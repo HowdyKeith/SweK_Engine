@@ -1,3 +1,60 @@
+## v3844 -- THE COCKPIT'S HIT VFX PORTED TO THE 3D FIGHT, AND THE PER-FRAME DRAG LEFT BEHIND
+
+Keith asked for cockpit.html's particle effect on the 3D dogfight. The spray is the easy half; the part worth
+taking is the RULE UNDER IT. cockpit's hit() absorbs damage into shields first and then picks the burst from the
+shield state AFTER absorption -- shields still up gives 6 cyan sparks, shields gone gives 12 red, and a kill adds
+40 amber ON TOP of the second rather than replacing it. So the shot that BREAKS a shield already throws hull-
+coloured debris, and a killing blow throws two bursts. es-box3d-fly3d already runs the same damage model
+(ev/combat.js applyDamage: shield absorbs, overflow hits armour, dead at armour <= 0), so the rule maps onto it
+without being invented.
+
+THE PURE HALF. render/hitBurst.js: burstsFor (which tiers a hit throws), spawnBurst (a burst as a pure function of
+its seed), stepBurst (integrate and retire), fadeOf and packPoints (fill a points buffer, colour already
+multiplied by the fade). No Three, no GL, no DOM, no Math.random.
+
+TWO THINGS DELIBERATELY NOT COPIED, AND THE SECOND IS A DEFECT IN THE SOURCE. (1) Math.random: a burst is a pure
+function of its seed here, off the tree's one integer hash (render/nebulaSkybox.js's, already shared by the
+skybox, star, planet and greeble), so the same hit throws the same debris and a gate can hold it still. (2) THE
+PER-FRAME DRAG. cockpit does `q.vx *= 0.94` ONCE PER FRAME, so its spray reaches further on a faster machine --
+the decay is per frame, not per second. Here drag is exponential in TIME and the position is its analytic integral
+(x += v*(1-e^-kdt)/k), which composes exactly: ONE STEP OF 0.1 s EQUALS TEN OF 0.01 s TO 3.3e-16, and a hundred of
+0.001 s to the same. Restoring cockpit's own per-frame form as a plant fires four checks.
+
+WHY NOT render/particleSystem.js, WHICH ALREADY EXISTS: that pool is raw WebGL -- it takes a `gl` context and owns
+its own instanced-billboard draw -- and its ImpactBurstEmitter is wired to the voxel eventBus. es-box3d-fly3d is a
+Three scene that already draws its shots as a Points cloud. Sharing a GL context between the two draw paths is not
+reuse, it is a state fight. So hitBurst.js owns ARITHMETIC ONLY and the page packs the result into a Points buffer.
+
+GATED in render/hitBurst-selfcheck.mjs, 37 checks, and the first one is the port itself: COCKPIT'S OWN hit() IS
+TRANSCRIBED INTO THE GATE and swept against burstsFor over all 3600 shield/armour/damage combinations. If the port
+drifts, that says so -- not somebody's memory of what the 2D page did. Also pinned: the shield-emptying shot is
+already a hull burst; a kill throws two bursts, hull first; the counts are the source's 6/12/40; the burst has no
+favoured direction and its polar fraction is the sphere's own 0.10 (a cube-normalised sampler gives 0.07, and that
+is a plant); speeds and lives stay inside their declared bands; inherit 0 reproduces cockpit exactly; the pool
+never exceeds its cap and drops the OLDEST first; stepping retires the expired without disturbing the survivors;
+packPoints stops at the buffer's edge. Five plants fire, tree restored each: read the tier from the shield BEFORE
+absorption; let a kill REPLACE the hull burst; restore the per-frame drag; normalise directions from a uniform
+cube; drop the pool cap.
+
+ONE ADDITION OVER THE SOURCE, NAMED AS ONE: debris carries 35 percent of the victim's velocity. cockpit does not
+(its ships are slow and its space is 2D); at this scene's speeds a burst that ignores the ship's motion visibly
+hangs in the air behind it. inherit 0 is cockpit's behaviour exactly, and the gate pins that.
+
+FRONT DOOR: es-box3d-fly3d, a Hit FX button. The burst is spawned at the SHOT's position -- the impact point, not
+the ship's centre -- and drawn as ONE Points draw over a 900-particle pool with per-particle size. Mock run at the
+scene's own scale (S = 0.01579): a Raider taking 26-damage hits reads shield, shield, shield, hull, hull,
+hull+kill -- exactly cockpit's cadence; 40 simultaneous kills fill the pool to its 900 cap; all debris retires
+1.30 s after the last hit.
+
+NOT CHECKED, AND NO HEADLESS CHECK CAN: whether it LOOKS right -- spark size, how bright additive blending reads
+against the nebula, whether 900 is too many or too few in a real brawl. Keith's first hard-reload; no GPU here.
+
+A PAIRED EDIT NAMED HERE FOR frozenReferee: render/hitBurst-selfcheck.mjs grades and imports its new subject
+render/hitBurst.js. The gate imports nothing else; nebulaSkybox.js did not change. es-box3d-fly3d.html changed
+only to wire the front door.
+
+CARRIED REDS: the same four measured byte-identical against pristine v3841 in v3842 (gateQuality, gateReach,
+registryOrphans, pageReach), unchanged again here. No device added. gate count 1092 -> 1093 (hitBurst-selfcheck).
 ## v3843 -- LONG SILENCE: GREEBLING AS AN EXACT PARTITION, AND SOMETHING TO FLY PAST
 
 The rest of Keith's element audit: greebling, and asteroids/stations/structures -- the three that were genuinely

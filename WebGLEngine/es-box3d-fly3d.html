@@ -11,7 +11,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck.">
+<meta name="demo:desc" content="Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.">
 <title>SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)</title>
 <style>
   html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
@@ -40,6 +40,7 @@
   <button id="starBtn" title="Procedural star baked from the same gradient+noise generator as the skybox: photosphere granulation + limb darkening + corona. Off = hidden" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9728; Star</button>
   <button id="reliefBtn" title="Cube-baked planet surface (v3842): baked normals from the height field's own gradient plus CPU-displaced vertices. Off = the smooth painted ball" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9968; Relief</button>
   <button id="structuresBtn" title="Asteroid belt and a greebled station (v3843): rocks placed with no interpenetration, hulls plated by an exact panel partition. Off = empty space" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9673; Structures</button>
+  <button id="hitfxBtn" title="Hit debris ported from cockpit.html (v3844): shields up throws cyan sparks, shields gone throws red, a kill adds amber on top. Off = no debris" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#10022; Hit FX</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
 </div>
 <div id="modelsPanel" style="position:fixed;top:40px;right:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:520px;max-height:80vh;overflow:auto;box-shadow:0 8px 30px #000a;"></div>
@@ -67,6 +68,7 @@ import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-m
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
 import { bakeSurfaceCubemap, sampleCubeScalar } from "/world/planetSurface.js";   // v3842 -- the surface, cube-baked with relief
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
+import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
 
 const CLASSES = [
@@ -108,13 +110,31 @@ function sideDriveShots(mine, foes, weights, esbx, dt, nowMs) {
   }
   return shots;
 }
+// v3844 -- HIT DEBRIS. The pool and the seed live here; the RULE (which bursts a hit throws, and that a kill
+// throws two) is render/hitBurst.js's, ported from cockpit.html and gated against cockpit's own hit(). The burst
+// is spawned at the SHOT's position -- the impact point, not the ship's centre -- and carries a share of the
+// victim's velocity so the debris trails the ship instead of hanging in the air.
+const hitParts = []; let burstSeed = 1, hitFxOn = true;
 function advanceShots(shots, ships, dt) {
   const rr = HIT_RADIUS * HIT_RADIUS, alive = [];
   for (const sh of shots) {
     sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.alt += (sh.valt || 0) * dt; sh.life -= dt;
     if (sh.life <= 0) continue;
     let hit = false;
-    for (const e of ships) { if (e.dead || e.team === sh.team) continue; const dx = e.x - sh.x, dy = e.y - sh.y, da = (e.alt || 0) - sh.alt; if (dx * dx + dy * dy + da * da <= rr) { if (applyDamage(e, SHOT.dmgShield, SHOT.dmgArmor)) e.dead = true; hit = true; break; } }
+    for (const e of ships) {
+      if (e.dead || e.team === sh.team) continue;
+      const dx = e.x - sh.x, dy = e.y - sh.y, da = (e.alt || 0) - sh.alt;
+      if (dx * dx + dy * dy + da * da <= rr) {
+        const tiers = burstsFor(e.shield || 0, e.armor || 0, SHOT.dmgShield + SHOT.dmgArmor);   // read BEFORE the damage lands
+        if (applyDamage(e, SHOT.dmgShield, SHOT.dmgArmor)) e.dead = true;
+        if (hitFxOn) {
+          const at = [sh.x * S, (sh.alt || 0) * S, sh.y * S];
+          const vel = [(e.vx || 0) * S, (e.valt || 0) * S, (e.vy || 0) * S];
+          for (const tier of tiers) spawnBurst(hitParts, at, vel, tier, burstSeed++);
+        }
+        hit = true; break;
+      }
+    }
     if (!hit) alive.push(sh);
   }
   return alive;
@@ -364,6 +384,29 @@ const shotGeo = new THREE.BufferGeometry(); shotGeo.setAttribute("position", new
 let shotPos = new Float32Array(0);
 scene.add(new THREE.Points(shotGeo, new THREE.PointsMaterial({ color: 0xbfe6ff, size: 3, sizeAttenuation: false, transparent: true, opacity: 0.95 })));
 
+// v3844 -- the debris cloud: one Points draw, a fixed pool, per-particle size and a colour already multiplied by
+// the fade (hitBurst.packPoints does that), additively blended so it reads as sparks against the nebula.
+const HIT_CAP = 900;
+const hitPos = new Float32Array(HIT_CAP * 3), hitCol = new Float32Array(HIT_CAP * 3), hitSize = new Float32Array(HIT_CAP);
+const hitGeo = new THREE.BufferGeometry();
+hitGeo.setAttribute("position", new THREE.BufferAttribute(hitPos, 3));
+hitGeo.setAttribute("aCol", new THREE.BufferAttribute(hitCol, 3));
+hitGeo.setAttribute("aSize", new THREE.BufferAttribute(hitSize, 1));
+hitGeo.setDrawRange(0, 0);
+const hitCloud = new THREE.Points(hitGeo, new THREE.ShaderMaterial({
+  uniforms: { uScale: { value: 1.6 } },
+  vertexShader: `attribute vec3 aCol; attribute float aSize; uniform float uScale; varying vec3 vC;
+    void main(){ vC = aCol; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_PointSize = aSize * uScale; }`,
+  fragmentShader: `precision highp float; varying vec3 vC;
+    void main(){ vec2 d = gl_PointCoord - 0.5; if (dot(d,d) > 0.25) discard; gl_FragColor = vec4(vC, 1.0); }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+}));
+hitCloud.frustumCulled = false; scene.add(hitCloud);
+{
+  const btn = document.getElementById("hitfxBtn");
+  if (btn) btn.onclick = () => { hitFxOn = !hitFxOn; if (!hitFxOn) hitParts.length = 0; btn.style.opacity = hitFxOn ? "1" : "0.5"; };
+}
+
 const NOSE = new THREE.Vector3(1, 0, 0), _fwd = new THREE.Vector3();
 const hulls = new Map();
 function clearHulls() { for (const h of hulls.values()) scene.remove(h); hulls.clear(); }
@@ -534,6 +577,14 @@ function syncScene() {
   for (const id of [...hulls.keys()]) if (!live.has(id)) { scene.remove(hulls.get(id)); hulls.delete(id); }
 
   const n = shots.length;
+  {   // v3844 -- advance the debris and refill its buffers (one draw, capped pool)
+    stepBurst(hitParts, dt, { cap: HIT_CAP });
+    const live = packPoints(hitParts, hitPos, hitCol, hitSize);
+    hitGeo.setDrawRange(0, live);
+    hitGeo.attributes.position.needsUpdate = true;
+    hitGeo.attributes.aCol.needsUpdate = true;
+    hitGeo.attributes.aSize.needsUpdate = true;
+  }
   if (shotPos.length !== n * 3) shotPos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { shotPos[i*3] = shots[i].x * S; shotPos[i*3+1] = (shots[i].alt || 0) * S; shotPos[i*3+2] = shots[i].y * S; }
   shotGeo.setAttribute("position", new THREE.BufferAttribute(shotPos, 3));
