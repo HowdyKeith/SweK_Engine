@@ -100,7 +100,22 @@ function buildSpatial({ mode = "agreement", config = {} } = {}) {
 export const spatialAgreementDevice = {
     modes: ["agreement", "supersetbox"],
     name: "spatial-five-way-agreement", observables: SPATIAL_OBSERVABLES, build: buildSpatial,
-    defaults: ({ mode } = {}) => ({ mode: mode === "supersetbox" ? mode : "agreement", config: { ...DEF } }),
+    // *** v3854 -- IT REFUSES AN UNDECLARED MODE NOW, AND IT USED TO HAND THE NAME STRAIGHT BACK. ***
+    // The old line was `mode: mode || "agreement"`, which returns ANY truthy name as though the device offered
+    // it -- deviceModes-selfcheck's `checkMode(d, "zzz_not_a_mode_zzz")` saw acceptance, and `spatial` sat on
+    // that gate's UNGUARDED_BASELINE. Guarding it was the PLANT'S PRECONDITION and not a side errand: v3806's
+    // lesson, quoted in that gate, is that a validator which silently rewrites the mode makes both arms read
+    // an identical number, so the plant appears to fire and changes nothing.
+    // *** AND I WALKED INTO EXACTLY THAT ON splatBind THIS SAME ROUND *** -- a second copy of the mode list
+    // inside its defaults() coerced the new plant mode to the primary and the two arms came back bit-identical.
+    // The lesson was written down at v3806 and cost a debugging round anyway at v3854.
+    // NULL, NOT A COERCION: beamBind returns null for an undeclared mode and that is the behaviour the gate
+    // calls correct -- coercing to the primary passes the same check while still answering a question nobody
+    // asked.
+    defaults: ({ mode } = {}) => {
+        const m = mode ?? "agreement";
+        return ["agreement", "supersetbox"].includes(m) ? { mode: m, config: { ...DEF } } : null;
+    },
     // `boxExtraPairs` 0 -> the count below. NOT `boxFamilyAgrees`, which is the boolean this device has always
     // carried and which the census cannot grade; NOT `boxMissingPairs`, which stays EXACTLY 0 under this plant
     // because a superset misses nothing -- and a declaration pointed at an observable that does not move is
