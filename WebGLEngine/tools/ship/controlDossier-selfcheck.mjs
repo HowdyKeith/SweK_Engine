@@ -32,12 +32,26 @@ const dos = D.controlDossier(ENG, cen);
 
 // ---- 1. THE CENSUS WAS REPORTING TWO NUMBERS UNDER ONE NAME ---------------------------------------------------
 {
-    ok("!! *** the census now names OCCURRENCES and DISTINCT CONTROLS separately ***",
-        cen.total === 114 && cen.distinct === 103 && cen.total !== cen.distinct,
-        "total counted OCCURRENCES while ids was DEDUPLICATED, so it reported 114 while its own list held 103 " +
-        "-- and per file, count disagreed with ids.length for the same reason. TWO THINGS WEARING ONE LABEL, in " +
-        "a module I shipped at v3138 TO FIX A NUMBER THAT WAS WRONG. The queue has said '114 controls' ever " +
-        "since; the actionable list is 103");
+    // *** v3900 -- THE PROPERTY IS ASSERTED, NOT THE DAY'S MEASUREMENT. *** This read
+    // `cen.total === 114 && cen.distinct === 103` -- two numbers frozen into a condition -- and it went red
+    // because THE TREE GOT BETTER: the census is 91/81 now, and it fell because pages KEEP LEAVING IT. Every
+    // conversion to ui/roundTrip.js removes a file from the census by design (v3846 moved spacedesk and said
+    // so at the time), so a literal here turns progress into a failure. Same shape the parallel line found in
+    // coverageTriage at its v3853, which asserted `rawFraction < 0.70` and went red when coverage improved to
+    // 73.7%.
+    //
+    // WHAT THE ROUND WAS ABOUT SURVIVES AND IS WHAT GETS CHECKED: total counts OCCURRENCES, distinct counts
+    // CONTROLS, they are reported under separate names, and they DIFFER -- which is the whole finding, because
+    // one label carrying both is what made the queue say "114 controls" when the actionable list was 103. The
+    // numbers move; the confusion is what must not come back.
+    ok("!! *** the census names OCCURRENCES and DISTINCT CONTROLS separately, and they differ ***",
+        Number.isInteger(cen.total) && Number.isInteger(cen.distinct) &&
+        cen.total > 0 && cen.distinct > 0 && cen.total > cen.distinct,
+        cen.total + " occurrences over " + cen.distinct + " distinct controls, " + (cen.total - cen.distinct) +
+        " of them assigned more than once in one file. TWO THINGS WEARING ONE LABEL, in a module shipped at " +
+        "v3138 TO FIX A NUMBER THAT WAS WRONG -- the queue said '114 controls' while the actionable list held " +
+        "103. *** THE COUNTS ARE REPORTED, NOT PINNED: they were 114/103 when this was written and fall every " +
+        "time a page converts to ui/roundTrip.js and leaves the census. ***");
 
     ok("...and per file the two agree with their own names",
         cen.perFile.every((f) => f.count >= f.distinct && f.distinct === f.ids.length),

@@ -17,6 +17,11 @@
 // included, and writes WebGLEngine/corpus.txt -- which the bridge already serves, so the thing has a URL rather
 // than being a file somebody has to be told about.
 //
+// v3900 -- textYield NOW TAKES { html } AND THE CORPUS PASSES false. The paragraph below describes what it
+// does to an HTML DASHBOARD, which is still exactly right for server.html and no longer applies to the corpus:
+// Markdown and JSON have no markup to strip, and every `<` in the changelog is prose. Applying the HTML rules
+// to it removed 95% of BACKLOG.md and the corpus SHIPPED that way -- see corpus.mjs's note at textYield.
+//
 // WHAT textYield DOES AND DOES NOT MEASURE, because a ratio is easy to over-read. It strips script and style
 // ELEMENTS and then all markup, and answers "how much of this file survives as prose". That is a DETECTOR FOR
 // MARKUP SHELLS. Applied to plain text it UNDER-reports, because angle brackets in prose and in code samples
@@ -36,7 +41,7 @@ let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 
 const { text, blocks, missing } = buildCorpus();
-const corpus = textYield(text);
+const corpus = textYield(text, { html: false });   // v3900 -- Markdown + JSON, not markup
 const dash = textYield(fs.readFileSync(path.join(ENG, "server.html"), "utf8"));
 
 // ---- 1. THE FINDING, MEASURED -------------------------------------------------------------------------------------
@@ -56,9 +61,14 @@ const dash = textYield(fs.readFileSync(path.join(ENG, "server.html"), "utf8"));
     // THE RATIO IS NOT A QUALITY SCORE AND THIS FILE REFUSES TO TREAT IT AS ONE.
     ok("...and the corpus ratio is BELOW 100% for a stated reason, not a suspicious one",
         corpus.ratio > 0.4 && corpus.ratio < 1.0,
-        (100 * corpus.ratio).toFixed(1) + "%. textYield eats angle brackets, so prose and code samples containing " +
-        "< or > are stripped as if they were markup. That is fine for its real job -- telling a shell apart from " +
-        "a document -- and it is why the assertion above is on absolute bytes instead");
+        (100 * corpus.ratio).toFixed(1) + "%. WHAT IS LEFT IS WHITESPACE COLLAPSE AND NOTHING ELSE: the corpus " +
+        "is Markdown and JSON, so textYield is called with html:false and no tag rule touches it. *** UNTIL " +
+        "v3900 THIS READ 10.6% AND THE NOTE HERE BLAMED ANGLE BRACKETS. IT WAS THE <script> RULE, which ate " +
+        "3,447,633 characters -- 95% -- of BACKLOG.md, because the changelog DISCUSSES `<script src>` and a " +
+        "non-greedy span closed on a </script> thousands of lines later. v3126 learned that exact shape when " +
+        "the same construction deleted 965,179 characters of server.js, and this file kept it. *** The ratio " +
+        "stays below 100% because collapsing runs of whitespace is real, and the assertion above is on " +
+        "absolute bytes because a ratio was never the claim");
 }
 
 // ---- 2. EVERY BLOCK SAYS WHERE IT CAME FROM AND WHY ----------------------------------------------------------------
