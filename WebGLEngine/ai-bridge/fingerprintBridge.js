@@ -283,6 +283,78 @@ function handle(req, res) {
         });
         return true;
     }
+    // v3848 -- THE DISPATCH ROUTE, WHICH IS THE HALF officeManager HAS BEEN MISSING SINCE v3824.
+    //
+    // *** IT DECIDED, AND NOTHING LISTENED. *** officeManager answers "what runs next, on whom, and when is a
+    // human woken" and its only consumer was office-floor.html -- a page that DRAWS the answer. curriculum has
+    // /curriculum/run; the manager had no route at all, so on a live fleet it arbitrated nothing. This is the
+    // loop's tick: read the registers, ask the manager, post the result to the queue peers actually claim from.
+    //
+    // THE DECISION IS NOT MADE HERE. Everything between the read and the write lives in
+    // tools/roundhouse/officeDispatch.mjs so it can be graded headless; this handler is plumbing and is allowed
+    // to be dull. What it adds is the two things a route must do and a pure module cannot: say WHERE each
+    // register came from, and refuse to write when asked not to.
+    //
+    // POST because it MUTATES THE QUEUE. `{ dryRun: true }` plans and returns without writing, which is how an
+    // operator sees what a tick would do before letting a loop do it on a timer.
+    if (req.method === "POST" && url === "/office/dispatch") {
+        let body = "";
+        req.on("data", (d) => { body += d; if (body.length > 2 * 1024 * 1024) req.destroy(); });
+        req.on("end", async () => {
+            try {
+                const j = JSON.parse(body || "{}");
+                const fs = await import("node:fs"); const path = await import("node:path");
+                const { readQ, writeQ, MODES } = await jobsIO();
+                const D = await import("../tools/roundhouse/officeDispatch.mjs");
+                const sources = {};
+                const queue = readQ(); sources.queue = "tools/roundhouse/" + JOB_QUEUE_FILE;
+
+                // FLEET: the lighthouse roster, whose rows carry the activity each peer reported. A peer that
+                // reported nothing lands in officeManager's UNKNOWN bucket, never IDLE -- silence is not consent.
+                let fleet = j.fleet;
+                if (Array.isArray(fleet)) sources.fleet = "request body";
+                else {
+                    let roster = { peers: {} };
+                    try { roster = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools", "roundhouse", "lighthouse-roster.json"), "utf8")); } catch {}
+                    fleet = D.fleetFromRoster(roster); sources.fleet = "tools/roundhouse/lighthouse-roster.json";
+                }
+
+                // FRONTIER: curriculum's proposals. Calling propose() is the slow part of a tick, so a caller may
+                // supply one it already has -- a loop that just ran /curriculum/run should not pay for it twice.
+                let frontier = j.frontier;
+                if (frontier) sources.frontier = "request body";
+                else {
+                    const c = await import("../tools/roundhouse/curriculum.mjs");
+                    frontier = await c.propose({ perKind: Math.min(5, Math.max(1, j.perKind || 1)) });
+                    sources.frontier = "curriculum.propose()";
+                }
+
+                // LEDGER: existence-only, subject -> record. *** THERE IS NO FILE FOR THIS AND ONE IS NOT INVENTED
+                // HERE. *** officeManager's own header warns against a seventh register nobody asked for, and a
+                // settled-subject ledger is properly the curriculum's to own. Absent one, the manager sees an
+                // EMPTY ledger and treats every proposal as open -- which is safe, because the idempotence guard
+                // in officeDispatch stops the same subject being queued twice regardless. Reported, not hidden.
+                const ledger = (j.ledger && typeof j.ledger === "object") ? j.ledger : {};
+                sources.ledger = j.ledger ? "request body" : "EMPTY -- no settled-subject register exists yet";
+
+                const plan = D.planDispatch({ frontier, queue, fleet, ledger, budget: j.budget || null,
+                                              maxAssignments: Number.isFinite(j.max) ? j.max : Infinity }, { modes: MODES });
+                let added = [];
+                if (j.dryRun) { sources.write = "SKIPPED -- dryRun"; }
+                else { const ap = D.applyDispatch(queue, plan.specs, { modes: MODES }); writeQ(ap.queue); added = ap.added; sources.write = sources.queue; }
+
+                sendJson({ ok: true, sources, added,
+                           assignments: plan.result.assignments.map((a) => ({ peer: a.peer, subject: a.proposal.subject, kind: a.proposal.kind })),
+                           held: plan.held, invalid: plan.invalid,
+                           // THE ESCALATIONS COME BACK AS DATA AND THIS ROUTE DOES NOT DELIVER THEM. The sink is
+                           // injected by design (officeManager's header); wiring it to the outbox is a decision
+                           // with a network in it and is Keith's, not a side effect of adding a dispatcher.
+                           escalations: plan.result.escalations,
+                           lines: D.dispatchLines(plan, added) });
+            } catch (e) { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); }
+        });
+        return true;
+    }
     // v2968 -- MESH EXCHANGE. The merge module has existed since v2965 with nothing able to reach it; this is the
     // route that makes two hubs actually gossip. It is SYMMETRIC: the caller sends its ledgers, we merge them
     // into ours, and we return ours so the caller can do the same. One round trip, both sides converge.
