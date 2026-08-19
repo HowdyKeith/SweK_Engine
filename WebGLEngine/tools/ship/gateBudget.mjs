@@ -85,6 +85,18 @@ export const MEASURED = {
     // headroom on the SMALLER measurement is deliberately the conservative choice, because being killed is a
     // visible failure and a budget nobody notices is not.
     "tools/roundhouse/labResults-selfcheck.mjs":      94282,
+    // *** MEASURED AT v3853, STOPWATCH-TIMED ON AN IDLE BOX: 555s, AND IT PASSES. Its own header said
+    // "~25s -- MEASURED". *** It spawns every row of reportingTools' REPORTING registry, so it grows
+    // with the registry and the 25s was true of a much smaller one. THE COST OF THE MISSING ENTRY WAS
+    // NOT SLOWNESS, IT WAS SILENCE: at 143s (the general default) the suite killed it, A TIMEOUT IS NOT
+    // A FAILURE and NEVER RUN IS DISTINCT FROM PASS -- so the two real failures it was carrying went
+    // unreported for as long as it has been over budget. This is the fourth gate the v3212 table has
+    // caught being killed rather than broken.
+    //
+    // AND THE MEASUREMENT IS OF THE FIXED GATE, WHICH IS THE SMALLER NUMBER: v3853 also stopped section
+    // 1 running every tool twice (562s with one run still red, 555s green), so this is not a budget
+    // raised to fit a gate that was never trimmed.
+    "tools/ship/toolFrontDoor-selfcheck.mjs":        555000,
 };
 
 export const TAIL_HEADROOM = 2;

@@ -296,14 +296,18 @@ export function buildBlob(hyp, base = {}) {
 }
 
 export const blobThermalDevice = {
+    // *** v3851 -- KNOB, AND IT IS WORTH SAYING WHY IT IS NOT A READER, BECAUSE ITS SHAPE INVITES THAT. ***
+    // axisFactor is the 2 in Einstein-Smoluchowski, and a wrong factor in an MSD *inference* would be a
+    // reader plant (v3850 planted exactly that on `thermal`: <r^2> = 4*alpha*t read as 2*alpha*t). HERE IT
+    // GOES THE OTHER WAY: axisFactor feeds jitterCentres, where sigma = sqrt(axisFactor*D*dt) is THE STEP
+    // SIZE OF THE WALK. The particles genuinely move differently; the measurement of them is untouched.
+    // SAME CONSTANT, OPPOSITE SIDE OF THE INSTRUMENT, OPPOSITE KIND.
+    plantKind: "knob",
+    // *** v3851 -- `plantKind` IS THE TAXONOMY; `planted.knob` BELOW IS THE CONFIG KEY. Two different
+    // things wearing one word, and gates read the second by name, so it is NOT renamed here. ***
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose.
     // The floor mode is NOT listed: it is blind to this knob BY DESIGN, and claiming it as coverage would be
     // counting an invariant that never looked.
-    // v3851 -- KNOB PLANT, DECLARED. axisFactor is handed to jitterCentres, so it scales the STEP THE
-    // WALKERS ACTUALLY TAKE; the reading (msd / (6 t)) is untouched. The walk is a physics input and the whole
-    // path from it to dErrFrac is graded. NOT a reader plant, even though the defect is an Einstein-
-    // Smoluchowski factor -- the factor is applied to the motion, not to the inference from it.
-    plantKind: "knob",
     planted: { knob: "axisFactor", observable: "dErrFrac",
                note: "sqrt(D*dt) instead of sqrt(2*D*dt) -- walks at half the commanded D; dErrFrac 0.0070 -> 0.5035" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were

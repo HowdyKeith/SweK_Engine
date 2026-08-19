@@ -61,6 +61,27 @@ say(r.covered.length + " of " + r.registered + " binds carry a live planted erro
     // A WALL IS ONLY AFFORDABLE AT ZERO -- the platformRequires precedent. The only way to break it is a NEW
     // plant arriving undeclared, which is exactly when somebody should be made to read the bind. READ THE BIND
     // AND DECLARE; NEVER RAISE A BASELINE.
+    //
+    // *** v3851 -- THE WALL DID ITS JOB. SIX NEW PLANTS HAD ARRIVED UNDECLARED SINCE v3400, AND READING THEM
+    // CORRECTED THE TAXONOMY A SECOND TIME. *** born, crystallize, blobkelvin and blobthermal are KNOB plants
+    // (a refractive-index model, a periodic boundary condition, a STICK-vs-SLIP drag law, and the Einstein
+    // factor that sets a random walk's step size). TWO ARE NOT, and the default would have been wrong about
+    // both:
+    //   chaos      READER. logistic.js's lyapunov() advances the orbit with `x = logistic(r, x)`, which the
+    //              plant never touches; slopeOfMap enters ONLY the sum. The dynamics run identically and the
+    //              measurement is corrupted -- v3400's reader shape exactly, and its own header calls the
+    //              planted arm "THE PLANTED INSTRUMENT" four times.
+    //   blobbodies METHOD, the second one this tree has found after seismic. The advection law is right and
+    //              the centroid reading is right; the DEPARTURE POINT IS EVALUATED by rounding to the nearest
+    //              voxel instead of interpolating, and since v*dt is a quarter of a cell the field never
+    //              moves. No law replaced, no measurement substituted -- a discretisation choice inside a
+    //              correct scheme.
+    //
+    // *** SO THE COUNT SINCE v3393 IS: THE BINARY WAS WRONG ONCE (v3400, seismic) AND WOULD HAVE BEEN WRONG
+    // TWICE MORE HERE. blobthermal is the sharpest of them -- axisFactor is the SAME CONSTANT v3850 planted on
+    // `thermal` as a READER (an MSD read with the wrong factor), and here it sets the WALK'S STEP SIZE
+    // instead. SAME CONSTANT, OPPOSITE SIDE OF THE INSTRUMENT, OPPOSITE KIND, and only reading the bind can
+    // tell you which. ***
     ok("!! *** every planted bind DECLARES its kind -- undeclared is a WALL at zero ***",
         (r.byKind.undeclared || 0) === 0 && (r.byKind.knob || 0) > 0 &&
         (r.byKind.reader || 0) > 0 && (r.byKind.method || 0) > 0,
@@ -122,15 +143,36 @@ say(r.covered.length + " of " + r.registered + " binds carry a live planted erro
 
 // ---- 5. THE CENSUS IS ABOUT THE CONVENTION AND MUST NOT BE READ AS A QUALITY SCORE ------------------------
 {
-    // Named here so a future reader cannot mistake one for the other, with the antidote stated.
-    const knownGoodNegativesWithoutAPlant = ["galaxy", "geostats", "md", "volume", "friction", "figureeight"];
-    const present = knownGoodNegativesWithoutAPlant.filter((n) => r.uncovered.includes(n) || !D.DEVICE_NAMES.includes(n));
-    ok("!! devices with an excellent negative in another form still read UNCOVERED here, on purpose",
-        present.length === knownGoodNegativesWithoutAPlant.length,
-        "galaxy, geostats, md, volume, friction, figureeight all carry load-bearing negatives and none of them " +
-        "uses the `planted` convention. *** WHEN SOMEBODY UNIFIES THE TWO NOTIONS THIS LINE SHOULD GO RED AND " +
-        "BE DELETED, NOT WEAKENED -- and the honest unification is to give those devices a plant, never to " +
-        "widen the census until the number looks better. ***");
+    // *** v3852 -- THE LINE THAT STOOD HERE IS DELETED, WHICH IS WHAT IT ASKED FOR. *** It named galaxy,
+    // geostats, md, volume, friction and figureeight as devices carrying load-bearing negatives that did not
+    // use the `planted` convention, and said: "WHEN SOMEBODY UNIFIES THE TWO NOTIONS THIS LINE SHOULD GO RED
+    // AND BE DELETED, NOT WEAKENED -- and the honest unification is to give those devices a plant, never to
+    // widen the census until the number looks better." All five real ones have a plant now, so it went red and
+    // it is gone rather than adjusted.
+    //
+    // *** TWO THINGS READING THEM ESTABLISHED, KEPT BECAUSE THEY ARE WHY THE LINE WAS RIGHT: ***
+    //
+    // (1) `volume` WAS NEVER A DEVICE. No volumeBind, not in devices.mjs, no trace in the changelog. The old
+    //     filter passed it through `|| !D.DEVICE_NAMES.includes(n)`, so a name that never existed was a
+    //     PERMANENT PASS and that sixth entry asserted nothing for as long as it stood. AN ESCAPE CLAUSE ADDED
+    //     FOR ROBUSTNESS MADE ONE SIXTH OF THE CHECK VACUOUS, and only counting the real ones found it.
+    //
+    // (2) NONE OF THE FIVE NEGATIVES WAS A PLANT, and the census was right to keep reading them as uncovered.
+    //     friction's zeroMu and md's alphaFree move their observable TO its ideal -- CONTROLS. figureeight's
+    //     perturbed and geostats' screen vary a legitimate INPUT, so nothing is implemented wrongly in either
+    //     arm. galaxy's oneway is an exact structural identity whose own header says it "needs no sabotage".
+    //     A PLANT HAS TO BE A WRONG METHOD ON THE RIGHT PROBLEM, and none of these was, so the work was to
+    //     BUILD FIVE, not to relabel five.
+    //
+    // (3) AND ONE OF THEM DID NOT FIT THE CONTROL CONTRACT EITHER. friction's zeroMuRatio is a SEPARATION
+    //     demonstration -- "these two must be far apart", reading 1.6e17 -- and the control contract wants an
+    //     observable that REACHES a stated ideal. It was declared wrong first and probeControlMode refused it
+    //     by name. The control is declared on travelHalfMu -> 0 instead, which is a value something reaches.
+    //     THE TAXONOMY HAS A THIRD SHAPE AND THE CENSUS HAS NO CATEGORY FOR IT; that is recorded, not forced.
+    ok("!! the census counts plants and NEVER folds a control into the number",
+        (r.controls || []).length >= 1 && !(r.covered || []).some((c) => (r.controls || []).some((k) => k.name === c.name && !c.plantKind)),
+        "a subject with a good control and no plant has not been shown to CATCH anything, so controls are " +
+        "probed separately, reported separately, and kept out of the coverage total on purpose");
 }
 
 console.log(failed ? "\n[plantedCoverage-selfcheck] FAILED " + failed : "\n[plantedCoverage-selfcheck] all checks pass");

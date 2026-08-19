@@ -13,7 +13,15 @@
 
 // Resolve a particle set against a static plane (n . x = d, n unit) with Coulomb friction. Mutates pred; prev is the
 // pre-step position, used to measure the tangential motion to resist.
-export function solvePlaneFriction(pred, prev, invMass, n, d, mu) {
+/**
+ * *** v3852 -- `constantBound` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON WHAT MAKES THIS COULOMB
+ * FRICTION RATHER THAN A DRAG CAP: THE BOUND IS PROPORTIONAL TO THE NORMAL LOAD. *** maxFric = mu * depth is
+ * the whole law -- press harder, hold harder. Replacing it with a constant mu still sticks, still slides,
+ * still bounds the tangential correction, and still produces a perfectly ordinary trajectory. WHAT IT LOSES
+ * IS THE ONLY THING THE DEVICE MEASURES: the transition stops sitting at tan(theta) = mu, because the bound
+ * no longer scales with the slope's normal component. Every existing figure is unchanged at the default.
+ */
+export function solvePlaneFriction(pred, prev, invMass, n, d, mu, { constantBound = false } = {}) {
     const nx = n[0], ny = n[1], nz = n[2], N = invMass.length;
     for (let i = 0; i < N; i++) {
         if (invMass[i] === 0) continue;
@@ -28,7 +36,7 @@ export function solvePlaneFriction(pred, prev, invMass, n, d, mu) {
         dxx -= dn * nx; dxy -= dn * ny; dxz -= dn * nz;   // tangential component
         const tLen = Math.sqrt(dxx * dxx + dxy * dxy + dxz * dxz);
         if (tLen < 1e-12) continue;
-        const maxFric = mu * depth;
+        const maxFric = constantBound ? mu : mu * depth;   // v3852 -- the plant drops the normal-load factor
         const scale = tLen <= maxFric ? 1 : maxFric / tLen;   // static: cancel all; kinetic: bounded by mu*depth
         pred[o] -= scale * dxx; pred[o + 1] -= scale * dxy; pred[o + 2] -= scale * dxz;
     }
@@ -41,7 +49,7 @@ export function planeFrictionSubstep(state, n, d, mu, opts = {}) {
     const dt = opts.dt ?? 0.016, g = opts.gravity || [0, -10, 0];
     const pred = new Float64Array(pos.length), prev = Float64Array.from(pos);
     for (let a = 0; a < N; a++) { const o = 3 * a; if (invMass[a] > 0) { vel[o] += g[0] * dt; vel[o + 1] += g[1] * dt; vel[o + 2] += g[2] * dt; pred[o] = pos[o] + vel[o] * dt; pred[o + 1] = pos[o + 1] + vel[o + 1] * dt; pred[o + 2] = pos[o + 2] + vel[o + 2] * dt; } else { pred[o] = pos[o]; pred[o + 1] = pos[o + 1]; pred[o + 2] = pos[o + 2]; } }
-    solvePlaneFriction(pred, prev, invMass, n, d, mu);
+    solvePlaneFriction(pred, prev, invMass, n, d, mu, { constantBound: !!opts.constantBound });
     for (let a = 0; a < N; a++) { const o = 3 * a; if (invMass[a] > 0) { vel[o] = (pred[o] - prev[o]) / dt; vel[o + 1] = (pred[o + 1] - prev[o + 1]) / dt; vel[o + 2] = (pred[o + 2] - prev[o + 2]) / dt; } pos[o] = pred[o]; pos[o + 1] = pred[o + 1]; pos[o + 2] = pred[o + 2]; }
     return state;
 }

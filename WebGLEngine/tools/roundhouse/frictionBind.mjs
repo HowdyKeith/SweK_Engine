@@ -35,7 +35,19 @@ export const FRICTION_OBSERVABLES = [
 ];
 
 const DEF = { mu: 0.5, steps: 200, dt: 0.016 };
-export const FRICTION_MODES = ["critical", "stickSlide", "zeroMu", "monotone"];
+// *** v3852 -- `constantbound` IS THE PLANT, AND `zeroMu` IS A CONTROL RATHER THAN ONE. *** plantedCoverage
+// read this device as UNCOVERED while its header advertised a LOAD-BEARING NEGATIVE, and the census was right
+// by its own discriminator: A CONTROL MOVES THE OBSERVABLE TO ITS IDEAL AND A PLANT MOVES IT AWAY. zeroMu
+// sets mu = 0 and recovers FULL frictionless travel -- zeroMuRatio goes TO 1 -- which proves the apparatus
+// and shows the Coulomb bound is not leaking. That is worth having and IT IS NOT COVERAGE: a subject with a
+// good control and no plant has not been shown to CATCH anything. Both are now declared, separately, which is
+// exactly how the census accounts for them.
+//
+// THE PLANT: maxFric = mu instead of mu * depth. Coulomb friction IS the proportionality to normal load --
+// press harder, hold harder -- and a constant bound still sticks, still slides, and still produces an
+// ordinary trajectory. What it loses is the only thing this device measures: the transition stops sitting at
+// tan(theta) = mu, because the bound no longer scales with the slope's normal component.
+export const FRICTION_MODES = ["critical", "stickSlide", "zeroMu", "monotone", "constantbound"];
 
 export function frictionDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
@@ -43,10 +55,10 @@ export function frictionDefaults(cfg = {}) {
 }
 
 /** Distance travelled down a slope of tangent s under friction mu. */
-function travel(s, mu, steps = DEF.steps, dt = DEF.dt) {
+function travel(s, mu, steps = DEF.steps, dt = DEF.dt, constantBound = false) {
     const st = { pos: new Float64Array([0, 0, 0]), vel: new Float64Array([0, 0, 0]), invMass: new Float64Array([1]) };
     const n = slopeNormal(s);
-    for (let i = 0; i < steps; i++) planeFrictionSubstep(st, n, 0, mu, { dt, gravity: [0, -10, 0] });
+    for (let i = 0; i < steps; i++) planeFrictionSubstep(st, n, 0, mu, { dt, gravity: [0, -10, 0], constantBound });
     return Math.hypot(st.pos[0], st.pos[1], st.pos[2]);
 }
 
@@ -57,11 +69,11 @@ function travel(s, mu, steps = DEF.steps, dt = DEF.dt) {
  * bisecting against exact zero would chase round-off and never converge. The threshold sits fifteen orders
  * above the noise and fifteen orders below the sliding case, so no plausible value of it changes the answer.
  */
-function criticalSlope(mu) {
+function criticalSlope(mu, constantBound = false) {
     let lo = 1e-3, hi = 4;
     for (let i = 0; i < 40; i++) {
         const mid = (lo + hi) / 2;
-        if (travel(mid, mu) > 1e-3) hi = mid; else lo = mid;
+        if (travel(mid, mu, DEF.steps, DEF.dt, constantBound) > 1e-3) hi = mid; else lo = mid;
     }
     return (lo + hi) / 2;
 }
@@ -103,14 +115,29 @@ export async function buildFriction(args = {}) {
         return { ...NONE, mu, monotoneViolations: bad, travelZeroMu: ts[0], travelHalfMu: ts[ts.length - 1] };
     }
 
-    const crit = criticalSlope(mu);
+    // The plant runs THIS fixture -- same mu, same bisection, same threshold -- and changes only the friction
+    // LAW, so the separation belongs to the physics and not to a second experiment.
+    const crit = criticalSlope(mu, mode === "constantbound");
     return { ...NONE, mu, criticalSlope: crit, criticalKey: mu,
              criticalErrAbs: Math.abs(crit - mu), criticalErrFrac: Math.abs(crit - mu) / mu };
 }
 
 export const frictionDevice = {
     name: "coulomb-friction-bifurcation",
+    // "critical" stays FIRST: it owns criticalErrFrac, and the contract compares the plant against modes[0].
     modes: FRICTION_MODES,
+    plantMode: "constantbound", plantFlips: "criticalErrFrac", plantKind: "knob",
+    // *** AND THE CONTROL IS DECLARED SEPARATELY AND COUNTED SEPARATELY, ON travelHalfMu AND NOT ON
+    // zeroMuRatio -- WHICH I GOT WRONG FIRST AND THE CONTRACT CAUGHT. *** I read "mu = 0 must recover FULL
+    // travel" as an observable REACHING 1 and declared zeroMuRatio with ideal 1. It is the opposite: the
+    // header says the failure is the ratio being NEAR 1, and it honestly reads 1.6e17. probeControlMode
+    // refused it by name ("zeroMuRatio did not reach 1"), which is the control contract doing exactly its job.
+    //
+    // zeroMuRatio is a SEPARATION demonstration -- "these two must be far apart" -- and the census has no
+    // category for that, so it is not forced into one. What IS a reach-the-ideal control is the other half of
+    // the same mode: on a slope of tangent 1.0 under mu = 2.0 the particle is EXACTLY stuck, travelHalfMu
+    // 3.07e-19, which is zero in a float. The bound does not leak, and that is a value an observable reaches.
+    controlMode: "zeroMu", controlPerfects: "travelHalfMu", controlIdeal: 0,
     observables: FRICTION_OBSERVABLES,
     build: buildFriction,
     defaults: frictionDefaults,

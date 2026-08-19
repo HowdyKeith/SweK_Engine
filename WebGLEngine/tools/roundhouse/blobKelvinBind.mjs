@@ -85,12 +85,14 @@ export function buildKelvin(hyp, base = {}) {
 }
 
 export const blobKelvinDevice = {
+    // *** v3851 -- KNOB, and blobKelvin.js says so in its own words: "Stokes drag on a sphere is 6*pi*eta*r
+    // under a STICK (no-slip) boundary condition and 4*pi*eta*r under a SLIP one. BOTH ARE REAL PHYSICS."
+    // The plant swaps STICK for SLIP. A boundary condition on the drag law is a physics input if anything is.
+    plantKind: "knob",
+    // *** v3851 -- `plantKind` IS THE TAXONOMY; `planted.knob` BELOW IS THE CONFIG KEY. Two different
+    // things wearing one word, and gates read the second by name, so it is NOT renamed here. ***
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose:
     // the calibration moves by exactly 3/2 while the round trip stays exact.
-    // v3851 -- KNOB PLANT, DECLARED. dragK is a coefficient in the SCENARIO the run is handed -- slip drag
-    // in place of stick -- so it perturbs the physics upstream of every observable and the whole path to
-    // boilingKelvin is graded.
-    plantKind: "knob",
     planted: { knob: "dragK", observable: "boilingKelvin",
                note: "slip drag (4*pi*eta*r) instead of stick (6*pi); roundTripErrFrac is blind to it, and roomTravelFrac becomes impossible at 1.1784" },
     // v3191 -- EXPORTED so nothing has to GUESS. A probed mode count is a LOWER BOUND: you can only ask

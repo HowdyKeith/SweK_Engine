@@ -73,7 +73,14 @@ export function solve(A, b) {
 // ---- ordinary kriging -----------------------------------------------------------------------------------
 // samples: [{ at: [x,y,...], value }]
 // Returns { value, variance, weights, lagrange, exact } -- or null when the system cannot be solved.
-export function ordinaryKriging(samples, query, gamma, { exactTol = 1e-12 } = {}) {
+/**
+ * *** v3852 -- `noConstraint` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE LAGRANGE ROW. *** Dropping
+ * the border solves G w = g0 instead of the bordered system -- which is SIMPLE kriging with an assumed-known
+ * mean, applied where ORDINARY kriging is required. It is the single most common mistake in a kriging
+ * implementation, it produces finite well-behaved weights, and the only thing wrong with them is that THEY DO
+ * NOT SUM TO ONE, so the estimator is no longer unbiased. Every existing figure is unchanged at the default.
+ */
+export function ordinaryKriging(samples, query, gamma, { exactTol = 1e-12, noConstraint = false } = {}) {
     const n = samples.length;
     if (n === 0) return null;
 
@@ -100,9 +107,13 @@ export function ordinaryKriging(samples, query, gamma, { exactTol = 1e-12 } = {}
     const b = samples.map((s) => gamma(dist(s.at, query)));
     b.push(1);
 
-    const x = solve(A, b);
+    // THE PLANT: strip the bordered row and column, so sum(w) = 1 is never imposed.
+    const Asolve = noConstraint ? A.slice(0, n).map((row) => row.slice(0, n)) : A;
+    const bsolve = noConstraint ? b.slice(0, n) : b;
+
+    const x = solve(Asolve, bsolve);
     if (!x) return null;
-    const weights = x.slice(0, n), lagrange = x[n];
+    const weights = x.slice(0, n), lagrange = noConstraint ? 0 : x[n];
 
     let value = 0;
     for (let i = 0; i < n; i++) value += weights[i] * samples[i].value;

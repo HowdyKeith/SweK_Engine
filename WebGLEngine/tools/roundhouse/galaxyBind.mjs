@@ -41,7 +41,18 @@ import { makeGalaxy, buildAdj, bfsDistances, components, asymmetricLinks } from 
 import { symEigenvalues } from "../../physics/quantum/rmt.js";
 
 const DEF = { seed: 42, n: 60, k: 3, zeroTol: 1e-8, maxHops: 24, marooned: 0 };
-export const MODES = ["traces", "spectrum", "walks", "island", "oneway"];
+// *** v3852 -- `unorderedtri` IS THE PLANT, AND `oneway` NEVER WAS ONE. *** plantedCoverage read this device
+// as UNCOVERED while its header advertised a LOAD-BEARING NEGATIVE, and the census was right. `oneway` says
+// tr(A^2) counts only links that come back, so the gap IS the number of one-way links -- an EXACT STRUCTURAL
+// IDENTITY, and its own header says it "NEEDS NO SABOTAGE". A demonstration that an identity discriminates is
+// not a plant: nothing is implemented wrongly in either arm.
+//
+// `unorderedtri` is a wrong method on the right problem: drop the j > i and k > j ordering in countTriangles
+// and every triangle is found once per permutation of its vertices. The result is still a positive integer
+// that scales with the graph. MEASURED: triangles 46 -> 276 and triangleErr 0 (exact) -> 1380, against a
+// tr(A^3) of 276 that DOES NOT MOVE -- the trace route never enumerates a triple, so the identity's other
+// side is untouched and the whole excursion belongs to the count.
+export const MODES = ["traces", "spectrum", "walks", "island", "oneway", "unorderedtri"];
 
 /** Row-major adjacency matrix from a directed link list. */
 export function adjacencyMatrix(n, links) {
@@ -72,8 +83,22 @@ export function laplacian(A, n) {
 }
 
 /** Triangles counted by ENUMERATION -- no matrix is formed, so tr(A^3)/6 has something to be checked against. */
-export function countTriangles(A, n) {
+/**
+ * *** v3852 -- `unordered` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE ONE LINE THAT MAKES THIS A
+ * COUNT RATHER THAN AN ENUMERATION: the j > i and k > j ordering. *** Without it every triangle is found once
+ * per permutation of its three vertices -- SIX TIMES -- and the result is still a positive integer, still
+ * scales with the graph, and still looks exactly like a triangle count. Dropping a canonical ordering is the
+ * classic combinatorial over-count, and nothing about the number's shape gives it away.
+ *
+ * THE TRACE IDENTITY IS THE INDEPENDENT ROUTE: tr(A^3) = 6 * triangles, computed by matrix multiplication that
+ * never enumerates a triple. TWO ROUTES SHARING NO CODE, which is what lets one of them be planted.
+ */
+export function countTriangles(A, n, { unordered = false } = {}) {
     let t = 0;
+    if (unordered) {
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { if (!A[i * n + j]) continue; for (let k = 0; k < n; k++) if (A[j * n + k] && A[i * n + k]) t++; }
+        return t;
+    }
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { if (!A[i * n + j]) continue; for (let k = j + 1; k < n; k++) if (A[j * n + k] && A[i * n + k]) t++; }
     return t;
 }
@@ -108,9 +133,11 @@ export function build({ mode = "traces", config = {} } = {}) {
     const G = makeGalaxy(c.seed, c.n, c.k), n = G.systems.length;
     const A = adjacencyMatrix(n, G.links);
 
-    if (mode === "traces") {
+    if (mode === "traces" || mode === "unorderedtri") {
+        // The plant runs THIS fixture -- same map, same matrices -- and corrupts only the enumeration route,
+        // so the trace side of the identity is untouched and the separation belongs to the count.
         const A2 = matmul(A, A, n), A3 = matmul(A2, A, n);
-        const tri = countTriangles(A, n);
+        const tri = countTriangles(A, n, { unordered: mode === "unorderedtri" });
         return {
             trA: trace(A, n), trA2: trace(A2, n), trA3: trace(A3, n),
             linkCount: G.links.length, triangles: tri,
@@ -179,6 +206,8 @@ export const GALAXY_OBSERVABLES = [
 
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */
 export const galaxyDevice = {
+    // "traces" stays FIRST: it owns triangleErr, and the contract compares the plant against modes[0].
     modes: MODES, name: "cosmic-map-spectral", observables: GALAXY_OBSERVABLES, build, defaults,
+    plantMode: "unorderedtri", plantFlips: "triangleErr", plantKind: "method",
 };
 export default galaxyDevice;

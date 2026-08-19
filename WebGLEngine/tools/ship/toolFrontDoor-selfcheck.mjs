@@ -1,7 +1,18 @@
 // WebGLEngine/tools/ship/toolFrontDoor-selfcheck.mjs
 //
-// Run: node tools/ship/toolFrontDoor-selfcheck.mjs   (~25s -- MEASURED)
-// Gated by tools/ship/selfchecks.mjs (auto-discovered).
+// Run: node tools/ship/toolFrontDoor-selfcheck.mjs   (555s -- MEASURED at v3853 on an idle box, stopwatch)
+// Gated by tools/ship/selfchecks.mjs (auto-discovered), with a MEASURED budget entry in gateBudget.mjs.
+//
+// *** v3853 -- THIS LINE SAID "~25s -- MEASURED" AND THE GATE TAKES NINE MINUTES. *** It spawns every
+// reporting tool in the registry, and that registry has grown for six hundred versions while the number
+// beside it did not. AT 555s AGAINST gateBudget's 143s DEFAULT IT WAS BEING KILLED IN THE FAST SUITE --
+// and NEVER RUN IS DISTINCT FROM PASS (verify.mjs's own words), so nothing in the suite was reporting
+// the two failures it was carrying. THE RED WAS INVISIBLE BECAUSE THE GATE THAT WOULD HAVE SHOWN IT
+// COULD NOT FINISH. Measured, and recorded in gateBudget.MEASURED where a number can be contradicted by
+// a re-measure instead of quietly outliving its subject -- which is exactly what this line did.
+//
+// v3853 also HALVED THE SPAWNS: every tool used to run twice, once per assertion in section 1, and the
+// two runs were never compared. One run, two assertions -- cheaper, and a stricter claim.
 //
 // v3219 -- *** EIGHT ANALYSIS TOOLS PRINTED NOTHING AND EXITED 0. ***
 //
@@ -40,39 +51,51 @@ const report = (n, d) => console.log("  ----  " + n + (d ? "   " + d : ""));
 // tools, and a second copy of the registry is the defect this session has found in nine files (MODES), three
 // (the gate-file walk) and four (a mesher's liveness). THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED, so
 // tools/ship/reportingTools.mjs is the one definition and both the gate and the bridge read it.
-import { REPORTING, NO_MAIN, isReportingTool, ARTEFACT_TOOLS, artefactTool } from "./reportingTools.mjs";
+import { REPORTING, NO_MAIN, PAGE_DOOR, isReportingTool, ARTEFACT_TOOLS, artefactTool } from "./reportingTools.mjs";
 import { referenceGraph } from "./moduleRefs.mjs";   // v3546 -- ASK THE THING THAT WALKS, never a path prefix
 const SHOULD_REPORT = REPORTING.map((t) => t.rel);
 
 // ---- 1. EVERY TOOL THAT SHOULD REPORT, REPORTS -------------------------------------------------------------------
 {
-    const silent = [], broken = [];
+    // *** v3853 -- EVERY TOOL RAN TWICE, ONCE PER ASSERTION, AND THE TWO RUNS WERE NEVER COMPARED. ***
+    // The two checks below ask different questions of THE SAME OUTPUT, and each used to spawn its own copy of
+    // every tool: 62 tools became 124 processes, and orphanTriage alone walks the whole tree. That is half of
+    // this gate's wall clock spent re-deriving output it already had.
+    //
+    // AND IT WAS NOT MERELY WASTEFUL, IT WAS WEAKER. Two runs are two samples: a tool could print on one and
+    // not the other, and the gate would report "prints something: PASS" beside "names itself: FAIL" with no
+    // way to tell a naming defect from a flake. ONE RUN, TWO ASSERTIONS, is both cheaper and a stricter claim
+    // -- the second check now grades the exact bytes the first one graded.
+    const out = new Map(), silent = [], broken = [];
     for (const rel of SHOULD_REPORT) {
-        let out = "";
-        try { out = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: 120000 }); }
+        let text = "";
+        try { text = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: 120000 }); }
         catch (e) { broken.push(rel + " (exit " + (e && e.status) + ")"); continue; }
-        if (!String(out).trim()) silent.push(rel);
+        out.set(rel, String(text));
+        if (!String(text).trim()) silent.push(rel);
     }
     ok("!! *** every analysis tool that should report, PRINTS SOMETHING when you run it ***",
         silent.length === 0 && broken.length === 0,
-        SHOULD_REPORT.length + " tools run directly. " +
+        SHOULD_REPORT.length + " tools run directly, ONCE EACH. " +
         (silent.length ? "SILENT: " + silent.join(", ") + ". " : "") +
         (broken.length ? "NONZERO EXIT: " + broken.join(", ") + ". " : "") +
         "EXIT 0 WITH NO OUTPUT READS AS A CLEAN BILL -- `node tools/ship/orphanScan.mjs` saying nothing looks " +
         "exactly like a tree with no orphans, and it meant the file had defined some functions and ended");
 
+    // OVER-ESCAPED ON THE FIRST WRITE: "\\[" is the three-character string \\[ , so the regex hunted a
+    // literal BACKSLASH followed by a bracket and matched nothing. The check failed on five tools that were
+    // all printing their name correctly. This project's own list of recurring first-measurement errors has
+    // "over-escaping a regex" on it; here it is again, in the gate written to stop tools lying about what
+    // they did.
+    const unnamed = [...out.keys()].filter((rel) =>
+        !new RegExp("\\[" + path.basename(rel, ".mjs") + "\\]").test(out.get(rel)));
     ok("...and each one names ITSELF in its output, so a piped log says which tool spoke",
-        SHOULD_REPORT.every((rel) => {
-            try {
-                const out = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: 120000 });
-                // OVER-ESCAPED ON THE FIRST WRITE: "\\\\[" is the three-character string \\[ , so the regex hunted a
-                // literal BACKSLASH followed by a bracket and matched nothing. The check failed on five tools
-                // that were all printing their name correctly. This project's own list of recurring
-                // first-measurement errors has "over-escaping a regex" on it; here it is again, in the gate
-                // written to stop tools lying about what they did.
-                return new RegExp("\\[" + path.basename(rel, ".mjs") + "\\]").test(out);
-            } catch { return false; }
-        }),
+        unnamed.length === 0 && broken.length === 0,
+        // *** v3853 -- THIS FAILED WITHOUT SAYING WHO, WHICH IS THE DEFECT THIS ROUND CAME HERE TO FIX. ***
+        // The line printed only its rationale, so the red beside it was read off the check ABOVE and the
+        // record recorded ONE name where there were nine. A failing check that will not name its offenders
+        // makes the reader guess, and the reader guessed short for hundreds of versions.
+        (unnamed.length ? "NOT NAMING THEMSELVES: " + unnamed.join(", ") + ". " : "") +
         "a report with no name on it is unattributable the moment two of them share a terminal");
 }
 
@@ -84,9 +107,13 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
     });
     ok("!! the tools deliberately WITHOUT a front door still have none, and each carries its reason",
         wrong.length === 0 && [...NO_MAIN.values()].every((v) => v.length > 40),
-        NO_MAIN.size + " named absences. A TOOL THAT TAKES ITS CORPUS OR ITS REGISTRY FROM THE CALLER cannot " +
-        "grow a main block without picking one, and picking one is how a tool starts disagreeing with the gate " +
-        "that uses it" + (wrong.length ? ". UNEXPECTED MAIN BLOCK IN: " + wrong.join(", ") : ""));
+        NO_MAIN.size + " named absences, and as of v3853 they are TWO refusals rather than one. (1) INJECTION: " +
+        "a tool that takes its corpus or its registry FROM THE CALLER cannot grow a main block without picking " +
+        "one, and picking one is how a tool starts disagreeing with the gate that uses it. (2) THE PAGE IS THE " +
+        "DOOR: " + PAGE_DOOR.size + " of them are imported by a browser page, so they may carry no node: " +
+        "specifier -- and a main block needs node:url. THIS LINE SAID ONLY (1) WHILE NINE ENTRIES BELONGED TO " +
+        "(2), which is a reason that had quietly stopped describing its own list" +
+        (wrong.length ? ". UNEXPECTED MAIN BLOCK IN: " + wrong.join(", ") : ""));
 
     ok("...and this list is NAMED rather than discovered, on purpose",
         SHOULD_REPORT.length + NO_MAIN.size >= 8,
@@ -163,6 +190,40 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
         (REFS.refs.get(path.join(ROOT, hasCallerCase)) || []).some((r) => !isGate(r.from)),
         "driven: " + (REFS.refs.get(path.join(ROOT, hasCallerCase)) || []).filter((r) => !isGate(r.from))
             .map((r) => path.relative(ROOT, r.from).split(path.sep).join("/")).slice(0, 3).join(", "));
+
+    // *** v3853 -- NINE ENTRIES IN NO_MAIN SAY "THE PAGE IS THE DOOR", AND UNTIL THIS CHECK THAT WAS PROSE. ***
+    //
+    // The reason those nine carry is a WIRING CLAIM -- statistical-mechanics.html imports eight of them, ct.html
+    // the ninth -- and the comment twenty lines above this one is the tree's verdict on wiring claims written in
+    // prose: nothing re-derives them, twelve instances, ASK THE THING THAT WALKS. So the page is a FIELD on the
+    // row (reportingTools' PAGE_DOOR, derived from the same rows as the sentences so the two cannot drift), and
+    // it is asked of THE SAME RESOLVER the census above uses -- not of a substring search over the page, which
+    // is a mention test and would pass on a commented-out import.
+    //
+    // WHAT THIS PROTECTS: these nine were moved OUT of the "should print" list on the strength of having a
+    // better door. IF THE PAGE EVER STOPS IMPORTING ONE, IT HAS NO DOOR AT ALL and the exemption becomes the
+    // silence it was granted to avoid -- the exact failure this gate exists for, wearing the fix's clothes.
+    const doorless = [], doorNodeImport = [];
+    for (const [rel, page] of PAGE_DOOR) {
+        const from = (REFS.refs.get(path.join(ROOT, rel)) || []).map((r) => r.from);
+        if (!from.includes(path.join(ROOT, page))) doorless.push(rel + " -> " + page);
+        // AND THE OTHER HALF OF THE REASON, which is what makes the CLI impossible rather than merely absent.
+        let src = ""; try { src = noComments(fs.readFileSync(path.join(ROOT, rel), "utf8")); } catch { /* handled */ }
+        if (/from\s*["']node:/.test(src)) doorNodeImport.push(rel);
+    }
+    ok("!! *** every 'THE PAGE IS THE DOOR' reason is ASKED OF THE RESOLVER, never just asserted ***",
+        doorless.length === 0,
+        PAGE_DOOR.size + " page-door entries, each re-derived through the same referenceGraph the census above " +
+        "uses" + (doorless.length ? ". PAGE DOES NOT IMPORT: " + doorless.join(", ") : "") +
+        ". These nine left the 'should print' list because they have the door this rule PREFERS; a claim that " +
+        "buys an exemption has to be re-derived, or the exemption outlives the fact that earned it");
+
+    ok("...and each one really cannot have a main block -- NO `node:` specifier, checked through codeOnly",
+        doorNodeImport.length === 0,
+        (doorNodeImport.length ? "HAS A node: IMPORT: " + doorNodeImport.join(", ") + ". " : "") +
+        "the reason is not 'nobody wrote one', it is that a main block needs node:url for the pathToFileURL " +
+        "comparison the Windows path law (v2759) requires, and a browser cannot resolve node:url. A FILE THAT " +
+        "COULD carry one is not exempt -- it is unfinished, and belongs back in REPORTING");
 
     // *** THE PROPERTY, AND IT IS THE ONE THE ROUND ACTUALLY ESTABLISHED. *** A tool nothing imports has no
     // caller to notice its silence, so it is exactly the population the front-door law exists for. Section 1

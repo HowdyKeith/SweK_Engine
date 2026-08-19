@@ -131,8 +131,10 @@ const cov = G.gradedCoverage(path.resolve(HERE, "..", ".."));
         "PROPOSED FOR IT WAS SECTION 1 OF ITS OWN GATE VERBATIM, which would have moved the count and graded " +
         "nothing just as surely");
 
-    ok("...nine modes, EXPORTED, nonsense refused",
-        Array.isArray(dev.modes) && dev.modes.length === 9 &&
+    ok("...ten modes, EXPORTED, nonsense refused",
+        // v3852 -- the count moves with the declared PLANT MODE, which is a real mode and must be in the
+        // list or probeModePlant cannot build it. Raised deliberately, not to make a check pass.
+        Array.isArray(dev.modes) && dev.modes.length === 10 &&
         dev.modes.every((m) => K.checkMode(dev, m).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
         dev.modes.join(", "));

@@ -52,6 +52,9 @@ export const NON_SCENE = {
     "physics/fluidBox3d.js": { verdict: "CANDIDATE", why: "a co-simulation coupler between box3d and the fluid. Momentum exchange across the coupling COULD be an exact key (what one side loses the other gains), which would be a real gate rather than a smoke test." },
     "physics/voxel/fracture.js": { verdict: "CANDIDATE", why: "turns a broken voxel structure into rigid bodies. Total mass before and after a fracture is conserved exactly, which is a key nobody has written." },
     "simulation/euler/eulerShader.js": { verdict: "HARDWARE", why: "compressible Euler as a WGSL compute kernel. Needs a real GPU, like the bench pages, so it cannot be gated in a sandbox." },
+    // v3853 -- the first UNCLASSIFIED entry this list has had since it was written, and the classification is
+    // the module's own: its header opens by saying it is DELIBERATELY not named *-selfcheck.mjs.
+    "physics/mpm/gpuKernelInterp.mjs": { verdict: "DEPENDENCY", why: "a WGSL interpreter harness built on wgsl_reflect, a package that is NOT in the tree and cannot be installed on a machine with no network. Its own header says it is deliberately not named *-selfcheck.mjs because 'a gate that fails because a dependency is missing is a gate that cries wolf' -- the numbers it produces are recorded in gpuKernel-selfcheck.mjs where they can be contradicted, and the tool ships so the measurement can be retaken rather than trusted." },
     "simulation/tomo/honest-error.mjs": { verdict: "GATEABLE", why: "133 lines, and NOT merely a helper: it builds a phantom, scans it, and reports correlation and RMS against the TRUTH IMAGE it generated. That is an answer key by construction. GATED in v3436." },
 };
 

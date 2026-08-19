@@ -25,8 +25,17 @@ const t = triage();
 
 // ---- 2. SO THE HONEST COVERAGE FIGURE IS FAR HIGHER THAN THE QUOTED ONE ---------------------------------------------
 {
-    ok("!! excluding scene code, coverage is 96% and not 63%",
-       t.honestFraction > 0.92 && t.rawFraction < 0.70,
+    // *** v3853 -- THIS ASSERTED `rawFraction < 0.70` AND WENT RED BECAUSE THE TREE GOT BETTER. *** Raw
+    // coverage was 63% when this was written and is 73.7% now: more modules are gated than were, and the
+    // check read that improvement as a failure. A GATE THAT FORBIDS ITS OWN FIX IS A GATE THAT GETS EDITED TO
+    // AGREE WITH WHATEVER SHIPPED (v3816's words, on a different file, in this same session's other red).
+    //
+    // THE CLAIM WAS NEVER ABOUT THE RAW NUMBER'S ABSOLUTE VALUE -- it is that EXCLUDING SCENE CODE CHANGES THE
+    // PICTURE MATERIALLY, because PHYSICS_ROOTS sweeps in demo scenes. So the GAP is asserted, which is the
+    // thing that must not close, and the honest figure keeps its floor. If the raw number ever reaches the
+    // honest one the denominator has been fixed and THIS LINE SHOULD BE DELETED, NOT RELAXED.
+    ok("!! excluding scene code moves the picture materially -- the honest figure is far above the raw one",
+       t.honestFraction > 0.92 && (t.honestFraction - t.rawFraction) > 0.15,
        (t.rawFraction * 100).toFixed(1) + "% raw -> " + (t.honestFraction * 100).toFixed(1) + "% honest (" +
        t.physicsGated + " of " + t.physicsTotal + ") — the denominator swept in scene code because PHYSICS_ROOTS " +
        "includes simulation wholesale");

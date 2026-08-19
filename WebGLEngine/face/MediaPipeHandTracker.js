@@ -33,6 +33,11 @@ const DEFAULT_OPTS = {
     minHandPresenceConfidence:  0.5,
     minTrackingConfidence:      0.5,
     mirror: true,           // webcam is a mirror; flip X so right feels right
+    // v3850 -- A DECLARED DEFECT KNOB, OFF BY DEFAULT, for tools/roundhouse/handsBind.mjs's plant mode.
+    // Dropping the z term is the most tempting real edit to this file (MediaPipe's z is by far its noisiest
+    // coordinate, and every metric here would still "work"), so it is the defect the gate should be able to
+    // prove it would catch. NOTHING SHIPS WITH THIS ON -- see _dist3D for why it branches the long way.
+    flatDistance: false,
 };
 
 // MediaPipe hand landmark indices (21 points per hand).
@@ -304,6 +309,10 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     const pinchThreshold = opts.pinchThreshold ?? DEFAULT_OPTS.pinchThreshold;
     const mirror = opts.mirror ?? DEFAULT_OPTS.mirror;
     const mx = (x) => mirror ? 1.0 - x : x;
+    // v3850 -- the declared defect knob; see DEFAULT_OPTS. `false` here means every call below takes the
+    // three-argument path character for character, which is what makes the default verifiable.
+    const flat = opts.flatDistance ?? DEFAULT_OPTS.flatDistance;
+    const dist = (a, b) => _dist3D(a, b, flat);
 
     const hands = [];
     for (let i = 0; i < landmarksArray.length && i < 2; i++) {
@@ -315,7 +324,7 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         const indexTip = lm[IDX.INDEX_TIP];
 
         // Pinch: 3D distance between thumb tip and index tip.
-        const pinchDist = _dist3D(thumbTip, indexTip);
+        const pinchDist = dist(thumbTip, indexTip);
         const pinchActive = pinchDist < pinchThreshold;
 
         // Grab point: midpoint of thumb+index (mirrored X).
@@ -329,7 +338,7 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         // folded when its tip is closer to the wrist than its PIP joint.
         const folded = {};
         for (const f of FINGERS) {
-            folded[f.name] = _dist3D(wrist, lm[f.tip]) < _dist3D(wrist, lm[f.pip]);
+            folded[f.name] = dist(wrist, lm[f.tip]) < dist(wrist, lm[f.pip]);
         }
         const fist = folded.index && folded.middle && folded.ring && folded.pinky;
         const openPalm = !folded.index && !folded.middle && !folded.ring && !folded.pinky;
@@ -354,7 +363,7 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     if (hands[0] && hands[1] && landmarksArray[0] && landmarksArray[1]) {
         const w0 = landmarksArray[0][IDX.WRIST];
         const w1 = landmarksArray[1][IDX.WRIST];
-        const spread = _dist3D(w0, w1);
+        const spread = dist(w0, w1);
         // Roll angle of the line between hands (use mirrored X so it matches view).
         const roll = Math.atan2(w1.y - w0.y, mx(w1.x) - mx(w0.x));
         twoHand = { spread, roll };
@@ -369,9 +378,15 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     };
 }
 
-function _dist3D(a, b) {
+function _dist3D(a, b, flat = false) {
     if (!a || !b) return 0;
     const dx = a.x - b.x, dy = a.y - b.y, dz = (a.z ?? 0) - (b.z ?? 0);
+    // *** THE BRANCH IS ON THE WHOLE CALL, NOT ON A ZEROED dz, AND THAT IS NOT TIDINESS. ***
+    // Math.hypot(dx, dy, 0) and Math.hypot(dx, dy) are different operations over different argument counts and
+    // are not obliged to agree in the last ulp. Writing this as `Math.hypot(dx, dy, flat ? 0 : dz)` would put
+    // the knob INSIDE the default's arithmetic, and A KNOB THAT MOVES THE DEFAULT IS NOT A KNOB (v3845's
+    // flip3d lesson, same shape). The `flat` path is entered only when a caller asks for it by name.
+    if (flat) return Math.hypot(dx, dy);
     return Math.hypot(dx, dy, dz);
 }
 

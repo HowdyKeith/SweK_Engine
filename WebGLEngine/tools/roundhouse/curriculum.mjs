@@ -59,18 +59,52 @@ export function graderExists(kind) { return fs.existsSync(path.join(ENG, kind.gr
 /** Candidates for a plant, straight out of the census -- binds that declare none. NOT a list I wrote. */
 let _plantCache = undefined;
 async function plantCandidates() {
-    // MEMOISED for the same reason the door walk is: one propose() costs ~96 SECONDS, and the gate calls it
-    // five times. Five censuses of one unchanged tree is four censuses too many -- and a check that cannot
-    // finish is not a check (this gate timed out at 290s before the cache).
+    // *** v3853 -- THIS ASKED FOR AN EXPORT THAT HAS NEVER EXISTED, AND THE FALLBACK WAS THE SWEEP. ***
+    //
+    // The line read `P.declaredPlants ? P.declaredPlants(...) : await P.plantedCoverage(...)`. There is no
+    // `declaredPlants` in plantedCoverage.mjs and there never was -- the source-only census is called
+    // `declaredCensus`. So the ternary took the else branch on EVERY run, and the else branch BUILDS EVERY
+    // DEVICE AT EVERY MODE, TWICE. `node tools/roundhouse/curriculum.mjs` took OVER FIVE MINUTES against
+    // toolFrontDoor's 120-second budget, exited on the timeout with no output at all, and the gate reported
+    // NONZERO EXIT (exit null) -- which is what a carried red looked like from the outside.
+    //
+    // *** AND declaredCensus's OWN DOCSTRING IS THIS EXACT ACCIDENT, WRITTEN DOWN 282 VERSIONS EARLIER: ***
+    // "v3395 learned what that costs at a front door -- capabilityCard ran this and blew toolFrontDoor's
+    // budget (every reporting tool runs TWICE at 120s each) and turned a green gate red." The function was
+    // split out FOR THIS, with the caveat carried in the name, and this file walked past the name into the
+    // sweep because a feature test spelled it wrong. A FEATURE TEST THAT NAMES NOTHING IS ALWAYS FALSE, and
+    // an `||` fallback turns always-false into always-the-expensive-route WITHOUT EVER SAYING SO.
+    //
+    // SO THE NAME IS NOW CALLED DIRECTLY AND NOT PROBED FOR. If plantedCoverage stops exporting it the import
+    // throws, plantCandidates returns null, and propose() reports UNMEASURED -- which is the honest answer.
+    // A SILENT FALLBACK TO A FIVE-MINUTE SWEEP IS NOT A FALLBACK, IT IS THE DEFECT WEARING A CONDITIONAL.
+    //
+    // MEASURED BOTH WAYS ON THIS BOX: `node tools/roundhouse/curriculum.mjs` was 5m0s (killed at the 300s
+    // ceiling, no output) and is 0.31s. THE CACHE BELOW STAYS ANYWAY -- its reason was never only the cost.
+    // The gate calls propose() five times and a curriculum that answered differently between two calls on one
+    // unchanged tree would be advising from a frontier that moved while nobody touched it.
     if (_plantCache !== undefined) return _plantCache;
     try {
         const P = await import("./plantedCoverage.mjs");
         const D = await import("./devices.mjs");
-        const r = P.declaredPlants
-            ? P.declaredPlants(ENG, D)
-            : (await P.plantedCoverage(ENG, D));
-        const un = r.undeclared || r.uncovered || [];
-        _plantCache = un.map((n) => (typeof n === "string" ? n : n.name)).filter(Boolean);
+        // *** AND declaredCensus ALONE WOULD HAVE BEEN THE WRONG FIX, WHICH ITS OWN SIBLING SAYS OUT LOUD. ***
+        // It reads the KNOB shape only, through readsPlantedKnob's /\bplanted\b/ over source -- and
+        // declaredPlantMode's docstring, four lines below it, is "readsPlantedKnob cannot see any of them, so
+        // they counted as undeclared". Taken bare it calls 65 binds undeclared against the census's 41
+        // declared, and would propose plants for binds planted this very arc -- SENDING SOMEBODY TO REDO DONE
+        // WORK, which is the one failure refusedPlants() already exists to prevent.
+        //
+        // SO BOTH SHAPES ARE READ, AND NEITHER IS THE SWEEP. The knob comes from SOURCE; the mode comes from
+        // the BUILT DEVICE, which is a thunk and costs milliseconds. What is expensive is RUNNING a device at
+        // every mode twice, and nothing here runs one.
+        const bySource = P.declaredCensus(ENG, D.DEVICE_NAMES || []);
+        const undeclared = [];
+        for (const name of bySource.undeclared || []) {
+            let dev = null;
+            try { dev = await D.getDevice(name); } catch { /* a bind that will not build has declared nothing */ }
+            if (!P.declaredPlantMode(dev)) undeclared.push(name);
+        }
+        _plantCache = undeclared;
     } catch { _plantCache = null; }
     return _plantCache;          // null means COULD NOT MEASURE -- never an empty list, which would read as "none left"
 }

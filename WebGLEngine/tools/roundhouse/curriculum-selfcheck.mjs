@@ -99,8 +99,11 @@ console.log("curriculum-selfcheck -- can the thing that proposes work also pass 
     ok("!! a SLOW census is SKIPPED BY NAME, never silently dropped",
         withSlow.skipped.length === 1 && /285s|SLOW/.test(withSlow.skipped[0].why || ""),
         JSON.stringify(withSlow.skipped.map((x) => x.kind)) + ". Its census walks the whole tree; the default " +
-        "run is 96 seconds without it and TIMED OUT AT 290 WITH IT. A CURRICULUM NOBODY RUNS PROPOSES NOTHING " +
-        "-- but a kind that vanished quietly would read as a frontier with nothing on it.");
+        "run is 0.31s without it (v3853 -- MEASURED; IT SAID 96 SECONDS HERE UNTIL THEN AND THAT NUMBER WAS A " +
+        "DEFECT BEING QUOTED AS A COST: plantCandidates feature-tested `P.declaredPlants`, a name that has " +
+        "never existed, and the else branch ran the FULL SWEEP every time) and TIMED OUT AT 290 WITH IT. " +
+        "A CURRICULUM NOBODY RUNS PROPOSES NOTHING -- but a kind that vanished quietly would read as a " +
+        "frontier with nothing on it.");
 }
 
 // ---- 5. THE RUN IS VISIBLE TO THE FLEET, AND THE PROPOSER STILL CANNOT PUBLISH IT ITSELF -------------------
@@ -124,9 +127,13 @@ console.log("curriculum-selfcheck -- can the thing that proposes work also pass 
     ok("!! *** the phase count is the FINEST TRUE PROGRESS, and there is no seconds timer ***",
         ticks.every((t) => /^\d+\/\d+$/.test(t)),
         "each census is ONE OPAQUE CALL that returns when it returns, so '2 of 3' is all that is honestly " +
-        "available. A 90-SECOND BAR WOULD BE A DRAWING: 96s is what THIS sandbox measured on one core, and a " +
-        "countdown hard-coded from it would be wrong on every other box -- a number that looks like a " +
-        "measurement and is a memory of somebody else's machine.");
+        "available. A SECONDS BAR WOULD BE A DRAWING: whatever THIS sandbox measured on one core, a countdown " +
+        "hard-coded from it would be wrong on every other box -- a number that looks like a measurement " +
+        "and is a memory of somebody else's machine. *** AND v3853 IS THE STRONGER VERSION OF THAT " +
+        "ARGUMENT THAN THE ONE ORIGINALLY WRITTEN HERE: the 96s this line quoted was not a cost at all, " +
+        "it was plantCandidates silently running the full sweep because its feature test named nothing. " +
+        "A HARD-CODED DURATION WOULD HAVE OUTLIVED THE BUG IT WAS MEASURING and gone on drawing a bar " +
+        "for work that now takes a third of a second. ***");
 
     ok("!! ...and the marker is CLEARED, so a finished run does not read as running",
         activityOf(globalThis.__swekActiveRun || null).state === ACTIVITY.IDLE,

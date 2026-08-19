@@ -89,9 +89,26 @@ ok("...and no threshold was tuned to make that happen",
 
 // ---- 7. EVERY DECLARED MODE PRODUCES A DISTINCT ANSWER AND AN UNDECLARED ONE IS REFUSED -------------------
 {
-    const keys = G.MODES.map((m) => Object.keys(G.build({ mode: m })).sort().join(","));
-    ok("all five modes return different observable sets -- a branch that changed nothing would be a mode in name only",
-        new Set(keys).size === G.MODES.length, G.MODES.join(" / "));
+    // *** v3852 -- THE PLANT MODE IS EXCLUDED, AND THAT IS THE CONTRACT RATHER THAN A WEAKENING. ***
+    // probeModePlant builds the primary and the plant and requires THE SAME DECLARED OBSERVABLE to be a finite
+    // number in both, so a plant mode MUST return its primary's shape. Demanding it look different would
+    // demand it break the contract that makes it adjudicable. The rule still applies in full to every mode
+    // that claims to ask a NEW QUESTION, which is what it was for.
+    const plantMode = G.galaxyDevice.plantMode;
+    const claimModes = G.MODES.filter((m) => m !== plantMode);
+    const keys = claimModes.map((m) => Object.keys(G.build({ mode: m })).sort().join(","));
+    ok("every CLAIM mode returns a different observable set -- a branch that changed nothing would be a mode in name only",
+        new Set(keys).size === claimModes.length, claimModes.join(" / "));
+    // ...and the plant is held to the stronger pair: its primary's shape, a different value, off an exact zero.
+    const primary = G.MODES.find((m) => m !== plantMode);
+    const pv = G.build({ mode: primary })[G.galaxyDevice.plantFlips];
+    const qv = G.build({ mode: plantMode })[G.galaxyDevice.plantFlips];
+    ok("!! the plant returns its PRIMARY'S shape and moves the DECLARED observable off an exact zero",
+        Object.keys(G.build({ mode: primary })).sort().join(",") === Object.keys(G.build({ mode: plantMode })).sort().join(",") &&
+        pv === 0 && Number.isFinite(qv) && qv !== 0,
+        `${G.galaxyDevice.plantFlips} ${pv} -> ${qv}. Dropping the j > i / k > j ordering finds every triangle ` +
+        "once per permutation of its vertices -- SIX TIMES -- while tr(A^3), which never enumerates a triple, " +
+        "does not move at all");
     let refused = false;
     try { G.build({ mode: "no-such-mode-will-ever-be-declared" }); } catch { refused = true; }
     ok("an undeclared mode is REFUSED rather than silently defaulted", refused && G.defaults({ mode: "nope" }) === null);

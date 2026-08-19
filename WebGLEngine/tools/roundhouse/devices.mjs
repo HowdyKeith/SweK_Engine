@@ -117,6 +117,10 @@ import { seismicDevice } from "./seismicBind.mjs";          // v3384 - seismolog
 import { acousticsDevice } from "./acousticsBind.mjs";      // v3385 - acoustics as waves
 import { emDevice } from "./emBind.mjs";                    // v3387 - electromagnetism
 import { xpbdDevice } from "./xpbdBind.mjs";                // v3458 - xpbd compliance
+// v3850 -- THE GESTURE LAYER. face/MediaPipeHandTracker.js shipped its pure metric function at round 310
+// marked "headless-testable" and nothing ever tested it; barehands' gesture vocabulary is what named the
+// invariances worth grading. STATIC IMPORT, for the v3768 reason spelled out in the REGISTRY below.
+import { handsDevice } from "./handsBind.mjs";
 
 async function makeLbmDevice() {
     const { makeLBM } = await import("../../simulation/lbm/lbm2d.js");
@@ -262,6 +266,14 @@ const REGISTRY = {
     // v3805 -- KEITH'S BVH QUESTION, MEASURED. The hashed grid does 8-9x less work per query, and the
     // correctness check is the ONLY thing that can tell whether both structures answered the same question.
     nbench: async () => neighbourBenchDevice,
+    // v3850 -- THE GESTURE LAYER, opened by the barehands question. The keys are geometric identities rather
+    // than physics: a rigid motion preserves the distances `folded` compares, so no rotation or translation may
+    // change a gesture verdict -- EXACTLY, not approximately. The honest negative is in the same function:
+    // `folded` is a RATIO test and scale-invariant, `pinch.active` is an absolute threshold and is NOT, which
+    // gives barehands' two most-used gestures a working volume nothing documents. Static import, for the v3768
+    // reason spelled out at the `adjoint` entry above -- a device reached through a dynamic import is INVISIBLE
+    // to deviceInstrumentMap while every gate passes.
+    hands: async () => handsDevice,
     fdtd: async () => fdtdDevice,
     tempering: async () => temperingDevice,
     pbc: async () => pbcDevice,

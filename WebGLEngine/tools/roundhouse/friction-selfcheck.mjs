@@ -100,8 +100,10 @@ const src = fsMod.readFileSync(path.join(HERE, "frictionBind.mjs"), "utf8");
         "so the next person reading frictionBind finds out why its sixteen neighbours were left alone. A " +
         "DECISION NOT TO DO SOMETHING LOOKS EXACTLY LIKE AN ABSENCE FROM OUTSIDE THE FILE THAT RECORDS IT");
 
-    ok("...four modes, EXPORTED, nonsense refused",
-        Array.isArray(dev.modes) && dev.modes.length === 4 &&
+    ok("...five modes, EXPORTED, nonsense refused",
+        // v3852 -- the count moves with the declared PLANT MODE, which is a real mode and must be in the
+        // list or probeModePlant cannot build it. Raised deliberately, not to make a check pass.
+        Array.isArray(dev.modes) && dev.modes.length === 5 &&
         dev.modes.every((x) => K.checkMode(dev, x).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
         dev.modes.join(", "));

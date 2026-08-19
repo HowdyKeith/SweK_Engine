@@ -177,21 +177,29 @@ console.log("\n6. BOTH PAGES HAVE A FRONT DOOR, AND A WAY BACK OUT");
 {
     ok("!! server.html carries an anchor to the demo", /href="\/mpm-gpu\.html"/.test(SRV));
     ok("!! server.html carries an anchor to the adjudicator", /href="\/mpm-gpu-check\.html"/.test(SRV));
-    // *** v3845 -- THIS LINE MADE THE SAME MISTAKE THE COMMENT DIRECTLY BELOW IT DOCUMENTS. *** It pinned two
-    // sentences of anchor COPY -- "Drift -- the Material Point Method on the GPU" and "against the graded CPU
-    // loop on YOUR hardware" -- to assert a property about whether the anchors DESCRIBE their pages. Editing a
-    // word of that copy would have reddened this gate exactly the way removing "has no WebGPU" did at v3816,
-    // and gateQuality counted it as the tree's 41st prose-as-code regex against a baseline of 40. The property
-    // is that each anchor carries a real DESCRIPTION naming the CPU comparison, not that it carries a sentence.
-    const anchorTitle = (href) => {
-        const m = SRV.match(new RegExp('href="' + href.replace(/[/.]/g, "\\$&") + '"[^>]*title="([^"]*)"'));
-        return m ? m[1] : "";
+    // *** v3853 -- THIS CHECK MATCHED PROSE, AND THE COMMENT DIRECTLY BELOW IT ALREADY NAMED THAT MISTAKE FOR
+    // ITS SIBLING. *** v3816 unpinned the "has no WebGPU" wording two lines down with the words "a gate that
+    // forbids its own fix is a gate that gets edited to agree with whatever shipped" -- and this line went on
+    // matching two exact title sentences, so gateQuality counted it as a prose-as-code offender and the
+    // debt-does-not-grow wall went red on it. THE LESSON WAS LEARNED FOR ONE CHECK AND NOT THE ONE BESIDE IT.
+    //
+    // THE PROPERTY IS "THE ANCHOR EXPLAINS THE PAGE RATHER THAN NAMING IT", and that is structural: the link
+    // TEXT is a short label ("MPM GPU") and the TITLE is the explanation. Asserted as a relationship between
+    // the two, so any rewording survives and an anchor that degrades to a bare name does not.
+    const anchor = (href) => {
+        const esc = href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const m = SRV.match(new RegExp('<a[^>]*href="' + esc + '"[^>]*>([^<]*)</a>'));
+        if (!m) return null;
+        const t = m[0].match(/title="([^"]*)"/);
+        return { text: m[1].trim(), title: t ? t[1].trim() : "" };
     };
-    const demoTitle = anchorTitle("/mpm-gpu.html"), checkTitle = anchorTitle("/mpm-gpu-check.html");
-    ok("the anchors say what the pages show rather than just naming them",
-        demoTitle.length > 80 && checkTitle.length > 80 && /\bCPU\b/.test(demoTitle) && /\bCPU\b/.test(checkTitle),
-        "demo title " + demoTitle.length + " chars, adjudicator title " + checkTitle.length + ", both naming the " +
-        "CPU comparison. A bare name would be a short title with no CPU in it, which is the thing being forbidden");
+    for (const href of ["/mpm-gpu.html", "/mpm-gpu-check.html"]) {
+        const a = anchor(href);
+        ok(`the ${href} anchor EXPLAINS the page rather than naming it`,
+            !!a && a.title !== a.text && a.title.length > 8 * Math.max(a.text.length, 1),
+            a ? `link text ${JSON.stringify(a.text)} (${a.text.length} chars), title ${a.title.length} chars -- ` +
+                "a bare name would fail this and any rewording passes it" : "anchor not found");
+    }
     // v3816 -- THIS CHECK USED TO REQUIRE THE STRING "has no WebGPU" AND WENT RED WHEN THAT SENTENCE WAS
     // CORRECTLY REMOVED. It was pinned to a WORDING when the property is "the page asks why, and says where
     // the physics runs without a GPU". A gate that forbids its own fix is a gate that gets edited to agree

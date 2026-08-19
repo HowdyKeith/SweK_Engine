@@ -34,7 +34,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { INSTRUMENTS } from "../../physics/instruments.mjs";
-import { parseRegistry, readsPlantedKnob } from "./plantedCoverage.mjs";
+import { parseRegistry, readsPlantedKnob, declaredPlantMode } from "./plantedCoverage.mjs";
 
 /** The absences, first-class. A caller that reads only the positive fields would over-trust the card. */
 export const NOT_CLAIMED = [
@@ -59,6 +59,9 @@ export function cardFor(name, device, { instrument, plant }) {
         // more damning one. v3334's rule in a new place: UNKNOWN IS NOT SATISFIED, and it is not refused either.
         statedKey: instrument ? !!(instrument.key && instrument.key.length > 0) : null,
         plantDeclared: !!plant,
+        // v3900 -- how the declaration was found: "knob" (the bind reads a planted config key), "mode" (the
+        // device names a plantMode and the observable it flips), or both. Null when there is no plant.
+        plantShape: plant ? plant.shape : null,
         plantKind: plant ? ((device && device.plantKind) || "undeclared") : null,
     };
 }
@@ -71,9 +74,24 @@ export async function capabilityCard(engRoot, registry) {
     // planted knob) and names `plantedVerifiedBy` so a caller who wants the run knows exactly what to run.
     // A CARD THAT SILENTLY PUBLISHED A DECLARATION AS A MEASUREMENT WOULD BE THE EXACT DEFECT THIS TREE KEEPS
     // FINDING; a card that dropped the column to stay fast would hide the one field nobody else can publish.
-    const plantBy = {};
+    // *** v3900 -- THE COLUMN COUNTED KNOB PLANTS AND WAS NAMED FOR ALL OF THEM, WHICH IS THE THIRD PLACE THIS
+    // TREE HAS MADE THE SAME MISTAKE. *** readsPlantedKnob is a `\bplanted\b` GREP OVER CODE, so a bind whose
+    // plant is a MODE -- declared as plantMode/plantFlips on the device object, not as a config knob -- never
+    // entered this map at all. plantDeclared read FALSE for hands, flip3d, hydrostatic, flip2d, mpmrefine and
+    // gyroscope, i.e. for EVERY mode-shaped plant in the tree, under a count whose name says "declaring a
+    // plant". The barehands round (v3850, parallel line) NAMED this and correctly left it: "a tree that
+    // declares two plant shapes and counts one of them under a name that says all will keep reporting
+    // mode-planted devices as bare." detectionMap carried the same defect and was fixed this round; this is
+    // the same edit in the third consumer, and the reason it is worth doing here rather than later is that
+    // ONE GREP IS NOT A TAXONOMY -- the device says what kind of plant it has, so ask the device.
+    //
+    // *** THE DECLARED-NOT-VERIFIED CAVEAT IS UNTOUCHED, and that distinction is the whole point of the
+    // column. *** A mode plant is DECLARED here on exactly the same terms as a knob plant: the bind says it
+    // has one. Whether it MOVES anything is still plantedCoverage's sweep, still named in plantedVerifiedBy,
+    // and still not pretended at.
+    const knobBy = {};
     for (const row of parseRegistry(engRoot)) {
-        if (readsPlantedKnob(engRoot, row.file)) plantBy[row.name] = { declared: true };
+        if (readsPlantedKnob(engRoot, row.file)) knobBy[row.name] = true;
     }
     const instBy = {};
     for (const i of INSTRUMENTS) if (i.device) instBy[i.device] = i;
@@ -82,7 +100,14 @@ export async function capabilityCard(engRoot, registry) {
     for (const name of registry.DEVICE_NAMES) {
         let d = null;
         try { d = await registry.getDevice(name); } catch { /* an unloadable device is still a row */ }
-        devices.push(cardFor(name, d, { instrument: instBy[name] || null, plant: plantBy[name] || null }));
+        // A bind may declare BOTH shapes. `shape` records which one was found, so a reader can tell a mode
+        // plant from a knob plant without re-deriving it -- the two are not the same evidence, which is the
+        // rule plantedCoverage already applies by keeping probeModePlant ahead of the knob path.
+        const mode = declaredPlantMode(d);
+        const plant = (knobBy[name] || mode)
+            ? { declared: true, shape: knobBy[name] ? (mode ? "knob+mode" : "knob") : "mode" }
+            : null;
+        devices.push(cardFor(name, d, { instrument: instBy[name] || null, plant }));
     }
     const version = readVersion(engRoot);
     return {

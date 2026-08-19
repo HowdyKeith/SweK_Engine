@@ -158,7 +158,13 @@ export function inspect() {
 
 export function showLines() {
     const { state, rows } = inspect();
-    const out = [`ship ritual — ${STEPS.length} steps. Tree is at ${state.engine} (brain ${state.brain}), ${state.gates} gates indexed.`];
+    // v3853 -- *** IT NAMED ITSELF ONLY UNDER --run. *** The [shipRitual] tag was on the one line the
+    // default invocation never prints, so `node tools/ship/shipRitual.mjs` produced eight steps of
+    // report with nothing attributing them, and toolFrontDoor's self-naming rule failed on it. THE
+    // CHECK HAD BEEN FAILING ON THIS FILE THE WHOLE TIME AND NOBODY COULD SEE IT: that check printed
+    // only its rationale and never its offenders, so its red was read off the SILENT list beside it.
+    // Naming the offenders (v3853, same round) surfaced this on the first honest run.
+    const out = [`[shipRitual] ship ritual — ${STEPS.length} steps. Tree is at ${state.engine} (brain ${state.brain}), ${state.gates} gates indexed.`];
     for (let i = 0; i < STEPS.length; i++) {
         const s = STEPS[i], r = rows[i];
         const mark = r.ok === true ? "ok " : r.ok === false ? "XX " : "-- ";

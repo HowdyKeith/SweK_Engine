@@ -31,17 +31,28 @@ export const FIG8_OBSERVABLES = [
 ];
 
 const DEF = { steps: 20000 };
-export const FIG8_MODES = ["period", "choreography", "perturbed", "conserve"];
+// *** v3852 -- `euler` IS THE PLANT, AND `perturbed` NEVER WAS ONE. *** plantedCoverage read this device as
+// UNCOVERED for hundreds of versions while its header advertised a LOAD-BEARING NEGATIVE, and the census was
+// right: `perturbed` nudges the INITIAL CONDITIONS, so the orbit genuinely stops being the figure-eight and
+// closure correctly fails. THAT IS A SENSITIVITY SWEEP AND IT PROVES THE SOLUTION IS ISOLATED -- it is not a
+// defect, and no gate catching it has caught a bug. A PLANT HAS TO BE A WRONG METHOD ON THE RIGHT PROBLEM.
+//
+// `euler` is that: the same initial conditions, integrated by explicit Euler instead of velocity-Verlet.
+// MEASURED at the default 20000 steps: returnDist 5.3051e-6 -> 5.5357e-2, a separation of 1.04e4, with
+// energyDriftFrac going 8.6255e-16 -> 9.8144e-3. The orbit is right, the reading is right, and the
+// INTEGRATOR IS NO LONGER SYMPLECTIC -- which is the one property every claim on this device rests on.
+export const FIG8_MODES = ["period", "choreography", "perturbed", "conserve", "euler"];
 
 export function figureEightDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
+    // The validator already LISTS every mode, so the plant cannot silently revert (v3806's flip2d lesson).
     return { mode: FIG8_MODES.includes(want) ? want : "period", steps: (cfg && cfg.steps) || DEF.steps };
 }
 
 const mag = (v) => (Array.isArray(v) ? Math.hypot(...v) : Math.abs(v));
 
 /** One integration, returning everything any mode needs -- ONE runner so a difference cannot be the harness. */
-function run(steps, nudge = 0) {
+function run(steps, nudge = 0, euler = false) {
     const s = makeFigureEight();
     if (nudge) s.bodies[0].r[0] += nudge;
     const dt = FIG8_PERIOD / steps;
@@ -49,7 +60,7 @@ function run(steps, nudge = 0) {
     const E0 = totalEnergy(s), L0 = mag(angularMomentum(s));
     let third = null;
     const atThird = Math.round(steps / 3) - 1;
-    for (let i = 0; i < steps; i++) { orbitStep(s, dt); if (i === atThird) third = s.bodies.map((b) => b.r.slice()); }
+    for (let i = 0; i < steps; i++) { orbitStep(s, dt, { euler }); if (i === atThird) third = s.bodies.map((b) => b.r.slice()); }
     let ret = 0;
     for (let i = 0; i < 3; i++) {
         const b = s.bodies[i].r;
@@ -94,14 +105,20 @@ export async function buildFigureEight(args = {}) {
                  nudge: 0, returnRatio: -1, linearityErrFrac: -1, closes: 1 };
     }
 
-    const r = run(steps, 0);
-    return { ...base, returnDist: r.ret, thirdDist: -1, energyDriftFrac: -1, angMomDrift: -1,
+    // The `euler` plant runs the SAME initial conditions and the SAME budget as `period` -- only the
+    // integrator changes -- so the separation belongs to the method and not to a second fixture. Energy and
+    // angular-momentum drift are reported here too, because a non-symplectic step shows in both.
+    const r = run(steps, 0, mode === "euler");
+    return { ...base, returnDist: r.ret, thirdDist: -1,
+             energyDriftFrac: Math.abs((r.E1 - r.E0) / r.E0), angMomDrift: Math.abs(r.L1 - r.L0),
              nudge: 0, returnRatio: -1, linearityErrFrac: -1, closes: r.ret < 1e-4 ? 1 : 0 };
 }
 
 export const figureEightDevice = {
     name: "figure-eight-choreography",
+    // "period" stays FIRST: it owns returnDist, and the contract compares the plant against modes[0].
     modes: FIG8_MODES,
+    plantMode: "euler", plantFlips: "returnDist", plantKind: "knob",
     observables: FIG8_OBSERVABLES,
     build: buildFigureEight,
     defaults: figureEightDefaults,

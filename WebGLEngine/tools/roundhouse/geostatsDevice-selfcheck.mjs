@@ -102,8 +102,30 @@ ok("scaling gamma by a constant leaves the weights bit-stable and scales the var
 
 // ---- 8. MODES ARE DECLARED, DISTINCT AND COMPLETE -----------------------------------------------------------
 {
-    const keys = K.MODES.map((m) => Object.keys(K.build({ mode: m })).sort().join(","));
-    ok("all four modes return different observable sets", new Set(keys).size === K.MODES.length, K.MODES.join(" / "));
+    // *** v3852 -- THE PLANT MODE IS EXCLUDED FROM THE DISTINCTNESS SET, AND THAT IS THE CONTRACT RATHER THAN
+    // A WEAKENING. *** probeModePlant builds the primary and the plant and requires THE SAME DECLARED
+    // OBSERVABLE TO BE A FINITE NUMBER IN BOTH -- so a plant mode MUST return its primary's shape. Demanding
+    // it look different would demand it break the contract that makes it adjudicable. The distinctness rule
+    // still applies in full to every mode that claims to ask a NEW QUESTION, which is what it was for.
+    const plantMode = K.geostatsDevice.plantMode;
+    const claimModes = K.MODES.filter((m) => m !== plantMode);
+    const keys = claimModes.map((m) => Object.keys(K.build({ mode: m })).sort().join(","));
+    ok("every CLAIM mode returns a different observable set", new Set(keys).size === claimModes.length,
+        claimModes.join(" / "));
+
+    // ...and the plant is held to the STRONGER pair instead: same shape as its primary, different value.
+    const primary = K.MODES.find((m) => m !== plantMode);
+    const pk = Object.keys(K.build({ mode: primary })).sort().join(",");
+    const qk = Object.keys(K.build({ mode: plantMode })).sort().join(",");
+    ok("!! the plant mode returns its PRIMARY'S shape, which is what makes it adjudicable",
+        pk === qk, `${primary} and ${plantMode} both return [${pk}]`);
+    const pv = K.build({ mode: primary })[K.geostatsDevice.plantFlips];
+    const qv = K.build({ mode: plantMode })[K.geostatsDevice.plantFlips];
+    ok("!! ...and the DECLARED observable differs, off an exact zero",
+        Number.isFinite(pv) && Number.isFinite(qv) && pv !== qv && pv === 0,
+        `${K.geostatsDevice.plantFlips} ${pv} -> ${qv}. Dropping the Lagrange row is SIMPLE kriging where ` +
+        "ORDINARY is required: the weights stay finite and stop summing to one, so the estimator stops being " +
+        "unbiased and the pure-nugget answer stops being the arithmetic mean");
     let refused = false;
     try { K.build({ mode: "no-such-mode-will-ever-be-declared" }); } catch { refused = true; }
     ok("an undeclared mode is REFUSED rather than silently defaulted", refused && K.defaults({ mode: "nope" }) === null);

@@ -21,6 +21,14 @@ const SQRT_PI = 1.7724538509055159;
 
 // pos: Float64Array 3N (Cartesian, a cubic box of side L, charges may sit anywhere). q: length-N charges.
 // opts: { alpha, kmax, rcut }. Returns { energy, forces, parts:{ eReal, eRecip, eSelf } }.
+/**
+ * *** v3852 -- `noSelf` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE TERM THAT CARRIES NO FORCE. ***
+ * E_self = -(alpha/sqrt(pi)) sum q^2 is a CONSTANT: it does not depend on any position, so it contributes
+ * nothing to any gradient. Omitting it is the canonical Ewald mistake precisely because of that -- EVERY
+ * FORCE TEST STILL PASSES, every trajectory is still right, and only the ENERGY is wrong. It is also the term
+ * that makes the total independent of alpha, so dropping it turns a splitting parameter into a knob that
+ * changes the answer. Every existing figure is unchanged at the default.
+ */
 export function ewald(pos, q, N, L, opts = {}) {
     const alpha = opts.alpha != null ? opts.alpha : 5 / L;
     const kmax = opts.kmax != null ? opts.kmax : 8;
@@ -52,7 +60,7 @@ export function ewald(pos, q, N, L, opts = {}) {
 
     // ---- self energy (constant, no force) ----
     let sumq2 = 0; for (let i = 0; i < N; i++) sumq2 += q[i] * q[i];
-    const eSelf = -alpha / SQRT_PI * sumq2;
+    const eSelf = opts.noSelf ? 0 : -alpha / SQRT_PI * sumq2;   // v3852 -- the plant drops the constant
 
     // ---- reciprocal space ----
     let eRecip = 0;

@@ -57,7 +57,19 @@ const VALS = [2.0, -1.0, 4.5, 0.25, 7.0, -3.0];
 const QUERIES = [0.5, 2.0, 4.75, 8.3, 12.5];
 
 const DEF = { queries: QUERIES, exponents: [1, 1.05, 1.25, 1.5], probe: 4.75, nuggetLevel: 1 };
-export const MODES = ["bridge", "screen", "nugget", "scale"];
+// *** v3852 -- `noconstraint` IS THE PLANT, AND THE `screen` NEGATIVE NEVER WAS ONE. *** plantedCoverage read
+// this device as UNCOVERED while its header advertised a LOAD-BEARING NEGATIVE, and the census was right:
+// sweeping the variogram exponent away from 1 opens the screen PROPORTIONALLY, which is a SENSITIVITY SWEEP
+// over legitimate models. Nothing is wrong in any arm of it -- exponent 1.25 is a real variogram, and a gate
+// catching it has caught no bug. A PLANT HAS TO BE A WRONG METHOD ON THE RIGHT PROBLEM.
+//
+// `noconstraint` is that: drop the Lagrange row, so the bordered system becomes G w = g0 and sum(w) = 1 is
+// never imposed. THAT IS SIMPLE KRIGING WITH AN ASSUMED-KNOWN MEAN, APPLIED WHERE ORDINARY KRIGING IS
+// REQUIRED -- the most common mistake in a kriging implementation. The weights stay finite and well behaved;
+// the only thing wrong with them is that they no longer sum to one, so the estimator is no longer unbiased.
+// MEASURED on the pure-nugget key, where the unbiased answer is provably the arithmetic mean: value 2.333333
+// -> 2.800000, sum(w) 1.000000 -> 1.200000, valueErr 4.441e-16 -> 4.667e-1.
+export const MODES = ["nugget", "bridge", "screen", "scale", "noconstraint"];
 
 const samples = () => XS.map((x, i) => ({ at: [x], value: VALS[i] }));
 
@@ -69,8 +81,8 @@ export function bracket(x0) {
 }
 
 /** Largest |weight| carried by a sample that is NOT one of the two bracketing the query. */
-export function outerWeight(gamma, x0) {
-    const r = ordinaryKriging(samples(), [x0], gamma);
+export function outerWeight(gamma, x0, opts = {}) {
+    const r = ordinaryKriging(samples(), [x0], gamma, opts);
     if (!r) return null;
     const { lo } = bracket(x0);
     let m = 0;
@@ -125,10 +137,12 @@ export function build({ mode = "bridge", config = {} } = {}) {
         };
     }
 
-    if (mode === "nugget") {
+    if (mode === "nugget" || mode === "noconstraint") {
         // Pure nugget: no spatial information, so the only unbiased answer left is the arithmetic mean.
+        // The plant runs THIS fixture -- same samples, same variogram, same probe -- and drops only the
+        // unbiasedness row, so the separation belongs to the solver and not to a second model.
         const gamma = (h) => (h <= 0 ? 0 : c.nuggetLevel);
-        const r = ordinaryKriging(S, [c.probe], gamma);
+        const r = ordinaryKriging(S, [c.probe], gamma, mode === "noconstraint" ? { noConstraint: true } : {});
         const mean = VALS.reduce((a, b) => a + b, 0) / VALS.length;
         const n = VALS.length;
         return {
@@ -163,6 +177,13 @@ export const GEOSTATS_OBSERVABLES = [
 
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */
 export const geostatsDevice = {
+    // *** "nugget" IS modes[0] ON PURPOSE, AND THE REASON IS A MEASURED BLINDNESS. *** The obvious choice was
+    // "bridge" (worstValueErr), and the plant DOES NOT MOVE IT: 2.6645e-15 in both arms. For the Brownian
+    // variogram the system is Markov and the UNCONSTRAINED solution coincides with the constrained one, so
+    // the device's headline key cannot see a missing unbiasedness row at all. `nugget` can, because there the
+    // unbiased answer is provably the arithmetic mean. THE DEFAULT IS UNTOUCHED: defaults() still returns
+    // "bridge". Declaring against worstValueErr would have shipped a DECLARED BUT DEAD device.
     modes: MODES, name: "kriging-screen-effect", observables: GEOSTATS_OBSERVABLES, build, defaults,
+    plantMode: "noconstraint", plantFlips: "valueErr", plantKind: "knob",
 };
 export default geostatsDevice;

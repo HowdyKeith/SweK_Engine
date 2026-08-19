@@ -30,8 +30,28 @@ function computeAcc(state) {
 }
 
 // One velocity-Verlet step: r += v dt + 1/2 a dt^2 ; recompute a ; v += 1/2 (a_old + a_new) dt.
-export function orbitStep(state, dt = 1 / 60) {
+/**
+ * *** v3852 -- `euler` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE ONE PROPERTY THAT MAKES THIS AN
+ * ORBIT INTEGRATOR RATHER THAN A DIFFERENCE SCHEME: SYMPLECTICITY. *** Velocity-Verlet carries the
+ * a*dt^2/2 term into the position and AVERAGES the old and new accelerations into the velocity; explicit
+ * Euler does neither. It is the same two lines in the same order with two terms dropped, it is stable enough
+ * to run, and totalEnergy's own comment two functions down already names the consequence: "Bounded under
+ * Verlet, drifting under Euler."
+ *
+ * *** THE HONEST BRANCH IS WRITTEN OUT CHARACTER FOR CHARACTER RATHER THAN FACTORED. *** Floating-point
+ * addition is not associative, so hoisting a shared sub-expression to serve both branches would move every
+ * figure this integrator has ever recorded. A KNOB THAT CHANGES THE DEFAULT IS NOT A KNOB (v3845, flip3d).
+ */
+export function orbitStep(state, dt = 1 / 60, { euler = false } = {}) {
     const b = state.bodies, a = state.acc, hdt2 = 0.5 * dt * dt;
+    if (euler) {
+        // THE PLANT: positions from the CURRENT velocities, velocities from the CURRENT accelerations. No
+        // dt^2 term, no averaging -- the textbook non-symplectic step.
+        for (let i = 0; i < b.length; i++) for (let k = 0; k < 3; k++) b[i].r[k] += b[i].v[k] * dt;
+        for (let i = 0; i < b.length; i++) for (let k = 0; k < 3; k++) b[i].v[k] += a[i][k] * dt;
+        state.acc = computeAcc(state);
+        return state;
+    }
     for (let i = 0; i < b.length; i++) for (let k = 0; k < 3; k++) b[i].r[k] += b[i].v[k] * dt + a[i][k] * hdt2;
     const a2 = computeAcc(state);
     for (let i = 0; i < b.length; i++) for (let k = 0; k < 3; k++) b[i].v[k] += 0.5 * (a[i][k] + a2[i][k]) * dt;

@@ -121,6 +121,14 @@ export const NO_INSTRUMENT = {
     // AN INSTRUMENT: it measures a COST, not a physical quantity, and it has no constant to put on a front
     // door. Its thirteen MPM siblings took ROWS in the same round because mpm.html is REAL and they grade
     // physics; this one takes an EXEMPTION because neither is true of it. ***
+    // *** v3853 -- multigrid3d TAKES AN EXEMPTION ON EXACTLY nbench's REASONING, AND BOTH FACTS ARE DERIVED
+    // RATHER THAN ASSERTED. *** (1) NO PAGE IMPORTS fluid/multigrid3d.mjs -- checked across every .html in the
+    // tree -- so a row would need `page: null` and become another pageless one. (2) Its observables are
+    // `iters`, `itersSmall`, `itersLarge`, `iterRatio`, `cellRatio`: ITERATION COUNTS. Grid-independent
+    // convergence is a property of the SOLVER, not a physical constant, and there is nothing to put on a front
+    // door. That is nbench's case word for word, and it is why this is an exemption rather than a fabricated
+    // reason -- the file's own rule is that an invented reason closes a question that should stay open.
+    multigrid3d: "not a physical instrument: it measures ITERATION COUNTS -- grid-independent convergence, itersSmall against itersLarge as a ratio -- which is a property of the solver rather than a physical quantity. No page in the tree imports fluid/multigrid3d.mjs, so a row would be a pageless one, and there is no physical constant to put on a front door. Same disposition as nbench, for the same two reasons.",
     nbench: "not a physical instrument: it compares the COST of two neighbour-search structures (Morton BVH against the hashed grid) and reports CHECK COUNTS, which are machine-independent where milliseconds are not. No page imports physics/sph/spatialGrid.js, so a row would be a pageless one, and there is no physical constant to put on a front door.",
     // *** v3419 -- heidler IS EXEMPT, AND THE MAP IS WHAT TALKED ME OUT OF AN INSTRUMENT ROW. *** I wrote one
     // with `page: null` -- the field for "deliberately no front door of its own" -- and got MISLINKED back:

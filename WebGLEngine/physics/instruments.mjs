@@ -21,6 +21,14 @@ export const INSTRUMENTS = [
       measures: "A D2Q9 lattice Boltzmann fluid, and the vortex street behind a cylinder.",
       key: "Poiseuille flow matches the exact analytic parabola to 0.07%, and the viscosity nu = (tau-1/2)/3 EMERGES -- it is never fed in.",
       gate: "tools/ship/physicsSuite.mjs" },
+    // *** v3853 -- voxelize GAINS AN INSTRUMENT RATHER THAN AN EXEMPTION, and the page is DERIVED not assumed:
+    // wind-tunnel.html is the only page that imports physics/mesh/voxelize.mjs, and it is the page that needs
+    // it (the tunnel takes a .glb and must turn it into an occupancy grid first). One page may carry several
+    // rows -- beam/device/hmc/method-lab/samplers already prove that -- so this sits beside wind-tunnel.
+    { id: "voxelise", device: "voxelize", page: "wind-tunnel.html", name: "Voxeliser", area: "fluids",
+      measures: "A triangle mesh turned into a solid occupancy grid by RAY PARITY, so the tunnel can be pointed at a real model. Refuses an open mesh rather than filling half the domain.",
+      key: "TWO convergences, and only one has a rate. meshVolume() is the divergence theorem over the triangles and its deficit against (4/3)pi r^3 falls SECOND ORDER as segments double -- ratios 3.80, 3.95, 3.99, approaching exactly 4 per doubling. voxelVolume() against meshVolume() does NOT converge monotonically and is reported as an agreement BOUND rather than a rate, because a cell-centre membership test has an O(h) signed error that oscillates.",
+      gate: "tools/roundhouse/voxelizeBind-selfcheck.mjs" },
     { id: "wind-tunnel", device: "windtunnel", page: "wind-tunnel.html", name: "Wind tunnel", area: "fluids",
       measures: "Drag and lift on a body by momentum exchange on its boundary links. Takes a .glb.",
       key: "At steady state the force on ALL solids equals the total applied body force -- matched to a ratio of 1.0000. Derived from momentum conservation and NOT what the measurement is built from, so it adjudicates independently; the first formula failed it by a NON-CONSTANT 2.6x-5.7x, which is why it was catchable.",
@@ -1044,6 +1052,12 @@ export const INSTRUMENTS = [
       measures: "The transfer in 3D: a 27-node stencil, angular momentum as a vector.",
       key: "All three identities lift to 3D. PIC loses 55.56% of EVERY component -- exactly 5/9 -- while its linear momentum error is BETTER than APIC's. THE INVERSION DID NOT GO AWAY WITH THE EXTRA DIMENSION.",
       gate: "tools/roundhouse/mpm3dBind-selfcheck.mjs" },
+    // *** v3853 -- fft GAINS AN INSTRUMENT, and its page is DERIVED: predictions.html is the only page that
+    // imports physics/fft.js. Parseval is a real answer key -- an identity the transform is never told.
+    { id: "fft-parseval", device: "fft", page: "predictions.html", name: "FFT / Parseval", area: "maths",
+      measures: "A discrete Fourier transform, its round trip, and where a pure tone lands in the bin index.",
+      key: "PARSEVAL'S IDENTITY, and it reads EXACTLY 0 at N = 64 -- not 1e-16, zero: the energy in the samples equals the energy in the coefficients, an identity the transform is never handed and cannot be tuned to. The round trip is held SEPARATELY at 2.22e-16, because an inverse that undid a wrong forward would pass that and fail Parseval. A pure tone lands in bin 5 of 64 where the analytic answer says 5.",
+      gate: "tools/roundhouse/fftBind-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

@@ -68,9 +68,9 @@ function rockSalt(L) {
     for (const p of cl) { pos.push(p[0] * L, p[1] * L, p[2] * L); q.push(-1); }
     return { pos: new Float64Array(pos), q: new Float64Array(q), N: 8 };
 }
-const madelungAt = (alpha, L = 1) => {
+const madelungAt = (alpha, L = 1, noSelf = false) => {
     const { pos, q, N } = rockSalt(L);
-    return -ewald(pos, q, N, L, { alpha: alpha / L, kmax: 8, rcut: L }).energy * L / 8;
+    return -ewald(pos, q, N, L, { alpha: alpha / L, kmax: 8, rcut: L, noSelf }).energy * L / 8;
 };
 
 export const MD_OBSERVABLES = [
@@ -86,7 +86,17 @@ export const MD_OBSERVABLES = [
 ];
 
 const MADELUNG = 1.7475645946;      // NaCl rock salt, published to ten places
-export const MD_MODES = ["madelung", "alphaFree", "bond", "coulomb", "torsion", "angles", "angleFreq", "angleLinear", "integrator"];
+// *** v3852 -- `noselfenergy` IS THE PLANT, AND `alphaFree` IS A CONTROL RATHER THAN ONE. *** plantedCoverage
+// read this device as UNCOVERED while its header advertised TWO load-bearing negatives, and the census was
+// right about both. alphaFree sweeps the Ewald splitting parameter and asserts the answer DOES NOT MOVE --
+// an INVARIANCE control, which moves the observable TO its ideal. angleLinear reports a predicted EXPONENT
+// for a linear molecule. Neither is a wrong method; neither is coverage.
+//
+// THE PLANT: drop E_self, the constant -(alpha/sqrt(pi)) sum q^2. *** IT CARRIES NO FORCE, SO EVERY FORCE
+// TEST IN THIS DEVICE STILL PASSES AND ONLY THE ENERGY IS WRONG *** -- which is exactly why it is the
+// canonical Ewald mistake. It is also the term that makes the total alpha-independent, so the same defect
+// that breaks the Madelung constant ALSO breaks alphaFree's invariance: one omission, both negatives.
+export const MD_MODES = ["madelung", "alphaFree", "bond", "coulomb", "torsion", "angles", "angleFreq", "angleLinear", "integrator", "noselfenergy"];
 
 export function mdDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
@@ -345,8 +355,10 @@ export async function buildMd(args = {}) {
                  angleLinearStiffKey: stiffKey(180, kang) };
     }
 
-    if (mode === "madelung") {
-        const M = madelungAt(alpha);
+    if (mode === "madelung" || mode === "noselfenergy") {
+        // The plant runs THIS fixture -- same lattice, same alpha, same cutoffs -- and drops only the
+        // constant self term, so the separation belongs to the sum and not to a second experiment.
+        const M = madelungAt(alpha, 1, mode === "noselfenergy");
         return { ...NONE, madelung: M, madelungErrFrac: Math.abs(M - MADELUNG) / MADELUNG };
     }
 
@@ -355,7 +367,9 @@ export async function buildMd(args = {}) {
 
 export const mdDevice = {
     name: "md-force-field",
+    // "madelung" stays FIRST: it owns madelungErrFrac, and the contract compares the plant against modes[0].
     modes: MD_MODES,
+    plantMode: "noselfenergy", plantFlips: "madelungErrFrac", plantKind: "knob",
     observables: MD_OBSERVABLES,
     build: buildMd,
     defaults: mdDefaults,
