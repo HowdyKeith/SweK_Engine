@@ -18,7 +18,7 @@ import inspector from "node:inspector";
 import path from "node:path";
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const require_ = createRequire(import.meta.url);
@@ -32,7 +32,13 @@ const say = (m) => console.log("  ----  " + m);
  * 1. A PROFILE WITH A KNOWN CALLER
  * --------------------------------------------------------------------------------------------------------- */
 const { profile, hot } = await (async () => {
-    const { getDevice } = await import(path.join(ENG, "tools/roundhouse/devices.mjs"));
+    // v3900 -- pathToFileURL, NOT A RAW PATH. On Windows an absolute path starts with "C:" and "c:"
+    // parses as a URL SCHEME, so the loader throws ERR_UNSUPPORTED_ESM_URL_SCHEME and THE GATE DIES
+    // rather than failing -- taking every check after it with it. Keith's rig hit exactly this on this
+    // file. windowsImport-selfcheck had been naming it (and claimCheck.mjs twice) all along: the guard
+    // written at v2997 for the first three offenders was reporting three more and nobody acted on it.
+    // *** A GUARD THAT NAMES A DEFECT NOBODY FIXES IS A GUARD THAT HAS ALREADY DONE ITS JOB. ***
+    const { getDevice } = await import(pathToFileURL(path.join(ENG, "tools/roundhouse/devices.mjs")).href);
     const dev = await getDevice("optics");
     // NAMED, not anonymous: the whole check is whether this name comes back out.
     async function theCallerWeAreLookingFor() { return dev.build({ mode: "airy" }); }

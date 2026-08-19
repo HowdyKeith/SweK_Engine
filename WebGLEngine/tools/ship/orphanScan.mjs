@@ -57,7 +57,23 @@ const isGateTool = (rel) => rel.startsWith(GATE_TOOL_DIR + "/");
 // every one of them "mentioned" and the scan reports zero. Third time in a single round that this scanner was
 // blinded by something describing it: first its own header comment, then prose docs, now its own output.
 // A file that RECORDS references is not a file that MAKES them.
+// v3900 -- *** THE RULE ABOVE WAS RIGHT AND WAS APPLIED TO ONE FILE BY NAME, SO TWO MORE WALKED IN. ***
+// v3126 excluded orphan-baseline.json because "a file that RECORDS references is not a file that MAKES them",
+// and then named a single file. Since then two more GENERATED RECORDS have arrived in tools/ship and both are
+// corpus: population-census.json (a list of every module path, which marks simulation/SpatialHash.js reached)
+// and duplicate-files-baseline.json (a list of byte-identical paths, which marks ai-bridge/haDiscovery.js
+// reached). Keith's rig ran baselineHygiene and it duly reported both suppressions STALE -- prescribing the
+// deletion of the protection on two files that are still orphans, one of which (SpatialHash) was ALREADY SWEPT
+// ONCE AT v3159 and had to be restored from a shipped zip.
+//
+// *** SO THE EXCLUSION IS A PROPERTY, NOT A LIST. *** A generated artefact declares its own provenance in this
+// tree -- populationCensus stamps `generatedFrom`, the baselines stamp `captured`/`generated` -- so the corpus
+// asks the file what it is instead of matching its name. A name list would need editing every time somebody
+// writes a new report, which is precisely the maintenance nobody does and how these two got in.
 const SKIP = /orphan-baseline\.json|node_modules|(^|[\\/])vendor[\\/]|\.git|render-qa[\\/]out|[\\/]dist[\\/]|\.min\./;
+/** A JSON file that declares it was generated is a RECORD of references, never a maker of them. */
+const isGeneratedRecord = (file, text) =>
+    /\.json$/.test(file) && /^\s*[{[]/.test(text) && /"(?:generatedFrom|generated|captured)"\s*:/.test(text.slice(0, 4096));
 const CODE = /\.(js|mjs)$/;
 // v3126 -- PROSE IS NOT REACHABILITY, and this cost a round to learn. The corpus first included .md and .txt,
 // and this scanner's OWN header names the orphans it was written for -- so documenting SSAOPass and SpatialHash
@@ -107,7 +123,14 @@ export function orphanScan(root) {
     const codeFiles = walk(root, CODE);
     const corpusFiles = walk(root, CORPUS);
     const texts = new Map();
-    for (const f of corpusFiles) { try { texts.set(f, stripComments(fs.readFileSync(f, "utf8"))); } catch { texts.set(f, ""); } }
+    for (const f of corpusFiles) {
+        try {
+            const raw = fs.readFileSync(f, "utf8");
+            // v3900 -- a generated record is dropped from the corpus entirely rather than stripped, because
+            // EVERY path in it is a mention and none of them is a call.
+            texts.set(f, isGeneratedRecord(f, raw) ? "" : stripComments(raw));
+        } catch { texts.set(f, ""); }
+    }
 
     const candidates = [];
     for (const f of codeFiles) {

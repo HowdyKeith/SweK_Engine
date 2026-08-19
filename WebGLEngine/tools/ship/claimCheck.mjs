@@ -30,7 +30,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gateFiles } from "./staleness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -63,13 +63,13 @@ export const CLAIM_SHAPES = [
     {
         id: "deviceNames",
         re: /\bDEVICE_NAMES\s+(\d{1,4})\b/g,
-        derive: async () => (await import(path.join(ENG, "tools", "roundhouse", "devices.mjs"))).DEVICE_NAMES.length,
+        derive: async () => (await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "devices.mjs")).href)).DEVICE_NAMES.length,
         note: "the registry's own export, not a regex over it",
     },
     {
         id: "instrumentRows",
         re: /\b(\d{1,4})\s+instrument rows\b/g,
-        derive: async () => (await import(path.join(ENG, "physics", "instruments.mjs"))).INSTRUMENTS.length,
+        derive: async () => (await import(pathToFileURL(path.join(ENG, "physics", "instruments.mjs")).href)).INSTRUMENTS.length,
         note: "instruments.mjs's own array length",
     },
 ];
