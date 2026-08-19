@@ -39,6 +39,13 @@ doc_env/
 EngineProject_*/
 *.zip
 *.tar.gz
+# ...but voxelcaster.zip is a DELIVERABLE, not a build artifact: it is the sideloaded
+# Roku channel (manifest + icon + 78 lines of BrightScript, 1.7 KB) that ai-bridge/
+# server.js POSTs to a TV's /plugin_install, and that ui/rokuRemotePanel.js offers as
+# "via sideloaded VoxelCaster channel". The *.zip rule above was aimed at EngineProject_*
+# forks and caught this as collateral; without it a fresh clone's cast button fails with
+# "couldn't read channel zip". The tools/ship/deleted/deleted_*.zip tombstones stay out.
+!WebGLEngine/roku-channel/voxelcaster.zip
 
 # Large/generated binaries — uncomment if you'd rather keep them off-repo (use Git LFS)
 # **/*.onnx
