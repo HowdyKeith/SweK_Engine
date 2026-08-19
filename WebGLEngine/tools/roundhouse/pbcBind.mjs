@@ -23,6 +23,24 @@
 // forces differ by 8.8e-1 -- the magnitude of the forces themselves. Not a subtle drift: the wrong pairs are
 // interacting entirely.
 //
+// *** v3845 -- THE PLANT WAS HERE ALL ALONG AND THE CENSUS COULD NOT SEE IT. *** This device has computed
+// wrapWRONG since v3301 and reported it as `plantedForceDiff`, and plantedCoverage HAS LISTED pbc AS UNCOVERED
+// FOR FIVE HUNDRED VERSIONS. The reason is one word boundary: readsPlantedKnob tests /\bplanted\b/ against the
+// bind's code, and `plantedForceDiff` does not match it -- the identifier continues into `F`, so the \b fails.
+// A REAL, LIVE, MEASURED PLANT WAS INVISIBLE TO THE CENSUS BUILT TO FIND PLANTS, and every reader of that
+// report has been told to go and write one.
+//
+// *** THIS IS "REACHABLE AND FINDABLE ARE TWO DIFFERENT EDITS" (v3766) IN ITS PUREST FORM YET -- the previous
+// instances hid a device behind a dynamic import or left a mode off a list, and this one hides a plant behind
+// a CAPITAL LETTER. *** The fix is not to rename the observable into matching a regex, which would be writing
+// code to satisfy a scanner; it is to declare the plant the way the census actually adjudicates plants -- as a
+// MODE whose named observable must flip, verified by building both arms. The plant did not change. What
+// changed is that the tree can now be asked about it.
+//
+// MEASURED, the two arms: worstForceDiff 2.331e-15 -> 1.0489, A SEPARATION OF 4.5e14 -- and the plant's value
+// is the size of the forces themselves (max |force| 0.9934). THE PLANT IS THE SIZE OF THE ANSWER, which is
+// what the header below has said since v3301 -- now on the record in a form the census reads.
+//
 // AND A TRAP THIS DEVICE HAD TO AVOID. makeFluid builds a PERFECT LATTICE, and on a perfect lattice every force
 // cancels by symmetry: the first measurement compared two routes that both returned ZERO and agreed exactly.
 // A comparison of zeros is the emptiest possible pass. The device jitters the positions first, and the gate
@@ -56,11 +74,20 @@ const worstDiff = (a, b) => {
 };
 
 function buildPbc({ mode = "agreement", config = {} } = {}) {
+    // *** THE VALIDATOR MUST LIST THE PLANT MODE, or the plant silently reverts and both arms read an
+    // IDENTICAL number -- v3806 lost a round to exactly that on flip2d. Anything unrecognised is the honest
+    // mode, and `wrapwrong` is recognised. ***
+    if (!PBC_MODES.includes(mode)) mode = "agreement";
     const c = { ...DEF, ...config };
     const f = jitteredFluid(c);
     const box = makeBox({ L: c.L, cutoff: c.cutoff });
 
-    const pbc = computeForcesPBC(f.pos, f.N, 1, 1, box);
+    // THE PLANT SITS ON THE ROUTE UNDER TEST, NOT ON THE ANSWER KEY. `agreement` grades minimum-image against
+    // the explicit image shell; `wrapwrong` grades the SAME shell against a minimum-image step that never
+    // applies the minimum-image displacement, so the wrong pairs interact entirely. The key does not move.
+    const pbc = mode === "wrapwrong"
+        ? wrapWRONG(f.pos, f.N, 1, 1, box)
+        : computeForcesPBC(f.pos, f.N, 1, 1, box);
     const img = computeForcesImages(f.pos, f.N, 1, 1, box, { shell: 1 });
     const bad = wrapWRONG(f.pos, f.N, 1, 1, box);
 
@@ -78,10 +105,14 @@ function buildPbc({ mode = "agreement", config = {} } = {}) {
     };
 }
 
+export const PBC_MODES = ["agreement", "wrapwrong"];
+
 export const pbcDevice = {
-    modes: ["agreement"],
+    // "agreement" stays FIRST so the mode-plant contract compares the plant against the mode that owns the key.
+    modes: PBC_MODES,
+    plantMode: "wrapwrong", plantFlips: "worstForceDiff", plantKind: "mode",
     name: "periodic-minimum-image", observables: PBC_OBSERVABLES, build: buildPbc,
-    defaults: ({ mode } = {}) => ({ mode: mode || "agreement", config: { ...DEF } }),
+    defaults: ({ mode } = {}) => ({ mode: PBC_MODES.includes(mode) ? mode : "agreement", config: { ...DEF } }),
 };
 
 export { makeBox };

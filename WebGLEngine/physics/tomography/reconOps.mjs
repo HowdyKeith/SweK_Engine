@@ -93,3 +93,44 @@ export function landweber(sino, N, angles, nDet, { iters = 300, step = null, x0 
     }
     return { x, step: lam, history, residual: residual(x, sino, N, angles, nDet) };
 }
+
+/**
+ * ================================================================================================================
+ * v3846 -- THE OBJECTIVE ENTRY POINT. SPLIT BY QUESTION, NOT BY VERDICT.
+ * ================================================================================================================
+ *
+ * v3616 left "move the default" as Keith's call and it is now settled, but NOT as "matched wins". Measured
+ * across the angle counts sirt.mjs actually publishes, on its own phantom at N = 96, the two operators CROSS
+ * OVER and no single default serves both ends:
+ *
+ *     nAngles      FBP        shipped @300      matched (converged)
+ *        12      0.874950     0.970618          0.954752   (residual 3.0e-4)
+ *        30      0.956257     0.987556          0.981497
+ *       120      0.987036     0.996503          0.999732   (residual 1.29)
+ *
+ * *** THE MATCHED OPERATOR'S CORRELATION SATURATES BELOW THE SHIPPED PAIR AT SPARSE ANGLES AND MORE BUDGET
+ * DOES NOT CLOSE IT -- 0.952483 at 300 iterations, 0.954752 at 2400, 0.954752 at 4800. That is not early
+ * stopping, it was checked to convergence. *** It is v3612's ambiguity from a third direction: the
+ * least-squares solution of an underdetermined system is not the best picture, so DESCENDING FURTHER ON
+ * ||Ax - b|| BUYS THE DATA AND DOES NOT BUY THE OBJECT. At 120 views the system is determined enough that the
+ * two agree about what the data means, and the matched operator wins outright on both numbers.
+ *
+ * SO THE SPLIT IS BY QUESTION AND BOTH DEFAULTS ARE RIGHT FOR THEIRS:
+ *
+ *     landweber()         RECONSTRUCTION. Defaults to backProject. v3613's published correlations stay
+ *                         reproducible and its hash-pinned table does not move. Must be STOPPED EARLY --
+ *                         this pair turns round, and that is now gated rather than remembered.
+ *     landweberDescent()  THE OBJECTIVE. Defaults to matchedBackProject. Anything that claims to MINIMISE
+ *                         a residual belongs here, because the other pair provably does not minimise it.
+ *
+ * *** THE CONCRETE DEFECT THIS FIXES IS IN A GATE, NOT IN A PAGE. sirt-selfcheck's section 2 asserted "the
+ * residual falls at every checkpoint" over 200 iterations USING THE OPERATOR THAT DOES NOT DESCEND. Measured
+ * on that gate's own fixture (N = 48, 24 angles): the shipped pair bottoms out at iteration ~750 and RISES
+ * from 4.345 to 7.556 by 4000, while the matched operator falls monotonically to 0.2945 and is still falling.
+ * THE CLAIM WAS TRUE ONLY INSIDE A BUDGET THAT HID THE DEFECT, which is the same shape as a tolerance chosen
+ * by looking at where the measurement landed. ***
+ */
+export function landweberDescent(sino, N, angles, nDet, opts = {}) {
+    const adjoint = opts.adjoint || ((r) => matchedBackProject(r, N, angles, nDet));
+    return landweber(sino, N, angles, nDet, { ...opts, adjoint });
+}

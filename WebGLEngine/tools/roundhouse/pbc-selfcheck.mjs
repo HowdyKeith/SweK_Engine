@@ -96,6 +96,47 @@ const o = await dev.build({ mode: "agreement" });
         `source "${m.source}", modes ${JSON.stringify(m.declared)}`);
 }
 
+// ---- 7. THE MODE PLANT, DECLARED SO THE CENSUS CAN ADJUDICATE IT (v3845) --------------------------------------
+// *** THE PLANT IS NOT NEW. THE DECLARATION IS. *** wrapWRONG has been computed here since v3301 and reported
+// as `plantedForceDiff` -- and plantedCoverage listed pbc as UNCOVERED the whole time, because its source scan
+// tests /\bplanted\b/ and `plantedForceDiff` fails that word boundary on the capital F. This section pins the
+// declaration itself, so the thing that was invisible cannot go quiet again.
+{
+    const planted = await dev.build({ mode: "wrapwrong" });
+
+    ok("!! the plant is DECLARED in the shape the census adjudicates -- plantMode / plantFlips / plantKind",
+        dev.plantMode === "wrapwrong" && dev.plantFlips === "worstForceDiff" && dev.plantKind === "mode" &&
+        dev.modes.includes("wrapwrong") && dev.modes[0] === "agreement",
+        'modes ' + JSON.stringify(dev.modes) + ' -- "agreement" stays FIRST so the contract compares the plant ' +
+        "against the mode that owns the key. A mode that is not in the list is not a plant, and probeModePlant " +
+        "checks exactly that before it builds anything");
+
+    ok("!! and the DECLARED observable actually flips, which is the whole contract",
+        Number.isFinite(planted.worstForceDiff) && Number.isFinite(o.worstForceDiff) &&
+        planted.worstForceDiff > 1e6 * o.worstForceDiff,
+        `worstForceDiff ${o.worstForceDiff.toExponential(3)} -> ${planted.worstForceDiff.toExponential(3)}. ` +
+        "A DECLARATION IS NOT A CAPABILITY (v3081): reading `plantMode` off a config proves the identifier " +
+        "exists, not that the mode moves anything. This builds both arms and compares");
+
+    ok("!! the plant is the SIZE OF THE ANSWER, not a drift",
+        planted.worstForceDiff > 0.5 * o.maxForceMagnitude,
+        `${planted.worstForceDiff.toFixed(4)} against forces up to ${o.maxForceMagnitude.toFixed(4)}. Disabling ` +
+        "minimum image does not perturb the answer -- the wrong pairs are interacting entirely");
+
+    ok("!! the ANSWER KEY does not move under the plant, so the separation is the route's and not the key's",
+        Math.abs(planted.virialImages - o.virialImages) < 1e-9 * Math.abs(o.virialImages),
+        `virialImages ${o.virialImages.toFixed(6)} -> ${planted.virialImages.toFixed(6)}. The plant sits on the ` +
+        "minimum-image route under test; the explicit 3x3x3 shell it is graded against is untouched. A plant " +
+        "that moved BOTH arms would be measuring nothing");
+
+    ok("...and the validator LISTS the plant mode, so it cannot silently revert",
+        (await dev.build({ mode: "nonsense-mode" })).worstForceDiff < 1e-12 &&
+        dev.defaults({ mode: "wrapwrong" }).mode === "wrapwrong",
+        "v3806 wrote a validator as `if (mode !== primary) mode = primary` and SILENTLY REVERTED the plant -- " +
+        "both arms read an identical number and the plant fired at nothing. An unrecognised mode falls back to " +
+        "`agreement`; `wrapwrong` survives the validator");
+}
+
 console.log();
 if (fails) { console.log("pbc-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("pbc-selfcheck: all checks pass");

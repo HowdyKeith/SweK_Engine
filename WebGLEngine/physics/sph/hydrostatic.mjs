@@ -22,15 +22,24 @@ import { createSphWorld } from "./sph.js";
 // dead `mu` (v3517) in the fluid: INVARIANT BECAUSE UNREAD, with the register about to record the wrong
 // reason. Both are now parameters; THE DEFAULTS ARE UNCHANGED, so every existing row is bit-identical, and
 // materialKnobs-selfcheck asserts that by passing the defaults explicitly and demanding the same opts back.
+// *** v3845 -- `surfacePacking` DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE INTERIOR FILTER BELOW,
+// WHICH IS THE ONE JUDGEMENT THIS PROBE MAKES. *** An SPH density estimate is a kernel sum over neighbours, so
+// a particle AT THE SURFACE has only half a neighbourhood and reads LOW -- not because the packing is looser
+// there, but because the support is truncated. Averaging over all 686 particles instead of the 441 interior
+// ones therefore reports the SURFACE DEFICIT as if it were the lattice's density. THE CANONICAL SPH MISTAKE,
+// and this file's entire recorded history (v2484 / v2494 / v2881 / v2883) is about getting rho0 right.
+// Every existing row is unchanged at the default.
 export function makeColumn({ eos = "ideal", restDensity = null, soundSpeed = null, spacing = 0.05,
                              nx = 7, ny = 14, nz = 7, h = 0.1, mass = 0.02, stiffness = 8,
-                             viscosity = 0.1, gamma = 7 } = {}) {
+                             viscosity = 0.1, gamma = 7, surfacePacking = false } = {}) {
     // Measure the packing's density with gravity OFF before deciding anything.
     const probe = createSphWorld({ h, mass, restDensity: 1, gravity: [0, 0, 0] });
     for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++)
         probe.addParticle([0.15 + i * spacing, 0.05 + j * spacing, 0.15 + k * spacing]);
     probe.computeDensity();
-    const interior = probe.particles.filter((p) => p.y > 0.15 && p.y < 0.6).map((p) => p.rho);
+    // v3845 -- the plant drops the interior filter. INTERIOR ONLY is the shipped, correct estimate.
+    const sample = surfacePacking ? probe.particles : probe.particles.filter((p) => p.y > 0.15 && p.y < 0.6);
+    const interior = sample.map((p) => p.rho);
     const packed = interior.reduce((a, b) => a + b, 0) / Math.max(1, interior.length);
 
     const rho0 = restDensity == null ? packed : restDensity;

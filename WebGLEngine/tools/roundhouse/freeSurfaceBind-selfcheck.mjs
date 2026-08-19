@@ -14,7 +14,7 @@
 // The device's own two claims and how each is shown to have power:
 //   vessels -- gapEnvelope <= 1 cell. NEGATIVE CONTROL: the SAME fixture run shorter FAILS it (section 3).
 //   depth   -- depthErrFrac <= 0.15. PLANT: v3540's minimum-cell surface passes the gap and fails this.
-import { buildFreeSurface, vesselFixture, freeSurfaceDefaults, FREESURFACE_OBSERVABLES } from "./freeSurfaceBind.mjs";
+import { buildFreeSurface, vesselFixture, freeSurfaceDefaults, freeSurfaceDevice, FREESURFACE_OBSERVABLES } from "./freeSurfaceBind.mjs";
 import { surfaceCells, levelness, volumeHeight, occupancy } from "../../fluid/freeSurface.mjs";
 import { Flip2D } from "../../fluid/flip2d.mjs";
 
@@ -200,6 +200,44 @@ report("WHAT THIS DOES NOT CLAIM",
     "volumeHeight are all exercised on a real settled fluid; a 3D free surface, a moving container and the " +
     "surface's behaviour under a lid are UNGRADED. gradedCoverage moves by ONE MODULE, and the honest reading " +
     "of that is 'this module now has a key', not 'this module is correct'.");
+
+// ---- THE MODE PLANT, AND THE OBSERVABLE IT DELIBERATELY DOES NOT USE (v3845) ---------------------------------
+// *** THIS DEVICE'S HEADER HAS DESCRIBED THIS DEFECT SINCE v3728 AND NEVER DECLARED IT. *** The argument for
+// keeping the `depth` mode is "reimplement v3540's shipped bug -- take the MINIMUM cell per column instead of
+// the maximum -- and the gap reads 0.0000, a perfect pass". That is an argument AND a plant, and leaving it as
+// prose meant the census could not ask this device what it would catch. A MEASUREMENT MADE IN A COMMENT IS NOT
+// COVERAGE.
+{
+    const dev = freeSurfaceDevice;
+    const honest = await buildFreeSurface({ mode: "vessels" });
+    const planted = await buildFreeSurface({ mode: "mincell" });
+
+    ok("!! the plant is DECLARED in the shape the census adjudicates -- plantMode / plantFlips / plantKind",
+        dev.plantMode === "mincell" && dev.plantFlips === "depthErrFrac" && dev.plantKind === "mode" &&
+        dev.modes.includes("mincell") && dev.modes[0] === "vessels",
+        "modes " + JSON.stringify(dev.modes) + ' -- "vessels" stays FIRST so the contract compares the plant ' +
+        "against the mode that owns the fixture");
+
+    ok("!! the DECLARED observable flips across its bar: depthErrFrac",
+        planted.depthErrFrac > 0.15 && honest.depthErrFrac < 0.15,
+        `${honest.depthErrFrac.toFixed(4)} -> ${planted.depthErrFrac.toFixed(4)} against a bar of 0.15 -- ` +
+        `${(planted.depthErrFrac / 0.15).toFixed(2)}x over. depthObserved ${honest.depthObserved} -> ` +
+        `${planted.depthObserved}: taking the minimum cell reports THE CONTAINER FLOOR instead of the surface`);
+
+    ok("!! *** AND THE OTHER KEY IMPROVES UNDER THE DEFECT, WHICH IS WHY IT IS NOT THE DECLARED OBSERVABLE ***",
+        planted.gapEnvelope < honest.gapEnvelope && planted.gapEnvelope === 0,
+        `gapEnvelope ${honest.gapEnvelope.toFixed(4)} -> ${planted.gapEnvelope.toFixed(4)} -- EXACTLY ZERO, a ` +
+        "PERFECT pass, because the container floor is level too. *** A PLANT DECLARED AGAINST gapEnvelope " +
+        "WOULD HAVE READ AS THE CODE GETTING BETTER AND SHIPPED A PLANT THAT CERTIFIED THE BUG. Choosing the " +
+        "observable is the whole of the mode-plant contract; a defect that moves a key the RIGHT way is the " +
+        "failure mode it exists to expose. ***");
+
+    ok("...and the validator LISTS the plant mode, so it cannot silently revert",
+        (await buildFreeSurface({ mode: "nonsense-mode" })).depthErrFrac === honest.depthErrFrac &&
+        freeSurfaceDefaults({ mode: "mincell" }).mode === "mincell",
+        "v3806 lost a round to a validator written as a two-name test that reverted its plant in silence -- " +
+        "both arms read an identical number and the plant fired at nothing");
+}
 
 console.log(`\nfreeSurfaceBind-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);

@@ -79,12 +79,31 @@
 // (per=4) across three seeds each, so 0.15 leaves a 2.84x margin, and the minimum-cell plant fires at 0.8944
 // -- 5.96x the bar. THE RESIDUE IS THE PACKING, NOT NOISE, which is why the bar is 15% and not 1%.
 //
-// NOT PLANTED. The curriculum asked for a GRADE and this is a grade; a plant for freeSurface is a separate
-// round. NOT CLAIMED: that fluid/freeSurface.mjs is verified. occupancy's binning, the `frac` threshold and
+// *** PLANTED AT v3845, AND THE PLANT IS THE ONE THIS HEADER ALREADY NAMED AND MEASURED. *** The paragraph
+// above about the two modes covering each other's blindness says it outright: reimplement v3540's shipped bug
+// -- take the MINIMUM cell per column instead of the maximum -- and `vessels` reads a gap of 0.0000, A PERFECT
+// PASS, because the container floor is level too. That was written as an argument for keeping `depth`. IT IS
+// ALSO A PLANT, and leaving it as prose meant the census could not ask this device what it would catch.
+//
+// *** SO THE PLANT'S REAL SUBJECT IS THE GATE'S OWN BLIND SPOT, WHICH IS THE STRONGEST THING A PLANT CAN DO
+// HERE. The declared observable is `depthErrFrac` and NOT `gapEnvelope`, because gapEnvelope IMPROVES under
+// the defect -- 0.0526 -> 0.0000 -- and a plant declared against it would read as the code getting BETTER.
+// A DEFECT THAT MOVES A KEY THE RIGHT WAY IS THE FAILURE MODE THE MODE-PLANT CONTRACT EXISTS TO EXPOSE, and
+// naming the wrong observable here would have shipped a plant that certified the bug. ***
+//
+// MEASURED, the two arms at the device default: depthErrFrac 0.0500 -> 0.8944 (17.9x, and 5.96x its bar of
+// 0.15) while gapEnvelope goes 0.0526 -> 0.0000. THE PAIR IS THE POINT.
+//
+// The plant reimplements ONLY the max/min decision and reuses the shipped `occupancy` binning, so what it
+// perturbs is the one line v3540 got wrong and nothing else.
+//
+// NOT CLAIMED: that fluid/freeSurface.mjs is verified. occupancy's binning, the `frac` threshold and
 // volumeHeight's arithmetic are exercised; nothing here grades a 3D free surface or a moving container.
 
-import { surfaceCells, levelness, volumeHeight } from "../../fluid/freeSurface.mjs";
+import { surfaceCells, levelness, volumeHeight, occupancy } from "../../fluid/freeSurface.mjs";
 import { Flip2D } from "../../fluid/flip2d.mjs";
+
+export const FREESURFACE_MODES = ["vessels", "depth", "mincell"];
 
 export const FREESURFACE_OBSERVABLES = [
     "gapInitial", "gapInitialExact", "sdInitial",
@@ -119,9 +138,12 @@ export function freeSurfaceDefaults(hyp) {
     c.leftTall = Math.min(c.ny - 4, Math.max(2, num(c.leftTall, DEF.leftTall) | 0));
     c.rightTall = Math.min(c.leftTall - 1, Math.max(1, num(c.rightTall, DEF.rightTall) | 0));
     h.config = c;
-    if (h.mode !== "vessels" && h.mode !== "depth") h.mode = "vessels";
+    // *** THE VALIDATOR MUST LIST THE PLANT MODE. Written as a two-name test it SILENTLY REVERTS `mincell`
+    // to `vessels`, both arms read an identical number, and the plant fires at nothing -- v3806 lost a round
+    // to exactly that shape on flip2d. REACHABLE AND FINDABLE ARE TWO DIFFERENT EDITS (v3766). ***
+    if (!FREESURFACE_MODES.includes(h.mode)) h.mode = "vessels";
     if (!h.claim || !h.claim.observable) {
-        h.claim = h.mode === "depth"
+        h.claim = (h.mode === "depth" || h.mode === "mincell")
             ? { observable: "depthErrFrac", max: 0.15 }
             : { observable: "gapEnvelope", max: 1 };
     }
@@ -136,6 +158,24 @@ function lcg(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1103515245 
  * copies of a fixture are two declarations about one experiment that nobody ever compares -- and a plant
  * measured against a fixture the plant's own file wrote proves nothing about the shipped one.
  */
+/**
+ * *** THE PLANT: v3540'S SHIPPED BUG, REIMPLEMENTED AS ONE COMPARISON. *** surfaceCells keeps the MAXIMUM
+ * occupied cell per column because gravity decreases y here, so the maximum is the free surface and the
+ * minimum is the container floor. Taking the minimum reports THE BOTTOM OF THE FLUID -- flat by construction,
+ * sitting on the floor -- which is why it reads as a perfect level and a wrecked depth. Everything else is the
+ * shipped path: the same `occupancy` binning, the same `frac * perCellFull` threshold, the same sort.
+ */
+function surfaceCellsMIN(px, py, h, perCellFull, frac = 0.5) {
+    const cnt = occupancy(px, py, h);
+    const bot = new Map();
+    for (const [k, v] of cnt) {
+        if (v < frac * perCellFull) continue;
+        const i = k.indexOf(","), cx = +k.slice(0, i), cy = +k.slice(i + 1);
+        if (!bot.has(cx) || cy < bot.get(cx)) bot.set(cx, cy);   // MIN -- the floor, not the surface
+    }
+    return [...bot.entries()].sort((a, b) => a[0] - b[0]).map(([cx, cy]) => ({ cx, cy }));
+}
+
 export function vesselFixture(c) {
     const full = c.per * c.per;                 // fillBlock lays perCell particles PER AXIS -- a cell gets its square
     const mid = Math.floor(c.nx / 2);
@@ -153,8 +193,9 @@ export async function buildFreeSurface(hyp, base = {}) {
     const particles = f.count();
     if (particles < 4 * full) return { error: "not-enough-particles (the fill produced nothing to measure)" };
 
+    const surfaceOf = h.mode === "mincell" ? surfaceCellsMIN : surfaceCells;
     const read = () => {
-        const s = surfaceCells(f.px, f.py, f.h, full, 0.5);
+        const s = surfaceOf(f.px, f.py, f.h, full, 0.5);
         const L = s.filter((e) => e.cx < mid), R = s.filter((e) => e.cx >= mid);
         const mean = (a) => (a.length ? a.reduce((x, e) => x + e.cy, 0) / a.length : NaN);
         const lv = levelness(s);
@@ -200,7 +241,10 @@ export async function buildFreeSurface(hyp, base = {}) {
 }
 
 export const freeSurfaceDevice = {
-    modes: ["vessels", "depth"],
+    // "vessels" stays FIRST so the contract compares the plant against the mode that owns the fixture.
+    modes: FREESURFACE_MODES,
+    // *** `depthErrFrac` AND NOT `gapEnvelope`: the defect IMPROVES the gap (0.0526 -> 0.0000). See the header.
+    plantMode: "mincell", plantFlips: "depthErrFrac", plantKind: "mode",
     name: "freesurface-vessels",
     observables: FREESURFACE_OBSERVABLES,
     build: buildFreeSurface,
@@ -230,5 +274,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log("  the point gap reads 0.0526 while the envelope from there to 3000 is 2.9474.");
     console.log("  THE GAP IS A DIFFERENCE, so the settled packing constant cancels -- which is the thing");
     console.log("  volumeHeight cannot do, since the density a fluid relaxes into is a RESULT, not an input.");
-    console.log("  NOT CLAIMED: that freeSurface.mjs is verified. NOT PLANTED: a plant here is a separate round.");
+    console.log("  NOT CLAIMED: that freeSurface.mjs is verified. PLANTED at v3845: `mincell` takes the floor instead\n  of the surface -- depthErrFrac 0.0500 -> 0.8944 WHILE gapEnvelope IMPROVES to 0.0000.");
 }

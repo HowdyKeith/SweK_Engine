@@ -11,7 +11,7 @@
 // show is a fact about the data. AND THE SEEDED FORM IS STRONGER THAN A TIE -- both seeds sit at residual
 // EXACTLY zero, which is asserted as zero because it is zero.
 import {
-    sirt, stepFor, residual, methodGain, seedExperiment, PHANTOM, MEASURED_V3613, reportLines,
+    sirt, sirtDescent, stepFor, residual, methodGain, seedExperiment, PHANTOM, MEASURED_V3613, MEASURED_V3846, reportLines,
 } from "./sirt.mjs";
 import { radon, backProject, filteredBackProjection, scoreRecon, phantomField, angleSet } from "./ct.js";
 import { binaryPair, PAIR, LATTICE_ANGLES, PLUS_DIAGONALS } from "./ambiguity.mjs";
@@ -39,18 +39,70 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
        "N=" + N + " -> " + s.step.toExponential(3) + ", N=" + (N * 2) + " -> " + s2.step.toExponential(3));
 }
 
-// ---- 2. IT CONVERGES, AND THE RESIDUAL IS THE THING THAT FALLS -------------------------------------------------------
+// ---- 2. THE DESCENT CLAIM, ON THE OPERATOR THAT OWNS IT -- AND THE BUDGET THAT USED TO HIDE THE DEFECT ------
+// *** v3846 -- THIS SECTION USED TO ASSERT "the residual falls at every checkpoint" OVER 200 ITERATIONS USING
+// sirt(), WHICH DOES NOT DESCEND. *** The claim was true, and it was true only inside a budget short enough to
+// stop before the turn -- the same shape as a tolerance chosen by looking at where the measurement landed.
+// v3616 proved the shipped pair turns round; nothing propagated that into the gate that makes the descent
+// claim. THE CLAIM NOW RUNS ON sirtDescent() AND PAST THE TURN, and the negative below is what makes the
+// split evidence rather than preference.
 {
     const N = 48, nDet = 48, angles = angleSet(24);
     const truth = phantomField(N, PHANTOM), b = radon(truth, N, angles, nDet);
+
+    // THE OBJECTIVE HALF: matched adjoint, run four thousand iterations -- five times past where the shipped
+    // pair bottoms out, so a claim of descent has somewhere to fail.
+    const d = sirtDescent(b, N, angles, nDet, { iters: 4000, every: 250 });
+    const hd = d.history.map((e) => e.residual);
+    ok("!! the residual falls at EVERY checkpoint, over 4000 iterations", hd.every((v, i) => i === 0 || v <= hd[i - 1]),
+       hd.filter((_, i) => i % 4 === 0).map((v) => v.toExponential(2)).join(" -> ") +
+       " -- Landweber's theorem says a matched operator with a step inside the spectral bound cannot increase " +
+       "the residual, and this is that statement driven rather than quoted");
+    ok("!! ...and it falls three orders, so this is convergence and not a nudge", hd[0] / hd[hd.length - 1] > 1000,
+       (hd[0] / hd[hd.length - 1]).toExponential(2) + "x -- asserted as a RATIO of its own first reading");
+
+    // *** THE NEGATIVE, AND IT IS THE REASON THE SPLIT EXISTS. Same fixture, same budget, shipped operator. ***
+    const u = sirt(b, N, angles, nDet, { iters: 4000, every: 250 });
+    const hu = u.history.map((e) => e.residual);
+    const minU = Math.min(...hu), minAt = hu.indexOf(minU) * 250;
+    ok("!! *** AND THE SHIPPED PAIR IS NOT MONOTONE ON THE SAME FIXTURE -- IT TURNS ROUND ***",
+       !hu.every((v, i) => i === 0 || v <= hu[i - 1]) && hu[hu.length - 1] > minU * 1.5,
+       `bottoms out at ${minU.toExponential(4)} near iteration ${minAt}, then RISES to ` +
+       `${hu[hu.length - 1].toExponential(4)} by 4000. *** THE OLD CHECK RAN 200 ITERATIONS AND PASSED. A ` +
+       "SHORT ENOUGH BUDGET MAKES A NON-DESCENT METHOD LOOK LIKE A DESCENT METHOD, which is why the objective " +
+       "claim moved to the operator that can carry it ***");
+    ok("...so the two operators genuinely differ on the objective, not by a rounding",
+       minU / hd[hd.length - 1] > 10,
+       `the shipped pair's BEST residual (${minU.toExponential(3)}) is still ` +
+       `${(minU / hd[hd.length - 1]).toFixed(1)}x the matched operator's LAST (${hd[hd.length - 1].toExponential(3)})`);
+
+    // THE RECONSTRUCTION HALF STAYS ON THE SHIPPED OPERATOR AND ITS BUDGET, UNCHANGED.
     const r = sirt(b, N, angles, nDet, { iters: 200, every: 25 });
-    const h = r.history.map((e) => e.residual);
-    ok("the residual falls at every checkpoint", h.every((v, i) => i === 0 || v <= h[i - 1]),
-       h.map((v) => v.toExponential(2)).join(" -> "));
-    ok("...and it falls a long way, so this is convergence and not a nudge", h[0] / h[h.length - 1] > 10,
-       (h[0] / h[h.length - 1]).toExponential(2) + "x -- asserted as a RATIO of its own first reading");
     ok("the reconstruction is a good match to the truth it was built from", scoreRecon(r.x, truth).corr > 0.9,
-       "corr " + scoreRecon(r.x, truth).corr.toFixed(6) + " against the ellipse phantom the device owns");
+       "corr " + scoreRecon(r.x, truth).corr.toFixed(6) + " against the ellipse phantom the device owns -- " +
+       "sirt() and its 200-iteration budget are UNCHANGED, because the picture is the question it answers");
+}
+
+// ---- 2b. THE CROSSOVER, WHICH IS WHY THE DEFAULT WAS SPLIT AND NOT MOVED (v3846) ----------------------------
+// *** MEASURED BEFORE THE CHANGE, NOT AFTER. *** v3616 recommended the matched adjoint off one 16-angle
+// reading. Swept over the angle counts this file publishes, the operators CROSS OVER -- and moving the default
+// wholesale would have regressed FINDING 1's headline at the sparse end.
+{
+    const c = MEASURED_V3846.crossover;
+    ok("!! the shipped pair wins at the SPARSE end and the matched one wins at the DENSE end",
+       c[12].shipped300 > c[12].matchedConverged && c[30].shipped300 > c[30].matchedConverged &&
+       c[120].matchedConverged > c[120].shipped300,
+       `12 views ${c[12].shipped300.toFixed(6)} vs ${c[12].matchedConverged.toFixed(6)} (shipped); ` +
+       `120 views ${c[120].shipped300.toFixed(6)} vs ${c[120].matchedConverged.toFixed(6)} (matched). ` +
+       "*** NO SINGLE DEFAULT SERVES BOTH ENDS, which is what 'split by question' means here ***");
+    ok("!! ...and the sparse-end gap is SATURATION, not budget -- recorded because it is what settled the call",
+       (MEASURED_V3846.saturationIsNotEarlyStopping || "").includes("CHECKED TO CONVERGENCE"),
+       "0.952483 at 300 iterations, 0.954752 at 2400, 0.954752 at 4800, residual down to 3.0e-4. The " +
+       "least-squares answer is a worse PICTURE than the regularised one -- v3612's ambiguity from a third " +
+       "direction, and the reason descending further buys the data and not the object");
+    ok("...and the cost of moving it wholesale is recorded rather than discovered later",
+       (MEASURED_V3846.whatMovingItWholesaleWouldHaveCost || "").includes("+0.0957"),
+       "FINDING 1's gain at twelve views would have fallen +0.0957 -> +0.0776");
 }
 
 // ---- 3. THE OTHER HALF OF THE LABEL: PART OF THE SPARSE-ANGLE LOSS IS THE METHOD --------------------------------------

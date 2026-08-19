@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!-- lab-census.html -- v3849 -- THE LAB'S COVERAGE IN ONE PLACE.
+     Four censuses (graded, plants, corroboration, instruments) each answered their own question correctly and
+     each printed its own prose, so nobody could state the lab's coverage without running four tools and holding
+     four numbers -- and the numbers in the notes went stale, which is how this page got commissioned. A fifth row
+     was invisible entirely: whether the dispatcher wired at v3848 is actually ticking.
+     THE PAGE COMPUTES NOTHING. Every figure comes from GET /lab/census, which serves tools/ship/labCensus.mjs,
+     which imports each census from the tool that OWNS it. A number typed into this file would be the next stale
+     copy of exactly the kind this page exists to stop. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Lab census">
+<meta name="demo:desc" content="The physics lab's coverage in one read: how many proven modules a device bind reaches, how many binds declare a plant, how many devices can face the four-criterion corroboration battery, how many are reachable from an instrument, and whether the job dispatcher is actually ticking. Every figure is imported from the tool that owns it -- the page re-derives nothing, which is the whole point: four censuses that each print their own prose is why the numbers in the notes went stale.">
+<meta name="demo:category" content="tools">
+<title>Lab census</title>
+<style>
+  :root { --bg:#0d1117; --ink:#c9d4e2; --dim:#6b7d92; --line:#233043; --ok:#5fe08a; --warn:#f0b74a; --bad:#ff6b7a; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:14px ui-monospace,Menlo,monospace; }
+  header { padding:20px 24px 10px; }
+  h1 { margin:0 0 6px; font-size:19px; }
+  header p { margin:0; color:var(--dim); font-size:12.5px; max-width:76ch; line-height:1.55; }
+  main { padding:8px 24px 32px; max-width:1000px; }
+  .row { border:1px solid var(--line); border-radius:6px; padding:12px 14px; margin:10px 0; background:#111823; }
+  .head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .id { font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:12px; }
+  .frac { font-size:18px; }
+  .pct { color:var(--dim); }
+  .what { color:var(--dim); font-size:12.5px; margin:5px 0 0; }
+  .bar { height:6px; background:#1b2532; border-radius:3px; margin:9px 0 7px; overflow:hidden; }
+  .fill { height:100%; }
+  .caveat { color:var(--dim); font-size:12px; line-height:1.5; border-left:2px solid var(--line); padding-left:9px; margin-top:7px; }
+  .owner { color:#4a5c72; font-size:11.5px; margin-top:6px; }
+  .tag { border:1px solid var(--line); border-radius:3px; padding:1px 6px; font-size:11px; }
+  #err { color:var(--bad); padding:14px 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Lab census</h1>
+  <p>Five questions about the physics lab, answered in one read. Every figure is imported from the tool that owns
+     it &mdash; <code>gradedCoverage</code>, <code>plantedCoverage</code>, the knob registries,
+     <code>deviceInstrumentMap</code> and the job queue. This page re-derives nothing, because a second copy of a
+     census is how the first one stops being true.</p>
+</header>
+<main id="out"><p style="color:var(--dim)">reading&hellip;</p></main>
+<div id="err"></div>
+<script type="module">
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+const colourFor = (r) => {
+  if (r.id === "dispatcher") return r.pulse.state === "recent" ? "var(--ok)" : (r.pulse.state === "stale" ? "var(--warn)" : "var(--bad)");
+  if (!r.total) return "var(--dim)";
+  const f = r.have / r.total;
+  return f >= 0.6 ? "var(--ok)" : (f >= 0.3 ? "var(--warn)" : "var(--bad)");
+};
+try {
+  const j = await (await fetch("/lab/census", { cache: "no-store" })).json();
+  if (!j.ok) throw new Error(j.error || "refused");
+  document.getElementById("out").innerHTML = j.rows.map((r) => {
+    const pct = r.total ? (100 * r.have / r.total) : 0;
+    const col = colourFor(r);
+    // the dispatcher row is a STATE, not a fraction -- rendering it as a percentage would invent a scale
+    const frac = r.id === "dispatcher"
+      ? `<span class="frac" style="color:${col}">${esc(r.pulse.state)}</span> <span class="pct">${r.total ? r.have + " of " + r.total + " jobs made by the dispatcher" : "queue empty"}</span>`
+      : `<span class="frac">${r.have} <span class="pct">of ${r.total}</span></span> <span class="pct">${pct.toFixed(1)}%</span>`;
+    return `<div class="row">
+      <div class="head"><span class="id" style="color:${col}">${esc(r.id)}</span> ${frac}</div>
+      <p class="what">${esc(r.what)}</p>
+      ${r.id === "dispatcher" ? "" : `<div class="bar"><div class="fill" style="width:${pct.toFixed(1)}%;background:${col}"></div></div>`}
+      ${r.unexplained && r.unexplained.length ? `<p class="what">unexplained: ${r.unexplained.map((u) => `<span class="tag">${esc(u)}</span>`).join(" ")}</p>` : ""}
+      ${r.outsideRegistry && r.outsideRegistry.length ? `<p class="what">declared outside the registry: ${r.outsideRegistry.map((u) => `<span class="tag">${esc(u)}</span>`).join(" ")}</p>` : ""}
+      <p class="caveat">${esc(r.caveat)}</p>
+      <p class="owner">owner &middot; ${esc(r.owner)}</p>
+    </div>`;
+  }).join("");
+} catch (e) {
+  document.getElementById("err").textContent = "✗ " + (e && e.message || e) + " — this page needs the hub (GET /lab/census).";
+  document.getElementById("out").innerHTML = "";
+}
+</script>
+</body>
+</html>

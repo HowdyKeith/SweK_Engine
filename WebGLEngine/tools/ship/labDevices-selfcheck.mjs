@@ -432,7 +432,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     ["kerr", buildKerr, kerrDevice, ["spin", "limit", "extremal"]],
                     ["ct", buildCT, ctDevice, ["parallel", "fan"]],
                     ["interferometer", buildInterferometer, interferometerDevice, ["recover", "nounwrap"]],
-                    ["windtunnel", buildFluid, fluidDevice, ["balance", "drag"]],
+                    ["windtunnel", buildFluid, fluidDevice, ["balance", "drag", "sourceconfusion"]],   // v3845: + the declared reader plant
                     ["thermal", buildThermal, thermalDevice, ["diffuse", "convect"]],
                     ["pipe3d", buildPipe, pipeDevice, ["profile", "noslip"]],
                     ["geometry", buildGeometry, geometryDevice, ["sphere", "converge", "blob"]],
@@ -565,7 +565,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 
     const d = await buildFreeSurface({ mode: "depth" });
     ok("freesurface: declares its modes and every measured key is declared",
-        freeSurfaceDevice.modes.length === 2 &&
+        freeSurfaceDevice.modes.length === 3 &&               // v3845: + the `mincell` plant mode
         [r, d].every((o) => Object.keys(o).every((k) => freeSurfaceDevice.observables.includes(k))));
 }
 
@@ -582,7 +582,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 
     const i = await buildFlip3D({ mode: "isotropy" });
     ok("flip3d: declares its modes and every measured key is declared",
-        flip3dDevice.modes.length === 3 &&
+        flip3dDevice.modes.length === 4 &&                   // v3845: + the `flatdivergence` plant mode
         [r, i].every((o) => Object.keys(o).every((k) => flip3dDevice.observables.includes(k))));
 }
 

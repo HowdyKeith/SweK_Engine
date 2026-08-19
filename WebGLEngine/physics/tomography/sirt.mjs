@@ -35,6 +35,69 @@
 // the default is Keith's call (v3603's idiom). ***
 //
 // ================================================================================================================
+// *** v3846 -- KEITH SETTLED IT, AND MEASURING IT FIRST CHANGED WHAT "SETTLED" MEANT. SPLIT BY QUESTION. ***
+// ================================================================================================================
+//
+// v3616 recommended the matched adjoint off ONE reading -- 16 angles at N = 96 -- and that reading is real but
+// it is not the whole shape. Swept across the angle counts THIS FILE ACTUALLY PUBLISHES, on this file's own
+// phantom, run to convergence rather than to a budget:
+//
+//     nAngles      FBP        shipped @300      matched (converged)        winner
+//        12      0.874950     0.970618          0.954752  (resid 3.0e-4)   SHIPPED
+//        30      0.956257     0.987556          0.981497                   SHIPPED
+//       120      0.987036     0.996503          0.999732  (resid 1.29)     MATCHED
+//
+// *** THE TWO OPERATORS CROSS OVER WITH ANGLE COUNT -- AND I NEARLY REPORTED THAT AS A DISCOVERY WHEN THE
+// TREE ALREADY KNEW IT. ct.html HAS SAID SO SINCE v3617, in its own words: "It holds at 30 angles here and
+// REVERSES at 90 ... the correlation comparison FLIPS with angle count while the residual comparison does
+// not -- the wrinkle is an effect of SPARSE angles, not a general law." *** THAT IS THIS FINDING, WRITTEN
+// DOWN THIRTY VERSIONS AGO, ON A PAGE. *** It is v2881/v2883's shape exactly -- reading one file and missing
+// the correction already recorded in another -- and it was caught here only because toolFrontDoor's tool
+// registry was being read for an unrelated reason. WHAT IS ACTUALLY NEW IN THIS ROUND IS TWO THINGS, AND
+// NEITHER IS THE CROSSOVER:
+//
+//   (1) THE CROSSOVER NEVER LEFT THE PAGE. It is in ct.html's prose and in reportingTools' blurb, and it is
+//       in NEITHER this header, NOR sirt-selfcheck, NOR the standing "moving the default is Keith's call"
+//       that three module headers kept repeating. The fact that decides the question sat in the one place
+//       nobody re-reads when deciding it. REACHABLE AND FINDABLE, AGAIN.
+//   (2) *** THE SPARSE-SIDE GAP IS SATURATION, NOT BUDGET, AND THAT IS THE PART ct.html DID NOT ESTABLISH. ***
+//       Its numbers are taken at a fixed budget, so "matched loses the correlation at 30" leaves open the
+//       reading that it simply had not arrived yet -- which is exactly what v3616 said about the OTHER
+//       operator. Run to convergence it does not close: see below.
+//
+// The matched operator
+// correlation SATURATES below the shipped pair where the data is sparse, and more budget does not close the
+// gap: 0.952483 at 300 iterations, 0.954752 at 2400, 0.954752 at 4800 -- CHECKED TO CONVERGENCE, so this is
+// not early stopping wearing a disguise. It is v3612's ambiguity arriving from a third direction: the
+// least-squares solution of an underdetermined system is not the best picture, so DESCENDING FURTHER ON
+// ||Ax - b|| BUYS THE DATA AND DOES NOT BUY THE OBJECT. At 120 views the system is determined enough that the
+// two agree about what the data means, and there the matched operator wins on both numbers at once.
+//
+// *** SO MOVING THE DEFAULT WHOLESALE WOULD HAVE REGRESSED THIS FILE'S OWN HEADLINE FINDING. *** FINDING 1
+// below is "the advantage is largest where the data is sparsest", and at twelve views the gain would have
+// fallen +0.0957 -> +0.0776. A round must not move a verdict it is not about (v3679), and this round is about
+// which operator answers which question -- not about whether SIRT beats FBP.
+//
+// THE SPLIT, AND BOTH DEFAULTS ARE RIGHT FOR THEIR QUESTION:
+//
+//     sirt()         RECONSTRUCTION -- "what does the object look like". Defaults to backProject, UNCHANGED,
+//                    so every published correlation here stays reproducible. It must be STOPPED EARLY.
+//     sirtDescent()  THE OBJECTIVE -- "how small can ||Ax - b|| get". Defaults to matchedBackProject, because
+//                    the other pair provably does not minimise the thing the claim names.
+//
+// *** AND THE DEFECT THIS ACTUALLY FIXES WAS IN A GATE. sirt-selfcheck's section 2 asserted "the residual
+// falls at every checkpoint" over 200 iterations WITH THE OPERATOR THAT DOES NOT DESCEND. On that gate's own
+// fixture (N = 48, 24 angles) the shipped pair bottoms out around iteration 750 and RISES 4.345 -> 7.556 by
+// 4000, while the matched operator falls monotonically to 0.2945 and is still falling. THE CLAIM WAS TRUE
+// ONLY INSIDE A BUDGET THAT HID THE DEFECT -- the same shape as a tolerance chosen by looking at where the
+// measurement landed. The descent claim now runs on the operator that owns it, and past the turn. ***
+//
+// NOT CLAIMED: that the matched operator is worse at reconstruction. At N = 48 / 24 angles it reads 0.983912
+// against the shipped pair's 0.904417 over the same 4000 iterations -- the crossover is about HOW
+// UNDERDETERMINED the system is, not about the operator being good or bad, and two of this file's three
+// published angle counts happen to sit on the sparse side.
+//
+// ================================================================================================================
 // FINDING 1: THE OTHER HALF OF THE LABEL. PART OF THE SPARSE-ANGLE LOSS **IS** THE METHOD.
 // ================================================================================================================
 //
@@ -88,7 +151,7 @@ import { radon, backProject, filteredBackProjection, scoreRecon, phantomField, a
 // every caller and every hash-pinned check here keeps working against ONE declaration. AND IT CLOSED A
 // DUPLICATION I CREATED AT v3616: stepFor existed in this file AND in matchedAdjoint.mjs -- the same power
 // iteration written twice, in the arc whose whole subject is two declarations of one thing.
-import { landweber, powerStep, residual } from "./reconOps.mjs";
+import { landweber, landweberDescent, matchedBackProject, powerStep, residual } from "./reconOps.mjs";
 export { residual };
 import { binaryPair, PAIR, LATTICE_ANGLES, PLUS_DIAGONALS } from "./ambiguity.mjs";
 
@@ -104,6 +167,18 @@ export const stepFor = (N, angles, nDet, opts) => powerStep((r) => backProject(r
 
 /** x <- x + step * A^T (b - A x). Both operators are the SHIPPED ones; nothing new is modelled here. */
 export const sirt = (sino, N, angles, nDet, opts) => landweber(sino, N, angles, nDet, opts);
+
+/**
+ * v3846 -- THE OBJECTIVE HALF OF THE SPLIT. Same iteration, matched adjoint, so ||Ax - b|| actually descends.
+ * Use this wherever the claim is about the RESIDUAL; use sirt() wherever it is about the PICTURE. Reaching for
+ * the wrong one is not a style question -- it is the difference between a claim that is true and one that is
+ * true only inside its budget.
+ */
+export const sirtDescent = (sino, N, angles, nDet, opts) => landweberDescent(sino, N, angles, nDet, opts);
+
+/** The step for the MATCHED operator, derived the same way and NOT the same number -- it moves with B. */
+export const stepForMatched = (N, angles, nDet, opts) =>
+    powerStep((r) => matchedBackProject(r, N, angles, nDet), N, angles, nDet, opts);
 
 // --- FINDING 1: the half of the label that IS the method ----------------------------------------------------------
 
@@ -141,6 +216,45 @@ export function seedExperiment(angles = LATTICE_ANGLES, { iters = 300 } = {}) {
         zeroVsMean: den > 0 ? Math.sqrt(num / den) : null,
     };
 }
+
+/**
+ * v3846 -- THE CROSSOVER, MEASURED BEFORE THE DEFAULT WAS MOVED RATHER THAN AFTER. Kept separate from
+ * MEASURED_V3613 because it does not correct those readings -- every one of them still stands, taken with the
+ * operator that still ships. What it corrects is v3616's RECOMMENDATION, which was right about convergence
+ * and silent about the regime where convergence is not what you want.
+ */
+export const MEASURED_V3846 = {
+    crossover: {
+        12:  { fbp: 0.874950, shipped300: 0.970618, matchedConverged: 0.954752, winner: "shipped" },
+        30:  { fbp: 0.956257, shipped300: 0.987556, matchedConverged: 0.981497, winner: "shipped" },
+        120: { fbp: 0.987036, shipped300: 0.996503, matchedConverged: 0.999732, winner: "matched" },
+    },
+    creditWhereItIsDue:
+        "*** THE CROSSOVER IS NOT THIS ROUND'S DISCOVERY. ct.html has recorded it since v3617 -- 'it holds at " +
+        "30 angles here and REVERSES at 90 ... the wrinkle is an effect of SPARSE angles, not a general law' " +
+        "-- and I nearly shipped it as new. v2881/v2883's shape: reading one file and missing the correction " +
+        "already written in another. WHAT IS NEW IS THAT IT NEVER LEFT THE PAGE (not this header, not the " +
+        "gate, not the standing default question three headers kept repeating) AND THAT THE SPARSE-SIDE GAP " +
+        "IS SATURATION RATHER THAN BUDGET, which ct.html's fixed-budget numbers could not establish. ***",
+    saturationIsNotEarlyStopping:
+        "the matched operator's correlation at 12 views reads 0.952483 at 300 iterations, 0.954752 at 2400 " +
+        "and 0.954752 at 4800, with the residual down to 3.0e-4. CHECKED TO CONVERGENCE. The gap to the " +
+        "shipped pair's 0.970618 is not a budget artefact -- it is the least-squares answer being a worse " +
+        "PICTURE than the regularised one, which is v3612's ambiguity from a third direction.",
+    whatMovingItWholesaleWouldHaveCost:
+        "FINDING 1's headline -- 'the advantage is largest where the data is sparsest' -- would have gone " +
+        "+0.0957 -> +0.0776 at twelve views. A ROUND MUST NOT MOVE A VERDICT IT IS NOT ABOUT (v3679), and " +
+        "this round is about which operator answers which question.",
+    theDefectItActuallyFixed:
+        "sirt-selfcheck section 2 asserted 'the residual falls at every checkpoint' over 200 iterations using " +
+        "the operator that does not descend. On that gate's own fixture (N = 48, 24 angles) the shipped pair " +
+        "bottoms out near iteration 750 and RISES 4.345 -> 7.556 by 4000; the matched operator falls " +
+        "monotonically to 0.2945 and is still falling. A TRUE CLAIM INSIDE A BUDGET THAT HID THE DEFECT.",
+    notClaimed:
+        "that the matched operator reconstructs worse. At N = 48 / 24 angles it reads 0.983912 against the " +
+        "shipped pair's 0.904417 over the same 4000 iterations. The crossover is about HOW UNDERDETERMINED " +
+        "the system is, and two of this file's three published angle counts sit on the sparse side.",
+};
 
 export const MEASURED_V3613 = {
     supersededByV3616: "run past 300 iterations the shipped pair DIVERGES -- residual rising and correlation " +

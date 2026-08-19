@@ -23,6 +23,13 @@ class Flip3D {
         this.flipRatio = opts.flipRatio != null ? opts.flipRatio : 0.95;
         this.iters = opts.iters || 50;
         this.solver = opts.solver || "jacobi";      // "jacobi" | "rbgs"
+        // *** v3845 -- DEFAULTS FALSE AND EXISTS SO A PLANT CAN SIT ON THE ONE LINE THAT MAKES THIS SOLVER 3D.
+        // The divergence of a MAC cell is the sum of THREE face differences; dropping the w (z) term leaves a
+        // solver that is still stable, still incompressible-looking in its own residual, and STILL PERFECTLY
+        // HYDROSTATIC -- because a column at rest has no z-flow to lose. WHAT BREAKS IS ISOTROPY: x and z stop
+        // being interchangeable, which is the one claim a 2D fluid cannot be asked. Every existing figure is
+        // unchanged at the default. ***
+        this.flatDivergence = !!opts.flatDivergence;
         this.omega = opts.omega != null ? opts.omega : 1.4;
 
         this.nu = (nx + 1) * ny * nz; this.nv = nx * (ny + 1) * nz; this.nw = nx * ny * (nz + 1); this.nc = nx * ny * nz;
@@ -253,8 +260,15 @@ class Flip3D {
         const { nx, ny, nz } = this;
         for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
             const c = this.ci(i, j, k);
-            this.div[c] = (this.type[c] === FLUID)
-                ? (this.u[this.ui(i + 1, j, k)] - this.u[this.ui(i, j, k)] + this.v[this.vi(i, j + 1, k)] - this.v[this.vi(i, j, k)] + this.w[this.wi(i, j, k + 1)] - this.w[this.wi(i, j, k)]) : 0;
+            // *** v3845 -- THE PLANT DROPS THE z FACE DIFFERENCE, AND THE HONEST BRANCH IS WRITTEN OUT
+            // CHARACTER FOR CHARACTER RATHER THAN FACTORED. Floating-point addition is not associative:
+            // `...+ w1 - w0` and `...+ (w1 - w0)` are DIFFERENT OPERATIONS and can differ in the last ulp, so
+            // factoring the z term into a variable to make the plant tidy would have silently moved every
+            // figure this solver has ever recorded. A KNOB THAT CHANGES THE DEFAULT IS NOT A KNOB. ***
+            this.div[c] = (this.type[c] !== FLUID) ? 0
+                : this.flatDivergence
+                    ? (this.u[this.ui(i + 1, j, k)] - this.u[this.ui(i, j, k)] + this.v[this.vi(i, j + 1, k)] - this.v[this.vi(i, j, k)])
+                    : (this.u[this.ui(i + 1, j, k)] - this.u[this.ui(i, j, k)] + this.v[this.vi(i, j + 1, k)] - this.v[this.vi(i, j, k)] + this.w[this.wi(i, j, k + 1)] - this.w[this.wi(i, j, k)]);
         }
         const invDt = 1.0 / dt;
         const nbrSum = (i, j, k) => {   // returns [denom, fluid-neighbor pressure sum]

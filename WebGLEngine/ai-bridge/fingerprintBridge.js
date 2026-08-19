@@ -283,6 +283,20 @@ function handle(req, res) {
         });
         return true;
     }
+    // v3849 -- THE LAB'S COVERAGE IN ONE READ. Four censuses each answered their own question correctly and each
+    // printed its own prose, so saying "here is the lab's coverage" took four runs and a head for numbers --
+    // which is why the numbers in the notes went stale. tools/ship/labCensus.mjs aggregates them WITHOUT
+    // re-deriving any, and this serves it. GET, because it computes nothing and writes nothing.
+    if (req.method === "GET" && url === "/lab/census") {
+        (async () => {
+            try {
+                const { labCensus, censusLines } = await import("../tools/ship/labCensus.mjs");
+                const c = labCensus();
+                sendJson({ ok: true, ...c, lines: censusLines(c) });
+            } catch (e) { sendJson({ ok: false, error: String((e && e.message) || e) }, 500); }
+        })();
+        return true;
+    }
     // v3848 -- THE DISPATCH ROUTE, WHICH IS THE HALF officeManager HAS BEEN MISSING SINCE v3824.
     //
     // *** IT DECIDED, AND NOTHING LISTENED. *** officeManager answers "what runs next, on whom, and when is a

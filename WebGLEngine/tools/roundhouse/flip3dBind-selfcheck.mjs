@@ -153,5 +153,59 @@ report("WHAT THIS DOES NOT CLAIM",
     "these keys drive. gradedCoverage moves by ONE MODULE, and the honest reading of that is 'this module now " +
     "has a key', not 'this module is verified'.");
 
+// ---- THE MODE PLANT, AND THE KEY THAT IS BLIND TO IT BY CONSTRUCTION (v3845) ---------------------------------
+// *** THIS DEVICE RAN THIS DEFECT AT v3729 AND THREW THE MEASUREMENT AWAY. *** The front door has printed
+// "the divergence dropping its z term leaves the hydrostatic column PERFECT and moves isotropy to 2.5e-1" for
+// a hundred versions, as EVIDENCE ABOUT THE KEYS -- and the census still read flip3d as bare, because a
+// measurement made and discarded is not coverage. It is a declared mode now.
+{
+    const honest = await buildFlip3D({ mode: "isotropy" });
+    const planted = await buildFlip3D({ mode: "flatdivergence" });
+    const hydro = await buildFlip3D({ mode: "hydrostatic" });
+
+    ok("!! the plant is DECLARED in the shape the census adjudicates -- plantMode / plantFlips / plantKind",
+        flip3dDevice.plantMode === "flatdivergence" && flip3dDevice.plantFlips === "worstRel" &&
+        flip3dDevice.plantKind === "mode" && flip3dDevice.modes.includes("flatdivergence") &&
+        flip3dDevice.modes[0] === "isotropy",
+        "modes " + JSON.stringify(flip3dDevice.modes) + ' -- *** "isotropy" IS FIRST ON PURPOSE: the contract ' +
+        "compares the plant against `modes.find(m => m !== plantMode)`, and worstRel EXISTS ONLY IN THE " +
+        "ISOTROPY BRANCH. With hydrostatic first the census would build an arm with no worstRel in it and " +
+        "report this device DECLARED BUT DEAD -- which is exactly what mpmrefine reads today. ***");
+
+    ok("!! the DECLARED observable flips off an EXACT zero, so any movement at all is a violation",
+        honest.worstRel === 0 && planted.worstRel > 0.1,
+        `worstRel ${honest.worstRel} -> ${planted.worstRel.toExponential(4)}. The transposed pair is ` +
+        "BIT-IDENTICAL when the solver is honest -- the same particles run along x and along z -- so the bar " +
+        "is EXACTLY 0 and needs no tolerance to argue about. Component-wise: frontRel " +
+        `${honest.frontRel} -> ${planted.frontRel.toExponential(3)}, maxDivRel ${honest.maxDivRel} -> ` +
+        `${planted.maxDivRel.toExponential(3)}`);
+
+    ok("!! *** AND THE DEVICE'S PRIMARY KEY IS BLIND TO IT, WHICH IS WHY THE TWO MODES ARE NOT ONE CLAIM ***",
+        Math.abs(hydro.slopeErrFrac) < 1e-3 && hydro.linearityR2 > 0.999999,
+        `the hydrostatic column is UNTOUCHED at slope ${hydro.slopePerCell.toFixed(6)} (err ` +
+        `${hydro.slopeErrFrac.toExponential(3)}, R^2 ${hydro.linearityR2.toFixed(12)}) while the solver has ` +
+        "lost a third of its divergence. A column at rest has NO z-flow to lose, so the key cannot see the " +
+        "defect -- ONE PLANT TESTS ONE CLAIM, and this one says which claim the other key was never making");
+
+    ok("!! the shipped default is BIT-IDENTICAL with the knob off -- verified, not assumed",
+        (() => {
+            const mk = (flat) => { const f = new Flip3D(6, 8, 6, { h: 1, gravity: -9.81, iters: 20, flatDivergence: flat }); return f; };
+            const a = mk(false), b = mk(undefined);
+            for (const f of [a, b]) { let s2 = 1; for (let i = 1; i < 5; i++) for (let j = 1; j < 5; j++) for (let k = 1; k < 5; k++) f.addParticle(i, j, k, 0, 0, 0); for (let t = 0; t < 20; t++) f.step(1 / 60); }
+            let sa = 0, sb = 0; for (let i = 0; i < a.p.length; i++) { sa += a.p[i]; sb += b.p[i]; }
+            return sa === sb && a.flatDivergence === false && b.flatDivergence === false;
+        })(),
+        "*** THE KNOB BRANCHES ON THE WHOLE EXPRESSION RATHER THAN FACTORING THE z TERM INTO A VARIABLE, " +
+        "because floating-point addition is NOT ASSOCIATIVE: `... + w1 - w0` and `... + (w1 - w0)` are " +
+        "different operations and the tidy version moved the default in the last ulp. A KNOB THAT CHANGES THE " +
+        "DEFAULT IS NOT A KNOB. ***");
+
+    ok("...and the validator LISTS the plant mode, so it cannot silently revert",
+        flip3dDefaults({ mode: "flatdivergence" }).mode === "flatdivergence" &&
+        flip3dDefaults({ mode: "nonsense-mode" }).mode === "hydrostatic",
+        "v3806 lost a round to a validator that reverted its plant in silence. The DEFAULT is untouched by " +
+        "the reordering: flip3dDefaults still returns `hydrostatic` and the front door still leads with it");
+}
+
 console.log("\nflip3dBind-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

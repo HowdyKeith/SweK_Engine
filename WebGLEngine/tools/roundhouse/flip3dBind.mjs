@@ -62,13 +62,39 @@
 // against a 1e-3 bar). A claim that moves only where an existing claim also moves is a SECOND DECLARATION, not
 // a second key, and the honest place for it is the report.
 //
-// NOT PLANTED. The curriculum asked for a GRADE; a declared plant for flip3d is a separate round, and the
-// three plants above were run and REVERTED -- they are evidence about these keys, not coverage.
+// *** PLANTED AT v3845, AND IT IS ONE OF THE THREE THIS HEADER ALREADY RAN AND REVERTED. *** The front door
+// has printed the measurement for rounds: "the divergence dropping its z term leaves the hydrostatic column
+// PERFECT and moves isotropy to 2.5e-1". That was run as EVIDENCE ABOUT THE KEYS and then thrown away, which
+// is why this device still read as bare in the census -- A MEASUREMENT MADE AND DISCARDED IS NOT COVERAGE.
+// It is now a declared mode, so the tree can be asked what flip3d would catch instead of being told.
+//
+// *** THE DEFECT IS THE ONE THAT MAKES THIS SOLVER 3D, AND THE HYDROSTATIC KEY IS BLIND TO IT BY
+// CONSTRUCTION. *** A MAC cell's divergence is three face differences; drop the z one and the solver is still
+// stable, its own residual still collapses, and the hydrostatic column is still EXACT -- because a column at
+// rest has no z-flow to lose. So the device's PRIMARY key cannot see it at all. `isotropy` can, and this is
+// the round that pins that: the two modes are not two spellings of one claim.
+//
+// MEASURED, the two arms at the device default: worstRel 0 -> 3.467e-1, and the 0 is EXACT rather than small
+// -- the transposed pair is bit-identical when the solver is honest, so ANY movement is a violation and the
+// bar needs no tolerance to argue about. Component-wise: frontRel 0 -> 8.645e-3, maxDivRel 0 -> 7.352e-2.
+// The hydrostatic arm is UNTOUCHED at slope -9.810030, err 3.009e-6, R^2 0.999999999999711.
+//
+// *** AND THE SHIPPED KNOB WAS WRITTEN THE LONG WAY ON PURPOSE. `flatDivergence` branches on the WHOLE
+// expression rather than factoring the z term into a variable, because floating-point addition is not
+// associative: `... + w1 - w0` and `... + (w1 - w0)` are different operations. The tidy version moved the
+// default in the last ulp. VERIFIED BIT-IDENTICAL against the pristine v3844 extract -- same summed pressure
+// field to all 17 digits, same maxDivergence -- rather than assumed. ***
+//
+// NOT CLAIMED: that this plant grades the OTHER two keys. footprintSpread and slopeErrFrac are untouched by
+// it, and ONE PLANT TESTS ONE CLAIM. The other two defects this header ran (halving the pressure scale in all
+// three axes; under-convergence) remain evidence about the keys and were not promoted.
 // NOT CLAIMED: that fluid/flip3d.mjs is correct. The rigid coupling (twoWay, buoyancy over submerged faces),
 // the mgpcg and rbgs solver paths, and the free surface in 3D are all UNGRADED here; the default jacobi path
 // is what these keys drive.
 
 import { Flip3D, FLUID } from "../../fluid/flip3d.mjs";
+
+export const FLIP3D_MODES = ["isotropy", "hydrostatic", "footprint", "flatdivergence"];
 
 export const FLIP3D_OBSERVABLES = [
     "slopePerCell", "slopeExact", "slopeErrFrac", "linearityR2",
@@ -97,9 +123,12 @@ export function flip3dDefaults(hyp) {
     c.steps = Math.min(2000, Math.max(30, num(c.steps, DEF.steps) | 0));
     c.iters = Math.min(400, Math.max(1, num(c.iters, DEF.iters) | 0));
     h.config = c;
-    if (!["hydrostatic", "isotropy", "footprint"].includes(h.mode)) h.mode = "hydrostatic";
+    // *** THE VALIDATOR MUST LIST THE PLANT MODE, or `flatdivergence` silently reverts, both arms read an
+    // IDENTICAL number and the plant fires at nothing -- v3806's lesson on flip2d, and the reason that round
+    // caught it at all was that the two numbers matched to every digit. ***
+    if (!FLIP3D_MODES.includes(h.mode)) h.mode = "hydrostatic";
     if (!h.claim || !h.claim.observable) {
-        h.claim = h.mode === "isotropy"
+        h.claim = (h.mode === "isotropy" || h.mode === "flatdivergence")
             ? { observable: "worstRel", max: 0 }              // EXACTLY zero: see the header, this is not a tolerance
             : h.mode === "footprint"
                 ? { observable: "footprintSpread", max: 1e-3 }
@@ -115,8 +144,8 @@ function lcg(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 1103515245 
  * A settled pool filling the whole cross-section, EXPORTED so a gate drives the same fixture rather than a
  * second spelling of it. `n` overrides the config's cross-section, which is what the footprint sweep varies.
  */
-export function settledPool(c, n = c.n) {
-    const f = new Flip3D(n, c.ny, n, { h: c.h, gravity: c.gravity, iters: c.iters });
+export function settledPool(c, n = c.n, flat = false) {
+    const f = new Flip3D(n, c.ny, n, { h: c.h, gravity: c.gravity, iters: c.iters, flatDivergence: flat });
     f.fillBlock(c.h, c.h, c.h, (n - 1) * c.h, (1 + c.depth) * c.h, (n - 1) * c.h, c.per, lcg(c.seed));
     for (let s = 0; s < c.steps; s++) f.step(c.dt);
     return f;
@@ -141,10 +170,10 @@ function column(f, n) {
  * The transposed pair: one dam break along x, and THE SAME PARTICLES along z. Exported for the same reason --
  * a transposition built twice is two claims about one experiment.
  */
-export function transposedPair(c) {
-    const X = new Flip3D(c.n, c.ny, c.n, { h: c.h, gravity: c.gravity, iters: c.iters });
+export function transposedPair(c, flat = false) {
+    const X = new Flip3D(c.n, c.ny, c.n, { h: c.h, gravity: c.gravity, iters: c.iters, flatDivergence: flat });
     X.fillBlock(c.h, c.h, c.h, Math.floor(c.n / 2) * c.h, (1 + c.depth) * c.h, (c.n - 1) * c.h, c.per, lcg(c.seed));
-    const Z = new Flip3D(c.n, c.ny, c.n, { h: c.h, gravity: c.gravity, iters: c.iters });
+    const Z = new Flip3D(c.n, c.ny, c.n, { h: c.h, gravity: c.gravity, iters: c.iters, flatDivergence: flat });
     for (let i = 0; i < X.count(); i++) Z.addParticle(X.pz[i], X.py[i], X.px[i], X.pvz[i], X.pvy[i], X.pvx[i]);
     return { X, Z };
 }
@@ -167,15 +196,20 @@ export async function buildFlip3D(hyp, base = {}) {
     const h = flip3dDefaults({ ...hyp, config: { ...(base || {}), ...(hyp && hyp.config) } });
     const c = h.config;
 
-    if (h.mode === "isotropy") {
-        const { X, Z } = transposedPair(c);
+    // *** BOTH SIDES OF THE TRANSPOSITION GET THE SAME DEFECT, which is what makes this a plant rather than a
+    // rigged comparison: the two runs stay identical in every respect except that the solver they share has
+    // lost its z divergence term. If only X carried it, the asymmetry would be the FIXTURE's, not the solver's.
+    const flat = h.mode === "flatdivergence";
+
+    if (h.mode === "isotropy" || h.mode === "flatdivergence") {
+        const { X, Z } = transposedPair(c, flat);
         if (X.count() < 8) return { error: "not-enough-particles (the fill produced nothing to move)" };
         for (let s = 0; s < c.steps; s++) { X.step(c.dt); Z.step(c.dt); }
         const a = lateralStats(X, "x"), b = lateralStats(Z, "z");
         const frontRel = rel(a.front, b.front), meanAlongRel = rel(a.meanAlong, b.meanAlong);
         const meanHeightRel = rel(a.meanHeight, b.meanHeight), maxDivRel = rel(a.maxDiv, b.maxDiv);
         return {
-            kind: "isotropy",
+            kind: flat ? "flatdivergence" : "isotropy",
             frontRel, meanAlongRel, meanHeightRel, maxDivRel,
             meanSpeedRel: rel(a.meanSpeed, b.meanSpeed),     // a SUM: transposition permutes the additions
             worstRel: Math.max(frontRel, meanAlongRel, meanHeightRel, maxDivRel),
@@ -220,7 +254,14 @@ export async function buildFlip3D(hyp, base = {}) {
 }
 
 export const flip3dDevice = {
-    modes: ["hydrostatic", "isotropy", "footprint"],
+    // *** "isotropy" IS FIRST ON PURPOSE, and it is the only reordering in this patch. probeModePlant compares
+    // the plant against `modes.find(m => m !== plantMode)`, so the primary must be THE MODE THAT OWNS THE
+    // DECLARED OBSERVABLE. worstRel exists only in the isotropy branch; with "hydrostatic" first the census
+    // would build a hydrostatic arm, find no worstRel in it, and report this device DECLARED BUT DEAD -- which
+    // is exactly what mpmrefine reads in the current census. The DEFAULT is untouched: flip3dDefaults still
+    // returns mode "hydrostatic" and the front door still leads with it. ***
+    modes: FLIP3D_MODES,
+    plantMode: "flatdivergence", plantFlips: "worstRel", plantKind: "mode",
     name: "flip3d-hydrostatic",
     observables: FLIP3D_OBSERVABLES,
     build: buildFlip3D,

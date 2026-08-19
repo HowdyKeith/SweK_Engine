@@ -68,10 +68,16 @@ for (const name of D.DEVICE_NAMES) {
     // It was fixed because a round happened to be inside that bind and the mode list finally had one
     // definition -- not by a sweep. THE ENTRY WAS DELETED, NOT COMMENTED OUT: the staleness half below would
     // have failed on it the moment it stopped being true, which is exactly what it is for.
+    // *** v3845 -- "hydrostatic" AND "pbc" CAME OFF THIS LIST, AND THE STALENESS HALF IS WHAT SAID SO. ***
+    // Both took a declared mode plant this round, and a plant mode is only real if the validator LISTS it --
+    // the v3806 lesson: a validator written as `if (mode !== primary) mode = primary` silently reverts the
+    // plant and both arms read an identical number. So guarding the mode was not a side errand, it was the
+    // plant's precondition, and this gate went red the moment the guards landed. TWO ENTRIES DELETED, NOT
+    // COMMENTED OUT, the same way "em" left at v3424.
     const UNGUARDED_BASELINE = [
         "acoustics", "seismic", "nuclear", "clocks", "fieldnav", "kuramoto", "hmc", "landauzener",
-        "inference", "langevin", "rmt", "percolation", "diffusion", "hydrostatic", "wolff", "spatial",
-        "twof", "tempering", "pbc", "blobbodies",
+        "inference", "langevin", "rmt", "percolation", "diffusion", "wolff", "spatial",
+        "twof", "tempering", "blobbodies",
         // v3501 -- xpbd and compose were ALREADY unguarded on the pristine v3500 extract (this gate was red there,
         // it is not carried by verify). They are recorded here to bring the baseline current, not to excuse them:
         // when either learns to refuse an undeclared mode, DELETE its name. astroparticle, added this round, is

@@ -92,8 +92,64 @@ const dev = await getDevice("hydrostatic");
     const { modesOf } = await import("./deviceModes.mjs");
     const m = modesOf(dev, null);
     ok("hydrostatic declares its modes -- 43 graded of 113 proven",
-        m.source === "exported" && m.declared.length === 3,
+        m.source === "exported" && m.declared.length === 4,      // v3845: + the `surfacedensity` plant mode
         `source "${m.source}", modes ${JSON.stringify(m.declared)}`);
+}
+
+// ---- 5. THE MODE PLANT, AND THE OBSERVABLE IT DELIBERATELY DOES NOT USE (v3845) ------------------------------
+// *** THE ROUND'S FINDING IS A NEGATIVE AND IT IS PINNED FIRST: `retained` CANNOT HOLD A PLANT. *** It is an
+// END STATE -- collapsed under ideal, blown apart under Tait -- and once the column has done either, a method
+// defect of any plausible size lands in the same place. A plant declared against it would be technically live
+// (the census only asks that the number MOVE) and would certify this device on a sub-percent wobble.
+{
+    const honest = await dev.build({ mode: "matched" });
+    const planted = await dev.build({ mode: "surfacedensity" });
+
+    ok("!! the plant is DECLARED in the shape the census adjudicates",
+        dev.plantMode === "surfacedensity" && dev.plantFlips === "densityMismatch" &&
+        dev.modes.includes("surfacedensity") && dev.modes[0] === "matched",
+        'modes ' + JSON.stringify(dev.modes) + ' -- "matched" stays FIRST so the contract compares the plant ' +
+        "against the mode that owns the recorded row it breaks");
+
+    ok("!! the DECLARED observable flips across the bar: densityMismatch",
+        planted.densityMismatch > 1e-2 && honest.densityMismatch < 1e-2,
+        `${honest.densityMismatch.toExponential(4)} -> ${planted.densityMismatch.toExponential(4)}, an 11.1x ` +
+        `separation. packedDensity ${honest.packedDensity.toFixed(3)} -> ${planted.packedDensity.toFixed(3)}: an SPH ` +
+        "density is a kernel sum, so a particle at the free surface has half a neighbourhood and reads LOW. " +
+        "Averaging over all 686 particles instead of the 441 interior ones REPORTS THE SURFACE DEFICIT AS THE " +
+        "LATTICE'S DENSITY -- the canonical SPH mistake, and this file's whole history is about that number");
+
+    ok("!! *** AND `retained` DOES NOT MOVE AT ALL, WHICH IS THE POINT OF THE ISOLATION ***",
+        planted.retained === honest.retained,
+        `${honest.retained.toFixed(4)} in BOTH arms, bit-identical. \`matched\` hands makeColumn an explicit ` +
+        "restDensity of 144, so the WORLD IS IDENTICAL and the plant perturbs only the measurement under " +
+        "grade. A plant that moved the physics too would not isolate the claim");
+
+    // *** THE NEGATIVE IS MEASURED HERE, NOT QUOTED -- but ONE candidate, not both. *** verify.mjs gives each
+    // gate 180 s and every settle here costs ~20 s, so asserting all four arms put this gate at 103 s on the
+    // sandbox and left no margin for a slower rig. The ideal/rho0 arm is the one that belongs in a gate: it is
+    // this file's own subject. The Tait arm (B missing its /gamma: 1.8418 -> 1.8352, 0.4%, still `expanded`)
+    // is recorded in hydrostaticBind.mjs's header as a measurement, which is where a fact nobody re-derives
+    // every run belongs. THE BASELINE IS REUSED FROM `honest` RATHER THAN SETTLED TWICE.
+    const assumedNominal = settle(makeColumn({ eos: "ideal", restDensity: 0.02 / Math.pow(0.05, 3) }),
+                                  { steps: 1500, dt: 1 / 1000 }).retained;      // the nominal m/d^3 = 160
+
+    const relMove = (a, b) => Math.abs(a - b) / Math.abs(a);
+    ok("!! ...and `retained` is SATURATED under a REAL defect, which is why it is not the declared observable",
+        relMove(honest.retained, assumedNominal) < 0.05 &&
+        relMove(honest.densityMismatch, planted.densityMismatch) > 5,
+        `rho0 ASSUMED as the nominal m/d^3 = 160 instead of the measured 144.34 moves retained ` +
+        `${honest.retained.toFixed(4)} -> ${assumedNominal.toFixed(4)} ` +
+        `(${(100 * relMove(honest.retained, assumedNominal)).toFixed(1)}%, and STILL \`collapsed\`) -- against ` +
+        `densityMismatch's ${(100 * relMove(honest.densityMismatch, planted.densityMismatch)).toFixed(0)}% on ` +
+        "the plant. *** THE CENSUS ASKS 'DID IT MOVE'; A PLANT HAS TO ANSWER 'WOULD THE GATE HAVE CAUGHT IT', " +
+        "AND THOSE COME APART EXACTLY HERE: the defect is REAL and the headline observable cannot see it. ***");
+
+    ok("...and the validator LISTS the plant mode, so it cannot silently revert",
+        (await dev.build({ mode: "nonsense-mode" })).densityMismatch === honest.densityMismatch &&
+        dev.defaults({ mode: "surfacedensity" }).mode === "surfacedensity",
+        "v3806 lost a round to a validator that reverted its plant in silence; an unrecognised mode falls " +
+        "back to `matched` and `surfacedensity` survives");
 }
 
 console.log();
