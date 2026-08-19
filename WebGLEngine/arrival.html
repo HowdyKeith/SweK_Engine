@@ -48,12 +48,12 @@
 
       <div class="row" style="margin-top:6px;">
         <div><label>Turn on a light (optional)</label><input id="light" placeholder="light.entry" /></div>
-        <div><label>Auto-off after (sec, 0 = stay)</label><input id="flashSec" type="number" min="0" max="600" value="0" /></div>
+        <div><label>Auto-off after (sec, 0 = stay)</label><input id="flashSec" type="number" min="0" max="600" placeholder="0" /></div>
       </div>
 
       <div class="row">
-        <div><label>On the Shield</label><select id="shieldAction"><option value="none">Nothing</option><option value="blink">Open Blink app</option><option value="url">Open a page</option></select></div>
-        <div><label>Shield IP</label><input id="shieldIp" value="192.168.10.114" /></div>
+        <div><label>On the Android TV Device</label><select id="shieldAction"><option value="none">Nothing</option><option value="blink">Open Blink app</option><option value="url">Open a page</option></select></div>
+        <div><label>Android TV Device IP</label><input id="shieldIp" data-rt-placeholder="192.168.x.x" placeholder="192.168.x.x" /></div>
       </div>
       <div id="urlRow"><label>Page URL (relative ok)</label><input id="shieldUrl" placeholder="/pipboy-models.html" /></div>
 

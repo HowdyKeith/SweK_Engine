@@ -5,7 +5,7 @@
 //
 // GATES the Tasker stage chain -- and the two rules that keep it from becoming a dashboard that lies.
 //
-// Keith runs Tasker on a Shield TV already wired into this engine, and asked whether it could close the gaps
+// Keith runs Tasker on a Android TV Device already wired into this engine, and asked whether it could close the gaps
 // between install, run, submit and update on the Android peer. It can, through Termux:Tasker -- the plugin that
 // executes a script INSIDE Termux, which is the designed seam and the sibling of the Termux:Boot integration
 // this tree has used since v2935.

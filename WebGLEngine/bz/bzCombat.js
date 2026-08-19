@@ -5,7 +5,7 @@
 //
 //   * A shot is a point. A tank is an oriented box, half a tank-length by half a tank-width, one tank
 //     height tall, with `pos` at the centre of its underside. A hit is the point in the box.
-//   * ONE SHOT KILLS. In BZFlag a tank has no hit points; the Shield flag absorbs one hit and there are
+//   * ONE SHOT KILLS. In BZFlag a tank has no hit points; the Android TV Device flag absorbs one hit and there are
 //     no flags here, so a hit is a death. Pretending otherwise would be inventing a health bar the game
 //     does not have.
 //   * A tank cannot shoot itself. `_muzzleFront` is `_tankRadius + 0.1`, so a shot is born clear of its

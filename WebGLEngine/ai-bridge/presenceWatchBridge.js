@@ -13,10 +13,10 @@ const CONFIG = path.join(__dirname, "presence-watch.json");
 
 let cfg = { watch: false, rules: [], personRules: [
     // v1304 — example, pre-wired per the request: when Keith arrives AND Helga is away,
-    // open the pip-boy on the Shield TV. url is relative so it resolves to this PC's LAN
-    // address at fire time; edit names / Shield IP in the Presence panel. Only fires once
+    // open the pip-boy on the Android TV Device. url is relative so it resolves to this PC's LAN
+    // address at fire time; edit names / Android TV Device IP in the Presence panel. Only fires once
     // "Broadcast presence" is on. (Won't fire if a saved presence-watch.json already exists.)
-    { match: "Keith", onArrive: { kind: "shield", url: "/pipboy-models.html", ip: "192.168.10.114" }, if: { person: "Helga", home: false } },
+    { match: "Keith", onArrive: { kind: "shield", url: "/pipboy-models.html", ip: "" }, if: { person: "Helga", home: false } },
 ], avatars: {} };
 try { if (fs.existsSync(CONFIG)) cfg = Object.assign(cfg, JSON.parse(fs.readFileSync(CONFIG, "utf8"))); } catch {}
 function saveCfg() { try { fs.writeFileSync(CONFIG, JSON.stringify(cfg), { mode: 0o600 }); } catch {} }
@@ -24,7 +24,7 @@ function saveCfg() { try { fs.writeFileSync(CONFIG, JSON.stringify(cfg), { mode:
 let deps = null, timer = null, lastPeople = null, lastRooms = null, baseline = false, lastSnap = null, _curPeople = {};
 
 // Run a rule action — either a control command on the engine bus, or open a page on the
-// Shield TV (v1304). { cmd, args } => control;  { kind:"shield", ip, url } => Shield openUrl.
+// Android TV Device (v1304). { cmd, args } => control;  { kind:"shield", ip, url } => Shield openUrl.
 function runAction(act) {
     if (!act || !deps) return;
     if (act.kind === "shield" && act.url) {

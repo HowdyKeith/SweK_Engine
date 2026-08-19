@@ -345,7 +345,7 @@ function saveGenQueue() {
     catch (e) { console.warn("[gen-queue] save failed:", e.message); return false; }
 }
 // v949 — spawn relay. A standalone library page (asset-library.html, possibly on
-// a phone or the Shield, or just another browser tab) can't reach
+// a phone or the Android TV Device, or just another browser tab) can't reach
 // window.spawnAssetFromLibrary inside the running engine, so it POSTs an asset id
 // here; the engine polls /spawn/pending, which DRAINS this list, and spawns each.
 // Drain semantics (not openUrl's latest-seq) so several quick spawns all arrive.
@@ -2117,7 +2117,7 @@ const xboxBridge = require("./xboxBridge.js");           // v1298 — Xbox Devic
 const presenceWatch = require("./presenceWatchBridge.js"); // v1302 — bridge presence routing + room-occupancy rules
 const airWatch = require("./airWatchBridge.js"); // v1313 — watch a PM2.5 sensor; haze feed + bad-air reactions
 // v1304 — reusable Shield ADB openUrl (same whitelist/validation as /shield/exec) so the
-// presence watcher can open a page on the Shield TV as a rule action.
+// presence watcher can open a page on the Android TV Device as a rule action.
 function shieldOpenUrl(ip, url) {
     try {
         ip = String(ip || "").trim();
@@ -2131,7 +2131,7 @@ function shieldOpenUrl(ip, url) {
         return true;
     } catch (e) { return false; }
 }
-// v1319 — launch the Blink app on the Shield (it doesn't deep-link to a single camera, so this just opens the app).
+// v1319 — launch the Blink app on the Android TV Device (it doesn't deep-link to a single camera, so this just opens the app).
 function shieldBlink(ip) {
     try {
         ip = String(ip || "").trim();
@@ -2144,7 +2144,7 @@ function shieldBlink(ip) {
         return true;
     } catch (e) { return false; }
 }
-// v1320 — sideload an APK onto the Shield (or any ADB device) via `adb install`. Only files dropped
+// v1320 — sideload an APK onto the Android TV Device (or any ADB device) via `adb install`. Only files dropped
 // into ai-bridge/apks are eligible (basename validated, no path traversal). cb(err, output).
 // v1322 — generic Shield app launcher by package (LAUNCHER intent via monkey).
 function shieldLaunchApp(ip, pkg) {
@@ -2180,7 +2180,7 @@ function shieldInstallApk(ip, file, cb) {
         });
     });
 }
-// v1321 — run a sequence of `adb shell` commands on the Shield (connect once, then in order).
+// v1321 — run a sequence of `adb shell` commands on the Android TV Device (connect once, then in order).
 function shieldShellSeq(ip, cmds, cb) {
     ip = String(ip || "").trim();
     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return cb("bad ip");
@@ -2239,9 +2239,9 @@ function isProcessRunning(name, cb) {
     });
 }
 // v1322 — spacedesk auto-launch: when the spacedesk SERVER process appears on this PC, open the
-// spacedesk VIEWER app on the Shield so it auto-joins as a second monitor. Fires on the rising edge.
+// spacedesk VIEWER app on the Android TV Device so it auto-joins as a second monitor. Fires on the rising edge.
 const SPACEDESK_FILE = path.join(__dirname, "spacedesk.json");
-let spacedeskCfg = (() => { const def = { watch: false, processName: "spacedeskService.exe", shieldIp: "192.168.10.114", viewerPkg: "ph.spacedesk.beta", pollSec: 10 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(SPACEDESK_FILE, "utf8"))); } catch { return def; } })();
+let spacedeskCfg = (() => { const def = { watch: false, processName: "spacedeskService.exe", shieldIp: "", viewerPkg: "ph.spacedesk.beta", pollSec: 10 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(SPACEDESK_FILE, "utf8"))); } catch { return def; } })();
 let _spacedeskTimer = null, _spacedeskSeen = false;
 function saveSpacedeskCfg() { try { fs.writeFileSync(SPACEDESK_FILE, JSON.stringify(spacedeskCfg), { mode: 0o600 }); } catch {} }
 function spacedeskTick() {
@@ -2249,7 +2249,7 @@ function spacedeskTick() {
         if (running && !_spacedeskSeen) {
             _spacedeskSeen = true;
             shieldLaunchApp(spacedeskCfg.shieldIp, spacedeskCfg.viewerPkg);
-            try { pushAvatarEvent({ kind: "toast", title: "\uD83D\uDDA5\uFE0F spacedesk", message: "server up \u2014 opening the viewer on the Shield" }); } catch {}
+            try { pushAvatarEvent({ kind: "toast", title: "\uD83D\uDDA5\uFE0F spacedesk", message: "server up \u2014 opening the viewer on the Android TV Device" }); } catch {}
             try { broadcast({ type: "spacedesk", state: "up" }); } catch {}
         } else if (!running && _spacedeskSeen) { _spacedeskSeen = false; try { broadcast({ type: "spacedesk", state: "down" }); } catch {} }
     });
@@ -2297,7 +2297,7 @@ function lanBaseUrl() {
 }
 
 // v1319 — "doorbell" fan-out: one trigger announces (avatar quip + TTS + HA speaker), pops the
-// Blink app (or a camera URL) on the Shield, and optionally flashes a light. Config in doorbell.json.
+// Blink app (or a camera URL) on the Android TV Device, and optionally flashes a light. Config in doorbell.json.
 // v1322 — issue a typed command to an Alexa Echo through Home Assistant. Two integration modes:
 //   amp     -> Alexa Media Player (HACS): media_player.play_media custom command to a media_player entity
 //   devices -> Alexa Devices (official): alexa_devices.send_text_command to a device_id
@@ -2410,7 +2410,7 @@ function listBoards() { return { ok: true, boards: Object.keys(boardCfg.boards) 
 // (avatar quip + TTS + HA/Echo) and optionally pop a Shield scene + a light. Also a generic
 // /notice announce (e.g. an Android Auto "Hey Google, tell my dogs I love them" shortcut).
 const ARRIVAL_FILE = path.join(__dirname, "arrival.json");
-let arrivalCfg = (() => { const def = { enabled: true, speak: true, haSpeaker: true, greet: "Welcome home, {name}!", greetings: {}, light: "", flashSec: 0, shieldAction: "none", shieldUrl: "", shieldIp: "192.168.10.114" }; try { return Object.assign(def, JSON.parse(fs.readFileSync(ARRIVAL_FILE, "utf8"))); } catch { return def; } })();
+let arrivalCfg = (() => { const def = { enabled: true, speak: true, haSpeaker: true, greet: "Welcome home, {name}!", greetings: {}, light: "", flashSec: 0, shieldAction: "none", shieldUrl: "", shieldIp: "" }; try { return Object.assign(def, JSON.parse(fs.readFileSync(ARRIVAL_FILE, "utf8"))); } catch { return def; } })();
 function saveArrivalCfg() { try { fs.writeFileSync(ARRIVAL_FILE, JSON.stringify(arrivalCfg), { mode: 0o600 }); } catch {} }
 function arrivalRing(name) {
     const c = arrivalCfg, did = [];
@@ -2459,7 +2459,7 @@ function noticeAnnounce(text, opts) {
 
 const ARRIVAL_DUMMY = 0;
 const DOORBELL_FILE = path.join(__dirname, "doorbell.json");
-let doorbellCfg = (() => { const def = { shieldIp: "192.168.10.114", shieldAction: "blink", shieldUrl: "", announce: true, quip: "Someone's at the door!", speak: true, light: "", flashSec: 0 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(DOORBELL_FILE, "utf8"))); } catch { return def; } })();
+let doorbellCfg = (() => { const def = { shieldIp: "", shieldAction: "blink", shieldUrl: "", announce: true, quip: "Someone's at the door!", speak: true, light: "", flashSec: 0 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(DOORBELL_FILE, "utf8"))); } catch { return def; } })();
 function saveDoorbellCfg() { try { fs.writeFileSync(DOORBELL_FILE, JSON.stringify(doorbellCfg), { mode: 0o600 }); } catch {} }
 function doorbellRing() {
     const c = doorbellCfg, did = [];
@@ -5186,7 +5186,7 @@ const server = http.createServer((req, res) => {
             req.on("error", () => { res.writeHead(500); res.end("error"); });
             return;
         }
-        // v1867 — list notify.* services so the UI can offer the Shield TV as a toast target.
+        // v1867 — list notify.* services so the UI can offer the Android TV Device as a toast target.
         if (req.method === "GET" && haPath === "/ha/notify-services") {
             haBridge.notifyServices().then(r => { res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(r)); })
                 .catch(e => { res.writeHead(502, { "Content-Type": "application/json" }); res.end(JSON.stringify({ ok: false, error: String(e && e.message || e) })); });
@@ -5576,7 +5576,7 @@ const server = http.createServer((req, res) => {
             if (adSt && adSt.boundInterface) add("ok", "Advertiser is pinned to " + adSt.boundInterface + ".");
         }
         add("info", process.platform === "win32" ? "Firewall: allow inbound UDP 5353 once (admin): netsh advfirewall firewall add rule name=\"mDNS 5353\" dir=in action=allow protocol=UDP localport=5353" : "Make sure UDP 5353 is allowed through the firewall.");
-        if (lanIp) add("info", "Many Android TVs (incl. the Shield) can't resolve .local at all \u2014 on those, use the IP URL: http://" + lanIp + ":" + PORT + "/");
+        if (lanIp) add("info", "Many Android TVs (incl. the Android TV Device) can't resolve .local at all \u2014 on those, use the IP URL: http://" + lanIp + ":" + PORT + "/");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, runtime: isBun ? "bun" : "node", advertiser: adSt, adapters: list, recommendedInterface: lanIp, findings }));
         return;
@@ -9161,7 +9161,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
     // v679 — Shield Debug remote control. Wireless ADB to an Android device
-    // on the LAN (designed for Nvidia Shield Pro at 192.168.10.114 but works
+    // on the LAN (designed for Nvidia Android TV Device at 192.168.10.114 but works
     // for any wireless-ADB Android). Whitelisted action set so the panel
     // can't be coerced into running arbitrary shell. Requires `adb` on PATH
     // on the PC + the target paired (Settings → Developer → Wireless debug
@@ -9254,7 +9254,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
-    // v844 — /shield/screenshot — fetch a PNG screenshot from the Shield.
+    // v844 — /shield/screenshot — fetch a PNG screenshot from the Android TV Device.
     // GET /shield/screenshot?ip=192.168.10.114 → image/png bytes.
     // Browser can display directly in <img src> or save via download attr.
     // Errors come back as JSON (200 if success, 500 with JSON otherwise).
@@ -9310,7 +9310,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
-    // v1109 — /shield/nowplaying-vision — screenshot the Shield + ask Gemini for
+    // v1109 — /shield/nowplaying-vision — screenshot the Android TV Device + ask Gemini for
     // the on-screen video title. Works for YouTube, where MediaSession is empty.
     if (req.method === "GET" && req.url.startsWith("/shield/nowplaying-vision")) {
         (async () => {
@@ -9324,7 +9324,7 @@ ${text.replace(/'/g, "''")}
                 const r = spawnSync("adb", ["-s", `${ip}:5555`, "exec-out", "screencap", "-p"], { timeout: 8000, encoding: "buffer" });
                 if (r.error) return reply({ ok: false, error: r.error.code === "ENOENT" ? "adb not on PATH" : r.error.message });
                 const png = r.stdout;
-                if (!png || png.length < 8 || png[0] !== 0x89 || png[1] !== 0x50) return reply({ ok: false, error: "screencap returned non-PNG — is the Shield connected?" });
+                if (!png || png.length < 8 || png[0] !== 0x89 || png[1] !== 0x50) return reply({ ok: false, error: "screencap returned non-PNG — is the Android TV Device connected?" });
                 const model = (process.env.GEMINI_MODEL || "gemini-2.5-flash-lite").trim();
                 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
                 const body = {
@@ -9394,7 +9394,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
-    // v1233 — list local .apk files the user can sideload to the Shield. Scans
+    // v1233 — list local .apk files the user can sideload to the Android TV Device. Scans
     // Downloads + the project folders, plus an optional ?dir=. Read-only.
     if (req.method === "GET" && req.url.startsWith("/shield/apks")) {
         try {
@@ -9423,7 +9423,7 @@ ${text.replace(/'/g, "''")}
         } catch (e) { sendJson({ ok: false, error: String(e && e.message || e) }); }
         return;
     }
-    // v1233 — sideload an APK to the Shield: adb connect ip:5555, then install -r.
+    // v1233 — sideload an APK to the Android TV Device: adb connect ip:5555, then install -r.
     // Accepts a local { path } (must be an existing .apk) or a { url } to download
     // first. Optional { launchPkg } monkey-launches it after a successful install.
     if (req.method === "POST" && req.url === "/shield/install-apk") {
@@ -9637,7 +9637,7 @@ ${text.replace(/'/g, "''")}
                 }
                 // Mic mute toggle. `cmd audio set-mute-input` is Android 10+;
                 // Shield mostly runs Android 11+ so this should work. If
-                // your Shield doesn't honor it, file a BACKLOG note.
+                // your Android TV Device doesn't honor it, file a BACKLOG note.
                 case "micToggleMute": {
                     args = ["-s", target, "shell", "cmd", "audio", "set-mute-input", "toggle"];
                     break;
@@ -9694,7 +9694,7 @@ ${text.replace(/'/g, "''")}
                 }
                 if (r.error) {
                     if (r.error.code === "ENOENT") {
-                        // v688 — structured ENOENT response so the Shield panel
+                        // v688 — structured ENOENT response so the Android TV Device panel
                         // can render a one-click "Install ADB" button instead
                         // of just showing a bare error string.
                         return reply({
@@ -10241,7 +10241,7 @@ ${text.replace(/'/g, "''")}
     // v707 — /shield/notifications. Receives notifications captured by
     // Tasker + AutoNotification on the user's phone, stores the last N
     // in a small JSON file, surfaces them to the phone control panel so
-    // the user can re-fire a captured deep-link intent on the Shield via
+    // the user can re-fire a captured deep-link intent on the Android TV Device via
     // ADB (`am start -d <intent>`).
     //
     // POST body (from Tasker AutoNotification Intercept event):
@@ -12127,7 +12127,7 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/ai/mlx-config" && req.method === "POST") { readJson(d => sendJson(aiProviders.setMlxConfig(d || {}))); return; }
     // v1145 — /ai/describe-image — Gemini vision turns a photo into a short phrase
     // tuned for voxel generation, so the engine's text→voxel (Gemini) path can build
-    // a model from a photo with no Kaggle. Reuses the same vision call as the Shield.
+    // a model from a photo with no Kaggle. Reuses the same vision call as the Android TV Device.
     if (req.url === "/ai/describe-image" && req.method === "POST") {
         readJson(async (d) => {
             const b64 = String((d && d.imageBase64) || "").replace(/^data:image\/[a-z]+;base64,/i, "");
@@ -16423,7 +16423,7 @@ ${text.replace(/'/g, "''")}
     if (req.method === "POST" && req.url === "/govee/colortem"){ readJson(d => goveeBridge.colorTem((d || {}).device, (d || {}).k).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/govee/all-color"){ readJson(d => goveeBridge.allColor((d || {}).rgb || {}, (d || {}).bri).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     // v1298 — Xbox Device Portal (Dev Mode) control. LAN-only; HTTPS self-signed + Basic
-    // auth + CSRF all handled in xboxBridge. Mirrors the Shield picker idea for Xbox.
+    // auth + CSRF all handled in xboxBridge. Mirrors the Android TV Device picker idea for Xbox.
     if (req.method === "GET"  && req.url === "/xbox/config")  { sendJson(xboxBridge.getConfig()); return; }
     if (req.method === "POST" && req.url === "/xbox/config")  { readJson(d => sendJson(xboxBridge.setConfig(d || {}))); return; }
     if (req.method === "GET"  && req.url === "/xbox/status")  { xboxBridge.status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
@@ -18745,7 +18745,7 @@ function _refreshGpuAsync() {
         list.sort((a, b) => ((rank[a.device] ?? 9) - (rank[b.device] ?? 9)) || (a.ageMs - b.ageMs));
         // out-of-band swap updates the header counts in the same response; the main body is the list.
         let html = '<span id="counts" class="counts" hx-swap-oob="true"><span class="dot"></span><b>' + list.length + '</b> connected &nbsp; \uD83D\uDCBB ' + (by.pc || 0) + ' &nbsp; \uD83D\uDCF1 ' + (by.phone || 0) + ' &nbsp; \uD83D\uDCFA ' + (by.shield || 0) + '</span>';
-        if (!list.length) { html += '<div id="empty">No clients connected right now. Open the engine, a phone view, or the Shield and they\'ll appear here.</div>'; }
+        if (!list.length) { html += '<div id="empty">No clients connected right now. Open the engine, a phone view, or the Android TV Device and they\'ll appear here.</div>'; }
         else html += list.map(c => {
             const dev = c.device || "unknown";
             const acts = dev === "shield" ? '<div class="acts">' + SHIELD_OPEN.map(o => '<button data-ip="' + esc(c.ip) + '" data-path="' + esc(o[1]) + '">' + o[0] + '</button>').join("") + '</div>' : "";
@@ -19492,7 +19492,7 @@ wss.on("connection", (ws, req) => {
         // a `shield:logcat:line` message. One stream per WS connection
         // (start while running = no-op + warn). Default filter targets
         // Chromium browser logs (which is where the engine's console.log
-        // calls end up on the Shield's WebView).
+        // calls end up on the Android TV Device's WebView).
         if (msg.type === "shield:logcat:start") {
             const ip = String(msg.ip || "").trim();
             if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
@@ -21007,9 +21007,9 @@ appServer.listen(PORT, () => {
     try {
         const adbProbe = spawnSync("adb", ["version"], { encoding: "utf8", timeout: 3000 });
         if (adbProbe.error && adbProbe.error.code === "ENOENT") {
-            console.log("[shield] adb NOT in PATH. To use the Shield panel buttons, install Android Platform Tools:");
+            console.log("[shield] adb NOT in PATH. To use the Android TV Device panel buttons, install Android Platform Tools:");
             console.log("[shield]   winget install -e --id Google.PlatformTools");
-            console.log("[shield] or via the Shield panel's 'Install ADB' button (uses winget under the hood).");
+            console.log("[shield] or via the Android TV Device panel's 'Install ADB' button (uses winget under the hood).");
             console.log("[shield] After install, restart the AI bridge so the new PATH propagates.");
         } else if (adbProbe.status === 0) {
             const first = (adbProbe.stdout || "").split("\n")[0].trim();

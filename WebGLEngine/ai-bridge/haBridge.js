@@ -402,7 +402,7 @@ async function verifiedCall(domain, service, data, { entityId = null, expect = n
 module.exports = { start, status, capabilities, states, callService, verifiedCall, notifyServices, notifyTv, calendars, todoItems, cameraSnapshot, eventsSince, addSseClient, removeSseClient, setConfig, nestProtect, presence, configured, rawToken };
 
 // v1867 — list available notify.* services (Android TV / Fire TV overlay, mobile app, persistent, etc.)
-// so the UI can offer the Shield TV as a toast target. Uses HA's /api/services catalog.
+// so the UI can offer the Android TV Device as a toast target. Uses HA's /api/services catalog.
 async function notifyServices() {
     try {
         const r = await haRequest("GET", "/api/services");

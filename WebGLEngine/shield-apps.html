@@ -34,11 +34,11 @@
   <header><span class="title"><span class="g">📥</span> App installer &amp; links</span></header>
   <main>
     <div class="note">
-      Install links for the apps this engine talks to — handy on the <b>Shield</b>, where you sideload instead of using Google&nbsp;Play. The Shield has no browser by default; the usual flow is <b>Downloader by AFTVnews</b> → paste an APKMirror link → install. Or skip that: drop <b>.apk</b> files into <b>ai-bridge/apks/</b> on the PC and push-install them straight to the Shield over ADB below. For Home&nbsp;Assistant <b>on the TV itself</b>, <b>QuickBars</b> (top of the list below) is the TV-native overlay \u2014 install from Google&nbsp;Play on the Shield, or push its APK over ADB, then launch it by package <code>dev.trooped.tvquickbars</code>.
+      Install links for the apps this engine talks to — handy on the <b>Shield</b>, where you sideload instead of using Google&nbsp;Play. The Shield has no browser by default; the usual flow is <b>Downloader by AFTVnews</b> → paste an APKMirror link → install. Or skip that: drop <b>.apk</b> files into <b>ai-bridge/apks/</b> on the PC and push-install them straight to the Android TV Device over ADB below. For Home&nbsp;Assistant <b>on the TV itself</b>, <b>QuickBars</b> (top of the list below) is the TV-native overlay \u2014 install from Google&nbsp;Play on the Android TV Device, or push its APK over ADB, then launch it by package <code>dev.trooped.tvquickbars</code>.
     </div>
 
-    <h3>Push-install to the Shield (ADB)</h3>
-    <div class="ipline">Shield IP <input id="ip" value="192.168.10.114" /></div>
+    <h3>Push-install to the Android TV Device (ADB)</h3>
+    <div class="ipline">Android TV Device IP <input id="ip" placeholder="192.168.x.x" /></div>
     <div id="apks"></div>
     <div id="empty">Drop <code>.apk</code> files into <code>ai-bridge/apks/</code> and reload — they'll appear here with an install button.</div>
     <div id="apkMsg"></div>

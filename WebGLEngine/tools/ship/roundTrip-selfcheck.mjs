@@ -115,13 +115,20 @@ const mod = noComments(modRaw);
     // so the trap was in the HTML as well as the JS. AND ITS "Test ring" BUTTON POSTS THE CONFIG -- a write
     // nobody reads as one -- so the damage did not need the Save button. THE FILE LEFT THE CENSUS ENTIRELY
     // (33 files -> 32).
-    const UNGUARDED_BASELINE = 83;   // v3243 measured 103 distinct / 3 guarded; v3455 arrival.html; v3670 doorbell.html.
+    // v3846 -- LOWERED 83 -> 78: spacedesk.html CONVERTED, the THIRD call site. Five controls, and it carried
+    // the defect in BOTH of the places the two earlier conversions found it separately: the JS did
+    // `c.viewerPkg || "ph.spacedesk.beta"` and `c.pollSec || 10` (arrival.html's trap), AND the markup carried
+    // value="192.168.10.114" on the device IP and value="10" on the poll interval (doorbell.html's trap, whose
+    // note says "the trap was in the HTML as well as the JS"). ITS TEST BUTTON ALSO POSTS THE CONFIG, so the
+    // damage never needed the Save button -- the same thing doorbell.html's "Test ring" does. THE FILE LEFT THE
+    // CENSUS ENTIRELY (32 files -> 31).
+    const UNGUARDED_BASELINE = 78;   // v3243 measured 103 distinct / 3 guarded; v3455 arrival.html; v3670 doorbell.html; v3846 spacedesk.html.
     const unguarded = r.distinct - r.guarded;
 
     // THE CONVERTED FILES ARE NAMED, NOT JUST COUNTED. v3420's rule: a tally lets one file gain a guard while
     // another quietly loses one and never moves. When a file is converted, ADD ITS NAME HERE AND LOWER THE
     // BASELINE; if a name stops holding, that is a REGRESSION and it fails by name rather than by arithmetic.
-    const CONVERTED = ["arrival.html", "doorbell.html"];
+    const CONVERTED = ["arrival.html", "doorbell.html", "spacedesk.html"];
     for (const f of CONVERTED) {
         const raw = fs.readFileSync(path.join(ROOT, f), "utf8");
         // *** noComments, NOT THE RAW TEXT -- AND THIS CAUGHT ME ON THE FIRST RUN. The header I wrote in
@@ -133,6 +140,20 @@ const mod = noComments(modRaw);
         ok("!! " + f + " still uses the shared rules rather than restating them",
            /from\s*["'][^"']*ui\/roundTrip\.js["']/.test(src) && /applyLoaded\(/.test(src) && /collectIfKnown\(/.test(src),
            "imports ui/roundTrip.js and calls BOTH halves. Importing it and using only applyLoaded would guard the LOAD and leave the save writing browser defaults -- half the fix looks like the fix.");
+        // *** v3846 -- AND THE MARKUP HALF, WHICH THIS CHECK DID NOT LOOK AT AND WHICH arrival.html STILL HAD.
+        // The assertion below reads the JS only, so arrival.html passed as CONVERTED from v3455 to v3845 while
+        // carrying value="192.168.10.114" on the device IP and value="0" on flashSec -- a number whose own
+        // label reads "0 = stay". doorbell.html's v3670 note had ALREADY named this exact trap ("the trap was
+        // in the HTML as well as the JS") and the check was never widened to look for it. A control with a
+        // value= in the markup holds that value after a failed fetch just as surely as one assigned in JS, and
+        // collectIfKnown cannot tell the difference: the DOM simply has a value. ***
+        const valued = (noComments(raw).match(/<input[^>]*\bid="[^"]*"[^>]*>/g) || [])
+            .filter((t) => /\bvalue="/.test(t) && !/type="(submit|button|hidden)"/.test(t));
+        ok("!! " + f + " carries no markup default on a round-trip control either", valued.length === 0,
+           valued.length ? "still hardcoded in the HTML: " + valued.join(" ") :
+           "no id'd input carries a value= attribute. THE PLACEHOLDER IS THE ONLY LEGAL WAY TO SUGGEST A VALUE, " +
+           "because a placeholder is not submitted and a value is");
+
         ok("...and its load no longer supplies a fallback the save would post back",
            !/\$\("(shieldIp|greet|light|shieldUrl|quip|flashSec|shieldAction)"\)\.value\s*=\s*c\.\w+\s*\|\|/.test(src) &&
            !/\$\("(announce|speak)"\)\.checked\s*=\s*c\.\w+\s*!==\s*false/.test(src),

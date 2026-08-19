@@ -1,5 +1,5 @@
 // FILE: ui/openUrlListener.js
-// v933 — lets the phone push a URL to THIS engine page (e.g. on the Shield TV).
+// v933 — lets the phone push a URL to THIS engine page (e.g. on the Android TV Device).
 // Polls GET /open-url; when a new command appears it acts by mode:
 //   "iframe"   → show a fullscreen in-engine overlay iframe (default; no popup
 //                blocker, fully controllable, works for engine pages + framable

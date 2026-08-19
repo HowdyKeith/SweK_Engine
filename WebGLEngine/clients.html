@@ -54,7 +54,7 @@
       This panel lists devices connected to the bridge over its <b>WebSocket relay</b>. Light console pages
       (this one, the server console, the WASM pages) talk to the bridge over plain HTTP, so they <b>don't</b>
       appear here — only things that open the engine's WebSocket do: the render engine, avatar/Pip-Boy modes,
-      a phone view, the Shield TV, or the viewer pages below. Open one and it shows up within a few seconds.
+      a phone view, the Android TV Device, or the viewer pages below. Open one and it shows up within a few seconds.
     </div>
     <!-- v1949 — launch buttons: each opens a page that DOES register a WS client, so you can populate the list. -->
     <div id="launch">
@@ -66,7 +66,7 @@
         <button data-open="/terminal.html" title="terminal page — registers a WS client">⌨ Terminal</button>
         <button data-open="/rps.html" title="rock-paper-scissors — registers a WS client">✊ RPS</button>
       </div>
-      <div class="lhint">They open in new tabs; leave one open and watch it appear here. Open on your phone for a 📱 row, or cast to the Shield for a 📺 row.</div>
+      <div class="lhint">They open in new tabs; leave one open and watch it appear here. Open on your phone for a 📱 row, or cast to the Android TV Device for a 📺 row.</div>
     </div>
     <!-- v1942 — htmx: declarative poll. hx-get fetches a server-rendered HTML fragment every 4s and swaps
          it into #list; the fragment also carries an hx-swap-oob update for #counts. No hand-rolled

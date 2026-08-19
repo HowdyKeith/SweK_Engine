@@ -308,7 +308,7 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
                   launch.addEventListener("click", () => { try { window.open("https://mesh2motion.org", "_blank", "noopener"); } catch {} });
                   launchLocal.addEventListener("click", () => { const u = (local.value || "").trim(); if (u) { try { window.open(u, "_blank", "noopener"); } catch {} } });
               } },
-            { id: "avatarPush", label: "🧑‍🚀 Push an avatar (live swap)", hint: "Open the avatar picker: pick any .glb avatar and push it live — it hot-swaps on the engine window, the standalone avatar window, and the Shield/phone with no reload. “Show on Shield” opens the avatar window on the Shield, then keeps it in sync.", type: "button",
+            { id: "avatarPush", label: "🧑‍🚀 Push an avatar (live swap)", hint: "Open the avatar picker: pick any .glb avatar and push it live — it hot-swaps on the engine window, the standalone avatar window, and the Android TV Device/phone with no reload. “Show on Shield” opens the avatar window on the Android TV Device, then keeps it in sync.", type: "button",
               action: () => { try { window.open("/avatar-push.html", "_blank"); } catch { location.href = "/avatar-push.html"; } } },
             { id: "peerAvatarSynch", type: "custom",
               render: (box) => {
@@ -1424,13 +1424,13 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
               action: () => { try { window.open("/clients.html", "_blank"); } catch { location.href = "/clients.html"; } } },
             { id: "connectDevice", label: "📲 Connect a device", hint: "Open the connect helper: the bridge's LAN address (and .local mDNS name) to open on a phone, tablet or Shield on the same Wi-Fi, with copy buttons, every network address listed (real adapters first, virtual ones flagged), and one-tap 'open the engine here' for any connected Shield.", type: "button",
               action: () => { try { window.open("/connect.html", "_blank"); } catch { location.href = "/connect.html"; } } },
-            { id: "appInstaller", label: "📥 App installer & links", hint: "Open the app installer: install links for every app this engine talks to (handy on the Shield, where you sideload) plus a push-installer — drop .apk files into ai-bridge/apks/ and install them straight to the Shield over ADB.", type: "button",
+            { id: "appInstaller", label: "📥 App installer & links", hint: "Open the app installer: install links for every app this engine talks to (handy on the Android TV Device, where you sideload) plus a push-installer — drop .apk files into ai-bridge/apks/ and install them straight to the Android TV Device over ADB.", type: "button",
               action: () => { try { window.open("/shield-apps.html", "_blank"); } catch { location.href = "/shield-apps.html"; } } },
             { id: "alexaCmd", label: "🗣️ Alexa command", hint: "Open the Alexa command panel: type a command (e.g. 'set a 10 minute timer') and send it to an Echo through Home Assistant, via Alexa Media Player (pick a media_player entity) or the official Alexa Devices integration (device id).", type: "button",
               action: () => { try { window.open("/alexa.html", "_blank"); } catch { location.href = "/alexa.html"; } } },
             { id: "echoShow", label: "📺 Show on Echo", hint: "Open the Show-on-Echo panel: open an engine page (wall switchboard, custom board, …) on an Echo Show screen. Alexa has no native open-URL command, so it relies on a tiny one-time APL skill that maps page numbers to URLs; this panel fires the 'open page N' text command via Home Assistant. Not a true kiosk — the Show reverts to home after a few minutes.", type: "button",
               action: () => { try { window.open("/echo-show.html", "_blank"); } catch { location.href = "/echo-show.html"; } } },
-            { id: "spacedesk", label: "🖥️ spacedesk auto-launch", hint: "Open the spacedesk panel: when the spacedesk server starts on this PC, auto-open the spacedesk viewer on the Shield so it joins as a second monitor. Scan finds the server's process name; Test launches the viewer now.", type: "button",
+            { id: "spacedesk", label: "🖥️ spacedesk auto-launch", hint: "Open the spacedesk panel: when the spacedesk server starts on this PC, auto-open the spacedesk viewer on the Android TV Device so it joins as a second monitor. Scan finds the server's process name; Test launches the viewer now.", type: "button",
               action: () => { try { window.open("/spacedesk.html", "_blank"); } catch { location.href = "/spacedesk.html"; } } },
             { id: "xbox", label: "🎮 Xbox (Dev Mode)", hint: "Open the Xbox panel: control an Xbox One/Series in Developer Mode via its Device Portal — list & launch apps, read system perf, grab a screenshot. Needs the console IP + the Dev Portal username/password.", type: "button",
               action: () => { try { window.open("/xbox.html", "_blank"); } catch { location.href = "/xbox.html"; } } },
@@ -1834,11 +1834,11 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
               action: () => { try { window.open("/ac.html", "_blank"); } catch { location.href = "/ac.html"; } } },
             { id: "solar", label: "☀️ Solar & energy gauges", hint: "Open the solar gauges: live production, home-battery %, grid import/export and energy-today, read from the haSolar roles (Enphase Envoy etc.). Setup maps your HA sensors to each role. Optional toggle ties the avatar's mood to the battery level.", type: "button",
               action: () => { try { window.open("/solar.html", "_blank"); } catch { location.href = "/solar.html"; } } },
-            { id: "doorbell", label: "🔔 Doorbell fan-out", hint: "Open the doorbell panel: one trigger (GET /doorbell/ring, fired from MacroDroid/Tasker on a Blink event) announces on the avatar (quip + TTS + HA speaker), pops the Blink app on the Shield, and can flash a light. Includes a Test ring button.", type: "button",
+            { id: "doorbell", label: "🔔 Doorbell fan-out", hint: "Open the doorbell panel: one trigger (GET /doorbell/ring, fired from MacroDroid/Tasker on a Blink event) announces on the avatar (quip + TTS + HA speaker), pops the Blink app on the Android TV Device, and can flash a light. Includes a Test ring button.", type: "button",
               action: () => { try { window.open("/doorbell.html", "_blank"); } catch { location.href = "/doorbell.html"; } } },
             { id: "arrival", label: "🏠 Arrival fan-out", hint: "Open the arrival panel: when a person arrives home (HA presence, or a phone geofence hitting /arrival/ring), greet them across the avatar + local TTS + the Echo, with optional Shield scene + light. Per-person greetings + a Test button.", type: "button",
               action: () => { try { window.open("/arrival.html", "_blank"); } catch { location.href = "/arrival.html"; } } },
-            { id: "shieldDisplay", label: "📐 Shield display test", hint: "Open the Shield display tester: push rotation, resolution (wm size) and DPI (wm density) to the Shield over ADB to wrangle portrait-locked apps. 'Reset all' recovers a bad setting.", type: "button",
+            { id: "shieldDisplay", label: "📐 Shield display test", hint: "Open the Android TV Device display tester: push rotation, resolution (wm size) and DPI (wm density) to the Android TV Device over ADB to wrangle portrait-locked apps. 'Reset all' recovers a bad setting.", type: "button",
               action: () => { try { window.open("/shield-display.html", "_blank"); } catch { location.href = "/shield-display.html"; } } },
             { id: "cloudedge", label: "📷 CloudEdge camera", hint: "Open the CloudEdge helper: enable ONVIF in the CloudEdge app, then enter the camera IP + password here to build the local RTSP URL and register it with go2rtc so it shows in the camera picker. Note: only works if your cam exposes local ONVIF/RTSP (some are cloud-only).", type: "button",
               action: () => { try { window.open("/cloudedge.html", "_blank"); } catch { location.href = "/cloudedge.html"; } } },
@@ -2394,7 +2394,7 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
                   const mk = (tag, css, txt) => { const e = document.createElement(tag); if (css) e.style.cssText = css; if (txt != null) e.textContent = txt; return e; };
                   Object.assign(box.style, { padding: "10px 0", fontSize: "12px", lineHeight: "1.5" });
                   box.textContent = "";
-                  box.appendChild(mk("div", "color:#7f93a8;margin-bottom:10px;", "Pop a toast/overlay onto an Android TV (e.g. the Shield) through Home Assistant. Needs the \u201CNotifications for Android TV / Fire TV\u201D integration in HA (which you already have if toasts appear on the TV)."));
+                  box.appendChild(mk("div", "color:#7f93a8;margin-bottom:10px;", "Pop a toast/overlay onto an Android TV (e.g. the Android TV Device) through Home Assistant. Needs the \u201CNotifications for Android TV / Fire TV\u201D integration in HA (which you already have if toasts appear on the TV)."));
 
                   const mRow = mk("div", "display:flex;align-items:flex-start;gap:8px;margin:6px 0;");
                   mRow.appendChild(mk("label", "width:64px;color:#9fb3cc;flex:none;padding-top:6px;", "Message"));

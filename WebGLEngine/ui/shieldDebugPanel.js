@@ -1,20 +1,20 @@
-// ui/shieldDebugPanel.js — remote-debug panel for the Nvidia Shield Pro (or any
+// ui/shieldDebugPanel.js — remote-debug panel for the Nvidia Android TV Device (or any
 // Android device on the LAN with wireless ADB enabled).
 //
 // What this panel can do (all via ADB-over-network through the bridge):
-//   - Open the engine URL in the Shield's default browser
+//   - Open the engine URL in the Android TV Device's default browser
 //   - Pull a tail of `logcat` so we can see browser/renderer errors
 //   - Send an Android intent to open the Blink app on a specific camera
 //   - Send keyevents (DPAD nav, BACK, HOME) for headless control
 //
-// Setup required ONCE on the Shield (the PC's `adb` must be on PATH too):
+// Setup required ONCE on the Android TV Device (the PC's `adb` must be on PATH too):
 //   1. Settings → Device Preferences → Developer Options → "Network debugging" ON
 //   2. On the PC: `adb connect 192.168.10.114:5555`
 //      (Shield runs Android 11; if it prompts for an RSA fingerprint, accept
 //      on the TV.) For Android 11 wireless-debug-with-pairing flow, see the
 //      "Copy adb pair cmd" button.
 //
-// Honest framing for the user: if adb isn't installed on the PC or the Shield
+// Honest framing for the user: if adb isn't installed on the PC or the Android TV Device
 // hasn't been paired, every button returns an error. We surface that error
 // rather than pretending it worked.
 
@@ -54,7 +54,7 @@ export function mountShieldDebugPanel() {
     });
 
     root.appendChild(el("div", H, "NVIDIA SHIELD DEBUG"));
-    root.appendChild(el("div", DIM, "Wireless ADB to the Shield Pro (or any Android on LAN). Setup steps in panel source comments."));
+    root.appendChild(el("div", DIM, "Wireless ADB to the Android TV Device (or any Android on LAN). Setup steps in panel source comments."));
 
     // IP input — default from your LAN
     const ipRow = el("div", { display: "flex", gap: "4px", marginTop: "6px", alignItems: "center" });
@@ -69,8 +69,8 @@ export function mountShieldDebugPanel() {
         fontFamily: "ui-monospace, monospace",
     });
     ip.type = "text";
-    ip.value = localStorage.getItem("shieldDebug.ip") || "192.168.10.114";
-    ip.placeholder = "192.168.10.114";
+    ip.value = localStorage.getItem("shieldDebug.ip") || "";
+    ip.placeholder = "192.168.x.x";
     ip.addEventListener("change", () => localStorage.setItem("shieldDebug.ip", ip.value.trim()));
     ipRow.appendChild(ip);
     root.appendChild(ipRow);
@@ -238,9 +238,9 @@ export function mountShieldDebugPanel() {
     root.appendChild(el("div", H, "ENGINE → SHIELD"));
 
     const openEngineBtn = el("div", BTN, "🌐 Open engine on Shield");
-    openEngineBtn.title = "Sends an intent to open the engine URL in the Shield's default browser (JioPages if installed).";
+    openEngineBtn.title = "Sends an intent to open the engine URL in the Android TV Device's default browser (JioPages if installed).";
     openEngineBtn.addEventListener("click", async () => {
-        // Build a LAN URL from the current page so the Shield hits the PC, not localhost.
+        // Build a LAN URL from the current page so the Android TV Device hits the PC, not localhost.
         const port = location.port || "8787";
         const host = location.hostname === "localhost" ? "" : location.hostname;
         const url = host ? `http://${host}:${port}/` : `http://PC-LAN-IP:${port}/`;
@@ -253,7 +253,7 @@ export function mountShieldDebugPanel() {
     root.appendChild(openEngineBtn);
 
     const blinkBtn = el("div", BTN, "📷 Blink → Camera 1");
-    blinkBtn.title = "Launches the Blink app on the Shield (camera selection inside the app — Blink doesn't accept deep-link camera args).";
+    blinkBtn.title = "Launches the Blink app on the Android TV Device (camera selection inside the app — Blink doesn't accept deep-link camera args).";
     blinkBtn.addEventListener("click", () => shieldExec("blinkApp"));
     root.appendChild(blinkBtn);
 
@@ -290,7 +290,7 @@ export function mountShieldDebugPanel() {
     root.appendChild(filterRow);
 
     const streamBtn = el("div", BTN, "📡 Stream logcat (live)");
-    streamBtn.title = "Live-tail the Shield's Chromium logcat over WS. Click again to stop.";
+    streamBtn.title = "Live-tail the Android TV Device's Chromium logcat over WS. Click again to stop.";
     let streaming = false;
     let streamLines = [];
     const MAX_RETAINED = 500;
@@ -345,7 +345,7 @@ export function mountShieldDebugPanel() {
     root.appendChild(streamBtn);
 
     const dumpBtn = el("div", BTN, "📋 Current activity");
-    dumpBtn.title = "Which app + activity is on screen right now on the Shield.";
+    dumpBtn.title = "Which app + activity is on screen right now on the Android TV Device.";
     dumpBtn.addEventListener("click", async () => {
         const r = await shieldExec("currentActivity");
         if (r?.output) {
@@ -448,7 +448,7 @@ export function mountShieldDebugPanel() {
     root.appendChild(out);
 
     root.appendChild(el("div", { ...DIM, marginTop: "8px", fontStyle: "italic" },
-        "If buttons fail, adb may not be on the PC's PATH or the Shield isn't paired. Install Android Platform Tools and try 'adb connect' once from a terminal."));
+        "If buttons fail, adb may not be on the PC's PATH or the Android TV Device isn't paired. Install Android Platform Tools and try 'adb connect' once from a terminal."));
 
     return { root };
 }

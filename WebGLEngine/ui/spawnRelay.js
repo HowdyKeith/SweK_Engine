@@ -1,6 +1,6 @@
 // ui/spawnRelay.js — v949
 // Engine-side drainer for the spawn relay. A standalone library page
-// (asset-library.html — possibly on a phone or the Shield TV, or just another
+// (asset-library.html — possibly on a phone or the Android TV Device, or just another
 // browser tab) POSTs an asset id to the bridge (/spawn/push). THIS running
 // engine polls /spawn/pending, which the bridge drains, and spawns each asset
 // via window.spawnAssetFromLibrary(id, opts) — the same rig+place pipeline the

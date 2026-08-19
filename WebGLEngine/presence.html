@@ -69,9 +69,9 @@
     </div>
     <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap;align-items:center;">
       <span class="muted">do</span>
-      <select id="pAct" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="demo">Run demo</option><option value="next">Next demo</option><option value="console">Console line</option><option value="shield">Open on Shield TV</option><option value="ha-on">Light/switch ON</option><option value="ha-off">Light/switch OFF</option><option value="ha-toggle">Toggle light/switch</option><option value="ha-open">Valve OPEN (watering)</option><option value="ha-close">Valve CLOSE</option><option value="water">Water zone for Ns</option></select>
+      <select id="pAct" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="demo">Run demo</option><option value="next">Next demo</option><option value="console">Console line</option><option value="shield">Open on Android TV Device</option><option value="ha-on">Light/switch ON</option><option value="ha-off">Light/switch OFF</option><option value="ha-toggle">Toggle light/switch</option><option value="ha-open">Valve OPEN (watering)</option><option value="ha-close">Valve CLOSE</option><option value="water">Water zone for Ns</option></select>
       <input id="pVal" placeholder="demo id / JS line" style="flex:1;min-width:120px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
-      <input id="pIp" placeholder="Shield IP" value="192.168.10.114" style="display:none;flex:0 0 120px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <input id="pIp" placeholder="Android TV Device IP"  style="display:none;flex:0 0 120px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
       <button id="pAdd">+ Add</button>
     </div>
 
@@ -191,7 +191,7 @@
     if (at === "demo") { if (!val) return; act = { cmd:"demo:set", args:{ id: val } }; }
     else if (at === "next") { act = { cmd:"demo:next" }; }
     else if (at === "console") { if (!val) return; act = { cmd:"console:exec", args:{ line: val } }; }
-    else if (at === "shield") { act = { kind:"shield", url: (val || shieldPipUrl()), ip: ($("pIp").value.trim() || "192.168.10.114") }; }
+    else if (at === "shield") { act = { kind:"shield", url: (val || shieldPipUrl()), ip: $("pIp").value.trim() }; }
     else if (at.startsWith("ha-")) { if (!val) return; const svc = at === "ha-on" ? "turn_on" : at === "ha-off" ? "turn_off" : at === "ha-open" ? "open_valve" : at === "ha-close" ? "close_valve" : "toggle"; act = { kind:"ha", domain: val.split(".")[0], service: svc, entity_id: val }; }
     else if (at === "water") { if (!val) return; const parts = val.split(/\s+/); const ent = parts[0]; const secs = parseInt(parts[1], 10) || 30; act = { kind:"water", entity_id: ent, zone: ent, seconds: secs }; }
     const rule = { match }; if (when === "arrive") rule.onArrive = act; else rule.onLeave = act;

@@ -122,7 +122,7 @@ function handle(req, res) {
     if (req.method === "GET" && u === "/android/status") { sendJson(res, status()); return true; }
 
     // v3008 -- THE TASKER CHAIN. Termux:Tasker executes a script inside Termux, which is the designed seam for
-    // driving this phone from the Shield. Each stage carries the command AND the artefact that proves it
+    // driving this phone from the Android TV Device. Each stage carries the command AND the artefact that proves it
     // happened, because a task that FIRED is not a task that WORKED -- Tasker reports success for a script that
     // ran, found nothing and exited 0, on a device nobody is sitting at.
     // v3034 -- HOW THIS TRANSCRIPT MAY BE USED. runClass.mjs was written at v3029 to make Keith's policy

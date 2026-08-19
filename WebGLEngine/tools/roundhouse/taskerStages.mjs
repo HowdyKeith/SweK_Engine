@@ -2,7 +2,7 @@
 //
 // THE ANDROID PEER CHAIN, AS STAGES TASKER CAN DRIVE -- AND WHAT PROVES EACH ONE HAPPENED.
 //
-// Keith runs Tasker on a Shield TV, already wired into this engine. The question was whether it can close the
+// Keith runs Tasker on a Android TV Device, already wired into this engine. The question was whether it can close the
 // gaps between install, run, submit and update. It can, through Termux:Tasker -- the purpose-built plugin that
 // lets Tasker execute a script INSIDE Termux. That is the designed seam, not a workaround, and this tree already
 // uses its sibling Termux:Boot for start-on-boot since v2935.

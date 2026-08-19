@@ -149,7 +149,7 @@ export const SECTIONS = [
       note: "everything that needs a Mac: the .command launchers, the Raycast peer, the tunnel, and the LAPACK key",
       pages: [] },
 
-    { id: "smarthome", tab: "smarthome", label: "Smart Home", note: "Home Assistant, the Shield, announcements and the house sensors",
+    { id: "smarthome", tab: "smarthome", label: "Smart Home", note: "Home Assistant, the Android TV Device, announcements and the house sensors",
       pages: ["home.html", "ha-switches.html", "ha-capabilities.html", "ha-diagram.html", "presence.html",
               "arrival.html", "doorbell.html", "alexa.html", "echo-show.html", "agenda.html",
               "air-quality.html", "nest-protect.html", "solar.html", "ac.html", "wall.html"] },

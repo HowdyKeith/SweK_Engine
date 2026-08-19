@@ -3,7 +3,7 @@
 // v1409 — XInput / standard gamepad support via the browser Gamepad API. Polls
 // each frame (called from the main loop just before camera.update) and drives the
 // camera with ANALOG move + look, plus FPS fire — no extra deps, works in Chrome
-// for Xbox/standard controllers (and on the Shield).
+// for Xbox/standard controllers (and on the Android TV Device).
 //
 // Standard mapping (Xbox layout): axes[0],[1] = LEFT stick (move), axes[2],[3] =
 // RIGHT stick (look), button 7 = RT and button 0 = A (fire), button 5 = RB (jump).

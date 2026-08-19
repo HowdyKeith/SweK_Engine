@@ -600,7 +600,7 @@
         </select>
         <button class="act accent" id="pushGo">open</button>
       </div>
-      <p class="hint">Opens on the engine page (your Shield/PC). "overlay" works great for engine pages; "download" fetches a file (e.g. an .apk you dropped in the engine folder) so you can tap-install it on that device.</p>
+      <p class="hint">Opens on the engine page (your Android TV Device/PC). "overlay" works great for engine pages; "download" fetches a file (e.g. an .apk you dropped in the engine folder) so you can tap-install it on that device.</p>
     </section>
 
     <!-- v938 — fire an arbitrary toast at the TvOverlay app on the TV -->
@@ -1179,7 +1179,7 @@
                transform:translate(-4px,-4px); pointer-events:none;
                transition:opacity 0.2s;"></div>
         </div>
-        <p class="hint" style="text-align:center;">Absolute tap mode — touch position maps to screen coords (Shield Pro 1920×1080).</p>
+        <p class="hint" style="text-align:center;">Absolute tap mode — touch position maps to screen coords (Android TV Device 1920×1080).</p>
       </div>
       <!-- Click buttons + extras shared across modes -->
       <div class="grid" style="margin-top:8px; grid-template-columns:1fr 1fr;">
@@ -1207,7 +1207,7 @@
         <button class="act media" data-key="MEDIA_REWIND" title="Rewind">⏪</button>
         <button class="act media" data-key="MEDIA_FAST_FORWARD" title="Fast-forward">⏩</button>
       </div>
-      <p class="hint" style="margin-top:8px;">⚠ Power button below puts the Shield to sleep. Use the physical remote to wake it.</p>
+      <p class="hint" style="margin-top:8px;">⚠ Power button below puts the Android TV Device to sleep. Use the physical remote to wake it.</p>
       <button id="shPower" class="act wide" style="margin-top:4px; background:#3a1a1a; border-color:#7a3a3a; color:#fcc;">⏻ Sleep Shield (confirms first)</button>
     </section>
 
@@ -1252,7 +1252,7 @@
       </div>
       <p class="hint" id="sysHelp" style="display:none; margin-top:8px;">
         <b>Confirmed</b>: Screenshot (PNG returned to browser), Save (screencap to /sdcard/), Start/Stop record (screenrecord on device, up to 60s), Mic mute/unmute (cmd audio set-mute-input), Media rec (KEYCODE_MEDIA_RECORD).<br>
-        <b>Speculative</b>: Instant replay + Broadcast use best-guess Tegra intent names (com.nvidia.tegrazone3.intent.action.*) — if they don't trigger the Shield UI, the long-press PIP menu still works directly. Report back what does/doesn't fire and we can adjust.<br>
+        <b>Speculative</b>: Instant replay + Broadcast use best-guess Tegra intent names (com.nvidia.tegrazone3.intent.action.*) — if they don't trigger the Android TV Device UI, the long-press PIP menu still works directly. Report back what does/doesn't fire and we can adjust.<br>
         Gameplay can trigger any of these via <code>window.shield.screenshot()</code>, <code>window.shield.recordStart(60)</code>, <code>window.shield.micMute()</code>, etc.
       </p>
       <img id="shScreenshotPreview" style="display:none; max-width:100%; margin-top:8px; border:1px solid var(--edge); border-radius:6px;" alt="latest screenshot">
@@ -1404,7 +1404,7 @@
       <pre id="shOut" style="margin-top:10px; max-height:240px; overflow:auto; background:#0a0d12; border:1px solid var(--edge); padding:8px; font-size:11px; color:#bdf; white-space:pre-wrap; word-break:break-all; display:none; -webkit-user-select:text; user-select:text;"></pre>
       <details style="margin-top:8px; color:var(--dim); font-size:11px;">
         <summary style="cursor:pointer;">Notes on Blink notifications + auto-rotate</summary>
-        <p style="margin:6px 0;">Blink's motion-detection notification on Android DOES carry a deep-link intent that opens the specific camera. The PC bridge can't directly grab that link — it's only on the Shield. Workaround: install Tasker (or AutoApps + AutoNotification) on the Shield, write a profile that captures the Blink notification's intent string, then POST it back to the bridge via HTTP. From there the bridge can replay it via <code>adb shell am start -d &lt;intent&gt;</code>.</p>
+        <p style="margin:6px 0;">Blink's motion-detection notification on Android DOES carry a deep-link intent that opens the specific camera. The PC bridge can't directly grab that link — it's only on the Android TV Device. Workaround: install Tasker (or AutoApps + AutoNotification) on the Android TV Device, write a profile that captures the Blink notification's intent string, then POST it back to the bridge via HTTP. From there the bridge can replay it via <code>adb shell am start -d &lt;intent&gt;</code>.</p>
         <p style="margin:6px 0;">Auto-rotate-on-Shield: the "Set Orientation" app (com.pittvandewitt.orientation) or "Rotation Control" can force landscape on apps that default to portrait. Add to the Quick Launch grid by editing SHIELD_APPS in this file once you know the exact package on your TV.</p>
       </details>
     </section>
@@ -1415,7 +1415,7 @@
         <span id="shSetupCollapse" style="font-size:10px; color:var(--dim); cursor:pointer; user-select:none;">▼ collapse</span>
       </p>
       <div id="shSetupBody">
-        <p class="hint">Default IP is the Shield Pro at <code>192.168.10.114</code>. For a VSEE box or any other Android TV box, swap in its IP. Setup needed once: device → Developer Options → Network debugging ON; PC must have <code>adb</code> on PATH; first run <code>adb connect &lt;IP&gt;:5555</code> in a PC terminal and accept the RSA fingerprint on the TV.</p>
+        <p class="hint">Default IP is the Android TV Device at <code>192.168.10.114</code>. For a VSEE box or any other Android TV box, swap in its IP. Setup needed once: device → Developer Options → Network debugging ON; PC must have <code>adb</code> on PATH; first run <code>adb connect &lt;IP&gt;:5555</code> in a PC terminal and accept the RSA fingerprint on the TV.</p>
         <!-- v734 — saved/named device list. Multiple Shield/Android boxes
              can be saved and recalled by name. Selecting one updates the
              IP field below. -->
@@ -1431,7 +1431,7 @@
         </div>
         <div style="margin-top:8px;">
           <label class="hint" style="display:block; margin-bottom:4px;">IP address</label>
-          <input type="text" id="shieldIp" value="192.168.10.114" placeholder="192.168.10.114"
+          <input type="text" id="shieldIp" placeholder="192.168.x.x"
                  style="width:100%; padding:10px; font-size:15px; background:#0c0f14; color:var(--ink); border:1px solid var(--edge); border-radius:8px; -webkit-user-select:text; user-select:text;">
         </div>
         <div class="grid" style="margin-top:10px;">
@@ -1449,7 +1449,7 @@
          adb monkey + package name. Package names are best-guess Android TV
          versions; if an app doesn't launch, the package may be wrong for
          your TV's installed variant — edit SHIELD_APPS in the script. -->
-    <!-- v1233 — sideload an APK to the Shield. Lists local .apk files (Downloads +
+    <!-- v1233 — sideload an APK to the Android TV Device. Lists local .apk files (Downloads +
          project folders) or take a direct path/URL, then adb install -r to the TV. -->
     <section id="apkSideload" style="margin-top:6px;">
       <p class="label">📦 Install APK on Shield</p>
@@ -1463,7 +1463,7 @@
              style="width:100%; margin-top:6px; padding:9px; font-size:13px; background:#0c0f14; color:var(--ink); border:1px solid var(--edge); border-radius:8px; -webkit-user-select:text; user-select:text;">
       <button class="act accent wide" id="apkInstall" style="margin-top:8px;">⬇ Install to Shield</button>
       <pre id="apkLog" style="margin-top:8px; max-height:150px; overflow:auto; background:#0a0c10; border:1px solid var(--edge); border-radius:8px; padding:8px; font-size:11px; color:var(--dim); white-space:pre-wrap; display:none;"></pre>
-      <p class="hint">Uses the IP above + wireless ADB (enable Network debugging on the Shield, allow the fingerprint once). Installs to the TV; tap the package field to also auto-launch it.</p>
+      <p class="hint">Uses the IP above + wireless ADB (enable Network debugging on the Android TV Device, allow the fingerprint once). Installs to the TV; tap the package field to also auto-launch it.</p>
     </section>
 
     <!-- v1283 — unified "send a source to this device" picker. Resolves a URL for the
@@ -1815,7 +1815,7 @@
     appCaption.classList.toggle("open",open);
     appCaption.setAttribute("aria-expanded",open?"true":"false");
   });
-  // v984 — open Tools & Panels pages. New tabs are unreliable on the Shield TV
+  // v984 — open Tools & Panels pages. New tabs are unreliable on the Android TV Device
   // browser (popups blocked / no tab UI), so if window.open is refused, fall
   // back to navigating this tab (the page has its own UI; remote Back returns).
   var _phoneTools = document.getElementById("phoneTools");
@@ -2772,7 +2772,7 @@
   })();
 
   // v847 — Wandering avatar sprite (items 6/7/8 of phone wishlist).
-  //   Landscape mode (Shield TV, rotated phone) → sprite walks horizontally
+  //   Landscape mode (Android TV Device, rotated phone) → sprite walks horizontally
   //   inside the kpavatar-wrap, bouncing off edges. Occasionally wanders
   //   off-screen, waits 3-8 seconds, then walks back to center. Click the
   //   wrap (or the sprite area) to summon it back to center immediately.
@@ -4308,7 +4308,7 @@
     var toTv = document.getElementById("m2mToTv");
     if (toTv) toTv.addEventListener("click", function(){
       var ip = ""; var sip = document.getElementById("shieldIp"); if (sip) ip = sip.value.trim();
-      if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)){ show("set the Shield IP in the TV Remote tab first"); return; }
+      if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)){ show("set the Android TV Device IP in the TV Remote tab first"); return; }
       fetch("/shield/exec", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"openUrl", ip: ip, url: RIG_URL }) })
         .then(function(r){ return r.json(); }).then(function(j){ show(j && j.ok ? "opened on the TV" : "TV failed: " + ((j && j.error) || "?")); })
         .catch(function(){ show("TV failed: bridge unreachable"); });
@@ -5545,13 +5545,13 @@
     var btn = document.getElementById("shPower");
     if (!btn) return;
     btn.addEventListener("click", function(){
-      if (!confirm("Put the Shield to sleep?\n\nYou'll need the physical remote (or another Wi-Fi-up command) to wake it.")) return;
+      if (!confirm("Put the Android TV Device to sleep?\n\nYou'll need the physical remote (or another Wi-Fi-up command) to wake it.")) return;
       shieldExec("key", { keycode: "POWER" });
     });
   })();
   // v707 — Tasker notifications panel. Polls /shield/notifications every
-  // 5s while the Shield tab is visible. Each row shows the captured
-  // notification + a button to fire its intent on the Shield via the
+  // 5s while the Android TV Device tab is visible. Each row shows the captured
+  // notification + a button to fire its intent on the Android TV Device via the
   // existing openUrl ADB action.
   (function bindShieldNotifications(){
     var listEl   = document.getElementById("shNotifList");
@@ -5620,7 +5620,7 @@
       }
     }
     refresh();
-    // Poll every 5s while the Shield tab is visible
+    // Poll every 5s while the Android TV Device tab is visible
     setInterval(function(){
       var tab = document.getElementById("tab-shield");
       if (tab && tab.classList.contains("active")) refresh();
@@ -5646,7 +5646,7 @@
 </script>
 <script>
 (function(){
-  // v1348 — "?" help toggles + collapsible sections for the Shield remote panel
+  // v1348 — "?" help toggles + collapsible sections for the Android TV Device remote panel
   document.addEventListener("click", function(e){
     var b = e.target.closest("[data-help]");
     if (b){ var el = document.getElementById(b.getAttribute("data-help")); if (el) el.style.display = (el.style.display === "none") ? "" : "none"; return; }

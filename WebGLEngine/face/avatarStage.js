@@ -11,7 +11,7 @@
 // Perf: single context (same budget as the old stamp), ~30fps throttle, and
 // auto-pause when the canvas is hidden (document.hidden) or scrolled offscreen
 // (IntersectionObserver). Procedural low-poly gauge meshes. Fine on Pascal /
-// the Shield.
+// the Android TV Device.
 //
 //   import { mountStage } from "./avatarStage.js";
 //   const h = mountStage(canvasEl, { url: "RobotExpressive", getValue: () => 0.5 });

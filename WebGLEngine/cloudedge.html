@@ -184,7 +184,7 @@
       const j = await r.json().catch(() => ({}));
       if (!j || j.ok === false) { setMsg("✗ " + ((j && j.error) || "go2rtc not reachable — is it running?"), "bad"); return; }
       const cams = j.cameras || [];
-      if (cams.indexOf(name) >= 0) setMsg("✓ \"" + name + "\" is live in the picker. It'll appear in the camera/cast picker (and can be cast to the Shield).", "ok");
+      if (cams.indexOf(name) >= 0) setMsg("✓ \"" + name + "\" is live in the picker. It'll appear in the camera/cast picker (and can be cast to the Android TV Device).", "ok");
       else setMsg("Streams go2rtc currently serves: " + (cams.length ? cams.join(", ") : "(none)") + ". \"" + name + "\" isn't live yet — restart go2rtc to load the new config.", "");
     } catch (e) { setMsg("✗ " + (e && e.message || e), "bad"); }
   };

@@ -29,12 +29,12 @@
   <header><span class="title"><span class="g">🔔</span> Doorbell fan-out</span></header>
   <main>
     <div class="note">
-      One trigger, many reactions. Fire it from a phone whenever Blink reports a doorbell/motion event — MacroDroid/Tasker → HTTP <b>GET <code>/doorbell/ring</code></b>. It announces on the avatar (quip + TTS + HA speaker), pops the Blink app on the Shield, and can flash a light. Blink stays cloud-only, so the Shield opens the app (no single-camera deep link); the live feed still lives in Blink / on your Echo Show.
+      One trigger, many reactions. Fire it from a phone whenever Blink reports a doorbell/motion event — MacroDroid/Tasker → HTTP <b>GET <code>/doorbell/ring</code></b>. It announces on the avatar (quip + TTS + HA speaker), pops the Blink app on the Android TV Device, and can flash a light. Blink stays cloud-only, so the Android TV Device opens the app (no single-camera deep link); the live feed still lives in Blink / on your Echo Show.
     </div>
     <div class="card">
       <div class="row">
-        <div><label>Shield IP</label><input id="shieldIp" data-rt-placeholder="192.168.10.114" placeholder="192.168.10.114" /></div>
-        <div><label>On the Shield</label><select id="shieldAction"><option value="blink">Open the Blink app</option><option value="url">Open a camera URL</option><option value="none">Nothing</option></select></div>
+        <div><label>Android TV Device IP</label><input id="shieldIp" data-rt-placeholder="192.168.10.114" placeholder="192.168.10.114" /></div>
+        <div><label>On the Android TV Device</label><select id="shieldAction"><option value="blink">Open the Blink app</option><option value="url">Open a camera URL</option><option value="none">Nothing</option></select></div>
       </div>
       <div id="urlRow" style="display:none;"><label>Camera URL (relative ok → resolves to this PC)</label><input id="shieldUrl" data-rt-placeholder="/cloudedge.html or http://…" placeholder="/cloudedge.html or http://…" /></div>
 
