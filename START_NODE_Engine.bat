@@ -102,6 +102,115 @@ if errorlevel 1 (
 )
 :node_ready
 
+REM v3850 -- *** THE PORT GUARD RUNS BEFORE ANYTHING IS STARTED, AND IT USED TO RUN AFTER. ***
+REM It sat below the KPop Listener and the GPU Brain, so the refusal path started two services and then exited,
+REM and the window closing took the Listener down with it -- Keith met exactly that: "it exits, taking KPop
+REM Listener down as it goes away." A GUARD THAT COSTS SOMETHING WHEN IT SAYS NO IS NOT A GUARD, it is a
+REM partial boot. Deciding whether this launcher may live is now the first thing after Node is present.
+REM v2303 -- reap any STALE SweK engine (a node server.js from an OLD version folder) BEFORE launching the
+REM new one. Each old server pins its own WebGLEngine\ai-bridge -- that held handle is exactly why the
+REM pruneOldVersions pass hit EBUSY and could not delete v2291..v2299. Nothing legit is running yet (the new
+REM node starts below), so killing every SweK engine node by command line is safe -- same pattern as the
+REM brain reaper above. The match is server.js (this box's node app). Temp .ps1 dodges batch quote/pipe/brace parsing.
+REM v3251 -- *** ASK FIRST. *** POST /sys/exit has been routed for hundreds of versions and the launcher
+REM never used it: it went straight to matching Name=node.exe with a CommandLine containing server.js and
+REM terminating whatever came back. THAT MATCH IS A GUESS ABOUT IDENTITY and a broad one -- any node on the
+REM box whose command line mentions server.js is in scope, including another project or a second SweK folder
+REM somebody is deliberately running. A shutdown the server ACKNOWLEDGES is a fact about the right process.
+REM
+REM The reap below still runs when the ask fails, because A HUNG SERVER CANNOT ANSWER. What changed is that
+REM killing is no longer the FIRST move and no longer SILENT.
+REM v3256 -- *** WHO OWNS THE PORT, NOT JUST WHO IS LISTENING. ***
+REM v3251 taught this launcher to ASK the server on 8787 to exit. With TWO launchers up that is not enough:
+REM the ask kills the socket, and the OTHER launcher -- still supervising -- puts one back. A LISTENER IS A
+REM SOCKET; AN OWNER IS THE LAUNCHER THAT INTENDS TO KEEP ONE THERE, and killing the socket does not remove
+REM the intent. Both windows behave correctly on their own and fight forever.
+REM
+REM Our own PID is not a thing batch can read, so it is fetched ONCE here from the title of this window and
+REM handed to the claim helper. If that fails, SWEK_LAUNCHER_PID stays empty, the helper claims nothing, and
+REM the launcher behaves exactly as it did before this round -- A LAUNCHER THAT WILL NOT LAUNCH BECAUSE IT
+REM COULD NOT WRITE A TEMP FILE would be a worse bug than the one being fixed.
+REM A UNIQUE TITLE IS SET AND THEN SEARCHED FOR BY THAT SAME TITLE. My first version set one title and
+REM searched for another (%~n0*, the script name) -- so the lookup would have matched nothing, or worse,
+REM matched a DIFFERENT SweK window and claimed the port under somebody else's PID. A CLAIM UNDER THE WRONG
+REM PID IS WORSE THAN NO CLAIM: it looks valid, it survives liveness checks, and it locks out the launcher
+REM that actually owns the port.
+set "SWEK_TITLE=SweK Launcher %RANDOM%%RANDOM%"
+title %SWEK_TITLE%
+set "SWEK_LAUNCHER_PID="
+for /f "tokens=2 delims=," %%P in ('tasklist /FI "WINDOWTITLE eq %SWEK_TITLE%" /FO CSV /NH 2^>nul') do set "SWEK_LAUNCHER_PID=%%~P"
+REM v3850 -- *** SUPERSEDE IS COMPUTED HERE NOW, BECAUSE THE GUARD BELOW IS THE THING THAT NEEDED IT. ***
+REM It used to be worked out fifty lines further down, where its only job was to suppress a duplicate browser
+REM tab -- so the port guard, which is the branch that DECIDES WHETHER THIS LAUNCH LIVES, never knew that the
+REM running engine had ASKED for it. sysadminBridge.restart() writes swek_superseded.flag, spawns this
+REM launcher and exits 900ms later; this launcher claimed the port before that exit, saw the old owner alive,
+REM and refused the handover it had been invited into. THE UPDATE THEN NEVER LANDED: the old build kept the
+REM port, the new window died, and it took the KPop Listener with it.
+REM The age check is swek_flag_fresh.bat and NOT a fourth copy of the ninety seconds -- v3250 and v3273 are
+REM both rounds spent on a reader that asked whether the flag EXISTED and not how old it was.
+set "SUPERSEDE="
+call "%~dp0WebGLEngine\tools\ship\swek_flag_fresh.bat"
+if "%FRESH%"=="1" set "SUPERSEDE=1"
+call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" 8787
+REM v3333 -- THIS REFUSAL IS CORRECT AND ITS HOLD WAS NOT. Keith met it as a window stuck on "Press any key
+REM to continue . . ." after an auto-update, with nobody there to press one. The block is also un-parenthesised
+REM now, per this file's own law two screens up: cmd expands %vars% in a block at PARSE time.
+if not "%PORT_OWNER%"=="other" goto :port_not_owned
+REM *** AN INVITED LAUNCH WAITS; AN UNINVITED ONE STILL REFUSES. *** The refusal below is correct and stays
+REM correct: two launchers that both start a server take turns forever. What it must not do is refuse the ONE
+REM case where the other launcher is deliberately standing down, and a fresh swek_superseded.flag is exactly
+REM that statement -- written by the engine that spawned this window, seconds ago, and expiring in ninety.
+if "%SUPERSEDE%"=="1" goto :port_handover
+echo.
+echo [SweK] ANOTHER SweK LAUNCHER ^(PID %OWNER_PID%^) ALREADY OWNS PORT 8787.
+echo [SweK] Not asking its server to exit and not reaping anything: it would just start another one,
+echo [SweK] and the two windows would take turns forever. Close that window first, then run this again.
+echo.
+call "%~dp0WebGLEngine\tools\ship\swek_hold.bat" 60
+exit /b 1
+
+:port_handover
+echo.
+echo [SweK] the running engine asked for this launch ^(fresh swek_superseded.flag^) and still owns 8787.
+echo [SweK] Waiting for it to release the port rather than refusing a handover it started.
+set "SWEK_WAITED=0"
+:port_handover_loop
+call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" 8787
+if not "%PORT_OWNER%"=="other" goto :port_handover_done
+set /a SWEK_WAITED+=1
+if %SWEK_WAITED% GEQ 45 goto :port_handover_timeout
+timeout /t 1 /nobreak >nul 2>&1
+goto :port_handover_loop
+:port_handover_timeout
+echo.
+echo [SweK] waited 45s and PID %OWNER_PID% still owns 8787. REFUSING, exactly as an unasked launch would --
+echo [SweK] a flag is a statement of intent and this one was not honoured. Close that window, then run this again.
+call "%~dp0WebGLEngine\tools\ship\swek_hold.bat" 60
+exit /b 1
+:port_handover_done
+echo [SweK] the previous launcher released 8787 after %SWEK_WAITED%s -- taking over.
+REM THE FLAG IS CONSUMED. It stays fresh for ninety seconds and it authorises exactly ONE handover; leaving it
+REM would let a third window take the port from this one on the same invitation.
+del "%TEMP%\swek_superseded.flag" >nul 2>&1
+
+:port_not_owned
+
+call "%~dp0WebGLEngine\tools\ship\swek_ask_exit.bat" 8787
+REM v3255 -- *** AN UNSET ASKED_OK IS NOT PERMISSION TO KILL. *** The helper had an endlocal inside a for
+REM block, so this variable could come back EMPTY even when the ask had worked -- and an empty value fell
+REM through to the reap, terminating the server that had just been started politely. The helper is fixed;
+REM this line is belt and braces, because THE FAILURE DIRECTION MATTERS: skipping a reap costs one stale
+REM process that the next launch asks again, while a wrong reap kills a working engine.
+if not defined ASKED_OK (echo [SweK] the exit-ask helper returned nothing -- SKIPPING the reap rather than
+echo         killing on an unset value. If a stale server is still holding the port, say so and it will be reaped next run.
+goto :engine_reaped)
+if "%ASKED_OK%"=="1" goto :engine_reaped
+
+REM v3658 -- a REAL script on disk, not a temp file dropped and deleted. See the header of
+REM WebGLEngine\ai-bridge\installers\kill-engine.ps1 for why that sequence had to go.
+powershell -NoProfile -ExecutionPolicy Bypass -File "WebGLEngine\ai-bridge\installers\kill-engine.ps1" >nul 2>&1
+:engine_reaped
+
 REM --- KPop Listener --------------------------------------------------------
 REM v2068 - guard + sync BEFORE choosing the run folder. kpop-guard.ps1 does, in order:
 REM   (a) if bundled "KPop Listener\" version differs from sibling "..\KPop Listener\",
@@ -209,67 +318,6 @@ goto brain_done
 start "SweK GPU Brain" cmd /c "cd /d %~dp0WebGLEngine\brain && START_BRAIN.bat"
 :brain_done
 
-REM v2303 -- reap any STALE SweK engine (a node server.js from an OLD version folder) BEFORE launching the
-REM new one. Each old server pins its own WebGLEngine\ai-bridge -- that held handle is exactly why the
-REM pruneOldVersions pass hit EBUSY and could not delete v2291..v2299. Nothing legit is running yet (the new
-REM node starts below), so killing every SweK engine node by command line is safe -- same pattern as the
-REM brain reaper above. The match is server.js (this box's node app). Temp .ps1 dodges batch quote/pipe/brace parsing.
-REM v3251 -- *** ASK FIRST. *** POST /sys/exit has been routed for hundreds of versions and the launcher
-REM never used it: it went straight to matching Name=node.exe with a CommandLine containing server.js and
-REM terminating whatever came back. THAT MATCH IS A GUESS ABOUT IDENTITY and a broad one -- any node on the
-REM box whose command line mentions server.js is in scope, including another project or a second SweK folder
-REM somebody is deliberately running. A shutdown the server ACKNOWLEDGES is a fact about the right process.
-REM
-REM The reap below still runs when the ask fails, because A HUNG SERVER CANNOT ANSWER. What changed is that
-REM killing is no longer the FIRST move and no longer SILENT.
-REM v3256 -- *** WHO OWNS THE PORT, NOT JUST WHO IS LISTENING. ***
-REM v3251 taught this launcher to ASK the server on 8787 to exit. With TWO launchers up that is not enough:
-REM the ask kills the socket, and the OTHER launcher -- still supervising -- puts one back. A LISTENER IS A
-REM SOCKET; AN OWNER IS THE LAUNCHER THAT INTENDS TO KEEP ONE THERE, and killing the socket does not remove
-REM the intent. Both windows behave correctly on their own and fight forever.
-REM
-REM Our own PID is not a thing batch can read, so it is fetched ONCE here from the title of this window and
-REM handed to the claim helper. If that fails, SWEK_LAUNCHER_PID stays empty, the helper claims nothing, and
-REM the launcher behaves exactly as it did before this round -- A LAUNCHER THAT WILL NOT LAUNCH BECAUSE IT
-REM COULD NOT WRITE A TEMP FILE would be a worse bug than the one being fixed.
-REM A UNIQUE TITLE IS SET AND THEN SEARCHED FOR BY THAT SAME TITLE. My first version set one title and
-REM searched for another (%~n0*, the script name) -- so the lookup would have matched nothing, or worse,
-REM matched a DIFFERENT SweK window and claimed the port under somebody else's PID. A CLAIM UNDER THE WRONG
-REM PID IS WORSE THAN NO CLAIM: it looks valid, it survives liveness checks, and it locks out the launcher
-REM that actually owns the port.
-set "SWEK_TITLE=SweK Launcher %RANDOM%%RANDOM%"
-title %SWEK_TITLE%
-set "SWEK_LAUNCHER_PID="
-for /f "tokens=2 delims=," %%P in ('tasklist /FI "WINDOWTITLE eq %SWEK_TITLE%" /FO CSV /NH 2^>nul') do set "SWEK_LAUNCHER_PID=%%~P"
-call "%~dp0WebGLEngine\tools\ship\swek_claim_port.bat" 8787
-REM v3333 -- THIS REFUSAL IS CORRECT AND ITS HOLD WAS NOT. Keith met it as a window stuck on "Press any key
-REM to continue . . ." after an auto-update, with nobody there to press one. The block is also un-parenthesised
-REM now, per this file's own law two screens up: cmd expands %vars% in a block at PARSE time.
-if not "%PORT_OWNER%"=="other" goto :port_not_owned
-echo.
-echo [SweK] ANOTHER SweK LAUNCHER ^(PID %OWNER_PID%^) ALREADY OWNS PORT 8787.
-echo [SweK] Not asking its server to exit and not reaping anything: it would just start another one,
-echo [SweK] and the two windows would take turns forever. Close that window first, then run this again.
-echo.
-call "%~dp0WebGLEngine\tools\ship\swek_hold.bat" 60
-exit /b 1
-:port_not_owned
-
-call "%~dp0WebGLEngine\tools\ship\swek_ask_exit.bat" 8787
-REM v3255 -- *** AN UNSET ASKED_OK IS NOT PERMISSION TO KILL. *** The helper had an endlocal inside a for
-REM block, so this variable could come back EMPTY even when the ask had worked -- and an empty value fell
-REM through to the reap, terminating the server that had just been started politely. The helper is fixed;
-REM this line is belt and braces, because THE FAILURE DIRECTION MATTERS: skipping a reap costs one stale
-REM process that the next launch asks again, while a wrong reap kills a working engine.
-if not defined ASKED_OK (echo [SweK] the exit-ask helper returned nothing -- SKIPPING the reap rather than
-echo         killing on an unset value. If a stale server is still holding the port, say so and it will be reaped next run.
-goto :engine_reaped)
-if "%ASKED_OK%"=="1" goto :engine_reaped
-
-REM v3658 -- a REAL script on disk, not a temp file dropped and deleted. See the header of
-REM WebGLEngine\ai-bridge\installers\kill-engine.ps1 for why that sequence had to go.
-powershell -NoProfile -ExecutionPolicy Bypass -File "WebGLEngine\ai-bridge\installers\kill-engine.ps1" >nul 2>&1
-:engine_reaped
 
 REM --- ai-bridge under Node ------------------------------------------------
 pushd WebGLEngine\ai-bridge
@@ -299,9 +347,9 @@ REM EVERY later launch believe a machine had asked for it, and server.js then re
 REM   "[open] no browser tab after ~40s (update/restart) -- NOT opening one. A machine asked for this boot."
 REM Keith double-clicked the launcher and got no page at all. THE SAME MISTAKE, IN THE FILE I DID NOT CHECK
 REM WHEN I FIXED THE OTHER ONE -- and swek_flag_fresh.bat existed the whole time as the one definition.
-set "SUPERSEDE="
-call "%~dp0WebGLEngine\tools\ship\swek_flag_fresh.bat"
-if "%FRESH%"=="1" set "SUPERSEDE=1"
+REM v3850 -- SUPERSEDE IS ALREADY SET, up at the port guard, which is the branch that actually needed it.
+REM Calling swek_flag_fresh.bat a second time here would be harmless and pointless -- and the helper CLEARS a
+REM stale flag, so the one call that does the clearing should be the FIRST thing that asks, not the last.
 REM v3097 -- v3096 wrote this check INLINE here. It is now shared with the other four launchers as
 REM swek_free_port.bat, because two definitions of one judgement is precisely what keeps costing this
 REM tree rounds. The behaviour is unchanged; the owner moved.

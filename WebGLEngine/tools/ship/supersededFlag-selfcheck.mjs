@@ -255,6 +255,54 @@ const server = rd(path.join(ROOT, "ai-bridge", "server.js"));
 }
 
 console.log();
+console.log("\n*** v3850 -- THE FOURTH READER, AND THE ONE WHOSE ANSWER DECIDED WHETHER A LAUNCH LIVED ***");
+{
+    // Keith, on an update: the installer ran, a new launcher window opened, announced "ANOTHER SweK LAUNCHER
+    // ALREADY OWNS PORT 8787", held sixty seconds and exited -- taking the KPop Listener with it -- and the old
+    // build was still there afterwards. THE UPDATE NEVER LANDED, every time.
+    //
+    // sysadminBridge.restart() writes swek_superseded.flag, spawns the launcher, and exits 900 ms LATER. The new
+    // launcher claimed the port inside that window, saw the old owner alive, and refused -- A HANDOVER IT HAD
+    // BEEN INVITED INTO. It DID compute SUPERSEDE from the same flag, fifty lines further down, where its only
+    // job was suppressing a duplicate browser tab. The signal was in the file and the branch that needed it
+    // never saw it.
+    const boot = rd(path.join(PROJ, "START_NODE_Engine.bat"));
+    const iFresh = boot.indexOf("swek_flag_fresh.bat");
+    const iGuard = boot.indexOf("ALREADY OWNS PORT");
+    const iKpop = boot.indexOf("Starting KPopListener");
+    const iHand = boot.indexOf(":port_handover");
+
+    ok("!! the launcher asks the flag's AGE through the shared helper, not `if exist`",
+        iFresh > 0 && !/if exist "%TEMP%\\swek_superseded\.flag"/i.test(boot),
+        "swek_flag_fresh.bat is the one definition of the ninety seconds -- v3250 and v3273 were both rounds " +
+        "spent on a reader that asked whether the flag existed and not how old it was");
+    ok("!! ...and it asks BEFORE the port guard, which is the branch that acts on the answer",
+        iFresh > 0 && iGuard > 0 && iFresh < iGuard,
+        "computed at the guard, not fifty lines below it where it only chose a browser tab");
+    ok("!! *** AN INVITED LAUNCH WAITS FOR THE HANDOVER INSTEAD OF REFUSING IT ***",
+        iHand > 0 && /if "%SUPERSEDE%"=="1" goto :port_handover/.test(boot),
+        "a fresh flag is the running engine saying it is standing down, seconds ago, expiring in ninety");
+    ok("...and an UNINVITED launch still refuses, which was always correct",
+        /ALREADY OWNS PORT 8787/.test(boot) && /exit \/b 1/.test(boot),
+        "two launchers that both start a server take turns forever; the refusal is not the bug");
+    ok("...and the handover TIMES OUT rather than waiting for ever",
+        /:port_handover_timeout/.test(boot) && /GEQ 45/.test(boot),
+        "a flag is a statement of intent, and one that is not honoured inside 45s is refused like any other");
+    ok("!! ...and the handover CONSUMES the flag, so it authorises exactly one takeover",
+        /del "%TEMP%\\swek_superseded\.flag"/.test(boot),
+        "it stays fresh for ninety seconds; leaving it would let a third window take the port from this one on " +
+        "the same invitation");
+
+    ok("!! *** THE PORT GUARD RUNS BEFORE ANY SERVICE IS STARTED ***", iGuard > 0 && iKpop > 0 && iGuard < iKpop,
+        "the guard sat BELOW the KPop Listener and the GPU Brain, so refusing started two services and then " +
+        "exited, and the closing window took the Listener with it. A GUARD THAT COSTS SOMETHING WHEN IT SAYS NO " +
+        "IS NOT A GUARD, IT IS A PARTIAL BOOT");
+
+    console.log("  ----  WHAT THIS CANNOT DO: run a .bat. These are checks on its SOURCE -- the order of its");
+    console.log("  ----  branches and which helper it calls. That the handover COMPLETES on Keith's box is his");
+    console.log("  ----  first update after this build, and it is the only thing that settles it.");
+}
+
 console.log("  ----  WHAT THIS DOES NOT FIX: the kill-then-start dance itself. The launcher still identifies old");
 console.log("  ----  processes by MATCHING A COMMAND LINE and terminating them, which is a guess about identity.");
 console.log("  ----  Keith's suggestion is better and is the next round: ASK the old server to exit, wait for the");
