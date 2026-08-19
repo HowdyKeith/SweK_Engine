@@ -58,6 +58,7 @@
 // a physics judgement and it is KEITH'S.
 "use strict";
 import { createSphWorld } from "./sph.js";
+import { pathToFileURL } from "node:url";
 import { LATTICE, packedDensity } from "./materialKnobs.mjs";
 
 export const G = 9.81;
@@ -270,4 +271,4 @@ export function reportLines({ live = true } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }

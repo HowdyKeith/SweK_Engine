@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // tools/roundhouse/handsBind.mjs
 //
 // v3850 -- THE GESTURE LAYER (face/MediaPipeHandTracker.js), GRADED. Opened by the barehands question:
@@ -335,7 +336,7 @@ export const handsDevice = {
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const rigid = await buildHands({ mode: "rigid" });
     const flat = await buildHands({ mode: "flatdistance" });
     const scale = await buildHands({ mode: "scale" });

@@ -31,7 +31,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { physicsModules, PHYSICS_ROOTS } from "./gateReach.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -118,7 +118,7 @@ export function lines(c = compare()) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (process.argv.includes("--write")) {
         const p = writeCensus();
         console.log(`[census] recorded ${p.total} modules across ${Object.keys(p.areas).length} areas -> ${CENSUS_FILE}`);

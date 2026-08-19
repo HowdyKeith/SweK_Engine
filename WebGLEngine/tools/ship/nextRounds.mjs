@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // WebGLEngine/tools/ship/nextRounds.mjs — v3340
 // ---------------------------------------------------------------------------------------------------------------
 // THE STANDING LIST OF WHAT IS DEFERRED AND WHY — because a backlog that lives in a conversation is not a backlog.
@@ -83,4 +84,4 @@ export function lines() {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) for (const l of lines()) console.log(l);
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) for (const l of lines()) console.log(l);

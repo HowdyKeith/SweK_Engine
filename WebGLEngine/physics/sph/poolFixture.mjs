@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // physics/sph/poolFixture.mjs
 //
 // v3543 -- *** THE 24% GAP WAS NEVER QUANTISATION, AND EIGHT TIMES THE DEPTH MOVES IT BY NOTHING. ***
@@ -333,4 +334,4 @@ export function reportLines({ live = true } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }

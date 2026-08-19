@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // WebGLEngine/tools/ship/ddaPrecisionReport.mjs -- v3559
 // ---------------------------------------------------------------------------------------------------------------
 // "IS A GPU/CPU VOXEL DISAGREEMENT EXPECTED?" -- THE ANSWER, SOMEWHERE A PERSON CAN READ IT.
@@ -228,7 +229,7 @@ export function reportLines() {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     for (const l of reportLines()) console.log(l);
     process.exit(0);
 }

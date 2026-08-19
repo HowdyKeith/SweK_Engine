@@ -17,6 +17,7 @@ import { REFINEMENT_KNOBS } from "./refinementKnobs.mjs";
 import { NUISANCE_KNOBS } from "./nuisanceKnobs.mjs";
 import { NEW_NUISANCE } from "./corroborateFully.mjs";
 import { getDevice, DEVICE_NAMES } from "./devices.mjs";
+import { pathToFileURL } from "node:url";
 
 /**
  * *** THE NUISANCE REGISTER LIVES IN TWO FILES AND ANYTHING COUNTING ELIGIBILITY MUST UNION BOTH. ***
@@ -129,7 +130,7 @@ export async function reportLines() {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     console.log("[corroborationReach] who can be put through the four-criterion battery at all");
     for (const l of await reportLines()) console.log(l);
 }

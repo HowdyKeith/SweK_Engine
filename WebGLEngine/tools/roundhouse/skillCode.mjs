@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // tools/roundhouse/skillCode.mjs
 //
 // Run: node tools/roundhouse/skillCode.mjs            (front door: skillbook.html, "Executable skills")
@@ -162,7 +163,7 @@ export function certificationBelongsTo() {
 // ---- front door ------------------------------------------------------------------------------------------
 // A MODULE WITH NO CALLER IS UNFINISHED. skillbook.html renders this; running the file directly prints the
 // same three things without a browser.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const demo = [
         makeCodeSkill({ id: "clamp01", trigger: "malformed", run: (x) => Math.min(1, Math.max(0, Number(x) || 0)) }),
         makeCodeSkill({ id: "percent", trigger: "malformed", uses: ["clamp01"], run: (x, ctx) => `${(ctx.call("clamp01", x) * 100).toFixed(1)}%` }),

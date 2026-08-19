@@ -28,6 +28,7 @@
 // module now has a key", not "this module is right".
 
 import { PoissonMG3D, FLUID, SOLID } from "../../fluid/multigrid3d.mjs";
+import { pathToFileURL } from "node:url";
 
 export const MG3D_OBSERVABLES = [
     "iters", "residual", "converged", "cells", "levels", "n",
@@ -119,7 +120,7 @@ export const multigrid3dDevice = {
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     console.log("[multigrid3d] the property that makes a multigrid a multigrid: THE WORK DOES NOT SCALE WITH THE PROBLEM\n");
     const s = buildMG3D({ mode: "scaling" });
     console.log(`  ${s.cellRatio.toFixed(0)}x the cells (${s.itersSmall} iterations at n=16, ${s.itersLarge} at n=32)` +

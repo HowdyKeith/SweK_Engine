@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // tools/roundhouse/freeSurfaceBind.mjs
 //
 // v3728 -- roundhouse device: WHERE THE LIQUID ENDS (fluid/freeSurface.mjs). The curriculum has proposed
@@ -254,7 +255,7 @@ export const freeSurfaceDevice = {
 // ---- front door ------------------------------------------------------------------------------------------
 // device.html lists every name in DEVICE_NAMES from /device/list and runs it, so registering is the door; this
 // block is the one that works without a server.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const r = await buildFreeSurface({ mode: "vessels" });
     console.log("[freesurface] COMMUNICATING VESSELS -- two unequal columns over one floor must find one level\n");
     if (r.error) { console.log("  REFUSED:", r.error); }

@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // physics/sph/packingTransfer.mjs
 //
 // v3546 -- CAN `full` BE CALIBRATED ON ONE POOL AND USED TO JUDGE ANOTHER? NO. THE CONTAINER MOVES IT MOST.
@@ -189,4 +190,4 @@ export function reportLines({ live = false } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }

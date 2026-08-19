@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // WebGLEngine/tools/roundhouse/officeDispatch-selfcheck.mjs -- v3848
 //
 // officeManager has decided what runs next since v3824 and NOTHING HAS EVER LISTENED. This grades the half that
@@ -15,7 +16,10 @@ import path from "node:path";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (n, d) => console.log("  ----  " + n + "   " + d);
-const HERE = path.dirname(new URL(import.meta.url).pathname), ENG = path.resolve(HERE, "..", "..");
+// v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
+// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
+// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
+const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 
 const FRONTIER = [
     { kind: "plant", subject: "physics/alpha.mjs", grader: "tools/roundhouse/alphaBind.mjs" },

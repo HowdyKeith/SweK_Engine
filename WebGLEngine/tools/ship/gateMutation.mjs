@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -142,7 +142,7 @@ export function mutationLines(r) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const args = process.argv.slice(2);
     const limit = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : 60;
     const maxMs = args.includes("--maxMs") ? Number(args[args.indexOf("--maxMs") + 1]) : 1200;

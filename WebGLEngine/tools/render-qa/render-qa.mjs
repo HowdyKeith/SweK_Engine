@@ -103,7 +103,10 @@ async function loadManifest() {
   let unjudgeable = [];
   if (HAVE.length) {
     const { manifestRequirements, judgeable } = await import("./pageRequirements.mjs");
-    const rows = manifestRequirements(new URL("../../", import.meta.url).pathname);
+    // v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
+// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
+// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
+const rows = manifestRequirements(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."));
     const byUrl = new Map(rows.map(r => [r.url, r]));
     const split = judgeable(pages.map(pg => byUrl.get(pg.url) || { name: pg.name, url: pg.url, ok: true, needs: [] }), HAVE);
     const cannot = new Set(split.cannot.map(r => r.url));

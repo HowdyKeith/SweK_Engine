@@ -22,7 +22,7 @@
 // file with ages, because %TEMP% SURVIVES REBOOTS and a report that silently dropped old rows would hide
 // exactly the thing that makes a stale record dangerous. THE AGE IS SHOWN AND THE READER DECIDES.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -71,4 +71,4 @@ export function reportLines() {
     return L;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }

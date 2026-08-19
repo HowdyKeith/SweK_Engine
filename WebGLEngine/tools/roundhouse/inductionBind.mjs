@@ -43,6 +43,7 @@
 // GRADE, and the three plants below were run against the shipped file and REVERTED.
 
 import { inducedE, coulombE, divergence, K_COULOMB } from "../../physics/blobInduction.js";
+import { pathToFileURL } from "node:url";
 
 export const INDUCTION_OBSERVABLES = [
     "circulation", "circulationExact", "circulationErr", "circulationWorstErr", "loops",
@@ -175,7 +176,7 @@ export const inductionDevice = {
     defaults: inductionDefaults,
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const f = await buildInduction({ mode: "faraday" });
     const g = await buildInduction({ mode: "gauss" });
     const s = await buildInduction({ mode: "separation" });

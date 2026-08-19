@@ -27,7 +27,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -92,7 +92,7 @@ export function owedLines(a) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const a = audit({});
     // v3342 -- NAME ITSELF. The front-door gate requires it and the requirement is right: two reports sharing
     // a terminal are unattributable otherwise. Missing since this file shipped one patch ago.

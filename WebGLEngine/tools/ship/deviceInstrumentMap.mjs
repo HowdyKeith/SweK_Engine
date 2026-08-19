@@ -24,7 +24,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { INSTRUMENTS } from "../../physics/instruments.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -357,7 +357,7 @@ export function mapLines(r) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const r = reconcile();
     for (const l of mapLines(r)) console.log(l);
     if (r.uncovered.length) {

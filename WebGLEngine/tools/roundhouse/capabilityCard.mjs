@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // WebGLEngine/tools/roundhouse/capabilityCard.mjs -- v3395
 //
 // *** WHAT THIS LAB CAN BE ASKED, PUBLISHED AS DATA -- AND, JUST AS IMPORTANTLY, WHAT IT REFUSES TO CLAIM. ***
@@ -136,7 +137,10 @@ export function readVersion(engRoot) {
 
 // ---- main block: this is a REPORTING tool -- it prints and exits zero, and changes nothing ----------------
 if (process.argv[1] && process.argv[1].endsWith("capabilityCard.mjs")) {
-    const here = path.dirname(new URL(import.meta.url).pathname);
+    // v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
+// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
+// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
+const here = path.dirname(fileURLToPath(import.meta.url));
     const eng = path.join(here, "..", "..");
     const D = await import("./devices.mjs");
     const card = await capabilityCard(eng, D);

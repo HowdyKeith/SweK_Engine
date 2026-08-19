@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // tools/roundhouse/kerrLadderBind.mjs
 //
 // v3730 -- roundhouse device: KERR CIRCULAR ORBITS (physics/blackhole/kerrLadder.mjs).
@@ -218,7 +219,7 @@ export const kerrLadderDevice = {
     defaults: kerrLadderDefaults,
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const p = await buildKerrLadder({ mode: "photon" });
     const i = await buildKerrLadder({ mode: "isco" });
     const e = await buildKerrLadder({ mode: "extremal" });

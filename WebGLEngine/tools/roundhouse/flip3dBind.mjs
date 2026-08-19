@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 // tools/roundhouse/flip3dBind.mjs
 //
 // v3729 -- roundhouse device: THE 3D FLIP/PIC FLUID (fluid/flip3d.mjs). The curriculum has proposed GRADE
@@ -271,7 +272,7 @@ export const flip3dDevice = {
 // ---- front door ------------------------------------------------------------------------------------------
 // device.html lists every name in DEVICE_NAMES from /device/list and runs it, so registering is the door; this
 // block is the one that works without a server.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const hy = await buildFlip3D({ mode: "hydrostatic" });
     const is = await buildFlip3D({ mode: "isotropy" });
     console.log("[flip3d] THE 3D FLIP/PIC FLUID -- one ported key, and one that cannot be asked in 2D\n");

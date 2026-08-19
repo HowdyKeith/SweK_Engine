@@ -15,7 +15,7 @@
 // NO CANVAS, NO DOM, NO GPU. The glyphs are polylines and the raster is a nearest-cell walk, so this runs in
 // the same node the gates run in.
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as SM from "../../physics/mesh/strokeMorph.mjs";
 
 const W = 13, H = 13, N = 64;
@@ -69,4 +69,4 @@ export function reportLines(pairs = [[1, 2], [2, 3], [9, 0]]) {
     return L;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
