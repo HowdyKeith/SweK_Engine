@@ -16820,6 +16820,140 @@ Neither live-browser gate this project had was actually running here: both `brow
 
 ---
 
+## v3904 -- THE OPEN EXPORTED FUNCTIONS IN mesh AND render, AND 23 OF THE 32 WERE NOT OPEN AT ALL
+
+Keith asked for the open exported functions, specifically the physics/mesh cluster (21, mostly triReconstruct
+and quadraticRecon) and physics/render (11). *** MEASURING THEM ONE AT A TIME BEFORE FIXING ANY OF THEM CHANGED
+WHAT THE ROUND WAS: 23 OF THE 32 ARE ALREADY EXERCISED, BY A GATE THAT IMPORTS THE SYMBOL FROM THAT MODULE AND
+CALLS IT -- JUST NOT THE GATE SITTING BESIDE THE FILE. *** Nine were reached by nothing anywhere in the tree,
+and those nine are the round.
+
+### THE INSTRUMENT WAS ASKING "DOES ITS OWN GATE NAME IT", AND THIS FOLDER NAMES GATES AFTER QUESTIONS
+
+`definitionGates` counts a definition as covered when the file `<module>-selfcheck.mjs` mentions it. physics/mesh
+has NINETEEN gates against twelve modules, and eight of them -- boundaryRank, rowWeight, nodeGradient,
+gradientJoin, tetRank, weightScaling, quadraticWall, featurePreserve -- are SUBJECTS rather than modules. The
+sibling rule cannot see any of them:
+
+    triReconstruct.mjs's seven   ->  boundaryRank, nodeGradient, gradientJoin, tetRank
+    quadraticRecon.mjs's five    ->  rowWeight, quadraticWall, weightScaling
+    marchingCubes.js's five      ->  featurePreserve, manifoldCensus, ambientOcclusion, sdfMarch, aoWiring
+    furnace's toWorld, occlusion's occluded, bounces' pair, microfacet's misWeight  ->  five more gates
+
+That is 72% of this cluster reading as debt while being driven every ship. *** THE PIN AT 37 IS NOT MOVED AND
+SECTION 1 OF definitionGates IS NOT TOUCHED -- a baseline lifted to meet the tree is a gate edited to agree with
+whatever shipped. *** What is added is the SPLIT the single count cannot make, and a floor that ratchets only the
+class that means what the headline sounds like it means: exercised by NO gate at all.
+
+**And the classifier had to be built to refuse a word match.** `sideOf` appears in `bz/tools/bz-teleport-selfcheck.mjs`
+-- a different sideOf, in a different subject, with nothing imported from physics/mesh. A scan counting the word
+would have called discontinuity.mjs covered by a file about BZFlag. Reach here means the gate IMPORTS the symbol
+from that exact resolved path (named or through a namespace) AND uses it with imports and comments stripped.
+Sabotage drives all three answers: a non-sibling gate that does reach it, an unrelated gate that only mentions
+it, and a name nothing imports.
+
+### THE NINE THAT WERE GENUINELY DARK, AND WHAT EACH ONE COST TO CLOSE
+
+| module | definitions | the key that now holds them |
+| --- | --- | --- |
+| `physics/mesh/discontinuity.mjs` | `sideOf`, `distanceToInterface` | one partition, one unit |
+| `physics/mesh/strokeMorph.mjs` | `toPathD`, `morphPaths` | rounding, and the wrapper pinned to the page's four steps |
+| `physics/render/furnace.mjs` | `cosinePdf` | the cancellation, in ulps, and a zero-variance estimator |
+| `physics/render/microfacet.mjs` | `sampleHalfVector`, `sampleDirPdf`, `bounceWeight`, `bsdfEval` | the whole sampling half |
+
+Every one is a property with a plant beside it, and **all nine plants were driven against the new gates and all
+nine go red**: `x <= xi` in sideOf, the missing `/h` in distanceToInterface, a `places` that is ignored, a
+morphPaths that skips the pairing, a cosinePdf over 2pi, a swapped u1 in the sampler, a dropped reflection
+Jacobian, a dropped `|wo.wh|`, and a dropped G2.
+
+### FOUR FINDINGS, AND THE FIRST TWO ARE DEFECTS THE OLD GATES REPORTED AS PASSES
+
+**(1) A CLAIM THAT LIVED IN A DETAIL STRING FOR 260 VERSIONS.** discontinuity-selfcheck's section 2 has been
+printing "the REACH doubles too, 0.33 to 0.67 cells, INDEPENDENT OF n" since v3644. Dropping the `/ m.h` from
+`distanceToInterface` -- so the reach is measured in length rather than cells -- makes it read 0.28/0.14 at
+n = 24/48, halving with every refinement, **and every check in the file still passes** while that sentence goes
+on being printed unchanged. The claim was prose, and prose is a fixed string. It is a check now: reach is
+0.333333 and 0.666667 at both mesh sizes to twelve figures, and the length-measured version is shown halving.
+
+**(2) THIS FILE'S WRITER PRODUCES SVG THIS FILE'S READER REFUSES.** Found by writing the obvious round-trip check
+for `toPathD` and having it throw: it emits the minimal separator (`M12 3L14 5`), which is legal SVG and is what
+the browser parses on every frame, while `parseStroke` splits on whitespace and reads `M12` as an unknown op.
+*** NEITHER FUNCTION IS WRONG AND THE PAGE IS UNAFFECTED *** -- but `parse(toPathD(x))` is not a round trip, and
+a later round assuming it is would be building on a sentence nobody had run. RECORDED, NOT FIXED: which side
+moves (widen the parser, or space the writer at a cost in attribute size) changes the DOM payload and is Keith's
+call, not a defect to be quietly patched inside a gating round.
+
+**(3) A ZERO-VARIANCE ESTIMATOR, AND TWO WRONG-PDF FAULTS THE MEAN CANNOT TELL APART.** `cosinePdf` is what makes
+the cosine-weighted integrand CONSTANT: `cos / cosinePdf(cos)` is pi to within one ulp (4.44e-16 against
+ulp(pi) = 6.98e-16 over 100,000 values -- asserted at the precision it holds at, not as the exact identity I
+first wrote). The consequence is measurable and is not "better sampling": across 24 seeds at 2000 samples the
+spread is **3.08e-16 against the uniform sampler's 1.24e-2, thirteen orders of magnitude**, because every sample
+contributes exactly pi. And that separates two faults a mean cannot:
+
+    a pdf wrong by a CONSTANT (half of cosinePdf)   mean 2.000000   sd 6.17e-16   pure bias, still exact
+    a pdf wrong in SHAPE (the module's wrongPdf)    mean 1.331637   sd 1.06e-2    bias AND the variance back
+
+No amount of sampling finds the first, and a convergence check would report a perfectly converged renderer.
+
+**(4) THE SAMPLING HALF OF THE BSDF WAS UNGRADED, AND ITS OWN PLANT HAD NEVER BEEN DRIVEN.** microfacet.mjs's
+four sampling exports are reached only through pathTracer.mjs, so every claim about them was a claim about the
+path tracer's keys. They now carry their own:
+
+  - `sampleHalfVector` INVERTS the GGX cdf: the sample returns the u it was handed, worst 8.42e-14 across six
+    roughnesses. A closed form is its own key -- no histogram, no sample count, no tolerance somebody chose.
+  - `sampleDirPdf`'s mass: the reflection Jacobian MOVES the NDF's mass and cannot create it. It integrates to 1
+    at a normal view at every roughness, and BELOW 1 at grazing -- 0.80 at alpha 1, cos_o 0.6 -- because
+    half-vectors more than 90 degrees from wo are never sampled. The grazing half is quadrature-limited and is
+    proven by REFINEMENT (5.82e-3 -> 2.90e-3 from N = 200 to 400) rather than by a tolerance chosen to pass.
+  - `bounceWeight` IS `bsdfEval * cos_i / sampleDirPdf`: the module states that algebra in its header and
+    nothing drove it. Worst relative disagreement 4.75e-16 over 652 configurations -- three exports graded by
+    one equation. It is also BLIND to a wrong D by construction, since D is what cancels, and the gate says so.
+  - `bsdfEval` reproduces `directionalAlbedo` TO THE LAST BIT, which pins the function a renderer calls to the
+    function section 4 grades, and it is reciprocal to 4.11e-16.
+
+Two sabotages land on this file's own doctrine -- told apart by the TREND, not by the size of any one reading:
+dropping cos_h from the pdf is **x1.0092 at alpha 0.05 and exactly x2.0000 at alpha 1**; dropping G2 from the
+evaluation is **0.06% at alpha 0.05 and 70% at alpha 1**. A tolerance chosen at a smooth roughness passes both.
+
+### WHAT MOVED
+
+    definitionGates       121 unmentioned -> 110      (the nine, plus toWorld and cosineSampleHemisphere,
+                                                       which the furnace's cosine arc brought along)
+    reached by NO gate     84 -> 76 tree-wide,        physics/mesh 4 -> 0, physics/render 5 -> 0
+    physics/mesh          21 sibling-unmentioned -> 17, all 17 driven by the subject-named gates
+    physics/render        11 sibling-unmentioned ->  6, all  6 driven elsewhere
+    assertions            discontinuity 16, strokeMorph 19, furnace 15, microfacet 24
+
+The next round is derived rather than typed: the gate prints what is still dark by cluster -- physics 13,
+physics/xpbd 9, physics/sph 8, physics/thermal 8, physics/mechanics 6, physics/mpm 6, across 21 clusters.
+
+### A LIMIT OF THE INSTRUMENT, FOUND WHILE USING IT
+
+definitionGates reads `export const NAME = (` and `export function NAME`. An exported TABLE matches neither, so
+`EXPECTED_COSINE` is invisible to it -- and pulling on cosinePdf found that the word `strategy` does not appear
+in furnace-selfcheck either. *** THE FLAGGED EXPORT WAS THE VISIBLE TIP: THE WHOLE v3468 COSINE ARC WAS UNGRADED
+AND THE INSTRUMENT COULD SEE ONE QUARTER OF IT. *** Reported, not fixed: widening the regex changes the
+denominator every number in this file is quoted against, and that is its own round.
+
+### HONEST NOTES
+
+- **The modules are untouched.** All four are byte-identical to v3903; this round changed five gates and nothing
+  else. The modules are carried in the patch so the gates can be run, not because they moved.
+- **definitionGates stays RED.** Its section-1 ratchet is at 110 against a frozen pin of 37 and has been red
+  since long before this round. The number improved by eleven; the pin did not move, and lifting it is the one
+  move that cannot be undone.
+- **`--affected` over all five changed files: 1 failed of 5, and it is that same pre-existing ratchet.** The
+  four physics gates are green. deadImportScan's one failure ("the deleted barrel left a recovery archive
+  behind") is red at v3903 too, verified against a pristine extraction.
+- **Verified in a full-tree copy, not just in the slice**, because a gate that reads `../../ui/morphDigits.js`
+  or `path-tracer.html` for its front-door check passes vacuously in a tree that does not have them.
+- Runtime: microfacet 4.2s (was ~3.5s), discontinuity 0.25s, furnace 0.59s, strokeMorph 0.10s,
+  definitionGates 5.2s (the new cross-gate scan reads 1100 gate files once).
+
+<!-- Folded in from the root CHANGELOG-v3904.md when the v3904-v3906 rounds were rebased onto main.
+     Those three predate the v3941 split of this file out of README.md, so they were never migrated;
+     root CHANGELOG-v*.md was retired at 867ba208 and is not revived here. -->
+
 ## Since v854 — Audio system foundation (closes the audio queued item from the tamagotchi/wandering/audio plan): three pieces. (1) FIX SILENT NO-OP — discovery: AudioManager.setVolume(group, v) didn't exist, so the settingsHub volume sliders (volMaster/volSfx/volMusic) were silently no-oping via optional-chaining (a?.setVolume?.(group, v)). Real bug, not a new feature. Added generic setVolume(group, v) + currentVolume(group) dispatchers that route to setMasterVolume/setSFXVolume/setAmbientVolume, plus relay music to audioBus.setMusicVolume so the new music layer responds to the same slider. Tracks _masterVolume / _sfxVolume / _musicVolume internally for currentVolume() reads. (2) MUSIC / AMBIENT LOOP LAYER — new procedural music in audioBus.js. New _musicGain node parallel to master, new _ensureMusicGain() lazy init. Single procedural voice "ambient_pad": three sine oscillators tuned to a D minor triad (D3 / F3 / A3 = 146.83 / 174.61 / 220.00 Hz) with slow LFO detune (0.08-0.14 Hz, ±8 cents) for breathing pad sound. Per-osc gain decreasing for higher voices so the bass dominates. 1.5s fade-in on startMusic, 1s fade-out on stopMusic. No asset files needed — entirely synthesized. Added startMusic(name)/stopMusic()/setMusicVolume(v)/getMusicVolume()/isMusicPlaying() public methods. AudioManager.startMusic/stopMusic passthroughs let the same audioManager API drive both EngineAudio's ambient gain AND the new audioBus music pad through one call. (3) ENGINE EVENT AUDIO CUES — the v849 Twitch wiring dispatches engine:kaijuDefeated / engine:weatherChanged / engine:roundShipped / engine:bridge-up window events; v855 maps them to audio.play() voices via an ENGINE_EVENT_CUES table: kaijuDefeated→alert (siren burst), weatherChanged→ping (soft tonal), roundShipped→feed (ascending fanfare), bridge-up→happy (gentle chord). Cue voices are the existing 0.1-0.4s synth voices — short, non-intrusive. (4) MUSIC AUTO-START + TOGGLE — music starts on first user gesture (click/keydown/touchstart) since browsers require gesture to resume AudioContext. Preference persists to localStorage as voxelEngine.musicEnabled (default ON). New Music toggle in the settingsHub audio tab calls audio.startMusic/stopMusic + persists the pref. (5) WIRING SURFACE — settingsHub audio tab now has 4 controls: Master volume, SFX volume, Music volume, Music toggle. All hot-wired to a real audio path (no more silent no-ops). VERIFIED: 3 audio files syntax-clean, real ES module import of audioBus succeeds, 13/13 expected methods on AudioBus prototype (8 pre-existing + 5 new music methods), volume clamping works (0.5 stored as 0.5, 2.5 clamped to 1.0, -1 clamped to 0.0), startMusic without AudioContext returns {ok:false, error: "no audio context"}, unknown music voice returns error, isMusicPlaying() = false when not started. HONEST GAPS: (a) Music is ONE procedural pad — no track variety. Day/night/weather/biome-aware music selection is a future round. (b) Music gain is parallel to master (under master gain), so master slider correctly scales everything; music slider scales music below that. But the existing EngineAudio.ambientGain is a SEPARATE gain — setting "music" group volume now updates BOTH (via the new setMusicVolume relay) so EngineAudio's ambient sounds (rain, wind from the world system) also respond. This is intentional unification, but if user wants independent control of "wind/rain ambient" vs "background pad" it would need to split. (c) Engine event audio cues fire on the WINDOW events from v849, but the engine code that DISPATCHES those events (kaijuDefeated etc.) is still not wired — the receiving side (audio + Twitch broadcast) is ready but the firing side waits for engine code to call dispatchEvent at the relevant moments. (d) The music pad is a static minor triad; doesn't change in response to engine state. Future: rotate to a more tense voicing during super_busy AI activity, mellow during idle, etc. (e) Music auto-start uses ONE first-gesture hook; if the user has the page open but never clicks (e.g. a Shield as a passive display), music never starts. Could add a "always start at page load" mode for kiosk use. (f) No music asset-file support yet — only the one procedural voice. Adding file-based music tracks would need a load + register path similar to the existing buffer system. v855 doesn't yet provide that.
 
 ## Since v853 — Tamagotchi liveliness, rigged-avatar fidget + llama refinements (user redirect mid-round: "the rigged glb avatar is the real tamagotchi super alive avatar, llama is secondary/m2, llama stays 2D"): two pieces. (1) RIGGED AVATAR IDLE FIDGET — robotFaceAvatar.js gains an idle fidget controller. When the avatar has been in neutral idle for >4s and no head-lock (speech) is active, every 8-18s it triggers a brief weighted-random clip from a fidget pool (wave×3, happy×3, thumbsup×3, yes×2, no×2, play/jump×2, greet×1) and returns to neutral via the existing HOLD timer. Excludes PERSISTENT clips (would stick) + long HOLDS (run/death) + loud reactions (alert/attack — those read as engine events). Every non-fidget setEmotion call resets the cooldown so the character doesn't immediately fidget after a user-driven expression. Console API: window.kpopFidget.enable() / disable() / setEnabled() / setInterval(min, max) / trigger() / snapshot(). Default enabled. (2) LLAMA SIDE-TO-SIDE RUN — the super_busy state's body now translates -15px → +15px → flips scaleX(-1) → -15px (back-and-forth across the panel with proper direction flip at each turnaround) on a 4s ease-in-out loop. Inner animations (motion-blur legs, dust trail, panting head) unchanged. Visually reads as "the llama is sprinting back and forth because the AI is hammering". (3) LLAMA GRAZE IDLE — alongside the existing yawn, occasional grazing behavior during idle (head dips + tilts slightly as if eating grass; 1.6s animation, every 30-90s random). Both idle behaviors check state===idle && !isYawning && !isGrazing before firing, so they alternate naturally. Yawn first kicks at 8-12s after mount, graze at 15-30s, so the first interaction with the panel shows both behaviors quickly. (4) NOT IN THIS ROUND — lateral wandering of the rigged avatar in 3D space (would require Walking-clip locomotion + model offset + bound-clamping in the small render area), per the redirect: focus is on liveliness via idle fidget rather than spatial wandering. The rigged avatar stays at origin; the camera orbits it; fidget triggers make it feel super alive without movement. (5) USER CLARIFIED — llama stays 2D ("we don't need llama to be 3d and I like it not actual 3d"). Confirmed in code: HeartbeatAvatar is SVG-only; no 3D path added. (6) USER CLARIFIED — llama wandering is "currently not important" but the side-to-side run during super_busy was explicitly wanted ("It may run from one side of the screen to the other and back and forth quickly when legs are running") and that's what's shipped. VERIFIED: both files syntax-clean, 35 _fidget references in robotFaceAvatar.js, 9 hb-run-sideways/hb-graze/_doGraze/_scheduleGraze markers in HeartbeatAvatar.js. HeartbeatAvatar import succeeds with new _scheduleGraze + _doGraze on prototype. HONEST GAPS: (a) Fidget can pick a clip whose actual GLB doesn't have it — setClipFuzzy does a fuzzy lookup but a missing clip name silently degrades to whatever the fuzzy match returns. Edge case: if the loaded avatar has no Wave clip, the fidget tick "succeeds" but visually nothing happens. Snapshot can show currentEmotion="wave" but the rig didn't change. (b) Fidget is per-instance of robotface.html. The PC PipAvatar iframe runs one instance; the phone iframe runs another. They fidget independently (no synchronization). For users with both visible, expressions won't match. (c) The lateral-wandering item from the original v854 spec was descoped here. If the user wants the rigged avatar to actually move around its viewport, that's a follow-up round needing Walking clip + root-joint translation + camera-follow tuning. (d) Llama side-to-side run has fixed -15px..+15px range tuned for the 100px SVG viewBox. If the panel is rendered at a different scale, the run amplitude might feel cramped. (e) Graze + yawn aren't audibly cued — no sleep sigh, no munch sound. v855 audio round can wire them.
