@@ -33,14 +33,14 @@ const signOffer = (offer, key) => ({ ...offer,
 // ---- 1. CLASSIFICATION IS FROM THE URL, AND IT FAILS CLOSED ------------------------------------------------------
 {
     // v3316 -- THE MAPPED FORMS ARE HERE BECAUSE THEY ARE WHAT A REAL LAN PRODUCES. A dual-stack Node server
-    // reports a LAN machine's remoteAddress as ::ffff:192.168.1.50, the lighthouse records exactly that, and
+    // reports a LAN machine's remoteAddress as ::ffff:192.168.11.50, the lighthouse records exactly that, and
     // new URL() normalises the bracketed form to hex (::ffff:c0a8:132). The first version handled only the
     // dotted spelling and classified wireless LAN peers as EXTERNAL, staging their updates instead of applying
     // them -- a security rule doing its job on machines it was never meant to cover.
-    const lan = ["http://192.168.1.42:8080", "http://10.0.0.5", "http://172.16.3.9", "http://127.0.0.1:3000",
+    const lan = ["http://192.168.11.42:8080", "http://10.0.0.5", "http://172.16.3.9", "http://127.0.0.1:3000",
                  "http://localhost:8080", "http://swek-box.local", "http://[::1]:8080", "http://[fd12:3456::1]",
                  "http://169.254.10.10", "http://100.64.0.7",
-                 "http://[::ffff:192.168.1.50]:8080", "http://[::ffff:c0a8:132]:8080", "http://[::ffff:10.0.0.7]",
+                 "http://[::ffff:192.168.11.50]:8080", "http://[::ffff:c0a8:132]:8080", "http://[::ffff:10.0.0.7]",
                  "http://[fe80::1a2b:3c4d]:8080"];
     const ext = ["https://abc-def-ghi.trycloudflare.com", "http://203.0.113.9", "https://example.com",
                  "http://swek-box", "http://172.32.0.1", "http://192.169.1.1", "http://11.0.0.1", "not a url",
@@ -65,7 +65,7 @@ const signOffer = (offer, key) => ({ ...offer,
 
 // ---- 3. LAN: TRUST-ON-PAIR KEPT, BY DECISION ------------------------------------------------------------------------
 {
-    const d = decidePeerUpdate({ peerUrl: "http://192.168.1.50:8080", offer: manifestFor(3300, bytes), bytes, policy });
+    const d = decidePeerUpdate({ peerUrl: "http://192.168.11.50:8080", offer: manifestFor(3300, bytes), bytes, policy });
     ok("!! a LAN peer may still auto-apply with no signature (the ordinary two-machines-at-home workflow survives)",
        d.action === ACTION_APPLY && d.origin === ORIGIN_LAN, d.why);
 }

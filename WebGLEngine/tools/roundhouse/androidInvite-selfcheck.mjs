@@ -33,7 +33,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 let execCalls = [];
 const fakeExec = (cmd, args, opts, cb) => {
     execCalls.push({ cmd, args });
-    if (cmd === "arp") return cb(null, "? (192.168.1.55) at 34:23:87:aa:bb:cc [ether] on eth0\n? (192.168.1.9) at 00:11:22:33:44:55 [ether] on eth0\n");
+    if (cmd === "arp") return cb(null, "? (192.168.11.55) at 34:23:87:aa:bb:cc [ether] on eth0\n? (192.168.11.9) at 00:11:22:33:44:55 [ether] on eth0\n");
     if (cmd === "adb" && args[0] === "connect") return cb(null, "connected");
     if (cmd === "adb" && args.includes("install")) return cb(null, "Success\n");
     cb(null, "");
@@ -55,10 +55,10 @@ const call = (method, url, body) => new Promise((resolve) => {
 // ---- RUNG 0/1: SIGHTINGS AND A PASSIVE SWEEP -----------------------------------------------------------------------
 {
     // a phone loads a page -> sighting recorded from the UA, no action
-    bridge.noteSighting("192.168.1.55", "Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/120");
+    bridge.noteSighting("192.168.11.55", "Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/120");
     execCalls = [];
     let r = await call("GET", "/android/candidates");
-    const pixel = r.body.candidates.find((c) => c.ip === "192.168.1.55");
+    const pixel = r.body.candidates.find((c) => c.ip === "192.168.11.55");
     ok("!! a phone that loaded a page is a self-identified candidate", pixel && pixel.confidence === "self-identified",
         pixel ? pixel.why[0] : "not found");
     ok("!! a default sweep sends NO packets -- only the ARP cache is read",
@@ -81,22 +81,22 @@ const call = (method, url, body) => new Promise((resolve) => {
 
 // ---- RUNG 2: INVITES ARE EXPLICIT, EXPIRING, REVOCABLE ---------------------------------------------------------------
 {
-    let r = await call("POST", "/android/invite", { confirm: false, ip: "192.168.1.55" });
+    let r = await call("POST", "/android/invite", { confirm: false, ip: "192.168.11.55" });
     ok("!! no invite without an explicit confirm", r.code === 400 && /explicit operator confirm/.test(r.body.error));
 
-    r = await call("POST", "/android/invite", { confirm: true, ip: "192.168.1.55", note: "cousin's Pixel" });
+    r = await call("POST", "/android/invite", { confirm: true, ip: "192.168.11.55", note: "cousin's Pixel" });
     ok("!! an invite mints only on confirm, and yields a shareable door", r.body.ok && /\/android\/join\?t=/.test(r.body.url),
         r.body.shareNote);
     const token = r.body.invite.token;
 
-    r = await call("GET", "/android/manifest", { __ip: "192.168.1.55" });   // token in url needed; do it properly:
-    const m = await call("GET", "/android/manifest?t=" + token, { __ip: "192.168.1.55" });
+    r = await call("GET", "/android/manifest", { __ip: "192.168.11.55" });   // token in url needed; do it properly:
+    const m = await call("GET", "/android/manifest?t=" + token, { __ip: "192.168.11.55" });
     ok("a valid invite unlocks the file manifest", m.body.ok && Array.isArray(m.body.files) && m.body.files.length > 5);
 
     const bad = await call("GET", "/android/manifest?t=deadbeef");
     ok("!! a bad token yields a refusal, not a payload", bad.code === 403 && !bad.body.files);
 
-    const bs = await call("GET", "/android/bootstrap.sh?t=" + token, { __ip: "192.168.1.55" });
+    const bs = await call("GET", "/android/bootstrap.sh?t=" + token, { __ip: "192.168.11.55" });
     ok("!! the bootstrap script installs nothing and touches only ~/swek-peer",
         /swek-peer/.test(bs.body) && !/apt |pkg install|adb |sudo |rm -rf \//.test(bs.body) && /nothing has been run/.test(bs.body),
         "it fetches files and stops; running the suite is a second, separate, human decision");
@@ -108,11 +108,11 @@ const call = (method, url, body) => new Promise((resolve) => {
 
 // ---- RUNG 4: THE APK PUSH, AND ITS HONESTY ---------------------------------------------------------------------------
 {
-    let r = await call("POST", "/android/push", { ip: "192.168.1.55", file: "peer.apk" });
+    let r = await call("POST", "/android/push", { ip: "192.168.11.55", file: "peer.apk" });
     ok("!! a push without the verbatim consent phrase is REFUSED", r.code === 400 && /confirm phrase is required/.test(r.body.error),
         "no accidental or scripted push is possible");
 
-    r = await call("POST", "/android/push", { ip: "192.168.1.55", file: "peer.apk", confirm: "I have this device's owner's permission" });
+    r = await call("POST", "/android/push", { ip: "192.168.11.55", file: "peer.apk", confirm: "I have this device's owner's permission" });
     ok("!! with consent but no APK on disk, it says WHY an APK can't just be made from Termux",
         r.code === 404 && /sandbox forbids/.test(r.body.error),
         "the impossibility is surfaced at the point of use, not buried");
@@ -145,9 +145,9 @@ const call = (method, url, body) => new Promise((resolve) => {
     ok("!! a REMOTE cannot sweep the host's LAN -- candidate enumeration is 403 over the tunnel",
         r.code === 403 && /operator-only/.test(r.body.error),
         "this was the gap: without it, a tunnel visitor could enumerate the host's device list and MAC addresses");
-    r = await callRemote("POST", "/android/invite", { confirm: true, ip: "192.168.1.5" });
+    r = await callRemote("POST", "/android/invite", { confirm: true, ip: "192.168.11.5" });
     ok("!! a REMOTE cannot mint invites", r.code === 403);
-    r = await callRemote("POST", "/android/push", { ip: "192.168.1.5", file: "x.apk", confirm: "I have this device's owner's permission" });
+    r = await callRemote("POST", "/android/push", { ip: "192.168.11.5", file: "x.apk", confirm: "I have this device's owner's permission" });
     ok("!! a REMOTE cannot reach the push endpoint at all (defence before the consent phrase)", r.code === 403);
 
     // but a phone WITH an invite token still gets the phone-facing routes over the tunnel

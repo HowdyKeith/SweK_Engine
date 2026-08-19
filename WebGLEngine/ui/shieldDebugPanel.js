@@ -9,7 +9,7 @@
 //
 // Setup required ONCE on the Shield (the PC's `adb` must be on PATH too):
 //   1. Settings → Device Preferences → Developer Options → "Network debugging" ON
-//   2. On the PC: `adb connect 192.168.50.114:5555`
+//   2. On the PC: `adb connect 192.168.10.114:5555`
 //      (Shield runs Android 11; if it prompts for an RSA fingerprint, accept
 //      on the TV.) For Android 11 wireless-debug-with-pairing flow, see the
 //      "Copy adb pair cmd" button.
@@ -69,8 +69,8 @@ export function mountShieldDebugPanel() {
         fontFamily: "ui-monospace, monospace",
     });
     ip.type = "text";
-    ip.value = localStorage.getItem("shieldDebug.ip") || "192.168.50.114";
-    ip.placeholder = "192.168.50.114";
+    ip.value = localStorage.getItem("shieldDebug.ip") || "192.168.10.114";
+    ip.placeholder = "192.168.10.114";
     ip.addEventListener("change", () => localStorage.setItem("shieldDebug.ip", ip.value.trim()));
     ipRow.appendChild(ip);
     root.appendChild(ipRow);

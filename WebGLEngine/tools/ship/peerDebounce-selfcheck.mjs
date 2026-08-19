@@ -2,7 +2,7 @@
 //
 // *** ONE PEER ANNOUNCING ITSELF RE-INTERROGATED THE WHOLE FLEET, OVER AND OVER. ***
 //
-// Keith's boot log carries dozens of `[autoPull] peer connected (/net/introduce from 192.168.50.42) - running
+// Keith's boot log carries dozens of `[autoPull] peer connected (/net/introduce from 192.168.10.42) - running
 // version check now`, and after EACH one a full `checking 13 peer(s)` ... `no newer peer` -- on a box whose event
 // loop was already blocking for minutes at a time. He named the shape himself: duplicate backed-up work.
 //

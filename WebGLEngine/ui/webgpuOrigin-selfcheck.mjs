@@ -7,9 +7,9 @@
 // v3666, Keith: "this computer has webgpu and it works with our blob webgpu and all the webgpu.com demos", and
 // server.html said "this browser has no WebGPU". ui/webgpuProbe.mjs was written to answer it, and its header
 // names the cause exactly: WebGPU is gated on a SECURE CONTEXT, so over http://<lan-ip>:8787 the browser has
-// WebGPU and does not expose it to that origin. It even names a LAN address: 192.168.50.53:8787.
+// WebGPU and does not expose it to that origin. It even names a LAN address: 192.168.10.53:8787.
 //
-// v3815, Keith: "http://192.168.50.194:8787/mpm-gpu-check.html and mpm-gpu.html report no gpu, but webgpu is
+// v3815, Keith: "http://192.168.10.194:8787/mpm-gpu-check.html and mpm-gpu.html report no gpu, but webgpu is
 // confirmed to be working on this pc, we have had the detector mis-report before."
 //
 // *** HE WAS RIGHT THAT IT HAD HAPPENED BEFORE, AND THE PAGE THAT DID IT THE SECOND TIME WAS MINE. *** I wrote
@@ -38,12 +38,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 console.log("1. THE MODULE STILL ANSWERS THE QUESTION IT WAS WRITTEN FOR");
 {
-    const lan = describeWebGPU({ navigator: {}, isSecureContext: false, location: { protocol: "http:", host: "192.168.50.194:8787", hostname: "192.168.50.194", pathname: "/mpm-gpu.html" } });
+    const lan = describeWebGPU({ navigator: {}, isSecureContext: false, location: { protocol: "http:", host: "192.168.10.194:8787", hostname: "192.168.10.194", pathname: "/mpm-gpu.html" } });
     ok("!! *** KEITH'S EXACT ORIGIN IS CLASSIFIED AS insecure-origin, NOT AS A MISSING BROWSER FEATURE ***",
         lan.reason === "insecure-origin" && lan.actionable === true,
         "reason=" + lan.reason + " actionable=" + lan.actionable);
     ok("...and the message names the origin and does NOT blame the browser",
-        /secure origin/i.test(lan.message) && /192\.168\.50\.194/.test(lan.message) && !/browser has no WebGPU/i.test(lan.message),
+        /secure origin/i.test(lan.message) && /192\.168\.10\.194/.test(lan.message) && !/browser has no WebGPU/i.test(lan.message),
         "a reader told \"this browser has no WebGPU\" goes and checks a driver, a browser version and a GPU, " +
         "NONE OF WHICH IS THE PROBLEM");
     ok("...and it offers localhost and the tunnel, which are the two routes that actually exist",

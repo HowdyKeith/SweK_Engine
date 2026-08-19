@@ -28,7 +28,7 @@ After `wss` and `bridgeState` exist (e.g. just before `server.listen(...)`):
 ## 4. Point it at your broker (env vars)
 | Variable               | Default            | Notes |
 |------------------------|--------------------|-------|
-| `HA_MQTT`              | (falls back to `KPOP_MQTT`) | broker URL, e.g. `mqtt://192.168.1.50:1883` or `mqtts://...`. **Required** to enable. |
+| `HA_MQTT`              | (falls back to `KPOP_MQTT`) | broker URL, e.g. `mqtt://192.168.11.50:1883` or `mqtts://...`. **Required** to enable. |
 | `HA_MQTT_USER` / `_PASS` | (falls back to KPOP_*) | broker credentials |
 | `HA_MQTT_CA`           | —                  | CA file path for `mqtts://` |
 | `HA_MQTT_INSECURE`     | —                  | `1` to skip TLS verify (self-signed) |
@@ -39,7 +39,7 @@ After `wss` and `bridgeState` exist (e.g. just before `server.listen(...)`):
 
 Example (PowerShell):
 
-    $env:HA_MQTT = "mqtt://192.168.1.50:1883"
+    $env:HA_MQTT = "mqtt://192.168.11.50:1883"
     $env:HA_MQTT_USER = "mqtt_user"; $env:HA_MQTT_PASS = "secret"
     node server.js
 

@@ -11,7 +11,7 @@
 #   ./install.ps1 -HostName "homeassistant.local" -ShareName "config"
 #
 #   # Bridge running on a different machine on the LAN
-#   ./install.ps1 -BridgeUrl "http://192.168.1.42:8787"
+#   ./install.ps1 -BridgeUrl "http://192.168.11.42:8787"
 #
 # Requires: HA Samba share add-on enabled and reachable. (Settings >
 # Add-ons > Samba share > Start.) No HA API token needed.

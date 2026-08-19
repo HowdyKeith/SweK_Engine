@@ -53,7 +53,7 @@
 
       <div class="row">
         <div><label>On the Shield</label><select id="shieldAction"><option value="none">Nothing</option><option value="blink">Open Blink app</option><option value="url">Open a page</option></select></div>
-        <div><label>Shield IP</label><input id="shieldIp" value="192.168.50.114" /></div>
+        <div><label>Shield IP</label><input id="shieldIp" value="192.168.10.114" /></div>
       </div>
       <div id="urlRow"><label>Page URL (relative ok)</label><input id="shieldUrl" placeholder="/pipboy-models.html" /></div>
 
@@ -66,7 +66,7 @@
   </main>
 <script type="module">
 // v3455 -- FIRST CONVERSION TO ui/roundTrip.js. This page is the whole defect in one file: the load did
-// `$("shieldIp").value = c.shieldIp || "192.168.50.114"` and the save posted that value back, so A FAILED FETCH
+// `$("shieldIp").value = c.shieldIp || "192.168.10.114"` and the save posted that value back, so A FAILED FETCH
 // PUT A HARDCODED IP INTO THE FORM AND THE NEXT SAVE WROTE IT INTO THE CONFIG AS THOUGH SOMEBODY CHOSE IT.
 // `enabled`/`speak`/`haSpeaker` were worse: `c.enabled !== false` reads a MISSING field as TRUE, so a config
 // that never loaded saved back as fully enabled. THE CATCH BRANCH DID NOT EVEN CLEAR THE FORM.

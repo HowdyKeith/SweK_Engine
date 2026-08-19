@@ -11,7 +11,7 @@
 # of what it has reported, and a delivery can be audited later.
 #
 # THE HUB ADDRESS is remembered in ~/.swek_hub the first time it is supplied, so later runs need no argument:
-#     sh tools/roundhouse/swek_outbox.sh http://192.168.1.42:8080     # first time: learn and flush
+#     sh tools/roundhouse/swek_outbox.sh http://192.168.11.42:8080     # first time: learn and flush
 #     sh tools/roundhouse/swek_outbox.sh                              # thereafter: flush to the remembered hub
 # A Cloudflare tunnel URL works exactly the same way, which is what lets an off-site volunteer's phone deliver.
 #

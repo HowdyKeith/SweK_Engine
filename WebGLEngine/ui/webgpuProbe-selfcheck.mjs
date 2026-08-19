@@ -6,7 +6,7 @@
 // and all the webgpu.com demos" AND server.html saying "this browser has no WebGPU". THE DETECTOR WAS NOT WRONG
 // ABOUT THE FACT -- navigator.gpu really was undefined -- IT WAS WRONG ABOUT THE CAUSE, and the cause is the
 // only part a person can act on. WebGPU is gated on a SECURE ORIGIN: https, or localhost. server.html is served
-// from http://192.168.50.53:8787, A LAN IP, WHICH IS NEITHER, so the browser does not expose navigator.gpu on
+// from http://192.168.10.53:8787, A LAN IP, WHICH IS NEITHER, so the browser does not expose navigator.gpu on
 // that page at all. "The browser has no WebGPU" and "this origin does not get WebGPU" are TWO THINGS WEARING
 // ONE LABEL, and naming the wrong one sends the reader to check their GPU, their driver and their browser
 // version -- none of which is the problem. ***
@@ -26,8 +26,8 @@ const env = (gpu, secure, host, proto = "http:") => ({
 
 // --- 1. KEITH'S ACTUAL CASE ---------------------------------------------------------------------------------
 {
-    say("1. THE PAGE HE WAS LOOKING AT: http://192.168.50.53:8787/server.html");
-    const r = describeWebGPU(env(null, false, "192.168.50.53"));
+    say("1. THE PAGE HE WAS LOOKING AT: http://192.168.10.53:8787/server.html");
+    const r = describeWebGPU(env(null, false, "192.168.10.53"));
     say("     reason: " + r.reason);
     say("     message: " + r.message);
     ok("!! it names the ORIGIN, not the browser", r.reason === "insecure-origin" && !/this browser has no/.test(r.message),
@@ -40,7 +40,7 @@ const env = (gpu, secure, host, proto = "http:") => ({
 {
     say("2. THE SAME ABSENCE FROM FOUR DIFFERENT CAUSES.");
     const rows = [
-        ["LAN IP, http", env(null, false, "192.168.50.53"), "insecure-origin"],
+        ["LAN IP, http", env(null, false, "192.168.10.53"), "insecure-origin"],
         ["localhost, http", env(null, false, "localhost"), "no-webgpu"],
         ["127.0.0.1, http", env(null, false, "127.0.0.1"), "no-webgpu"],
         ["https, truly absent", env(null, true, "example.com", "https:"), "no-webgpu"],
@@ -75,7 +75,7 @@ const env = (gpu, secure, host, proto = "http:") => ({
     ok("a throwing requestAdapter is caught, not propagated", boom.available === false && boom.reason === "adapter-threw");
     ok("and the insecure-origin case short-circuits without ever calling requestAdapter", (() => {
         let called = false;
-        const e = env(null, false, "192.168.50.53");
+        const e = env(null, false, "192.168.10.53");
         e.navigator = { gpu: undefined, requestAdapter: () => { called = true; } };
         return describeWebGPU(e).reason === "insecure-origin" && !called;
     })());
@@ -120,9 +120,9 @@ const env = (gpu, secure, host, proto = "http:") => ({
 // NAMING A FIX THAT DOES NOT EXIST IS WORSE THAN NAMING NO FIX, BECAUSE IT SENDS SOMEBODY TO TRY IT. ***
 {
     const insecure = describeWebGPU({ navigator: {}, isSecureContext: false,
-        location: { protocol: "http:", hostname: "192.168.50.193", host: "192.168.50.193:8787", pathname: "/server.html" } });
+        location: { protocol: "http:", hostname: "192.168.10.193", host: "192.168.10.193:8787", pathname: "/server.html" } });
     ok("!! *** THE INSECURE-ORIGIN MESSAGE NAMES THE SWITCH, NOT JUST THE URL ***",
-        /HTTPS=1/.test(insecure.message) && /https:\/\/192\.168\.50\.193:8787/.test(insecure.message),
+        /HTTPS=1/.test(insecure.message) && /https:\/\/192\.168\.10\.193:8787/.test(insecure.message),
         "it claims `actionable: true`, so the reader must be able to ACT: the message now names HTTPS=1, says " +
         "the cert is generated on first run, and warns that the browser will complain once. IT ALSO OFFERS THE " +
         "CHEAPER ROUTE FIRST -- open it on the serving machine, where localhost counts as secure and no cert " +
@@ -139,7 +139,7 @@ const env = (gpu, secure, host, proto = "http:") => ({
         "strictly better than HTTPS=1 there -- a publicly trusted cert warns nobody, while a self-signed one " +
         "warns once PER DEVICE");
     ok("!! and it still names the actual origin it is complaining about",
-        /192\.168\.50\.193/.test(insecure.message) && insecure.reason === "insecure-origin",
+        /192\.168\.10\.193/.test(insecure.message) && insecure.reason === "insecure-origin",
         "the host comes from loc.hostname; a message that said 'this page is http://' with nothing after it " +
         "would be a message about nothing");
     const local = describeWebGPU({ navigator: {}, isSecureContext: false,

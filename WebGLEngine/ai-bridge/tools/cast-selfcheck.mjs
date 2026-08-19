@@ -27,7 +27,7 @@ const ok = (n, c, extra) => c ? (pass++, console.log("  ok   " + n)) : (fail++, 
 // --- 1. a stream url from the network is a url a page opens ---------------------------------------------
 {
     const S = (u, extra) => announce.normalizeStream({ url: u, ...extra });
-    ok("http and https are castable", !!S("http://192.168.50.40:1984/stream.html?src=cam") && !!S("https://a.example/x"));
+    ok("http and https are castable", !!S("http://192.168.10.40:1984/stream.html?src=cam") && !!S("https://a.example/x"));
     ok("ws and wss too, because that is what WebRTC signalling rides on", !!S("ws://h:8555/api/ws") && !!S("wss://h/api/ws"));
 
     ok("`javascript:` is refused -- that is how a toast becomes an exploit", S("javascript:alert(1)") === null);
@@ -38,7 +38,7 @@ const ok = (n, c, extra) => c ? (pass++, console.log("  ok   " + n)) : (fail++, 
     ok("a url longer than five hundred characters is not a url", S("http://h/" + "x".repeat(600)) === null);
     ok("garbage is refused rather than passed on", S("not a url") === null && S("") === null && announce.normalizeStream(null) === null);
 
-    const good = S("http://192.168.50.40:1984/stream.html?src=frontdoor", { title: "Front door", mode: "webrtc" });
+    const good = S("http://192.168.10.40:1984/stream.html?src=frontdoor", { title: "Front door", mode: "webrtc" });
     ok("a good one keeps its url, title and mode", good.url.includes("frontdoor") && good.title === "Front door" && good.mode === "webrtc");
     ok("an unknown mode falls back to `page`, rather than being obeyed", S("http://h/x", { mode: "eval" }).mode === "page");
     ok("a title longer than eighty characters is cut, not refused", S("http://h/x", { title: "t".repeat(200) }).title.length === 80);
@@ -113,10 +113,10 @@ const ok = (n, c, extra) => c ? (pass++, console.log("  ok   " + n)) : (fail++, 
     ok("a fresh install is detected AND flagged as needing setup", f.ok && f.startupComplete === false);
     await new Promise((r) => fresh.close(r));
 
-    ok("the url for a peer is the engine's LAN address, not `localhost`", jellyfin.webUrl("192.168.50.40") === "http://192.168.50.40:8096/");
+    ok("the url for a peer is the engine's LAN address, not `localhost`", jellyfin.webUrl("192.168.10.40") === "http://192.168.10.40:8096/");
     ok("...and for the host, loopback", jellyfin.webUrl("127.0.0.1") === "http://127.0.0.1:8096/");
 
-    const s = await jellyfin.status("192.168.50.40");
+    const s = await jellyfin.status("192.168.10.40");
     ok("the status says out loud that Jellyfin is a LIBRARY and not a transport", /library/i.test(s.note) && /go2rtc/.test(s.note));
     ok("...and that live LAN streams go through go2rtc at sub-second latency", /sub-second/.test(s.note));
     ok("with nothing installed, it offers no url to open", s.installed === false && s.url === null);

@@ -1661,7 +1661,7 @@ between series without touching a console variable in the browser.
 2) REMATCH AUDIT TRAIL. Same append-log pattern as the gates:
 ai-bridge/rematch_audit.json records {ts, from, terms} per rematch
 (500-ring), and the console's Series section shows the last five --
-"7/6/2026 -- rematch from 192.168.50.40 (terms: {bestOf: 5})".
+"7/6/2026 -- rematch from 192.168.10.40 (terms: {bestOf: 5})".
 
 3) ERA CHART ON THE LIVE CONSOLE. The offline report's twin, canvas-
 drawn: the route embeds the last 300 history entries as JSON and the
@@ -7097,7 +7097,7 @@ Built:
  - New gpanel with THREE gauges polled from /ai/brain/health (the same endpoint the chip
    uses): state (+detail), solves posted (+"last solve Ns ago"), experience (samples).
  - A host box so the panel can watch ANY box on the fleet, not just the one serving the
-   page (Keith wanted 192.168.50.195). Verified this is actually possible before building
+   page (Keith wanted 192.168.10.195). Verified this is actually possible before building
    it: the bridge sets Access-Control-Allow-Origin:* (server.js:3894) so the cross-box
    fetch works, and NO X-Frame-Options / CSP frame-ancestors is set, so the mind page
    embeds. Host persists in localStorage; blank = same origin.

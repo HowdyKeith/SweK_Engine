@@ -35,7 +35,7 @@ function planMuster(botIds, npcIds, opts = {}) {
     const viable = botIds.every(b => counts[b] > 0);
     const room = opts.room || "default", system = opts.system != null ? opts.system : 128;
     // the exact commands the lobby would run to bring the squad up (esPilot for brain-flown hostiles)
-    const launch = botIds.map(b => `SWEK_PILOT_URL=${opts.url || "http://192.168.50.40:9999"} SWEK_PILOT_ROOM=${room} SWEK_PILOT_SYSTEM=${system} SWEK_PILOT_ID=${b} node brain/esPilot.mjs`);
+    const launch = botIds.map(b => `SWEK_PILOT_URL=${opts.url || "http://192.168.10.40:9999"} SWEK_PILOT_ROOM=${room} SWEK_PILOT_SYSTEM=${system} SWEK_PILOT_ID=${b} node brain/esPilot.mjs`);
     return { room, system, squad: botIds, npcCount: npcIds.length, counts, owners, complete, fair, viable, ok: complete && fair && viable, launch };
 }
 

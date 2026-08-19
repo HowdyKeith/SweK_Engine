@@ -13,7 +13,7 @@ import { createRequire } from "module";
 // Simulate Galaxina: a real NIC + a virtual Hyper-V NIC, before assetSync reads them.
 os.networkInterfaces = () => ({
     "vEthernet (Default Switch)": [{ address: "192.168.237.1", family: "IPv4", internal: false }],
-    "Ethernet": [{ address: "192.168.50.56", family: "IPv4", internal: false }],
+    "Ethernet": [{ address: "192.168.10.56", family: "IPv4", internal: false }],
 });
 os.hostname = () => "Galaxina";
 
@@ -26,13 +26,13 @@ const ok = (n, c) => { total++; if (c) { pass++; console.log(`  ok   ${n}`); } e
 
 console.log("peer-selfhost-selfcheck: own addresses are not peers");
 ok("own virtual NIC 192.168.237.1 rejected", isPeer("http://192.168.237.1:8787") === false);
-ok("own real NIC 192.168.50.56 rejected", isPeer("http://192.168.50.56:8787") === false);
+ok("own real NIC 192.168.10.56 rejected", isPeer("http://192.168.10.56:8787") === false);
 ok("own name Galaxina.local rejected", isPeer("http://Galaxina.local:8787") === false);
 ok("localhost rejected", isPeer("http://localhost:8787") === false);
 ok("127.0.0.1 rejected", isPeer("http://127.0.0.1:8787") === false);
 
 console.log("peer-selfhost-selfcheck: real peers still accepted");
-ok("MacBook 192.168.50.42 accepted", isPeer("http://192.168.50.42:8787") === true);
+ok("MacBook 192.168.10.42 accepted", isPeer("http://192.168.10.42:8787") === true);
 ok("a real box on the same virtual subnet (.237.2) accepted", isPeer("http://192.168.237.2:8787") === true);
 ok("another box's mDNS name accepted", isPeer("http://macbook-pro.local:8787") === true);
 

@@ -33,11 +33,11 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 
 const now = Date.now();
 const iso = (ms) => new Date(now - ms).toISOString();
-const cands = [{ ip: "192.168.1.40" }, { ip: "192.168.1.41" }, { ip: "192.168.1.55" }, { ip: "192.168.1.99" }];
+const cands = [{ ip: "192.168.11.40" }, { ip: "192.168.11.41" }, { ip: "192.168.11.55" }, { ip: "192.168.11.99" }];
 const known = {
-    roster: [{ origin: "http://192.168.1.40:8787", host: "shield", at: iso(3600000) }],
-    peers: [{ url: "http://192.168.1.41:8787", host: "tablet", at: iso(60 * 3600000) }],
-    ledger: [{ origin: "http://192.168.1.40:8787", host: "shield", at: iso(7200000) }],
+    roster: [{ origin: "http://192.168.11.40:8787", host: "shield", at: iso(3600000) }],
+    peers: [{ url: "http://192.168.11.41:8787", host: "tablet", at: iso(60 * 3600000) }],
+    ledger: [{ origin: "http://192.168.11.40:8787", host: "shield", at: iso(7200000) }],
 };
 const r = classifyCandidates(cands, known, now);
 const by = (ip) => r.rows.find((x) => x.ip === ip);
@@ -46,15 +46,15 @@ const by = (ip) => r.rows.find((x) => x.ip === ip);
 {
     ok("!! known addresses are separated from unknown", r.knownCount === 2 && r.unknownCount === 2,
        r.note);
-    ok("a matched address names its host", by("192.168.1.40").host === "shield",
+    ok("a matched address names its host", by("192.168.11.40").host === "shield",
        "an IP alone tells you nothing you can act on");
-    ok("an unmatched address says WHY it is unmatched", /no check-in, no successful pull/.test(by("192.168.1.55").why || ""),
+    ok("an unmatched address says WHY it is unmatched", /no check-in, no successful pull/.test(by("192.168.11.55").why || ""),
        "'unknown' with no reason is indistinguishable from 'not looked up'");
 }
 
 // ---- 2. THREE WITNESSES, AND MULTIPLE ARE REPORTED TOGETHER ---------------------------------------------------------
 {
-    const strong = by("192.168.1.40");
+    const strong = by("192.168.11.40");
     ok("!! an address with TWO witnesses reports both", strong.witnesses.length === 2 &&
        strong.witnesses.includes(WITNESS.ROSTER) && strong.witnesses.includes(WITNESS.LEDGER),
        strong.witnesses.join(" + ") + " -- a box that checked in AND did GPU work is a stronger claim than either alone, and collapsing them to a boolean loses that");
@@ -65,12 +65,12 @@ const by = (ip) => r.rows.find((x) => x.ip === ip);
 
 // ---- 3. AN IP MATCH IS EVIDENCE, NOT IDENTITY -------------------------------------------------------------------------
 {
-    const old = by("192.168.1.41");
+    const old = by("192.168.11.41");
     ok("!! a STALE witness is flagged", old.stale === true,
        "60h old against a " + (FRESH_MS / 3600000) + "h window");
     ok("!! ...and the reason names DHCP", /DHCP reassigns/.test(old.why || ""),
        "the phone that was .40 last week may be a printer today -- a lead, not an identification");
-    ok("a fresh witness is NOT flagged stale", by("192.168.1.40").stale === false);
+    ok("a fresh witness is NOT flagged stale", by("192.168.11.40").stale === false);
     ok("the age travels with the claim", typeof old.ageMs === "number" && old.ageMs > 0,
        "a six-week-old sighting and a six-minute-old one are different claims wearing the same word");
     ok("!! the module says so in its own source", /EVIDENCE, NOT IDENTITY/.test(src),

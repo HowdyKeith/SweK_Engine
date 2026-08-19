@@ -48,7 +48,7 @@ Defaults:
 
 Custom:
 ```powershell
-./install.ps1 -HostName "homeassistant.local" -BridgeUrl "http://192.168.1.42:8787"
+./install.ps1 -HostName "homeassistant.local" -BridgeUrl "http://192.168.11.42:8787"
 ```
 
 The script:

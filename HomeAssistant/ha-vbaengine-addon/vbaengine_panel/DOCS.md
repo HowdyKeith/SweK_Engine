@@ -6,7 +6,7 @@ sidebar panel and handles authentication and the secure connection.
 ## Options
 | Option       | Type | Purpose |
 |--------------|------|---------|
-| `bridge_url` | str? | Your Node bridge base URL, if the engine should pull live state directly (e.g. `http://192.168.1.50:8787`). |
+| `bridge_url` | str? | Your Node bridge base URL, if the engine should pull live state directly (e.g. `http://192.168.11.50:8787`). |
 | `title`      | str? | Sidebar/panel title override. |
 
 ## Reading Home Assistant data from the panel

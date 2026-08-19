@@ -5,7 +5,7 @@ REM  Opens the SweK Engine in Chrome at the machine's real LAN address + the
 REM  server.html landing page -- NOT 127.0.0.1 / localhost.
 REM
 REM  The relay computes its best non-virtual LAN URL at  GET /net/info
-REM  (.recommended, e.g. http://192.168.50.109:8787/). We resolve it at runtime
+REM  (.recommended, e.g. http://192.168.10.109:8787/). We resolve it at runtime
 REM  so the IP is never hardcoded. Falls back to localhost/server.html if the
 REM  bridge isn't answering yet. All logic is one powershell line on purpose
 REM  (a batch if() block would premature-close on the parens inside powershell).

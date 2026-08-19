@@ -34,8 +34,8 @@ const ENC = () => function VideoEncoder() {};
 
 // --- 1. SweK'S OWN DEPLOYMENT ------------------------------------------------------------------------------
 {
-    say("1. THE ORIGIN THE ENGINE ACTUALLY SHIPS AS: http://192.168.50.53:8787/server.html");
-    const r = describeWebCodecs(env({ MediaRecorder: function () {} }, false, "192.168.50.53"));
+    say("1. THE ORIGIN THE ENGINE ACTUALLY SHIPS AS: http://192.168.10.53:8787/server.html");
+    const r = describeWebCodecs(env({ MediaRecorder: function () {} }, false, "192.168.10.53"));
     say("     reason: " + r.reason);
     ok("!! it names the ORIGIN, not the browser or the machine",
         r.reason === "insecure-origin" && !/this browser has no/.test(r.message),
@@ -43,7 +43,7 @@ const ENC = () => function VideoEncoder() {};
     ok("and it says what to do about it", r.actionable === true && /https|localhost/.test(r.message));
 
     // *** THE ASYMMETRY THAT MAKES THIS WORTH A MODULE RATHER THAN A LINE. ***
-    const cap = describeCapture(env({ MediaRecorder: function () {} }, false, "192.168.50.53"));
+    const cap = describeCapture(env({ MediaRecorder: function () {} }, false, "192.168.10.53"));
     ok("!! *** ON THAT ORIGIN THE PAGE CAN RECORD AND CANNOT RE-ENCODE, AND IT SAYS BOTH ***",
         cap.canRecord === true && cap.canTranscode === false && cap.split === true,
         "canvas.captureStream + MediaRecorder are NOT secure-context gated and keep working over http, while " +
@@ -55,7 +55,7 @@ const ENC = () => function VideoEncoder() {};
 {
     say("2. THE SAME ABSENCE FROM DIFFERENT CAUSES.");
     const rows = [
-        ["LAN IP, http", env(null, false, "192.168.50.53"), "insecure-origin"],
+        ["LAN IP, http", env(null, false, "192.168.10.53"), "insecure-origin"],
         ["localhost, http", env(null, false, "localhost"), "no-webcodecs"],
         ["127.0.0.1, http", env(null, false, "127.0.0.1"), "no-webcodecs"],
         ["https, truly absent", env(null, true, "example.com", "https:"), "no-webcodecs"],
@@ -71,7 +71,7 @@ const ENC = () => function VideoEncoder() {};
         "the browser's own rule, and the same one webgpuProbe applies");
 
     // The two probes must agree about ORIGINS even though they disagree about APIs.
-    const both = [["192.168.50.53", false], ["localhost", false], ["example.com", true]];
+    const both = [["192.168.10.53", false], ["localhost", false], ["example.com", true]];
     ok("!! *** THE TWO PROBES AGREE ABOUT WHICH ORIGINS ARE SECURE, ASSERTED RATHER THAN ASSUMED ***",
         both.every(([h, s]) => {
             const gpu = describeWebGPU({ navigator: {}, isSecureContext: s, location: { hostname: h, host: h, protocol: s ? "https:" : "http:" } });
@@ -123,7 +123,7 @@ const ENC = () => function VideoEncoder() {};
     // to prove that again. The real property is an ORDER: the ORIGIN verdict must come before the CONFIG
     // verdict, so a page on the LAN with no config at all is told about the ORIGIN -- the thing it can act on --
     // and not about a missing argument. ***
-    const r = await probeEncoderConfig(env(null, false, "192.168.50.53"), null);
+    const r = await probeEncoderConfig(env(null, false, "192.168.10.53"), null);
     ok("!! an unavailable ORIGIN is reported before a missing CONFIG, because only one of them is actionable",
         r.reason === "insecure-origin",
         "got '" + r.reason + "'. Reverse the two checks in probeEncoderConfig and this reads 'no-config' -- " +

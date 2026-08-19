@@ -8,7 +8,7 @@
 // is the only part a person can act on.
 //
 // WebGPU IS GATED ON A SECURE CONTEXT. Over https, or on localhost, navigator.gpu exists. Over
-// http://192.168.50.53:8787 -- A LAN IP, WHICH IS NEITHER -- THE BROWSER DOES NOT EXPOSE IT AT ALL. So the same
+// http://192.168.10.53:8787 -- A LAN IP, WHICH IS NEITHER -- THE BROWSER DOES NOT EXPOSE IT AT ALL. So the same
 // browser on the same machine has WebGPU on webgpu.com and none on a page served from the engine's own LAN
 // address. "THE BROWSER HAS NO WebGPU" AND "THIS ORIGIN DOES NOT GET WebGPU" ARE TWO THINGS WEARING ONE LABEL,
 // and the message named the wrong one -- so the reader goes looking at their GPU, their driver and their

@@ -25,7 +25,7 @@ NOT YET -- and the interesting part is why it took until now. v2546's own header
 
 ## Kill condition
 
-Different `state=` on x86_64 and arm64. First suspects IN ORDER: (1) THE TWO MACHINES RAN DIFFERENT BYTES -- the Mac PULLS the wasm from Galaxina over the fleet (192.168.50.8:8787), so the harness prints the wasm's OWN sha256 FIRST and if those differ nothing else means anything; (2) fma contraction, clang fusing a*b+c on one target and not the other; (3) libm transcendentals -- sqrt is exact per IEEE, sin/cos/exp are not mandated bit-exact. NOTE THE ORDER: THE LIKELIEST FAILURE IS NOT A PHYSICS BUG, IT IS COMPARING TWO BUILDS AND CALLING IT TWO ARCHITECTURES.
+Different `state=` on x86_64 and arm64. First suspects IN ORDER: (1) THE TWO MACHINES RAN DIFFERENT BYTES -- the Mac PULLS the wasm from Galaxina over the fleet (192.168.10.8:8787), so the harness prints the wasm's OWN sha256 FIRST and if those differ nothing else means anything; (2) fma contraction, clang fusing a*b+c on one target and not the other; (3) libm transcendentals -- sqrt is exact per IEEE, sin/cos/exp are not mandated bit-exact. NOTE THE ORDER: THE LIKELIEST FAILURE IS NOT A PHYSICS BUG, IT IS COMPARING TWO BUILDS AND CALLING IT TWO ARCHITECTURES.
 
 # Citations
 

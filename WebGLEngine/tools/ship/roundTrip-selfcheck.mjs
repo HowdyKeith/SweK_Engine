@@ -99,7 +99,7 @@ const mod = noComments(modRaw);
     const r = roundTripCensus(ROOT);
     // v3455 -- LOWERED 100 -> 91: arrival.html CONVERTED, THE FIRST CALL SITE TO USE ui/roundTrip.js RATHER THAN
     // RESTATE THE RULES. Nine controls, and the page was the whole defect in one file: the load did
-    // `$("shieldIp").value = c.shieldIp || "192.168.50.114"` and the save posted it back, so A FAILED FETCH PUT
+    // `$("shieldIp").value = c.shieldIp || "192.168.10.114"` and the save posted it back, so A FAILED FETCH PUT
     // A HARDCODED IP INTO THE FORM AND THE NEXT SAVE WROTE IT INTO THE CONFIG. `c.enabled !== false` read a
     // MISSING field as TRUE, so a config that never loaded saved back fully enabled. And the catch branch did
     // not clear the form at all. THE FILE LEFT THE CENSUS ENTIRELY (34 files -> 33).
@@ -136,7 +136,7 @@ const mod = noComments(modRaw);
         ok("...and its load no longer supplies a fallback the save would post back",
            !/\$\("(shieldIp|greet|light|shieldUrl|quip|flashSec|shieldAction)"\)\.value\s*=\s*c\.\w+\s*\|\|/.test(src) &&
            !/\$\("(announce|speak)"\)\.checked\s*=\s*c\.\w+\s*!==\s*false/.test(src),
-           "the `c.x || \"default\"` idiom is what put 192.168.50.114 into the form on a failed fetch. ITS ABSENCE IS THE CHECK, because the count above would not notice it coming back on a control that is otherwise guarded.");
+           "the `c.x || \"default\"` idiom is what put 192.168.10.114 into the form on a failed fetch. ITS ABSENCE IS THE CHECK, because the count above would not notice it coming back on a control that is otherwise guarded.");
     }
 
     ok("!! *** unguarded round-trip controls have not increased ***",

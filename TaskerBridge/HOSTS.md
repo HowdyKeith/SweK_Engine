@@ -34,7 +34,7 @@ can prefer Node and fall back to the transmitter (or vice-versa) automatically:
 import { resolveHost } from "./public/hostResolve.js";
 const base = await resolveHost([
   "http://localhost:8790",     // prefer Node
-  "http://192.168.1.20:8099"   // else the transmitter
+  "http://192.168.11.20:8099"   // else the transmitter
 ]);
 ```
 

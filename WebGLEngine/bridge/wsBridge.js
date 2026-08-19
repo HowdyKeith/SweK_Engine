@@ -16,7 +16,7 @@
 // the JSON and forwards to router.exec(cmd).
 
 // v1220 — derive the relay WS URL from the page's own location instead of a
-// hardcoded localhost. Loading the engine from the LAN IP (e.g. 192.168.50.132)
+// hardcoded localhost. Loading the engine from the LAN IP (e.g. 192.168.10.132)
 // now connects back to that same host. And "localhost" is forced to 127.0.0.1 so
 // the loopback uses IPv4 — under Bun on Windows, ws://localhost resolves to IPv6
 // ::1, which Bun's IPv4 listener refuses (the same Windows-socket quirk that

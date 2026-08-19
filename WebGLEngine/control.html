@@ -1415,7 +1415,7 @@
         <span id="shSetupCollapse" style="font-size:10px; color:var(--dim); cursor:pointer; user-select:none;">▼ collapse</span>
       </p>
       <div id="shSetupBody">
-        <p class="hint">Default IP is the Shield Pro at <code>192.168.50.114</code>. For a VSEE box or any other Android TV box, swap in its IP. Setup needed once: device → Developer Options → Network debugging ON; PC must have <code>adb</code> on PATH; first run <code>adb connect &lt;IP&gt;:5555</code> in a PC terminal and accept the RSA fingerprint on the TV.</p>
+        <p class="hint">Default IP is the Shield Pro at <code>192.168.10.114</code>. For a VSEE box or any other Android TV box, swap in its IP. Setup needed once: device → Developer Options → Network debugging ON; PC must have <code>adb</code> on PATH; first run <code>adb connect &lt;IP&gt;:5555</code> in a PC terminal and accept the RSA fingerprint on the TV.</p>
         <!-- v734 — saved/named device list. Multiple Shield/Android boxes
              can be saved and recalled by name. Selecting one updates the
              IP field below. -->
@@ -1431,7 +1431,7 @@
         </div>
         <div style="margin-top:8px;">
           <label class="hint" style="display:block; margin-bottom:4px;">IP address</label>
-          <input type="text" id="shieldIp" value="192.168.50.114" placeholder="192.168.50.114"
+          <input type="text" id="shieldIp" value="192.168.10.114" placeholder="192.168.10.114"
                  style="width:100%; padding:10px; font-size:15px; background:#0c0f14; color:var(--ink); border:1px solid var(--edge); border-radius:8px; -webkit-user-select:text; user-select:text;">
         </div>
         <div class="grid" style="margin-top:10px;">
@@ -1706,7 +1706,7 @@
   <section style="margin-top:8px;">
     <p class="label">🎮 PS3 (webMAN MOD) <span id="ps3Hen" title="Live reachability of webMAN's web server — green = HEN active + webMAN responding; amber = configured but not answering (PS3 off or HEN not loaded); grey = not set up." style="float:right; font-size:11px; color:var(--dim); font-weight:normal;"><span id="ps3HenDot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#666; margin-right:4px; vertical-align:middle;"></span><span id="ps3HenTxt">—</span></span></p>
     <div class="row" style="margin-top:6px;">
-      <input type="text" id="ps3Host" placeholder="PS3 IP (e.g. 192.168.50.40)" style="flex:2; font-size:12px;">
+      <input type="text" id="ps3Host" placeholder="PS3 IP (e.g. 192.168.10.40)" style="flex:2; font-size:12px;">
       <input type="text" id="ps3Port" value="80" style="width:54px; font-size:12px;" title="port">
       <button id="ps3Save" style="flex:0 0 auto;">💾 Save</button>
     </div>
@@ -2119,7 +2119,7 @@
             // endpoint (openUrl action launches the URL in Shield's browser).
             // IP defaults to user's Shield; override via localStorage key
             // "voxelengine.shieldIp".
-            var shieldIp = "192.168.50.114";
+            var shieldIp = "192.168.10.114";
             try { shieldIp = localStorage.getItem("voxelengine.shieldIp") || shieldIp; } catch {}
             var engineUrl = location.origin + "/?demo=" + encodeURIComponent(d.id) + "&engine=1";
             fetch("/shield/exec", {
@@ -2191,7 +2191,7 @@
           clients.forEach(function(c){
             var o = document.createElement("option");
             o.value = c.id;
-            // Show role + label, e.g. "🖥 PC (192.168.1.10)" or "🎮 SHIELD (192.168.50.114)"
+            // Show role + label, e.g. "🖥 PC (192.168.11.10)" or "🎮 SHIELD (192.168.10.114)"
             var icon = c.role === "phone"  ? "📱"
                      : c.role === "shield" ? "🎮"
                      : c.role === "pc"     ? "🖥"

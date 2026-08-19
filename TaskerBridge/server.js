@@ -57,7 +57,7 @@ async function triggerAutoRemote(task) {
 // Direct LAN: POST/GET to the phone's own Tasker HTTP Request server (Tasker 6.2+).
 async function triggerTaskerHttp(task) {
   const base = config.backends?.tasker_http?.baseUrl;
-  if (!base) throw new Error("set config.backends.tasker_http.baseUrl (e.g. http://192.168.1.50:1821)");
+  if (!base) throw new Error("set config.backends.tasker_http.baseUrl (e.g. http://192.168.11.50:1821)");
   const url = base.replace(/\/+$/, "") + (task.path || "/");
   const method = (task.method || "POST").toUpperCase();
   const opts = { method };
@@ -89,7 +89,7 @@ async function triggerHA(task) {
 let _mqttClient = null;
 async function triggerMqtt(task) {
   const m = config.backends?.mqtt || {};
-  if (!m.url) throw new Error("set config.backends.mqtt.url (e.g. mqtt://192.168.1.10:1883)");
+  if (!m.url) throw new Error("set config.backends.mqtt.url (e.g. mqtt://192.168.11.10:1883)");
   let mqtt;
   try { mqtt = require("mqtt"); }
   catch { throw new Error("mqtt backend needs the optional package — run: npm i mqtt"); }

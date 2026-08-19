@@ -9,7 +9,7 @@
 //   import { resolveHost } from "./hostResolve.js";
 //   const base = await resolveHost([
 //     "http://localhost:8790",            // Node TaskerBridge (preferred)
-//     "http://192.168.1.20:8099"          // VBA transmitter (fallback)
+//     "http://192.168.11.20:8099"          // VBA transmitter (fallback)
 //   ]);
 //   if (base) (await fetch(base + "/api/tasks")) ...; else /* nothing up */
 

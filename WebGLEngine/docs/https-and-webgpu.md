@@ -7,7 +7,7 @@ that nothing in this tree explained how to produce.*
 
 Cycling the avatar switch to **⚡ Blobulator GPU** on a page served from a LAN IP shows:
 
-> WebGPU needs a secure origin — this page is http://192.168.50.193, so the browser does not expose it here.
+> WebGPU needs a secure origin — this page is http://192.168.10.193, so the browser does not expose it here.
 
 The avatar falls back to the SVG robot and says why. **That verdict is correct.** `navigator.gpu` really is
 undefined — not because the browser lacks WebGPU, but because **WebGPU is gated on a secure context**, and

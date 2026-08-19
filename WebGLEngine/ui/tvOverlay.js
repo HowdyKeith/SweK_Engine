@@ -2,7 +2,7 @@
 // TvOverlay Android-TV app WITHOUT going through the VBA workbook: the engine
 // POSTs to this Node bridge (same-origin, like avatarPublish), and the bridge
 // forwards to TvOverlay's REST API. Point the bridge at the TV by setting the
-// TV_OVERLAY_URL env var (e.g. TV_OVERLAY_URL=http://192.168.1.50:5678).
+// TV_OVERLAY_URL env var (e.g. TV_OVERLAY_URL=http://192.168.11.50:5678).
 //
 //   window.tvNotify("Kaiju!", "Spawned at sector 7", { image:"mdi:alert", corner:"top_end", duration:6 })
 //   window.tvFixed("hp", "Shield 80%", { icon:"mdi:shield", iconColor:"#33d6ff" })

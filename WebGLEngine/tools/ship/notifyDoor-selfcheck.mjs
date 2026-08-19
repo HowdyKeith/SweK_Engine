@@ -44,7 +44,7 @@ const sUnconf = B.evaluate({ server: "", topic: "" }).state;
 const sNoTopic = B.evaluate({ server: "https://ntfy.example.net", topic: "" }).state;
 const sPublicBare = B.evaluate({ server: "https://ntfy.sh", topic: "swek-fleet" });
 const sPublicAuth = B.evaluate({ server: "https://ntfy.sh", topic: "swek-fleet", token: "tk_x" }).state;
-const sLan = B.evaluate({ server: "http://192.168.1.9:8080", topic: "swek-fleet" }).state;
+const sLan = B.evaluate({ server: "http://192.168.11.9:8080", topic: "swek-fleet" }).state;
 const sBadUrl = B.evaluate({ server: "not a url", topic: "swek-fleet" }).state;
 say("states reached: unconfigured=" + sUnconf + " noTopic=" + sNoTopic + " publicBare=" + sPublicBare.state +
     " publicAuth=" + sPublicAuth + " lanBare=" + sLan + " badUrl=" + sBadUrl);
@@ -71,7 +71,7 @@ ok("!! *** a PUBLIC ntfy host with NO token is REFUSED, and the reason names the
     "ledgers rather than trusting them (v2968) for exactly this reason");
 
 ok("...and it is a refusal about REACHABILITY, not a ban on going without a token",
-    sLan === "ready" && B.isPrivateHost("192.168.1.9") && B.isPrivateHost("127.0.0.1") && B.isPrivateHost("hub.local") && !B.isPrivateHost("ntfy.sh"),
+    sLan === "ready" && B.isPrivateHost("192.168.11.9") && B.isPrivateHost("127.0.0.1") && B.isPrivateHost("hub.local") && !B.isPrivateHost("ntfy.sh"),
     "a LAN instance with no token is FINE -- the network is the boundary. Refusing that too would train " +
     "somebody to set a fake token to make the check quiet, which is worse than the thing being guarded");
 

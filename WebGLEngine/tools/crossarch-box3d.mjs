@@ -36,7 +36,7 @@
 //   3. libm: any transcendental (sqrt is exact per IEEE, but sin/cos/exp are not mandated bit-exact)
 //
 // SUSPECT 2 IS THE LIKELY ONE AND IT IS NOT A PHYSICS BUG: the Mac already PULLS the wasm from Galaxina over the
-// fleet (192.168.50.8:8787). IF THE TWO MACHINES RUN DIFFERENT BYTES, THIS TOOL IS COMPARING TWO BUILDS, NOT TWO
+// fleet (192.168.10.8:8787). IF THE TWO MACHINES RUN DIFFERENT BYTES, THIS TOOL IS COMPARING TWO BUILDS, NOT TWO
 // ARCHITECTURES -- so it prints the wasm's own SHA-256 first, and if those differ, nothing below means anything.
 import fs from "node:fs";
 import path from "node:path";

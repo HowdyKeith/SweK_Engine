@@ -246,7 +246,7 @@ export function llmCommander(opts = {}) {
 // The peer is expected to answer POST {game, side} -> {plan}. Falls back to heuristic.
 export function remoteCommander(opts = {}) {
     const fetchFn = opts.fetch || (typeof fetch !== "undefined" ? fetch : null);
-    const url = opts.url;   // e.g. "http://192.168.50.50:8787/skirmish/plan"
+    const url = opts.url;   // e.g. "http://192.168.10.50:8787/skirmish/plan"
     return async (game, side) => {
         if (!fetchFn || !url) return heuristicPlan(game, side);
         try {

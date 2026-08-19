@@ -124,7 +124,7 @@ function writeConfig(cfg) {
     y += "streams:\n";
     const keys = Object.keys(streams);
     if (keys.length) for (const k of keys) y += "  " + k + ": " + streams[k] + "\n";
-    else y += "  # add cameras here, e.g.:\n  # frontdoor: rtsp://user:pass@192.168.50.50:554/stream\n";
+    else y += "  # add cameras here, e.g.:\n  # frontdoor: rtsp://user:pass@192.168.10.50:554/stream\n";
     fs.writeFileSync(YAML, y);
     return { ok: true, configPath: YAML, streams: keys, ffmpegBin: ffBin || "(PATH)" };
 }

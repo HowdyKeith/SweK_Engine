@@ -16,7 +16,7 @@ let cfg = { watch: false, rules: [], personRules: [
     // open the pip-boy on the Shield TV. url is relative so it resolves to this PC's LAN
     // address at fire time; edit names / Shield IP in the Presence panel. Only fires once
     // "Broadcast presence" is on. (Won't fire if a saved presence-watch.json already exists.)
-    { match: "Keith", onArrive: { kind: "shield", url: "/pipboy-models.html", ip: "192.168.50.114" }, if: { person: "Helga", home: false } },
+    { match: "Keith", onArrive: { kind: "shield", url: "/pipboy-models.html", ip: "192.168.10.114" }, if: { person: "Helga", home: false } },
 ], avatars: {} };
 try { if (fs.existsSync(CONFIG)) cfg = Object.assign(cfg, JSON.parse(fs.readFileSync(CONFIG, "utf8"))); } catch {}
 function saveCfg() { try { fs.writeFileSync(CONFIG, JSON.stringify(cfg), { mode: 0o600 }); } catch {} }

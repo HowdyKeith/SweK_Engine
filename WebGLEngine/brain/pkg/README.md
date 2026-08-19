@@ -32,7 +32,7 @@ No Node or Bun install is needed on the target machine; the runtime is embedded.
 Config is read from the environment at run time, so one binary serves any cell:
 
 ```
-SYSTEM=128 ROOM=default URLBASE=http://192.168.50.40:8787 swek-brain.exe
+SYSTEM=128 ROOM=default URLBASE=http://192.168.10.40:8787 swek-brain.exe
 ```
 
 For the EVE-style "one owner per system" layout, spawn one per system (each takes its fair share by hashing, so two owners in the same room automatically split the wing). `BRAIN_BACKEND=cpu` on a GPU-less box (Stellar Atlas) is the clean fit; keep any real GPU-compute path native and in Node on Galaxina and let the exe own CPU cells.

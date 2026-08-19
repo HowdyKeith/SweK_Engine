@@ -42,8 +42,8 @@ backends need **no npm install**; the MQTT backend is optional (`npm i mqtt`).
   "port": 8790,
   "backends": {
     "autoremote": { "key": "..." },
-    "tasker_http": { "baseUrl": "http://192.168.1.50:1821" },
-    "mqtt": { "url": "mqtt://192.168.1.10:1883", "username": "", "password": "" },
+    "tasker_http": { "baseUrl": "http://192.168.11.50:1821" },
+    "mqtt": { "url": "mqtt://192.168.11.10:1883", "username": "", "password": "" },
     "ha": { "baseUrl": "http://homeassistant.local:8123", "token": "..." }
   },
   "tasks": [

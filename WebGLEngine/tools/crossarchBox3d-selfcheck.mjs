@@ -93,7 +93,7 @@ ok("the stack SETTLES -- it is a real scene, not free fall", Math.abs(a.low - 0.
 {
     const src = fs.readFileSync(path.join(here, "crossarch-box3d.mjs"), "utf8");
     ok("the harness prints the WASM's own hash first", /wasm=/.test(src) && /sha256/.test(src),
-       "THE MAC PULLS THE WASM FROM GALAXINA OVER THE FLEET (192.168.50.8:8787). If the two machines run different BYTES, this compares TWO BUILDS, NOT TWO ARCHITECTURES -- and that is the likeliest false alarm, not an fma difference.");
+       "THE MAC PULLS THE WASM FROM GALAXINA OVER THE FLEET (192.168.10.8:8787). If the two machines run different BYTES, this compares TWO BUILDS, NOT TWO ARCHITECTURES -- and that is the likeliest false alarm, not an fma difference.");
     ok("...and it declares its own arch", /process\.arch/.test(src),
        "a hash with no arch beside it is two strings in a chat window");
     // Comparing SOURCE TEXT would grep the prose of the scene, not the scene. RUN the harness and compare the

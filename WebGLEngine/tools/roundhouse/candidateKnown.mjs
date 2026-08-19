@@ -13,7 +13,7 @@
 //   the DEVICE LEDGER      -- a device that SUBMITTED magmap results. It did real GPU work for us.
 //
 // AN IP MATCH IS EVIDENCE, NOT IDENTITY, AND THAT DISTINCTION IS THE WHOLE FILE. DHCP reassigns; a phone that
-// was 192.168.1.40 last week may be a printer today. So a match is reported as "this IP matches a peer that
+// was 192.168.11.40 last week may be a printer today. So a match is reported as "this IP matches a peer that
 // checked in at T", never as "this IS that peer" -- and the AGE of the witness travels with it, because a
 // six-week-old sighting and a six-minute-old one are different claims wearing the same word.
 "use strict";

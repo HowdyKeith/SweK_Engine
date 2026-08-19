@@ -50,7 +50,7 @@ function shareableTunnelUrl(ts) {
 }
 
 // Diagnose WHY a tunnel won't attach. cloudflared tunnels to http://localhost:PORT, so if the SweK server is bound only
-// to the LAN IP (e.g. 192.168.50.56) and not to 127.0.0.1, cloudflared gets connection-refused and the public URL
+// to the LAN IP (e.g. 192.168.10.56) and not to 127.0.0.1, cloudflared gets connection-refused and the public URL
 // answers 502 forever -- which looks exactly like the born-bad-gateway flakiness but never clears. Given a probe of the
 // LOCAL target (fetch http://127.0.0.1:PORT/health), say what it means:
 //   "target-reachable"   -> the server answers on localhost; cloudflared can attach. A 502 is transient / CF-edge.

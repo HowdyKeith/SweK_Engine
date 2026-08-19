@@ -190,7 +190,7 @@ function mqttMirror(msg) {
 }
 // --- v937 — TvOverlay push (engine → bridge → TV; no VBA, no broker). The
 // engine POSTs /tv/notify to this bridge and we forward it to the TvOverlay
-// REST API at TV_OVERLAY_URL (e.g. http://192.168.1.50:5678). No-op if unset.
+// REST API at TV_OVERLAY_URL (e.g. http://192.168.11.50:5678). No-op if unset.
 const TV_OVERLAY_URL = (process.env.TV_OVERLAY_URL || "").trim().replace(/\/+$/, "");
 const TV_MQTT_TOPIC = (process.env.TV_MQTT_TOPIC || "").trim();   // topic TvOverlay subscribes to for commands (find via broker sniff / VBA broker subscribe log)
 function tvOverlayPost(pathName, bodyObj, cb) {
@@ -2241,7 +2241,7 @@ function isProcessRunning(name, cb) {
 // v1322 — spacedesk auto-launch: when the spacedesk SERVER process appears on this PC, open the
 // spacedesk VIEWER app on the Shield so it auto-joins as a second monitor. Fires on the rising edge.
 const SPACEDESK_FILE = path.join(__dirname, "spacedesk.json");
-let spacedeskCfg = (() => { const def = { watch: false, processName: "spacedeskService.exe", shieldIp: "192.168.50.114", viewerPkg: "ph.spacedesk.beta", pollSec: 10 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(SPACEDESK_FILE, "utf8"))); } catch { return def; } })();
+let spacedeskCfg = (() => { const def = { watch: false, processName: "spacedeskService.exe", shieldIp: "192.168.10.114", viewerPkg: "ph.spacedesk.beta", pollSec: 10 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(SPACEDESK_FILE, "utf8"))); } catch { return def; } })();
 let _spacedeskTimer = null, _spacedeskSeen = false;
 function saveSpacedeskCfg() { try { fs.writeFileSync(SPACEDESK_FILE, JSON.stringify(spacedeskCfg), { mode: 0o600 }); } catch {} }
 function spacedeskTick() {
@@ -2410,7 +2410,7 @@ function listBoards() { return { ok: true, boards: Object.keys(boardCfg.boards) 
 // (avatar quip + TTS + HA/Echo) and optionally pop a Shield scene + a light. Also a generic
 // /notice announce (e.g. an Android Auto "Hey Google, tell my dogs I love them" shortcut).
 const ARRIVAL_FILE = path.join(__dirname, "arrival.json");
-let arrivalCfg = (() => { const def = { enabled: true, speak: true, haSpeaker: true, greet: "Welcome home, {name}!", greetings: {}, light: "", flashSec: 0, shieldAction: "none", shieldUrl: "", shieldIp: "192.168.50.114" }; try { return Object.assign(def, JSON.parse(fs.readFileSync(ARRIVAL_FILE, "utf8"))); } catch { return def; } })();
+let arrivalCfg = (() => { const def = { enabled: true, speak: true, haSpeaker: true, greet: "Welcome home, {name}!", greetings: {}, light: "", flashSec: 0, shieldAction: "none", shieldUrl: "", shieldIp: "192.168.10.114" }; try { return Object.assign(def, JSON.parse(fs.readFileSync(ARRIVAL_FILE, "utf8"))); } catch { return def; } })();
 function saveArrivalCfg() { try { fs.writeFileSync(ARRIVAL_FILE, JSON.stringify(arrivalCfg), { mode: 0o600 }); } catch {} }
 function arrivalRing(name) {
     const c = arrivalCfg, did = [];
@@ -2459,7 +2459,7 @@ function noticeAnnounce(text, opts) {
 
 const ARRIVAL_DUMMY = 0;
 const DOORBELL_FILE = path.join(__dirname, "doorbell.json");
-let doorbellCfg = (() => { const def = { shieldIp: "192.168.50.114", shieldAction: "blink", shieldUrl: "", announce: true, quip: "Someone's at the door!", speak: true, light: "", flashSec: 0 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(DOORBELL_FILE, "utf8"))); } catch { return def; } })();
+let doorbellCfg = (() => { const def = { shieldIp: "192.168.10.114", shieldAction: "blink", shieldUrl: "", announce: true, quip: "Someone's at the door!", speak: true, light: "", flashSec: 0 }; try { return Object.assign(def, JSON.parse(fs.readFileSync(DOORBELL_FILE, "utf8"))); } catch { return def; } })();
 function saveDoorbellCfg() { try { fs.writeFileSync(DOORBELL_FILE, JSON.stringify(doorbellCfg), { mode: 0o600 }); } catch {} }
 function doorbellRing() {
     const c = doorbellCfg, did = [];
@@ -9161,7 +9161,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
     // v679 — Shield Debug remote control. Wireless ADB to an Android device
-    // on the LAN (designed for Nvidia Shield Pro at 192.168.50.114 but works
+    // on the LAN (designed for Nvidia Shield Pro at 192.168.10.114 but works
     // for any wireless-ADB Android). Whitelisted action set so the panel
     // can't be coerced into running arbitrary shell. Requires `adb` on PATH
     // on the PC + the target paired (Settings → Developer → Wireless debug
@@ -9255,7 +9255,7 @@ ${text.replace(/'/g, "''")}
     }
 
     // v844 — /shield/screenshot — fetch a PNG screenshot from the Shield.
-    // GET /shield/screenshot?ip=192.168.50.114 → image/png bytes.
+    // GET /shield/screenshot?ip=192.168.10.114 → image/png bytes.
     // Browser can display directly in <img src> or save via download attr.
     // Errors come back as JSON (200 if success, 500 with JSON otherwise).
     if (req.method === "GET" && req.url.startsWith("/shield/screenshot")) {
@@ -16051,7 +16051,7 @@ ${text.replace(/'/g, "''")}
         readJson(async (d) => {
             try {
                 const body = d || {};
-                const self = assetSync.selfUrl(PORT);          // e.g. http://192.168.50.40:8787
+                const self = assetSync.selfUrl(PORT);          // e.g. http://192.168.10.40:8787
                 let stream = null;
 
                 if (body.stream && body.stream.url) {
@@ -20897,7 +20897,7 @@ appServer.listen(PORT, () => {
                     // GRANULARITY: it either blocks a genuinely new peer or admits a FULL THIRTEEN-PEER SWEEP. ***
                     //
                     // Keith's boot log carries dozens of `[autoPull] peer connected (/net/introduce from
-                    // 192.168.50.42) - running version check now` and after EACH one a full
+                    // 192.168.10.42) - running version check now` and after EACH one a full
                     // `checking 13 peer(s)` ... `no newer peer`. ONE PEER ANNOUNCING ITSELF RE-INTERROGATED THE
                     // WHOLE FLEET, over and over, on a box whose event loop was already blocking for minutes.
                     //

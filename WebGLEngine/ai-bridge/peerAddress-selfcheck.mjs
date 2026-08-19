@@ -59,7 +59,7 @@ const accepts = (url) => {
 
 // ---- the real LAN, which is what the fleet actually runs on -------------------------------------------------
 {
-    ok("192.168.x is a peer (Stellar Atlas, PurtyGF)", accepts("http://192.168.50.40:8787"));
+    ok("192.168.x is a peer (Stellar Atlas, PurtyGF)", accepts("http://192.168.10.40:8787"));
     ok("10.x is a peer", accepts("http://10.0.0.5:8787"));
     ok("172.16.x is a peer (the real-LAN slice)", accepts("http://172.16.3.4:8787"));
     ok(".local names are peers (mDNS)", accepts("http://stellar-atlas.local:8787"));

@@ -50,9 +50,9 @@ const isPrivateV4 = (p) => {
     return false;
 };
 // v3316 -- *** IPv4-MAPPED IPv6 WAS BEING CLASSIFIED EXTERNAL, AND THAT IS THE FORM A LAN ACTUALLY PRODUCES. ***
-// A dual-stack Node server reports req.socket.remoteAddress for a LAN machine as ::ffff:192.168.1.50, and the
+// A dual-stack Node server reports req.socket.remoteAddress for a LAN machine as ::ffff:192.168.11.50, and the
 // lighthouse records exactly that as its remoteHint. The original check handled the DOTTED form -- but
-// new URL("http://[::ffff:192.168.1.50]").hostname NORMALISES TO ::ffff:c0a8:132, hex, and .split(":").pop()
+// new URL("http://[::ffff:192.168.11.50]").hostname NORMALISES TO ::ffff:c0a8:132, hex, and .split(":").pop()
 // then reads "132", which is not a private IPv4 address and not anything else either. So a wireless LAN peer
 // reached by its mapped address failed the LAN test, was treated as external, and had its updates STAGED
 // instead of applied -- a security rule doing its job on a machine it was never meant to apply to.
@@ -64,7 +64,7 @@ const isPrivateV6 = (h) => {
     if (x === "::1") return true;                                    // loopback
     if (/^f[cd][0-9a-f]{2}:/.test(x)) return true;                   // fc00::/7 unique-local
     if (/^fe[89ab][0-9a-f]:/.test(x)) return true;                   // fe80::/10 link-local
-    // v4-mapped, DOTTED form: ::ffff:192.168.1.50
+    // v4-mapped, DOTTED form: ::ffff:192.168.11.50
     const dotted = x.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     if (dotted) return isPrivateV4(dotted[1]);
     // v4-mapped, HEX form: ::ffff:c0a8:132 -- what new URL() hands back

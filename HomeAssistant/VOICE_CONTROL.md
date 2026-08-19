@@ -32,7 +32,7 @@ In HA `configuration.yaml` (replace the IP with your engine PC's LAN address):
 ```yaml
 rest_command:
   swek_voice:
-    url: "http://192.168.1.50:8787/voice/command"
+    url: "http://192.168.11.50:8787/voice/command"
     method: POST
     content_type: "application/json"
     payload: '{"command": "{{ command }}", "args": "{{ args | default(\"\") }}"}'

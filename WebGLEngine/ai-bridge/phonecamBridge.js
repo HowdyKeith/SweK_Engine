@@ -4,7 +4,7 @@
 // app (free, Android), which serves an MJPEG stream + JPEG snapshots over the LAN:
 //   stream:   http://PHONE_IP:8080/video
 //   snapshot: http://PHONE_IP:8080/shot.jpg
-// Set the base URL once (POST /phonecam/config { url:"http://192.168.50.123:8080" }),
+// Set the base URL once (POST /phonecam/config { url:"http://192.168.10.123:8080" }),
 // then the engine uses /phonecam/stream (MJPEG in an <img>) or /phonecam/snapshot.
 // This proxies through the bridge so the page can show it without CORS/secure-context
 // issues. Off until a URL is set; nothing auto-connects.

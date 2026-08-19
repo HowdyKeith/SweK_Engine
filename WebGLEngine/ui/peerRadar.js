@@ -632,7 +632,7 @@ export function installPeerRadar() {
             const _norm = (u) => String(u || "").replace(/\/+$/, "");
             const _self = new Set(_selfIps);
             // v1612 — exclude loopback AND this box's own LAN IP(s); a browser on .40 viewing .40 shows up as an
-            // inbound link from 192.168.50.40, which is SELF, not a peer.
+            // inbound link from 192.168.10.40, which is SELF, not a peer.
             const _isLoop = (ip) => /^(::1|127\.|0\.0\.0\.0|localhost)/i.test(String(ip || "")) || _self.has(String(ip));
             const _byUrl = new Map();
             for (const p of discovered) { const u = _norm(p.url); if (u) _byUrl.set(u, { url: u, caps: p.caps || {}, lastSeen: p.lastSeen, src: "discovered" }); }

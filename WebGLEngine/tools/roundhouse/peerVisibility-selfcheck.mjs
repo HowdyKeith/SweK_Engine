@@ -36,10 +36,10 @@ const bridge = require(path.join(ROOT, "ai-bridge", "androidInviteBridge.js"));
 {
     const R = (headers) => bridge.isRemoteReq({ headers });
     ok("localhost is local", R({ host: "localhost:8787" }) === false);
-    ok("a LAN address is local", R({ host: "192.168.1.40:8787" }) === false && R({ host: "10.0.0.5" }) === false);
+    ok("a LAN address is local", R({ host: "192.168.11.40:8787" }) === false && R({ host: "10.0.0.5" }) === false);
     ok("an mDNS .local name is local", R({ host: "galaxina.local:8787" }) === false);
     ok("!! a Cloudflare header means remote, whatever the host says",
-        R({ host: "localhost", "cf-ray": "abc" }) === true && R({ "cf-connecting-ip": "1.2.3.4", host: "192.168.1.9" }) === true,
+        R({ host: "localhost", "cf-ray": "abc" }) === true && R({ "cf-connecting-ip": "1.2.3.4", host: "192.168.11.9" }) === true,
         "the tunnel rewrites host, so the CF stamp is the authoritative signal");
     ok("!! a public hostname means remote", R({ host: "swek.trycloudflare.com" }) === true);
     ok("a missing host is treated as local (no false remote flag)", R({}) === false);
@@ -54,7 +54,7 @@ const bridge = require(path.join(ROOT, "ai-bridge", "androidInviteBridge.js"));
         const spin = () => (m.body === null ? setTimeout(spin, 5) : resolve(m));
         spin();
     });
-    const local = await call({ host: "192.168.1.5:8787" });
+    const local = await call({ host: "192.168.11.5:8787" });
     ok("a LAN sweep is allowed and labelled local", local.body && local.body.viaTunnel === false && /local/.test(local.body.scanScope));
     const remote = await call({ "cf-ray": "z", host: "swek.trycloudflare.com" });
     ok("!! a tunnelled sweep is now BLOCKED (403), not merely labelled -- the v2926 audit fix supersedes v2924's label",

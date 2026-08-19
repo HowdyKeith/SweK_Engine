@@ -39,7 +39,7 @@ for (const f of ["assetDiscovery.js", "server.js"]) {
 const os = require("os");
 const realNI = os.networkInterfaces;
 os.networkInterfaces = () => ({
-    "Ethernet":                     [{ family: "IPv4", internal: false, address: "192.168.1.42",  netmask: "255.255.255.0" }],
+    "Ethernet":                     [{ family: "IPv4", internal: false, address: "192.168.11.42",  netmask: "255.255.255.0" }],
     "Wi-Fi":                        [{ family: "IPv4", internal: false, address: "10.0.0.17",     netmask: "255.255.254.0" }],
     "VMware Network Adapter VMnet1":[{ family: "IPv4", internal: false, address: "192.168.56.1",  netmask: "255.255.255.0" }],
     "vEthernet (WSL)":              [{ family: "IPv4", internal: false, address: "172.20.32.1",   netmask: "255.255.240.0" }],
@@ -54,7 +54,7 @@ os.networkInterfaces = realNI;
 
 console.log("  targets:", targets.join(", "));
 ok("keeps legacy limited broadcast", targets.includes("255.255.255.255"));
-ok("beacons the WIRED subnet (192.168.1.255)", targets.includes("192.168.1.255"));
+ok("beacons the WIRED subnet (192.168.11.255)", targets.includes("192.168.11.255"));
 ok("beacons the WIRELESS subnet, /23 math (10.0.1.255)", targets.includes("10.0.1.255"));
 ok("skips VMware host-only (no 192.168.56.255)", !targets.includes("192.168.56.255"));
 ok("skips WSL vEthernet (no 172.20.47.255)", !targets.includes("172.20.47.255"));
@@ -72,13 +72,13 @@ ok("no duplicates", new Set(targets).size === targets.length);
         send(_b, _o, _l, _port, dst) { sent.push(dst); },
     });
     os.networkInterfaces = () => ({
-        "Ethernet": [{ family: "IPv4", internal: false, address: "192.168.1.42", netmask: "255.255.255.0" }],
+        "Ethernet": [{ family: "IPv4", internal: false, address: "192.168.11.42", netmask: "255.255.255.0" }],
         "Wi-Fi":    [{ family: "IPv4", internal: false, address: "10.0.0.17",    netmask: "255.255.254.0" }],
     });
     // fresh module instance so the 30s target cache doesn't reuse run (1)'s list
     delete require.cache[require.resolve(path.join(BRIDGE, "assetDiscovery.js"))];
     const d2 = require(path.join(BRIDGE, "assetDiscovery.js"));
-    d2.start({ selfUrl: "http://192.168.1.42:8787" });
+    d2.start({ selfUrl: "http://192.168.11.42:8787" });
     await new Promise(r => setTimeout(r, 5600));   // one BEACON_MS tick
     d2.stop();
     dgram.createSocket = realCreate;
@@ -86,7 +86,7 @@ ok("no duplicates", new Set(targets).size === targets.length);
     const dsts = [...new Set(sent)];
     console.log("  beacon destinations:", dsts.join(", ") || "(none)");
     ok("beacon sent at all", sent.length > 0);
-    ok("beacon hit the wired subnet", dsts.includes("192.168.1.255"));
+    ok("beacon hit the wired subnet", dsts.includes("192.168.11.255"));
     ok("beacon hit the wireless subnet", dsts.includes("10.0.1.255"));
     ok("beacon kept 255.255.255.255", dsts.includes("255.255.255.255"));
 }

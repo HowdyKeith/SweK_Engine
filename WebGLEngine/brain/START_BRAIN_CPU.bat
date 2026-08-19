@@ -24,7 +24,7 @@ if errorlevel 1 (
 
 REM CPU backend forces fields-only (policy is a GPU MLP). Override the
 REM bridge to point at the machine hosting the engine + GPU brain, e.g.:
-REM   set BRAIN_BRIDGE=http://192.168.50.57:8787
+REM   set BRAIN_BRIDGE=http://192.168.10.57:8787
 set BRAIN_BACKEND=cpu
 if "%BRAIN_BRIDGE%"=="" set BRAIN_BRIDGE=http://127.0.0.1:8787
 echo [brain-cpu] CPU fields brain starting against %BRAIN_BRIDGE% (Ctrl+C to stop)

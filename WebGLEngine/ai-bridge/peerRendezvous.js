@@ -7,7 +7,7 @@
 // boxes are on different networks (cousin in CA) or when WiFi eats the UDP beacon.
 //
 // deps (passed from server.js): { driveSync, getToken(scope)->token, folderId, selfName, fetchImpl,
-//                                  addrs: () => [ "http://192.168.50.8:8787", "http://100.x.x.x:8787", ... ] }
+//                                  addrs: () => [ "http://192.168.10.8:8787", "http://100.x.x.x:8787", ... ] }
 // SECURITY: we only ever ADD candidate URLs through assetSync.addPeer, which already validates they are
 // LAN/mesh/CGNAT ranges (192.168/10/172.16/127/100.64-127) - a hostile Drive file can't inject a public IP
 // as a peer, and non-URL junk is ignored.

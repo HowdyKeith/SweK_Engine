@@ -34,7 +34,7 @@ const kept = (url) => (assetSync.addPeer(url) || []).includes(url.replace(/\/+$/
 
 // ---- 1. THE CHOKEPOINT KEEPS WHAT IT SHOULD -----------------------------------------------------------------
 {
-    const good = ["http://192.168.1.9:8787", "http://10.0.0.5:8787", "http://172.16.4.4:8787", "http://100.64.3.4:8787"];
+    const good = ["http://192.168.11.9:8787", "http://10.0.0.5:8787", "http://172.16.4.4:8787", "http://100.64.3.4:8787"];
     const bad = ["http://8.8.8.8:8787", "http://example.com:8787", "http://172.32.1.1:8787", "http://1.1.1.1:9000"];
     const keptGood = good.filter(kept), keptBad = bad.filter(kept);
     ok("!! *** every real LAN and mesh range is KEPT ***", keptGood.length === good.length,

@@ -21,7 +21,7 @@ const BCAST = "255.255.255.255";
 // ONE interface — whichever the route table picks, frequently a VIRTUAL adapter — so a box
 // sitting on WiFi never actually beaconed onto the WiFi segment and wireless peers looked
 // "invisible" while wired ones worked. Now we compute each real interface's subnet-DIRECTED
-// broadcast (addr | ~netmask, e.g. 192.168.1.255) and send the beacon to every one of them,
+// broadcast (addr | ~netmask, e.g. 192.168.11.255) and send the beacon to every one of them,
 // plus the legacy 255.255.255.255 for anything exotic. Virtual adapters are skipped with the
 // same name heuristic assetSync.lanIp uses. Targets are cached ~30s (interfaces rarely change).
 function _isVirtualIf(name, addr) {

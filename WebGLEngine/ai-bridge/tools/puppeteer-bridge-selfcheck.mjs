@@ -21,7 +21,7 @@ ok("does NOT own /rocket/prepare", !b.owns("/rocket/prepare"));
 console.log("puppeteer-bridge-selfcheck: URL guard (own pages only unless overridden)");
 ok("localhost allowed", b._guardUrl("http://localhost:8787/server.html", false).ok);
 ok("127.0.0.1 allowed", b._guardUrl("http://127.0.0.1:8787/brain-maze.html", false).ok);
-ok("private LAN (192.168.x) allowed", b._guardUrl("http://192.168.50.40:8787/server.html", false).ok);
+ok("private LAN (192.168.x) allowed", b._guardUrl("http://192.168.10.40:8787/server.html", false).ok);
 ok("private LAN (10.x) allowed", b._guardUrl("http://10.0.0.5:8787/", false).ok);
 ok(".local mDNS host allowed", b._guardUrl("http://galaxina.local:8787/", false).ok);
 ok("public URL BLOCKED by default", !b._guardUrl("https://example.com/", false).ok);

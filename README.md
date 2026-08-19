@@ -3441,7 +3441,7 @@ From left-edge bottom:470px to **bottom edge, left:320px** so it sits right of S
 ### 3. Shield Debug on the phone side
 
 control.html gets a new **📺 Shield** nav tab. Same four sections as the desktop panel:
-- IP input (defaults to `192.168.50.114`, saved to localStorage)
+- IP input (defaults to `192.168.10.114`, saved to localStorage)
 - Connection: adb connect, Copy pair cmd
 - Engine → Shield: Open engine on Shield (auto-uses LAN URL), Launch Blink app
 - Debug: Logcat tail (200 lines, output in a scrolling pre), Current activity
@@ -3602,7 +3602,7 @@ engine at:
 http://voxelengine.local:8787/
 ```
 
-instead of typing `http://192.168.50.114:8787/`. The name is configurable
+instead of typing `http://192.168.10.114:8787/`. The name is configurable
 via the `MDNS_NAME` env var if you want something else (e.g. `engine`,
 `voxel`, your hostname).
 
@@ -3735,10 +3735,10 @@ So:
 
 New left-edge dock tab: **Shield**.
 
-The panel shows your Shield's IP (default `192.168.50.114`, remembered in localStorage), plus buttons in four sections:
+The panel shows your Shield's IP (default `192.168.10.114`, remembered in localStorage), plus buttons in four sections:
 
 **Connection**
-- adb connect - one-tap `adb connect 192.168.50.114:5555`
+- adb connect - one-tap `adb connect 192.168.10.114:5555`
 - Copy adb pair cmd - copies the Android-11+ wireless-debug pairing command to clipboard for paste-in-terminal
 
 **Engine -> Shield**
@@ -3757,7 +3757,7 @@ Backend endpoint `POST /shield/exec` in `ai-bridge/server.js` with a whitelisted
 ### Setup required ONCE on the Shield (and PC)
 1. Shield: Settings -> Device Preferences -> Developer Options -> "Network debugging" ON.
 2. PC: install Android Platform Tools (the `adb` binary on PATH). Easiest path: `winget install Google.PlatformTools` in PowerShell.
-3. From a PC terminal: `adb connect 192.168.50.114:5555`. Accept the RSA fingerprint on the Shield TV when prompted.
+3. From a PC terminal: `adb connect 192.168.10.114:5555`. Accept the RSA fingerprint on the Shield TV when prompted.
 4. From that point on, panel buttons work directly.
 
 Honest framing: I cannot test ADB-over-network in this sandbox. The panel surfaces real errors verbatim - if adb's missing on PATH you'll see `adb not found on PATH. Install Android Platform Tools.`; if the Shield isn't paired you'll see `error: device not found` or similar. That's the data we need for the next turn if something goes sideways.
@@ -3772,7 +3772,7 @@ Honest framing: I cannot test ADB-over-network in this sandbox. The panel surfac
 2. BLANK SANDBOX demo: click 🐟 Fish - should stand still on the stage, swim-wiggle in place. Click 🧹 Clear All - should despawn it, console says `clearAll -- despawned 1 entity`.
 3. Switch to any terrain demo (kaiju, wad_arena): click 🐛 Centipede - should walk on the terrain. Click 🧹 Clear All - should despawn.
 4. Click 🌍 Draw Terrain in BLANK SANDBOX after spawning - creature stays put (was on stage); creature near you should now ride the real terrain on its next motion tick.
-5. Open the **Shield** tab (left dock). Enter your Shield IP. Click adb connect. If you've done the one-time setup, it returns `connected to 192.168.50.114:5555`. Then click Open engine on Shield - should pop the engine page in the Shield's default browser.
+5. Open the **Shield** tab (left dock). Enter your Shield IP. Click adb connect. If you've done the one-time setup, it returns `connected to 192.168.10.114:5555`. Then click Open engine on Shield - should pop the engine page in the Shield's default browser.
 6. Once the engine page loads on the Shield, click Get logcat tail to see if there are WebGL-related errors that explain the "robot not rendering" symptom.
 
 ### Still queued
@@ -5241,7 +5241,7 @@ STATUS bar shows v639.
 **Fix:** `ui/phoneConnectQR.js` now calls `controlURLForPhone()` which:
   1. Returns the current origin unchanged if the user opened the engine via a non-localhost host (LAN IP or .local mDNS) - that's already phone-reachable.
   2. Otherwise fetches `/net/info` (existing endpoint, lines ~1313 of server.js) and uses `info.recommended` - the first non-virtual NIC (skips VPN/VMware/Hyper-V adapters at 192.168.209.1 / 192.168.223.1 etc. that the user has running). Falls back to `info.urls[0]` then `lanIps[0]`. Returns the original origin if /net/info fails so we never make things worse.
-The bridge already detects the correct adapter and prints it on startup ('LAN access:  http://192.168.50.132:8787/   <- open this on your phone'); the QR now uses the SAME value.
+The bridge already detects the correct adapter and prints it on startup ('LAN access:  http://192.168.10.132:8787/   <- open this on your phone'); the QR now uses the SAME value.
 **On "AI Models shows sparc3d not detected" + ComfyUI-3D-Pack "missing" after install:**
 - The user's launcher log shows `[install_catalog] loaded 61 entries from C:\WebGLEngine\ai-bridge\install_catalog.json` but v637 ships 63 entries. So C:\WebGLEngine is still on an older drop (probably v627/v628). The new aiModels detection + new install rows aren't on disk yet. Make sure to copy v638's `WebGLEngine/` contents over your existing `C:\WebGLEngine\` and restart the bridge. Sanity check: after copying, the launcher log should say "loaded 63 entries".
 - ComfyUI-3D-Pack "missing" after install: the install command succeeding doesn't always mean the post-install checkPath matched (the node may have landed at a path the catalog's checkPath rule doesn't recognize). Two diagnostics: (a) restart the bridge - mtime-cached install detection re-runs on startup; (b) check the actual folder ComfyUI loaded the node into (`C:\VoxelBAK\ComfyUI_windows_portable\ComfyUI\custom_nodes\`) for the package. Worth a focused look once you're on v638's catalog.

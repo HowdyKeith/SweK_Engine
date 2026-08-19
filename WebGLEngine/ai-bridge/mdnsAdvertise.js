@@ -115,7 +115,7 @@ function start(opts = {}) {
         // v1151 — on a machine with several adapters (real LAN + VMware/Hyper-V/WSL
         // virtual ones), bonjour can announce `voxelengine.local` pointing at a
         // virtual IP that phones/TVs can't route to. Pin the advertiser to one
-        // interface IP via MDNS_INTERFACE (e.g. your real LAN 192.168.50.132).
+        // interface IP via MDNS_INTERFACE (e.g. your real LAN 192.168.10.132).
         boundInterface = opts.interface || process.env.MDNS_INTERFACE || null;
         bonjour = new Bonjour(boundInterface ? { interface: boundInterface } : {}, (err) => {
             // Async error callback — surfaces bind / socket errors that don't
