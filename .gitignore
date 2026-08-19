@@ -55,13 +55,16 @@ desktop.ini
 
 # === Held back from the public mirror (v3845) ===
 # Keith's call: the CODE ships, the internal working record does not. These are the
-# session notes and claim ledger, not build inputs. They ride in the versioned zip,
-# which remains the complete build.
-# CONSEQUENCE, STATED RATHER THAN DISCOVERED: okf/claims is read by main.js,
-# predictions.html, ai-bridge/okfService-selfcheck.mjs and tools/ship/orphanTriage*.
-# On a fresh clone of this mirror those read an empty claim set.
+# session notes, not build inputs. They ride in the versioned zip, which remains the
+# complete build.
+#
+# okf/claims/ WAS held back and is NOT any more: it is read by main.js,
+# predictions.html, ai-bridge/okfService-selfcheck.mjs and tools/ship/orphanTriage*,
+# so withholding it left the mirror unable to run its own gates. Project data, not a
+# personal note -- scanned for credentials and personal data before publishing, clean.
+# okf/log.md stays out and costs nothing: the one "log.md" reference in
+# predictions.html is PROSE inside a why: string describing the OKF spec, not a read.
 BACKLOG.md
 TODO.md
-WebGLEngine/okf/claims/
 WebGLEngine/okf/log.md
 Root Utils/email-draft.md

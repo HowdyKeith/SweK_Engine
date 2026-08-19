@@ -1,0 +1,252 @@
+# Claims
+
+Every claim the SweK Engine makes about itself, each with a kill condition -- the thing that would prove it wrong. 240 total.
+
+## settled (203)
+
+- [The Endless Sky calendar is exact to the day, because approximately right is a save file that disagrees with itself](/claims/the-endless-sky-calendar-is-exact-to-the-day-because-approxi.md) -- v2864
+- [A peer may SHOOT anything and may only APPLY damage to what it owns](/claims/a-peer-may-shoot-anything-and-may-only-apply-damage-to-what-.md) -- v2864
+- [Do not claim what you cannot own -- with no peers, nothing is simulated on their behalf](/claims/do-not-claim-what-you-cannot-own-with-no-peers-nothing-is-si.md) -- v2864
+- [The mission gate is mutation-tested, because a gate that always opens is not a gate](/claims/the-mission-gate-is-mutation-tested-because-a-gate-that-alwa.md) -- v2864
+- [The side faces come from merging adjacent columns' runs -- greedy vertical quads, at run cost, exact against a scan](/claims/the-side-faces-come-from-merging-adjacent-columns-runs-greed.md) -- v2770
+- [The RLE run boundaries ARE the vertical surface -- fast face detection at run cost, not voxel cost](/claims/the-rle-run-boundaries-are-the-vertical-surface-fast-face-de.md) -- v2769
+- [Voxel chunks store run-length-encoded and stay usable at runtime -- lossless, O(log n) queryable, tens of times smaller](/claims/voxel-chunks-store-run-length-encoded-and-stay-usable-at-run.md) -- v2768
+- [Auto-extremity: raise the mountains and the world grows to fit them -- sized from the content, never clipped](/claims/auto-extremity-raise-the-mountains-and-the-world-grows-to-fi.md) -- v2767
+- [The voxel world knows when its content has reached the edge -- extremity bound checking, proven not assumed](/claims/the-voxel-world-knows-when-its-content-has-reached-the-edge-.md) -- v2765
+- [The agents route on a verifier, not on hope -- cheapest model that passes a SweK gate wins, escalate only on failure](/claims/the-agents-route-on-a-verifier-not-on-hope-cheapest-model-th.md) -- v2764
+- [Crevices darken because they are genuinely enclosed -- occlusion measured from the field, not painted](/claims/crevices-darken-because-they-are-genuinely-enclosed-occlusio.md) -- v2764
+- [No browser page imports a Node builtin, so the pages actually load -- guarded so the render-QA regression cannot return](/claims/no-browser-page-imports-a-node-builtin-so-the-pages-actually.md) -- v2762
+- [The selfchecks and the server survive Windows path semantics -- guarded so the rig-test bugs cannot come back](/claims/the-selfchecks-and-the-server-survive-windows-path-semantics.md) -- v2759
+- [The cosmic map is a galaxy you can verify -- proven connected, two-way, and shortest-path routable](/claims/the-cosmic-map-is-a-galaxy-you-can-verify-proven-connected-t.md) -- v2758
+- [The marching-cubes flesh is watertight, its volume converges to the analytic value, and its vertices sit on the isosurface](/claims/the-marching-cubes-flesh-is-watertight-its-volume-converges-.md) -- v2757
+- [Anticipating a threat's next move, scored against the future it actually reaches -- and the intercept folds into the fingerprint](/claims/anticipating-a-threat-s-next-move-scored-against-the-future-.md) -- v2756
+- [A GR-exact geodesic tracer reproduces the 4M/b light deflection and the 3 sqrt(3) M black-hole shadow](/claims/a-gr-exact-geodesic-tracer-reproduces-the-4m-b-light-deflect.md) -- v2755
+- [Filtered back-projection reconstructs a known phantom from its sinogram, and the ramp filter is what makes it work](/claims/filtered-back-projection-reconstructs-a-known-phantom-from-i.md) -- v2754
+- [The diffraction propagator reproduces the analytic sinc, Young fringes, and the Rayleigh limit 1.22 lambda/D](/claims/the-diffraction-propagator-reproduces-the-analytic-sinc-youn.md) -- v2753
+- [A simulated interferometer recovers a surface we know exactly from its fringes, and grades the recovery against the truth](/claims/a-simulated-interferometer-recovers-a-surface-we-know-exactl.md) -- v2752
+- [The rig verification is clickable now -- master, fleet, and the full gate suite run from a button in server.html](/claims/the-rig-verification-is-clickable-now-master-fleet-and-the-f.md) -- v2751
+- [The roundhouse loop crystallizes on the measured observable, and an agreeable evaluator cannot force it](/claims/the-roundhouse-loop-crystallizes-on-the-measured-observable-.md) -- v2750
+- [The shedding-onset harness is bound to the real LBM lab and refuses to crystallize on a transient](/claims/the-shedding-onset-harness-is-bound-to-the-real-lbm-lab-and-.md) -- v2749
+- [SweK's routes are exposed as ChatGPT App widgets, so a fleet can be checked and driven from a chat](/claims/swek-s-routes-are-exposed-as-chatgpt-app-widgets-so-a-fleet-.md) -- v2748
+- [The live-mind and a single gauge are extracted into their own mini-panels, so the dashboard can tile just the part you want](/claims/the-live-mind-and-a-single-gauge-are-extracted-into-their-ow.md) -- v2747
+- [The page index is a dashboard-assembler, not a link list -- check pages and watch them live side by side](/claims/the-page-index-is-a-dashboard-assembler-not-a-link-list-chec.md) -- v2746
+- [A pulsar's pulse train is bit-identical across the fleet -- the most precise clock in nature, ticking the same on every box](/claims/a-pulsar-s-pulse-train-is-bit-identical-across-the-fleet-the.md) -- v2745
+- [The occlusion confidence is folded into the fingerprint too -- what the camera could see is now bit-identical across the fleet](/claims/the-occlusion-confidence-is-folded-into-the-fingerprint-too-.md) -- v2744
+- [The 4D ground-truth benchmark is folded into the cross-arch fingerprint -- it is bit-identical on every box in the fleet](/claims/the-4d-ground-truth-benchmark-is-folded-into-the-cross-arch-.md) -- v2743
+- [SweK exports its ground truth in the estimator's own format, so a method like Trace Anything can be scored against it](/claims/swek-exports-its-ground-truth-in-the-estimator-s-own-format-.md) -- v2742
+- [The ground-truth scene renders to actual depth frames, and the z-buffer gives point-vs-point self-occlusion for free](/claims/the-ground-truth-scene-renders-to-actual-depth-frames-and-th.md) -- v2741
+- [The ground-truth scene now has occlusion -- tracks vanish behind solids and return, and the grade knows which points were seen](/claims/the-ground-truth-scene-now-has-occlusion-tracks-vanish-behin.md) -- v2740
+- [SweK is a 4D ground-truth generator -- exact trajectory fields to grade estimators like Trace Anything against](/claims/swek-is-a-4d-ground-truth-generator-exact-trajectory-fields-.md) -- v2739
+- [The other live brain pages got the same swap-away guard, and the audit named which pages actually needed it](/claims/the-other-live-brain-pages-got-the-same-swap-away-guard-and-.md) -- v2738
+- [brain-maze's render and poll loops go quiet when the page is swapped away, instead of throwing every frame](/claims/brain-maze-s-render-and-poll-loops-go-quiet-when-the-page-is.md) -- v2737
+- [The brain on the robot's head gets a glass dome with lights that flash and cast a glow over it](/claims/the-brain-on-the-robot-s-head-gets-a-glass-dome-with-lights-.md) -- v2736
+- [One peer can master-check the whole fleet, and a divergent box is caught by name](/claims/one-peer-can-master-check-the-whole-fleet-and-a-divergent-bo.md) -- v2735
+- [The fleet agent dispatches real work across the LAN and learns from the times that come back](/claims/the-fleet-agent-dispatches-real-work-across-the-lan-and-lear.md) -- v2735
+- [The GPU brain is a visible brain on the robot's head -- a whirlpool that swirls while it solves](/claims/the-gpu-brain-is-a-visible-brain-on-the-robot-s-head-a-whirl.md) -- v2734
+- [Fleet + per-tick agent fold into the fingerprint, and the scheduler runs on real LAN solve-times](/claims/fleet-per-tick-agent-fold-into-the-fingerprint-and-the-sched.md) -- v2733
+- [Fleet agent -- a learned scheduler that routes work by capability and provably beats round-robin](/claims/fleet-agent-a-learned-scheduler-that-routes-work-by-capabili.md) -- v2732
+- [The bandit chooses among four tactics including the brain's per-tick flow -- and is not fooled](/claims/the-bandit-chooses-among-four-tactics-including-the-brain-s-.md) -- v2731
+- [The agent's flow tactic runs on the GPU brain's own solver -- the brain as executor](/claims/the-agent-s-flow-tactic-runs-on-the-gpu-brain-s-own-solver-t.md) -- v2730
+- [Agent arena -- a learned bandit that provably beats its baselines over deterministic episodes](/claims/agent-arena-a-learned-bandit-that-provably-beats-its-baselin.md) -- v2729
+- [Device gate is multi-runtime and honours forceEngine -- no more false 'no WebGL2'](/claims/device-gate-is-multi-runtime-and-honours-forceengine-no-more.md) -- v2728
+- [GPU Brain in the dock -- an SVG of the live mind that swaps in for the gauges](/claims/gpu-brain-in-the-dock-an-svg-of-the-live-mind-that-swaps-in-.md) -- v2727
+- [Krbn-compare left pane renders in real WebGL2, with a verified canvas-2D fallback](/claims/krbn-compare-left-pane-renders-in-real-webgl2-with-a-verifie.md) -- v2726
+- [Flesh -- the fourth scene, a capsule field marched over the ragdoll bones](/claims/flesh-the-fourth-scene-a-capsule-field-marched-over-the-ragd.md) -- v2725
+- [Scene picker -- the compare page points at real emitted scenes: blob, splat, ragdoll](/claims/scene-picker-the-compare-page-points-at-real-emitted-scenes-.md) -- v2724
+- [Krbn Compare -- the viewer and stroke-lift wired into the engine as a page on the real geometry](/claims/krbn-compare-the-viewer-and-stroke-lift-wired-into-the-engin.md) -- v2723
+- [Stroke-lift -- Krbn's flat drawing exported as an importable 3D object](/claims/stroke-lift-krbn-s-flat-drawing-exported-as-an-importable-3d.md) -- v2722
+- [Krbn is flat by choice, not by nature -- its drawing lifts back to 3D given the geometry](/claims/krbn-is-flat-by-choice-not-by-nature-its-drawing-lifts-back-.md) -- v2721
+- [Hologram -- the real optics: interference fringes that encode geometry, gated not fingerprinted](/claims/hologram-the-real-optics-interference-fringes-that-encode-ge.md) -- v2720
+- [Real multi-peer render -- the coordinator wired to the SweK mesh over an actual RPC](/claims/real-multi-peer-render-the-coordinator-wired-to-the-swek-mes.md) -- v2719
+- [Render cluster -- a coordinator that distributes, verifies, and survives a faulty peer](/claims/render-cluster-a-coordinator-that-distributes-verifies-and-s.md) -- v2718
+- [Distributed render -- peers split a frame, and it assembles bit-identical to a solo render](/claims/distributed-render-peers-split-a-frame-and-it-assembles-bit-.md) -- v2717
+- [Baked star catalog -- real recorded qualities, fetch-once-and-bake, no live core fetch](/claims/baked-star-catalog-real-recorded-qualities-fetch-once-and-ba.md) -- v2716
+- [Asteroid impact -- the real chain (approach, entry, energy, crater), no theatre](/claims/asteroid-impact-the-real-chain-approach-entry-energy-crater-.md) -- v2715
+- [Plasma -- a charged particle trapped in a magnetic bottle, and it is fingerprinted](/claims/plasma-a-charged-particle-trapped-in-a-magnetic-bottle-and-i.md) -- v2714
+- [White dwarf and its supernova -- real Chandrasekhar physics, gated but honestly NOT fingerprinted](/claims/white-dwarf-and-its-supernova-real-chandrasekhar-physics-gat.md) -- v2713
+- [Neutron star -- real documented specs; a compact object with a surface, not a horizon](/claims/neutron-star-real-documented-specs-a-compact-object-with-a-s.md) -- v2712
+- [Solar system -- real orbital elements, baked not fetched; Kepler's laws emerge](/claims/solar-system-real-orbital-elements-baked-not-fetched-kepler-.md) -- v2711
+- [Black hole -- the real, invisible structure made computable; nothing imaginary](/claims/black-hole-the-real-invisible-structure-made-computable-noth.md) -- v2710
+- [homelable borrow -- SweK reads the Zigbee/IoT inventory without owning an MQTT stack](/claims/homelable-borrow-swek-reads-the-zigbee-iot-inventory-without.md) -- v2709
+- [Radar manager -- one sink for every feed, with a real globe projection and a self-healing dock](/claims/radar-manager-one-sink-for-every-feed-with-a-real-globe-proj.md) -- v2708
+- [Tunnel diagnostic -- says WHY cloudflared can't attach instead of leaving you guessing](/claims/tunnel-diagnostic-says-why-cloudflared-can-t-attach-instead-.md) -- v2708
+- [Tunnel share holds to the same proof as the tunnel email -- no more live-looking dead links](/claims/tunnel-share-holds-to-the-same-proof-as-the-tunnel-email-no-.md) -- v2707
+- [Reproducibility harness -- the verification spine pointed at anyone's computation](/claims/reproducibility-harness-the-verification-spine-pointed-at-an.md) -- v2706
+- [Case study -- the whole engine made legible in one page, honest about its scope](/claims/case-study-the-whole-engine-made-legible-in-one-page-honest-.md) -- v2705
+- [Lockstep -- two peers, same inputs, byte-identical; desync caught at the frame; 700x headless](/claims/lockstep-two-peers-same-inputs-byte-identical-desync-caught-.md) -- v2704
+- [Verification console -- the fingerprint and peer attestation as buttons, in the browser](/claims/verification-console-the-fingerprint-and-peer-attestation-as.md) -- v2703
+- [Multi-window layout + live math panels -- see the scene and the numbers under it at once](/claims/multi-window-layout-live-math-panels-see-the-scene-and-the-n.md) -- v2702
+- [Three-body figure-eight -- a stable choreography on the orbit engine, bit-identical](/claims/three-body-figure-eight-a-stable-choreography-on-the-orbit-e.md) -- v2701
+- [Zeta on the critical line -- the nontrivial zeros located to machine zero, bit-identical](/claims/zeta-on-the-critical-line-the-nontrivial-zeros-located-to-ma.md) -- v2700
+- [Riemann zeta -- the pi-zeta bridge computed to the bit, Basel and beyond](/claims/riemann-zeta-the-pi-zeta-bridge-computed-to-the-bit-basel-an.md) -- v2699
+- [Peer attestation -- two SweK instances prove byte agreement and name where they diverge](/claims/peer-attestation-two-swek-instances-prove-byte-agreement-and.md) -- v2698
+- [Strict FFT -- a bit-identical spectrum that recovers the vibration eigenfrequencies](/claims/strict-fft-a-bit-identical-spectrum-that-recovers-the-vibrat.md) -- v2697
+- [Vibrations -- a mass-spring chain whose normal modes are standing waves at the analytic frequency](/claims/vibrations-a-mass-spring-chain-whose-normal-modes-are-standi.md) -- v2696
+- [Orbital mechanics -- a Kepler ellipse that closes, because the integrator is symplectic](/claims/orbital-mechanics-a-kepler-ellipse-that-closes-because-the-i.md) -- v2695
+- [Pendulum wave -- tuned oscillators that scramble and re-synchronise, exact via the strict-trig core](/claims/pendulum-wave-tuned-oscillators-that-scramble-and-re-synchro.md) -- v2694
+- [Gyroscope -- angular-momentum precession, where a faster spin precesses slower](/claims/gyroscope-angular-momentum-precession-where-a-faster-spin-pr.md) -- v2693
+- [Physics Lab contrasts -- A/B pairs where the difference is the lesson, gated to actually differ](/claims/physics-lab-contrasts-a-b-pairs-where-the-difference-is-the-.md) -- v2692
+- [Physics Lab workbench -- save your own scenes to a shelf, on one gated encoding](/claims/physics-lab-workbench-save-your-own-scenes-to-a-shelf-on-one.md) -- v2691
+- [Centrifuge -- rotating-frame Stokes sedimentation that separates a mixture by the Svedberg coefficient](/claims/centrifuge-rotating-frame-stokes-sedimentation-that-separate.md) -- v2690
+- [Physics Lab presets -- curated starter scenes as foundations, gated so none can rot](/claims/physics-lab-presets-curated-starter-scenes-as-foundations-ga.md) -- v2689
+- [Physics Lab -- the Blobarium skin, self-describing scenes, and scenes you can save as a link](/claims/physics-lab-the-blobarium-skin-self-describing-scenes-and-sc.md) -- v2688
+- [Strict-libm Gaussian -- a cross-architecture normal that lets the thermal coupling join the fingerprint](/claims/strict-libm-gaussian-a-cross-architecture-normal-that-lets-t.md) -- v2686
+- [Subsystem catalog -- a verified index of the whole physics library that cannot drift](/claims/subsystem-catalog-a-verified-index-of-the-whole-physics-libr.md) -- v2684
+- [Physics Lab -- a 3D showcase whose scenes are gated so the demo cannot rot](/claims/physics-lab-a-3d-showcase-whose-scenes-are-gated-so-the-demo.md) -- v2682
+- [Muscle belly -- a biological actuator composed from volume conservation and contractile fibres](/claims/muscle-belly-a-biological-actuator-composed-from-volume-cons.md) -- v2681
+- [Wind cloth -- the sampled field driving a constrained body, a flag that flaps but holds together](/claims/wind-cloth-the-sampled-field-driving-a-constrained-body-a-fl.md) -- v2680
+- [Sampled-field coupling -- particles driven by an external volumetric field, trilinear and exact](/claims/sampled-field-coupling-particles-driven-by-an-external-volum.md) -- v2679
+- [PBF polish -- artificial pressure that stops clumping and XSPH viscosity that makes the flow coherent](/claims/pbf-polish-artificial-pressure-that-stops-clumping-and-xsph-.md) -- v2678
+- [Anisotropic cloth -- direction-dependent stiffness, warp and weft, from a per-edge compliance](/claims/anisotropic-cloth-direction-dependent-stiffness-warp-and-wef.md) -- v2677
+- [Friction on the fluid-mesh contact -- the fluid drags the mesh, the mesh slows the fluid](/claims/friction-on-the-fluid-mesh-contact-the-fluid-drags-the-mesh-.md) -- v2676
+- [Angle of repose -- pairwise Coulomb friction, an emergent pile that is chaotic yet bit-reproducible](/claims/angle-of-repose-pairwise-coulomb-friction-an-emergent-pile-t.md) -- v2675
+- [Coulomb friction -- static holds, kinetic slides, the transition exactly at the friction ratio](/claims/coulomb-friction-static-holds-kinetic-slides-the-transition-.md) -- v2674
+- [Volume/pressure constraint -- pneumatic inflation of a closed mesh, a new constraint type](/claims/volume-pressure-constraint-pneumatic-inflation-of-a-closed-m.md) -- v2673
+- [PBF wired into the coupling -- the two-way fluid slot now runs the real density solver, stably](/claims/pbf-wired-into-the-coupling-the-two-way-fluid-slot-now-runs-.md) -- v2672
+- [Position-based fluids -- a real density solver for the fluid slot, made deterministic by sorted sums](/claims/position-based-fluids-a-real-density-solver-for-the-fluid-sl.md) -- v2671
+- [Fluid-mesh coupling -- two-way pressure, the capstone: fluid caves the mesh and the mesh holds the fluid](/claims/fluid-mesh-coupling-two-way-pressure-the-capstone-fluid-cave.md) -- v2670
+- [Coupling authoring bench -- a picker and a paint brush over the verified couplings, no physics in the UI](/claims/coupling-authoring-bench-a-picker-and-a-paint-brush-over-the.md) -- v2669
+- [Muscle -- a neural activation signal shrinks fiber rest length, turning data into motion](/claims/muscle-a-neural-activation-signal-shrinks-fiber-rest-length-.md) -- v2668
+- [Plasticity -- yield past a strain threshold permanently rewrites rest length (tearing's twin)](/claims/plasticity-yield-past-a-strain-threshold-permanently-rewrite.md) -- v2667
+- [Multi-physics modulation spine -- external fields rewrite constraint parameters before the solve (thermal first)](/claims/multi-physics-modulation-spine-external-fields-rewrite-const.md) -- v2666
+- [Cloth attachments -- pin to arbitrary and moving world anchors, deterministically](/claims/cloth-attachments-pin-to-arbitrary-and-moving-world-anchors-.md) -- v2665
+- [Cloth tearing -- deterministic, permanent constraint removal (self-collision run backwards)](/claims/cloth-tearing-deterministic-permanent-constraint-removal-sel.md) -- v2664
+- [XPBD damping -- paper Equation 26, energy bled along constraints, still deterministic](/claims/xpbd-damping-paper-equation-26-energy-bled-along-constraints.md) -- v2663
+- [Transform feedback + XPBD in one loop -- the whole cloth substep on the GPU, no CPU readback](/claims/transform-feedback-xpbd-in-one-loop-the-whole-cloth-substep-.md) -- v2662
+- [XPBD extensions -- bending, shear, and deterministic self-collision, all graph-colored](/claims/xpbd-extensions-bending-shear-and-deterministic-self-collisi.md) -- v2661
+- [Transform feedback that holds -- GPU agent advection, order-free by double-buffering](/claims/transform-feedback-that-holds-gpu-agent-advection-order-free.md) -- v2660
+- [XPBD that holds -- deterministic graph-colored cloth, the real formula, no atomics](/claims/xpbd-that-holds-deterministic-graph-colored-cloth-the-real-f.md) -- v2659
+- [The SVO packs to the GPU format and round-trips -- the transcript generator bug, fixed](/claims/the-svo-packs-to-the-gpu-format-and-round-trips-the-transcri.md) -- v2657
+- [The octree is a lossless, deterministic, sparse occupancy that A* can use unchanged](/claims/the-octree-is-a-lossless-deterministic-sparse-occupancy-that.md) -- v2656
+- [A* pathfinding is deterministic by construction -- same path on every machine](/claims/a-pathfinding-is-deterministic-by-construction-same-path-on-.md) -- v2654
+- [Prime Transport compaction is deterministic at any scale, atomics and all](/claims/prime-transport-compaction-is-deterministic-at-any-scale-ato.md) -- v2652
+- [Ewald closes the force field on the Madelung constant, deterministically](/claims/ewald-closes-the-force-field-on-the-madelung-constant-determ.md) -- v2650
+- [You can watch the force field run -- a live MD lab that holds energy flat](/claims/you-can-watch-the-force-field-run-a-live-md-lab-that-holds-e.md) -- v2649
+- [The improper keeps a group flat or handed -- a signed volume, sqrt-free](/claims/the-improper-keeps-a-group-flat-or-handed-a-signed-volume-sq.md) -- v2648
+- [The torsion completes the force field, and cos(n phi) stays deterministic by Chebyshev](/claims/the-torsion-completes-the-force-field-and-cos-n-phi-stays-de.md) -- v2647
+- [The neighbour grid makes MD scale, and changes nothing while doing it](/claims/the-neighbour-grid-makes-md-scale-and-changes-nothing-while-.md) -- v2646
+- [Charges feel each other by the inverse-square law, deterministically](/claims/charges-feel-each-other-by-the-inverse-square-law-determinis.md) -- v2645
+- [The thermostat holds a molecule at the temperature you ask for](/claims/the-thermostat-holds-a-molecule-at-the-temperature-you-ask-f.md) -- v2644
+- [The angle term gives a molecule its shape, without translating or spinning it](/claims/the-angle-term-gives-a-molecule-its-shape-without-translatin.md) -- v2643
+- [A bond makes a molecule -- and it vibrates at the frequency theory predicts](/claims/a-bond-makes-a-molecule-and-it-vibrates-at-the-frequency-the.md) -- v2642
+- [The molecules the engine can draw can now move -- deterministic molecular dynamics](/claims/the-molecules-the-engine-can-draw-can-now-move-deterministic.md) -- v2641
+- [Detection knows how to separate -- the contact is the minimum push that works](/claims/detection-knows-how-to-separate-the-contact-is-the-minimum-p.md) -- v2640
+- [The narrow phase is exact, and deterministic across architectures without box3d](/claims/the-narrow-phase-is-exact-and-deterministic-across-architect.md) -- v2639
+- [The 27 open claims are not stalled -- they are a rig worklist](/claims/the-27-open-claims-are-not-stalled-they-are-a-rig-worklist.md) -- v2638
+- [Many bodies without checking every pair -- and never a missed overlap](/claims/many-bodies-without-checking-every-pair-and-never-a-missed-o.md) -- v2637
+- [The moving voxel body lands where box3d says -- rigid posing, exact](/claims/the-moving-voxel-body-lands-where-box3d-says-rigid-posing-ex.md) -- v2636
+- [A voxel body knows how it tumbles -- centre of mass and inertia, exact](/claims/a-voxel-body-knows-how-it-tumbles-centre-of-mass-and-inertia.md) -- v2635
+- [Voxel collision for free -- the body becomes a few boxes, box3d does the rest](/claims/voxel-collision-for-free-the-body-becomes-a-few-boxes-box3d-.md) -- v2634
+- [Download only the newest incremental and you still get everything](/claims/download-only-the-newest-incremental-and-you-still-get-every.md) -- v2633
+- [The GPU brain was a word in the claims; now it is a concept you can open](/claims/the-gpu-brain-was-a-word-in-the-claims-now-it-is-a-concept-y.md) -- v2632
+- [The engine could already swallow an incremental -- now I can hand it one](/claims/the-engine-could-already-swallow-an-incremental-now-i-can-ha.md) -- v2631
+- [The LAN and its knowledge finally have a face](/claims/the-lan-and-its-knowledge-finally-have-a-face.md) -- v2630
+- [The LAN can now tell you what each box offers -- including the Mac](/claims/the-lan-can-now-tell-you-what-each-box-offers-including-the-.md) -- v2629
+- [The gift is now a package Valeriu can unzip, not a claim he has to trust](/claims/the-gift-is-now-a-package-valeriu-can-unzip-not-a-claim-he-h.md) -- v2628
+- [atan2 was the one I would not ship coarse -- now it meets the bar](/claims/atan2-was-the-one-i-would-not-ship-coarse-now-it-meets-the-b.md) -- v2627
+- [The host-free set now covers every function Valeriu named](/claims/the-host-free-set-now-covers-every-function-valeriu-named.md) -- v2626
+- [We were serving OKF and reading none of it -- now the engine reads its own](/claims/we-were-serving-okf-and-reading-none-of-it-now-the-engine-re.md) -- v2625
+- [OKF was a bundle on disk; now it is a service on the wire](/claims/okf-was-a-bundle-on-disk-now-it-is-a-service-on-the-wire.md) -- v2624
+- [The engine already was a knowledge base -- now it emits itself as one](/claims/the-engine-already-was-a-knowledge-base-now-it-emits-itself-.md) -- v2623
+- [The BVH was already in, and the mechanism behind box3d's cross-arch determinism is now gated](/claims/the-bvh-was-already-in-and-the-mechanism-behind-box3d-s-cros.md) -- v2622
+- [Yes, there is a real-time fracture engine -- and now the 'verified' in its header is true](/claims/yes-there-is-a-real-time-fracture-engine-and-now-the-verifie.md) -- v2621
+- [The flaky gate had two causes, and the diagnostic I built told them apart](/claims/the-flaky-gate-had-two-causes-and-the-diagnostic-i-built-tol.md) -- v2619
+- [The temperature modulator, and the phantom 3.2% that was my reused seeds](/claims/the-temperature-modulator-and-the-phantom-3-2-that-was-my-re.md) -- v2618
+- [Pick a viscosity was not enough -- you cannot get Kelvin from a diffusion coefficient](/claims/pick-a-viscosity-was-not-enough-you-cannot-get-kelvin-from-a.md) -- v2617
+- [Chrome and cairosvg draw the same hologram -- the gap I named twice, closed](/claims/chrome-and-cairosvg-draw-the-same-hologram-the-gap-i-named-t.md) -- v2616
+- [The prime sieve is exact because primality is local. The brain's field is global.](/claims/the-prime-sieve-is-exact-because-primality-is-local-the-brai.md) -- v2615
+- [The 50-page move was a stale list, and the directory was already categorised](/claims/the-50-page-move-was-a-stale-list-and-the-directory-was-alre.md) -- v2614
+- [A white square with a grid -- because I verified everything except the picture](/claims/a-white-square-with-a-grid-because-i-verified-everything-exc.md) -- v2613
+- [He said contrast. It was 1.42:1, and the floor for visible is 3:1.](/claims/he-said-contrast-it-was-1-42-1-and-the-floor-for-visible-is-.md) -- v2612
+- [One click from the tank to the hologram, and to a GIF](/claims/one-click-from-the-tank-to-the-hologram-and-to-a-gif.md) -- v2612
+- [The grid is not wrong. The box is.](/claims/the-grid-is-not-wrong-the-box-is.md) -- v2611
+- [The floor was only half the tank, and box3d never needed a browser](/claims/the-floor-was-only-half-the-tank-and-box3d-never-needed-a-br.md) -- v2610
+- [A page that is not linked is not shipped](/claims/a-page-that-is-not-linked-is-not-shipped.md) -- v2609
+- [The launcher deleted the answer and then asked the question](/claims/the-launcher-deleted-the-answer-and-then-asked-the-question.md) -- v2609
+- [The button he asked for was not needed, and bun was installed the whole time](/claims/the-button-he-asked-for-was-not-needed-and-bun-was-installed.md) -- v2608
+- [The ring spins him. Only charge radiates him.](/claims/the-ring-spins-him-only-charge-radiates-him.md) -- v2607
+- [A guarantee you can grep](/claims/a-guarantee-you-can-grep.md) -- v2603
+- [The 23x optimises the stage that was never the problem](/claims/the-23x-optimises-the-stage-that-was-never-the-problem.md) -- v2602
+- [A link I gave you is a promise](/claims/a-link-i-gave-you-is-a-promise.md) -- v2601
+- [The kernel that cannot move and the RNG that cannot repeat](/claims/the-kernel-that-cannot-move-and-the-rng-that-cannot-repeat.md) -- v2601
+- [You cannot set kelvin, and my slider was worse than mislabelled](/claims/you-cannot-set-kelvin-and-my-slider-was-worse-than-mislabell.md) -- v2600
+- [The blobarium was never at zero kelvin](/claims/the-blobarium-was-never-at-zero-kelvin.md) -- v2596
+- [The aquarium dissolves him](/claims/the-aquarium-dissolves-him.md) -- v2595
+- [mjs is a claim about the parser](/claims/mjs-is-a-claim-about-the-parser.md) -- v2594
+- [The answer next to the guess](/claims/the-answer-next-to-the-guess.md) -- v2593
+- [You do not cut a blob](/claims/you-do-not-cut-a-blob.md) -- v2592
+- [The worst format and the best answer](/claims/the-worst-format-and-the-best-answer.md) -- v2590
+- [Uphill is into the blob](/claims/uphill-is-into-the-blob.md) -- v2589
+- [The mp4 that is not an mp4](/claims/the-mp4-that-is-not-an-mp4.md) -- v2588
+- [The noise wrecks the compression and is free to the march](/claims/the-noise-wrecks-the-compression-and-is-free-to-the-march.md) -- v2587
+- [It is faster to speed through a grid than to compute it](/claims/it-is-faster-to-speed-through-a-grid-than-to-compute-it.md) -- v2586
+- [The thing being tested was more correct than the thing testing it](/claims/the-thing-being-tested-was-more-correct-than-the-thing-testi.md) -- v2583
+- [The same property, two opposite verdicts, decided by the shape of the world](/claims/the-same-property-two-opposite-verdicts-decided-by-the-shape.md) -- v2583
+- [A curve read off one sample is a guess with a graph](/claims/a-curve-read-off-one-sample-is-a-guess-with-a-graph.md) -- v2582
+- [The one failure mode here is the one that looks like success](/claims/the-one-failure-mode-here-is-the-one-that-looks-like-success.md) -- v2581
+- [A measurement with no front door is invisible](/claims/a-measurement-with-no-front-door-is-invisible.md) -- v2580
+- [Transcription is guessing with extra steps](/claims/transcription-is-guessing-with-extra-steps.md) -- v2578
+- [Every time I removed an assumption, the number got smaller](/claims/every-time-i-removed-an-assumption-the-number-got-smaller.md) -- v2577
+- [The caves cost 78% of the merge](/claims/the-caves-cost-78-of-the-merge.md) -- v2576
+- [Greedy meshing wins on flat things and does nothing on noise](/claims/greedy-meshing-wins-on-flat-things-and-does-nothing-on-noise.md) -- v2574
+- [Three meshers, and the live one is the naive one](/claims/three-meshers-and-the-live-one-is-the-naive-one.md) -- v2573
+- [A version number is prose](/claims/a-version-number-is-prose.md) -- v2572
+- [The primary source handed me the test](/claims/the-primary-source-handed-me-the-test.md) -- v2571
+- [A world that costs nothing is a backdrop](/claims/a-world-that-costs-nothing-is-a-backdrop.md) -- v2569
+- [The creature's control loop erases the world](/claims/the-creature-s-control-loop-erases-the-world.md) -- v2566
+- [The instrument was the limit, not the subject](/claims/the-instrument-was-the-limit-not-the-subject.md) -- v2565
+- [The limit is the interface, not the engine](/claims/the-limit-is-the-interface-not-the-engine.md) -- v2564
+- [The solver cannot blow up, so it lies instead](/claims/the-solver-cannot-blow-up-so-it-lies-instead.md) -- v2563
+- [A measurement is not a fact about a shape until you say what measured it](/claims/a-measurement-is-not-a-fact-about-a-shape-until-you-say-what.md) -- v2562
+- [The blob dies of uniform heat, not of heat](/claims/the-blob-dies-of-uniform-heat-not-of-heat.md) -- v2558
+- [Sound is vibration because the blob does not push back](/claims/sound-is-vibration-because-the-blob-does-not-push-back.md) -- v2554
+- [The paramecium loses to the mold, and that is the biology](/claims/the-paramecium-loses-to-the-mold-and-that-is-the-biology.md) -- v2552
+- [The isosurface papers optimise 10% of the flesh frame](/claims/the-isosurface-papers-optimise-10-of-the-flesh-frame.md) -- v2550
+- [You cannot measure substance by counting words](/claims/you-cannot-measure-substance-by-counting-words.md) -- v2548
+- [Splatting would not boil where our marcher does](/claims/splatting-would-not-boil-where-our-marcher-does.md) -- v2532, tested v2533
+- [Krbn's hand-drawn lines do not boil between frames](/claims/krbn-s-hand-drawn-lines-do-not-boil-between-frames.md) -- their claim, tested v2530
+- [Krbn's SVG is byte-identical across runs](/claims/krbn-s-svg-is-byte-identical-across-runs.md) -- their claim, tested at v2521
+- [The engine's blobulator page works](/claims/the-engine-s-blobulator-page-works.md) -- assumed since v2438, settled v2505
+
+## open (28)
+
+- [The 2f drag-lift relation is not blocked by the boundary condition any more -- it is blocked by confinement raising the shedding onset](/claims/the-2f-drag-lift-relation-is-not-blocked-by-the-boundary-con.md) -- v2862
+- [The fingerprint grows a memory -- a content-addressed result ledger across versions and peers](/claims/the-fingerprint-grows-a-memory-a-content-addressed-result-le.md) -- v2658
+- [The fleet fingerprints itself -- remote cross-arch check that names the diverging science](/claims/the-fleet-fingerprints-itself-remote-cross-arch-check-that-n.md) -- v2655
+- [One fingerprint proves the whole engine is bit-identical across machines](/claims/one-fingerprint-proves-the-whole-engine-is-bit-identical-acr.md) -- v2653
+- [A cross-arch determinism fingerprint, ready for the Mac that is not here yet](/claims/a-cross-arch-determinism-fingerprint-ready-for-the-mac-that-.md) -- v2620
+- [A sphere is where one lump ends. The skin is where seven lumps agree.](/claims/a-sphere-is-where-one-lump-ends-the-skin-is-where-seven-lump.md) -- v2606
+- [He cannot starve. Every way he has ever died was a bug I shipped.](/claims/he-cannot-starve-every-way-he-has-ever-died-was-a-bug-i-ship.md) -- v2605
+- [It is not the platform, it is the function](/claims/it-is-not-the-platform-it-is-the-function.md) -- v2599
+- [A page hash is a lie](/claims/a-page-hash-is-a-lie.md) -- v2598
+- [So we have a blobarium?](/claims/so-we-have-a-blobarium.md) -- v2597
+- [The turn is the keepsake](/claims/the-turn-is-the-keepsake.md) -- v2591
+- [A moment with no shutter is not a memory](/claims/a-moment-with-no-shutter-is-not-a-memory.md) -- v2585
+- [The buffer you never upload](/claims/the-buffer-you-never-upload.md) -- v2584
+- [A flag that lies is worse than no flag](/claims/a-flag-that-lies-is-worse-than-no-flag.md) -- v2579
+- [A reason that expired is a habit](/claims/a-reason-that-expired-is-a-habit.md) -- v2570
+- [The brain's handicap is memory, not sensors](/claims/the-brain-s-handicap-is-memory-not-sensors.md) -- v2557
+- [Two peers' brain traces can be diffed at the same moment](/claims/two-peers-brain-traces-can-be-diffed-at-the-same-moment.md) -- v2549
+- [The GPU brain can be marked against a wall that does not move](/claims/the-gpu-brain-can-be-marked-against-a-wall-that-does-not-mov.md) -- v2547
+- [The SPH flesh will agree bit-for-bit across arm64 and x86_64](/claims/the-sph-flesh-will-agree-bit-for-bit-across-arm64-and-x86-64.md) -- v2546
+- [A prior buys accuracy by spending auditability](/claims/a-prior-buys-accuracy-by-spending-auditability.md) -- v2544
+- [An uncertainty map belongs beside every reconstruction](/claims/an-uncertainty-map-belongs-beside-every-reconstruction.md) -- v2543
+- [A Born-gated splat fit is a thing nobody has built](/claims/a-born-gated-splat-fit-is-a-thing-nobody-has-built.md) -- v2534
+- [The CPU flow field beats the GPU one](/claims/the-cpu-flow-field-beats-the-gpu-one.md) -- v2156, restated v2506
+- [The sinogram shader's error was its own sin/cos](/claims/the-sinogram-shader-s-error-was-its-own-sin-cos.md) -- v2490
+- [Warp map: the shot noise was mine, not the universe's](/claims/warp-map-the-shot-noise-was-mine-not-the-universe-s.md) -- v2490
+- [Box3D is deterministic across architectures](/claims/box3d-is-deterministic-across-architectures.md) -- v2500
+- [Thread count does not change the physics](/claims/thread-count-does-not-change-the-physics.md) -- v2508
+- [The launcher race is closed](/claims/the-launcher-race-is-closed.md) -- v2514
+
+## broken (9)
+
+- [It was never a mold. It was a compass.](/claims/it-was-never-a-mold-it-was-a-compass.md) -- v2568
+- [It fell 418 metres and reported that dinner was lovely](/claims/it-fell-418-metres-and-reported-that-dinner-was-lovely.md) -- v2567
+- [The wasm blocker was a habit, not a wall](/claims/the-wasm-blocker-was-a-habit-not-a-wall.md) -- v2560
+- [The mold's third sensor is insurance, not intelligence](/claims/the-mold-s-third-sensor-is-insurance-not-intelligence.md) -- v2556
+- [The Krbn mesh cost is quadratic in triangle count](/claims/the-krbn-mesh-cost-is-quadratic-in-triangle-count.md) -- v2524, tested v2529
+- [The GPU brain would win](/claims/the-gpu-brain-would-win.md) -- v2137, settled v2156
+- [Cross-thread determinism was untestable](/claims/cross-thread-determinism-was-untestable.md) -- v2500, settled v2508
+- [The published blobulator is dead](/claims/the-published-blobulator-is-dead.md) -- v2513, settled same day
+- [The box3d shim compiles](/claims/the-box3d-shim-compiles.md) -- assumed v2508, settled v2512
