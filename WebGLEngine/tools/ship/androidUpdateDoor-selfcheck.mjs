@@ -47,14 +47,49 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     })(), "a version read from somewhere else would drift the moment one of them moved");
 }
 
-// ---- 3. THE DEBT IS CLOSED, and the number is checked rather than claimed --------------------------------------
+// ---- 3. THIS MODULE IS NOT AN ORPHAN, which is the fact this gate is about ------------------------------------
+//
+// *** v3900 -- THIS ASSERTED A GLOBAL COUNT TO PROVE A LOCAL FACT, AND THE COUNT WAS REDEFINED UNDER IT. ***
+//
+// The old check read `ORPHAN_UTIL_BASELINE === 0` and this file's own header explains why: at v2993, wiring
+// androidUpdate.mjs took the orphaned-utility census to zero, and the gate pinned that as a victory lap. IT WAS
+// TRUE THAT DAY. Then v3223 CHANGED WHAT THE NUMBER COUNTS -- every gate-only module rather than every
+// unexplained one -- and it went 0 -> 14 -> 104 -> 100 -> 88 -> 86, each move by hand with a written reason,
+// each one leaving this assertion further behind. IT HAS BEEN RED FOR ROUGHLY SEVEN HUNDRED VERSIONS and the
+// tree kept lowering the number it was complaining about.
+//
+// *** SO TWO GATES DEMANDED OPPOSITE THINGS: *** graveyard-selfcheck ratchets the count and passes at 86 of 86
+// with every raise carrying its reason; this one required that same literal to be nought. graveyard-selfcheck's
+// own v3223 note already names this exact shape -- "TWO CHECKS DEMANDING OPPOSITE THINGS ... neither of these
+// cares about the VALUE 8" -- and the resolution there is the resolution here: ASK FOR THE PROPERTY, NOT THE
+// NUMBER. A gate about the Android update door has no business adjudicating the size of a tree-wide debt pile,
+// and it never wanted to; it wanted to know that ITS OWN MODULE got a front door and kept it.
+//
+// MEASURED, which is why this is a rewrite and not a deletion: androidUpdate.mjs is imported at runtime by
+// ai-bridge/androidPeerBridge.js and driven as a command by tools/roundhouse/taskerStages.mjs. It has real
+// callers, so it is not in the 86, and the thing the old check was reaching for is TRUE -- it was just reaching
+// for it through a number that had stopped meaning it.
 {
     const g = fs.readFileSync(path.join(ENG, "tools", "ship", "graveyard-selfcheck.mjs"), "utf8");
-    const m = g.match(/const ORPHAN_UTIL_BASELINE = (\d+);/);
-    ok("!! the orphaned-utility baseline is ZERO", m && Number(m[1]) === 0,
-       m ? "baseline " + m[1] + " -- v2985 raised this to four after ninety-seven versions of nobody running the census" : "not found");
+    // The census's classifier counts a module as an orphaned utility when it EXPORTS and nothing imports it.
+    // So the property is asserted where it lives: a non-gate consumer, in the tree, by name.
+    const consumers = [
+        ["ai-bridge/androidPeerBridge.js", /androidUpdate\.mjs/],
+        ["tools/roundhouse/taskerStages.mjs", /androidUpdate\.mjs/],
+    ].filter(([f, re]) => {
+        try { return re.test(fs.readFileSync(path.join(ENG, f), "utf8")); } catch { return false; }
+    });
+    ok("!! androidUpdate.mjs HAS A NON-GATE CONSUMER, so it is not an orphaned utility",
+       consumers.length >= 1,
+       consumers.map(([f]) => f).join(", ") + " -- the census counts a module as orphaned when it exports and " +
+       "NOTHING imports it, so this is the property the old ORPHAN_UTIL_BASELINE === 0 check was reaching for. " +
+       "*** IT REACHED FOR IT THROUGH A TREE-WIDE COUNT THAT v3223 REDEFINED, and had been red ever since. ***");
+    ok("...and the tree-wide census is still RATCHETED rather than unbounded, which is graveyard's job not this one's",
+       /const ORPHAN_UTIL_BASELINE = \d+;/.test(g) && /RAISED FROM \d+ TO \d+|LOWERED/.test(g),
+       "the literal is still in the source with its history beside it. THIS GATE NO LONGER ASSERTS ITS VALUE: " +
+       "a number two gates disagree about is a number one of them should not be reading");
     ok("...and the census still distinguishes records from orphans", /isAnalysisRecord/.test(g),
-       "nine analysis records remain and are not debt -- their consumer is correctly the gate that re-derives them");
+       "analysis records are not debt -- their consumer is correctly the gate that re-derives them");
 }
 
 console.log(fails ? "\nandroidUpdateDoor-selfcheck: " + fails + " FAILED" : "\nandroidUpdateDoor-selfcheck: all checks pass");
