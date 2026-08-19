@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Cell Volume Viewer (WebGPU)</title>
+<style>
+  :root { --bg:#05080e; --ink:#cfe3f2; --dim:#7f93a8; --line:#1e2c3a; --accent:#7fd0ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px ui-monospace,SFMono-Regular,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  #top { display:flex; align-items:center; gap:12px; padding:8px 12px; border-bottom:1px solid var(--line); background:#0a1018; flex:none; flex-wrap:wrap; }
+  #top h1 { font-size:13px; margin:0; color:var(--accent); font-weight:600; letter-spacing:0.03em; }
+  #top .sp { flex:1; }
+  select,button { background:#0c1622; color:var(--ink); border:1px solid var(--line); border-radius:5px; font:12px ui-monospace,monospace; padding:4px 9px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  #stage { flex:1; position:relative; }
+  canvas { display:block; width:100%; height:100%; }
+  #scrub { display:flex; align-items:center; gap:10px; padding:8px 14px; border-top:1px solid var(--line); background:#0a1018; flex:none; }
+  #scrub input[type=range] { flex:1; accent-color:var(--accent); }
+  #tlabel { min-width:96px; text-align:right; color:var(--accent); }
+  .chk { display:flex; align-items:center; gap:5px; color:var(--dim); font-size:11px; cursor:pointer; user-select:none; }
+  #msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--dim); padding:0 24px; flex-direction:column; gap:10px; }
+  #msg a { color:var(--accent); }
+  #legend { position:absolute; top:10px; left:10px; background:rgba(8,14,22,0.82); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:11px; line-height:1.7; pointer-events:none; }
+  label.slab { display:flex; align-items:center; gap:5px; color:var(--dim); font-size:11px; }
+  input[type=range].mini { width:90px; accent-color:var(--accent); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <h1>&#129516; Cell Volume Viewer <span style="color:var(--dim);font-weight:400;">· WebGPU</span></h1>
+    <select id="dataset" title="which sample volume to view"></select>
+    <label class="chk"><input type="checkbox" id="showTracks" checked> tracks</label>
+    <label class="slab">density <input type="range" class="mini" id="dens" min="0.2" max="3" step="0.1" value="1.1"></label>
+    <label class="slab">threshold <input type="range" class="mini" id="thr" min="0" max="0.6" step="0.02" value="0.08"></label>
+    <label class="chk"><input type="checkbox" id="spin"> auto-spin</label>
+    <span class="sp"></span>
+    <span id="stats" style="color:var(--dim);font-size:11px;"></span>
+    <a href="/celltrack-viewer.html" style="color:var(--dim);font-size:11px;" title="Open the lightweight WebGL2 point/track viewer">WebGL2 viewer &rarr;</a>
+  </div>
+  <div id="stage">
+    <div id="legend" style="display:none;">volume = raw intensity (nuclei)<br>lines = predicted tracks</div>
+    <canvas id="gpu"></canvas>
+    <div id="msg">checking WebGPU&hellip;</div>
+  </div>
+  <div id="scrub">
+    <button id="playBtn" title="Play / pause time">&#9654;</button>
+    <input type="range" id="time" min="0" max="0" value="0" step="1">
+    <span id="tlabel">t = 0 / 0</span>
+  </div>
+</div>
+
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+const $ = (id) => document.getElementById(id);
+const msg = (html) => { const m = $("msg"); if (!html) { m.style.display = "none"; } else { m.style.display = "flex"; m.innerHTML = html; } };
+const params = new URLSearchParams(location.search);
+const PEER = params.get("peer");
+const pq = PEER ? ("&peer=" + encodeURIComponent(PEER)) : "";
+const pq0 = PEER ? ("?peer=" + encodeURIComponent(PEER)) : "";
+
+// ---------- math (tiny mat4 helpers, column-major) ----------
+function mat4Mul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
+    o[c * 4 + r] = s;
+  }
+  return o;
+}
+function perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  const o = new Float32Array(16);
+  o[0] = f / aspect; o[5] = f; o[10] = (far + near) * nf; o[11] = -1; o[14] = 2 * far * near * nf;
+  return o;
+}
+function lookAt(eye, center, up) {
+  const z = norm3(sub3(eye, center)), x = norm3(cross3(up, z)), y = cross3(z, x);
+  const o = new Float32Array(16);
+  o[0] = x[0]; o[1] = y[0]; o[2] = z[0]; o[4] = x[1]; o[5] = y[1]; o[6] = z[1];
+  o[8] = x[2]; o[9] = y[2]; o[10] = z[2];
+  o[12] = -dot3(x, eye); o[13] = -dot3(y, eye); o[14] = -dot3(z, eye); o[15] = 1;
+  return o;
+}
+function invert(m) {
+  const inv = new Float32Array(16), a = m;
+  inv[0]=a[5]*a[10]*a[15]-a[5]*a[11]*a[14]-a[9]*a[6]*a[15]+a[9]*a[7]*a[14]+a[13]*a[6]*a[11]-a[13]*a[7]*a[10];
+  inv[4]=-a[4]*a[10]*a[15]+a[4]*a[11]*a[14]+a[8]*a[6]*a[15]-a[8]*a[7]*a[14]-a[12]*a[6]*a[11]+a[12]*a[7]*a[10];
+  inv[8]=a[4]*a[9]*a[15]-a[4]*a[11]*a[13]-a[8]*a[5]*a[15]+a[8]*a[7]*a[13]+a[12]*a[5]*a[11]-a[12]*a[7]*a[9];
+  inv[12]=-a[4]*a[9]*a[14]+a[4]*a[10]*a[13]+a[8]*a[5]*a[14]-a[8]*a[6]*a[13]-a[12]*a[5]*a[10]+a[12]*a[6]*a[9];
+  inv[1]=-a[1]*a[10]*a[15]+a[1]*a[11]*a[14]+a[9]*a[2]*a[15]-a[9]*a[3]*a[14]-a[13]*a[2]*a[11]+a[13]*a[3]*a[10];
+  inv[5]=a[0]*a[10]*a[15]-a[0]*a[11]*a[14]-a[8]*a[2]*a[15]+a[8]*a[3]*a[14]+a[12]*a[2]*a[11]-a[12]*a[3]*a[10];
+  inv[9]=-a[0]*a[9]*a[15]+a[0]*a[11]*a[13]+a[8]*a[1]*a[15]-a[8]*a[3]*a[13]-a[12]*a[1]*a[11]+a[12]*a[3]*a[9];
+  inv[13]=a[0]*a[9]*a[14]-a[0]*a[10]*a[13]-a[8]*a[1]*a[14]+a[8]*a[2]*a[13]+a[12]*a[1]*a[10]-a[12]*a[2]*a[9];
+  inv[2]=a[1]*a[6]*a[15]-a[1]*a[7]*a[14]-a[5]*a[2]*a[15]+a[5]*a[3]*a[14]+a[13]*a[2]*a[7]-a[13]*a[3]*a[6];
+  inv[6]=-a[0]*a[6]*a[15]+a[0]*a[7]*a[14]+a[4]*a[2]*a[15]-a[4]*a[3]*a[14]-a[12]*a[2]*a[7]+a[12]*a[3]*a[6];
+  inv[10]=a[0]*a[5]*a[15]-a[0]*a[7]*a[13]-a[4]*a[1]*a[15]+a[4]*a[3]*a[13]+a[12]*a[1]*a[7]-a[12]*a[3]*a[5];
+  inv[14]=-a[0]*a[5]*a[14]+a[0]*a[6]*a[13]+a[4]*a[1]*a[14]-a[4]*a[2]*a[13]-a[12]*a[1]*a[6]+a[12]*a[2]*a[5];
+  inv[3]=-a[1]*a[6]*a[11]+a[1]*a[7]*a[10]+a[5]*a[2]*a[11]-a[5]*a[3]*a[10]-a[9]*a[2]*a[7]+a[9]*a[3]*a[6];
+  inv[7]=a[0]*a[6]*a[11]-a[0]*a[7]*a[10]-a[4]*a[2]*a[11]+a[4]*a[3]*a[10]+a[8]*a[2]*a[7]-a[8]*a[3]*a[6];
+  inv[11]=-a[0]*a[5]*a[11]+a[0]*a[7]*a[9]+a[4]*a[1]*a[11]-a[4]*a[3]*a[9]-a[8]*a[1]*a[7]+a[8]*a[3]*a[5];
+  inv[15]=a[0]*a[5]*a[10]-a[0]*a[6]*a[9]-a[4]*a[1]*a[10]+a[4]*a[2]*a[9]+a[8]*a[1]*a[6]-a[8]*a[2]*a[5];
+  let det = a[0]*inv[0]+a[1]*inv[4]+a[2]*inv[8]+a[3]*inv[12];
+  if (!det) return m; det = 1/det;
+  const o = new Float32Array(16); for (let i=0;i<16;i++) o[i]=inv[i]*det; return o;
+}
+const sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm3=(a)=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l];};
+
+// ---------- state ----------
+let device, ctx, format;
+let volPipeline, volBind, uniformBuf, volTexture, volSampler;
+let linePipeline, lineBuf, lineCount = 0, lineUniformBuf;
+let meta = null, tMax = 0, curT = 0, playing = false;
+let volBytes = null;      // (legacy) unused in streaming mode
+let frameSize = 0;        // D*H*W
+// v1883 — on-demand streaming: fetch each timepoint's bytes when needed, cache a window,
+// evict oldest. Keeps browser memory bounded so real (hundreds-of-frames) volumes work.
+let curSample = null;
+const frameCache = new Map();   // t -> Uint8Array
+const CACHE_MAX = 24;           // ~ keep 24 frames resident (LRU by insertion order)
+let loadToken = 0;              // bumped each setTime so a slow fetch can't upload a stale frame
+let camTheta = 0.9, camPhi = 1.1, camRad = 3.2, dragging = false, lastX = 0, lastY = 0;
+let tracks = null;        // {nodes, edges} for the current dataset
+let physExtent = [1,1,1]; // normalized box half-extents
+
+const WGSL_VOLUME = `
+struct Uni {
+  invViewProj : mat4x4<f32>,
+  camPos : vec4<f32>,
+  boxHalf : vec4<f32>,   // xyz = half extents of the volume box in world space
+  params : vec4<f32>,    // x=density, y=threshold, z=steps, w=unused
+};
+@group(0) @binding(0) var<uniform> u : Uni;
+@group(0) @binding(1) var volTex : texture_3d<f32>;
+@group(0) @binding(2) var volSamp : sampler;
+
+struct VSOut { @builtin(position) pos : vec4<f32>, @location(0) ndc : vec2<f32> };
+@vertex
+fn vs(@builtin(vertex_index) vi : u32) -> VSOut {
+  var p = array<vec2<f32>,3>( vec2<f32>(-1.0,-1.0), vec2<f32>(3.0,-1.0), vec2<f32>(-1.0,3.0) );
+  var o : VSOut;
+  o.pos = vec4<f32>(p[vi], 0.0, 1.0);
+  o.ndc = p[vi];
+  return o;
+}
+
+// ray-box intersection; box centered at origin with half extents u.boxHalf.xyz
+fn intersectBox(ro : vec3<f32>, rd : vec3<f32>, h : vec3<f32>) -> vec2<f32> {
+  let inv = 1.0 / rd;
+  let t0 = (-h - ro) * inv;
+  let t1 = ( h - ro) * inv;
+  let tmin = min(t0, t1);
+  let tmax = max(t0, t1);
+  let tn = max(max(tmin.x, tmin.y), tmin.z);
+  let tf = min(min(tmax.x, tmax.y), tmax.z);
+  return vec2<f32>(tn, tf);
+}
+
+@fragment
+fn fs(in : VSOut) -> @location(0) vec4<f32> {
+  // reconstruct a world-space ray from the NDC position
+  let near = u.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
+  let far  = u.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
+  let np = near.xyz / near.w;
+  let fp = far.xyz / far.w;
+  let ro = u.camPos.xyz;
+  let rd = normalize(fp - np);
+
+  let h = u.boxHalf.xyz;
+  let tb = intersectBox(ro, rd, h);
+  if (tb.y <= max(tb.x, 0.0)) { discard; }
+  var t = max(tb.x, 0.0);
+  let tend = tb.y;
+
+  let steps = i32(u.params.z);
+  let dt = (tend - t) / f32(steps);
+  var acc = vec4<f32>(0.0);
+  let dens = u.params.x;
+  let thr = u.params.y;
+
+  for (var i = 0; i < steps; i = i + 1) {
+    let p = ro + rd * t;
+    // map world [-h,h] -> texture uvw [0,1]
+    let uvw = (p / h) * 0.5 + vec3<f32>(0.5);
+    var s = textureSampleLevel(volTex, volSamp, uvw, 0.0).r;
+    s = max(0.0, s - thr) / max(0.001, 1.0 - thr);
+    if (s > 0.001) {
+      // teal->white ramp for intensity; alpha grows with density
+      let col = mix(vec3<f32>(0.20,0.55,0.85), vec3<f32>(0.95,0.98,1.0), s);
+      let a = 1.0 - exp(-s * dens * 3.5 * dt * f32(steps) / 64.0);
+      let src = vec4<f32>(col * a, a);
+      acc = acc + (1.0 - acc.a) * src;   // front-to-back compositing
+      if (acc.a > 0.98) { break; }
+    }
+    t = t + dt;
+  }
+  return acc;
+}
+`;
+
+const WGSL_LINES = `
+struct LUni { viewProj : mat4x4<f32>, boxHalf : vec4<f32> };
+@group(0) @binding(0) var<uniform> u : LUni;
+struct VSOut { @builtin(position) pos : vec4<f32>, @location(0) col : vec3<f32> };
+@vertex
+fn vs(@location(0) p : vec3<f32>, @location(1) c : vec3<f32>) -> VSOut {
+  var o : VSOut;
+  o.pos = u.viewProj * vec4<f32>(p, 1.0);
+  o.col = c;
+  return o;
+}
+@fragment
+fn fs(in : VSOut) -> @location(0) vec4<f32> { return vec4<f32>(in.col, 1.0); }
+`;
+
+async function initGPU() {
+  if (!navigator.gpu) {
+    // v3845 -- "Use Chrome or Edge 113+ (your Pascal GPUs support it)" answers a browser-and-hardware question.
+    // Over http://<lan-ip> the browser is already Chrome 140 and the Pascal cards are already there; the origin
+    // is what withheld it. The WebGL2 fallback link stays in both branches -- it is useful either way.
+    const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    const cause = p.reason === "insecure-origin" ? "<b>" + p.message + "</b>"
+      : "<b>WebGPU isn't available in this browser.</b><br>Use Chrome or Edge 113+ (your Pascal GPUs support it).";
+    msg(cause + "<br><br>The lightweight <a href='/celltrack-viewer.html" + pq0 + "'>WebGL2 point/track viewer</a> works everywhere.");
+    return false;
+  }
+  let adapter;
+  try { adapter = await navigator.gpu.requestAdapter(); } catch (e) {}
+  if (!adapter) { msg("<b>No WebGPU adapter.</b><br>Your browser has WebGPU but no GPU adapter was granted.<br><br>Try the <a href='/celltrack-viewer.html" + pq0 + "'>WebGL2 viewer</a>."); return false; }
+  device = await adapter.requestDevice();
+  const canvas = $("gpu");
+  ctx = canvas.getContext("webgpu");
+  format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode: "premultiplied" });
+  resize();
+  window.addEventListener("resize", resize);
+  addOrbit(canvas);
+
+  uniformBuf = device.createBuffer({ size: 4 * (16 + 4 + 4 + 4), usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  lineUniformBuf = device.createBuffer({ size: 4 * (16 + 4), usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  volSampler = device.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge", addressModeW: "clamp-to-edge" });
+
+  const vmod = device.createShaderModule({ code: WGSL_VOLUME });
+  volPipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: vmod, entryPoint: "vs" },
+    fragment: { module: vmod, entryPoint: "fs", targets: [{ format, blend: {
+      color: { srcFactor: "one", dstFactor: "one-minus-src-alpha" },
+      alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" } } }] },
+    primitive: { topology: "triangle-list" },
+  });
+
+  const lmod = device.createShaderModule({ code: WGSL_LINES });
+  linePipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: lmod, entryPoint: "vs", buffers: [{ arrayStride: 24, attributes: [
+      { shaderLocation: 0, offset: 0, format: "float32x3" },
+      { shaderLocation: 1, offset: 12, format: "float32x3" } ] }] },
+    fragment: { module: lmod, entryPoint: "fs", targets: [{ format, blend: {
+      color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+      alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" } } }] },
+    primitive: { topology: "line-list" },
+  });
+  return true;
+}
+
+function resize() {
+  const c = $("gpu"), dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.max(1, Math.floor(c.clientWidth * dpr));
+  c.height = Math.max(1, Math.floor(c.clientHeight * dpr));
+}
+function addOrbit(dom) {
+  dom.addEventListener("mousedown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener("mouseup", () => dragging = false);
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    camTheta -= (e.clientX - lastX) * 0.008; camPhi -= (e.clientY - lastY) * 0.008;
+    camPhi = Math.max(0.12, Math.min(Math.PI - 0.12, camPhi));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  dom.addEventListener("wheel", (e) => { e.preventDefault(); camRad *= (1 + Math.sign(e.deltaY) * 0.08); camRad = Math.max(0.8, Math.min(10, camRad)); }, { passive: false });
+}
+
+// upload one timepoint into the 3D texture
+// write a decoded frame (Uint8Array of D*H*W) into the 3D texture
+function writeFrameToTexture(bytes) {
+  if (!bytes || !meta) return;
+  const [D, H, W] = meta.dims;
+  device.queue.writeTexture(
+    { texture: volTexture },
+    bytes,
+    { bytesPerRow: W, rowsPerImage: H },
+    { width: W, height: H, depthOrArrayLayers: D }
+  );
+}
+
+// fetch one timepoint's bytes on demand (cached). Returns a Uint8Array or null.
+async function fetchFrame(t) {
+  if (frameCache.has(t)) return frameCache.get(t);
+  try {
+    const buf = await fetch("/celltrack/volume?sample=" + encodeURIComponent(curSample) + "&t=" + t + pq, { cache: "no-store" }).then(r => r.ok ? r.arrayBuffer() : null);
+    if (!buf) return null;
+    const arr = new Uint8Array(buf);
+    frameCache.set(t, arr);
+    // LRU-ish eviction: drop oldest inserted while over cap
+    while (frameCache.size > CACHE_MAX) {
+      const oldest = frameCache.keys().next().value;
+      if (oldest === t) break;
+      frameCache.delete(oldest);
+    }
+    return arr;
+  } catch (e) { return null; }
+}
+
+// prefetch a frame in the background (no upload), to keep scrubbing/playing smooth
+function prefetch(t) { if (t >= 0 && t <= tMax && !frameCache.has(t)) fetchFrame(t); }
+
+function createVolTexture() {
+  const [D, H, W] = meta.dims;
+  frameSize = D * H * W;
+  volTexture = device.createTexture({
+    size: { width: W, height: H, depthOrArrayLayers: D },
+    format: "r8unorm",
+    dimension: "3d",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  volBind = device.createBindGroup({
+    layout: volPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuf } },
+      { binding: 1, resource: volTexture.createView() },
+      { binding: 2, resource: volSampler },
+    ],
+  });
+  // normalized box half-extents from physical size (largest axis -> 1.0)
+  const phys = meta.phys || [meta.dims[0], meta.dims[1], meta.dims[2]];
+  const m = Math.max(phys[0], phys[1], phys[2]) || 1;
+  // texture axes are (D=z, H=y, W=x); world x,y,z map to phys x,y,z
+  physExtent = [ (phys[2] / m), (phys[1] / m), (phys[0] / m) ]; // world (x,y,z) half extents
+}
+
+// build track line vertices in the same normalized box space
+function buildLines() {
+  lineCount = 0; lineBuf = null;
+  if (!tracks || !tracks.nodes) return;
+  const byId = new Map();
+  for (const [nid, t, z, y, x] of tracks.nodes) byId.set(nid, [z, y, x]);
+  // lineage color: hash source id
+  const verts = [];
+  const [Z, Y, X] = meta.orig;
+  const toWorld = (z, y, x) => {
+    // voxel -> [-half, half] per axis (world x,y,z from voxel x,y,z)
+    const wx = ((x / (X - 1)) - 0.5) * 2 * physExtent[0];
+    const wy = -(((y / (Y - 1)) - 0.5) * 2 * physExtent[1]);
+    const wz = ((z / (Z - 1)) - 0.5) * 2 * physExtent[2];
+    return [wx, wy, wz];
+  };
+  const col = (id) => { const h = (id * 0.61803398875) % 1; return hsl(h, 0.6, 0.62); };
+  for (const [s, tg] of tracks.edges) {
+    const a = byId.get(s), b = byId.get(tg);
+    if (!a || !b) continue;
+    const wa = toWorld(a[0], a[1], a[2]), wb = toWorld(b[0], b[1], b[2]);
+    const c = col(s);
+    verts.push(wa[0], wa[1], wa[2], c[0], c[1], c[2], wb[0], wb[1], wb[2], c[0], c[1], c[2]);
+  }
+  if (!verts.length) return;
+  const arr = new Float32Array(verts);
+  lineBuf = device.createBuffer({ size: arr.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(lineBuf, 0, arr);
+  lineCount = arr.length / 6;
+}
+function hsl(h, s, l) {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => { const k = (n + h * 12) % 12; return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1))); };
+  return [f(0), f(8), f(4)];
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (!device || !volTexture) return;
+  if ($("spin").checked && !dragging) camTheta += 0.0035;
+
+  const aspect = $("gpu").width / Math.max(1, $("gpu").height);
+  const eye = [
+    camRad * Math.sin(camPhi) * Math.sin(camTheta),
+    camRad * Math.cos(camPhi),
+    camRad * Math.sin(camPhi) * Math.cos(camTheta),
+  ];
+  const proj = perspective(45 * Math.PI / 180, aspect, 0.05, 40);
+  const view = lookAt(eye, [0, 0, 0], [0, 1, 0]);
+  const viewProj = mat4Mul(proj, view);
+  const invVP = invert(viewProj);
+
+  // volume uniforms
+  const ub = new Float32Array(16 + 4 + 4 + 4);
+  ub.set(invVP, 0);
+  ub[16] = eye[0]; ub[17] = eye[1]; ub[18] = eye[2]; ub[19] = 1;
+  ub[20] = physExtent[0]; ub[21] = physExtent[1]; ub[22] = physExtent[2]; ub[23] = 0;
+  ub[24] = parseFloat($("dens").value); ub[25] = parseFloat($("thr").value); ub[26] = 96; ub[27] = 0;
+  device.queue.writeBuffer(uniformBuf, 0, ub);
+
+  // line uniforms
+  const lub = new Float32Array(16 + 4);
+  lub.set(viewProj, 0);
+  device.queue.writeBuffer(lineUniformBuf, 0, lub);
+
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginRenderPass({
+    colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.02, g: 0.03, b: 0.05, a: 1 }, loadOp: "clear", storeOp: "store" }],
+  });
+  pass.setPipeline(volPipeline);
+  pass.setBindGroup(0, volBind);
+  pass.draw(3);
+  if ($("showTracks").checked && lineBuf && lineCount) {
+    const lbind = device.createBindGroup({ layout: linePipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: lineUniformBuf } }] });
+    pass.setPipeline(linePipeline);
+    pass.setBindGroup(0, lbind);
+    pass.setVertexBuffer(0, lineBuf);
+    pass.draw(lineCount);
+  }
+  pass.end();
+  device.queue.submit([enc.finish()]);
+}
+
+async function setTime(t) {
+  curT = Math.max(0, Math.min(tMax, t | 0));
+  $("time").value = curT; $("tlabel").textContent = "t = " + curT + " / " + tMax;
+  const token = ++loadToken;
+  const cached = frameCache.has(curT);
+  if (!cached) $("tlabel").textContent = "t = " + curT + " / " + tMax + " \u2026";
+  const bytes = await fetchFrame(curT);
+  // if the user moved on while we were fetching, don't upload this stale frame
+  if (token !== loadToken) return;
+  if (bytes) { writeFrameToTexture(bytes); $("tlabel").textContent = "t = " + curT + " / " + tMax; }
+  // warm the next couple of frames (forward-biased for playback)
+  prefetch(curT + 1); prefetch(curT + 2);
+}
+
+async function loadDataset(sample) {
+  msg("loading volume &amp; tracks&hellip;");
+  // meta
+  const mj = await fetch("/celltrack/volume-meta?sample=" + encodeURIComponent(sample) + pq, { cache: "no-store" }).then(r => r.json()).catch(() => null);
+  if (!mj || !mj.ok) { msg("No exported volume for <b>" + sample + "</b>.<br><br>In the panel: <b>Export volume</b>, then reopen.<br>(That dumps a downsampled density grid the browser can render.)"); return; }
+  meta = mj.meta; tMax = (meta.t || 1) - 1;
+  curSample = sample;
+  frameCache.clear();
+  const [D, H, W] = meta.dims; frameSize = D * H * W;
+  createVolTexture();
+  // tracks (optional overlay) — parse the latest submission for this dataset
+  try {
+    const tj = await fetch("/celltrack/tracks" + pq0, { cache: "no-store" }).then(r => r.json());
+    tracks = (tj && tj.ok && tj.datasets && tj.datasets[sample]) ? tj.datasets[sample] : null;
+  } catch (e) { tracks = null; }
+  buildLines();
+  $("time").min = 0; $("time").max = tMax; $("time").value = 0;
+  const mb = (frameSize / (1024 * 1024)).toFixed(2);
+  $("stats").textContent = meta.dims.join("\u00d7") + " \u00b7 t=" + meta.t + " \u00b7 streaming " + mb + " MB/frame" + (tracks ? (" \u00b7 " + tracks.edges.length + " track edges") : " \u00b7 no tracks yet");
+  await setTime(0);
+  msg(""); $("legend").style.display = "block";
+}
+
+async function load() {
+  const ok = await initGPU();
+  if (!ok) return;
+  const lj = await fetch("/celltrack/volume-list" + pq0, { cache: "no-store" }).then(r => r.json()).catch(() => null);
+  const vols = (lj && lj.ok && lj.volumes) ? lj.volumes : [];
+  const sel = $("dataset"); sel.innerHTML = "";
+  if (!vols.length) { msg("No exported volumes yet.<br><br>In the server-mode panel: run the pipeline, then click <b>Export volume</b>, then reopen this viewer."); frame(); return; }
+  vols.forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+  sel.onchange = () => loadDataset(sel.value);
+  frame();
+  loadDataset(vols[0]);
+}
+
+$("time").addEventListener("input", (e) => setTime(+e.target.value));
+$("playBtn").addEventListener("click", () => { playing = !playing; $("playBtn").innerHTML = playing ? "&#10073;&#10073;" : "&#9654;"; });
+setInterval(() => { if (playing && meta) setTime(curT >= tMax ? 0 : curT + 1); }, 500);
+
+load();
+</script>
+</body>
+</html>

@@ -1,3 +1,79 @@
+## v3845 -- THE WebGPU DETECTOR PINNED FOUR SPELLINGS AND CALLED IT A CLASS; SEVEN PAGES WERE ALREADY THROUGH IT
+
+Keith named three piles. This round finishes one of them and clears a carried red; the third is measured and
+handed back with the reason it is not mine to decide.
+
+*** THE CENSUS, AND THE GAP IT FOUND. *** v3816 fixed six pages that told a reader "this browser has no WebGPU"
+over a LAN origin, and gated the CLASS so a seventh would be caught without editing the gate. ITS OWN COMMENT
+SAYS SO: "a seventh page written next month is covered without anybody editing this file." THE SEVENTH PAGE DID
+NOT NEED TO BE WRITTEN. The rule was /browser has no WebGPU|no WebGPU support|WebGPU is not supported|this
+browser does not support WebGPU/ -- the wording of the six pages it had just fixed -- and SEVEN OTHER PAGES IN
+THE SAME TREE were saying the same wrong thing in their own words, all green, the whole time:
+
+  celltrack-viewer-gpu  "WebGPU isn't available in this browser. Use Chrome or Edge 113+ (your Pascal GPUs...)"
+  webgpu-bench          "WebGPU is not available in this browser" + use Chrome/Edge/Brave 113+, enable hardware
+                        acceleration, visit chrome://gpu -- a three-item checklist, every item the wrong subsystem
+  hmc-bench, ising-bench  "WebGPU unavailable -- run it on a machine with a GPU"
+  magmap-bench          "WebGPU unavailable -- needs Chrome/Android or Safari 18+"
+  magmap-android        "WebGPU unavailable" + check chrome://flags/#enable-unsafe-webgpu
+  multigrid             "this browser exposes no navigator.gpu -- WebGPU is unavailable, which is a CAPABILITY"
+
+A PHRASE LIST IS A RECORD OF WHAT WAS ALREADY FIXED. The gate now matches ATTRIBUTION instead: naming a browser,
+a browser setting, or the reader's hardware as the cause, inside the branch that concluded WebGPU is absent,
+without asking about the origin. Measured over the tree: 26 pages touch navigator.gpu, 22 branch on it, and the
+seven above attributed the absence. The gate asserts, as a number, that the old four-phrase rule catches ZERO of
+those seven -- the size of the gap, measured on the tree rather than argued.
+
+*** A SECOND TIGHTENING NOBODY ASKED FOR AND THE FIRST ONE IMPLIES: THE ESCAPE IS BRANCH-LOCAL NOW. *** The old
+rule excused a page that mentioned webgpuProbe ANYWHERE in it, so a page could ask about the origin in one branch
+and blame the browser in another and read as fixed. The probe must be consulted in the branch that draws the
+conclusion. A sabotage pins it: half a fix no longer reads as a whole one.
+
+*** AND THE SABOTAGES NOW DRIVE THE SHIPPED PREDICATE. *** The v3816 section 3 declared its OWN copy of BLAMES
+and ASKS, so its three sabotages proved a rule no page was ever measured against -- a second declaration of the
+exact kind this tree keeps finding elsewhere. blamesWithoutAsking is one function now, used by the census and
+sabotaged by the tests. 12 checks -> 16, including four fresh wordings the old list would have missed (0 of 4).
+
+*** SEVEN PAGES FIXED ONE AT A TIME, NEVER SWEPT. *** Each got its own edit and its own note naming what its old
+sentence sent the reader to do: hmc/ising sent them to find another MACHINE; magmap-bench and celltrack named
+BROWSERS; magmap-android sent them to chrome://flags; multigrid called it a capability of the BROWSER; and
+webgpu-bench -- whose own header says "fail LOUDLY with the exact things to check" -- sent them to chrome://gpu.
+Every page keeps its original sentence for the SECURE-origin case, where it was always right. That is why these
+survived: they are correct wherever anybody normally tests.
+
+VERIFIED IN A HEADLESS CHROMIUM OVER A REAL NON-LOOPBACK ADDRESS, which is the only way to see this fault. The
+tree was served on http://192.0.2.2:8788 and all seven pages loaded: two render at load, five need their Run
+button, so those were driven through a same-origin wrapper that clicks and reads the rendered text back. ALL
+SEVEN print "WebGPU needs a secure origin -- this page is http://192.0.2.2, so the browser does not expose it
+here" and NOT ONE still names a browser, a flag or a machine. The wrapper was deleted before the zip.
+
+*** A CARRIED RED IS GREEN, BY FIXING ONE FILE. *** gateQuality has been red since the v3820-v3830 MPM-GPU arc:
+prose-as-code debt 41 against a frozen baseline of 40, the single new offender being tools/ship/mpmGpuPage-
+selfcheck.mjs matching /against the graded CPU loop on YOUR hardware/ against server.html. THAT LINE MADE THE
+SAME MISTAKE THE COMMENT DIRECTLY BELOW IT DOCUMENTS -- six lines down, the same file explains that this gate
+once pinned "has no WebGPU" and went red when that sentence was correctly removed. It was pinning anchor COPY to
+assert a property about whether the anchors DESCRIBE their pages. Now it reads the two anchors' title attributes
+and asserts what it meant: each is a real description (>80 chars) naming the CPU comparison. Debt 41 -> 40,
+gateQuality ALL PASS. No baseline was lowered and no regex was excused -- one file was fixed.
+
+NOT DONE, AND THE REASON IS NOT TIME. The graveyard's actionable pile stands at 86 orphaned utilities (baseline
+86, ratchet green), and orphanTriage's register of survivors is 13. Its own words: "NOT ONE IS DECIDED HERE ...
+BUILT ENGINE FEATURES NOTHING WIRED (livePanel, radarManager, lbmShader, svoGenerator, ddaFloat32) ... is
+Keith's judgement, one at a time." I read ui/radarManager.js as the best candidate and STOPPED: predictions.html
+already records the finish as "adopting the manager in the live STATUS render is the rig-side finish", and
+peerRadar's blips are hash-ring positions while the manager projects world coordinates, so wiring them is a
+COORDINATE-MODEL DECISION, not a wiring. Forcing it to move 86 -> 85 would be the ratchet-gaming this tree names
+as its own failure mode (v3453). The pile is measured and listed; the decision is Keith's.
+
+PAIRED EDITS NAMED HERE FOR frozenReferee: ui/webgpuOrigin-selfcheck.mjs is a gate and its subjects are the
+seven pages plus ui/webgpuProbe.mjs, which did NOT change this round (its own gate still passes). tools/ship/
+mpmGpuPage-selfcheck.mjs is a gate edited without its subject changing -- server.html is untouched; the gate was
+pinned to the wrong thing about a page that was already correct.
+
+CARRIED REDS, MEASURED AGAIN: gateReach (population 464 against 418), registryOrphans (22 instruments outside
+the registry) and pageReach (Arriving 40 against 30) are unchanged and byte-identical to the pristine v3841
+extract. gateQuality is no longer among them. No device added, no gate file added. gate count 1093, unchanged --
+this round fixed gates rather than adding one.
 ## v3844 -- THE COCKPIT'S HIT VFX PORTED TO THE 3D FIGHT, AND THE PER-FRAME DRAG LEFT BEHIND
 
 Keith asked for cockpit.html's particle effect on the 3D dogfight. The spray is the easy half; the part worth
