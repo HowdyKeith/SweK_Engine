@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 387,
+ "count": 397,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -119,7 +119,7 @@
    "f": "ascii-video.html",
    "t": "ASCII Video Player",
    "d": "Load a JSON frame document and play it as ASCII video. Validates the grid, refuses ragged frames by name, and measures inter-frame churn so flicker is a number rather than an opinion.",
-   "g": "systools",
+   "g": "",
    "p": 0
   },
   {
@@ -900,6 +900,20 @@
    "p": 0
   },
   {
+   "f": "es-box3d-3d.html",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D",
+   "d": "Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-box3d-fly3d.html",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)",
+   "d": "Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "es-box3d.html",
    "t": "SweK &middot; Endless Sky on Box3D",
    "d": "",
@@ -1113,6 +1127,13 @@
    "f": "fluid-webgpu.html",
    "t": "SweK &middot; FLIP/PIC Fluid (WebGPU)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fog-of-war.html",
+   "t": "Fog of War (line-of-sight + toroidal memory)",
+   "d": "FOG OF WAR on a toroidal explored-memory buffer (v3839). The current field of view is recomputed every frame by RECURSIVE SHADOWCASTING, so the pillars actually occlude -- what is behind a pillar is dark and vision does not leak diagonally through a corner. What has been seen is REMEMBERED (dim) in a persistent toroidal wearField buffer that follows the viewer, until it travels far enough that old ground scrolls out of the window and is forgotten -- which is why a fixed buffer that follows the viewer is the right structure, not an infinite map. Three states per cell: unseen (black), remembered (dim), visible (lit). The viewer wanders on its own. Answer-key gate: fogOfWar-selfcheck (origin sees itself, an open disc lit to its radius, walls occlude, no corner leak, tri-state memory monotone).",
    "g": "",
    "p": 0
   },
@@ -1467,6 +1488,13 @@
    "p": 0
   },
   {
+   "f": "lab-census.html",
+   "t": "Lab census",
+   "d": "The physics lab's coverage in one read: how many proven modules a device bind reaches, how many binds declare a plant, how many devices can face the four-criterion corroboration battery, how many are reachable from an instrument, and whether the job dispatcher is actually ticking. Every figure is imported from the tool that owns it -- the page re-derives nothing, which is the whole point: four censuses that each print their own prose is why the numbers in the notes went stale.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "lab-export.html",
    "t": "Lab export -- SweK",
    "d": "",
@@ -1677,6 +1705,13 @@
    "p": 0
   },
   {
+   "f": "mpm3d.html",
+   "t": "MPM in 3D",
+   "d": "The 3D MPM loop, drawn (v3841). mpm3dBind proved the transfer identities lift to 3D; this is the loop above them -- p2g3, a 27-node stress scatter, gravity, g2p3, a 3x3 deformation-gradient update -- running an elastic block that falls into a box and settles. The graded key is the same one that graded the 2D loop: the centre of mass follows the analytic fall whatever the block does internally (step3d-selfcheck), now in three axes, with a 3x3 Neo-Hookean stress whose Cauchy tensor is symmetric (angular-momentum balance) and which returns NaN for an inverted particle rather than clamping. Drag to orbit. Run/Reset. Answer-key gate: step3d-selfcheck.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "multigrid.html",
    "t": "SweK Multigrid Bench",
    "d": "",
@@ -1737,6 +1772,13 @@
    "t": "A counting law grades a force field (v3652)",
    "d": "Normal modes are the Hessian of the MD force field already in the tree, graded by counting laws from geometry - 3N-6 and six zeros for a bent molecule, 3N-5 and five for a linear one. The linear case returns seven, and the reason is that the cosine-harmonic angle is quartic at 180 degrees.",
    "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "office-floor.html",
+   "t": "Office floor - who is working on what",
+   "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
+   "g": "",
    "p": 0
   },
   {
@@ -1995,7 +2037,7 @@
    "f": "raycast.html",
    "t": "Raycast Local LLM",
    "d": "",
-   "g": "systools",
+   "g": "",
    "p": 0
   },
   {
@@ -2258,6 +2300,13 @@
    "p": 0
   },
   {
+   "f": "slug-text.html",
+   "t": "SweK &middot; Slug text",
+   "d": "The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "social.html",
    "t": "Social &middot; SweK",
    "d": "",
@@ -2358,8 +2407,15 @@
   {
    "f": "statistical-mechanics.html",
    "t": "Statistical mechanics &mdash; the front door",
-   "d": "The front door for the statistical-mechanics arc: the Maxwell-Boltzmann speed distribution, the Planck law, the Debye heat capacity, Bose-Einstein condensation, the degenerate Fermi gas, the Sackur-Tetrode entropy, and the finite-temperature chemical potential that ties the three statistics together. Seven graded modules that had no door at all until v3818 -- runnable only by typing a selfcheck path. The page computes nothing itself: every figure comes from a module under physics/ with its own gate, and the headline of each panel is the KEY that module is graded on. The chemical-potential panel is the one to look at: one density constraint sets the fugacity for all three gases, mu = kT ln z, and the classical answer falls out of both quantum ones as the gas thins.",
+   "d": "The front door for the statistical-mechanics arc: the Maxwell-Boltzmann speed distribution, the Planck law, the Debye heat capacity, Bose-Einstein condensation, the degenerate Fermi gas, the Sackur-Tetrode entropy, the finite-temperature chemical potential that ties the three statistics together, and the paramagnet's Schottky anomaly (localised spins -- ising.js without the interactions). Eight graded modules that had no door at all -- runnable only by typing a selfcheck path (seven found this page at v3818, the paramagnet at v3820). The page computes nothing itself: every figure comes from a module under physics/ with its own gate, and the headline of each panel is the KEY that module is graded on. The chemical-potential panel is the one to look at: one density constraint sets the fugacity for all three gases, mu = kT ln z, and the classical answer falls out of both quantum ones as the gas thins.",
    "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "svg-forge.html",
+   "t": "SweK &middot; SVG forge",
+   "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
+   "g": "",
    "p": 0
   },
   {
@@ -2423,6 +2479,13 @@
    "t": "SweK Tools",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "toroidal-wave.html",
+   "t": "Toroidal Wave Buffer",
+   "d": "A TOROIDAL DEFORM BUFFER driving a real-time wave simulation on a curved surface (v3837). An N x N field is addressed with wraparound (modulo) indexing, so it has no edges -- a ripple leaving one side re-enters the other, the domain is periodic, and scrolling the read origin moves the whole field under the viewport with no buffer copy. Because a wrapped grid IS a torus topologically, the field maps onto a torus with no seam and the waves chase themselves around it. The 2D wave equation runs on the CPU here (leapfrog, wraparound 5-point Laplacian, CFL-safe); the GPU ping-pong-texture version is the optimisation. Drops splat with toroidal wrap; Scroll demonstrates the moving window; Reset stills the field. Answer-key gate: toroidalField-selfcheck (wraparound indexing, the cross-seam energy transfer, CFL stability, scroll==shift, seamless torus map).",
+   "g": "",
    "p": 0
   },
   {
@@ -2625,6 +2688,13 @@
    "f": "waveguide.html",
    "t": "SweK Physics — waveguide cutoffs",
    "d": "A hollow metal pipe carries nothing below its cutoff frequency. TE and TM modes come from the same 2D eigenproblem differing only in a boundary condition, and that difference decides which mode is dominant: solving TM with the wrong condition returns a tidy, plausible cutoff for a pipe that does not exist. The mode SET is what catches it, not the frequencies.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wear-field.html",
+   "t": "Wear Field (Toroidal Accumulation)",
+   "d": "A PERSISTENT TOROIDAL ACCUMULATION BUFFER following a ship (v3838) -- the snowflow deform buffer proper, the persistent half the stateless wave could not do. An N x N field is world-locked by wraparound addressing so it covers a size x size window that FOLLOWS the ship without ever being copied; the ship stamps wear/scorch into it every frame and it DECAYS, so a trail smears behind and heals over time. The subtle part, gated in wearField-selfcheck: the SCROLL-AND-CLEAR -- when the window recenters, only the newly-exposed texels (world the ship has just reached) are zeroed, while everything still in the window keeps accumulating; clearing everything would erase the trail, clearing nothing would ghost the world you left and returned to. The buffer runs on the CPU here; the GPU ping-pong-texture version is the optimisation. Pause/Reset/Heal. Answer-key gate: wearField-selfcheck (toroidal addressing, accumulation, persistence across scroll, re-entry clearing, decay).",
    "g": "",
    "p": 0
   },
