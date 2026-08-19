@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Sprite Raycaster">
+<meta name="demo:desc" content="SweK's third sprite path (after extrude and voxelize): an NGRayEx-style DDA raycaster. Textured walls AND floor/ceiling via floor-casting; ES ships drawn as distance-scaled billboards with 8-frame per-facing turnaround (they show their real heading as you circle them) and true wall occlusion. Flown by the navigation brain (the GPU Brain drops into the same hook on-rig). Bloom, minimap, autonomous. Press P for manual (WASD + arrows).">
+<meta name="demo:category" content="fx">
+<title>Sprite Raycaster</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:#f6a623; letter-spacing:.14em; text-transform:uppercase; z-index:3; }
+  #st { position:fixed; right:14px; bottom:12px; color:#5f7aa0; font-size:11px; z-index:3; }
+  #hint { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); color:#5f7aa0; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Sprite Raycaster</div>
+<div id="st"></div>
+<div id="hint">brain is flying &middot; press P for manual (WASD + arrows)</div>
+<script type="module">
+import { makeCamera, raycastColumns, projectSprites, pilotStep, moveCollide, rotate, floorCastRow, spriteFrame, registerDoors, updateDoors } from "./fx/raycast/raycaster.js";
+import { attachGestures } from "./ui/touchGestures.js";
+import { makeBloom } from "./fx/post/bloom.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), st = document.getElementById("st");
+const bloom = makeBloom({ threshold: 0.62, intensity: 0.7, blurPx: 5 });
+let W = 0, H = 0, RW = 0, RH = 0; const SCALE = 3;
+const rbuf = document.createElement("canvas"), rctx = rbuf.getContext("2d");
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; RW = rbuf.width = Math.max(180, (W / SCALE) | 0); RH = rbuf.height = Math.max(110, (H / SCALE) | 0); }
+addEventListener("resize", resize);
+
+const M = [
+  [1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,3,0,0,1,1,0,0,2,2,0,0,3,0,1],[1,0,0,0,0,1,0,0,0,0,2,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],[2,0,0,2,2,0,0,0,0,0,0,3,3,0,0,2],
+  [2,0,0,2,0,0,0,0,0,0,0,0,3,0,0,1],[1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1],
+  [1,0,3,0,0,0,0,1,1,0,0,0,0,3,0,1],[1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1]];
+const MH = M.length, MW = M[0].length;
+
+function texData(kind) {
+  const S = 64, s = document.createElement("canvas"); s.width = s.height = S; const g = s.getContext("2d");
+  if (kind === 1) { g.fillStyle = "#5a3a2a"; g.fillRect(0, 0, S, S); g.fillStyle = "#3a251a"; for (let y = 0; y < S; y += 16) for (let x = 0; x < S; x += 32) g.fillRect(x + ((y / 16) % 2 ? 16 : 0), y, 30, 14); }
+  else if (kind === 2) { g.fillStyle = "#26405c"; g.fillRect(0, 0, S, S); g.strokeStyle = "#59d1ff"; g.lineWidth = 2; g.strokeRect(4, 4, S - 8, S - 8); g.fillStyle = "#3a5a7c"; g.fillRect(S / 2 - 3, 8, 6, S - 16); }
+  else if (kind === 3) { g.fillStyle = "#5c4318"; g.fillRect(0, 0, S, S); g.fillStyle = "#f6a623"; g.fillRect(0, S / 2 - 4, S, 8); g.fillStyle = "#3a2a0e"; for (let x = 0; x < S; x += 12) g.fillRect(x, 0, 6, S); }
+  else if (kind === 4) { g.fillStyle = "#7a2a2a"; g.fillRect(0, 0, S, S); g.fillStyle = "#c05050"; g.fillRect(6, 6, S - 12, S - 12); g.fillStyle = "#f6a623"; g.fillRect(S / 2 - 2, 10, 4, S - 20); g.fillStyle = "#3a1010"; for (let y = 0; y < S; y += 10) g.fillRect(0, y, S, 2); }
+  else if (kind === "floor") { g.fillStyle = "#1a2230"; g.fillRect(0, 0, S, S); g.strokeStyle = "#2a3a4e"; g.lineWidth = 1; for (let i = 0; i <= S; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.moveTo(0, i); g.lineTo(S, i); g.stroke(); } }
+  else { g.fillStyle = "#0a0f18"; g.fillRect(0, 0, S, S); g.fillStyle = "#141c2a"; for (let i = 0; i < 40; i++) g.fillRect((i * 37) % S, (i * 53) % S, 1, 1); }
+  return g.getImageData(0, 0, S, S);
+}
+const TEX = { 1: texData(1), 2: texData(2), 3: texData(3), 4: texData(4) }, FLOOR = texData("floor"), CEIL = texData("ceil");
+
+// 8-frame per-facing ship turnaround sheet (frame f = ship pointing at f*45deg)
+function shipSheet(hue) { const F = 8, S = 34, c = document.createElement("canvas"); c.width = F * S; c.height = S; const g = c.getContext("2d"); for (let f = 0; f < F; f++) { g.save(); g.translate(f * S + S / 2, S / 2); g.rotate(f * Math.PI / 4 + Math.PI / 2); g.fillStyle = hue; g.beginPath(); g.moveTo(0, -14); g.lineTo(5, 6); g.lineTo(11, 10); g.lineTo(3, 9); g.lineTo(0, 13); g.lineTo(-3, 9); g.lineTo(-11, 10); g.lineTo(-5, 6); g.closePath(); g.fill(); g.restore(); } return c; }
+function orb() { const S = 30, c = document.createElement("canvas"); c.width = c.height = S; const g = c.getContext("2d"); const r = g.createRadialGradient(S / 2, S / 2, 1, S / 2, S / 2, S / 2); r.addColorStop(0, "#eaffff"); r.addColorStop(0.4, "#59d1ff"); r.addColorStop(1, "rgba(89,209,255,0)"); g.fillStyle = r; g.fillRect(0, 0, S, S); return c; }
+const sprites = [
+  { x: 5.5, y: 2.5, img: shipSheet("#a9c4ff"), frames: 8, facing: 0.6, h: 0.7 }, { x: 11.5, y: 3.5, img: shipSheet("#ffcf8f"), frames: 8, facing: 3.4, h: 0.7 },
+  { x: 8.5, y: 5.5, img: orb(), frames: 1, h: 0.5, glow: 1 }, { x: 3.5, y: 6.5, img: shipSheet("#9be1b0"), frames: 8, facing: 1.7, h: 0.7 }, { x: 13.5, y: 7.5, img: orb(), frames: 1, h: 0.5, glow: 1 }];
+
+let cam = makeCamera(7.5, 4.5, 0.4), manual = false; const keys = {};
+const doors = registerDoors(M, 4);
+attachGestures(cv, { onPan: (pan, fingers) => { if (fingers === 1) { manual = true; rotate(cam, pan.dx * 0.004); moveCollide(cam, -cam.dirX * pan.dy * 0.004, -cam.dirY * pan.dy * 0.004, M); } }, onTap: () => { manual = !manual; document.getElementById("hint").textContent = manual ? "manual: drag to look/move, tap to hand it back" : "brain is flying \u00b7 tap or press P for manual"; } });
+addEventListener("keydown", e => { const k = e.key.toLowerCase(); if (k === "p") { manual = !manual; document.getElementById("hint").textContent = manual ? "manual: WASD move, arrows turn -- press P to give it back to the brain" : "brain is flying \u00b7 press P for manual (WASD + arrows)"; } keys[k] = true; keys[e.key] = true; });
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; keys[e.key] = false; });
+
+const zbuf = new Float32Array(4096);
+function render() {
+  const img = rctx.createImageData(RW, RH), d = img.data;
+  // floor + ceiling by floor-casting
+  for (let y = (RH / 2 | 0) + 1; y < RH; y++) {
+    const fc = floorCastRow(cam, y, RW, RH); if (!fc) continue; let fx = fc.floorX, fy = fc.floorY; const cy = RH - y - 1, fog = Math.max(0.18, 1 - fc.rowDist / 13);
+    for (let x = 0; x < RW; x++) {
+      const tx = ((fx - Math.floor(fx)) * 64) & 63, ty = ((fy - Math.floor(fy)) * 64) & 63, ti = (ty * 64 + tx) * 4;
+      let o = (y * RW + x) * 4; d[o] = FLOOR.data[ti] * fog; d[o + 1] = FLOOR.data[ti + 1] * fog; d[o + 2] = FLOOR.data[ti + 2] * fog; d[o + 3] = 255;
+      o = (cy * RW + x) * 4; d[o] = CEIL.data[ti] * fog; d[o + 1] = CEIL.data[ti + 1] * fog; d[o + 2] = CEIL.data[ti + 2] * fog + 8; d[o + 3] = 255;
+      fx += fc.stepX; fy += fc.stepY;
+    }
+  }
+  // walls overwrite the middle band
+  const cols = raycastColumns(M, cam, RW);
+  for (let x = 0; x < RW; x++) {
+    const c = cols[x], perp = c.perp; zbuf[x] = perp; const h = Math.min(RH * 4, (RH / perp) | 0), y0 = ((RH - h) / 2) | 0;
+    const tex = TEX[c.cell] || TEX[1], tx = Math.min(63, (c.wallX * 64) | 0), fog = Math.max(0.25, 1 - perp / 11) * (c.side ? 0.65 : 1);
+    for (let y = 0; y < h; y++) { const yy = y0 + y; if (yy < 0 || yy >= RH) continue; const ty = Math.min(63, ((y / h) * 64) | 0), ti = (ty * 64 + tx) * 4, o = (yy * RW + x) * 4; d[o] = tex.data[ti] * fog; d[o + 1] = tex.data[ti + 1] * fog; d[o + 2] = tex.data[ti + 2] * fog; d[o + 3] = 255; }
+  }
+  rctx.putImageData(img, 0, 0);
+  // billboards: per-facing frame + per-column wall occlusion
+  for (const b of projectSprites(sprites, cam, RW)) {
+    const spr = b.spr, size = Math.abs((RH / b.depth) * (spr.h || 0.7)) | 0, sx = b.screenX | 0, half = (size / 2) | 0, vy = (RH / 2) | 0;
+    const fi = spr.frames > 1 ? spriteFrame(spr, cam, spr.frames) : 0, fw = spr.img.width / (spr.frames || 1);
+    for (let col = -half; col < half; col++) { const px = sx + col; if (px < 0 || px >= RW) continue; if (b.depth >= zbuf[px]) continue; const u = fi * fw + ((col + half) / size) * fw; rctx.save(); if (spr.glow) rctx.globalCompositeOperation = "lighter"; rctx.drawImage(spr.img, u, 0, 1, spr.img.height, px, vy - half, 1, size); rctx.restore(); }
+  }
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(rbuf, 0, 0, W, H);
+  bloom(cv, ctx, W, H); drawMinimap();
+}
+function drawMinimap() {
+  const s = 7, ox = W - MW * s - 12, oy = 12; ctx.globalAlpha = 0.85;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) { ctx.fillStyle = M[y][x] ? (M[y][x] === 2 ? "#26405c" : M[y][x] === 3 ? "#7a5a20" : "#3a2a1a") : "rgba(10,16,24,0.5)"; ctx.fillRect(ox + x * s, oy + y * s, s - 1, s - 1); }
+  for (const b of sprites) { ctx.fillStyle = b.glow ? "#59d1ff" : "#a9c4ff"; ctx.fillRect(ox + b.x * s - 1, oy + b.y * s - 1, 3, 3); }
+  ctx.fillStyle = "#f6a623"; ctx.beginPath(); ctx.arc(ox + cam.px * s, oy + cam.py * s, 3, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = "#f6a623"; ctx.beginPath(); ctx.moveTo(ox + cam.px * s, oy + cam.py * s); ctx.lineTo(ox + (cam.px + cam.dirX) * s, oy + (cam.py + cam.dirY) * s); ctx.stroke(); ctx.globalAlpha = 1;
+}
+resize();
+function frame() {
+  updateDoors(doors, M, cam, 1 / 60, {});
+  if (manual) { const spd = 0.06; if (keys["w"]) moveCollide(cam, cam.dirX * spd, cam.dirY * spd, M); if (keys["s"]) moveCollide(cam, -cam.dirX * spd, -cam.dirY * spd, M); if (keys["a"]) moveCollide(cam, cam.dirY * spd, -cam.dirX * spd, M); if (keys["d"]) moveCollide(cam, -cam.dirY * spd, cam.dirX * spd, M); if (keys["ArrowLeft"]) rotate(cam, -0.05); if (keys["ArrowRight"]) rotate(cam, 0.05); }
+  else pilotStep(cam, M, sprites, { speed: 0.04, turn: 0.08, seek: 0.5 });
+  render();
+  st.textContent = (manual ? "manual" : "brain-piloted") + " \u00b7 (" + cam.px.toFixed(1) + "," + cam.py.toFixed(1) + ") \u00b7 floor+ceiling cast \u00b7 " + RW + "\u00d7" + RH;
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

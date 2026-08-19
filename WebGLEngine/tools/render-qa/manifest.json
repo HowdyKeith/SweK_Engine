@@ -1,0 +1,1021 @@
+{
+  "defaults": {
+    "wait": 3500,
+    "width": 1280,
+    "height": 800
+  },
+  "pages": [
+    {
+      "name": "showcase",
+      "url": "/showcase.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        },
+        {
+          "type": "luminanceInRange",
+          "min": 6,
+          "max": 250
+        }
+      ],
+      "ignoreConsole": [
+        "dedication\\.jpg"
+      ]
+    },
+    {
+      "name": "engine",
+      "url": "/index.html?preset=qa1",
+      "wait": 6000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 40
+        },
+        {
+          "type": "regionNotBlack",
+          "x0": 0.0,
+          "y0": 0.0,
+          "x1": 1.0,
+          "y1": 0.45,
+          "minNonBlackFrac": 0.2
+        }
+      ],
+      "ignoreConsole": [
+        "intro\\.mp4",
+        "/comfyui/",
+        "/kpop/"
+      ]
+    },
+    {
+      "name": "play",
+      "url": "/play.html",
+      "wait": 6000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 30
+        }
+      ]
+    },
+    {
+      "name": "thead",
+      "url": "/thead.html",
+      "wait": 4000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "wasm-bench",
+      "url": "/wasm-bench.html",
+      "canvas": "viewport",
+      "wait": 2500,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 20
+        }
+      ]
+    },
+    {
+      "name": "webgpu-bench",
+      "url": "/webgpu-bench.html",
+      "canvas": "viewport",
+      "wait": 2500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 20
+        }
+      ]
+    },
+    {
+      "name": "water",
+      "url": "/water.html",
+      "wait": 4000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 20
+        }
+      ]
+    },
+    {
+      "name": "brain-maze",
+      "url": "/brain-maze.html",
+      "wait": 4000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 16
+        }
+      ]
+    },
+    {
+      "name": "robotface",
+      "url": "/RobotExpressive.html",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "voxearth",
+      "url": "/voxearth.html",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 16
+        }
+      ]
+    },
+    {
+      "name": "battleship3d",
+      "url": "/battleship3d.html",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 16
+        }
+      ]
+    },
+    {
+      "name": "brain-room",
+      "url": "/brain-room.html",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "box3d-demo",
+      "url": "/box3d-demo.html",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 10
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d"
+      ]
+    },
+    {
+      "name": "box3d-contacts",
+      "url": "/box3d-contacts.html",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 10
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d"
+      ]
+    },
+    {
+      "name": "es-box3d",
+      "url": "/es-box3d.html",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.003
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 6
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d"
+      ]
+    },
+    {
+      "name": "kaiju-box3d",
+      "url": "/index.html?box3ddemo=1",
+      "wait": 11000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "box3ddemo",
+        "vendor/box3d",
+        "brain",
+        "peer",
+        "/comfyui/",
+        "/kpop/",
+        "intro"
+      ]
+    },
+    {
+      "name": "fire-demo",
+      "url": "/fire-demo.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        },
+        {
+          "type": "luminanceInRange",
+          "min": 6,
+          "max": 250
+        }
+      ],
+      "ignoreConsole": [
+        "dedication\\.jpg"
+      ]
+    },
+    {
+      "name": "blobulator",
+      "url": "/blobulator.html",
+      "canvas": "viewport",
+      "wait": 5000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        },
+        {
+          "type": "luminanceInRange",
+          "min": 6,
+          "max": 250
+        }
+      ]
+    },
+    {
+      "name": "gallery",
+      "url": "/gallery.html",
+      "canvas": "viewport",
+      "wait": 3000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        }
+      ]
+    },
+    {
+      "name": "blobulator-gpu",
+      "url": "/blobulator-gpu.html",
+      "canvas": "viewport",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.04
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 18
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d",
+        "WebGPU",
+        "webgpu",
+        "gpu"
+      ]
+    },
+    {
+      "name": "box3d-blobs",
+      "url": "/box3d-blobs.html",
+      "canvas": "viewport",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.04
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 18
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d"
+      ]
+    },
+    {
+      "name": "flight-gpu",
+      "url": "/flight-gpu.html",
+      "canvas": "viewport",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.008
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ],
+      "ignoreConsole": [
+        "box3d",
+        "vendor/box3d",
+        "WebGPU",
+        "webgpu",
+        "gpu"
+      ]
+    },
+    {
+      "name": "brain-quadrants",
+      "url": "/brain-quadrants.html",
+      "canvas": "viewport",
+      "wait": 4500,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "flight-coop",
+      "url": "/flight-coop.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.01
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ]
+    },
+    {
+      "name": "wormhole",
+      "url": "/wormhole.html",
+      "canvas": "viewport",
+      "wait": 3000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 16
+        }
+      ],
+      "ignoreConsole": [
+        "webgpu",
+        "WebGPU",
+        "gpu"
+      ]
+    },
+    {
+      "name": "blackhole",
+      "url": "/blackhole.html",
+      "canvas": "viewport",
+      "wait": 3000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.015
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 16
+        }
+      ],
+      "ignoreConsole": [
+        "webgpu",
+        "WebGPU",
+        "gpu"
+      ]
+    },
+    {
+      "name": "box3d-vs-jolt",
+      "url": "/box3d-vs-jolt.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "checks": [
+        {
+          "type": "regionFracInRange",
+          "x0": 0.5,
+          "y0": 0.14,
+          "x1": 0.74,
+          "y1": 0.4,
+          "rgb": [
+            255,
+            60,
+            90
+          ],
+          "tol": 50,
+          "minFrac": 0.0,
+          "maxFrac": 0.3,
+          "_note": "diff panel: red-diff fraction must stay under the envelope; 0 when box3d WASM absent, non-zero+bounded when both backends run"
+        }
+      ]
+    },
+    {
+      "name": "world-default",
+      "url": "/index.html",
+      "canvas": "viewport",
+      "wait": 6000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        },
+        {
+          "type": "luminanceInRange",
+          "min": 6,
+          "max": 250
+        }
+      ]
+    },
+    {
+      "name": "world-rle",
+      "url": "/index.html?rle=1",
+      "canvas": "viewport",
+      "wait": 6000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        },
+        {
+          "type": "luminanceInRange",
+          "min": 6,
+          "max": 250
+        }
+      ]
+    },
+    {
+      "name": "world-biomes",
+      "url": "/index.html?biomes=1",
+      "canvas": "viewport",
+      "wait": 6000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        }
+      ]
+    },
+    {
+      "name": "world-rle-biomes",
+      "url": "/index.html?rle=1&biomes=1",
+      "canvas": "viewport",
+      "wait": 6000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        }
+      ]
+    },
+    {
+      "name": "lab-ising",
+      "url": "/ising.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-kepler",
+      "url": "/kepler.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-fresnel",
+      "url": "/fresnel.html",
+      "canvas": "viewport",
+      "wait": 3500,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-kerr",
+      "url": "/kerr.html",
+      "canvas": "viewport",
+      "wait": 3500,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-fanbeam",
+      "url": "/fanbeam.html",
+      "canvas": "viewport",
+      "wait": 5000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-wind-tunnel",
+      "url": "/wind-tunnel.html",
+      "canvas": "viewport",
+      "wait": 5000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-schrodinger",
+      "url": "/schrodinger.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-logistic",
+      "url": "/logistic.html",
+      "canvas": "viewport",
+      "wait": 5000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "lab-splat",
+      "url": "/splat-lab.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ]
+    },
+    {
+      "name": "lab-discovery",
+      "url": "/discovery-lab.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ]
+    },
+    {
+      "name": "lab-probe",
+      "url": "/probe-lab.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ]
+    },
+    {
+      "name": "models-compare",
+      "url": "/models.html",
+      "canvas": null,
+      "wait": 3000,
+      "noConsoleErrors": true,
+      "checks": []
+    },
+    {
+      "name": "lab-kinematic",
+      "url": "/kinematic.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 12
+        }
+      ]
+    },
+    {
+      "name": "wasm-gen-stats",
+      "url": "/index.html?preset=qa1&wasmprobe=1",
+      "canvas": "viewport",
+      "wait": 6000,
+      "noConsoleErrors": false,
+      "stress": {
+        "seconds": 20,
+        "radius": 400,
+        "teleports": 3
+      },
+      "probe": "JSON.parse(JSON.stringify({stats: window.world && window.world.wasmGenStats ? window.world.wasmGenStats() : null, streamer: window.streamer ? window.streamer.stats() : null, cores: navigator.hardwareConcurrency, rigCheck: window.rigCheck ? {last: window.rigCheck.last, attestation: window.rigCheck.attestation()} : null, seed: window.worldSeed ? window.worldSeed() : null}))",
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        }
+      ]
+    },
+    {
+      "name": "lab-kriging",
+      "url": "/kriging.html",
+      "canvas": "viewport",
+      "wait": 4000,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 24
+        }
+      ]
+    },
+    {
+      "name": "voxel-viewer-greedy",
+      "url": "/voxel-viewer.html?mesher=greedy",
+      "canvas": "viewport",
+      "wait": 5000,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.01
+        }
+      ],
+      "assert": {
+        "claim": "v2579 A flag that lies is worse than no flag",
+        "expr": "window.__swekMesher && window.__swekMesher.requested === 'greedy' && window.__swekMesher.used === 'greedy'",
+        "why": "?mesher=greedy must actually RUN the greedy mesher; a silent fallback renders the old mesh while reporting the new one"
+      }
+    },
+    {
+      "name": "face-mirror",
+      "url": "/face-mirror.html",
+      "wait": 6000,
+      "note": "v3110 -- MediaPipe FaceLandmarker via a FAKE camera (--use-fake-device-for-media-stream). The pixel checks answer 'did it render'; the probe answers 'did it stay responsive', which no pixel check can see. detectForVideo() is synchronous and is called from a rAF tick with no worker, so this page is where that costs something. Tracking a REAL face is still a human check at the rig.",
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 8
+        }
+      ],
+      "probe": "@mainThreadResponsiveness"
+    },
+    {
+      "name": "population",
+      "url": "/population.html",
+      "canvas": "grid",
+      "wait": 2500,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 2
+        }
+      ],
+      "note": "v3120 -- the planner grid is the pixel check; the GPU compile is exercised by the button and surfaces as a pageerror if a shader fails to compile. UNSUPPORTED is reported in the page and is NOT an error."
+    },
+    {
+      "name": "economy",
+      "url": "/economy.html",
+      "canvas": null,
+      "wait": 1500,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.02
+        }
+      ],
+      "note": "v3135 -- the page was linked from server.html and render-qa never opened it. It renders WITHOUT spaceprojectsim running (every handler checks d.ok and shows the named failure), so a sim-less QA box is a valid pass here rather than a skip."
+    },
+    {
+      "name": "sphere-impostor",
+      "url": "/sphere-impostor.html",
+      "canvas": "#sphere",
+      "wait": 900,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "terminatorBow",
+          "minBow": 0.05
+        }
+      ],
+      "note": "v3180 -- THE SPHERE PANEL MUST BOW. terminatorBow walks the region row by row and reports the SPREAD of the light/dark crossings as a fraction of width; a sphere's terminator curves, so the spread is large. Synthetic validation: a straight boundary measures 0.0000 and a bowed one 0.2833. A box with no WebGL2 shows a NAMED unsupported banner rather than a blank canvas, so a capability-less QA machine is a valid pass and not evidence the page works (v3135's reasoning, RESTORED after v3180's rewrite dropped it)."
+    },
+    {
+      "name": "sphere-impostor-flat",
+      "url": "/sphere-impostor.html",
+      "canvas": "#flat",
+      "wait": 900,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.05
+        },
+        {
+          "type": "terminatorBow",
+          "maxBow": 0.03
+        }
+      ],
+      "note": "v3180 -- THE FLAT PANEL MUST NOT BOW, and this half is what makes the other half mean anything. A check that only demanded 'the sphere bows' would pass on a page that drew TWO spheres. THE FAILING CASE HAS TO BE MEASURED FAILING. Both entries load the same URL and screenshot different canvases."
+    },
+    {
+      "name": "raymarch-live",
+      "url": "/raymarch-live.html",
+      "canvas": "#c",
+      "wait": 1200,
+      "noConsoleErrors": true,
+      "checks": [
+        {
+          "type": "notAllBlack",
+          "minNonBlackFrac": 0.03
+        },
+        {
+          "type": "notUniform",
+          "minUniqueColors": 20
+        },
+        {
+          "type": "edgeBiasProfile",
+          "maxEdgeBias": 0.25,
+          "maxAsymmetry": 0.25
+        }
+      ],
+      "note": "v3181 -- THE PAGE WAS NOT IN THIS MANIFEST AT ALL, so nothing has ever looked at it. The standing suspicion (handoff) is that the compositing boxes are PARTLY BURIED and buried MORE AT THE EDGES -- the classic 1/cos ray-march error where the step is taken along a direction not normalized per pixel. edgeBiasProfile MEASURES it: positive edgeBias means the edges sit LOWER than the centre. *** THE LIMITS HERE ARE DELIBERATELY LOOSE AND ARE NOT THE ANSWER. *** They exist so the run REPORTS the number rather than failing on a value nobody has measured. Keith's first run gives the real baseline; tighten then. SYMMETRY IS THE DISCRIMINATOR: a 1/cos artefact is symmetric because cos is even, so low asymmetry WITH high edgeBias is the bug, and high asymmetry is the scene or the lighting instead."
+    },
+    {
+      "name": "lab-export",
+      "url": "/lab-export.html",
+      "wait": 700,
+      "noConsoleErrors": true,
+      "note": "v3184 -- the front door for labExport (v3183 shipped the format with NO CALLER). NO canvas: this page is a TABLE, and asking for a canvas check would fail it for not being a renderer. It NAMES an absent bridge rather than showing an empty device list, so a QA box with no server running is a valid pass and not evidence the export works."
+    },
+    {
+      "name": "module-history",
+      "url": "/module-history.html",
+      "wait": 700,
+      "noConsoleErrors": true,
+      "note": "v3184 -- the front door for labExport (v3183 shipped the format with NO CALLER). NO canvas: this page is a TABLE, and asking for a canvas check would fail it for not being a renderer. It NAMES an absent bridge rather than showing an empty device list, so a QA box with no server running is a valid pass and not evidence the export works."
+    }
+  ],
+  "auto": true,
+  "exclude": {
+    "login.html": "needs a session",
+    "cams.html": "needs real cameras on the LAN",
+    "doorbell.html": "needs the doorbell device",
+    "nest-protect.html": "needs the Nest device",
+    "echo-show.html": "needs the Echo device",
+    "alexa.html": "needs the Alexa account",
+    "govee.html": "needs Govee hardware",
+    "shield-display.html": "needs the Shield",
+    "shield-apps.html": "needs the Shield",
+    "spacedesk.html": "needs the spacedesk driver",
+    "xbox.html": "needs the console",
+    "immich.html": "needs the Immich server",
+    "torrents.html": "needs the torrent client",
+    "webtorrent.html": "needs peers",
+    "librechat.html": "needs the LibreChat server",
+    "huly.html": "needs the Huly server",
+    "kaggle-config.html": "holds credentials",
+    "maigret.html": "runs OSINT lookups against live services",
+    "scrape.html": "hits live sites",
+    "scrapling.html": "hits live sites",
+    "camoufox.html": "drives a real browser",
+    "uitars.html": "drives the desktop",
+    "push2run.html": "drives the desktop",
+    "macrodroid.html": "needs the phone",
+    "terminal.html": "runs shell commands",
+    "devtools.html": "developer console surface",
+    "debug.html": "developer console surface"
+  }
+}

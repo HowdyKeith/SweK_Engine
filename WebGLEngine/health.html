@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Bridge health">
+<meta name="demo:desc" content="Live status of the ai-bridge endpoints — pings the per-tool detect/status/config routes, grouped, with latency. Ping all + auto-refresh.">
+<meta name="demo:cats" content="tool">
+<title>Bridge health</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; --wait:#ffd27f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:880px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 14px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .grp { margin-bottom:14px; }
+  .grp h2 { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px; }
+  .ep { display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid #14304a; border-left:4px solid #2a2f3a; border-radius:6px 6px 6px 12px; padding:7px 11px; margin-bottom:5px; }
+  .ep.ok { border-left-color:var(--good); } .ep.bad { border-left-color:var(--bad); } .ep.wait { border-left-color:var(--wait); }
+  .ep .dot { font-size:13px; width:16px; }
+  .ep .path { color:var(--blue); font-size:12px; min-width:190px; }
+  .ep .ms { color:var(--dim); font-size:11px; width:64px; text-align:right; }
+  .ep .sum { color:var(--text); font-size:11px; flex:1; word-break:break-word; opacity:.9; }
+  .ep a.go2 { margin-left:auto; color:var(--amber); font-size:11px; text-decoration:none; }
+</style>
+</head>
+<body>
+<div id="bar"><h1>🩺 Bridge health</h1><span id="status">…</span><span id="runtime" class="lead" style="margin-left:14px; opacity:.85">…</span></div>
+<div class="wrap">
+  <p class="lead">Live status of the ai-bridge tool endpoints. Each row pings a read-only liveness route (detect / status / config) and shows latency + a short summary. Green = responded ok.</p>
+  <div class="row">
+    <button class="btn go" id="pingAll">Ping all</button>
+    <label class="lead" style="margin:0"><input type="checkbox" id="auto"> auto-refresh 15s</label>
+    <span id="summary" class="lead" style="margin:0"></span>
+  </div>
+  <div id="groups"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+// Curated read-only liveness endpoints, grouped. (189 routes total; these are the safe pings.)
+const EPS = [
+  ["Core", [
+    ["/health","core"], ["/clients","core"], ["/bridge/state","core"],
+  ]],
+  ["Scraping", [
+    ["/camoufox/detect","camoufox"], ["/scrapling/detect","scrapling"], ["/scrape/status","scrape"],
+  ]],
+  ["Docs & voice", [
+    ["/doc/detect","doc"], ["/tts/detect","tts"], ["/tts/status","tts"], ["/tts/voices","tts"],
+  ]],
+  ["Trader", [
+    ["/trader/config","trader"], ["/trader/members?limit=1","trader"], ["/trader/ta/detect","trader"],
+  ]],
+  ["PetFBI & Outlook", [
+    ["/petfbi/config","petfbi"], ["/petfbi/counts","petfbi"], ["/petfbi/admins","petfbi"], ["/outlook/unread","outlook"],
+  ]],
+  ["OSINT", [ ["/maigret/detect","maigret"] ]],
+  ["Media gen", [
+    ["/comfyui/state","comfyui"], ["/diffuser/state","diffuser"], ["/asset-pipeline/status","asset"],
+  ]],
+  ["Integrations", [
+    ["/facebook/status","facebook"], ["/discord/config","discord"], ["/twitch/status","twitch"], ["/hosting/detect","hosting"],
+  ]],
+];
+const PANEL = { camoufox:"/camoufox.html", scrapling:"/scrapling.html", doc:"/doc.html", tts:"/tts.html", trader:"/trader.html", petfbi:"/petfbi.html", maigret:"/maigret.html" };
+
+function summarize(j){
+  if (j == null) return "";
+  const pick = ["ok","ready","installed","version","count","unread","subscribers","uptimeSec","node","engine","mode","source","sheetConfigured","total"];
+  const out = [];
+  for (const k of pick) if (j[k] !== undefined) out.push(k+": "+(typeof j[k]==="object"?JSON.stringify(j[k]):j[k]));
+  if (j.voices && j.voices.length!=null) out.push("voices: "+j.voices.length);
+  if (j.members && j.members.length!=null) out.push("members: "+j.members.length);
+  if (j.libs) out.push("libs: "+Object.values(j.libs).filter(Boolean).length+"/"+Object.keys(j.libs).length);
+  if (j.error) out.push("error: "+String(j.error).slice(0,60));
+  return out.slice(0,4).join(" · ");
+}
+
+function build(){
+  const root = $("groups"); root.innerHTML="";
+  for (const [name, eps] of EPS){
+    const g = document.createElement("div"); g.className="grp";
+    g.innerHTML = "<h2>"+name+"</h2>";
+    for (const [url, tool] of eps){
+      const id = "ep_"+url.replace(/[^a-z0-9]/gi,"_");
+      const row = document.createElement("div"); row.className="ep wait"; row.id=id;
+      const panel = PANEL[tool] ? '<a class="go2" href="'+PANEL[tool]+'">open ▸</a>' : '';
+      row.innerHTML = '<span class="dot">…</span><span class="path">'+url+'</span><span class="ms"></span><span class="sum">queued</span>'+panel;
+      g.appendChild(row);
+    }
+    root.appendChild(g);
+  }
+}
+
+async function ping(url){
+  const id = "ep_"+url.replace(/[^a-z0-9]/gi,"_");
+  const row = $(id); if(!row) return false;
+  row.className="ep wait"; row.querySelector(".dot").textContent="…"; row.querySelector(".sum").textContent="pinging…"; row.querySelector(".ms").textContent="";
+  const t0 = performance.now();
+  try{
+    const r = await fetch(url, { method:"GET" });
+    const ms = Math.round(performance.now()-t0);
+    let j=null; try{ j = await r.json(); }catch{}
+    const ok = r.ok && (!j || j.ok !== false);
+    row.className = "ep "+(ok?"ok":"bad");
+    row.querySelector(".dot").textContent = ok?"✓":"✕";
+    row.querySelector(".ms").textContent = ms+"ms";
+    row.querySelector(".sum").textContent = (j ? summarize(j) : ("HTTP "+r.status)) || ("HTTP "+r.status);
+    return ok;
+  }catch(e){
+    row.className="ep bad"; row.querySelector(".dot").textContent="✕"; row.querySelector(".ms").textContent=""; row.querySelector(".sum").textContent="unreachable: "+e.message;
+    return false;
+  }
+}
+
+async function pingAll(){
+  $("pingAll").disabled=true; $("summary").textContent="pinging…";
+  const all = EPS.flatMap(([,eps])=>eps.map(([url])=>url));
+  let ok=0;
+  for (const url of all){ if (await ping(url)) ok++; }
+  $("summary").textContent = ok+" / "+all.length+" ok";
+  $("status").textContent = ok===all.length ? "all green" : (ok+"/"+all.length);
+  $("pingAll").disabled=false;
+}
+$("pingAll").onclick = pingAll;
+let timer=null;
+$("auto").onchange = e => { clearInterval(timer); if(e.target.checked){ timer=setInterval(pingAll, 15000); } };
+build(); pingAll();
+// v1052 — show which runtime the bridge is on (Bun vs Node).
+fetch("/runtime",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+  if(!j) return;
+  const isBun = j.runtime==="bun";
+  $("runtime").textContent = (isBun?"🥖 Bun v":"⬢ Node v")+(j.version||"?")+(j.useBun&&!isBun?" · Bun set for next boot":"");
+  $("runtime").style.color = isBun?"#ffd884":"#9fe88f";
+}).catch(()=>{ $("runtime").textContent=""; });
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

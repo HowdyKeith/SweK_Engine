@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SweK Engine — End Credits</title>
+<style>
+  :root { --ink:#eef2f7; --dim:#8b97a8; --accent:#ffcf6b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#000; overflow:hidden;
+               font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; color:var(--ink); }
+  #stars { position:fixed; inset:0; z-index:0; display:block; }
+  /* cinematic edge fades top + bottom */
+  .stage { position:fixed; inset:0; z-index:1; overflow:hidden;
+           -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%);
+                   mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%); }
+  .scroll { position:absolute; left:0; right:0; will-change:transform; }
+  .col { max-width: 660px; margin:0 auto; padding:0 28px; text-align:center; }
+
+  .blk { padding: 18px 0; }
+  .title { font-size: clamp(34px, 7vw, 64px); font-weight: 800; letter-spacing:.04em;
+           margin: 0; line-height:1.05; }
+  .title .sub { display:block; font-size: clamp(13px,2.4vw,17px); font-weight:500;
+                color:var(--dim); letter-spacing:.32em; text-transform:uppercase; margin-top:14px; }
+
+  .role { padding: 26px 0; }
+  .role .what { font-size: 13px; letter-spacing:.34em; text-transform:uppercase; color:var(--dim); }
+  .role .who  { font-size: clamp(22px,4.5vw,34px); font-weight:700; margin-top:8px; }
+
+  .head { font-size: 14px; letter-spacing:.42em; text-transform:uppercase; color:var(--accent);
+          padding: 46px 0 8px; font-weight:700; }
+
+  .credit { display:flex; gap:18px; align-items:baseline; justify-content:center;
+            padding: 7px 0; flex-wrap:wrap; }
+  .credit .work { min-width: 44%; text-align:right; font-weight:600; font-size: clamp(15px,2.6vw,19px); }
+  .credit .who  { min-width: 44%; text-align:left; color:var(--dim); font-size: clamp(13px,2.3vw,16px); }
+  @media (max-width:540px){ .credit{flex-direction:column;gap:2px;} .credit .work,.credit .who{text-align:center;min-width:0;} }
+
+  .note { color:var(--dim); font-size:13px; line-height:1.7; padding: 8px 0; }
+  .end .title { color:var(--accent); }
+
+  /* controls */
+  .ctl { position:fixed; z-index:3; right:14px; bottom:14px; display:flex; gap:8px; align-items:center;
+         background:rgba(10,14,20,.62); border:1px solid #2a3340; border-radius:10px; padding:7px 10px;
+         backdrop-filter: blur(6px); font-size:12px; color:var(--dim); }
+  .ctl button { background:#1b2230; color:#cde; border:1px solid #38465c; border-radius:6px;
+                padding:5px 10px; cursor:pointer; font-size:12px; }
+  .ctl button:hover { background:#243049; }
+  .ctl input[type=range]{ width:96px; accent-color:var(--accent); }
+  .hint { position:fixed; z-index:3; left:14px; bottom:16px; color:#5b6675; font-size:11px;
+          letter-spacing:.04em; }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="stage"><div class="scroll"><div class="col" id="col"></div></div></div>
+
+<div class="ctl">
+  <button id="pause">Pause</button>
+  <button id="restart">Restart</button>
+  <span>Speed</span><input id="speed" type="range" min="20" max="160" step="5" value="58">
+</div>
+<div class="hint">Space = pause/play &nbsp;·&nbsp; &uarr;/&darr; = speed &nbsp;·&nbsp; R = restart</div>
+
+<script>
+// ---- Credits data --------------------------------------------------------
+// Append a { type:"credit", work, who } line here whenever a new library or
+// data source is integrated — that's the whole maintenance story.
+const CREDITS = [
+  { type:"title", title:"SweK ENGINE", sub:"a multi-runtime real-time engine" },
+  { type:"role", what:"created & engineered by", who:"Keith Swerling" },
+
+  { type:"head", text:"Built With" },
+  { type:"credit", work:"three.js", who:"Ricardo Cabello (mrdoob) & contributors" },
+  { type:"credit", work:"WebGL2 / WebAudio", who:"the open web platform" },
+  { type:"credit", work:"<model-viewer>", who:"Google" },
+  { type:"credit", work:"Node.js & Bun", who:"their communities" },
+
+  { type:"head", text:"Artificial Intelligence" },
+  { type:"credit", work:"Gemini Vision & Text", who:"Google DeepMind" },
+  { type:"credit", work:"Ollama (local LLMs)", who:"the Ollama project" },
+
+  { type:"head", text:"Real-World Data" },
+  { type:"credit", work:"Map & building data", who:"\u00A9 OpenStreetMap contributors (ODbL)" },
+  { type:"credit", work:"Overpass API", who:"the Overpass / OSM community" },
+  { type:"credit", work:"Elevation", who:"Open-Meteo \u00B7 USGS 3DEP \u00B7 Mapbox" },
+  { type:"credit", work:"Live aircraft", who:"adsb.lol \u00B7 the ADS-B community" },
+  { type:"credit", work:"Weather radar", who:"NOAA NEXRAD \u00B7 Iowa Environmental Mesonet" },
+  { type:"credit", work:"Current conditions", who:"Open-Meteo" },
+
+  { type:"head", text:"Tooling" },
+  { type:"credit", work:"Camoufox (stealth fetch)", who:"daijro" },
+  { type:"credit", work:"WLED lighting", who:"Christian Schwinne (Aircoookie) & contributors" },
+
+  { type:"head", text:"Voice" },
+  { type:"credit", work:"Piper neural TTS", who:"rhasspy / Michael Hansen" },
+  { type:"credit", work:"Speech-to-text", who:"whisper.cpp (ggml-org) \u00B7 faster-whisper (SYSTRAN) \u00B7 OpenAI Whisper" },
+
+  { type:"head", text:"Special Thanks" },
+  { type:"note", text:"To the open-source community, whose work makes a one-person engine possible \u2014 and to everyone reading this far." },
+
+  { type:"end", title:"Thank You", sub:"SweK Engine \u00B7 2026" },
+];
+
+// ---- Build the column ----------------------------------------------------
+const col = document.getElementById("col");
+function build(){
+  col.innerHTML = "";
+  const spacerTop = document.createElement("div"); spacerTop.style.height = "10vh"; col.appendChild(spacerTop);
+  for (const c of CREDITS){
+    const b = document.createElement("div"); b.className = "blk " + (c.type === "end" ? "end" : "");
+    if (c.type === "title" || c.type === "end"){
+      b.innerHTML = '<h1 class="title">' + c.title + '<span class="sub">' + (c.sub||"") + '</span></h1>';
+    } else if (c.type === "role"){
+      b.className += " role";
+      b.innerHTML = '<div class="what">' + c.what + '</div><div class="who">' + c.who + '</div>';
+    } else if (c.type === "head"){
+      b.className = "blk head"; b.textContent = c.text;
+    } else if (c.type === "credit"){
+      b.className = "blk credit";
+      b.innerHTML = '<div class="work">' + c.work + '</div><div class="who">' + c.who + '</div>';
+    } else if (c.type === "note"){
+      b.className = "blk note"; b.textContent = c.text;
+    }
+    col.appendChild(b);
+  }
+  const spacerBot = document.createElement("div"); spacerBot.style.height = "20vh"; col.appendChild(spacerBot);
+}
+build();
+
+// ---- Scroll engine -------------------------------------------------------
+const scroll = document.querySelector(".scroll");
+let y, speed = 58, paused = false, last = 0, contentH = 0;
+function reset(){ contentH = col.offsetHeight; y = window.innerHeight; scroll.style.transform = "translateY(" + y + "px)"; }
+function frame(t){
+  if (!last) last = t;
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  if (!paused){
+    y -= speed * dt;
+    if (y < -contentH) y = window.innerHeight;   // loop
+    scroll.style.transform = "translateY(" + y + "px)";
+  }
+  requestAnimationFrame(frame);
+}
+reset(); requestAnimationFrame(frame);
+addEventListener("resize", () => { contentH = col.offsetHeight; });
+
+// ---- Controls ------------------------------------------------------------
+const pauseBtn = document.getElementById("pause");
+const speedIn = document.getElementById("speed");
+pauseBtn.addEventListener("click", () => { paused = !paused; pauseBtn.textContent = paused ? "Play" : "Pause"; });
+document.getElementById("restart").addEventListener("click", reset);
+speedIn.addEventListener("input", () => { speed = +speedIn.value; });
+addEventListener("keydown", (e) => {
+  if (e.code === "Space"){ e.preventDefault(); paused = !paused; pauseBtn.textContent = paused ? "Play" : "Pause"; }
+  else if (e.code === "ArrowUp"){ speed = Math.min(160, speed + 8); speedIn.value = speed; }
+  else if (e.code === "ArrowDown"){ speed = Math.max(20, speed - 8); speedIn.value = speed; }
+  else if (e.key === "r" || e.key === "R"){ reset(); }
+});
+
+// ---- Starfield backdrop --------------------------------------------------
+const cv = document.getElementById("stars"), cx = cv.getContext("2d");
+let stars = [];
+function sizeStars(){
+  cv.width = innerWidth; cv.height = innerHeight;
+  const n = Math.round((innerWidth * innerHeight) / 7000);
+  stars = Array.from({ length: n }, () => ({
+    x: Math.random()*cv.width, y: Math.random()*cv.height,
+    z: Math.random()*0.8 + 0.2, r: Math.random()*1.2 + 0.3,
+    tw: Math.random()*Math.PI*2,
+  }));
+}
+sizeStars(); addEventListener("resize", sizeStars);
+function drawStars(t){
+  cx.clearRect(0,0,cv.width,cv.height);
+  for (const s of stars){
+    s.y -= s.z * 0.18;                       // gentle drift upward
+    if (s.y < 0){ s.y = cv.height; s.x = Math.random()*cv.width; }
+    const a = 0.45 + 0.45 * Math.sin(t/900 + s.tw);
+    cx.globalAlpha = a * s.z;
+    cx.fillStyle = "#dfe8ff";
+    cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.283); cx.fill();
+  }
+  cx.globalAlpha = 1;
+  requestAnimationFrame(drawStars);
+}
+requestAnimationFrame(drawStars);
+</script>
+</body>
+</html>

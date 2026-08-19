@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Avataro / Avatarina">
+<meta name="demo:desc" content="A blobulator kept as an avatar. Oddly normal, either or both -- Avataro / Avatarina / both, a palette you toggle. It breathes when idle and reacts when you tap: dance, rotate head, high-five, wave, nod, bounce. Reactions displace its metaballs and blend cumulatively -- stack a few and it makes an emergent shape rather than a canned animation, because metaballs merge by nature. Drag to orbit, pinch to zoom. This is the reactive core; a GPU-brain driver and a threat-tentacle-with-fire tip come next.">
+<meta name="demo:category" content="fx">
+<title>Avataro / Avatarina</title>
+<style>
+  html,body { margin:0; height:100%; background:#05060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #name { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:14px; } #sub { color:#5f7aa0; font-size:11px; margin-top:3px; max-width:230px; }
+  #react { position:fixed; left:0; right:0; bottom:14px; z-index:3; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:0 12px; }
+  #react button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:20px; padding:9px 15px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+  #persona { position:fixed; right:14px; top:12px; z-index:3; background:rgba(16,22,36,.92); color:#59d1ff; border:1px solid #22304a; border-radius:20px; padding:9px 15px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="name">&#9670; <span id="who">Avataro / Avatarina</span></div><div id="sub">oddly normal &middot; either or both &middot; tap the blob to drop a threat &middot; it reaches out, burning</div></div>
+<button id="persona">persona: both</button>
+<div id="react"></div>
+
+<script>
+/* v3656 -- ?embed=1 WAS BEING PASSED AND NEVER READ. ui/avatarSwitch.js has mounted this page as
+   "/blob-avatar.html?embed=1" since v3555, and this file contained ZERO occurrences of the word "embed" --
+   so every local control rendered on top of the avatar inside server.html's 143x210 panel. A FLAG THE
+   CALLER SENDS AND THE CALLEE NEVER READS IS NOT A FEATURE WITH A BUG, IT IS TWO FILES THAT NEVER MET.
+
+   Everything here is created later by the module scripts and appended to <body>, so a static CSS rule is
+   what catches them all -- a JS sweep would have to run after every appendChild. #hud and #react are the
+   named containers; the loose buttons are body > button. The canvas is untouched. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("embed") !== "1") return;
+    document.documentElement.setAttribute("data-embed", "1");
+    var st = document.createElement("style");
+    st.textContent =
+      'html[data-embed="1"] #hud,' +
+      'html[data-embed="1"] #react,' +
+      'html[data-embed="1"] body > button { display: none !important; }' +
+      'html[data-embed="1"] body { overflow: hidden; }';
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+</script>
+<script type="module">
+import { makeAvatar } from "./fx/avatar/blobAvatar.js";
+import { makeAvatarDriver } from "./fx/avatar/avatarBrain.js";
+import { makeTentacle, detectThreat } from "./fx/avatar/tentacle.js";
+import { makeSites, fractureMesh, makeDebris, stepDebris, _bounds } from "./fx/fracture/cellFracture.js";
+import { makePet, mergeState } from "./fx/avatar/pet.js";
+import { SKIN_NAMES, SKINS, shadeTri, makeInclusions } from "./fx/avatar/skins.js";
+import { selectBackend } from "./physics/backend.js";
+import { makePhysicsDebris, addGround, readDebris, applyXf } from "./fx/fracture/debrisPhysics.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+import { makeOrbitControls, attachOrbit } from "./ui/touchCamera.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+const av = makeAvatar({ persona: "both" });
+const orbit = makeOrbitControls({ az: 0.5, el: 0.2, dist: 3.0, minDist: 1.8, maxDist: 7 }); attachOrbit(cv, orbit);
+const personas = ["both", "avataro", "avatarina"], pname = { both: "both", avataro: "Avataro", avatarina: "Avatarina" };
+let pIdx = 0;
+document.getElementById("persona").onclick = () => { pIdx = (pIdx + 1) % 3; av.persona = personas[pIdx]; document.getElementById("persona").textContent = "persona: " + personas[pIdx]; document.getElementById("who").textContent = pname[personas[pIdx]] === "both" ? "Avataro / Avatarina" : pname[personas[pIdx]]; };
+
+// Autonomous: the driver picks reactions on its own; if a GPU Brain is registered it steers the pick.
+const brainInfer = (typeof window.__swekBrainInfer === "function") ? window.__swekBrainInfer : null;
+const driver = makeAvatarDriver(av, { infer: brainInfer, mood: 0.6 });
+let autonomous = true;
+const autoBtn = document.createElement("button"); autoBtn.id = "autoBtn";
+autoBtn.style.cssText = "position:fixed;right:14px;top:52px;z-index:3;background:rgba(16,22,36,.92);color:#9be15d;border:1px solid #2a6a4a;border-radius:20px;padding:9px 15px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+document.body.appendChild(autoBtn);
+function autoLabel() { autoBtn.textContent = autonomous ? ("autonomous \u00b7 " + (brainInfer ? "GPU BRAIN" : "self")) : "manual"; autoBtn.style.color = autonomous ? "#9be15d" : "#5f7aa0"; }
+autoBtn.onclick = () => { autonomous = !autonomous; autoLabel(); }; autoLabel();
+
+// THREAT + FIRE-TENTACLE: tap anywhere to drop a threat; Avataro reaches for it with a burning probe tip.
+const threats = [], tent = makeTentacle({ segments: 5, maxReach: 2.4 });
+let lastTip = null;
+cv.addEventListener("click", (e) => { const r = cv.getBoundingClientRect(); const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1); const az = orbit.st.az;
+  threats.length = 0; threats.push({ p: [Math.cos(az) * nx * 2.6, ny * 1.9, -Math.sin(az) * nx * 2.6] });
+  document.getElementById("sub").textContent = "threat detected \u2014 reaching out"; });
+
+// SHATTER: a serious hit fractures the marched body into Voronoi fragments that tumble -- then the metaball cores
+// re-merge into normal form, because they never left. Fracture is merge run backwards.
+let debris = null, shatterT = 0, lastMesh = null;
+// Real physics when a backend loads (Jolt preferred, box3d fallback): the fragments then collide and come to REST.
+// Without one we keep the toy integrator -- it still tumbles, it just never settles.
+let physics = null, pWorld = null, pBodies = null, physName = "cpu";
+selectBackend({ prefer: "jolt" }).then(be => { physics = be; physName = be.name; }).catch(() => { physics = null; physName = "cpu"; });
+function shatter(impact) {
+  if (!lastMesh || !lastMesh.positions.length) return;
+  const sites = makeSites(_bounds(lastMesh.positions), 16, { impact, bias: 0.6 });
+  const frags = fractureMesh(lastMesh, sites);
+  shatterT = 0;
+  if (physics) {   // real solver: bodies that collide, pile up and settle
+    try { if (pWorld) pWorld.destroy(); } catch (e) {}
+    pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -1.6, extent: 9 });
+    pBodies = makePhysicsDebris(pWorld, frags, impact, { force: 2.6 }); debris = null;
+  } else { debris = makeDebris(frags, impact, { force: 2.6 }); pBodies = null; }
+  if (petOn && pet.state === "merged") pet.state = "part";   // the blow breaks the bond -- they come back as two, then re-bond on their own
+  document.getElementById("sub").textContent = "shattered \u2014 " + frags.length + " fragments (" + physName + ") \u00b7 the cores re-merge; nothing was lost";
+}
+const shBtn = document.createElement("button"); shBtn.textContent = "\u26a1 shatter";
+shBtn.style.cssText = "position:fixed;right:14px;top:92px;z-index:3;background:rgba(16,22,36,.92);color:#ff8a5c;border:1px solid #6a3a2a;border-radius:20px;padding:9px 15px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+shBtn.onclick = () => shatter(threats.length ? threats[0].p : [1.2, 0.6, 0]);
+document.body.appendChild(shBtn);
+
+// THE PET: a second blob that roams on its own, comes in and MERGES into Avataro (their metaball fields simply sum
+// into one surface), then parts and re-forms as itself. Nothing is created or destroyed -- it keeps its own shape.
+const pet = makePet({ p: [2.75, 0.2, 0] });
+const petDriver = makeAvatarDriver(pet, { mood: 0.7 });   // the pet thinks for itself too -- same driver, its own moves
+let petOn = true, petState = "roam";
+const petBtn = document.createElement("button"); petBtn.textContent = "pet: on";
+petBtn.style.cssText = "position:fixed;right:14px;top:132px;z-index:3;background:rgba(16,22,36,.92);color:#7fe3c4;border:1px solid #2a6a5a;border-radius:20px;padding:9px 15px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+petBtn.onclick = () => { petOn = !petOn; petBtn.textContent = "pet: " + (petOn ? "on" : "off"); petBtn.style.color = petOn ? "#7fe3c4" : "#5f7aa0"; };
+document.body.appendChild(petBtn);
+
+// WHAT IT IS MADE OF: persona colour, or a real material -- lava (heat), ice (light through the thin parts),
+// crystal (normals snapped to facets), gas (additive density, no surface at all).
+const SKIN_CYCLE = ["persona"].concat(SKIN_NAMES);
+let skinIdx = 0;
+const inclusions = makeInclusions(6, { radius: 0.62, size: 0.2 });   // flaws suspended in the stone (negative metaballs)
+let melt = 0, melting = false;
+const meltBtn = document.createElement("button"); meltBtn.textContent = "\u2668 melt";
+meltBtn.style.cssText = "position:fixed;right:14px;top:212px;z-index:3;background:rgba(16,22,36,.92);color:#ff9d6a;border:1px solid #6a4a2a;border-radius:20px;padding:9px 15px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+meltBtn.onclick = () => { melting = !melting; meltBtn.textContent = melting ? "\u2668 freezing" : "\u2668 melt"; };
+document.body.appendChild(meltBtn);
+const skinBtn = document.createElement("button"); skinBtn.textContent = "skin: persona";
+skinBtn.style.cssText = "position:fixed;right:14px;top:172px;z-index:3;background:rgba(16,22,36,.92);color:#ffd08a;border:1px solid #6a5a2a;border-radius:20px;padding:9px 15px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+skinBtn.onclick = () => { skinIdx = (skinIdx + 1) % SKIN_CYCLE.length; skinBtn.textContent = "skin: " + SKIN_CYCLE[skinIdx]; };
+document.body.appendChild(skinBtn);
+
+const rBar = document.getElementById("react");
+for (const name of av.reactions) { const bt = document.createElement("button"); bt.textContent = name.replace(/([A-Z])/g, " $1").toLowerCase(); bt.onclick = () => av.react(name); rBar.appendChild(bt); }
+
+const N = 38, LO = -3.35, HI = 3.35, span = HI - LO, cell = span / (N - 1);   // fits the reaching tentacle AND the roaming pet
+function buildField(balls) {
+  const field = new Float32Array(N * N * N);
+  for (let z = 0; z < N; z++) { const wz = LO + span * z / (N - 1); for (let y = 0; y < N; y++) { const wy = LO + span * y / (N - 1); const row = (z * N + y) * N; for (let x = 0; x < N; x++) { const wx = LO + span * x / (N - 1); let sum = 0; for (const b of balls) { const dx = wx - b.p[0], dy = wy - b.p[1], dz = wz - b.p[2]; sum += (b.r * b.r) / (dx * dx + dy * dy + dz * dz + 0.02); } field[row + x] = sum; } } }
+  return field;
+}
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  orbit.autospin(dt, 0.14);
+  if (autonomous) { const chose = driver.step(dt); if (chose) document.getElementById("sub").textContent = (brainInfer ? "GPU brain chose: " : "chose: ") + chose.replace(/([A-Z])/g, " $1").toLowerCase() + " \u00b7 mood " + driver.mood.toFixed(2); }
+  const balls = av.step(dt);
+  const shoulder = balls[3].p;                                   // right arm = the shoulder the limb grows from
+  const th = detectThreat(threats, shoulder, 6);
+  const tOut = tent.step(dt, shoulder, th);
+  lastTip = tOut.tip;
+  let petBalls = [];
+  if (petOn) { const pc = petDriver.step(dt); const po = pet.step(dt, [balls[0].p[0], balls[0].p[1], balls[0].p[2]]); petBalls = po.balls;
+    if (pc) document.getElementById("sub").textContent = "the pet: " + pc;
+    if (po.state !== petState) { petState = po.state; const ms = mergeState(balls, petBalls, 1.0);
+      document.getElementById("sub").textContent = petState === "merged" ? "the pet merged in \u2014 one surface" : petState === "part" ? "parting \u2014 it re-forms as itself" : petState === "approach" ? "the pet is coming in" : "the pet roams"; } }
+  melt += ((melting ? 1 : 0) - melt) * Math.min(1, dt * 0.5);          // ice hands over to lava as it melts
+  const useIncl = SKIN_CYCLE[skinIdx] === "crystal";                    // flaws only read as flaws in stone
+  const field = buildField(balls.concat(tOut.balls).concat(petBalls).concat(useIncl ? inclusions : []));   // one field: limb + pet MERGE; inclusions CARVE
+  const mesh = marchScalarField(field, N, N, N, 1.0, { origin: [LO, LO, LO], cellSize: cell });
+  const P = mesh.positions, W = cv.width, H = cv.height, S = Math.min(W, H) * 0.34;
+  const az = orbit.st.az, el = orbit.st.el, d = orbit.st.dist, ca = Math.cos(az), sa = Math.sin(az), ce = Math.cos(el), se = Math.sin(el);
+  const proj = (x, y, z) => { let X = x * ca + z * sa, Z = -x * sa + z * ca, Y = y * ce - Z * se, Zc = y * se + Z * ce; const persp = 3.0 / (d - Zc); return [W / 2 + X * S * persp, H / 2 - Y * S * persp, Zc]; };
+  lastMesh = mesh;
+  const tint = av.personaTint(), L = [0.4, 0.75, 0.5], tris = [];
+  const src = [];
+  if (pBodies && pWorld) {                        // shattered, real solver: collide + settle
+    pWorld.step(Math.min(dt, 1 / 30), 1); shatterT += dt;
+    for (const d of readDebris(pWorld, pBodies)) { const F = d.frag.positions;
+      for (let i = 0; i + 8 < F.length; i += 9) src.push([applyXf(d, [F[i], F[i + 1], F[i + 2]]), applyXf(d, [F[i + 3], F[i + 4], F[i + 5]]), applyXf(d, [F[i + 6], F[i + 7], F[i + 8]])]); }
+    if (shatterT > 3.2) { try { pWorld.destroy(); } catch (e) {} pWorld = null; pBodies = null; document.getElementById("sub").textContent = "re-formed \u2014 the cores merged back into normal shape"; }
+  } else if (debris) {                            // no backend: the toy integrator still tumbles, it just never settles
+    stepDebris(debris, dt); shatterT += dt;
+    for (const b of debris) { const F = b.frag.positions, c = b.frag.centroid, cr = Math.cos(b.rot), sr = Math.sin(b.rot);
+      for (let i = 0; i + 8 < F.length; i += 9) { const t3 = [];
+        for (let k = 0; k < 9; k += 3) { const x = F[i + k] - c[0], y = F[i + k + 1] - c[1], z = F[i + k + 2] - c[2]; t3.push([c[0] + x * cr + z * sr + b.p[0], c[1] + y + b.p[1], c[2] + (-x * sr + z * cr) + b.p[2]]); }
+        src.push(t3); } }
+    if (shatterT > 2.4) { debris = null; document.getElementById("sub").textContent = "re-formed \u2014 the cores merged back into normal shape"; }
+  } else { for (let i = 0; i + 8 < P.length; i += 9) src.push([[P[i], P[i + 1], P[i + 2]], [P[i + 3], P[i + 4], P[i + 5]], [P[i + 6], P[i + 7], P[i + 8]]]); }
+  for (const t3 of src) {
+    const A = t3[0], B = t3[1], C = t3[2];
+    const pa = proj(A[0], A[1], A[2]), pb = proj(B[0], B[1], B[2]), pc = proj(C[0], C[1], C[2]);
+    let nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]);
+    let ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]);
+    let nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+    const ml = Math.hypot(nx, ny, nz) || 1; const lit = Math.max(0.15, (nx * L[0] + ny * L[1] + nz * L[2]) / ml);
+    const cx3 = (A[0] + B[0] + C[0]) / 3, cy3 = (A[1] + B[1] + C[1]) / 3, cz3 = (A[2] + B[2] + C[2]) / 3;
+    const core = balls[0].p, rr = Math.hypot(cx3 - core[0], cy3 - core[1], cz3 - core[2]);
+    tris.push({ z: (pa[2] + pb[2] + pc[2]) / 3, pa, pb, pc, lit, n: [nx / ml, ny / ml, nz / ml], pos: [cx3, cy3, cz3], thickness: Math.max(0, Math.min(1, 1 - rr / 2.2)) });
+  }
+  tris.sort((a, b) => a.z - b.z);
+  ctx.clearRect(0, 0, W, H);
+  const skin = SKIN_CYCLE[skinIdx], nowT = performance.now() / 1000;
+  if (skin !== "persona" && SKINS[skin].blend === "additive") ctx.globalCompositeOperation = "lighter";
+  for (const t of tris) {
+    if (skin === "persona") { const g0 = 40 + t.lit * 200; ctx.fillStyle = "rgb(" + Math.round(g0 * tint[0]) + "," + Math.round(g0 * tint[1]) + "," + Math.round(g0 * tint[2]) + ")"; }
+    else { const c = shadeTri(skin, { lit: t.lit, normal: t.n, thickness: t.thickness, pos: t.pos, t: nowT, melt });
+      ctx.fillStyle = "rgba(" + Math.round(c[0] * 255) + "," + Math.round(c[1] * 255) + "," + Math.round(c[2] * 255) + "," + c[3].toFixed(3) + ")"; }
+    ctx.beginPath(); ctx.moveTo(t.pa[0], t.pa[1]); ctx.lineTo(t.pb[0], t.pb[1]); ctx.lineTo(t.pc[0], t.pc[1]); ctx.closePath(); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  if (lastTip && lastTip.heat > 0.02) drawGlow(lastTip.p, 26 + lastTip.heat * 22, lastTip.color, (0.55 * lastTip.heat).toFixed(2));   // the probe tip burns
+  for (const t of threats) { const p = proj(t.p[0], t.p[1], t.p[2]); ctx.strokeStyle = "rgba(255,90,90,0.9)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], 9, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(p[0], p[1], 15, 0, 7); ctx.strokeStyle = "rgba(255,90,90,0.35)"; ctx.stroke(); }
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

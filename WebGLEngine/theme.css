@@ -1,0 +1,49 @@
+/* SweK Engine — shared panel theme (v1336).
+   One canonical palette for the whole web-panel suite (hub, smart-home, Shield/device,
+   avatar pages). Each panel links this and drops its own :root, so the family shares
+   one look. To re-skin everything, edit only these variables. */
+:root {
+  /* surfaces */
+  --bg:     #090c0e;   /* page background        */
+  --panel:  #121a18;   /* card / panel surface   */
+  --line:   #233330;   /* borders / dividers     */
+  --off:    #36443e;   /* disabled / inactive    */
+
+  /* text */
+  --ink:    #e6f0ec;   /* primary text           */
+  --dim:    #8a989a;   /* muted / secondary text */
+
+  /* brand + status */
+  --go:     #8af0c8;   /* primary mint accent    */
+  --ok:     #41e08a;   /* success green          */
+  --grn:    #41e08a;
+  --home:   #41e08a;   /* presence: home         */
+  --away:   #8a989a;   /* presence: away         */
+  --warn:   #ffcf6b;   /* warning / caution      */
+  --occ:    #ffcf6b;   /* presence: occupied     */
+  --red:    #ff6b6b;   /* error / alert          */
+  --bad:    #ff6b6b;
+  --err:    #ff6b6b;
+
+  /* secondary accents */
+  --acc:    #7cc0ff;   /* blue accent            */
+  --accent: #7cc0ff;
+  --blu:    #5cc8ff;
+  --cool:   #5cc8ff;   /* climate: cooling       */
+  --heat:   #ff8a5c;   /* climate: heating       */
+  --sun:    #ffcf4a;   /* solar                  */
+
+  /* device classes */
+  --pc:     #9ad0ff;
+  --phone:  #c6a8ff;
+  --shield: #7af0c0;
+}
+
+/* shared cosmetic identity (does not touch layout) */
+html { -webkit-text-size-adjust: 100%; }
+::selection { background: color-mix(in srgb, var(--go) 35%, transparent); }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--off); }
+::-webkit-scrollbar-track { background: transparent; }

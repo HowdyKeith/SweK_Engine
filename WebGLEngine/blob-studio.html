@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Engine — Blob Studio</title>
+<meta name="demo:desc" content="A mini studio for the blobulator narrator: several blob speakers seated fuse-safe, any one holding the floor with its carved mouth driven by its own synthesized voice, named lower-thirds, and camera shots (wide / punch-in / two-shot). Records the composited canvas WITH the multi-voice audio and exports a YouTube-ready mp4.">
+<style>
+  html,body { margin:0; height:100%; background:#03040a; overflow:hidden; color:#cfe0ff; font:12px ui-monospace,Menlo,monospace; }
+  #wrap { display:flex; flex-direction:column; height:100%; }
+  #stage { position:relative; flex:1; min-height:0; }
+  #c { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #bar { display:flex; gap:8px; align-items:center; padding:8px 10px; background:#0a0e18; border-top:1px solid #17202f; flex-wrap:wrap; }
+  button, select, input { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.rec { border-color:#5a2230; color:#ff9a9a; }
+  button.go { border-color:#2a5a3a; color:#9fe88f; }
+  button:disabled { opacity:.45; cursor:default; }
+  #msg { color:#8fb4d8; margin-left:4px; }
+  .shot.on { outline:2px solid #f6a623; }
+  #draft { display:none; position:absolute; right:12px; top:12px; width:320px; background:rgba(6,10,20,.93); border:1px solid #22304a; border-radius:10px; padding:11px; z-index:5; }
+  #preview { width:100%; border-radius:6px; background:#000; display:block; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="draft">
+      <div style="color:#9be15d;margin-bottom:6px;">Draft ready</div>
+      <video id="preview" controls></video>
+    </div>
+  </div>
+  <div id="bar">
+    <select id="panel" title="how many speakers">
+      <option value="2">2 speakers</option>
+      <option value="3" selected>3 speakers</option>
+      <option value="4">4 speakers</option>
+    </select>
+    <button class="shot on" data-shot="wide" title="everyone in frame">Wide</button>
+    <button class="shot" data-shot="punch" title="zoom the active speaker">Punch-in</button>
+    <button class="shot" data-shot="two" title="active + neighbour">Two-shot</button>
+    <button id="play" class="go">&#9654; Play script</button>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <button id="exp" class="go" disabled>&#11015; Export mp4</button>
+    <span id="msg">a panel of blobs, each with its own voice — Play to preview, Record to capture with sound</span>
+  </div>
+</div>
+<script type="module">
+import { makeStudio } from "./fx/avatar/studioCast.js";
+import { planSpeech, ampAt, speak as blobSpeak } from "./fx/avatar/blobVoice.js";
+import { SKINS, shadeTri, skinForPersona } from "./fx/avatar/skins.js";
+import { metaField } from "./fx/avatar/pet.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), msg = document.getElementById("msg");
+let W = 0, H = 0;
+function resize() { const r = cv.getBoundingClientRect(); W = cv.width = Math.max(640, r.width | 0); H = cv.height = Math.max(360, r.height | 0); }
+addEventListener("resize", resize);
+
+// ---- the cast ----
+let studio = null, speakerViews = [];
+function buildStudio(n) {
+  const names = ["Avataro", "Avatarina", "Cobalt", "Marigold"];
+  const personas = ["avataro", "avatarina", "both", "avataro"];
+  const speakers = [];
+  for (let i = 0; i < n; i++) speakers.push({ name: names[i], persona: personas[i % personas.length] });
+  studio = makeStudio({ speakers });
+  const chk = studio.verifySeating(1.0);
+  if (!chk.ok) console.warn("[studio] some seats fuse:", chk.pairs.filter(p => p.merged));
+  speakerViews = studio.speakers.map(s => ({ name: s.name }));
+}
+buildStudio(3);
+
+// ---- a tiny scripted panel (each line names who speaks) ----
+const SCRIPT = [
+  { who: 0, text: "Welcome to the SweK studio. I am Avataro, and this is a panel of blobs." },
+  { who: 1, text: "And I am Avatarina. Every one of us is a metaball whose mouth is carved, not drawn." },
+  { who: 2, text: "The trick is that one plan drives the sound and the opening. Same number, same instant." },
+  { who: 0, text: "Seats are checked so no two of us fuse into one creature. That distance is measured." },
+  { who: 1, text: "Wide shows the whole panel. Punch-in frames whoever is talking. A two-shot holds a pair." },
+  { who: 2, text: "It records with our voices, then exports a clip you can post. That is the whole studio." }
+];
+
+// ---- voice bus (captured into the recording) ----
+let actx = null, voiceBus = null, voiceStreamDest = null;
+function ensureBus() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  try { if (actx.state === "suspended") actx.resume(); } catch (e) {}
+  if (!voiceBus) {
+    voiceBus = actx.createGain(); voiceBus.gain.value = 1;
+    try { voiceBus.connect(actx.destination); } catch (e) {}
+    try { voiceStreamDest = actx.createMediaStreamDestination(); voiceBus.connect(voiceStreamDest); } catch (e) {}
+  }
+  return voiceBus;
+}
+
+// ---- narration state ----
+let show = { i: -1, active: -1, amp: 0, plan: null, t0: 0, speaking: false, caption: "", onEnd: null };
+function speakNext() {
+  show.i++;
+  if (show.i >= SCRIPT.length) { show.speaking = false; show.active = -1; show.caption = ""; if (show.onEnd) show.onEnd(); return; }
+  const line = SCRIPT[show.i]; show.active = line.who; show.caption = line.text;
+  const persona = studio.speakers[line.who].persona;
+  show.plan = planSpeech(line.text, { persona, rate: 1 });
+  show.t0 = performance.now() / 1000; show.speaking = true;
+  try { const bus = ensureBus(); if (bus) blobSpeak(show.plan, actx, { volume: 0.42, destination: bus }); } catch (e) {}
+  setTimeout(() => { show.speaking = false; show.plan = null; setTimeout(speakNext, 320); }, show.plan.dur * 1000 + 60);
+}
+function startScript(onEnd) { show.onEnd = onEnd; show.i = -1; speakNext(); }
+
+// ---- camera shots ----
+let shot = "wide";
+document.querySelectorAll(".shot").forEach(b => b.onclick = () => {
+  shot = b.dataset.shot;
+  document.querySelectorAll(".shot").forEach(x => x.classList.toggle("on", x === b));
+});
+// returns { cx, cy, scale } world->screen framing for the current shot
+function framing() {
+  const seats = studio.seats;
+  const active = show.active >= 0 ? show.active : 0;
+  const base = Math.min(W, H);
+  if (shot === "punch") {
+    const s = seats[active]; return { cx: s[0], scale: base * 0.34, cy: 0 };
+  }
+  if (shot === "two") {
+    const a = active, b = Math.min(seats.length - 1, Math.max(0, active + (active === seats.length - 1 ? -1 : 1)));
+    const mid = (seats[a][0] + seats[b][0]) / 2; const spread = Math.abs(seats[a][0] - seats[b][0]) + 2.2;
+    return { cx: mid, scale: base * 0.9 / spread, cy: 0 };
+  }
+  // wide: fit all seats
+  let lo = Infinity, hi = -Infinity; for (const s of seats) { lo = Math.min(lo, s[0]); hi = Math.max(hi, s[0]); }
+  const width = (hi - lo) + 3.2, cx = (lo + hi) / 2;
+  return { cx, scale: base * 0.92 / width, cy: 0 };
+}
+// smooth the framing so shot changes glide
+let camF = { cx: 0, scale: 200 };
+function stepCam(dt) { const want = framing(); const k = Math.min(1, dt * 6); camF.cx += (want.cx - camF.cx) * k; camF.scale += (want.scale - camF.scale) * k; }
+
+// ---- marching grid (per speaker, small) ----
+const NB = 20, NLO = -1.7, NHI = 1.7, nspan = NHI - NLO, ncell = nspan / (NB - 1);
+function drawSpeaker(sv, t) {
+  const px = (x, y) => [W / 2 + (x - camF.cx) * camF.scale * 0.5, H * 0.52 - y * camF.scale * 0.5];
+  // local field around this speaker's seat
+  const local = sv.balls.map(b => ({ neg: b.neg, r: b.r, p: [b.p[0] - sv.seat[0], b.p[1], b.p[2]] }));
+  const NF = new Float32Array(NB * NB * NB);
+  for (let z = 0; z < NB; z++) { const wz = NLO + nspan * z / (NB - 1); for (let y = 0; y < NB; y++) { const wy = NLO + nspan * y / (NB - 1); const row = (z * NB + y) * NB;
+    for (let x = 0; x < NB; x++) NF[row + x] = metaField(local, NLO + nspan * x / (NB - 1), wy, wz); } }
+  const hm = marchScalarField(NF, NB, NB, NB, 1.0, { origin: [NLO, NLO, NLO], cellSize: ncell });
+  const HP = hm.positions, tint = sv.tint, NL = [0.35, 0.6, 0.72], tris = [];
+  for (let i = 0; i + 8 < HP.length; i += 9) {
+    const A = px(HP[i] + sv.seat[0], HP[i + 1]), B = px(HP[i + 3] + sv.seat[0], HP[i + 4]), C = px(HP[i + 6] + sv.seat[0], HP[i + 7]);
+    let nx = (HP[i + 4] - HP[i + 1]) * (HP[i + 8] - HP[i + 2]) - (HP[i + 5] - HP[i + 2]) * (HP[i + 7] - HP[i + 1]);
+    let ny = (HP[i + 5] - HP[i + 2]) * (HP[i + 6] - HP[i]) - (HP[i + 3] - HP[i]) * (HP[i + 8] - HP[i + 2]);
+    let nz = (HP[i + 3] - HP[i]) * (HP[i + 7] - HP[i + 1]) - (HP[i + 4] - HP[i + 1]) * (HP[i + 6] - HP[i]);
+    const ml = Math.hypot(nx, ny, nz) || 1; const lit = Math.max(0.14, (nx * NL[0] + ny * NL[1] + nz * NL[2]) / ml);
+    const zc = (HP[i + 2] + HP[i + 5] + HP[i + 8]) / 3;
+    tris.push({ z: zc, A, B, C, lit });
+  }
+  tris.sort((a, b) => a.z - b.z);
+  // rings behind the ACTIVE speaker
+  if (sv.active) { const c = px(sv.seat[0], 0.1); for (let r = 0; r < 3; r++) { ctx.strokeStyle = "rgba(89,209,255," + (0.34 - r * 0.09) + ")"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(c[0], c[1], (34 + r * 8) * (camF.scale / 200), 0, 6.28); ctx.stroke(); } }
+  for (const tr of tris) { const g = 46 + tr.lit * 200; const a = sv.active ? 1 : 0.82; ctx.fillStyle = "rgba(" + Math.round(g * tint[0]) + "," + Math.round(g * tint[1]) + "," + Math.round(g * tint[2]) + "," + a + ")"; ctx.beginPath(); ctx.moveTo(tr.A[0], tr.A[1]); ctx.lineTo(tr.B[0], tr.B[1]); ctx.lineTo(tr.C[0], tr.C[1]); ctx.closePath(); ctx.fill(); }
+  // name plate
+  const np = px(sv.seat[0], -1.15);
+  ctx.textAlign = "center"; ctx.font = (sv.active ? "700 " : "") + Math.round(11 * camF.scale / 200) + "px ui-monospace,monospace";
+  ctx.fillStyle = sv.active ? "#f6a623" : "rgba(150,180,215,0.8)"; ctx.fillText(sv.name, np[0], np[1]);
+}
+
+function drawLowerThird() {
+  if (show.active < 0) return; const name = studio.speakers[show.active].name;
+  const bx = 24, by = H - 90, bw = Math.min(W - 48, 420);
+  ctx.fillStyle = "rgba(6,10,20,0.72)"; ctx.fillRect(bx, by, bw, 40); ctx.fillStyle = "#f6a623"; ctx.fillRect(bx, by, 4, 40);
+  ctx.textAlign = "left"; ctx.fillStyle = "#f6a623"; ctx.font = "800 16px ui-monospace,monospace"; ctx.fillText(name, bx + 14, by + 18);
+  ctx.fillStyle = "#8fb4d8"; ctx.font = "11px ui-monospace,monospace"; ctx.fillText(studio.speakers[show.active].persona.toUpperCase() + " \u00b7 on the floor", bx + 14, by + 33);
+}
+function drawCaption() {
+  if (!show.caption) return; ctx.textAlign = "center"; ctx.font = "600 15px ui-monospace,monospace";
+  const w = Math.min(W - 40, ctx.measureText(show.caption).width);
+  ctx.fillStyle = "rgba(3,5,12,0.7)"; ctx.fillRect(W / 2 - w / 2 - 12, H - 40, w + 24, 24);
+  ctx.fillStyle = "#eaf2ff"; ctx.fillText(show.caption, W / 2, H - 23);
+}
+
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // amp from the active plan (same envelope that carves the mouth)
+  const target = show.plan ? ampAt(show.plan, now / 1000 - show.t0) : 0;
+  show.amp += (target - show.amp) * 0.55;
+  stepCam(dt);
+  const st = studio.step(dt, { activeIndex: show.active, amp: show.amp, lineIndex: show.i });
+  speakerViews = st.speakers;
+  // background
+  ctx.fillStyle = "#05070f"; ctx.fillRect(0, 0, W, H);
+  const grd = ctx.createRadialGradient(W / 2, H * 0.42, 40, W / 2, H * 0.42, Math.max(W, H) * 0.7);
+  grd.addColorStop(0, "rgba(20,32,60,0.5)"); grd.addColorStop(1, "rgba(3,5,12,0)"); ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  // speakers back-to-front by seat depth (all z~0, so left-to-right; active drawn last for its rings)
+  const order = speakerViews.map((s, i) => i).sort((a, b) => (speakerViews[a].active ? 1 : 0) - (speakerViews[b].active ? 1 : 0));
+  for (const i of order) drawSpeaker(speakerViews[i], now / 1000);
+  drawLowerThird(); drawCaption();
+  requestAnimationFrame(frame);
+}
+
+// ---- controls ----
+document.getElementById("panel").onchange = function () { buildStudio(parseInt(this.value, 10)); show.active = -1; show.caption = ""; };
+document.getElementById("play").onclick = function () { ensureBus(); startScript(() => { msg.textContent = "script done"; }); msg.textContent = "playing\u2026"; };
+
+let rec = null, chunks = [], blob = null;
+document.getElementById("rec").onclick = function () {
+  if (rec && rec.state === "recording") { rec.stop(); return; }
+  chunks = []; blob = null; document.getElementById("exp").disabled = true;
+  const vstream = cv.captureStream(30); let mime = "video/webm;codecs=vp9"; if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+  const tracks = vstream.getVideoTracks();
+  ensureBus(); try { if (voiceStreamDest) for (const at of voiceStreamDest.stream.getAudioTracks()) tracks.push(at); } catch (e) {}
+  const stream = new MediaStream(tracks);
+  rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6 });
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    blob = new Blob(chunks, { type: "video/webm" }); document.getElementById("exp").disabled = false;
+    try { const pv = document.getElementById("preview"); if (pv._u) URL.revokeObjectURL(pv._u); pv._u = URL.createObjectURL(blob); pv.src = pv._u; document.getElementById("draft").style.display = "block"; } catch (e) {}
+    msg.textContent = "recorded " + (blob.size / 1e6).toFixed(1) + " MB with sound \u00b7 export to mp4"; this.textContent = "\u25CF Record"; this.classList.add("rec");
+  };
+  rec.start(); this.textContent = "\u25A0 Stop"; msg.textContent = "recording\u2026 playing the panel with voices";
+  startScript(() => { setTimeout(() => { if (rec && rec.state === "recording") rec.stop(); }, 800); });
+};
+document.getElementById("exp").onclick = async function () {
+  if (!blob) return; this.disabled = true; msg.textContent = "transcoding to mp4\u2026";
+  try {
+    const title = encodeURIComponent("SweK Blob Studio");
+    const desc = encodeURIComponent("A panel of blob speakers, each with its own carved-mouth voice. Rendered live with SweK Engine.");
+    const r = await fetch("/export/mp4?title=" + title + "&desc=" + desc + "&tags=swek,blob,studio,webgl", { method: "POST", headers: { "content-type": "application/octet-stream" }, body: blob });
+    const j = await r.json();
+    msg.textContent = j.ok ? ("\u2713 saved " + j.mp4 + " (" + (j.bytes / 1e6).toFixed(1) + " MB)") : ("export failed: " + j.error);
+  } catch (e) { msg.textContent = "export error: " + e.message; } this.disabled = false;
+};
+
+resize(); frame();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

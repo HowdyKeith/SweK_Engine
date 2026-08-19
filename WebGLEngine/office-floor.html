@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Office floor - who is working on what</title>
+<meta name="demo:desc" content="The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.">
+<!--
+  WebGLEngine/office-floor.html -- v3824
+
+  THE FRONT DOOR FOR tools/roundhouse/officeManager.mjs.
+
+  *** DRAWN, NOT SPRITED, AND THAT IS A LICENCE DECISION RATHER THAN A TASTE ONE. *** The prompt for this round
+  was munder-difflin (MIT), whose office floor is a Pixi.js scene over LimeZu tilesets and recoloured character
+  sheets -- and those assets are LimeZu FREE VERSION, NON-COMMERCIAL ONLY. The MIT grant covers their source and
+  explicitly carves the art out. Vendoring one sprite would put a non-commercial restriction on this whole
+  engine, so nothing from that repo is here: no code, no tiles, no cast. Desks are rectangles.
+
+  AND THE PAGE COMPUTES NOTHING. Every number on screen comes from nextAssignments(). A page that re-derived the
+  arbitration to draw it would be a second declaration of the scheduler, which is the defect this tree finds
+  more often than any other -- and the two would disagree exactly when it mattered.
+-->
+<style>
+  :root { --bg:#11151a; --ink:#e8eef4; --dim:#7f8c9a; --line:#243040;
+          --idle:#4ec9a5; --busy:#f0c674; --unatt:#e06c75; --unknown:#5a6472; --esc:#ff5f56; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:18px 22px 8px; border-bottom:1px solid var(--line); }
+  h1 { font-size:16px; margin:0 0 4px; letter-spacing:.06em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:70ch; }
+  main { display:grid; grid-template-columns:minmax(420px,1fr) minmax(320px,420px); gap:0; }
+  section { padding:16px 22px; }
+  section + section { border-left:1px solid var(--line); }
+  h2 { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  .row { padding:7px 0; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .who { color:var(--ink); }
+  .what { color:var(--dim); }
+  .esc { color:var(--esc); }
+  .none { color:var(--dim); font-style:italic; }
+  button { background:#1b2430; color:var(--ink); border:1px solid var(--line); padding:6px 11px;
+           font:inherit; cursor:pointer; border-radius:3px; margin-right:6px; }
+  button:hover { border-color:var(--dim); }
+  .bar { padding:10px 22px; border-bottom:1px solid var(--line); }
+  code { color:var(--busy); }
+  footer { padding:14px 22px 30px; color:var(--dim); border-top:1px solid var(--line); max-width:80ch; }
+</style>
+
+<header>
+  <h1>Office floor</h1>
+  <p>Who takes the next unit of work, and what wakes a human. The arbitration is
+     <code>tools/roundhouse/officeManager.mjs</code>; this page only draws what it returns.</p>
+</header>
+
+<div class="bar">
+  <button id="bNormal">ordinary morning</button>
+  <button id="bStarved">everyone busy</button>
+  <button id="bBroke">budget nearly gone</button>
+  <button id="bStuck">a job keeps failing</button>
+</div>
+
+<main>
+  <section>
+    <h2>The floor</h2>
+    <svg id="floor" viewBox="0 0 640 300" width="100%" height="300" role="img" aria-label="Peer desks"></svg>
+    <div id="assign"></div>
+  </section>
+  <section>
+    <h2>Escalations</h2>
+    <div id="esc"></div>
+    <h2 style="margin-top:20px">Ledger</h2>
+    <div id="stat" class="what"></div>
+  </section>
+</main>
+
+<footer>
+  Green desk idle, amber running, red unattended (says running, nothing has updated it in fifteen minutes),
+  grey unknown (a peer that reported no activity field at all: an old build, not an idle box). Only the green
+  ones can be given work.
+</footer>
+
+<script type="module">
+import { ACTIVITY, activityOf } from "./tools/roundhouse/activity.mjs";
+import { emptyQueue, enqueue, claim } from "./tools/roundhouse/jobQueue.mjs";
+import { nextAssignments, ESCALATION } from "./tools/roundhouse/officeManager.mjs";
+
+const T0 = Date.parse("2026-01-01T09:00:00.000Z");
+const prop = (kind, subject) => ({ kind, subject, grader: "tools/roundhouse/" + kind + "Coverage.mjs" });
+const FRONTIER = [
+  prop("plant", "physics/em/skinDepth.mjs"),
+  prop("grade", "physics/mesh/quadraticRecon.mjs"),
+  prop("plant", "physics/thermal/freeze.mjs"),
+  prop("grade", "text/slugAtlas.js"),
+];
+const idle = activityOf(null, T0);
+const busy = (dev, round) => activityOf({ startedAt: T0 - 6e5, device: dev, round, maxRounds: 8 }, T0);
+
+// A job claimed and abandoned repeatedly, built by driving the REAL jobQueue rather than setting a counter.
+function stuckQueue() {
+  let q = emptyQueue();
+  const e = enqueue(q, { kind: "suite", config: { grader: "g", subject: "s" } }, {}, { at: new Date(T0).toISOString() });
+  q = e.queue;
+  let t = T0;
+  for (let k = 0; k < 3; k++) { q = claim(q, "peer-" + k, { now: new Date(t).toISOString(), leaseMs: 1000 }).queue; t += 6e5; }
+  return q;
+}
+
+const SCENES = {
+  normal: { frontier: FRONTIER, queue: emptyQueue(), budget: null, fleet: [
+    { key: "rig",     activity: idle },
+    { key: "pixel-8", activity: idle },
+    { key: "shield",  activity: busy("lbm", 3) },
+    { key: "mac-mini",activity: { state: ACTIVITY.UNKNOWN } } ] },
+  starved: { frontier: FRONTIER, queue: emptyQueue(), budget: null, fleet: [
+    { key: "rig",     activity: busy("ct", 5) },
+    { key: "pixel-8", activity: { state: ACTIVITY.UNATTENDED } },
+    { key: "shield",  activity: busy("lbm", 3) },
+    { key: "mac-mini",activity: { state: ACTIVITY.UNKNOWN } } ] },
+  broke: { frontier: FRONTIER, queue: emptyQueue(), budget: { tokensRemaining: 900, tokensPerJob: 400 }, fleet: [
+    { key: "rig",     activity: idle },
+    { key: "pixel-8", activity: idle },
+    { key: "shield",  activity: idle },
+    { key: "mac-mini",activity: idle } ] },
+  stuck: { frontier: FRONTIER.slice(0, 1), queue: stuckQueue(), budget: null, fleet: [
+    { key: "rig",     activity: idle },
+    { key: "pixel-8", activity: busy("md", 2) },
+    { key: "shield",  activity: idle },
+    { key: "mac-mini",activity: { state: ACTIVITY.UNKNOWN } } ] },
+};
+
+const COLOUR = { [ACTIVITY.IDLE]:"var(--idle)", [ACTIVITY.RUNNING]:"var(--busy)",
+                 [ACTIVITY.UNATTENDED]:"var(--unatt)", [ACTIVITY.UNKNOWN]:"var(--unknown)" };
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+
+function draw(name) {
+  const scene = SCENES[name];
+  const r = nextAssignments({ ...scene, ledger: {}, now: T0 });
+  const gotJob = new Map(r.assignments.map((a) => [a.peer, a.proposal]));
+
+  // --- desks ---
+  let svg = "";
+  scene.fleet.forEach((p, i) => {
+    const x = 30 + (i % 2) * 320, y = 26 + Math.floor(i / 2) * 130;
+    const state = (p.activity && p.activity.state) || ACTIVITY.UNKNOWN;
+    const col = COLOUR[state] || COLOUR[ACTIVITY.UNKNOWN];
+    const job = gotJob.get(p.key);
+    svg += `<rect x="${x}" y="${y}" width="270" height="96" rx="4" fill="#161c24" stroke="${col}" stroke-width="1.5"/>`;
+    svg += `<circle cx="${x + 24}" cy="${y + 26}" r="9" fill="${col}"/>`;
+    svg += `<text x="${x + 44}" y="${y + 31}" fill="var(--ink)" font-size="13" font-family="monospace">${esc(p.key)}</text>`;
+    svg += `<text x="${x + 44}" y="${y + 50}" fill="${col}" font-size="11" font-family="monospace">${esc(state)}${
+      state === ACTIVITY.RUNNING && p.activity.device ? " &#183; " + esc(p.activity.device) : ""}</text>`;
+    svg += `<text x="${x + 14}" y="${y + 78}" fill="${job ? "var(--idle)" : "var(--dim)"}" font-size="11" font-family="monospace">${
+      job ? "&#9656; " + esc(job.subject.split("/").pop()) : "&#183;"}</text>`;
+  });
+  document.getElementById("floor").innerHTML = svg;
+
+  // --- assignments ---
+  document.getElementById("assign").innerHTML = r.assignments.length
+    ? r.assignments.map((a) => `<div class="row"><span class="who">${esc(a.peer)}</span>
+         <span class="what"> &#8592; ${esc(a.proposal.kind)}: ${esc(a.proposal.subject)}</span></div>`).join("")
+    : `<div class="row none">nothing assigned this pass</div>`;
+
+  // --- escalations ---
+  document.getElementById("esc").innerHTML = r.escalations.length
+    ? r.escalations.map((e) => `<div class="row"><span class="esc">${esc(e.kind).toUpperCase()}</span>
+         <div class="what">${esc(e.why)}</div></div>`).join("")
+    : `<div class="row none">nothing escalated &#8212; routine work resolved without waking anybody</div>`;
+
+  document.getElementById("stat").textContent =
+    `considered ${r.considered} \u00b7 settled ${r.settled} \u00b7 assigned ${r.assignments.length} \u00b7 idle peers left ${r.idle}`;
+}
+
+for (const [id, key] of [["bNormal","normal"],["bStarved","starved"],["bBroke","broke"],["bStuck","stuck"]]) {
+  document.getElementById(id).addEventListener("click", () => draw(key));
+}
+draw("normal");
+</script>

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Bridge · Commander</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#0a0c12;color:#dfe3ee;font:13px/1.5 system-ui,Segoe UI,sans-serif}
+  .wrap{display:flex;height:100%}
+  canvas{flex:1;display:block;cursor:crosshair}
+  aside{width:300px;border-left:1px solid #1d2433;padding:14px;overflow:auto}
+  h1{font-size:15px;margin:0 0 4px}.sub{color:#7c879c;margin:0 0 12px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:#172033}
+  .ok{color:#7ee0a6}.bad{color:#ff8a8a}
+  .orders{margin-top:12px;font-family:Consolas,monospace;font-size:12px}
+  .orders div{padding:2px 0;border-bottom:1px solid #141a27;color:#aeb6c8}
+  .hint{color:#7c879c;margin-top:10px;font-size:12px}
+</style></head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+  <aside>
+    <h1>Commander</h1>
+    <p class="sub">Top-down command view. The OpenGL player is the body on the
+      ground; you issue orders here and they cross the bridge.</p>
+    <div>Link: <span id="status" class="pill bad">offline</span></div>
+    <div style="margin-top:8px">Selected: <b id="sel">none</b></div>
+    <div class="hint">Click an entity to select/target it · click empty ground to
+      order a move to that point.</div>
+    <div class="orders" id="orders"></div>
+  </aside>
+</div>
+<script src="./bridgeClient.js"></script>
+<script>
+(function(){
+  const c=document.getElementById("c"), g=c.getContext("2d");
+  const $=id=>document.getElementById(id);
+  let state=null, view=null, selId=null, marker=null;
+  function resize(){c.width=c.clientWidth*devicePixelRatio;c.height=c.clientHeight*devicePixelRatio;}
+  addEventListener("resize",resize); resize();
+  function order(msg){const d=document.createElement("div");d.textContent=msg;
+    $("orders").prepend(d); while($("orders").childElementCount>40)$("orders").lastChild.remove();}
+
+  const client=new BridgeClient();
+  client.onStatus=(ok,via)=>{const s=$("status");s.textContent=ok?via:"offline";s.className="pill "+(ok?"ok":"bad");};
+  client.onState=(st)=>{state=st;};
+  client.start();
+
+  c.addEventListener("click",(ev)=>{
+    if(!view) return;
+    const mx=ev.offsetX*devicePixelRatio,my=ev.offsetY*devicePixelRatio;
+    const ents=BridgeClient.entities(state); let best=null,bd=1e9;
+    ents.forEach(e=>{const x=view.cx+e.x*view.s,y=view.cy+e.z*view.s;
+      const d=(x-mx)*(x-mx)+(y-my)*(y-my); if(d<bd){bd=d;best=e;}});
+    if(best && bd<(14*devicePixelRatio)**2){
+      selId=best.id; $("sel").textContent="#"+best.id;
+      client.send({cmd:"target",id:best.id}); order("target #"+best.id);
+    }else{
+      const wx=(mx-view.cx)/view.s, wz=(my-view.cy)/view.s;
+      marker={x:wx,z:wz,t:performance.now()};
+      client.send({cmd:"move",x:+wx.toFixed(2),z:+wz.toFixed(2)});
+      order("move → ("+wx.toFixed(1)+", "+wz.toFixed(1)+")");
+    }
+  });
+
+  function draw(){
+    const w=c.width,h=c.height; g.fillStyle="#0a0c12"; g.fillRect(0,0,w,h);
+    const cx=w/2,cy=h/2,s=Math.min(w,h)/(260*devicePixelRatio); view={cx,cy,s};
+    // grid
+    g.strokeStyle="#121a2c";
+    for(let i=-120;i<=120;i+=20){g.beginPath();g.moveTo(cx+i*s,cy-120*s);g.lineTo(cx+i*s,cy+120*s);
+      g.moveTo(cx-120*s,cy+i*s);g.lineTo(cx+120*s,cy+i*s);g.stroke();}
+    g.fillStyle="#5bd0ff"; g.beginPath(); g.arc(cx,cy,5*devicePixelRatio,0,7); g.fill(); // body
+    if(marker && performance.now()-marker.t<2000){
+      g.strokeStyle="#ffd24a"; const x=cx+marker.x*s,y=cy+marker.z*s;
+      g.beginPath(); g.arc(x,y,9*devicePixelRatio,0,7); g.stroke();
+      g.beginPath(); g.moveTo(x-6,y); g.lineTo(x+6,y); g.moveTo(x,y-6); g.lineTo(x,y+6); g.stroke();
+    }
+    BridgeClient.entities(state).forEach(e=>{const x=cx+e.x*s,y=cy+e.z*s;
+      if(e.id===selId){g.strokeStyle="#ffd24a";g.beginPath();g.arc(x,y,8*devicePixelRatio,0,7);g.stroke();}
+      g.fillStyle=e.alive?"#ff7a7a":"#46506a"; g.beginPath(); g.arc(x,y,4*devicePixelRatio,0,7); g.fill();});
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body></html>

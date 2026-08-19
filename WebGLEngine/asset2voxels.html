@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SweK · Asset 2 Voxels</title>
+<style>
+  :root { --line:#1a4d33; --ink:#cfe; --go:#37e07a; --dim:#7fa8c4; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#060c0a; color:var(--ink); font:13px ui-monospace,monospace; overflow:hidden; }
+  #stage { position:fixed; inset:0; }
+  .panel { position:fixed; top:10px; left:10px; width:300px; max-height:calc(100% - 20px); overflow:auto; z-index:20;
+    background:linear-gradient(180deg,rgba(8,18,12,0.94),rgba(4,10,8,0.96)); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  h1 { font-size:14px; margin:0 0 8px; color:var(--go); letter-spacing:0.04em; }
+  label { display:block; font-size:11px; color:var(--dim); margin:8px 0 3px; }
+  input[type=text], select { width:100%; background:#0c1610; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:12px ui-monospace,monospace; }
+  input[type=range] { width:100%; }
+  button { background:#06200f; color:#7fd1ff; border:1px solid #1aa257; border-radius:6px; padding:7px 10px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#0a2f16; }
+  button.primary { background:#0e3a1d; color:var(--go); border-color:#2fae5a; font-weight:bold; width:100%; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .chk { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink); margin:8px 0 2px; }
+  #stat { font-size:11px; color:var(--dim); margin-top:8px; white-space:pre-line; line-height:1.5; }
+  .sub { font-size:10px; color:var(--dim); margin:2px 0 0; }
+  a.back { position:fixed; top:12px; right:14px; z-index:21; color:var(--dim); text-decoration:none; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<a class="back" href="/server.html">&larr; back to SweK</a>
+<div class="panel">
+  <h1>&#129482; Asset 2 Voxels</h1>
+  <div class="sub">Load a model, then rebuild it out of colored voxels. Texture colors are sampled per voxel; some can be liquid.</div>
+
+  <label for="folder">Models folder (under GPU_Assets)</label>
+  <div class="row"><input type="text" id="folder" value="pipboy" style="flex:1;"><button id="listBtn">List</button></div>
+  <label for="pick">Model</label>
+  <select id="pick"><option value="">&mdash; list a folder, or paste a URL &mdash;</option></select>
+  <label for="url">&hellip; or a model URL / path (.glb / .gltf)</label>
+  <div class="row"><input type="text" id="url" placeholder="/GPU_Assets/pipboy/x.glb" style="flex:1;"><button id="loadUrl">Load</button></div>
+
+  <label for="res">Resolution: <b id="resVal">64</b> voxels (longest axis)</label>
+  <input type="range" id="res" min="8" max="256" step="1" value="64">
+  <label class="chk"><input type="checkbox" id="fill" checked> Fill solid interior</label>
+  <label for="liq">Liquid materials (regex on material/mesh name)</label>
+  <input type="text" id="liq" value="water|glass|liquid|smoke|lava|fog|ice|gel">
+
+  <button class="primary" id="vox" style="margin-top:10px;" disabled>&#129482; Voxelize</button>
+  <div class="row" style="margin-top:6px;">
+    <button id="showOrig" disabled>Show original</button>
+    <button id="showVox" disabled>Show voxels</button>
+  </div>
+  <div class="row" style="margin-top:6px;">
+    <button id="saveJson" disabled>Save .json</button>
+    <button id="addLib" disabled>Add to library</button>
+  </div>
+  <div id="stat"></div>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "./vendor/three/jsm/loaders/GLTFLoader.js";
+import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { voxelizeObject } from "./ui/assetVoxelizer.js";
+
+const $ = id => document.getElementById(id);
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+renderer.setSize(stage.clientWidth, stage.clientHeight);
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x070d0b);
+const camera = new THREE.PerspectiveCamera(45, stage.clientWidth / stage.clientHeight, 0.01, 5000);
+camera.position.set(2.5, 1.8, 3.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{}); controls.enableDamping = true;
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dl = new THREE.DirectionalLight(0xffffff, 1.1); dl.position.set(3, 5, 2); scene.add(dl);
+const grid = new THREE.GridHelper(10, 20, 0x14402a, 0x0d2a1c); grid.position.y = -0.001; scene.add(grid);
+const loader = new GLTFLoader(); enableMeshopt(loader);
+
+let _model = null, _voxOut = null, _voxName = "asset";
+
+function frameObject(obj) {
+  const box = new THREE.Box3().setFromObject(obj); if (box.isEmpty()) return;
+  const c = new THREE.Vector3(); box.getCenter(c); const s = new THREE.Vector3(); box.getSize(s);
+  const r = Math.max(s.x, s.y, s.z) || 1; controls.target.copy(c);
+  camera.position.copy(c).add(new THREE.Vector3(r * 1.4, r * 1.0, r * 1.7)); camera.near = r / 100; camera.far = r * 100; camera.updateProjectionMatrix();
+}
+function clearModel() { if (_model) { scene.remove(_model); _model.traverse(o => { if (o.geometry) o.geometry.dispose?.(); }); _model = null; } }
+function clearVox() { if (_voxOut) { try { _voxOut.dispose(); } catch {} _voxOut = null; } }
+
+function loadModel(url, name) {
+  clearVox(); clearModel();
+  $("stat").textContent = "Loading " + url + " ...";
+  loader.load(url,
+    (g) => { _model = g.scene; scene.add(_model); frameObject(_model); _voxName = (name || url.split("/").pop() || "asset").replace(/\.(glb|gltf)$/i, "");
+      $("vox").disabled = false; $("showOrig").disabled = false; $("showVox").disabled = true; $("stat").textContent = "Loaded: " + _voxName + "\nSet a resolution, then Voxelize."; },
+    null,
+    (e) => { $("stat").textContent = "Couldn't load " + url; console.warn(e); });
+}
+
+async function listFolder() {
+  const sub = ($("folder").value || "pipboy").trim();
+  $("stat").textContent = "Listing GPU_Assets/" + sub + " ...";
+  try {
+    const j = await fetch("/assets/sub-glb?sub=" + encodeURIComponent(sub), { cache:"no-store" }).then(r => r.json());
+    const pick = $("pick"); pick.innerHTML = "<option value=''>&mdash; pick a model &mdash;</option>";
+    (j && j.files || []).forEach(f => { const o = document.createElement("option"); o.value = "/GPU_Assets/" + sub + "/" + f; o.textContent = f; pick.appendChild(o); });
+    $("stat").textContent = (j && j.files || []).length + " model(s) in GPU_Assets/" + sub;
+  } catch (e) { $("stat").textContent = "List failed (folder reachable on the host only)."; }
+}
+
+function doVoxelize() {
+  if (!_model) return;
+  const resolution = +$("res").value, fill = $("fill").checked;
+  let rx = null; try { rx = new RegExp($("liq").value || "$^", "i"); } catch { rx = /$^/; }
+  $("stat").textContent = "Voxelizing at " + resolution + " ...";
+  // let the label paint before the (synchronous) voxelize
+  setTimeout(() => {
+    clearVox();
+    const t0 = performance.now();
+    try {
+      _voxOut = voxelizeObject(THREE, _model, { resolution, fill, liquidTest: (n) => rx.test(n) });
+      scene.add(_voxOut.group); _model.visible = false;
+      const s = _voxOut.stats; const ms = Math.round(performance.now() - t0);
+      $("stat").textContent = "Voxels: " + s.total.toLocaleString() + "  (solid " + s.solid.toLocaleString() + " · liquid " + s.liquid.toLocaleString() + ")\n" +
+        "Grid " + s.dims.join("×") + "  ·  " + ms + " ms";
+      $("showOrig").disabled = false; $("showVox").disabled = false; $("saveJson").disabled = false; $("addLib").disabled = false;
+    } catch (e) { $("stat").textContent = "Voxelize failed: " + (e && e.message || e); console.error(e); }
+  }, 30);
+}
+
+$("res").addEventListener("input", () => { $("resVal").textContent = $("res").value; });
+$("listBtn").addEventListener("click", listFolder);
+$("pick").addEventListener("change", () => { const v = $("pick").value; if (v) { $("url").value = v; loadModel(v, $("pick").selectedOptions[0].textContent); } });
+$("loadUrl").addEventListener("click", () => { const v = $("url").value.trim(); if (v) loadModel(v); });
+$("vox").addEventListener("click", doVoxelize);
+$("showOrig").addEventListener("click", () => { if (_model) _model.visible = true; if (_voxOut) _voxOut.group.visible = false; });
+$("showVox").addEventListener("click", () => { if (_model) _model.visible = false; if (_voxOut) _voxOut.group.visible = true; });
+$("saveJson").addEventListener("click", () => {
+  if (!_voxOut) return; const blob = new Blob([JSON.stringify(_voxOut.toJSON())], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = _voxName + "-voxels.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+$("addLib").addEventListener("click", async () => {
+  if (!_voxOut) return; $("addLib").disabled = true; $("stat").textContent += "\nAdding to library ...";
+  try {
+    const json = JSON.stringify(_voxOut.toJSON());
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    const r = await fetch("/assets/add", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ type:"voxel", source:"local", dataBase64:b64, dataExt:"json", name:_voxName + " (voxelized)", tags:["voxelized","asset2voxels"] }) }).then(x => x.json());
+    $("stat").textContent += (r && r.ok) ? "\n✓ added to the asset library" : "\n✗ " + ((r && r.error) || "add failed");
+  } catch (e) { $("stat").textContent += "\n✗ " + (e && e.message || e); }
+  $("addLib").disabled = false;
+});
+
+addEventListener("resize", () => { renderer.setSize(stage.clientWidth, stage.clientHeight); camera.aspect = stage.clientWidth / stage.clientHeight; camera.updateProjectionMatrix(); });
+(function loop(){ controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+// convenience: auto-list the default folder
+listFolder();
+</script>
+</body>
+</html>

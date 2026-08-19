@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Verified">
+<meta name="demo:desc" content="Every number in these tables is being computed in your browser, right now, from the equations -- and compared against an answer that was known before any of this code existed. Poiseuille's parabola, the lattice speed of sound, a shock compressing by exactly six, Galileo's falling body. Nothing here is recorded or quoted; the solvers are re-run live and the results are whatever they are. Both halves of the engine are here: the fluids and the rigid bodies that the ship flight and cross-peer lockstep are built on. What could not be checked in seconds is listed underneath, unhidden, because a verification page that only shows its wins is an advertisement.">
+<meta name="demo:category" content="simulation">
+<title>Verified</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#04060e; color:#9fb2d4; font:13px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:940px; margin:0 auto; padding:34px 20px 60px; }
+  h1 { color:#f6a623; letter-spacing:.16em; text-transform:uppercase; font-size:15px; margin:0 0 4px; }
+  .sub { color:#7fb2d4; max-width:74ch; margin-bottom:22px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:#5f7aa0; font-weight:600; font-size:10px; letter-spacing:.13em; text-transform:uppercase; padding:0 10px 8px 0; border-bottom:1px solid #1c2740; }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid #101827; vertical-align:top; }
+  .nm { color:#cfe0f6; }
+  .ex { color:#6f86ab; font-size:11px; }
+  .val { color:#fff; white-space:nowrap; }
+  .ok { color:#7fe3c4; font-weight:700; }
+  .bad { color:#ff8a8a; font-weight:700; }
+  .run { color:#f6a623; }
+  .ms { color:#4d6285; font-size:11px; }
+  #sum { margin:20px 0 6px; font-size:15px; color:#fff; }
+  .note { color:#6f86ab; font-size:11.5px; max-width:78ch; }
+  h2 { color:#f6a623; letter-spacing:.13em; text-transform:uppercase; font-size:11px; margin:30px 0 8px; }
+  li { color:#7fb2d4; margin-bottom:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; The physics, re-earned in your browser</h1>
+  <div class="sub">Every number below is being computed right now, on this machine, from the equations &mdash; then compared against an answer that was known long before this code existed. Nothing is recorded. The expected values are written out as literal mathematics and never read from the code being tested, because a check that takes its answer from the thing it is checking can never fail.</div>
+  <table>
+    <thead><tr><th style="width:46%">check</th><th style="width:22%">measured</th><th style="width:12%">verdict</th><th style="width:10%">time</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="sum"></div>
+  <div class="note" id="note"></div>
+  <h2 style="margin-top:34px;">The rigid bodies &mdash; what the ship flight and lockstep actually run on</h2>
+  <div class="note" style="margin-bottom:10px;">The same suite the ship gate runs, pointed at the physics backend in your browser. Every dynamic body in this engine carries 0.05-per-second linear drag straight out of Jolt's defaults &mdash; measured here, not read from a document &mdash; so the exact answer it is checked against is the <i>damped</i> trajectory, not Galileo's vacuum.</div>
+  <table>
+    <thead><tr><th style="width:46%">check</th><th style="width:22%">measured</th><th style="width:12%">verdict</th><th style="width:10%">time</th></tr></thead>
+    <tbody id="rrows"></tbody>
+  </table>
+  <div id="rsum"></div>
+  <h2>Not gated &mdash; verified, but too slow for four seconds</h2>
+  <ul id="ung"></ul>
+  <div class="note">These are all real results, listed here rather than quietly omitted. Each needs minutes: a bisection over long runs, a 200&times;200 blast, a sweep across modes. A verification page that shows only what it can afford to re-run is an advertisement.</div>
+</div>
+<script type="module">
+import { CHECKS, UNGATED } from "./tools/ship/physicsSuite.mjs";
+import { CHECKS as RCHECKS, UNGATED as RUNGATED } from "./tools/ship/rigidSuite.mjs";
+import { createJoltBackend } from "./physics/jolt/joltLoader.js";
+const rowsEl = document.getElementById("rows");
+const yield_ = () => new Promise(r => setTimeout(r, 16));
+(async () => {
+  let pass = 0, total = 0, ms = 0;
+  for (const c of CHECKS) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td><div class="nm">' + c.name + '</div><div class="ex">against ' + c.exact + '</div></td>' +
+                   '<td class="val run">running&hellip;</td><td></td><td></td>';
+    rowsEl.appendChild(tr);
+    await yield_(); await yield_();
+    const t0 = performance.now();
+    let r = null, err = null;
+    try { r = c.run(); } catch (e) { err = e.message; }
+    const dt = performance.now() - t0; ms += dt; total++;
+    const ok = !err && r.got <= c.tol; if (ok) pass++;
+    const shown = err ? "threw" : (r.detail || (r.got.toExponential(2) + " " + r.unit));
+    tr.children[1].className = "val"; tr.children[1].textContent = shown;
+    tr.children[2].innerHTML = '<span class="' + (ok ? "ok" : "bad") + '">' + (ok ? "AGREES" : "FAILS") + "</span>";
+    tr.children[3].innerHTML = '<span class="ms">' + dt.toFixed(0) + " ms</span>";
+    await yield_();
+  }
+  document.getElementById("sum").innerHTML = pass === total
+    ? '<span class="ok">' + pass + " of " + total + " agree with mathematics</span> &nbsp;<span class=\"ms\">in " + (ms/1000).toFixed(1) + "s, on your hardware</span>"
+    : '<span class="bad">' + (total - pass) + " of " + total + " no longer agree</span>";
+  document.getElementById("note").innerHTML = pass === total
+    ? "These same checks run on every build. If a future edit stops the channel being a parabola, or the speed of sound drifting off one over root three, the build fails rather than the error travelling quietly into the next round."
+    : "A check is failing. That is the gate doing its job.";
+})();
+// the rigid bodies -- the same module the gate runs, pointed at the browser's own physics backend
+(async () => {
+  const el = document.getElementById("rrows");
+  let mk = null;
+  try { await createJoltBackend(); mk = () => createJoltBackend(); }
+  catch (e) {
+    el.innerHTML = '<tr><td colspan="4" class="ex">The physics backend could not load here: ' + e.message + " &mdash; reported rather than skipped quietly.</td></tr>";
+    return;
+  }
+  let pass = 0, ms = 0;
+  for (const c of RCHECKS) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td><div class="nm">' + c.name + '</div><div class="ex">against ' + c.exact + '</div></td>' +
+                   '<td class="val run">running&hellip;</td><td></td><td></td>';
+    el.appendChild(tr);
+    await yield_(); await yield_();
+    const t0 = performance.now();
+    let r = null, err = null;
+    try { r = await c.run(mk); } catch (e) { err = e.message; }
+    const dt = performance.now() - t0; ms += dt;
+    const ok = !err && r.got <= c.tol; if (ok) pass++;
+    tr.children[1].className = "val"; tr.children[1].textContent = err ? "threw" : (r.detail || (r.got.toExponential(2) + " " + r.unit));
+    tr.children[2].innerHTML = '<span class="' + (ok ? "ok" : "bad") + '">' + (ok ? "AGREES" : "FAILS") + "</span>";
+    tr.children[3].innerHTML = '<span class="ms">' + dt.toFixed(0) + " ms</span>";
+    await yield_();
+  }
+  document.getElementById("rsum").innerHTML = pass === RCHECKS.length
+    ? '<span class="ok">' + pass + " of " + RCHECKS.length + " agree with mathematics</span> &nbsp;<span class=\"ms\">in " + (ms/1000).toFixed(1) + "s</span>"
+    : '<span class="bad">' + (RCHECKS.length - pass) + " of " + RCHECKS.length + " no longer agree</span>";
+})();
+document.getElementById("ung").innerHTML = UNGATED.concat(RUNGATED).map(u => "<li>" + u + "</li>").join("");
+</script>
+</body>
+</html>

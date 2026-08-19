@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="demo:title" content="Logistic map">
+<meta name="demo:category" content="physics lab">
+<title>Logistic map - the road to chaos</title>
+<style>
+  html,body{margin:0;background:#08090b;color:#dae0e6;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:920px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#828d99;margin-bottom:14px}
+  .card{border:1px solid #232a31;background:#0e1216;padding:12px 14px;margin-bottom:13px}
+  canvas{border:1px solid #1c2229;background:#050709;display:block;width:100%;
+           /* v2872 -- height:auto was MISSING: this canvas scaled to 100% width with a fixed height attribute,
+              so on any window wider than its natural size the plot was STRETCHED. Responsive is not the same as
+              undistorted, and it looked deliberate. */
+           height: auto; }
+  #bif{height:320px}#lya{height:180px}
+  label{color:#828d99;margin-right:6px}input[type=range]{width:220px;vertical-align:middle}
+  button{font:inherit;background:#161c22;color:#dae0e6;border:1px solid #2b343d;padding:5px 12px;margin-right:6px;cursor:pointer}
+  .num{color:#8fd0e8}.dim{color:#828d99}.good{color:#8fe0a8}
+  td{padding:1px 16px 1px 0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Logistic map &mdash; the road to chaos</h1>
+  <div class="sub">x &rarr; r&thinsp;x(1&minus;x). One line of arithmetic, and the numbers that fall out of it are
+    <em>universal</em> &mdash; the same constants appear in any system that reaches chaos this way.</div>
+
+  <div class="card">
+    <label>r range</label><input id="r0" type="range" min="250" max="380" value="280"><span class="num" id="r0v"></span>
+    <span class="dim">to</span><input id="r1" type="range" min="300" max="400" value="400"><span class="num" id="r1v"></span>
+    <button id="draw">redraw</button>
+    <button id="measure">measure Feigenbaum &delta;</button>
+    <span class="dim" id="stat"></span>
+  </div>
+
+  <div class="card">
+    <canvas id="bif" width="880" height="320"></canvas>
+    <div class="dim" style="margin-top:4px">Bifurcation diagram: where the attractor sits, for each r. One line
+      becomes two, two become four, and then the picture fills in &mdash; but look for the pale gap near r&thinsp;=&thinsp;3.83,
+      the period-3 window where order returns.</div>
+  </div>
+
+  <div class="card">
+    <canvas id="lya" width="880" height="180"></canvas>
+    <div class="dim" style="margin-top:4px">Lyapunov exponent. <span class="good">Below zero</span> the orbit is
+      attracted to a cycle; above zero neighbouring trajectories separate &mdash; that is chaos, defined rather
+      than asserted. At r&thinsp;=&thinsp;4 it equals <span class="num">ln&thinsp;2</span> exactly.</div>
+  </div>
+
+  <div class="card"><table id="tbl"><tr><td class="dim">press "measure Feigenbaum &delta;"</td></tr></table></div>
+</div>
+
+<script type="module">
+import { orbit, lyapunov, cascade, deltaEstimates, FEIGENBAUM_DELTA, LN2 } from "/physics/chaos/logistic.js";
+
+const $=(id)=>document.getElementById(id);
+const sync=()=>{ $("r0v").textContent=($("r0").value/100).toFixed(2); $("r1v").textContent=($("r1").value/100).toFixed(2); };
+$("r0").oninput=$("r1").oninput=sync; sync();
+
+function drawAll(){
+  const rMin=$("r0").value/100, rMax=Math.max($("r1").value/100, $("r0").value/100+0.05);
+  const c=$("bif"), ctx=c.getContext("2d"), W=c.width, H=c.height;
+  ctx.fillStyle="#050709"; ctx.fillRect(0,0,W,H);
+  const img=ctx.createImageData(W,H);
+  for(let i=0;i<W*H*4;i+=4){ img.data[i]=5; img.data[i+1]=7; img.data[i+2]=9; img.data[i+3]=255; }
+  for(let px=0;px<W;px++){
+    const r=rMin+(rMax-rMin)*px/(W-1);
+    const xs=orbit(r,{warmup:600,samples:200});
+    for(const x of xs){
+      const py=Math.min(H-1,Math.max(0,Math.round((1-x)*(H-1))));
+      const o=(py*W+px)*4;
+      img.data[o]=Math.min(255,img.data[o]+70);
+      img.data[o+1]=Math.min(255,img.data[o+1]+150);
+      img.data[o+2]=Math.min(255,img.data[o+2]+190);
+    }
+  }
+  ctx.putImageData(img,0,0);
+  ctx.fillStyle="#828d99"; ctx.font="11px monospace";
+  ctx.fillText("r = "+rMin.toFixed(2), 6, H-6); ctx.fillText("r = "+rMax.toFixed(2), W-70, H-6);
+  ctx.fillText("x = 1", 6, 12); ctx.fillText("x = 0", 6, H-20);
+
+  const l=$("lya"), lx=l.getContext("2d"), LW=l.width, LH=l.height, pad=22;
+  lx.clearRect(0,0,LW,LH);
+  const vals=[]; for(let px=0;px<LW;px++){ const r=rMin+(rMax-rMin)*px/(LW-1); vals.push(lyapunov(r,{warmup:1200,samples:2500})); }
+  const lo=Math.min(-1.2,Math.min(...vals)), hi=Math.max(1,Math.max(...vals));
+  const Y=(v)=>LH-pad-(LH-2*pad)*(v-lo)/(hi-lo);
+  lx.strokeStyle="#2b343d"; lx.beginPath(); lx.moveTo(0,Y(0)); lx.lineTo(LW,Y(0)); lx.stroke();
+  lx.beginPath();
+  vals.forEach((v,i)=>{ const y=Y(Math.max(lo,Math.min(hi,v))); i?lx.lineTo(i,y):lx.moveTo(i,y); });
+  lx.strokeStyle="#8fd0e8"; lx.lineWidth=1.2; lx.stroke();
+  lx.fillStyle="#828d99"; lx.font="11px monospace"; lx.fillText("lambda = 0", 6, Y(0)-4);
+}
+
+$("draw").onclick=drawAll;
+$("measure").onclick=()=>{
+  $("stat").textContent=" searching the cascade...";
+  setTimeout(()=>{
+    const rs=cascade({count:5}), d=deltaEstimates(rs);
+    const best=d.reduce((a,b)=>Math.abs(b-FEIGENBAUM_DELTA)<Math.abs(a-FEIGENBAUM_DELTA)?b:a);
+    let rows='<tr><th class="dim">period begins</th><th class="dim">at r =</th><th class="dim">gap</th><th class="dim">ratio</th></tr>';
+    rs.forEach((r,i)=>{
+      const gap=i?(r-rs[i-1]).toExponential(4):"&mdash;";
+      const ratio=(i>=2)?((rs[i-1]-rs[i-2])/(r-rs[i-1])).toFixed(5):"&mdash;";
+      rows+=`<tr><td>${Math.pow(2,i+1)}</td><td class="num">${r.toFixed(9)}</td><td class="dim">${gap}</td><td class="num">${ratio}</td></tr>`;
+    });
+    rows+=`<tr><td colspan="4" style="padding-top:8px">measured &delta; = <span class="num">${best.toFixed(6)}</span>
+      &nbsp; Feigenbaum's constant = <span class="good">${FEIGENBAUM_DELTA.toFixed(9)}</span>
+      &nbsp; <span class="dim">(${(Math.abs(best-FEIGENBAUM_DELTA)/FEIGENBAUM_DELTA*100).toFixed(3)}%)</span></td></tr>`;
+    rows+=`<tr><td colspan="4" class="dim">Nothing in the search knows that constant &mdash; it bisects on the
+      measured PERIOD, an integer the iteration reports. The first two points are checkable independently:
+      exactly 3, and exactly 1+&radic;6 = 3.449489743.</td></tr>`;
+    $("tbl").innerHTML=rows; $("stat").textContent="";
+  },20);
+};
+drawAll();
+</script>
+</body>
+</html>

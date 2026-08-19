@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Discovery Lab - equations rediscovered, and silence where there is none</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:960px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}
+  .sub{color:#6f8a7c;margin-bottom:16px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;margin-bottom:14px}
+  h2{font-size:14px;margin:0 0 6px;color:#9fe8c0}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid #1a2a22;vertical-align:top}
+  th{color:#6f8a7c;font-weight:normal}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:#7fe0a4}.warn{color:#e6c877}.hot{color:#f28b8b}.dim{color:#6f8a7c}
+  code{color:#9fb8ab}
+  button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:5px 12px;cursor:pointer;margin-right:6px}
+  button:hover{background:#1d2c24}
+  .eq{font-size:14px;color:#b6f0cf}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Discovery Lab</h1>
+  <div class="sub">Symbolic regression graded against laws this lab already owns to their exact closed forms.
+    The question is not "can it discover physics" &mdash; it is whether the <b>discoverer</b> rediscovers what we
+    already know, <b>and stays silent where there is no law</b>.</div>
+
+  <div class="card">
+    <h2>Rediscovery</h2>
+    <div class="dim">Each row hands the fitter data from a working instrument and compares what it finds against
+      the exact value. Nothing tells it the answer.</div>
+    <table id="redis"><tr><td class="dim">running&hellip;</td></tr></table>
+  </div>
+
+  <div class="card">
+    <h2>The same chaos, asked two ways</h2>
+    <div class="dim">The logistic map at r=4 is deterministic and chaotic. Framed as
+      <code>x(n+1)</code> vs <code>x(n)</code> an exact law exists and must be found. Framed as
+      <code>x(n)</code> vs <code>n</code> there is none, and <b>nothing must be returned</b>. Same numbers,
+      opposite required answers &mdash; a regressor that always finds an equation is decoration.</div>
+    <table id="pair"></table>
+  </div>
+
+  <div class="card">
+    <h2>A verdict with a spread, not a boolean</h2>
+    <div class="dim">The fits above cut the data <b>once</b>, at 60%. So the verdict is a property of the data
+      <i>and</i> of where it was cut &mdash; and nothing separated the two. Rolling the origin refits at several
+      cut points and reports the <b>distribution</b>. For a real law the recovered exponent is the same from every
+      window, so its spread collapses to nothing; that is a sharper claim than a high R&sup2;, because it says the
+      law does not depend on which part of the range you looked at &mdash; which is what a law <i>means</i>.</div>
+    <table id="roll"></table>
+  </div>
+
+  <div class="card">
+    <h2>What this does not claim</h2>
+    <div class="dim">Sparse regression does <b>not invent the vocabulary</b>. Hand it a library containing
+      <code>x^2</code> and it can find <code>x^2</code>; hand it one without and it cannot. What it genuinely
+      does is decide <b>which</b> of the offered terms matter and with what coefficients. The library is an input,
+      and the physics knowledge hides there. These simulations are also noiseless, which makes this easier than
+      real measurement &mdash; a success here does not transfer straight to laboratory data.</div>
+  </div>
+</div>
+
+<script type="module">
+import { fit, powerLaw, polyLibrary, multiLibrary, TERM, VERDICT, rollingFit, ROLLING } from "./physics/discovery/symbolicFit.js";
+import { period, visViva } from "./physics/orbits/kepler.js";
+import { projectedAreaAtDepth } from "./physics/splat/gaussianSplat.js";
+import { orbit } from "./physics/chaos/logistic.js";
+import { squareWellLevels } from "./physics/quantum/schrodinger1d.js";
+
+const $ = (id) => document.getElementById(id);
+const row = (what, found, exact, good, note) =>
+  '<tr><td>' + what + '</td><td class="eq">' + found + '</td><td class="num dim">' + exact +
+  '</td><td class="' + (good ? 'ok' : 'hot') + '">' + (good ? 'rediscovered' : 'MISS') + '</td>' +
+  '<td class="dim">' + (note || '') + '</td></tr>';
+
+function rediscovery() {
+  let h = '<tr><th>instrument</th><th>found</th><th>exact</th><th></th><th></th></tr>';
+
+  const a = [1,1.3,1.7,2.2,2.9,3.8,5.0,6.5];
+  const k = powerLaw(a, a.map(v => period(v,1)));
+  h += row("Kepler III &mdash; T vs a", "T ~ a^" + k.exponent.toPrecision(12), "3/2",
+           Math.abs(k.exponent-1.5) < 1e-9, "from (a,T) pairs alone");
+
+  const z = [2,2.7,3.5,4.6,6,8,10.5,14];
+  const s = powerLaw(z, z.map(v => projectedAreaAtDepth(v)));
+  h += row("Splat &mdash; projected area vs depth", "A ~ z^" + s.exponent.toPrecision(12), "-2",
+           Math.abs(s.exponent+2) < 1e-9, "the perspective law");
+
+  const lv = Array.from(squareWellLevels(6,{N:600}));
+  const q = powerLaw(lv.map((_,i)=>i+1), lv);
+  h += row("Schrodinger &mdash; square well levels", "E ~ n^" + q.exponent.toPrecision(10), "2",
+           Math.abs(q.exponent-2) < 1e-4, "residual is grid error, not fit error");
+
+  const x = [1,2,3,4,5,6,7,8,9,10];
+  const p = fit({X:x, y:x.map(v=>3*v*v-2*v+1), library:polyLibrary("x",5), threshold:1e-8});
+  h += row("control &mdash; a known polynomial", p.equation, "1 - 2x + 3x&sup2;",
+           p.equation === "y = 1 - 2*x + 3*x^2", "offered x^4 and x^5, took neither");
+
+  const rows=[],yy=[];
+  for (const aa of [1,1.5,2,2.6,3.3,4.1,5,6,7.2,8.5,10,12])
+    for (const f of [0.6,1.0,1.4]) { const rr=aa*f, v=visViva(rr,aa,1);
+      if (Number.isFinite(v)&&v>0){rows.push([rr,aa]); yy.push(v*v);} }
+  const lib=multiLibrary([TERM.one,TERM.inv(0,"r"),TERM.inv(1,"a"),TERM.invSq(0,"r"),TERM.invSq(1,"a"),TERM.col(0,"r")]);
+  const vv=fit({X:rows,y:yy,library:lib,threshold:1e-9});
+  h += row("Kepler &mdash; VIS-VIVA (two variables)", vv.equation, "2/r - 1/a",
+           vv.equation === "y = 2*1/r - 1*1/a", "took 2 of 6 offered terms");
+
+  const poor=multiLibrary([TERM.one,TERM.col(0,"r"),TERM.col(1,"a"),TERM.sq(0,"r"),TERM.sq(1,"a")]);
+  const bad=fit({X:rows,y:yy,library:poor,threshold:1e-9});
+  h += '<tr><td>...same data, library WITHOUT 1/r</td><td class="eq dim">' + bad.verdict +
+       '</td><td class="num dim">refuse</td><td class="' + (bad.verdict===VERDICT.NO_LAW?'ok':'hot') + '">' +
+       (bad.verdict===VERDICT.NO_LAW?'refused':'APPROXIMATED') +
+       '</td><td class="dim">the vocabulary is an input; when it is wrong the honest answer is nothing</td></tr>';
+
+  $("redis").innerHTML = h;
+}
+
+function pair() {
+  let h = '<tr><th>framing</th><th>verdict</th><th>result</th></tr>';
+  const orb = Array.from(orbit(4.0,{warmup:500,samples:400}));
+
+  const m = fit({X:orb.slice(0,-1), y:orb.slice(1), library:polyLibrary("x",3), threshold:1e-8});
+  h += '<tr><td>x(n+1) vs x(n)</td><td class="' + (m.verdict===VERDICT.LAW?'ok':'hot') + '">' + m.verdict +
+       '</td><td class="eq">' + m.equation + ' <span class="dim">(exact: y = 4*x - 4*x^2)</span></td></tr>';
+
+  const nl = fit({X:orb.map((_,i)=>i+1), y:orb, library:polyLibrary("n",4), threshold:1e-8});
+  const right = nl.verdict === VERDICT.NO_LAW;
+  h += '<tr><td>x(n) vs n</td><td class="' + (right?'ok':'hot') + '">' + nl.verdict +
+       '</td><td class="dim">' + (nl.reason || '') + '</td></tr>';
+
+  $("pair").innerHTML = h;
+}
+
+function rolling() {
+  const rows = [];
+  const a = [1,1.3,1.7,2.2,2.9,3.8,5.0,6.5,8.2,10.5];
+  const k = rollingFit({X:a, y:a.map(v=>period(v,1)), powerLawMode:true});
+  rows.push(["Kepler III &mdash; T vs a", k, "exponent " + k.exponentMean.toPrecision(14) + ", sd " + k.exponentSd.toExponential(2)]);
+
+  const orb = Array.from(orbit(4.0,{warmup:500,samples:300}));
+  const c = rollingFit({X:orb.map((_,i)=>i+1), y:orb, library:polyLibrary("n",4), threshold:1e-9});
+  rows.push(["chaos &mdash; x(n) vs n", c, "no origin found one"]);
+
+  const x = Array.from({length:14},(_,i)=>i+1);
+  const e = rollingFit({X:x, y:x.map(v=>Math.exp(v/3)), library:polyLibrary("x",5), threshold:1e-9});
+  rows.push(["exp(x/3) fitted by a degree-5 polynomial", e,
+             "no-law at cuts 0.4&ndash;0.7, LAW at 0.8 &mdash; same data, answer flips on the cut"]);
+
+  const cls = (v) => v===ROLLING.LAW ? "ok" : v===ROLLING.FRAGILE ? "warn" : "dim";
+  $("roll").innerHTML = '<tr><th>data</th><th>origins finding a law</th><th>verdict</th><th></th></tr>' +
+    rows.map(([label,r,note]) =>
+      '<tr><td>'+label+'</td><td class="num">'+r.runs.filter(x=>x.verdict==="law").length+' / '+r.runs.length+
+      '</td><td class="'+cls(r.verdict)+'">'+r.verdict+'</td><td class="dim">'+note+'</td></tr>').join("") +
+    '<tr><td colspan="4" class="dim"><b>fragile</b> is the verdict a single split cannot express: it has to answer law or no-law, so it reports whichever way its one cut happened to land.</td></tr>';
+}
+
+rediscovery(); pair(); rolling();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SweK LLM Cost</title><style>
+html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;}
+#w{max-width:1000px;margin:0 auto;padding:16px;} h1{font-size:17px;margin:0 0 2px;} .sub{color:#6f8a7c;margin-bottom:12px;}
+.card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px;}
+button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:5px 12px;margin-right:6px;cursor:pointer;}
+button:hover:not(:disabled){background:#1d2c24;} button:disabled{opacity:.45;cursor:default;} .primary{border-color:#4c8f6a;color:#b6f0cf;}
+table{border-collapse:collapse;width:100%;} th,td{text-align:left;padding:2px 8px 2px 0;border-bottom:1px solid #16241d;} th{color:#6f8a7c;font-weight:normal;} td.n{text-align:right;}
+input{background:#0a1210;color:#cfe9d8;border:1px solid #2c463a;font:inherit;padding:4px 6px;width:100%;box-sizing:border-box;}
+pre{white-space:pre;overflow:auto;color:#a8c9b8;background:#0a1210;border:1px solid #1a2a22;padding:8px;margin:6px 0 0;}
+.dim{color:#6f8a7c;}.hot{color:#e0a0a0;}.warn{color:#e0c58a;}.ok{color:#7fe0a4;}
+.stat{display:inline-block;min-width:120px;margin:0 14px 6px 0;} .stat b{font-size:19px;} .stat span{display:block;color:#6f8a7c;font-size:11px;}
+</style></head><body><div id="w">
+<h1>LLM Cost &amp; Chain Order</h1>
+<div class="sub">Prices your <i>own</i> roundhouse traffic with <a href="https://github.com/Rodiun/frugon" style="color:#8fb4e8">frugon</a> (MIT, local, zero network calls in analyze mode), then orders <code>escalateRoute</code>'s chain by <b>verified-per-dollar</b> &mdash; using the gate result frugon can't see. Frugon <i>infers</i> whether a cheaper model would have sufficed; <code>escalateRoute</code> ran a real gate and knows.</div>
+<div class="card"><button id="bStat" class="primary">Status</button><button id="bTable">Tally</button><button id="bCap">Capture: ?</button><button id="bRun">Run frugon analyze</button><span class="dim" id="msg"></span><div id="stat" style="margin-top:8px"></div></div>
+<div class="card"><div class="dim">Per-call cost from frugon's report, as JSON. <b>Typed, not scraped</b> &mdash; frugon prints a box-drawing TUI, and a scraper for it would be an undeclared dependency on someone else's formatting that breaks silently on their next release while still returning a confident number.</div>
+<input id="costs" placeholder='{"claude-haiku-4-5":0.0012,"claude-opus-5":0.019}' style="margin-top:6px"><button id="bRank" class="primary" style="margin-top:6px">Rank the chain</button><div id="rank" style="margin-top:8px"></div></div>
+<div class="card"><pre id="out" style="display:none"></pre></div>
+</div><script>
+(function(){
+var $=function(i){return document.getElementById(i);},esc=function(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"})[c];});};
+var st=function(v,l,c){return '<div class="stat"><b class="'+(c||"")+'">'+esc(v)+"</b><span>"+esc(l)+"</span></div>";};
+var get=function(u){return fetch(u,{cache:"no-store"}).then(function(r){return r.json();});};
+$("bCap").onclick=function(){var want=$("bCap").dataset.on==="1"?"0":"1";
+ get("/frugon/capture?on="+want).then(function(d){if(d.ok){$("bStat").click();}else{$("msg").innerHTML=' <span class="hot">'+esc(d.error)+"</span>";}});};
+$("bStat").onclick=function(){$("msg").textContent=" checking...";get("/frugon/status").then(function(d){$("msg").textContent="";
+ $("bCap").dataset.on=(d.capture==="on")?"1":"0";$("bCap").textContent="Capture: "+(d.capture==="on"?"ON":"off");
+ $("stat").innerHTML=st(d.rows,"logged calls",d.rows?"ok":"warn")+st(d.unpriceable,"unpriceable",d.unpriceable?"warn":"")+st(d.installed?"yes":"no","frugon installed",d.installed?"ok":"hot")+st((d.models||[]).length,"models seen")
+ +'<div class="dim" style="margin-top:4px">log: '+esc(d.logPath)+"</div>"
+ +'<div class="'+(d.capture==="on"?"ok":"warn")+'">capture '+esc(d.capture)+"</div>"
+ +'<div style="margin-top:6px" class="'+(d.captureScope&&d.captureScope.indexOf("nothing")<0?"warn":"dim")+'">scope: '+esc(d.captureScope||"unknown")+"</div>"
+ +(d.install?'<div class="hot" style="margin-top:6px">frugon is not here. '+esc(d.install)+"</div>":"");}).catch(function(e){$("msg").innerHTML=' <span class="hot">'+esc(e.message)+"</span>";});};
+$("bTable").onclick=function(){get("/frugon/table").then(function(d){
+ if(!d.tally.length){$("stat").innerHTML='<span class="warn">no rows. Run the roundhouse with SWEK_CALL_LOG=1 &mdash; an empty tally is not a finding of zero cost, it is an absence of data.</span>';return;}
+ $("stat").innerHTML='<table><tr><th>model</th><th class="n">calls</th><th class="n">gated</th><th class="n">verified</th><th class="n">unpriceable</th></tr>'
+ +d.tally.map(function(t){return "<tr><td>"+esc(t.model)+'</td><td class="n">'+t.calls+'</td><td class="n'+(t.judged<d.minSamples?" warn":"")+'">'+t.judged+'</td><td class="n">'+t.verified+'</td><td class="n'+(t.unpriceable?" hot":"")+'">'+t.unpriceable+"</td></tr>";}).join("")
+ +'</table><div class="dim">floor is '+d.minSamples+" gated calls; below it a model is reported but never ranked.</div>";});};
+$("bRank").onclick=function(){get("/frugon/rank?costs="+encodeURIComponent($("costs").value||"{}")).then(function(d){
+ var h="";
+ if(d.refused){h='<div class="hot">'+esc(d.refused)+"</div>";}
+ else if(!d.ranked.length){h='<div class="warn">'+esc(d.chain.why)+"</div>";}
+ else{h='<table><tr><th>#</th><th>model</th><th class="n">gated</th><th class="n">accept</th><th class="n">lower bound</th><th class="n">verified/$</th></tr>'
+  +d.ranked.map(function(r,i){return "<tr><td>"+(i+1)+"</td><td>"+esc(r.model)+'</td><td class="n">'+r.judged+'</td><td class="n">'+(r.accept*100).toFixed(0)+'%</td><td class="n">'+(r.lower*100).toFixed(0)+'%</td><td class="n">'+r.merit.toFixed(0)+"</td></tr>";}).join("")+"</table>";
+  if(d.cost&&d.cost.perAnswer!=null){h+='<div style="margin-top:8px">'+st(d.cost.perAnswer.toFixed(5),"per verified answer")+st((d.cost.saving*100).toFixed(0)+"%","saved vs strongest",d.cost.saving>0.2?"ok":"warn")+'</div><div class="dim">'+esc(d.cost.why)+"</div>";}
+  h+='<div class="dim" style="margin-top:6px">Ranked on the <b>Wilson lower bound</b>, not the raw rate: 3/3 scores 0.438 and 40/50 scores 0.670, so a thin perfect record cannot outrank a thick good one.</div>';}
+ if(d.insufficient&&d.insufficient.length){h+='<div class="warn" style="margin-top:8px">not ranked:</div><div class="dim">'+d.insufficient.map(function(r){return esc(r.model)+" &mdash; "+esc(r.why);}).join("<br>")+"</div>";}
+ $("rank").innerHTML=h;});};
+$("bRun").onclick=function(){$("bRun").disabled=true;$("msg").textContent=" running frugon...";
+ get("/frugon/analyze").then(function(d){$("bRun").disabled=false;$("msg").textContent="";$("out").style.display="";
+  $("out").textContent=(d.cmd?"$ "+d.cmd+"\n\n":"")+(d.report||d.error||"")+'<div style="margin-top:6px" class="'+(d.captureScope&&d.captureScope.indexOf("nothing")<0?"warn":"dim")+'">scope: '+esc(d.captureScope||"unknown")+"</div>"
+ +(d.install?"\n\n"+d.install:"");}).catch(function(e){$("bRun").disabled=false;$("msg").innerHTML=' <span class="hot">'+esc(e.message)+"</span>";});};
+$("bStat").click();
+})();
+</script></body></html>

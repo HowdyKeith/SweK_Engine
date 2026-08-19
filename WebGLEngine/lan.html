@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK LAN Console</title>
+<style>
+/* SweK LAN Console -- an LCARS-family view of what the LAN offers (services registry) and what this box
+   knows about itself (OKF brief). Palette + Antonio face match the engine's existing pages. */
+:root{
+  --bg:#000; --panel:#0c0906; --edge:#1c140c;
+  --amber:#ff9c3f; --amber2:#ff9933; --salmon:#ff9a6a; --peach:#ff9b8a; --pink:#ff9aa2;
+  --good:#8aff9e; --dim:#6b5a44; --purple:#c99ad6; --ink:#0a0704; --text:#ffd9b0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Antonio',ui-monospace,'Segoe UI',monospace;font-weight:500}
+body{padding:14px;display:grid;grid-template-columns:92px 1fr;gap:12px;min-height:100vh;align-content:start}
+@media (max-width:640px){body{grid-template-columns:1fr}.rail{flex-direction:row!important;height:auto!important}}
+.rail{display:flex;flex-direction:column;gap:8px;height:calc(100vh - 28px);position:sticky;top:14px}
+.rail .pill{background:var(--salmon);color:var(--ink);border-radius:14px;padding:8px 10px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;line-height:1.05;font-weight:700}
+.rail .pill.b{background:var(--amber)} .rail .pill.c{background:var(--pink)} .rail .pill.d{background:var(--purple)}
+.rail .grow{flex:1;background:var(--edge);border-radius:14px}
+.rail .stat{background:var(--edge);border-radius:14px;padding:10px;color:var(--salmon);font-size:12px;letter-spacing:.1em}
+.rail .stat b{display:block;color:var(--good);font-size:22px;letter-spacing:.02em}
+.head{display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--edge);padding-bottom:8px;margin-bottom:6px}
+.head h1{margin:0;font-size:30px;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;font-weight:700}
+.head .v{color:var(--purple);letter-spacing:.16em;font-size:14px}
+.head .live{margin-left:auto;font-size:12px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.head .live.on{color:var(--good)}
+section{margin-bottom:16px}
+.bar{display:flex;align-items:center;gap:10px;margin:14px 0 10px}
+.bar .tag{background:var(--amber);color:var(--ink);padding:4px 16px 4px 12px;border-radius:12px 0 0 12px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;font-size:15px}
+.bar .rule{flex:1;height:12px;background:var(--edge);border-radius:0 12px 12px 0}
+.bar .n{color:var(--salmon);letter-spacing:.12em;font-size:13px}
+.box{border:1px solid var(--edge);border-left:6px solid var(--salmon);border-radius:0 12px 12px 0;background:var(--panel);padding:10px 12px;margin-bottom:8px}
+.box.self{border-left-color:var(--amber)} .box.down{border-left-color:var(--dim);opacity:.72}
+.box h3{margin:0 0 8px;font-size:16px;letter-spacing:.1em;color:var(--peach);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.box h3 .who{color:var(--purple);font-size:12px;letter-spacing:.08em;margin-left:auto;text-transform:none}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+.dot.off{background:var(--dim);box-shadow:none}
+.svcs{display:flex;flex-wrap:wrap;gap:6px}
+.svc{background:var(--ink);border:1px solid var(--edge);border-radius:10px;padding:4px 10px;font-size:13px;letter-spacing:.06em;display:flex;align-items:center;gap:7px}
+.svc .k{color:var(--good);font-weight:700} .svc .kind{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+.svc.cap .k{color:var(--purple)} .svc.external .k{color:var(--amber)}
+.ledger{border:1px solid var(--edge);border-radius:12px;background:var(--panel);padding:12px}
+.seg{display:flex;height:26px;border-radius:8px;overflow:hidden;margin:8px 0}
+.seg i{display:block;height:100%} .seg .s{background:var(--good)} .seg .o{background:var(--amber)} .seg .b{background:var(--pink)}
+.legend{display:flex;gap:16px;font-size:12px;letter-spacing:.1em;color:var(--salmon);text-transform:uppercase}
+.legend b{color:var(--text)}
+.open{margin-top:12px} .open .row{border-left:4px solid var(--amber);padding:6px 10px;margin-bottom:6px;background:var(--ink);border-radius:0 8px 8px 0}
+.open .row .t{color:var(--peach);letter-spacing:.04em} .open .row .kill{color:var(--dim);font-size:12px;margin-top:2px}
+.empty{color:var(--dim);letter-spacing:.1em;padding:18px;border:1px dashed var(--edge);border-radius:12px;text-align:center;text-transform:uppercase;font-size:13px}
+</style>
+</head>
+<body>
+  <nav class="rail" aria-label="status">
+    <div class="pill b">SweK</div>
+    <div class="pill">LAN<br>Console</div>
+    <div class="stat">Boxes<b id="rBoxes">--</b></div>
+    <div class="stat">Services<b id="rSvcs">--</b></div>
+    <div class="pill c">OKF</div>
+    <div class="stat">Claims<b id="rClaims">--</b></div>
+    <div class="grow"></div>
+    <div class="pill d">4 7 4</div>
+  </nav>
+  <main>
+    <header class="head">
+      <h1>SweK LAN Console</h1>
+      <span class="v" id="ver">v----</span>
+      <span class="live" id="live">connecting</span>
+    </header>
+    <section aria-labelledby="svcHead">
+      <div class="bar"><span class="tag" id="svcHead">Services on the LAN</span><span class="rule"></span><span class="n" id="svcN"></span></div>
+      <div id="boxes"><div class="empty">Scanning the LAN&hellip;</div></div>
+    </section>
+    <section aria-labelledby="okfHead">
+      <div class="bar"><span class="tag">Self-Knowledge</span><span class="rule"></span><span class="n" id="okfN"></span></div>
+      <div class="ledger" id="ledger"><div class="empty">Reading the OKF brief&hellip;</div></div>
+    </section>
+  </main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+async function getJSON(url){
+  const r = await fetch(url, { cache: "no-store" });
+  if(!r.ok) throw new Error(url + " -> " + r.status);
+  return r.json();
+}
+function svcChip(s){
+  const kind = (s.kind || "service");
+  const where = s.url ? s.url : (s.path || "");
+  return '<span class="svc ' + esc(kind) + '" title="' + esc(where) + '"><span class="k">' + esc(s.name) + '</span><span class="kind">' + esc(kind) + '</span></span>';
+}
+function renderServices(reg){
+  const boxes = [];
+  const self = reg.self || { peer: "this box", services: [] };
+  boxes.push({ peer: self.peer, services: self.services || [], reachable: true, self: true });
+  for(const p of (reg.peers || [])) boxes.push({ peer: p.peer, services: p.services || [], reachable: !!p.reachable, self: false });
+  let svcCount = 0;
+  const html = boxes.map((b) => {
+    svcCount += b.services.length;
+    const cls = "box" + (b.self ? " self" : "") + (b.reachable ? "" : " down");
+    const dot = '<span class="dot ' + (b.reachable ? "" : "off") + '"></span>';
+    const who = b.self ? "this box" : (b.reachable ? "peer" : "unreachable");
+    const chips = b.services.length ? b.services.map(svcChip).join("") : '<span class="svc"><span class="kind">no services advertised</span></span>';
+    return '<div class="' + cls + '"><h3>' + dot + esc(b.peer) + '<span class="who">' + who + '</span></h3><div class="svcs">' + chips + '</div></div>';
+  }).join("");
+  $("boxes").innerHTML = html || '<div class="empty">No boxes found</div>';
+  $("rBoxes").textContent = boxes.length;
+  $("rSvcs").textContent = svcCount;
+  $("svcN").textContent = boxes.length + " box" + (boxes.length === 1 ? "" : "es") + " \u00b7 " + svcCount + " services";
+}
+function renderOKF(brief){
+  const t = (brief && brief.tally) || { settled: 0, open: 0, broken: 0, total: 0 };
+  const total = t.total || (t.settled + t.open + t.broken) || 1;
+  const pct = (n) => (100 * n / total).toFixed(2) + "%";
+  const open = (brief && brief.openClaims) || [];
+  const rows = open.slice(0, 6).map((c) =>
+    '<div class="row"><div class="t">' + esc(c.title) + ' <span style="color:var(--dim)">' + esc(c.since || "") + '</span></div><div class="kill">settles when: ' + esc((c.kill || "").slice(0, 120)) + '</div></div>').join("");
+  $("ledger").innerHTML =
+    '<div class="legend"><span>Settled <b>' + t.settled + '</b></span><span>Open <b>' + t.open + '</b></span><span>Broken <b>' + t.broken + '</b></span></div>'
+    + '<div class="seg"><i class="s" style="width:' + pct(t.settled) + '"></i><i class="o" style="width:' + pct(t.open) + '"></i><i class="b" style="width:' + pct(t.broken) + '"></i></div>'
+    + '<div class="open">' + (rows || '<div class="empty">No open claims</div>') + '</div>';
+  $("rClaims").textContent = t.total || (t.settled + t.open + t.broken);
+  $("okfN").textContent = (brief && brief.engine ? brief.engine.title : "engine") + " \u00b7 " + t.open + " open to adjudicate";
+}
+function offline(msg){
+  $("live").textContent = "no engine"; $("live").className = "live";
+  $("boxes").innerHTML = '<div class="empty">' + esc(msg) + '<br>serve this page from the SweK engine to see the live LAN.</div>';
+  $("ledger").innerHTML = '<div class="empty">the OKF brief loads from /okf/brief.json on the engine.</div>';
+}
+async function tick(){
+  try{
+    const [reg, brief] = await Promise.all([ getJSON("/services"), getJSON("/okf/brief.json").then((r) => r.brief || r).catch(() => null) ]);
+    renderServices(reg);
+    if(brief) renderOKF(brief);
+    $("live").textContent = "live"; $("live").className = "live on";
+  }catch(e){
+    offline("LAN registry unreachable (" + esc(e.message) + ").");
+  }
+}
+async function boot(){ tick(); setInterval(tick, 7000); }
+boot();
+</script>
+</body>
+</html>

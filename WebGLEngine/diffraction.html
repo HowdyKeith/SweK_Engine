@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Diffraction -- patterns graded against the analytic forms</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .wrap { padding:12px 18px 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; max-width:960px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:10px 12px; }
+  .card h2 { margin:0 0 6px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.06em; }
+  canvas { display:block; width:100%; height:auto; border-radius:5px; background:#01060c; }
+  .leg { font-size:11px; color:var(--dim); margin-top:6px; } .leg b { color:var(--amber); } .leg i { color:var(--cyan); font-style:normal; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Diffraction &mdash; patterns graded against the analytic forms</h1>
+  <p>A far-field diffraction propagator, summed as phasors across apertures we define exactly, checked against the closed forms we already know: a single slit gives <b>sinc squared</b>, two slits give that times <b>cos squared</b>, and a circular aperture puts its first dark ring at the <b>Rayleigh limit, 1.22&thinsp;&lambda;/D</b>. Runs <code>physics/optics/diffraction.js</code>. The propagator is real optics; the answer key is analytic; a number nobody fed it &mdash; 1.22 &mdash; falls out of the geometry.</p>
+</header>
+<div class="wrap">
+  <div class="card"><h2>Single slit</h2><canvas id="cSlit" width="440" height="180"></canvas>
+    <div class="leg"><i>line</i> numeric &middot; <b>dots</b> analytic sinc&sup2; &middot; ticks at minima m&lambda;/a. <span id="sSlit"></span></div></div>
+  <div class="card"><h2>Double slit (Young)</h2><canvas id="cDbl" width="440" height="180"></canvas>
+    <div class="leg">interference fringes under the single-slit envelope. <span id="sDbl"></span></div></div>
+  <div class="card"><h2>Circular aperture (Airy)</h2><canvas id="cAiry" width="440" height="200"></canvas>
+    <div class="leg">the ring marks the numeric first dark ring; it lands on the analytic Rayleigh limit. <span id="sAiry"></span></div></div>
+</div>
+<script type="module">
+import { slitNumeric, slitAnalytic, slitMinima, doubleSlitNumeric, doubleSlitAnalytic, circularNumeric, airyFirstMinimum, firstMinimumAt, scorePattern } from "./physics/optics/diffraction.js";
+const lambda = 0.5;
+const sweep = (lo, hi, n) => { const a = []; for (let i = 0; i <= n; i++) a.push(lo + (hi - lo) * i / n); return a; };
+
+function plot(cv, st, numeric, analytic, minima) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height, pad = 8;
+  g.clearRect(0, 0, W, H);
+  const nMax = Math.max.apply(null, numeric) || 1, aMax = analytic ? (Math.max.apply(null, analytic) || 1) : 1;
+  const X = (i) => pad + i / (st.length - 1) * (W - 2 * pad), Y = (v) => H - pad - v * (H - 2 * pad);
+  // minima ticks
+  if (minima) { g.strokeStyle = "#2a4a3a"; for (const m of minima) for (const s of [m, -m]) { const i = st.findIndex((v) => v >= s); if (i > 0) { g.beginPath(); g.moveTo(X(i), H - pad); g.lineTo(X(i), pad); g.stroke(); } } }
+  // analytic dots
+  if (analytic) { g.fillStyle = "#ffcc66"; for (let i = 0; i < st.length; i += 6) { g.beginPath(); g.arc(X(i), Y(analytic[i] / aMax), 1.6, 0, 7); g.fill(); } }
+  // numeric line
+  g.strokeStyle = "#33ccff"; g.lineWidth = 1.4; g.beginPath();
+  for (let i = 0; i < st.length; i++) { const x = X(i), y = Y(numeric[i] / nMax); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+}
+
+// SINGLE SLIT
+{ const a = 4.0, st = sweep(-0.4, 0.4, 600); const num = slitNumeric(a, lambda, st), an = slitAnalytic(a, lambda, st);
+  plot(document.getElementById("cSlit"), st, num, an, slitMinima(a, lambda, 4));
+  document.getElementById("sSlit").innerHTML = "match rms <b>" + scorePattern(num, an).rms.toExponential(1) + "</b>"; }
+// DOUBLE SLIT
+{ const a = 4.0, d = 12.0, st = sweep(-0.25, 0.25, 900); const num = doubleSlitNumeric(a, d, lambda, st), an = doubleSlitAnalytic(a, d, lambda, st);
+  plot(document.getElementById("cDbl"), st, num, an, null);
+  document.getElementById("sDbl").innerHTML = "match rms <b>" + scorePattern(num, an).rms.toExponential(1) + "</b> &middot; d/a = " + (d / a) + " fringes/lobe"; }
+// CIRCULAR AIRY (2D heatmap + ring)
+{ const D = 6.0, cv = document.getElementById("cAiry"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const st = sweep(0, 0.28, 260); const radial = circularNumeric(D, lambda, st);
+  const rMax = Math.max.apply(null, radial) || 1;
+  const cx = W / 2, cy = H / 2, RpxPerSt = (Math.min(W, H) / 2 - 6) / 0.28;
+  const img = g.createImageData(W, H), dd = img.data;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const st2 = Math.hypot(x - cx, y - cy) / RpxPerSt; let v = 0;
+    if (st2 <= 0.28) { const i = Math.min(radial.length - 1, Math.round(st2 / 0.28 * (radial.length - 1))); v = Math.sqrt(radial[i] / rMax); }
+    const k = (y * W + x) * 4; dd[k] = 40 + v * 215; dd[k + 1] = 90 + v * 150; dd[k + 2] = 60 + v * 60; dd[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const ring = firstMinimumAt(radial, st), rayleigh = airyFirstMinimum(D, lambda);
+  g.strokeStyle = "#e8736a"; g.lineWidth = 1.3; g.beginPath(); g.arc(cx, cy, ring * RpxPerSt, 0, 7); g.stroke();
+  document.getElementById("sAiry").innerHTML = "first ring <b>" + ring.toFixed(4) + "</b> vs Rayleigh 1.22&lambda;/D <b>" + rayleigh.toFixed(4) + "</b> (" + (Math.abs(ring - rayleigh) / rayleigh * 100).toFixed(2) + "%)";
+}
+</script>
+</body>
+</html>

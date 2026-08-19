@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Board</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:15px/1.4 ui-rounded,system-ui,sans-serif; overflow:hidden; }
+  #bar { display:flex; align-items:center; gap:12px; padding:10px 14px; }
+  #clock { font-size:20px; font-weight:700; } #title { color:var(--dim); font-size:13px; }
+  #bar .sp { flex:1; }
+  #bar button { background:#0f161b; color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font:inherit; cursor:pointer; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; padding:0 14px 18px; height:calc(100% - 52px); overflow:auto; align-content:start; }
+  .tile { border:1px solid var(--line); border-radius:16px; background:#0f161b; min-height:104px; padding:12px; display:flex; flex-direction:column; gap:6px; }
+  .tile .top { display:flex; align-items:center; gap:8px; }
+  .tile .ico { font-size:22px; opacity:.6; }
+  .tile .nm { font-weight:600; font-size:14px; line-height:1.15; }
+  .tile .st { font-size:13px; color:var(--dim); margin-top:auto; }
+  .tile.on { border-color:#5a4a22; background:linear-gradient(160deg,#211d10,#13110a); } .tile.on .ico { opacity:1; color:#ffcf6b; } .tile.on .st { color:#ffcf6b; }
+  .tile.alert { border-color:#5a2222; } .tile.alert .ico { color:#ff7a7a; opacity:1; }
+  .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  .acts button { background:#10161c; color:#cfe; border:1px solid var(--line); border-radius:8px; padding:6px 9px; font:inherit; font-size:13px; cursor:pointer; }
+  .tap { cursor:pointer; }
+  /* picker */
+  #pick { position:fixed; inset:0; background:#060809ee; display:none; flex-direction:column; z-index:50; }
+  #pick.on { display:flex; }
+  #pick .ph { display:flex; gap:10px; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line); }
+  #pick input { flex:1; padding:9px 12px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:9px; font:inherit; }
+  #pick .list { flex:1; overflow:auto; padding:8px 14px 18px; }
+  #pick h4 { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin:12px 0 5px; }
+  #pick .row { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; cursor:pointer; }
+  #pick .row:hover { background:#10161c; }
+  #pick .row.sel { background:#13201a; }
+  #pick .row .eid { color:var(--dim); font-size:11px; }
+  #pick .ph button { background:#10231a; color:#41e08a; border:1px solid #224a36; border-radius:9px; padding:9px 14px; font:inherit; cursor:pointer; }
+  #msg { color:var(--dim); padding:14px; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <span id="clock">--:--</span><span id="title"></span>
+    <span class="sp"></span>
+    <button id="edit">✎ Add / remove</button>
+    <button id="full">⛶</button>
+  </div>
+  <div id="msg" style="display:none;"></div>
+  <div id="grid"></div>
+
+  <div id="pick">
+    <div class="ph"><input id="search" placeholder="search entities…" /><button id="pickDone">✓ Done</button></div>
+    <div class="list" id="pickList"></div>
+  </div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const params = new URLSearchParams(location.search);
+  const BOARD = params.get("board") || "main";
+  $("title").textContent = BOARD === "main" ? "" : BOARD;
+
+  const ICON = { light:"💡", switch:"🔌", fan:"🌀", cover:"🪟", valve:"🚿", lock:"🔒", climate:"🌡️", media_player:"🔊", sensor:"📊", binary_sensor:"⚪", scene:"🎬", script:"📜", button:"🔘", input_button:"🔘", input_boolean:"🔘", person:"🧑", device_tracker:"📍", weather:"⛅", sun:"☀️", automation:"⚙️", camera:"📷", vacuum:"🧹", humidifier:"💧", siren:"📣" };
+  function kindOf(d){ if (["light","switch","fan","input_boolean","siren","humidifier","automation"].includes(d)) return "toggle"; if (d==="cover") return "cover"; if (d==="valve") return "valve"; if (d==="lock") return "lock"; if (d==="climate") return "climate"; if (d==="media_player") return "media"; if (d==="scene") return "scene"; if (d==="script") return "script"; if (d==="button"||d==="input_button") return "button"; return "readonly"; }
+
+  let all = [], boardIds = [], byId = {};
+  async function fetchAll(){ try { const r = await fetch("/ha/states", { cache:"no-store" }); const j = await r.json(); all = Array.isArray(j) ? j : []; byId = {}; all.forEach(e => byId[e.entity_id] = e); } catch { all = []; } }
+  async function loadBoard(){ try { const r = await fetch("/board/config?name=" + encodeURIComponent(BOARD), { cache:"no-store" }); const j = await r.json(); boardIds = (j && j.entities) || []; } catch { boardIds = []; } }
+  function saveBoard(){ fetch("/board/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ name: BOARD, entities: boardIds }) }).catch(()=>{}); }
+
+  function call(domain, service, data, quiet){ fetch("/ha/call", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ domain, service, data }) }).catch(()=>{}); if (!quiet) setTimeout(refresh, 700); }
+
+  function stateText(e){
+    const d = e.domain, s = String(e.state);
+    if (d === "climate") { const cur = e.current_temperature != null ? e.current_temperature + "°" : "—"; const tgt = e.temperature != null ? " → " + e.temperature + "°" : ""; return cur + tgt + (e.hvac_action ? "  " + e.hvac_action : ""); }
+    if (d === "light" && s === "on" && e.brightness != null) return Math.round(e.brightness/255*100) + "%";
+    return s + (e.unit ? " " + e.unit : "");
+  }
+  function isActive(e){ const s = String(e.state).toLowerCase(); if (e.domain==="cover"||e.domain==="valve") return s==="open"||s==="opening"; if (e.domain==="lock") return s==="locked"; if (e.domain==="binary_sensor") return s==="on"; return s==="on"||s==="playing"||s==="home"||s==="heat"||s==="cool"; }
+  function isAlert(e){ return e.domain==="binary_sensor" && String(e.state)==="on" && ["smoke","gas","carbon_monoxide","moisture","problem"].includes(e.device_class); }
+
+  function actionsFor(e){
+    const k = kindOf(e.domain), id = e.entity_id;
+    if (k === "cover") return [["▲ Open",()=>call("cover","open_cover",{entity_id:id})],["■",()=>call("cover","stop_cover",{entity_id:id})],["▼ Close",()=>call("cover","close_cover",{entity_id:id})]];
+    if (k === "valve") return [["Open",()=>call("valve","open_valve",{entity_id:id})],["Close",()=>call("valve","close_valve",{entity_id:id})]];
+    if (k === "lock") return [["🔒 Lock",()=>call("lock","lock",{entity_id:id})],["🔓 Unlock",()=>call("lock","unlock",{entity_id:id})]];
+    if (k === "climate") return [["–",()=>call("climate","set_temperature",{entity_id:id,temperature:(e.temperature||20)-1})],["+",()=>call("climate","set_temperature",{entity_id:id,temperature:(e.temperature||20)+1})]];
+    if (k === "media") return [["🔉",()=>call("media_player","volume_down",{entity_id:id},true)],["⏯",()=>call("media_player","media_play_pause",{entity_id:id})],["🔊",()=>call("media_player","volume_up",{entity_id:id},true)]];
+    return null;
+  }
+  function tapFor(e){
+    const k = kindOf(e.domain), id = e.entity_id;
+    if (k === "toggle") return () => call(e.domain, "toggle", { entity_id: id });
+    if (k === "scene") return () => call("scene", "turn_on", { entity_id: id });
+    if (k === "script") return () => call("script", "turn_on", { entity_id: id });
+    if (k === "button") return () => call(e.domain, "press", { entity_id: id });
+    return null;
+  }
+
+  function render(){
+    const items = boardIds.map(id => byId[id]).filter(Boolean);
+    if (!items.length) { $("msg").style.display = "block"; $("msg").textContent = "Empty board — tap “Add / remove” to pick entities."; $("grid").innerHTML = ""; return; }
+    $("msg").style.display = "none";
+    $("grid").innerHTML = items.map(e => {
+      const active = isActive(e), alert = isAlert(e), acts = actionsFor(e), tap = tapFor(e);
+      return '<div class="tile ' + (alert?"alert":(active?"on":"")) + (tap?" tap":"") + '" data-eid="' + esc(e.entity_id) + '" data-tap="' + (tap?"1":"") + '">' +
+        '<div class="top"><span class="ico">' + (ICON[e.domain] || "⬜") + '</span><span class="nm">' + esc(e.name) + '</span></div>' +
+        '<div class="st">' + esc(stateText(e)) + '</div>' +
+        (acts ? '<div class="acts">' + acts.map((a,i)=>'<button data-act="'+i+'">'+esc(a[0])+'</button>').join("") + '</div>' : "") + '</div>';
+    }).join("");
+    $("grid").querySelectorAll(".tile").forEach(t => {
+      const e = byId[t.getAttribute("data-eid")]; if (!e) return;
+      if (t.getAttribute("data-tap")) { const fn = tapFor(e); t.onclick = (ev) => { if (ev.target.closest(".acts")) return; fn(); }; }
+      const acts = actionsFor(e); if (acts) t.querySelectorAll("button[data-act]").forEach(b => b.onclick = (ev) => { ev.stopPropagation(); acts[+b.getAttribute("data-act")][1](); });
+    });
+  }
+
+  async function refresh(){ await fetchAll(); render(); }
+
+  // picker
+  function openPicker(){ $("pick").classList.add("on"); renderPick(""); $("search").value=""; $("search").focus(); }
+  $("edit").onclick = openPicker;
+  $("pickDone").onclick = () => { $("pick").classList.remove("on"); refresh(); };
+  $("search").oninput = () => renderPick($("search").value.trim().toLowerCase());
+  function renderPick(q){
+    const groups = {};
+    all.filter(e => !q || (e.name + " " + e.entity_id).toLowerCase().includes(q)).forEach(e => { (groups[e.domain] = groups[e.domain] || []).push(e); });
+    const order = Object.keys(groups).sort();
+    $("pickList").innerHTML = order.map(dom => '<h4>' + esc(dom) + '</h4>' + groups[dom].sort((a,b)=>a.name.localeCompare(b.name)).map(e =>
+      '<div class="row ' + (boardIds.indexOf(e.entity_id)>=0?"sel":"") + '" data-eid="' + esc(e.entity_id) + '"><span>' + (boardIds.indexOf(e.entity_id)>=0?"✅":"➕") + '</span><span>' + esc(e.name) + ' <span class="eid">' + esc(e.entity_id) + '</span></span></div>'
+    ).join("")).join("");
+    $("pickList").querySelectorAll(".row").forEach(r => r.onclick = () => { const id = r.getAttribute("data-eid"); const i = boardIds.indexOf(id); if (i>=0) boardIds.splice(i,1); else boardIds.push(id); saveBoard(); renderPick($("search").value.trim().toLowerCase()); });
+  }
+
+  $("full").onclick = () => { try { (document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen).call(document.documentElement); } catch {} };
+  function tick(){ $("clock").textContent = new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); } tick(); setInterval(tick, 10000);
+  let wl=null; async function wake(){ try { if ("wakeLock" in navigator) { wl = await navigator.wakeLock.request("screen"); } } catch {} }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState==="visible") wake(); }); document.addEventListener("click", () => { if (!wl) wake(); }); wake();
+
+  (async () => { await Promise.all([fetchAll(), loadBoard()]); render(); })();
+  setInterval(() => { if (!$("pick").classList.contains("on")) refresh(); }, 6000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

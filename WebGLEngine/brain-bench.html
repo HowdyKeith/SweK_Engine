@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK Engine &mdash; Which half of a brain belongs on a GPU</title>
+<style>
+  :root { --bg:#05080e; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff9f6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; padding:26px 20px 70px; }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size:18px; letter-spacing:.09em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 24px; }
+  .panel { border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; background:rgba(10,20,34,.55); }
+  .panel h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--dim); font-weight:600; padding:5px 8px; border-bottom:1px solid var(--line); font-size:10px; letter-spacing:.06em; text-transform:uppercase; }
+  td { padding:5px 8px; border-bottom:1px solid rgba(22,48,77,.4); font-variant-numeric: tabular-nums; }
+  .num { text-align:right; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  button { padding:8px 15px; background:#2a4d3a; color:#cfe; border:1px solid #4a7d5a; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:disabled { opacity:.4; cursor:default; }
+  .big { font-size:22px; }
+  p { color:var(--dim); }
+  code { color:var(--ink); }
+  a { color:#7fd1ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Which half of a brain belongs on a GPU</h1>
+  <p class="sub">Both halves are here. This machine decides, and it may not agree with mine.</p>
+
+  <div class="panel">
+    <h2>The question</h2>
+    <p style="margin:0 0 10px">The brain solves a cost-weighted flow field over a heightmap every tick &mdash; "from
+    every cell, which way is downhill toward a goal". There are two solvers: an <b>exact CPU Dijkstra</b>, and a
+    <b>GPU iterative relaxation</b>. GPU-by-default says the parallel one wins.</p>
+    <p style="margin:0 0 10px">It does not. On the rig this was written on, the GPU field measured <b>~50x slower and
+    about 40&deg; less accurate</b>, so the CPU became the default. That is not a story about a bad GPU &mdash; it is
+    a story about <b>shape</b>: Dijkstra is sequential and memory-bound, which is the wrong shape for a GPU no matter
+    how good the GPU is. A dense matrix multiply is the right shape, which is why the brain's <b>policy network
+    stayed on the GPU</b>. Two halves, two answers, one measurement each.</p>
+    <p style="margin:0"><b>But "the rig's grid" and "the rig's GPU" are not universal.</b> A bigger grid, or a
+    stronger discrete card, and the relaxation can win. So the engine stopped guessing:
+    <code>brain/flowfieldAuto.js</code> measures both on <em>your</em> box and picks. This page shows you what it
+    sees.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Run it here</h2>
+    <p style="margin:0 0 12px">Same workload generator and same agreement metric as <code>brain/bench.mjs</code>
+    &mdash; imported from it, not reimplemented, so this page and the command line cannot drift apart.</p>
+    <button id="go">Measure this machine</button>
+    <span id="status" class="dim" style="margin-left:12px">&nbsp;</span>
+    <div style="margin-top:14px">
+      <table>
+        <thead><tr><th>grid</th><th class="num">cpu median</th><th class="num">gpu median</th><th class="num">speedup</th><th class="num">agreement</th><th>verdict</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>The verdict for this box</h2>
+    <div class="big" id="verdict">&mdash;</div>
+    <p style="margin:8px 0 0" id="why">&nbsp;</p>
+  </div>
+
+  <div class="panel">
+    <h2>Why agreement is on this table</h2>
+    <p style="margin:0"><b>A fast wrong field is not a win.</b> The GPU solver relaxes iteratively toward the answer;
+    stop it early and it is quick and wrong. So every row reports the <b>direction</b> each solver chose per cell,
+    compared against exact Dijkstra as ground truth. A speedup column with no accuracy column beside it is a
+    benchmark that cannot fail &mdash; and one that always flatters the approximate solver.</p>
+  </div>
+</div>
+
+<script type="module">
+// The workload and the metric come from bench.mjs. Reimplementing them here would give this page its own private
+// definition of "agreement" and its own heightmap, and then the page and the CLI could disagree forever without
+// either being wrong. One source of truth.
+import { makeHeights, makeGoals, agreement, stats } from "./brain/bench.mjs";
+import { FlowFieldSolverCPU } from "./brain/flowfieldCpu.js";
+import { FlowFieldSolver } from "./brain/flowfield.js";
+
+const $ = (id) => document.getElementById(id);
+const SIZES = [64, 96, 128];
+const ITERS = 12, WARMUP = 3;
+
+async function timeSolver(solver, heights, goals, opts) {
+  for (let i = 0; i < WARMUP; i++) await solver.solve(heights, goals, opts);
+  const ms = [];
+  let last = null;
+  for (let i = 0; i < ITERS; i++) {
+    const t0 = performance.now();
+    last = await solver.solve(heights, goals, opts);
+    ms.push(performance.now() - t0);
+  }
+  return { ms: stats(ms), last };
+}
+
+async function getDevice() {
+  if (!navigator.gpu) return null;
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return null;
+    return await adapter.requestDevice();
+  } catch { return null; }
+}
+
+$("go").onclick = async () => {
+  $("go").disabled = true;
+  $("rows").innerHTML = "";
+  $("status").textContent = "asking for a GPU\u2026";
+
+  const device = await getDevice();
+  if (!device) {
+    // No WebGPU is a RESULT, not an error: on this box the CPU is the only solver, and the auto-selector will
+    // reach the same conclusion without measuring anything.
+    $("status").textContent = "no WebGPU here \u2014 the CPU wins by walkover";
+    $("verdict").textContent = "CPU, by default";
+    $("verdict").className = "big ok";
+    $("why").textContent = (window.isSecureContext === false && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+      // v3816 -- SAY WHICH OF THE TWO IT IS. On a LAN origin the browser has WebGPU and withholds it from
+      // this context; blaming the browser sends the reader to a driver that was never involved.
+      ? "No WebGPU AT THIS ORIGIN: " + location.protocol + "//" + location.hostname + " is not a secure context, so the browser does not expose it here. Open the page as localhost, or over the Public tunnel's https address, and the GPU solver appears. The browser itself is fine."
+      : "This browser has no WebGPU, so there is no GPU solver to race. That is not a failure; it is why flowfieldAuto.js checks before it chooses.");
+  }
+  $("status").textContent = "measuring\u2026 (this blocks the tab; the numbers matter more than the animation)";
+  await new Promise((r) => setTimeout(r, 30));
+
+  const results = [];
+  for (const n of SIZES) {
+    const heights = makeHeights(n, n, 1234);
+    const goals = makeGoals(n, n);
+    const opts = { wantFlow: true, wantDist: true };
+
+    const cpuSolver = new FlowFieldSolverCPU(null, n, n, { cell: 4 });
+    const cpu = await timeSolver(cpuSolver, heights, goals, opts);
+
+    let gpu = null, agree = null;
+    if (device) {
+      try {
+        const gpuSolver = new FlowFieldSolver(device, n, n, { cell: 4 });
+        gpu = await timeSolver(gpuSolver, heights, goals, opts);
+        agree = agreement(cpu.last, gpu.last, n * n);
+        gpuSolver.destroy && gpuSolver.destroy();
+      } catch (e) {
+        gpu = { error: String(e && e.message || e).slice(0, 60) };
+      }
+    }
+    cpuSolver.destroy && cpuSolver.destroy();
+
+    const speedup = gpu && gpu.ms ? cpu.ms.median / gpu.ms.median : null;
+    results.push({ n, cpu: cpu.ms, gpu: gpu && gpu.ms, agree, speedup, err: gpu && gpu.error });
+
+    const cos = agree && agree.meanCos != null ? agree.meanCos : null;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + n + "&sup2;</td>" +
+      "<td class='num'>" + cpu.ms.median.toFixed(2) + " ms</td>" +
+      "<td class='num'>" + (gpu && gpu.ms ? gpu.ms.median.toFixed(2) + " ms" : "<span class='dim'>" + (gpu && gpu.error ? "error" : "&mdash;") + "</span>") + "</td>" +
+      "<td class='num'>" + (speedup ? (speedup >= 1 ? "<span class='ok'>" + speedup.toFixed(1) + "x GPU</span>" : "<span class='hot'>" + (1 / speedup).toFixed(1) + "x CPU</span>") : "<span class='dim'>&mdash;</span>") + "</td>" +
+      "<td class='num'>" + (cos != null ? (cos > 0.99 ? "<span class='ok'>" : cos > 0.9 ? "<span class='warn'>" : "<span class='hot'>") + cos.toFixed(3) + "</span>" : "<span class='dim'>&mdash;</span>") + "</td>" +
+      "<td class='num'>" + (agree && agree.within45Pct != null ? (agree.within45Pct > 99 ? "<span class='ok'>" : agree.within45Pct > 90 ? "<span class='warn'>" : "<span class='hot'>") + agree.within45Pct.toFixed(0) + "%</span>" : "<span class='dim'>&mdash;</span>") + "</td>" +
+      "<td class='dim'>" + (!gpu ? "no GPU solver" : gpu.error ? gpu.error : cos == null ? "no flow to compare" : cos > 0.99 ? "same field" : "different field") + "</td>";
+    $("rows").appendChild(tr);
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  if (device) {
+    const usable = results.filter((r) => r.speedup && r.agree && r.agree.meanCos > 0.99);
+    const best = results.filter((r) => r.speedup).sort((a, b) => b.speedup - a.speedup)[0];
+    const v = $("verdict"), w = $("why");
+    if (usable.length && usable.some((r) => r.speedup > 1)) {
+      v.textContent = "GPU, on this box"; v.className = "big ok";
+      w.textContent = "The relaxation is faster AND agrees with exact Dijkstra. flowfieldAuto.js would pick it here -- which is the point of measuring rather than inheriting my default.";
+    } else if (best && best.speedup > 1) {
+      v.textContent = "Faster, and wrong"; v.className = "big warn";
+      w.textContent = "The GPU field is quicker but disagrees with exact Dijkstra. That is not a win: an agent following a wrong field walks into a wall confidently. Speed without the agreement column beside it is how this mistake gets published.";
+    } else {
+      v.textContent = "CPU, on this box too"; v.className = "big hot";
+      w.textContent = "Same answer as the rig: exact Dijkstra wins. Dijkstra is sequential and memory-bound -- the wrong shape for a GPU, whatever the card. The brain's policy network stays on the GPU, because a dense matmul is the right shape.";
+    }
+  }
+  $("status").textContent = "done \u2014 " + (device ? "measured" : "no GPU");
+  $("go").disabled = false;
+};
+</script>
+</body>
+</html>

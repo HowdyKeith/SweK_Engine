@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Spacetime Gauges">
+<meta name="demo:desc" content="Two instruments that read a value as a piece of spacetime instead of a bar. The wormhole opens its throat as the value rises -- rings recede into it, twisting and fading with depth. The black hole grows its horizon, which squeezes the accretion band into a narrower, faster ring, with the photon ring outside the horizon and the inner disk orbiting faster than the outer. Only ONE is shown at a time, held long enough to actually read, then it rotates -- a cluster of everything at once is wallpaper; one instrument is an instrument. Drag the slider, or let it follow a live source.">
+<meta name="demo:category" content="fx">
+<title>Spacetime Gauges</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; display:flex; align-items:center; justify-content:center; }
+  #wrap { text-align:center; }
+  #c { display:block; margin:0 auto; }
+  #name { color:#f6a623; letter-spacing:.22em; text-transform:uppercase; font-size:13px; margin-top:14px; }
+  #val { color:#7fe3c4; font-size:26px; font-weight:700; margin-top:4px; }
+  #src { color:#5f7aa0; font-size:10px; margin-top:2px; letter-spacing:.1em; }
+  #ctl { margin-top:18px; display:flex; gap:10px; align-items:center; justify-content:center; }
+  input[type=range] { width:210px; accent-color:#5ac8ff; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  
+  /* v2873 -- the action fills the page (no canvas rule existed). A drawing: aspect held, not pixelated. */
+  canvas { width: 100%; max-width: 700px; height: auto; display: block; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="440" height="440"></canvas>
+  <div id="name"></div>
+  <div id="val"></div>
+  <div id="src">one at a time &middot; rotates every 6s</div>
+  <div id="ctl">
+    <input id="v" type="range" min="0" max="100" value="42">
+    <button id="next">next gauge</button>
+    <button id="auto">auto: on</button>
+    <button id="live">source: manual</button>
+  </div>
+</div>
+<script type="module">
+import { paintWormhole, paintBlackHole, makeGaugeStack, wormholeGeometry, blackHoleGeometry } from "./fx/gauge/spacetimeGauges.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const nameEl = document.getElementById("name"), valEl = document.getElementById("val"), srcEl = document.getElementById("src");
+const GAUGES = [
+  { id: "wormhole",  label: "Wormhole \u00b7 throat",     paint: paintWormhole,  color: [120, 200, 255], read: (v) => "open " + Math.round(wormholeGeometry(v).throat * 100) + "%" },
+  { id: "blackhole", label: "Black hole \u00b7 accretion", paint: paintBlackHole, color: [255, 170, 90],  read: (v) => "band " + Math.round(blackHoleGeometry(v).band * 100) + "%" }
+];
+const stack = makeGaugeStack(GAUGES, { period: 6 });
+let value = 0.42, live = false, liveVal = 0.42;
+document.getElementById("v").oninput = (e) => { value = e.target.value / 100; live = false; document.getElementById("live").textContent = "source: manual"; };
+document.getElementById("next").onclick = () => stack.next();
+const autoBtn = document.getElementById("auto");
+autoBtn.onclick = () => { stack.auto = !stack.auto; autoBtn.textContent = "auto: " + (stack.auto ? "on" : "off"); };
+const liveBtn = document.getElementById("live");
+liveBtn.onclick = () => { live = !live; liveBtn.textContent = "source: " + (live ? "SweK peers" : "manual"); };
+// a real source when the bridge is up: how much of the fleet is aboard. Silent when it isn't.
+async function poll() {
+  if (!live) return;
+  try { const j = await fetch("/sys/peer-versions", { cache: "no-store" }).then(r => r.json());
+    const peers = (j && (j.peers || j.list)) || []; liveVal = Math.max(0, Math.min(1, peers.length / 4)); } catch (e) {}
+}
+setInterval(poll, 4000);
+
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const g = stack.step(dt);
+  const v = live ? (value += (liveVal - value) * Math.min(1, dt * 2)) : value;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  g.paint(ctx, cv.width / 2, cv.height / 2, cv.width * 0.42, v, now / 1000, { color: g.color });
+  nameEl.textContent = g.label;
+  valEl.textContent = Math.round(v * 100) + "%";
+  srcEl.textContent = g.read(v) + "  \u00b7  " + (stack.index + 1) + " of " + stack.n + (stack.auto ? " \u00b7 rotating" : " \u00b7 held");
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

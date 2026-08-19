@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Box3D</title>
+<style>
+  :root { --bg:#080b12; --panel:#0d1220; --line:#1e2a44; --ink:#d8e4f5; --dim:#7d8fa8;
+          --go:#2fd6b0; --cy:#5ad6ff; --warn:#ffc04e; --err:#ff5a5a; --ok:#4ade80; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:15px; margin:0; color:var(--go); letter-spacing:.4px; }
+  header h1 small { color:var(--dim); font-weight:normal; letter-spacing:0; }
+  main { padding:16px; max-width:1000px; }
+  section { border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:12px 14px; margin-bottom:14px; }
+  h2 { font-size:12px; margin:0 0 8px; color:var(--cy); letter-spacing:.4px; text-transform:uppercase; }
+  p { margin:6px 0; }
+  .dim { color:var(--dim); }
+  a.btn, button { font:11px ui-monospace,monospace; padding:4px 11px; border-radius:5px; cursor:pointer;
+                  background:#152136; color:#b9d4ff; border:1px solid #2f486c; text-decoration:none; display:inline-block; }
+  a.btn.go, button.go { background:#10261c; color:#9fe6c0; border-color:#2a6a4a; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  table { border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  td, th { padding:3px 12px 3px 0; text-align:left; vertical-align:top; }
+  th { color:var(--dim); font-weight:normal; }
+  b.num { color:#9fe6c0; font-weight:normal; }
+  code, pre { background:#070c15; border:1px solid var(--line); border-radius:5px; }
+  code { padding:1px 5px; }
+  pre { padding:8px 10px; overflow:auto; font-size:11px; margin:6px 0; max-height:240px; }
+  .gauges { display:flex; gap:10px; flex-wrap:wrap; }
+  .gauge { flex:1; min-width:130px; background:#0a0d12; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .gauge .k { font-size:10px; color:var(--dim); }
+  .gauge .v { font-size:15px; font-weight:bold; color:#9fe6c0; }
+  .v.bad { color:var(--err); } .v.warn { color:var(--warn); } .v.ok { color:var(--ok); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--dim); margin-right:5px; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--err); } .dot.warn { background:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#129521; Box3D <small>&mdash; the rigid-body destruction layer under the kaiju</small></h1>
+</header>
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p><a href="https://github.com/erincatto/box3d" target="_blank" rel="noopener" style="color:var(--cy)">erincatto/box3d</a>
+     (alpha, MIT) &mdash; Erin Catto's 3D successor to Box2D &mdash; compiled to <b>WASM</b> and used as a specialized
+     rigid-body layer <b>over</b> the kaiju world, not a replacement for it. box3d owns the destruction: buildings
+     topple, debris tumbles, thrown props spin. The kaiju keeps its own systems for everything else &mdash; GPU
+     flow-field locomotion, ClothSim capes, water, civ AI.</p>
+  <p class="dim">Standing buildings are static boxes the existing renderer draws as before; toppling <b>wakes</b> a
+     building to a dynamic body so box3d takes over its fall. The kaiju is a <b>kinematic collider</b> the flow-field
+     AI drives each frame &mdash; it shoves whatever it sweeps through. A thin C shim
+     (<code>physics/box3d/box3d_shim.c</code>) exposes a flat API bound by <code>physics/box3d/box3dLoader.js</code>;
+     <code>physics/kaijuBox3d.js</code> is the bridge and <code>physics/kaijuBox3dScene.js</code> the city scene.</p>
+  <div class="row" style="margin-top:8px">
+    <a class="btn go" href="/showcase.html" target="_blank" rel="noopener">Open the engine &#8599;</a>
+    <a class="btn" href="/servicesdash.html" target="_blank" rel="noopener">Build dashboard &#8599;</a>
+    <a class="btn" href="https://github.com/erincatto/box3d" target="_blank" rel="noopener">box3d upstream &#8599;</a>
+  </div>
+</section>
+
+<section>
+  <h2>Detect &amp; build</h2>
+  <p class="dim">The WASM is compiled once per box (it is not vendored). <b>Build now</b> runs
+     <code>physics/box3d/build-box3d-wasm-clang.sh</code> on the host &mdash; clones box3d at the pinned tag, compiles with
+     WASM SIMD, links the SweK shim, and writes <code>/vendor/box3d/box3d.{js,wasm}</code>. Needs <code>emsdk</code>.</p>
+  <div class="gauges" id="gauges">
+    <div class="gauge"><div class="k">emcc (emsdk)</div><div class="v" id="g-emcc">&hellip;</div></div>
+    <div class="gauge"><div class="k">bash / git</div><div class="v" id="g-tools">&hellip;</div></div>
+    <div class="gauge"><div class="k">WASM artifact</div><div class="v" id="g-art">&hellip;</div></div>
+    <div class="gauge"><div class="k">build</div><div class="v" id="g-build">&hellip;</div></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label class="dim">tag <input id="tag" value="v0.1.0" size="8" style="background:#070c15;border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:2px 6px;font:11px ui-monospace,monospace"></label>
+    <button id="detect">&#8635; Detect</button>
+    <button id="build" class="go" title="Pulls a prebuilt box3d from a fleet peer first (no toolchain needed); only builds locally if no peer has it.">&#9874; Build / Pull WASM</button>
+    <button id="pullPeer" style="display:none" title="This box auto-pulls the WASM from a peer on startup + when a peer appears. Press to pull now.">&#8681; Pull from peer now</button>
+    <button id="installEmsdk" style="display:none">&#11015; Install emsdk</button>
+    <span class="dim" id="buildmsg"></span>
+  </div>
+  <pre id="log" style="display:none"></pre>
+  <p class="dim" id="hints"></p>
+</section>
+
+<section>
+  <h2>Play / demo</h2>
+  <p>Flip the substrate on with the buttons below &mdash; they set the shared flags the engine,
+     <a href="/es-box3d.html" style="color:var(--cy)">ES on Box3D</a>, and the EV flight view all read. Or set them
+     from any engine page's console. Then watch a city come down:</p>
+  <div class="row" id="ctl" style="margin:2px 0 10px;align-items:center">
+    <span class="dim">Box3D substrate:</span> <button id="tglBox3d" class="go">&hellip;</button>
+    <span class="dim" style="margin-left:12px">EV flight (experimental):</span> <button id="tglEv">&hellip;</button>
+    <span class="dim" style="margin-left:12px">Fire (kaiju city):</span> <button id="tglFire">&hellip;</button>
+    <span class="dim" id="tglNote" style="margin-left:8px"></span>
+  </div>
+  <pre>box3d.setEnabled(true);        // the "use Box3D" switch (same as the button)
+await kaijuBox3d.enable();      // build the rigid city from kaijuCity's buildings
+kaijuCity.start();             // spawn the procedural city + kaiju
+kaijuCity.toppleNearest();     // now collapses as real rigid debris</pre>
+  <p class="dim">Per frame, drive the collider and step: <code>kaijuBox3d.driveKaiju([x,y,z]); kaijuBox3d.step();</code>
+     then draw <code>kaijuBox3d.bodies()</code> &mdash; each <code>{ref,pos,quat,kind}</code> &mdash; at its transform.
+     Verbs: <code>topple</code>, <code>spawnDebris</code>, <code>throwProp</code>. Check <code>kaijuBox3d.stats()</code>.</p>
+  <div class="row"><a class="btn go" href="/box3d-demo.html" target="_blank" rel="noopener">Open the box3d demo &#8599;</a><a class="btn go" href="/box3d-blobs.html" target="_blank" rel="noopener">&#129514; Box3D Blobs (physics lava) &#8599;</a><a class="btn go" href="/index.html?box3ddemo=1" target="_blank" rel="noopener">Kaiju demo in engine &#8599;</a><a class="btn" href="/showcase.html" target="_blank" rel="noopener">Open the engine &#8599;</a></div>
+</section>
+
+<section>
+  <h2>Render QA</h2>
+  <p class="dim">The <a href="/box3d-demo.html" target="_blank" rel="noopener" style="color:var(--cy)">box3d demo</a> is a
+     self-contained canvas that draws a toppling scene (real box3d when the WASM is built, a JS-gravity fallback
+     otherwise so it is never a black screen). It is in the render-QA manifest as <code>box3d-demo</code>, so
+     <b><a href="/server.html" style="color:var(--cy)">server.html</a> &rarr; Render QA &rarr; Run</b> boots it in a
+     headless GPU Chromium, screenshots the canvas, and asserts the render is not black and not uniform &mdash; a
+     regression that blanks the demo now fails the suite.</p>
+</section>
+
+<section>
+  <h2>Fleet-share</h2>
+  <p class="dim"><code>physics/box3dNet.js</code> shares the destruction the same two ways the NPCs are shared:</p>
+  <table>
+    <tr><th>owner-authoritative</th><td>one peer owns the city, steps it, broadcasts <code>kaijuBox3d.pack()</code> each tick; the others <code>applyRemote(packet)</code> and draw <code>remoteBodies()</code>. No determinism needed &mdash; the owner is truth.</td></tr>
+    <tr><th>lockstep</th><td>every peer registers the same ships in canonical order and steps the same shared WASM world from the same inputs, gating each tick until all peers' <code>{turn,thrust}</code> are in, then compares <code>stateHash</code>. This is the cross-peer path -- my ship rams your ship and both machines agree. The deterministic core is <code>physics/box3dLockstep.js</code> (<code>createLockstepSession</code>) and the net transport is <code>physics/box3dLockstepNet.js</code> (<code>createLockstepNet</code> -- send-ahead input delay + per-tick hash exchange); the room bus carries it. Safe because box3d is WASM (spec-defined IEEE-754), unlike the GPU brain, whose floats can never match.</td></tr>
+  </table>
+  <p class="dim">Run <code>selfTest()</code> on two machines: equal <code>stateHash</code> after 600 ticks proves cross-platform determinism &mdash; the precondition for input-only lockstep.</p>
+</section>
+
+<section>
+  <h2>Cross-machine sync (the lockstep precondition)</h2>
+  <p class="dim">Run the canonical box3d scenario here, then on the other machine. Equal final hash means the
+     Mac and PC boots evolve bit-for-bit the same &mdash; cross-peer lockstep is safe. A different hash means the
+     WASM diverges across platforms and you stay on owner-authoritative. Uses the real WASM when built (that is
+     what has to match); the JS fallback otherwise.</p>
+  <div class="row" style="align-items:center">
+    <label class="dim">machine <input id="syncMachine" size="12" placeholder="Galaxina / Stellar Atlas" style="background:#070c15;border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:2px 6px;font:11px ui-monospace,monospace"></label>
+    <button id="syncRun" class="go">Run sync check</button>
+    <button id="syncWatch">&#9673; Watch</button>
+    <span class="dim" id="syncMsg"></span>
+  </div>
+  <div id="syncAlert" style="display:none;margin-top:8px;padding:6px 10px;border-radius:6px;border:1px solid #6a2a30;background:#2a1015;color:#ff9aa2;font-weight:bold"></div>
+  <table id="syncTable" style="margin-top:8px"></table>
+</section>
+
+<section>
+  <h2>Proved without a GPU</h2>
+  <table>
+    <tr><td><code>kaiju-box3d-selfcheck</code></td><td>the bridge: register / step / sync / static-skip, plus the interaction verbs (impulse, throw+spin, kinematic drive, wall&#8594;debris). <b class="num">19</b> checks.</td></tr>
+    <tr><td><code>kaiju-box3d-scene-selfcheck</code></td><td>the city scene: buildings register standing, kaiju drives, topple falls + shoves, debris scatters, props fly, determinism. <b class="num">13</b> checks.</td></tr>
+    <tr><td><code>box3d-net-selfcheck</code></td><td>fleet-share: pack/apply round-trips over JSON, kinds survive the wire, stable ids, lockstep catches a desync. <b class="num">11</b> checks.</td></tr>
+    <tr><td><code>box3d-lockstep-selfcheck</code></td><td>cross-peer lockstep: two peers on the same input stream stay bit-identical for 120 ticks, the input gate holds a tick until all peers report, and a divergent input is caught as a desync. <b class="num">6</b> checks.</td></tr>
+    <tr><td><code>box3d-lockstep-net-selfcheck</code></td><td>lockstep over a laggy mock network: two peers exchange inputs with send-ahead delay and stay within a couple ticks + bit-identical hashes every tick, input lead stays bounded, a real same-inputs/different-result divergence is caught by the hash exchange, and it survives higher latency. <b class="num">7</b> checks.</td></tr>
+    <tr><td><code>box3d-smoke</code></td><td>the real WASM through the bridge: a pile settles, a thrown crate travels + tumbles, a kinematic sweep topples a tower, two runs hash identically. <b>Rig-gated</b> (needs the built WASM).</td></tr>
+  </table>
+</section>
+
+</main>
+<script type="module">
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { runSyncScenario } from "/physics/box3dSyncScenario.js";
+const $ = (id) => document.getElementById(id);
+const dot = (state) => `<span class="dot ${state}"></span>`;
+
+async function detect() {
+  $("buildmsg").textContent = "";
+  let j = null;
+  try { j = await fetch("/box3d/status", { cache: "no-store", signal: AbortSignal.timeout(9000) }).then((r) => r.json()); } catch (e) { j = null; }
+  if (!j || j.ok === false) {
+    const msg = j && j.error ? j.error : "no /box3d/status (start the engine server on :8787)";
+    for (const g of ["g-emcc", "g-tools", "g-art", "g-build"]) { $(g).innerHTML = "&mdash;"; }
+    $("g-art").innerHTML = dot("bad") + msg;
+    return;
+  }
+  const emcc = j.prereqs && j.prereqs.emcc;
+  $("g-emcc").innerHTML = emcc ? dot("ok") + "present" : dot("bad") + "missing";
+  $("g-emcc").className = "v " + (emcc ? "ok" : "bad");
+  $("installEmsdk").style.display = emcc ? "none" : "";
+  const tools = j.prereqs && j.prereqs.bash && j.prereqs.git;
+  $("g-tools").innerHTML = tools ? dot("ok") + "present" : dot("warn") + "missing";
+  const a = j.artifact || {};
+  if (a.ready) { $("g-art").innerHTML = dot("ok") + "BUILT"; $("g-art").className = "v ok"; $("g-art").title = a.wasm ? (a.wasm.size / 1024).toFixed(0) + " KB" : ""; }
+  else { $("g-art").innerHTML = dot("bad") + "not built"; $("g-art").className = "v bad"; }
+  // v2287 -- the WASM is portable, so when it isn't built here offer the P2P shortcut: pull it from a peer that has it.
+  $("pullPeer").style.display = a.ready ? "none" : "";
+  const b = j.build || {};
+  $("g-build").innerHTML = b.running ? dot("warn") + "running&hellip;" : (b.exit === 0 ? dot("ok") + "ok" : b.exit != null ? dot("bad") + "exit " + b.exit : dot("") + "idle");
+  $("build").disabled = !!b.running;
+  $("hints").textContent = j.hints || "";
+  if (b.logTail) { $("log").style.display = "block"; $("log").textContent = b.logTail; $("log").scrollTop = $("log").scrollHeight; }
+  return b.running;
+}
+
+async function pollLog() {
+  try { const t = await fetch("/box3d/log", { cache: "no-store", signal: AbortSignal.timeout(9000) }).then((r) => r.text()); $("log").style.display = "block"; $("log").textContent = t; $("log").scrollTop = $("log").scrollHeight; } catch {}
+  const running = await detect();
+  if (running) setTimeout(pollLog, 1500);
+}
+
+$("detect").onclick = detect;
+$("installEmsdk").onclick = async () => {
+  let est = null; try { est = await fetch("/emsdk/status", { cache: "no-store" }).then((x) => x.json()); } catch {}
+  const e = est && est.estimate;
+  $("buildmsg").textContent = e ? ("emsdk: ~" + e.downloadGb + "GB download, installs to ~" + e.installGb + "GB, " + e.minutes + " min" + (est.freeDiskGb != null ? " \u00b7 " + est.freeDiskGb + "GB free" : "") + " \u2014 starting\u2026") : "installing emsdk (downloads ~1GB, several minutes)\u2026";
+  $("installEmsdk").disabled = true; $("log").style.display = "block";
+  try {
+    const r = await fetch("/emsdk/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((x) => x.json());
+    if (r && r.alreadyInstalled) { $("buildmsg").textContent = "emsdk already installed"; $("installEmsdk").disabled = false; detect(); return; }
+    if (r && r.ok === false) { $("buildmsg").textContent = r.error || "install refused"; $("installEmsdk").disabled = false; return; }
+    const poll = async () => {
+      let s; try { s = await fetch("/emsdk/status", { cache: "no-store" }).then((x) => x.json()); } catch { setTimeout(poll, 2500); return; }
+      if (s && s.logTail) { $("log").textContent = s.logTail; $("log").scrollTop = $("log").scrollHeight; }
+      if (s && s.running) { $("buildmsg").textContent = "emsdk: " + (s.phase || "working") + "\u2026"; setTimeout(poll, 2500); }
+      else { $("buildmsg").textContent = (s && s.emcc) ? "emsdk installed \u2014 emcc ready, you can Build WASM now" : "emsdk install finished (see log)"; $("installEmsdk").disabled = false; detect(); }
+    };
+    poll();
+  } catch (e) { $("buildmsg").textContent = "could not reach /emsdk/install"; $("installEmsdk").disabled = false; }
+};
+$("build").onclick = async () => {
+  $("build").disabled = true; $("log").style.display = "block";
+  // v2294 -- "Build WASM" now does the whole job in one click. Step 1: PULL from a live peer -- the WASM is
+  // portable and needs no toolchain, so this is the right first move on any box (and the only move on Windows
+  // without bash). Step 2: only if no peer has it, fall back to the local bash build. The pull is forced, so a
+  // peer that was backed off during a restart is still tried, and its per-peer "tried" list is shown so a
+  // failure explains itself instead of looking stuck.
+  $("buildmsg").textContent = "step 1/2: checking peers for a prebuilt box3d\u2026";
+  $("log").textContent = "[get] step 1/2: looking for a fleet peer that already has box3d built\u2026";
+  try {
+    const pr = await fetch("/box3d/pull-from-peer", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((x) => x.json());
+    if (pr && pr.ok) {
+      const msg = "pulled from " + (pr.name || pr.from) + " \u2014 wasm " + Math.round((pr.sizes && pr.sizes.wasm || 0) / 1024) + " KB (no local build needed)";
+      $("buildmsg").textContent = msg; $("log").textContent = "[get] " + msg + "\n[get] artifact is now BUILT on this box.";
+      $("build").disabled = false; detect(); return;
+    }
+    $("log").textContent = "[get] step 1/2: " + ((pr && pr.error) || "no peer had it") + (pr && pr.tried && pr.tried.length ? "\n[get] tried each peer:\n  " + pr.tried.join("\n  ") : "");
+  } catch (e) { $("log").textContent = "[get] step 1/2: could not reach the pull endpoint."; }
+  // Only fall back to a LOCAL build if this box can actually build (bash present). On Windows without bash the
+  // build is guaranteed to ENOENT and would overwrite the tried-list above -- so instead we STOP and keep the
+  // diagnostic on screen, since a peer pull is the only path here.
+  let canBuild = false;
+  try { const s = await fetch("/box3d/status", { cache: "no-store", signal: AbortSignal.timeout(9000) }).then((r) => r.json()); canBuild = !!(s && s.prereqs && s.prereqs.bash); } catch (e) {}
+  if (!canBuild) {
+    $("buildmsg").textContent = "no peer had it, and this box can't build locally (no bash) \u2014 see the per-peer list below";
+    $("log").textContent += "\n[get] this box has no bash, so a local build isn't possible. The list above shows what each peer returned:\n[get]   \u00b7 'HTTP 404' = that peer hasn't built box3d\n[get]   \u00b7 'HTTP 401/403 (auth)' = reachable but the artifact was gated\n[get]   \u00b7 a timeout/error = that peer wasn't reachable\n[get] Build box3d once on a box with emsdk (the Mac), then click again.";
+    $("build").disabled = false; detect(); return;
+  }
+  $("buildmsg").textContent = "step 2/2: no peer had it \u2014 building locally\u2026";
+  try {
+    const r = await fetch("/box3d/build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: $("tag").value || "v0.1.0" }) });
+    const j = await r.json();
+    if (!j.ok) { $("buildmsg").textContent = j.error || "build refused (host/LAN only)"; $("build").disabled = false; return; }
+    $("buildmsg").textContent = "building on the host\u2026 (log below)";
+    pollLog();
+  } catch (e) { $("buildmsg").textContent = "could not reach /box3d/build"; $("build").disabled = false; }
+};
+// v2287 -- P2P pull: copy a built box3d.{js,wasm} from a live fleet peer that already has it. The WASM is
+// portable, so this is the instant path for a box that can't run the bash build (e.g. Windows without WSL).
+$("pullPeer").onclick = async () => {
+  $("pullPeer").disabled = true; $("buildmsg").textContent = "looking for a peer with box3d built\u2026";
+  $("log").style.display = "block"; $("log").textContent = "[pull] contacting live peers\u2026";
+  try {
+    const r = await fetch("/box3d/pull-from-peer", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((x) => x.json());
+    if (r && r.ok) {
+      const msg = "pulled from " + (r.name || r.from) + " \u2014 wasm " + Math.round((r.sizes && r.sizes.wasm || 0) / 1024) + " KB, js " + Math.round((r.sizes && r.sizes.js || 0) / 1024) + " KB";
+      $("buildmsg").textContent = msg; $("log").textContent = "[pull] " + msg + "\n[pull] artifact is now BUILT on this box.";
+    } else {
+      const err = (r && r.error) || "pull failed";
+      $("buildmsg").textContent = err;
+      $("log").textContent = "[pull] " + err + (r && r.tried && r.tried.length ? "\n[pull] tried:\n  " + r.tried.join("\n  ") : "");
+    }
+  } catch (e) { $("buildmsg").textContent = "could not reach /box3d/pull-from-peer"; $("log").textContent = "[pull] could not reach /box3d/pull-from-peer"; }
+  $("pullPeer").disabled = false; detect();
+};
+
+detect();
+
+// substrate toggles -> shared localStorage flags the engine / ES / flight view read (same origin).
+const evOn = () => { try { return localStorage.getItem("voxelengine.evBox3d") !== "0"; } catch { return true; } };   // v2316 -- default-on; "0" = classic
+function paintToggles() {
+  const b1 = $("tglBox3d"), on1 = box3d.enabled();
+  b1.innerHTML = on1 ? "\u2713 Box3D ON" : "Box3D OFF"; b1.className = on1 ? "go" : "";
+  const b2 = $("tglEv"), on2 = evOn();
+  b2.innerHTML = on2 ? "\u2713 EV flight ON" : "EV flight OFF"; b2.className = on2 ? "go" : "";
+  const b3 = $("tglFire"), on3 = fireOn();
+  b3.innerHTML = on3 ? "\u2713 Fire ON" : "Fire OFF"; b3.className = on3 ? "go" : "";
+}
+const fireOn = () => { try { return localStorage.getItem("voxelengine.box3dFire") === "1"; } catch { return false; } };
+$("tglBox3d").onclick = () => { box3d.setEnabled(!box3d.enabled()); paintToggles(); $("tglNote").textContent = "flag set \u2014 reload the engine / ES page to apply"; };
+$("tglEv").onclick = () => { try { evOn() ? localStorage.setItem("voxelengine.evBox3d", "0") : localStorage.removeItem("voxelengine.evBox3d"); } catch {} paintToggles(); $("tglNote").textContent = "flag set \u2014 reopen the EV flight view to apply"; };
+$("tglFire").onclick = () => { try { fireOn() ? localStorage.removeItem("voxelengine.box3dFire") : localStorage.setItem("voxelengine.box3dFire", "1"); } catch {} paintToggles(); $("tglNote").textContent = "flag set \u2014 volumetric fire on toppled buildings when the kaiju box3d demo runs"; };
+paintToggles();
+
+// cross-machine sync: run the canonical scenario, POST our hash, watch for + alert on divergence.
+let syncWatchTimer = null;
+async function runSyncOnce() {
+  $("syncRun").disabled = true; $("syncMsg").setAttribute("data-base", ""); $("syncMsg").textContent = "running 600 ticks\u2026";
+  let world = null, mode = "fallback", why = "";
+  try {
+    const st = await box3d.init();
+    if (st && st.ready) { world = box3d.createWorld({ gravity: [0, -20, 0] }); mode = "wasm"; }
+    else { why = (st && st.reason) || "box3d reported not-ready"; }
+  } catch (e) { why = String((e && e.message) || e); }
+  if (!world) { try { const m = await import("/physics/planarFallbackWorld.js"); world = m.planarFallbackWorld(); } catch (e) { $("syncMsg").textContent = "could not create a world"; $("syncRun").disabled = false; return; } }
+  // v2509 -- record while we run, but do not upload. A hash is 8 bytes and a recording is ~100 KB; posting one
+  // every sync would be absurd. It stays in memory here and is only offered if the hashes actually disagree --
+  // hash for DETECTION, recording for DIAGNOSIS.
+  let recBytes = null;
+  const canRecord = typeof world.supportsRecording === "function" && world.supportsRecording();
+  if (canRecord) { try { world.startRecording(); } catch (e) { /* older wasm: no replay API. Not fatal. */ } }
+  const r = runSyncScenario(world);
+  if (canRecord) { try { recBytes = world.stopRecording(); } catch (e) { recBytes = null; } }
+  window._box3dLastRec = recBytes;
+  const hash = r.finalHash.toString(16);
+  const machine = (($("syncMachine").value || "").trim() || (mode === "wasm" ? "this-wasm" : "this-fallback")).slice(0, 60);
+  // v2298 -- if we fell back to the JS world despite the artifact being BUILT, say WHY out loud. A silent
+  // fallback matched trivially (same JS = same hash) and read as SYNCHRONIZED without proving the WASM. The
+  // usual culprit is a stale browser copy of box3d.js/.wasm -- a hard reload (Ctrl+Shift+R) re-fetches them.
+  let base = `final hash <b style="color:#9fe6c0">${hash}</b> (${mode})`;
+  if (mode === "fallback" && why) base += ` &middot; <span style="color:#ffcf9a">WASM not loaded: ${why.replace(/[<>]/g, "").slice(0, 220)} &mdash; hard-reload (Ctrl+Shift+R) to re-fetch box3d.js/.wasm</span>`;
+  $("syncMsg").setAttribute("data-base", base); $("syncMsg").innerHTML = base;
+  try { await fetch("/box3d/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machine, hash, checkpoints: r.checkpoints.map((h) => h.toString(16)), mode }) }); } catch {}
+  await paintSync();
+
+// v2509 -- TURN "~tick 450" INTO A FRAME NUMBER.
+//
+// The hash tier has already told us THAT two machines disagree. This is the diagnosis tier: upload this machine's
+// recording (kept in memory since the sync run, never posted until now), fetch a peer's, and ask box3d which frame
+// first failed. b3RecPlayer replays the peer's recording IN THIS BUILD and checks every state hash the peer's box3d
+// embedded while recording -- so the verdict is box3d's, on box3d's definition of world state, not on my arithmetic.
+//
+// Requires the replay API: a box3d.wasm built before v2508 has no b3RecPlayer exports. Say that plainly rather
+// than throwing "undefined is not a function", which has never helped anyone.
+async function pinpoint() {
+  const out = $("pinOut"); const btn = $("pinBtn");
+  if (btn) btn.disabled = true;
+  const say = (h) => { if (out) out.innerHTML = h; };
+  try {
+    const mod = box3d._mod;
+    if (!mod || typeof mod._swk_player_create !== "function") {
+      say(`<span style="color:var(--warn)">this box3d.wasm predates v2508 &mdash; rebuild it to get the replay API</span>`);
+      return;
+    }
+    const mine = window._box3dLastRec;
+    if (!mine || !mine.length) { say(`<span style="color:var(--warn)">no recording from this run &mdash; run the sync check again</span>`); return; }
+
+    // offer ours first, so the OTHER machine can do the same thing in reverse
+    const me = (($("syncMachine").value || "").trim()) || "this-wasm";
+    say("uploading this machine's recording\u2026");
+    await fetch("/box3d/recording?machine=" + encodeURIComponent(me), { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: mine });
+
+    say("looking for a peer's recording\u2026");
+    const list = await fetch("/box3d/recording", { cache: "no-store" }).then((r) => r.json());
+    const other = (list.machines || []).filter((m) => m.machine !== me)[0];
+    if (!other) {
+      say(`<span class="dim">no peer recording yet &mdash; press this on the other machine too, then again here</span>`);
+      return;
+    }
+
+    say(`replaying ${other.machine}'s recording here\u2026`);
+    const bytes = new Uint8Array(await fetch("/box3d/recording?machine=" + encodeURIComponent(other.machine), { cache: "no-store" }).then((r) => r.arrayBuffer()));
+    const { Box3DPlayer } = await import("/physics/box3d/box3dLoader.js");
+    const p = new Box3DPlayer(mod);
+    let info;
+    try { info = p.open(bytes, 1); }
+    catch (e) { say(`<span style="color:var(--warn)">could not open ${other.machine}'s recording: ${String(e.message).slice(0, 80)}</span>`); return; }
+    while (p.step()) {}
+    const dv = p.diverged(), at = p.divergeFrame();
+    p.destroy();
+
+    if (!dv) {
+      // Worth saying out loud rather than swallowing: this build reproduced the peer's recording exactly, yet the
+      // two final hashes differ. That means the disagreement is NOT in box3d's stepping -- it is in what each
+      // machine FED it. Different inputs, different body order, a different scenario build. That is a different bug
+      // and a much better place to start looking than "the physics diverges".
+      say(`<b style="color:var(--ok)">this build reproduces ${other.machine}'s recording exactly</b> &mdash; so the physics agrees and the divergence is in what each machine fed it (inputs, body order, scenario), not in box3d's stepping`);
+      return;
+    }
+    say(`<b style="color:var(--err)">first divergent frame: ${at}</b> of ${info.frameCount} &mdash; not "~tick ${(j_divergedAt_hint() + 1) * 150}". box3d found it, exactly. <a href="/box3d-replay.html" target="_blank" rel="noopener" style="color:#7fd1ff">scrub it</a>`);
+  } catch (e) {
+    say(`<span style="color:var(--warn)">${String((e && e.message) || e).slice(0, 120)}</span>`);
+  } finally { if (btn) btn.disabled = false; }
+}
+function j_divergedAt_hint() { const m = ($("syncMsg").textContent || "").match(/checkpoint (\d+)/); return m ? parseInt(m[1], 10) : 0; }
+
+  $("syncRun").disabled = false;
+}
+async function paintSync() {
+  try {
+    const j = await fetch("/box3d/sync", { cache: "no-store" }).then((r) => r.json());
+    if (!j || !j.ok) return;
+    const rows = Object.entries(j.reports || {}).map(([m, r]) => `<tr><td><code>${m}</code></td><td><code>${r.hash}</code></td><td class="dim">${r.mode || ""}</td></tr>`).join("");
+    $("syncTable").innerHTML = rows ? `<tr><th>machine</th><th>final hash</th><th>mode</th></tr>${rows}` : "";
+    const alertEl = $("syncAlert");
+    let verdict;
+    if (j.count < 2) { verdict = `<span class="dim">report from a second machine to compare (${j.count} so far)</span>`; alertEl.style.display = "none"; alertEl._buzzed = false; }
+    else if (j.synchronized) { const modes = Object.values(j.reports || {}).map((r) => r.mode).filter(Boolean); const allFb = modes.length && modes.every((m) => m === "fallback"); verdict = j.mixedModes ? `<b style="color:var(--warn)">match, but MIXED modes</b> &mdash; run the WASM on both to prove it` : allFb ? `<b style="color:var(--warn)">SYNCHRONIZED (fallback only)</b> &mdash; this is the JS fallback, not the WASM; load box3d on both to prove real lockstep` : `<b style="color:var(--ok)">SYNCHRONIZED</b> &mdash; lockstep safe`; alertEl.style.display = "none"; alertEl._buzzed = false; }
+    else {
+      // v2509 -- "~tick" is this page admitting it can only bracket to 150 ticks. box3d can name the frame:
+      // a recording carries its own state hashes, and b3RecPlayer reports the first that fails on replay. So when
+      // we diverge, offer to go and get the exact number instead of leaving a tilde on screen.
+      const at = (j.divergedAt != null) ? ` first at checkpoint ${j.divergedAt} (~tick ${(j.divergedAt + 1) * 150})` : "";
+      verdict = `<b style="color:var(--err)">DIVERGED</b>${at} <button id="pinBtn" style="font-size:11px;padding:2px 9px;margin-left:8px;background:#2c1a1a;color:#ffb4a0;border:1px solid #6a3a3a;border-radius:5px;cursor:pointer;">Find the exact frame</button> <span id="pinOut" class="dim"></span>`;
+      alertEl.style.display = "block";
+      alertEl.innerHTML = `&#9888; box3d DIVERGED across machines${at} &mdash; cross-peer lockstep is NOT safe; stay owner-authoritative.`;
+      setTimeout(() => { const b = $("pinBtn"); if (b) b.onclick = pinpoint; }, 0);
+      if (!alertEl._buzzed) { alertEl._buzzed = true; try { console.error("[box3d-sync] DIVERGED", j); } catch {} }
+    }
+    const base = $("syncMsg").getAttribute("data-base") || "";
+    $("syncMsg").innerHTML = base + (base ? " &middot; " : "") + verdict;
+  } catch {}
+}
+$("syncRun").onclick = runSyncOnce;
+$("syncWatch").onclick = () => {
+  if (syncWatchTimer) { clearInterval(syncWatchTimer); syncWatchTimer = null; $("syncWatch").innerHTML = "\u25C9 Watch"; $("syncWatch").className = ""; return; }
+  $("syncWatch").innerHTML = "\u25A0 Watching\u2026"; $("syncWatch").className = "go";
+  runSyncOnce(); syncWatchTimer = setInterval(runSyncOnce, 8000);
+};
+paintSync();
+</script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Network Diagnostic (AP Isolation)</title>
+<script src="/engine/favicon-inject.js"></script>
+<style>
+  :root { --bg:#0a0e14; --ink:#d8e6f2; --dim:#8397ab; --line:#1e2c3a; --accent:#7fd0ff; --ok:#9fe88f; --warn:#e5c07b; --bad:#e5776d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  main { max-width:820px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:16px; color:var(--accent); margin:0 0 4px; }
+  .lead { color:var(--dim); font-size:12px; line-height:1.6; margin:0 0 16px; }
+  button { background:#14283a; color:var(--ink); border:1px solid var(--line); border-radius:6px; font:12px ui-monospace,monospace; padding:7px 14px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  #verdict { border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin:14px 0; font-size:13px; line-height:1.6; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:normal; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .ok { background:#12331e; color:var(--ok); } .warn { background:#33290f; color:var(--warn); } .bad { background:#331414; color:var(--bad); } .off { background:#232b33; color:var(--dim); }
+  code { background:#0c1622; padding:1px 5px; border-radius:4px; }
+  .tips { margin-top:16px; font-size:12px; color:var(--dim); line-height:1.7; }
+  .tips b { color:var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>&#128225; Network Diagnostic &mdash; peer reachability &amp; AP isolation</h1>
+  <p class="lead">Checks every SweK peer this box knows about. For each one it asks two things: <b>do we hear its beacon?</b> (UDP broadcast auto-discovery) and <b>can we actually reach it over HTTP?</b> The signature of <b>AP / client isolation</b> is a peer you <i>hear</i> but <i>cannot reach</i> &mdash; the router passes broadcast but blocks device-to-device traffic. That's the usual cause of &ldquo;detects an update but never receives it.&rdquo;</p>
+  <button id="run">Run diagnostic</button>
+  <div id="thisconn" style="margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:12px;line-height:1.6;">checking this connection…</div>
+  <div id="verdict" style="display:none;"></div>
+  <div id="tablewrap"></div>
+  <div class="tips" id="tips" style="display:none;">
+    <b>What the statuses mean:</b><br>
+    &bull; <span class="pill ok">reachable</span> &mdash; healthy; this peer can send/receive updates and streams.<br>
+    &bull; <span class="pill bad">isolated</span> &mdash; we hear its beacon but can't reach its HTTP. Almost always <b>AP / client isolation</b> on the router (or 2.4/5&nbsp;GHz band separation). Fix: turn OFF <i>AP isolation / client isolation / wireless isolation</i> for the main network, and put both boxes on one SSID/band. If you can't, use Tailscale/ZeroTier &mdash; the VPN overlay bypasses isolation.<br>
+    &bull; <span class="pill warn">no beacon</span> &mdash; reachable over HTTP but we don't hear its UDP beacon. Broadcast is being dropped (common on some Wi-Fi), but the saved roster still lets updates flow &mdash; usually fine.<br>
+    &bull; <span class="pill off">offline</span> &mdash; neither beacon nor HTTP. The box is off, on a different subnet, or fully firewalled.
+  </div>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function pill(d) {
+    if (d === "ok") return '<span class="pill ok">reachable</span>';
+    if (d === "isolated") return '<span class="pill bad">isolated</span>';
+    if (d === "no-beacon") return '<span class="pill warn">no beacon</span>';
+    return '<span class="pill off">offline</span>';
+  }
+  function run() {
+    $("run").disabled = true; $("run").textContent = "checking\u2026";
+    $("verdict").style.display = "block"; $("verdict").textContent = "Probing peers\u2026";
+    fetch("/net/reachability", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      $("run").disabled = false; $("run").textContent = "Re-run diagnostic";
+      if (!j || !j.ok) { $("verdict").innerHTML = "<span style='color:var(--bad)'>diagnostic failed</span>"; return; }
+      var v = j.verdict, msg = "", col = "var(--ok)";
+      if (v === "isolation-likely") { col = "var(--bad)"; msg = "\u26a0 <b>AP isolation likely.</b> One or more peers are heard (beacon) but unreachable over HTTP. Turn off AP / client isolation on your router for the main network."; }
+      else if (v === "broadcast-blocked") { col = "var(--warn)"; msg = "Broadcast discovery is partially blocked (a peer is reachable but its beacon isn't heard). Updates still work via the saved roster, so this is usually fine."; }
+      else if (v === "no-peers") { col = "var(--dim)"; msg = "No peers known yet. Open some peers, or add them, then re-run."; }
+      else { msg = "\u2713 All known peers are reachable. No isolation detected."; }
+      $("verdict").innerHTML = "<div style='color:"+col+"'>"+msg+"</div><div style='color:var(--dim);font-size:11px;margin-top:6px'>this box: "+(j.self||"?")+" \u00b7 beacon "+(j.beaconOn?"on":"off")+" \u00b7 "+(j.peers?j.peers.length:0)+" peer(s)</div>";
+      var rows = (j.peers||[]).map(function(p){
+        return "<tr><td>"+(p.name||"\u2014")+"</td><td><code>"+p.url.replace(/^https?:\/\//,"")+"</code></td><td>"+(p.version?("v"+String(p.version).replace(/^v/i,"")):"?")+"</td><td>"+(p.beacon?"\u2713":"\u2014")+"</td><td>"+(p.httpReachable?("\u2713 "+(p.ms||"?")+"ms"):"\u2717")+"</td><td>"+pill(p.diagnosis)+"</td></tr>";
+      }).join("");
+      $("tablewrap").innerHTML = j.peers && j.peers.length
+        ? "<table><thead><tr><th>name</th><th>address</th><th>version</th><th>beacon</th><th>http</th><th>status</th></tr></thead><tbody>"+rows+"</tbody></table>"
+        : "";
+      $("tips").style.display = "block";
+    }).catch(function(e){ $("run").disabled = false; $("run").textContent = "Re-run diagnostic"; $("verdict").innerHTML = "<span style='color:var(--bad)'>"+e+"</span>"; });
+  }
+  $("run").addEventListener("click", run);
+  // v1912 — "this connection" readout: is SweK seeing THIS device as local (LAN) or remote (through the
+  // Cloudflare tunnel)? The REMOTES gauge only counts remote (cf-header) sessions, so a phone on the same
+  // wifi hitting the LAN IP is LOCAL and correctly won't appear as a remote.
+  function thisConn(){
+    fetch("/self/whoami", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      var el = document.getElementById("thisconn"); if (!el) return;
+      var how = j.remote ? "<b style='color:var(--warn)'>REMOTE</b> (through the Cloudflare tunnel — counts toward SweK REMOTES)"
+                         : (j.local ? "<b style='color:var(--ok)'>LOCAL</b> (same network / LAN — counts as a peer, NOT a remote)"
+                                    : "<b>direct</b> (not local, no Cloudflare headers)");
+      el.innerHTML = "This device is connected as: " + how
+        + "<div style='color:var(--dim);margin-top:6px'>tunnel configured: " + (j.tunnel ? ("<a href='"+j.tunnel+"' target='_blank'>"+j.tunnel+"</a>") : "none")
+        + " &middot; active remotes now: " + (typeof j.remotes==="number"?j.remotes:"?") + "</div>"
+        + (!j.remote && j.local ? "<div style='color:var(--dim);margin-top:6px'>\u2192 To show up under SweK REMOTES, open this box via its <b>tunnel URL</b> (above) from OFF your network (e.g. phone on cellular), not the LAN address.</div>" : "");
+    }).catch(function(){ var el=document.getElementById("thisconn"); if(el) el.textContent="couldn't read connection info"; });
+  }
+  thisConn();
+  run();
+})();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

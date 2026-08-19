@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK -- ledger reports (for human eyes)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 1.5em; max-width: 70em; margin: 0 auto; }
+  h1 { font-size: 1.4em; margin: 0 0 .2em; }
+  .sub { opacity: .7; margin: 0 0 1.5em; }
+  .bar { display: flex; gap: .5em; align-items: center; flex-wrap: wrap; margin-bottom: 1em; padding: .8em; border: 1px solid #8884; border-radius: 8px; }
+  .bar input { flex: 1 1 22em; padding: .5em; font: inherit; border: 1px solid #8886; border-radius: 6px; background: transparent; color: inherit; }
+  .bar button { padding: .5em 1em; font: inherit; cursor: pointer; border: 1px solid #8886; border-radius: 6px; background: #8881; color: inherit; }
+  .hint { font-size: .82em; opacity: .65; flex-basis: 100%; }
+  table { border-collapse: collapse; width: 100%; margin: .5em 0 1.5em; }
+  th, td { text-align: left; padding: .35em .6em; border-bottom: 1px solid #8883; }
+  th { font-weight: 600; opacity: .8; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .regress { color: #c0392b; font-weight: 600; }
+  .improve { color: #1e8449; }
+  .src { font-size: .82em; opacity: .7; margin: .3em 0 1.2em; }
+  .err { color: #c0392b; padding: .6em; border: 1px solid #c0392b55; border-radius: 6px; background: #c0392b11; }
+  .empty { opacity: .6; font-style: italic; padding: .6em 0; }
+  h2 { font-size: 1.1em; margin: 1.5em 0 .3em; border-bottom: 2px solid #8884; padding-bottom: .2em; }
+  .spark { font-family: ui-monospace, monospace; letter-spacing: -1px; }
+  nav a { margin-right: 1em; }
+</style>
+</head>
+<body>
+  <h1>Ledger reports</h1>
+  <p class="sub">A read-only view of the performance and persistence ledgers, for human eyes. This page
+     <strong>adjudicates nothing</strong> &mdash; it renders whatever the target host reported. The verdicts it
+     shows were computed on that host; this is a viewer, not a grader.</p>
+
+  <div class="bar">
+    <label for="target" style="flex-basis:100%">Target host (blank = this host):</label>
+    <input id="target" type="text" placeholder="e.g. http://192.168.1.42:8080  (leave blank for same-origin)" autocomplete="off">
+    <button id="load">load reports</button>
+    <span class="hint">A different host must allow cross-origin reads (CORS) for this to work from the browser;
+      a same-origin (blank) target always works. The page fetches <code>&lt;target&gt;/perf</code> and
+      <code>&lt;target&gt;/fingerprint</code> and shows exactly what they return, labelled with their origin.</span>
+  </div>
+
+  <nav class="src">also live: <a href="/fingerprint.html">fingerprint</a> <a href="/android-peer.html">android peer</a> <a href="/magmap-android.html">magmap</a></nav>
+
+  <div id="out"></div>
+
+<script>
+  // ---- everything here is a VIEWER. Fetched data is rendered as TEXT, never as HTML, and never fed back into
+  //      any graded path. The report shows what a host reported; it does not verify it. This is the presentation
+  //      leaf the SweK bit-identity model allows: strictly downstream of the verdicts, trusted by nothing. -------
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // normalise a user-supplied target into a base URL, or "" for same-origin. Rejects anything that is not http(s),
+  // so a stray "javascript:" or file path cannot become a fetch target.
+  function normaliseTarget(raw) {
+    const t = (raw || "").trim().replace(/\/+$/, "");
+    if (!t) return "";                                   // same-origin
+    let u;
+    try { u = new URL(t); } catch { throw new Error("not a valid URL: " + t); }
+    if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("only http(s) targets are allowed, got " + u.protocol);
+    return u.origin + u.pathname.replace(/\/+$/, "");
+  }
+
+  async function getJson(base, route) {
+    const res = await fetch(base + route, { headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error(route + " -> HTTP " + res.status);
+    return res.json();
+  }
+
+  // tiny inline sparkline from a list of numbers, using block characters -- no library, no canvas
+  const BLOCKS = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
+  function spark(nums) {
+    if (!nums.length) return "";
+    const lo = Math.min(...nums), hi = Math.max(...nums), span = hi - lo || 1;
+    return nums.map((n) => BLOCKS[Math.min(7, Math.floor((n - lo) / span * 7))]).join("");
+  }
+
+  function renderPerf(data, origin) {
+    if (data.error) return `<h2>Performance</h2><div class="err">${esc(data.error)}</div>`;
+    const ledger = data.ledger || {}, grade = data.grade || {};
+    const checks = ledger.checks || {};
+    const names = Object.keys(checks).sort();
+    if (!names.length) return `<h2>Performance</h2><div class="empty">No timing runs folded yet. Run the suite and <code>perfLedger.mjs fold</code> a transcript to populate this.</div>`;
+    const regByKey = {};
+    for (const r of (grade.regressions || [])) regByKey[r.name + "|" + r.host] = r;
+    for (const r of (grade.improvements || [])) regByKey[r.name + "|" + r.host] = r;
+    let rows = "";
+    for (const name of names) {
+      // group by host
+      const byHost = {};
+      for (const s of checks[name]) (byHost[s.host] ||= []).push(s.ms);
+      for (const [host, ms] of Object.entries(byHost)) {
+        const g = regByKey[name + "|" + host];
+        const cls = g && g.verdict === "REGRESSED" ? "regress" : g && g.verdict === "IMPROVED" ? "improve" : "";
+        const note = g ? (g.verdict === "REGRESSED" ? `${g.ratio.toFixed(2)}x slower` : g.verdict === "IMPROVED" ? `${g.ratio.toFixed(2)}x faster` : "") : "";
+        const med = [...ms].sort((a, b) => a - b)[ms.length >> 1];
+        rows += `<tr><td>${esc(name)}</td><td>${esc(host)}</td><td class="num">${ms.length}</td><td class="num">${med.toFixed(0)}</td><td class="spark">${spark(ms)}</td><td class="${cls}">${esc(note)}</td></tr>`;
+      }
+    }
+    const reg = (grade.regressions || []).length;
+    return `<h2>Performance</h2>
+      <div class="src">reported by <strong>${esc(origin)}</strong> &mdash; ${reg ? `<span class="regress">${reg} regression${reg > 1 ? "s" : ""}</span>` : "no regressions"} across ${names.length} checks</div>
+      <table><thead><tr><th>check</th><th>host</th><th class="num">runs</th><th class="num">median ms</th><th>trend</th><th>verdict</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  function renderFingerprint(data, origin) {
+    if (data.error) return `<h2>Fingerprint</h2><div class="err">${esc(data.error)}</div>`;
+    const subs = data.subsystems || [];
+    const obs = data.observables || [];
+    let s = `<h2>Fingerprint</h2><div class="src">reported by <strong>${esc(origin)}</strong> &mdash; master <code>${esc((data.master || "").slice(0, 16))}</code>, ${subs.length} subsystems, ${obs.length} observables</div>`;
+    if (obs.length) {
+      let rows = "";
+      for (const o of obs.slice(0, 40)) rows += `<tr><td>${esc(o.id)}</td><td>${esc(o.kind || "")}</td><td>${o.portable ? "portable" : "may vary"}</td><td class="num">${o.value != null ? esc(String(o.value).slice(0, 14)) : ""}</td></tr>`;
+      s += `<table><thead><tr><th>observable</th><th>kind</th><th>prediction</th><th class="num">value</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    return s;
+  }
+
+
+  function renderDevices(data, origin) {
+    if (data.error) return `<h2>Devices</h2><div class="err">${esc(data.error)}</div>`;
+    const devices = Object.values((data.ledger && data.ledger.devices) || {});
+    const g = data.grade || {};
+    if (!devices.length) return `<h2>Devices</h2><div class="empty">No devices on record yet. Upload a report with <code>node tools/roundhouse/deviceLedger.mjs add magmap-report.json</code>.</div>`;
+    let rows = "";
+    for (const d of devices) {
+      const last = d.runs[d.runs.length - 1] || {};
+      const v = (last.graded && last.graded.verdict) || "?";
+      const cls = v === "CONFIRMED" ? "improve" : v === "FALSIFIED" ? "regress" : "";
+      const worst = last.reported && last.reported.fullGridWorst != null ? last.reported.fullGridWorst.toExponential(2) : "--";
+      rows += `<tr><td>${esc(d.family)}</td><td>${esc((d.adapter && d.adapter.vendor) || "")} / ${esc((d.adapter && d.adapter.architecture) || "")}</td><td class="num">${d.runs.length}</td><td class="num">${esc(worst)}</td><td class="${cls}">${esc(v)}</td><td class="spark">${esc(d.key.slice(0, 8))}</td></tr>`;
+    }
+    const flips = (g.flipped || []).map((f) => `<div class="regress">!! ${esc(f.family)} device ${esc(f.key.slice(0, 8))} CHANGED VERDICT: ${esc(f.verdicts.join(" -> "))}</div>`).join("");
+    // plain-text version, for copying and sending on
+    const text = (data.lines || []).concat(devices.map((d) => {
+      const last = d.runs[d.runs.length - 1] || {};
+      return `  ${d.family} | ${(d.adapter||{}).vendor}/${(d.adapter||{}).architecture} | runs ${d.runs.length} | worst ${last.reported ? last.reported.fullGridWorst : "?"} | ${last.graded ? last.graded.verdict : "?"} | key ${d.key.slice(0,8)}`;
+    })).join("\n");
+    return `<h2>Devices</h2>
+      <div class="src">reported by <strong>${esc(origin)}</strong> &mdash; ${devices.length} device(s), confirmed families: ${esc((g.confirmedFamilies || []).join(", ") || "none")}</div>
+      ${flips}
+      <table><thead><tr><th>family</th><th>adapter</th><th class="num">runs</th><th class="num">worst</th><th>verdict</th><th>key</th></tr></thead><tbody>${rows}</tbody></table>
+      <button id="copydev">copy this list as text</button>
+      <textarea id="devtext" readonly style="width:100%;height:7em;margin-top:.5em;font-family:ui-monospace,monospace;font-size:.8em">${esc(text)}</textarea>`;
+  }
+
+
+  function renderMetrics(data, origin) {
+    if (data.error) return `<h2>Fleet gauges</h2><div class="err">${esc(data.error)}</div>`;
+    const g = data.gauges || {};
+    let cards = "";
+    const order = ["peersCheckedIn", "peersPushed", "fleetMasters", "devices", "vendorFamilies", "gpuRuns",
+                   "jobsTotal", "jobsCompleted", "jobsInFlight", "jobsPending", "claimsDropped", "returnRate",
+                   "ballots", "agreementRate", "checksFailed", "checksTimedOut", "changedVerdict", "submissions", "perfSamples"];
+    for (const k of order) {
+      const gg = g[k]; if (!gg) continue;
+      const val = gg.value === null ? "&mdash;" : esc(String(gg.value) + (gg.unit || "") + (gg.of != null ? " / " + gg.of : ""));
+      const dim = gg.value === null ? "opacity:.45" : "";
+      const warn = ((k === "checksFailed" || k === "changedVerdict" || k === "claimsDropped") && gg.value > 0)
+                 || (k === "fleetMasters" && gg.value > 1)
+                 || (k === "returnRate" && gg.value !== null && gg.value < 80) ? "color:#c0392b" : "";
+      cards += `<div style="border:1px solid #8884;border-radius:8px;padding:.7em;min-width:9em;${dim}">
+        <div style="font-size:1.6em;font-variant-numeric:tabular-nums;${warn}">${val}</div>
+        <div style="font-size:.82em;font-weight:600">${esc(k)}</div>
+        <div style="font-size:.72em;opacity:.65;margin-top:.2em">${esc(gg.note || "")}</div>
+        <div style="font-size:.68em;opacity:.5;margin-top:.3em">${esc(gg.source)}${gg.asOf ? " &middot; " + esc(gg.asOf.slice(0, 10)) : " &middot; no data"}</div>
+      </div>`;
+    }
+    return `<h2>Fleet gauges</h2>
+      <div class="src">reported by <strong>${esc(origin)}</strong> &mdash; a dash means NO DATA, which is not the same as zero</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.6em;margin:.6em 0 1.2em">${cards}</div>
+      <div class="note">Return rate counts only CONCLUDED claims &mdash; a job still in flight is neither returned nor lost, and counting it as a miss would make a busy fleet look broken. Timeouts are reported separately and kept OUT of the agreement rate: the reference transcript itself times out twice, and a phone is slower than the reference by construction. Only disagreement falsifies.</div>`;
+  }
+
+  async function loadAll() {
+    const out = $("out");
+    out.innerHTML = '<div class="empty">loading&hellip;</div>';
+    let base;
+    try { base = normaliseTarget($("target").value); } catch (e) { out.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+    const origin = base || location.origin;
+    const parts = [];
+    // perf
+    try { parts.push(renderPerf(await getJson(base, "/perf"), origin)); }
+    catch (e) { parts.push(`<h2>Performance</h2><div class="err">could not load /perf from ${esc(origin)}: ${esc(e.message)}${base ? " (a cross-origin host must send CORS headers)" : ""}</div>`); }
+    // fleet gauges first -- the summary before the detail
+    try { parts.push(renderMetrics(await getJson(base, "/metrics"), origin)); }
+    catch (e) { parts.push(`<h2>Fleet gauges</h2><div class="err">could not load /metrics from ${esc(origin)}: ${esc(e.message)}</div>`); }
+    // devices (the permanent results ledger)
+    try { parts.push(renderDevices(await getJson(base, "/devices"), origin)); }
+    catch (e) { parts.push(`<h2>Devices</h2><div class="err">could not load /devices from ${esc(origin)}: ${esc(e.message)}</div>`); }
+    // fingerprint
+    try { parts.push(renderFingerprint(await getJson(base, "/fingerprint"), origin)); }
+    catch (e) { parts.push(`<h2>Fingerprint</h2><div class="err">could not load /fingerprint from ${esc(origin)}: ${esc(e.message)}${base ? " (cross-origin needs CORS)" : ""}</div>`); }
+    out.innerHTML = parts.join("");
+    const cd = document.getElementById("copydev");
+    if (cd) cd.onclick = async () => {
+      const ta = document.getElementById("devtext");
+      try { await navigator.clipboard.writeText(ta.value); cd.textContent = "copied \u2713"; setTimeout(() => cd.textContent = "copy this list as text", 1500); }
+      catch { ta.select(); cd.textContent = "select + copy manually"; }
+    };
+  }
+
+  $("load").onclick = loadAll;
+  $("target").addEventListener("keydown", (e) => { if (e.key === "Enter") loadAll(); });
+  loadAll();   // same-origin on first load
+</script>
+
+<!-- v3016 -- FLEET VERSIONS AND THE TASKER CHAIN, LIFTED TO HUMAN VIEW.
+     Peers have reported their engineVersion since v2957 and NOTHING EVER SHOWED IT. That is not cosmetic: TWO
+     separate mechanisms already REFUSE to compare across versions -- fleetBench returns INCOMPARABLE when the
+     fleet is running two builds (v2984), and macSession reports CONFOUNDED when a cross-arch divergence sits
+     alongside a version difference (v2998). Both were right to refuse, and a human could not see WHY, because
+     the thing they were refusing over was invisible.
+     The Tasker chain (v3008) had no view at all. -->
+<section style="max-width:1000px;margin:18px auto;padding:12px 14px;border:1px solid #24382e;background:#0e1512;
+         font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#cfe9d8;">
+  <h2 style="font-size:14px;margin:0 0 4px;color:#9fe8c0;">Fleet versions</h2>
+  <div style="color:#6f8a7c;font-size:11px;margin-bottom:8px;">
+    A mixed-version fleet is not a fault, but it IS the reason a benchmark comes back incomparable and a
+    cross-arch diff comes back confounded. Shown so a refusal is legible instead of mysterious.
+  </div>
+  <div id="fleetVer">loading&hellip;</div>
+
+  <h2 style="font-size:14px;margin:14px 0 4px;color:#9fe8c0;">Android peer chain (Termux / Tasker)</h2>
+  <div style="color:#6f8a7c;font-size:11px;margin-bottom:8px;">
+    A task that FIRED is not a task that WORKED. Only stages carrying an artefact this hub can see are
+    confirmable; the rest are driveable and say so.
+  </div>
+  <div id="taskerChain">loading&hellip;</div>
+</section>
+<script type="module">
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+  (async () => {
+    const el = document.getElementById("fleetVer");
+    try {
+      const j = await (await fetch("/lighthouse", { cache: "no-store" })).json();
+      const rows = (j && (j.roster || j.peers)) || [];
+      if (!rows.length) { el.innerHTML = '<span style="color:#6f8a7c">no peers have checked in</span>'; return; }
+      const vers = [...new Set(rows.map((r) => r.engineVersion).filter(Boolean))];
+      const mixed = vers.length > 1;
+      // v3019 -- ACTIVITY beside version. Both are now reported by a peer; neither was visible until this and
+      // the previous round. A fleet you can see the version of but not the state of is half a fleet view.
+      let act = null;
+      try { act = (await import("/tools/roundhouse/activity.mjs")).fleetActivity(rows); } catch { act = null; }
+
+      el.innerHTML =
+        (act ? '<div style="margin-bottom:6px;color:' + (act.unattended ? "#e6c877" : "#7fe0a4") + '">' +
+               esc(act.note) + (act.unattended ? " &mdash; UNATTENDED is a run nothing has updated, not a run in progress" : "") + "</div>" : "") +
+        '<div style="margin-bottom:6px;color:' + (mixed ? "#e6c877" : "#7fe0a4") + '">' +
+        (mixed ? "MIXED: " + vers.length + " builds in the fleet (" + vers.map(esc).join(", ") +
+                 ") &mdash; benchmarks across these are INCOMPARABLE by design, not broken"
+               : vers.length ? "all peers on " + esc(vers[0]) : "no peer reported a version") + "</div>" +
+        rows.map((r, i) => {
+          const a = (act && act.rows[i]) || null;
+          const col = !a ? "#6f8a7c"
+                    : a.state === "running" ? "#7fe0a4"
+                    : a.state === "unattended" ? "#e6c877"
+                    : a.state === "unknown" ? "#6f8a7c" : "#9fb8ab";
+          const detail = a && a.state === "running"
+            ? " " + esc(a.device || "?") + " round " + esc(a.round) + "/" + esc(a.maxRounds) +
+              (a.trajectory ? ' <span style="color:' + (a.trajectory === "worsened-overall" ? "#f28b8b" : "#6f8a7c") + '">' + esc(a.trajectory) + "</span>" : "")
+            : "";
+          // A RUNNING PEER LINKS TO ITS OWN TRANSCRIPT. The inspector (v3015) already renders the trajectory;
+          // this is the shortest path from "that box is getting worse" to seeing which round it happened in.
+          const link = a && a.state === "running" && a.runId
+            ? ' <a href="/run-inspector.html?id=' + encodeURIComponent(a.runId) + '" target="_blank" rel="noopener" style="color:#9fe6c0;">inspect</a>' : "";
+          return '<div><span style="color:' + col + '">' + esc(a ? a.state : "?") + "</span> " +
+            esc(r.host || r.origin || "?") +
+            ' <span style="color:#6f8a7c">' + esc(r.engineVersion || "version not reported") + "</span>" +
+            detail + link + "</div>";
+        }).join("");
+    } catch { el.textContent = "lighthouse unreachable"; }
+  })();
+
+  (async () => {
+    const el = document.getElementById("taskerChain");
+    try {
+      const j = await (await fetch("/android/tasker", { cache: "no-store" })).json();
+      if (!j || !j.rows) { el.textContent = "no chain reported"; return; }
+      const colour = (v) => v === "done" ? "#7fe0a4" : v === "human" ? "#9fb8ab"
+                          : v === "stale" ? "#e6c877" : v === "unconfirmable" ? "#6f8a7c" : "#f28b8b";
+      el.innerHTML = j.rows.map((r) =>
+        '<div><span style="color:' + colour(r.verdict) + '">' + esc(r.verdict) + "</span> &mdash; " +
+        esc(r.label) + (r.human ? ' <span style="color:#6f8a7c">(your decision, by design)</span>' : "") +
+        (r.why ? '<div style="color:#6f8a7c;font-size:11px;">' + esc(r.why).slice(0, 200) + "</div>" : "") + "</div>").join("") +
+        '<div style="margin-top:6px;color:#6f8a7c;font-size:11px;">' + j.automatable + " automatable, only " +
+        j.confirmable + " confirmable from this hub.</div>";
+    } catch { el.textContent = "android bridge unreachable"; }
+  })();
+</script>
+</body>
+</html>

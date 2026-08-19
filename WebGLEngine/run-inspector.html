@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SweK — Roundhouse Run Inspector</title>
+<!--
+  v3015 -- INSPECT THE EXECUTION FLOW, IN THE APP.
+  The idea is midday-ai/ai-sdk-tools' devtools: "inspect tool calls, messages, and execution flow directly in
+  your app". The roundhouse has recorded a full transcript per run since v2764 -- every hypothesis, the real
+  measurement it produced, the physics verdict, and the evaluator's critique -- and there has never been anywhere
+  to LOOK at one. The store holds twenty runs and they were reachable only by fetching JSON by hand.
+  v3007 made it worse in a useful way: it added a step-by-step trajectory (did each escalation actually help?)
+  that also had nowhere to be seen.
+-->
+<style>
+  :root { --bg:#0b110e; --panel:#0e1512; --line:#24382e; --ink:#cfe9d8; --dim:#6f8a7c; --good:#7fe0a4; --warn:#e6c877; --bad:#f28b8b; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  h1 { font-size:15px; margin:0 0 4px; color:var(--good); }
+  main { padding:14px 16px; max-width:1000px; }
+  input { background:#0a100d; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font:inherit; }
+  button { background:#143020; color:var(--good); border:1px solid #2c6a45; border-radius:5px; padding:4px 12px; font:inherit; cursor:pointer; }
+  .round { border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:8px 0; background:var(--panel); }
+  .k { color:var(--dim); }
+  .traj { border:1px solid var(--line); border-left:3px solid var(--good); padding:8px 10px; margin:10px 0; background:var(--panel); }
+  pre { margin:4px 0; white-space:pre-wrap; word-break:break-word; color:var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Roundhouse Run Inspector</h1>
+  <div class="k">Every hypothesis, the measurement it produced, the physics verdict, and whether each escalation helped.</div>
+</header>
+<main>
+  <div>
+    <label for="rid" class="k">run id</label>
+    <input id="rid" size="28" placeholder="paste a run id">
+    <button id="go">Inspect</button>
+    <span id="msg" class="k"></span>
+  </div>
+  <div id="traj"></div>
+  <div id="out"></div>
+</main>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+  async function load() {
+    const id = $("rid").value.trim();
+    $("traj").innerHTML = ""; $("out").innerHTML = "";
+    if (!id) { $("msg").textContent = " enter a run id"; return; }
+    $("msg").textContent = " loading...";
+    let j;
+    try { j = await (await fetch("/device/progress?id=" + encodeURIComponent(id), { cache: "no-store" })).json(); }
+    catch (e) { $("msg").textContent = " bridge unreachable"; return; }
+    if (!j || j.error) { $("msg").textContent = " " + ((j && j.error) || "not found") + " -- the store keeps only the last 20 runs, so an old id is GONE rather than empty"; return; }
+    $("msg").textContent = "";
+
+    // THE TRAJECTORY FIRST. "crystallized in 4 rounds" is the same sentence whether every escalation improved
+    // the answer or three of them made it worse -- v3007 measured that, and this is where it becomes visible.
+    const p = j.result && j.result.progress;
+    if (p) {
+      const colour = p.trajectory === "monotone-improving" ? "var(--good)"
+                   : p.trajectory === "worsened-overall" ? "var(--bad)"
+                   : p.trajectory === "improved-overall" ? "var(--warn)" : "var(--dim)";
+      $("traj").innerHTML = '<div class="traj"><b style="color:' + colour + '">' + esc(p.trajectory) + "</b>" +
+        (typeof p.helped === "number" ? ' <span class="k">' + p.helped + " of " + ((p.steps || []).length) + " escalations helped</span>" : "") +
+        '<div class="k" style="margin-top:4px">' + esc(p.why || "") + "</div></div>";
+    }
+
+    const rounds = (j.rounds || (j.result && j.result.history) || []);
+    if (!rounds.length) { $("out").innerHTML = '<div class="k">no rounds recorded for this run</div>'; return; }
+    $("out").innerHTML = rounds.map((r, i) => {
+      const v = r.verdict || {};
+      const state = v.done ? '<span style="color:var(--good)">crystallised</span>'
+                           : '<span style="color:var(--dim)">' + esc(v.reason || "not yet") + "</span>";
+      return '<div class="round"><b>round ' + (r.round ?? i) + "</b> &mdash; " + state +
+        '<div class="k" style="margin-top:4px">claim</div><pre>' + esc(JSON.stringify(r.hyp && r.hyp.claim)) + "</pre>" +
+        '<div class="k">measured</div><pre>' + esc(v.measured === undefined ? "(none)" : v.measured) + "</pre>" +
+        (r.critique ? '<div class="k">critique</div><pre>' + esc(typeof r.critique === "string" ? r.critique : JSON.stringify(r.critique)).slice(0, 600) + "</pre>" : "") +
+        "</div>";
+    }).join("");
+  }
+  $("go").addEventListener("click", load);
+  $("rid").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
+  const q = new URLSearchParams(location.search).get("id");
+  if (q) { $("rid").value = q; load(); }
+</script>
+</body>
+</html>

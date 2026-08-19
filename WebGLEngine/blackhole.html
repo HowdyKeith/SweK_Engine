@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Schwarzschild Black Hole (WebGPU)</title>
+<style>
+  html,body { margin:0; height:100%; background:#010106; color:#dfe7f2; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:14px; align-items:center; flex-wrap:wrap; background:rgba(6,6,16,.66); border:1px solid #241a40; border-radius:10px; padding:8px 13px; backdrop-filter:blur(6px); }
+  b.t { color:#ffb066; } #mode { padding:2px 8px; border-radius:5px; border:1px solid #6a4520; background:#1a1200; color:#ffcf9a; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  label { color:#c8b0a0; } button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#241a10; color:#ffcf9a; border:1px solid #6a4a2c; }
+  button.off { opacity:.55; } a { color:#8fd1ff; text-decoration:none; }
+  #fallback { position:fixed; inset:0; display:none; align-items:center; justify-content:center; text-align:center; }
+  #fallback .card { max-width:520px; background:rgba(10,8,20,.92); border:1px solid #241a40; border-radius:12px; padding:22px 26px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <b class="t">&#9899; Black Hole</b>
+  <span id="mode" class="fallback">detecting&hellip;</span>
+  <label>mass <input id="mass" type="range" min="0.5" max="2.5" step="0.1" value="1.2"></label>
+  <label>distance <input id="dist" type="range" min="6" max="24" step="0.5" value="12"></label>
+  <button id="disk">&#128520; disk: on</button>
+  <button id="spin">&#8635; orbit: on</button>
+  <a href="/gallery.html">&#129526; gallery</a>
+</div>
+<div id="fallback"><div class="card">
+  <h2 style="color:#e8c45a;margin:0 0 8px">WebGPU isn't available here</h2>
+  <p id="fbwhy" style="color:#8a94a8"></p>
+  <p>This bends light along photon geodesics &mdash; it needs WebGPU (Chrome/Edge, or Safari&nbsp;18+).</p>
+  <p><a href="/gallery.html">&#8594; Back to the demo gallery</a></p>
+</div></div>
+
+<script type="module">
+const canvas = document.getElementById("c");
+function fallback(why) { document.getElementById("hud").style.display = "none"; canvas.style.display = "none"; document.getElementById("fbwhy").textContent = why || ""; document.getElementById("fallback").style.display = "flex"; }
+
+const WGSL = `
+struct U { a: vec4f, b: vec4f };   // a=(resX,resY,time,camDist);  b=(rs, yaw, pitch, diskOn)
+@group(0) @binding(0) var<uniform> u: U;
+
+@vertex fn vs(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4f {
+  var p = array<vec2f,3>(vec2f(-1.,-1.), vec2f(3.,-1.), vec2f(-1.,3.));
+  return vec4f(p[vid], 0., 1.);
+}
+
+fn n3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(12.9898, 78.233, 37.719))) * 43758.5453); }
+fn sky(dir: vec3f) -> vec3f {
+  let neb = 0.5 + 0.5 * sin(dir.x * 3.1 + dir.z * 2.3 + dir.y * 1.7);
+  var c = vec3f(0.02, 0.03, 0.07) * neb + vec3f(0.03, 0.02, 0.05) * (0.5 + 0.5 * sin(dir.z * 5.0 - dir.x * 4.0));
+  for (var o = 0; o < 3; o = o + 1) {
+    let sc = 55.0 * pow(2.0, f32(o)); let g = dir * sc; let id = floor(g); let fp = fract(g); let hh = n3(id + f32(o) * 17.0);
+    if (hh > 0.986) { let d = length(fp - vec3f(0.5)); let star = smoothstep(0.55, 0.0, d) * (hh - 0.986) / 0.014;
+      let tint = mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.9, 0.7), n3(id + 3.0)); c = c + tint * star * 1.3; }
+  }
+  return c;
+}
+// emissive accretion disk: hot white inner -> orange outer, radial falloff, azimuthal banding + a doppler-ish tilt
+fn disk(r: f32, pos: vec3f, rs: f32) -> vec3f {
+  let rIn = 3.0 * rs; let rOut = 11.0 * rs;
+  if (r < rIn || r > rOut) { return vec3f(0.0); }
+  let tn = clamp((rOut - r) / (rOut - rIn), 0.0, 1.0);           // 1 inner .. 0 outer
+  let temp = mix(vec3f(1.0, 0.45, 0.12), vec3f(1.0, 0.96, 0.88), tn * tn);
+  let ang = atan2(pos.z, pos.x);
+  let band = 0.75 + 0.25 * sin(ang * 24.0 + r * 2.5) + 0.15 * sin(ang * 7.0 - r);
+  let dopp = 1.0 + 0.6 * sin(ang);                              // one side brighter (approx relativistic beaming)
+  return temp * pow(tn, 1.3) * band * dopp * 1.7;
+}
+
+@fragment fn fs(@builtin(position) frag: vec4f) -> @location(0) vec4f {
+  let dist = u.a.w; let yaw = u.b.y; let pitch = u.b.z; let rs = u.b.x; let diskOn = u.b.w;
+  let ro = dist * vec3f(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw));
+  let er = normalize(ro); let f = -er;
+  var rgt = normalize(cross(vec3f(0., 1., 0.), f)); let up = cross(f, rgt);
+  let uv = (frag.xy - 0.5 * u.a.xy) / u.a.y;
+  let rd = normalize(f + 1.1 * (uv.x * rgt - uv.y * up));
+
+  let ci = dot(rd, f); let tang = rd - ci * f; let stl = length(tang);
+  let s = select(rgt, tang / max(stl, 1e-6), stl > 1e-4);
+  let r0 = dist; var uu = 1.0 / r0; var du = uu * ci / max(stl, 1e-3);
+  var phi = 0.0; var prevY = ro.y; var col = vec3f(0.0); var done = false; var captured = false;
+  let dphi = 0.03;
+  for (var i = 0; i < 400; i = i + 1) {
+    // RK4 on (uu, du) with u'' = 1.5*rs*u^2 - u
+    let a0 = du;                     let a1 = 1.5 * rs * uu * uu - uu;
+    let b0 = du + 0.5 * dphi * a1;   let bu = uu + 0.5 * dphi * a0; let b1 = 1.5 * rs * bu * bu - bu;
+    let c0 = du + 0.5 * dphi * b1;   let cu = uu + 0.5 * dphi * b0; let c1 = 1.5 * rs * cu * cu - cu;
+    let d0 = du + dphi * c1;         let dcu = uu + dphi * c0;       let d1 = 1.5 * rs * dcu * dcu - dcu;
+    uu = uu + dphi / 6.0 * (a0 + 2.0 * b0 + 2.0 * c0 + d0);
+    du = du + dphi / 6.0 * (a1 + 2.0 * b1 + 2.0 * c1 + d1);
+    phi = phi + dphi;
+    if (uu <= 0.0) { uu = 1e-5; }
+    let r = 1.0 / uu;
+    if (r <= rs) { captured = true; done = true; break; }                       // crossed the horizon
+    let pos = r * (cos(phi) * er + sin(phi) * s);
+    if (diskOn > 0.5 && (pos.y * prevY) < 0.0) { col = col + disk(r, pos, rs); } // crossed the disk plane
+    prevY = pos.y;
+    if (r > r0 * 2.2 && du < 0.0) {                                              // escaped to infinity
+      let vel = (-du / (uu * uu)) * (cos(phi) * er + sin(phi) * s) + r * (-sin(phi) * er + cos(phi) * s);
+      col = col + sky(normalize(vel)); done = true; break;
+    }
+  }
+  if (!done) { captured = true; }                                               // spiralled near the photon sphere -> shadow
+  // faint photon ring just outside the shadow
+  col = col / (col + vec3f(1.0));
+  col = pow(col, vec3f(0.82));
+  return vec4f(col, 1.0);
+}
+`;
+
+let device, ctx, format, uBuf, pipe, bind;
+async function initGPU() {
+  if (!navigator.gpu) { fallback("navigator.gpu is undefined (no WebGPU)."); return false; }
+  let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
+  if (!adapter) { fallback("no GPU adapter."); return false; }
+  try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
+  device.lost.then((i) => { if (i && i.reason !== "destroyed") fallback("GPU device lost: " + i.message); });
+  ctx = canvas.getContext("webgpu"); if (!ctx) { fallback("getContext('webgpu') null."); return false; }
+  format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode: "opaque" });
+  const mod = device.createShaderModule({ code: WGSL });
+  if (mod.getCompilationInfo) { const ci = await mod.getCompilationInfo(); for (const m of ci.messages) if (m.type === "error") { fallback("WGSL error: " + m.message + " (line " + m.lineNum + ")"); return false; } }
+  uBuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  try { pipe = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } }); }
+  catch (e) { fallback("pipeline failed: " + e.message); return false; }
+  bind = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uBuf } }] });
+  return true;
+}
+
+let spin = true, diskOn = true, yaw = 0.6, pitch = 0.16, t0 = performance.now();
+function frame() {
+  requestAnimationFrame(frame);
+  const dpr = Math.min(2, window.devicePixelRatio || 1); const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  const t = (performance.now() - t0) / 1000; if (spin) yaw = 0.6 + t * 0.1;
+  const rs = +document.getElementById("mass").value, dist = +document.getElementById("dist").value;
+  device.queue.writeBuffer(uBuf, 0, new Float32Array([canvas.width, canvas.height, t, dist, rs, yaw, pitch, diskOn ? 1 : 0]));
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(pipe); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+  device.queue.submit([enc.finish()]);
+}
+
+let drag = false, px = 0, py = 0;
+canvas.addEventListener("pointerdown", (e) => { drag = true; px = e.clientX; py = e.clientY; spin = false; document.getElementById("spin").textContent = "\u21bb orbit: off"; document.getElementById("spin").classList.add("off"); });
+addEventListener("pointerup", () => { drag = false; });
+addEventListener("pointermove", (e) => { if (!drag) return; yaw -= (e.clientX - px) * 0.006; pitch = Math.max(-1.35, Math.min(1.35, pitch + (e.clientY - py) * 0.006)); px = e.clientX; py = e.clientY; });
+document.getElementById("spin").onclick = (e) => { spin = !spin; e.target.textContent = "\u21bb orbit: " + (spin ? "on" : "off"); e.target.classList.toggle("off", !spin); if (spin) t0 = performance.now() - (yaw - 0.6) / 0.1 * 1000; };
+document.getElementById("disk").onclick = (e) => { diskOn = !diskOn; e.target.textContent = "\uD83D\uDE08 disk: " + (diskOn ? "on" : "off"); e.target.classList.toggle("off", !diskOn); };
+
+(async () => {
+  const ok = await initGPU(); if (!ok) return;
+  document.getElementById("mode").textContent = "WebGPU \u00b7 photon geodesics"; document.getElementById("mode").className = "";
+  frame();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Alexa command</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:600px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; background:var(--panel); }
+  label { display:block; color:var(--dim); font-size:12px; margin:10px 0 4px; }
+  input, select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > div { flex:1; min-width:150px; }
+  .presets { display:flex; gap:7px; flex-wrap:wrap; margin-top:8px; }
+  .presets button { background:#10151d; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button.go { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:9px 16px; font:inherit; cursor:pointer; }
+  button.save { background:#10151d; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:9px 14px; font:inherit; cursor:pointer; }
+  #msg { color:var(--dim); font-size:12px; margin-top:10px; }
+  #devHint { color:var(--dim); font-size:11px; margin-top:4px; display:none; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🗣️</span> Alexa command</span></header>
+  <main>
+    <div class="note">
+      Type a command and the engine sends it to an Echo through Home Assistant, as if you'd spoken it. Needs one of: <b>Alexa Media Player</b> (HACS — gives each Echo as a media_player) or <b>Alexa Devices</b> (official integration — uses a device id).
+    </div>
+    <details class="note" style="cursor:pointer;">
+      <summary><b>Reverse: "Alexa, make the ball red" → control the engine</b></summary>
+      <div style="margin-top:8px;">
+        Alexa routines can only act on Alexa-known devices, so expose a little HA <b>script</b> to Alexa (via HA Cloud / the Alexa skill), then have it call the bridge. Three pieces:
+        <p style="margin:8px 0 2px;color:var(--ink);">1. <b>configuration.yaml</b> — a rest_command to the bridge:</p>
+        <pre style="background:#0c1411;border:1px solid var(--line);border-radius:7px;padding:9px;white-space:pre-wrap;color:var(--go);">rest_command:
+  swek_exec:
+    url: "http://PC_IP:8787/push2run/exec?cmd=exec&line={{ line | urlencode }}"
+    method: GET</pre>
+        <p style="margin:8px 0 2px;color:var(--ink);">2. A <b>script</b> (expose this one to Alexa) that runs the engine line:</p>
+        <pre style="background:#0c1411;border:1px solid var(--line);border-radius:7px;padding:9px;white-space:pre-wrap;color:var(--go);">script:
+  make_the_ball_red:
+    sequence:
+      - service: rest_command.swek_exec
+        data:
+          line: "window.swek&amp;&amp;swek.setBallColor('red')"</pre>
+        <p style="margin:8px 0 2px;color:var(--ink);">3. In the <b>Alexa app</b>: Routines → When you say "make the ball red" → Action → Smart Home → run that script.</p>
+        Swap the <code>line:</code> for whatever JS your demo uses. No engine code needed — it rides the existing <code>/push2run/exec</code>.
+      </div>
+    </details>
+    <div class="card">
+      <label>Integration</label>
+      <select id="mode">
+        <option value="amp">Alexa Media Player (pick a media_player entity)</option>
+        <option value="devices">Alexa Devices — official (paste a device id)</option>
+      </select>
+
+      <div id="ampWrap">
+        <label>Echo (media_player entity)</label>
+        <select id="entity"><option value="">— loading from Home Assistant —</option></select>
+      </div>
+      <div id="devWrap" style="display:none;">
+        <label>Echo device id</label>
+        <input id="devTarget" placeholder="037d79c1af96c67ba57ebcae560fb18e" />
+        <div id="devHint" style="display:block;">Settings → Devices &amp; Services → your Echo → the device-page URL ends in its id.</div>
+      </div>
+
+      <label>Command</label>
+      <input id="text" placeholder="set a 10 minute timer" />
+      <div class="presets">
+        <button data-t="set a 10 minute timer">10-min timer</button>
+        <button data-t="what's the time">what's the time</button>
+        <button data-t="turn off the office lights">office lights off</button>
+        <button data-t="play music">play music</button>
+        <button data-t="set the volume to 4">volume 4</button>
+      </div>
+
+      <div class="actions">
+        <button class="go" id="send">🗣️ Send to Echo</button>
+        <button class="save" id="save">Save as default</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  function syncMode(){ const dev = $("mode").value === "devices"; $("devWrap").style.display = dev ? "block" : "none"; $("ampWrap").style.display = dev ? "none" : "block"; }
+  $("mode").addEventListener("change", syncMode);
+  document.querySelectorAll(".presets button").forEach(b => b.onclick = () => { $("text").value = b.getAttribute("data-t"); });
+
+  // load media_player entities for the AMP dropdown
+  fetch("/ha/states?domain=media_player", { cache:"no-store" }).then(r => r.json()).then(arr => {
+    const list = Array.isArray(arr) ? arr : (arr && arr.entities) || [];
+    const sel = $("entity"); sel.innerHTML = '<option value="">— select an Echo —</option>';
+    list.forEach(e => { const o = document.createElement("option"); o.value = e.entity_id; o.textContent = (e.name || e.entity_id) + "  (" + e.entity_id + ")"; sel.appendChild(o); });
+    if (!list.length) sel.innerHTML = '<option value="">— no media_player entities (install Alexa Media Player) —</option>';
+  }).catch(() => { $("entity").innerHTML = '<option value="">— Home Assistant not reachable —</option>'; });
+
+  // load saved defaults
+  fetch("/alexa/config", { cache:"no-store" }).then(r => r.json()).then(c => {
+    if (!c) return; $("mode").value = c.mode || "amp"; syncMode();
+    if (c.mode === "devices") $("devTarget").value = c.target || ""; else if (c.target) setTimeout(() => { $("entity").value = c.target; }, 400);
+  }).catch(syncMode);
+
+  function target(){ return $("mode").value === "devices" ? $("devTarget").value.trim() : $("entity").value; }
+  $("save").onclick = () => { fetch("/alexa/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ mode: $("mode").value, target: target() }) }).then(r => r.json()).then(() => $("msg").textContent = "✓ default saved").catch(e => $("msg").textContent = "✗ " + e); };
+  $("send").onclick = () => {
+    const text = $("text").value.trim(); if (!text) { $("msg").textContent = "type a command first"; return; }
+    if (!target()) { $("msg").textContent = "pick / paste the Echo first"; return; }
+    $("msg").textContent = "sending…";
+    fetch("/alexa/command", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text, target: target(), mode: $("mode").value }) })
+      .then(r => r.json()).then(j => $("msg").textContent = j && j.ok ? "✓ sent to Echo" : ("✗ " + (j && j.error || "failed — is the integration set up?")))
+      .catch(e => $("msg").textContent = "✗ " + (e && e.message || e));
+  };
+  syncMode();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Co-op Lockstep (Endless Sky on Box3D)</title>
+<style>
+  :root { --bg:#05070e; --ink:#e7eef8; --dim:#8b97a8; }
+  html,body { margin:0; min-height:100%; background:radial-gradient(1100px 640px at 50% -12%, #0a1224 0%, var(--bg) 62%); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:1000px; margin:0 auto; padding:22px 18px 50px; }
+  .crumb { font-size:12px; color:var(--dim); margin-bottom:10px; } .crumb a { color:#7fd1ff; text-decoration:none; }
+  h1 { margin:0 0 4px; font-size:23px; background:linear-gradient(90deg,#8fe6c8,#5aa8ff 60%,#c78bff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--dim); font-size:13px; margin:0 0 16px; max-width:820px; }
+  .verdict { display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:14px; border:1px solid #2a6a4a; background:#10261c; color:#8fe6b8; }
+  .verdict.bad { border-color:#7a2a30; background:#2a1015; color:#ff9aa2; }
+  .hud { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin:12px 0; font-size:12.5px; color:#b9c4d4; }
+  .hud b { color:#eef3fa; } .chip { padding:3px 9px; border:1px solid #24405e; border-radius:7px; background:#0b1320; }
+  .views { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .peer { background:#04060c; border:1px solid #16223c; border-radius:10px; overflow:hidden; }
+  .peer .cap { display:flex; justify-content:space-between; padding:6px 10px; font-size:12px; border-bottom:1px solid #16223c; }
+  .peer .cap .h { color:#8fd6c0; } canvas { display:block; width:100%; height:300px; background:#04060c; }
+  .ctl { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:14px 0; }
+  button,input,select { font:12px ui-monospace,monospace; }
+  button { padding:4px 12px; border-radius:6px; cursor:pointer; background:#152136; color:#b9d4ff; border:1px solid #2f486c; }
+  .note { color:var(--dim); font-size:12px; margin-top:14px; max-width:820px; }
+  .foot { margin-top:18px; font-size:13px; } .foot a { color:#7fd1ff; text-decoration:none; margin-right:16px; }
+  code { color:#9fd6ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crumb"><a href="/gallery.html">&#129526; Gallery</a> / <a href="/flight.html">Flight</a> / Co-op Lockstep</div>
+  <h1>&#128101; Co-op Lockstep</h1>
+  <p class="sub">Two peers each own a fleet, step the <b>same</b> shared world from <b>each other's inputs</b>, and
+     compare a per-tick <code>stateHash</code>. If the hashes ever disagree, that's a desync &mdash; caught instantly.
+     This page runs both peers in one tab over a loopback link (with adjustable latency) so you can watch it stay
+     locked; on the fleet the identical <code>session</code>/<code>net</code> code runs across real boxes.</p>
+
+  <div id="verdict" class="verdict">&#9679; establishing lockstep&hellip;</div>
+  <div class="hud">
+    <span class="chip">tick <b id="tick">0</b></span>
+    <span class="chip">peer A hash <b id="ha">&mdash;</b></span>
+    <span class="chip">peer B hash <b id="hb">&mdash;</b></span>
+    <span class="chip">lead <b id="lead">0</b> <span style="color:#7a8290">(&asymp; input delay)</span></span>
+    <span class="chip">confirmed ticks <b id="conf">0</b></span>
+  </div>
+
+  <div class="views">
+    <div class="peer"><div class="cap"><span class="h">&#128225; Peer A <span style="color:#7a8290">(owns fleet A)</span></span><span id="capA" style="color:#7a8290"></span></div><canvas id="cA"></canvas></div>
+    <div class="peer"><div class="cap"><span class="h">&#128225; Peer B <span style="color:#7a8290">(owns fleet B)</span></span><span id="capB" style="color:#7a8290"></span></div><canvas id="cB"></canvas></div>
+  </div>
+
+  <div class="ctl">
+    <label>link latency <input id="lat" type="range" min="0" max="180" value="40"> <span id="latv">40</span> ms</label>
+    <button id="pause">&#9208; Pause</button>
+    <button id="reseed">&#8635; New battle</button>
+  </div>
+
+  <p class="note">Both panels are the <b>same simulation</b> advanced independently by two peers &mdash; if lockstep holds
+     they are pixel-for-pixel identical and the two hashes match every tick. The loopback link delays messages by the
+     latency above; the net's send-ahead input delay hides it, so the sim never stalls. (The desync detector itself is
+     proven in <code>box3d-lockstep-net-selfcheck</code>: "a real divergence is caught by the hash exchange.")</p>
+
+  <div class="foot">
+    <a href="/flight.html">&#128760; Flight sandbox</a>
+    <a href="/es-box3d.html">2D view</a>
+    <a href="/box3d-info.html">Box3D &amp; lockstep docs</a>
+  </div>
+</div>
+
+<script type="module">
+import { spawnEnemies, stepAI } from "/ev/combat.js";
+import { headingVector } from "/ev/flightModel.js";
+import { DEFAULT_W, decide as tacticsDecide } from "/ev/esTactics.js";
+import { createESBox3D } from "/physics/esBox3d.js";
+import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
+import { createLockstepSession } from "/physics/box3dLockstep.js";
+import { createLockstepNet } from "/physics/box3dLockstepNet.js";
+
+const CLASSES = [
+  { id: 1, name: "Raider",   shield: 80,  armor: 60, speed: 340, accel: 240, maneuver: 11, dps: 12 },
+  { id: 2, name: "Marauder", shield: 120, armor: 90, speed: 300, accel: 200, maneuver: 8,  dps: 18 },
+  { id: 3, name: "Corsair",  shield: 60,  armor: 40, speed: 400, accel: 280, maneuver: 14, dps: 8  },
+];
+const PEERS = ["A", "B"];
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+function makeFleet(team, center, count, rng) {
+  return spawnEnemies(CLASSES, {}, center, { count, team, minR: 150, spread: 460, rnd: rng }).map((e, i) => ({
+    ...e, id: team + "#" + i, team, vx: e.vx || 0, vy: e.vy || 0, _tgtId: null, _fleeing: false,
+  }));
+}
+function snapshot(list) { const o = []; for (const e of list) if (!e.dead) o.push({ id: e.id, x: e.x, y: e.y, team: e.team, shield: e.shield, armor: e.armor, maxShield: e.maxShield, maxArmor: e.maxArmor }); return o; }
+
+// A peer = its own world + lockstep session + the ship objects it simulates. Ownership decides whose inputs it generates.
+function makePeer(id, seed) {
+  const rng = makeRng(seed);
+  const A = makeFleet("A", { x: -1200, y: 0 }, 6, rng), B = makeFleet("B", { x: 1200, y: 0 }, 6, rng);
+  const all = A.concat(B);
+  const session = createLockstepSession({ peers: PEERS, world: planarFallbackWorld(), shipHalf: 60 });
+  session.addShips(all.map((s) => ({ ship: s, owner: s.team === "A" ? "A" : "B", stats: s.stats })));
+  const ownTeam = id === "A" ? "A" : "B";
+  function inputFn() {
+    const mine = all.filter((e) => !e.dead && e.team === ownTeam);
+    const foes = snapshot(all.filter((e) => e.team !== ownTeam));
+    const out = [];
+    for (const e of mine) {
+      const d = tacticsDecide(e, foes, DEFAULT_W, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
+      e._fleeing = !!d.fleeing; e._tgtId = (d.target && !d.target._flee) ? d.target.id : null;
+      if (!d.target) { out.push({ shipId: e.id, turn: 0, thrust: false }); continue; }
+      const ai = stepAI(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });
+      out.push({ shipId: e.id, turn: ai.turn, thrust: ai.thrust });
+    }
+    return out;
+  }
+  return { id, session, all, inputFn };
+}
+
+// loopback link: send() queues the message for the OTHER peer, delivered after `latency` ms.
+let latency = 40;
+const wire = [];   // {at, to, msg}
+function linkSend(toId) { return (msg) => wire.push({ at: performance.now() + latency, to: toId, msg }); }
+function pumpWire(net) { const now = performance.now(); for (let i = wire.length - 1; i >= 0; i--) { if (wire[i].at <= now) { const w = wire.splice(i, 1)[0]; net[w.to].receive(w.msg); } } }
+
+let seed = (Math.random() * 1e9) | 0;
+let peerA, peerB, netA, netB, net;
+function boot() {
+  peerA = makePeer("A", seed); peerB = makePeer("B", seed);
+  // v2475 -- the engine is part of the protocol: hand it to the transport so a mixed pair can never form.
+  const backendId = (peerA.world && peerA.world.backendId) ? peerA.world.backendId() : null;
+  netA = createLockstepNet({ session: peerA.session, selfId: "A", backendId, inputFn: peerA.inputFn, send: linkSend("B"), inputDelay: 4 });
+  netB = createLockstepNet({ session: peerB.session, selfId: "B", backendId: (peerB.world && peerB.world.backendId) ? peerB.world.backendId() : null, inputFn: peerB.inputFn, send: linkSend("A"), inputDelay: 4 });
+  net = { A: netA, B: netB };
+  wire.length = 0;
+}
+boot();
+
+// ---- 2D render of a peer's ships ----
+const cA = document.getElementById("cA"), cB = document.getElementById("cB");
+function fit(c) { const r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); c.width = r.width * d | 0; c.height = r.height * d | 0; }
+function drawPeer(canvas, ships) {
+  const ctx = canvas.getContext("2d"), W = canvas.width, H = canvas.height, HALF = 1900, sc = Math.min(W, H) / (HALF * 2);
+  const toX = (x) => W / 2 + x * sc, toY = (y) => H / 2 + y * sc;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = "#0c1830"; ctx.lineWidth = 1;
+  for (let g = -HALF; g <= HALF; g += 400) { ctx.beginPath(); ctx.moveTo(toX(g), 0); ctx.lineTo(toX(g), H); ctx.moveTo(0, toY(g)); ctx.lineTo(W, toY(g)); ctx.stroke(); }
+  for (const e of ships) {
+    if (e.dead) continue;
+    const hv = headingVector(e.heading), px = toX(e.x), py = toY(e.y), r = Math.max(6, 9 * sc * 100);
+    const nx = px + hv.x * r * 1.6, ny = py + hv.y * r * 1.6, bx = px - hv.x * r, by = py - hv.y * r, ox = -hv.y, oy = hv.x;
+    ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(bx + ox * r * 0.8, by + oy * r * 0.8); ctx.lineTo(bx - ox * r * 0.8, by - oy * r * 0.8); ctx.closePath();
+    ctx.fillStyle = e.team === "A" ? "#4fd0ff" : "#ff9a4f"; ctx.fill();
+  }
+}
+
+// ---- loop ----
+let paused = false, confirmed = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  if (!paused) {
+    pumpWire(net); netA.pump(); netB.pump();
+  }
+  fit(cA); fit(cB); drawPeer(cA, peerA.all); drawPeer(cB, peerB.all);
+  const t = Math.min(netA.tick, netB.tick);
+  const ha = netA.localHash(t - 1), hb = netB.localHash(t - 1);
+  const hx = (h) => (h == null ? "\u2014" : (h >>> 0).toString(16).padStart(8, "0"));
+  document.getElementById("tick").textContent = t;
+  document.getElementById("ha").textContent = hx(ha);
+  document.getElementById("hb").textContent = hx(hb);
+  document.getElementById("lead").textContent = netA.lead();
+  if (ha != null && hb != null) confirmed = t;
+  document.getElementById("conf").textContent = confirmed;
+  const ds = netA.desync() || netB.desync();
+  const v = document.getElementById("verdict");
+  if (ds) { v.className = "verdict bad"; v.innerHTML = "&#10007; DESYNC at tick " + ds.tick + " (local " + hx(ds.local) + " vs remote " + hx(ds.remote) + ")"; }
+  else if (confirmed > 3) { v.className = "verdict"; v.innerHTML = "&#10003; IN LOCKSTEP &mdash; both peers agree on every confirmed tick"; }
+}
+loop();
+
+// ---- controls ----
+const lat = document.getElementById("lat"), latv = document.getElementById("latv");
+lat.oninput = () => { latency = +lat.value; latv.textContent = lat.value; };
+document.getElementById("pause").onclick = (e) => { paused = !paused; e.target.innerHTML = paused ? "\u25B6 Resume" : "\u23F8 Pause"; };
+document.getElementById("reseed").onclick = () => { seed = (Math.random() * 1e9) | 0; confirmed = 0; boot(); };
+</script>
+</body>
+</html>

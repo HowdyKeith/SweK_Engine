@@ -1,0 +1,278 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Phase change - four transitions, four keys nothing here is told (v3669)</title>
+<meta name="demo:desc" content="Melting, freezing, gasification and crystallisation, each graded against a closed form the solver never sees - a Stefan front, an asymmetry predicted from material properties, an expansion ratio that is exactly 1 at the critical point, and an Avrami exponent set by counting dimensions.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e} button:disabled{opacity:.45;cursor:default}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:200px}
+ select{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;font:inherit;padding:3px 6px}
+</style></head><body><div id="w">
+<h1>Four phase changes, four keys &mdash; and none of them comes from this engine</h1>
+<div class="sub">Keith asked whether voxels could melt, gasify, freeze, burn or crystallise. Four of the five were
+built and graded at v3618&ndash;v3621; <b>burn was refused</b>, with its reason recorded. This page is the front
+door all four have been missing.</div>
+
+<div class="law"><b>This page exists because a red gate finally got read rather than excused.</b>
+<code>deviceInstrumentMap</code> has listed <code>melt</code>, <code>freeze</code>, <code>vaporize</code> and
+<code>crystallize</code> as <i>unexplained</i> since v3618 &mdash; each device either overlaps an instrument or is
+exempt with a stated reason, and these were neither. The cheap answer was four exemptions. <b>That would have been
+wrong:</b> an exemption says <i>never meant to have a front door</i>, and the real cause was that all four modules
+<code>import { pathToFileURL } from "node:url"</code> at module scope for their main-block guard, <b>so no browser
+could resolve them</b> &mdash; the third instance of a fault first found at v3617 and again at v3630. The arithmetic
+<b>moved</b> to <code>physics/thermal/phaseOps.mjs</code>, which has no imports at all; its gate asserts the two are
+<b>the same function object</b> rather than two copies that agree today.</div>
+
+<h2>1. Melting &mdash; the only phase change with an exact answer</h2>
+<div class="panel">
+  <div class="row">
+    <label>material <select id="mMat"></select></label>
+    <label>wall temperature above melting &nbsp;<input id="mDT" type="range" min="5" max="120" step="5" value="40"></label>
+    <span id="mDTv" class="dim"></span>
+    <button id="mGo" class="good">solve and grade</button>
+    <span id="mStat" class="dim"></span>
+  </div>
+  <canvas id="mCv" width="960" height="200"></canvas>
+  <table id="mT"></table>
+</div>
+<div class="law">The one-phase Stefan problem gives <code>X(t) = 2&lambda;&radic;(&alpha;t)</code> with &lambda; solving
+<code>&lambda;e<sup>&lambda;&sup2;</sup>erf(&lambda;) = St/&radic;&pi;</code>. <b>Nothing in it comes from our grid.</b>
+The solver evolves <b>enthalpy</b> and derives temperature, which <i>is</i> the correctness argument: the latent-heat
+stall falls out of the state variable instead of being a case somebody remembered to write. <b>The claim is the
+convergence order, not an error</b> &mdash; a single error number would pass on a solver that is wrong and never
+improves. Press <b>negative control</b> to run the obvious temperature-based solver instead: it does not merely run
+ahead, it puts <b>every cell above Tm</b>, so there is no front at all.</div>
+
+<h2>2. Freezing &mdash; not melting run backwards</h2>
+<div class="panel">
+  <div class="row">
+    <label>pair <select id="fMat"></select></label>
+    <label>|&Delta;T| <input id="fDT" type="range" min="5" max="60" step="5" value="25"></label>
+    <span id="fDTv" class="dim"></span>
+    <button id="fGo" class="good">grade the asymmetry</button>
+    <button id="fCtl">control: same properties both phases</button>
+    <span id="fStat" class="dim"></span>
+  </div>
+  <table id="fT"></table>
+</div>
+<div class="law">True of the <b>equation</b>, false of the <b>physics</b>: heat crosses the <i>liquid</i> to reach a
+melting front and the <i>solid</i> to reach a freezing one. Ice/water freezes about <b>twice</b> as fast as it melts
+at the same |&Delta;T| &mdash; and <b>the ratio decomposes into two factors pulling opposite ways</b>, neither of which
+predicts it alone. The control is the part that makes it a finding: give both phases <b>identical properties</b> and
+the two directions must agree to the digit, so the asymmetry is carried entirely by the materials and none of it by
+the freeze branch.</div>
+
+<h2>3. Gasification &mdash; mass, volume, density: pick two</h2>
+<div class="panel">
+  <div class="row">
+    <label>temperature (K) <input id="vT" type="range" min="280" max="647" step="1" value="373"></label>
+    <span id="vTv" class="dim"></span>
+    <button id="vGo" class="good">expansion ratio and the three choices</button>
+  </div>
+  <table id="vT2"></table>
+</div>
+<div class="law">The expansion ratio is a <b>function, not a number</b> &mdash; three orders across conditions anybody
+would call ordinary &mdash; so there is no constant to build a grid around. A voxel storing a <i>type</i> fixes the
+density of whatever sits in it, which leaves exactly three choices and <b>each is wrong in exactly one quantity by
+the same factor r</b>: there is nothing to trade. <b>The control is the critical point</b>, where r goes to exactly
+1 and all three coincide: the trap is distance from critical, not the voxel scheme. Drag the slider up to 647 K and
+watch it arrive.</div>
+
+<h2>4. Crystallisation &mdash; the exponent is geometry</h2>
+<div class="panel">
+  <div class="row">
+    <label>lattice L <select id="cL"></select></label>
+    <label>nuclei <input id="cN" type="range" min="10" max="60" step="5" value="30"></label>
+    <span id="cNv" class="dim"></span>
+    <button id="cGo" class="good">fit the exponent over six seeds</button>
+    <span id="cStat" class="dim"></span>
+  </div>
+  <table id="cT"></table>
+</div>
+<div class="law">Avrami's exponent is set by <b>counting dimensions</b> &mdash; 3 for site-saturated growth in three
+dimensions, 4 under continuous nucleation, the extra power being the nucleation rate integrated over time. Nothing in
+it comes from the lattice. <b>The seed spread is measured before the claim, not after,</b> which is the measurement
+<code>ising.L</code> was missing: the two predictions are one apart and the per-seed spread is several times smaller,
+so <b>the ensemble discriminates the two modes and a single seed does not</b>. Watch the per-seed column &mdash; the
+worst site-saturated seed and the best continuous one are under two per-seed sigma apart.</div>
+
+<div class="law">Graded headless by <code>physics/thermal/stefan-selfcheck.mjs</code>,
+<code>freeze-selfcheck.mjs</code>, <code>vaporize-selfcheck.mjs</code>, <code>crystallize-selfcheck.mjs</code> and
+<code>phaseOps-selfcheck.mjs</code>, all runnable from <a href="/gates.html" style="color:#9ab6e8">gates.html</a>.
+<b>Not one line of the physics was edited by this round</b> &mdash; it was moved, and the gates re-run unchanged
+against the file it moved to. <b>Not claimed here:</b> that any of this is a voxel melt. It is one dimension against
+exact solutions plus the transition arithmetic; the material tables key off the voxel type
+<code>voxel/voxelRLE.js</code> already stores per run, so the join exists and 3D is a different round with the same
+keys.</div>
+
+<script type="module">
+import {
+  MATERIALS, LIQUIDS, alphaOf, stefanNumber, lambdaFor, stefanFront, meltEnthalpy, stallCheck,
+  pairFor, frontExact, ratioParts, twoPhase, SATURATION, satPressure, expansionRatio, densityRatio,
+  representationChoices, voxelCost, AVRAMI, MODE_GAP, seedEnsemble,
+} from "/physics/thermal/phaseOps.mjs";
+
+const $ = (i) => document.getElementById(i);
+const f = (x, n = 4) => (Number.isFinite(x) ? x.toFixed(n) : String(x));
+const e = (x, n = 3) => (Number.isFinite(x) ? x.toExponential(n) : String(x));
+const rows = (t, head, body) => {
+  t.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+    body.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+
+// ---- 1. MELTING ------------------------------------------------------------------------------------------
+const matKeys = Object.keys(MATERIALS);
+$("mMat").innerHTML = matKeys.map((k) => '<option value="' + k + '">' + k + "</option>").join("");
+const mShow = () => { $("mDTv").textContent = "+" + $("mDT").value + " K above Tm"; };
+$("mDT").oninput = mShow; mShow();
+
+function drawMelt(cv, T, Tm) {
+  const c = cv.getContext("2d"), W = cv.width, H = cv.height;
+  c.clearRect(0, 0, W, H);
+  const lo = Math.min(...T), hi = Math.max(...T), span = (hi - lo) || 1;
+  for (let i = 0; i < T.length; i++) {
+    const x = (i / T.length) * W, w = W / T.length + 1;
+    // *** THE PICTURE IS THE PHASE, NOT THE TEMPERATURE. *** A temperature ramp looks the same whether or not
+    // latent heat was absorbed; what says the front exists is that a band of cells sits EXACTLY at Tm.
+    const at = Math.abs(T[i] - Tm) < 1e-9;
+    c.fillStyle = at ? "#e8c49a" : (T[i] > Tm ? "#3a6a8e" : "#1b2130");
+    c.fillRect(x, 20, w, H - 40);
+  }
+  c.fillStyle = "#7c88a0"; c.font = "11px ui-monospace,monospace";
+  c.fillText("liquid (T > Tm)", 8, 14);
+  c.fillText("mushy: EXACTLY Tm", 150, 14);
+  c.fillText("solid", 320, 14);
+  c.fillText("cold end \u2192", W - 90, H - 6);
+}
+
+function melt(naive) {
+  const key = $("mMat").value, m = MATERIALS[key], dT = +$("mDT").value;
+  const St = stefanNumber(m, m.Tm + dT), al = alphaOf(m), lam = lambdaFor(St);
+  const r = meltEnthalpy(1, { n: 400, tEnd: 1, Tw: 1, naive: !!naive });
+  const above = r.T.filter((t) => t > r.Tm + 1e-12).length;
+  const atTm = r.T.filter((t) => Math.abs(t - r.Tm) < 1e-9).length;
+  drawMelt($("mCv"), r.T, r.Tm);
+  const exact = stefanFront(r.St, r.alpha, 1);
+  rows($("mT"),
+    ["quantity", "value", "what it is"],
+    [
+      ["Stefan number St", f(St, 6), "c(Tw - Tm)/L for " + key + ", from the material table"],
+      ["&lambda; (bisected)", f(lam.lambda, 9), "root of &lambda;e^&lambda;&sup2;erf(&lambda;) = St/&radic;&pi;"],
+      ["residual at the root", e(lam.residual), "<b>solved is a measurement, not a loop that ran</b>"],
+      ["thermal diffusivity &alpha;", e(al), "k/(&rho;c)"],
+      ["front, closed form", f(exact, 6), "<b>the key &mdash; the solver is never told it</b>"],
+      ["front, solver", r.front === null ? '<span class="bad">null &mdash; NO FRONT EXISTS</span>' : f(r.front, 6),
+        r.front === null ? "<b>null rather than 0: a zero would mean two different things</b>" : "enthalpy solver, 400 cells"],
+      ["cells above Tm", above + " of " + r.T.length, naive ? '<span class="bad">every cell &mdash; no latent heat was absorbed</span>' : "the melted region"],
+      ["cells sitting EXACTLY at Tm", atTm, atTm ? '<span class="ok">the latent-heat stall, falling out of the state variable</span>' : '<span class="bad">none &mdash; nothing is holding the interface</span>'],
+      ["stall check", (() => { const s = stallCheck(1); return s.ok ? '<span class="ok">T reads exactly Tm across the mushy range</span>' : '<span class="bad">' + e(s.worst) + " off</span>"; })(), "an identity, so no tolerance is chosen"],
+    ]);
+  $("mStat").innerHTML = naive
+    ? '<span class="bad">negative control: the temperature-based solver</span>'
+    : '<span class="ok">enthalpy solver</span>';
+}
+$("mGo").onclick = () => melt(false);
+$("mGo").insertAdjacentHTML("afterend", '<button id="mCtl">negative control: temperature solver</button>');
+$("mCtl").onclick = () => melt(true);
+
+// ---- 2. FREEZING -----------------------------------------------------------------------------------------
+const pairKeys = Object.keys(LIQUIDS);
+$("fMat").innerHTML = pairKeys.map((k) => '<option value="' + k + '">' + k + "</option>").join("");
+const fShow = () => { $("fDTv").textContent = "|\u0394T| = " + $("fDT").value + " K"; };
+$("fDT").oninput = fShow; fShow();
+
+function freezeRun(control) {
+  const key = $("fMat").value, dT = +$("fDT").value;
+  let p = pairFor(key);
+  if (control) p = { solid: p.solid, liquid: p.solid, L: p.L, Tm: p.Tm };   // identical properties both phases
+  const parts = ratioParts({ solid: p.solid, liquid: p.liquid, L: p.L, dT, t: 1 });
+  const xm = frontExact({ ...p, dT, t: 1, freeze: false });
+  const xf = frontExact({ ...p, dT, t: 1, freeze: true });
+  const ratio = xf / xm;
+  rows($("fT"),
+    ["quantity", "value", "what it is"],
+    [
+      ["melt front at t = 1", f(xm, 6), "heat crosses the <b>liquid</b> to reach it"],
+      ["freeze front at t = 1", f(xf, 6), "heat crosses the <b>solid</b> to reach it"],
+      ["freeze / melt", "<b>" + f(ratio, 6) + "</b>",
+        control ? '<span class="ok">control: identical properties, so this must be 1</span>'
+                : "predicted from properties, not fitted"],
+      ["&radic;(&alpha;<sub>s</sub>/&alpha;<sub>l</sub>)", f(parts.diffusivityFactor, 6), "favours freezing"],
+      ["&lambda;<sub>f</sub>/&lambda;<sub>m</sub>", f(parts.lambdaFactor, 6), "<b>opposes it</b> &mdash; the two pull opposite ways"],
+      ["product", f(parts.product, 6), "matches the ratio; <b>neither factor predicts it alone</b>"],
+    ]);
+  $("fStat").innerHTML = control
+    ? (Math.abs(ratio - 1) < 1e-9
+        ? '<span class="ok">control fires: 1 to the digit, so the asymmetry is the materials</span>'
+        : '<span class="bad">control failed &mdash; ' + e(ratio - 1) + " from 1</span>")
+    : '<span class="dim">real pair</span>';
+}
+$("fGo").onclick = () => freezeRun(false);
+$("fCtl").onclick = () => freezeRun(true);
+
+// ---- 3. GASIFICATION -------------------------------------------------------------------------------------
+const vShow = () => { $("vTv").textContent = $("vT").value + " K"; };
+$("vT").oninput = vShow; vShow();
+$("vGo").onclick = () => {
+  const T = +$("vT").value, P = satPressure(T);
+  const near = SATURATION.reduce((a, b) => (Math.abs(b.T - T) < Math.abs(a.T - T) ? b : a));
+  const r = expansionRatio({ T, P });
+  const ch = representationChoices(r), vc = voxelCost(r);
+  rows($("vT2"),
+    ["quantity", "value", "what it is"],
+    [
+      ["saturation pressure at " + T + " K", e(P) + " Pa", "Clausius-Clapeyron with constant L"],
+      ["expansion ratio r", "<b>" + f(r, 3) + "</b>", "<b>a function, not a number</b>"],
+      ["r from the density table (nearest row, " + near.T + " K)", f(densityRatio(near), 3), "a second route sharing no formula"],
+      ["in place as gas", ch.inPlaceGas, "loses <b>mass</b> by r"],
+      ["expanded", ch.expanded, "conserves mass, costs <b>r voxels</b>"],
+      ["in place at liquid density", ch.inPlaceLiquid, "gets <b>density</b> wrong by r"],
+      ["voxels for one liquid voxel", Math.round(vc.voxels) + " (a " + f(vc.side, 2) + "&sup3; block)", "the expanded choice, drawn"],
+      ["all three penalties", Math.abs(r - 1) < 1e-9
+        ? '<span class="ok">r = 1 exactly &mdash; the three coincide, in-place gasification is EXACT here</span>'
+        : "the same factor r",
+        "<b>so there is nothing to trade</b>"],
+    ]);
+};
+
+// ---- 4. CRYSTALLISATION ----------------------------------------------------------------------------------
+$("cL").innerHTML = [24, 32, 48].map((n) => '<option value="' + n + '"' + (n === 32 ? " selected" : "") + ">" + n + "</option>").join("");
+const cShow = () => { $("cNv").textContent = $("cN").value + " nuclei"; };
+$("cN").oninput = cShow; cShow();
+$("cGo").onclick = () => {
+  $("cStat").textContent = "running six seeds twice \u2026";
+  // yield a frame so the status paints before the lattice work starts
+  setTimeout(() => {
+    const L = +$("cL").value, nNuclei = +$("cN").value;
+    const sat = seedEnsemble({ L, nNuclei, continuous: false });
+    const con = seedEnsemble({ L, nNuclei, continuous: true });
+    const margin = Math.min(...con.values) - Math.max(...sat.values);
+    rows($("cT"),
+      ["mode", "predicted n", "mean over 6 seeds", "per-seed spread (sd)", "per seed"],
+      [
+        ["3d site-saturated", AVRAMI["3d-site-saturated"].n, "<b>" + f(sat.mean, 4) + "</b>", f(sat.sd, 4),
+          '<span class="dim">' + sat.values.map((v) => f(v, 3)).join("  ") + "</span>"],
+        ["3d continuous", AVRAMI["3d-continuous"].n, "<b>" + f(con.mean, 4) + "</b>", f(con.sd, 4),
+          '<span class="dim">' + con.values.map((v) => f(v, 3)).join("  ") + "</span>"],
+        ["gap between predictions", MODE_GAP, "effect / noise = " + f(MODE_GAP / Math.max(sat.sd, con.sd), 2),
+          "", "<b>the ratio is the result</b>"],
+        ["population margin", "", f(margin, 3),
+          margin > 0 ? '<span class="ok">the two populations do not overlap</span>'
+                     : '<span class="warn">they overlap &mdash; one seed would be a coin flip</span>',
+          "worst site-saturated seed against the best continuous one"],
+      ]);
+    $("cStat").innerHTML = '<span class="dim">L = ' + L + ", " + nNuclei + " nuclei, periodic minimum-image distances</span>";
+  }, 30);
+};
+</script>
+</div></body></html>

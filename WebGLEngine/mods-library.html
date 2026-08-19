@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Mods Library + Tinder">
+<meta name="demo:desc" content="Browse installed mods / model sets as swipeable cards -- swipe or arrow-key to keep or discard a WHOLE mod, then Empty discarded to uninstall the entire sets at once. The set-level companion to the per-asset library.">
+<meta name="demo:category" content="ui">
+<title>Mods Library + Tinder — SweK Engine</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --red:#e5544b; --green:#5cb85c; }
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#dbe7ff; font:14px ui-monospace,Menlo,monospace; }
+  #cap { position:fixed; left:16px; top:14px; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; z-index:5; }
+  #st { position:fixed; right:16px; top:14px; color:#7c93b8; font-size:12px; z-index:5; }
+  #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  .card { position:absolute; width:min(78vw,360px); background:#0a1120; border:1px solid #1c2942; border-radius:16px; box-shadow:0 18px 60px rgba(0,0,0,.6); overflow:hidden; touch-action:none; user-select:none; }
+  .thumb { width:100%; height:230px; background:#060b16 center/contain no-repeat; display:flex; align-items:center; justify-content:center; color:#33507e; font-size:52px; }
+  .body { padding:16px 18px 20px; }
+  .name { font-size:19px; color:#eaf2ff; font-weight:700; word-break:break-word; }
+  .meta { color:#7c93b8; margin-top:6px; font-size:12px; }
+  .tag { position:absolute; top:18px; padding:6px 12px; border-radius:8px; font-weight:800; font-size:16px; letter-spacing:.1em; opacity:0; transition:opacity .1s; }
+  .keep { right:18px; color:var(--green); border:2px solid var(--green); transform:rotate(12deg); }
+  .disc { left:18px; color:var(--red); border:2px solid var(--red); transform:rotate(-12deg); }
+  #bar { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:5; display:flex; gap:12px; }
+  button { background:rgba(8,14,26,.85); color:var(--cyan); border:1px solid #1c2942; border-radius:10px; padding:11px 18px; font:700 13px ui-monospace,monospace; letter-spacing:.06em; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  button.danger { color:var(--red); border-color:#3a1c22; }
+  #empty { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; color:#33507e; font-size:15px; text-align:center; padding:0 30px; }
+  #hint { position:fixed; left:50%; bottom:78px; transform:translateX(-50%); color:#4a628a; font-size:11px; z-index:5; }
+</style>
+</head>
+<body>
+<div id="cap">&#9670; Mods Library</div>
+<div id="st">loading…</div>
+<div id="stage"><div id="empty">No mods installed. Drop a skirmish-mod zip in Downloads and it lands in <code>mods/</code>.</div></div>
+<div id="hint">swipe or &larr; discard &middot; keep &rarr; &middot; nothing is removed until you Empty discarded</div>
+<div id="bar">
+  <button id="bDisc" class="danger">&larr; Discard</button>
+  <button id="bKeep">Keep &rarr;</button>
+  <button id="bEmpty" class="danger">Empty discarded (0)</button>
+</div>
+<script>
+const api = {
+  list: () => fetch("/assets/mods/list").then(r => r.json()).catch(() => ({ ok:false, mods:[] })),
+  del:  (name) => fetch("/assets/mods/delete", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ name }) }).then(r => r.json()).catch(() => ({ ok:false })),
+};
+const stage = document.getElementById("stage"), st = document.getElementById("st"), emptyEl = document.getElementById("empty"), bEmpty = document.getElementById("bEmpty");
+let mods = [], idx = 0, discarded = [];
+
+function refreshCounts() { st.textContent = mods.length + " mods \u00b7 " + (mods.length - idx) + " left \u00b7 " + discarded.length + " to remove"; bEmpty.textContent = "Empty discarded (" + discarded.length + ")"; }
+
+function render() {
+  [...stage.querySelectorAll(".card")].forEach(c => c.remove());
+  emptyEl.style.display = idx >= mods.length ? "flex" : "none";
+  if (idx >= mods.length) { emptyEl.textContent = discarded.length ? "Reviewed. " + discarded.length + " mod(s) staged for removal — hit Empty discarded." : "All caught up. No mods left to review."; refreshCounts(); return; }
+  // render up to 2 cards (current on top)
+  for (let k = Math.min(idx + 1, mods.length - 1); k >= idx; k--) {
+    const m = mods[k], card = document.createElement("div"); card.className = "card"; card.style.zIndex = 100 - (k - idx); card.style.transform = k === idx ? "" : "scale(.96) translateY(10px)";
+    card.innerHTML = '<div class="tag keep">KEEP</div><div class="tag disc">DISCARD</div>' +
+      '<div class="thumb">' + (m.thumb ? '' : '\u25A6') + '</div>' +
+      '<div class="body"><div class="name">' + esc(m.name) + '</div><div class="meta">' + m.models + ' models \u00b7 ' + m.files + ' files</div></div>';
+    if (m.thumb) card.querySelector(".thumb").style.backgroundImage = "url('" + m.thumb + "')";
+    if (k === idx) wireDrag(card);
+    stage.appendChild(card);
+  }
+  refreshCounts();
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+
+function decide(keep) {
+  if (idx >= mods.length) return;
+  const card = stage.querySelector(".card"); const m = mods[idx];
+  if (!keep) discarded.push(m.name);
+  if (card) { card.style.transition = "transform .28s ease, opacity .28s ease"; card.style.transform = "translateX(" + (keep ? 1 : -1) * 130 + "%) rotate(" + (keep ? 14 : -14) + "deg)"; card.style.opacity = "0"; }
+  idx++; setTimeout(render, 180);
+}
+function wireDrag(card) {
+  let sx = 0, sy = 0, dx = 0, down = false;
+  const keepT = card.querySelector(".keep"), discT = card.querySelector(".disc");
+  card.addEventListener("pointerdown", e => { down = true; sx = e.clientX; sy = e.clientY; card.setPointerCapture(e.pointerId); });
+  card.addEventListener("pointermove", e => { if (!down) return; dx = e.clientX - sx; const dy = e.clientY - sy; card.style.transform = "translate(" + dx + "px," + dy + "px) rotate(" + dx * 0.05 + "deg)"; keepT.style.opacity = dx > 40 ? 1 : 0; discT.style.opacity = dx < -40 ? 1 : 0; });
+  card.addEventListener("pointerup", () => { down = false; if (dx > 90) decide(true); else if (dx < -90) decide(false); else { card.style.transform = ""; keepT.style.opacity = 0; discT.style.opacity = 0; } dx = 0; });
+}
+document.getElementById("bKeep").onclick = () => decide(true);
+document.getElementById("bDisc").onclick = () => decide(false);
+addEventListener("keydown", e => { if (e.key === "ArrowRight") decide(true); else if (e.key === "ArrowLeft") decide(false); });
+bEmpty.onclick = async () => {
+  if (!discarded.length) return;
+  if (!confirm("Permanently delete " + discarded.length + " whole mod set(s)? This removes their folders.")) return;
+  bEmpty.disabled = true; let done = 0;
+  for (const name of discarded) { const r = await api.del(name); if (r && r.ok) done++; }
+  alert("Removed " + done + " / " + discarded.length + " mod set(s).");
+  discarded = []; bEmpty.disabled = false; await load();
+};
+async function load() { const r = await api.list(); mods = (r && r.mods) || []; idx = 0; render(); }
+load();
+</script>
+</body>
+</html>

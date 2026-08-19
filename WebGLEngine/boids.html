@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Boids flocking</title>
+<!-- v821 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Boids Flocking">
+<meta name="demo:desc"   content="Classic flocking — separation, alignment, cohesion. Tap to scatter.">
+<meta name="demo:cats"   content="sim,particles">
+<meta name="demo:swatch" content="🐦">
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1}
+  #topbar button{padding:6px 12px;border-radius:6px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:13px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #sim{background:#000;max-width:100vmin;max-height:100vmin;border-radius:4px;touch-action:none}
+  #footer{padding:8px 12px;font-size:11px;color:#789;text-align:center}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🐦 Boids Flocking</h1>
+    <button id="btnReset">🔄 Reset</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host"><canvas id="sim" width="512" height="512"></canvas></div>
+  <div id="footer">Reynolds: separation + alignment + cohesion · tap to scatter</div>
+</div>
+<script>
+"use strict";
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const canvas = document.getElementById("sim");
+function resize(){
+  const host = document.getElementById("host");
+  const size = Math.min(host.clientWidth, host.clientHeight, 600);
+  canvas.style.width = size + "px";
+  canvas.style.height = size + "px";
+}
+window.addEventListener("resize", resize); resize();
+
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+const NUM_BOIDS = 80;
+const VISION = 50, VISION_SQ = VISION*VISION;
+const SEP = 18, SEP_SQ = SEP*SEP;
+// v821 — made live so postMessage controls can adjust them
+let MAX_SPEED = 2.5, MAX_FORCE = 0.05;
+let W_SEP = 1.8, W_ALIGN = 1.0, W_COH = 0.8;
+
+let boids = [];
+function reset(){
+  boids = [];
+  for (let i=0; i<NUM_BOIDS; i++) {
+    boids.push({
+      x: Math.random()*W, y: Math.random()*H,
+      vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2,
+      hue: Math.floor(Math.random()*60) + 180,   // blue-cyan family
+    });
+  }
+}
+reset();
+canvas.addEventListener("click", reset);
+canvas.addEventListener("touchend", e => { e.preventDefault(); reset(); });
+document.getElementById("btnReset").addEventListener("click", reset);
+
+function limit(vx, vy, max){
+  const m2 = vx*vx + vy*vy;
+  if (m2 > max*max) {
+    const m = Math.sqrt(m2);
+    return [vx/m*max, vy/m*max];
+  }
+  return [vx, vy];
+}
+
+function step(){
+  for (let i=0; i<boids.length; i++) {
+    const b = boids[i];
+    let sepX=0, sepY=0, alignX=0, alignY=0, cohX=0, cohY=0;
+    let nearCount=0, sepCount=0;
+    for (let j=0; j<boids.length; j++) {
+      if (i===j) continue;
+      const o = boids[j];
+      const dx = o.x - b.x, dy = o.y - b.y;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < VISION_SQ) {
+        alignX += o.vx; alignY += o.vy;
+        cohX += o.x; cohY += o.y;
+        nearCount++;
+        if (d2 < SEP_SQ && d2 > 0.001) {
+          // Push away, weighted inversely by distance
+          const inv = 1.0 / Math.sqrt(d2);
+          sepX -= dx*inv; sepY -= dy*inv;
+          sepCount++;
+        }
+      }
+    }
+    let ax=0, ay=0;
+    if (nearCount > 0) {
+      // Align with mean velocity
+      alignX /= nearCount; alignY /= nearCount;
+      const [axA, ayA] = limit(alignX - b.vx, alignY - b.vy, MAX_FORCE);
+      ax += axA * W_ALIGN; ay += ayA * W_ALIGN;
+      // Cohesion toward center of nearby
+      cohX = cohX/nearCount - b.x; cohY = cohY/nearCount - b.y;
+      const [axC, ayC] = limit(cohX*0.02, cohY*0.02, MAX_FORCE);
+      ax += axC * W_COH; ay += ayC * W_COH;
+    }
+    if (sepCount > 0) {
+      sepX /= sepCount; sepY /= sepCount;
+      const [axS, ayS] = limit(sepX, sepY, MAX_FORCE);
+      ax += axS * W_SEP; ay += ayS * W_SEP;
+    }
+    b.vx += ax; b.vy += ay;
+    [b.vx, b.vy] = limit(b.vx, b.vy, MAX_SPEED);
+    b.x += b.vx; b.y += b.vy;
+    // Wrap edges
+    if (b.x < 0) b.x += W; if (b.x > W) b.x -= W;
+    if (b.y < 0) b.y += H; if (b.y > H) b.y -= H;
+  }
+}
+
+function draw(){
+  // Trail effect — dim previous frame instead of clearing
+  ctx.fillStyle = "rgba(4,3,10,0.18)";
+  ctx.fillRect(0, 0, W, H);
+  for (const b of boids) {
+    const angle = Math.atan2(b.vy, b.vx);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(angle);
+    ctx.fillStyle = `hsl(${b.hue}, 80%, 65%)`;
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-5, 3.5);
+    ctx.lineTo(-5, -3.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function frame(){ step(); draw(); requestAnimationFrame(frame); }
+ctx.fillStyle = "#000"; ctx.fillRect(0,0,W,H);
+requestAnimationFrame(frame);
+console.log("[boids.html] started with", NUM_BOIDS, "boids");
+
+// ─── v821 — Universal demo viewer protocol ────────────────
+// Demos opt-in by:
+//   1. Adding meta tags in <head> (demo:title, demo:desc, demo:cats, demo:swatch)
+//   2. Listening for "demo:set" messages to update parameters live
+//   3. Replying to "demo:request-thumb" by snapshotting the main canvas
+//   4. Announcing param schema via "demo:params" after init
+// Hosting page (universal-viewer.html) is the message peer via window.parent.
+(function demoProtocol() {
+    const params = [
+        { name: "separation", label: "Separation",  min: 0, max: 4, step: 0.1, default: 1.8, set: (v) => { W_SEP   = v; } },
+        { name: "alignment",  label: "Alignment",   min: 0, max: 4, step: 0.1, default: 1.0, set: (v) => { W_ALIGN = v; } },
+        { name: "cohesion",   label: "Cohesion",    min: 0, max: 4, step: 0.1, default: 0.8, set: (v) => { W_COH   = v; } },
+        { name: "maxSpeed",   label: "Max speed",   min: 0.5, max: 6, step: 0.1, default: 2.5, set: (v) => { MAX_SPEED = v; } },
+        { name: "maxForce",   label: "Max force",   min: 0.01, max: 0.2, step: 0.005, default: 0.05, set: (v) => { MAX_FORCE = v; } },
+    ];
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),    // strip the setter — not serializable across origins
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") p.set(d.value);
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: canvas.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    // Announce shortly after first paint so any viewer is listening
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine DevTools &mdash; see your own pages</title>
+<style>
+  :root { --ink:#d7e3f4; --dim:#7f95b3; --line:#1b2b44; --go:#5fd08a; --bad:#f4808c; --acc:#8ab4ff; }
+  body { margin:0; background:#06090a; color:var(--ink); font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:10px 14px; border-bottom:1px solid var(--line); }
+  h1 { font-size:15px; margin:0 0 4px; } .lede { color:var(--dim); max-width:900px; line-height:1.5; margin:0; }
+  code { color:var(--acc); }
+  .hud { position:sticky; top:0; z-index:6; background:#06090a; border-bottom:1px solid var(--line); padding:6px 14px; font-size:11px; }
+  .ok { color:var(--go); } .err { color:var(--bad); } .warn { color:#caa05a; }
+  .wrap { padding:14px; }
+  .bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  input[type=text] { background:#0b1420; border:1px solid #2f486c; color:var(--ink); border-radius:5px; padding:4px 8px; font:inherit; min-width:320px; }
+  button { font:inherit; font-size:12px; padding:4px 11px; border-radius:5px; cursor:pointer; background:#152136; color:#b9d4ff; border:1px solid #2f486c; }
+  button.primary { background:#1d3559; }
+  .quick a { color:var(--acc); text-decoration:none; margin-right:10px; font-size:11px; }
+  label { color:var(--dim); font-size:11px; }
+  .out { margin-top:12px; display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; }
+  #shot { max-width:720px; border:1px solid var(--line); border-radius:6px; background:#080d14; }
+  pre { background:#0b1420; border:1px solid var(--line); border-radius:6px; padding:8px; max-width:520px; max-height:420px; overflow:auto; white-space:pre-wrap; font-size:11px; }
+  .perf b { color:var(--acc); font-weight:normal; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128065; Engine DevTools &mdash; the engine looks at its own pages</h1>
+  <p class="lede">
+    Drives headless Chrome directly (puppeteer-core, no agent, no MCP) to screenshot a page, dump its
+    console errors, and take a light performance sample. Aimed at SweK's own pages &mdash; it closes the
+    gap the headless render checks can't reach: what the WebGL actually paints and what it logs.
+  </p>
+</header>
+<div class="hud"><span id="status" class="warn">checking devtools bridge&hellip;</span></div>
+
+<div class="wrap">
+  <div class="bar">
+    <input type="text" id="url" value="">
+    <button class="primary" id="btnShot">Screenshot</button>
+    <button id="btnConsole">Console errors</button>
+    <button id="btnPerf">Perf sample</button>
+    <label><input type="checkbox" id="fullPage"> full page</label>
+    <label><input type="checkbox" id="headful"> visible (GPU)</label>
+  </div>
+  <div class="quick">jump to:
+    <a href="#" data-p="/server.html">server.html</a>
+    <a href="#" data-p="/brain-maze.html">brain-maze</a>
+    <a href="#" data-p="/brain-bench.html">brain-bench</a>
+    <a href="#" data-p="/brain-room.html">brain-room</a>
+    <a href="#" data-p="/counter-strike.html">counter-strike</a>
+  </div>
+  <div class="out">
+    <img id="shot" alt="" style="display:none">
+    <div style="flex:1;min-width:300px">
+      <div class="perf" id="perf"></div>
+      <pre id="log">Pick a page and a button. Screenshots and console dumps run on the engine's own Chrome.</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+$("url").value = location.origin + "/server.html";
+const setStatus = (cls, msg) => { const s = $("status"); s.className = cls; s.textContent = msg; };
+
+async function refresh() {
+  try {
+    const r = await fetch("/devtools/status"); const j = await r.json();
+    if (j.ready) setStatus("ok", "devtools ready \u00b7 puppeteer: " + j.puppeteer + " \u00b7 chrome: " + j.chrome);
+    else setStatus("warn", "not ready \u00b7 " + j.puppeteer + " \u00b7 install puppeteer-core in ai-bridge, then reload");
+  } catch (e) { setStatus("err", "bridge unreachable: " + (e.message || e)); }
+}
+
+function opts() { return { url: $("url").value.trim(), fullPage: $("fullPage").checked, headless: $("headful").checked ? false : "new", waitMs: 800 }; }
+function showErrors(j) {
+  const lines = [];
+  if (j.perf) $("perf").innerHTML = "fps <b>" + j.perf.fps + "</b> \u00b7 DCL <b>" + j.perf.domContentLoadedMs + "ms</b> \u00b7 load <b>" + j.perf.loadMs + "ms</b> \u00b7 transfer <b>" + j.perf.transferKB + "KB</b>";
+  (j.errors || []).forEach((e) => lines.push("ERROR  " + e));
+  (j.console || []).forEach((m) => lines.push(m.type.padEnd(7) + m.text));
+  $("log").textContent = lines.length ? lines.join("\n") : (j.ok ? "no console errors \u2014 clean." : ("failed: " + (j.error || "?")));
+}
+
+async function call(route, withShot) {
+  setStatus("warn", "running " + route + " \u2026");
+  $("btnShot").disabled = $("btnConsole").disabled = $("btnPerf").disabled = true;
+  try {
+    const r = await fetch(route, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(opts()) });
+    const j = await r.json();
+    if (!j.ok) { setStatus("err", route + " failed: " + (j.error || r.status)); $("log").textContent = j.error || ("HTTP " + r.status); }
+    else setStatus("ok", route + " ok");
+    if (withShot && j.pngBase64) { $("shot").src = "data:image/png;base64," + j.pngBase64; $("shot").style.display = "block"; }
+    showErrors(j);
+  } catch (e) { setStatus("err", route + ": " + (e.message || e)); }
+  finally { $("btnShot").disabled = $("btnConsole").disabled = $("btnPerf").disabled = false; }
+}
+
+$("btnShot").onclick = () => call("/devtools/shot", true);
+$("btnConsole").onclick = () => call("/devtools/console", false);
+$("btnPerf").onclick = () => call("/devtools/perf", false);
+document.querySelectorAll(".quick a").forEach((a) => a.onclick = (ev) => { ev.preventDefault(); $("url").value = location.origin + a.dataset.p; });
+refresh();
+</script>
+</body>
+</html>

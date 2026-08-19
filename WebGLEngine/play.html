@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SweK — demo loader</title>
+<style>
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; background:#05070a; color:#cfe; font:13px ui-rounded,system-ui,sans-serif; overflow:hidden; }
+  /* thin top bar — the ONLY chrome; everything else is the demo */
+  #bar { position:fixed; top:0; left:0; right:0; height:38px; z-index:10; display:flex; align-items:center; gap:10px;
+         padding:0 12px; background:rgba(6,12,10,0.9); border-bottom:1px solid #1d3a2b; backdrop-filter:blur(6px); }
+  #bar a, #bar button { background:transparent; border:0; color:#8effc4; font:inherit; cursor:pointer; padding:6px 9px; border-radius:7px; white-space:nowrap; }
+  #bar a:hover, #bar button:hover { background:rgba(43,150,120,0.16); }
+  #title { color:#eafff4; font-weight:700; flex:0 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #tag { color:#6fae8e; font:11px ui-monospace,monospace; }
+  .sp { flex:1; }
+  #frame { position:fixed; inset:38px 0 0 0; width:100%; border:0; background:#05070a; }
+  #hint { position:fixed; inset:38px 0 0 0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:#6fae8e; text-align:center; padding:20px; }
+  #hint a { color:#8effc4; }
+  #load { position:fixed; top:38px; left:0; height:2px; background:linear-gradient(90deg,#2bff88,#2ad); width:0; transition:width .3s; z-index:11; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <a href="/showcase.html" title="Back to the showcase front door">✦ Showcase</a>
+    <span id="title">loading…</span>
+    <span id="tag"></span>
+    <span class="sp"></span>
+    <button id="reload" title="Reload this demo">↻</button>
+    <button id="pop" title="Open in its own tab (full window)">⤢ full</button>
+  </div>
+  <div id="load"></div>
+  <iframe id="frame" allow="autoplay; camera; microphone; gamepad; fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
+  <div id="hint" style="display:none"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const q = new URLSearchParams(location.search);
+
+  // What to load. Two shapes:
+  //   ?go=<engineDemoId>   -> an IN-ENGINE demo: frame index.html in KIOSK mode (no boot prompts / index panels / dock)
+  //   ?page=<htmlPage>     -> a STANDALONE page (the old demos that live outside the engine sandbox), framed clean
+  //   ?url=<abs/rel url>   -> any URL (kept same-origin for safety)
+  const go   = q.get("go");
+  const page = q.get("page");
+  const url  = q.get("url");
+  const title = q.get("title") || go || page || "demo";
+  const tag   = q.get("tag") || (go ? "in-engine demo" : "app");
+  const clean = q.get("clean") !== "0";   // engine demos default to a clean isolated stage
+
+  $("title").textContent = title;
+  $("tag").textContent = tag;
+  document.title = "SweK — " + title;
+
+  function resolveTarget(){
+    if (go)   { let u = "/index.html?forceEngine=1&kiosk=1&go=" + encodeURIComponent(go); if (clean) u += "&clean=1"; return u; }
+    if (page) { // standalone page name (e.g. "AudioLab.html"); keep it same-origin
+                const name = String(page).replace(/^\/+/, "").split("?")[0];
+                return "/" + name + (String(page).includes("?") ? ("?" + String(page).split("?").slice(1).join("?")) : ""); }
+    if (url)  { try { const u = new URL(url, location.origin); if (u.origin === location.origin) return u.pathname + u.search; } catch {} return null; }
+    return null;
+  }
+
+  const target = resolveTarget();
+  if (!target) {
+    $("frame").style.display = "none";
+    $("hint").style.display = "flex";
+    $("hint").innerHTML = "Nothing to load.<br>Open this from the <a href='/showcase.html'>Showcase</a>, or pass <code>?go=&lt;demo&gt;</code> or <code>?page=&lt;page.html&gt;</code>.";
+  } else {
+    // simple load progress shimmer
+    let p = 8; $("load").style.width = p + "%";
+    const iv = setInterval(() => { p = Math.min(90, p + 6); $("load").style.width = p + "%"; }, 200);
+    const fr = $("frame");
+    fr.src = target;
+    fr.onload = () => { clearInterval(iv); $("load").style.width = "100%"; setTimeout(() => $("load").style.width = "0", 400); };
+    $("reload").onclick = () => { fr.src = target; };
+    $("pop").onclick = () => window.open(target, "_blank");
+  }
+</script>
+</body>
+</html>

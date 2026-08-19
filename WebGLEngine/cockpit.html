@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Cockpit HUD">
+<meta name="demo:desc" content="Gauges 3000 wired to real ship state: shields, hull, fuel, weapon charge, and target lock all driven by a live dogfight, with explosion + wreckage VFX on every hit. The spectacle becomes a dashboard.">
+<meta name="demo:category" content="fx">
+<title>Cockpit HUD</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --red:#ff5d6c; --dim:#7c93b8; }
+  html, body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #view { position:fixed; inset:0; width:100%; height:100%; display:block; z-index:1; }
+  #hud { position:fixed; inset:0; width:100%; height:100%; display:block; z-index:2; pointer-events:none; }
+  #cap { position:fixed; left:14px; top:12px; z-index:3; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; font-size:13px; }
+  #st { position:fixed; right:14px; top:12px; z-index:3; color:var(--dim); font-size:11px; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<canvas id="hud"></canvas>
+<div id="cap">&#9670; Cockpit HUD</div>
+<div id="st"></div>
+<script type="module">
+const view = document.getElementById("view"), vctx = view.getContext("2d");
+const hud = document.getElementById("hud"), hctx = hud.getContext("2d");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+function resize() { W = innerWidth; H = innerHeight; for (const c of [view, hud]) { c.width = W * DPR; c.height = H * DPR; c.style.width = W + "px"; c.style.height = H + "px"; } vctx.setTransform(DPR, 0, 0, DPR, 0, 0); hctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener("resize", resize); resize();
+
+// ---- ship state: this is what a real esHullCombat ship exposes; here a self-contained dogfight drives it ----
+function makeShip(x, y, col, enemy) { return { x, y, h: Math.random() * 6.28, vx: 0, vy: 0, col, enemy,
+  hull: 100, shields: 100, fuel: 100, weapon: 100, lock: 0, cd: 0, dead: false, respawn: 0 }; }
+const player = makeShip(W * 0.35, H * 0.5, "#59d1ff");
+const foe = makeShip(W * 0.65, H * 0.5, "#f6a623");
+player.enemy = foe; foe.enemy = player;
+const shots = [], parts = [];
+const K = { TURN: 2.4, ACCEL: 240, DRAG: 0.4, SHOT: 520, RANGE: 520 };
+
+function boom(x, y, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, s = 40 + Math.random() * 200; parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.4 + Math.random() * 0.5, col }); } }
+
+function ai(s, dt) {
+  if (s.dead) return;
+  const e = s.enemy; if (e.dead) { s.fuel = Math.min(100, s.fuel + 6 * dt); return; }
+  const dx = e.x - s.x, dy = e.y - s.y, dist = Math.hypot(dx, dy) || 1, want = Math.atan2(dy, dx);
+  let da = want - s.h; while (da > Math.PI) da -= 6.283; while (da < -Math.PI) da += 6.283;
+  const turn = Math.max(-1, Math.min(1, da * 2.2)); s.h += turn * K.TURN * dt;
+  const aligned = Math.abs(da) < 0.28;
+  // thrust to hold a firing range; burns fuel
+  const thrust = (dist > 260 && s.fuel > 5) ? 1 : (dist < 150 ? -0.4 : 0.15);
+  if (thrust > 0 && s.fuel > 0) { s.vx += Math.cos(s.h) * thrust * K.ACCEL * dt; s.vy += Math.sin(s.h) * thrust * K.ACCEL * dt; s.fuel = Math.max(0, s.fuel - Math.abs(thrust) * 9 * dt); }
+  s.vx -= s.vx * K.DRAG * dt; s.vy -= s.vy * K.DRAG * dt; s.x += s.vx * dt; s.y += s.vy * dt;
+  // wrap
+  if (s.x < 0) s.x += W; if (s.x > W) s.x -= W; if (s.y < 0) s.y += H; if (s.y > H) s.y -= H;
+  // target lock builds when aligned + in range
+  s.lock = Math.max(0, Math.min(100, s.lock + ((aligned && dist < K.RANGE) ? 120 : -180) * dt));
+  // fire when locked + charged
+  s.cd -= dt; s.weapon = Math.min(100, s.weapon + 26 * dt);
+  if (s.lock > 60 && s.weapon > 22 && s.cd <= 0) { s.cd = 0.32; s.weapon -= 22;
+    shots.push({ x: s.x + Math.cos(s.h) * 16, y: s.y + Math.sin(s.h) * 16, vx: Math.cos(s.h) * K.SHOT + s.vx, vy: Math.sin(s.h) * K.SHOT + s.vy, life: 1.1, col: s.col, side: s }); }
+  s.shields = Math.min(100, s.shields + 7 * dt);   // shields regen
+}
+function hit(s, dmg) {
+  const ab = Math.min(s.shields, dmg); s.shields -= ab; const rest = dmg - ab;
+  if (rest > 0) s.hull -= rest; boom(s.x, s.y, s.shields > 0 ? "#59d1ff" : "#ff5d6c", s.shields > 0 ? 6 : 12);
+  if (s.hull <= 0 && !s.dead) { s.dead = true; s.respawn = 2.2; boom(s.x, s.y, "#f6a623", 40); }
+}
+function stepShots(dt) {
+  for (let i = shots.length - 1; i >= 0; i--) { const p = shots[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    const e = p.side.enemy; if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 16) { hit(e, 16); shots.splice(i, 1); continue; }
+    if (p.life <= 0) shots.splice(i, 1); }
+  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.94; q.vy *= 0.94; q.life -= dt; if (q.life <= 0) parts.splice(i, 1); }
+}
+function respawn(s, dt) { if (!s.dead) return; s.respawn -= dt; if (s.respawn <= 0) { s.dead = false; s.hull = 100; s.shields = 100; s.fuel = 100; s.weapon = 100; s.lock = 0; s.x = Math.random() * W; s.y = Math.random() * H; s.vx = s.vy = 0; } }
+
+function drawShip(s) { if (s.dead) return; vctx.save(); vctx.translate(s.x, s.y); vctx.rotate(s.h);
+  vctx.shadowColor = s.col; vctx.shadowBlur = 10; vctx.fillStyle = s.col; vctx.beginPath(); vctx.moveTo(16, 0); vctx.lineTo(-11, 8); vctx.lineTo(-6, 0); vctx.lineTo(-11, -8); vctx.closePath(); vctx.fill();
+  if (s.shields > 20) { vctx.shadowBlur = 0; vctx.strokeStyle = "rgba(89,209,255," + (s.shields / 300) + ")"; vctx.lineWidth = 2; vctx.beginPath(); vctx.arc(0, 0, 22, 0, 6.283); vctx.stroke(); }
+  vctx.restore(); }
+function drawView() { vctx.fillStyle = "#04060d"; vctx.fillRect(0, 0, W, H);
+  vctx.fillStyle = "#0a1020"; for (let i = 0; i < 60; i++) { const x = (i * 137.5) % W, y = (i * 89.3) % H; vctx.fillRect(x, y, 1.5, 1.5); }
+  for (const p of shots) { vctx.strokeStyle = p.col; vctx.lineWidth = 2.5; vctx.shadowColor = p.col; vctx.shadowBlur = 6; vctx.beginPath(); vctx.moveTo(p.x, p.y); vctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02); vctx.stroke(); }
+  vctx.shadowBlur = 0;
+  for (const q of parts) { vctx.globalAlpha = Math.max(0, q.life); vctx.fillStyle = q.col; vctx.beginPath(); vctx.arc(q.x, q.y, 2.5, 0, 6.283); vctx.fill(); } vctx.globalAlpha = 1;
+  drawShip(foe); drawShip(player);
+}
+
+// ---- the HUD: gauges driven by REAL ship state ----
+function gauge(x, y, rad, frac, col, label, val) {
+  const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25; frac = Math.max(0, Math.min(1, frac));
+  hctx.strokeStyle = "rgba(120,140,180,0.18)"; hctx.lineWidth = rad * 0.16; hctx.beginPath(); hctx.arc(x, y, rad, A0, A1); hctx.stroke();
+  hctx.save(); hctx.shadowColor = col; hctx.shadowBlur = 12; hctx.strokeStyle = col; hctx.lineWidth = rad * 0.16; hctx.lineCap = "round"; hctx.beginPath(); hctx.arc(x, y, rad, A0, A0 + (A1 - A0) * frac); hctx.stroke(); hctx.restore();
+  hctx.fillStyle = "#dbe7ff"; hctx.font = "700 " + (rad * 0.42).toFixed(0) + "px ui-monospace, monospace"; hctx.textAlign = "center"; hctx.fillText(val, x, y + rad * 0.15);
+  hctx.fillStyle = col; hctx.font = "600 " + (rad * 0.26).toFixed(0) + "px ui-monospace, monospace"; hctx.fillText(label, x, y + rad * 1.45);
+}
+function drawHUD() {
+  hctx.clearRect(0, 0, W, H);
+  const p = player, rad = Math.max(30, Math.min(52, W / 18)), y = H - rad * 2.0, gap = Math.min(rad * 3.2, W / 5.5), cx = W / 2;
+  gauge(cx - gap * 2, y, rad, p.hull / 100, p.hull < 30 ? "#ff5d6c" : "#5fe08a", "HULL", Math.round(p.hull));
+  gauge(cx - gap, y, rad, p.shields / 100, "#59d1ff", "SHIELD", Math.round(p.shields));
+  gauge(cx, y, rad, p.weapon / 100, "#f6a623", "WEAPON", Math.round(p.weapon));
+  gauge(cx + gap, y, rad, p.fuel / 100, "#5fe08a", "FUEL", Math.round(p.fuel));
+  gauge(cx + gap * 2, y, rad, p.lock / 100, p.lock > 60 ? "#ff5d6c" : "#7c93b8", "LOCK", p.lock > 60 ? "SET" : Math.round(p.lock) + "%");
+  // target-lock reticle over the foe when locked
+  if (p.lock > 60 && !foe.dead) { hctx.strokeStyle = "rgba(255,93,108," + (0.5 + 0.5 * Math.sin(performance.now() / 90)) + ")"; hctx.lineWidth = 2;
+    hctx.strokeRect(foe.x - 22, foe.y - 22, 44, 44); hctx.beginPath(); hctx.moveTo(foe.x - 30, foe.y); hctx.lineTo(foe.x - 22, foe.y); hctx.moveTo(foe.x + 22, foe.y); hctx.lineTo(foe.x + 30, foe.y); hctx.stroke(); }
+  document.getElementById("st").textContent = p.dead ? "HULL BREACH -- respawning" : (p.lock > 60 ? "TARGET LOCKED" : "tracking");
+}
+
+let last = performance.now();
+function frame() { const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  ai(player, dt); ai(foe, dt); stepShots(dt); respawn(player, dt); respawn(foe, dt);
+  drawView(); drawHUD(); requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

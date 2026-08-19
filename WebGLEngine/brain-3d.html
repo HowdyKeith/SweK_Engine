@@ -1,0 +1,267 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SweK Engine — GPU Brain 3D (the brain's actual mechanics, in 3D)</title>
+<style>
+  :root { --ink:#cfe2f2; --dim:#6d829a; --line:#26405e; --go:#4ade80; }
+  body { margin:0; background:#05080c; color:var(--ink); font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:0; left:0; right:0; padding:8px 12px; background:linear-gradient(#05080ccc,#05080c00); z-index:5; pointer-events:none; }
+  #hud h1 { margin:0; font-size:13px; color:var(--go); }
+  #hud p { margin:4px 0 0; font-size:11px; color:var(--dim); max-width:900px; line-height:1.5; }
+  #bar { position:fixed; bottom:10px; left:10px; z-index:5; display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+         background:#0a1018cc; border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  button, label, select { font:11px ui-monospace,monospace; color:#b0c4ff; }
+  button, select { background:#1a2438; border:1px solid #3a4a6a; border-radius:5px; padding:3px 9px; cursor:pointer; }
+  label { color:var(--dim); display:flex; gap:4px; align-items:center; }
+  #side { position:fixed; top:56px; right:10px; z-index:5; width:220px; background:#0a1018cc; border:1px solid var(--line);
+          border-radius:8px; padding:8px 10px; font-size:11px; }
+  .kv { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #12202f; }
+  .kv b { color:#8ab4ff; font-weight:normal; }
+  #status { margin-top:6px; color:#caa05a; font-size:10px; line-height:1.5; }
+  canvas { display:block; }
+</style>
+
+<div id="hud">
+  <h1>&#129504; GPU Brain &mdash; 3D mechanics</h1>
+  <p>Not a metaphor: this renders the brain's <b>published distance field as terrain</b> (valleys = close to a goal, ridges = far / walled),
+     the <b>flow vectors</b> as the arrows navigation actually follows down that terrain, <b>goal wells</b>, <b>threat peaks</b>, and the
+     <b>relaxation wavefront</b> &mdash; the ring of cells whose distance changed most recently, i.e. the brain mid-think. Drag to orbit, scroll to zoom.</p>
+</div>
+
+<div id="side">
+  <div class="kv"><span>brain state</span><b id="kState">&mdash;</b></div>
+  <div class="kv"><span>backend</span><b id="kBackend">&mdash;</b></div>
+  <div class="kv"><span>grid</span><b id="kGrid">&mdash;</b></div>
+  <div class="kv"><span>solve time</span><b id="kSolve">&mdash;</b></div>
+  <div class="kv"><span>field age</span><b id="kAge">&mdash;</b></div>
+  <div class="kv"><span>re-solves</span><b id="kSolves">0</b></div>
+  <div class="kv"><span>role</span><b id="kRole">&mdash;</b></div>
+  <div id="status">connecting to the brain&hellip;</div>
+</div>
+
+<div id="bar">
+  <label><input type="checkbox" id="cTerrain" checked> distance terrain</label>
+  <label><input type="checkbox" id="cFlow" checked> flow vectors</label>
+  <label><input type="checkbox" id="cWave" checked> think wavefront</label>
+  <label><input type="checkbox" id="cThreat" checked> threat peaks</label>
+  <label>height <input type="range" id="cGain" min="4" max="40" value="16" style="width:80px"></label>
+  <button id="btnSpin">pause spin</button>
+  <select id="src"><option value="auto">field: goal (nav)</option><option value="threat">field: threat</option><option value="player">field: player-seek</option></select>
+</div>
+
+<script type="module">
+import { attachGestures as _swekGestures } from "./ui/touchGestures.js";
+import * as THREE from "/vendor/three/three.module.js";
+
+const CV = document.createElement("canvas"); document.body.appendChild(CV);
+const renderer = new THREE.WebGLRenderer({ canvas: CV, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+try { if ("useLegacyLights" in renderer) renderer.useLegacyLights = true; } catch {}
+try { if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; } catch {}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05080c);
+scene.fog = new THREE.FogExp2(0x05080c, 0.0018);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 4000);
+
+scene.add(new THREE.AmbientLight(0x33445a, 1.4));
+const key = new THREE.DirectionalLight(0x88bbff, 1.1); key.position.set(120, 220, 80); scene.add(key);
+const rim = new THREE.DirectionalLight(0x4ade80, 0.5); rim.position.set(-100, 60, -120); scene.add(rim);
+
+// ---- orbit (no external controls dep) --------------------------------------
+const cam = { az: -0.7, el: 0.72, dist: 340, tgt: new THREE.Vector3(0, 0, 0) };
+let spin = true;
+function applyCam() {
+  const x = cam.tgt.x + cam.dist * Math.cos(cam.el) * Math.sin(cam.az);
+  const y = cam.tgt.y + cam.dist * Math.sin(cam.el);
+  const z = cam.tgt.z + cam.dist * Math.cos(cam.el) * Math.cos(cam.az);
+  camera.position.set(x, y, z); camera.lookAt(cam.tgt);
+}
+{
+  let drag = false, px = 0, py = 0;
+  CV.addEventListener("pointerdown", e => { drag = true; px = e.clientX; py = e.clientY; spin = false; });
+  addEventListener("pointerup", () => drag = false);
+  addEventListener("pointermove", e => { if (!drag) return; cam.az -= (e.clientX - px) * 0.005; cam.el += (e.clientY - py) * 0.005; cam.el = Math.max(0.08, Math.min(1.5, cam.el)); px = e.clientX; py = e.clientY; });
+  CV.addEventListener("wheel", e => { e.preventDefault(); cam.dist = Math.max(80, Math.min(1200, cam.dist + e.deltaY * 0.25)); }, { passive: false });
+  _swekGestures(CV, { onPan: (p, fg) => { if (fg === 1) { cam.az -= p.dx * 0.005; cam.el = Math.max(0.08, Math.min(1.5, cam.el + p.dy * 0.005)); } }, onPinch: (sc) => { cam.dist = Math.max(80, Math.min(1200, cam.dist / sc)); } });   // touch: drag orbit, pinch zoom (phone)
+}
+
+// ---- dynamic field meshes --------------------------------------------------
+let W = 0, H = 0, cell = 4, spanScale = 1;
+let terrain = null, flowLines = null, goalMarks = [], threatMarks = [], waveMesh = null;
+let prevDist = null;
+
+const $ = id => document.getElementById(id);
+const gain = () => +$("cGain").value;
+
+function rebuildGrid(w, h) {
+  for (const m of [terrain, flowLines, waveMesh]) if (m) { scene.remove(m); m.geometry?.dispose?.(); }
+  for (const g of goalMarks.concat(threatMarks)) scene.remove(g);
+  goalMarks = []; threatMarks = [];
+  W = w; H = h;
+  spanScale = 240 / Math.max(w, h);          // fit grid into ~240 world units
+  // terrain: one vertex per cell, colored by distance
+  const geo = new THREE.PlaneGeometry((w - 1) * spanScale, (h - 1) * spanScale, w - 1, h - 1);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 24, side: THREE.DoubleSide, flatShading: false });
+  terrain = new THREE.Mesh(geo, mat); scene.add(terrain);
+  // flow: a LineSegments pair per cell (subsampled)
+  const step = w > 64 ? 3 : 2;
+  const segs = [];
+  for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) segs.push(0, 0, 0, 0, 0, 0);
+  const fg = new THREE.BufferGeometry();
+  fg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(segs), 3));
+  flowLines = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ color: 0x9fe6c0, transparent: true, opacity: 0.6 }));
+  flowLines.userData.step = step; scene.add(flowLines);
+  // wavefront points
+  const wg = new THREE.BufferGeometry();
+  wg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(w * h * 3), 3));
+  waveMesh = new THREE.Points(wg, new THREE.PointsMaterial({ color: 0xffe08a, size: 3.2, transparent: true, opacity: 0.9, sizeAttenuation: true }));
+  scene.add(waveMesh);
+  prevDist = null;
+}
+
+const wx = (gx) => (gx - (W - 1) / 2) * spanScale;
+const wz = (gy) => (gy - (H - 1) / 2) * spanScale;
+function distToY(d, maxD) { return d >= 1e8 ? gain() * 1.15 : (d / maxD) * gain() * (-1) + gain(); } // valleys near goal
+function colorFor(d, maxD, out) {
+  if (d >= 1e8) { out.setRGB(0.09, 0.12, 0.17); return; }         // walls / unreachable: dark slate
+  const t = Math.min(1, d / maxD);
+  // near goal = green, mid = cyan, far = deep blue
+  out.setRGB(0.12 + t * 0.05, 0.85 - t * 0.55, 0.45 + t * 0.35);
+}
+
+function updateFromField(f) {
+  if (!f || !f.fx || !f.w) return;
+  if (f.w !== W || f.h !== H) rebuildGrid(f.w, f.h);
+  cell = f.cell || 4;
+  const N = W * H;
+  const dist = f.dist || null;
+  let maxD = 1;
+  if (dist) for (let i = 0; i < N; i++) if (dist[i] < 1e8) maxD = Math.max(maxD, dist[i]);
+
+  // terrain heights + colors
+  const pos = terrain.geometry.attributes.position;
+  let colAttr = terrain.geometry.attributes.color;
+  if (!colAttr) { colAttr = new THREE.BufferAttribute(new Float32Array(N * 3), 3); terrain.geometry.setAttribute("color", colAttr); }
+  const c = new THREE.Color();
+  for (let gy = 0; gy < H; gy++) for (let gx = 0; gx < W; gx++) {
+    const i = gy * W + gx, vi = gy * W + gx;
+    const d = dist ? dist[i] : 0;
+    pos.setY(vi, distToY(d, maxD));
+    colorFor(d, maxD, c); colAttr.setXYZ(vi, c.r, c.g, c.b);
+  }
+  pos.needsUpdate = true; colAttr.needsUpdate = true;
+  terrain.geometry.computeVertexNormals();
+  terrain.visible = $("cTerrain").checked;
+
+  // flow vectors, laid on the terrain surface
+  const step = flowLines.userData.step;
+  const fpos = flowLines.geometry.attributes.position; let k = 0;
+  for (let gy = 0; gy < H; gy += step) for (let gx = 0; gx < W; gx += step) {
+    const i = gy * W + gx;
+    const fx = f.fx[i], fz = f.fz[i], len = Math.hypot(fx, fz);
+    const d = dist ? dist[i] : 0, y = distToY(d, maxD) + 1.2;
+    const x0 = wx(gx), z0 = wz(gy), L = spanScale * 1.4;
+    fpos.setXYZ(k++, x0, y, z0);
+    if (len > 1e-3) fpos.setXYZ(k++, x0 + (fx / len) * L, y, z0 + (fz / len) * L);
+    else fpos.setXYZ(k++, x0, y, z0);
+  }
+  fpos.needsUpdate = true; flowLines.visible = $("cFlow").checked;
+
+  // wavefront: cells whose distance changed most since last field
+  const wpos = waveMesh.geometry.attributes.position; let wc = 0;
+  if (dist && prevDist && prevDist.length === N) {
+    for (let i = 0; i < N; i++) {
+      if (dist[i] < 1e8 && Math.abs(dist[i] - prevDist[i]) > maxD * 0.004) {
+        const gx = i % W, gy = (i / W) | 0;
+        wpos.setXYZ(wc++, wx(gx), distToY(dist[i], maxD) + 2.4, wz(gy));
+      }
+    }
+  }
+  for (let i = wc; i < N; i++) wpos.setXYZ(i, 0, -9999, 0);   // park unused
+  wpos.needsUpdate = true;
+  waveMesh.geometry.setDrawRange(0, wc);
+  waveMesh.visible = $("cWave").checked && wc > 0;
+  if (dist) prevDist = dist.slice(0);
+
+  // goal wells (green) from published goals; threat peaks from the threat array
+  for (const g of goalMarks) scene.remove(g); goalMarks = [];
+  if (Array.isArray(f.goals)) for (const g of f.goals) {
+    const gx = Math.round((g.x - (f.ox || 0)) / cell), gy = Math.round((g.z - (f.oz || 0)) / cell);
+    if (gx < 0 || gy < 0 || gx >= W || gy >= H) continue;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(spanScale * 1.2, gain() * 0.9, 16),
+      new THREE.MeshBasicMaterial({ color: 0x4ade80 }));
+    m.position.set(wx(gx), distToY(0, maxD) + gain() * 0.45, wz(gy)); m.rotation.x = Math.PI;
+    scene.add(m); goalMarks.push(m);
+  }
+  for (const t of threatMarks) scene.remove(t); threatMarks = [];
+  if ($("cThreat").checked && f.threat) {
+    for (let i = 0; i < N; i += 1) {
+      const tv = f.threat[i];
+      if (tv != null && tv < 30 && tv > 0.1) {                 // close threat cells only
+        const gx = i % W, gy = (i / W) | 0;
+        const m = new THREE.Mesh(new THREE.ConeGeometry(spanScale * 0.8, gain() * (1 - tv / 30) + 3, 10),
+          new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.75 }));
+        m.position.set(wx(gx), distToY(0, maxD) + 3, wz(gy)); scene.add(m); threatMarks.push(m);
+        if (threatMarks.length > 60) break;                    // cap
+      }
+    }
+  }
+}
+
+// ---- polling ---------------------------------------------------------------
+let fieldSeen = 0, lastTs = 0;
+async function pollField() {
+  if (!CV || !CV.isConnected) return;   // v2738 -- orphaned interval on a swapped-away page
+  try {
+    const j = await fetch("/ai/brain/flowfield", { cache: "no-store" }).then(r => r.json());
+    const f = j && j.field;
+    if (f && f.fx && f.w) {
+      if (f.ts !== lastTs) { fieldSeen++; lastTs = f.ts; }
+      updateFromField(f);
+      $("kBackend").textContent = (f.solver && f.solver.backend) || "cpu";   // v2214 -- live GPU/CPU/auto/demoted string is nested under field.solver, not top-level
+      $("kGrid").textContent = f.w + "x" + f.h + " cell=" + (f.cell || 4);
+      $("kSolve").textContent = f.solveMs != null ? f.solveMs + "ms" : "—";
+      $("kAge").textContent = f.ts ? Math.max(0, Math.round((Date.now() - f.ts) / 100) / 10) + "s" : "—";
+      $("kSolves").textContent = fieldSeen;
+      $("kRole").textContent = f.brainRole || f.role || "all";
+      $("status").textContent = "live — rendering the brain's published field in 3D";
+      $("status").style.color = "#4ade80";
+    } else {
+      $("status").textContent = "no field yet — is the Deno brain running against this bridge?";
+      $("status").style.color = "#caa05a";
+    }
+  } catch (e) {
+    $("status").textContent = "can't reach the bridge: " + (e.message || e);
+    $("status").style.color = "#ff5a5a";
+  }
+}
+async function pollHealth() {
+  if (!CV || !CV.isConnected) return;   // v2738 -- orphaned interval on a swapped-away page
+  try { const h = await fetch("/ai/brain/health", { cache: "no-store" }).then(r => r.json());
+    $("kState").textContent = h.state || "—";
+    $("kState").style.color = h.state === "live" ? "#4ade80" : (h.state === "idle" ? "#ffd35a" : "#ff5a5a");
+  } catch { $("kState").textContent = "unreachable"; }
+}
+
+$("btnSpin").onclick = () => { spin = !spin; $("btnSpin").textContent = spin ? "pause spin" : "resume spin"; };
+
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+setInterval(pollField, 250);
+setInterval(pollHealth, 3000);
+pollField();
+
+let t = 0;
+function frame() {
+  if (!CV || !CV.isConnected) return;   // v2738 -- page swapped away: stop the loop instead of throwing on null $()
+  requestAnimationFrame(frame);
+  if (spin) cam.az += 0.0016;
+  applyCam();
+  // gentle wavefront shimmer
+  if (waveMesh && waveMesh.visible) waveMesh.material.opacity = 0.6 + Math.sin((t += 0.05) * 3) * 0.3;
+  renderer.render(scene, camera);
+}
+frame();
+</script>

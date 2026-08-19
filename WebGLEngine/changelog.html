@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Changelog</title>
+<style>
+  html, body { margin:0; background:#0a0e0c; color:#cfe9d8; font:12.5px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display:flex; height:100vh; }
+  #side { width:190px; flex:0 0 190px; overflow:auto; border-right:1px solid #24382e; padding:10px; }
+  #main { flex:1; overflow:auto; padding:14px 18px; }
+  h1 { font-size:15px; margin:0 0 8px; }
+  .sub { color:#6f8a7c; }
+  a.v { display:block; color:#8fb4e8; text-decoration:none; padding:2px 5px; border-radius:3px; }
+  a.v:hover { background:#14201a; } a.v.on { background:#1d2c24; color:#b6f0cf; }
+  input { background:#0a1210; color:#cfe9d8; border:1px solid #2c463a; font:inherit; padding:4px 6px; width:100%; box-sizing:border-box; margin-bottom:8px; }
+  pre { white-space:pre-wrap; word-break:break-word; margin:0; color:#a8c9b8; }
+  .hot { color:#e0a0a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="side"><input id="q" placeholder="filter version"><div id="list" class="sub">loading...</div></div>
+  <div id="main"><h1 id="title">SweK Changelog</h1><div class="sub" id="meta"></div><pre id="body"></pre></div>
+</div>
+<script>
+(function(){
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"})[c];});};
+  var all=[], cur=null;
+  function draw(){
+    var f=(document.getElementById("q").value||"").trim().toLowerCase();
+    var rows=all.filter(function(e){return !f||e.version.toLowerCase().indexOf(f)>=0;});
+    document.getElementById("list").innerHTML=rows.length
+      ? rows.map(function(e){return '<a class="v'+(e.version===cur?" on":"")+'" href="#'+esc(e.version)+'" data-v="'+esc(e.version)+'">'+esc(e.version)+'</a>';}).join("")
+      : '<span class="sub">no version matches "'+esc(f)+'"</span>';
+  }
+  function show(v){
+    fetch("/changelog?version="+encodeURIComponent(v),{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){
+      if(!d||!d.ok){document.getElementById("body").innerHTML='<span class="hot">'+esc(d&&d.error||"no response")+'</span>';return;}
+      cur=d.version; location.hash=d.version; draw();
+      document.getElementById("title").textContent=d.title;
+      document.getElementById("meta").textContent=(d.version===d.newest?"newest entry":"newest is "+d.newest)+" \u2014 straight from BACKLOG.md, unedited";
+      document.getElementById("body").textContent=d.body;
+    }).catch(function(e){document.getElementById("body").innerHTML='<span class="hot">'+esc(e&&e.message)+'</span>';});
+  }
+  document.getElementById("q").addEventListener("input",draw);
+  document.getElementById("list").addEventListener("click",function(e){
+    var a=e.target.closest&&e.target.closest("a.v"); if(a){e.preventDefault();show(a.getAttribute("data-v"));}
+  });
+  fetch("/changelog?list=1",{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ok){document.getElementById("list").innerHTML='<span class="hot">'+esc(d&&d.error||"no response")+'</span>';return;}
+    all=d.entries; draw(); show((location.hash||"").replace(/^#/,"")||all[0].version);
+  }).catch(function(e){document.getElementById("list").innerHTML='<span class="hot">'+esc(e&&e.message)+'</span>';});
+})();
+</script>
+</body>
+</html>

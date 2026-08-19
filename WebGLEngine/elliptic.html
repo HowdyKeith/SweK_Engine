@@ -1,0 +1,229 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Elliptic integrals, and the pendulum they grade (v3625)</title>
+<meta name="demo:desc" content="Carlson RF/RD elliptic integrals checked live three ways against Legendre's relation, and the exact large-angle pendulum period they predict - drawn as a pendulum wave that must snap into line on the tick.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ input[type=range]{vertical-align:middle;width:220px}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+ canvas{display:block;background:#080a0f;border:1px solid #232b3d;max-width:100%}
+ .row{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ .big{font-size:14px}
+</style></head><body><div id="w">
+
+<h1>Elliptic integrals &mdash; and the pendulum that grades them back</h1>
+<div class="sub">Legendre's <code>F(&phi;|m)</code>, <code>E(&phi;|m)</code>, <code>K(m)</code>, <code>E(m)</code> through
+<b>Carlson's symmetric forms</b> RF and RD (duplication plus a truncated series). The code is the easy half. The
+reason these are worth having in this tree is the <b>answer key</b>: elliptic integrals carry exact external
+anchors that no amount of agreeing with myself can manufacture.</div>
+
+<div class="law"><b>Three routes, sharing no code.</b> Carlson duplication; Gauss's arithmetic-geometric mean
+(no duplication, no series); and composite Simpson straight down the defining integral. Two routes agreeing
+could be two typos agreeing. Three plus a constant that appears nowhere in the file could not.</div>
+
+<h2>1. The exact limits, and why they are not enough on their own</h2>
+<div class="panel">
+  <button id="runLimits" class="good">check the closed forms</button>
+  <span class="note"><code>F(&phi;|0)=E(&phi;|0)=&phi;</code>, <code>K(0)=E(0)=&pi;/2</code>, <code>E(&phi;|1)=sin&phi;</code></span>
+  <table id="tLimits"></table>
+</div>
+<div class="law"><b>Not one of those lines can tell the parameter <code>m</code> from the modulus <code>k</code></b>,
+because <code>m = k&sup2;</code> has fixed points at exactly 0 and 1 &mdash; which is where every closed form lives.
+The literature uses both conventions and calls both of them K. A routine that reads its argument as the modulus
+passes the whole panel above and is 9% wrong in the interior, which reads like a tolerance problem rather than a
+wrong function. Two things wearing one label, this time in the textbooks rather than in our code.</div>
+
+<h2>2. The interior: three routes, and Legendre's relation</h2>
+<div class="panel">
+  <button id="runRoutes" class="good">check the interior</button>
+  <span class="note">Legendre: <code>E(m)K(1-m) + E(1-m)K(m) - K(m)K(1-m) = &pi;/2</code> for every m &mdash; four
+  values, two parameters, one constant that is not in the file</span>
+  <table id="tRoutes"></table>
+</div>
+
+<h2>3. The consumer: a pendulum's exact period</h2>
+<div class="panel">
+  <div class="row">
+    <label>release angle &theta;<sub>0</sub> <input id="th0" type="range" min="0.05" max="3.0" step="0.01" value="2.00"></label>
+    <span id="th0v" class="big"></span>
+    <button id="runPend" class="good">integrate it and compare</button>
+  </div>
+  <div class="note"><code>T = 4&radic;(L/g) K(sin&sup2;(&theta;<sub>0</sub>/2))</code> is a function of one angle &mdash;
+  no grid, no timestep, no machine. So it can grade an integrator rather than be graded by one. RK4 runs in your
+  browser when you press the button.</div>
+  <table id="tPend"></table>
+</div>
+
+<h2>4. The verification, drawn</h2>
+<div class="law">physics/pendulumWave.js tunes a row of pendulums so that in one cycle the longest completes 20
+swings, the next 21, and so on &mdash; released together they fan into a travelling wave and snap back into line at
+the end. It steps <b>exact simple harmonic motion</b>, so its re-sync is exact <em>for the equation it solves</em>.
+A real pendulum is not harmonic. At the shipped amplitude of 0.3&nbsp;rad every one of them runs <b>0.565% slow</b>,
+and the row lines up on the <span class="ok">green tick</span> below &mdash; a time predicted from
+<code>K</code> alone &mdash; rather than at its own nominal 60&nbsp;s.</div>
+<div class="panel">
+  <div class="row">
+    <button id="play" class="good">play</button>
+    <label>amplitude spread <input id="spread" type="range" min="0" max="0.12" step="0.002" value="0"></label>
+    <span id="spreadv"></span>
+    <label><input id="showTrue" type="checkbox" checked> use true (elliptic) periods</label>
+  </div>
+  <canvas id="cv" width="980" height="260"></canvas>
+  <div class="row">
+    <span>t = <b id="tnow">0.00</b> s</span>
+    <span class="dim">nominal cycle 60.000 s</span>
+    <span class="ok">predicted true cycle <b id="tcyc"></b> s</span>
+    <span>phase spread now: <b id="psp"></b> rad</span>
+  </div>
+</div>
+<div class="law"><b>And the picture is a weak instrument, which is the point of saying so.</b> At the moment of
+re-synchronisation every pendulum sits at its turning point, where <code>d&theta;/d(phase) = 0</code>. A phase
+error of 0.1&nbsp;rad &mdash; a visibly late pendulum &mdash; moves the drawn angle by <code>amp&middot;&epsilon;&sup2;/2</code>
+&asymp; 0.0015&nbsp;rad, which is nothing. So the drawing is worth having and the <b>number beside it</b> is what
+grades it. Push the amplitude spread up: the phase readout moves long before your eye does.</div>
+
+<h2>5. What the spread buys you, as a tolerance</h2>
+<div class="panel">
+  <button id="runTol" class="good">derive it, then simulate it</button>
+  <span class="note">the fastest pendulum does 34 swings per cycle, so it accumulates the most phase</span>
+  <table id="tTol"></table>
+</div>
+
+<div class="law">Graded headless by <code>tools/ship/elliptic-selfcheck.mjs</code> and
+<code>physics/mechanics/pendulumExact-selfcheck.mjs</code>. Both run from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Nothing in <code>physics/pendulumWave.js</code> was
+edited by this round &mdash; it is correct about the equation it solves, and its gate asserts that it still solves
+that one.</div>
+
+<script type="module">
+import { ellipK, ellipEc, ellipF, ellipE, agmK, agmE, quadF, quadE } from "/math/elliptic.js";
+import { pendulumPeriod, pendulumPeriodFactor, integratePendulum,
+         trueWaveRow, phaseSpread, trueCycle, amplitudeTolerance } from "/physics/mechanics/pendulumExact.mjs";
+
+const $ = (id) => document.getElementById(id);
+const rel = (a, b) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-300);
+const cls = (good) => good ? "ok" : "bad";
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+
+// --- 1 -------------------------------------------------------------------------------------------------------
+$("runLimits").onclick = () => {
+    const out = [];
+    for (const phi of [0.1, 0.9, 1.5]) {
+        out.push(["F(" + phi + "|0)", ellipF(phi, 0).toFixed(15), phi.toFixed(15),
+            "<span class='" + cls(rel(ellipF(phi, 0), phi) < 1e-15) + "'>" + rel(ellipF(phi, 0), phi).toExponential(2) + "</span>"]);
+        out.push(["E(" + phi + "|1)", ellipE(phi, 1).toFixed(15), Math.sin(phi).toFixed(15),
+            "<span class='" + cls(rel(ellipE(phi, 1), Math.sin(phi)) < 1e-14) + "'>" + rel(ellipE(phi, 1), Math.sin(phi)).toExponential(2) + "</span>"]);
+    }
+    out.push(["K(0)", ellipK(0).toFixed(15), (Math.PI / 2).toFixed(15),
+        "<span class='" + cls(ellipK(0) === Math.PI / 2) + "'>exact</span>"]);
+    out.push(["E(1)", ellipEc(1).toFixed(15), (1).toFixed(15),
+        "<span class='" + cls(ellipEc(1) === 1) + "'>exact</span>"]);
+    out.push(["<span class='warn'>K(m=0.5) vs K(k=0.5)</span>", ellipK(0.5).toFixed(9), ellipK(0.25).toFixed(9),
+        "<span class='warn'>" + (100 * rel(ellipK(0.25), ellipK(0.5))).toFixed(2) + "% apart &mdash; invisible to every row above</span>"]);
+    rows($("tLimits"), ["quantity", "computed", "closed form", "relative"], out);
+};
+
+// --- 2 -------------------------------------------------------------------------------------------------------
+$("runRoutes").onclick = () => {
+    const out = [];
+    for (const m of [0.1, 0.25, 0.5, 0.75, 0.9, 0.99]) {
+        const c = ellipK(m), a = agmK(m), q = quadF(Math.PI / 2, m, 40000);
+        const ce = ellipEc(m), ae = agmE(m);
+        const worst = Math.max(rel(c, a), rel(c, q), rel(ce, ae));
+        const L = ce * ellipK(1 - m) + ellipEc(1 - m) * ellipK(m) - ellipK(m) * ellipK(1 - m);
+        out.push([m.toFixed(2), c.toFixed(12), a.toFixed(12), q.toFixed(12),
+            "<span class='" + cls(worst < 1e-11) + "'>" + worst.toExponential(2) + "</span>",
+            "<span class='" + cls(rel(L, Math.PI / 2) < 1e-14) + "'>" + rel(L, Math.PI / 2).toExponential(2) + "</span>"]);
+    }
+    rows($("tRoutes"), ["m", "Carlson K", "AGM K", "Simpson K", "worst spread", "Legendre residual"], out);
+};
+
+// --- 3 -------------------------------------------------------------------------------------------------------
+const showTh = () => { $("th0v").textContent = (+$("th0").value).toFixed(2) + " rad (" + (180 / Math.PI * $("th0").value).toFixed(1) + "\u00B0)"; };
+$("th0").oninput = showTh; showTh();
+$("runPend").onclick = () => {
+    const th0 = +$("th0").value, T0 = 2 * Math.PI / Math.sqrt(9.80665);
+    const P = pendulumPeriod({ theta0: th0 });
+    const r = integratePendulum({ theta0: th0, dt: 2e-4 });
+    rows($("tPend"), ["prediction", "period (s)", "vs measured RK4"], [
+        ["elliptic, 4&radic;(L/g)K(m)", P.toFixed(12), "<span class='ok'>" + rel(r.period, P).toExponential(3) + "</span>"],
+        ["small-angle, 2&pi;&radic;(L/g)", T0.toFixed(12), "<span class='bad'>" + (100 * rel(r.period, T0)).toFixed(3) + "% out</span>"],
+        ["measured (RK4, dt 2e-4)", r.period.toFixed(12), "<span class='dim'>energy drift " + r.energyDrift.toExponential(2) + "</span>"],
+    ]);
+};
+
+// --- 4: the picture ------------------------------------------------------------------------------------------
+const cv = $("cv"), g = cv.getContext("2d");
+let t = 0, playing = false, last = 0, wave = null;
+const CYCLE = 60, AMP = 0.3;
+const rebuild = () => {
+    const sp = +$("spread").value;
+    $("spreadv").textContent = (100 * sp).toFixed(1) + "% of amplitude";
+    wave = trueWaveRow({ ampSpread: sp, pattern: "random", seed: 7 });
+    if (!$("showTrue").checked) for (const p of wave.row) p.T = p.T0;   // pretend it is harmonic, as the demo does
+    $("tcyc").textContent = trueCycle({}).toFixed(4);
+};
+$("spread").oninput = rebuild; $("showTrue").onchange = rebuild; rebuild();
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "pause" : "play"; last = performance.now(); };
+
+function draw() {
+    const W = cv.width, H = cv.height, railY = 26, L = 150;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "#080a0f"; g.fillRect(0, 0, W, H);
+    // timeline
+    const tl = H - 26, x0 = 40, x1 = W - 40, span = 70;
+    g.strokeStyle = "#2a3348"; g.beginPath(); g.moveTo(x0, tl); g.lineTo(x1, tl); g.stroke();
+    const tx = (s) => x0 + (x1 - x0) * Math.min(1, Math.max(0, s / span));
+    g.strokeStyle = "#4a5670"; g.beginPath(); g.moveTo(tx(CYCLE), tl - 8); g.lineTo(tx(CYCLE), tl + 8); g.stroke();
+    g.fillStyle = "#68748c"; g.font = "10px ui-monospace,monospace"; g.fillText("nominal 60s", tx(CYCLE) - 28, tl + 20);
+    const tc = trueCycle({});
+    g.strokeStyle = "#8fe0a8"; g.lineWidth = 2; g.beginPath(); g.moveTo(tx(tc), tl - 11); g.lineTo(tx(tc), tl + 11); g.stroke(); g.lineWidth = 1;
+    g.fillStyle = "#8fe0a8"; g.fillText("predicted " + tc.toFixed(2) + "s", tx(tc) - 8, tl - 15);
+    g.fillStyle = "#d5dcea"; g.beginPath(); g.arc(tx(t), tl, 3, 0, 7); g.fill();
+    // the row
+    g.strokeStyle = "#2a3348"; g.beginPath(); g.moveTo(x0, railY); g.lineTo(x1, railY); g.stroke();
+    const N = wave.row.length, dx = (x1 - x0) / (N + 1);
+    for (let i = 0; i < N; i++) {
+        const p = wave.row[i], px = x0 + dx * (i + 1);
+        const th = p.amp * Math.cos(2 * Math.PI * t / p.T);
+        const bx = px + L * Math.sin(th), by = railY + L * Math.cos(th);
+        g.strokeStyle = "#39456a"; g.beginPath(); g.moveTo(px, railY); g.lineTo(bx, by); g.stroke();
+        g.fillStyle = "#9ab6e8"; g.beginPath(); g.arc(bx, by, 5, 0, 7); g.fill();
+    }
+    const ps = phaseSpread(wave, t);
+    $("psp").textContent = ps.toExponential(3);
+    $("psp").className = ps < 1e-3 ? "ok" : ps < 0.15 ? "warn" : "bad";
+    $("tnow").textContent = t.toFixed(2);
+}
+function frame(now) {
+    if (playing) { t += Math.min(0.25, (now - last) / 1000) * 4; last = now; if (t > 70) t = 0; }
+    draw(); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// --- 5 -------------------------------------------------------------------------------------------------------
+$("runTol").onclick = () => {
+    const out = [];
+    for (const budget of [0.4, 0.2, 0.1, 0.05, 0.025]) {
+        const tol = amplitudeTolerance({ budget });
+        const w = trueWaveRow({ ampSpread: tol.halfSpread / AMP, pattern: "worst" });
+        const meas = phaseSpread(w, trueCycle({}));
+        out.push([budget.toFixed(4), tol.halfSpread.toExponential(3), (100 * tol.fraction).toFixed(2) + "%",
+            meas.toFixed(6), "<span class='" + cls(Math.abs(meas / budget - 1) < 0.12) + "'>" + (meas / budget).toFixed(4) + "</span>"]);
+    }
+    rows($("tTol"), ["phase budget (rad)", "tolerated amplitude excess", "as % of 0.3 rad", "measured spread", "measured / derived"], out);
+};
+</script>
+</div></body></html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Remote Hosting</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --panel2:#0c1a2c; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb454; --dim:#7fa8d8; --text:#cfe6ff; --bad:#ff7b7b; --good:#7fe0a0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(circle at 50% -10%, #0c1626, #06090f 70%); color:var(--text); font-family:ui-monospace,Menlo,monospace; padding:16px; max-width:760px; margin:0 auto; }
+  h1 { font-size:17px; color:var(--amber); letter-spacing:.08em; margin:0 0 2px; }
+  .sub { font-size:11px; color:var(--dim); margin:0 0 16px; }
+  a { color:var(--blue); }
+  .banner { border-radius:10px; padding:11px 13px; font-size:12px; margin-bottom:16px; line-height:1.5; border:1px solid var(--edge); }
+  .banner.warn { background:#2a1606; border-color:#7a4a12; color:var(--amber); }
+  .banner.ok { background:#06220f; border-color:#1f6a3a; color:var(--good); }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:14px; color:var(--blue); margin:0 0 2px; display:flex; align-items:center; gap:8px; }
+  .badge { font-size:10px; padding:2px 8px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); }
+  .badge.on { color:var(--good); border-color:#1f6a3a; background:#06220f; }
+  .badge.off { color:var(--dim); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; align-items:center; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:8px; padding:9px 13px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn:active { background:#1d4a78; }
+  .btn.go { background:#0f3a22; color:var(--good); border-color:#1f6a3a; }
+  .btn.stop { background:#3a1212; color:var(--bad); border-color:#7a2a2a; }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .steps { font-size:11.5px; color:var(--dim); line-height:1.65; margin:8px 0 0; padding-left:18px; }
+  .steps code, code.inline { background:#04070d; border:1px solid #14304a; border-radius:5px; padding:1px 6px; color:var(--text); font-size:11px; }
+  .url { background:#04070d; border:1px solid var(--edge); border-radius:8px; padding:10px; font-size:12px; word-break:break-all; margin-top:10px; display:none; }
+  .url a { color:var(--good); }
+  .log { background:#04070d; border:1px solid #14304a; border-radius:8px; padding:9px; font-size:10.5px; color:var(--dim); white-space:pre-wrap; max-height:150px; overflow:auto; margin-top:10px; display:none; }
+  .muted { font-size:10.5px; color:#5f86b0; }
+</style>
+</head>
+<body>
+  <h1>📡 Remote Hosting</h1>
+  <p class="sub">Expose this bridge to the internet — securely. <a href="/control.html">← control</a></p>
+
+  <div class="banner" id="authBanner">Checking auth…</div>
+
+  <!-- Cloudflare -->
+  <div class="card">
+    <h2>☁️ Cloudflare Tunnel <span class="badge off" id="cfBadge">checking…</span></h2>
+    <div class="muted">Public HTTPS URL, no client for visitors to install. Best when other people (your PetFBI admins, viewers) need in from any browser. Free, includes DDoS/WAF.</div>
+    <div class="row">
+      <button class="btn" id="cfInstall">Install cloudflared</button>
+      <button class="btn go" id="cfStart">Start quick tunnel</button>
+      <button class="btn stop" id="cfStop" disabled>Stop</button>
+    </div>
+    <div class="url" id="cfUrl"></div>
+    <div class="log" id="cfLog"></div>
+    <ol class="steps">
+      <li><b>Quick tunnel</b> (the button above): runs <code>cloudflared tunnel --url http://localhost:8787</code> and shows a random <code>trycloudflare.com</code> URL. Great for a smoke test; the URL changes each run.</li>
+      <li><b>Permanent URL</b> (your own domain): at <code>one.dash.cloudflare.com → Networks → Tunnels → Create → Cloudflared</code>, then map a hostname to <code>http://localhost:8787</code>. Runs as a service, survives reboot.</li>
+    </ol>
+  </div>
+
+  <!-- Permanent URL (named tunnel) auto-setup -->
+  <div class="card">
+    <h2>&#127760; Permanent URL (named tunnel)</h2>
+    <div class="muted">A permanent <code>https://swek.yourdomain.com</code> needs a domain on your Cloudflare account (free plan is fine). This generates a one-run setup script for this machine's OS &mdash; it installs cloudflared, creates the tunnel, routes DNS, and installs it as an auto-start service. One step (<code>cloudflared tunnel login</code>) opens a browser for you to pick your domain.</div>
+    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="cfHost" placeholder="swek.yourdomain.com" style="flex:1 1 220px;background:#0c1622;color:#d8e6f2;border:1px solid #24323f;border-radius:5px;padding:6px 9px;font:12px ui-monospace,monospace;">
+      <button class="btn go" id="cfGen">Generate setup script</button>
+    </div>
+    <div class="log" id="cfScript" style="display:none;white-space:pre-wrap;max-height:280px;overflow:auto;"></div>
+    <div class="row" id="cfScriptTools" style="display:none;margin-top:6px;gap:6px;">
+      <button class="btn" id="cfCopy">Copy</button>
+      <button class="btn" id="cfDl">Download script</button>
+    </div>
+    <hr style="border-color:#1e2c3a;margin:12px 0;">
+    <div class="muted"><b>Free alternative &mdash; Drive URL pointer.</b> No domain needed. This box writes its current tunnel URL to a fixed file in your Drive SweK folder; peers read that file to always find the live URL (the <i>file</i> is permanent even though the URL changes). Requires Drive to be configured.</div>
+    <div class="row" style="margin-top:8px;gap:6px;align-items:center;">
+      <label style="font-size:12px;"><input type="checkbox" id="cfPtr"> enable Drive URL-pointer</label>
+      <button class="btn" id="cfPtrWrite">Write pointer now</button>
+      <button class="btn" id="cfPtrList">List peer pointers</button>
+    </div>
+    <div class="log" id="cfPtrLog" style="display:none;"></div>
+  </div>
+
+  <!-- Tailscale -->
+  <div class="card">
+    <h2>🔗 Tailscale <span class="badge off" id="tsBadge">checking…</span></h2>
+    <div class="muted">Best when it's just you + a few trusted devices. <b>Serve</b> = private to your tailnet (nothing public). <b>Funnel</b> = public HTTPS, visitors don't need Tailscale.</div>
+    <div class="row">
+      <button class="btn" id="tsInstall">Install Tailscale</button>
+    </div>
+    <div class="log" id="tsLog"></div>
+    <div id="tsCtl" style="display:none;margin-top:8px;">
+      <div id="tsUrl" style="font-size:12px;margin-bottom:6px;"></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" id="tsServe">Serve (private, tailnet-only)</button>
+        <button class="btn go" id="tsFunnel">Funnel (public HTTPS)</button>
+        <button class="btn" id="tsOff">Turn off</button>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:11px;">Both give the same permanent <code>&lt;machine&gt;.&lt;tailnet&gt;.ts.net</code> URL and persist across reboots. <b>Serve</b> = only devices on your tailnet can reach it. <b>Funnel</b> = anyone on the internet (needs HTTPS enabled in your tailnet; the button surfaces the enable link if not).</div>
+    </div>
+    <ol class="steps">
+      <li>First time only: install above, then run <code>tailscale up</code> in a terminal to sign in. Refresh this page &mdash; the controls appear once you're connected.</li>
+      <li>Then just click <b>Serve</b> or <b>Funnel</b> here &mdash; no terminal needed. (macOS: use the open-source/standalone Tailscale variant for Funnel.)</li>
+    </ol>
+  </div>
+
+  <!-- NetBird (v1923) -->
+  <div class="card">
+    <h2>&#128378; NetBird <span class="badge off" id="nbBadge">checking&hellip;</span></h2>
+    <div class="muted">A fully open-source, self-hostable <b>WireGuard P2P mesh</b> (an alternative/complement to Tailscale). Devices form direct encrypted peer-to-peer tunnels; only key/discovery is brokered. If a box is on a NetBird mesh, SweK can use its <code>100.x</code> mesh IP as a peer.</div>
+    <div id="nbCtl" style="margin-top:8px;">
+      <div id="nbInfo" style="font-size:12px;margin-bottom:6px;color:var(--dim);">not detected on this box</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;">
+        <button class="btn go" id="nbUp">Join mesh (netbird up)</button>
+        <button class="btn" id="nbDown">Leave</button>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:11px;">Client agent: Windows <code>winget install NetBird.NetBird</code>, macOS <code>brew install netbird</code>, Linux the netbird package &mdash; then this box can join a mesh. To host your OWN control plane, use the NetBird entry in <b>Settings &rarr; Services</b> (needs a public domain + ports 80/443/UDP-3478). Or use NetBird's free managed cloud &mdash; the client is the same either way.</div>
+    </div>
+  </div>
+
+  <p class="muted" id="plat"></p>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const j = (u, o) => fetch(u, o).then(r => r.json());
+
+  async function auth() {
+    try {
+      const s = await j("/auth/status");
+      const b = $("authBanner");
+      if (s.enabled) { b.className = "banner ok"; b.innerHTML = "✓ Auth is active — a password is set, so it's safe to expose. Sessions gate both HTTP and WebSocket."; }
+      else { b.className = "banner warn"; b.innerHTML = "⚠ No password set yet. <b>Set one before starting any tunnel</b> — open <a href='/login.html'>login.html</a> on this machine and use the setup box. A tunnel makes outside traffic look local, so an open bridge would be wide open."; }
+    } catch { $("authBanner").textContent = "Could not reach the bridge."; }
+  }
+
+  function badge(el, t) {
+    if (t && t.installed) { el.className = "badge on"; el.textContent = "installed" + (t.version ? " v" + t.version : ""); }
+    else { el.className = "badge off"; el.textContent = "not installed"; }
+  }
+
+  async function detect() {
+    try {
+      const d = await j("/hosting/detect");
+      badge($("cfBadge"), d.cloudflared);
+      badge($("tsBadge"), d.tailscale);
+      $("cfInstall").disabled = !!(d.cloudflared && d.cloudflared.installed);
+      $("tsInstall").disabled = !!(d.tailscale && d.tailscale.installed);
+      if (d.tailscale && d.tailscale.installed) tsRefresh();
+      const winget = d.winget && d.winget.installed;
+      $("plat").textContent = "platform: " + d.platform + " · winget: " + (winget ? "available" : "not found") + (d.platform !== "win32" ? " (one-click install is Windows-only)" : "");
+      if (!winget && d.platform === "win32") { $("cfInstall").title = $("tsInstall").title = "winget not found — update App Installer from the Microsoft Store"; }
+    } catch { $("cfBadge").textContent = $("tsBadge").textContent = "bridge unreachable"; }
+  }
+
+  async function runInstall(tool, logEl) {
+    logEl.style.display = "block"; logEl.textContent = "starting install…";
+    const r = await j("/hosting/install", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ tool }) });
+    if (!r.ok) { logEl.textContent = r.error || "install failed to start"; return; }
+    const poll = setInterval(async () => {
+      const s = await j("/hosting/install/status");
+      logEl.textContent = (s.log || "").slice(-3000) || "working…";
+      logEl.scrollTop = logEl.scrollHeight;
+      if (!s.running) { clearInterval(poll); logEl.textContent += "\n\n[done, exit " + s.code + "]"; detect(); }
+    }, 1500);
+  }
+
+  $("cfInstall").onclick = () => runInstall("cloudflare", $("cfLog"));
+  $("tsInstall").onclick = () => runInstall("tailscale", $("tsLog"));
+
+  // v1923 — NetBird mesh status
+  function nbRefresh(){
+    fetch("/netbird/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(s){
+      var b=document.getElementById("nbBadge"), info=document.getElementById("nbInfo");
+      if(!s||!s.ok){ return; }
+      if(!s.installed){ b.textContent="client not installed"; b.className="badge off"; info.textContent="Install the NetBird client agent (see below) to join a mesh."; return; }
+      if(s.connected){ b.textContent="on mesh"; b.className="badge on"; info.innerHTML="On a NetBird mesh"+(s.netbirdIp?(" &middot; this box: <code>"+s.netbirdIp+"</code> &middot; peers: "+(s.peers||0)):"")+". Use that 100.x IP as a peer URL, e.g. <code>http://"+(s.netbirdIp||"100.x.x.x")+":8787</code>."; }
+      else { b.textContent="installed, not connected"; b.className="badge off"; info.textContent="NetBird client is installed but this box isn't on a mesh yet. Click Join."; }
+    }).catch(function(){});
+  }
+  if($("nbUp")) $("nbUp").onclick=function(){ var k=prompt("Setup key (optional — leave blank for interactive browser SSO):",""); fetch("/netbird/up",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setupKey:k||""})}).then(function(r){return r.json();}).then(function(x){ alert(x&&x.ok?"netbird up started — finish any SSO in your browser":("failed: "+((x&&x.error)||(x&&x.out)||"?"))); nbRefresh(); }).catch(function(){}); };
+  if($("nbDown")) $("nbDown").onclick=function(){ fetch("/netbird/down",{method:"POST"}).then(function(){ nbRefresh(); }); };
+  nbRefresh();
+
+  // v1911 — Tailscale serve/funnel live control
+  async function tsRefresh(){
+    try {
+      const s = await j("/hosting/tailscale/status");
+      var ctl = document.getElementById("tsCtl"), urlEl = document.getElementById("tsUrl");
+      if (!s || !s.ok) return;
+      if (!s.running) { ctl.style.display = "none"; return; }
+      ctl.style.display = "block";
+      var active = s.funnel ? "Funnel (public)" : (s.serve ? "Serve (private)" : "off");
+      if (s.url) urlEl.innerHTML = "Permanent URL: <a href='" + s.url + "' target='_blank'>" + s.url + "</a> &nbsp;<span class='muted'>(" + active + ")</span>";
+      else urlEl.innerHTML = "<span class='muted'>connected, but no ts.net name yet — enable MagicDNS/HTTPS in the admin console</span>";
+    } catch {}
+  }
+  async function tsExpose(mode){
+    var L = $("tsLog"); L.textContent = mode + ": working…";
+    try {
+      const r = await j("/hosting/tailscale/expose", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ mode: mode, on: true }) });
+      if (r && r.ok) { L.textContent = "\u2713 " + mode + " on — " + (r.url || "") + " (" + (r.note||"") + ")"; tsRefresh(); }
+      else { L.textContent = "\u2717 " + ((r && r.error) || "failed"); if (r && r.enableUrl) L.innerHTML += "<br>Enable it here: <a href='" + r.enableUrl + "' target='_blank'>" + r.enableUrl + "</a>"; }
+    } catch(e){ L.textContent = "\u2717 " + e; }
+  }
+  if ($("tsServe")) $("tsServe").onclick = () => tsExpose("serve");
+  if ($("tsFunnel")) $("tsFunnel").onclick = () => tsExpose("funnel");
+  if ($("tsOff")) $("tsOff").onclick = async () => { var L=$("tsLog"); L.textContent="turning off…"; try { await j("/hosting/tailscale/expose",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"funnel",on:false})}); await j("/hosting/tailscale/expose",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"serve",on:false})}); L.textContent="\u2713 off"; tsRefresh(); } catch(e){ L.textContent="\u2717 "+e; } };
+
+  let tunPoll = null;
+  $("cfStart").onclick = async () => {
+    $("cfStart").disabled = true; $("cfLog").style.display = "block"; $("cfLog").textContent = "starting tunnel…";
+    const r = await j("/hosting/tunnel", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"start" }) });
+    if (!r.ok) {
+      // already-running with a live URL → just show it instead of hanging on "starting…"
+      if (r.url) { $("cfLog").textContent = "tunnel already running"; const u = $("cfUrl"); u.style.display = "block"; u.innerHTML = "Live: <a href='" + r.url + "' target='_blank'>" + r.url + "</a> — open it on another device."; $("cfStop").disabled = false; }
+      else { $("cfLog").textContent = r.error || "could not start"; }
+      $("cfStart").disabled = false; return;
+    }
+    $("cfStop").disabled = false;
+    tunPoll = setInterval(async () => {
+      const s = await j("/hosting/tunnel/status");
+      $("cfLog").textContent = (s.log || "").slice(-2000); $("cfLog").scrollTop = $("cfLog").scrollHeight;
+      if (s.url) { const u = $("cfUrl"); u.style.display = "block"; u.innerHTML = "Live: <a href='" + s.url + "' target='_blank'>" + s.url + "</a> — open it on another device."; }
+      if (!s.running) { clearInterval(tunPoll); $("cfStart").disabled = false; $("cfStop").disabled = true; if (!s.url) $("cfLog").textContent += "\n[tunnel exited]"; }
+    }, 1500);
+  };
+  $("cfStop").onclick = async () => {
+    await j("/hosting/tunnel", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ action:"stop" }) });
+    if (tunPoll) clearInterval(tunPoll);
+    $("cfStart").disabled = false; $("cfStop").disabled = true; $("cfUrl").style.display = "none"; $("cfLog").textContent += "\n[stopped]";
+  };
+
+  // v1910 — permanent named-tunnel setup script + Drive URL-pointer
+  (function(){
+    var _lastScript = null, _lastFn = "swek-cloudflare-setup.sh";
+    var g = document.getElementById("cfGen");
+    if (g) g.onclick = function(){
+      var host = (document.getElementById("cfHost").value || "").trim();
+      if (!host) { alert("Enter your hostname, e.g. swek.yourdomain.com"); return; }
+      g.disabled = true; g.textContent = "generating…";
+      fetch("/cftunnel/setup-script", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ hostname: host }) })
+        .then(function(r){ return r.json(); }).then(function(j){
+          g.disabled = false; g.textContent = "Generate setup script";
+          if (!j || !j.ok) { alert((j&&j.error)||"failed"); return; }
+          _lastScript = j.script; _lastFn = j.filename;
+          var el = document.getElementById("cfScript"); el.style.display = "block";
+          el.textContent = "# " + (j.steps||[]).join("\n# ") + "\n# NOTE: " + (j.note||"") + "\n\n" + j.script;
+          document.getElementById("cfScriptTools").style.display = "flex";
+        }).catch(function(e){ g.disabled = false; g.textContent = "Generate setup script"; alert(e); });
+    };
+    var cp = document.getElementById("cfCopy"); if (cp) cp.onclick = function(){ if (_lastScript) navigator.clipboard.writeText(_lastScript).then(function(){ cp.textContent = "copied"; setTimeout(function(){ cp.textContent="Copy"; },1500); }); };
+    var dl = document.getElementById("cfDl"); if (dl) dl.onclick = function(){ if (!_lastScript) return; var b = new Blob([_lastScript], {type:"text/plain"}); var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = _lastFn; a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); },1000); };
+
+    // load pointer config
+    fetch("/cftunnel/config").then(function(r){return r.json();}).then(function(j){ if (j&&j.config){ var pc=document.getElementById("cfPtr"); if(pc) pc.checked=!!j.config.drivePointer; if(j.config.hostname){ var h=document.getElementById("cfHost"); if(h&&!h.value) h.value=j.config.hostname; } } }).catch(function(){});
+    var pc = document.getElementById("cfPtr"); if (pc) pc.onchange = function(){ fetch("/cftunnel/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({drivePointer:pc.checked})}); };
+    var pw = document.getElementById("cfPtrWrite"); if (pw) pw.onclick = function(){ var L=document.getElementById("cfPtrLog"); L.style.display="block"; L.textContent="writing pointer…"; fetch("/cftunnel/pointer/write",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(function(r){return r.json();}).then(function(j){ L.textContent = j&&j.ok ? ("\u2713 wrote "+(j.wrote||"")+" \u2192 "+(j.url||"")) : ("\u2717 "+((j&&(j.error||j.skipped))||"failed")); }).catch(function(e){ L.textContent="\u2717 "+e; }); };
+    var pl = document.getElementById("cfPtrList"); if (pl) pl.onclick = function(){ var L=document.getElementById("cfPtrLog"); L.style.display="block"; L.textContent="reading pointers…"; fetch("/cftunnel/pointer/list").then(function(r){return r.json();}).then(function(j){ if(j&&j.ok){ L.textContent = (j.pointers&&j.pointers.length)? j.pointers.map(function(p){return p.name+": "+p.url;}).join("\n") : "no pointers found in the Drive folder yet"; } else { L.textContent="\u2717 "+((j&&j.error)||"failed"); } }).catch(function(e){ L.textContent="\u2717 "+e; }); };
+  })();
+
+  auth(); detect();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

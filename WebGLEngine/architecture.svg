@@ -1,0 +1,235 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#080d16"/>
+      <stop offset="1" stop-color="#05080f"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3f5876"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5fb0ff"/>
+    </marker>
+    <style>
+      .node{rx:10;ry:10;stroke-width:1.6;}
+      .title{fill:#eaf2ff;font-weight:700;}
+      .sub{fill:#8aa0bf;font-size:11px;}
+      .hd{font-size:15px;font-weight:700;}
+      .hw{fill:#6f87a8;font-size:11px;}
+      .lbl{fill:#7d93b2;font-size:10.5px;font-style:italic;}
+      .col{fill:#46618a;font-size:12px;font-weight:700;letter-spacing:2px;}
+      .link{stroke:#2a3c54;stroke-width:1.6;fill:none;}
+      .linkB{stroke:#5fb0ff;stroke-width:2.2;fill:none;}
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="800" fill="url(#bg)"/>
+
+  <!-- title -->
+  <text x="40" y="50" class="title" font-size="26">SweK Engine — multi-runtime architecture</text>
+  <text x="40" y="74" class="sub" font-size="13">One world, five runtimes: an Excel/VBA simulation, a WebGL browser engine, a Node relay, and a PowerShell+Python tray agent, glued by a Node bridge.</text>
+
+  <!-- legend -->
+  <g transform="translate(832,14)">
+    <rect x="0" y="0" width="328" height="92" rx="9" fill="#0c1320" stroke="#1c2940"/>
+    <text x="14" y="20" class="sub" font-weight="700" fill="#9db4d6">RUNTIME</text>
+    <g font-size="11.5" fill="#bccbe2">
+      <rect x="14" y="30" width="11" height="11" rx="2" fill="#5fb0ff"/><text x="32" y="40">WebGL / JS</text>
+      <rect x="120" y="30" width="11" height="11" rx="2" fill="#7fe0a0"/><text x="138" y="40">Node.js</text>
+      <rect x="220" y="30" width="11" height="11" rx="2" fill="#ffcf8b"/><text x="238" y="40">Excel / VBA</text>
+      <rect x="14" y="52" width="11" height="11" rx="2" fill="#6fd6ff"/><text x="32" y="62">PowerShell</text>
+      <rect x="120" y="52" width="11" height="11" rx="2" fill="#ffe08a"/><text x="138" y="62">Python</text>
+      <rect x="220" y="52" width="11" height="11" rx="2" fill="#b79bff"/><text x="238" y="62">3rd-party</text>
+    </g>
+    <text x="14" y="82" class="lbl">Authority: game owns positions · browser owns intents</text>
+  </g>
+
+  <!-- column captions -->
+  <text x="60"  y="118" class="col">CLIENTS</text>
+  <text x="300" y="118" class="col">BROWSER</text>
+  <text x="600" y="118" class="col">BRIDGE</text>
+  <text x="850" y="118" class="col">PRODUCERS</text>
+  <text x="1066" y="118" class="col">EXTERNAL</text>
+
+  <!-- ============ CLIENTS ============ -->
+  <g>
+    <rect x="48" y="150" width="172" height="74" rx="10" fill="#0e1a2b" stroke="#274a6e"/>
+    <text x="62" y="178" class="title hd">Chrome (PC)</text>
+    <text x="62" y="198" class="hw">Windows 10/11</text>
+    <text x="62" y="214" class="hw">GTX 1070 / 1080 · Pascal</text>
+
+    <rect x="48" y="240" width="172" height="62" rx="10" fill="#0e1a2b" stroke="#274a6e"/>
+    <text x="62" y="266" class="title hd">Nvidia Shield</text>
+    <text x="62" y="286" class="hw">living-room client</text>
+
+    <rect x="48" y="318" width="172" height="62" rx="10" fill="#0e1a2b" stroke="#274a6e"/>
+    <text x="62" y="344" class="title hd">Phone</text>
+    <text x="62" y="364" class="hw">control.html remote</text>
+  </g>
+
+  <!-- ============ BROWSER ENGINE ============ -->
+  <g>
+    <rect x="262" y="150" width="252" height="372" rx="12" fill="#0d1928" stroke="#3a78c0" stroke-width="2"/>
+    <rect x="262" y="150" width="252" height="40" rx="12" fill="#143256"/>
+    <rect x="262" y="172" width="252" height="18" fill="#143256"/>
+    <text x="280" y="176" class="title" font-size="17">WebGLEngine</text>
+    <text x="280" y="210" class="sub" fill="#7fb0ee">browser · WebGL2 · ES modules</text>
+
+    <g>
+      <rect x="280" y="226" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="244" fill="#cfe0f5" font-size="12.5" font-weight="600">Voxel world</text>
+      <text x="293" y="259" class="sub">chunked terrain · greedy mesh · water</text>
+
+      <rect x="280" y="272" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="290" fill="#cfe0f5" font-size="12.5" font-weight="600">Kaiju + civ simulation</text>
+      <text x="293" y="305" class="sub">attacks · personalities · defenders · rivalry</text>
+
+      <rect x="280" y="318" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="336" fill="#cfe0f5" font-size="12.5" font-weight="600">Real terrain</text>
+      <text x="293" y="351" class="sub">OSM streets/buildings/water + elevation</text>
+
+      <rect x="280" y="364" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="382" fill="#cfe0f5" font-size="12.5" font-weight="600">Avatar + ~50 control panels</text>
+      <text x="293" y="397" class="sub">diorama · trading floor · settings hub</text>
+
+      <rect x="280" y="410" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="428" fill="#cfe0f5" font-size="12.5" font-weight="600">Standalone demos</text>
+      <text x="293" y="443" class="sub">boids · asteroids · slots · pachinko · …</text>
+
+      <rect x="280" y="456" width="216" height="40" rx="7" fill="#0a1422" stroke="#21405f"/>
+      <text x="293" y="474" fill="#cfe0f5" font-size="12.5" font-weight="600">Procedural audio + FX</text>
+      <text x="293" y="489" class="sub">music · SFX · particles · RGB cues</text>
+    </g>
+  </g>
+
+  <!-- ============ BRIDGE ============ -->
+  <g>
+    <rect x="556" y="226" width="208" height="300" rx="12" fill="#0c1c14" stroke="#3ea776" stroke-width="2"/>
+    <rect x="556" y="226" width="208" height="40" rx="12" fill="#11331f"/>
+    <rect x="556" y="254" width="208" height="14" fill="#11331f"/>
+    <text x="574" y="252" class="title" font-size="17">ai-bridge</text>
+    <text x="574" y="286" class="sub" fill="#86dcab">Node.js · port 8787 · CommonJS</text>
+
+    <rect x="574" y="300" width="172" height="34" rx="7" fill="#08130d" stroke="#235c3f"/>
+    <text x="587" y="321" fill="#cdeede" font-size="12" font-weight="600">WebSocket relay</text>
+
+    <rect x="574" y="340" width="172" height="34" rx="7" fill="#08130d" stroke="#235c3f"/>
+    <text x="587" y="361" fill="#cdeede" font-size="12" font-weight="600">REST routes (40+)</text>
+
+    <rect x="574" y="380" width="172" height="186" rx="7" fill="#08130d" stroke="#235c3f"/>
+    <text x="587" y="399" fill="#cdeede" font-size="12" font-weight="600">Connector modules</text>
+    <text x="587" y="415" class="sub">haBridge · rgbBridge · trader</text>
+    <text x="587" y="429" class="sub">starfield · fallout · hosting</text>
+    <text x="587" y="443" class="sub">petfbi · emailRules engine</text>
+    <text x="587" y="457" class="sub">flowHooks &#8594; Power Automate</text>
+    <text x="587" y="471" class="sub">booklore · comic (cbz/cbr)</text>
+    <text x="587" y="485" class="sub">printingPress · agentCookie</text>
+    <text x="587" y="499" class="sub">hermes · mlx · ideogram</text>
+    <text x="587" y="513" class="sub">winCred vault · github · auth gate</text>
+    <text x="587" y="537" class="lbl">caches game state · forwards intents</text>
+  </g>
+
+  <!-- ============ PRODUCERS ============ -->
+  <g>
+    <rect x="806" y="150" width="208" height="86" rx="11" fill="#1f1707" stroke="#a4760f" stroke-width="1.8"/>
+    <text x="822" y="176" class="title hd">VBATransmitter</text>
+    <text x="822" y="196" class="sub" fill="#e6b878">Excel / VBA simulation</text>
+    <text x="822" y="214" class="hw">+ VBA OpenGL engine (Win32)</text>
+    <text x="822" y="229" class="hw">async POST · MSXML2.XMLHTTP60</text>
+
+    <rect x="806" y="252" width="208" height="92" rx="11" fill="#06181f" stroke="#2f86a8" stroke-width="1.8"/>
+    <text x="822" y="278" class="title hd">KPop Listener</text>
+    <text x="822" y="298" class="sub" fill="#7fd2ee">PowerShell + Python tray agent</text>
+    <text x="822" y="316" class="hw">clipboard saver · toasts · TTS</text>
+    <text x="822" y="332" class="hw">HTTP /kpop · MQTT · named pipes</text>
+
+    <rect x="806" y="360" width="208" height="80" rx="11" fill="#100f1d" stroke="#6a59b8" stroke-width="1.8"/>
+    <text x="822" y="386" class="title hd">Home Assistant</text>
+    <text x="822" y="406" class="sub" fill="#b3a6ea">smart-home hub</text>
+    <text x="822" y="424" class="hw">Enphase solar · OpenRGB · sensors</text>
+  </g>
+
+  <!-- ============ EXTERNAL ============ -->
+  <g font-size="12.5">
+    <rect x="1042" y="150" width="138" height="58" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="176" fill="#d8cdf2" font-weight="700">Ollama</text>
+    <text x="1056" y="194" class="sub">local LLM</text>
+
+    <rect x="1042" y="222" width="138" height="78" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="248" fill="#d8cdf2" font-weight="700">Map / Elevation</text>
+    <text x="1056" y="266" class="sub">OSM · Overpass</text>
+    <text x="1056" y="281" class="sub">Open-Meteo · USGS</text>
+    <text x="1056" y="296" class="sub">Mapbox</text>
+
+    <rect x="1042" y="314" width="138" height="58" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="340" fill="#d8cdf2" font-weight="700">Twitch / Discord</text>
+    <text x="1056" y="358" class="sub">EventSub · webhooks</text>
+
+    <rect x="1042" y="386" width="138" height="68" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="412" fill="#d8cdf2" font-weight="700">Games</text>
+    <text x="1056" y="430" class="sub">Fallout 4 Pip-Boy</text>
+    <text x="1056" y="445" class="sub">Starfield console</text>
+
+    <rect x="1042" y="462" width="138" height="62" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="486" fill="#d8cdf2" font-weight="700">Local AI brains</text>
+    <text x="1056" y="504" class="sub">Hermes · MLX (Apple Si)</text>
+    <text x="1056" y="518" class="sub">OpenAI-compatible</text>
+
+    <rect x="1042" y="536" width="138" height="54" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="560" fill="#d8cdf2" font-weight="700">Power Automate</text>
+    <text x="1056" y="578" class="sub">outbound flow hooks</text>
+
+    <rect x="1042" y="602" width="138" height="56" rx="10" fill="#15101f" stroke="#5a4a86"/>
+    <text x="1056" y="626" fill="#d8cdf2" font-weight="700">Ideogram 4.0</text>
+    <text x="1056" y="644" class="sub">image · text-in-image</text>
+  </g>
+
+  <!-- ============ LINKS ============ -->
+  <!-- clients -> engine -->
+  <path class="link" d="M220,187 H262" marker-end="url(#arr)"/>
+  <path class="link" d="M220,271 C242,271 244,300 262,310" marker-end="url(#arr)"/>
+  <path class="link" d="M220,349 C244,349 244,380 262,392" marker-end="url(#arr)"/>
+  <text x="228" y="205" class="lbl">HTTP</text>
+
+  <!-- engine <-> bridge (highlighted spine) -->
+  <path class="linkB" d="M514,330 H556" marker-end="url(#arrB)" marker-start="url(#arrB)"/>
+  <text x="520" y="320" fill="#9fd0ff" font-size="11" font-weight="600">WebSocket</text>
+  <text x="520" y="350" fill="#6f9ed0" font-size="10.5">+ HTTP :8787</text>
+
+  <!-- engine -> map APIs (direct CORS) -->
+  <path class="link" d="M514,200 C720,150 900,120 1042,235" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="690" y="135" class="lbl">direct fetch (CORS) — no key</text>
+
+  <!-- producers -> bridge -->
+  <path class="link" d="M806,200 C786,200 784,280 764,300" marker-end="url(#arr)"/>
+  <text x="678" y="214" class="lbl">async HTTP / MSXML2</text>
+
+  <!-- v1251 — engine-authority loop: the bridge DRIVES the listener (policy + /kpop/control
+       verbs); the listener reports back (events · clipboard · TTS results). Promoted to a
+       first-class blue two-way spine like the engine<->bridge link. -->
+  <path class="linkB" d="M806,298 H764" marker-end="url(#arrB)" marker-start="url(#arrB)"/>
+  <text x="785" y="289" text-anchor="middle" font-size="8" fill="#9fd0ff" class="lbl">policy &#8594;</text>
+  <text x="785" y="313" text-anchor="middle" font-size="8" fill="#7fd2ee" class="lbl">&#8592; events</text>
+
+  <path class="link" d="M806,400 C786,400 784,440 764,450" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <!-- bridge -> external -->
+  <path class="link" d="M764,360 C880,360 920,180 1042,180" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="846" y="250" class="lbl">HTTP</text>
+
+  <path class="link" d="M764,400 C900,400 930,343 1042,343" marker-end="url(#arr)" marker-start="url(#arr)"/>
+
+  <path class="link" d="M764,470 C900,470 930,420 1042,420" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <text x="846" y="486" class="lbl">Pip-Boy / console</text>
+
+  <!-- bridge -> new external (AI brains / Power Automate / Ideogram) -->
+  <path class="link" d="M746,470 C900,470 940,492 1042,492" stroke-dasharray="5 4" marker-end="url(#arr)" marker-start="url(#arr)"/>
+  <path class="link" d="M746,490 C900,540 960,560 1042,560" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <path class="link" d="M746,500 C900,620 960,630 1042,628" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="900" y="540" class="lbl">local AI · webhooks · image</text>
+
+  <!-- footer -->
+  <line x1="40" y1="724" x2="1160" y2="724" stroke="#1a2942"/>
+  <text x="40" y="752" class="sub" font-size="12.5">Targets: Windows · Chrome · GTX 1070/1080 (Pascal) · Nvidia Shield · Node / Bun runtime</text>
+  <text x="40" y="772" class="lbl" font-size="11.5">Data-flow model: the VBA/browser sim owns authoritative positions; the browser sends intents; the Node bridge caches state and fans it out to every client and connector.</text>
+</svg>

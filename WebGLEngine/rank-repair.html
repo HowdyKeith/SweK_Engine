@@ -1,0 +1,102 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Three repairs, and one of them lies (v3642)</title>
+<meta name="demo:desc" content="What to do at a cell whose gradient is undetermined: a vertex stencil is exact and needs no physics, Dirichlet is exact and costs no stencil, and zero-Neumann restores the rank while producing a 55% wrong answer - the error falls from 1.000 to 0.547 and the situation gets worse.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+</style></head><body><div id="w">
+<h1>Three repairs, and one of them lies</h1>
+<div class="sub">Two rounds established that a handful of cells have gradients that <b>cannot be determined from
+cell averages at all</b> &mdash; exactly two in 2D, 6n in 3D. Three repairs were named and none tested. All three
+are measured here against the same exact key: reproduce a linear field exactly, or do not.</div>
+<div class="law"><b>The unrepaired cell reads 1.000, which is a refusal. A zero-Neumann repair reads 0.547, which
+is an answer.</b> The error got smaller and the situation got worse &mdash; <code>1.000</code> is
+<code>g = 0</code>, a flag a caller can test for; <code>0.547</code> is a plausible vector a solver would use
+without hesitating.</div>
+<h2>1. The three repairs</h2>
+<div class="panel"><button id="go" class="good">measure all three</button><table id="t"></table></div>
+<div class="law"><b>The vertex stencil is exact and asserts nothing about the physics</b> &mdash; pure geometry,
+the only one a solver can apply without knowing what the boundary <i>is</i>. <b>Dirichlet is exact and costs no
+stencil</b>, from data a solver genuinely has. <b>Zero-Neumann restores the rank and gets the answer wrong</b>,
+because the field's normal derivative there is not zero. <b>Rank is not correctness.</b></div>
+<h2>2. Is Neumann broken, or is the assertion false?</h2>
+<div class="panel"><button id="mech" class="good">hold everything but the right-hand side</button><table id="t2"></table></div>
+<div class="law">Supplied with the <i>honest</i> normal derivative, the same machinery is exact &mdash; same rank,
+same stencil, same rows, only the right-hand side differs, and the error moves by thirteen orders. <b>The mechanism
+is sound; the assertion was what was false.</b> "Neumann repairs the rank" is true. "A zero-Neumann boundary is a
+safe default" is a claim about the field.</div>
+<h2>3. Where a rule is applied is as load-bearing as the rule</h2>
+<div class="panel"><button id="scope" class="good">apply it everywhere, then only where needed</button><table id="t3"></table></div>
+<div class="law">A repair is usually written as a boundary rule and applied to every boundary cell. But <b>92 of the
+94 boundary cells were already exact</b>, so a false rule applied to all of them <b>can only do harm</b> &mdash; it
+takes them from 1.3e-14 to 5.4e-1. A <i>true</i> condition applied everywhere is harmless, because an extra row
+consistent with the field cannot move a fit that already passes through it. <b>So "apply it everywhere" is safe
+exactly when the condition is true &mdash; which is not a numerical safeguard.</b></div>
+<div class="law">Graded by <code>physics/mesh/rankRepair-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. The vertex stencil costs ~4&times; the rows, every cell,
+forever, against a defect affecting two cells in 2D &mdash; in 3D, where there are 6n of them, that trade is a
+different sum and this round does not do it. Related:
+<a href="/boundary-rank.html" style="color:#9ab6e8">boundary rank</a>,
+<a href="/tet-rank.html" style="color:#9ab6e8">tet rank</a>.</div>
+<script type="module">
+import { makeTriMesh, analyticCells, gradientLS } from "/physics/mesh/triReconstruct.mjs";
+import { repairError, vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+const $ = (i) => document.getElementById(i);
+const M = makeTriMesh({ nx: 24, ny: 24, h: 20 / 24, skew: 0.25 });
+const U = analyticCells((x, y) => 0.3 + 0.7 * x - 0.4 * y, M);
+const G0 = gradientLS(U, M);
+const MASK = new Uint8Array(M.tri.length);
+let NDEF = 0; for (let t = 0; t < M.tri.length; t++) if (G0.rank[t] < 2) { MASK[t] = 1; NDEF++; }
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const cell = (v) => "<span class='" + (v < 1e-12 ? "ok" : (v > 0.1 ? "bad" : "warn")) + "'>" + v.toExponential(3) + "</span>";
+$("go").onclick = () => {
+    const vn = vertexNeighbours(M);
+    let sf = 0, sv = 0; for (let t = 0; t < M.tri.length; t++) { sf += M.nbr[t].length; sv += vn[t].length; }
+    const out = [["no repair", { mode: "none" }], ["vertex stencil", { mode: "vertex" }],
+        ["Dirichlet", { mode: "dirichlet" }], ["Neumann = 0", { mode: "neumann" }]].map(([name, o]) => {
+        const r = repairError(M, MASK, o);
+        return [name, cell(r.deficient), cell(r.healthy), r.stillRank1, r.maxStencil,
+            name === "no repair" ? "a refusal" : (r.deficient < 1e-12 ? "exact" : "<span class='bad'>rank restored, answer wrong</span>")];
+    });
+    out.push(["stencil cost", "&mdash;", "&mdash;", "&mdash;", (sv / sf).toFixed(2) + "x rows",
+        "<span class='dim'>vertex widening, every cell</span>"]);
+    rows($("t"), ["repair", "deficient cells (" + NDEF + ")", "healthy cells", "still rank&lt;2", "max stencil", "verdict"], out);
+};
+$("mech").onclick = () => {
+    const z = repairError(M, MASK, { mode: "neumann", onlyWhereDeficient: MASK });
+    const h = repairError(M, MASK, { mode: "neumann", onlyWhereDeficient: MASK, honestNeumann: true });
+    rows($("t2"), ["right-hand side", "deficient-cell error", "rank restored", "stencil", "verdict"], [
+        ["grad&middot;n = 0 (the default)", cell(z.deficient), z.stillRank1 === 0 ? "yes" : "no", z.maxStencil,
+            "<span class='bad'>the assertion is false here</span>"],
+        ["grad&middot;n = the true value", cell(h.deficient), h.stillRank1 === 0 ? "yes" : "no", h.maxStencil,
+            "<span class='ok'>the mechanism is sound</span>"],
+        ["ratio", (z.deficient / h.deficient).toExponential(1) + "x", "identical", "identical",
+            "<span class='dim'>only the right-hand side differs</span>"]]);
+};
+$("scope").onclick = () => {
+    const out = [];
+    for (const [name, o] of [["Neumann = 0, everywhere", { mode: "neumann" }],
+        ["Neumann = 0, only where deficient", { mode: "neumann", onlyWhereDeficient: MASK }],
+        ["Dirichlet, everywhere", { mode: "dirichlet" }],
+        ["Dirichlet, only where deficient", { mode: "dirichlet", onlyWhereDeficient: MASK }]]) {
+        const r = repairError(M, MASK, o);
+        out.push([name, cell(r.deficient), cell(r.healthy),
+            r.healthy > 0.1 ? "<span class='bad'>damages cells that were already exact</span>" : "<span class='ok'>harmless</span>"]);
+    }
+    rows($("t3"), ["rule and scope", "deficient cells", "healthy cells", "verdict"], out);
+};
+</script>
+</div></body></html>

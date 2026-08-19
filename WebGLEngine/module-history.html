@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!-- WebGLEngine/module-history.html -- v3203
+     THE FRONT DOOR FOR MODULE RECOVERY.
+
+     THE SHIPPED ZIP HAS BEEN THE BACKUP FIVE TIMES -- v3140, v3159, v3176, v3201 and v3202 -- and every single
+     time the question was the same one, answered by hand: which archive last held this file, and which round
+     removed it. Twice the answer arrived so late that the loss had already been rationalised.
+
+     *** THE PAIR OF VERSIONS IS THE ANSWER, NOT A PRESENT/ABSENT LIST. *** Last-present and first-absent name
+     the ROUND that did it, and a round has a changelog entry and an author. A column of ticks makes the reader
+     do the bisection, which is the part nobody has time for at the moment they need this.
+
+     TWO HONESTY RULES ARE VISIBLE ON THE PAGE. An archive with no zips in it prints the directories that were
+     searched, because "nothing was ever lost" and "nothing was examined" are opposite claims and a zero renders
+     identically for both. And the gap between last-present and first-absent is shown as a RANGE, because the
+     ship ritual's own trim step keeps only the two newest zips -- the archive is SPARSE BY DESIGN and narrowing
+     the range further needs a build nobody kept. -->
+<html lang="en"><head><meta charset="utf-8"><title>Module history -- SweK</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --ink:#cfe8f2; --dim:#7fa8bb; --line:#1e4a5a; --warn:#e8b98a; --good:#8fd0a8; }
+  body { margin:0; background:#070c11; color:var(--ink); font:14px/1.55 system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 3px; font-size:17px; }
+  h2 { font-size:14px; margin:22px 0 6px; color:var(--dim); }
+  main { padding:14px 16px 28px; max-width:1040px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  input, button { background:#0d1620; color:var(--ink); border:1px solid var(--line);
+                  border-radius:6px; padding:5px 9px; font:inherit; }
+  input { min-width:320px; }
+  button { cursor:pointer; } button:hover { background:#14212c; }
+  button.primary { border-color:#2a5f73; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  table { border-collapse:collapse; width:100%; font-size:12px; margin-top:8px; }
+  th, td { text-align:left; padding:3px 8px; border-bottom:1px solid #12242e; vertical-align:top; }
+  th { color:var(--dim); font-weight:600; }
+  td.mono { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .good { color:var(--good); } .warn { color:var(--warn); } .dim { color:var(--dim); }
+  .msg { margin-top:8px; color:var(--dim); font-size:12px; }
+  .why { color:var(--dim); font-size:12px; max-width:820px; margin-top:16px; }
+  .refuse { border:1px solid var(--warn); border-radius:6px; padding:8px 10px; color:var(--warn);
+            font-size:12px; margin-top:8px; }
+</style></head><body>
+<header>
+  <h1>Module history</h1>
+  <div class="dim" style="font-size:12px">Which shipped zip last held a file, and which round removed it.</div>
+</header>
+<main>
+  <div id="archive" class="msg">reading the archive...</div>
+  <div class="row" style="margin-top:8px">
+    <input id="dir" placeholder="D:\SweK_Archives  -- a folder holding SweK_Engine_v*.zip" autocomplete="off">
+    <button id="addDir">Add folder</button>
+  </div>
+  <div id="dirOut" class="msg"></div>
+
+  <h2>Find one path</h2>
+  <div class="row">
+    <input id="path" placeholder="ui/PerfHUD.js" autocomplete="off">
+    <button id="find" class="primary">History</button>
+  </div>
+  <div id="findOut"></div>
+
+  <h2>Still referenced, still missing</h2>
+  <div class="row">
+    <button id="scan">Scan the tree</button>
+    <button id="restore" disabled>Restore checked</button>
+  </div>
+  <div id="scanOut" class="msg">Not run yet.</div>
+
+  <div class="why">
+    A path is listed here only when something in the tree still <em>imports</em> it -- static, require or a
+    literal <code>import()</code>. A file nothing references is finished with; a file still imported is a defect
+    somebody will meet. Restore never overwrites: a path already present is refused rather than replaced, because
+    writing an older copy over newer work is the one failure that would be hardest to notice afterwards.
+  </div>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function get(url) {
+    const r = await fetch(url);
+    // .ok BEFORE parsing -- a 500 body is not a measurement, and a page that renders one as data is lying.
+    if (!r.ok) { let why = r.status + " " + r.statusText; try { const j = await r.json(); if (j && j.why) why = j.why; } catch {} throw new Error(why); }
+    return await r.json();
+}
+
+let builds = [];
+
+async function loadArchive() {
+    try {
+        const j = await get("/modulehistory");
+        builds = j.builds || [];
+        if (!builds.length) {
+            // NAME THE DIRECTORIES. An empty archive rendered as "0 builds" reads as "nothing was lost".
+            $("archive").innerHTML = '<div class="refuse">No <code>SweK_Engine_v*.zip</code> found, so nothing can be'
+                + ' searched -- this is not a clean result. Looked in:<br>'
+                + (j.searched || []).map((s) => "&nbsp;&nbsp;" + esc(s.dir)).join("<br>") + "</div>";
+            return;
+        }
+        $("archive").innerHTML = '<span class="good">' + builds.length + " build(s)</span> in the archive: "
+            + builds.map((b) => esc(b.version)).join(", ")
+            + ' <span class="dim">-- the ship ritual keeps only the newest two, so this is sparse by design.</span>';
+    } catch (e) { $("archive").innerHTML = '<div class="refuse">Could not read the archive: ' + esc(e.message) + "</div>"; }
+}
+
+$("find").onclick = async () => {
+    const p = $("path").value.trim();
+    if (!p) { $("findOut").innerHTML = '<div class="refuse">Enter a path. An empty search would return nothing and look like an answer.</div>'; return; }
+    $("findOut").innerHTML = '<div class="msg">searching...</div>';
+    try {
+        const h = await get("/modulehistory/find?path=" + encodeURIComponent(p));
+        let out = '<table><tr><th>build</th><th>this path</th></tr>';
+        for (const r of h.rows) {
+            const state = r.unreadable ? '<span class="warn">UNREADABLE ' + esc(r.unreadable) + "</span>"
+                        : r.present ? '<span class="good">present</span>' : '<span class="dim">absent</span>';
+            out += "<tr><td class=mono>" + esc(r.version) + "</td><td>" + state + "</td></tr>";
+        }
+        out += "</table><div class=msg>";
+        out += "In the tree now: " + (h.inTree ? '<span class="good">yes</span>' : '<span class="warn">no</span>') + ". ";
+        if (!h.everPresent) out += "Not present in any examined build -- either it never shipped, or it predates every archive kept here.";
+        else if (h.vanishedBetween) out += "Last present <b>" + esc(h.vanishedBetween[0]) + "</b>, first absent <b>" + esc(h.vanishedBetween[1])
+            + "</b>. The round that removed it is somewhere in those " + h.gapVersions + " version(s) -- narrowing it further needs a zip from inside the gap.";
+        else out += "Present as recently as <b>" + esc(h.lastPresent) + "</b>.";
+        out += "</div>";
+        $("findOut").innerHTML = out;
+    } catch (e) { $("findOut").innerHTML = '<div class="refuse">' + esc(e.message) + "</div>"; }
+};
+
+$("scan").onclick = async () => {
+    $("scanOut").innerHTML = '<div class="msg">walking the tree...</div>';
+    $("restore").disabled = true;
+    try {
+        const j = await get("/modulehistory/recoverable");
+        if (!j.rows.length) { $("scanOut").innerHTML = '<div class="msg good">Nothing referenced is missing.</div>'; return; }
+        // THE HEADLINE IS THE REAL COUNT. A total that mixes a broken import with a commented-out line and an
+        // optional build output is the same mistake as a bare count of dangling imports -- it reads as a backlog
+        // when it is a question, and a list where most rows are noise trains you to skim past the one that is not.
+        const LABEL = { missing: "Genuinely missing", "optional-build": "Optional build outputs -- absent BY DESIGN",
+                        fixture: "Gate fixtures -- code-shaped strings, not files", commented: "Commented out -- not a reference at all" };
+        const notes = Object.entries(j.counts || {}).filter(([k]) => k !== "missing");
+        // NEVER RENDER undefined AS A NUMBER. A missing field printed raw looks like a measurement of nothing,
+        // and that is exactly how "undefined genuinely missing" reached Keith's screen.
+        if (typeof j.realCount !== "number") {
+            $("scanOut").innerHTML = '<div class="refuse">The server did not send a realCount. The page and the'
+                + " bridge disagree about the shape of a scan -- that is a version mismatch, not an empty result.</div>";
+            return;
+        }
+        let out = '<div class="msg"><b class="' + (j.realCount ? "warn" : "good") + '">' + j.realCount
+                + "</b> genuinely missing, <b>" + j.recoverableCount + "</b> recoverable"
+                + (notes.length ? ' <span class="dim">-- also listed, not defects: ' + notes.map(([k, n]) => n + " " + k).join(", ") + "</span>" : "")
+                + "</div>";
+        for (const kind of ["missing", "optional-build", "fixture", "commented"]) {
+            const group = j.rows.filter((r) => r.kind === kind);
+            if (!group.length) continue;
+            out += "<h2>" + esc(LABEL[kind]) + "</h2><table><tr><th></th><th>path</th><th>recover from</th><th>wanted by</th></tr>";
+            for (const r of group) {
+                const box = (r.recoverable && kind === "missing") ? '<input type="checkbox" class="pick" data-p="' + esc(r.target) + '" checked>' : "";
+                const from = r.recoverable ? '<span class="good">' + esc(r.from) + "</span>"
+                           : '<span class="dim">not in any archived build</span>';
+                out += "<tr><td>" + box + "</td><td class=mono>" + esc(r.target) + "</td><td>" + from
+                     + '</td><td class="dim">' + esc(r.referrers.slice(0, 3).join(", ")) + (r.referrerCount > 3 ? " +" + (r.referrerCount - 3) : "")
+                     + (r.kindNote ? '<br><span style="opacity:.7">' + esc(r.kindNote) + "</span>" : "") + "</td></tr>";
+            }
+            out += "</table>";
+        }
+        $("scanOut").innerHTML = out;
+        // only the genuinely-missing rows are pre-checked, so Restore never offers to "recover" a comment
+        $("restore").disabled = j.rows.filter((r) => r.kind === "missing" && r.recoverable).length === 0;
+    } catch (e) { $("scanOut").innerHTML = '<div class="refuse">' + esc(e.message) + "</div>"; }
+};
+
+$("restore").onclick = async () => {
+    const paths = [...document.querySelectorAll(".pick:checked")].map((c) => c.dataset.p);
+    if (!paths.length) return;
+    $("restore").disabled = true;
+    try {
+        const r = await fetch("/modulehistory/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j && j.why ? j.why : r.status + " " + r.statusText);
+        let out = '<div class="msg"><span class="good">restored ' + j.restored.length + "</span>";
+        if (j.refused.length) out += ', <span class="warn">refused ' + j.refused.length + "</span>";
+        out += "</div><table><tr><th>path</th><th>outcome</th></tr>";
+        for (const x of j.restored) out += "<tr><td class=mono>" + esc(x.path) + '</td><td class="good">restored from ' + esc(x.from) + " (" + x.bytes + " bytes)</td></tr>";
+        for (const x of j.refused) out += "<tr><td class=mono>" + esc(x.path) + '</td><td class="warn">' + esc(x.why) + "</td></tr>";
+        out += "</table><div class=msg>Re-scan to confirm, then re-run the import gates.</div>";
+        $("scanOut").innerHTML = out;
+    } catch (e) { $("scanOut").innerHTML = '<div class="refuse">' + esc(e.message) + "</div>"; }
+};
+
+$("addDir").onclick = async () => {
+    const d = $("dir").value.trim();
+    if (!d) return;
+    $("dirOut").textContent = "checking...";
+    try {
+        const r = await fetch("/modulehistory/dirs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add: d }) });
+        const j = await r.json();
+        if (!j.ok) { $("dirOut").innerHTML = '<div class="refuse">' + esc(j.why) + "</div>"; return; }
+        // A FOLDER WITH NO ZIPS IN IT IS REPORTED, not silently accepted -- otherwise the page goes straight
+        // back to answering "not in any archived build" out of a directory it cannot actually read.
+        $("dirOut").innerHTML = j.why ? '<div class="refuse">' + esc(j.why) + "</div>"
+                                      : '<span class="good">added ' + esc(j.dir) + " -- " + j.zips + " zip(s)</span>";
+        $("dir").value = "";
+        loadArchive();
+    } catch (e) { $("dirOut").innerHTML = '<div class="refuse">' + esc(e.message) + "</div>"; }
+};
+
+loadArchive();
+</script>
+</body></html>

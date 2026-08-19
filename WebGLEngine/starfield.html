@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Starfield — telemetry">
+<meta name="demo:desc" content="Live Starfield telemetry (health, O2, level, position) via the SFSE Console API, plus a console command box. Runs on the PC bridge.">
+<title>🚀 Starfield — SweK Engine</title>
+<style>
+  :root { --bg:#05080f; --panel:#0a1422; --edge:#16314e; --blue:#7dd3ff; --cyan:#8ff0ff; --orange:#ff9d54; --txt:#dbe8f5; --dim:#6f8aa6; --good:#7dffb0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; }
+  body {
+    background:radial-gradient(ellipse at 50% -10%, #0a1a30 0%, #05080f 60%, #02040a 100%);
+    color:var(--txt); font:14px/1.45 "Inter",system-ui,Segoe UI,Roboto,sans-serif; min-height:100vh;
+  }
+  /* faint starfield */
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+    background-image:radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 60%, #cfe, transparent), radial-gradient(1px 1px at 40% 80%, #9bd, transparent), radial-gradient(1px 1px at 85% 20%, #fff, transparent), radial-gradient(1px 1px at 10% 70%, #bdf, transparent); background-repeat:repeat; }
+  #bar, .wrap { position:relative; z-index:1; }
+  #bar { display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--edge); position:sticky; top:0; background:linear-gradient(180deg,#081320,#05080f); }
+  #bar h1 { font-size:18px; margin:0; letter-spacing:3px; text-transform:uppercase; font-weight:600; }
+  #bar h1 small { color:var(--orange); font-size:11px; letter-spacing:2px; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { padding:16px 18px 60px; max-width:920px; margin:0 auto; }
+  h2 { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:var(--orange); margin:22px 0 10px; border-bottom:1px solid var(--edge); padding-bottom:5px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px 15px; flex:1; min-width:140px; box-shadow:inset 0 1px 0 rgba(125,211,255,.06); }
+  .lbl { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; }
+  .big { font-size:30px; font-weight:700; margin-top:3px; color:var(--cyan); }
+  .bar { height:20px; border:1px solid var(--edge); border-radius:4px; background:#04101d; position:relative; overflow:hidden; margin-top:7px; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#2b6e9e,var(--blue)); box-shadow:0 0 10px rgba(125,211,255,.5); transition:width .4s ease; }
+  .bar > b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+  .bar.o2 > i { background:linear-gradient(90deg,#1f7d63,var(--good)); }
+  .mono { font-family:ui-monospace,Consolas,monospace; }
+  #console { width:100%; min-height:120px; background:#04101d; color:#bfe6ff; border:1px solid var(--edge); border-radius:8px; padding:10px; font:12px/1.4 ui-monospace,Consolas,monospace; white-space:pre-wrap; overflow:auto; }
+  .cmdRow { display:flex; gap:7px; margin-top:8px; }
+  #cmd { flex:1; padding:8px 10px; background:#04101d; color:#dbe8f5; border:1px solid var(--edge); border-radius:8px; font:12px ui-monospace,Consolas,monospace; }
+  .btn { padding:8px 14px; background:#10283f; color:var(--blue); border:1px solid var(--edge); border-radius:8px; cursor:pointer; font-size:12px; }
+  .btn:hover { background:#163750; }
+  .chip { display:inline-block; font-size:10px; padding:3px 9px; border:1px solid var(--edge); border-radius:10px; color:var(--blue); margin:2px 4px 2px 0; cursor:pointer; }
+  #offline { text-align:center; padding:60px 20px; color:var(--dim); }
+  .quick { margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="bar"><h1>Starfield <small>CONSTELLATION LINK</small></h1><span id="status">connecting…</span><button class="btn" id="refresh">REFRESH</button></div>
+<div class="wrap">
+  <div id="offline">No link to Starfield.<br><span class="lbl" style="text-transform:none;letter-spacing:0;">Launch via <span class="mono">sfse_loader.exe</span> with the SFSE Console API plugin, then enable the connector in Settings → Starfield.</span></div>
+  <div id="content" style="display:none;">
+    <div class="row">
+      <div class="card"><div class="lbl">Level</div><div class="big" id="level">—</div></div>
+      <div class="card"><div class="lbl">Position</div><div class="big mono" id="pos" style="font-size:16px;">—</div></div>
+    </div>
+    <h2>Vitals</h2>
+    <div class="row">
+      <div class="card"><div class="lbl">Health</div><div class="bar"><i id="hpfill" style="width:0%"></i><b id="hptxt">—</b></div></div>
+      <div class="card"><div class="lbl">Oxygen</div><div class="bar o2"><i id="o2fill" style="width:0%"></i><b id="o2txt">—</b></div></div>
+    </div>
+    <h2>Console</h2>
+    <div class="quick">
+      <span class="chip" data-cmd="player.getav Health">getav Health</span>
+      <span class="chip" data-cmd="player.getav O2">getav O2</span>
+      <span class="chip" data-cmd="player.getlevel">getlevel</span>
+      <span class="chip" data-cmd="GetSFSEVersion">SFSE version</span>
+    </div>
+    <div id="console" class="mono">› console ready</div>
+    <div class="cmdRow"><input id="cmd" placeholder="console command, e.g. player.getav Health" autocomplete="off"><button class="btn" id="send">Send</button></div>
+    <div class="lbl" style="margin-top:6px;text-transform:none;letter-spacing:0;">Sends to the SFSE Console API on the bridge PC. The connector must be enabled.</div>
+  </div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : null;
+  const conEl = () => $("console");
+  function render(s) {
+    if (!s || !s.connected || !s.ready) {
+      $("offline").style.display = "block"; $("content").style.display = "none";
+      $("status").textContent = s && s.connected ? "linked — waiting for data…" : (s && s.error ? ("(" + s.error + ")") : "no link");
+      return;
+    }
+    $("status").textContent = "● LINKED " + s.host + ":" + s.port;
+    $("offline").style.display = "none"; $("content").style.display = "block";
+    const p = s.player || {};
+    $("level").textContent = p.level != null ? p.level : "—";
+    const hp = num(p.health); $("hpfill").style.width = hp != null ? Math.max(0, Math.min(100, hp)) + "%" : "0%"; $("hptxt").textContent = hp != null ? Math.round(hp) + " HP" : "—";
+    const o2 = num(p.o2); $("o2fill").style.width = o2 != null ? Math.max(0, Math.min(100, o2)) + "%" : "0%"; $("o2txt").textContent = o2 != null ? Math.round(o2) + "% O₂" : "—";
+    const pos = p.pos || {}; const c = ["x","y","z"].map(k => pos[k] != null ? Math.round(pos[k]) : "?");
+    $("pos").textContent = "(" + c.join(", ") + ")";
+  }
+  async function load() { try { const r = await fetch("/starfield/state", { cache:"no-store" }); render(await r.json()); } catch(e){ $("status").textContent = "bridge unreachable"; } }
+  function logLine(t){ const e = conEl(); e.textContent += "\n" + t; e.scrollTop = e.scrollHeight; }
+  async function runCmd(c){ if(!c.trim()) return; logLine("› " + c); try { const j = await (await fetch("/starfield/command",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({command:c})})).json(); logLine(j.ok ? String(j.text||"(no output)").trim() : ("✕ " + (j.error||"failed"))); } catch(e){ logLine("✕ " + e.message); } }
+  $("refresh").onclick = load;
+  $("send").onclick = () => { runCmd($("cmd").value); $("cmd").value = ""; };
+  $("cmd").addEventListener("keydown", e => { if(e.key==="Enter"){ runCmd($("cmd").value); $("cmd").value=""; } });
+  document.querySelectorAll(".chip").forEach(ch => ch.onclick = () => runCmd(ch.dataset.cmd));
+  load(); setInterval(load, 2000);
+</script>
+<script src="kiosk.js"></script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Angle of repose - two solvers against atan(mu) (v3630)</title>
+<meta name="demo:desc" content="Two independent solvers - box3d rigid-body wasm and an XPBD particle solver - both bisect for the angle at which a block slides, and both are graded against atan(mu), the closed form neither is told.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e} button:disabled{opacity:.45;cursor:default}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:200px}
+</style></head><body><div id="w">
+<h1>The angle of repose &mdash; two solvers, one closed form</h1>
+<div class="sub">A block on a slope slides when <code>tan&theta; &gt; &mu;</code>, so the critical angle is
+<b><code>atan(&mu;)</code></b>. Two completely independent solvers bisect for it here &mdash; a <b>rigid-body wasm</b>
+solver (box3d) and an <b>XPBD particle</b> solver &mdash; and <b>neither is told the answer while it searches</b>.</div>
+<div class="law">This page exists because asking for it found a defect.
+<code>physics/mechanics/contactKeys.mjs</code> imports <code>node:url</code> and the Node box3d bootstrap
+<b>at module scope</b>, so no browser could ever have imported it &mdash; the second instance of a fault first found
+at v3617. The arithmetic <b>moved</b> to <code>physics/mechanics/reposeOps.mjs</code>, which has no imports at all
+and takes the wasm module as a parameter; its gate asserts the two are <b>the same function object</b> rather than
+two copies that agree today.</div>
+<h2>Run it</h2>
+<div class="panel">
+  <div class="row">
+    <label>&mu; <input id="mu" type="range" min="0.1" max="1.4" step="0.05" value="0.5"></label>
+    <span id="muv" class="dim"></span>
+    <button id="go" class="good">initialise box3d and grade both</button>
+    <span id="stat" class="dim"></span>
+  </div>
+  <canvas id="cv" width="960" height="260"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>Both solvers land above the key, and they do not agree with each other.</b> Measured headless:
+box3d is out by 3.52% / 2.24% / 1.59% in <code>tan&theta;</code> at &mu; = 0.3 / 0.5 / 0.8, the XPBD solver by
+0.146% / 0.100% / 0.082%. A solver that scattered either side would just be noisy; one that is always high has a
+mechanism. <b>I expected that mechanism to be the detector and it is not</b> &mdash; tightening the speed threshold
+33&times; moves box3d's excess by nothing at all, so the 2.2% is its own friction cone, not a measurement artefact.</div>
+<div class="law"><b>Past &mu; = 1 the fixture stops being valid, and the sign flips to say so.</b> A unit cube
+<b>tips</b> at 45&deg; (<code>tan = 1</code>) whatever the friction is, so above &mu; = 1 the geometry takes over and
+<code>atan(&mu;)</code> is no longer the right key for <i>this block</i>. Drag &mu; past 1.0 and watch box3d fall
+below the line &mdash; not a smaller error, a different mechanism.</div>
+<div class="law">Graded headless by <code>physics/mechanics/reposeOps-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Neither solver was edited by this round.</div>
+<script type="module">
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { gradeBoth } from "/physics/mechanics/reposeOps.mjs";
+import { criticalAngle as xpbdDeg } from "/physics/xpbd/frictionKey.mjs";
+const $=(i)=>document.getElementById(i);
+const show=()=>{$("muv").textContent="\u03bc = "+(+$("mu").value).toFixed(2)+
+  "   atan(\u03bc) = "+(180/Math.PI*Math.atan(+$("mu").value)).toFixed(4)+"\u00b0";};
+$("mu").oninput=show; show();
+function draw(exactDeg,boxDeg,xDeg){
+  const cv=$("cv"),g=cv.getContext("2d"),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);g.fillStyle="#080a0f";g.fillRect(0,0,W,H);
+  const ox=90,oy=H-56,len=380;
+  const ramp=(deg,col,label,dash)=>{const t=deg*Math.PI/180;
+    g.strokeStyle=col;g.lineWidth=2;if(dash)g.setLineDash(dash);
+    g.beginPath();g.moveTo(ox,oy);g.lineTo(ox+len*Math.cos(t),oy-len*Math.sin(t));g.stroke();
+    g.setLineDash([]);g.lineWidth=1;g.fillStyle=col;
+    g.fillText(label,ox+len*Math.cos(t)+6,oy-len*Math.sin(t));return t;};
+  g.strokeStyle="#3a2b2b";g.setLineDash([3,5]);
+  g.beginPath();g.moveTo(ox,oy);g.lineTo(ox+len*Math.cos(Math.PI/4),oy-len*Math.sin(Math.PI/4));g.stroke();g.setLineDash([]);
+  g.fillStyle="#6b4a4a";g.fillText("45\u00b0 tipping limit",ox+len*Math.cos(Math.PI/4)+6,oy-len*Math.sin(Math.PI/4)-14);
+  const te=ramp(exactDeg,"#8fe0a8","atan(\u03bc) = "+exactDeg.toFixed(3)+"\u00b0");
+  if(boxDeg!==null) ramp(boxDeg,"#9ab6e8","box3d "+boxDeg.toFixed(3)+"\u00b0",[6,4]);
+  if(xDeg!==null) ramp(xDeg,"#e8c49a","xpbd "+xDeg.toFixed(3)+"\u00b0",[2,3]);
+  const d=190,bx=ox+d*Math.cos(te),by=oy-d*Math.sin(te),s=26;
+  g.save();g.translate(bx,by);g.rotate(-te);
+  g.fillStyle="#2b3a58";g.strokeStyle="#9ab6e8";g.fillRect(-s/2,-s,s,s);g.strokeRect(-s/2,-s,s,s);g.restore();
+}
+$("go").onclick=async()=>{
+  const mu=+$("mu").value;
+  $("go").disabled=true;$("stat").textContent="loading box3d\u2026";$("stat").className="dim";
+  const st=await box3d.init();
+  const m=st.ready?box3d.mod():null;
+  $("stat").textContent=st.ready?"box3d ready":"box3d NOT available \u2014 "+st.reason;
+  $("stat").className=st.ready?"ok":"bad";
+  await new Promise(r=>setTimeout(r,0));
+  const g=gradeBoth(m,mu,{xpbdDeg});
+  const rows=[["closed form atan(\u03bc)",g.exactDeg.toFixed(5)+"\u00b0",g.exactTan.toFixed(6),
+    "<span class='dim'>told to neither solver</span>"]];
+  if(g.box3d) rows.push(["box3d (rigid-body wasm)",g.box3d.deg.toFixed(5)+"\u00b0",g.box3d.tan.toFixed(6),
+    "<span class='"+(g.box3d.relTan<0.05?"warn":"bad")+"'>tan out by "+(100*g.box3d.relTan).toFixed(3)+"% "+
+    (g.box3d.tan>mu?"ABOVE":"BELOW")+"</span>"]);
+  else rows.push(["box3d","&mdash;","&mdash;","<span class='bad'>not loaded \u2014 stated absence, not a skip</span>"]);
+  rows.push(["xpbd (particle solver)",g.xpbd.deg.toFixed(5)+"\u00b0",g.xpbd.tan.toFixed(6),
+    "<span class='"+(g.xpbd.relTan<0.01?"ok":"warn")+"'>tan out by "+(100*g.xpbd.relTan).toFixed(3)+"% "+
+    (g.xpbd.tan>mu?"ABOVE":"BELOW")+"</span>"]);
+  if(g.solverGap!==null) rows.push(["solver-to-solver gap",(180/Math.PI*g.solverGap).toFixed(5)+"\u00b0","&mdash;",
+    "<span class='dim'>reported only AFTER both are graded against the key</span>"]);
+  if(mu>1) rows.push(["\u03bc &gt; 1","&mdash;","&mdash;",
+    "<span class='bad'>the block TIPS at 45\u00b0; atan(\u03bc) is no longer the right key for this block</span>"]);
+  $("t").innerHTML="<tr><th>route</th><th>critical angle</th><th>tan</th><th>against the key</th></tr>"+
+    rows.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");
+  draw(g.exactDeg,g.box3d?g.box3d.deg:null,g.xpbd.deg);
+  $("go").disabled=false;
+};
+</script>
+</div></body></html>

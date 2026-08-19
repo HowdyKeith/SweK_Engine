@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — the cantilever beam</title>
+<meta name="demo:desc" content="Two exact keys from one discretisation that fail in different ways. Static: the tip deflection is exactly FL^3/3EI. Dynamic: the vibration frequencies are roots of cos(b)cosh(b) = -1, so the ratios 6.2669 and 17.5475 are irrational numbers no plausible bug produces by accident. A tenfold stiffness change moves the deflection tenfold and leaves every ratio bit-identical, which is why one key cannot replace the other.">
+<style>
+  html,body{margin:0;background:#05070d;color:#cfe0ff;font:13px ui-monospace,Menlo,monospace}
+  #w{max-width:900px;margin:0 auto;padding:18px;line-height:1.65}
+  canvas{border:1px solid #22304a;border-radius:6px;width:100%}
+  button{background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:6px 11px;font:12px ui-monospace,monospace;cursor:pointer;margin-right:6px}
+  table{border-collapse:collapse;margin-top:10px}td,th{border:1px solid #22304a;padding:5px 10px}
+  .num{text-align:right}.dim{color:#7f96b8}.good{color:#9be15d}
+</style>
+</head>
+<body><div id="w">
+<h2 style="margin:0 0 4px;">The cantilever beam</h2>
+<div class="dim">Clamped at the left, free at the right. <b>Static:</b> a tip load deflects it by exactly FL&sup3;/3EI. <b>Dynamic:</b> it rings at frequencies set by the roots of cos(b)cosh(b) = &minus;1, so f2/f1 = 6.2669 and f3/f1 = 17.5475 are irrational. The two keys catch different mistakes — one wrong boundary row broke both at once while this was built. Gate: <code>physics/elasticity/beam-selfcheck.mjs</code>.</div>
+<p><button id="run">Load it and ring it</button><span id="st" class="dim"></span></p>
+<canvas id="c" width="880" height="230"></canvas>
+<div id="out"></div>
+</div>
+<script type="module">
+import { measureTipDeflection, measureModes, BETA } from "./physics/elasticity/beam.js";
+import { measureBuckling, criticalLoad } from "./physics/elasticity/buckling.js";
+const c=document.getElementById("c"),x=c.getContext("2d"),out=document.getElementById("out"),st=document.getElementById("st");
+function draw(w){
+  x.fillStyle="#05070d";x.fillRect(0,0,880,230);
+  x.fillStyle="#22304a";x.fillRect(40,40,10,150);         // the wall
+  if(!w){x.strokeStyle="#22304a";x.beginPath();x.moveTo(50,115);x.lineTo(840,115);x.stroke();return;}
+  const mx=Math.max(...w.map(Math.abs))||1;
+  x.strokeStyle="rgba(89,209,255,0.95)";x.lineWidth=2;x.beginPath();
+  x.moveTo(50,115);
+  for(let i=0;i<w.length;i++){const X=50+790*(i+1)/w.length,Y=115+ (w[i]/mx)*80; i?x.lineTo(X,Y):x.moveTo(X,Y);}
+  x.stroke();x.lineWidth=1;
+  x.strokeStyle="#22304a";x.setLineDash([3,3]);x.beginPath();x.moveTo(50,115);x.lineTo(840,115);x.stroke();x.setLineDash([]);
+  x.fillStyle="#7f96b8";x.fillText("undeflected centreline",640,110);
+  x.fillStyle="#9be15d";x.fillText("tip load F", 780, 115+(w[w.length-1]/mx)*80-10);
+}
+document.getElementById("run").onclick=()=>{
+  st.textContent=" solving…";setTimeout(()=>{
+    const rows=[50,100,200].map(n=>{const r=measureTipDeflection({n});return {n,...r,rel:Math.abs(r.tip-r.exact)/r.exact};});
+    draw(Array.from(rows[2].w));
+    const md=measureModes({n:120,count:3});
+    const rm=[md.omegas[1]/md.omegas[0],md.omegas[2]/md.omegas[0]];
+    const re=[md.exact[1]/md.exact[0],md.exact[2]/md.exact[0]];
+    let h="<table><tr><th>grid</th><th class='num'>tip deflection</th><th class='num'>exact FL³/3EI</th><th class='num'>relative</th></tr>";
+    for(const r of rows) h+="<tr><td>n="+r.n+"</td><td class='num'>"+r.tip.toFixed(6)+"</td><td class='num'>"+r.exact.toFixed(6)+"</td><td class='num'>"+r.rel.toExponential(2)+"</td></tr>";
+    h+="</table><div class='dim' style='margin-top:6px'>error falls "+(rows[0].rel/rows[1].rel).toFixed(2)+"x then "+(rows[1].rel/rows[2].rel).toFixed(2)+
+       "x per doubling — second order, so what remains is the discretisation and not a leak.</div>";
+    h+="<table style='margin-top:12px'><tr><th>mode ratio</th><th class='num'>measured</th><th class='num'>exact (cos·cosh = −1)</th></tr>"+
+       "<tr><td>f2/f1</td><td class='num'>"+rm[0].toFixed(4)+"</td><td class='num'>"+re[0].toFixed(4)+"</td></tr>"+
+       "<tr><td>f3/f1</td><td class='num'>"+rm[1].toFixed(4)+"</td><td class='num'>"+re[1].toFixed(4)+"</td></tr></table>";
+    h+="<div class='dim' style='margin-top:6px'>β roots: "+BETA.map(b=>b.toFixed(6)).join(", ")+
+       ". The <b>ratios</b> are more accurate than the absolute frequencies because the grid error is common to all modes and cancels — a ratio that were worse would mean the modes were wrong in different ways.</div>";
+    // v3408 -- THE THIRD KEY ON THE SAME OPERATOR. Static asks where a loaded beam ends up, vibration asks how an
+    // unloaded one rings, and buckling asks when it stops being stable. All three run through one matrix.
+    const bk=measureBuckling({n:120,count:3});
+    h+="<table style='margin-top:12px'><tr><th>buckling load</th><th class='num'>measured</th><th class='num'>exact (odd squares x &pi;&sup2;/4)</th></tr>";
+    for(let i=0;i<3;i++) h+="<tr><td>P"+(i+1)+"</td><td class='num'>"+bk.loads[i].toFixed(4)+"</td><td class='num'>"+bk.exact[i].toFixed(4)+"</td></tr>";
+    h+="</table><div class='dim' style='margin-top:6px'>ratios "+(bk.loads[1]/bk.loads[0]).toFixed(4)+" and "+(bk.loads[2]/bk.loads[0]).toFixed(4)+
+       " against <b>9</b> and <b>25</b>. An integer is a far harder target than a fitted constant. "+
+       "The geometric stiffness is written as an energy form D&#7488;D: hand-rolling its rows produced a lowest 'critical load' of 0.152 that HALVED with the grid, "+
+       "a null-space ghost sitting below the true 2.467 where it looks alarming rather than obviously wrong.</div>";
+    out.innerHTML=h;st.textContent="";
+  },20);
+};
+draw(null);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body></html>

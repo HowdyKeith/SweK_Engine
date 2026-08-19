@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — CloudEdge Camera</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:680px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); } .note.warn { background:#221c10; border-color:#5a4a22; }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; margin:10px 0; background:var(--panel); }
+  label { display:block; color:var(--dim); font-size:12px; margin:10px 0 4px; }
+  input, select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > div { flex:1; min-width:130px; }
+  .url { word-break:break-all; background:#0c1411; border:1px solid var(--line); border-radius:7px; padding:9px; color:var(--go); font-size:12px; margin-top:6px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:8px 13px; font:inherit; cursor:pointer; }
+  button.sec { color:var(--dim); border-color:var(--line); background:#10151d; }
+  #msg { margin-top:10px; font-size:12px; color:var(--dim); }
+  #msg.ok { color:var(--ok); } #msg.bad { color:var(--bad); }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">📷</span> CloudEdge Camera <span style="color:var(--dim);font-weight:400;">· local RTSP → go2rtc</span></span></header>
+  <main>
+    <div class="note">
+      <b>First, in the CloudEdge app:</b> open the camera's settings and turn on <b>ONVIF</b> (a.k.a. "Local RTSP" / "LAN protocol") — it's <b>off by default</b> — and set a password. The username is always <b>admin</b> (RTSP on port 8554, ONVIF on 8000). Then fill this in to register the local stream with go2rtc so it shows in the camera picker.
+    </div>
+    <div class="card">
+      <div class="row">
+        <div><label>Camera IP (on your LAN)</label><input id="ip" placeholder="192.168.50.xx" /></div>
+        <div><label>Stream name (in the picker)</label><input id="name" placeholder="cloudedge_front" value="cloudedge_front" /></div>
+      </div>
+      <label>ONVIF / RTSP password (set in the app)</label>
+      <input id="pw" type="password" placeholder="the password you set" />
+      <div class="row">
+        <div><label>Quality</label><select id="quality"><option value="main">Main (high-res)</option><option value="sub">Sub (low-res / smoother)</option></select></div>
+        <div><label>Path style</label><select id="style">
+          <option value="channels">/Streaming/Channels/101 · 102 (Hikvision-family)</option>
+          <option value="slash">/main · /sub</option>
+          <option value="dahua">/cam/realmonitor?channel=1&subtype=0 (Dahua/Amcrest/Imou)</option>
+          <option value="reolink">/h264Preview_01_main (Reolink)</option>
+          <option value="tapo">/stream1 · /stream2 (Tapo/TP-Link)</option>
+          <option value="onvifsdp">/onvif1 · /live/0/onvif.sdp</option>
+          <option value="custom">Custom — type it myself ▾</option>
+        </select></div>
+      </div>
+      <div class="row" id="customRow" style="display:none">
+        <div><label>Custom RTSP path (start with /)</label><input id="customPath" placeholder="/h264Preview_01_main" /></div>
+        <div><label>Port</label><input id="port" placeholder="8554" value="8554" /></div>
+      </div>
+      <label>Built RTSP URL</label>
+      <div class="url" id="url">—</div>
+      <div class="actions">
+        <button id="add">Add to go2rtc</button>
+        <button class="sec" id="copy">Copy URL</button>
+        <button class="sec" id="check">Check picker</button>
+      </div>
+      <div id="msg"></div>
+
+      <!-- v1961 — find-my-path helper: the hard part of RTSP is the per-vendor stream path. Three ways to get it. -->
+      <div class="note" style="border-color:#2a5a3a">
+        <b>🔎 Don't know the RTSP path?</b> Every brand differs — here's how to find it:
+        <div class="actions" style="margin-top:8px;margin-bottom:4px">
+          <button id="onvifAuto" style="background:#12230f;color:#8effc4;border:1px solid #2a5a3a;">✨ Auto-detect via ONVIF (best)</button>
+          <span style="color:var(--dim);font-size:11.5px;align-self:center">— uses the IP + password above to ask the camera for its exact path</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Camera brand</label><input id="brand" placeholder="Reolink / Hikvision / Tapo / CloudEdge…" /></div>
+          <div><label>Model (optional)</label><input id="model" placeholder="RLC-810A" /></div>
+        </div>
+        <div class="actions" style="margin-top:8px">
+          <button class="sec" id="lookupDb">📖 Look up in camera database</button>
+          <button class="sec" id="lookupAi">🔎 Find my RTSP path (search)</button>
+        </div>
+        <div style="color:var(--dim);font-size:11.5px;margin-top:7px">
+          <b>Best of all:</b> if your camera does ONVIF, the go2rtc panel's <b>scan</b> can often auto-detect the exact path — no guessing. The database is iSpyConnect (the largest crowd-sourced RTSP list, per-brand); the search button pre-fills the brand + model so an AI answer or forum post fills in the path.
+        </div>
+      </div>
+    </div>
+    <div class="note warn">
+      <b>If it won't connect:</b> some CloudEdge cams only do <b>Cloud RTSP</b> (a dynamic, expiring link via Tuya's cloud) and <b>can't</b> be streamed locally — if there's no ONVIF/Local-RTSP toggle in the app, that's likely yours. Also try the other <b>path style</b> if one fails, and test the URL in <b>VLC</b> (Media → Open Network Stream) to confirm the camera side before blaming go2rtc. go2rtc must be installed &amp; running (go2rtc panel), and may need a restart to pick up the new stream.
+    </div>
+    <div class="note">
+      <b>Motion + spotlight:</b> ONVIF gives video only. For motion events and turning the camera's light on, add the cam to Home Assistant via <b>Tuya</b> or <b>LocalTuya</b> — its motion shows up as a sensor (which the Presence panel's room rules already react to) and its spotlight as a switch you can flip from the <b>Lights &amp; switches</b> panel or a rule.
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  function sanitizeName(s){ return String(s || "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "cloudedge"; }
+  function buildUrl(){
+    const ip = $("ip").value.trim();
+    const pw = $("pw").value;
+    if (!ip) return "";
+    const enc = encodeURIComponent(pw);
+    const q = $("quality").value, style = $("style").value;
+    const port = ($("port") && $("port").value.trim()) || "8554";
+    let path;
+    switch (style) {
+      case "channels": path = q === "sub" ? "/Streaming/Channels/102" : "/Streaming/Channels/101"; break;
+      case "slash":    path = q === "sub" ? "/sub" : "/main"; break;
+      case "dahua":    path = "/cam/realmonitor?channel=1&subtype=" + (q === "sub" ? "1" : "0"); break;
+      case "reolink":  path = q === "sub" ? "/h264Preview_01_sub" : "/h264Preview_01_main"; break;
+      case "tapo":     path = q === "sub" ? "/stream2" : "/stream1"; break;
+      case "onvifsdp": path = "/onvif1"; break;
+      case "custom":   path = ($("customPath") && $("customPath").value.trim()) || "/"; if (path[0] !== "/") path = "/" + path; break;
+      default:         path = "/main";
+    }
+    return "rtsp://admin:" + enc + "@" + ip + ":" + port + path;
+  }
+  function refresh(){ window._onvifUrl = null; const u = buildUrl(); $("url").textContent = u || "— (enter the camera IP)"; return u; }
+  ["ip", "pw", "quality", "style"].forEach(id => $(id).addEventListener("input", refresh));
+  $("quality").addEventListener("change", refresh); $("style").addEventListener("change", refresh);
+  // custom row toggles with the "custom" path style; port + custom path also re-build the URL
+  $("style").addEventListener("change", () => { $("customRow").style.display = $("style").value === "custom" ? "flex" : "none"; refresh(); });
+  ["customPath", "port"].forEach(id => { const el = $(id); if (el) el.addEventListener("input", refresh); });
+
+  // v1962 — ONVIF auto-detect: ask the camera itself for its exact RTSP URI (no path guessing).
+  $("onvifAuto").onclick = async () => {
+    const ip = $("ip").value.trim(); const pw = $("pw").value;
+    if (!ip) { setMsg("Enter the camera IP first.", "bad"); return; }
+    setMsg("asking the camera over ONVIF… (needs ONVIF enabled + the right password)");
+    try {
+      const r = await (await fetch("/camera/onvif-uri", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ ip, pass: pw, user: "admin" }) })).json();
+      if (!r || !r.ok) { setMsg("✗ ONVIF: " + ((r && r.error) || "no response") + ". Make sure ONVIF is ON in the app and the password matches — or use the manual path options below.", "bad"); return; }
+      // pick the main (usually first / highest-res) stream; strip creds the camera echoes back, we add our own
+      const main = r.streams[0].uri;
+      // insert our credentials into the returned URI (cameras return it without auth)
+      let withAuth = main;
+      try { const u = new URL(main); u.username = "admin"; u.password = pw; withAuth = u.toString(); } catch {}
+      $("style").value = "custom"; $("customRow").style.display = "flex";
+      try { const u = new URL(main); $("customPath").value = u.pathname + (u.search || ""); $("port").value = u.port || "554"; } catch {}
+      refresh();
+      $("url").textContent = withAuth;   // show the exact camera-reported URL
+      window._onvifUrl = withAuth;
+      setMsg("✓ ONVIF returned " + r.count + " stream(s). Using: " + main + " — click Add to register it.", "ok");
+    } catch (e) { setMsg("✗ " + (e && e.message || e), "bad"); }
+  };
+  function brandSlug(){ return String($("brand").value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+  function camQuery(){ const b = $("brand").value.trim(), m = $("model").value.trim(); return (b + " " + m).trim(); }
+  $("lookupDb").onclick = () => {
+    const slug = brandSlug();
+    // iSpyConnect (verified): the canonical crowd-sourced RTSP database, per-brand at /camera/<slug>.
+    const url = slug ? ("https://www.ispyconnect.com/camera/" + encodeURIComponent(slug)) : "https://www.ispyconnect.com/cameras";
+    window.open(url, "_blank", "noopener");
+  };
+  $("lookupAi").onclick = () => {
+    const cam = camQuery(); if (!cam) { setMsg("Enter the camera brand (and model) first.", "bad"); return; }
+    // A pre-filled question, sent through a general search (works with no login and no injection surface;
+    // Claude's own ?q= prefill was retired in 2025). The user can then click into any AI answer from there.
+    const prompt = cam + " IP camera exact RTSP stream URL path main and sub stream port default username";
+    window.open("https://www.google.com/search?q=" + encodeURIComponent(prompt), "_blank", "noopener");
+    setMsg("Opened a pre-filled search for the " + cam + " RTSP path in a new tab.", "ok");
+  };
+
+  function setMsg(t, cls){ const m = $("msg"); m.textContent = t; m.className = cls || ""; }
+
+  $("add").onclick = async () => {
+    const url = (window._onvifUrl && $("url").textContent === window._onvifUrl) ? window._onvifUrl : refresh();
+    if (!url) { setMsg("Enter the camera IP first.", "bad"); return; }
+    const name = sanitizeName($("name").value);
+    $("name").value = name;
+    setMsg("adding to go2rtc…");
+    try {
+      const r = await fetch("/go2rtc/add-stream", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ name, url }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok) setMsg("✓ added \"" + name + "\" to go2rtc config. Now check the picker (go2rtc may need a restart to load it).", "ok");
+      else setMsg("✗ " + ((j && j.error) || "could not write go2rtc config"), "bad");
+    } catch (e) { setMsg("✗ " + (e && e.message || e), "bad"); }
+  };
+
+  $("copy").onclick = async () => { const u = refresh(); if (!u) { setMsg("Nothing to copy yet.", "bad"); return; } try { await navigator.clipboard.writeText(u); setMsg("URL copied — paste into VLC to test the camera.", "ok"); } catch { setMsg("Copy failed — select the URL text manually.", "bad"); } };
+
+  $("check").onclick = async () => {
+    const name = sanitizeName($("name").value);
+    setMsg("asking go2rtc which streams it has…");
+    try {
+      const r = await fetch("/camera/streams", { cache:"no-store" });
+      const j = await r.json().catch(() => ({}));
+      if (!j || j.ok === false) { setMsg("✗ " + ((j && j.error) || "go2rtc not reachable — is it running?"), "bad"); return; }
+      const cams = j.cameras || [];
+      if (cams.indexOf(name) >= 0) setMsg("✓ \"" + name + "\" is live in the picker. It'll appear in the camera/cast picker (and can be cast to the Shield).", "ok");
+      else setMsg("Streams go2rtc currently serves: " + (cams.length ? cams.join(", ") : "(none)") + ". \"" + name + "\" isn't live yet — restart go2rtc to load the new config.", "");
+    } catch (e) { setMsg("✗ " + (e && e.message || e), "bad"); }
+  };
+
+  refresh();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

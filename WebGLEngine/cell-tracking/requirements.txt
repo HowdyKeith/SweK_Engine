@@ -1,0 +1,13 @@
+matplotlib
+networkx
+numpy
+pandas
+pillow
+scikit-image
+scipy
+zarr>=3
+
+# v2210 -- the ILP tracker (src/tracker_ilp.py, `--tracker ilp`). OPTIONAL: the classical Hungarian
+# baseline runs without them. `ilpy` brings SCIP, a free ILP backend; Gurobi is supported and not required.
+tracksdata
+ilpy

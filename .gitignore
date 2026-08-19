@@ -1,0 +1,67 @@
+# === VoxelEngine monorepo .gitignore ===
+
+# Node
+**/node_modules/
+**/package-lock.json
+npm-debug.log*
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+.venv/
+# per-tool venvs (created on the rig by the install buttons, not committed)
+camoufox_env/
+scrapling_env/
+doc_env/
+
+# Bridge runtime state + caches (regenerated; some hold local data)
+**/asset_library/
+**/tts-out/
+**/doc-out/
+**/petfbi-board.json
+**/petfbi-counts.json
+**/gen-queue.json
+**/toasts.json
+**/uitars.json
+
+# Secrets / local config — these live in ~/.voxelbridge, but never commit copies
+**/.voxelbridge/
+.env
+*.env
+**/trader.json
+**/petfbi.json
+**/tts.json
+*app*password*
+*apppw*
+
+# Build artifacts + working forks
+EngineProject_*/
+*.zip
+*.tar.gz
+
+# Large/generated binaries — uncomment if you'd rather keep them off-repo (use Git LFS)
+# **/*.onnx
+# **/*.vox
+# (the small sample GLBs in GPU_Assets are ~200KB each and fine to commit)
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# === Held back from the public mirror (v3845) ===
+# Keith's call: the CODE ships, the internal working record does not. These are the
+# session notes and claim ledger, not build inputs. They ride in the versioned zip,
+# which remains the complete build.
+# CONSEQUENCE, STATED RATHER THAN DISCOVERED: okf/claims is read by main.js,
+# predictions.html, ai-bridge/okfService-selfcheck.mjs and tools/ship/orphanTriage*.
+# On a fresh clone of this mirror those read an empty claim set.
+BACKLOG.md
+TODO.md
+WebGLEngine/okf/claims/
+WebGLEngine/okf/log.md
+Root Utils/email-draft.md

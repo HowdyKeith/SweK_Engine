@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Bot Muster">
+<meta name="demo:desc" content="Convene a squad of GPU-brain pilots into a LAN room and put on a skirmish: plan the ownership split (fair + complete), launch the bots, watch them, dismiss them. Rendezvous hashing splits the ships with no coordinator.">
+<meta name="demo:category" content="ai">
+<title>Bot Muster</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --red:#ff5d6c; --dim:#7c93b8; }
+  body { margin:0; background:#04060d; color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; padding:18px; }
+  h1 { font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 4px; }
+  .sub { color:var(--dim); margin-bottom:16px; }
+  .card { background:#0a1020; border:1px solid #16233c; border-radius:10px; padding:14px; margin-bottom:12px; max-width:720px; }
+  label { display:inline-block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-right:6px; }
+  input { background:#0c1526; color:#eaf3ff; border:1px solid #1c2942; border-radius:6px; padding:6px 8px; font:600 13px ui-monospace, monospace; width:70px; margin-right:14px; }
+  input.wide { width:150px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:8px 15px; font:600 12px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; margin-right:8px; margin-top:4px; }
+  button:hover { border-color:var(--cyan); }
+  button.go { color:var(--amber); border-color:#2a2410; } button.go:hover { border-color:var(--amber); }
+  button.stop { color:var(--red); } button.stop:hover { border-color:var(--red); }
+  .row { display:flex; flex-wrap:wrap; align-items:center; gap:6px 0; margin-bottom:10px; }
+  .chip { display:inline-block; background:#0c1526; border:1px solid #1c2942; border-radius:20px; padding:4px 11px; margin:3px 5px 3px 0; font-size:12px; }
+  .ok { color:var(--green); } .bad { color:var(--red); } .idle { color:var(--dim); }
+  pre { background:#04060d; border:1px solid #14203a; border-radius:6px; padding:10px; overflow:auto; font-size:12px; color:#b9c9e6; white-space:pre-wrap; }
+  #dryWrap { color:var(--dim); font-size:12px; margin-left:4px; }
+</style>
+</head>
+<body>
+<h1>&#128225; Bot Muster</h1>
+<div class="sub">Convene a squad of GPU-brain pilots into a LAN room and put on a skirmish.</div>
+
+<div class="card">
+  <div class="row">
+    <label>Squad</label><input id="count" type="number" value="4" min="1" max="16">
+    <label>Room</label><input id="room" class="wide" type="text" value="lan">
+    <label>System</label><input id="system" type="number" value="128">
+  </div>
+  <div class="row">
+    <label>Relay URL</label><input id="url" class="wide" type="text" value="http://192.168.50.40:9999" style="width:230px">
+    <span id="dryWrap"><input id="dry" type="checkbox" checked style="width:auto"> dry-run (simulate locally, no network)</span>
+  </div>
+  <button onclick="plan()">Plan</button>
+  <button class="go" onclick="muster()">&#9654; Muster squad</button>
+  <button onclick="refresh()">Status</button>
+  <button class="stop" onclick="dismiss()">Dismiss all</button>
+</div>
+
+<div class="card">
+  <div style="color:var(--cyan);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Ownership plan</div>
+  <div id="planChips" class="idle">Click Plan to preview the split before launch.</div>
+  <pre id="planOut" style="display:none"></pre>
+</div>
+
+<div class="card">
+  <div style="color:var(--cyan);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Mustered squad</div>
+  <div id="squad" class="idle">No bots mustered.</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const cfg = () => ({ count: +$("count").value, room: $("room").value, system: +$("system").value, url: $("url").value, dryRun: $("dry").checked });
+async function jget(u) { const r = await fetch(u); return r.json(); }
+async function jpost(u, b) { const r = await fetch(u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b || {}) }); return r.json(); }
+
+async function plan() {
+  const c = cfg();
+  const p = await jget(`/muster/plan?count=${c.count}&room=${encodeURIComponent(c.room)}&system=${c.system}&url=${encodeURIComponent(c.url)}`);
+  const chips = $("planChips"); chips.className = "";
+  const flags = [["complete", p.complete], ["fair", p.fair], ["viable", p.viable]].map(([k, v]) => `<span class="chip ${v ? "ok" : "bad"}">${v ? "&#10003;" : "&#10007;"} ${k}</span>`).join("");
+  const split = Object.entries(p.counts || {}).map(([b, n]) => `<span class="chip">${b}: ${n} ships</span>`).join("");
+  chips.innerHTML = `<div style="margin-bottom:6px">${p.squad.length} bots &middot; ${p.npcCount} hostiles &middot; room <b>${p.room}</b> &middot; system <b>${p.system}</b></div>${split}<div style="margin-top:6px">${flags} <span class="chip ${p.ok ? "ok" : "bad"}">${p.ok ? "READY" : "NOT READY"}</span></div>`;
+  const out = $("planOut"); out.style.display = "block"; out.textContent = "launch commands:\n" + (p.launch || []).join("\n");
+}
+async function muster() {
+  const r = await jpost("/muster/launch", cfg());
+  if (!r.ok) { alert("muster: " + (r.reason || r.error || "failed")); return; }
+  refresh();
+}
+async function refresh() {
+  const s = await jget("/muster/status");
+  const el = $("squad");
+  if (!s.count) { el.className = "idle"; el.textContent = "No bots mustered."; return; }
+  el.className = "";
+  el.innerHTML = `<div style="margin-bottom:6px">${s.alive}/${s.count} alive</div>` + s.bots.map(b => {
+    const state = b.alive ? `<span class="ok">flying</span>` : (b.exitCode === 0 ? `<span class="idle">done</span>` : `<span class="bad">exit ${b.exitCode}</span>`);
+    return `<span class="chip">${b.id} &middot; ${state}${b.dry ? " &middot; dry" : ""} &middot; ${(b.uptimeMs / 1000).toFixed(0)}s</span>`;
+  }).join("");
+}
+async function dismiss() { await jpost("/muster/dismiss", {}); refresh(); }
+setInterval(() => { if ($("squad").className !== "idle") refresh(); }, 3000);
+</script>
+</body>
+</html>

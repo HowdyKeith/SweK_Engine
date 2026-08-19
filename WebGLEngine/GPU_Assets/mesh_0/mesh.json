@@ -1,0 +1,7 @@
+{
+"name":"Mesh_0",
+"vertexBuffer":"vertices.bin",
+"indexBuffer":"indices.bin",
+"vertexCount":2000,
+"indexCount":2000
+}

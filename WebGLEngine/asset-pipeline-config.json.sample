@@ -1,0 +1,75 @@
+{
+    "_comment_": "Round 277/280 — asset pipeline config. Copy this to asset-pipeline-config.json (drop the .sample) and edit paths for your install. All fields optional; missing tools just skip that stage of the pipeline.",
+
+    "_comment_comfyUrl": "Where ComfyUI is running. Default is the standard install. Bridge proxies POST /prompt + GET /history calls here.",
+    "comfyUrl": "http://127.0.0.1:8188",
+
+    "_comment_cudaVoxelizerExe": "Forceflow's cuda_voxelizer. Preferred — fast and produces clean .vox. https://github.com/Forceflow/cuda_voxelizer",
+    "cudaVoxelizerExe": "C:/Tools/cuda_voxelizer.exe",
+
+    "_comment_meshToVoxExe": "MeshToVox CLI. Fallback when cuda_voxelizer isn't available. https://github.com/noahbadoa/MeshToVox",
+    "meshToVoxExe": "C:/Tools/mesh_to_vox.exe",
+
+    "_comment_voxOutDir": "Where generated .vox and refined .obj files land. Bridge serves them at /asset-pipeline/vox/<filename> and /asset-pipeline/mesh/<filename>. Created on first run.",
+    "voxOutDir": "C:/VoxelBAK/asset_pipeline_out",
+
+    "_comment_defaultDim": "Default voxelization grid size when caller doesn't specify. 64 = small detail, 128 = balanced, 256 = high detail but slow.",
+    "defaultDim": 128,
+
+    "_comment_ultrashape": "UltraShape 1.0 (PKU-YuanGroup) — diffusion-based MESH REFINEMENT. Takes a coarse mesh from Hunyuan3D-2.1 / Trellis / etc, produces a high-fidelity mesh.",
+    "_comment_ultrashapeRepoDir": "Absolute path to the cloned UltraShape-1.0 repo (contains main.py).",
+    "ultrashapeRepoDir": "C:/AI/UltraShape-1.0",
+
+    "_comment_ultrashapeConda": "Conda env name. The README creates 'ultrashape' with PyTorch 2.5.1 / CUDA 12.1. Leave null if you use ultrashapePython instead.",
+    "ultrashapeConda": "ultrashape",
+
+    "_comment_ultrashapePython": "OPTIONAL — full path to a python interpreter (e.g. a venv). When set, conda is skipped. Use this if conda activation through Node spawn doesn't work in your shell.",
+    "ultrashapePython": null,
+
+    "_comment_ultrashapeArgsTemplate": "Token array passed to python. {input} and {output} are substituted with absolute paths. Adjust after running `python main.py --help` in the UltraShape repo to match your fork's exact CLI signature.",
+    "ultrashapeArgsTemplate": ["main.py", "--input", "{input}", "--output", "{output}"],
+
+    "_comment_ultrashapeTimeoutMs": "Wall-clock timeout. 10 min default — generous for cold-start model load (~30s on Pascal) plus refine. Bumps to 30 min if you have weak hardware.",
+    "ultrashapeTimeoutMs": 600000,
+
+    "_comment_meshGenerators": "Round 281 — image-to-mesh GENERATOR registry. Same spawn pattern as UltraShape, but they take an IMAGE as input. Add a tool by editing this object; the bridge handles it generically via /asset-pipeline/generate-mesh and /race-generators. argsTemplate substitutions: {input} {output} {output_dir} {input_dir} {workdir}. outputGlob is searched relative to repoDir when the tool writes elsewhere than {output}.",
+    "meshGenerators": {
+        "instantmesh": {
+            "repoDir":      "C:/AI/InstantMesh",
+            "conda":        "instantmesh",
+            "python":       null,
+            "argsTemplate": ["run.py", "configs/instant-mesh-large.yaml", "{input}", "--output_path", "{output_dir}"],
+            "outputExt":    ".obj",
+            "outputGlob":   "outputs/instant-mesh-large/meshes/*.obj",
+            "timeoutMs":    600000
+        },
+        "hunyuan3d": {
+            "repoDir":      "C:/AI/Hunyuan3D-2.1",
+            "conda":        "hunyuan3d",
+            "python":       null,
+            "argsTemplate": ["demo.py", "--image_path", "{input}", "--output_path", "{output}"],
+            "outputExt":    ".glb",
+            "outputGlob":   "outputs/*.glb",
+            "timeoutMs":    900000
+        },
+        "unique3d": {
+            "repoDir":      "C:/AI/Unique3D",
+            "conda":        "unique3d",
+            "python":       null,
+            "argsTemplate": ["app/cli.py", "--input", "{input}", "--output", "{output}"],
+            "outputExt":    ".obj",
+            "outputGlob":   "outputs/*.obj",
+            "timeoutMs":    720000
+        },
+        "crm": {
+            "repoDir":      "C:/AI/CRM",
+            "conda":        "crm",
+            "python":       null,
+            "argsTemplate": ["run.py", "--inputdir", "{input_dir}", "--outdir", "{output_dir}"],
+            "outputExt":    ".obj",
+            "outputGlob":   "out/*.obj",
+            "timeoutMs":    600000
+        }
+    }
+}
+

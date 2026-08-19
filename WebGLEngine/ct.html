@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CT reconstruction -- graded against a phantom we know</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:9px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 14px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  label { font-size:11px; color:var(--dim); }
+  .wrap { padding:4px 18px 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; max-width:940px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:10px; }
+  .card h2 { margin:0 0 8px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.06em; }
+  canvas { display:block; width:100%; height:auto; image-rendering:pixelated; border-radius:5px; background:#01060c; }
+  .read { padding:2px 18px 16px; font-size:12px; } .read b { color:var(--amber); font-size:15px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CT reconstruction &mdash; graded against a phantom we know</h1>
+  <p>Filtered back-projection, the reconstruction inside every CT scanner, run on a phantom we define exactly. We forward-project it into a <b>sinogram</b> (the line integrals a scanner records at each angle), then reconstruct and grade against the phantom we own. Runs <code>physics/tomography/ct.js</code>. The <b>ramp filter</b> is what makes back-projection reconstruct instead of blur &mdash; toggle it off and watch the image smear. Clean-room; the straight-ray model is valid in the weak-scattering regime <code>born.js</code> bounds.</p>
+</header>
+<div class="controls">
+  <button id="filter">Ramp filter: ON</button>
+  <label>angles:</label>
+  <button id="a30" data-n="30">30</button><button id="a90" data-n="90">90</button><button id="a180" data-n="180">180</button>
+</div>
+<div class="wrap">
+  <div class="card"><h2>Phantom (ground truth)</h2><canvas id="cPhan" width="96" height="96"></canvas></div>
+  <div class="card"><h2>Sinogram (what the scanner records)</h2><canvas id="cSino" width="120" height="96"></canvas></div>
+  <div class="card"><h2>Reconstruction (FBP)</h2><canvas id="cRec" width="96" height="96"></canvas></div>
+</div>
+<div class="read" id="read"></div>
+
+<header style="margin-top:1.4em">
+  <h1>Which backprojector? &mdash; watch the shipped default turn round</h1>
+  <p>Both panels below run the SAME iteration &mdash; <code>x &larr; x + step&middot;B(b &minus; Ax)</code>, the step DERIVED per operator by power iteration &mdash; and differ only in <b>B</b>. Left uses <code>backProject</code>, the operator <code>sirt.mjs</code> has shipped since v3613. Right uses <code>matchedBackProject</code>, the transpose of <code>radon</code> built by reversing its innermost assignment (v3616: dot-product defect 8.304e-14 against backProject's 2.751e+1). <b>Let it run and watch the residual readouts.</b> The left panel sharpens, reaches a best point, and then walks away from the data &mdash; residual rising, correlation falling &mdash; because an unmatched pair is not a descent method. The right one keeps descending. Measured at THIS page's settings: at <b>30 angles</b> backProject bottoms out around iteration 600 (residual 6.62, correlation 0.9862) and is back to 6.84 / 0.9850 by 1200, while the matched adjoint goes 5.44 &rarr; 2.34 with correlation <i>rising</i> to 0.9835. At <b>90 angles</b> the same shape arrives later &mdash; backProject bottoms near iteration 900 (12.1 / 0.9972) and rises to 12.6 / 0.9966, while the matched one falls 13.0 &rarr; 3.97 and reaches 0.9992. <b>Press 30 to see it plainly; at 90 the pixels barely move and the numbers carry it.</b></p>
+  <p style="opacity:.8">A caution about a claim I got wrong on this page's first draft: v3616 measured, at <b>16</b> angles on a different phantom, that the matched operator settled at a <i>lower</i> correlation than backProject touched at its best moment &mdash; converging on the objective is not the same as being closest to the truth. <b>It holds at 30 angles here and REVERSES at 90.</b> At 30 the matched operator wins the residual (2.34 vs 6.84) and loses the correlation (0.9835 vs 0.9850); at 90 it wins both (3.97 / 0.9992 against 12.6 / 0.9966). So the correlation comparison FLIPS with angle count while the residual comparison does not &mdash; the wrinkle is an effect of SPARSE angles, not a general law. My first draft of this paragraph claimed the matched operator won both at 30, and the gate caught it by re-deriving these numbers from this page's own constants, which is why they are quoted with their settings.</p>
+</header>
+<div class="controls">
+  <button id="go">Run 2000 iterations</button>
+  <button id="stop">Stop</button>
+  <span id="iterRead" style="opacity:.75"></span>
+</div>
+<div class="wrap">
+  <div class="card"><h2>SIRT &middot; backProject <span style="opacity:.6">(shipped default)</span></h2><canvas id="cUn" width="96" height="96"></canvas><div class="read" id="readUn"></div></div>
+  <div class="card"><h2>SIRT &middot; matchedBackProject <span style="opacity:.6">(the adjoint)</span></h2><canvas id="cMa" width="96" height="96"></canvas><div class="read" id="readMa"></div></div>
+</div>
+<script type="module">
+import { phantomField, radon, backProject, filteredBackProjection, scoreRecon, angleSet } from "./physics/tomography/ct.js";
+// v3617 -- reconOps.mjs exists because sirt.mjs / matchedAdjoint.mjs / adjoint.mjs each import "node:url" for
+// their main-block guard, which a browser cannot resolve. They were STRUCTURALLY UNREACHABLE from any page.
+import { matchedBackProject, powerStep, residual } from "./physics/tomography/reconOps.mjs";
+const N = 96, nDet = 130;
+let filter = true, nAngles = 90;
+const $ = (id) => document.getElementById(id);
+const phantom = [{ cx: 0, cy: 0, a: 0.72, b: 0.9, rho: 1 }, { cx: -0.26, cy: 0.12, a: 0.22, b: 0.3, rho: -0.55 }, { cx: 0.32, cy: -0.22, a: 0.16, b: 0.16, rho: 0.7 }, { cx: 0.08, cy: 0.46, a: 0.1, b: 0.1, rho: 0.9 }, { cx: -0.1, cy: -0.4, a: 0.13, b: 0.08, rho: 0.5 }];
+const truth = phantomField(N, phantom);
+
+function paintField(cv, data, W, H) {
+  const g = cv.getContext("2d"), img = g.createImageData(W, H), d = img.data;
+  let lo = Infinity, hi = -Infinity; for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; } const span = (hi - lo) || 1;
+  for (let k = 0; k < W * H; k++) { const t = (data[k] - lo) / span; d[k*4]=40+t*215; d[k*4+1]=90+t*150; d[k*4+2]=60+t*80; d[k*4+3]=255; }
+  g.putImageData(img, 0, 0);
+}
+function paintSino(cv, sino, nDet) {
+  const g = cv.getContext("2d"), W = sino.length, H = nDet, img = g.createImageData(W, H), d = img.data;
+  let lo = Infinity, hi = -Infinity; for (const p of sino) for (const v of p) { if (v < lo) lo = v; if (v > hi) hi = v; } const span = (hi - lo) || 1;
+  for (let a = 0; a < W; a++) for (let r = 0; r < H; r++) { const t = (sino[a][r] - lo) / span, k = (r*W+a)*4; d[k]=30+t*200; d[k+1]=80+t*120; d[k+2]=100+t*100; d[k+3]=255; }
+  cv.width = W; cv.height = H; g.putImageData(img, 0, 0);
+}
+
+function run() {
+  const ang = angleSet(nAngles);
+  const sino = radon(truth, N, ang, nDet);
+  const rec = filteredBackProjection(sino, N, ang, nDet, filter);
+  const s = scoreRecon(rec, truth);
+  paintField($("cPhan"), truth, N, N);
+  paintSino($("cSino"), sino, nDet);
+  paintField($("cRec"), rec, N, N);
+  $("read").innerHTML = "correlation with truth <b>" + s.corr.toFixed(4) + "</b> &middot; normalized rms <b>" + s.rms.toFixed(3) + "</b> &middot; " + nAngles + " angles &middot; filter " + (filter ? "on" : "off (blurred back-projection)");
+}
+$("filter").onclick = () => { filter = !filter; $("filter").textContent = "Ramp filter: " + (filter ? "ON" : "OFF"); run(); };
+for (const id of ["a30", "a90", "a180"]) $(id).onclick = () => { nAngles = +$(id).dataset.n; run(); restartRace(); };
+
+// ---- the two backprojectors, side by side, ITERATED IN CHUNKS SO THE TURN-ROUND IS SOMETHING YOU WATCH ----
+// Running 2000 iterations synchronously would freeze the tab for minutes, and a frozen tab shows you a single
+// answer at one budget -- which is exactly the comparison v3616 found to be a comparison of BUDGETS rather
+// than of operators. Stepping in chunks per frame keeps the page alive AND makes the shape visible.
+let race = null;
+function makeRunner(adjoint, cv, readEl, label) {
+  const ang = angleSet(nAngles), sino = radon(truth, N, ang, nDet);
+  const step = powerStep(adjoint, N, ang, nDet).step;
+  return { adjoint, cv, readEl, label, ang, sino, step, x: new Float64Array(N * N), k: 0,
+           best: { corr: -Infinity, res: Infinity, k: 0 } };
+}
+function advance(r, chunk) {
+  for (let i = 0; i < chunk; i++) {
+    const ax = radon(r.x, N, r.ang, nDet);
+    const res = ax.map((p, a) => { const q = new Float64Array(nDet); for (let d = 0; d < nDet; d++) q[d] = r.sino[a][d] - p[d]; return q; });
+    const g = r.adjoint(res);
+    for (let j = 0; j < r.x.length; j++) r.x[j] += r.step * g[j];
+    r.k++;
+  }
+  const corr = scoreRecon(r.x, truth).corr, res = residual(r.x, r.sino, N, r.ang, nDet);
+  if (res < r.best.res) r.best = { corr, res, k: r.k };
+  paintField(r.cv, r.x, N, N);
+  const turned = r.k > r.best.k;
+  r.readEl.innerHTML = "corr <b>" + corr.toFixed(4) + "</b> &middot; residual <b>" + res.toExponential(3) + "</b>"
+    + "<br><span style='opacity:.7'>best residual " + r.best.res.toExponential(3) + " at iteration " + r.best.k
+    + (turned ? " &mdash; <b style='color:#c66'>past its best point, walking away from the data</b>" : "") + "</span>";
+}
+function restartRace() {
+  if (race) { cancelAnimationFrame(race.raf); race = null; }
+  const un = makeRunner((y) => backProject(y, N, angleSet(nAngles), nDet), $("cUn"), $("readUn"), "backProject");
+  const ma = makeRunner((y) => matchedBackProject(y, N, angleSet(nAngles), nDet), $("cMa"), $("readMa"), "matched");
+  race = { un, ma, target: 0, raf: 0 };
+  $("iterRead").textContent = "";
+}
+function tick() {
+  if (!race) return;
+  const chunk = 5;
+  if (race.un.k < race.target) advance(race.un, chunk);
+  if (race.ma.k < race.target) advance(race.ma, chunk);
+  $("iterRead").textContent = "iteration " + Math.min(race.un.k, race.target) + " / " + race.target
+    + "  \u00b7  steps derived: backProject " + race.un.step.toExponential(2) + ", matched " + race.ma.step.toExponential(2);
+  if (race.un.k < race.target || race.ma.k < race.target) race.raf = requestAnimationFrame(tick);
+}
+$("go").onclick = () => { if (!race) restartRace(); race.target += 2000; cancelAnimationFrame(race.raf); race.raf = requestAnimationFrame(tick); };
+$("stop").onclick = () => { if (race) { cancelAnimationFrame(race.raf); race.target = Math.min(race.un.k, race.ma.k); } };
+
+run();
+restartRace();
+</script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ray-march options (v3351)</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{padding:14px 18px 48px;max-width:1180px}
+  h1{font-size:15px;margin:0 0 4px}
+  h2{font-size:12px;margin:22px 0 6px;color:#8fd0a8;letter-spacing:.5px}
+  .sub{color:#7d9c8b}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #1d2a22;vertical-align:top}
+  th{color:#8fd0a8;font-weight:normal;border-bottom:1px solid #2b4033}
+  .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;margin-right:4px}
+  .see{background:#1f3a4d;color:#9ed2ee}
+  .meas{background:#1f4030;color:#9eeeb8}
+  .ref{background:#4d2a1f;color:#eeb89e}
+  .pin{background:#3a2f4d;color:#c9b8ee}
+  code{color:#b6f0cf}
+  .exp{color:#9ab8a8}
+</style>
+</head>
+<body>
+<div id="wrap">
+<h1>Ray-march options &mdash; every control is SEEABLE or MEASURED</h1>
+<div class="sub">
+  An option earns its place only if moving it produces a <b>difference a person can judge</b> or a
+  <b>number the engine reports</b>. A control that is neither is decoration &mdash; the
+  &ldquo;plausible-looking readout with no checkable answer&rdquo; the lab&rsquo;s governing rule refuses.
+  Every row below declares its bucket and what it <i>expects</i>, so a run of this page is a test rather than
+  a slideshow.
+  <br><br>
+  <b>Both channels at once, never one at a time.</b> The visual and the numeric readout sit side by side, because
+  the value is in whether they <i>agree</i> &mdash; the brick skip is right only when the number moves and the
+  picture does not, and a page that showed them in turn would let that disagreement pass unnoticed.
+  <br><br>
+  <b>Held while judging.</b> A toggle compared across two camera positions is two pictures, not an A/B, and the
+  difference a person reports is then partly the move. Every option judged by eye names what is
+  <i>pinned</i> while it is judged &mdash; the same idea as an engine dyno&rsquo;s RPM hold, which pins the speed
+  so every other reading becomes comparable.
+  <br><br>
+  <b>Where the adjudication lives:</b> a number can refuse while an eye is still deciding, so the cheaper
+  refusal runs first. Every row here is owned by the engine; none is left to taste alone.
+</div>
+
+<h2>Live</h2>
+<div class="sub">
+  <b>The camera is PINNED by default</b> &mdash; that is the whole point of the held-variable column. An A/B taken
+  from two positions is two pictures. Unpinning is a deliberate act and the readout says which state you are in.
+  <br><br>
+  <b>Rig-unverified.</b> This sandbox has no GPU, so nothing below has been seen to draw. Every failure names
+  <i>which</i> link of the chain broke rather than leaving a black canvas &mdash; five causes with five different
+  fixes, which is the v3047 lesson.
+</div>
+<div style="position:relative;width:640px;max-width:100%">
+  <canvas id="c" width="640" height="360" style="width:100%;background:#050807;border:1px solid #1d2a22"></canvas>
+  <div id="reason" style="position:absolute;inset:0;padding:10px;white-space:pre-wrap;color:#eeb89e;background:rgba(5,8,7,.86);display:none"></div>
+</div>
+<p>
+  <button id="btnPin">Camera: PINNED</button>
+  <button id="btnAB">A/B this option</button>
+  <button id="btnRetryGL">Retry GL</button>
+  <span id="glnote" class="sub"></span>
+</p>
+<pre id="live" class="sub">not started</pre>
+
+<h2>Options</h2>
+<table id="opts"><thead><tr>
+  <th style="width:20%">option</th><th style="width:9%">bucket</th>
+  <th style="width:19%">what you look at</th><th style="width:17%">what is measured</th><th style="width:12%">held while judging</th><th>expected</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>Considered and refused &mdash; kept, not deleted</h2>
+<div class="sub">A page that showed only what it built would look complete. These are the ones that were
+  weighed and rejected, with the reason, so a reader can tell a refusal from an oversight.</div>
+<table id="refused"><thead><tr><th style="width:20%">option</th><th>why it is not here</th></tr></thead><tbody></tbody></table>
+
+<h2>What this page does NOT claim</h2>
+<div class="sub">
+  It drives a live context now &mdash; <b>that is not the same as being verified.</b> This sandbox has no GPU,
+  so nothing here has been <i>seen</i> to draw. Wiring and working are different claims and the page must not
+  let them read the same.
+  <br><br>
+  <b>What a failure looks like:</b> five named causes with five different fixes &mdash; no context, program
+  failed to link (with the shader log), no region uploaded, no texture bound, or a throw inside the draw. A
+  blank canvas that names none of them is not a bug report.
+  <br><br>
+  <b>And the GPU numbers are still Keith&rsquo;s.</b> The brick skip&rsquo;s 94.0% is a CPU figure over 5,000
+  rays; no GPU number exists. This page can now produce one &mdash; it has not.
+</div>
+</div>
+<script type="module">
+import { OPTIONS, REFUSED, PINS, bucketsOf, channelsOf } from "/render/raymarchOptions.mjs";
+import { VoxelVolumeStream } from "/render/voxelVolumeStream.js";
+import { VoxelRaymarchPass } from "/render/voxelRaymarchPass.js";
+import { chunkToRLE, chunkIndexReal } from "/voxel/rleWorldBridge.js";
+import { chunkKey } from "/voxel/rleRegionVolume.js";
+import { acquireGL } from "/render/glBootstrap.js";
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const tag = (b) => b === "seeable" ? '<span class="tag see">SEE</span>' : '<span class="tag meas">MEAS</span>';
+document.querySelector("#opts tbody").innerHTML = OPTIONS.map((o) => {
+  const b = bucketsOf(o);
+  const ctl = o.kind === "toggle"
+    ? `<input type="checkbox" id="${esc(o.id)}" ${o.def ? "checked" : ""}>`
+    : `<input type="range" id="${esc(o.id)}" min="${o.min}" max="${o.max}" step="${o.step}" value="${o.def}"> <span id="${esc(o.id)}_v">${o.def}</span>`;
+  return `<tr><td><b>${esc(o.label)}</b><br>${ctl}${o.why ? `<br><span class="sub">${esc(o.why)}</span>` : ""}</td>
+    <td>${b.map(tag).join("")}</td><td>${esc(o.sees || "\u2014")}</td><td>${esc(o.measures || "\u2014")}</td>
+    <td>${(o.pin||[]).map((k)=>`<span class="tag pin" title="${esc(PINS[k])}">${esc(k)}</span>`).join("")||"\u2014"}</td>
+    <td class="exp">${esc(o.expect)}</td></tr>`;
+}).join("");
+document.querySelector("#refused tbody").innerHTML = REFUSED.map((r) =>
+  `<tr><td><span class="tag ref">REFUSED</span><b>${esc(r.id)}</b></td><td>${esc(r.why)}</td></tr>`).join("");
+for (const o of OPTIONS) if (o.kind === "range") {
+  const el = document.getElementById(o.id), out = document.getElementById(o.id + "_v");
+  el.addEventListener("input", () => { out.textContent = el.value; });
+}
+
+// ============================================================================================================
+// v3356 -- THE LIVE HALF. v3351 declared the contract and drove nothing, and said so; this wires it.
+//
+// IT REUSES raymarch-live's WORLD, PROVIDER AND GL DISCIPLINE RATHER THAN INVENTING A SECOND ONE. A second
+// generated world would drift from that page's and make the two incomparable, which is the duplication this
+// tree refuses everywhere else.
+// ============================================================================================================
+const S = 16, H = 64, DIMS = { sx: S, sy: H, sz: S };
+function genChunk(cx, cz) {
+    const v = new Uint8Array(S * H * S);
+    for (let x = 0; x < S; x++) for (let z = 0; z < S; z++) {
+        const wx = cx * S + x, wz = cz * S + z;
+        const h = Math.max(1, Math.min(H - 1, Math.floor(22 + 9 * Math.sin(wx * 0.07) + 7 * Math.cos(wz * 0.06) + 4 * Math.sin((wx - wz) * 0.04))));
+        for (let y = 0; y < h; y++) v[chunkIndexReal(x, y, z, DIMS)] = (y === h - 1) ? (h > 30 ? 3 : 1) : (y >= h - 3 ? 4 : 6);
+    }
+    return v;
+}
+const world = new Map(), rleCache = new Map();
+const provider = {
+    chunkSize: S, chunkHeight: H,
+    getChunkRLE(cx, cz) {
+        const k = chunkKey(cx, cz);
+        if (!world.has(k)) world.set(k, genChunk(cx, cz));
+        if (!rleCache.has(k)) rleCache.set(k, chunkToRLE(world.get(k), DIMS, chunkIndexReal));
+        return rleCache.get(k);
+    },
+};
+
+const canvas = document.getElementById("c"), reasonEl = document.getElementById("reason");
+// v3050/v3053 -- THROUGH acquireGL, and the failure reason goes to an OVERLAY DIV. Painting it with a 2D
+// context would permanently forfeit webgl2 on this canvas and make the failure irreversible.
+let _ctx = acquireGL(canvas, { onLost: () => { document.getElementById("glnote").textContent = "WebGL2 context LOST (usually exhaustion -- close other GL tabs)"; } });
+let gl = _ctx && _ctx.gl, pass = null, stream = null, built = "";
+addEventListener("pagehide", (e) => { if (e.persisted) return; try { stream && stream.dispose(); } catch {} try { _ctx && _ctx.dispose(); } catch {} });
+
+const val = (id) => { const el = document.getElementById(id); return el.type === "checkbox" ? el.checked : Number(el.value); };
+const passKey = () => [val("brickSkip"), val("depthComposite"), val("uintVolume")].join("|");
+
+function rebuild() {
+    if (!gl) return;
+    const k = passKey();
+    if (pass && built === k) return;
+    try { stream && stream.dispose(); } catch {}
+    pass = new VoxelRaymarchPass(gl, { uint: !!val("uintVolume"), brick: !!val("brickSkip"), depth: !!val("depthComposite") });
+    const w = val("regionWindow") | 0;
+    stream = new VoxelVolumeStream(gl, provider, { window: { nx: w, nz: w } });
+    built = k;
+}
+
+// *** THE PIN. Engine Sim's RPM hold: the camera is held so the A/B compares one changed thing. ***
+let pinned = true;
+const CAM = { eye: [40, 42, 96], fwd: [0, -0.22, -0.97], right: [1, 0, 0], up: [0, 0.97, -0.22], tanFov: 0.6 };
+document.getElementById("btnPin").addEventListener("click", (e) => {
+    pinned = !pinned;
+    e.target.textContent = "Camera: " + (pinned ? "PINNED" : "FREE");
+});
+
+function chain() {
+    if (!gl) return { ok: false, why: "no webgl2 context -- acquireGL refused. Most often CONTEXT EXHAUSTION: close other WebGL tabs (raymarch-live, volume-cache, index) and reload. chrome://gpu if it persists." };
+    if (!pass) return { ok: false, why: "no pass built yet" };
+    if (pass.dead) return { ok: false, why: "shader program failed to link:\n" + (pass.error || "(no log kept)") };
+    if (!stream) return { ok: false, why: "no volume stream" };
+    if (!stream.lastUpload || !stream.lastUpload.ok) return { ok: false, why: "no region uploaded: " + ((stream.lastUpload && stream.lastUpload.why) || "update() has not produced one") };
+    if (!pass.tex) return { ok: false, why: "no texture bound to the pass (attachTo did not run)" };
+    return { ok: true };
+}
+const showReason = (t) => { reasonEl.style.display = t ? "block" : "none"; reasonEl.textContent = t || ""; };
+
+let timer = 0;
+function schedule(ms) { clearTimeout(timer); timer = setTimeout(frame, ms); }
+function frame() {
+    // v3051 -- a hidden page does ZERO work, and a broken chain backs off to 1Hz instead of spinning at 60.
+    if (document.hidden) return schedule(1000);
+    try {
+        rebuild();
+        if (stream) { stream.update(CAM.eye[0], CAM.eye[2]); stream.attachTo(pass); }
+        const st = chain();
+        if (!st.ok) { showReason("NOTHING TO DRAW\n\n" + st.why); report(st); return schedule(1000); }
+        showReason("");
+        pass.render(CAM, canvas.width, canvas.height, { maxSteps: val("maxSteps") | 0 });
+        report(st);
+    } catch (e) {
+        showReason("draw threw:\n" + ((e && e.message) || e));
+        return schedule(1000);
+    }
+    schedule(0);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) schedule(0); });
+document.getElementById("btnRetryGL").addEventListener("click", () => {
+    _ctx = acquireGL(canvas, {}); gl = _ctx && _ctx.gl; pass = null; built = ""; schedule(0);
+});
+
+// BOTH CHANNELS AT ONCE: the numeric readout sits beside the picture, never in place of it.
+function report(st) {
+    const u = stream && stream.lastUpload;
+    document.getElementById("live").textContent =
+        "camera        : " + (pinned ? "PINNED (A/B is comparable)" : "FREE (an A/B taken now is TWO PICTURES)") +
+        "\npass          : brick=" + (pass ? pass.brick : "-") + "  depth=" + (pass ? pass.depth : "-") + "  uint=" + (pass ? pass.uint : "-") +
+        "\nregion        : " + (u && u.ok ? (u.dx + "x" + u.dy + "x" + u.dz + "  " + Math.round((u.bytes || 0) / 1024) + " KB") : "-") +
+        "\nderive        : " + (stream && stream.lastDeriveMs != null ? stream.lastDeriveMs.toFixed(1) + " ms" : "-") +
+        "\nmaxSteps      : " + (val("maxSteps") | 0) +
+        "\nchain         : " + (st.ok ? "ok" : st.why.split("\n")[0]);
+}
+
+// A/B: hold everything, flip the first toggle, redraw, flip back -- the comparison the pin exists to make honest.
+document.getElementById("btnAB").addEventListener("click", () => {
+    if (!pinned) { showReason("A/B REFUSED: the camera is FREE.\n\nTwo pictures from two positions are not an A/B, and the difference you would report is partly the move. Pin the camera first."); return; }
+    const el = document.getElementById("brickSkip");
+    el.checked = !el.checked; schedule(0);
+});
+
+schedule(0);
+</script>
+</body>
+</html>

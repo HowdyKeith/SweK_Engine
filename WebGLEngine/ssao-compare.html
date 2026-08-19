@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SSAO comparison (v3369)</title>
+<style>
+ html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #wrap{padding:14px 18px 48px;max-width:1000px} h1{font-size:15px;margin:0 0 4px}
+ h2{font-size:12px;margin:22px 0 6px;color:#8fd0a8;letter-spacing:.5px} .sub{color:#7d9c8b}
+ table{border-collapse:collapse;width:100%;margin-top:6px}
+ th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #1d2a22;vertical-align:top}
+ th{color:#8fd0a8;font-weight:normal;border-bottom:1px solid #2b4033}
+ code{color:#b6f0cf} .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px}
+ .see{background:#1f3a4d;color:#9ed2ee} .meas{background:#1f4030;color:#9eeeb8} .warn{background:#4d2a1f;color:#eeb89e}
+</style></head><body><div id="wrap">
+<h1>SSAO &mdash; two implementations, one decision</h1>
+<div class="sub">
+  A status report called <code>render/SSAOPass.js</code> &ldquo;proven better AO, never connected&rdquo;.
+  <b>It has no gate</b>, so <i>proven</i> has no referent; it is filed in the <b>orphan</b> machinery rather than
+  the unwired register, which is a different claim; and <code>orphanScan</code>&rsquo;s own header already said
+  the part the report left out &mdash; <i>347 lines, 2 exports, zero referrers, while a SECOND SSAO lives inside
+  bloomPass.js</i>. That second one is <b>live</b>: main.js imports BloomPass.
+  <br><br>
+  So &ldquo;better&rdquo; was never measured against anything. This page exists so it can be. <b>It does not decide.</b>
+</div>
+
+<h2>What is comparable from source</h2>
+<table id="t"><thead><tr><th style="width:150px">axis</th><th style="width:38%">bloomPass SSAO</th><th style="width:38%">SSAOPass</th><th>kind</th></tr></thead><tbody></tbody></table>
+
+<h2>The one difference that is a correctness claim</h2>
+<div class="sub" id="flat"></div>
+
+<h2>What only a rig can settle</h2>
+<div class="sub">
+  <span class="tag see">SEE</span> Which one <i>looks</i> right. No amount of reading settles it &mdash;
+  <b>proven correct and looks right on a screen are different claims</b>, which is why voxel-viewer&rsquo;s
+  <code>?mesher=greedy</code> flag was left to a human for 780 versions.
+  <br><br>
+  <span class="tag meas">MEAS</span> The real frame cost. The <b>8&times;</b> below is <i>arithmetic</i>
+  &mdash; samples multiplied by pixel count &mdash; <b>not a benchmark</b>. Bandwidth, cache behaviour and the
+  half-res upsample are not in it, and on your GPU the measured ratio may be nothing like 8.
+  <br><br>
+  <span class="tag warn">REFUSES</span> <b>This page will not rank them.</b> <span id="why"></span>
+</div>
+</div>
+<script type="module">
+import { IMPLEMENTATIONS as I, FLAT_SURFACE_TEST, costRatio, REFUSES_TO_RANK } from "/render/ssaoCompare.mjs";
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const c = costRatio();
+const rows = [
+  ["status", I.bloom.status, I.pass.status, "fact"],
+  ["samples per pixel", I.bloom.samples, I.pass.samples, "MEAS"],
+  ["sample geometry", I.bloom.geometry, I.pass.geometry, "MEAS"],
+  ["resolution", I.bloom.resolution, I.pass.resolution, "MEAS"],
+  ["radius model", I.bloom.radiusModel, I.pass.radiusModel, "fact"],
+  ["relative fragment work", c.a, c.b + "  (" + c.ratio + "\u00d7)", "MEAS"],
+  ["source note", I.bloom.note, I.pass.note, "fact"],
+];
+document.querySelector("#t tbody").innerHTML = rows.map((r) =>
+  `<tr><td><b>${esc(r[0])}</b></td><td>${esc(r[1])}</td><td>${esc(r[2])}</td>` +
+  `<td>${r[3] === "MEAS" ? '<span class="tag meas">MEAS</span>' : '<span class="sub">fact</span>'}</td></tr>`).join("");
+document.getElementById("flat").innerHTML = '<span class="tag see">SEE</span> ' + esc(FLAT_SURFACE_TEST);
+document.getElementById("why").textContent = REFUSES_TO_RANK + ".";
+</script></body></html>

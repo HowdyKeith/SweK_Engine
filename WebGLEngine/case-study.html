@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Engine &mdash; a physics engine you can prove</title>
+<style>
+  :root { --amber:#ffcc66; --amber2:#ff9f00; --cyan:#33ccff; --green:#9fe6c0; --bg:#06120b; --panel:#0b1d15; --line:#1c3f2e; --dim:#6f8f7f; --ink:#e6f2ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:56px 24px 80px; }
+  .mono { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  h1 { font-size:34px; line-height:1.15; margin:0 0 8px; letter-spacing:-0.5px; }
+  h1 .accent { color:var(--amber); }
+  .tag { color:var(--cyan); font-weight:600; letter-spacing:2px; text-transform:uppercase; font-size:13px; margin:0 0 24px; }
+  .lede { font-size:20px; color:#cfe6da; margin:0 0 32px; }
+  h2 { font-size:15px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); margin:44px 0 14px; }
+  p { margin:0 0 16px; }
+  a { color:var(--cyan); }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:8px 0 8px; }
+  .stat { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 14px; text-align:center; }
+  .stat b { display:block; font-size:30px; color:var(--amber); font-family:ui-monospace,monospace; }
+  .stat span { font-size:12px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; }
+  .master { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:16px 0; font-size:13px; word-break:break-all; }
+  .master b { color:var(--cyan); }
+  .master .live { color:var(--green); font-size:12px; }
+  .pillars { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .pillar { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 20px; }
+  .pillar h3 { margin:0 0 6px; font-size:17px; color:var(--amber); }
+  .pillar p { font-size:14.5px; color:#cfe6da; margin:0; }
+  .cta { display:inline-block; margin:28px 0 8px; background:var(--amber); color:#06120b; font-weight:700; text-decoration:none; padding:14px 26px; border-radius:16px 5px 16px 5px; letter-spacing:1px; }
+  .cta.ghost { background:transparent; color:var(--cyan); border:1px solid var(--line); margin-left:10px; }
+  .foot { color:var(--dim); font-size:13px; margin-top:48px; border-top:1px solid var(--line); padding-top:20px; }
+  .honest { border-left:3px solid var(--amber2); padding:2px 0 2px 16px; color:#cfe6da; font-size:15px; }
+  @media (max-width:620px){ .stats{grid-template-columns:repeat(2,1fr);} .pillars{grid-template-columns:1fr;} h1{font-size:27px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="tag">SweK Engine &middot; solo project</p>
+  <h1>A physics engine whose every result is <span class="accent">proven identical to the bit</span> &mdash; and made to fail on command.</h1>
+  <p class="lede">Thirty-eight physics and math subsystems, each computed the same down to the last bit on any machine, each guarded by a test that has been deliberately broken to confirm it can fail, each tied to a falsifiable written claim.</p>
+
+  <div class="stats" id="stats">
+    <div class="stat"><b id="nSub">50</b><span>subsystems</span></div>
+    <div class="stat" data-morph-stat><b>1093</b><span>gates</span></div>
+    <div class="stat"><b>240</b><span>claims</span></div>
+    <div class="stat"><b id="nErr">0</b><span>regressions</span></div>
+  </div>
+  <div class="master">WHOLE-ENGINE FINGERPRINT <b id="master">computing&hellip;</b> <span class="live" id="liveNote"></span></div>
+
+  <a class="cta" href="./verify.html">Open the live verification console &rarr;</a>
+  <a class="cta ghost" href="./physics-lab.html">Open the physics lab</a>
+
+  <h2>The idea</h2>
+  <p>Most engines ask you to trust that the simulation is right. This one is built to <em>prove</em> it. Floating-point math drifts between CPUs and compilers &mdash; a square root here, a sine there, off in the last bit &mdash; and that drift quietly breaks reproducible science and networked multiplayer alike. So every subsystem here avoids the platform math library entirely, computing transcendentals from a strict core in only add, subtract, multiply, divide, and square root. The result is a whole-engine fingerprint: one hash that will be identical on every machine that runs it, or will pinpoint exactly which subsystem disagreed.</p>
+
+  <h2>Four things it does that most engines don't</h2>
+  <div class="pillars">
+    <div class="pillar"><h3>Bit-identical determinism</h3><p>No library trig, exp, log, or pow anywhere in the physics. A strict math core &mdash; sine, exp, error function, logarithm, FFT, even the Riemann zeta function &mdash; built in pure arithmetic, so the same inputs give the same bits everywhere.</p></div>
+    <div class="pillar"><h3>Sabotage-tested gates</h3><p>Every check has been intentionally broken to confirm it fails when the physics is wrong. A control you have never watched fail is decoration; here all 286 have failed on purpose, once.</p></div>
+    <div class="pillar"><h3>Peer attestation</h3><p>Two machines each emit a signed list of their subsystem hashes; a one-click compare proves byte agreement and, on disagreement, names the exact subsystem that diverged &mdash; not "the masters differ somewhere."</p></div>
+    <div class="pillar"><h3>Deterministic lockstep</h3><p>Because the physics is bit-identical, two peers stay in sync on nothing but inputs; a per-frame checksum catches any desync at its frame; and the same headless step replays a match exactly or fast-forwards at 700&times; realtime.</p></div>
+  </div>
+
+  <h2>A concrete example</h2>
+  <p>The strict math core is real enough to walk up the critical line of the Riemann zeta function and locate its first nontrivial zeros &mdash; at t &asymp; 14.1347, 21.0220, 25.0109 &mdash; driving the magnitude to machine zero, bit-identically. <span class="honest">To be clear about scope: this <em>locates</em> the zeros and computes the function exactly; it does not and cannot prove the Riemann Hypothesis, which is open. Honesty about what a result is and isn't is the whole discipline.</span></p>
+
+  <h2>What's proven, and what's next</h2>
+  <p>Every subsystem is proven bit-identical run-to-run, and the fingerprint computes to the same master across the two runtimes it currently runs in &mdash; the terminal and this browser. The attestation protocol is built and gated to confirm that identity across CPU architectures; the one remaining step is running it on physical x86-64 and arm64 hardware and comparing the two files, which the console does with a click on each machine. The engineering is honest about that line: the machinery to earn the cross-architecture claim exists and is tested; earning it is a hardware comparison, not a promise.</p>
+
+  <div class="foot mono">
+    Built by Keith Swerling (&ldquo;Geek&rdquo;) &middot; GitHub HowdyKeith &middot; Warwick, RI<br>
+    Multi-runtime WebGL2 / WebGPU / Node &middot; deterministic physics &middot; verification-first.
+  </div>
+</div>
+
+<script type="module">
+  import { computeFingerprint } from "./tools/fingerprint/fingerprint.mjs";
+  try {
+    const t0 = performance.now();
+    const { subsystems, master } = computeFingerprint();
+    const ms = (performance.now() - t0).toFixed(0);
+    document.getElementById("nSub").textContent = subsystems.length;
+    document.getElementById("master").textContent = master;
+    document.getElementById("liveNote").textContent = "\u2014 computed live in your browser in " + ms + " ms";
+  } catch (e) {
+    document.getElementById("master").textContent = "(open via the engine server to compute live)";
+  }
+</script>
+<script type="module">
+  // v3531 -- the gate count morphs on load. THE NUMBER IS ALREADY CORRECT WITHOUT THIS SCRIPT: it is plain text
+  // in the markup, `staleness --fix` keeps editing it exactly as before, and the morph is a reveal on top.
+  // Only elements carrying data-morph-number are touched, and the rule for what may carry it is in
+  // ui/morphDigits.js: A NUMBER MAY MORPH ONLY IF A READER WOULD NEVER NEED TO TRUST IT MID-TRANSITION.
+  import { initMorphNumbers } from "./ui/morphDigits.js";
+  try { initMorphNumbers(document); } catch (e) { /* the text stands on its own */ }
+</script>
+</body>
+</html>

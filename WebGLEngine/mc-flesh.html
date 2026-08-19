@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Marching-cubes flesh -- a surface graded against the field it came from</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:9px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 14px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .wrap { padding:4px 18px 8px; max-width:520px; }
+  canvas { display:block; width:100%; height:auto; border-radius:8px; background:#020a06; border:1px solid var(--line); }
+  .read { padding:6px 18px 18px; max-width:520px; font-size:12px; color:var(--dim); } .read b { color:var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Marching-cubes flesh &mdash; a surface graded against the field it came from</h1>
+  <p>A smooth organic surface extracted from a metaball field we know exactly, by marching tetrahedra, shaded with normals taken straight from the analytic gradient so there is no faceting. Runs <code>physics/mesh/marchingCubes.js</code>. The mesh is <b>watertight</b> (a closed manifold), its vertices sit on the isosurface because the crossing is interpolated, and the volume it encloses converges to the analytic value &mdash; the same honest move as the other benchmarks, here for a mesh: define the truth, build the thing, grade it against the truth.</p>
+</header>
+<div class="controls"><button id="wire">Shading: smooth</button>
+  <button id="ao" title="switch it off and watch the creases flatten">Occlusion: on</button><button id="reseed">New blob</button></div>
+<div class="wrap"><canvas id="cv" width="480" height="420"></canvas></div>
+<div class="read" id="read"></div>
+<script type="module">
+import { wyvill, wyvillGrad, marchingTets, meshVolume, watertight, ambientOcclusion, occlusionRamp } from "./physics/mesh/marchingCubes.js";
+const cv = document.getElementById("cv"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+let wire = false, seed = 3, mesh = null, t = 0;
+// v2831 -- ambientOcclusion + occlusionRamp were built and gated in v2764 and rendered by NOTHING. The engine's
+// own predictions.html says so: "wiring the ramp into the live blob/flesh pages is the rendering step". This is
+// that step. AO is kept TOGGLEABLE because the only honest way to show occlusion is doing something is to be
+// able to switch it off and watch the creases flatten -- the same move as the rebinning toggle on fanbeam.html.
+let useAO = true, ao = null, aoRGB = null, aoRange = [0, 0];
+const $ = (id) => document.getElementById(id);
+
+function rng(s) { let x = s * 2654435761 >>> 0; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }
+function build() {
+  const r = rng(seed), n = 3 + (r() * 3 | 0), balls = [];
+  for (let i = 0; i < n; i++) balls.push({ cx: (r() - 0.5) * 1.3, cy: (r() - 0.5) * 1.3, cz: (r() - 0.5) * 1.3, r: 0.6 + r() * 0.5, s: 1 });
+  mesh = marchingTets((x, y, z) => wyvill(balls, x, y, z), (x, y, z) => wyvillGrad(balls, x, y, z), { N: 40, lo: -1.9, hi: 1.9, iso: 0.3 });
+  // MEASURED from the field, not painted: for each vertex, sample the hemisphere about its outward normal and
+  // count how much of it lands back inside the surface. A crease between two metaballs sees mostly itself.
+  const field = (x, y, z) => wyvill(balls, x, y, z);
+  const grad = (x, y, z) => wyvillGrad(balls, x, y, z);
+  ao = ambientOcclusion(mesh.verts, field, grad, { iso: 0.3, radius: 0.25 });
+  aoRGB = occlusionRamp(ao);
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < ao.length; i++) { if (ao[i] < lo) lo = ao[i]; if (ao[i] > hi) hi = ao[i]; }
+  aoRange = [lo, hi];
+
+  const wt = watertight(mesh.tris), vol = meshVolume(mesh.verts, mesh.tris);
+  $("read").innerHTML = "<b>" + mesh.verts.length + "</b> vertices, <b>" + mesh.tris.length + "</b> triangles &middot; watertight <b>" + (wt.watertight ? "yes" : "NO (" + wt.boundaryEdges + ")") + "</b> &middot; enclosed volume <b>" + vol.toFixed(3) + "</b> &middot; normals from the analytic gradient (smooth, no faceting)." + " &middot; occlusion <b>" + aoRange[0].toFixed(3) + "</b> to <b>" + aoRange[1].toFixed(3) + "</b> (measured from the field, not painted)";
+}
+
+function render() {
+  t += 0.008;
+  g.clearRect(0, 0, W, H);
+  const ca = Math.cos(t), sa = Math.sin(t), cb = Math.cos(0.5), sb = Math.sin(0.5), sc = 120, L = [0.4, 0.5, 0.75];
+  const rot = (p) => { let x = p[0] * ca - p[2] * sa, z = p[0] * sa + p[2] * ca, y = p[1] * cb - z * sb, z2 = p[1] * sb + z * cb; return [x, y, z2]; };
+  const proj = (p) => [W / 2 + p[0] * sc, H / 2 - p[1] * sc, p[2]];
+  const faces = [];
+  for (const tri of mesh.tris) {
+    const P = tri.map((i) => proj(rot(mesh.verts[i])));
+    const N = tri.map((i) => rot(mesh.normals[i]));
+    const depth = (P[0][2] + P[1][2] + P[2][2]) / 3;
+    // per-face occlusion = the mean of its three vertices, so a crease darkens smoothly across the surface
+    const occ = (ao[tri[0]] + ao[tri[1]] + ao[tri[2]]) / 3;
+    const c0 = tri[0] * 3, c1 = tri[1] * 3, c2 = tri[2] * 3;
+    const tint = [(aoRGB[c0] + aoRGB[c1] + aoRGB[c2]) / 3, (aoRGB[c0 + 1] + aoRGB[c1 + 1] + aoRGB[c2 + 1]) / 3, (aoRGB[c0 + 2] + aoRGB[c1 + 2] + aoRGB[c2 + 2]) / 3];
+    faces.push({ P, N, depth, occ, tint });
+  }
+  faces.sort((a, b) => a.depth - b.depth);
+  for (const f of faces) {
+    const nAvg = [(f.N[0][0] + f.N[1][0] + f.N[2][0]) / 3, (f.N[0][1] + f.N[1][1] + f.N[2][1]) / 3, (f.N[0][2] + f.N[1][2] + f.N[2][2]) / 3];
+    const nl = Math.max(0, nAvg[0] * L[0] + nAvg[1] * L[1] + nAvg[2] * L[2]);
+    // AO MULTIPLIES the ambient term rather than replacing the light: occlusion darkens what is not directly
+    // lit, so a crease facing the lamp stays bright while one buried between two lobes goes dark. Replacing the
+    // Lambert term instead would make the shape read as flat-lit, which is the usual way AO gets misused.
+    const amb = useAO ? 0.15 * (1 - 0.85 * f.occ) : 0.15;
+    const shade = amb + 0.85 * nl;
+    g.beginPath(); g.moveTo(f.P[0][0], f.P[0][1]); g.lineTo(f.P[1][0], f.P[1][1]); g.lineTo(f.P[2][0], f.P[2][1]); g.closePath();
+    if (wire) { g.strokeStyle = "rgba(159,230,192,0.5)"; g.lineWidth = 0.4; g.stroke(); }
+    else {
+      // the ramp supplies the flesh tint; shading scales it. With AO off, the tint is the unoccluded end.
+      const base = useAO ? f.tint : [1.0, 0.85, 0.5];
+      const rr = 255 * base[0] * shade, gg = 255 * base[1] * shade, bb = 255 * base[2] * shade;
+      g.fillStyle = "rgb(" + Math.min(255, rr | 0) + "," + Math.min(255, gg | 0) + "," + Math.min(255, bb | 0) + ")"; g.fill();
+    }
+  }
+  requestAnimationFrame(render);
+}
+$("wire").onclick = () => { wire = !wire; $("wire").textContent = "Shading: " + (wire ? "wireframe" : "smooth"); };
+$("ao").onclick = () => { useAO = !useAO; $("ao").textContent = "Occlusion: " + (useAO ? "on" : "off"); };
+$("reseed").onclick = () => { seed = (seed * 1664525 + 1013904223) >>> 0 % 9999 || 3; build(); };
+build(); render();
+</script>
+</body>
+</html>

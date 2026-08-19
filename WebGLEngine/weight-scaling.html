@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The optimum converges, but not to one number (v3650)</title>
+<meta name="demo:desc" content="Does the boundary row's optimal weight move with refinement? It converges to about 0.218 at fixed mesh shape - but it is a function of the cell aspect ratio, moving 2.2x across shapes, and the shipped default of 1 is outside the whole measured range.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>The optimum converges &mdash; but not to one number</h1>
+<div class="sub">The previous round found the boundary row's weight had been a hardcoded <code>1</code> for six
+rounds and that a better value was worth 1.7&times;. It ended on the right question: <b>does the optimum move with
+refinement?</b> A fixed constant is defensible only if it doesn't.</div>
+<div class="law"><b>And the first answer was my own search grid.</b> A sweep spaced <code>2<sup>0.25</sup></code>
+reported the argmin moving by <b>exactly one sample</b> at each refinement, twice, then zero &mdash; which is what a
+quantised search reports when the true optimum drifts more slowly than the grid. <b>An argmin over a sweep is an
+index</b>, and the same law that caught a front measured in cell numbers applies to a search unchanged.</div>
+<h2>1. The grid was the answer</h2>
+<div class="panel"><button id="g1" class="good">sweep, then search properly</button><table id="t1"></table></div>
+<h2>2. It converges, it does not scale</h2>
+<div class="panel">
+  <button id="g2" class="good">golden section at five refinements</button>
+  <canvas id="cv" width="620" height="300" style="max-width:100%"></canvas>
+  <table id="t2"></table>
+</div>
+<div class="law">The increments shrink and <b>neither <code>w*/h</code> nor <code>w*/&radic;h</code> is
+constant</b> &mdash; both grow monotonically, so it isn't a scaling law. It approaches a dimensionless constant
+near <b>0.218</b>, and is still 5% short at nt = 768. <b>And the gain is h-independent</b>: choosing the weight is
+worth the same 1.7&times; at every resolution, so the cost of leaving it at 1 doesn't shrink as the mesh
+improves.</div>
+<h2>3. What it must not depend on, and what it does</h2>
+<div class="panel"><button id="g3" class="good">run the controls</button><table id="t3"></table></div>
+<div class="law"><b>Invariant to field amplitude and to overall length scale</b> &mdash; bit-identical, as a
+dimensionless quantity in a linear problem must be. Those are the controls that say the search is measuring the
+method.</div>
+<div class="law"><b>But it is a function of the cell aspect ratio</b>, moving <b>2.2&times;</b> across shapes at
+one refinement &mdash; and two entirely different geometries with the <i>same</i> aspect ratio give the same
+optimum to the last digit. <b>So a constant is defensible at fixed mesh shape and not across shapes</b>, and the
+shipped default of <code>1</code> is <b>outside the whole measured range</b> (0.107 to 0.240) and worse than every
+point in it. It is left at 1 anyway, so six rounds of numbers still reproduce &mdash; the deliverable is that the
+knob exists, what it tracks, and that the current value is off the end of the range. Graded by
+<code>physics/mesh/weightScaling-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/row-weight.html" style="color:#9ab6e8">row weight</a>.</div>
+<script type="module">
+import { makeAnnulus, potentialFlow, cellValues, annulusFaces, wallSideError } from "/physics/mesh/curvedWall.mjs";
+import { vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+import { quadraticGradient, quadraticGradientWithWall, optimalRowWeight, wallAspect } from "/physics/mesh/quadraticRecon.mjs";
+const $ = (i) => document.getElementById(i);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const study = (nt, { a = 1, b = 3, U = 1, nrScale = 8 } = {}) => {
+    const { phi, grad } = potentialFlow({ U, a });
+    const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / nrScale)), nt, a, b });
+    const u = cellValues(m, phi), F = annulusFaces(m), vn = vertexNeighbours(m);
+    const f = (lw) => wallSideError(m, F, grad, quadraticGradientWithWall(u, m, vn, F, { rowWeight: Math.pow(2, lw) }), "inner");
+    return { nt, best: optimalRowWeight(f), aspect: wallAspect(m), arc: 2 * Math.PI * a / nt, atOne: f(0),
+        noRow: wallSideError(m, F, grad, quadraticGradient(u, m, vn), "inner") };
+};
+$("g1").onclick = () => {
+    const out = [];
+    for (const nt of [48, 96, 192, 384]) {
+        const { phi, grad } = potentialFlow({});
+        const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / 8)), nt, a: 1, b: 3 });
+        const u = cellValues(m, phi), F = annulusFaces(m), vn = vertexNeighbours(m);
+        let best = null;
+        for (let e = -3; e <= 3; e += 0.25) { const w = Math.pow(2, e);
+            const err = wallSideError(m, F, grad, quadraticGradientWithWall(u, m, vn, F, { rowWeight: w }), "inner");
+            if (!best || err < best.e) best = { w, e: err }; }
+        const s = study(nt);
+        out.push([nt, "<span class='bad'>" + best.w.toFixed(4) + "</span>", "<span class='ok'>" + s.best.w.toFixed(6) + "</span>",
+            (best.w / s.best.w).toFixed(4)]);
+    }
+    rows($("t1"), ["nt", "sweep argmin (grid 2^0.25)", "golden section (tol 1e-4)", "sweep / true"], out);
+};
+$("g2").onclick = () => {
+    const R = [48, 96, 192, 384, 768].map((nt) => study(nt));
+    rows($("t2"), ["nt", "arc spacing", "w*", "error at w*", "gain over w = 1", "w*/h"],
+        R.map((r) => [r.nt, r.arc.toFixed(6), "<span class='ok'>" + r.best.w.toFixed(6) + "</span>",
+            r.best.error.toExponential(3), (r.atOne / r.best.error).toFixed(3) + "x",
+            "<span class='bad'>" + (r.best.w / r.arc).toFixed(2) + "</span>"]));
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    const L = 52, B = 30, T = 16, Rr = 14, lo = 0.13, hi = 0.23;
+    const X = (i) => L + i / (R.length - 1) * (W - L - Rr);
+    const Y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+    ctx.strokeStyle = "#232b3d"; ctx.fillStyle = "#68748c";
+    for (const v of [0.14, 0.16, 0.18, 0.20, 0.22]) { ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(W - Rr, Y(v)); ctx.stroke(); ctx.fillText(v.toFixed(2), 8, Y(v) + 4); }
+    ctx.strokeStyle = "#4a5670"; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(0.218)); ctx.lineTo(W - Rr, Y(0.218)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#4a5670"; ctx.fillText("extrapolated limit ~0.218", W - 190, Y(0.218) - 6);
+    ctx.strokeStyle = "#8fe0a8"; ctx.lineWidth = 2; ctx.beginPath();
+    R.forEach((r, i) => { const px = X(i), py = Y(r.best.w); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.stroke(); ctx.lineWidth = 1;
+    R.forEach((r, i) => { ctx.fillStyle = "#8fe0a8"; ctx.beginPath(); ctx.arc(X(i), Y(r.best.w), 4, 0, 7); ctx.fill();
+        ctx.fillStyle = "#68748c"; ctx.fillText("nt " + r.nt, X(i) - 16, H - 12); });
+};
+$("g3").onclick = () => {
+    const base = study(192);
+    const out = [
+        ["field amplitude x5", study(192, { U: 5 }).best.w, base.aspect, "must not move"],
+        ["geometry scaled x2", study(192, { a: 2, b: 6 }).best.w, base.aspect, "must not move"],
+    ].map(([n, w, asp, note]) => [n, "<span class='" + (w === base.best.w ? "ok" : "bad") + "'>" + w.toFixed(6) + "</span>",
+        asp.toFixed(3), w === base.best.w ? "<span class='ok'>bit-identical</span>" : "<span class='bad'>moved</span>"]);
+    for (const [n, o] of [["b = 2 (thin)", { b: 2 }], ["baseline b = 3", {}], ["b = 6 (thick)", { b: 6 }],
+        ["radial cells x2", { nrScale: 4 }], ["radial cells /2", { nrScale: 16 }]]) {
+        const s = study(192, o);
+        out.push([n, "<span class='warn'>" + s.best.w.toFixed(6) + "</span>", s.aspect.toFixed(3),
+            "<span class='warn'>tracks the aspect ratio</span>"]);
+    }
+    rows($("t3"), ["variation (all at nt = 192)", "w*", "cell aspect", "reading"], out);
+};
+</script>
+</div></body></html>

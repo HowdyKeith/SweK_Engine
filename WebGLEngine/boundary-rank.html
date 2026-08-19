@@ -1,0 +1,120 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The boundary is not where accuracy dies (v3640)</title>
+<meta name="demo:desc" content="Boundary cells were excluded by name in three rounds. Measured: 92 of 94 reproduce a linear field exactly. The real defect is rank - two cells whose gradient is not inaccurate but undetermined, exactly two at every mesh size, and the code answered zero without saying so.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:180px}
+</style></head><body><div id="w">
+<h1>The boundary is not where accuracy dies</h1>
+<div class="sub">Three consecutive rounds excluded "boundary cells" by name. Taken as a subject, the first
+measurement says the exclusion was mostly unnecessary: <b>of 94 boundary cells, 92 reproduce a linear field
+exactly.</b> Two non-collinear differences determine a two-vector exactly &mdash; a boundary cell with two
+neighbours is not a degraded interior cell, it is a fully determined one.</div>
+<div class="law"><b>The real defect is smaller, sharper, and of a different kind.</b> A gradient in 2D has
+<b>two</b> unknowns and each neighbour supplies <b>one</b> equation, so a cell with a single neighbour cannot
+determine it &mdash; not inaccurately, <i>not at all</i>. That is a <b>rank</b> statement, and no amount of
+refinement touches it.</div>
+<h2>1. The census</h2>
+<div class="panel">
+  <div class="row"><label>mesh n <input id="n" type="range" min="8" max="64" step="8" value="24"></label>
+    <span id="nv" class="dim"></span>
+    <label>shear <input id="skew" type="range" min="0" max="0.4" step="0.05" value="0.25"></label>
+    <span id="sv" class="dim"></span>
+    <button id="go" class="good">count and draw</button></div>
+  <canvas id="cv" width="620" height="620" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>The underdetermined set is exactly two, at every mesh size</b>, while boundary cells go
+30 &rarr; 62 &rarr; 126 &rarr; 254. <b>Refinement never fixes it and never worsens it</b> &mdash; the signature of a
+rank defect rather than a discretisation error. They are the corners where a triangle owns <i>two</i> boundary
+edges; this triangulation cuts every square the same way, so only two of the four rectangle corners produce one.</div>
+<h2>2. What those two cells actually know</h2>
+<div class="panel"><button id="rank" class="good">interrogate the rank-1 cells</button><table id="t2"></table></div>
+<div class="law"><b>The full gradient reads exactly 100% wrong, because the code wrote zero.</b> That is not an
+accuracy figure &mdash; <code>gx = gy = 0</code> against a unit-normalised truth <i>is</i> exactly one. <b>An error
+of exactly 1.000 is a refusal, not a measurement.</b> But the component <b>along</b> the single available lever is
+exact: half the gradient is recoverable perfectly and half is unknowable from cell averages alone. The honest answer
+is a partial gradient plus a named unknown, and <code>rank</code>, <code>along</code> and the direction now carry it
+instead of a zero that says nothing.</div>
+<div class="law"><b>And this arc has produced three different sets all called "the boundary", no two equal.</b> A
+boundary <i>face</i> means a missing equation; a boundary <i>node</i> means an invented value; <b>rank-deficient</b>
+means the system cannot be solved. Which one you mean decides the answer &mdash; the previous round read 32% or
+1.6e-14 for the same scheme on the same mesh depending only on that choice.</div>
+<div class="law">Graded by <code>physics/mesh/boundaryRank-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Not done, and now named rather than excluded:</b>
+what a solver should do at a rank-1 cell &mdash; a boundary condition supplying the missing equation, a wider
+stencil, or refusing to reconstruct there. Each is a different physical claim. Related:
+<a href="/node-gradient.html" style="color:#9ab6e8">node gradient</a>,
+<a href="/gradient-join.html" style="color:#9ab6e8">two gradients</a>.</div>
+<script type="module">
+import { makeTriMesh, analyticCells, gradientLS, rankCensus, boundaryCells, boundaryTouching } from "/physics/mesh/triReconstruct.mjs";
+const $ = (i) => document.getElementById(i);
+const B = 0.7, C = -0.4, NORM = Math.hypot(B, C);
+const LIN = (x, y) => 0.3 + B * x + C * y;
+const MESH = (s, n) => makeTriMesh({ nx: n, ny: n, h: 20 / n, skew: s });
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const upd = () => { $("nv").textContent = $("n").value; $("sv").textContent = (+$("skew").value).toFixed(2); };
+$("n").oninput = upd; $("skew").oninput = upd; upd();
+$("go").onclick = () => {
+    const n = +$("n").value, skew = +$("skew").value, m = MESH(skew, n);
+    const u = analyticCells(LIN, m), g = gradientLS(u, m), c = rankCensus(u, m);
+    const face = boundaryCells(m), node = boundaryTouching(m);
+    let nf = 0, nn = 0; for (let t = 0; t < m.tri.length; t++) { if (face[t]) nf++; if (node[t]) nn++; }
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    let xlo = Infinity, xhi = -Infinity; for (const v of m.vx) { xlo = Math.min(xlo, v); xhi = Math.max(xhi, v); }
+    const X = (x) => 10 + (x - xlo) / (xhi - xlo) * (W - 20), Y = (y) => H - 10 - (y - xlo) / (xhi - xlo) * (H - 20);
+    for (let t = 0; t < m.tri.length; t++) {
+        const [a, b, cc] = m.tri[t];
+        ctx.beginPath(); ctx.moveTo(X(m.vx[a]), Y(m.vy[a])); ctx.lineTo(X(m.vx[b]), Y(m.vy[b]));
+        ctx.lineTo(X(m.vx[cc]), Y(m.vy[cc])); ctx.closePath();
+        ctx.fillStyle = g.rank[t] < 2 ? "rgba(255,70,80,0.95)" : (face[t] ? "rgba(230,196,154,0.45)"
+            : (node[t] ? "rgba(90,110,150,0.5)" : "rgba(40,60,90,0.6)"));
+        ctx.fill(); ctx.strokeStyle = "#141a26"; ctx.stroke();
+    }
+    ctx.fillStyle = "#f0a8a0"; ctx.fillText("red = RANK-DEFICIENT (gradient undetermined)", 14, 18);
+    ctx.fillStyle = "#e8c49a"; ctx.fillText("tan = boundary FACE (exact anyway)", 14, 34);
+    ctx.fillStyle = "#8fa4d0"; ctx.fillText("blue = touches a boundary NODE", 14, 50);
+    let worst2 = 0; for (let t = 0; t < u.length; t++) if (g.rank[t] === 2) worst2 = Math.max(worst2, Math.hypot(g.gx[t] - B, g.gy[t] - C) / NORM);
+    rows($("t"), ["quantity", "value", "note"], [
+        ["cells", m.tri.length, "neighbour counts " + JSON.stringify(c.byNbr)],
+        ["boundary FACE / boundary NODE", nf + " / " + nn, "<span class='dim'>nested, and not the same set</span>"],
+        ["rank-deficient", "<span class='bad'>" + (c.byRank[1] || 0) + "</span>",
+            "<span class='bad'>two, whatever n is</span>"],
+        ["worst linearity error, rank-2 cells", "<span class='ok'>" + worst2.toExponential(3) + "</span>",
+            "exact &mdash; boundary cells included"]]);
+};
+$("rank").onclick = () => {
+    const m = MESH(0.25, 24), u = analyticCells(LIN, m), g = gradientLS(u, m);
+    const out = [];
+    for (let t = 0; t < u.length; t++) if (g.rank[t] === 1) {
+        const truthAlong = B * g.dirx[t] + C * g.diry[t];
+        out.push(["cell " + t, "<span class='bad'>" + (Math.hypot(g.gx[t] - B, g.gy[t] - C) / NORM).toFixed(6) + "</span>",
+            "<span class='ok'>" + (Math.abs(g.along[t] - truthAlong) / Math.abs(truthAlong)).toExponential(2) + "</span>",
+            "one lever at (" + g.dirx[t].toFixed(3) + ", " + g.diry[t].toFixed(3) + ")"]);
+    }
+    for (const n of [8, 16, 32, 64]) {
+        const mm = MESH(0.25, n), cc = rankCensus(analyticCells(LIN, mm), mm);
+        let b = 0; for (const v of boundaryCells(mm)) b += v;
+        out.push(["n = " + n, mm.tri.length + " cells", b + " boundary",
+            "<span class='bad'>rank-1: " + (cc.byRank[1] || 0) + "</span>"]);
+    }
+    rows($("t2"), ["what", "full gradient error", "error ALONG the one lever", "note"], out);
+};
+</script>
+</div></body></html>

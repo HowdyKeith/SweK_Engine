@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Composer · Facebook</title>
+<!--
+  v974 — ASSISTED Facebook composer. Default path keeps a human in the loop:
+  it copies your post text to the clipboard and opens Facebook so you paste +
+  click Post (FB no longer prefills status text via URL). A link gets the
+  prefilled share dialog. If you've configured a PAGE token, you can also post
+  directly to that Page via the Graph API. Nothing posts on its own.
+-->
+<style>
+  :root{ --bg:#0b1016; --panel:#121a24; --edge:#1f3550; --ink:#dce7f5; --dim:#7d93ad;
+    --fb:#1877f2; --amber:#ffb14e; --green:#3ecf8e; --bad:#e06a6a; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;
+    display:flex;flex-direction:column;min-height:100vh;}
+  header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--edge);}
+  header .f{width:30px;height:30px;border-radius:7px;background:var(--fb);color:#fff;font-weight:800;
+    font-size:21px;display:flex;align-items:center;justify-content:center;}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.3px;}
+  header .badge{margin-left:auto;font-size:12px;color:var(--dim);}
+  main{flex:1;max-width:620px;width:100%;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px;}
+  label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;}
+  textarea,input{width:100%;background:#0c141d;border:1px solid var(--edge);border-radius:9px;color:var(--ink);
+    font-family:inherit;font-size:15px;padding:11px 12px;resize:vertical;}
+  textarea{min-height:130px;line-height:1.45;}
+  textarea:focus,input:focus{outline:none;border-color:var(--fb);}
+  .count{font-size:11px;color:var(--dim);text-align:right;margin-top:4px;}
+  .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  button{font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:9px;padding:11px 16px;
+    cursor:pointer;transition:filter .12s,transform .08s;}
+  button:hover{filter:brightness(1.1);} button:active{transform:translateY(1px);}
+  button:disabled{opacity:.45;cursor:not-allowed;filter:none;}
+  .primary{background:var(--fb);color:#fff;flex:1;min-width:200px;}
+  .ghost{background:#1a2735;color:var(--ink);border:1px solid var(--edge);}
+  .page{background:var(--green);color:#042;}
+  .flash{min-height:20px;font-size:13px;color:var(--amber);}
+  details{border:1px solid var(--edge);border-radius:9px;padding:10px 12px;background:var(--panel);}
+  summary{cursor:pointer;font-size:13px;color:var(--dim);}
+  details .row{margin-top:10px;}
+  .hint{font-size:12px;color:var(--dim);line-height:1.5;}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#1a2735;color:var(--dim);}
+  .pill.on{background:rgba(62,207,142,.18);color:var(--green);}
+</style>
+</head>
+<body>
+  <header>
+    <div class="f">f</div><h1>Assisted Composer</h1>
+    <span class="badge" id="pageBadge"><span class="pill" id="pagePill">page: checking…</span></span>
+  </header>
+  <main>
+    <div>
+      <label>Post text</label>
+      <textarea id="text" placeholder="What's on your mind? (e.g. a lost-pet alert, an engine update…)"></textarea>
+      <div class="count"><span id="cnt">0</span> chars</div>
+    </div>
+    <div>
+      <label>Link (optional — gets a prefilled share dialog)</label>
+      <input id="link" type="url" placeholder="https://…">
+    </div>
+    <div class="flash" id="flash"></div>
+    <div class="btns">
+      <button class="primary" id="copyOpen">📋 Copy text &amp; open Facebook</button>
+      <button class="ghost" id="shareLink">🔗 Share link dialog</button>
+      <button class="page" id="pagePost" style="display:none">📄 Post to Page</button>
+    </div>
+    <p class="hint">Assisted: your text is copied to the clipboard and Facebook opens — paste (Ctrl+V) into the composer and click Post. Facebook stopped letting apps prefill status text, so this is the reliable path. A <b>link</b> uses Facebook's share dialog (it prefills the link, not the text). The draft is also saved to the bridge so a screen agent could type it later.</p>
+
+    <details id="pageCfg">
+      <summary>⚙ Page posting (optional, direct via Graph API)</summary>
+      <div class="row"><label>Page ID</label><input id="pageId" placeholder="numeric page id"></div>
+      <div class="row"><label>Page access token</label><input id="pageToken" type="password" placeholder="EAAB… (stored locally, mode 600)"></div>
+      <div class="row btns">
+        <button class="ghost" id="saveCfg">Save page config</button>
+      </div>
+      <p class="hint">Only needed if you own a Facebook <b>Page</b> and want one-click direct posting. Personal-timeline posting via API isn't available to third-party apps — that's why the default is assisted. Get a Page token from the Graph API Explorer / your app with the <code>pages_manage_posts</code> permission. The token is stored only on this machine.</p>
+    </details>
+  </main>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const flash=(m,bad)=>{ const f=$("flash"); f.textContent=m; f.style.color=bad?"var(--bad)":"var(--amber)"; };
+  const J=(u,m,b)=>fetch(u,{method:m||"GET",headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+
+  $("text").addEventListener("input",()=>$("cnt").textContent=$("text").value.length);
+
+  function refreshStatus(){
+    J("/facebook/status").then(s=>{
+      const on = s && s.pageConfigured;
+      $("pagePill").textContent = on ? ("page: "+(s.pageId||"set")) : "page: not set";
+      $("pagePill").className = "pill"+(on?" on":"");
+      $("pagePost").style.display = on ? "" : "none";
+      if(on && s.pageId) $("pageId").value = s.pageId;
+    }).catch(()=>{ $("pagePill").textContent="bridge offline"; });
+  }
+
+  $("copyOpen").addEventListener("click", async ()=>{
+    const text=$("text").value, link=$("link").value.trim();
+    if(!text && !link){ flash("nothing to post yet",true); return; }
+    const r = await J("/facebook/compose","POST",{text,link}).catch(()=>null);
+    try { await navigator.clipboard.writeText(text||link); flash("✓ text copied — paste into Facebook and post"); }
+    catch { flash("opened Facebook — couldn't auto-copy, copy your text manually"); }
+    const url = (r && r.composerUrl) || "https://www.facebook.com/";
+    window.open(url,"_blank","noopener");
+  });
+
+  $("shareLink").addEventListener("click", async ()=>{
+    const link=$("link").value.trim();
+    if(!link){ flash("add a link first for the share dialog",true); return; }
+    const r = await J("/facebook/compose","POST",{text:$("text").value,link}).catch(()=>null);
+    if(r && r.shareUrl) window.open(r.shareUrl,"_blank","noopener");
+    else window.open("https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(link),"_blank","noopener");
+    flash("share dialog opened");
+  });
+
+  $("pagePost").addEventListener("click", async ()=>{
+    const text=$("text").value, link=$("link").value.trim();
+    if(!text && !link){ flash("nothing to post",true); return; }
+    $("pagePost").disabled=true; flash("posting to page…");
+    const r = await J("/facebook/page-post","POST",{text,link}).catch(()=>({ok:false,error:"bridge offline"}));
+    $("pagePost").disabled=false;
+    flash(r&&r.ok ? ("✓ posted to page"+(r.postId?(" ("+r.postId+")"):"")) : ("⚠ "+((r&&r.error)||"failed")), !(r&&r.ok));
+  });
+
+  $("saveCfg").addEventListener("click", async ()=>{
+    const r = await J("/facebook/config","POST",{ pageId:$("pageId").value.trim(), pageToken:$("pageToken").value.trim() }).catch(()=>null);
+    flash(r&&r.ok ? "✓ page config saved" : "⚠ save failed", !(r&&r.ok));
+    $("pageToken").value="";
+    refreshStatus();
+  });
+
+  refreshStatus();
+})();
+</script>
+</body>
+</html>

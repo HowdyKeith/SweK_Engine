@@ -1,0 +1,17 @@
+{
+    "type": "kaiju_kind",
+    "name": "frost",
+    "config": {
+        "origin": "frozen wastes",
+        "moveSpeed": 3.0,
+        "scale": 3.5,
+        "color": [0.70, 0.85, 1.00],
+        "bobAmpl": 0.25,
+        "spawnFallSpeed": 12,
+        "spawnLandY": 24,
+        "damageMul": 0.85,
+        "maxLifetime": 110,
+        "debrisVoxel": 1,
+        "eruptRing": false
+    }
+}

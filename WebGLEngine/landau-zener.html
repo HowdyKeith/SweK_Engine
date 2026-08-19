@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Landau-Zener</title>
+<meta name="demo:desc" content="Drive a two-level system through an avoided crossing and ask what survives. The answer is a closed form the integrator never contains: P = exp(-pi D^2 / 2v). Both limits are counterintuitive and both are live here — sweep FAST and the system jumps the gap intact, sweep SLOW and it follows the crossing round and flips. 'Fast' is set by D^2/v, not by v alone. Sabotage puts D instead of D/2 in the off-diagonal: same shape, wrong everywhere.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { display:flex; gap:14px; padding:16px; flex-wrap:wrap; }
+  canvas { border:1px solid #22304a; border-radius:6px; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:5px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; } button.on { outline:2px solid #f6a623; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+  label { margin-right:12px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <div class="dim" style="margin-bottom:6px;">the two adiabatic levels (they never touch — minimum gap D) and the state's position on them</div>
+    <canvas id="lev" width="420" height="260"></canvas>
+    <div style="margin-top:10px;">
+      <label>D <input id="dS" type="range" min="0.2" max="4" step="0.1" value="1" style="width:130px;vertical-align:middle;"><span id="dV">1.0</span></label>
+      <label>v <input id="vS" type="range" min="0.5" max="60" step="0.5" value="4" style="width:130px;vertical-align:middle;"><span id="vV">4.0</span></label>
+      <button id="sab" class="sab" title="D instead of D/2 off-diagonal — a factor-of-two slip that keeps the crossing smooth and lands on the wrong curve">Sabotage coupling</button>
+    </div>
+    <div id="hud" style="margin-top:8px;line-height:1.7;">…</div>
+  </div>
+  <div style="flex:1;min-width:340px;">
+    <div class="dim" style="margin-bottom:6px;">measured survival against the exact exp(−&pi;D²/2v). Every dot is a full RK4 sweep with no renormalization: unitarity is measured, never enforced. Gate: physics/quantum/landauZener-selfcheck.mjs.</div>
+    <canvas id="plot" width="520" height="330" style="width:100%;max-width:640px;"></canvas>
+  </div>
+</div>
+<script type="module">
+import { lzSweep, lzExact, couplingWRONG } from "./physics/quantum/landauZener.js";
+
+let D = 1, v = 4, sab = false;
+const visited = new Map();
+const lev = document.getElementById("lev"), lctx = lev.getContext("2d");
+const plot = document.getElementById("plot"), pctx = plot.getContext("2d");
+const hud = document.getElementById("hud");
+
+function drawLevels(p) {
+  lctx.fillStyle = "#05070d"; lctx.fillRect(0, 0, 420, 260);
+  const tx = (t) => 210 + t * 26, ty = (E) => 130 - E * 26;
+  lctx.strokeStyle = "#22304a"; lctx.setLineDash([3, 3]);
+  for (const s of [1, -1]) { lctx.beginPath();
+    for (let t = -4; t <= 4; t += 0.05) { const X = tx(t), Y = ty(s * v * t / 2 / Math.max(v, 1) * 2);
+      t <= -3.95 ? lctx.moveTo(X, Y) : lctx.lineTo(X, Y); } lctx.stroke(); }
+  lctx.setLineDash([]);
+  const gap = D / Math.max(1, Math.sqrt(v)) * 1.6;
+  for (const s of [1, -1]) {
+    lctx.strokeStyle = s > 0 ? "rgba(89,209,255,0.95)" : "rgba(155,225,93,0.95)"; lctx.lineWidth = 2;
+    lctx.beginPath();
+    for (let t = -4; t <= 4; t += 0.02) {
+      const e = v * t / 2 / Math.max(v, 1) * 2;
+      const E = s * Math.hypot(e, gap / 2);
+      const X = tx(t), Y = ty(E); t <= -3.98 ? lctx.moveTo(X, Y) : lctx.lineTo(X, Y);
+    }
+    lctx.stroke(); lctx.lineWidth = 1;
+  }
+  lctx.fillStyle = "#7f96b8"; lctx.fillText("diabatic (dashed) · adiabatic (solid)", 12, 18);
+  lctx.fillText("min gap D = " + D.toFixed(1), 12, 34);
+  // the state after the sweep: fraction p stayed diabatic (jumped the gap), 1-p followed round
+  lctx.fillStyle = "rgba(89,209,255," + p.toFixed(3) + ")";
+  lctx.beginPath(); lctx.arc(tx(3.4), ty(Math.hypot(v * 3.4 / 2 / Math.max(v, 1) * 2, gap / 2)), 7, 0, 6.3); lctx.fill();
+  lctx.fillStyle = "rgba(155,225,93," + (1 - p).toFixed(3) + ")";
+  lctx.beginPath(); lctx.arc(tx(3.4), ty(-Math.hypot(v * 3.4 / 2 / Math.max(v, 1) * 2, gap / 2)), 7, 0, 6.3); lctx.fill();
+}
+function drawPlot() {
+  pctx.fillStyle = "#05070d"; pctx.fillRect(0, 0, 520, 330);
+  const xmax = 3.2;
+  const tx = (a) => 45 + a / xmax * 445, ty = (P) => 300 - P * 265;
+  pctx.strokeStyle = "#22304a"; pctx.strokeRect(45, 30, 445, 270);
+  pctx.strokeStyle = "rgba(246,166,35,0.9)"; pctx.beginPath();
+  for (let a = 0; a <= xmax; a += 0.01) { const X = tx(a), Y = ty(Math.exp(-Math.PI * a / 2));
+    a <= 0.01 ? pctx.moveTo(X, Y) : pctx.lineTo(X, Y); }
+  pctx.stroke();
+  pctx.fillStyle = "#f6a623"; pctx.fillText("exp(−πD²/2v)", 350, 60);
+  for (const [k, val] of visited) {
+    pctx.fillStyle = val.sab ? "rgba(255,154,154,0.9)" : "rgba(155,225,93,0.9)";
+    pctx.beginPath(); pctx.arc(tx(Math.min(xmax, val.a)), ty(val.P), 4, 0, 6.3); pctx.fill();
+  }
+  pctx.fillStyle = "#7f96b8"; pctx.fillText("D² / v", 440, 318); pctx.fillText("P survive", 48, 24);
+}
+function run() {
+  const r = lzSweep({ D, v, coupling: sab ? couplingWRONG : undefined });
+  const ex = lzExact(D, v), a = D * D / v;
+  visited.set(a.toFixed(3) + (sab ? "s" : ""), { a, P: r.pDiabatic, sab });
+  drawLevels(r.pDiabatic); drawPlot();
+  const onCurve = Math.abs(r.pDiabatic - ex) / ex < 0.02;
+  hud.innerHTML = "D²/v = <b>" + a.toFixed(3) + "</b> · measured P = <b>" + r.pDiabatic.toFixed(4) +
+    "</b> · exact " + ex.toFixed(4) + " <b class='" + (onCurve ? "good" : "bad") + "'>" + (onCurve ? "ON CURVE" : "OFF CURVE") + "</b>" +
+    "<br><span class='dim'>" + r.steps.toLocaleString() + " RK4 steps, norm drift " + Math.abs(r.norm - 1).toExponential(1) +
+    " (never renormalized)</span>" + (sab ? "<br><span class='bad'>sabotage live: D instead of D/2 — same shape, wrong everywhere</span>" : "");
+}
+document.getElementById("dS").oninput = (e) => { D = parseFloat(e.target.value); document.getElementById("dV").textContent = D.toFixed(1); run(); };
+document.getElementById("vS").oninput = (e) => { v = parseFloat(e.target.value); document.getElementById("vV").textContent = v.toFixed(1); run(); };
+document.getElementById("sab").onclick = function () { sab = !sab; this.classList.toggle("on", sab); run(); };
+run();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

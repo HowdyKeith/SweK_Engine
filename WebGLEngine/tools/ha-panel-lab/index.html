@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HA Panel Lab</title>
+<style>
+    :root { --bg:#060912; --panel:#0d1726; --line:#1d3350; --txt:#cfe6f7; --dim:#6f86a6; --accent:#22dd77; }
+    * { box-sizing: border-box; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+        font:14px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; overflow:hidden; }
+    #app { display:grid; grid-template-columns: 320px 1fr; height:100%; }
+    /* ---- sidebar ---- */
+    aside { background:var(--panel); border-right:1px solid var(--line); padding:18px 16px; overflow-y:auto; }
+    aside h1 { margin:0 0 2px; font-size:15px; letter-spacing:.06em; color:#eafff2; }
+    aside .sub { margin:0 0 18px; font-size:11px; color:var(--dim); }
+    .group { border:1px solid var(--line); border-radius:12px; padding:13px 13px 5px; margin-bottom:14px; }
+    .group h2 { margin:0 0 10px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+    .row { margin:0 0 11px; }
+    .row label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; color:#9fb6d4; }
+    .row label b { color:#eafff2; font-variant-numeric:tabular-nums; }
+    input[type=range] { width:100%; accent-color:var(--accent); }
+    select, input[type=text], textarea { width:100%; background:#0a1422; color:var(--txt);
+        border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:12px ui-monospace, monospace; }
+    textarea { resize:vertical; min-height:64px; }
+    .btnrow { display:flex; gap:6px; flex-wrap:wrap; }
+    button { flex:1; min-width:58px; padding:7px 4px; font-size:11px; cursor:pointer;
+        background:#112138; color:var(--txt); border:1px solid var(--line); border-radius:8px; }
+    button:hover { border-color:var(--accent); color:#eafff2; }
+    button.on { background:var(--accent); color:#062; border-color:var(--accent); font-weight:700; }
+    .hint { font-size:10.5px; color:var(--dim); margin:6px 0 0; line-height:1.5; }
+    /* ---- stage ---- */
+    main { position:relative; display:flex; align-items:center; justify-content:center; padding:28px; }
+    #stage { width:100%; max-width:680px; }
+    .stagebar { position:absolute; top:12px; right:16px; font-size:11px; color:var(--dim);
+        background:rgba(13,23,38,.7); border:1px solid var(--line); border-radius:8px; padding:5px 10px; }
+    .err { color:#ff8080; font-family:ui-monospace, monospace; padding:18px; border:1px solid #5a1f1f;
+        border-radius:10px; background:#1a0c0c; }
+</style>
+</head>
+<body>
+<div id="app">
+    <aside>
+        <h1>HA&nbsp;PANEL&nbsp;LAB</h1>
+        <p class="sub">Develop Home Assistant cards against a mock <code>hass</code> — no HA needed</p>
+
+        <div class="group">
+            <h2>Panel</h2>
+            <div class="row"><select id="panelPick"></select></div>
+            <div class="row">
+                <input id="loadFile" type="text" placeholder="load file… e.g. my-card.js">
+            </div>
+            <div class="btnrow"><button id="loadBtn">Load file</button><button id="reloadBtn">Reload</button></div>
+            <p class="hint">Drop a <code>.js</code> card into <code>panels/</code>, add it to
+            <code>panels/manifest.json</code>, then Reload — or type its filename above to load ad-hoc.</p>
+        </div>
+
+        <div class="group">
+            <h2>Config (JSON)</h2>
+            <div class="row"><textarea id="cfg" spellcheck="false"></textarea></div>
+            <div class="btnrow"><button id="applyCfg">Apply config</button></div>
+        </div>
+
+        <div class="group">
+            <h2>Mock entities</h2>
+            <div class="row"><label>Battery <b id="vBatt">62%</b></label><input id="batt" type="range" min="0" max="100" value="62"></div>
+            <div class="row"><label>Sun elevation <b id="vEl">35°</b></label><input id="el" type="range" min="-18" max="80" value="35"></div>
+            <div class="row"><label>Sun azimuth <b id="vAz">140°</b></label><input id="az" type="range" min="0" max="360" value="140"></div>
+            <div class="row"><label>Cloud cover <b id="vCl">25%</b></label><input id="cl" type="range" min="0" max="100" value="25"></div>
+            <div class="btnrow">
+                <button data-p="dawn">Dawn</button><button data-p="noon">Noon</button>
+                <button data-p="dusk">Dusk</button><button data-p="night">Night</button><button data-p="storm">Storm</button>
+            </div>
+            <div class="btnrow" style="margin-top:6px"><button id="dayBtn">▶ Run day cycle</button></div>
+        </div>
+
+        <div class="group">
+            <h2>Raw hass.states</h2>
+            <div class="row"><textarea id="rawStates" spellcheck="false" style="min-height:120px"></textarea></div>
+            <div class="btnrow"><button id="applyRaw">Apply raw</button><button id="syncRaw">Sync from sliders</button></div>
+            <p class="hint">Edit arbitrary entities here for cards that read other states.
+            "Apply raw" overrides the sliders until you Sync again.</p>
+        </div>
+    </aside>
+
+    <main>
+        <div class="stagebar" id="stagebar">no panel loaded</div>
+        <div id="stage"></div>
+    </main>
+</div>
+
+<script type="module">
+// =============================================================================
+// HA Panel Lab — a mock Home Assistant harness for developing custom cards.
+//
+// It builds a fake `hass` object (the same shape HA passes to cards: a
+// `.states` map of entity_id → { state, attributes }), instantiates the
+// selected panel's custom element, and re-pushes `hass` on every control
+// change — exactly how HA calls `set hass` when entity states update.
+//
+// SERVE THIS FOLDER over http (ES module imports + manifest fetch don't work
+// from file://). With Node:  npx serve   (or)  npx http-server
+// =============================================================================
+
+const stage   = document.getElementById("stage");
+const bar      = document.getElementById("stagebar");
+const panelPick = document.getElementById("panelPick");
+
+let manifest = { panels: [] };
+let current  = null;        // { entry, el }
+let rawOverride = null;     // when set, used instead of slider-built states
+
+// ---- mock hass -------------------------------------------------------------
+function weatherStateFromCloud(c) {
+    if (c < 10) return "sunny";
+    if (c < 50) return "partlycloudy";
+    if (c < 90) return "cloudy";
+    return "rainy";
+}
+function buildStatesFromSliders() {
+    const batt = +document.getElementById("batt").value;
+    const el   = +document.getElementById("el").value;
+    const az   = +document.getElementById("az").value;
+    const cl   = +document.getElementById("cl").value;
+    return {
+        "sensor.solar_battery_level": { entity_id: "sensor.solar_battery_level", state: String(batt),
+            attributes: { unit_of_measurement: "%", friendly_name: "Solar Battery" } },
+        "sun.sun": { entity_id: "sun.sun", state: el > 0 ? "above_horizon" : "below_horizon",
+            attributes: { elevation: el, azimuth: az, friendly_name: "Sun" } },
+        "weather.home": { entity_id: "weather.home", state: weatherStateFromCloud(cl),
+            attributes: { cloud_coverage: cl, temperature: 18, friendly_name: "Home" } },
+    };
+}
+function makeHass() {
+    const states = rawOverride ?? buildStatesFromSliders();
+    return {
+        states,
+        // Common fields cards sometimes read — enough to not crash on access.
+        themes: { darkMode: true }, language: "en", locale: { language: "en" },
+        callService: async (domain, service, data) => { console.log("[lab] callService", domain, service, data); },
+        formatEntityState: (s) => `${s.state}`,
+    };
+}
+function pushHass() {
+    if (current?.el) {
+        try { current.el.hass = makeHass(); }
+        catch (e) { showErr("set hass threw: " + e.message); }
+    }
+    refreshRawView();
+}
+
+// ---- panel loading ---------------------------------------------------------
+async function loadManifest() {
+    try {
+        const res = await fetch("./panels/manifest.json", { cache: "no-store" });
+        manifest = await res.json();
+    } catch {
+        manifest = { panels: [] };
+        console.warn("[lab] no manifest.json (or not served over http)");
+    }
+    panelPick.innerHTML = "";
+    for (const p of manifest.panels) {
+        const o = document.createElement("option");
+        o.value = p.file; o.textContent = p.name || p.tag || p.file;
+        panelPick.appendChild(o);
+    }
+    if (manifest.panels.length) selectPanel(manifest.panels[0]);
+    else bar.textContent = "no panels in manifest";
+}
+
+async function selectPanel(entry) {
+    showErr(null);
+    try {
+        // Import the panel module — it self-registers its custom element.
+        await import(`./panels/${entry.file}?t=${Date.now()}`);
+        const tag = entry.tag || guessTagFromFile(entry.file);
+        if (!customElements.get(tag)) {
+            showErr(`Loaded ${entry.file} but no element <${tag}> registered. ` +
+                    `Set "tag" in manifest.json to the element this file defines.`);
+            return;
+        }
+        if (current?.el) current.el.remove();
+        const el = document.createElement(tag);
+        const cfg = entry.config || {};
+        document.getElementById("cfg").value = JSON.stringify(cfg, null, 2);
+        if (typeof el.setConfig === "function") el.setConfig(cfg);
+        stage.innerHTML = ""; stage.appendChild(el);
+        current = { entry, el };
+        el.hass = makeHass();
+        bar.textContent = `<${tag}>  ·  ${entry.file}`;
+    } catch (e) {
+        showErr(`Failed to load ${entry.file}: ${e.message}`);
+        console.error(e);
+    }
+}
+function guessTagFromFile(file) { return file.replace(/\.js$/, ""); }
+
+// ---- raw states view -------------------------------------------------------
+function refreshRawView() {
+    if (document.activeElement === document.getElementById("rawStates")) return;
+    document.getElementById("rawStates").value =
+        JSON.stringify((rawOverride ?? buildStatesFromSliders()), null, 2);
+}
+
+// ---- ui wiring -------------------------------------------------------------
+function fmt() {
+    document.getElementById("vBatt").textContent = document.getElementById("batt").value + "%";
+    document.getElementById("vEl").textContent   = document.getElementById("el").value + "°";
+    document.getElementById("vAz").textContent   = document.getElementById("az").value + "°";
+    document.getElementById("vCl").textContent   = document.getElementById("cl").value + "%";
+}
+["batt","el","az","cl"].forEach(id =>
+    document.getElementById(id).addEventListener("input", () => { rawOverride = null; fmt(); pushHass(); }));
+
+const PRESETS = {
+    dawn:{batt:28,el:4,az:90,cl:20}, noon:{batt:88,el:68,az:180,cl:10},
+    dusk:{batt:74,el:2,az:268,cl:35}, night:{batt:46,el:-12,az:320,cl:25}, storm:{batt:19,el:30,az:160,cl:95},
+};
+document.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => {
+    const p = PRESETS[b.dataset.p]; rawOverride = null;
+    document.getElementById("batt").value=p.batt; document.getElementById("el").value=p.el;
+    document.getElementById("az").value=p.az; document.getElementById("cl").value=p.cl;
+    fmt(); pushHass();
+}));
+
+// day-cycle animation
+let dayRaf = 0, dayT = 0;
+document.getElementById("dayBtn").addEventListener("click", function () {
+    if (dayRaf) { cancelAnimationFrame(dayRaf); dayRaf = 0; this.classList.remove("on"); this.textContent = "▶ Run day cycle"; return; }
+    this.classList.add("on"); this.textContent = "⏸ Stop";
+    rawOverride = null;
+    const step = () => {
+        dayT += 0.0016; if (dayT > 1) dayT = 0;
+        const el = -15 + 85 * Math.sin(dayT * Math.PI);     // below horizon at night, peak at noon
+        const az = (dayT * 360 + 90) % 360;
+        document.getElementById("el").value = Math.round(el);
+        document.getElementById("az").value = Math.round(az);
+        fmt(); pushHass();
+        dayRaf = requestAnimationFrame(step);
+    };
+    step();
+});
+
+document.getElementById("applyCfg").addEventListener("click", () => {
+    try {
+        const cfg = JSON.parse(document.getElementById("cfg").value);
+        if (current?.el?.setConfig) { current.el.setConfig(cfg); current.el.hass = makeHass(); showErr(null); }
+    } catch (e) { showErr("Config JSON error: " + e.message); }
+});
+document.getElementById("applyRaw").addEventListener("click", () => {
+    try { rawOverride = JSON.parse(document.getElementById("rawStates").value); pushHass(); showErr(null); }
+    catch (e) { showErr("Raw states JSON error: " + e.message); }
+});
+document.getElementById("syncRaw").addEventListener("click", () => { rawOverride = null; refreshRawView(); pushHass(); });
+
+document.getElementById("reloadBtn").addEventListener("click", loadManifest);
+panelPick.addEventListener("change", () => {
+    const entry = manifest.panels.find(p => p.file === panelPick.value);
+    if (entry) selectPanel(entry);
+});
+document.getElementById("loadBtn").addEventListener("click", () => {
+    const f = document.getElementById("loadFile").value.trim();
+    if (f) selectPanel({ file: f, tag: guessTagFromFile(f), config: {} });
+});
+
+function showErr(msg) {
+    if (!msg) { const e = stage.querySelector(".err"); if (e) e.remove(); return; }
+    stage.innerHTML = `<div class="err">${msg}</div>`;
+}
+
+// ---- go --------------------------------------------------------------------
+fmt();
+loadManifest();
+</script>
+</body>
+</html>

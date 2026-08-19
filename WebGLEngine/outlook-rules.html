@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outlook Rules</title>
+<style>
+  :root { --bg:#0a0e14; --panel:#0c1118; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --go:#9fe88f; --err:#f88; --accent:#7fb3d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  header .sub { font-size:11px; color:var(--dim); }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:14px; max-width:1100px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { padding:6px 11px; background:#16202c; color:#cde; border:1px solid #2a3340; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button.go { background:#14241a; border-color:#2a5a3a; color:#9fe; }
+  button.warn { background:#2a1414; border-color:#5a2a2a; color:#f99; }
+  button:disabled { opacity:.5; cursor:default; }
+  .msg { font-size:11px; color:var(--dim); min-height:15px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th,td { border:1px solid var(--line); padding:3px 5px; text-align:left; vertical-align:top; }
+  th { color:var(--accent); font-weight:600; background:#0c1118; position:sticky; top:0; }
+  td input[type=text], td select { width:100%; background:#0a0e14; color:var(--ink); border:1px solid #2a3340; border-radius:4px; padding:3px 5px; font:11px ui-monospace,monospace; }
+  td.xcol { text-align:center; width:28px; }
+  .section { border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .section h2 { font-size:12px; margin:0 0 8px; color:var(--accent); }
+  textarea { width:100%; min-height:60px; background:#0a0e14; color:var(--ink); border:1px solid #2a3340; border-radius:6px; padding:6px; font:11px ui-monospace,monospace; resize:vertical; }
+  pre { white-space:pre-wrap; font-size:11px; color:#bcd; background:#0a0e14; border:1px solid var(--line); border-radius:6px; padding:8px; max-height:240px; overflow:auto; }
+  .grow { flex:1; }
+  a { color:#9ed5ff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128231; Outlook Rules</h1>
+  <span class="sub grow">view / add / edit / delete / run email rules &mdash; forward, reply, &hellip;</span>
+  <span id="wbState" class="sub"></span>
+</header>
+<main>
+  <div class="section">
+    <h2>Rules</h2>
+    <div class="bar">
+      <button id="loadBtn" class="go">Load rules</button>
+      <button id="addBtn">+ Row</button>
+      <button id="saveBtn" class="go">Save workbook</button>
+      <button id="csvBtn">Export CSV</button>
+      <span class="grow"></span>
+      <button id="procBtn">Process inbox now</button>
+      <button id="queueBtn">Review queue / log</button>
+    </div>
+    <div class="bar" style="margin-top:6px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="skipRead"> Skip already-read emails</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="goFwd"> Only act on mail from now on</label>
+      <span id="goFwdState" class="sub" style="font-size:12px;"></span>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink);margin-left:auto;">Mail source
+        <select id="mailSource" title="Which inbox the rules read. Outlook (this PC's Outlook), Gmail (IMAP app-password, set in Settings -> Gmail), or both merged." style="background:#0a0e14;color:var(--ink);border:1px solid #2a3340;border-radius:5px;padding:4px 6px;font-size:13px;">
+          <option value="outlook">Outlook</option>
+          <option value="gmail">Gmail</option>
+          <option value="both">Both</option>
+        </select>
+      </label>
+    </div>
+    <div id="msg" class="msg"></div>
+    <div style="overflow:auto;max-height:360px;margin-top:6px;">
+      <table id="grid"><thead><tr>
+        <th style="width:60px">Enabled</th><th style="width:130px">Name</th>
+        <th>Match&nbsp;From</th><th>Match&nbsp;Subject</th>
+        <th style="width:92px">Action</th><th>To</th><th>Subject</th><th>Body</th><th style="width:28px"></th>
+      </tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div class="sub" style="margin-top:6px;">Set or change the workbook path (and create / browse a new one) in <b>Settings &rarr; <a href="#" id="erLink2" style="color:#7fc4ff;text-decoration:underline;cursor:pointer;">Email Rules</a></b>. This app edits the rules inside whatever workbook is configured there.</div>
+  </div>
+
+  <div class="section">
+    <h2>Preview against a sample email (doesn't touch the inbox)</h2>
+    <div class="bar"><input id="pvFrom" type="text" placeholder="from (e.g. client@acme.com)" style="flex:1;min-width:140px;background:#0a0e14;color:var(--ink);border:1px solid #2a3340;border-radius:5px;padding:5px 7px;">
+      <input id="pvSubj" type="text" placeholder="subject" style="flex:1;min-width:140px;background:#0a0e14;color:var(--ink);border:1px solid #2a3340;border-radius:5px;padding:5px 7px;">
+      <button id="pvBtn" class="go">Preview match</button></div>
+    <textarea id="pvBody" placeholder="body&hellip;"></textarea>
+    <pre id="pvOut" style="display:none;"></pre>
+  </div>
+
+  <div class="section" id="queueWrap" style="display:none;">
+    <h2>Approval queue &amp; log</h2>
+    <div id="queue"></div>
+    <pre id="log"></pre>
+  </div>
+
+  <div class="section">
+    <h2>Native Outlook rules (Windows)</h2>
+    <div class="sub" style="margin-bottom:6px;">Your real Outlook rules can be <b>listed</b> and <b>run</b> here. Create / edit / delete them inside Outlook itself.</div>
+    <div class="bar"><button id="olLoad">Load Outlook rules</button>
+      <select id="olRules" style="flex:1;min-width:180px;background:#0a0e14;color:var(--ink);border:1px solid #2a3340;border-radius:5px;padding:5px 7px;"><option value="">(load rules&hellip;)</option></select>
+      <button id="olRun" class="go">Run rule</button></div>
+    <div id="olMsg" class="msg"></div>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  var ACTIONS = ["email", "forward", "reply", "note", "petfbi"];
+  var rows = [];   // working copy of rule objects
+  var configured = false;
+  function $(id) { return document.getElementById(id); }
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, error: e && e.message }; }); }
+  function api(op, body) { return j("/rules/" + op, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  // case-insensitive field get/set so we round-trip whatever keys the workbook uses
+  function fget(o, k) { for (var p in o) if (p.toLowerCase() === k.toLowerCase()) return o[p]; return ""; }
+  function setMsg(el, t, ok) { el.textContent = t; el.style.color = ok === false ? "#f88" : ok === true ? "#9fe88f" : "#8b97a8"; }
+  // v1576 - jump to Settings -> Email Rules. When this app was opened from the engine, drive the
+  // opener's settings panel directly; if opened standalone, deep-link a fresh engine tab.
+  function openEmailRulesSettings() {
+    try {
+      if (window.opener && !window.opener.closed && typeof window.opener.openSettings === "function") {
+        window.opener.openSettings("emailRules");
+        try { window.opener.focus(); } catch (e) {}
+        return;
+      }
+    } catch (e) {}
+    try { window.open("/index.html#settings=emailRules", "_blank"); }
+    catch (e) { try { location.href = "/index.html#settings=emailRules"; } catch (e2) {} }
+  }
+
+  function render() {
+    var tb = $("rows"); tb.innerHTML = "";
+    rows.forEach(function (r, i) {
+      var tr = document.createElement("tr");
+      var en = /^(true|1|yes|y)$/i.test(String(fget(r, "enabled"))) ? "checked" : "";
+      var act = String(fget(r, "action") || "email").toLowerCase();
+      tr.innerHTML =
+        "<td class='xcol'><input type='checkbox' data-f='enabled' " + en + "></td>" +
+        "<td><input type='text' data-f='name' value='" + esc(fget(r, "name")) + "'></td>" +
+        "<td><input type='text' data-f='matchfrom' value='" + esc(fget(r, "matchfrom")) + "'></td>" +
+        "<td><input type='text' data-f='matchsubject' value='" + esc(fget(r, "matchsubject")) + "'></td>" +
+        "<td><select data-f='action'>" + ACTIONS.map(function (a) { return "<option " + (a === act ? "selected" : "") + ">" + a + "</option>"; }).join("") + "</select></td>" +
+        "<td><input type='text' data-f='to' value='" + esc(fget(r, "to")) + "'></td>" +
+        "<td><input type='text' data-f='subject' value='" + esc(fget(r, "subject")) + "'></td>" +
+        "<td><input type='text' data-f='body' value='" + esc(fget(r, "body")) + "'></td>" +
+        "<td class='xcol'><button class='warn' data-del='" + i + "' style='padding:1px 6px'>&#10005;</button></td>";
+      tb.appendChild(tr);
+    });
+  }
+  // pull the grid back into rows[] before saving
+  function harvest() {
+    var trs = $("rows").querySelectorAll("tr");
+    rows = Array.prototype.map.call(trs, function (tr) {
+      var o = {};
+      tr.querySelectorAll("[data-f]").forEach(function (el) {
+        var f = el.getAttribute("data-f");
+        o[f] = el.type === "checkbox" ? (el.checked ? "TRUE" : "FALSE") : el.value;
+      });
+      // normalize to the template's column names
+      return { Enabled: o.enabled, Name: o.name, MatchFrom: o.matchfrom, MatchSubject: o.matchsubject, Action: o.action, To: o.to, Subject: o.subject, Body: o.body };
+    });
+  }
+
+  $("grid").addEventListener("click", function (e) {
+    var d = e.target.closest("[data-del]");
+    if (d) { harvest(); rows.splice(parseInt(d.getAttribute("data-del"), 10), 1); render(); }
+  });
+
+  function loadRules() {
+    setMsg($("msg"), "loading\u2026");
+    return j("/rules/list").then(function (r) {
+      if (r && r.ok) { rows = (r.rules || []).map(function (x) { return Object.assign({}, x); }); render(); setMsg($("msg"), rows.length + " rule(s) loaded", true); }
+      else { var _se = (r && (r.stderr || r.raw)) ? (" \u2014 " + String(r.stderr || r.raw).replace(/\s+/g, " ").trim().slice(0, 160)) : ""; var _hint = (r && /openpyxl|pandas|no module|modulenotfound|python/i.test(String(r.error || "") + String(r.stderr || ""))) ? "  (the rules engine needs Python 3 + pandas + openpyxl on this machine \u2014 install them in Settings \u2192 Email Rules)" : ((r && /no JSON from rules engine/.test(String(r.error || "")) && !_se) ? "  (workbook missing or the Python rules engine failed)" : ""); setMsg($("msg"), "\u2717 " + ((r && r.error) || "no workbook configured \u2014 set one in Settings \u2192 Email Rules") + _se + _hint, false); }
+    });
+  }
+  $("loadBtn").addEventListener("click", loadRules);
+  $("addBtn").addEventListener("click", function () { harvest(); rows.push({ Enabled: "TRUE", Name: "New rule", Action: "forward" }); render(); });
+  $("saveBtn").addEventListener("click", function () {
+    harvest(); setMsg($("msg"), "saving\u2026");
+    api("write", { rules: rows }).then(function (r) {
+      if (r && r.ok) setMsg($("msg"), "\u2713 wrote " + (r.wrote != null ? r.wrote : rows.length) + " rule(s)" + (r.path ? " \u2192 " + r.path.split(/[\\/]/).pop() : ""), true);
+      else setMsg($("msg"), "\u2717 " + ((r && r.error) || "save failed"), false);
+    });
+  });
+  $("csvBtn").addEventListener("click", function () { setMsg($("msg"), "exporting\u2026"); api("export-csv", {}).then(function (r) { setMsg($("msg"), r && r.ok ? ("\u2713 " + (r.rows != null ? r.rows : "") + " rules \u2192 " + ((r.path || "").split(/[\\/]/).pop())) : ("\u2717 " + ((r && r.error) || "load a workbook first")), !!(r && r.ok)); }); });
+  $("procBtn").addEventListener("click", function () { setMsg($("msg"), "processing inbox\u2026"); api("process", {}).then(function (r) { setMsg($("msg"), r && r.ok ? ("\u2713 matched " + (r.matched || 0) + ", fired " + (r.fired || r.sent || 0)) : ("\u2717 " + ((r && r.error) || "failed")), !!(r && r.ok)); }); });
+  // v1584 — skip already-read + "only act on mail from now on" (records a cutoff + skips older mail)
+  function _fmtTs(ts) { try { return new Date(ts).toLocaleString(); } catch (e) { return String(ts); } }
+  function renderGoFwd(ts) { var st = $("goFwdState"); if (!st) return; if (ts && ts > 0) { if ($("goFwd")) $("goFwd").checked = true; st.textContent = "acting only on mail since " + _fmtTs(ts); st.style.color = "#9fe88f"; } else { if ($("goFwd")) $("goFwd").checked = false; st.textContent = ""; } }
+  $("skipRead").addEventListener("change", function () { var on = $("skipRead").checked; setMsg($("msg"), on ? "skipping already-read mail" : "processing read + unread mail", true); j("/rules/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ onlyUnread: on }) }); });
+  (function(){ var ms = $("mailSource"); if (ms) ms.addEventListener("change", function () { var v = ms.value; setMsg($("msg"), "mail source: " + v + (v !== "outlook" ? " (Gmail needs an app password set in Settings -> Gmail)" : ""), true); j("/rules/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: v }) }); }); })();
+  $("goFwd").addEventListener("change", function () { var on = $("goFwd").checked; setMsg($("msg"), on ? "setting cutoff\u2026" : "clearing cutoff\u2026"); api("goforward", { on: on }).then(function (r) { if (r && r.ok) { if (on) { renderGoFwd(r.since || Date.now()); setMsg($("msg"), "\u2713 from now on only \u2014 left " + (r.primed || 0) + " existing message(s) alone", true); } else { renderGoFwd(0); setMsg($("msg"), "\u2713 cutoff cleared \u2014 acting on all matching mail", true); } } else { $("goFwd").checked = !on; setMsg($("msg"), "\u2717 " + ((r && r.error) || "failed"), false); } }); });
+
+  $("pvBtn").addEventListener("click", function () {
+    var out = $("pvOut"); out.style.display = "block"; out.textContent = "matching\u2026";
+    api("apply", { from: $("pvFrom").value.trim(), subject: $("pvSubj").value.trim(), body: $("pvBody").value }).then(function (r) {
+      if (!r || !r.ok) { out.textContent = "\u2717 " + ((r && r.error) || "failed"); return; }
+      if (!r.actions || !r.actions.length) { out.textContent = "(no rules matched)"; return; }
+      out.textContent = r.actions.map(function (a) { return "\u2713 " + a.rule + " [" + a.action + "]\n   to: " + ((a.to || []).join(", ") || "(none)") + "\n   subj: " + (a.subject || "") + "\n   body: " + String(a.body || "").slice(0, 160); }).join("\n\n");
+    });
+  });
+
+  $("queueBtn").addEventListener("click", function () {
+    var w = $("queueWrap"); w.style.display = "block";
+    Promise.all([j("/rules/pending"), j("/rules/log?n=30")]).then(function (res) {
+      var pj = res[0] || {}, lj = res[1] || {};
+      var q = $("queue"); q.innerHTML = "";
+      var items = (pj.pending || pj.items || []);
+      if (!items.length) { q.innerHTML = "<div class='sub'>(approval queue empty)</div>"; }
+      else items.forEach(function (it) {
+        var row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:5px 7px;margin-bottom:4px;font-size:11px;";
+        row.innerHTML = "<span class='grow'>" + esc(it.rule || "(rule)") + " \u00b7 " + esc((it.msg && it.msg.subject) || it.kind || "") + "</span>";
+        var ok = document.createElement("button"); ok.className = "go"; ok.textContent = "Approve"; ok.style.padding = "2px 8px";
+        var no = document.createElement("button"); no.className = "warn"; no.textContent = "Reject"; no.style.padding = "2px 8px";
+        ok.addEventListener("click", function () { ok.textContent = "\u2026"; api("approve", { id: it.id }).then(function (j2) { row.style.opacity = ".4"; ok.textContent = j2 && j2.ok ? "\u2713 sent" : "\u2717"; ok.disabled = no.disabled = true; }); });
+        no.addEventListener("click", function () { api("reject", { id: it.id }); row.remove(); });
+        row.append(ok, no); q.appendChild(row);
+      });
+      var entries = (lj.log || lj.entries || []);
+      $("log").textContent = entries.length ? entries.map(function (e) { return (e.ts ? new Date(e.ts).toLocaleString() + "  " : "") + (e.rule || "") + " [" + (e.action || "") + "] " + (e.result || ""); }).join("\n") : "(log empty)";
+    });
+  });
+
+  // native Outlook rules
+  $("olLoad").addEventListener("click", function () {
+    setMsg($("olMsg"), "loading\u2026");
+    j("/outlook/rules").then(function (r) {
+      var sel = $("olRules"); sel.innerHTML = "";
+      if (r && r.ok && r.rules && r.rules.length) { r.rules.forEach(function (x) { var o = document.createElement("option"); o.value = x.name; o.textContent = x.name + (x.enabled ? "" : " (off)"); sel.appendChild(o); }); setMsg($("olMsg"), r.rules.length + " Outlook rules", true); }
+      else { sel.innerHTML = "<option value=''>(none)</option>"; setMsg($("olMsg"), "\u2717 " + ((r && r.error) || "no rules / Outlook not available"), false); }
+    });
+  });
+  $("olRun").addEventListener("click", function () {
+    var name = $("olRules").value; if (!name) { setMsg($("olMsg"), "pick a rule"); return; }
+    setMsg($("olMsg"), "running " + name + "\u2026");
+    j("/outlook/rule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name }) }).then(function (r) { setMsg($("olMsg"), r && r.ok ? ("\u2713 ran " + name) : ("\u2717 " + ((r && r.error) || "failed")), !!(r && r.ok)); });
+  });
+
+  // initial: report whether a workbook is configured, then auto-load
+  var _erl2 = $("erLink2"); if (_erl2) _erl2.addEventListener("click", function (ev) { ev.preventDefault(); openEmailRulesSettings(); });
+  j("/rules/config").then(function (s) {
+    configured = !!(s && (s.configured || s.rulesXls));
+    try { $("skipRead").checked = (s && s.onlyUnread !== false); renderGoFwd(s && s.goForwardTs); } catch (e) {}
+    try { var ms = $("mailSource"); if (ms && s && s.source) ms.value = s.source; } catch (e) {}
+    if (configured) {
+      var _nm = (s.rulesXls || "").split(/[\\/]/).pop();
+      if (s && s.exists === false) { $("wbState").textContent = "workbook attached but not created yet: " + _nm; $("wbState").style.color = "#f0a85a"; }
+      else { $("wbState").textContent = "workbook: " + _nm; $("wbState").style.color = "#9fe88f"; }
+    } else {
+      $("wbState").innerHTML = "no workbook set (Settings \u2192 <a href=\"#\" id=\"erLink\" style=\"color:#7fc4ff;text-decoration:underline;cursor:pointer;\">Email Rules</a>)";
+      $("wbState").style.color = "#caa05a";
+      var _erl = $("erLink"); if (_erl) _erl.addEventListener("click", function (ev) { ev.preventDefault(); openEmailRulesSettings(); });
+    }
+    if (configured) loadRules();
+  });
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

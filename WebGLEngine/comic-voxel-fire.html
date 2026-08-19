@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Comic Voxel Fire">
+<meta name="demo:desc" content="Round one of content->voxels->filters: a comic page is sampled into a colored voxel slab and set alight -- an ignition front sweeps up and carries the page into embers. Crank the resolution to stress the voxel count. WebGL2 instanced cubes, Canvas2D fallback.">
+<meta name="demo:category" content="fx">
+<title>Comic Voxel Fire</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; }
+  html,body { margin:0; height:100%; background:#050308; overflow:hidden; color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; z-index:3; }
+  #st { position:fixed; right:14px; top:12px; color:#7c93b8; font-size:11px; z-index:3; }
+  #bar { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:3; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  button { background:rgba(20,10,8,.75); color:var(--cyan); border:1px solid #3a1c14; border-radius:8px; padding:9px 16px; font:600 12px ui-monospace,monospace; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--amber); }
+  #hint { position:fixed; left:50%; bottom:62px; transform:translateX(-50%); color:#7c93b8; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Comic Voxel Fire</div>
+<div id="st"></div>
+<div id="hint">drag to orbit &middot; the page voxelizes and burns</div>
+<div id="bar"><button id="ignite">&#128293; Re-ignite</button><button id="res">Resolution: med</button><button id="page">Next page</button></div>
+<script type="module">
+import { voxelizePage, igniteState, updateFire, burnedFraction } from "./fx/voxelize/pageVoxels.js";
+
+const cv = document.getElementById("c"), st = document.getElementById("st");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+function resize() { W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR); cv.width = W; cv.height = H; cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px"; }
+addEventListener("resize", resize); resize();
+
+// draw a procedural comic page: panels, figures, speech bubbles
+function makePage(kind) {
+  const PW = 480, PH = 620, s = document.createElement("canvas"); s.width = PW; s.height = PH; const g = s.getContext("2d");
+  g.fillStyle = "#f4efe3"; g.fillRect(0, 0, PW, PH);
+  const panels = kind === 0 ? [[20, 20, 440, 180], [20, 220, 210, 180], [250, 220, 210, 180], [20, 420, 440, 180]] : [[20, 20, 440, 285], [20, 325, 440, 275]];
+  const sky = ["#8ec5e8", "#e8b04a", "#c86a8e", "#7fb08a"];
+  panels.forEach((p, i) => {
+    g.fillStyle = sky[(i + kind) % 4]; g.fillRect(p[0], p[1], p[2], p[3]);
+    g.fillStyle = "rgba(255,255,255,0.18)"; for (let k = 0; k < 5; k++) g.fillRect(p[0] + 20 + k * 60, p[1] + 14, 30, 8);
+    // a "figure"
+    g.fillStyle = ["#e5544b", "#4b8de5", "#5cb85c", "#b05ce5"][(i * 2 + kind) % 4]; const fx = p[0] + p[2] * 0.3, fy = p[1] + p[3] * 0.72;
+    g.beginPath(); g.moveTo(fx - 16, fy); g.lineTo(fx + 16, fy); g.lineTo(fx + 10, fy - 46); g.lineTo(fx - 10, fy - 46); g.closePath(); g.fill();
+    g.fillStyle = "#f2c69a"; g.beginPath(); g.arc(fx, fy - 56, 12, 0, 6.28); g.fill();
+    // speech bubble
+    g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 2; g.beginPath(); g.ellipse(p[0] + p[2] * 0.7, p[1] + 42, 46, 26, 0, 0, 6.28); g.fill(); g.stroke();
+    g.fillStyle = "#111"; g.fillRect(p[0] + p[2] * 0.7 - 28, p[1] + 36, 40, 4); g.fillRect(p[0] + p[2] * 0.7 - 20, p[1] + 46, 32, 4);
+    g.strokeStyle = "#111"; g.lineWidth = 4; g.strokeRect(p[0], p[1], p[2], p[3]);
+  });
+  return s;
+}
+
+const RES = { low: 12, med: 7, high: 4 }, resNames = ["low", "med", "high"]; let resI = 1, kind = 0, vg = null, t = 0, ry = 0.5, rx = -0.2;
+function rebuild() { const pg = makePage(kind), d = pg.getContext("2d").getImageData(0, 0, pg.width, pg.height).data; vg = voxelizePage(d, pg.width, pg.height, { cell: RES[resNames[resI]] }); igniteState(vg, { dir: "up", burnDur: 0.5 }); t = 0; }
+rebuild();
+document.getElementById("ignite").addEventListener("click", () => { t = 0; });
+document.getElementById("res").addEventListener("click", (e) => { resI = (resI + 1) % 3; e.target.textContent = "Resolution: " + resNames[resI]; rebuild(); });
+document.getElementById("page").addEventListener("click", () => { kind = (kind + 1) % 2; rebuild(); });
+let drag = false, lx = 0, ly = 0;
+cv.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; });
+addEventListener("pointerup", () => drag = false);
+addEventListener("pointermove", e => { if (!drag) return; ry += (e.clientX - lx) * 0.008; rx += (e.clientY - ly) * 0.008; lx = e.clientX; ly = e.clientY; });
+
+// ---- renderer: WebGL2 instanced cubes, else Canvas2D projected quads ----
+let R = null;
+function initGL() {
+  const gl = cv.getContext("webgl2"); if (!gl) return null;
+  const vs = `#version 300 es
+  layout(location=0) in vec3 aPos; layout(location=1) in vec3 iOff; layout(location=2) in vec3 iCol; layout(location=3) in float iA;
+  uniform mat4 uMVP; uniform float uVox; out vec3 vCol; out float vA; out float vShade;
+  void main(){ vec3 p = aPos*uVox + iOff; gl_Position = uMVP * vec4(p,1.0); vCol=iCol; vA=iA; vShade=0.55+0.45*aPos.z; }`;
+  const fs = `#version 300 es
+  precision highp float; in vec3 vCol; in float vA; in float vShade; out vec4 o;
+  void main(){ if(vA<0.02) discard; o=vec4(vCol*vShade, vA); }`;
+  const sh = (t, src) => { const o = gl.createShader(t); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(o); return o; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw gl.getProgramInfoLog(pr);
+  // unit cube (position only; z used for cheap shade)
+  const cube = new Float32Array([-.5,-.5,-.5, .5,-.5,-.5, .5,.5,-.5, -.5,.5,-.5, -.5,-.5,.5, .5,-.5,.5, .5,.5,.5, -.5,.5,.5]);
+  const idx = new Uint16Array([0,1,2,0,2,3, 4,6,5,4,7,6, 0,4,5,0,5,1, 3,2,6,3,6,7, 1,5,6,1,6,2, 0,3,7,0,7,4]);
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, cube, gl.STATIC_DRAW); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  const inst = gl.createBuffer();  // interleaved: off(3) col(3) a(1) = 7 floats
+  const stride = 7 * 4;
+  gl.bindBuffer(gl.ARRAY_BUFFER, inst);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0); gl.vertexAttribDivisor(1, 1);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 12); gl.vertexAttribDivisor(2, 1);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 24); gl.vertexAttribDivisor(3, 1);
+  gl.enable(gl.DEPTH_TEST); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const uMVP = gl.getUniformLocation(pr, "uMVP"), uVox = gl.getUniformLocation(pr, "uVox");
+  let data = new Float32Array(0);
+  return { draw() {
+    gl.viewport(0, 0, W, H); gl.clearColor(0.02, 0.012, 0.03, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const N = vg.voxels.length; if (data.length < N * 7) data = new Float32Array(N * 7);
+    let m = 0; for (const v of vg.voxels) { if (v.alpha <= 0.02) continue; const o = m * 7; data[o] = v.px; data[o + 1] = -v.py; data[o + 2] = v.pz; data[o + 3] = v.cr; data[o + 4] = v.cg; data[o + 5] = v.cb; data[o + 6] = v.alpha; m++; }
+    gl.useProgram(pr); gl.bindVertexArray(vao); gl.bindBuffer(gl.ARRAY_BUFFER, inst); gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, m * 7), gl.DYNAMIC_DRAW);
+    gl.uniformMatrix4fv(uMVP, false, mvp()); gl.uniform1f(uVox, 0.9 / vg.ny);
+    gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, m);
+    return m;
+  } };
+}
+function mat4Mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; }
+function mat4Persp(fovy, asp, n, f) { const t = 1 / Math.tan(fovy / 2), o = new Float32Array(16); o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f); return o; }
+function mat4RotY(a) { const c = Math.cos(a), s = Math.sin(a), o = new Float32Array(16); o[0] = c; o[2] = -s; o[5] = 1; o[8] = s; o[10] = c; o[15] = 1; return o; }
+function mat4RotX(a) { const c = Math.cos(a), s = Math.sin(a), o = new Float32Array(16); o[0] = 1; o[5] = c; o[6] = s; o[9] = -s; o[10] = c; o[15] = 1; return o; }
+function mat4Trans(x, y, z) { const o = new Float32Array(16); o[0] = o[5] = o[10] = o[15] = 1; o[12] = x; o[13] = y; o[14] = z; return o; }
+function mvp() { const P = mat4Persp(1.05, W / H, 0.1, 100), V = mat4Trans(0, 0, -2.4), M = mat4Mul(mat4RotX(rx), mat4RotY(ry)); return mat4Mul(P, mat4Mul(V, M)); }
+function initCanvas() {
+  const ctx = cv.getContext("2d");
+  return { draw() {
+    ctx.fillStyle = "#050308"; ctx.fillRect(0, 0, W, H);
+    const cy = Math.cos(ry), sy = Math.sin(ry), cx = Math.cos(rx), sx = Math.sin(rx), sc = Math.min(W, H) * 0.42, ox = W / 2, oy = H / 2, vox = Math.max(2, sc * 0.9 / vg.ny);
+    const pts = []; for (const v of vg.voxels) { if (v.alpha <= 0.02) continue; let X = v.px * cy + v.pz * sy, Z = -v.px * sy + v.pz * cy, Y = (-v.py) * cx - Z * sx, Z2 = (-v.py) * sx + Z * cx; const pp = 2.4 / (2.4 - Z2); pts.push({ x: ox + X * sc * pp, y: oy - Y * sc * pp, z: Z2, v, s: vox * pp }); }
+    pts.sort((a, b) => a.z - b.z);
+    for (const p of pts) { ctx.globalAlpha = p.v.alpha; ctx.fillStyle = "rgb(" + (p.v.cr * 255 | 0) + "," + (p.v.cg * 255 | 0) + "," + (p.v.cb * 255 | 0) + ")"; ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); }
+    ctx.globalAlpha = 1; return pts.length;
+  } };
+}
+let tier = "Canvas2D"; try { R = initGL(); if (R) tier = "WebGL2"; } catch (e) { R = null; } if (!R) R = initCanvas();
+
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!drag) ry += 0.004; t += dt; updateFire(vg, t);
+  let shown = 0; try { shown = R.draw() || 0; } catch (e) { st.textContent = "render error"; }
+  st.textContent = tier + " \u00b7 " + vg.voxels.length + " voxels \u00b7 " + Math.round(burnedFraction(vg) * 100) + "% burned";
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy this file to ha.config.json (same folder as server.js) and fill in your values, then start the bridge. Real environment variables override these. Keep ha.config.json local / out of git — it holds your long-lived token.",
+  "HA_URL": "http://homeassistant.local:8123",
+  "HA_TOKEN": "paste-your-HA-long-lived-access-token-here",
+  "HA_MOTION_ENTITIES": [
+    "binary_sensor.front_door_motion_detected"
+  ],
+  "HA_MOTION_POLL_MS": 1500
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Comic Voxel Water">
+<meta name="demo:desc" content="Round two of content->voxels->filters: a comic page becomes a voxel surface and ripples like ink floating on water. A 2D wave equation displaces each voxel; tap the page to drop a stone. Reuses the voxel slab from the fire round. WebGL2 instanced cubes, Canvas2D fallback.">
+<meta name="demo:category" content="fx">
+<title>Comic Voxel Water</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; }
+  html,body { margin:0; height:100%; background:#03060b; overflow:hidden; color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:var(--cyan); letter-spacing:.15em; text-transform:uppercase; z-index:3; }
+  #st { position:fixed; right:14px; top:12px; color:#7c93b8; font-size:11px; z-index:3; }
+  #bar { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:3; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  button { background:rgba(8,18,30,.75); color:var(--cyan); border:1px solid #14324a; border-radius:8px; padding:9px 16px; font:600 12px ui-monospace,monospace; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  #hint { position:fixed; left:50%; bottom:62px; transform:translateX(-50%); color:#7c93b8; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Comic Voxel Water</div>
+<div id="st"></div>
+<div id="hint">tap the page to drop a stone &middot; shift-drag to orbit</div>
+<div id="bar"><button id="rain">&#127783; Toggle rain</button><button id="res">Resolution: med</button><button id="page">Next page</button><button id="calm">Calm</button></div>
+<script type="module">
+import { voxelizePage, waterState, dropAt, updateWater } from "./fx/voxelize/pageVoxels.js";
+
+const cv = document.getElementById("c"), st = document.getElementById("st");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+function resize() { W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR); cv.width = W; cv.height = H; cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px"; }
+addEventListener("resize", resize); resize();
+
+function makePage(kind) {
+  const PW = 480, PH = 620, s = document.createElement("canvas"); s.width = PW; s.height = PH; const g = s.getContext("2d");
+  g.fillStyle = "#f4efe3"; g.fillRect(0, 0, PW, PH);
+  const panels = kind === 0 ? [[20, 20, 440, 180], [20, 220, 210, 180], [250, 220, 210, 180], [20, 420, 440, 180]] : [[20, 20, 440, 285], [20, 325, 440, 275]];
+  const sky = ["#8ec5e8", "#e8b04a", "#c86a8e", "#7fb08a"];
+  panels.forEach((p, i) => {
+    g.fillStyle = sky[(i + kind) % 4]; g.fillRect(p[0], p[1], p[2], p[3]);
+    g.fillStyle = ["#e5544b", "#4b8de5", "#5cb85c", "#b05ce5"][(i * 2 + kind) % 4]; const fx = p[0] + p[2] * 0.3, fy = p[1] + p[3] * 0.72;
+    g.beginPath(); g.moveTo(fx - 16, fy); g.lineTo(fx + 16, fy); g.lineTo(fx + 10, fy - 46); g.lineTo(fx - 10, fy - 46); g.closePath(); g.fill();
+    g.fillStyle = "#f2c69a"; g.beginPath(); g.arc(fx, fy - 56, 12, 0, 6.28); g.fill();
+    g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 2; g.beginPath(); g.ellipse(p[0] + p[2] * 0.7, p[1] + 42, 46, 26, 0, 0, 6.28); g.fill(); g.stroke();
+    g.strokeStyle = "#111"; g.lineWidth = 4; g.strokeRect(p[0], p[1], p[2], p[3]);
+  });
+  return s;
+}
+
+const RES = { low: 12, med: 7, high: 4 }, resNames = ["low", "med", "high"]; let resI = 1, kind = 0, vg = null, ry = 0.0, rx = -0.62, raining = true, rainT = 0;
+function rebuild() { const pg = makePage(kind), d = pg.getContext("2d").getImageData(0, 0, pg.width, pg.height).data; vg = voxelizePage(d, pg.width, pg.height, { cell: RES[resNames[resI]] }); waterState(vg); }
+rebuild();
+document.getElementById("rain").addEventListener("click", () => { raining = !raining; });
+document.getElementById("res").addEventListener("click", (e) => { resI = (resI + 1) % 3; e.target.textContent = "Resolution: " + resNames[resI]; rebuild(); });
+document.getElementById("page").addEventListener("click", () => { kind = (kind + 1) % 2; rebuild(); });
+document.getElementById("calm").addEventListener("click", () => { waterState(vg); });
+
+// tap -> drop at the nearest grid cell (approx map screen to page grid); shift-drag -> orbit
+let drag = false, lx = 0, ly = 0, orbit = false;
+cv.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; orbit = e.shiftKey; if (!orbit) dropScreen(e.clientX, e.clientY); });
+addEventListener("pointerup", () => drag = false);
+addEventListener("pointermove", e => { if (!drag) return; if (orbit) { ry += (e.clientX - lx) * 0.008; rx += (e.clientY - ly) * 0.008; lx = e.clientX; ly = e.clientY; } else dropScreen(e.clientX, e.clientY); });
+function dropScreen(sx, sy) { const gx = Math.round((sx / innerWidth) * vg.nx), gy = Math.round((sy / innerHeight) * vg.ny); dropAt(vg, gx, gy, 1.6); }
+
+let R = null, tier = "Canvas2D";
+function frame() {
+  rainT += 1 / 60; if (raining && rainT > 0.5) { rainT = 0; dropAt(vg, 2 + Math.random() * (vg.nx - 4), 2 + Math.random() * (vg.ny - 4), 1.3); }
+  updateWater(vg, 1 / 60, { c: 11, amp: 0.18 });
+  try { R.draw(); } catch (e) { st.textContent = "render error"; }
+  st.textContent = tier + " \u00b7 " + vg.voxels.length + " voxels \u00b7 wave-equation surface";
+  requestAnimationFrame(frame);
+}
+import("./fx/voxelize/voxelRender.js").then(m => { try { R = m.initVoxelGL(cv, () => vg, () => mvpArgs()); if (R) tier = "WebGL2"; } catch (e) { R = null; } if (!R) { R = m.initVoxelCanvas(cv, () => vg, () => mvpArgs(), () => ({ W, H })); } frame(); });
+function mvpArgs() { return { W, H, ry, rx }; }
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kepler orbits - symplectic vs RK4</title>
+<style>
+  html,body{margin:0;background:#06080e;color:#d6dcea;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:920px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#7f869a;margin-bottom:14px}
+  .card{border:1px solid #24293a;background:#0d1018;padding:12px 14px;margin-bottom:13px}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  canvas{border:1px solid #1d2230;background:#04060a}
+  /* v2872 -- the plot fills the page. This canvas is a DRAWING rather than a lattice, so it is scaled
+     by CSS with aspect-ratio held: the backing store keeps its own resolution and the lines stay in
+     proportion. (A field page would use pixelated here; a curve must not.) */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; }
+  #orb{width:340px;height:340px}#drift{width:520px;height:340px}
+  label{color:#7f869a;margin-right:6px}input[type=range]{width:200px;vertical-align:middle}
+  button{font:inherit;background:#171d29;color:#d6dcea;border:1px solid #2e3648;padding:5px 12px;margin-right:6px;cursor:pointer}
+  .num{color:#9fc8e8}.dim{color:#7f869a}.good{color:#7fe0a4}.bad{color:#e8a0a0}
+  td{padding:1px 14px 1px 0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Kepler orbits &mdash; symplectic vs RK4</h1>
+  <div class="sub">RK4 is fourth order and more accurate every single step. It is also the wrong choice for a long
+    integration, and this page is about why.</div>
+
+  <div class="card">
+    <label>eccentricity</label><input id="e" type="range" min="0" max="90" value="50"><span class="num" id="ev"></span>
+    <label style="margin-left:14px">steps/orbit</label><input id="sp" type="range" min="50" max="800" step="50" value="400"><span class="num" id="spv"></span>
+    <label style="margin-left:14px">orbits</label><input id="orb" type="range" min="20" max="800" step="20" value="200"><span class="num" id="orbv"></span>
+    <div style="margin-top:8px"><button id="run">run both</button><span class="dim" id="stat"></span></div>
+  </div>
+
+  <div class="card row">
+    <div>
+      <canvas id="orbc" width="340" height="340"></canvas>
+      <div class="dim" style="width:340px;margin-top:4px">
+        <span class="good">&#9679;</span> Verlet (symplectic) &nbsp; <span class="bad">&#9679;</span> RK4 &mdash;
+        after the full run. Watch RK4's orbit shrink.</div>
+    </div>
+    <div>
+      <canvas id="driftc" width="520" height="340"></canvas>
+      <div class="dim" style="width:520px;margin-top:4px">energy error vs orbit number. Verlet oscillates inside
+        a band; RK4 climbs a ramp.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table id="tbl"><tr><td class="dim">run it</td></tr></table>
+    <div class="dim" style="margin-top:8px" id="note"></div>
+  </div>
+</div>
+
+<script type="module">
+import { atPerihelion, period, specificEnergy, angularMomentum, stepVerlet, stepRK4, measurePeriod, keplerThirdLaw } from "/physics/orbits/kepler.js";
+
+const $=(id)=>document.getElementById(id);
+const sync=()=>{ $("ev").textContent=($("e").value/100).toFixed(2); $("spv").textContent=$("sp").value; $("orbv").textContent=$("orb").value; };
+$("e").oninput=$("sp").oninput=$("orb").oninput=sync; sync();
+
+function runOne(step,a,e,stepsPerOrbit,orbits){
+  let s=atPerihelion(a,e), T=period(a), dt=T/stepsPerOrbit, total=Math.round(stepsPerOrbit*orbits);
+  const E0=specificEnergy(s), L0=angularMomentum(s);
+  const errs=[], path=[]; const every=Math.max(1,Math.floor(total/1200));
+  let maxL=0;
+  for(let i=0;i<total;i++){
+    s=step(s,dt);
+    if(i%stepsPerOrbit===0) errs.push(Math.abs((specificEnergy(s)-E0)/E0));
+    maxL=Math.max(maxL,Math.abs((angularMomentum(s)-L0)/L0));
+    if(i>total-stepsPerOrbit && i%Math.max(1,Math.floor(stepsPerOrbit/240))===0) path.push([s.x,s.y]);
+  }
+  return {errs, path, finalErr:Math.abs((specificEnergy(s)-E0)/E0), maxL};
+}
+
+$("run").onclick=()=>{
+  const e=$("e").value/100, sp=parseInt($("sp").value), orbits=parseInt($("orb").value);
+  $("stat").textContent=" integrating...";
+  setTimeout(()=>{
+    const V=runOne(stepVerlet,1,e,sp,orbits), R=runOne(stepRK4,1,e,sp,orbits);
+    // orbit shapes
+    const c=$("orbc"), ctx=c.getContext("2d"), W=c.width,H=c.height, cx=W/2, cy=H/2;
+    ctx.clearRect(0,0,W,H);
+    let mx=0; for(const p of V.path.concat(R.path)) mx=Math.max(mx,Math.hypot(p[0],p[1]));
+    const S=(W/2-16)/(mx||1);
+    ctx.fillStyle="#e8d27c"; ctx.beginPath(); ctx.arc(cx,cy,4,0,7); ctx.fill();
+    const drawPath=(path,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.beginPath();
+      path.forEach((p,i)=>{const x=cx+p[0]*S,y=cy-p[1]*S; i?ctx.lineTo(x,y):ctx.moveTo(x,y);}); ctx.stroke(); };
+    drawPath(V.path,"#7fe0a4"); drawPath(R.path,"#e8a0a0");
+    // drift curves
+    const d=$("driftc"), dx=d.getContext("2d"), DW=d.width, DH=d.height, pad=34;
+    dx.clearRect(0,0,DW,DH);
+    const all=V.errs.concat(R.errs).filter(v=>v>0);
+    const lo=Math.min(...all), hi=Math.max(...all);
+    const Y=(v)=>DH-pad-(DH-2*pad)*(Math.log10(Math.max(v,lo))-Math.log10(lo))/(Math.log10(hi)-Math.log10(lo)||1);
+    const X=(i,n)=>pad+(DW-2*pad)*i/Math.max(1,n-1);
+    dx.strokeStyle="#1d2230"; dx.beginPath(); dx.moveTo(pad,DH-pad); dx.lineTo(DW-pad,DH-pad); dx.stroke();
+    const curve=(errs,col)=>{ dx.strokeStyle=col; dx.lineWidth=1.6; dx.beginPath();
+      errs.forEach((v,i)=>{const x=X(i,errs.length),y=Y(v); i?dx.lineTo(x,y):dx.moveTo(x,y);}); dx.stroke(); };
+    curve(V.errs,"#7fe0a4"); curve(R.errs,"#e8a0a0");
+    dx.fillStyle="#7f869a"; dx.font="11px monospace";
+    dx.fillText("|dE/E| (log)",6,14); dx.fillText("orbit "+orbits,DW-pad-40,DH-pad+16);
+
+    const growth=(errs)=>{const h=Math.floor(errs.length/2); const f=Math.max(...errs.slice(0,h)), s2=Math.max(...errs.slice(h)); return f>0?s2/f:NaN;};
+    const kp=keplerThirdLaw({});
+    const mp=measurePeriod({a:1,e,integrator:"verlet"});
+    $("tbl").innerHTML=`
+      <tr><td class="dim"></td><td class="good">Verlet (symplectic)</td><td class="bad">RK4</td></tr>
+      <tr><td class="dim">final |dE/E|</td><td class="num">${V.finalErr.toExponential(3)}</td><td class="num">${R.finalErr.toExponential(3)}</td></tr>
+      <tr><td class="dim">growth ratio (2nd half / 1st)</td><td class="num">${growth(V.errs).toFixed(3)}</td><td class="num">${growth(R.errs).toFixed(3)}</td></tr>
+      <tr><td class="dim">max |dL/L|</td><td class="num">${V.maxL.toExponential(2)}</td><td class="num">${R.maxL.toExponential(2)}</td></tr>
+      <tr><td class="dim">Kepler III slope (must be 1.5)</td><td class="num" colspan="2">${kp.slopeMeasured.toFixed(6)}</td></tr>
+      <tr><td class="dim">measured period error</td><td class="num" colspan="2">${(mp.errFrac*100).toFixed(5)}%</td></tr>`;
+    $("note").innerHTML=`A growth ratio near <span class="num">1</span> means the error is BOUNDED &mdash; it
+      oscillates and returns. Above 1 it is still climbing. Verlet holds a band forever; RK4's error grows
+      linearly with time, so however small it starts, it eventually wins. That is why long integrations use
+      symplectic methods even though they are lower order.`;
+    $("stat").textContent="";
+  },20);
+};
+</script>
+</body>
+</html>

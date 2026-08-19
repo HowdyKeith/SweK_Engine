@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Conservation, order, and overshoot - pick two (v3634)</title>
+<meta name="demo:desc" content="A conservative cell-average remap that is also high order: conservation is exact for any slope, the unlimited slope is third order and overshoots by 18.75% on a step, minmod is second order and never overshoots - so the trade moves to the peak rather than vanishing.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ select{background:#0c1018;color:#d5dcea;border:1px solid #2e3c5a;padding:3px 6px;font:inherit}
+</style></head><body><div id="w">
+<h1>Conservation, order, overshoot &mdash; pick two</h1>
+<div class="sub">The previous round found you cannot have both: a remap that keeps the sum loses the value, and it
+was only first order. A <b>second-order conservative remap exists</b>, so this builds it &mdash; reconstruct a
+straight line inside each coarse cell whose <i>cell average</i> is the stored value, then take the fine subcells'
+averages of that line. <b>Conservation is then exact for any slope whatsoever</b>, because the subcell offsets are
+symmetric about the cell centre and the slope term cancels in the mean.</div>
+<div class="law"><b>Which also means the round trip is the identity for every slope, and proves nothing.</b> Said
+in advance this time: the previous round discovered the same shape halfway through and had to relabel a result as
+a non-result. The slopes are graded against <b>analytic cell averages</b> &mdash; a truth no operator here is told.</div>
+<h2>1. The three slopes</h2>
+<div class="panel">
+  <div class="row"><label>field <select id="fld"><option value="step">a step</option>
+    <option value="gauss">a gaussian peak</option></select></label>
+    <label>ratio <select id="rat"><option>2</option><option selected>4</option><option>8</option></select></label>
+    <button id="go" class="good">refine it</button></div>
+  <canvas id="cv" width="960" height="230"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>The unlimited slope invents field the data never contained</b> &mdash; 18.75% of the range on a
+step, and it does it on a <i>smooth</i> gaussian peak too, so "only near shocks" would have been false here. In an
+EM grid a value outside the range of its own data is not a rounding error. It is a source.</div>
+<h2>2. The orders</h2>
+<div class="panel"><button id="sweep" class="good">measure all three</button><table id="t2"></table></div>
+<div class="law"><b>Piecewise constant is first order, minmod is second, and the unlimited slope is third
+&mdash; I had predicted second.</b> A centred-slope reconstruction of cell averages is third order in the average
+because the leading error term is symmetric about the cell centre and cancels. Had I asserted "second order" with a
+tolerance wide enough to pass, this would have shipped a true check hiding a wrong belief.</div>
+<div class="law"><b>So the trade is relocated, not defeated: order 3 with overshoot, order 2 without, or order 1
+without. You cannot have three and no overshoot</b> &mdash; Godunov's barrier turning up in a remap operator. And
+the place you pay is the peak of the wave, which is the part of the field anybody wanted to refine around. That is
+the honest end of this thread rather than a win.</div>
+<div class="law">Graded by <code>physics/em/conservativeRemap-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>These numbers are not comparable with
+<a href="/regrid-cost.html" style="color:#9ab6e8">regrid cost</a>'s</b> and are deliberately not tabled together:
+that round moved <i>node values</i>, this one moves <i>cell averages</i>, and "conservative" names a preserved sum
+there and the integral of the field here.</div>
+<script type="module">
+import { refineCells, analyticCells, refineAccuracy, newExtrema, stepCells, cellIntegral } from "/physics/em/conservativeRemap.mjs";
+const $=(i)=>document.getElementById(i);
+const MODES=["none","centered","minmod"];
+const COL={none:"#68748c",centered:"#f0a8a0",minmod:"#8fe0a8"};
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+const gauss=(x)=>Math.exp(-Math.pow((x-100)/20,2));
+const mkField=()=>$("fld").value==="step"?stepCells(41,20):analyticCells(gauss,201,{});
+$("go").onclick=()=>{
+  const u=mkField(), r=+$("rat").value;
+  const cv=$("cv"),c=cv.getContext("2d"),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.fillStyle="#080a0f";c.fillRect(0,0,W,H);
+  let lo=Infinity,hi=-Infinity;for(const v of u){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  const pad=0.25*(hi-lo)||1;
+  const Y=(v)=>H-14-(v-lo+pad)/((hi-lo)+2*pad)*(H-28);
+  const X=(i,n)=>10+i/n*(W-20);
+  c.strokeStyle="#2a3348";c.setLineDash([3,4]);
+  c.beginPath();c.moveTo(10,Y(hi));c.lineTo(W-10,Y(hi));c.stroke();
+  c.beginPath();c.moveTo(10,Y(lo));c.lineTo(W-10,Y(lo));c.stroke();c.setLineDash([]);
+  c.fillStyle="#4a5670";c.fillText("data range",W-90,Y(hi)-4);
+  for(const m of MODES){const f=refineCells(u,r,m);
+    c.strokeStyle=COL[m];c.lineWidth=m==="centered"?1.8:1.3;c.beginPath();
+    for(let i=0;i<f.length;i++){const px=X(i,f.length),py=Y(f[i]);if(i===0)c.moveTo(px,py);else c.lineTo(px,py);}
+    c.stroke();c.lineWidth=1;}
+  let x=14;for(const m of MODES){c.fillStyle=COL[m];c.fillText(m,x,18);x+=70;}
+  const out=[];
+  for(const m of MODES){const e=newExtrema(u,r,m);const f=refineCells(u,r,m);
+    const drift=Math.abs(cellIntegral(f,1/r)-cellIntegral(u,1))/Math.abs(cellIntegral(u,1)||1);
+    out.push([m,"<span class='"+(drift<1e-13?"ok":"bad")+"'>"+drift.toExponential(2)+"</span>",
+      "<span class='"+(e.count?"bad":"ok")+"'>"+e.count+"</span>",
+      e.count?"<span class='bad'>"+(100*e.relative).toFixed(4)+"% of range</span>":"<span class='ok'>none</span>"]);}
+  rows($("t"),["slope","integral drift","new extrema","worst overshoot"],out);
+};
+$("sweep").onclick=()=>{
+  const out=[];
+  for(const m of MODES){
+    const errs=[4,2,1,0.5].map(h=>refineAccuracy(gauss,Math.round(200/h),2,{h,mode:m}).relative);
+    const ords=errs.slice(1).map((e,i)=>Math.log2(errs[i]/e));
+    const o=ords[ords.length-1];
+    out.push([m,errs.map(e=>e.toExponential(2)).join("  "),ords.map(x=>x.toFixed(2)).join(", "),
+      "<span class='"+(o>2.5?"warn":o>1.5?"ok":"dim")+"'>order "+Math.round(o)+"</span>"]);}
+  out.push(["overshoot on a step","none 0 / minmod 0","centered "+newExtrema(stepCells(41,20),4,"centered").count,
+    "<span class='bad'>"+(100*newExtrema(stepCells(41,20),4,"centered").relative).toFixed(2)+"%</span>"]);
+  rows($("t2"),["slope","error, coarse &rarr; fine","measured orders","verdict"],out);
+};
+</script>
+</div></body></html>

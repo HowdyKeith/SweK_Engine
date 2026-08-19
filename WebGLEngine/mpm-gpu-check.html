@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="MPM GPU adjudicator">
+<meta name="demo:desc" content="The MPM compute kernel was written on a machine with no GPU. It has been run on a WGSL interpreter and agrees with the graded CPU loop to about 1e-7 relative, but an interpreter is not a driver: it cannot prove the shader compiles on real hardware, and because it runs invocations one after another it CANNOT SEE A RACE. This page is the check that can, and it runs on your hardware. It puts the kernel and the graded loop on the identical fixture from the identical state, steps both, and compares them particle by particle; asks the GPU alone to reproduce the discrete free-fall parabola; and runs the same scene twice to test the determinism the fixed-point atomics were chosen for, which is exactly the claim a race would break. There is a sabotage button. It mistypes one coefficient of the B-spline stencil so you can watch the adjudicator go red, because a check you have never seen fail is a check you should not trust.">
+<meta name="demo:category" content="simulation">
+<meta name="demo:needs" content="webgpu">
+<title>MPM GPU adjudicator</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#04060e; color:#9fb2d4; font:13px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:960px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { color:#f6a623; letter-spacing:.15em; text-transform:uppercase; font-size:15px; margin:0 0 4px; }
+  .sub { color:#7fb2d4; max-width:84ch; margin-bottom:20px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th { text-align:left; color:#5f7aa0; font-size:10px; letter-spacing:.13em; text-transform:uppercase; padding:0 10px 8px 0; border-bottom:1px solid #1c2740; }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid #101827; vertical-align:top; }
+  .nm { color:#cfe0f6; } .ex { color:#6f86ab; font-size:11px; }
+  .ok { color:#7fe3c4; font-weight:700; } .bad { color:#ff8a8a; font-weight:700; } .run { color:#f6a623; }
+  #verdict { margin:22px 0 8px; font-size:15px; }
+  .note { color:#6f86ab; font-size:11.5px; max-width:88ch; line-height:1.6; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:16px; padding:8px 14px; font:600 11px ui-monospace,monospace; cursor:pointer; margin-right:8px; }
+  button.sab { color:#ff9a9a; border-color:#5a2a2a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; MPM GPU adjudicator</h1>
+  <div class="sub">
+    This kernel was written where there was no GPU to run it on. It has since been run on a <b>WGSL interpreter</b>
+    and agrees with the graded loop to about 1e-7 relative &mdash; but an interpreter is not a driver. It does not
+    prove the shader compiles on real hardware, and because it runs invocations one after another <b>it cannot see
+    a race</b>. So the kernel is checked here, on <b>your</b> hardware, against
+    <code>physics/mpm/step.mjs</code> &mdash; the loop the gates grade &mdash; and then asked to earn the free-fall
+    key by itself.
+  </div>
+  <div>
+    <button id="run">run the check</button>
+    <button id="sab" class="sab">sabotage the stencil</button>
+  </div>
+  <table><thead><tr><th style="width:52%">test</th><th style="width:32%">result</th><th style="width:16%">verdict</th></tr></thead><tbody id="rows"></tbody></table>
+  <div id="verdict"></div>
+  <div class="note" id="note"></div>
+</div>
+<script type="module">
+import { MPM_WGSL, packParams, fixedPointScales, clampLimits, PF, PARTICLE_FLOATS } from "/physics/mpm/gpuKernel.mjs";
+import { makeGrid } from "/physics/mpm/transfer.mjs";
+import { lame } from "/physics/mpm/constitutive.mjs";
+import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
+import { restBlock, centreOfMass, step } from "/physics/mpm/step.mjs";
+// v3816 -- same detector as mpm-gpu.html and as server.html: ui/webgpuProbe.mjs. See that module's header for
+// why "this browser has no WebGPU" is the wrong sentence on a LAN origin.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+
+// The fixture is mpm.html's own: restBlock's defaults on a 16x16 grid at h = 0.5, dt = 1/240. Small on
+// purpose -- the point here is AGREEMENT, and a scene the CPU can run exactly is the only kind that can
+// adjudicate one it cannot.
+const NX = 16, NY = 16, H = 0.5, DT = 1 / 240, GY = -9.81;
+const WALL = { lo: 3, hi: 3, sticky: false };
+const MAT = lame(500, 0.3);
+const ALPHA = alphaOf(45);
+let sabotage = false;
+
+const rowsEl = document.getElementById("rows");
+function row(name, exact) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = '<td><div class="nm">' + name + '</div><div class="ex">' + exact + "</div></td>" +
+                 '<td class="run">running&hellip;</td><td></td>';
+  rowsEl.appendChild(tr);
+  return tr;
+}
+function settle(tr, text, ok) {
+  tr.children[1].className = "";
+  tr.children[1].textContent = text;
+  tr.children[2].innerHTML = '<span class="' + (ok ? "ok" : "bad") + '">' + (ok ? "AGREES" : "DISAGREES") + "</span>";
+  return ok;
+}
+const breathe = () => new Promise((r) => setTimeout(r, 30));
+
+async function device() {
+  const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!probe.available) throw new Error(probe.message);
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error("WebGPU is present but this system offered no adapter -- presence is not capability");
+  return adapter.requestDevice();
+}
+
+/** Run the shipped kernel for `steps` steps and hand back the particle buffer and the saturation counter. */
+async function gpuRun(dev, { block = {}, walls = null, mode = 1, steps = 60 } = {}) {
+  let src = MPM_WGSL;
+  // THE SABOTAGE: one coefficient of the quadratic B-spline, mistyped by one digit. It is the same corruption
+  // physics/mpm/gpuKernel-selfcheck.mjs plants in JavaScript, so both halves of the defence have been watched
+  // failing on the identical mistake. Its effect is that the nine weights no longer sum to one, and the
+  // transfer then scatters mass and momentum SHORT -- silently, as a slightly light material.
+  if (sabotage) src = src.replace("o.w1 = 0.75 -", "o.w1 = 0.755 -");
+
+  const mod = dev.createShaderModule({ code: src });
+  const info = await mod.getCompilationInfo?.();
+  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
+
+  const ps = restBlock(block), N = ps.length, nodes = (NX + 1) * (NY + 1);
+  const parts = new Float32Array(N * PARTICLE_FLOATS);
+  ps.forEach((p, i) => {
+    const o = i * PARTICLE_FLOATS;
+    parts[o + PF.px] = p.x; parts[o + PF.py] = p.y;
+    parts[o + PF.f00] = 1; parts[o + PF.f11] = 1;
+    parts[o + PF.p00] = 1; parts[o + PF.p11] = 1;
+  });
+
+  const ST = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
+  const bufParts = dev.createBuffer({ size: N * PARTICLE_FLOATS * 4, usage: ST });
+  const bufAcc = dev.createBuffer({ size: nodes * 5 * 4, usage: ST });
+  const bufGv = dev.createBuffer({ size: nodes * 4 * 4, usage: ST });
+  const bufFlags = dev.createBuffer({ size: 16, usage: ST });
+  const bufUni = dev.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  dev.queue.writeBuffer(bufParts, 0, parts);
+  dev.queue.writeBuffer(bufFlags, 0, new Uint32Array([0, 0, 0, 0]));
+
+  const cl = clampLimits();
+  const scales = fixedPointScales({ h: H });
+  dev.queue.writeBuffer(bufUni, 0, packParams({
+    nx: NX, ny: NY, nParticles: N, plasticMode: mode, h: H, dt: DT, gx: 0, gy: GY,
+    mu: MAT.mu, lambda: MAT.lambda, alpha: ALPHA, pmass: ps[0].m, pvol: ps[0].vol0,
+    thetaC: cl.thetaC, thetaS: cl.thetaS, walls, scales,
+  }));
+
+  const entries = [
+    { binding: 0, resource: { buffer: bufUni } }, { binding: 1, resource: { buffer: bufParts } },
+    { binding: 2, resource: { buffer: bufAcc } }, { binding: 3, resource: { buffer: bufGv } },
+    { binding: 4, resource: { buffer: bufFlags } },
+  ];
+  const pipes = {}, binds = {};
+  for (const stage of ["clear", "p2g", "grid", "g2p"]) {
+    pipes[stage] = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: stage } });
+    binds[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries });
+  }
+
+  const wg = (x) => Math.ceil(x / 64);
+  const enc = dev.createCommandEncoder();
+  for (let s = 0; s < steps; s++) {
+    for (const [stage, count] of [["clear", nodes * 5], ["p2g", N], ["grid", nodes], ["g2p", N]]) {
+      const p = enc.beginComputePass();
+      p.setPipeline(pipes[stage]); p.setBindGroup(0, binds[stage]);
+      p.dispatchWorkgroups(wg(count)); p.end();
+    }
+  }
+  dev.queue.submit([enc.finish()]);
+
+  const read = dev.createBuffer({ size: N * PARTICLE_FLOATS * 4 + 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const e2 = dev.createCommandEncoder();
+  e2.copyBufferToBuffer(bufParts, 0, read, 0, N * PARTICLE_FLOATS * 4);
+  e2.copyBufferToBuffer(bufFlags, 0, read, N * PARTICLE_FLOATS * 4, 16);
+  dev.queue.submit([e2.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const raw = read.getMappedRange();
+  const out = new Float32Array(raw.slice(0, N * PARTICLE_FLOATS * 4));
+  const sat = new Uint32Array(raw.slice(N * PARTICLE_FLOATS * 4, N * PARTICLE_FLOATS * 4 + 16))[0];
+  read.unmap();
+  for (const b of [bufParts, bufAcc, bufGv, bufFlags, bufUni, read]) b.destroy();
+  return { parts: out, N, sat, m: ps[0].m };
+}
+
+/** The graded loop, on the identical fixture. Nothing here re-implements it. */
+function cpuRun({ block = {}, walls = null, plastic = true, steps = 60 } = {}) {
+  const ps = restBlock(block), g = makeGrid(NX, NY, H);
+  for (let s = 0; s < steps; s++) {
+    step(ps, g, { dt: DT, gy: GY, params: { ...MAT, alpha: ALPHA }, plastic, walls });
+  }
+  return ps;
+}
+
+function worstGap(gpu, cpu) {
+  let d = 0, ref = 0;
+  for (let i = 0; i < cpu.length; i++) {
+    const o = i * PARTICLE_FLOATS;
+    d = Math.max(d, Math.abs(gpu.parts[o + PF.px] - cpu[i].x), Math.abs(gpu.parts[o + PF.py] - cpu[i].y));
+    ref = Math.max(ref, Math.hypot(cpu[i].x, cpu[i].y));
+  }
+  return { abs: d, rel: d / ref };
+}
+function comOf(g) {
+  const ps = new Array(g.N);
+  for (let i = 0; i < g.N; i++) {
+    const o = i * PARTICLE_FLOATS;
+    ps[i] = { m: g.m, x: g.parts[o + PF.px], y: g.parts[o + PF.py] };
+  }
+  return centreOfMass(ps);
+}
+
+document.getElementById("sab").onclick = (e) => {
+  sabotage = !sabotage;
+  e.target.textContent = sabotage ? "sabotage: ON (one stencil coefficient is wrong)" : "sabotage the stencil";
+  e.target.style.color = sabotage ? "#ff6a6a" : "";
+};
+
+document.getElementById("run").onclick = async () => {
+  rowsEl.innerHTML = "";
+  document.getElementById("verdict").innerHTML = "";
+  document.getElementById("note").innerHTML = "";
+  const STEPS = 60, KEY_STEPS = 120;
+  let allOk = true;
+
+  const r1 = row("the GPU and the CPU are the same material &mdash; free fall",
+    "identical fixture, identical state, " + STEPS + " steps, compared particle by particle");
+  await breathe();
+  try {
+    const dev = await device();
+
+    // 1. free fall
+    {
+      const [g, c] = [await gpuRun(dev, { steps: STEPS }), cpuRun({ steps: STEPS })];
+      const w = worstGap(g, c);
+      // f32 on the GPU against f64 on the CPU cannot agree bitwise and pretending otherwise would be
+      // dishonest. 1e-4 relative is loose enough for single precision over 60 steps -- the WGSL interpreter
+      // measured 1.6e-7 -- and far too tight for a mistyped weight.
+      allOk = settle(r1, "worst particle apart by " + w.abs.toExponential(3) + " (" + w.rel.toExponential(2) + " relative)", w.rel < 1e-4) && allOk;
+
+      // 2. the collapsing column, where the material actually does something
+      const r2 = row("...and on the collapsing column, where the material yields",
+        "a floor, real deformation, the plastic clamp firing on most particles");
+      await breathe();
+      const blockC = { n: 6, spacing: 0.2, x0: 3, y0: 2.2, m: 0.1, vol0: 0.04 };
+      const [g2, c2] = [await gpuRun(dev, { block: blockC, walls: WALL, steps: STEPS }), cpuRun({ block: blockC, walls: WALL, steps: STEPS })];
+      const w2 = worstGap(g2, c2);
+      allOk = settle(r2, "worst particle apart by " + w2.abs.toExponential(3) + " (" + w2.rel.toExponential(2) + " relative)", w2.rel < 1e-4) && allOk;
+
+      // 3. the key, earned by the GPU alone
+      const r3 = row("the GPU earns the free-fall parabola on its own",
+        "centre of mass must follow g&middot;dt&sup2;&middot;n(n+1)/2 &mdash; the DISCRETE fall, not g&middot;t&sup2;/2");
+      await breathe();
+      const g3 = await gpuRun(dev, { steps: KEY_STEPS });
+      const c0 = centreOfMass(restBlock());
+      const want = c0.y + GY * DT * DT * (KEY_STEPS * (KEY_STEPS + 1) / 2);
+      const com = comOf(g3);
+      const err = Math.abs(com.y - want), drift = Math.abs(com.x - c0.x);
+      allOk = settle(r3, com.y.toFixed(9) + " against " + want.toFixed(9) + "   error " + err.toExponential(3), err < 1e-3) && allOk;
+
+      const r4 = row("...and nothing pushed it sideways",
+        "gravity is vertical, so a non-zero drift means the stencil or the force scatter went asymmetric");
+      allOk = settle(r4, drift.toExponential(3), drift < 1e-5) && allOk;
+
+      // 4. determinism -- the claim a race would break, and the reason the atomics are integer
+      const r5 = row("two identical runs are bit-identical",
+        "integer addition is associative, so the node total cannot depend on which workgroup finished first");
+      await breathe();
+      const [a, b] = [await gpuRun(dev, { block: blockC, walls: WALL, steps: 40 }),
+                      await gpuRun(dev, { block: blockC, walls: WALL, steps: 40 })];
+      let same = 0;
+      for (let i = 0; i < a.parts.length; i++) if (a.parts[i] !== b.parts[i]) same++;
+      allOk = settle(r5, same === 0 ? "identical, all " + a.parts.length + " floats" : same + " floats differ", same === 0) && allOk;
+
+      // 5. the fixed point never clipped
+      const r6 = row("the fixed-point accumulators never saturated",
+        "an i32 that overflows does not crash, it wraps &mdash; so the kernel counts the event instead");
+      allOk = settle(r6, g.sat + g2.sat + g3.sat + a.sat + b.sat + " clipped scatters across every run above",
+        (g.sat + g2.sat + g3.sat + a.sat + b.sat) === 0) && allOk;
+    }
+
+    document.getElementById("verdict").innerHTML = allOk
+      ? '<span class="ok">The GPU is running the same material.</span>'
+      : '<span class="bad">The GPU is NOT running the same material.</span>';
+    document.getElementById("note").innerHTML = sabotage
+      ? "Sabotage is ON &mdash; one coefficient of the quadratic B-spline reads 0.755 where it should read 0.75. " +
+        "The nine weights then no longer sum to one, so the transfer scatters mass and momentum short and the " +
+        "material comes out slightly light. If the rows above are red, the check works. That is the only reason " +
+        "this button exists, and the same corruption is planted in JavaScript inside " +
+        "<code>physics/mpm/gpuKernel-selfcheck.mjs</code>, so both halves of the defence have been watched " +
+        "failing on the identical mistake."
+      : (allOk
+        ? "Single precision on the GPU against double on the CPU cannot agree bitwise, so the tolerance is 1e-4 " +
+          "relative &mdash; the WGSL interpreter measured 1.6e-7 over fifteen steps, and a mistyped weight is " +
+          "orders coarser than either. <b>The determinism row is the one an interpreter could never have " +
+          "produced:</b> it runs invocations one after another, so it cannot see a race, and this is the first " +
+          "test of that claim where the ordering genuinely varies. Press <b>sabotage</b> and run again to watch " +
+          "it fail."
+        : "Something real is wrong. Run with sabotage OFF to be sure it is not the deliberate corruption. If the " +
+          "determinism row alone is red, suspect a race rather than the arithmetic: every other row would still " +
+          "pass on a kernel that computes correctly and accumulates in an order that varies.");
+  } catch (e) {
+    settle(r1, e.message, false);
+    document.getElementById("verdict").innerHTML = '<span class="bad">Could not run: ' + e.message + "</span>";
+    document.getElementById("note").innerHTML = "WebGPU is needed here (Chrome or Edge). The CPU loop is " +
+      "unaffected and still runs everywhere: <a href='/mpm.html' style='color:#9fd6ff'>mpm.html</a>.";
+  }
+};
+</script>
+</body>
+</html>

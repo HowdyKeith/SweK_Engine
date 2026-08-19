@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Nebula on the Unified Device">
+<meta name="demo:desc" content="A live procedural nebula rendered through SweK's unified device -- one render path that runs on WebGPU (preferred) or WebGL2 (fallback). The nebula is a domain-warped fbm fullscreen shader, parameterized by time + resolution uniforms; only the shader text differs per backend (WGSL vs GLSL), everything else is written once. The uniform reaches both backends through the same pass.uniform() call: a bind-group uniform buffer on WebGPU, individual uniforms on WebGL2. Live backend + fps readout; toggle forces the other runtime.">
+<meta name="demo:category" content="fx">
+<title>Nebula on the Unified Device</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; } #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  button { position:fixed; right:14px; top:12px; z-index:3; background:rgba(14,20,32,.85); color:#59d1ff; border:1px solid #22304a; border-radius:7px; padding:7px 12px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; Nebula &middot; Unified Device</div><div id="be"></div><div id="sub"></div></div>
+<button id="toggle">force other backend</button>
+<script type="module">
+import { requestDevice, detectBackends } from "./gfx/device.js";
+const cv = document.getElementById("c"), be = document.getElementById("be"), sub = document.getElementById("sub");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+addEventListener("resize", resize); resize();
+
+const quad = new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]);   // fullscreen, 2 triangles
+const GLSL = {
+  vertex: "#version 300 es\nin vec2 pos;\nvoid main(){ gl_Position = vec4(pos, 0.0, 1.0); }",
+  fragment: "#version 300 es\nprecision highp float;\nuniform float uTime;\nuniform vec2 uRes;\nout vec4 o;\n" +
+    "float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }\n" +
+    "float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }\n" +
+    "float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.0; a*=0.5; } return v; }\n" +
+    "void main(){ vec2 uv=gl_FragCoord.xy/uRes; uv.x*=uRes.x/uRes.y; vec2 p=uv*3.0; float t=uTime*0.05;\n" +
+    "  vec2 q=vec2(fbm(p+t), fbm(p+vec2(5.2,1.3)-t)); float n=fbm(p+2.0*q+t);\n" +
+    "  vec3 col=mix(vec3(0.04,0.07,0.2), vec3(0.9,0.5,0.2), n); col=mix(col, vec3(0.4,0.1,0.55), q.x);\n" +
+    "  col+=vec3(0.6,0.85,1.0)*pow(n,3.0)*0.6; o=vec4(col,1.0); }"
+};
+const WGSL =
+  "struct U { uTime: f32, uRes: vec2f };\n@group(0) @binding(0) var<uniform> u: U;\n" +
+  "struct VO { @builtin(position) p: vec4f };\n@vertex fn vs(@location(0) pos: vec2f) -> VO { var o: VO; o.p = vec4f(pos, 0.0, 1.0); return o; }\n" +
+  "fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1,311.7)))*43758.5453); }\n" +
+  "fn noise(pp: vec2f) -> f32 { let i=floor(pp); var f=fract(pp); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2f(1,0)),f.x), mix(hash(i+vec2f(0,1)),hash(i+vec2f(1,1)),f.x), f.y); }\n" +
+  "fn fbm(p0: vec2f) -> f32 { var p=p0; var v=0.0; var a=0.5; for(var i=0;i<5;i=i+1){ v=v+a*noise(p); p=p*2.0; a=a*0.5; } return v; }\n" +
+  "@fragment fn fs(inp: VO) -> @location(0) vec4f { var uv=inp.p.xy/u.uRes; uv.x=uv.x*(u.uRes.x/u.uRes.y); let p=uv*3.0; let t=u.uTime*0.05;\n" +
+  "  let q=vec2f(fbm(p+vec2f(t,t)), fbm(p+vec2f(5.2,1.3)-vec2f(t,t))); let n=fbm(p+2.0*q+vec2f(t,t));\n" +
+  "  var col=mix(vec3f(0.04,0.07,0.2), vec3f(0.9,0.5,0.2), n); col=mix(col, vec3f(0.4,0.1,0.55), q.x);\n" +
+  "  col=col+vec3f(0.6,0.85,1.0)*pow(n,3.0)*0.6; return vec4f(col,1.0); }";
+
+let device = null, pipe = null, buf = null, raf = 0, prefer = "webgpu";
+async function boot(pref) {
+  if (device) { cancelAnimationFrame(raf); try { device.destroy(); } catch (e) {} }
+  device = await requestDevice(cv, { prefer: pref });
+  buf = device.buffer({ data: quad, count: 6, components: 2 });
+  pipe = device.pipeline({ shaders: { wgsl: WGSL, glsl: GLSL }, attributes: [{ name: "pos", size: 2, offset: 0, wgpuFormat: "float32x2" }], stride: 8, uniforms: [{ name: "uTime", type: "f32" }, { name: "uRes", type: "vec2" }] });
+  const av = detectBackends();
+  sub.textContent = "available: " + (av.webgpu ? "WebGPU " : "") + (av.webgl2 ? "WebGL2" : "") + (device.backend === "null" ? " (headless recorder)" : "") + " \u00b7 one nebula, either runtime";
+  let t0 = performance.now(), frames = 0;
+  function frame() {
+    const t = performance.now() / 1000;
+    device.frame(({ pass }) => { pass.clear([0.02, 0.03, 0.06, 1]); pass.use(pipe); pass.vertices(buf); pass.uniform("uTime", t); pass.uniform("uRes", [cv.width, cv.height]); pass.draw(6); });
+    frames++; const now = performance.now(); if (now - t0 > 500) { const fps = Math.round(frames * 1000 / (now - t0)); frames = 0; t0 = now; be.textContent = "backend: " + device.backend.toUpperCase() + "  \u00b7  " + fps + " fps"; }
+    raf = requestAnimationFrame(frame);
+  }
+  frame();
+}
+document.getElementById("toggle").onclick = () => { prefer = (prefer === "webgpu") ? "webgl2" : "webgpu"; boot(prefer); };
+boot(prefer);
+</script>
+</body>
+</html>

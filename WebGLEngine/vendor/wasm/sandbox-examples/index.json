@@ -1,0 +1,5 @@
+[
+  { "id": "primes", "label": "Prime sieve", "desc": "Emits every prime up to N (well-behaved compute). Returns the count.", "input": 50, "src": "primes.ts" },
+  { "id": "infinite", "label": "Infinite loop", "desc": "Never returns — proves the wall-clock timeout terminates the worker.", "input": 0, "src": "infinite.ts" },
+  { "id": "membomb", "label": "Memory bomb", "desc": "Tries to grow memory forever — proves the memory cap stops it (grow returns -1).", "input": 0, "src": "membomb.ts" }
+]

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Curriculum &mdash; what to attempt next</title>
+<meta name="demo:desc" content="Start a proposer run and watch it: the frontier of unplanted binds, ungraded physics and doorless modules, each naming the gate that would decide it. Phone-first, one column, and the progress is a phase count rather than a countdown.">
+<style>
+  /* PHONE FIRST AND NOT AS A COURTESY: this is the page you open standing next to a machine, so ONE COLUMN is
+     the layout and a wider screen just gets a wider column. No table -- a table of proposals is unreadable on a
+     phone and there is nothing here that needs columns. */
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --go:#9fe6c0; --warn:#ffcc66; --bad:#ff8a8a; }
+  * { box-sizing:border-box; -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;
+         padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { padding:14px 16px 10px; border-bottom:1px solid var(--line); }
+  h1 { font-size:17px; margin:0 0 4px; color:var(--go); }
+  main { padding:14px 16px 40px; max-width:720px; }
+  .hint { font-size:12px; color:var(--dim); line-height:1.6; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:12px; background:#0c1018; margin-bottom:12px; }
+  /* 44px is the smallest thing a thumb hits reliably. A 24px desktop button is the usual way a page that "works
+     on mobile" turns out not to. */
+  button { min-height:44px; padding:10px 18px; font:inherit; font-size:15px; border-radius:9px;
+           background:#153024; color:var(--go); border:1px solid #2c5a45; cursor:pointer; width:100%; }
+  button:disabled { opacity:.55; cursor:default; }
+  button.secondary { background:#132033; color:var(--ink); border-color:#2a3a52; margin-top:8px; }
+  .state { font-size:14px; margin-top:10px; min-height:20px; }
+  .bar { display:flex; gap:5px; margin-top:9px; }
+  .pip { flex:1; height:9px; border-radius:5px; background:#1c2430; }
+  .pip.done { background:var(--go); }
+  .kind { display:inline-block; font-size:11px; padding:1px 7px; border-radius:9px; background:#152233;
+          color:#9bd6ff; margin-right:7px; }
+  .item { border-top:1px solid var(--line); padding:9px 0; }
+  .item:first-child { border-top:0; }
+  .subject { font-size:14px; word-break:break-all; }
+  .grader { font-size:11px; color:var(--dim); margin-top:2px; word-break:break-all; }
+  a { color:#9ab6e8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127891; Curriculum &mdash; what to attempt next</h1>
+  <div class="hint">Reads what is already measured and says which subject is next. It proposes; the gate named
+    beside each one is what decides.</div>
+</header>
+<main>
+
+  <div class="card">
+    <button id="go">&#9654; Run the proposer</button>
+    <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+      <input type="checkbox" id="doors" style="width:20px;height:20px;">
+      include doorless modules (walks the whole tree, several minutes)
+    </label>
+    <div class="bar" id="bar"></div>
+    <div class="state" id="state">idle</div>
+    <div class="hint" id="note" style="margin-top:8px;">
+      <b>The progress is a phase count, not a countdown.</b> Each census is one call that returns when it
+      returns, so &ldquo;2 of 3&rdquo; is the finest true thing there is &mdash; a seconds bar would be a drawing
+      timed off somebody else&rsquo;s machine.
+    </div>
+  </div>
+
+  <div class="card" id="out" hidden></div>
+
+  <div class="card">
+    <div class="hint" id="peerNote">This box&rsquo;s peer pages:
+      <a href="/android-peer.html">Android</a> &middot; <a href="/ios-peer.html">iOS</a></div>
+    <a href="/physics-lab.html"><button class="secondary">&#9883; Physics Lab</button></a>
+    <a href="/server.html"><button class="secondary">&#8962; Server</button></a>
+  </div>
+
+</main>
+<!-- v3705 -- A CLASSIC SCRIPT, NOT type="module", AND THE REASON IS THAT THE CHECK COULD NOT REACH IT
+     OTHERWISE: jsdom does not run module scripts, so the Go button existed and pressing it did nothing in the
+     gate while working perfectly in a browser. A CONTROL NOBODY CAN PRESS IN A TEST IS A CONTROL NOBODY HAS
+     PRESSED. The two module imports it needs are dynamic and already guarded, so nothing is lost -- and a page
+     whose whole script is a module also dies entirely if that module fails to load, which this does not. -->
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// The matching peer page is emphasised here the same way server.html does it -- OFFERED, never navigated to.
+// An uncertain kind changes nothing, which is why peerPageFor returns null for mac-or-ipad and unknown.
+import("/ui/deviceKind.mjs").then(function (M) {
+  const d = M.detect(window), page = M.peerPageFor(d.kind);
+  window.__swekDevice = d;
+  if (page && d.confident) {
+    const a = $("peerNote").querySelector('a[href="' + page + '"]');
+    if (a) { a.style.color = "#9fe6c0"; a.textContent += " \u25c0 this device"; a.title = d.why; }
+  }
+}).catch(function () {});
+
+// Progress is READ FROM THE SAME PLACE THE FLEET READS IT -- /fingerprint's activity block, through
+// activity.mjs's own describe(). A second reading of what "running" means, living in a page, is the
+// duplicated-table class this tree has paid for repeatedly.
+let A = null, poll = 0;
+async function tick() {
+  try {
+    if (!A) A = await import("/tools/roundhouse/activity.mjs");   // guarded by this function's own catch
+    const me = await (await fetch("/fingerprint", { cache: "no-store" })).json();
+    const a = A.readActivity(me && me.roundhouse);
+    if (a.state === "running") {
+      const done = Number(a.round) || 0, total = Number(a.maxRounds) || 0;
+      $("bar").innerHTML = total
+        ? Array.from({ length: total }, (_, i) => '<div class="pip' + (i < done ? " done" : "") + '"></div>').join("")
+        : "";
+      $("state").innerHTML = '<span style="color:var(--go)">' + esc(A.describe(a).text) + "</span>";
+      return true;
+    }
+    return false;
+  } catch { return false; }
+}
+
+function render(j) {
+  const out = $("out");
+  const P = (j && j.proposals) || [];
+  let h = "<div class='hint' style='margin-bottom:8px'>" + P.length + " proposal(s) &mdash; " +
+          (j && j.ms ? Math.round(j.ms / 1000) + "s" : "") + "</div>";
+  for (const p of P) {
+    h += "<div class='item'><div class='subject'><span class='kind'>" + esc(p.kind) + "</span>" + esc(p.subject) +
+         "</div><div class='grader'>" + esc(p.task) + "<br>graded by " + esc(p.grader) + "</div></div>";
+  }
+  // *** THE THREE OTHER STATES ARE SHOWN, NOT SWALLOWED. *** An empty list with these hidden would read as
+  // "nothing left to do", which is the most expensive possible lie because it looks like completion.
+  for (const [label, rows] of [["NO GRADER", (j && j.ungradable) || []], ["UNMEASURED", (j && j.unmeasured) || []],
+                               ["SKIPPED", (j && j.skipped) || []]]) {
+    for (const u of rows) h += "<div class='item'><div class='subject' style='color:var(--warn)'><span class='kind'>" +
+                               label + "</span>" + esc(u.kind) + "</div><div class='grader'>" + esc(u.why) + "</div></div>";
+  }
+  if (!P.length) h += "<div class='hint' style='margin-top:8px'>No proposals. Read the lines above before taking " +
+                      "that as &ldquo;done&rdquo;: a census that could not be read is not an empty frontier.</div>";
+  h += "<div class='hint' style='margin-top:10px'>A proposal says a subject is <b>reachable and checkable</b>, " +
+       "never that it is worth doing. Nothing here has been marked done &mdash; the graders above are the only " +
+       "things that decide.</div>";
+  out.innerHTML = h; out.hidden = false;
+}
+
+$("go").onclick = async function () {
+  this.disabled = true; $("out").hidden = true; $("state").textContent = "starting\u2026"; $("bar").innerHTML = "";
+  poll = setInterval(tick, 1200);
+  try {
+    const r = await fetch("/curriculum/run" + ($("doors").checked ? "?doors=1" : ""), { cache: "no-store" });
+    const j = await r.json();
+    clearInterval(poll);
+    if (!j || !j.ok) {
+      // 409 means A RUN IS ALREADY IN FLIGHT ON THIS BOX, which is not an error worth hiding: two runs sharing
+      // one marker would report each other's progress.
+      $("state").innerHTML = '<span style="color:var(--warn)">' + esc((j && j.error) || "failed") + "</span>";
+    } else {
+      $("bar").innerHTML = ""; $("state").innerHTML = '<span style="color:var(--go)">done</span>';
+      render(j);
+    }
+  } catch (e) {
+    clearInterval(poll);
+    $("state").innerHTML = '<span style="color:var(--bad)">' + esc(e) + "</span>";
+  }
+  this.disabled = false;
+};
+
+// If a run is already going when the page opens -- started here, from another tab, or by another person -- say
+// so rather than showing an idle box beside a busy one.
+tick().then((running) => { if (running) { $("state").innerHTML += ' <span class="hint">(already running)</span>'; poll = setInterval(tick, 1200); } });
+</script>
+</body>
+</html>

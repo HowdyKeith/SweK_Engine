@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Writeup &mdash; SweK Engine</title>
+<style>
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:#010409; color:#c9d1d9; font:14px/1.6 -apple-system,Segoe UI,Helvetica,Arial,sans-serif; }
+  .top { position:sticky; top:0; z-index:5; background:#0d1117; border-bottom:1px solid #21262d; padding:10px 16px; display:flex; align-items:center; gap:10px; }
+  .top .t { flex:1; font:13px ui-monospace,monospace; color:#7fd6a8; }
+  .top a { color:#58a6ff; text-decoration:none; font:12px ui-monospace,monospace; }
+  .wrap { max-width:980px; margin:0 auto; padding:18px 16px 60px; }
+  #card { display:none; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:16px 18px; margin-bottom:16px; }
+  #msg { font:13px ui-monospace,monospace; color:#8b949e; padding:14px 2px; }
+  .ghmd { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:22px 26px; }
+  .ghmd h1,.ghmd h2,.ghmd h3,.ghmd h4 { font-weight:600; margin:22px 0 14px; line-height:1.25; }
+  .ghmd h1,.ghmd h2 { border-bottom:1px solid #21262d; padding-bottom:.3em; }
+  .ghmd a { color:#58a6ff; text-decoration:none; } .ghmd a:hover { text-decoration:underline; }
+  .ghmd p { margin:0 0 16px; } .ghmd ul,.ghmd ol { margin:0 0 16px; padding-left:2em; }
+  .ghmd code { background:#161b22; padding:.2em .4em; border-radius:6px; font:85% ui-monospace,SFMono-Regular,monospace; }
+  .ghmd pre { background:#161b22; padding:16px; border-radius:8px; overflow:auto; } .ghmd pre code { background:none; padding:0; }
+  .ghmd blockquote { color:#8b949e; border-left:.25em solid #30363d; padding:0 1em; margin:0 0 16px; }
+  .ghmd table { border-collapse:collapse; margin:0 0 16px; display:block; overflow:auto; } .ghmd th,.ghmd td { border:1px solid #30363d; padding:6px 13px; } .ghmd tr:nth-child(2n) { background:#161b22; }
+  .ghmd img { max-width:100%; } .ghmd hr { border:none; border-top:1px solid #30363d; margin:20px 0; }
+  .chip { display:inline-block; background:#1f6feb22; color:#58a6ff; border:1px solid #1f6feb55; border-radius:999px; padding:1px 9px; font-size:12px; margin:2px 4px 2px 0; }
+  .meta { display:flex; gap:16px; flex-wrap:wrap; color:#8b949e; font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="top"><span class="t" id="title">Demo writeup</span><a href="/panels.html">Simple view</a> &nbsp;<a href="/">engine &rarr;</a></div>
+<div class="wrap">
+  <div id="card"></div>
+  <div id="msg">Loading from GitHub&hellip;</div>
+  <div class="ghmd" id="body" style="display:none;"></div>
+</div>
+
+<script>
+function qp(k) { return new URLSearchParams(location.search).get(k) || ""; }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+var repo = qp("repo");
+
+(async function () {
+  var msg = document.getElementById("msg"), card = document.getElementById("card"), body = document.getElementById("body");
+  var j;
+  try { j = await fetch("/github/preview?repo=" + encodeURIComponent(repo)).then(function (r) { return r.json(); }); }
+  catch (e) { msg.textContent = "Couldn't reach the bridge."; return; }
+  if (!j || !j.ok) { msg.innerHTML = "\u2717 " + esc((j && j.error) || "failed") + '<br><span style="color:#667">Set your GitHub username + repo (and token) in the engine\u2019s GitHub Manager first.</span>'; return; }
+  var r = j.repo;
+  document.getElementById("title").textContent = r.name;
+  document.title = r.shortName + " — writeup";
+  var topics = (r.topics || []).map(function (t) { return '<span class="chip">' + esc(t) + "</span>"; }).join("");
+  card.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<span style="font-size:17px;">\uD83D\uDCD8</span>'
+    + '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" style="color:#58a6ff;font-size:17px;font-weight:600;text-decoration:none;">' + esc(r.name) + "</a>"
+    + '<span style="border:1px solid #30363d;color:#8b949e;border-radius:999px;padding:0 8px;font-size:11px;">' + (r.isPrivate ? "Private" : "Public") + "</span></div>"
+    + (r.desc ? '<div style="color:#c9d1d9;font-size:14px;margin-top:8px;">' + esc(r.desc) + "</div>" : "")
+    + (topics ? '<div style="margin-top:8px;">' + topics + "</div>" : "")
+    + '<div class="meta">'
+    + (r.language ? "<span>\u25CF " + esc(r.language) + "</span>" : "")
+    + "<span>\u2606 " + r.stars + " stars</span><span>\u2387 " + r.forks + " forks</span><span>\u26A0 " + r.openIssues + " issues</span>"
+    + (r.license ? "<span>" + esc(r.license) + "</span>" : "")
+    + (r.homepage ? '<a href="' + esc(r.homepage) + '" target="_blank" rel="noopener" style="color:#58a6ff;text-decoration:none;">\uD83D\uDD17 ' + esc(r.homepage) + "</a>" : "")
+    + "</div>";
+  card.style.display = "block";
+  msg.style.display = "none";
+  if (j.readmeHtml) { body.innerHTML = j.readmeHtml; body.style.display = "block"; }
+  else if (j.readmeMissing) { body.innerHTML = '<div style="color:#8b949e;">No README in this repo yet \u2014 add one and it\u2019ll appear here as the demo\u2019s writeup.</div>'; body.style.display = "block"; }
+})();
+</script>
+</body>
+</html>

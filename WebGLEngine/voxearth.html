@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<!-- v1262 — Voxel Earth: a spinning cubesphere globe (procedural continents/oceans/ice)
+     in orbit; zoom in (or tap "Dig in") to drop to a local voxel GEOLOGY view — a terrain
+     block with strata (grass / dirt / stone / ore / lava core). InstancedMesh + per-instance
+     color (three r160). Self-contained; no deps beyond vendored three. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voxel Earth</title>
+<!-- universal viewer discovery meta -->
+<meta name="demo:title" content="Voxel Earth">
+<meta name="demo:desc"  content="Spinning voxel globe; zoom from orbit to a local geological strata view.">
+<meta name="demo:cats"  content="sim,3d">
+<meta name="demo:swatch" content="E">
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#03040a; color:#cfe6ff;
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; overflow:hidden; }
+  #view{ position:fixed; inset:0; display:block; }
+  #hud{ position:fixed; left:12px; top:12px; background:rgba(6,12,22,.75); border:1px solid #1c3a55;
+    border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); }
+  #hud b{ color:#dff1ff; } .dim{ color:#7c9ec0; font-size:12px; }
+  .row{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  button{ font:13px inherit; color:#cfe6ff; background:#0e1c2c; border:1px solid #1c3a55; border-radius:8px; padding:6px 10px; cursor:pointer; }
+  button.accent{ background:#4fd08a; color:#04130d; font-weight:700; border-color:#4fd08a; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hud">
+  <b>🌍 Voxel Earth</b>
+  <div class="dim" id="mode">orbit view — drag to rotate, scroll to zoom</div>
+  <div class="row">
+    <button id="modeBtn" class="accent">⛰️ Dig in</button>
+    <button id="spinBtn">⏸ Spin</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x03040a);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 2000);
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 6; controls.maxDistance = 60;
+
+scene.add(new THREE.HemisphereLight(0xbcd6ff, 0x0a1018, 0.5));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.5); sun.position.set(20, 14, 12); scene.add(sun);
+scene.add(new THREE.AmbientLight(0x223355, 0.5));
+
+// starfield backdrop
+(function stars(){
+  const g = new THREE.BufferGeometry(); const n = 1400, a = new Float32Array(n*3);
+  for (let i=0;i<n;i++){ const r=400+Math.random()*600, t=Math.random()*6.283, p=Math.acos(2*Math.random()-1);
+    a[i*3]=r*Math.sin(p)*Math.cos(t); a[i*3+1]=r*Math.cos(p); a[i*3+2]=r*Math.sin(p)*Math.sin(t); }
+  g.setAttribute("position", new THREE.BufferAttribute(a, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xbcd0ff, size: 1.2, sizeAttenuation: false })));
+})();
+
+function resize(){ const w=innerWidth, h=innerHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+// ---- compact 3D value-noise + fbm (no deps) ----
+function hash3(x,y,z){ let h = (x*374761393 + y*668265263 + z*1274126177) | 0; h = Math.imul(h ^ (h>>>13), 1274126177); return ((h ^ (h>>>16)) >>> 0) / 4294967295; }
+const fade = (t) => t*t*t*(t*(t*6-15)+10);
+const lerp = (a,b,t) => a+(b-a)*t;
+function vnoise(x,y,z){
+  const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z), xf=x-xi, yf=y-yi, zf=z-zi;
+  const u=fade(xf), v=fade(yf), w=fade(zf);
+  const c=(dx,dy,dz)=>hash3(xi+dx, yi+dy, zi+dz);
+  const x00=lerp(c(0,0,0),c(1,0,0),u), x10=lerp(c(0,1,0),c(1,1,0),u);
+  const x01=lerp(c(0,0,1),c(1,0,1),u), x11=lerp(c(0,1,1),c(1,1,1),u);
+  return lerp(lerp(x00,x10,v), lerp(x01,x11,v), w);
+}
+function fbm(x,y,z,oct){ let a=0, amp=0.5, f=1; for(let i=0;i<(oct||4);i++){ a+=amp*vnoise(x*f,y*f,z*f); f*=2; amp*=0.5; } return a; }
+
+const C = (hex) => new THREE.Color(hex);
+const tmpM = new THREE.Matrix4(), tmpP = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3();
+function place(mesh, i, x, y, z, s, color){ tmpP.set(x,y,z); tmpS.set(s,s,s); tmpM.compose(tmpP, tmpQ, tmpS); mesh.setMatrixAt(i, tmpM); mesh.setColorAt(i, color); }
+
+// ---- GLOBE: cubesphere of voxels, colored by elevation + latitude ----
+const globe = new THREE.Group(); scene.add(globe);
+function buildGlobe(){
+  const N = 26, R = 10, faces = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+  const total = 6*N*N, size = (R*2/N)*0.92;
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(size,size,size),
+    new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0.0 }), total);
+  const cOcean=C(0x12477e), cShallow=C(0x2f86c0), cBeach=C(0xc9bd7a), cGrass=C(0x3f8a45),
+        cForest=C(0x276b35), cRock=C(0x7d756a), cSnow=C(0xeef6ff), cIce=C(0xd7ecff);
+  let idx=0;
+  for (const [fx,fy,fz] of faces){
+    for (let i=0;i<N;i++) for (let j=0;j<N;j++){
+      const u=(i+0.5)/N*2-1, v=(j+0.5)/N*2-1;
+      let p;
+      if (fx) p=new THREE.Vector3(fx, v, u*fx); else if (fy) p=new THREE.Vector3(u, fy, v*fy); else p=new THREE.Vector3(u*fz, v, fz);
+      p.normalize();
+      const e = fbm((p.x+1)*1.6, (p.y+1)*1.6, (p.z+1)*1.6, 5);    // 0..1 elevation
+      const lat = Math.abs(p.y);                                   // 0 eq .. 1 pole
+      let col, h = R;
+      if (lat > 0.86){ col = cIce; }
+      else if (e < 0.46){ col = e < 0.40 ? cOcean : cShallow; }      // sea
+      else {
+        h = R + (e-0.46)*3.2;                                       // land rises a touch
+        if (e > 0.74) col = lat>0.62 ? cSnow : cRock;
+        else if (e > 0.58) col = cForest;
+        else if (e > 0.49) col = cGrass;
+        else col = cBeach;
+      }
+      place(mesh, idx++, p.x*h, p.y*h, p.z*h, size, col);
+    }
+  }
+  mesh.count = idx; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  globe.add(mesh);
+}
+buildGlobe();
+
+// ---- LOCAL GEOLOGY: voxel terrain block with strata ----
+const local = new THREE.Group(); local.visible = false; scene.add(local);
+let lavaMesh = null;
+function buildLocal(){
+  const G = 30, maxH = 14, cell = 1.0, base = -8;
+  const cap = G*G*maxH;
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(cell,cell,cell),
+    new THREE.MeshStandardMaterial({ roughness: 0.95 }), cap);
+  const cGrass=C(0x3f8a45), cDirt=C(0x6e4a2b), cStone=C(0x6a6a72), cDeep=C(0x474d59), cOre=C(0xc9a24a), cLava=C(0xff5a1e);
+  let idx=0; const half=G/2;
+  for (let x=0;x<G;x++) for (let z=0;z<G;z++){
+    const h = 6 + Math.floor(fbm(x*0.12, 0, z*0.12, 4) * maxH);
+    for (let y=0;y<h;y++){
+      let col;
+      const depthFromTop = h-1-y;
+      if (y < 1) col = cLava;
+      else if (depthFromTop === 0) col = cGrass;
+      else if (depthFromTop < 3) col = cDirt;
+      else if (y < 3) col = cDeep;
+      else col = (fbm(x*0.6, y*0.6, z*0.6, 2) > 0.72) ? cOre : cStone;
+      place(mesh, idx++, (x-half)*cell, base + y*cell, (z-half)*cell, cell*0.99, col);
+    }
+  }
+  mesh.count = idx; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  local.add(mesh);
+  // a glowing lava plane peeking under the crust
+  const lp = new THREE.Mesh(new THREE.PlaneGeometry(G,G), new THREE.MeshBasicMaterial({ color: 0xff4a14 }));
+  lp.rotation.x = -Math.PI/2; lp.position.y = base + 0.6; local.add(lp); lavaMesh = lp;
+  local.add(new THREE.PointLight(0xff5a1e, 8, 30, 2).translateY(base+1));
+}
+buildLocal();
+
+// ---- mode switching (button + zoom hysteresis) ----
+let mode = "globe", spinning = true;
+const modeEl = document.getElementById("mode"), modeBtn = document.getElementById("modeBtn");
+function setMode(m){
+  if (m === mode) return; mode = m;
+  if (m === "local"){
+    globe.visible = false; local.visible = true;
+    controls.minDistance = 4; controls.maxDistance = 80;
+    camera.position.set(14, 16, 22); controls.target.set(0, -4, 0);
+    modeEl.textContent = "local geology — strata: grass · dirt · stone · ore · lava";
+    modeBtn.textContent = "🌍 Back to orbit"; modeBtn.classList.remove("accent");
+  } else {
+    local.visible = false; globe.visible = true;
+    controls.minDistance = 6; controls.maxDistance = 60;
+    camera.position.set(0, 8, 26); controls.target.set(0, 0, 0);
+    modeEl.textContent = "orbit view — drag to rotate, scroll to zoom (zoom in to dig)";
+    modeBtn.textContent = "⛰️ Dig in"; modeBtn.classList.add("accent");
+  }
+  controls.update();
+}
+setMode("globe"); mode = "globe"; camera.position.set(0, 8, 26); controls.update();
+modeBtn.addEventListener("click", () => setMode(mode === "globe" ? "local" : "globe"));
+const spinBtn = document.getElementById("spinBtn");
+spinBtn.addEventListener("click", () => { spinning = !spinning; spinBtn.textContent = spinning ? "⏸ Spin" : "▶ Spin"; });
+
+// auto-dig when you zoom the globe in close; pop back out when you zoom local far
+controls.addEventListener("change", () => {
+  const d = camera.position.distanceTo(controls.target);
+  if (mode === "globe" && d < 8.5) setMode("local");
+  else if (mode === "local" && d > 70) setMode("globe");
+});
+
+let t0 = performance.now();
+(function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - t0)/1000); t0 = now;
+  if (spinning && mode === "globe") globe.rotation.y += dt * 0.12;
+  if (lavaMesh && mode === "local") lavaMesh.material.color.setHSL(0.04, 1, 0.45 + 0.08*Math.sin(now/300));
+  controls.update();
+  renderer.render(scene, camera);
+})(t0);
+</script>
+</body>
+</html>

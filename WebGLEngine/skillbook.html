@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skillbook trial — SweK</title>
+<!--
+  v3398 -- THE FRONT DOOR FOR THE SKILLBOOK. Keith asked whether a run-through could be tested from a page and a
+  button, with the process statistics. It can, and this is it.
+
+  *** WHAT THIS PAGE IS HONEST ABOUT, IN THE RESULT RATHER THAN IN A FOOTNOTE: THE PROPOSER IS A DETERMINISTIC
+  MOCK. *** The trial, the device, the critic and the verdict are all real; the thing being proposed is generated
+  from a seed with a KNOWN malformed rate. So this measures THE HARNESS -- does a real effect come back PROVEN,
+  does a null come back RETIRED, does a thin sample come back UNDERPOWERED -- and NOT whether a hint helps a real
+  model. That needs a model, which is a rig job. A page that blurred the two would be worth less than no page.
+
+  THE INPUT SITS BESIDE THE RECOVERED NUMBER ON PURPOSE. You tell the mock how often to be malformed and how much
+  the hint helps; the trial has to find those back. A harness that could not recover a KNOWN effect could not be
+  trusted with an unknown one, and putting the two columns side by side is the whole demonstration.
+
+  v3415 -- *** THE LOCAL MODEL JOINS THE MOCK, AND THE PAGE NEVER LETS YOU MISTAKE ONE FOR THE OTHER. *** Pick
+  "local model" and the same trial asks Ollama for every claim, graded by the same critic. The two columns change
+  meaning with the proposer, because they have to: nobody TELLS a model its malformed rate, so the left column
+  becomes WHAT WAS ASKED (device, model, host, hint) and the right stays WHAT THE TRIAL RECOVERED. The mock is
+  kept rather than replaced -- it is the only proposer whose effect size is known, which is what makes it a check
+  on the harness; the model is the only one that can fill the book.
+
+  AND THE PAGE SHOWS THE ROW THAT CAN REFUSE THE WHOLE RUN: DISTINCT CLAIMS PER ARM. A model pinned to
+  temperature 0 answers identically every time, so an arm of forty questions carries ONE sample -- and a control
+  that is malformed every time beside a treated arm that is clean every time prints PROVEN off one observation.
+  That is refused by name, with the numbers and the verdict it WOULD have said, rather than shown with a caveat.
+-->
+<style>
+  :root { color-scheme: dark; --bg:#0b0e13; --fg:#d8dee9; --dim:#8b98ab; --line:#1e2733; --ok:#7ee081; --no:#ff8b8b; --warn:#ffd479; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  main { max-width:920px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:18px; margin:0 0 4px; } h2 { font-size:14px; margin:28px 0 8px; color:var(--dim); font-weight:600; }
+  p.lede { color:var(--dim); margin:0 0 18px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:14px; }
+  label { display:block; font-size:11px; color:var(--dim); margin-bottom:3px; }
+  input,select { background:#121822; color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:6px 8px; font:inherit; min-width:92px; }
+  button { background:#1b2735; color:var(--fg); border:1px solid #2c3d52; border-radius:4px; padding:8px 16px; font:inherit; cursor:pointer; }
+  button:hover { background:#243346; } button[disabled] { opacity:.5; cursor:default; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th,td { text-align:left; padding:5px 10px 5px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .num { font-variant-numeric:tabular-nums; }
+  .state { font-weight:700; }
+  .PROVEN { color:var(--ok); } .RETIRED { color:var(--no); } .UNDERPOWERED,.PROPOSED { color:var(--warn); }
+  .note { color:var(--dim); font-size:12px; margin-top:10px; }
+  .mock { border:1px solid #4a3a12; background:#1d1708; color:var(--warn); padding:8px 10px; border-radius:4px; margin:14px 0; }
+  .model { border:1px solid #16384a; background:#0c1a22; color:#9ecbff; padding:8px 10px; border-radius:4px; margin:14px 0; }
+  .refuse { border:1px solid #5a1f1f; background:#210d0d; color:var(--no); padding:10px 12px; border-radius:4px; margin:14px 0; }
+  .hidden { display:none !important; }
+  code { color:#9ecbff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Skillbook trial</h1>
+  <p class="lede">A two-arm trial, run end to end: same questions, one arm with the hint and one without.
+     Every number below comes back from <code>skillTrial</code> and <code>skillbook</code> — this page computes none of them.</p>
+
+  <div class="row">
+    <div><label for="proposer">proposer</label><select id="proposer">
+      <option value="mock">mock (seeded, known effect)</option>
+      <option value="ollama">local model (Ollama)</option>
+    </select></div>
+    <div><label for="device">device</label><select id="device"></select></div>
+    <div><label for="n">questions per arm</label><input id="n" class="num" type="number" value="40" min="20" max="400"></div>
+    <div><label for="seed">seed</label><input id="seed" class="num" type="number" value="1"></div>
+    <div class="mockOnly"><label for="base">mock malformed rate</label><input id="base" class="num" type="number" value="0.65" step="0.05" min="0" max="1"></div>
+    <div class="mockOnly"><label for="effect">hint effect</label><input id="effect" class="num" type="number" value="0.60" step="0.05" min="0" max="1"></div>
+    <div><button id="run">Run trial</button></div>
+  </div>
+
+  <div id="modelState" class="note"></div>
+
+  <div class="mock mockOnly" id="mockNote">
+    The proposer is a <strong>deterministic mock</strong>, not a model. The trial, the device, the critic and the
+    verdict are real; what is proposed is generated from the seed at the malformed rate you set. So this tests
+    <strong>the harness</strong> — that a real effect comes back PROVEN, a null comes back RETIRED and a thin
+    sample comes back UNDERPOWERED. Whether a hint helps a real model needs a real model.
+  </div>
+
+  <div class="model modelOnly" id="modelNote">
+    The proposer is the <strong>local model</strong> named below, reached through the engine's own
+    <code>llmHost</code> setting — the same base <code>ragBridge</code> and the GPU-brain bridge use, so pointing
+    the fleet at another machine moves this too. The trial, the device, the critic and the verdict are unchanged;
+    the only difference is who answers. Nothing here tells the model how often to be wrong, so there is no
+    "told" column — the numbers on the right are the only numbers there are.
+  </div>
+
+  <div id="out"></div>
+
+  <h2>What the states mean</h2>
+  <table>
+    <tr><th>state</th><th>meaning</th></tr>
+    <tr><td class="state PROVEN">PROVEN</td><td>the drop cleared the size bar <em>and</em> its own standard error. Only these are ever injected into a prompt.</td></tr>
+    <tr><td class="state UNDERPOWERED">UNDERPOWERED</td><td>a real drop the sample cannot separate from noise. Not retired — retiring it would discard something that may be true. Never injected.</td></tr>
+    <tr><td class="state RETIRED">RETIRED</td><td>measured and did nothing. Kept <em>with its numbers</em>, because "we tried this and it did nothing" is a result nobody should rediscover.</td></tr>
+    <tr><td class="state PROPOSED">PROPOSED</td><td>not trialled, or trialled on too few runs to count. Never injected.</td></tr>
+  </table>
+
+  <h2>The book on disk</h2>
+  <div id="book" class="note">…</div>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const pc = (x) => (100 * x).toFixed(1) + "%";
+
+async function ask(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+// The device list comes from the registry the trial itself uses, so the picker cannot offer something the
+// bridge would then refuse.
+try {
+  const d = await ask("/device/list");
+  const names = (d.devices || d.names || []).map((x) => (typeof x === "string" ? x : x.name)).filter(Boolean);
+  $("device").innerHTML = names.map((n) => `<option>${n}</option>`).join("") || "<option>kerr</option>";
+} catch { $("device").innerHTML = "<option>kerr</option>"; }
+
+const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function render(r) {
+  if (!r.ok) {
+    // *** A DEGENERATE ARM IS NOT AN ERROR MESSAGE, IT IS A FINDING, so it is shown with its numbers AND with
+    // the verdict it would have printed. A refusal that hides what it refused teaches nothing. ***
+    if (r.error === "degenerate-arm") {
+      $("out").innerHTML = `
+        <div class="refuse"><strong>REFUSED — degenerate arm (${(r.arms || []).join(", ")})</strong><br>${esc(r.message)}</div>
+        <table>
+          <tr><th>arm</th><th>questions</th><th>distinct claims</th><th>effective sample</th></tr>
+          ${["control", "treated"].map((a) => `<tr><td>${a}</td><td class="num">${r.sampling[a].n}</td>
+             <td class="num">${r.sampling[a].distinct}</td><td class="num">${r.sampling[a].distinct}</td></tr>`).join("")}
+        </table>
+        <p class="note">Malformed rate ${pc(r.observed.before)} → ${pc(r.observed.after)}, which would have printed
+           <span class="state ${r.observed.wouldHaveSaid}">${r.observed.wouldHaveSaid}</span> — off one observation per arm.
+           That is why this is refused rather than reported with a footnote.</p>`;
+      return;
+    }
+    const fix = r.fix ? `<p class="note">${esc(r.fix)}</p>` : "";
+    $("out").innerHTML = `<p class="note" style="color:var(--no)">${esc(r.error)}: ${esc(r.message || "")}</p>${fix}`;
+    return;
+  }
+  // THE TWO COLUMNS CHANGE MEANING WITH THE PROPOSER, because they measure different things. For the mock the
+  // demonstration is that the trial finds back what it was TOLD; for a model there is nothing to tell, so the
+  // left column is WHAT WAS ASKED and the right is the only number that exists.
+  const left = r.input
+    ? `<tr><th>quantity</th><th>told to the mock</th><th>recovered by the trial</th></tr>
+       <tr><td>malformed rate, control arm</td><td class="num">${pc(r.input.baseRate)}</td><td class="num">${pc(r.before)}</td></tr>
+       <tr><td>malformed rate, treated arm</td><td class="num">${pc(Math.max(0, r.input.baseRate - r.input.hintEffect))}</td><td class="num">${pc(r.after)}</td></tr>
+       <tr><td>drop</td><td class="num">${pc(r.input.hintEffect)}</td><td class="num">${pc(r.drop)}</td></tr>`
+    : `<tr><th>quantity</th><th>what was asked</th><th>what the model did</th></tr>
+       <tr><td>malformed rate, control arm</td><td>no hint in the prompt</td><td class="num">${pc(r.before)}</td></tr>
+       <tr><td>malformed rate, treated arm</td><td>the hint, in the prompt</td><td class="num">${pc(r.after)}</td></tr>
+       <tr><td>drop</td><td>—  nobody tells a model its rate</td><td class="num">${pc(r.drop)}</td></tr>`;
+  const sampling = r.sampling
+    ? `<h2>How many samples the arms really carry</h2>
+       <table>
+         <tr><th>arm</th><th>questions</th><th>distinct claims</th></tr>
+         <tr><td>control</td><td class="num">${r.sampling.control.n}</td><td class="num">${r.sampling.control.distinct}</td></tr>
+         <tr><td>treated</td><td class="num">${r.sampling.treated.n}</td><td class="num">${r.sampling.treated.distinct}</td></tr>
+       </table>
+       <p class="note">z assumes the questions in an arm are independent samples. A model that answers identically
+          every time makes n a fiction, so one distinct claim across an arm refuses the run rather than passing
+          with a caveat.</p>` : "";
+  $("out").innerHTML = `
+    <h2>Result — ${esc(r.device)}, n=${r.n} per arm, ${r.ms} ms
+        <span class="note">· proposer ${esc(r.proposer)}${r.model ? " · " + esc(r.model) + " @ " + esc(r.host) : " · seed " + r.seed}</span></h2>
+    <table>
+      ${left}
+    </table>${sampling}
+    <h2>The statistics behind the verdict</h2>
+    <table>
+      <tr><th>size bar</th><th>drop</th><th>z</th><th>z needed</th><th>runs needed</th><th>verdict</th></tr>
+      <tr>
+        <td class="num">${r.bar}</td>
+        <td class="num">${r.drop.toFixed(3)}</td>
+        <td class="num">${Number.isFinite(r.z) ? r.z.toFixed(2) : "&infin;"}</td>
+        <td class="num">${r.zMin}</td>
+        <td class="num">${Number.isFinite(r.requiredN) ? r.requiredN : "—"}</td>
+        <td class="state ${r.state}">${r.state}</td>
+      </tr>
+    </table>
+    <p class="note">${r.why}</p>
+    <p class="note">arms: control ${r.arms.control}, treated ${r.arms.treated} — the same questions, run twice.
+       The control arm is what ACE has not got: without it, a model that improved on its own gets credited to
+       whatever strategy was added that week, and nothing in the design can tell that apart from the strategy working.</p>`;
+}
+
+// The mock's knobs are hidden for the model path rather than left on screen doing nothing -- a control that
+// cannot affect the run is the same defect as a number that means two things.
+function syncProposer() {
+  const model = $("proposer").value !== "mock";
+  document.querySelectorAll(".mockOnly").forEach((el) => el.classList.toggle("hidden", model));
+  document.querySelectorAll(".modelOnly").forEach((el) => el.classList.toggle("hidden", !model));
+  $("modelState").classList.toggle("hidden", !model);
+}
+$("proposer").onchange = syncProposer;
+syncProposer();
+
+// Ask what the local model situation IS before anyone presses run. NOT-RUNNING, RUNNING-WITH-NO-MODELS and
+// PINNED-MODEL-MISSING are three different sentences, because the third only bites at the first call, mid-run.
+try {
+  const m = await ask("/skill/model");
+  $("modelState").innerHTML = m.ready
+    ? `local model <strong>${esc(m.model || "(unpinned)")}</strong> at <code>${esc(m.host)}</code> — ${esc(m.why)}`
+    : `<span style="color:var(--warn)">local model not usable — ${esc(m.why)}</span><br>${esc(m.fix || "")}`;
+} catch { $("modelState").textContent = "could not reach /skill/model."; }
+
+$("run").onclick = async () => {
+  $("run").disabled = true;
+  const isModel = $("proposer").value !== "mock";
+  $("out").innerHTML = `<p class="note">running both arms…${isModel ? " a local model answers " + (2 * Number($("n").value)) + " times, so this is minutes, not milliseconds." : ""}</p>`;
+  try {
+    const q = new URLSearchParams({ caller: $("proposer").value, device: $("device").value, n: $("n").value,
+                                    seed: $("seed").value, base: $("base").value, effect: $("effect").value });
+    render(await ask("/skill/trial?" + q));
+  } catch (e) {
+    $("out").innerHTML = `<p class="note" style="color:var(--no)">could not reach /skill/trial — ${e.message}</p>`;
+  }
+  $("run").disabled = false;
+};
+
+try {
+  const b = await ask("/skill/book");
+  // MISSING and EMPTY are different facts and are shown as different sentences.
+  $("book").textContent = b.missing
+    ? "No skillbook.json on disk. The shipped book is empty on purpose: a strategy untrialled on THIS tree's devices has no evidence here, and evidence is the only thing that lets one be used."
+    // v3399 -- REFINEMENTS and INHERITED are reported as SEPARATE facts. A refinement is normal bookkeeping;
+    // one carrying its parent's numbers is a defect, and one number could not say both.
+    : `${b.summary.total} strategies — ${b.summary.proven} proven, ${b.summary.proposed} proposed, `
+      + `${b.summary.underpowered} underpowered, ${b.summary.retired} retired. `
+      + `${b.summary.refinements} are refinements of an earlier hint`
+      + (b.summary.inherited ? `, and ${b.summary.inherited} of those arrived carrying their PARENT'S evidence and were forced back to PROPOSED — a new hint is a new claim.` : ".");
+} catch { $("book").textContent = "could not reach /skill/book."; }
+</script>
+</body>
+</html>

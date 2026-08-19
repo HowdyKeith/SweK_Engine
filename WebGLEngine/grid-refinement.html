@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>What adaptivity costs - a refinement interface reflects (v3632)</title>
+<meta name="demo:desc" content="A grid refinement interface is an impedance discontinuity: the true reflection is exactly zero because the medium is identical on both sides, so everything measured is numerical artefact - second order in cell size, bounded in ratio, and it costs the magic time step everywhere else.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:190px}
+</style></head><body><div id="w">
+<h1>What adaptivity costs</h1>
+<div class="sub">A grid that refines where the action is sounds free. It is not, and the price is measurable
+because <b>the right answer is exactly zero</b>: in the continuum a refinement interface <i>does not exist</i>
+&mdash; same <code>&epsilon;</code>, same <code>&mu;</code>, same <code>c</code> on both sides. A change of cell
+size is a change in how the problem is written down, not in the problem. <b>Every photon that comes back is pure
+numerical artefact</b>, and its size is the price.</div>
+<h2>1. Send a pulse through an interface</h2>
+<div class="panel">
+  <div class="row">
+    <label>refinement ratio <input id="ratio" type="range" min="1" max="6" step="0.5" value="2"></label>
+    <span id="rv" class="dim"></span>
+    <label>pulse width <input id="pw" type="range" min="7" max="56" step="7" value="14"></label>
+    <span id="pwv" class="dim"></span>
+    <button id="go" class="good">measure the reflection</button>
+  </div>
+  <canvas id="cv" width="960" height="200"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law">The reference is a <b>uniform grid at the coarse spacing</b> with the same shared time step
+&mdash; the grid you would have had if you had not refined &mdash; so the number is the price of the
+<b>refinement</b>, not of the resolution. At ratio 1 it reads <b>exactly zero</b>, which is the control saying the
+machinery itself adds nothing.</div>
+<h2>2. The two costs</h2>
+<div class="panel"><button id="sweep" class="good">sweep ratio and resolution</button><table id="t2"></table></div>
+<div class="law"><b>The reflection is second order in cell size and it saturates in ratio.</b> Going from 2&times;
+to 6&times; costs about a third more, not three times more &mdash; the interface cost approaches a ceiling set by the
+coarse side alone. And second order means the interface introduces <b>more of the error that was already there</b>,
+not a new one. That is a better answer than "it's fine" or "it's broken".</div>
+<div class="law"><b>The cost that isn't a measurement is the larger one.</b> One time step is shared, so
+<code>S<sub>fine</sub> = ratio &times; S<sub>coarse</sub></code> and the finest cell limits the whole domain.
+<b>The magic time step therefore exists on at most one side of any refinement interface</b> &mdash; and
+<code>fdtd-selfcheck</code> already measured that shrinking the step makes 1D FDTD <i>worse</i>. Refining any part
+of a grid takes the one exact configuration away from every other part. The reflection is second order and bounded;
+that is neither.</div>
+<div class="law">Graded by <code>physics/em/gridRefine-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>No adaptive grid was built</b> &mdash; nothing in
+this tree consumes an EM field volume yet, so the refusal stands. This is the number you would want <i>before</i>
+deciding to build one.</div>
+<script type="module">
+import { interfaceReflection, courantPair, makeGrid, run } from "/physics/em/gridRefine.mjs";
+const $=(i)=>document.getElementById(i);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+const show=()=>{$("rv").textContent=(+$("ratio").value).toFixed(1)+"x";
+  $("pwv").textContent=(+$("pw").value)+" coarse cells";};
+$("ratio").oninput=show;$("pw").oninput=show;show();
+$("go").onclick=()=>{
+  const ratio=+$("ratio").value, pulseWidth=+$("pw").value;
+  const q=interfaceReflection({ratio,pulseWidth});
+  const g=q.geometry;
+  const grid=makeGrid({nCoarse:g.nCoarse,nFine:g.nFine,ratio});
+  const snap=run({grid,sFine:1,steps:Math.round(g.steps*0.55),pulseAt:g.pulseAt,pulseWidth,probeCell:g.pulseAt});
+  const cv=$("cv"),c=cv.getContext("2d"),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.fillStyle="#080a0f";c.fillRect(0,0,W,H);
+  const xmax=snap.x[snap.x.length-1];
+  const X=(v)=>10+v/xmax*(W-20), Y=(v)=>H/2-v*(H/2-16);
+  c.strokeStyle="#232b3d";c.beginPath();c.moveTo(10,H/2);c.lineTo(W-10,H/2);c.stroke();
+  const xi=snap.x[grid.splitAt];
+  c.strokeStyle="#e8c49a";c.setLineDash([4,4]);c.beginPath();c.moveTo(X(xi),12);c.lineTo(X(xi),H-12);c.stroke();c.setLineDash([]);
+  c.fillStyle="#e8c49a";c.fillText("refinement interface ("+ratio.toFixed(1)+"x)",X(xi)+6,20);
+  c.strokeStyle="#9ab6e8";c.lineWidth=1.6;c.beginPath();
+  for(let i=0;i<grid.dx.length;i++){const px=X(snap.x[i]),py=Y(snap.E[i]);if(i===0)c.moveTo(px,py);else c.lineTo(px,py);}
+  c.stroke();c.lineWidth=1;
+  c.fillStyle="#68748c";c.fillText("coarse",14,H-14);c.fillText("fine",X(xi)+6,H-14);
+  const cp=courantPair({ratio,sFine:1});
+  rows($("t"),["quantity","value","note"],[
+    ["true reflection","<span class='ok'>0 (exactly)</span>","no interface exists in the continuum"],
+    ["measured |r|","<span class='"+(q.coefficient===0?"ok":"warn")+"'>"+q.coefficient.toExponential(3)+"</span>",
+      "against a uniform coarse-grid reference at the same shared dt"],
+    ["S<sub>fine</sub> / S<sub>coarse</sub>",cp.sFine.toFixed(3)+" / "+cp.sCoarse.toFixed(3),
+      "<span class='"+(cp.magicSidesPossible===2?"ok":"bad")+"'>sides that can hold the magic step: "+cp.magicSidesPossible+"</span>"],
+    ["fixture geometry","coarse "+g.nCoarse+", fine "+g.nFine+", "+g.steps+" steps",
+      "<span class='dim'>derived from the pulse width and ratio, never fixed</span>"]]);
+};
+$("sweep").onclick=()=>{
+  const out=[];
+  for(const r of [1,1.5,2,3,4,6]){const q=interfaceReflection({ratio:r});
+    out.push(["ratio "+r,q.coefficient.toExponential(3),"S_coarse "+q.courant.sCoarse.toFixed(4),
+      r===1?"<span class='ok'>exactly zero &mdash; the control</span>":"<span class='warn'>artefact</span>"]);}
+  const errs=[7,14,28,56].map(pw=>interfaceReflection({ratio:2,pulseWidth:pw}).coefficient);
+  errs.forEach((e,i)=>{const w=[7,14,28,56][i];
+    out.push(["width "+w+" (ratio 2)",e.toExponential(3),i?"order "+Math.log2(errs[i-1]/e).toFixed(3):"&mdash;",
+      i?"<span class='ok'>second order in cell size</span>":"<span class='dim'>baseline</span>"]);});
+  rows($("t2"),["setting","|r|","derived","verdict"],out);
+};
+</script>
+</div></body></html>

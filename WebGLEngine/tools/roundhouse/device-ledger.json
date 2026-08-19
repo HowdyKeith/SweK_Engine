@@ -1,0 +1,38 @@
+{
+  "kind": "swek-device-results-ledger",
+  "version": 1,
+  "devices": {
+    "e504cd63c40d3c76": {
+      "key": "e504cd63c40d3c76",
+      "family": "ARM/Mali",
+      "mobile": true,
+      "adapter": {
+        "vendor": "arm",
+        "architecture": "valhall"
+      },
+      "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+      "firstSeen": "2026-07-25T03:26:00.727Z",
+      "runs": [
+        {
+          "kind": "magmap",
+          "at": "2026-07-25T03:26:00.727Z",
+          "engineVersion": null,
+          "reported": {
+            "fullGridWorst": 0.0000050863670272553635,
+            "fullGridCells": 441,
+            "sampledWorst": 0.000002789037748719737,
+            "tol": 0.00001,
+            "floor": 0.000004385,
+            "fellBack": false,
+            "cfgN": 21
+          },
+          "graded": {
+            "verdict": "CONFIRMED",
+            "why": "ARM/Mali GPU 'arm / valhall' lands full-grid worst 5.09e-6 under tol 1e-5 -- a tolerance set from the emulated floor before this vendor existed. The kernel gains its second vendor"
+          }
+        }
+      ],
+      "lastSeen": "2026-07-25T03:26:00.727Z"
+    }
+  }
+}

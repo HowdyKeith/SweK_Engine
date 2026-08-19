@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Doctor</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  main { max-width:920px; margin:0 auto; padding:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:14px 16px; margin-bottom:14px; }
+  h2 { font-size:14px; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:9px 15px; font:inherit; font-size:13px; cursor:pointer; }
+  button:active { transform:scale(.98); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; align-items:flex-start; gap:8px; padding:5px 0; border-bottom:1px solid #12201a; font:12px ui-monospace,monospace; }
+  .row:last-child { border-bottom:0; }
+  .pill { flex:none; width:44px; text-align:center; border-radius:5px; padding:1px 0; font-weight:700; font-size:10px; }
+  .ok { background:#12301e; color:#7fe0a0; } .warn { background:#332a10; color:#e8c060; } .fail { background:#3a1616; color:#f6a; }
+  .k { flex:none; width:150px; color:var(--ink); } .v { flex:1; color:var(--dim); word-break:break-all; }
+  .hint { color:#e8c060; font-size:11px; margin-top:2px; }
+  .sum { display:flex; gap:14px; font:13px ui-monospace,monospace; }
+  .sum b { font-size:15px; }
+  .muted { color:var(--dim); font-size:12px; }
+  code { background:#0c1410; padding:1px 5px; border-radius:4px; }
+  a { color:#9ed5ff; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">SweK Engine <span class="g">// Doctor</span></div>
+  <div style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+    <span id="sum" class="sum"></span>
+    <button id="rerun">Re-run</button>
+  </div>
+</header>
+<main>
+  <p class="muted" id="intro">Per-machine sanity check for the box the bridge is running on: the PATH it actually sees, whether tools resolve at absolute paths, daemon liveness, ports, disk, and cameras. Each problem shows a fix. This reflects <b>this</b> machine (the one serving the bridge), not your browser.</p>
+  <div id="report"></div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function pill(status){ const c = status==="ok"?"ok":status==="fail"?"fail":"warn"; const t = status==="ok"?"OK":status==="fail"?"FAIL":"WARN"; return `<span class="pill ${c}">${t}</span>`; }
+function rowHtml(status, k, v, hint){ return `<div class="row">${pill(status)}<span class="k">${esc(k)}</span><span class="v">${esc(v)}${hint?`<div class="hint">&#9888; ${esc(hint)}</div>`:""}</span></div>`; }
+
+function render(r){
+  if(!r || !r.ok){ $("#report").innerHTML = `<div class="card fail">Doctor failed: ${esc(r&&r.error||"unknown")}</div>`; return; }
+  const s = r.summary || {pass:0,warn:0,fail:0};
+  $("#sum").innerHTML = `<span class="ok">&#9679; ${s.pass}</span> <span class="warn">&#9679; ${s.warn}</span> <span class="fail">&#9679; ${s.fail}</span>`;
+
+  const sys = r.system||{};
+  let html = "";
+
+  // System
+  html += `<div class="card"><h2>&#128421; System</h2>
+    ${rowHtml("ok","OS", (sys.os||"")+" "+(sys.osVersion||"")+"  ·  node "+(sys.node||""))}
+    ${rowHtml("ok","engine root", sys.engineRoot||"")}
+    ${rowHtml("ok","user / pid", (sys.user||"?")+"  ·  pid "+(sys.pid||"?")+"  ·  up "+(sys.uptimeSec||0)+"s")}
+    ${rowHtml("ok","memory", (sys.freeMemGB||"?")+" GB free / "+(sys.totalMemGB||"?")+" GB")}
+  </div>`;
+
+  // PATH
+  const p = r.path||{};
+  html += `<div class="card"><h2>&#128193; PATH the bridge sees</h2>
+    ${rowHtml(p.status||"ok","entries", (p.entryCount||0)+" dirs")}
+    ${(p.warnings||[]).map(w=>rowHtml("warn","","",w)).join("")}
+    <div class="row"><span class="pill" style="visibility:hidden">.</span><span class="v" style="color:var(--dim)">${esc((p.entries||[]).join("  ·  "))}</span></div>
+  </div>`;
+
+  // Binaries
+  html += `<div class="card"><h2>&#129513; Binaries</h2>` +
+    (r.binaries||[]).map(b=>rowHtml(b.status, b.name, b.found?(b.absolute||b.onPath||""):"not found"+(b.onPath?"":""), b.hint)).join("") + `</div>`;
+
+  // Daemons
+  html += `<div class="card"><h2>&#9881;&#65039; Daemons</h2>` +
+    (r.daemons||[]).map(d=>rowHtml(d.status, d.name, (d.target||"")+"  ·  "+(d.up?"up":"down"), d.up?"":d.hint)).join("") + `</div>`;
+
+  // Ports + Disk
+  html += `<div class="card"><h2>&#128268; Ports &amp; disk</h2>` +
+    (r.ports||[]).map(x=>rowHtml(x.status, x.name, ":"+x.port+"  ·  "+(x.listening?"listening":"closed"), x.listening?"":x.hint)).join("") +
+    rowHtml(r.disk.status, "free disk", (r.disk.freeGB!=null?(r.disk.freeGB+" GB free / "+r.disk.totalGB+" GB"):"unknown")+"  ·  "+esc(r.disk.path||""), r.disk.hint) + `</div>`;
+
+  // Cameras
+  const cam = r.cameras||{};
+  html += `<div class="card"><h2>&#128247; Cameras</h2>`;
+  if(!cam.configured){ html += rowHtml("ok","cameras", cam.note||"none configured"); }
+  else { html += (cam.cams||[]).map(c=>rowHtml(c.status, c.name, c.host+":"+c.port+"  ·  "+(c.reachable?"reachable":"unreachable"), c.reachable?"":c.hint)).join(""); }
+  html += `</div>`;
+
+  $("#report").innerHTML = html;
+}
+
+function run(){
+  $("#rerun").disabled = true; $("#report").innerHTML = `<div class="card muted">running checks&hellip;</div>`;
+  fetch("/doctor",{cache:"no-store"}).then(r=>r.json()).then(render).catch(e=>{ $("#report").innerHTML = `<div class="card fail">couldn't reach /doctor: ${esc(e)}</div>`; }).finally(()=>{ $("#rerun").disabled=false; });
+}
+$("#rerun").addEventListener("click", run);
+run();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

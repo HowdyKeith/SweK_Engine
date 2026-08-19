@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SweK Engine — Push2Run</title>
+<style>
+  :root { --bg:#0a0d12; --panel:#10151c; --line:#23303c; --ink:#dfe9f2; --dim:#8aa0b2; --go:#5fd0ff; --on:#41e08a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; position:sticky; top:0; background:#0b0f15ee; backdrop-filter:blur(5px); }
+  .title { font-weight:600; letter-spacing:.4px; } .title .g { color:var(--go); }
+  main { max-width:820px; margin:0 auto; padding:14px; }
+  h2 { font-size:12px; letter-spacing:1.4px; text-transform:uppercase; color:var(--go); border-bottom:1px solid var(--line); padding-bottom:5px; margin:20px 0 10px; }
+  .sub { color:var(--dim); font-size:12px; margin:-4px 0 12px; }
+  ol { color:var(--dim); font-size:12px; padding-left:18px; } ol b { color:var(--ink); } code { color:#9fe8c0; }
+  input[type=text] { width:100%; padding:8px; background:#0a0912; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:12px ui-monospace,monospace; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  td, th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; }
+  .args { color:#9fe8c0; }
+  button { background:#10231a; color:var(--on); border:1px solid #224a36; border-radius:7px; padding:4px 9px; font:inherit; cursor:pointer; white-space:nowrap; }
+  button:hover { background:#143020; }
+  .foot { color:var(--dim); font-size:11px; margin-top:18px; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🔊</span> Push2Run</span></header>
+  <main>
+    <p class="sub">Push2Run watches your phone pushes / clipboard / hotkeys and runs a local command when text matches. These rules forward a verb to the running engine. Set the path to <code>swek-cmd.bat</code> once, then paste each rule into Push2Run as <b>Run a program</b> (Program = the bat, Parameters = the args below).</p>
+
+    <h2>1 · Path to the helper</h2>
+    <input type="text" id="batPath" placeholder="C:\\path\\to\\EngineProject\\swek-cmd.bat" value="C:\\EngineProject\\swek-cmd.bat">
+    <p class="sub">It's in your project root next to START_BUN_Full.bat. This only changes what the copy buttons paste.</p>
+
+    <h2>2 · Setup in Push2Run</h2>
+    <ol>
+      <li>Install <b>Push2Run</b> (push2run.com) and connect it to Pushbullet/Join (or use its hotkeys/clipboard).</li>
+      <li>Add a <b>Command</b>: <b>Words to match</b> = your trigger phrase (e.g. "engine city"), <b>Action</b> = Run a program.</li>
+      <li><b>Program</b> = the bat path above. <b>Parameters</b> = the args from the table (copy button).</li>
+      <li>The engine must be open + the bridge running on 8787. Speak/type your phrase → the engine reacts.</li>
+    </ol>
+
+    <h2>3 · Control rules</h2>
+    <table id="ctrlTable">
+      <thead><tr><th>Action</th><th>Parameters</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>3b · Install &amp; service rules <span style="color:var(--dim);font-weight:400;font-size:11px">(v1989 — trusted access only)</span></h2>
+    <p class="sub">Push2Run can now auto-install tools from GitHub Releases (cross-platform) and start/stop them — not just drive a running engine. These verbs require trusted access (the calling box must be local, authed, or LAN-exempt), since they run software. <code>id</code> is a service id from the Background Services catalog (e.g. <code>lazydocker</code>, <code>llamaserver</code>, <code>netbird</code>).</p>
+    <table id="opsTable">
+      <thead><tr><th>Action</th><th>Parameters</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>4 · Run a demo</h2>
+    <p class="sub">One rule per demo (id from the engine's demo menu). Loaded live from the engine:</p>
+    <table id="demoTable">
+      <thead><tr><th>Demo</th><th>Parameters</th><th></th></tr></thead>
+      <tbody><tr><td colspan="3" style="color:var(--dim)">loading demo list…</td></tr></tbody>
+    </table>
+
+    <p class="foot">No bat? You can also point Push2Run at <b>curl</b> directly: Program = <code>curl</code>, Parameters = <code>-s "http://127.0.0.1:8787/push2run/exec?cmd=demo:set&id=&lt;id&gt;"</code>. LAN-only by design — anyone who can reach the bridge can fire these.</p>
+  </main>
+<script>
+  const CTRL = [
+    { label: "Toggle perf dashboard", args: "perf" },
+    { label: "Next demo",             args: "next" },
+    { label: "Random demo",           args: "random" },
+    { label: "Pause demo",            args: "pause" },
+    { label: "Resume demo",           args: "resume" },
+    { label: "Stop demo",             args: "stop" },
+  ];
+  // v1989 — install/service verbs. args go to swek-cmd.bat (or curl) the same way;
+  // <id> is a Background Services catalog id. These hit /push2run/exec?cmd=... too.
+  const OPS = [
+    { label: "Install a tool (auto: winget or GitHub)", args: "install:smart <id>" },
+    { label: "Install a tool from GitHub Releases",     args: "install:github <id>" },
+    { label: "Start a service",                         args: "svc:start <id>" },
+    { label: "Stop a service",                          args: "svc:stop <id>" },
+    { label: "Service status",                          args: "svc:status <id>" },
+  ];
+  const bat = () => document.getElementById("batPath").value.trim() || "swek-cmd.bat";
+  function copy(text){ navigator.clipboard?.writeText(text).catch(()=>{}); }
+  function rowBtn(args){ const b=document.createElement("button"); b.textContent="copy"; b.onclick=()=>{ copy(args); b.textContent="✓"; setTimeout(()=>b.textContent="copy",900); }; return b; }
+  function fillCtrl(){
+    const tb=document.querySelector("#ctrlTable tbody"); tb.innerHTML="";
+    CTRL.forEach(c=>{ const tr=document.createElement("tr");
+      const td1=document.createElement("td"); td1.textContent=c.label;
+      const td2=document.createElement("td"); td2.className="args"; td2.textContent=c.args;
+      const td3=document.createElement("td"); td3.appendChild(rowBtn(c.args));
+      tr.append(td1,td2,td3); tb.appendChild(tr); });
+  }
+  function fillDemos(list){
+    const tb=document.querySelector("#demoTable tbody"); tb.innerHTML="";
+    if(!list||!list.length){ tb.innerHTML='<tr><td colspan="3" style="color:var(--dim)">No demo list (is the engine running?). Use args: <span class="args">demo &lt;id&gt;</span></td></tr>'; return; }
+    list.forEach(d=>{ const id=d.id||d; const label=d.label||d.name||id; const args="demo "+id;
+      const tr=document.createElement("tr");
+      const td1=document.createElement("td"); td1.textContent=label;
+      const td2=document.createElement("td"); td2.className="args"; td2.textContent=args;
+      const td3=document.createElement("td"); td3.appendChild(rowBtn(args));
+      tr.append(td1,td2,td3); tb.appendChild(tr); });
+  }
+  fillCtrl();
+  (function fillOps(){
+    const tb=document.querySelector("#opsTable tbody"); if(!tb) return; tb.innerHTML="";
+    OPS.forEach(c=>{ const tr=document.createElement("tr");
+      const td1=document.createElement("td"); td1.textContent=c.label;
+      const td2=document.createElement("td"); td2.className="args"; td2.textContent=c.args;
+      const td3=document.createElement("td"); td3.appendChild(rowBtn(c.args));
+      tr.append(td1,td2,td3); tb.appendChild(tr); });
+  })();
+  fetch("/demos/list",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+    const list = Array.isArray(j) ? j : (j && (j.demos||j.list)) || [];
+    fillDemos(list);
+  }).catch(()=>fillDemos(null));
+</script>
+</body>
+</html>

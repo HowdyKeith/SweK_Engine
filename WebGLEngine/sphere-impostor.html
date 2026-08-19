@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<!-- WebGLEngine/sphere-impostor.html -- v3179
+     THE CLAIM v3177 MADE, PUT WHERE IT CAN BE DISPROVED.
+
+     v3177 lit ev.html's planet sprites as SPHERE IMPOSTORS. v3178 made the light draggable, because a STATIC
+     lit sphere and a STATIC shaded disc look identical -- both are bright on one side.
+
+     *** BUT A MOVING TERMINATOR IS ONLY OBVIOUS NEXT TO ONE THAT DOES NOT MOVE THE SAME WAY. *** This page
+     draws BOTH from the same light: on the left a FLAT DISC shaded by the same lambert term against a constant
+     normal, on the right the SPHERE IMPOSTOR. Drag the sun and the left boundary stays STRAIGHT while the right
+     one BOWS. That is the difference, and it cannot be argued with.
+
+     A CLAIM ABOUT ABSENCE MUST BE SHOWN FAILING -- and the flat disc is the failing case, drawn on purpose. -->
+<html lang="en"><head><meta charset="utf-8"><title>Sphere impostor -- SweK</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --ink:#cfe8f2; --dim:#7fa8bb; --line:#1e4a5a; }
+  body { margin:0; background:#070c11; color:var(--ink); font:14px/1.5 system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:17px; }
+  main { display:flex; flex-wrap:wrap; gap:18px; padding:16px; align-items:flex-start; }
+  .cell { text-align:center; }
+  .cell canvas { display:block; border:1px solid var(--line); border-radius:8px; background:#04080c; }
+  .cell b { display:block; margin-top:6px; font-size:12px; }
+  .cell span { display:block; font-size:11px; color:var(--dim); max-width:260px; }
+  #pad { border-radius:50%; border:1px solid #2a5f73; cursor:crosshair; display:block; }
+  #why { max-width:640px; padding:0 16px 20px; color:var(--dim); font-size:12px; }
+  #unsupported { display:none; margin:16px; padding:10px 12px; border:1px solid #7a4a2a; border-radius:8px; color:#e8b98a; }
+</style></head><body>
+<header>
+  <h1>Sphere impostor &mdash; drag the sun</h1>
+  <div style="color:var(--dim);font-size:12px">Both discs take the <b>same light</b>. Watch the boundary.</div>
+</header>
+<div id="unsupported"></div>
+<main>
+  <div class="cell"><canvas id="flat" width="260" height="260"></canvas>
+    <b>flat disc</b><span>one constant normal. Its boundary is <b>straight</b> and slides across.</span></div>
+  <div class="cell"><canvas id="sphere" width="260" height="260"></canvas>
+    <b>sphere impostor</b><span>N = vec3(p, sqrt(1&nbsp;&minus;&nbsp;p&middot;p)). Its terminator <b>bows</b>, and goes crescent at grazing.</span></div>
+  <div class="cell"><canvas id="pad" width="120" height="120" title="Drag to move the light"></canvas>
+    <b>sun</b><span id="dirTxt"></span></div>
+</main>
+<div id="why">
+  <p><b>Why two of them.</b> A lit sphere and a shaded disc look the same in a still frame &mdash; both are bright
+  on one side. The flat disc is drawn here <i>on purpose</i>, as the failing case: if the right-hand boundary
+  ever looks like the left-hand one, the impostor normal is not reaching the fragment.</p>
+  <p><b>What to look for.</b> Drag the sun toward the rim. The flat boundary stays a straight line; the sphere's
+  narrows to a <b>crescent</b>. Push past the edge and the light clamps edge-on, which is where the two differ most.</p>
+</div>
+<script type="module">
+// ONE SHADER, TWO MODES, and the mode is a uniform rather than two programs -- so a difference between the
+// panels cannot come from a difference in the code that drew them. If they ever agree, it is the normal, not
+// the plumbing.
+const FS = `#version 300 es
+precision highp float;
+in vec2 v_uv; uniform vec3 u_light; uniform float u_sphere; out vec4 frag;
+void main(){
+  vec2 p = (v_uv - 0.5) * 2.0;
+  float sz = 1.0 - dot(p, p);
+  if (sz < 0.0) discard;                       // outside the disc
+  // GUARDED: sqrt of a negative is NaN and would paint the whole quad. The discard above already covers it,
+  // but relying on an earlier discard to protect a later sqrt is trusting the order of two decisions.
+  vec3 sphN  = vec3(p.x, -p.y, sqrt(max(sz, 0.0)));
+  vec3 flatN = vec3(0.0, 0.0, 1.0);            // one normal for the whole disc -- the failing case, on purpose
+  vec3 N = mix(flatN, sphN, u_sphere);
+  float lam = max(dot(N, normalize(u_light)), 0.0);
+  vec3 base = vec3(0.55, 0.72, 0.95);
+  frag = vec4(base * (0.18 + 0.82 * lam), 1.0);   // ambient floor: a black limb reads as a bite taken out
+}`;
+const VS = `#version 300 es
+in vec2 a_p; out vec2 v_uv;
+void main(){ v_uv = a_p; gl_Position = vec4(a_p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+let light = [-0.45, 0.55, 0.70];
+const panes = [];
+
+function makePane(id, sphere) {
+  const cv = document.getElementById(id);
+  const gl = cv.getContext("webgl2");
+  // UNSUPPORTED IS NAMED, NOT FAILED. v3120's law: one word for "this box has no WebGL2" and "the shader is
+  // broken" makes every limited machine look defective.
+  if (!gl) return null;
+  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || "compile failed");
+    return s; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr) || "link failed");
+  gl.useProgram(pr);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
+  const a = gl.getAttribLocation(pr, "a_p");
+  gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+  return { gl, uL: gl.getUniformLocation(pr, "u_light"), uS: gl.getUniformLocation(pr, "u_sphere"), sphere };
+}
+
+function draw() {
+  for (const p of panes) {
+    p.gl.uniform3f(p.uL, light[0], light[1], light[2]);
+    p.gl.uniform1f(p.uS, p.sphere ? 1 : 0);
+    p.gl.clearColor(0.016, 0.031, 0.047, 1); p.gl.clear(p.gl.COLOR_BUFFER_BIT);
+    p.gl.drawArrays(p.gl.TRIANGLES, 0, 6);
+  }
+  const pad = document.getElementById("pad"), g = pad.getContext("2d"), R = pad.width / 2;
+  g.clearRect(0,0,pad.width,pad.height);
+  g.fillStyle = "#0c1620"; g.beginPath(); g.arc(R,R,R-1,0,Math.PI*2); g.fill();
+  g.strokeStyle = "#2a5f73"; g.stroke();
+  g.fillStyle = light[2] >= 0 ? "#ffd98a" : "#5a4a20";
+  g.beginPath(); g.arc(R + light[0]*(R-7), R - light[1]*(R-7), 6, 0, Math.PI*2); g.fill();
+  document.getElementById("dirTxt").textContent =
+    light.map(v => v.toFixed(2)).join(", ") + (light[2] < 0.02 ? "  (edge-on)" : "");
+}
+
+try {
+  for (const [id, sph] of [["flat", false], ["sphere", true]]) {
+    const p = makePane(id, sph);
+    if (!p) { throw Object.assign(new Error("this browser has no WebGL2 context"), { unsupported: true }); }
+    panes.push(p);
+  }
+  const pad = document.getElementById("pad");
+  const set = (e) => {
+    const r = pad.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width * 2 - 1, ny = -((e.clientY - r.top) / r.height * 2 - 1);
+    const rr = nx*nx + ny*ny, k = rr > 1 ? 1/Math.sqrt(rr) : 1;   // past the rim clamps to edge-on
+    const x = nx*k, y = ny*k;
+    light = [x, y, Math.sqrt(Math.max(0, 1 - x*x - y*y))];
+    draw();
+  };
+  let down = false;
+  pad.addEventListener("pointerdown", e => { down = true; pad.setPointerCapture(e.pointerId); set(e); });
+  pad.addEventListener("pointermove", e => { if (down) set(e); });
+  pad.addEventListener("pointerup",   e => { down = false; try { pad.releasePointerCapture(e.pointerId); } catch {} });
+  draw();
+} catch (e) {
+  // THREE OUTCOMES KEPT APART (v3120): ran / UNSUPPORTED, named / FAILED, with the driver's own words.
+  const box = document.getElementById("unsupported");
+  box.style.display = "block";
+  box.textContent = e && e.unsupported
+    ? "UNSUPPORTED: " + e.message + " -- this is a capability of the browser, not a defect in the page."
+    : "FAILED: " + ((e && e.message) || e);
+  if (!(e && e.unsupported)) throw e;      // RETHROWN so render-qa's pageerror hook sees a real failure
+}
+</script>
+</body></html>

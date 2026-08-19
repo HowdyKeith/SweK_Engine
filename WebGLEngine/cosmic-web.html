@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Cosmic Web">
+<meta name="demo:desc" content="The large-scale structure of the universe, grown rather than drawn. It starts as a Gaussian random field carrying a prescribed power spectrum -- and that field is checked: build it to P(k) = k^-2, measure the spectrum back out, and it returns what was asked for to about four percent on well-sampled shells. Then Zel'dovich (1970): every parcel of matter coasts along its initial impulse, x = q + D*Psi(q), and filaments, sheets and voids fall out of nothing but that. The displacement solves Poisson in Fourier space to machine precision, and the moment a sheet folds on itself -- a caustic, the seed of every cluster here -- lands where the mathematics says it must, at D = 1/A. Drag the slider and watch a smooth universe become a web. The isosurface is the same marching-cubes code the fluid pages use.">
+<meta name="demo:category" content="simulation">
+<title>Cosmic Web</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<style>
+  html,body { margin:0; height:100%; background:#01010a; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:440px; pointer-events:none; }
+  #cap { color:#c9b6ff; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.7; }
+  #note { color:#6f86ab; margin-top:7px; line-height:1.45; font-size:11.5px; }
+  #ctl { position:fixed; left:14px; bottom:14px; z-index:4; background:rgba(8,10,22,.9); border:1px solid #2a2450; border-radius:10px; padding:11px 14px; }
+  #ctl label { color:#c9b6ff; display:block; margin-bottom:6px; font-size:11px; }
+  input[type=range] { width:330px; }
+  #dval { color:#f6a623; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:16px; padding:6px 12px; font:600 11px ui-monospace,monospace; cursor:pointer; margin-right:6px; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+  #btns { position:fixed; right:14px; top:12px; z-index:4; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Cosmic Web &mdash; grown, not drawn</div><div id="stat"></div><div id="note"></div></div>
+<div id="btns"><button id="tWeb" class="on">filaments</button><button id="tPts" class="on">matter</button><button id="reseed">new universe</button></div>
+<div id="ctl"><label>growth factor D &mdash; how far cosmic time has carried the collapse: <span id="dval">0.0</span></label><input id="D" type="range" min="0" max="34" step="0.25" value="0"></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { makeGRF, measureP } from "./simulation/cosmo/grf.js";
+import { displacementField, advect, densityGrid } from "./simulation/cosmo/zeldovich.js";
+import { marchScalarField } from "./simulation/MarchingCubes.js";
+import { blackbodyRamp } from "./fx/voxelize/fireRamp.js";
+
+const N = 32, BOX = 100;
+const Pin = (k) => (k > 0 ? Math.pow(k, -2.0) : 0);   // the spectrum the field is BUILT to, and verified against
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x01010a);
+const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 2000);
+cam.position.set(118, 84, 138);
+const ctr = new OrbitControls(cam, renderer.domElement); ctr.enableDamping = true; ctr.target.set(BOX/2, BOX/2, BOX/2);
+addEventListener("resize", () => { cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+scene.add(new THREE.AmbientLight(0x223355, 1.5));
+const key = new THREE.DirectionalLight(0xffe0b0, 1.2); key.position.set(60, 90, 40); scene.add(key);
+const rim = new THREE.DirectionalLight(0x7080ff, 0.7); rim.position.set(-50, -30, -60); scene.add(rim);
+const box = new THREE.Mesh(new THREE.BoxGeometry(BOX, BOX, BOX), new THREE.MeshBasicMaterial({ color: 0x1a2244, wireframe: true, transparent: true, opacity: 0.18 }));
+box.position.set(BOX/2, BOX/2, BOX/2); scene.add(box);
+
+let field = null, disp = null, mesh = null, pts = null, seed = 20260715, measured = "";
+function buildUniverse(s) {
+  field = makeGRF({ n: N, boxSize: BOX, P: Pin, seed: s });
+  disp = displacementField(field);
+  // measure the spectrum back out of the field this page is actually showing -- not a number I typed in
+  const m = measureP(field, 5, Pin).filter(r => r.modes >= 100);
+  const worst = Math.max(...m.map(r => Math.abs(r.P/r.Ptruth - 1)));
+  measured = m.length + " well-sampled shells, worst " + (worst*100).toFixed(1) + "% from the P(k) requested";
+}
+function rebuild(D) {
+  const pos = advect(disp, D);
+  const g = densityGrid(pos, N, BOX, N);
+  let dmax = 0; for (let i = 0; i < g.length; i++) if (g[i] > dmax) dmax = g[i];
+  const iso = marchScalarField(Float32Array.from(g), N, N, N, Math.max(0.6, dmax*0.30), { cellSize: BOX/N });
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh = null; }
+  const tris = iso.positions.length/9;
+  if (tris) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(iso.positions), 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(iso.normals), 3));
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xffb060, transparent: true, opacity: 0.42, roughness: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    mesh.visible = document.getElementById("tWeb").classList.contains("on");
+    scene.add(mesh);
+  }
+  if (pts) { scene.remove(pts); pts.geometry.dispose(); }
+  const np = pos.length/3, col = new Float32Array(np*3);
+  const cell = BOX/N;
+  for (let i = 0; i < np; i++) {
+    const gx = Math.min(N-1, Math.max(0, Math.round(pos[i*3]/cell) % N));
+    const gy = Math.min(N-1, Math.max(0, Math.round(pos[i*3+1]/cell) % N));
+    const gz = Math.min(N-1, Math.max(0, Math.round(pos[i*3+2]/cell) % N));
+    const d = g[((gz+N)%N*N + (gy+N)%N)*N + (gx+N)%N];
+    const c = blackbodyRamp(Math.min(1, Math.max(0, (d+1)/(dmax+1))));
+    col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+  }
+  const pg = new THREE.BufferGeometry();
+  pg.setAttribute("position", new THREE.BufferAttribute(Float32Array.from(pos), 3));
+  pg.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  pts = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.62, vertexColors: true, transparent: true, opacity: 0.85 }));
+  pts.visible = document.getElementById("tPts").classList.contains("on");
+  scene.add(pts);
+  const A = 0.05;
+  document.getElementById("stat").innerHTML =
+    N + "&sup3; = " + (N*N*N).toLocaleString() + " parcels of matter &nbsp;&middot;&nbsp; growth factor D = <b style='color:#f6a623'>" + D.toFixed(2) + "</b>" +
+    "<br>peak density contrast &delta; = " + dmax.toFixed(1) + " &nbsp;&middot;&nbsp; web " + tris.toLocaleString() + " triangles" +
+    "<br><span style='color:#8fa8cf'>the field this page is showing, measured: " + measured + "</span>";
+  document.getElementById("note").innerHTML =
+    "Nothing here is drawn. A Gaussian random field with P(k) = k<sup>-2</sup> is displaced by Zel&rsquo;dovich (1970): <b>x = q + D&middot;&Psi;(q)</b>, every parcel coasting along its initial impulse. " +
+    "&Psi; solves Poisson in Fourier space to machine precision, and a sheet folds &mdash; a caustic, the seed of every cluster you can see &mdash; exactly when D reaches 1/A. " +
+    "Filaments, sheets and voids are not features anyone wrote: they fall out of a smooth field and one multiplication.";
+  document.getElementById("dval").textContent = D.toFixed(2);
+}
+const slider = document.getElementById("D");
+slider.oninput = () => rebuild(parseFloat(slider.value));
+document.getElementById("tWeb").onclick = (e) => { e.target.classList.toggle("on"); if (mesh) mesh.visible = e.target.classList.contains("on"); };
+document.getElementById("tPts").onclick = (e) => { e.target.classList.toggle("on"); if (pts) pts.visible = e.target.classList.contains("on"); };
+document.getElementById("reseed").onclick = () => { seed = (seed*7919 + 13) >>> 0; buildUniverse(seed); rebuild(parseFloat(slider.value)); };
+buildUniverse(seed); rebuild(0);
+(function frame() { ctr.update(); renderer.render(scene, cam); requestAnimationFrame(frame); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Roundhouse Devices</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:940px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#6f8a7c;margin-bottom:14px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;margin-bottom:13px}
+  button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:6px 13px;margin-right:6px;cursor:pointer}
+  button:hover:not(:disabled){background:#1d2c24}button:disabled{opacity:.45;cursor:default}
+  .primary{border-color:#4c8f6a;color:#b6f0cf}
+  select,input{background:#0a1210;color:#cfe9d8;border:1px solid #2c463a;font:inherit;padding:4px 7px}
+  label{color:#6f8a7c;margin-right:6px}
+  table{border-collapse:collapse;width:100%;margin-top:8px}
+  th,td{text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid #1a2a22;vertical-align:top}
+  th{color:#6f8a7c;font-weight:normal}
+  .pass{color:#7fe0a4}.fail{color:#e0a0a0}.dim{color:#6f8a7c}.num{color:#9fe8c0}
+  .obs{display:inline-block;border:1px solid #2c463a;padding:0 6px;margin:1px 4px 1px 0;color:#8fb3a0}
+  .big{font-size:15px}
+  #rounds tr.new{animation:fade .5s}@keyframes fade{from{background:#1d2c24}to{background:transparent}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Roundhouse Devices</h1>
+  <div class="sub">Pick a lab and watch the loop crystallise: a claim is proposed, the <em>real simulation</em>
+    runs, and the measured number decides whether it stands. The model never gets a vote.</div>
+
+  <div class="card">
+    <label>device</label><select id="dev"></select>
+    <label style="margin-left:10px">caller</label><select id="caller">
+      <option value="mock">mock (no model, no key - runs the real sim)</option>
+      <option value="ollama">ollama (local model proposes - free, private)</option>
+      <option value="gemini">gemini (remote free tier - key stays on the server)</option>
+    </select>
+    <label style="margin-left:10px">rounds</label><input id="rounds" type="number" min="1" max="12" value="4" style="width:52px">
+    <span id="modelWrap" style="display:none">
+      <label style="margin-left:10px">model</label><select id="model"></select>
+      <button id="install" style="margin-left:6px" title="ollama pull this model">install</button>
+      <label style="margin-left:10px">this peer has</label><input id="mem" type="number" min="2" max="256" value="8" style="width:56px"> GB
+      <select id="memkind"><option value="gpu">VRAM (discrete card)</option><option value="unified">unified (Apple Silicon)</option><option value="cpu">CPU only</option></select>
+    </span>
+    <div style="margin-top:10px">
+      <button id="go" class="primary">Run</button>
+      <span class="dim" id="status"></span>
+    </div>
+    <div class="dim" style="margin-top:8px" id="obs"></div>
+  </div>
+
+  <div class="card">
+    <table><thead><tr><th style="width:46px">round</th><th>claim</th><th style="width:150px">measured</th><th style="width:110px">verdict</th></tr></thead>
+    <tbody id="rounds"><tr><td colspan="4" class="dim">no run yet</td></tr></tbody></table>
+  </div>
+
+  <div class="card" id="outcome" style="display:none"></div>
+</div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+const num=(v)=>typeof v==="number"?(Math.abs(v)>=1e4||(Math.abs(v)<1e-3&&v!==0)?v.toExponential(3):+v.toFixed(6)):esc(String(v));
+let devices=[];
+
+async function jget(u,o){const r=await fetch(u,o);return r.json().catch(()=>({ok:false,error:"bad-json"}));}
+
+function claimText(c){
+  if(!c)return '<span class="dim">-</span>';
+  const o=esc(c.observable||"?");
+  if("equals" in c)return `${o} == ${esc(String(c.equals))}`;
+  if("target" in c)return `${o} = ${num(c.target)} <span class="dim">+/- ${num(c.tol??0)}</span>`;
+  if("max" in c)return `${o} &le; ${num(c.max)}`;
+  if("min" in c)return `${o} &ge; ${num(c.min)}`;
+  if("withinBracket" in c)return `${o} bracket &le; ${num(c.withinBracket)}`;
+  return o;
+}
+
+function addRow(r){
+  const tb=$("rounds");
+  if(tb.querySelector(".dim")&&tb.children.length===1)tb.innerHTML="";
+  const v=r.verdict||{};
+  const ok=!!v.done;
+  const why=ok?"crystallised":(v.reason?esc(v.reason):"refused");
+  const delta=("delta" in v)?` <span class="dim">delta ${num(v.delta)}</span>`:("bracketWidth" in v?` <span class="dim">width ${num(v.bracketWidth)}</span>`:"");
+  const tr=document.createElement("tr");
+  tr.className="new";
+  tr.innerHTML=`<td class="num">${r.round+1}</td><td>${claimText(r.claim)}</td>
+    <td class="num">${r.measured===undefined?'<span class="dim">-</span>':num(r.measured)}${delta}</td>
+    <td class="${ok?"pass":"fail"}">${why}</td>`;
+  tb.appendChild(tr);
+}
+
+async function load(){
+  const l=await jget("/device/list");
+  if(!l.ok){$("status").textContent="bridge unreachable";return;}
+  devices=l.devices;
+  // v3189 -- SHOW THE MODE COUNT IN THE OPTION ITSELF. A device with ONE mode cannot tell you whether its
+  // error is the key's truncation or its own defect (v3174), and that was invisible here. A device that
+  // accepts a NONSENSE mode is marked separately -- a long list from an unguarded device is not richness.
+  $("dev").innerHTML=devices.map(d=>{
+    const n=(d.modes||[]).length;
+    const tag = d.modesEnforced===false ? " [modes UNGUARDED]" : (n?" ["+n+" mode"+(n===1?"":"s")+"]" : " [modes unknown]");
+    return `<option value="${d.name}">${d.name}${tag}</option>`;
+  }).join("");
+  window.__callers=l.callers||{};
+  showObs();
+}
+function showObs(){
+  const d=devices.find(x=>x.name===$("dev").value);
+  const warn=$("obs").dataset.warn, mnote=$("obs").dataset.modelNote;
+  $("obs").innerHTML=(d?("observables it can measure: "+d.observables.map(o=>`<span class="obs">${esc(o)}</span>`).join("")):"")
+    + (mnote?`<div class="dim" style="margin-top:6px">${esc(mnote)}</div>`:"")
+    + (warn?`<div class="fail" style="margin-top:6px">${esc(warn)}</div>`:"");
+}
+
+$("dev").onchange=showObs;
+async function loadModels(){
+  const mem=parseInt($("mem").value)||8, kind=$("memkind").value;
+  const m=await jget(`/device/models?memoryGB=${mem}&kind=${kind}`);
+  if(!m.ok){ $("model").innerHTML='<option value="">(bridge unreachable)</option>'; return; }
+  const fitTags=new Set((m.peer&&m.peer.canRun)||[]);
+  // Show EVERY catalogue model, but say plainly which fit this peer and which are already here. A picker that
+  // hides the too-big ones teaches nothing; one that lets you pick them wastes a run.
+  $("model").innerHTML=m.catalogue.map(e=>{
+    const fits=fitTags.has(e.tag);
+    const state=e.installed?"installed":(fits?"not installed":"too big for this peer");
+    return `<option value="${esc(e.tag)}" ${fits?"":"disabled"}>${esc(e.tag)} - ${e.params}B, ~${e.approxGB}GB - ${state}</option>`;
+  }).join("");
+  const best=m.peer&&m.peer.best;
+  if(best) $("model").value=best;
+  window.__catalogue=m.catalogue;
+  const note=(m.catalogue.find(e=>e.tag===$("model").value)||{}).jsonNote||"";
+  $("obs").dataset.modelNote=note+(m.unverified.length?`  (${m.unverified.length} catalogue tags unverified against this registry)`:"");
+  showObs();
+}
+$("mem").onchange=$("memkind").onchange=loadModels;
+$("model").onchange=()=>{
+  const e=(window.__catalogue||[]).find(x=>x.tag===$("model").value)||{};
+  $("obs").dataset.modelNote=e.jsonNote||""; showObs();
+};
+$("install").onclick=async()=>{
+  const tag=$("model").value; if(!tag) return;
+  $("install").disabled=true; $("status").textContent=" pulling "+tag+" (large models take minutes)...";
+  const r=await jget("/device/pull",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tag})});
+  $("status").textContent=r.ok?" pulled "+tag:" "+(r.message||r.error);
+  $("install").disabled=false; if(r.ok) loadModels();
+};
+$("caller").onchange=()=>{
+  const k=$("caller").value;
+  $("modelWrap").style.display=k==="ollama"?"":"none";
+  if(k==="ollama") loadModels();
+  const c=(window.__callers||{})[k];
+  $("obs").dataset.warn=(c && c.available===false)?c.note:"";
+  showObs();
+};
+
+$("go").onclick=async()=>{
+  $("go").disabled=true;$("rounds").innerHTML="";$("outcome").style.display="none";
+  $("status").textContent="starting...";
+  const body={device:$("dev").value,caller:$("caller").value,rounds:parseInt($("rounds").value)};
+  if(body.caller==="ollama")body.model=$("model").value;
+  const s=await jget("/device/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!s.ok){$("status").textContent="";$("outcome").style.display="block";
+    $("outcome").innerHTML=`<span class="fail">${esc(s.message||s.error)}</span>`;$("go").disabled=false;return;}
+  let shown=0,p;
+  for(let i=0;i<600;i++){
+    await new Promise(r=>setTimeout(r,400));
+    p=await jget("/device/progress?id="+encodeURIComponent(s.runId));
+    if(!p.ok)break;
+    while(shown<p.rounds.length){addRow(p.rounds[shown++]);}
+    $("status").textContent=`round ${p.rounds.length} - ${(p.elapsedMs/1000).toFixed(1)}s`;
+    if(p.done)break;
+  }
+  $("go").disabled=false;$("status").textContent="";
+  $("outcome").style.display="block";
+  if(p&&p.error){$("outcome").innerHTML=`<span class="fail">run failed: ${esc(p.error)}</span>`;return;}
+  const r=(p&&p.result)||{};
+  $("outcome").innerHTML=r.crystallized
+    ? `<div class="big pass">crystallised in ${r.rounds} round${r.rounds===1?"":"s"}</div>
+       <div class="dim">The claim held against the measured observable. The simulation decided this &mdash; the
+       loop exits only when the number agrees, so a model that talks itself into a conclusion still fails here.</div>`
+    : `<div class="big fail">did not crystallise</div>
+       <div class="dim">${esc(r.reason||"no verdict")} &mdash; that is a real outcome, not an error. The claims
+       proposed were refused by the measurement.</div>`;
+};
+load();
+</script>
+</body>
+</html>

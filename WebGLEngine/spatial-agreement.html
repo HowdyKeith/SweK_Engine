@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spatial agreement - five structures, one question</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:960px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}
+  .sub{color:#6f8a7c;margin-bottom:16px;max-width:82ch}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;margin-bottom:14px}
+  h2{font-size:14px;margin:0 0 6px;color:#9fe8c0}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22}
+  th{color:#6f8a7c;font-weight:normal}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:#7fe0a4}.hot{color:#f28b8b}.dim{color:#6f8a7c}.warn{color:#e6c877}
+  label{margin-right:14px}
+  input[type=range]{vertical-align:middle;width:150px}
+  code{color:#9fb8ab}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Spatial agreement</h1>
+  <div class="sub">This engine holds <b>five independent answers</b> to one question &mdash; which bodies are near
+    which. Each is gated against its own brute force, in isolation; none referenced another. They never met, and
+    the reason is not neglect: they answer <b>two different questions wearing similar names</b>.</div>
+
+  <div class="card">
+    <h2>Scene</h2>
+    <div>
+      <label>points <input id="n" type="range" min="40" max="500" step="20" value="200"> <span class="dim" id="nv"></span></label>
+      <label>radius <input id="r" type="range" min="0.3" max="3" step="0.1" value="1.2"> <span class="dim" id="rv"></span></label>
+      <span class="dim">seeded, so the answer is pinnable rather than a distribution</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>The point family &mdash; an L2 <i>sphere</i> test</h2>
+    <div class="dim">k-d tree, molecular-dynamics neighbour grid, SPH spatial grid. Same question, so these must
+      agree with brute force <b>exactly</b> &mdash; no superset slack.</div>
+    <table id="pf"></table>
+  </div>
+
+  <div class="card">
+    <h2>The box family &mdash; an L&infin; <i>box</i> test</h2>
+    <div class="dim">A uniform AABB grid and a balanced BVH, sharing no code. Give each point a box of half-extent
+      r/2 and overlap means Chebyshev &le; r.</div>
+    <table id="bf"></table>
+  </div>
+
+  <div class="card">
+    <h2>Across the families</h2>
+    <div class="dim">Since |d|<sub>2</sub> &le; r implies |d|<sub>&infin;</sub> &le; r, sphere pairs are a
+      <b>subset</b> of box pairs &mdash; exact geometry, no tolerance. And they must <b>not</b> be equal: if they
+      ever matched, one family would be computing the other's metric and every agreement above would be vacuous.
+      <b>Agreement is the failure mode here, not the success.</b></div>
+    <table id="xf"></table>
+  </div>
+</div>
+
+<script type="module">
+import { scene, compareAll, isSubset, sameSet, missing, extra } from "./physics/spatial/agreement.mjs";
+const $ = (id) => document.getElementById(id);
+
+function row(name, got, truth) {
+  const miss = missing(truth, got), ext = extra(truth, got);
+  const exact = miss.length === 0 && ext.length === 0;
+  return '<tr><td>' + name + '</td><td class="num">' + got.size + '</td><td class="num dim">' + truth.size +
+    '</td><td class="' + (exact ? 'ok' : 'hot') + '">' + (exact ? 'exact' : (miss.length ? miss.length + ' MISSED' : '') + (ext.length ? ' ' + ext.length + ' extra' : '')) + '</td></tr>';
+}
+
+function run() {
+  const n = +$("n").value, r = +$("r").value;
+  $("nv").textContent = n; $("rv").textContent = r.toFixed(1);
+  const c = compareAll(scene(n, { span: 10 }), r);
+
+  $("pf").innerHTML = '<tr><th>structure</th><th>pairs</th><th>brute force</th><th></th></tr>' +
+    row("k-d tree", c.kdtree, c.bruteSphere) + row("neighbour grid", c.neighborGrid, c.bruteSphere) +
+    row("SPH grid", c.sphGrid, c.bruteSphere);
+
+  $("bf").innerHTML = '<tr><th>structure</th><th>pairs</th><th>brute force</th><th></th></tr>' +
+    row("AABB grid", c.aabbGrid, c.bruteBox) + row("BVH tree", c.aabbTree, c.bruteBox) +
+    '<tr><td>grid vs tree</td><td colspan="2" class="dim">a uniform grid against a balanced BVH</td><td class="' +
+    (sameSet(c.aabbGrid, c.aabbTree) ? 'ok">identical' : 'hot">DIVERGE') + '</td></tr>';
+
+  const sub = isSubset(c.bruteSphere, c.bruteBox), strict = c.bruteBox.size > c.bruteSphere.size;
+  $("xf").innerHTML = '<tr><th>relation</th><th>value</th><th></th></tr>' +
+    '<tr><td>sphere &sube; box</td><td class="num">' + c.bruteSphere.size + ' within ' + c.bruteBox.size +
+      '</td><td class="' + (sub ? 'ok">holds' : 'hot">VIOLATED') + '</td></tr>' +
+    '<tr><td>strictly smaller</td><td class="num">' + (c.bruteBox.size - c.bruteSphere.size) +
+      ' pairs Chebyshev-near but Euclidean-far</td><td class="' + (strict ? 'ok">as it must be' : 'hot">EQUAL - one metric is wrong') + '</td></tr>';
+}
+
+for (const id of ["n", "r"]) $(id).addEventListener("input", run);
+run();
+</script>
+</body>
+</html>

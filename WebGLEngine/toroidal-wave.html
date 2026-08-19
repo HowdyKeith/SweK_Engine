@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toroidal Wave Buffer</title>
+<meta name="demo:desc" content="A TOROIDAL DEFORM BUFFER driving a real-time wave simulation on a curved surface (v3837). An N x N field is addressed with wraparound (modulo) indexing, so it has no edges -- a ripple leaving one side re-enters the other, the domain is periodic, and scrolling the read origin moves the whole field under the viewport with no buffer copy. Because a wrapped grid IS a torus topologically, the field maps onto a torus with no seam and the waves chase themselves around it. The 2D wave equation runs on the CPU here (leapfrog, wraparound 5-point Laplacian, CFL-safe); the GPU ping-pong-texture version is the optimisation. Drops splat with toroidal wrap; Scroll demonstrates the moving window; Reset stills the field. Answer-key gate: toroidalField-selfcheck (wraparound indexing, the cross-seam energy transfer, CFL stability, scroll==shift, seamless torus map).">
+<style>
+  html,body{margin:0;height:100%;background:#05070d;color:#cfe0ff;font:13px ui-monospace,monospace;overflow:hidden}
+  #hud{position:fixed;left:10px;top:10px;z-index:5;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  #hud button{background:#132338;color:#cfe0ff;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:3px 10px}
+  #hud .on{background:#1d3a2a;color:#9fe6c0}
+  #note{position:fixed;left:10px;bottom:8px;z-index:5;color:#6f86a8;font-size:11px;max-width:60ch}
+</style>
+</head>
+<body>
+<div id="hud">
+  <button id="dropBtn" title="Splat a Gaussian drop at a random cell (wraps toroidally)">&#128167; Drop</button>
+  <button id="scrollBtn" title="Scroll the read origin each frame -- the field drifts around the torus with no buffer copy">&#8635; Scroll</button>
+  <button id="resetBtn" title="Still the field">&#9632; Reset</button>
+  <span id="stat" style="color:#6f86a8"></span>
+</div>
+<div id="note">Wraparound N&times;N wave buffer on a torus &mdash; a ripple that leaves one edge re-enters the opposite one, so it circulates with no seam. Drag to orbit.</div>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { stepWave, splat, readScrolled, wrapIndex } from "/physics/toroidalField.js";
+
+const N = 64, R = 3.0, r = 1.15, AMP = 0.42;
+let prev = new Float64Array(N * N), cur = new Float64Array(N * N);
+let ox = 0, oy = 0, scrolling = false;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070d);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 5.5, 8.5);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0x9fd0ff, 0x0a1420, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(5, 8, 6); scene.add(key);
+
+// torus with (N+1)x(N+1) vertices; cell (i tubular, j radial) maps to field (i,j) with wrap on the +1 seam
+const geo = new THREE.TorusGeometry(R, r, N, N);
+const base = geo.attributes.position.array.slice();
+const nrm = geo.attributes.normal.array.slice();
+geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
+const mat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.1, roughness: 0.55, flatShading: false });
+const torus = new THREE.Mesh(geo, mat); scene.add(torus);
+
+const col = new THREE.Color();
+function heightColor(h) {
+  // troughs deep blue -> crests pale cyan/white
+  const t = Math.max(0, Math.min(1, 0.5 + h * 1.6));
+  col.setRGB(0.10 + 0.55 * t * t, 0.35 + 0.5 * t, 0.55 + 0.45 * t);
+  return col;
+}
+
+function displace() {
+  const pos = geo.attributes.position.array, cc = geo.attributes.color.array;
+  const tub = N + 1;
+  for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+    const vi = j * tub + i, o = vi * 3;
+    const h = readScrolled(cur, N, ox, oy, wrapIndex(i, N), wrapIndex(j, N));
+    pos[o]     = base[o]     + nrm[o]     * h * AMP;
+    pos[o + 1] = base[o + 1] + nrm[o + 1] * h * AMP;
+    pos[o + 2] = base[o + 2] + nrm[o + 2] * h * AMP;
+    const c = heightColor(h); cc[o] = c.r; cc[o + 1] = c.g; cc[o + 2] = c.b;
+  }
+  geo.attributes.position.needsUpdate = true;
+  geo.attributes.color.needsUpdate = true;
+}
+
+function drop(cx, cy) { splat(cur, N, cx ?? (Math.random() * N) | 0, cy ?? (Math.random() * N) | 0, 4, 1.0); }
+for (let k = 0; k < 3; k++) drop();   // start with a little life
+
+const stat = document.getElementById("stat");
+document.getElementById("dropBtn").onclick = () => drop();
+document.getElementById("scrollBtn").onclick = (e) => { scrolling = !scrolling; e.target.classList.toggle("on", scrolling); };
+document.getElementById("resetBtn").onclick = () => { prev = new Float64Array(N * N); cur = new Float64Array(N * N); ox = oy = 0; };
+
+let frame = 0;
+function tick() {
+  const next = stepWave(prev, cur, N, { c: 0.5, dt: 1, damping: 0.002 });
+  prev = cur; cur = next;
+  if (scrolling) { ox = wrapIndex(ox + 1, N); if ((frame & 1) === 0) oy = wrapIndex(oy + 1, N); }
+  if ((frame % 140) === 0) drop();     // an occasional drop so it never fully stills
+  displace();
+  controls.update();
+  renderer.render(scene, camera);
+  if ((frame & 15) === 0) stat.textContent = `${N}x${N} toroidal buffer  scroll(${ox},${oy})`;
+  frame++;
+  requestAnimationFrame(tick);
+}
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+tick();
+</script>
+</body>
+</html>

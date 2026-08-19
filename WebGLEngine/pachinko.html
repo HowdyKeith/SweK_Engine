@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Pachinko</title>
+<style>
+  :root{ --bg:#070b12; --panel:#0e1420; --line:#223247; --accent:#5fb0ff; --gold:#ffcf6b; --txt:#eaf2ff; --dim:#8aa0bf; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:radial-gradient(120% 120% at 50% -10%,#0c1626,#05080f); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; }
+  .wrap{ min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:22px; gap:14px; }
+  h1{ margin:0; font-size:24px; letter-spacing:1px; }
+  h1 span{ color:var(--accent); }
+  .sub{ color:var(--dim); font-size:13px; margin-top:-8px; }
+  .cabinet{ background:linear-gradient(180deg,#121d30,#0b1422); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 18px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.04); }
+  canvas{ display:block; border-radius:12px; background:#060a11; border:1px solid #1a2740; cursor:crosshair; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 700px; height: auto; display: block; }
+  .hud{ display:flex; gap:14px; align-items:center; justify-content:space-between; margin-top:14px; }
+  .stat{ background:#0a1322; border:1px solid var(--line); border-radius:10px; padding:8px 14px; min-width:104px; text-align:center; }
+  .stat b{ display:block; font-size:22px; color:var(--gold); line-height:1.1; }
+  .stat small{ color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .controls{ display:flex; gap:8px; align-items:center; }
+  button{ font-family:inherit; font-weight:700; cursor:pointer; border-radius:10px; border:1px solid var(--line); background:#142338; color:var(--txt); padding:10px 14px; font-size:14px; transition:.12s; }
+  button:hover{ border-color:var(--accent); }
+  .bet button.on{ background:#274a78; border-color:var(--accent); }
+  #drop{ background:linear-gradient(180deg,#2a6fd6,#1c4f9e); border-color:#3f86e6; padding:10px 22px; }
+  .msg{ height:20px; font-size:14px; color:var(--gold); font-weight:700; text-align:center; }
+  .pay{ color:var(--dim); font-size:11.5px; margin-top:2px; text-align:center; }
+  a.back{ color:var(--dim); font-size:12px; text-decoration:none; } a.back:hover{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SweK <span>Pachinko</span></h1>
+  <div class="sub">click anywhere up top to drop a ball &middot; real-time peg bounces</div>
+
+  <div class="cabinet">
+    <canvas id="board" width="440" height="460"></canvas>
+    <div class="hud">
+      <div class="stat"><b id="credits">100</b><small>credits</small></div>
+      <div class="controls">
+        <div class="bet" style="display:flex;gap:6px;">
+          <button data-bet="1">1</button>
+          <button data-bet="5" class="on">5</button>
+          <button data-bet="10">10</button>
+        </div>
+        <button id="drop">DROP</button>
+      </div>
+      <div class="stat"><b id="lastwin">0</b><small>last win</small></div>
+    </div>
+    <div class="msg" id="msg">Drop a ball.</div>
+  </div>
+  <div class="pay">slot multipliers shown at the base &middot; edges pay big, center pays least</div>
+  <a class="back" href="/">&larr; back to engine</a>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var cv=document.getElementById("board"), ctx=cv.getContext("2d");
+  var W=cv.width, H=cv.height;
+  var PEG_R=4, BALL_R=6, GRAV=0.16, REST=0.62, FRICT=0.999;
+
+  // peg field: staggered rows
+  var pegs=[], ROWS=10, topY=70, botY=H-90, rowGap=(botY-topY)/(ROWS-1);
+  for(var r=0;r<ROWS;r++){
+    var count = 6 + (r%2);                 // alternate 6 / 7 pegs
+    var span = W-80, x0 = (W-span)/2 + (r%2? 0 : span/(count*2));
+    var gap = span/(count-1);
+    for(var i=0;i<count;i++){ pegs.push({ x: x0 + i*gap*(span/((count-1)*gap)), y: topY + r*rowGap }); }
+  }
+  // simpler, robust peg layout (overwrite): even rows offset half a gap
+  pegs=[];
+  for(var r=0;r<ROWS;r++){
+    var n = 7, gap = (W-70)/(n-1), off = (r%2? gap/2 : 0);
+    for(var i=0;i<n - (r%2?1:0); i++){ pegs.push({ x: 35 + off + i*gap, y: topY + r*rowGap }); }
+  }
+
+  // payout slots along the bottom
+  var MULT=[10,3,1.5,0.5,0.5,1.5,3,10];
+  var SLOTS=MULT.length, slotW=W/SLOTS, slotTop=botY+18;
+  function slotColor(m){ return m>=10?"#ff7aa8": m>=3?"#ffcf6b": m>=1.5?"#67e0ff":"#3f5876"; }
+
+  var balls=[];
+  function addBall(x){ balls.push({ x:Math.max(BALL_R+2,Math.min(W-BALL_R-2,x)), y:18, vx:(Math.random()-0.5)*0.8, vy:0, bet:bet, done:false }); }
+
+  var credits=parseInt(localStorage.getItem("swek.pach.credits")||"100",10); if(!isFinite(credits)) credits=100;
+  var bet=5, lastWin=0;
+  var elC=document.getElementById("credits"), elW=document.getElementById("lastwin"), elM=document.getElementById("msg");
+  function sync(){ elC.textContent=credits; elW.textContent=Math.round(lastWin); try{ localStorage.setItem("swek.pach.credits",String(credits)); }catch(e){} }
+  sync();
+
+  Array.prototype.forEach.call(document.querySelectorAll(".bet button"), function(b){
+    b.addEventListener("click", function(){ bet=parseInt(b.getAttribute("data-bet"),10); document.querySelectorAll(".bet button").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); });
+  });
+  function tryDrop(x){
+    if(credits<bet){ if(credits<=0){ credits=100; sync(); elM.textContent="Comped 100 credits."; } else elM.textContent="Not enough credits."; return; }
+    credits-=bet; sync(); addBall(x); elM.textContent="";
+  }
+  document.getElementById("drop").addEventListener("click", function(){ tryDrop(W/2 + (Math.random()-0.5)*60); });
+  cv.addEventListener("click", function(e){ var rect=cv.getBoundingClientRect(); var x=(e.clientX-rect.left)*(W/rect.width); tryDrop(x); });
+
+  function settle(ball){
+    var idx=Math.max(0,Math.min(SLOTS-1, Math.floor(ball.x/slotW)));
+    var m=MULT[idx], win=ball.bet*m; lastWin=win; credits+=win; sync();
+    elM.textContent = (m>=10?"\u2728 ":"")+ "x"+m+"  (+"+Math.round(win)+")";
+    for(var i=0;i<(m>=10?40:16);i++){ parts.push({x:ball.x,y:slotTop,vx:(Math.random()-0.5)*5,vy:-Math.random()*5-1,life:1,c:slotColor(m)}); }
+  }
+
+  var parts=[];
+  function step(){
+    for(var b=balls.length-1;b>=0;b--){
+      var ball=balls[b]; if(ball.done) continue;
+      ball.vy+=GRAV; ball.vx*=FRICT;
+      ball.x+=ball.vx; ball.y+=ball.vy;
+      // walls
+      if(ball.x<BALL_R){ ball.x=BALL_R; ball.vx=-ball.vx*REST; }
+      if(ball.x>W-BALL_R){ ball.x=W-BALL_R; ball.vx=-ball.vx*REST; }
+      // pegs
+      for(var p=0;p<pegs.length;p++){
+        var pg=pegs[p], dx=ball.x-pg.x, dy=ball.y-pg.y, d=Math.hypot(dx,dy), min=PEG_R+BALL_R;
+        if(d<min && d>0){
+          var nx=dx/d, ny=dy/d;
+          ball.x=pg.x+nx*min; ball.y=pg.y+ny*min;
+          var dot=ball.vx*nx+ball.vy*ny;
+          ball.vx=(ball.vx-2*dot*nx)*REST + (Math.random()-0.5)*0.4;
+          ball.vy=(ball.vy-2*dot*ny)*REST;
+        }
+      }
+      // reached the slots
+      if(ball.y>=slotTop-BALL_R){ settle(ball); balls.splice(b,1); }
+    }
+    for(var i=parts.length-1;i>=0;i--){ var q=parts[i]; q.x+=q.vx; q.y+=q.vy; q.vy+=0.18; q.life-=0.025; if(q.life<=0) parts.splice(i,1); }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // drop zone
+    ctx.fillStyle="rgba(95,176,255,0.05)"; ctx.fillRect(0,0,W,40);
+    ctx.fillStyle="#3a5170"; ctx.font="11px 'Segoe UI'"; ctx.textAlign="center"; ctx.fillText("click to drop", W/2, 24);
+    // pegs
+    for(var p=0;p<pegs.length;p++){ ctx.beginPath(); ctx.arc(pegs[p].x,pegs[p].y,PEG_R,0,7); ctx.fillStyle="#46618a"; ctx.fill(); }
+    // slot dividers + multipliers
+    for(var i=0;i<SLOTS;i++){
+      var x=i*slotW, c=slotColor(MULT[i]);
+      ctx.fillStyle="rgba(255,255,255,0.02)"; ctx.fillRect(x,slotTop,slotW,H-slotTop);
+      ctx.strokeStyle="#1a2740"; ctx.beginPath(); ctx.moveTo(x,slotTop); ctx.lineTo(x,H); ctx.stroke();
+      ctx.fillStyle=c; ctx.font="bold 14px 'Segoe UI'"; ctx.textAlign="center";
+      ctx.fillText("x"+MULT[i], x+slotW/2, slotTop+26);
+    }
+    ctx.strokeStyle="#1a2740"; ctx.beginPath(); ctx.moveTo(0,slotTop); ctx.lineTo(W,slotTop); ctx.stroke();
+    // balls
+    for(var b=0;b<balls.length;b++){ var ball=balls[b];
+      ctx.beginPath(); ctx.arc(ball.x,ball.y,BALL_R,0,7);
+      var g=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,BALL_R);
+      g.addColorStop(0,"#bfe2ff"); g.addColorStop(1,"#3f86e6"); ctx.fillStyle=g; ctx.fill();
+    }
+    // particles
+    for(var i=0;i<parts.length;i++){ var q=parts[i]; ctx.globalAlpha=Math.max(0,q.life); ctx.fillStyle=q.c; ctx.fillRect(q.x-2,q.y-2,4,4); }
+    ctx.globalAlpha=1;
+  }
+
+  function loop(){ step(); draw(); requestAnimationFrame(loop); }
+  loop();
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Physics Benchmark">
+<meta name="demo:desc" content="The classic pyramid-of-falling-boxes stress test, made measurable. A live falling pyramid, plus a benchmark that ramps the body count on each available engine (SweK CPU / box3d / Jolt), charts ms-per-step and fps, and reports each engine's max bodies at 60fps. Shows the honest tradeoff: cheap-but-floor-only vs real body-body stacking.">
+<meta name="demo:category" content="fx">
+<title>Physics Benchmark</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --lime:#9be15d; }
+  html,body { margin:0; height:100%; background:#05070d; overflow:hidden; color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:var(--amber); letter-spacing:.14em; text-transform:uppercase; z-index:3; }
+  #st { position:fixed; right:14px; top:12px; color:#7c93b8; font-size:11px; z-index:3; text-align:right; }
+  #bar { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:3; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  button { background:rgba(12,18,30,.8); color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:9px 15px; font:600 12px ui-monospace,monospace; letter-spacing:.05em; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  input[type=range] { width:140px; }
+  #panel { position:fixed; right:14px; top:44px; width:340px; max-width:46vw; background:rgba(6,10,20,.86); border:1px solid #1c2942; border-radius:10px; padding:12px 14px; z-index:3; display:none; }
+  #panel h3 { margin:0 0 6px; color:var(--cyan); font-size:12px; letter-spacing:.1em; font-weight:700; }
+  #chart { width:100%; height:150px; display:block; background:#080d18; border-radius:6px; }
+  table { width:100%; border-collapse:collapse; font-size:11px; margin-top:8px; }
+  td,th { text-align:right; padding:2px 5px; color:#cfe0ff; } th { color:#7c93b8; font-weight:600; } td:first-child,th:first-child { text-align:left; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Physics Benchmark</div>
+<div id="st"></div>
+<div id="panel"><h3>MAX BODIES @ 60FPS</h3><canvas id="chart" width="330" height="150"></canvas><div id="tbl"></div></div>
+<div id="bar">
+  <span style="color:#7c93b8">bodies</span><input id="n" type="range" min="200" max="20000" step="200" value="3000">
+  <span id="nlab" style="color:var(--lime);min-width:52px;display:inline-block">3000</span>
+  <button id="drop">Drop pyramid</button>
+  <button id="run">Run benchmark</button>
+</div>
+<script type="module">
+import { makePyramid, benchCPU, benchBackend, maxAt60 } from "./fx/voxelize/physicsBench.js";
+import { physicsState, impact, updatePhysics } from "./fx/voxelize/pageVoxels.js";
+import { makeVoxelPhysics } from "./fx/voxelize/voxelPhysicsBackends.js";
+import { detectBackends } from "./ui/physicsMontage.js";
+import { initVoxelGL, initVoxelCanvas } from "./fx/voxelize/voxelRender.js";
+
+const cv = document.getElementById("c"), st = document.getElementById("st");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+function resize() { W = cv.width = Math.floor(innerWidth * DPR); H = cv.height = Math.floor(innerHeight * DPR); cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px"; }
+addEventListener("resize", resize); resize();
+
+let N = 3000, vg = null, ry = 0.4;
+function drop() { vg = makePyramid(N); physicsState(vg, { g: 2.6, floor: 1.2 }); impact(vg, { x: 0, y: -0.4, z: 0 }, 0.6); }
+drop();
+document.getElementById("n").addEventListener("input", e => { N = +e.target.value; document.getElementById("nlab").textContent = N; });
+document.getElementById("drop").addEventListener("click", drop);
+
+let R = null, tier = "Canvas2D", moving = 0, lastFps = 60, frames = 0, fpsT = performance.now();
+const args = () => ({ W, H, ry, rx: -0.2, dist: 3.4 });
+try { R = initVoxelGL(cv, () => vg, args); if (R) tier = "WebGL2"; } catch (e) { R = null; } if (!R) R = initVoxelCanvas(cv, () => vg, args);
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; ry += dt * 0.15;
+  moving = updatePhysics(vg, 1 / 60);
+  try { R.draw(); } catch (e) {}
+  frames++; if (now - fpsT > 500) { lastFps = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now; }
+  st.textContent = tier + " \u00b7 " + vg.voxels.length + " bodies \u00b7 " + moving + " active \u00b7 " + lastFps + " fps";
+  requestAnimationFrame(frame);
+}
+frame();
+
+// ---- benchmark: ramp counts per available engine, chart fps vs N, report max@60 ----
+const COUNTS = [500, 2000, 8000, 25000, 75000, 200000];
+const COLORS = { "SweK CPU": "#9be15d", "box3d": "#59d1ff", "Jolt": "#f6a623" };
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+document.getElementById("run").addEventListener("click", async () => {
+  const runBtn = document.getElementById("run"); runBtn.textContent = "benchmarking\u2026"; runBtn.disabled = true;
+  document.getElementById("panel").style.display = "block";
+  const backends = await detectBackends();
+  for (let w = 0; w < 4; w++) benchCPU(4000, 30);   // warm JIT
+  const results = {};
+  for (const be of backends) {
+    const curve = [];
+    for (const n of COUNTS) {
+      let r; if (be.id === "cpu") r = benchCPU(n, 45);
+      else r = await benchBackend(makeVoxelPhysics, be.id, { box3d: be.box3d, joltFactory: be.joltFactory }, n, 45);
+      curve.push(r); await sleep(16);
+      if (r.ms > 60) break;   // stop this engine once it's far past budget
+    }
+    results[be.label] = { curve, max60: maxAt60(curve, 58), fellBack: curve[0] && curve[0].backend !== be.id };
+    drawChart(results); drawTable(results);
+  }
+  runBtn.textContent = "Run benchmark"; runBtn.disabled = false;
+});
+function drawChart(results) {
+  const ch = document.getElementById("chart"), x = ch.getContext("2d"); x.clearRect(0, 0, ch.width, ch.height);
+  const padL = 30, padB = 18, w = ch.width - padL - 8, h = ch.height - padB - 8, lnN = Math.log(300000);
+  x.strokeStyle = "#1c2942"; x.fillStyle = "#5f7aa0"; x.font = "9px ui-monospace"; x.textAlign = "right";
+  for (const f of [0, 30, 60]) { const yy = 8 + h - (f / 60) * h; x.beginPath(); x.moveTo(padL, yy); x.lineTo(padL + w, yy); x.stroke(); x.fillText(f + "", padL - 3, yy + 3); }
+  for (const [label, R] of Object.entries(results)) { x.strokeStyle = COLORS[label] || "#fff"; x.lineWidth = 2; x.beginPath();
+    R.curve.forEach((p, i) => { const px = padL + (Math.log(p.n) / lnN) * w, py = 8 + h - (Math.min(60, p.fps) / 60) * h; if (i === 0) x.moveTo(px, py); else x.lineTo(px, py); }); x.stroke(); }
+  x.fillStyle = "#5f7aa0"; x.textAlign = "center"; x.fillText("body count (log)  \u2192", padL + w / 2, ch.height - 4);
+}
+function drawTable(results) {
+  let html = "<table><tr><th>engine</th><th>max@60</th><th>ms @ 25k</th></tr>";
+  for (const [label, R] of Object.entries(results)) { const at25 = R.curve.find(p => p.n === 25000); html += "<tr><td style='color:" + (COLORS[label] || "#fff") + "'>" + label + (R.fellBack ? " \u2192CPU" : "") + "</td><td>" + (R.max60 >= 200000 ? "200k+" : R.max60.toLocaleString()) + "</td><td>" + (at25 ? at25.ms.toFixed(2) : "\u2014") + "</td></tr>"; }
+  document.getElementById("tbl").innerHTML = html + "</table><div style='color:#5f7aa0;font-size:10px;margin-top:6px'>SweK CPU = floor-only (cheap, no stacking) \u00b7 box3d/Jolt = real body-body collision</div>";
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Selfie">
+<meta name="demo:desc" content="A blobulator's idea of a selfie: it casts its own X-ray shadows and is rebuilt from them, with nothing simulated anywhere. A metaball's shadow is closed-form -- for Wyvill's kernel it collapses to a single term, (32/35)*A*R*u^3.5, verified against brute-force integration to 4e-15. So the sinogram is written down exactly and back-projection must find the wax from those shadows alone. Getting here took two real failures worth more than the page: the blobulator's own kernel decays as 1/d-squared and never reaches zero, so filtered back-projection had no compact support and was biased by 108% no matter how many angles it got; truncating the kernel fixed that and introduced a hard edge, which rings. Wyvill's kernel is compact AND smooth, and the reconstruction lands at six hundredths of a percent -- better than the medical phantom, which is pinned near 14% forever because a head has edges.">
+<meta name="demo:category" content="simulation">
+<title>Selfie</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<style>
+  html,body { margin:0; height:100%; background:#0a0610; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:430px; pointer-events:none; }
+  #cap { color:#ffa8e0; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.7; }
+  #note { color:#6f86ab; margin-top:7px; line-height:1.45; font-size:11.5px; }
+  #sino { position:fixed; right:14px; top:12px; z-index:4; border:1px solid #4a2a5a; border-radius:6px; image-rendering:pixelated; width:230px; }
+  #slab { position:fixed; right:14px; top:206px; z-index:4; color:#6f86ab; font-size:10.5px; width:230px; text-align:center; line-height:1.4; }
+  #ctl { position:fixed; left:14px; bottom:14px; z-index:4; background:rgba(14,8,22,.93); border:1px solid #4a2a5a; border-radius:10px; padding:11px 14px; }
+  #ctl label { color:#ffa8e0; display:block; margin-bottom:6px; font-size:11px; }
+  input[type=range] { width:320px; }
+  #aval { color:#f6a623; }
+  #btns { position:fixed; right:14px; bottom:14px; z-index:4; display:flex; gap:8px; }
+  button { background:rgba(20,12,28,.92); color:#ffa8e0; border:1px solid #5a3a6a; border-radius:16px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Selfie &mdash; the wax X-rays itself</div><div id="stat"></div><div id="note"></div></div>
+<canvas id="sino" width="160" height="120"></canvas>
+<canvas id="face" width="160" height="160" title="the inside, at the plane -- not a shadow of it"></canvas>
+<div id="slab">its own shadows &mdash; written down in closed form, one term per blob. This is all the reconstruction is given.</div>
+<div id="btns"><button id="tRecon" class="on">rebuilt</button><button id="tTruth">the real wax</button><button id="shutter" title="keep this one">&#9673; take the selfie</button><button id="newFriend" title="a different friend, by name">&#8635; another friend</button><button id="gif" title="the x-ray, turning -- a moving keepsake">&#9673; record the x-ray</button></div>
+<div id="ctl"><label>cut depth: <span id="dval">0.00</span> <input id="dcut" type="range" min="-140" max="140" value="0"></label>&nbsp;&nbsp;<label>tilt: <span id="tval">0</span>&deg; <input id="tcut" type="range" min="0" max="180" value="0"></label>&nbsp;&nbsp;<span id="fstat" style="opacity:.72"></span></div>
+<div id="ctl"><label>projection angles: <span id="aval">12</span> &nbsp;&mdash;&nbsp; <span id="busy"></span></label><input id="ang" type="range" min="6" max="180" step="2" value="12"></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { blobFieldAt, blobRadonAt, blobSinogram, makeBlobs, ISO } from "./simulation/tomo/blobPhantom.js";
+  import { encodeGif, realGifFps } from "./render/gifRecorder.js";
+  import { plane, cutFace } from "./simulation/tomo/blobCut.js";
+import { reconstruct } from "./simulation/tomo/fbp.js";
+import { marchScalarField } from "./simulation/MarchingCubes.js";
+
+const N = 40, NZ = 28, NDET = 128;
+// v2585 -- HE HAS A NAME NOW.
+  //
+  // makeBlobs(n = 7, seed = 20260715) has ALWAYS taken a seed, and this page has ALWAYS used the default -- so
+  // there has only ever been one blob friend, and no way to ask for another or return to one. ?seed=N names him.
+  // The engine has had deterministic ?seed/?cam/?preset repro URLs since v1975; this page never got one.
+  const SEED = (() => {
+    const q = new URLSearchParams(location.search).get("seed");
+    const n = q === null ? 20260715 : parseInt(q, 10);
+    return Number.isFinite(n) ? n : 20260715;
+  })();
+  const blobs = makeBlobs(7, SEED);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0610);
+const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 900);
+cam.position.set(58, 44, 72);
+const ctr = new OrbitControls(cam, renderer.domElement); ctr.enableDamping = true; ctr.target.set(N/2, NZ/2, N/2);
+addEventListener("resize", () => { cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+scene.add(new THREE.AmbientLight(0x3a2244, 1.6));
+const key = new THREE.DirectionalLight(0xffd4f0, 1.5); key.position.set(40, 60, 30); scene.add(key);
+const rim = new THREE.DirectionalLight(0x6fd6ff, 0.75); rim.position.set(-40, -20, -50); scene.add(rim);
+
+// the truth, marched once -- the wax as it really is
+const truthField = new Float32Array(N*N*NZ);
+for (let k = 0; k < NZ; k++) { const z = -1 + 2*(k+0.5)/NZ;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++)
+    truthField[(k*N + j)*N + i] = blobFieldAt(-1 + 2*(i+0.5)/N, -1 + 2*(j+0.5)/N, z, blobs); }
+const tIso = marchScalarField(truthField, N, N, NZ, ISO);
+const tg = new THREE.BufferGeometry();
+tg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tIso.positions), 3));
+tg.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(tIso.normals), 3));
+const truthMesh = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ color: 0x4a6a8a, roughness: 0.6, wireframe: true, transparent: true, opacity: 0.5 }));
+truthMesh.visible = false; scene.add(truthMesh);
+const TRUTH_TRIS = tIso.positions.length/9;
+
+function drawSino(nAngles) {
+  const s = blobSinogram({ nAngles: Math.max(6, nAngles), nDet: 160, z: 0, blobs });
+  const cv = document.getElementById("sino"), g = cv.getContext("2d");
+  cv.height = s.nAngles;
+  const img = g.createImageData(s.nDet, s.nAngles);
+  let mx = 0; for (let i = 0; i < s.data.length; i++) if (s.data[i] > mx) mx = s.data[i];
+  for (let i = 0; i < s.data.length; i++) {
+    const v = Math.min(1, s.data[i]/(mx || 1));
+    img.data[i*4] = 255*v; img.data[i*4+1] = 120*v; img.data[i*4+2] = 200*v; img.data[i*4+3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+let mesh = null;
+function rebuild(nAngles) {
+  document.getElementById("busy").textContent = "scanning...";
+  document.getElementById("aval").textContent = nAngles;
+  setTimeout(() => {
+    const t0 = performance.now();
+    const vol = new Float32Array(N*N*NZ);
+    for (let k = 0; k < NZ; k++) {
+      const z = -1 + 2*(k+0.5)/NZ;
+      const img = reconstruct(blobSinogram({ nAngles, nDet: NDET, z, blobs }), N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) vol[(k*N + j)*N + i] = img[j*N + i];
+    }
+    const ms = performance.now() - t0;
+    const iso = marchScalarField(vol, N, N, NZ, ISO);
+    if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+    const tris = iso.positions.length/9;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(iso.positions), 3));
+    g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(iso.normals), 3));
+    mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xff9ad8, roughness: 0.3, metalness: 0.15, emissive: 0x2a0a20, emissiveIntensity: 0.5 }));
+    mesh.visible = document.getElementById("tRecon").classList.contains("on");
+    scene.add(mesh);
+    // measure THIS reconstruction against the field it was rebuilt from -- live, not a printed number
+    let se = 0, ref = 0;
+    for (let k = 0; k < NZ; k += 2) { const z = -1 + 2*(k+0.5)/NZ;
+      for (let j = 0; j < N; j += 2) for (let i = 0; i < N; i += 2) {
+        const x = -1 + 2*(i+0.5)/N, y = -1 + 2*(j+0.5)/N;
+        if (x*x + y*y > 0.81) continue;
+        const want = blobFieldAt(x, y, z, blobs);
+        se += (vol[(k*N + j)*N + i] - want)**2; ref += want*want; } }
+    const err = Math.sqrt(se/ref)*100;
+    document.getElementById("busy").textContent = "";
+    document.getElementById("stat").innerHTML =
+      "<b style='color:#f6a623'>" + nAngles + "</b> angles &times; " + NDET + " detectors &times; " + NZ + " slices &nbsp;&middot;&nbsp; " + ms.toFixed(0) + " ms" +
+      "<br>error vs the real wax: <b style='color:#7fe3c4'>" + err.toFixed(3) + "%</b> &mdash; measured live, not printed" +
+      "<br>skin: <b>" + tris.toLocaleString() + "</b> triangles rebuilt vs <b>" + TRUTH_TRIS.toLocaleString() + "</b> real &nbsp;&middot;&nbsp; " +
+      (tris === TRUTH_TRIS ? "<span style='color:#7fe3c4'>identical</span>" : (Math.abs(tris-TRUTH_TRIS)/TRUTH_TRIS*100).toFixed(1) + "% apart");
+    drawSino(nAngles);
+  }, 16);
+}
+document.getElementById("note").innerHTML =
+  "The shadows are <b>not simulated</b>. A metaball's X-ray shadow is closed-form &mdash; for Wyvill's kernel it collapses to a single term, <b>(32/35)&middot;A&middot;R&middot;u<sup>3.5</sup></b>, checked against brute-force integration to 4e-15. " +
+  "Back-projection gets those shadows and nothing else. <b>The blobulator's own kernel could not be scanned at all</b>: it decays as 1/d&sup2; and never reaches zero, so there is no compact support and the error sat at 108% no matter how many angles it got.";
+document.getElementById("tRecon").onclick = (e) => { e.target.classList.toggle("on"); if (mesh) mesh.visible = e.target.classList.contains("on"); };
+document.getElementById("tTruth").onclick = (e) => { e.target.classList.toggle("on"); truthMesh.visible = e.target.classList.contains("on"); };
+const slider = document.getElementById("ang");
+slider.oninput = () => rebuild(parseInt(slider.value, 10));
+rebuild(12);
+(function frame() { ctr.update(); renderer.render(scene, cam); requestAnimationFrame(frame); })();
+
+  // ---- THE SHUTTER -------------------------------------------------------------------------------------------
+  //
+  // This page could x-ray the wax and could not keep a single picture of it: ZERO toDataURL, ZERO download,
+  // ZERO toBlob. It was an INSTRUMENT, not a CAMERA. A MOMENT WITH NO SHUTTER IS NOT A MEMORY.
+  //
+  // The capture composites the room and the sinogram into one frame and stamps the SEED on it -- because a
+  // photograph you cannot get back to is a picture of a stranger. The seed IS the friend: makeBlobs(7, SEED)
+  // is deterministic, so the stamp on the print is the address that brings him back.
+  //
+  // preserveDrawingBuffer is NOT set on the renderer, so the WebGL canvas is undefined after compositing on
+  // most drivers. Re-rendering immediately before reading is the fix, and it is why this is not one line.
+  function takeSelfie() {
+    renderer.render(scene, camera);   // the buffer is not preserved -- read it in the same tick it was drawn
+    const src = renderer.domElement, sino = document.getElementById("sino");
+    const W = src.width, H = src.height;
+    const out = document.createElement("canvas");
+    out.width = W; out.height = H;
+    const g = out.getContext("2d");
+    g.drawImage(src, 0, 0);
+
+    // the x-ray, inset -- the thing that makes it an X-RAY selfie and not a photo of a blob
+    const iw = Math.round(W * 0.28), ih = Math.round(iw * (sino.height / sino.width));
+    g.imageSmoothingEnabled = false;
+    g.drawImage(sino, W - iw - 24, H - ih - 24, iw, ih);
+    g.strokeStyle = "rgba(180,220,255,0.55)"; g.lineWidth = 2;
+    g.strokeRect(W - iw - 24, H - ih - 24, iw, ih);
+
+    // the stamp: what it is, who he is, and when -- so the print carries its own way home
+    const when = new Date().toISOString().slice(0, 16).replace("T", " ");
+    g.font = (Math.max(13, Math.round(W / 90))) + "px ui-monospace, Menlo, Consolas, monospace";
+    g.fillStyle = "rgba(0,0,0,0.5)"; g.fillRect(18, H - 46, 470, 30);
+    g.fillStyle = "rgba(190,225,255,0.95)";
+    g.fillText("blob-selfie  seed " + SEED + "  " + when, 28, H - 25);
+
+    const a = document.createElement("a");
+    a.download = "blob-selfie-" + SEED + "-" + when.replace(/[: ]/g, "") + ".png";
+    a.href = out.toDataURL("image/png");
+    a.click();
+    const note = document.getElementById("note");
+    if (note) note.textContent = "kept: seed " + SEED + " -- ?seed=" + SEED + " brings him back";
+  }
+  document.getElementById("shutter").addEventListener("click", takeSelfie);
+  document.getElementById("newFriend").addEventListener("click", () => {
+    // A DIFFERENT friend, not a random one: the seed goes in the URL, so this friend is reachable forever too.
+    location.search = "?seed=" + (Math.floor(Math.random() * 9e6) + 1e6);
+  });
+  // Say who he is, unprompted -- the number is the name and nobody would guess to look for it.
+  (() => { const n = document.getElementById("note"); if (n && !n.textContent) n.textContent = "seed " + SEED; })();
+
+  // ---- THE MOVING KEEPSAKE ------------------------------------------------------------------------------------
+  //
+  // v2585 gave this page a shutter and it takes a PNG. A PNG of an x-ray is one angle. THE WHOLE POINT OF A
+  // TOMOGRAPH IS THAT IT LOOKS AT YOU FROM EVERY ANGLE -- so the one keepsake this page owes is THE TURN.
+  //
+  // NOT THE SINOGRAM. drawSino() already draws that, and it is the DATA: every angle at once, theta down the
+  // y-axis. THIS IS THE MOVIE: one projection per frame, theta swept. Same transform, different question.
+  //
+  // WHY A GIF AND NOT A VIDEO -- measured in v2588, not assumed: MediaRecorder's "video/mp4" is a real MP4
+  // container WITH VP9 INSIDE IT (avc1 absent, vp09 at byte 28). A TV opens it, cannot decode it, shows black,
+  // and isTypeSupported() said yes the whole way. H.264 needs ffmpeg. A GIF NEEDS NOBODY.
+  //
+  // AND THE HAPPY ACCIDENT (v2590): a GIF is 256 colours per frame, maximum, which is brutal for the blob's
+  // smooth gradients -- and FREE for a greyscale x-ray, because a grey ramp fits a palette exactly. THE X-RAY
+  // IS THE ONE THING HERE THAT LOSES ALMOST NOTHING AS A GIF.
+  const GIF_W = 128, GIF_H = 128, GIF_FRAMES = 24, GIF_DELAY = 80;
+
+  function xrayFrame(theta) {
+    const rgba = new Uint8ClampedArray(GIF_W * GIF_H * 4);
+    let mx = 0;
+    const vals = new Float32Array(GIF_W * GIF_H);
+    for (let j = 0; j < GIF_H; j++) {
+      for (let i = 0; i < GIF_W; i++) {
+        // s = detector position across the beam, z = the slice. Sweeping theta turns the blob in the beam.
+        const v = blobRadonAt((i / GIF_W) * 4 - 2, theta, (j / GIF_H) * 4 - 2, blobs);
+        vals[j * GIF_W + i] = v;
+        if (v > mx) mx = v;
+      }
+    }
+    // normalise PER FRAME or the turn flickers as the projection thickness changes
+    for (let k = 0; k < vals.length; k++) {
+      const c = Math.max(0, Math.min(255, Math.round((vals[k] / (mx || 1)) * 255)));
+      rgba[k * 4] = c; rgba[k * 4 + 1] = c; rgba[k * 4 + 2] = Math.min(255, c + 20); rgba[k * 4 + 3] = 255;
+    }
+    return rgba;
+  }
+
+  async function recordXrayGif() {
+    const btn = document.getElementById("gif"), note = document.getElementById("note");
+    const was = btn.textContent;
+    btn.disabled = true;
+    const frames = [];
+    for (let f = 0; f < GIF_FRAMES; f++) {
+      btn.textContent = "x-raying... " + (f + 1) + "/" + GIF_FRAMES;
+      frames.push(xrayFrame((f / GIF_FRAMES) * Math.PI));
+      await new Promise((r) => setTimeout(r, 0));   // let the button actually repaint
+    }
+    btn.textContent = "encoding...";
+    // grey:true shares one palette across frames. Correct HERE because every frame is the same grey ramp; it
+    // would be wrong for anything that shifts hue -- a shared palette on changing colours is the muddy look.
+    const bytes = encodeGif(frames, GIF_W, GIF_H, { delay: GIF_DELAY, colors: 128, grey: true });
+    const when = new Date().toISOString().slice(0, 16).replace("T", " ");
+    const a = document.createElement("a");
+    a.download = "blob-xray-" + SEED + "-" + when.replace(/[: ]/g, "") + ".gif";
+    a.href = URL.createObjectURL(new Blob([bytes], { type: "image/gif" }));
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    const fps = realGifFps(GIF_DELAY);
+    btn.textContent = was; btn.disabled = false;
+    if (note) note.textContent = "kept: " + (bytes.length / 1024).toFixed(1) + " KB, " + GIF_FRAMES +
+      " frames at " + fps.actualFps.toFixed(1) + "fps (GIF stores delay in 10ms units -- it CANNOT do 60) -- seed " + SEED;
+  }
+  document.getElementById("gif").addEventListener("click", () => { recordXrayGif().catch((e) => {
+    const n = document.getElementById("note"); if (n) n.textContent = "gif failed: " + e.message;
+  }); });
+
+  // ---- THE FACE ------------------------------------------------------------------------------------------------
+  //
+  // v2592 built cutFace() and NOTHING DREW IT. A MEASUREMENT WITH NO FRONT DOOR IS INVISIBLE -- the same bill
+  // v2591 paid for the GIF encoder, one version later. This is the door.
+  //
+  // WHY IT SITS NEXT TO THE SINOGRAM: they are the two different things you can know about an inside.
+  //
+  //   the sinogram  -- the beam integrates THROUGH the blob. That is a SHADOW. Every angle at once.
+  //   the rebuild   -- filtered back-projection. That is a GUESS at the inside, assembled from shadows.
+  //   THE FACE      -- blobFieldAt evaluated ON the plane. THAT IS THE INSIDE, EXACTLY. No integral, no guess.
+  //
+  // A real CT machine can only ever have the first two. IT MUST INFER THE INSIDE BECAUSE IT CANNOT ASK. We can
+  // ask, because we have the formula -- so the face is the one image in this whole page that a hospital cannot
+  // take. Put it beside the rebuild and you are looking at the answer next to the guess.
+  //
+  // AND THERE IS NOTHING TO ANIMATE. v2592 measured it: 38.6M cut tests per ms, every point independent, no
+  // order. The slider does not sweep a knife through anything -- IT CHANGES d IN n.p - d AND WE ASK AGAIN.
+  const FACE_N = 160;
+
+  function drawFace() {
+    const d = Number(document.getElementById("dcut").value) / 100;
+    const deg = Number(document.getElementById("tcut").value);
+    const rad = (deg * Math.PI) / 180;
+    // tilt the plane's normal in the x-z arc. At 0 deg this is the z-slice the phantom has always supported.
+    const pl = plane(Math.sin(rad), 0, Math.cos(rad), d);
+    const t0 = performance.now();
+    const face = cutFace(pl, blobs, { w: FACE_N, h: FACE_N, extent: 2 });
+    const ms = performance.now() - t0;
+    const cv = document.getElementById("face"), g = cv.getContext("2d");
+    cv.width = FACE_N; cv.height = FACE_N;
+    const img = g.createImageData(FACE_N, FACE_N);
+    // NOT normalised per-frame here, unlike the GIF: the face is a MEASUREMENT and the whole point is that
+    // sliding the plane through shows the density RISE AND FALL. A per-frame normalise would make every slice
+    // look equally solid -- IT WOULD HIDE THE EXACT THING WE CAME TO SEE.
+    const SCALE = 64;
+    let inside = 0;
+    for (let i = 0; i < face.data.length; i++) {
+      const v = face.data[i];
+      if (v > ISO) inside++;
+      const c = Math.max(0, Math.min(255, Math.round(v * SCALE)));
+      img.data[i * 4] = c;
+      img.data[i * 4 + 1] = Math.min(255, c + 8);
+      img.data[i * 4 + 2] = Math.min(255, c + 26);
+      img.data[i * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    document.getElementById("dval").textContent = d.toFixed(2);
+    document.getElementById("tval").textContent = deg;
+    const pct = ((inside / face.data.length) * 100).toFixed(1);
+    document.getElementById("fstat").textContent =
+      "the inside at this plane: " + pct + "% solid, peak " + face.max.toFixed(2) + " -- " + ms.toFixed(0) + "ms, all points at once";
+  }
+  document.getElementById("dcut").addEventListener("input", drawFace);
+  document.getElementById("tcut").addEventListener("input", drawFace);
+  drawFace();
+</script>
+</body>
+</html>

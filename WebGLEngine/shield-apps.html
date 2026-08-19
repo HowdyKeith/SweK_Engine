@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — App installer</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:720px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  h3 { margin:18px 0 6px; font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .app { border:1px solid var(--line); border-radius:11px; padding:11px 13px; margin:8px 0; background:var(--panel); }
+  .app .nm { font-weight:600; color:var(--ink); }
+  .app .by { color:var(--dim); font-size:12px; }
+  .app .links { margin-top:7px; display:flex; gap:7px; flex-wrap:wrap; }
+  a.btn, button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer; text-decoration:none; display:inline-block; }
+  .pkg { color:var(--dim); font-size:11px; margin-top:5px; word-break:break-all; }
+  .apkrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; border:1px solid var(--line); border-radius:9px; padding:9px 11px; margin:6px 0; background:#10151d; }
+  .apkrow .fn { flex:1; min-width:140px; word-break:break-all; }
+  .apkrow button { color:var(--warn); border-color:#5a4a22; background:#221c10; }
+  .ipline { display:flex; gap:8px; align-items:center; margin:8px 0; }
+  .ipline input { padding:7px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; width:160px; }
+  #apkMsg, #empty { color:var(--dim); font-size:12px; margin-top:6px; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#10231a; border:1px solid #224a36; color:var(--ok); padding:8px 14px; border-radius:9px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  #toast.on { opacity:1; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">📥</span> App installer &amp; links</span></header>
+  <main>
+    <div class="note">
+      Install links for the apps this engine talks to — handy on the <b>Shield</b>, where you sideload instead of using Google&nbsp;Play. The Shield has no browser by default; the usual flow is <b>Downloader by AFTVnews</b> → paste an APKMirror link → install. Or skip that: drop <b>.apk</b> files into <b>ai-bridge/apks/</b> on the PC and push-install them straight to the Shield over ADB below. For Home&nbsp;Assistant <b>on the TV itself</b>, <b>QuickBars</b> (top of the list below) is the TV-native overlay \u2014 install from Google&nbsp;Play on the Shield, or push its APK over ADB, then launch it by package <code>dev.trooped.tvquickbars</code>.
+    </div>
+
+    <h3>Push-install to the Shield (ADB)</h3>
+    <div class="ipline">Shield IP <input id="ip" value="192.168.50.114" /></div>
+    <div id="apks"></div>
+    <div id="empty">Drop <code>.apk</code> files into <code>ai-bridge/apks/</code> and reload — they'll appear here with an install button.</div>
+    <div id="apkMsg"></div>
+
+    <h3>Install links</h3>
+    <div id="list"></div>
+  </main>
+  <div id="toast"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function toast(t){ const e=$("toast"); e.textContent=t; e.classList.add("on"); setTimeout(()=>e.classList.remove("on"),1500); }
+
+  const apps = [
+    { nm:"QuickBars \u2014 Home Assistant overlay for Android TV", by:"Omri Peretz (Trooped) \u00b7 maps remote keys \u2192 HA actions, camera PiPs, TV alerts", pkg:"dev.trooped.tvquickbars", links:[["Play","https://play.google.com/store/apps/details?id=dev.trooped.tvquickbars"],["Site","https://quickbars.app/"],["GitHub","https://github.com/Trooped/QuickBars"]] },
+    { nm:"MacroDroid", by:"ArloSoft (Jamie Higgins)", pkg:"com.arlosoft.macrodroid", links:[["Site","https://www.macrodroid.com/"],["APKMirror","https://www.apkmirror.com/apk/arlosoft/macrodroid/"]] },
+    { nm:"Tasker", by:"João Dias (joaomgcd)", pkg:"net.dinglisch.android.taskerm", links:[["Site","https://tasker.joaoapps.com/"],["APKMirror","https://www.apkmirror.com/apk/joao-app/tasker/"]] },
+    { nm:"Join + AutoApps", by:"João Dias (joaomgcd)", pkg:"com.joaomgcd.join", links:[["Join","https://joaoapps.com/join/"],["AutoApps","https://joaoapps.com/autoapps/"]] },
+    { nm:"Blink Home Monitor", by:"Immedia / Amazon", pkg:"com.immediasemi.blink", links:[["Site","https://blinkforhome.com/"],["APKMirror","https://www.apkmirror.com/apk/immedia-semiconductor-inc/"]] },
+    { nm:"CloudEdge", by:"Hangzhou Meari", pkg:"com.cloudedge.smarteye", links:[["Site","https://www.cloudedge.app/"]] },
+    { nm:"Govee Home", by:"Govee (Eric Wu / ex-Anker)", pkg:"com.govee.home", links:[["Site","https://www.govee.com/"]] },
+    { nm:"Orbit B-hyve", by:"Orbit Irrigation (Husqvarna)", pkg:"com.orbit.bhyve", links:[["Site","https://www.orbitonline.com/pages/b-hyve-app"]] },
+    { nm:"spacedesk (2nd-monitor viewer)", by:"datronicsoft", pkg:"ph.spacedesk.beta", links:[["Driver + viewer","https://www.spacedesk.net/"],["APKMirror","https://www.apkmirror.com/apk/datronicsoft/spacedesk/"]] },
+    { nm:"Fully Kiosk Browser", by:"Fully / Ola Aigner", pkg:"de.ozerov.fully", links:[["Site","https://www.fully-kiosk.com/"]] },
+    { nm:"Downloader (sideload helper)", by:"AFTVnews", pkg:"com.esaba.downloader", links:[["About","https://www.aftvnews.com/downloader/"]] },
+  ];
+
+  function renderApps(){
+    $("list").innerHTML = apps.map(a =>
+      '<div class="app"><div class="nm">' + esc(a.nm) + '</div><div class="by">by ' + esc(a.by) + '</div>' +
+      '<div class="links">' + a.links.map(l => '<a class="btn" href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + esc(l[0]) + ' ↗</a>').join("") +
+      '<button data-copy="' + esc(a.links[0][1]) + '">Copy</button></div>' +
+      '<div class="pkg">' + esc(a.pkg) + '</div></div>'
+    ).join("");
+    $("list").querySelectorAll("button[data-copy]").forEach(b => b.onclick = () => navigator.clipboard.writeText(b.getAttribute("data-copy")).then(()=>toast("Copied")).catch(()=>toast("Copy failed")));
+  }
+  renderApps();
+
+  function loadApks(){
+    fetch("/shield/apks", { cache:"no-store" }).then(r => r.json()).then(j => {
+      const list = (j && j.apks) || [];
+      $("empty").style.display = list.length ? "none" : "block";
+      $("apks").innerHTML = list.map(a => '<div class="apkrow"><span class="fn">' + esc(a.file) + ' <span style="color:var(--dim)">(' + (a.size/1048576).toFixed(1) + ' MB)</span></span><button data-apk="' + esc(a.file) + '">Install on Shield</button></div>').join("");
+      $("apks").querySelectorAll("button[data-apk]").forEach(b => b.onclick = () => install(b.getAttribute("data-apk")));
+    }).catch(() => {});
+  }
+  function install(file){
+    $("apkMsg").textContent = "installing " + file + " … (this can take a minute)";
+    fetch("/shield/install", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ ip: $("ip").value.trim(), file }) })
+      .then(r => r.json()).then(j => { $("apkMsg").textContent = j && j.ok ? ("✓ " + file + ": " + (j.output || "done").trim().split("\n").pop()) : ("✗ " + (j && j.error || "failed")); })
+      .catch(e => $("apkMsg").textContent = "✗ " + (e && e.message || e));
+  }
+  loadApks();
+</script>
+</body>
+</html>

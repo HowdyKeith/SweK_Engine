@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Social &middot; SweK</title>
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root { --bg:#0c1016; --ink:#dfe8f2; --dim:#8aa; --line:#26303c; --go:#7fd88f; --err:#f38; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; padding:18px; max-width:720px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .hint { color:var(--dim); font-size:13px; margin-bottom:12px; }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px 16px; margin-bottom:12px; background:rgba(255,255,255,0.015); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  input, textarea, select { background:#070b10; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font:14px system-ui; }
+  input.grow { flex:1; min-width:200px; }
+  textarea { width:100%; box-sizing:border-box; min-height:90px; resize:vertical; font:14px system-ui; }
+  button { background:#14202c; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:8px 14px; cursor:pointer; font:14px system-ui; }
+  button.go { background:#123020; color:var(--go); border-color:#2a6; font-weight:600; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:10px; border:1px solid var(--line); color:var(--dim); }
+  .badge.on { color:var(--go); border-color:#2a6; }
+  .chan { display:flex; align-items:center; gap:8px; padding:5px 8px; border:1px solid var(--line); border-radius:7px; cursor:pointer; }
+  .chan.sel { border-color:#2a6; background:#0e1c14; }
+  code { background:#070b10; padding:1px 5px; border-radius:4px; font-size:12px; }
+  #stat { font-size:13px; }
+  .muted { color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>&#128227; Social <span class="badge" id="badge">checking&hellip;</span></h1>
+  <div class="hint">Post &amp; schedule to Facebook, X, LinkedIn, Instagram, Threads, Mastodon, Bluesky, Telegram and more &mdash; through <a href="https://postiz.com" target="_blank" rel="noopener">Postiz</a>. Connect your channels inside Postiz, then paste its API key here. The key is stored only on this machine. (For just a Facebook Page without Postiz, the <a href="/composer.html">Composer</a> still works.)</div>
+
+  <div class="card">
+    <div class="row"><b>Postiz connection</b></div>
+    <div class="row">
+      <input id="base" class="grow" placeholder="Base URL (blank = cloud api.postiz.com)" />
+    </div>
+    <div class="row">
+      <input id="key" class="grow" type="password" placeholder="Postiz API key (Settings &rarr; API Key)" />
+      <button id="save">Save</button>
+      <span id="cfgStat" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card" id="composeCard" style="display:none;">
+    <div class="row"><b>Compose</b> <span class="muted">pick channel(s), write, then post now or schedule</span></div>
+    <div class="row" id="chanList" style="gap:6px;"></div>
+    <textarea id="text" placeholder="What's on your mind?"></textarea>
+    <div class="row">
+      <button class="go" id="postNow">Post now</button>
+      <span class="muted">or schedule for</span>
+      <input id="when" type="datetime-local" />
+      <button id="schedule">Schedule</button>
+    </div>
+    <div class="row"><span id="stat"></span></div>
+  </div>
+
+<script>
+  var $ = function(id){ return document.getElementById(id); };
+  function J(u,m,b){ return fetch(u,{method:m||"GET",cache:"no-store",headers:b?{"Content-Type":"application/json"}:undefined,body:b?JSON.stringify(b):undefined}).then(function(r){return r.json();}); }
+  var selected = {};   // integrationId -> provider
+
+  function loadCfg(){
+    J("/postiz/config").then(function(c){
+      if(!c||!c.ok) return;
+      $("base").value = c.selfHosted ? c.base : "";
+      if(c.hasKey){ $("badge").textContent="connected"; $("badge").className="badge on"; $("key").placeholder="[key saved \u2014 type to replace]"; $("composeCard").style.display="block"; loadChannels(); }
+      else { $("badge").textContent="no key"; $("cfgStat").textContent="paste your Postiz API key to start"; }
+    }).catch(function(){ $("badge").textContent="bridge?"; });
+  }
+  function loadChannels(){
+    J("/postiz/channels").then(function(r){
+      var box=$("chanList");
+      if(!r||!r.ok){ box.innerHTML="<span class='muted'>couldn't load channels: "+((r&&r.error)||"?")+"</span>"; return; }
+      if(!r.channels||!r.channels.length){ box.innerHTML="<span class='muted'>no channels connected yet \u2014 connect some in the Postiz dashboard first</span>"; return; }
+      box.innerHTML="";
+      r.channels.forEach(function(c){
+        var d=document.createElement("div"); d.className="chan"; d.textContent=(c.name||c.provider)+" \u00b7 "+c.provider;
+        d.onclick=function(){ if(selected[c.id]){ delete selected[c.id]; d.classList.remove("sel"); } else { selected[c.id]=c.provider; d.classList.add("sel"); } };
+        box.appendChild(d);
+      });
+    }).catch(function(){});
+  }
+  $("save").onclick=function(){
+    var body={ key:$("key").value.trim(), base:$("base").value.trim() };
+    if(!body.key && !body.base){ $("cfgStat").textContent="enter a key"; return; }
+    J("/postiz/config","POST",body).then(function(){ $("key").value=""; $("cfgStat").textContent="saved"; loadCfg(); });
+  };
+  function doPost(when){
+    var ids=Object.keys(selected);
+    if(!ids.length){ $("stat").innerHTML="<span style='color:var(--err)'>pick at least one channel</span>"; return; }
+    var text=$("text").value.trim();
+    if(!text){ $("stat").innerHTML="<span style='color:var(--err)'>write something first</span>"; return; }
+    $("stat").textContent="posting\u2026";
+    var done=0, fail=0, n=ids.length;
+    ids.forEach(function(id){
+      J("/postiz/post","POST",{ integrationId:id, provider:selected[id], content:text, when:when }).then(function(r){
+        if(r&&r.ok) done++; else { fail++; }
+        if(done+fail===n){ $("stat").innerHTML = fail? ("<span style='color:var(--err)'>"+done+" ok, "+fail+" failed</span>") : ("<span style='color:var(--go)'>\u2713 "+(when==="now"?"posted":"scheduled")+" to "+done+" channel(s)</span>"); }
+      }).catch(function(){ fail++; });
+    });
+  }
+  $("postNow").onclick=function(){ doPost("now"); };
+  $("schedule").onclick=function(){ var w=$("when").value; if(!w){ $("stat").innerHTML="<span style='color:var(--err)'>pick a date/time</span>"; return; } doPost(new Date(w).toISOString()); };
+  loadCfg();
+</script>
+</body>
+</html>

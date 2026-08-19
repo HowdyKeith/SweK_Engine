@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Box3D Blobs (physics-driven lava)</title>
+<style>
+  html, body { margin:0; height:100%; background:#07050b; overflow:hidden; color:#e9e0f0;
+               font:13px ui-sans-serif,system-ui,sans-serif; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:5; background:rgba(16,10,22,.72); border:1px solid #3a2740;
+         border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); max-width:380px; }
+  #hud h1 { margin:0 0 4px; font-size:15px; } #hud p { margin:4px 0; color:#b39ac2; font-size:12px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  button, select { font:12px ui-monospace,monospace; padding:5px 11px; border-radius:7px; border:1px solid #5a3a52;
+                   background:#241726; color:#f0d9ec; cursor:pointer; }
+  button.go { background:#3a1c10; color:#ffcf9a; border-color:#7a3d1e; }
+  button.rec { background:#3a1015; color:#ff9aa2; border-color:#6a2a30; }
+  label.sl { display:flex; align-items:center; gap:6px; color:#b39ac2; font-size:11px; }
+  .dim { color:#9c86ad; font-size:11px; } #fps { font-variant-numeric:tabular-nums; }
+  .warn { color:#ffcf9a; }
+
+  /* collapsible HUD: a small tab on mobile so it never covers the view */
+  #hud { max-height:80vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #hud.min { max-height:none; overflow:visible; }
+  #hud.min > :not(h1) { display:none; }
+  #hud h1 { cursor:default; }
+  .hudTab { display:inline-block; cursor:pointer; border:1px solid #3a2740; border-radius:6px; padding:0 8px; margin-right:8px; font-size:14px; line-height:1.4; color:#b39ac2; background:rgba(255,255,255,.05); user-select:none; -webkit-tap-highlight-color:transparent; }
+  .hudTab:hover { color:#e9e0f0; border-color:#6a4d80; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest(\'#hud\').classList.toggle(\'min\')" title="show/hide controls">&#9776;</span>&#129514; Box3D Blobs</h1>
+  <p id="blurb">The lava is driven by <b>real rigid-body physics</b>: Box3D simulates a tank of falling bodies,
+     their positions become metaball centers, and the marched isosurface is fire-painted around them.
+     <span id="fps" class="dim"></span></p>
+  <div class="row">
+    <label class="sl">blobs <input id="blobs" type="range" min="10" max="60" value="34"></label>
+    <label class="sl">res <input id="res" type="range" min="24" max="44" step="4" value="32"></label>
+    <label class="sl">fountain <input id="fount" type="range" min="0" max="100" value="55"></label>
+  </div>
+  <div class="row" style="margin-top:6px"><button onclick="togglePhysics()" id="physBtn" style="background:#1a1024;color:#b39ac2;border:1px solid #3a2740;border-radius:8px;padding:5px 11px;font:600 11px ui-monospace,monospace;cursor:pointer">Physics: box3d</button> <span class="dim" style="font-size:11px">box3d or Jolt &mdash; same tank, either engine</span></div>
+  <div class="row">
+    <button id="pour" class="go">&#127799; Pour more</button>
+    <button id="quake" class="go">&#128165; Erupt</button>
+    <button id="spin" class="go">&#8635; orbit: on</button>
+    <select id="dur"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <span class="dim" id="msg"></span>
+  </div>
+</div>
+
+<script type="module">
+import { attachGestures as _swekGestures } from "./ui/touchGestures.js";
+import { computeSkinColors, applySkinMaterial } from "./fx/avatar/skinsThree.js";
+import { blackbodyRamp as fireRamp } from "./fx/voxelize/fireRamp.js";   // v2438 -- the shared temperature ramp; this page carried a byte-identical copy
+import { SKIN_NAMES } from "./fx/avatar/skins.js";
+import * as THREE from "/vendor/three/three.module.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { createJoltBackend } from "/physics/jolt/joltLoader.js";
+let useJolt = false, joltBackend = null;   // Jolt loaded on demand; box3d is the default backend
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+const canvas = document.getElementById("c");
+let userAz = 0, userZoom = 1;
+_swekGestures(canvas, { onPan: (p, fg) => { if (fg === 1) { userAz -= p.dx * 0.006; spin = false; } }, onPinch: (sc) => { userZoom = Math.max(0.4, Math.min(3, userZoom / sc)); } });   // touch: drag rotate, pinch zoom
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x07050b);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 4000);
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+scene.add(new THREE.HemisphereLight(0x2a2440, 0x120a08, 0.35));
+const bulb = new THREE.PointLight(0xff5a12, 3.0, 400, 1.6); bulb.position.set(0, 4, 0); scene.add(bulb);
+
+// ---- tank (world units): a square bowl the blobs fall into ----
+const TW = 8, TH = 20;                     // half-width, height
+const tankMat = new THREE.MeshStandardMaterial({ color: 0x140a0c, roughness: 0.9, emissive: 0x2a0a04, emissiveIntensity: 0.5, side: THREE.BackSide, transparent: true, opacity: 0.55 });
+const tank = new THREE.Mesh(new THREE.BoxGeometry(TW * 2, TH, TW * 2), tankMat); tank.position.y = TH / 2; scene.add(tank);
+const floor = new THREE.Mesh(new THREE.BoxGeometry(TW * 2 + 2, 1, TW * 2 + 2), new THREE.MeshStandardMaterial({ color: 0x180a0c, roughness: 0.8, emissive: 0x3a0e04, emissiveIntensity: 0.6 })); floor.position.y = -0.5; scene.add(floor);
+
+// ---- fire isosurface ----
+const fireMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+const blobMesh = new THREE.Mesh(new THREE.BufferGeometry(), fireMat); scene.add(blobMesh);
+// SKINS: "native" keeps this page's own tuned fire (heat by height + flicker); the rest are the shared materials,
+// coloured by the very same shadeTri the canvas pages use -- so lava here and lava there cannot drift apart.
+const SKIN_CYCLE = ["native"].concat(SKIN_NAMES); let skinIdx = 0;
+const _sb = document.createElement("button"); _sb.textContent = "skin: native";
+_sb.style.cssText = "position:fixed;right:12px;top:12px;z-index:9;background:rgba(16,22,36,.92);color:#ffd08a;border:1px solid #6a5a2a;border-radius:18px;padding:8px 13px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+_sb.onclick = () => { skinIdx = (skinIdx + 1) % SKIN_CYCLE.length; _sb.textContent = "skin: " + SKIN_CYCLE[skinIdx];
+  if (SKIN_CYCLE[skinIdx] === "native") { fireMat.blending = THREE.NormalBlending; fireMat.transparent = false; fireMat.opacity = 1; fireMat.depthWrite = true; fireMat.flatShading = false; fireMat.needsUpdate = true; }
+  else applySkinMaterial(THREE, fireMat, SKIN_CYCLE[skinIdx]); };
+document.body.appendChild(_sb);
+
+// ---- embers ----
+const EMBERS = 200, emberPos = new Float32Array(EMBERS * 3), emberCol = new Float32Array(EMBERS * 3), emberV = [];
+const emberGeo = new THREE.BufferGeometry();
+emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+emberGeo.setAttribute("color", new THREE.BufferAttribute(emberCol, 3));
+const embers = new THREE.Points(emberGeo, new THREE.PointsMaterial({ size: 1.3, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+scene.add(embers);
+function seedEmber(i, fresh) { emberPos[i * 3] = (Math.random() - 0.5) * TW * 1.8; emberPos[i * 3 + 1] = fresh ? Math.random() * TH : 1 + Math.random() * 3; emberPos[i * 3 + 2] = (Math.random() - 0.5) * TW * 1.8; emberV[i] = { vy: 5 + Math.random() * 13, vx: (Math.random() - 0.5) * 3, vz: (Math.random() - 0.5) * 3, w: Math.random() * 6.28 }; }
+for (let i = 0; i < EMBERS; i++) seedEmber(i, true);
+
+// ---- fire ramp ----
+
+// ---- world state ----
+let RES = 32, wantBlobs = 34, fountain = 0.55;
+let world = null, ready = false, bodyN = 0, floorIdx = -1, wallIdx = [];
+const cx = [], cy = [], cz = [], cspd = [];      // metaball centers (world) + speed, refilled each frame
+
+// scripted fallback centers (when box3d.wasm isn't built)
+let fb = [];
+function seedFallback(n) { fb = []; for (let i = 0; i < n; i++) fb.push({ ph: Math.random() * 6.28, sp: 0.4 + Math.random(), xa: (Math.random() * 2 - 1) * TW * 0.6, za: (Math.random() * 2 - 1) * TW * 0.6, xp: Math.random() * 6.28, zp: Math.random() * 6.28 }); }
+
+async function initPhysics() {
+  const st = await box3d.init();
+  ready = !!(st && st.ready);
+  if (!ready) {
+    document.getElementById("blurb").innerHTML = "<span class='warn'>Box3D WASM isn't built on this box, so the blobs are running a scripted fallback.</span> Build/pull box3d (box3d-info.html) and reload to see <b>real physics</b>. <span id='fps' class='dim'></span>";
+    seedFallback(wantBlobs); return;
+  }
+  buildWorld();
+}
+function buildWorld() {
+  if (world) { try { world.destroy(); } catch (e) {} }
+  const backend = (useJolt && joltBackend) ? joltBackend : box3d;
+  world = backend.createWorld({ gravity: [0, -20, 0] });
+  bodyN = 0; wallIdx = [];
+  floorIdx = world.addBox({ type: "static", pos: [0, -0.5, 0], half: [TW + 1, 0.5, TW + 1] });
+  wallIdx.push(world.addBox({ type: "static", pos: [TW, TH / 2, 0], half: [0.5, TH, TW] }));
+  wallIdx.push(world.addBox({ type: "static", pos: [-TW, TH / 2, 0], half: [0.5, TH, TW] }));
+  wallIdx.push(world.addBox({ type: "static", pos: [0, TH / 2, TW], half: [TW, TH, 0.5] }));
+  wallIdx.push(world.addBox({ type: "static", pos: [0, TH / 2, -TW], half: [TW, TH, 0.5] }));
+  for (let i = 0; i < wantBlobs; i++) addBlob();
+}
+// swap the rigid-body backend live (box3d <-> Jolt); rebuilds the tank on the chosen engine
+async function togglePhysics() {
+  const btn = document.getElementById("physBtn");
+  if (!useJolt) {
+    if (btn) btn.textContent = "loading Jolt\u2026";
+    try { if (!joltBackend) joltBackend = await createJoltBackend(); useJolt = true; ready = true; buildWorld(); if (btn) btn.textContent = "Physics: Jolt"; }
+    catch (e) { useJolt = false; if (btn) btn.textContent = "Physics: box3d (Jolt failed)"; }
+  } else {
+    useJolt = false; if (btn) btn.textContent = "Physics: box3d";
+    const st = await box3d.init(); ready = !!(st && st.ready); if (ready) buildWorld();
+  }
+}
+window.togglePhysics = togglePhysics;
+function addBlob() {
+  if (!ready || !world) return;
+  try { world.addBox({ type: "dynamic", pos: [(Math.random() - 0.5) * TW * 1.3, TH * (0.5 + Math.random() * 0.4), (Math.random() - 0.5) * TW * 1.3], half: [0.7, 0.7, 0.7], density: 1 }); bodyN++; }
+  catch (e) { /* body limit */ }
+}
+// dynamic-body indices are everything after the 1 floor + 4 walls
+function firstDynamic() { return 5; }
+
+// ---- build the metaball field from current centers, march, fire-paint ----
+const _c = [0, 0, 0];
+function fieldFromCenters(res) {
+  const LX = res, LZ = res, LY = Math.max(20, Math.round(res * (TH / (TW * 2))));
+  const cs = (TW * 2) / LX;                          // world units per cell
+  const plane = LX * LY, field = new Float32Array(LX * LY * LZ);
+  const rad = 1.7 / cs, rad2 = rad * rad;            // metaball radius (field units)
+  const fx = [], fy = [], fz = [];
+  for (let k = 0; k < cx.length; k++) { fx.push((cx[k] + TW) / cs); fy.push(cy[k] / cs); fz.push((cz[k] + TW) / cs); }
+  for (let z = 0; z < LZ; z++) for (let y = 0; y < LY; y++) { const row = z * plane + y * LX; for (let x = 0; x < LX; x++) {
+    let sum = 0; for (let k = 0; k < fx.length; k++) { const dx = x - fx[k], dy = y - fy[k], dz = z - fz[k]; sum += rad2 / (dx * dx + dy * dy + dz * dz + 0.4); }
+    field[row + x] = 1.0 - sum;
+  } }
+  const m = marchScalarField(field, LX, LY, LZ, 0, { origin: [-TW, 0, -TW], cellSize: cs });
+  return m;
+}
+function paintFire(g, positions, normals, t) {
+  const n = positions.length / 3, colors = new Float32Array(positions.length);
+  for (let i = 0; i < n; i++) {
+    const py = positions[i * 3 + 1], px = positions[i * 3];
+    const nx = normals[i * 3], ny = normals[i * 3 + 1], nz = normals[i * 3 + 2];
+    let heat = 1.0 - (py / TH) * 1.05 + 0.10 * Math.sin(px * 0.4 + t * 7) + 0.05 * Math.sin(py * 0.6 - t * 9);
+    fireRamp(heat, _c);
+    const shade = 0.6 + 0.4 * Math.max(0, nx * 0.3 + ny * 0.85 + nz * 0.2);
+    colors[i * 3] = Math.min(1, _c[0] * shade * 1.05); colors[i * 3 + 1] = Math.min(1, _c[1] * shade); colors[i * 3 + 2] = Math.min(1, _c[2] * shade);
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
+// ---- main loop ----
+let spin = true, theta = 0.6, frameCount = 0, marchEvery = 1, fountT = 0, fpsT = performance.now(), fpsN = 0, prev = performance.now();
+// v2450 -- frame() re-arms itself at the BOTTOM, so anything that threw above that line killed the animation for good
+// and did so silently. That is how a single missing method (world.bodyCount on Jolt) froze this whole page. Now the
+// loop survives its own bugs: it reports the first fault once, in the open, and keeps running.
+let _frameFault = null;
+function _reportFault(e) {
+  if (_frameFault) return; _frameFault = String((e && e.message) || e);
+  console.error("[swek] frame fault (the loop kept going):", e);
+  const b = document.getElementById("blurb");
+  if (b) b.innerHTML += " <span style='color:#ff9a9a'>frame fault: " + _frameFault + " -- the loop is still running; this feature is degraded.</span>";
+}
+
+function frame() {
+  try { _frameBody(); } catch (e) { _reportFault(e); }
+  requestAnimationFrame(frame);
+}
+function _frameBody() {
+  const now = performance.now(), t = now / 1000; let dt = (now - prev) / 1000; prev = now; if (dt > 0.05) dt = 0.05;
+  frameCount++;
+
+  // refresh centers from physics (or fallback)
+  cx.length = cy.length = cz.length = cspd.length = 0;
+  if (ready && world) {
+    world.step(1 / 60, 4);
+    // buoyancy fountain: periodically launch some settled bodies upward -> flaming balloons
+    fountT += dt;
+    if (fountain > 0 && fountT > 0.12) {
+      fountT = 0;
+      const xf0 = world.readTransforms(); const nB = world.bodyCount();
+      const launches = Math.round(fountain * 3);
+      for (let l = 0; l < launches; l++) {
+        const idx = firstDynamic() + Math.floor(Math.random() * Math.max(1, nB - firstDynamic()));
+        if (idx >= nB) continue;
+        const yy = xf0[idx * 7 + 1];
+        if (yy < TH * 0.5) world.impulse(idx, [(Math.random() - 0.5) * 6, 26 + Math.random() * 22 * fountain, (Math.random() - 0.5) * 6]);
+      }
+    }
+    const xf = world.readTransforms(), vel = world.readVelocities(), nB = world.bodyCount();
+    for (let b = firstDynamic(); b < nB; b++) {
+      cx.push(xf[b * 7]); cy.push(xf[b * 7 + 1]); cz.push(xf[b * 7 + 2]);
+      const vx = vel[b * 3], vy = vel[b * 3 + 1], vz = vel[b * 3 + 2]; cspd.push(Math.hypot(vx, vy, vz));
+    }
+  } else {
+    for (const b of fb) { cx.push(b.xa * Math.sin(t * 0.5 * b.sp + b.xp)); cy.push(TH * (0.5 + 0.4 * Math.sin(t * b.sp + b.ph))); cz.push(b.za * Math.cos(t * 0.43 * b.sp + b.zp)); cspd.push(0); }
+  }
+
+  if (frameCount % marchEvery === 0 && cx.length) {
+    const m = fieldFromCenters(RES);
+    const g = blobMesh.geometry;
+    const pos = new Float32Array(m.positions), nor = new Float32Array(m.normals);
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    const _sk = SKIN_CYCLE[skinIdx];
+    if (_sk === "native") paintFire(g, pos, nor, t);
+    else g.setAttribute("color", new THREE.BufferAttribute(computeSkinColors(pos, _sk, { t, center: [0, TH * 0.4, 0], radius: TW * 1.2 }), 3));
+    g.computeBoundingSphere();
+  }
+
+  // embers
+  for (let i = 0; i < EMBERS; i++) { const e = emberV[i]; emberPos[i * 3] += (e.vx + Math.sin(t * 2 + e.w) * 2) * dt; emberPos[i * 3 + 1] += e.vy * dt; emberPos[i * 3 + 2] += e.vz * dt; if (emberPos[i * 3 + 1] > TH * 0.98) seedEmber(i, false); const h = 1 - emberPos[i * 3 + 1] / TH; fireRamp(0.35 + h * 0.6, _c); emberCol[i * 3] = _c[0]; emberCol[i * 3 + 1] = _c[1]; emberCol[i * 3 + 2] = _c[2]; }
+  emberGeo.attributes.position.needsUpdate = true; emberGeo.attributes.color.needsUpdate = true;
+
+  if (spin) theta += 0.0028;
+  const r = 46 * userZoom; camera.position.set(Math.cos(theta + userAz) * r, TH * 0.62, Math.sin(theta + userAz) * r); camera.lookAt(0, TH * 0.34, 0);
+  renderer.render(scene, camera);
+
+  fpsN++; if (now - fpsT > 500) { const el = document.getElementById("fps"); if (el) el.textContent = Math.round(fpsN * 1000 / (now - fpsT)) + " fps \u00b7 " + cx.length + " bodies \u00b7 " + (blobMesh.geometry.attributes.position ? (blobMesh.geometry.attributes.position.count / 3 | 0) : 0) + " tris" + (ready ? "" : " \u00b7 fallback"); fpsT = now; fpsN = 0; marchEvery = RES >= 40 ? 2 : 1; }
+}
+
+// ---- controls ----
+const $ = (id) => document.getElementById(id);
+$("blobs").oninput = (e) => { wantBlobs = +e.target.value; if (ready) { const have = Math.max(0, (world ? world.bodyCount() : 0) - firstDynamic()); if (wantBlobs > have) for (let i = have; i < wantBlobs; i++) addBlob(); } else { seedFallback(wantBlobs); } };
+$("res").oninput = (e) => { RES = +e.target.value; };
+$("fount").oninput = (e) => { fountain = (+e.target.value) / 100; };
+$("pour").onclick = () => { if (ready) for (let i = 0; i < 8; i++) addBlob(); else { seedFallback(fb.length + 8); } };
+$("quake").onclick = () => { if (!ready || !world) return; const nB = world.bodyCount(); for (let b = firstDynamic(); b < nB; b++) world.impulse(b, [(Math.random() - 0.5) * 20, 30 + Math.random() * 30, (Math.random() - 0.5) * 20]); };
+$("spin").onclick = () => { spin = !spin; $("spin").textContent = "\u21bb orbit: " + (spin ? "on" : "off"); };
+$("rec").onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); $("rec").textContent = "\u25CF Record"; return; }
+  const secs = +($("dur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, canvas)) { $("rec").textContent = "\u25A0 recording " + secs + "s"; $("msg").textContent = "capturing\u2026 a .webm will download"; setTimeout(() => { $("rec").textContent = "\u25CF Record"; $("msg").textContent = "saved"; }, secs * 1000 + 200); }
+  else { $("msg").textContent = "no MediaRecorder here"; }
+};
+
+initPhysics().then(frame);
+</script>
+
+<script>(function(){var h=document.getElementById("hud");if(h&&window.matchMedia&&window.matchMedia("(max-width:640px)").matches)h.classList.add("min");})();</script>
+<script type="module">
+// ?reel -> video-capture overlay (title card + captions + one-click tab recorder). Normal viewing is unaffected.
+if (new URLSearchParams(location.search).has("reel")) {
+  const { startReel } = await import("./ui/reelCard.js");
+  startReel({ title: "SweK Engine", subtitle: "box3D Physics", file: "swek-box3d-blobs", rate: 0.97,
+    narrate: [
+      "This is SweK Engine. I\u2019m building it from scratch \u2014 no Unity, no Unreal.",
+      "What you\u2019re seeing is box 3 D rigid-body physics, running right in a browser tab.",
+      "Every blob is a real body \u2014 collisions, momentum, stacking. The lava look is a G P U metaball surface over the physics.",
+      "The same engine runs three ways: WebGL 2, WebGPU, and headless in Node on my L A N.",
+      "One person, from scratch. Devlog one. More coming \u2014 A I pilots, a space sim, and LAN skirmishes. Thanks for watching."
+    ] });
+}
+</script>
+</body>
+</html>

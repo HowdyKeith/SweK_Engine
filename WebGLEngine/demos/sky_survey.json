@@ -1,0 +1,5 @@
+{
+    "name": "Sky Survey",
+    "description": "Top-down view to see biome distribution across the world.",
+    "camera": { "x": 0, "y": 200, "z": 30, "yaw": 0, "pitch": -1.4 }
+}

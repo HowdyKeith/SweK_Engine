@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Flight GPU (Endless Sky on Box3D, WebGPU 3D)</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060c; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:rgba(8,14,26,.7); border:1px solid #16223c; border-radius:9px; padding:8px 12px; backdrop-filter:blur(6px); }
+  b.t { color:#2fd6b0; } #mode { padding:2px 8px; border-radius:5px; border:1px solid #2a6a4a; background:#10261c; color:#9fe6c0; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  button,select { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#152136; color:#b9d4ff; border:1px solid #2f486c; }
+  button.on { background:#2a1015; color:#ff9aa2; border-color:#6a2a30; }
+  a { color:#5ad6ff; } #stat { color:#7d8fa8; }
+  #fallback { position:fixed; inset:0; display:none; align-items:center; justify-content:center; text-align:center; }
+  #fallback .card { max-width:520px; background:rgba(8,14,26,.9); border:1px solid #16223c; border-radius:12px; padding:22px 26px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <b class="t">&#128640; Flight GPU</b>
+  <span id="mode" class="fallback">detecting&hellip;</span>
+  <button id="cam">cam: orbit</button>
+  <button id="fly">&#128377;&#65039; Fly</button>
+  <button id="bh">&#128371;&#65039; Black hole</button>
+  <select id="recDur" style="padding:2px 4px"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+  <button id="rec">&#9679; Record</button>
+  <span id="stat"></span>
+  <span id="pstat" style="color:#c8e89a"></span>
+  <a href="/es-box3d.html">2D view &#8599;</a>
+</div>
+<div id="fallback"><div class="card">
+  <h2 style="color:#e8c45a;margin:0 0 8px">WebGPU isn't available here</h2>
+  <p id="fbwhy" style="color:#7d8fa8"></p>
+  <p>The same Endless-Sky-on-Box3D fight renders anywhere in the 2D view:</p>
+  <p><a href="/es-box3d.html">&#8594; Open the 2D flight view</a></p>
+  <p style="color:#7d8fa8">Redirecting there automatically&hellip;</p>
+</div></div>
+
+<script type="module">
+// ===== the sim is es-box3d's, verbatim: tactics-policy pilots + Box3D collisions + shots. We only swap the view. =====
+import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
+import { headingVector } from "/ev/flightModel.js";
+import { DEFAULT_W, decide as tacticsDecide, applyBrainWeights } from "/ev/esTactics.js";
+import { createESBox3D } from "/physics/esBox3d.js";
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+const CLASSES = [
+  { id: 1, name: "Raider",   shield: 80,  armor: 60, speed: 340, accel: 240, maneuver: 11, dps: 12 },
+  { id: 2, name: "Marauder", shield: 120, armor: 90, speed: 300, accel: 200, maneuver: 8,  dps: 18 },
+  { id: 3, name: "Corsair",  shield: 60,  armor: 40, speed: 400, accel: 280, maneuver: 14, dps: 8  },
+];
+const SHOT = { speed: 1050, life: 1.7, dmgShield: 14, dmgArmor: 12, cooldownMs: 360 };
+const HIT_RADIUS = 90;
+const W_A = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W);   // scatter
+const W_B = { ...DEFAULT_W };                                                                             // hand
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+function makeFleet(team, center, count, rng) {
+  return spawnEnemies(CLASSES, {}, center, { count, team, minR: 150, spread: 500, rnd: rng }).map((e, i) => ({
+    ...e, id: team + "#" + i, team, vx: e.vx || 0, vy: e.vy || 0, dps: (e.cls && e.cls.dps) || e.dps || 10, _cool: 0, _tgtId: null, _fleeing: false,
+  }));
+}
+function snapshot(fleet) { const o = []; for (const e of fleet) if (!e.dead) o.push({ id: e.id, x: e.x, y: e.y, team: e.team, shield: e.shield, armor: e.armor, maxShield: e.maxShield, maxArmor: e.maxArmor, dps: e.dps, dead: false }); return o; }
+function sideDriveShots(mine, foes, weights, esbx, dt, nowMs) {
+  const shots = [];
+  for (const e of mine) {
+    if (e.dead || e._player) continue;
+    const d = tacticsDecide(e, foes, weights, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
+    e._fleeing = !!d.fleeing; e._tgtId = (d.target && !d.target._flee) ? d.target.id : null;
+    if (!d.target) continue;
+    const ai = stepAI(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });
+    esbx.driveShip(e._bx, { turn: ai.turn, thrust: ai.thrust }, dt);
+    if (ai.thrust) { const hv = headingVector(e.heading); spawnFx(e.x - hv.x * 46, e.y - hv.y * 46, 22, FX_ENGINE, 0.13); }
+    if (ai.firing && d.engaging && nowMs >= (e._cool || 0)) { e._cool = nowMs + SHOT.cooldownMs; const dir = headingVector(e.heading); spawnFx(e.x + dir.x * 50, e.y + dir.y * 50, 38, e.team === "A" ? FX_MUZ_A : FX_MUZ_B, 0.10); shots.push({ team: e.team, x: e.x, y: e.y, vx: dir.x * SHOT.speed, vy: dir.y * SHOT.speed, life: SHOT.life }); }
+  }
+  return shots;
+}
+function advanceShots(shots, ships, dt) {
+  const rr = HIT_RADIUS * HIT_RADIUS, alive = [];
+  for (const sh of shots) {
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt; if (sh.life <= 0) continue;
+    let hit = false;
+    for (const e of ships) { if (e.dead || e.team === sh.team) continue; const dx = e.x - sh.x, dy = e.y - sh.y; if (dx * dx + dy * dy <= rr) { const killed = applyDamage(e, SHOT.dmgShield, SHOT.dmgArmor); if (killed) e.dead = true; spawnFx(sh.x, sh.y, killed ? 78 : 50, killed ? FX_KILL : FX_HIT, killed ? 0.30 : 0.15); hit = true; break; } }
+    if (!hit) alive.push(sh);
+  }
+  return alive;
+}
+// v2309 -- FX layer: short-lived additive glows spawned by the sim (muzzle, impact/kill, engine).
+const FX_ENGINE = [0.35, 0.6, 1.0], FX_MUZ_A = [0.6, 0.95, 1.0], FX_MUZ_B = [1.0, 0.85, 0.6], FX_HIT = [1.0, 0.8, 0.5], FX_KILL = [1.0, 0.6, 0.3];
+let fx = [];
+function spawnFx(x, y, size, col, life) { if (fx.length < MAXFX) fx.push({ x, y, size, r: col[0], g: col[1], b: col[2], life, max: life }); }
+function updateFx(dt) { for (let i = fx.length - 1; i >= 0; i--) { fx[i].life -= dt; if (fx[i].life <= 0) fx.splice(i, 1); } }
+function buildFx() { let n = 0; for (const p of fx) { if (n >= MAXFX) break; const f = Math.max(0, p.life / p.max); fxPos[n * 4] = p.x; fxPos[n * 4 + 1] = p.y; fxPos[n * 4 + 2] = p.size * (1.0 + 0.7 * (1 - f)); fxPos[n * 4 + 3] = f; fxCols[n * 3] = p.r; fxCols[n * 3 + 1] = p.g; fxCols[n * 3 + 2] = p.b; n++; } return n; }
+let A = [], B = [], shots = [], t = 0, esbx = null, ready = false, wins = { A: 0, B: 0 };
+let player = null, playerOn = false, pcool = 0;          // the player-flown ship (joins team A)
+const pin = { turn: 0, thrust: false, fire: false };     // player input -- same {turn:-1/0/+1, thrust} the AI produces
+let bhOn = false; const BH_RS = 120, BH_G = 40000000, BH_PULLCAP = 500, BH_CAP = 315;   // black hole at world origin (v2313)
+function makePlayer() { const p = makeFleet("A", { x: -1300, y: 600 }, 1, makeRng(777))[0]; p.id = "PLAYER"; p._player = true; return p; }
+function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, 0, 0] }) : planarFallbackWorld(); }
+function newBattle() {
+  const rng = makeRng((Math.random() * 1e9) | 0);
+  A = makeFleet("A", { x: -1300, y: 0 }, 6, rng); B = makeFleet("B", { x: 1300, y: 0 }, 6, rng);
+  if (playerOn) { player = makePlayer(); A.push(player); } else player = null;
+  esbx = createESBox3D(makeWorld(), { shipHalf: 60 });
+  for (const e of A.concat(B)) e._bx = esbx.add(e, e.stats);
+  shots = []; t = 0;
+}
+function stepSim() {
+  const dt = 1 / 30, nowMs = t * 1000;
+  const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
+  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); return; }
+  const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs);
+  const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);
+  const sP = [];
+  if (player && !player.dead) {                                   // player flies with the same driveShip path as the AI
+    esbx.driveShip(player._bx, { turn: pin.turn, thrust: pin.thrust }, dt);
+    if (pin.thrust) { const hv = headingVector(player.heading); spawnFx(player.x - hv.x * 48, player.y - hv.y * 48, 26, FX_ENGINE, 0.14); }
+    if (pin.fire && nowMs >= pcool) { pcool = nowMs + SHOT.cooldownMs; const dir = headingVector(player.heading); spawnFx(player.x + dir.x * 50, player.y + dir.y * 50, 40, FX_MUZ_A, 0.10); sP.push({ team: "A", x: player.x, y: player.y, vx: dir.x * SHOT.speed, vy: dir.y * SHOT.speed, life: SHOT.life }); }
+  }
+  let grav = null;
+  if (bhOn) {                                                    // gravity well: a non-accumulating pull toward the hole; capture at the shadow
+    grav = [];
+    for (const e of A.concat(B)) {
+      if (e.dead) continue;
+      const r = Math.hypot(e.x, e.y);
+      if (r < BH_CAP) { e.dead = true; spawnFx(e.x, e.y, 120, FX_KILL, 0.5); continue; }
+      const pull = Math.min(BH_G / (r * r), BH_PULLCAP);
+      const gx = -e.x / r * pull, gy = -e.y / r * pull;
+      esbx.nudge(e._bx, gx, gy); grav.push([e, gx, gy]);
+    }
+  }
+  esbx.step(dt); esbx.sync();
+  if (grav) { for (const g of grav) { if (!g[0].dead) { g[0].vx -= g[1]; g[0].vy -= g[2]; } } }   // the pull moved position this tick but must NOT build momentum (else it runs away)
+  shots = advanceShots(shots.concat(sA, sB, sP), A.concat(B), dt); t += dt;
+}
+
+// ===================== WebGPU 3D view =====================
+const canvas = document.getElementById("c");
+function fallback(why) { document.getElementById("hud").style.display = "none"; canvas.style.display = "none"; document.getElementById("fbwhy").textContent = why || ""; document.getElementById("fallback").style.display = "flex"; setTimeout(() => { location.href = "/es-box3d.html"; }, 4000); }
+
+// column-major mat4 (WebGPU NDC z in [0,1], y up) -- validated headless
+function perspZO(fovy, aspect, near, far) { const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far), o = new Float32Array(16); o[0] = f / aspect; o[5] = f; o[11] = -1; o[10] = far * nf; o[14] = far * near * nf; return o; }
+function lookAt(e, c, up) {
+  let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2]; let zl = Math.hypot(zx, zy, zz) || 1; zx /= zl; zy /= zl; zz /= zl;
+  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx; let xl = Math.hypot(xx, xy, xz) || 1; xx /= xl; xy /= xl; xz /= xl;
+  let yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx; const o = new Float32Array(16);
+  o[0] = xx; o[1] = yx; o[2] = zx; o[3] = 0; o[4] = xy; o[5] = yy; o[6] = zy; o[7] = 0; o[8] = xz; o[9] = yz; o[10] = zz; o[11] = 0;
+  o[12] = -(xx * e[0] + xy * e[1] + xz * e[2]); o[13] = -(yx * e[0] + yy * e[1] + yz * e[2]); o[14] = -(zx * e[0] + zy * e[1] + zz * e[2]); o[15] = 1; return o;
+}
+function mul(a, b) { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; }
+
+const SHIP_WGSL = `
+struct U { vp: mat4x4f };
+@group(0) @binding(0) var<uniform> u: U;
+struct O { @builtin(position) pos: vec4f, @location(0) col: vec3f, @location(1) nrm: vec3f };
+@vertex fn vs(@location(0) p: vec3f, @location(1) i0: vec4f, @location(2) i1: vec4f) -> O {
+  let fwd = vec3f(i0.z, 0.0, i0.w); let rgt = vec3f(i0.w, 0.0, -i0.z); let up = vec3f(0.0, 1.0, 0.0);
+  let off = p.x * fwd + p.y * up + p.z * rgt;
+  let world = vec3f(i0.x, 0.0, i0.y) + i1.w * off;
+  var o: O; o.pos = u.vp * vec4f(world, 1.0); o.nrm = normalize(off + vec3f(0.0001, 0.0, 0.0)); o.col = i1.xyz; return o;
+}
+@fragment fn fs(v: O) -> @location(0) vec4f { let l = normalize(vec3f(0.4, 0.8, 0.3)); let sh = 0.5 + 0.5 * max(dot(normalize(v.nrm), l), 0.0); return vec4f(v.col * sh, 1.0); }
+`;
+const GRID_WGSL = `
+struct U { vp: mat4x4f };
+@group(0) @binding(0) var<uniform> u: U;
+struct O { @builtin(position) pos: vec4f, @location(0) w: vec2f };
+@vertex fn vs(@builtin(vertex_index) vid: u32) -> O {
+  var q = array<vec2f,6>(vec2f(-1.,-1.), vec2f(1.,-1.), vec2f(-1.,1.), vec2f(-1.,1.), vec2f(1.,-1.), vec2f(1.,1.));
+  let G = 4200.0; let p = q[vid] * G; var o: O; o.pos = u.vp * vec4f(p.x, -2.0, p.y, 1.0); o.w = p; return o;
+}
+@fragment fn fs(v: O) -> @location(0) vec4f {
+  let sp = 220.0; let g = abs(fract(v.w / sp - 0.5) - 0.5) / fwidth(v.w / sp);
+  let line = 1.0 - min(min(g.x, g.y), 1.0);
+  let fade = clamp(1.0 - length(v.w) / 4200.0, 0.0, 1.0);
+  return vec4f(vec3f(0.12, 0.22, 0.4) * line * fade, line * fade * 0.6);
+}
+`;
+const SHOT_WGSL = `
+struct U { vp: mat4x4f };
+@group(0) @binding(0) var<uniform> u: U;
+struct O { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec3f };
+@vertex fn vs(@builtin(vertex_index) vid: u32, @location(0) inst: vec4f, @location(1) col: vec3f) -> O {
+  var q = array<vec2f,6>(vec2f(-1.,-1.), vec2f(1.,-1.), vec2f(-1.,1.), vec2f(-1.,1.), vec2f(1.,-1.), vec2f(1.,1.));
+  let s = 34.0; let c = q[vid]; let world = vec3f(inst.x + c.x * s, 6.0, inst.y + c.y * s);
+  var o: O; o.pos = u.vp * vec4f(world, 1.0); o.uv = c; o.col = col; return o;
+}
+@fragment fn fs(v: O) -> @location(0) vec4f { let d = 1.0 - clamp(length(v.uv), 0.0, 1.0); return vec4f(v.col * d, d); }
+`;
+// v2309 -- FX: additive glow quads with per-instance size + alpha (muzzle flash, impact/kill burst, engine glow).
+const FX_WGSL = `
+struct U { vp: mat4x4f };
+@group(0) @binding(0) var<uniform> u: U;
+struct O { @builtin(position) pos: vec4f, @location(0) uv: vec2f, @location(1) col: vec3f, @location(2) a: f32 };
+@vertex fn vs(@builtin(vertex_index) vid: u32, @location(0) inst: vec4f, @location(1) col: vec3f) -> O {
+  var q = array<vec2f,6>(vec2f(-1.,-1.), vec2f(1.,-1.), vec2f(-1.,1.), vec2f(-1.,1.), vec2f(1.,-1.), vec2f(1.,1.));
+  let s = inst.z; let c = q[vid]; let world = vec3f(inst.x + c.x * s, 8.0, inst.y + c.y * s);
+  var o: O; o.pos = u.vp * vec4f(world, 1.0); o.uv = c; o.col = col; o.a = inst.w; return o;
+}
+@fragment fn fs(v: O) -> @location(0) vec4f { let d = 1.0 - clamp(length(v.uv), 0.0, 1.0); let g = d * d; return vec4f(v.col * g * v.a, g * v.a); }
+`;
+
+// v2313 -- lensing backdrop: a Schwarzschild black hole ray-traced from the SCENE camera (BH at world origin,
+// disk in the battle plane y=0), drawn behind the ships. Same photon-geodesic core as blackhole.html.
+const BACKDROP_WGSL = `
+struct C { eye: vec4f, fwd: vec4f, rgt: vec4f, up: vec4f, prm: vec4f, vp0: vec4f, vp1: vec4f, vp2: vec4f, vp3: vec4f };
+@group(0) @binding(0) var<uniform> c: C;
+@group(0) @binding(1) var samp: sampler;
+@group(0) @binding(2) var scene: texture_2d<f32>;
+@group(0) @binding(3) var sceneDepth: texture_depth_2d;
+@vertex fn vs(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4f {
+  var p = array<vec2f,3>(vec2f(-1.,-1.), vec2f(3.,-1.), vec2f(-1.,3.)); return vec4f(p[vid], 0., 1.);
+}
+fn n3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(12.9898, 78.233, 37.719))) * 43758.5453); }
+fn sky(dir: vec3f) -> vec3f {
+  let neb = 0.5 + 0.5 * sin(dir.x * 3.1 + dir.z * 2.3 + dir.y * 1.7);
+  var col = vec3f(0.015, 0.02, 0.05) * neb;
+  for (var o = 0; o < 3; o = o + 1) {
+    let sc = 55.0 * pow(2.0, f32(o)); let g = dir * sc; let id = floor(g); let fp = fract(g); let hh = n3(id + f32(o) * 17.0);
+    if (hh > 0.987) { let d = length(fp - vec3f(0.5)); let star = smoothstep(0.55, 0.0, d) * (hh - 0.987) / 0.013;
+      col = col + mix(vec3f(0.7, 0.82, 1.0), vec3f(1.0, 0.9, 0.7), n3(id + 3.0)) * star * 1.2; }
+  }
+  return col;
+}
+fn disk(r: f32, pos: vec3f, rs: f32) -> vec3f {
+  let rIn = 3.0 * rs; let rOut = 11.0 * rs; if (r < rIn || r > rOut) { return vec3f(0.0); }
+  let tn = clamp((rOut - r) / (rOut - rIn), 0.0, 1.0);
+  let temp = mix(vec3f(1.0, 0.45, 0.12), vec3f(1.0, 0.96, 0.88), tn * tn);
+  let ang = atan2(pos.z, pos.x); let band = 0.75 + 0.25 * sin(ang * 24.0 + r * 0.03) + 0.15 * sin(ang * 7.0);
+  let dopp = 1.0 + 0.6 * sin(ang); return temp * pow(tn, 1.3) * band * dopp * 1.6;
+}
+@fragment fn fs(@builtin(position) frag: vec4f) -> @location(0) vec4f {
+  let res = vec2f(c.eye.w, c.fwd.w); let ndc = vec2f(frag.x / res.x * 2.0 - 1.0, 1.0 - frag.y / res.y * 2.0);
+  let holeNdcZ = c.vp3.z / c.vp3.w;                                               // depth of the hole center (plane test)
+  let px = vec2i(i32(frag.x), i32(frag.y)); let sD = textureLoad(sceneDepth, px, 0);
+  if (sD < holeNdcZ - 1e-4) { return vec4f(textureLoad(scene, px, 0).rgb, 1.0); } // scene surface in FRONT of the hole -> undistorted
+  let rd = normalize(c.fwd.xyz + ndc.x * c.rgt.w * c.up.w * c.rgt.xyz + ndc.y * c.rgt.w * c.up.xyz);
+  let ro = c.eye.xyz; let rs = c.prm.x; let diskOn = c.prm.y;
+  let r0 = length(ro); let er = normalize(ro); let f = -er;
+  let ci = dot(rd, f); let tang = rd - dot(rd, er) * er; let stl = length(tang);
+  let s = select(normalize(c.rgt.xyz - dot(c.rgt.xyz, er) * er), tang / max(stl, 1e-6), stl > 1e-4);
+  var uu = 1.0 / r0; var du = uu * ci / max(stl, 1e-3);
+  var phi = 0.0; var prevY = ro.y; var col = vec3f(0.0); var done = false;
+  let dphi = 0.035;
+  for (var i = 0; i < 260; i = i + 1) {
+    let a0 = du; let a1 = 1.5 * rs * uu * uu - uu;
+    let b0 = du + 0.5 * dphi * a1; let bu = uu + 0.5 * dphi * a0; let b1 = 1.5 * rs * bu * bu - bu;
+    let cc0 = du + 0.5 * dphi * b1; let cu = uu + 0.5 * dphi * b0; let cc1 = 1.5 * rs * cu * cu - cu;
+    let d0 = du + dphi * cc1; let dcu = uu + dphi * cc0; let d1 = 1.5 * rs * dcu * dcu - dcu;
+    uu = uu + dphi / 6.0 * (a0 + 2.0 * b0 + 2.0 * cc0 + d0);
+    du = du + dphi / 6.0 * (a1 + 2.0 * b1 + 2.0 * cc1 + d1);
+    phi = phi + dphi; if (uu <= 0.0) { uu = 1e-5; }
+    let r = 1.0 / uu; if (r <= rs) { done = true; break; }
+    let pos = r * (cos(phi) * er + sin(phi) * s);
+    if (diskOn > 0.5 && (pos.y * prevY) < 0.0) { col = col + disk(r, pos, rs); }
+    prevY = pos.y;
+    if (r > r0 * 2.4 && du < 0.0) {
+      let vel = (-du / (uu * uu)) * (cos(phi) * er + sin(phi) * s) + r * (-sin(phi) * er + cos(phi) * s); let ed = normalize(vel);
+      col = col + sky(ed);
+      let clip = ed.x * c.vp0 + ed.y * c.vp1 + ed.z * c.vp2;                                 // project the bent exit ray back to screen
+      if (clip.w > 0.0) { var uvp = clip.xy / clip.w; uvp = uvp * 0.5 + 0.5; uvp.y = 1.0 - uvp.y;
+        if (uvp.x >= 0.0 && uvp.x <= 1.0 && uvp.y >= 0.0 && uvp.y <= 1.0) {
+          let bpx = vec2i(i32(uvp.x * res.x), i32(uvp.y * res.y)); let bd = textureLoad(sceneDepth, bpx, 0);
+          if (bd > holeNdcZ && bd < 0.99999) { col = col + textureSampleLevel(scene, samp, uvp, 0.0).rgb; }   // lens only what's BEHIND the hole
+        } }   // lensed ships/shots
+      done = true; break;
+    }
+  }
+  col = col / (col + vec3f(1.0)); col = pow(col, vec3f(0.82));
+  return vec4f(col, 1.0);
+}
+`;
+
+let device, ctx, format, uBuf, bind, shipPipe, gridPipe, shotPipe, fxPipe, meshBuf, instBuf, shotInst, shotCol, fxInst, fxCol, depthTex;
+let bhPipe, bhUBO, bhBind, sceneTex, sceneView, depthView, sampler;
+const bhCam = new Float32Array(36);   // 5 vec4 camera + mat4 viewProj
+const MAXSHIP = 64, MAXSHOT = 1024, MAXFX = 512;
+const instData = new Float32Array(MAXSHIP * 8);      // x,z,hvx,hvz, r,g,b, scale
+const shotPos = new Float32Array(MAXSHOT * 4);       // x,z,_,_
+const shotColArr = new Float32Array(MAXSHOT * 3);
+const fxPos = new Float32Array(MAXFX * 4);           // x,z,size,alpha
+const fxCols = new Float32Array(MAXFX * 3);
+
+function shipMesh() {
+  // a little dart pointing +X (nose along heading); +Y is dorsal
+  const N = [1.6, 0, 0], TL = [-0.9, 0, 0.7], TR = [-0.9, 0, -0.7], TP = [-0.5, 0.5, 0];
+  const tris = [N, TL, TR, N, TP, TL, N, TR, TP, TL, TR, TP];
+  return new Float32Array(tris.flat());
+}
+
+async function initGPU() {
+  if (!navigator.gpu) { fallback("navigator.gpu is undefined (no WebGPU)."); return false; }
+  let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
+  if (!adapter) { fallback("no GPU adapter."); return false; }
+  try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
+  device.lost.then((i) => { if (i && i.reason !== "destroyed") fallback("GPU device lost: " + i.message); });
+  // v3822 -- SURFACE RUNTIME WEBGPU ERRORS. The shaders below are checked for COMPILE errors, but a black
+  // screen with the sim still running is the signature of a RENDER-TIME validation error (a bad bind group,
+  // a format or attachment mismatch, an exceeded limit) -- and those are asynchronous, so nothing throws and
+  // init() returns true. This handler prints the first such error to the console AND the on-page banner, so a
+  // black frame says WHY instead of nothing.
+  let _gpuErrShown = false;
+  device.addEventListener("uncapturederror", (ev) => {
+    const m = (ev.error && ev.error.message) || String(ev.error);
+    console.error("[flight-gpu] WebGPU error:", m);
+    if (_gpuErrShown) return; _gpuErrShown = true;
+    try { const s = document.getElementById("stat"); if (s) s.innerHTML = "<span style=\"color:#ff8a8a\">WebGPU error</span> \u00b7 " + String(m).replace(/&/g, "&amp;").replace(/</g, "&lt;"); } catch (_) {}
+  });
+  ctx = canvas.getContext("webgpu"); if (!ctx) { fallback("getContext('webgpu') null."); return false; }
+  format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode: "opaque" });
+
+  uBuf = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  meshBuf = device.createBuffer({ size: shipMesh().byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(meshBuf, 0, shipMesh());
+  instBuf = device.createBuffer({ size: instData.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  shotInst = device.createBuffer({ size: shotPos.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  shotCol = device.createBuffer({ size: shotColArr.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  fxInst = device.createBuffer({ size: fxPos.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+  fxCol = device.createBuffer({ size: fxCols.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+
+  const modS = device.createShaderModule({ code: SHIP_WGSL });
+  const modG = device.createShaderModule({ code: GRID_WGSL });
+  const modH = device.createShaderModule({ code: SHOT_WGSL });
+  const modFX = device.createShaderModule({ code: FX_WGSL });
+  for (const [nm, mod] of [["ship", modS], ["grid", modG], ["shot", modH], ["fx", modFX]]) {
+    const ci = mod.getCompilationInfo ? await mod.getCompilationInfo() : null;
+    if (ci) for (const m of ci.messages) if (m.type === "error") { fallback("WGSL (" + nm + ") error: " + m.message); return false; }
+  }
+  const DS = { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" };
+  try {
+    shipPipe = device.createRenderPipeline({
+      layout: "auto", primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: DS,
+      vertex: { module: modS, entryPoint: "vs", buffers: [
+        { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
+        { arrayStride: 32, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }, { shaderLocation: 2, offset: 16, format: "float32x4" }] },
+      ] },
+      fragment: { module: modS, entryPoint: "fs", targets: [{ format }] },
+    });
+    gridPipe = device.createRenderPipeline({
+      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      vertex: { module: modG, entryPoint: "vs" },
+      fragment: { module: modG, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+    });
+    shotPipe = device.createRenderPipeline({
+      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      vertex: { module: modH, entryPoint: "vs", buffers: [
+        { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
+        { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
+      ] },
+      fragment: { module: modH, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+    });
+    fxPipe = device.createRenderPipeline({
+      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      vertex: { module: modFX, entryPoint: "vs", buffers: [
+        { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
+        { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
+      ] },
+      fragment: { module: modFX, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
+    });
+  } catch (e) { fallback("pipeline failed: " + e.message); return false; }
+  bind = device.createBindGroup({ layout: shipPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uBuf } }] });
+  bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+  const modBD = device.createShaderModule({ code: BACKDROP_WGSL });
+  if (modBD.getCompilationInfo) { const ci = await modBD.getCompilationInfo(); for (const m of ci.messages) if (m.type === "error") { fallback("WGSL (backdrop) error: " + m.message); return false; } }
+  try {
+    bhPipe = device.createRenderPipeline({ layout: "auto", vertex: { module: modBD, entryPoint: "vs" }, fragment: { module: modBD, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
+  } catch (e) { fallback("backdrop pipeline failed: " + e.message); return false; }
+  return true;
+}
+
+function resizeTargets() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1); const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h || !depthTex) {
+    canvas.width = w; canvas.height = h;
+    if (depthTex) depthTex.destroy(); depthTex = device.createTexture({ size: [w, h], format: "depth32float", usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    if (sceneTex) sceneTex.destroy(); sceneTex = device.createTexture({ size: [w, h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+    sceneView = sceneTex.createView(); depthView = depthTex.createView();
+    bhBind = device.createBindGroup({ layout: bhPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bhUBO } }, { binding: 1, resource: sampler }, { binding: 2, resource: sceneView }, { binding: 3, resource: depthView }] });
+  }
+}
+
+let camMode = "orbit", theta = 0.4, followIdx = 0;
+function buildInstances() {
+  let n = 0;
+  const push = (e) => { if (e.dead || n >= MAXSHIP) return; const hv = headingVector(e.heading); const hp = (e.shield + e.armor) / ((e.maxShield || 1) + (e.maxArmor || 1)); const dim = 0.45 + 0.55 * Math.max(0, Math.min(1, hp)); const col = e._player ? [0.75 * dim + 0.15, 1.0 * dim, 0.35 * dim] : (e.team === "A" ? [0.30 * dim + 0.1, 0.80 * dim, 1.0 * dim] : [1.0 * dim, 0.62 * dim, 0.30 * dim + 0.05]); const o = n * 8; instData[o] = e.x; instData[o + 1] = e.y; instData[o + 2] = hv.x; instData[o + 3] = hv.y; instData[o + 4] = col[0]; instData[o + 5] = col[1]; instData[o + 6] = col[2]; instData[o + 7] = e._player ? 70 : 55; n++; };
+  for (const e of A) push(e); for (const e of B) push(e);
+  return n;
+}
+function buildShots() { let n = 0; for (const sh of shots) { if (n >= MAXSHOT) break; shotPos[n * 4] = sh.x; shotPos[n * 4 + 1] = sh.y; const c = sh.team === "A" ? [0.5, 0.9, 1.0] : [1.0, 0.8, 0.5]; shotColArr[n * 3] = c[0]; shotColArr[n * 3 + 1] = c[1]; shotColArr[n * 3 + 2] = c[2]; n++; } return n; }
+function battleCenter() { let cx = 0, cy = 0, k = 0; for (const e of A.concat(B)) if (!e.dead) { cx += e.x; cy += e.y; k++; } if (!k) return [0, 0]; return [cx / k, cy / k]; }
+
+function render() {
+  resizeTargets();
+  const nShip = buildInstances(); device.queue.writeBuffer(instBuf, 0, instData, 0, nShip * 8 || 8);
+  const nShot = buildShots(); if (nShot) { device.queue.writeBuffer(shotInst, 0, shotPos, 0, nShot * 4); device.queue.writeBuffer(shotCol, 0, shotColArr, 0, nShot * 3); }
+  const nFx = buildFx(); if (nFx) { device.queue.writeBuffer(fxInst, 0, fxPos, 0, nFx * 4); device.queue.writeBuffer(fxCol, 0, fxCols, 0, nFx * 3); }
+
+  const [ccx, ccy] = battleCenter();
+  let eye, center;
+  if (camMode === "player" && player && !player.dead) {
+    const hv = headingVector(player.heading);
+    eye = [player.x - hv.x * 430, 235, player.y - hv.y * 430]; center = [player.x + hv.x * 340, 18, player.y + hv.y * 340];
+  } else if (camMode === "follow" && A.concat(B).some((e) => !e.dead)) {
+    const list = A.concat(B).filter((e) => !e.dead); const me = list[followIdx % list.length]; const hv = headingVector(me.heading);
+    eye = [me.x - hv.x * 520 + 60, 260, me.y - hv.y * 520 + 60]; center = [me.x + hv.x * 300, 40, me.y + hv.y * 300];
+  } else { theta += 0.0016; const R = 2900, hgt = 1500; eye = [ccx + Math.cos(theta) * R, hgt, ccy + Math.sin(theta) * R]; center = [ccx, 0, ccy]; }
+  const view = lookAt(eye, center, [0, 1, 0]); const proj = perspZO(52 * Math.PI / 180, canvas.width / canvas.height, 12, 12000);
+  device.queue.writeBuffer(uBuf, 0, mul(proj, view));
+  if (bhOn) {
+    let fx0 = center[0] - eye[0], fy0 = center[1] - eye[1], fz0 = center[2] - eye[2]; const fl = Math.hypot(fx0, fy0, fz0) || 1; fx0 /= fl; fy0 /= fl; fz0 /= fl;   // forward
+    let rx = -fz0, ry = 0, rz = fx0; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;                                                    // right = norm(cross(fwd,(0,1,0)))
+    const ux = ry * fz0 - rz * fy0, uy = rz * fx0 - rx * fz0, uz = rx * fy0 - ry * fx0;                                                                        // up = cross(right, fwd)
+    const tanHalf = Math.tan(52 * Math.PI / 180 / 2), aspect = canvas.width / canvas.height;
+    bhCam.set([eye[0], eye[1], eye[2], canvas.width,  fx0, fy0, fz0, canvas.height,  rx, ry, rz, tanHalf,  ux, uy, uz, aspect,  BH_RS, 1, 0, 0]);
+    bhCam.set(mul(proj, view), 20);                                                                                           // viewProj for projecting bent rays back to screen
+    device.queue.writeBuffer(bhUBO, 0, bhCam);
+  }
+
+  const enc = device.createCommandEncoder();
+  if (bhOn) {
+    // Pass A: render the scene (ships/shots/fx) to an offscreen texture.
+    const pa = enc.beginRenderPass({
+      colorAttachments: [{ view: sceneView, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }],
+      depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" },
+    });
+    pa.setBindGroup(0, bind);
+    if (nShip) { pa.setPipeline(shipPipe); pa.setVertexBuffer(0, meshBuf); pa.setVertexBuffer(1, instBuf); pa.draw(12, nShip); }
+    if (nShot) { pa.setPipeline(shotPipe); pa.setVertexBuffer(0, shotInst); pa.setVertexBuffer(1, shotCol); pa.draw(6, nShot); }
+    if (nFx) { pa.setPipeline(fxPipe); pa.setVertexBuffer(0, fxInst); pa.setVertexBuffer(1, fxCol); pa.draw(6, nFx); }
+    pa.end();
+    // Pass B: the lensing shader samples that texture through the bent rays -> ships behind the hole warp.
+    const pb = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+    pb.setPipeline(bhPipe); pb.setBindGroup(0, bhBind); pb.draw(3); pb.end();
+  } else {
+    const pass = enc.beginRenderPass({
+      colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.016, g: 0.024, b: 0.047, a: 1 }, loadOp: "clear", storeOp: "store" }],
+      depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" },
+    });
+    pass.setBindGroup(0, bind);
+    pass.setPipeline(gridPipe); pass.draw(6);
+    if (nShip) { pass.setPipeline(shipPipe); pass.setVertexBuffer(0, meshBuf); pass.setVertexBuffer(1, instBuf); pass.draw(12, nShip); }
+    if (nShot) { pass.setPipeline(shotPipe); pass.setVertexBuffer(0, shotInst); pass.setVertexBuffer(1, shotCol); pass.draw(6, nShot); }
+    if (nFx) { pass.setPipeline(fxPipe); pass.setVertexBuffer(0, fxInst); pass.setVertexBuffer(1, fxCol); pass.draw(6, nFx); }
+    pass.end();
+  }
+  device.queue.submit([enc.finish()]);
+}
+
+let acc = 0, last = performance.now();
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now(); const frameDt = Math.min(0.1, (now - last) / 1000); acc += frameDt; last = now;
+  let steps = 0; while (acc >= 1 / 30 && steps < 4) { stepSim(); acc -= 1 / 30; steps++; }
+  updateFx(frameDt);
+  render();
+  const el = document.getElementById("stat"); if (el) el.textContent = "A " + A.filter((e) => !e.dead).length + " vs B " + B.filter((e) => !e.dead).length + "  \u00b7  battles A:" + wins.A + " B:" + wins.B + "  \u00b7  " + (ready ? "box3d" : "fallback") + " \u00b7 " + shots.length + " shots";
+  const ps = document.getElementById("pstat"); if (ps) ps.textContent = (playerOn && player) ? (player.dead ? "  \u00b7  \uD83D\uDC80 destroyed \u2014 press R to respawn" : "  \u00b7  \uD83D\uDD79\uFE0F hull " + Math.max(0, Math.round(player.shield + player.armor)) + "  \u00b7  A/D \u2190\u2192 steer, W/\u2191 thrust, Space fire") : "";
+}
+
+// ---- controls ----
+document.getElementById("cam").onclick = (e) => { camMode = camMode === "orbit" ? "follow" : camMode === "follow" ? "player" : "orbit"; if (camMode === "follow") followIdx = (followIdx + 1) % 12; e.target.textContent = "cam: " + camMode; };
+// v2308 -- player-flown ship. The player joins team A and flies with the SAME driveShip path + {turn,thrust}
+// the AI uses (input IS the lockstep currency, so this ship is co-op-ready by construction). Enemies already
+// target team A, so you become a valid target the moment you spawn.
+document.getElementById("fly").onclick = (e) => {
+  playerOn = !playerOn;
+  e.target.innerHTML = playerOn ? "\uD83D\uDD79\uFE0F Stop" : "\uD83D\uDD79\uFE0F Fly";
+  e.target.style.color = playerOn ? "#c8e89a" : "";
+  camMode = playerOn ? "player" : "orbit";
+  document.getElementById("cam").textContent = "cam: " + camMode;
+  newBattle();
+};
+document.getElementById("bh").onclick = (e) => { bhOn = !bhOn; e.target.innerHTML = bhOn ? "\uD83D\uDD73\uFE0F BH: on" : "\uD83D\uDD73\uFE0F Black hole"; e.target.style.color = bhOn ? "#ffb066" : ""; };
+addEventListener("keydown", (ev) => {
+  let h = true;
+  if (ev.code === "ArrowLeft" || ev.code === "KeyA") pin.turn = -1;
+  else if (ev.code === "ArrowRight" || ev.code === "KeyD") pin.turn = 1;
+  else if (ev.code === "ArrowUp" || ev.code === "KeyW") pin.thrust = true;
+  else if (ev.code === "Space") pin.fire = true;
+  else if (ev.code === "KeyR" && player && player.dead) newBattle();
+  else h = false;
+  if (h && playerOn) ev.preventDefault();
+});
+addEventListener("keyup", (ev) => {
+  if ((ev.code === "ArrowLeft" || ev.code === "KeyA") && pin.turn === -1) pin.turn = 0;
+  else if ((ev.code === "ArrowRight" || ev.code === "KeyD") && pin.turn === 1) pin.turn = 0;
+  else if (ev.code === "ArrowUp" || ev.code === "KeyW") pin.thrust = false;
+  else if (ev.code === "Space") pin.fire = false;
+});
+const recBtn = document.getElementById("rec");
+recBtn.onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); recBtn.textContent = "\u25CF Record"; recBtn.classList.remove("on"); return; }
+  const secs = +(document.getElementById("recDur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, canvas)) { recBtn.textContent = "\u25A0 recording " + secs + "s"; recBtn.classList.add("on"); setTimeout(() => { recBtn.textContent = "\u25CF Record"; recBtn.classList.remove("on"); }, secs * 1000 + 200); }
+  else { recBtn.textContent = "no MediaRecorder"; }
+};
+
+// ---- boot ----
+(async () => {
+  const okGpu = await initGPU(); if (!okGpu) return;
+  const modeEl = document.getElementById("mode");
+  let st = { ready: false }; try { st = await box3d.init(); } catch (e) { st = { ready: false, reason: e && e.message }; }
+  ready = !!st.ready; modeEl.textContent = ready ? "box3d WASM \u00b7 WebGPU 3D" : "JS fallback \u00b7 WebGPU 3D"; modeEl.className = ready ? "" : "fallback";
+  newBattle(); loop();
+})();
+</script>
+</body>
+</html>

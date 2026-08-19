@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Universal Viewer — SweK Engine Demos</title>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  /* ─── Reset + base ─────────────────────────────────────────── */
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    background: #0a0f1a;
+    color: #cde;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace;
+    overflow: hidden;
+  }
+  #app { display: flex; height: 100vh; width: 100vw; }
+  #sidebar {
+    width: 300px; min-width: 300px;
+    background: rgba(15, 22, 35, 0.97);
+    border-right: 1px solid rgba(90, 200, 255, 0.2);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #stage {
+    flex: 1;
+    display: flex; flex-direction: column;
+    background: #04030a;
+    min-width: 0;
+  }
+  #stageBar {
+    background: rgba(20, 28, 38, 0.97);
+    border-bottom: 1px solid rgba(90, 200, 255, 0.2);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    color: #cde;
+    font-size: 13px;
+  }
+  #stageTitle {
+    font-weight: 600; color: #bfe;
+    flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #stageDesc {
+    color: #9ab; font-size: 11px;
+    flex: 0 0 auto;
+    max-width: 35%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .stage-btn {
+    background: rgba(70, 120, 180, 0.3);
+    color: #bfe;
+    border: 1px solid rgba(120, 180, 240, 0.4);
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .stage-btn:hover { background: rgba(70, 120, 180, 0.5); }
+  .stage-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #frameWrap { flex: 1; position: relative; overflow: hidden; display: flex; }
+  #frame {
+    flex: 1;
+    border: 0; background: #04030a;
+  }
+  #welcome {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    color: #789; pointer-events: none;
+  }
+  #welcome h2 { color: #bfe; margin: 0; font-weight: 500; }
+  #welcome p { margin: 0; font-size: 12px; max-width: 420px; text-align: center; line-height: 1.5; }
+  #welcome kbd { background: #1a2333; color: #cde; padding: 1px 5px; border-radius: 3px; border: 1px solid #345; font-size: 11px; }
+
+  /* ─── Controls panel (right side, collapsible) ─────────── */
+  #controls {
+    width: 220px;
+    background: rgba(15, 22, 35, 0.97);
+    border-left: 1px solid rgba(90, 200, 255, 0.2);
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: none;
+    flex-shrink: 0;
+  }
+  #controls.visible { display: block; }
+  #controls h3 {
+    margin: 0 0 8px;
+    font-size: 11px; font-weight: 600;
+    color: #7af; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .ctrl-row { margin-bottom: 10px; }
+  .ctrl-row label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: #9ab; margin-bottom: 3px;
+  }
+  .ctrl-row label .v { color: #cde; font-family: monospace; }
+  .ctrl-row input[type=range] { width: 100%; margin: 0; }
+  .ctrl-empty { color: #678; font-size: 11px; font-style: italic; text-align: center; padding: 14px 0; }
+
+  /* ─── Sidebar ─────────────────────────────────────── */
+  #sbHeader {
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid rgba(90, 200, 255, 0.15);
+  }
+  #sbTitle {
+    font-size: 13px; font-weight: 600;
+    color: #bfe;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #sbTitle .count { color: #789; font-weight: 400; font-size: 11px; }
+  #discoStatus { color: #9ab; font-size: 9px; margin-left: auto; }
+  #discoStatus.scanning { color: #fc7; }
+  #discoStatus.done { color: #7c9; }
+  #search {
+    width: 100%; box-sizing: border-box;
+    background: #1a2333; color: #cde;
+    border: 1px solid #345;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  #catRow {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-top: 8px;
+  }
+  .cat-chip {
+    background: #1a2333; color: #9ab;
+    border: 1px solid #234;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px; cursor: pointer;
+    user-select: none;
+  }
+  .cat-chip.active { background: rgba(90, 160, 220, 0.3); color: #bfe; border-color: rgba(120, 180, 240, 0.5); }
+
+  #sbList { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .demo-row {
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    border-left: 3px solid transparent;
+  }
+  .demo-row:hover {
+    background: rgba(70, 120, 180, 0.1);
+    border-left-color: rgba(90, 160, 220, 0.4);
+  }
+  .demo-row.active {
+    background: rgba(70, 120, 180, 0.22);
+    border-left-color: #4af;
+  }
+  .demo-row .swatch {
+    width: 36px; height: 36px; flex: 0 0 36px;
+    border-radius: 4px;
+    background: #234; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: #cde;
+    overflow: hidden;
+  }
+  .demo-row .swatch img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .demo-row .swatch.protocol-on::after {
+    content: "·";
+    position: absolute; margin-top: -28px; margin-left: 26px;
+    color: #4f9; font-weight: 900; font-size: 20px;
+    text-shadow: 0 0 4px #4f9;
+  }
+  .demo-row .meta { flex: 1; min-width: 0; }
+  .demo-row .name {
+    font-size: 12px; color: #cde; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .demo-row .desc {
+    font-size: 10px; color: #789;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin-top: 1px;
+  }
+  @media (max-width: 900px) { #controls { width: 180px; } }
+  @media (max-width: 720px) {
+    #app { flex-direction: column; }
+    #sidebar { width: 100%; min-width: 0; max-height: 35vh; border-right: 0; border-bottom: 1px solid rgba(90, 200, 255, 0.2); }
+    #stageBar { font-size: 11px; padding: 8px 12px; }
+    #stageDesc { display: none; }
+    #controls { display: none !important; }   /* hide controls on phone */
+  }
+</style>
+<!-- v860 — KPop avatar favorites store. Loaded in head so the Avatar
+     Gallery view in this file can read window.kpopFavorites. -->
+<script type="module" src="./ui/kpopFavorites.js"></script>
+<!-- v863 — avatar costume store. Same loading pattern; auto-installs
+     window.avatarCostumes for the gallery's per-row costume picker. -->
+<script type="module" src="./ui/avatarCostumes.js"></script>
+<!-- v866 — avatar accessories store. Drives the variant controls panel
+     under the iframe + the per-row swatches (future). -->
+<script type="module" src="./ui/avatarAccessories.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- ─── Sidebar ─────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div id="sbHeader">
+      <div id="sbTitle">
+        <span id="sbModeTitle">🎛 Universal Viewer</span>
+        <span class="count" id="countLabel"></span>
+        <span id="discoStatus"></span>
+      </div>
+      <!-- v860 — view mode toggle. Demos (default) vs Avatar Gallery
+           (Your_Avatars folder + built-ins + favorites with ⭐ buttons). -->
+      <div id="viewModeRow" style="display:flex; gap:4px; padding:4px 8px 0;">
+        <button id="modeDemos"   class="mode-btn active" data-mode="demos"   style="flex:1; padding:6px 8px; background:rgba(80,120,200,0.4); color:#cef; border:1px solid rgba(120,200,255,0.4); border-radius:4px; cursor:pointer; font-size:12px;">🎛 Demos</button>
+        <button id="modeAvatars" class="mode-btn"        data-mode="avatars" style="flex:1; padding:6px 8px; background:rgba(40,60,80,0.5); color:#9ab; border:1px solid rgba(120,200,255,0.2); border-radius:4px; cursor:pointer; font-size:12px;">🎭 Avatars</button>
+        <button id="modePipeline" class="mode-btn"        data-mode="pipeline" style="flex:1; padding:6px 8px; background:rgba(40,60,80,0.5); color:#9ab; border:1px solid rgba(120,200,255,0.2); border-radius:4px; cursor:pointer; font-size:12px;">🧩 Pipeline</button>
+      </div>
+      <input id="search" type="search" placeholder="Search demos…" autocomplete="off">
+      <div id="catRow"></div>
+    </div>
+    <div id="sbList"></div>
+  </aside>
+
+  <!-- ─── Stage ───────────────────────────────────────────── -->
+  <main id="stage">
+    <header id="stageBar">
+      <div id="stageTitle">Pick a demo →</div>
+      <div id="stageDesc"></div>
+      <button id="thumbBtn"    class="stage-btn" title="Snapshot the current view as this demo's thumbnail" style="display:none">📸 Snap</button>
+      <button id="ctrlsBtn"    class="stage-btn" title="Toggle controls panel">⚙</button>
+      <a      id="openTab"     class="stage-btn" target="_blank" rel="noopener" style="display:none">↗ New tab</a>
+      <button id="prevBtn"     class="stage-btn" title="Previous (↑)">↑</button>
+      <button id="nextBtn"     class="stage-btn" title="Next (↓)">↓</button>
+    </header>
+    <!-- v874 — stage body is a horizontal flex row so the avatar
+         controls panel can sit to the LEFT of the iframe instead of
+         below it (user request: "vertical on the left between model
+         and wall"). When avatarControls is display:none (demos mode)
+         the iframe gets the full width. -->
+    <div id="stageBody" style="flex:1; display:flex; flex-direction:row; min-height:0;">
+      <!-- Avatar variant controls — vertical column. Visible only in
+           avatar gallery mode when an avatar is loaded in the iframe.
+           Section headers stack top-to-bottom; variant buttons within
+           each section wrap to fit the narrow column width.
+           All buttons live-sync with the global stores so picks here
+           AND picks made inside the iframe (RobotExpressive.html) stay
+           consistent. -->
+      <div id="avatarControls" style="display:none; flex:0 0 200px; width:200px; background:rgba(15,22,35,0.95); border-right:1px solid rgba(90,200,255,0.2); padding:10px 12px; overflow-y:auto; font-size:12px; color:#cde;">
+        <div id="acRowCostume"        style="margin-bottom:10px;"></div>
+        <div id="acRowHat"            style="margin-bottom:10px;"></div>
+        <div id="acRowEyewear"        style="margin-bottom:10px;"></div>
+        <div id="acRowCape"           style="margin-bottom:10px;"></div>
+        <div id="acRowStreamer"       style="margin-bottom:10px;"></div>
+        <div id="acRowHatColor"       style="margin-bottom:10px;"></div>
+        <div id="acRowEyewearColor"   style="margin-bottom:10px;"></div>
+        <div id="acRowCapeColor"      style="margin-bottom:10px;"></div>
+        <div id="acRowStreamerColor"  style="margin-bottom:10px;"></div>
+        <div id="acRowWind"           style="margin-bottom:4px;"></div>
+      </div>
+      <div id="frameWrap" style="flex:1; position:relative;">
+        <div id="welcome">
+          <h2>SweK Engine Demo Catalog</h2>
+          <p>Pick a demo from the sidebar. <kbd>↑</kbd>/<kbd>↓</kbd> navigates, <kbd>/</kbd> focuses search.<br>
+          Demos with a green dot in the sidebar implement the universal protocol — they expose tunable parameters in the <kbd>⚙</kbd> panel and can snapshot their canvas to a thumbnail (<kbd>📸 Snap</kbd>).</p>
+        </div>
+        <iframe id="frame" title="Selected demo" allowfullscreen sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-modals allow-forms allow-popups allow-downloads"></iframe>
+        <div id="pipelinePanel" style="display:none; position:absolute; inset:0; overflow-y:auto; padding:16px 18px; color:#cde; font-size:13px; background:linear-gradient(180deg,#0b1018,#070a11);"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ─── Controls panel ──────────────────────────────────── -->
+  <aside id="controls">
+    <h3>⚙ Controls</h3>
+    <div id="controlsBody"><div class="ctrl-empty">Select a demo to see its controls.</div></div>
+  </aside>
+</div>
+
+<script>
+// ─── Curated catalog (fallback defaults) ──────────────────────
+// Hardcoded entries get overridden by meta-tag values from each demo
+// during auto-discovery. Demos without meta tags use these defaults.
+const CATALOG = [
+  { id: "fidget-toys",      file: "avatarstage.html?cycle=fidget", title: "Fidget Toys",          desc: "Ambient fidget scenes — boids, pendulum, gears, Newton\u2019s cradle, bird, waves. Auto-rotates ~12s; click to skip.", cats: ["sim", "fun"],     swatch: "\ud83c\udf90" },
+  { id: "boids",            file: "boids.html",            title: "Boids Flocking",        desc: "Classic flocking — separation, alignment, cohesion.",          cats: ["sim", "particles"], swatch: "B" },
+  { id: "cellular-automata",file: "cellular-automata.html",title: "Game of Life",          desc: "Conway's life on a GPU grid.",                                 cats: ["sim", "cellular"],  swatch: "L" },
+  { id: "gray-scott",       file: "gray-scott.html",       title: "Gray-Scott RD",         desc: "Reaction-diffusion patterns.",                                 cats: ["sim"],              swatch: "G" },
+  { id: "slime-mold",       file: "slime-mold.html",       title: "Slime Mold",            desc: "Agent-based pheromone-trail aggregation.",                     cats: ["sim", "particles"], swatch: "S" },
+  { id: "rps",              file: "rps.html",              title: "Rock · Paper · Scissors", desc: "Cyclic-dominance cellular automaton.",                       cats: ["sim", "cellular"],  swatch: "R" },
+  { id: "battleship3d",     file: "battleship3d.html",     title: "ABYSS — 3D Battleship", desc: "3D naval combat.",                                              cats: ["game"],             swatch: "⚓" },
+  { id: "wadmap",           file: "wadmap.html",           title: "WAD Map",               desc: "DOOM WAD map viewer + engine companion.",                       cats: ["game", "tool"],     swatch: "W" },
+  { id: "aibrain",          file: "aibrain.html",          title: "AI Brain",              desc: "VBA-bridge visualizer for engine AI state.",                    cats: ["ai"],               swatch: "A" },
+  { id: "face",             file: "face.html",             title: "Face Avatar",           desc: "Procedural face avatar — expressions.",                         cats: ["ai", "face"],       swatch: "F" },
+  { id: "face-mirror",      file: "face-mirror.html",      title: "Face Mirror",           desc: "MediaPipe face tracking → live mirror.",                        cats: ["ai", "face"],       swatch: "M" },
+  { id: "robotface",        file: "RobotExpressive.html",        title: "Robot Avatar",          desc: "Generated robot face — grey-robot-man + expressions.",          cats: ["ai", "face"],       swatch: "🤖" },
+  { id: "AudioLab",         file: "AudioLab.html",         title: "Audio Lab",             desc: "Web Audio synthesis explorer.",                                 cats: ["audio"],            swatch: "♪" },
+  { id: "benchmark",        file: "benchmark.html",        title: "Device Benchmark",      desc: "GPU + CPU benchmark suite.",                                    cats: ["debug"],            swatch: "⚙" },
+  { id: "cube",             file: "cube.html",             title: "Cube Debug",            desc: "Minimal WebGL2 cube — context smoke test.",                     cats: ["debug"],            swatch: "□" },
+  { id: "voxel-viewer",     file: "voxel-viewer.html",     title: "Voxel Viewer / Generator", desc: "Gemini voxel viewer + generator.",                           cats: ["tool", "sim"],      swatch: "🧊" },
+  { id: "asset-library",    file: "asset-library.html",    title: "Asset Library + Tinder",  desc: "Browse, swipe-triage (keep/discard), and delete generated assets.",   cats: ["tool"],             swatch: "📦" },
+  { id: "camoufox",         file: "camoufox.html",         title: "Camoufox install & detect", desc: "Install/detect the anti-detect scraping browser (PC bridge).",        cats: ["tool"],             swatch: "🦊" },
+  { id: "scrape",           file: "scrape.html",           title: "Scrape console",          desc: "Drive Camoufox: rendered source, run JS, screenshot, grab a resource.", cats: ["tool"],             swatch: "🕸" },
+  { id: "webwright",        file: "webwright.html",        title: "Webwright + skills",      desc: "Author re-runnable scrapers; store & run them as Camoufox skills.",   cats: ["tool"],             swatch: "🛠" },
+  { id: "petfbi",           file: "petfbi.html",           title: "PetFBI board",            desc: "Shared lost-pet posting board with live claim/posted status for admin coordination.", cats: ["tool"],   swatch: "🐾" },
+  { id: "asteroids",        file: "asteroids.html",        title: "Asteroids (autopilot)", desc: "Self-playing UFO hunts drifting rocks and dodges to survive.",  cats: ["sim", "game"],      swatch: "🛸" },
+  { id: "star-gas",         file: "star_gas.html",         title: "Star & Gas Field",      desc: "Navigate a star catalog + gas cloud from Google Sheets; inspect star light.", cats: ["sim", "data"],  swatch: "🌌" },
+  { id: "splat-viewer",     file: "splat_viewer.html",     title: "Splat Viewer (Aholo)",  desc: "View Gaussian-splat captures (PLY/SPZ/SPLAT/SOG) with the Aholo 3DGS renderer.", cats: ["viewer", "3d"], swatch: "✨" },
+  { id: "glb-viewer",       file: "glb_viewer.html",       title: "Rigged GLB Viewer",     desc: "Play skinned/morph GLB animations (RigAnything output, Fox.glb); skeleton overlay.", cats: ["viewer", "3d", "rig"], swatch: "🦴" },
+  { id: "graph-viewer",     file: "graph_viewer.html",     title: "Code Graph (Graphify)", desc: "3D force-directed knowledge graph of the codebase from a Graphify GraphML export.", cats: ["viewer", "graph", "code"], swatch: "🕸" },
+];
+const CAT_LABELS = {
+  sim: "simulation", particles: "particles", cellular: "cellular",
+  game: "game", ai: "AI", face: "face", audio: "audio",
+  debug: "debug", tool: "tool",
+};
+const CAT_ORDER = ["sim", "particles", "cellular", "game", "ai", "face", "audio", "debug", "tool"];
+
+// localStorage keys
+const LS_THUMBS = "universalViewer:thumbs:v1";
+
+// ─── State ─────────────────────────────────────────────────
+const state = {
+  demos: CATALOG.slice(),        // mutable — discovery may augment
+  selectedId: null,
+  query: "",
+  activeCat: null,
+  protocolDemos: new Set(),      // ids known to implement the protocol
+  currentParams: null,           // last received params from the loaded demo
+  thumbs: _loadThumbs(),         // id → dataURL
+  controlsVisible: true,
+  // v860 — Avatar Gallery state
+  viewMode: "demos",             // "demos" | "avatars"
+  avatars: null,                 // populated by fetchAvatars on first switch
+  selectedAvatarUrl: null,       // url of the currently-previewed avatar
+};
+function _loadThumbs() {
+  try { return JSON.parse(localStorage.getItem(LS_THUMBS) || "{}"); } catch { return {}; }
+}
+function _saveThumbs() {
+  try { localStorage.setItem(LS_THUMBS, JSON.stringify(state.thumbs)); } catch {}
+}
+
+// ─── DOM refs ──────────────────────────────────────────────
+const $list     = document.getElementById("sbList");
+const $catRow   = document.getElementById("catRow");
+const $search   = document.getElementById("search");
+const $frame    = document.getElementById("frame");
+const $welcome  = document.getElementById("welcome");
+const $title    = document.getElementById("stageTitle");
+const $desc     = document.getElementById("stageDesc");
+const $openTab  = document.getElementById("openTab");
+const $count    = document.getElementById("countLabel");
+const $prev     = document.getElementById("prevBtn");
+const $next     = document.getElementById("nextBtn");
+const $disco    = document.getElementById("discoStatus");
+const $thumbBtn = document.getElementById("thumbBtn");
+const $ctrlsBtn = document.getElementById("ctrlsBtn");
+const $controls = document.getElementById("controls");
+const $cBody    = document.getElementById("controlsBody");
+
+// ─── Auto-discovery via fetch + meta parsing ──────────────
+// Walks every CATALOG entry, fetches the HTML, parses any
+// demo:* meta tags, and augments the catalog with discovered values.
+// Demos without meta tags keep their hardcoded defaults.
+async function discoverAll() {
+  $disco.textContent = `scanning 0/${state.demos.length}…`;
+  $disco.className = "scanning";
+  let done = 0;
+  await Promise.all(state.demos.map(async (demo) => {
+    try {
+      const resp = await fetch(demo.file, { cache: "no-cache" });
+      if (!resp.ok) return;
+      const html = await resp.text();
+      const meta = _parseMetaTags(html);
+      if (meta.title)   demo.title  = meta.title;
+      if (meta.desc)    demo.desc   = meta.desc;
+      if (meta.cats)    demo.cats   = meta.cats.split(/\s*,\s*/).filter(Boolean);
+      if (meta.swatch)  demo.swatch = meta.swatch;
+      // Heuristic: if the file mentions "demo:request-thumb" or "demo:params",
+      // assume it implements the protocol. Confirmed-on-load via postMessage.
+      if (/demo:request-thumb|demo:params/.test(html)) {
+        state.protocolDemos.add(demo.id);
+      }
+    } catch (e) {
+      // Network or parse error — leave the defaults
+    } finally {
+      done++;
+      $disco.textContent = `scanning ${done}/${state.demos.length}…`;
+    }
+  }));
+  $disco.textContent = `✓ ${state.protocolDemos.size}/${state.demos.length} w/ protocol`;
+  $disco.className = "done";
+  renderCats();
+  renderList();
+}
+
+function _parseMetaTags(html) {
+  // Light parser — sufficient for `<meta name="demo:..." content="...">` lines
+  const out = {};
+  const re = /<meta\s+name=["']demo:(\w+)["']\s+content=["']([^"']*)["']/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    out[m[1]] = m[2];
+  }
+  return out;
+}
+
+// ─── Render: category chips ───────────────────────────────
+function renderCats() {
+  $catRow.innerHTML = "";
+  const _chip = (key, label) => {
+    const c = document.createElement("div");
+    c.className = "cat-chip" + (state.activeCat === key ? " active" : "");
+    c.textContent = label;
+    c.addEventListener("click", () => {
+      state.activeCat = (state.activeCat === key) ? null : key;
+      renderCats();
+      renderList();
+    });
+    return c;
+  };
+  $catRow.appendChild(_chip(null, "all"));
+  // Build cat list dynamically from current demos so meta-discovered
+  // categories appear automatically.
+  const usedCats = new Set();
+  for (const d of state.demos) {
+    for (const c of d.cats || []) usedCats.add(c);
+  }
+  // Preserve canonical order; append any new (meta-introduced) cats at the end
+  const order = [...CAT_ORDER.filter(c => usedCats.has(c)), ...[...usedCats].filter(c => !CAT_ORDER.includes(c))];
+  for (const k of order) {
+    $catRow.appendChild(_chip(k, CAT_LABELS[k] || k));
+  }
+}
+
+// ─── Render: demo list ────────────────────────────────────
+function _matches(demo) {
+  if (state.activeCat && !demo.cats?.includes(state.activeCat)) return false;
+  if (state.query) {
+    const q = state.query.toLowerCase();
+    return demo.title.toLowerCase().includes(q)
+        || demo.desc.toLowerCase().includes(q)
+        || (demo.cats || []).some(c => (CAT_LABELS[c] || c).toLowerCase().includes(q));
+  }
+  return true;
+}
+function renderList() {
+  const filtered = state.demos.filter(_matches);
+  $count.textContent = `(${filtered.length}/${state.demos.length})`;
+  $list.innerHTML = "";
+  for (const d of filtered) {
+    const row = document.createElement("div");
+    row.className = "demo-row" + (state.selectedId === d.id ? " active" : "");
+    row.tabIndex = 0;
+    const sw = document.createElement("div");
+    sw.className = "swatch" + (state.protocolDemos.has(d.id) ? " protocol-on" : "");
+    if (state.thumbs[d.id]) {
+      const img = document.createElement("img");
+      img.src = state.thumbs[d.id];
+      img.alt = "";
+      sw.appendChild(img);
+    } else {
+      sw.textContent = d.swatch || d.title.charAt(0);
+    }
+    const meta = document.createElement("div"); meta.className = "meta";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = d.title;
+    const desc = document.createElement("div"); desc.className = "desc"; desc.textContent = d.desc;
+    meta.appendChild(name); meta.appendChild(desc);
+    row.appendChild(sw); row.appendChild(meta);
+    row.addEventListener("click", () => select(d.id));
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter") select(d.id); });
+    $list.appendChild(row);
+  }
+}
+
+// ─── v860: Avatar Gallery ────────────────────────────────────
+//
+// Lists available rigged glb avatars (built-ins + Your_Avatars/ folder
+// + favorites). Each row has a ⭐ star toggle and clicking previews
+// the avatar in the iframe via RobotExpressive.html.
+//
+// Built-ins: RobotExpressive, RobotWoman (both ship with the engine).
+// Customs come from /GPU_Assets/list/Your_Avatars (server endpoint
+// returns { ok, files: [...] }).
+// Favorites come from window.kpopFavorites (cross-window persisted).
+async function fetchAvatars() {
+  const builtIns = [
+    { key: "RobotExpressive",  label: "RobotExpressive",      url: "RobotExpressive", source: "built-in",
+      previewUrl: "/RobotExpressive.html?asset=RobotExpressive" },
+    { key: "RobotWoman",       label: "RobotWoman",           url: "RobotWoman",      source: "built-in",
+      previewUrl: "/RobotExpressive.html?asset=RobotWoman" },
+    { key: "test_rig",         label: "test_rig (Robot Man)", url: "test_rig",        source: "built-in",
+      previewUrl: "/RobotExpressive.html?asset=test_rig" },
+  ];
+
+  let customs = [];
+  try {
+    const r = await fetch("/GPU_Assets/list/Your_Avatars", { cache: "no-store" });
+    const j = await r.json();
+    if (j && j.ok && Array.isArray(j.files)) {
+      for (const fn of j.files) {
+        const base = fn.replace(/\.(glb|gltf)$/i, "");
+        const url = "/GPU_Assets/Your_Avatars/" + fn;
+        customs.push({
+          key: "custom_" + base.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          label: base,
+          url, source: "your_avatars",
+          previewUrl: "/RobotExpressive.html?glb=" + encodeURIComponent(url),
+        });
+      }
+    }
+  } catch {}
+
+  // De-dup: if a custom's url is in favorites, the row reads from favorites
+  // tag. If a favorite is NOT yet in any group, add it as its own entry.
+  const all = builtIns.concat(customs);
+  const known = new Set(all.map(a => a.url));
+  try {
+    const fav = window.kpopFavorites;
+    if (fav && fav.list) {
+      for (const f of fav.list()) {
+        if (known.has(f.url)) continue;
+        const isPath = /[\\/]/.test(f.url);
+        all.push({
+          key: "fav_" + (f.label || f.url).toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          label: f.label || f.url,
+          url: f.url,
+          source: "external",
+          previewUrl: isPath
+            ? "/RobotExpressive.html?glb=" + encodeURIComponent(f.url)
+            : "/RobotExpressive.html?asset=" + encodeURIComponent(f.url),
+        });
+      }
+    }
+  } catch {}
+
+  state.avatars = all;
+}
+
+// v1759 - offscreen GLB -> thumbnail for the avatar list (reuses the pipeline's offscreen-render). RIG-ONLY: needs WebGL.
+var _uvThree=null, _uvGltf=null, _uvRenderer=null, avatarThumb={};
+function uvEnsureThree(){
+  if(_uvThree&&_uvGltf) return Promise.resolve();
+  return import("/vendor/three/three.module.js").then(function(T){ _uvThree=T; return import("/vendor/three/jsm/loaders/GLTFLoader.js"); }).then(function(m){ _uvGltf=new m.GLTFLoader(); });
+}
+function renderAvatarThumb(url,size){
+  return uvEnsureThree().then(function(){
+    var THREE=_uvThree;
+    if(!_uvRenderer){ _uvRenderer=new THREE.WebGLRenderer({canvas:document.createElement("canvas"),antialias:true,alpha:true,preserveDrawingBuffer:true}); }
+    _uvRenderer.setSize(size,size,false);
+    var scene=new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff,0.85));
+    var dl=new THREE.DirectionalLight(0xffffff,0.9); dl.position.set(1,2,1.5); scene.add(dl);
+    return new Promise(function(res,rej){
+      _uvGltf.load(url, function(g){
+        try{
+          var obj=g.scene||(g.scenes&&g.scenes[0]); if(!obj){ rej(new Error("empty")); return; } scene.add(obj);
+          var box=new THREE.Box3().setFromObject(obj), ctr=box.getCenter(new THREE.Vector3()), sz=box.getSize(new THREE.Vector3());
+          obj.position.sub(ctr); var md=Math.max(sz.x,sz.y,sz.z)||1;
+          var cam=new THREE.PerspectiveCamera(30,1,md*0.01,md*100), dist=md*2.6;
+          cam.position.set(dist*0.25, dist*0.35, dist); cam.lookAt(0,0,0);
+          _uvRenderer.render(scene,cam);
+          var data=_uvRenderer.domElement.toDataURL("image/png");
+          obj.traverse(function(nn){ if(nn.geometry&&nn.geometry.dispose)nn.geometry.dispose(); if(nn.material){ (Array.isArray(nn.material)?nn.material:[nn.material]).forEach(function(mm){ if(mm&&mm.map&&mm.map.dispose)mm.map.dispose(); if(mm&&mm.dispose)mm.dispose(); }); } });
+          res(data);
+        }catch(e){ rej(e); }
+      }, undefined, function(e){ rej(e); });
+    });
+  });
+}
+function _setSwatchImg(sw,data){ if(!sw) return; sw.textContent=""; sw.style.background="#0a0f16"; var im=document.createElement("img"); im.src=data; im.alt=""; im.style.cssText="width:100%;height:100%;object-fit:cover;border-radius:6px;"; sw.appendChild(im); }
+function maybeAvatarThumb(url,sw){
+  if(!url || !/\.(glb|gltf)(\?|$)/i.test(url)) return;        // GLTFLoader only (no OBJ/VRM)
+  try{ sw.dataset.avurl=url; }catch(e){}
+  var c=avatarThumb[url];
+  if(typeof c==="string" && c.slice(0,5)==="data:"){ _setSwatchImg(sw,c); return; }
+  if(c==="pending"||c==="failed") return;
+  avatarThumb[url]="pending";
+  renderAvatarThumb(url,64).then(function(d){ avatarThumb[url]=d; document.querySelectorAll("div.swatch").forEach(function(el){ if(el.dataset.avurl===url) _setSwatchImg(el,d); }); }).catch(function(){ avatarThumb[url]="failed"; });
+}
+function renderAvatars() {
+  $list.innerHTML = "";
+  if (!state.avatars) {
+    const loading = document.createElement("div");
+    loading.style.cssText = "padding:20px; color:#9ab; font-size:13px; text-align:center;";
+    loading.textContent = "Loading avatars…";
+    $list.appendChild(loading);
+    return;
+  }
+  if (state.avatars.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.cssText = "padding:20px; color:#9ab; font-size:13px;";
+    empty.textContent = "No avatars found. Drop a .glb into /GPU_Assets/Your_Avatars to populate the list.";
+    $list.appendChild(empty);
+    return;
+  }
+  const fav = window.kpopFavorites;
+  $count.textContent = `(${state.avatars.length})`;
+  const _q = (state.query || "").toLowerCase();
+  let _shown = 0;
+
+  // v874 — instruction banner at the top of the list so first-time
+  // users immediately understand they can click to load any avatar
+  // (the user reported "didn't see immediately how to switch which
+  // rigged .glb could be seen in there"). Disappears once any avatar
+  // is selected to avoid clutter.
+  if (!state.selectedAvatarUrl) {
+    const hint = document.createElement("div");
+    hint.style.cssText = "margin:6px 8px; padding:8px 10px; background:rgba(80,140,200,0.18); border:1px solid rgba(120,200,255,0.35); border-radius:5px; color:#cef; font-size:11px; line-height:1.4;";
+    hint.innerHTML = "👇 <strong>Click any avatar below</strong> to load it in the preview. Once loaded, use the left panel to dress it up.";
+    $list.appendChild(hint);
+  }
+
+  // Group by source for visual organization
+  const groups = [
+    { key: "built-in",     label: "Built-in" },
+    { key: "your_avatars", label: "Your Avatars (folder)" },
+    { key: "external",     label: "Favorites (external)" },
+  ];
+  for (const g of groups) {
+    const items = state.avatars.filter(a => a.source === g.key &&
+      (!_q || (a.label || a.url || "").toLowerCase().includes(_q)));
+    if (!items.length) continue;
+    _shown += items.length;
+    const hdr = document.createElement("div");
+    hdr.style.cssText = "padding:10px 12px 4px; color:#789; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; font-weight:600;";
+    hdr.textContent = g.label + " (" + items.length + ")";
+    $list.appendChild(hdr);
+    for (const a of items) {
+      const row = document.createElement("div");
+      row.className = "demo-row" + (state.selectedAvatarUrl === a.url ? " active" : "");
+      // v874 — active row gets a bold blue accent border + brighter background
+      const isActive = state.selectedAvatarUrl === a.url;
+      row.style.cssText =
+        "padding:" + (isActive ? "10px 12px" : "8px 12px") + ";" +
+        " display:flex; align-items:center; gap:10px; cursor:pointer;" +
+        " border-left:" + (isActive ? "3px solid rgba(120,200,255,0.85)" : "3px solid transparent") + ";" +
+        " background:" + (isActive ? "rgba(80,120,200,0.18)" : "transparent") + ";";
+      row.tabIndex = 0;
+
+      // Swatch / placeholder
+      const sw = document.createElement("div");
+      sw.className = "swatch";
+      sw.style.cssText = "width:34px; height:34px; border-radius:6px; background:#1a2436; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;";
+      sw.textContent = g.key === "built-in" ? "🤖" : (g.key === "your_avatars" ? "🎭" : "★");
+      maybeAvatarThumb(a.url, sw);
+      row.appendChild(sw);
+
+      // Meta
+      const meta = document.createElement("div");
+      meta.style.cssText = "flex:1; min-width:0;";
+      const name = document.createElement("div");
+      name.style.cssText = "font-size:13px; color:#cef; font-weight:500;";
+      name.textContent = a.label;
+      const desc = document.createElement("div");
+      desc.style.cssText = "font-size:11px; color:#789;";
+      desc.textContent = a.url;
+      meta.append(name, desc);
+      row.appendChild(meta);
+
+      // v863 — costume picker swatch. Shows the current costume emoji
+      // for this avatar; click cycles to next palette. Uses the same
+      // window.avatarCostumes store as RobotExpressive.html's picker, so
+      // changes here sync to every iframe rendering this avatar (and
+      // vice versa via storage events).
+      const costume = document.createElement("button");
+      const costStore = window.avatarCostumes;
+      const curCostume = (costStore && costStore.get) ? costStore.get(a.url) : { emoji: "⚪", label: "Native" };
+      costume.textContent = curCostume.emoji || "⚪";
+      costume.style.cssText =
+        "background:transparent; border:1px solid rgba(120,200,255,0.2);" +
+        " color:#bfe; border-radius:6px; padding:4px 8px;" +
+        " font-size:15px; cursor:pointer; flex-shrink:0; margin-right:4px;";
+      costume.title = "Costume: " + (curCostume.label || "Native") + " — click to cycle (" +
+                      (costStore?.list ? costStore.list().length : 10) + " palettes)";
+      costume.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!window.avatarCostumes) return;
+        window.avatarCostumes.cycle(a.url);
+        renderAvatars();   // repaint to show new emoji
+      });
+      row.appendChild(costume);
+
+      // Star button
+      const star = document.createElement("button");
+      const isFav = fav && fav.has ? fav.has(a.url) : false;
+      star.textContent = isFav ? "★" : "☆";
+      star.style.cssText = "background:transparent; border:1px solid " +
+        (isFav ? "rgba(255,213,96,0.5)" : "rgba(120,200,255,0.2)") +
+        "; color:" + (isFav ? "#ffd560" : "#789") +
+        "; border-radius:6px; padding:4px 10px; font-size:16px; cursor:pointer; flex-shrink:0;";
+      star.title = isFav ? "Unstar" : "Add to KPop favorites";
+      star.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!window.kpopFavorites) return;
+        window.kpopFavorites.toggle(a.url, a.label);
+        renderAvatars();   // repaint button state
+      });
+      row.appendChild(star);
+
+      // Click row to preview
+      const preview = () => selectAvatar(a);
+      row.addEventListener("click", preview);
+      row.addEventListener("keydown", (e) => { if (e.key === "Enter") preview(); });
+      $list.appendChild(row);
+    }
+  }
+  if (_q && _shown === 0) {
+    const none = document.createElement("div");
+    none.style.cssText = "padding:16px; color:#9ab; font-size:12px;";
+    none.textContent = `No avatars match “${state.query}”.`;
+    $list.appendChild(none);
+  }
+}
+
+function selectAvatar(a) {
+  state.selectedAvatarUrl = a.url;
+  $title.textContent = a.label;
+  $desc.textContent = a.url + " (" + a.source + ")";
+  $openTab.style.display = "";
+  $openTab.href = a.previewUrl;
+  $thumbBtn.style.display = "none";   // avatars don't participate in thumb snap
+  $welcome.style.display = "none";
+  if ($frame.getAttribute("src") !== a.previewUrl) {
+    $frame.setAttribute("src", a.previewUrl);
+  }
+  // v866 — show variant controls panel
+  const panel = document.getElementById("avatarControls");
+  if (panel) {
+    panel.style.display = "";
+    renderAvatarControls(a.url);
+  }
+  renderAvatars();   // repaint active highlight
+}
+
+// v866 — Variant control panel renderer. Builds 8 labeled rows of
+// buttons. Each row corresponds to one picker (costume tint, hat,
+// eyewear, cape, three color rows, wind). Buttons use the same
+// glyph vocabulary as RobotExpressive.html's inline pickers. Clicking a
+// button updates the store; onChange subscription re-renders to
+// reflect the new state. Picks in the iframe (storage events) also
+// trigger re-render.
+function renderAvatarControls(avatarUrl) {
+  if (!avatarUrl) return;
+  const _btn = (txt, active, title, onClick) => {
+    const b = document.createElement("button");
+    b.textContent = txt;
+    b.title = title || "";
+    b.style.cssText =
+      "background:" + (active ? "rgba(80,120,200,0.5)" : "rgba(40,60,80,0.55)") + ";" +
+      "color:" + (active ? "#cef" : "#9ab") + ";" +
+      "border:1px solid " + (active ? "rgba(120,200,255,0.55)" : "rgba(120,200,255,0.15)") + ";" +
+      "border-radius:5px; padding:3px 7px; font-size:13px; cursor:pointer; margin:0 3px 3px 0;";
+    b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+    return b;
+  };
+  // v874 — section label is now a block header (vertical layout puts
+  // the label above its buttons), with the buttons in a wrap-flex
+  // container below.
+  const _label = (txt) => {
+    const span = document.createElement("div");
+    span.textContent = txt;
+    span.style.cssText = "display:block; margin-bottom:4px; font-weight:600; color:#9bd; font-size:10px; text-transform:uppercase; letter-spacing:0.06em;";
+    return span;
+  };
+  const _row = (id, label) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    el.innerHTML = "";
+    if (label) el.appendChild(_label(label));
+    // v874 — wrap buttons within the narrow column width
+    const btns = document.createElement("div");
+    btns.style.cssText = "display:flex; flex-wrap:wrap; gap:2px;";
+    el.appendChild(btns);
+    el._btnContainer = btns;
+    return btns;   // RETURN the button container, not the outer row
+  };
+
+  // ── Costume tint row ──
+  const cstore = window.avatarCostumes;
+  const costumeRow = _row("acRowCostume", "Tint");
+  if (costumeRow && cstore && cstore.list) {
+    const curKey = cstore.getKey(avatarUrl);
+    for (const c of cstore.list()) {
+      const active = c.key === curKey;
+      costumeRow.appendChild(_btn(c.emoji, active, c.label, () => {
+        cstore.set(avatarUrl, c.key);
+        renderAvatarControls(avatarUrl);
+      }));
+    }
+  }
+
+  // ── Accessory variant rows ──
+  const astore = window.avatarAccessories;
+  if (astore && astore.get) {
+    const slots = window.ACCESSORY_SLOTS || [];
+    for (const slotDef of slots) {
+      const rowId = "acRow" + slotDef.key.charAt(0).toUpperCase() + slotDef.key.slice(1);
+      const row = _row(rowId, slotDef.label);
+      if (!row) continue;
+      const curVariant = astore.getSlot(avatarUrl, slotDef.key);
+      for (const v of slotDef.variants) {
+        const active = v.key === curVariant;
+        row.appendChild(_btn(v.emoji, active, v.label, () => {
+          astore.setSlot(avatarUrl, slotDef.key, v.key);
+          renderAvatarControls(avatarUrl);
+        }));
+      }
+    }
+
+    // ── Color rows (one per slot, only meaningful when slot equipped) ──
+    const colors = window.ACCESSORY_COLORS || [];
+    for (const slotDef of slots) {
+      const rowId = "acRow" + slotDef.key.charAt(0).toUpperCase() + slotDef.key.slice(1) + "Color";
+      const row = _row(rowId, slotDef.label + " color");
+      if (!row) continue;
+      const slotEquipped = astore.getSlot(avatarUrl, slotDef.key) !== "none";
+      const curColor = astore.getColor ? astore.getColor(avatarUrl, slotDef.key) : "default";
+      for (const c of colors) {
+        const active = c.key === curColor;
+        const btn = _btn(c.emoji, active, c.label, () => {
+          astore.setColor(avatarUrl, slotDef.key, c.key);
+          renderAvatarControls(avatarUrl);
+        });
+        if (!slotEquipped) {
+          btn.style.opacity = "0.35";
+          btn.title = "(equip " + slotDef.label.toLowerCase() + " to apply)";
+        }
+        row.appendChild(btn);
+      }
+    }
+  }
+
+  // ── Wind row (cape sim) ──
+  const windRow = _row("acRowWind", "Wind");
+  if (windRow) {
+    const winds = [
+      { key: "off",    label: "Off",    emoji: "⏸" },
+      { key: "gentle", label: "Gentle", emoji: "🍃" },
+      { key: "strong", label: "Strong", emoji: "💨" },
+      { key: "gale",   label: "Gale",   emoji: "🌪" },
+    ];
+    // Read current wind from the iframe's window (if accessible) or
+    // localStorage cache. Cross-iframe API: simpler to use localStorage
+    // backed mirror of wind state. Default visual = "gentle" since
+    // that's the engine default.
+    let curWindKey = "gentle";
+    try {
+      const raw = localStorage.getItem("voxelEngine.windPreset");
+      if (raw && winds.some(w => w.key === raw)) curWindKey = raw;
+    } catch {}
+    for (const w of winds) {
+      const active = w.key === curWindKey;
+      windRow.appendChild(_btn(w.emoji + " " + w.label, active, "Wind: " + w.label, () => {
+        try { localStorage.setItem("voxelEngine.windPreset", w.key); } catch {}
+        // Try to reach into the iframe to apply immediately (same-origin
+        // means we can access contentWindow.kpopWind).
+        try {
+          const iframeWin = document.getElementById("frame")?.contentWindow;
+          if (iframeWin && iframeWin.kpopWind) {
+            if (typeof iframeWin.kpopWind[w.key] === "function") iframeWin.kpopWind[w.key]();
+          }
+        } catch {}
+        renderAvatarControls(avatarUrl);
+      }));
+    }
+  }
+}
+
+// Mode toggle wiring
+function setViewMode(mode) {
+  if (mode !== "demos" && mode !== "avatars" && mode !== "pipeline") return;
+  state.viewMode = mode;
+  const setBtn = (id, on) => { const b = document.getElementById(id); if (!b) return;
+    b.style.background = on ? "rgba(80,120,200,0.4)" : "rgba(40,60,80,0.5)";
+    b.style.color = on ? "#cef" : "#9ab";
+    b.style.borderColor = on ? "rgba(120,200,255,0.4)" : "rgba(120,200,255,0.2)"; };
+  setBtn("modeDemos", mode === "demos"); setBtn("modeAvatars", mode === "avatars"); setBtn("modePipeline", mode === "pipeline");
+  const titleEl = document.getElementById("sbModeTitle");
+  if (titleEl) titleEl.textContent = mode === "demos" ? "🎛 Universal Viewer" : mode === "avatars" ? "🎭 Avatar Gallery" : "🧩 Pipeline Routes";
+  document.getElementById("search").placeholder = mode === "demos" ? "Search demos…" : mode === "avatars" ? "Search avatars…" : "(use the route builder →)";
+  const panel = document.getElementById("avatarControls");
+  if (panel) panel.style.display = (mode === "avatars" && state.selectedAvatarUrl) ? "" : "none";
+  // pipeline mode takes over the stage with the route builder panel
+  const pp = document.getElementById("pipelinePanel"), fr = document.getElementById("frame"), wel = document.getElementById("welcome");
+  if (pp) {
+    if (mode === "pipeline") { pp.style.display = "block"; if (fr) fr.style.display = "none"; if (wel) wel.style.display = "none"; buildPipelinePanel(); }
+    else { pp.style.display = "none"; if (fr) fr.style.display = ""; }
+  }
+  if (mode === "avatars") {
+    if (!state.avatars) fetchAvatars().then(() => renderAvatars());
+    renderAvatars();
+  } else if (mode === "demos") {
+    renderList();
+  }
+}
+
+// Wire toggle buttons after DOM is ready
+(function bindModeToggle(){
+  const dBtn = document.getElementById("modeDemos");
+  const aBtn = document.getElementById("modeAvatars");
+  const pBtn = document.getElementById("modePipeline");
+  if (dBtn) dBtn.addEventListener("click", () => setViewMode("demos"));
+  if (aBtn) aBtn.addEventListener("click", () => setViewMode("avatars"));
+  if (pBtn) pBtn.addEventListener("click", () => setViewMode("pipeline"));
+  // Live-refresh avatar gallery on favorites change (matches PC/phone cycles)
+  let tries = 0;
+  const iv = setInterval(() => {
+    tries++;
+    if (window.kpopFavorites && window.kpopFavorites.onChange) {
+      clearInterval(iv);
+      window.kpopFavorites.onChange(() => {
+        if (state.viewMode === "avatars") {
+          fetchAvatars().then(() => renderAvatars());
+        }
+      });
+    } else if (tries > 25) clearInterval(iv);
+  }, 200);
+  // v863 — same pattern for costume changes. The picker swatch on
+  // each row reads window.avatarCostumes; when a change fires (either
+  // here, in the preview iframe, or in another tab via storage event)
+  // re-render so the swatches reflect new state. Only re-render when
+  // gallery is visible to avoid wasted work.
+  let cTries = 0;
+  const cIv = setInterval(() => {
+    cTries++;
+    if (window.avatarCostumes && window.avatarCostumes.onChange) {
+      clearInterval(cIv);
+      window.avatarCostumes.onChange(() => {
+        if (state.viewMode === "avatars") {
+          renderAvatars();   // no need to re-fetch; costume change doesn't add/remove avatars
+        }
+      });
+    } else if (cTries > 25) clearInterval(cIv);
+  }, 200);
+  // Cross-tab + cross-iframe (preview) sync via storage events. The
+  // costume store's singleton in THIS window won't see writes from
+  // the iframe automatically; re-load on storage event.
+  window.addEventListener("storage", (e) => {
+    if (e.key === "voxelEngine.avatarCostumes" && window.avatarCostumes?._load) {
+      window.avatarCostumes._load();
+      if (state.viewMode === "avatars") renderAvatars();
+      // v866 — also refresh variant controls panel if visible
+      if (state.viewMode === "avatars" && state.selectedAvatarUrl) {
+        renderAvatarControls(state.selectedAvatarUrl);
+      }
+    }
+    // v866 — accessory store changes from the preview iframe
+    if (e.key === "voxelEngine.avatarAccessories" && window.avatarAccessories?._load) {
+      window.avatarAccessories._load();
+      if (state.viewMode === "avatars" && state.selectedAvatarUrl) {
+        renderAvatarControls(state.selectedAvatarUrl);
+      }
+    }
+  });
+  // v866 — subscribe to accessory onChange in this window for same-tab
+  // changes (e.g. when our own panel writes a value).
+  let aTries = 0;
+  const aIv = setInterval(() => {
+    aTries++;
+    if (window.avatarAccessories && window.avatarAccessories.onChange) {
+      clearInterval(aIv);
+      window.avatarAccessories.onChange(() => {
+        if (state.viewMode === "avatars" && state.selectedAvatarUrl) {
+          renderAvatarControls(state.selectedAvatarUrl);
+        }
+      });
+    } else if (aTries > 25) clearInterval(aIv);
+  }, 200);
+})();
+
+// ─── Select / load a demo ─────────────────────────────────
+function select(id) {
+  const demo = state.demos.find(d => d.id === id);
+  if (!demo) return;
+  state.selectedId = id;
+  state.currentParams = null;
+  $title.textContent = demo.title;
+  $desc.textContent = demo.desc;
+  $openTab.style.display = "";
+  $openTab.href = demo.file;
+  $thumbBtn.style.display = "";
+  $welcome.style.display = "none";
+  if ($frame.getAttribute("src") !== demo.file) {
+    $frame.setAttribute("src", demo.file);
+  }
+  if (location.hash !== "#" + id) {
+    history.replaceState(null, "", "#" + id);
+  }
+  // Reset controls panel — wait for the demo to announce params
+  renderControls(null);
+  renderList();
+  // Auto-snap after a few seconds if no thumb yet + demo claims protocol
+  if (!state.thumbs[id] && state.protocolDemos.has(id)) {
+    setTimeout(() => { if (state.selectedId === id) requestThumb(); }, 3500);
+  }
+}
+
+// ─── Controls panel ──────────────────────────────────────
+function renderControls(params) {
+  $cBody.innerHTML = "";
+  if (!params || params.length === 0) {
+    const m = document.createElement("div");
+    m.className = "ctrl-empty";
+    m.textContent = state.selectedId
+      ? "This demo doesn't expose parameters. Use the demo's own UI."
+      : "Select a demo to see its controls.";
+    $cBody.appendChild(m);
+    return;
+  }
+  state.currentParams = params;
+  for (const p of params) {
+    const row = document.createElement("div"); row.className = "ctrl-row";
+    const label = document.createElement("label");
+    const lblText = document.createElement("span"); lblText.textContent = p.label || p.name;
+    const lblVal  = document.createElement("span"); lblVal.className = "v"; lblVal.textContent = (p.default ?? p.min ?? 0).toFixed(2);
+    label.appendChild(lblText); label.appendChild(lblVal);
+    const inp = document.createElement("input");
+    inp.type = "range";
+    inp.min = String(p.min ?? 0);
+    inp.max = String(p.max ?? 1);
+    inp.step = String(p.step ?? 0.01);
+    inp.value = String(p.default ?? p.min ?? 0);
+    inp.addEventListener("input", () => {
+      const v = parseFloat(inp.value);
+      lblVal.textContent = v.toFixed(2);
+      try {
+        $frame.contentWindow?.postMessage({ type: "demo:set", name: p.name, value: v }, "*");
+      } catch (e) {}
+    });
+    row.appendChild(label);
+    row.appendChild(inp);
+    $cBody.appendChild(row);
+  }
+}
+
+// ─── Thumbnail capture ───────────────────────────────────
+function requestThumb() {
+  if (!state.selectedId) return;
+  try {
+    $frame.contentWindow?.postMessage({ type: "demo:request-thumb" }, "*");
+  } catch (e) {}
+  // Fallback: if same-origin, try to grab the canvas directly after a tick.
+  // (Only works for demos that DON'T implement the protocol but DO have a canvas.)
+  setTimeout(() => {
+    try {
+      const doc = $frame.contentDocument;
+      if (!doc) return;
+      const c = doc.querySelector("canvas");
+      if (!c) return;
+      // If protocol already responded for the current demo, skip the fallback.
+      if (state.thumbs[state.selectedId]?.startsWith("data:image")) return;
+      const dataUrl = c.toDataURL("image/jpeg", 0.6);
+      if (dataUrl && dataUrl.length > 50) {
+        state.thumbs[state.selectedId] = dataUrl;
+        _saveThumbs();
+        renderList();
+      }
+    } catch (e) { /* cross-origin or no canvas — skip */ }
+  }, 250);
+}
+$thumbBtn.addEventListener("click", requestThumb);
+
+// ─── Controls toggle ──────────────────────────────────────
+$ctrlsBtn.addEventListener("click", () => {
+  state.controlsVisible = !state.controlsVisible;
+  $controls.classList.toggle("visible", state.controlsVisible);
+  $ctrlsBtn.style.background = state.controlsVisible ? "rgba(70, 120, 180, 0.55)" : "";
+});
+// Default: visible
+$controls.classList.add("visible");
+$ctrlsBtn.style.background = "rgba(70, 120, 180, 0.55)";
+
+// ─── postMessage listener (demo → viewer) ────────────────
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || typeof d !== "object") return;
+  // Sanity: only accept messages from our iframe
+  if (e.source !== $frame.contentWindow) return;
+  if (d.type === "demo:params" && Array.isArray(d.params)) {
+    // The demo just announced its params — mark protocol + render controls
+    if (state.selectedId) state.protocolDemos.add(state.selectedId);
+    renderControls(d.params);
+    renderList();
+  } else if (d.type === "demo:thumb" && typeof d.dataUrl === "string") {
+    if (state.selectedId && d.dataUrl.startsWith("data:image")) {
+      state.thumbs[state.selectedId] = d.dataUrl;
+      _saveThumbs();
+      renderList();
+      $thumbBtn.style.background = "rgba(70, 180, 90, 0.5)";
+      setTimeout(() => { $thumbBtn.style.background = ""; }, 600);
+    }
+  }
+});
+
+// ─── Iframe load → poke for params + auto-snap timer ─────
+$frame.addEventListener("load", () => {
+  // Ask the demo for its params (in case the demo loaded BEFORE we listened)
+  try { $frame.contentWindow?.postMessage({ type: "demo:request-params" }, "*"); } catch {}
+  // v883 — Demo Chrome (choice C): the standalone demo .html files self-mount
+  // ui/demoChrome.js, but some pages may not carry the tag. As a fallback,
+  // inject it here so the chrome shows in the viewer regardless. The module
+  // guards against double-mount (window.__demoChromeMounted), so a page that
+  // already self-mounted is unaffected. We pass the demo's human name through
+  // a global the module reads for the pill.
+  try {
+    const win = $frame.contentWindow;
+    const doc = $frame.contentDocument;
+    if (win && doc && !win.__demoChromeMounted) {
+      const demo = state.demos.find(d => d.id === state.selectedId);
+      try { win.__demoChromeName = demo?.title || doc.title || ""; } catch {}
+      if (!doc.getElementById("demoChromeInject")) {
+        const s = doc.createElement("script");
+        s.id = "demoChromeInject";
+        s.type = "module";
+        s.src = "/ui/demoChrome.js";
+        doc.body.appendChild(s);
+      }
+    }
+  } catch { /* cross-origin or not ready — self-mount covers it */ }
+});
+
+// ─── Keyboard nav ─────────────────────────────────────────
+function _nextDemo(dir) {
+  const visible = state.demos.filter(_matches);
+  if (visible.length === 0) return;
+  const idx = visible.findIndex(d => d.id === state.selectedId);
+  let next;
+  if (idx < 0) next = visible[0];
+  else next = visible[(idx + dir + visible.length) % visible.length];
+  select(next.id);
+}
+$prev.addEventListener("click", () => _nextDemo(-1));
+$next.addEventListener("click", () => _nextDemo(+1));
+
+window.addEventListener("keydown", (e) => {
+  if (document.activeElement === $search) {
+    if (e.key === "Escape") { $search.blur(); state.query = ""; $search.value = ""; renderList(); }
+    return;
+  }
+  if (e.key === "/") { e.preventDefault(); $search.focus(); return; }
+  if (e.key === "ArrowDown") { e.preventDefault(); _nextDemo(+1); return; }
+  if (e.key === "ArrowUp")   { e.preventDefault(); _nextDemo(-1); return; }
+});
+
+// ─── Search input ────────────────────────────────────────
+$search.addEventListener("input", () => {
+  state.query = $search.value;
+  if (state.viewMode === "avatars") renderAvatars(); else renderList();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Pipeline Routes (v905) — Kaggle-only slice.
+// Quick-route presets are the TRACED optimal model paths. Each
+// route is an ordered list of PHASES; each phase has a recommended
+// Kaggle template + the alternatives that do the same job. The
+// builder fires the ENTRY step now (real /kaggle/submit) and records
+// the full plan; auto-advancing step N→N+1 is the next round.
+// ═══════════════════════════════════════════════════════════
+const PHASES = {
+  text2img:    { label: "Text → image",        out: "image" },
+  img2mesh:    { label: "Image → 3D mesh",      out: "mesh"  },
+  img2splat:   { label: "Image → Gaussian splat", out: "splat" },
+  img2rigged:  { label: "Image → rigged mesh",  out: "rigged" },
+  mesh2rig:    { label: "Mesh → auto-rig",      out: "rigged" },
+  text2motion: { label: "Text → motion",        out: "motion" },
+  text2audio:  { label: "Text → audio",         out: "audio" },
+  text2speech: { label: "Text → speech",        out: "audio" },
+  text2video:  { label: "Text → video",         out: "video" },
+};
+// Phase-by-id: authoritative classification of the 18 templates.
+// (Some models are conceptually interchangeable within a phase; the
+//  route presets pick a sensible default and expose the rest as
+//  swappable alternatives in the per-step dropdown.)
+const PHASE_BY_ID = {
+  z_image: "text2img", qwen_image: "text2img",
+  kimodo: "text2motion",
+  triposr: "img2mesh", triposg: "img2mesh", hunyuan3d: "img2mesh", trellis2: "img2mesh",
+  instantmesh: "img2mesh", stable_fast_3d: "img2mesh", direct3d_s2: "img2mesh",
+  lito: "img2mesh", pixal3d: "img2mesh", sam3d_objects: "img2mesh",
+  triposplat: "img2splat", lgm: "img2splat",
+  sam3d_body: "img2rigged",
+  rig_anything: "mesh2rig",
+  musicgen: "text2audio", audiogen: "text2audio",
+  bark: "text2speech",
+  text2video: "text2video",
+  diagnostic: null,
+};
+function classifyPhase(t) {
+  if (Object.prototype.hasOwnProperty.call(PHASE_BY_ID, t.id)) return PHASE_BY_ID[t.id];
+  const ik = t.inputKind || "image";
+  if (ik === "mesh") return "mesh2rig";
+  if (ik === "text") return /motion/i.test(t.label || "") ? "text2motion" : "text2img";
+  return "img2mesh";
+}
+// The traced optimal routes. entry = what the user supplies.
+const ROUTES = [
+  { id: "text_to_3d", icon: "📝→🧊", label: "Text → image → 3D mesh", entry: "text",
+    desc: "Type a prompt → make a clean reference image → lift it into a textured mesh.",
+    steps: [ { phase: "text2img", rec: "z_image" }, { phase: "img2mesh", rec: "hunyuan3d" } ] },
+  { id: "image_to_3d", icon: "🖼→🧊", label: "Image → 3D mesh (textured)", entry: "image",
+    desc: "One upload → one textured mesh. Best all-rounder.",
+    steps: [ { phase: "img2mesh", rec: "hunyuan3d" } ] },
+  { id: "image_fast", icon: "⚡", label: "Image → fast draft mesh", entry: "image",
+    desc: "Half-a-second UV-unwrapped draft — good for blocking / iteration.",
+    steps: [ { phase: "img2mesh", rec: "stable_fast_3d" } ] },
+  { id: "image_to_rigged", icon: "🖼→🦴", label: "Image → 3D → auto-rig", entry: "image",
+    desc: "Quality mesh, then a skinned/animatable rig bolted on.",
+    steps: [ { phase: "img2mesh", rec: "triposg" }, { phase: "mesh2rig", rec: "rig_anything" } ] },
+  { id: "image_human", icon: "🧍", label: "Image → rigged human", entry: "image",
+    desc: "One-shot rigged human body (Meta SAM 3D Body, MHR rig). Gated.",
+    steps: [ { phase: "img2rigged", rec: "sam3d_body" } ] },
+  { id: "image_splat", icon: "✨", label: "Image → Gaussian splat", entry: "image",
+    desc: "Splat capture — great for organic subjects & scene-like looks.",
+    steps: [ { phase: "img2splat", rec: "triposplat" } ] },
+  { id: "text_motion", icon: "📝→🕺", label: "Text → motion clip", entry: "text",
+    desc: "Prompt → motion (NVIDIA Kimodo). Gated, heavy VRAM.",
+    steps: [ { phase: "text2motion", rec: "kimodo" } ] },
+  { id: "text_music", icon: "🎵", label: "Text → music", entry: "text",
+    desc: "Prompt → a short music clip (Meta MusicGen).",
+    steps: [ { phase: "text2audio", rec: "musicgen" } ] },
+  { id: "text_sfx", icon: "🔊", label: "Text → sound effect", entry: "text",
+    desc: "Prompt → an environmental sound / SFX (Meta AudioGen).",
+    steps: [ { phase: "text2audio", rec: "audiogen" } ] },
+  { id: "text_speech", icon: "🗣", label: "Text → speech (TTS)", entry: "text",
+    desc: "Prompt → spoken audio with a chosen voice (Suno Bark).",
+    steps: [ { phase: "text2speech", rec: "bark" } ] },
+  { id: "text_video", icon: "🎬", label: "Text → video", entry: "text",
+    desc: "Prompt → a short video clip on Kaggle (ModelScope / Zeroscope).",
+    steps: [ { phase: "text2video", rec: "text2video" } ] },
+];
+const _pipe = {
+  built: false,
+  byPhase: {},          // phase -> [template,...]
+  selRoute: null,       // current ROUTE object
+  picks: {},            // stepIndex -> templateId
+  backends: {},         // stepIndex -> "kaggle" | "gemini" | "local"
+  localWf: {},          // stepIndex -> chosen local ComfyUI workflow name
+  localWorkflows: [],   // available workflow JSON names (from the bridge)
+  localAudioWorkflows: [],  // v915 — local audio (ComfyUI text→audio) workflow names
+  src: { prompt: "", imageDataUrl: null, imageName: null },
+  timers: {},           // slug/runId -> setTimeout handle (active pollers)
+  running: {},          // runId -> true while a poll loop is live (dedupe)
+};
+const _LS_ROUTES = "voxelengine.pipelineRoutes";
+// Which backends can serve each phase. Gemini = text→image only (the
+// gemini-2.5-flash-image model via /ai/image). Mesh/rig/splat/
+// motion phases are Kaggle-only for now (local backend = a later round).
+const PHASE_BACKENDS = {
+  text2img: ["kaggle", "gemini"],
+  img2mesh: ["kaggle", "local"], img2splat: ["kaggle"], img2rigged: ["kaggle"],
+  mesh2rig: ["kaggle"], text2motion: ["kaggle"],
+  text2audio: ["kaggle", "local"], text2speech: ["kaggle"],
+  text2video: ["kaggle"],
+};
+function _routeStore() { try { return JSON.parse(localStorage.getItem(_LS_ROUTES) || "{}"); } catch { return {}; } }
+function _saveRouteStore(s) { try { localStorage.setItem(_LS_ROUTES, JSON.stringify(s)); } catch {} }
+// Local backend = ComfyUI mesh-gen, driven by user-exported workflow JSONs
+// in ai-bridge/comfyui-workflows/ (TripoSR / SF3D / Hunyuan3D / Trellis2 —
+// whatever the user saved via "Save (API Format)"). We list them; the user
+// picks which local model a step runs. No hardcoded graphs (node names vary).
+async function loadLocalWorkflows() {
+  try {
+    const r = await fetch("/comfyui/mesh-gen/workflows", { cache: "no-store" });
+    const j = await r.json();
+    _pipe.localWorkflows = (j && j.ok && Array.isArray(j.workflows)) ? j.workflows : [];
+  } catch { _pipe.localWorkflows = []; }
+  _pipe.localOk = _pipe.localWorkflows.length > 0;
+  return _pipe.localOk;
+}
+
+// v915 — local audio workflows (ComfyUI text → audio)
+async function loadLocalAudioWorkflows() {
+  try {
+    const r = await fetch("/comfyui/audio-gen/workflows", { cache: "no-store" });
+    const j = await r.json();
+    _pipe.localAudioWorkflows = (j && j.ok && Array.isArray(j.workflows)) ? j.workflows : [];
+  } catch { _pipe.localAudioWorkflows = []; }
+  _pipe.localAudioOk = _pipe.localAudioWorkflows.length > 0;
+  return _pipe.localAudioOk;
+}
+// Fetch any URL (e.g. a /comfyui/proxy/view artifact) → base64 (no prefix).
+async function _urlToB64(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  const buf = await r.arrayBuffer();
+  let bin = ""; const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function fetchTemplates() {
+  try {
+    const r = await fetch("/kaggle/templates", { cache: "no-store" });
+    const j = await r.json();
+    const byPhase = {};
+    for (const t of (j.templates || [])) {
+      const ph = classifyPhase(t);
+      if (!ph) continue;
+      (byPhase[ph] = byPhase[ph] || []).push(t);
+    }
+    _pipe.byPhase = byPhase;
+    return true;
+  } catch (e) { _pipe.byPhase = {}; return false; }
+}
+
+function buildPipelinePanel() {
+  const host = document.getElementById("pipelinePanel");
+  if (!host) return;
+  if (_pipe.built) { _pipe._refreshJobs && _pipe._refreshJobs(); return; }
+  _pipe.built = true;
+  host.innerHTML =
+    '<h2 style="margin:0 0 4px; color:#bfe; font-size:18px;">🧩 Pipeline Routes</h2>' +
+    '<p style="margin:0 0 14px; color:#8aa; font-size:12px; line-height:1.5;">' +
+    'Pick a quick route, choose a backend per step (☁ Kaggle · ✦ Gemini · 🖥 Local), drop in a ' +
+    'prompt or image, and run it. Steps auto-chain — each output feeds the next — and Kaggle ' +
+    'steps run off-device so you can close the phone and the result reconciles locally.</p>' +
+    '<div id="ppRoutes" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>' +
+    '<div id="ppBuilder" style="display:none;"></div>' +
+    '<hr style="border:0; border-top:1px solid rgba(120,200,255,0.15); margin:18px 0;">' +
+    '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">' +
+      '<label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#bcd; cursor:pointer;">' +
+        '<input type="checkbox" id="ppSheetLog"> 📊 Log routes to Google Sheets</label>' +
+      '<input id="ppSheetId" type="text" placeholder="spreadsheet ID" autocomplete="off" ' +
+        'style="flex:1; min-width:180px; background:rgba(10,16,26,0.9); color:#cde; border:1px solid rgba(120,200,255,0.25); border-radius:4px; padding:4px 7px; font-size:11px;">' +
+      '<span id="ppSheetMsg" style="font-size:10px; color:#789;"></span>' +
+    '</div>' +
+    '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
+      '<strong style="color:#bfe; font-size:13px;">Queue / jobs</strong>' +
+      '<button id="ppRefresh" style="padding:3px 10px; background:rgba(80,120,200,0.3); color:#cef; border:1px solid rgba(120,200,255,0.3); border-radius:4px; cursor:pointer; font-size:11px;">↻ Refresh</button>' +
+    '</div>' +
+    '<div id="ppJobs" style="font-size:12px; color:#9ab;">—</div>';
+
+  // Google Sheets logging config (persisted)
+  try {
+    const idIn = host.querySelector("#ppSheetId"), logCb = host.querySelector("#ppSheetLog");
+    idIn.value = localStorage.getItem("voxelengine.pipelineSheetId") || "";
+    logCb.checked = localStorage.getItem("voxelengine.pipelineSheetLog") === "1";
+    idIn.addEventListener("change", () => { try { localStorage.setItem("voxelengine.pipelineSheetId", idIn.value.trim()); } catch {} });
+    logCb.addEventListener("change", () => { try { localStorage.setItem("voxelengine.pipelineSheetLog", logCb.checked ? "1" : "0"); } catch {} });
+  } catch {}
+
+  // route preset buttons
+  const rWrap = host.querySelector("#ppRoutes");
+  for (const route of ROUTES) {
+    const b = document.createElement("button");
+    b.style.cssText = "text-align:left; flex:1 1 220px; min-width:200px; padding:9px 11px; background:rgba(30,44,66,0.7); color:#cde; border:1px solid rgba(120,200,255,0.22); border-radius:7px; cursor:pointer; font-size:12px; line-height:1.4;";
+    b.innerHTML = '<div style="font-weight:600; color:#cef;">' + route.icon + " " + route.label + '</div>' +
+                  '<div style="color:#8aa; font-size:11px; margin-top:3px;">' + route.desc + '</div>';
+    b.addEventListener("click", () => selectRoute(route.id));
+    rWrap.appendChild(b);
+  }
+
+  // wire refresh + fetch templates, then refresh jobs
+  const jobsEl = host.querySelector("#ppJobs");
+  async function refreshJobs() {
+    jobsEl.textContent = "Loading…";
+    // Persisted route records are the spine — they cover LOCAL routes (which
+    // have no Kaggle job) and survive refresh. Live Kaggle status enriches
+    // running cloud steps.
+    const store = _routeStore();
+    const recs = Object.values(store).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    let kBySlug = {};
+    try {
+      const r = await fetch("/kaggle/jobs", { cache: "no-store" });
+      const j = await r.json();
+      for (const x of (j.jobs || [])) if (x.slug) kBySlug[x.slug] = x;
+    } catch {}
+    if (!recs.length) { jobsEl.innerHTML = '<span style="color:#789;">No pipeline jobs yet. Queue a route above.</span>'; return; }
+    const beIcon = (be) => be === "local" ? "🖥" : be === "gemini" ? "✦" : "☁";
+    const bbtn = "padding:1px 6px; font-size:10px; border-radius:4px; cursor:pointer;";
+    jobsEl.innerHTML = recs.map(rec => {
+      const total = (rec.steps && rec.steps.length) || 1;
+      const si = Math.min(rec.stepIdx || 0, total - 1);
+      const cur = (rec.steps && rec.steps[si]) || {};
+      const st = rec.status || "?";
+      const col = st === "done" ? "#6c8" : st === "failed" ? "#c66" : "#cb6";
+      const driving = !!_pipe.running[rec.runId];
+      let live = "";
+      if (st === "running" && cur.backend !== "local" && cur.backend !== "gemini" && cur.slug && kBySlug[cur.slug]) live = kBySlug[cur.slug].status || "";
+      const stepTxt = st === "done" ? (total + "/" + total) : (Math.min((rec.stepIdx || 0) + 1, total) + "/" + total);
+      const resumeBtn = (st === "running" && !driving) ? ' <button class="ppResume" data-id="' + rec.runId + '" style="' + bbtn + ' background:rgba(80,160,120,0.45); color:#dfe; border:1px solid rgba(120,220,160,0.5);">▶ resume</button>' : "";
+      const dismissBtn = ' <button class="ppDismiss" data-id="' + rec.runId + '" title="Dismiss" style="' + bbtn + ' background:rgba(120,60,60,0.4); color:#fcc; border:1px solid rgba(200,120,120,0.4);">✕</button>';
+      return '<div style="padding:4px 0; border-bottom:1px solid rgba(120,200,255,0.08);">' +
+             '<span style="color:' + col + ';">●</span> <code style="color:#bcd;">' + (rec.label || rec.routeId) + '</code> ' +
+             '<span style="color:#9ab;">' + st + '</span> ' +
+             '<span style="color:#789;">' + beIcon(cur.backend) + ' step ' + stepTxt + '</span>' +
+             (live ? ' <span style="color:#678;">— ' + live + '</span>' : "") +
+             (rec._outFile && st === "done" ? ' <code style="color:#6a8;">' + String(rec._outFile).split("/").pop().slice(0, 38) + '</code>' : "") +
+             resumeBtn + dismissBtn + '</div>';
+    }).join("");
+    jobsEl.querySelectorAll(".ppResume").forEach(b => b.addEventListener("click", () => {
+      const id = b.getAttribute("data-id");
+      if (!_pipe.running[id]) { _pipe.running[id] = true; runRoute(id); }
+      setTimeout(refreshJobs, 500);
+    }));
+    jobsEl.querySelectorAll(".ppDismiss").forEach(b => b.addEventListener("click", () => {
+      const id = b.getAttribute("data-id");
+      const s = _routeStore(); delete s[id]; _saveRouteStore(s);
+      clearTimeout(_pipe.timers[id]); _pipe.running[id] = false;
+      refreshJobs();
+    }));
+  }
+  _pipe._refreshJobs = refreshJobs;
+  host.querySelector("#ppRefresh").addEventListener("click", refreshJobs);
+  fetchTemplates().then(() => { if (_pipe.selRoute) renderRoute(); refreshJobs(); reconcileRoutes(); });
+  loadLocalWorkflows().then(ok => { if (ok && _pipe.selRoute) renderRoute(); });   // enable 🖥 Local if workflows exist
+  loadLocalAudioWorkflows().then(ok => { if (ok && _pipe.selRoute) renderRoute(); });   // v915 — enable 🖥 Local for audio
+}
+
+function selectRoute(id) {
+  const route = ROUTES.find(r => r.id === id);
+  if (!route) return;
+  _pipe.selRoute = route;
+  _pipe.picks = {};
+  _pipe.backends = {};
+  route.steps.forEach((s, i) => {
+    _pipe.picks[i] = s.rec;
+    const allowed = PHASE_BACKENDS[s.phase] || ["kaggle"];
+    _pipe.backends[i] = allowed[0];   // default kaggle
+  });
+  renderRoute();
+}
+
+function renderRoute() {
+  const route = _pipe.selRoute;
+  const wrap = document.getElementById("ppBuilder");
+  if (!route || !wrap) return;
+  wrap.style.display = "block";
+  let html = '<div style="background:rgba(20,30,46,0.7); border:1px solid rgba(120,200,255,0.18); border-radius:8px; padding:14px;">';
+  html += '<div style="font-weight:600; color:#cef; font-size:14px; margin-bottom:2px;">' + route.icon + " " + route.label + '</div>';
+  html += '<div style="color:#8aa; font-size:11px; margin-bottom:12px;">' + route.desc + '</div>';
+
+  // source input(s)
+  if (route.entry === "text") {
+    html += '<label style="display:block; color:#9ab; font-size:11px; margin-bottom:4px;">Prompt</label>' +
+            '<textarea id="ppPrompt" rows="2" placeholder="e.g. a stout brass steampunk owl, studio lighting" style="width:100%; box-sizing:border-box; background:rgba(10,16,26,0.9); color:#cde; border:1px solid rgba(120,200,255,0.25); border-radius:5px; padding:7px; font-size:12px; resize:vertical;"></textarea>';
+  } else {
+    html += '<label style="display:block; color:#9ab; font-size:11px; margin-bottom:4px;">Source image</label>' +
+            '<input id="ppImage" type="file" accept="image/*" style="font-size:12px; color:#9ab;">' +
+            '<div id="ppImageName" style="color:#678; font-size:11px; margin-top:3px;"></div>';
+  }
+
+  // step cards
+  html += '<div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">';
+  route.steps.forEach((s, i) => {
+    const ph = PHASES[s.phase];
+    const opts = (_pipe.byPhase[s.phase] || []);
+    const allowed = PHASE_BACKENDS[s.phase] || ["kaggle"];
+    const backend = _pipe.backends[i] || allowed[0];
+    html += '<div style="background:rgba(12,20,32,0.8); border:1px solid rgba(120,200,255,0.14); border-radius:6px; padding:9px 11px;">';
+    html += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">' +
+            '<span style="background:rgba(80,120,200,0.35); color:#cef; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px;">' + (i + 1) + '</span>' +
+            '<strong style="color:#cde; font-size:12px;">' + ph.label + '</strong>' +
+            '<span id="ppStepStat' + i + '" style="margin-left:auto; color:#789; font-size:10px;"></span>' +
+            '</div>';
+    // backend selector — shows exactly the backends each phase supports.
+    // Gemini = text→image; Local = ComfyUI Trellis 2 for image→mesh (gated
+    // on a live ComfyUI at :8188). No local mesh-gen for other phases.
+    html += '<div style="display:flex; gap:5px; margin-bottom:6px;">';
+    for (const be of allowed) {
+      const _isAudioPhase = (PHASES[s.phase] || {}).out === "audio";
+      const _localReady = _isAudioPhase ? _pipe.localAudioOk : _pipe.localOk;
+      const ok = (be !== "local") || _localReady;
+      const on = backend === be;
+      const tip = be === "gemini" ? "Gemini (gemini-2.5-flash-image) — text → image"
+                : be === "local" ? (_localReady
+                    ? (_isAudioPhase ? "Local ComfyUI text → audio" : "Local ComfyUI mesh-gen (image → mesh)")
+                    : (_isAudioPhase ? "No exported audio workflows — see comfyui-audio-workflows/README.md" : "No exported ComfyUI workflows found — see comfyui-workflows/README.md"))
+                : "Kaggle GPU";
+      html += '<button class="ppBackend" data-step="' + i + '" data-be="' + be + '"' + (ok ? "" : " disabled") +
+        ' title="' + tip + '" style="flex:1; padding:4px 6px; font-size:10px; border-radius:4px; cursor:' + (ok ? "pointer" : "not-allowed") +
+        '; border:1px solid ' + (on ? "rgba(120,220,160,0.6)" : "rgba(120,200,255,0.18)") +
+        '; background:' + (on ? "rgba(80,160,120,0.45)" : "rgba(20,30,46,0.6)") +
+        '; color:' + (ok ? (on ? "#dfe" : "#9ab") : "#456") + ';">' +
+        (be === "kaggle" ? "☁ Kaggle" : be === "gemini" ? "✦ Gemini" : "🖥 Local") + '</button>';
+    }
+    html += '</div>';
+    // model area — Kaggle uses the template dropdown; Gemini/Local are fixed
+    if (backend === "kaggle") {
+      if (opts.length) {
+        html += '<select data-step="' + i + '" class="ppModel" style="width:100%; box-sizing:border-box; background:rgba(10,16,26,0.9); color:#cde; border:1px solid rgba(120,200,255,0.25); border-radius:5px; padding:6px; font-size:12px;">';
+        for (const t of opts) {
+          const sel = (_pipe.picks[i] === t.id) ? " selected" : "";
+          html += '<option value="' + t.id + '"' + sel + '>' + t.label + '</option>';
+        }
+        html += '</select>';
+      } else {
+        html += '<div style="color:#c66; font-size:11px;">No templates found for this phase (is the bridge up?).</div>';
+      }
+    } else if (backend === "gemini") {
+      html += '<div style="color:#9bd; font-size:11px;">✦ gemini-2.5-flash-image · text → image</div>';
+    } else if (backend === "local") {
+      const _audioPhase = (PHASES[s.phase] || {}).out === "audio";
+      const wfs = (_audioPhase ? _pipe.localAudioWorkflows : _pipe.localWorkflows) || [];
+      const _dir = _audioPhase ? "comfyui-audio-workflows" : "comfyui-workflows";
+      const _kind = _audioPhase ? "text → audio" : "image → mesh";
+      if (wfs.length) {
+        const cur = (_pipe.localWf && _pipe.localWf[i]) || wfs[0];
+        html += '<select data-step="' + i + '" class="ppLocalWf" style="width:100%; box-sizing:border-box; background:rgba(10,16,26,0.9); color:#9d9; border:1px solid rgba(120,220,160,0.3); border-radius:5px; padding:6px; font-size:12px;">';
+        for (const w of wfs) html += '<option value="' + w + '"' + (cur === w ? " selected" : "") + '>🖥 ' + w + ' (' + _kind + ')</option>';
+        html += '</select>';
+      } else {
+        html += '<div style="color:#c66; font-size:11px;">No local workflows. Export one from ComfyUI (Save → API Format) into ai-bridge/' + _dir + '/ — see the README.</div>';
+      }
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // v907 — Local finish: weld + smooth normals at engine load-time. Offered
+  // for routes whose final output is a mesh. This is the real "local backend"
+  // here — local can clean a mesh but can't generate one (no local mesh-gen
+  // endpoint), and cleanup runs in the engine on load, not as a queued job.
+  const _finalOut = (PHASES[route.steps[route.steps.length - 1].phase] || {}).out;
+  if (_finalOut === "mesh" || _finalOut === "rigged") {
+    let on = false; try { on = localStorage.getItem("voxelengine.meshCleanupOnLoad") === "1"; } catch {}
+    html += '<label style="display:flex; gap:8px; align-items:flex-start; margin-top:12px; padding:9px 11px; background:rgba(20,30,46,0.6); border:1px solid rgba(120,200,255,0.16); border-radius:6px; cursor:pointer;">' +
+            '<input type="checkbox" id="ppLocalClean"' + (on ? " checked" : "") + ' style="margin-top:2px;">' +
+            '<span style="font-size:11px; color:#bcd; line-height:1.45;"><strong style="color:#cde;">🖥 Local finish — weld + smooth normals</strong><br>' +
+            '<span style="color:#8aa;">Runs in the engine (CPU workers) when this asset loads — tidies the generated mesh. Not a queued job; persists as a setting (also in Settings → Gameplay).</span></span></label>';
+  }
+
+  html += '<button id="ppQueue" style="margin-top:14px; width:100%; padding:10px; background:rgba(80,160,120,0.5); color:#dfe; border:1px solid rgba(120,220,160,0.5); border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">⤴ Queue &amp; run route</button>';
+  html += '<div id="ppQueueMsg" style="margin-top:8px; font-size:12px;"></div>';
+  html += '</div>';
+  wrap.innerHTML = html;
+
+  // wire inputs
+  const pPrompt = wrap.querySelector("#ppPrompt");
+  if (pPrompt) { pPrompt.value = _pipe.src.prompt || ""; pPrompt.addEventListener("input", () => { _pipe.src.prompt = pPrompt.value; }); }
+  const pImage = wrap.querySelector("#ppImage");
+  if (pImage) pImage.addEventListener("change", () => {
+    const f = pImage.files && pImage.files[0]; if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => { _pipe.src.imageDataUrl = fr.result; _pipe.src.imageName = f.name;
+      const nm = wrap.querySelector("#ppImageName"); if (nm) nm.textContent = "✓ " + f.name; };
+    fr.readAsDataURL(f);
+  });
+  wrap.querySelectorAll(".ppModel").forEach(sel => sel.addEventListener("change", () => {
+    _pipe.picks[parseInt(sel.dataset.step, 10)] = sel.value;
+  }));
+  wrap.querySelectorAll(".ppLocalWf").forEach(sel => sel.addEventListener("change", () => {
+    _pipe.localWf[parseInt(sel.dataset.step, 10)] = sel.value;
+  }));
+  wrap.querySelectorAll(".ppBackend").forEach(btn => btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    _pipe.backends[parseInt(btn.dataset.step, 10)] = btn.dataset.be;
+    renderRoute();   // re-render so the model dropdown / Gemini note updates
+  }));
+  const pClean = wrap.querySelector("#ppLocalClean");
+  if (pClean) pClean.addEventListener("change", () => {
+    try { localStorage.setItem("voxelengine.meshCleanupOnLoad", pClean.checked ? "1" : "0"); } catch {}
+  });
+  wrap.querySelector("#ppQueue").addEventListener("click", queueRoute);
+}
+
+// ─── Auto-chain runner ───────────────────────────────────
+// Build the lab-style params object for a step (shared by both backends).
+function _stepParams(label, extra) {
+  return Object.assign({ removeBackground: true, withTexture: true, seed: 42,
+    simplify: true, simplifyCount: 8192, tags: ["lab", "route"],
+    note: "pipeline route: " + label }, extra || {});
+}
+// Feed the previous step's output (base64) into the next step's input,
+// keyed by the next template's phase output type → input param.
+function _feedInput(params, prevPhase, b64) {
+  const out = PHASES[prevPhase] && PHASES[prevPhase].out;
+  if (out === "image") params.imageBase64 = b64;
+  else { params.meshBase64 = b64; params.meshFormat = "glb"; }
+  return params;
+}
+// Fetch a finished Kaggle output file and return base64 (no data: prefix).
+async function _fileToB64(file) {
+  const url = "/GPU_Assets/" + String(file).replace(/^\/+/, "");
+  const r = await fetch(url, { cache: "no-store" });
+  const buf = await r.arrayBuffer();
+  let bin = ""; const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+// Pick the output file matching the desired type from a /kaggle/download list.
+function _pickOutput(files, wantOut) {
+  const rx = wantOut === "image" ? /\.(png|jpe?g|webp)$/i
+           : wantOut === "splat" ? /\.ply$/i
+           : wantOut === "video" ? /\.(mp4|webm|mov)$/i
+           : wantOut === "audio" ? /\.(wav|mp3|flac|ogg)$/i : /\.glb$/i;
+  return files.find(f => rx.test(String(f)))
+      || files.find(f => /\.(glb|wav|png)$/i.test(String(f))) || files[0] || null;
+}
+// Resolve the previous step's output to base64 (re-fetching a Kaggle file
+// from GPU_Assets, or reusing a persisted Gemini image). Refresh-safe.
+async function _prevOutputB64(rec, idx) {
+  const prev = rec.steps[idx - 1];
+  if (prev && prev.outImageB64) return prev.outImageB64;
+  if (prev && prev.outUrl) return await _urlToB64(prev.outUrl);   // local ComfyUI artifact
+  if (prev && prev.outFile) return await _fileToB64(prev.outFile);
+  throw new Error("missing prior-step output");
+}
+
+// Append a row to the configured Google Sheet (best-effort, no-throw).
+// Columns: timestamp, runId, route, backends, status, output.
+async function logToSheet(rec, status) {
+  let on = false, id = "";
+  try { on = localStorage.getItem("voxelengine.pipelineSheetLog") === "1"; id = (localStorage.getItem("voxelengine.pipelineSheetId") || "").trim(); } catch {}
+  if (!on || !id) return;
+  const backends = (rec.steps || []).map(s => (s.backend || "kaggle") + ":" + (s.workflow || s.template || "")).join(" → ");
+  const row = [new Date().toISOString(), rec.runId || "", rec.label || rec.routeId || "", backends, status, rec._outFile || ""];
+  try {
+    await fetch("/sheets/append", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ spreadsheetId: id, range: "Routes!A:F", values: [row] }) });
+    const m = document.getElementById("ppSheetMsg"); if (m) m.textContent = "logged: " + status;
+  } catch {}
+}
+
+// Play a generated audio file from GPU_Assets. Routes through the engine
+// audio bus if we're in the same window; otherwise a plain Audio element.
+let _ppAudio = null;
+function _clipUrl(file) { const f = String(file); return /^(https?:\/\/|\/)/.test(f) ? f : "/GPU_Assets/" + f.replace(/^\/+/, ""); }
+function playClip(file) {
+  const url = _clipUrl(file);
+  try { if (window.audio && typeof window.audio.playClip === "function") { window.audio.playClip(url); return; } } catch {}
+  try { if (_ppAudio) { _ppAudio.pause(); } _ppAudio = new Audio(url); _ppAudio.play(); } catch (e) {}
+}
+
+// v914 — set a generated clip as the looping ambient track.
+let _ppAmbient = null;
+function setAmbient(file) {
+  const url = _clipUrl(file);
+  try { if (window.audio && typeof window.audio.setAmbientClip === "function") { window.audio.setAmbientClip(url); return; } } catch {}
+  try { if (_ppAmbient) { _ppAmbient.pause(); } _ppAmbient = new Audio(url); _ppAmbient.loop = true; _ppAmbient.play(); } catch (e) {}
+}
+
+// v916 — watch a generated video in a dismissable overlay player.
+function playVideo(file) {
+  const url = _clipUrl(file);
+  try {
+    const back = document.createElement("div");
+    Object.assign(back.style, { position: "fixed", inset: "0", background: "rgba(0,0,0,0.85)", zIndex: "99999",
+      display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" });
+    const v = document.createElement("video");
+    v.src = url; v.controls = true; v.autoplay = true; v.loop = true;
+    Object.assign(v.style, { maxWidth: "92vw", maxHeight: "92vh", borderRadius: "8px", boxShadow: "0 8px 40px rgba(0,0,0,0.6)" });
+    v.addEventListener("click", (e) => e.stopPropagation());
+    back.addEventListener("click", () => { try { v.pause(); } catch {} back.remove(); });
+    back.appendChild(v); document.body.appendChild(back);
+  } catch (e) {}
+}
+
+async function queueRoute() {
+  const route = _pipe.selRoute, msg = document.getElementById("ppQueueMsg");
+  if (!route || !msg) return;
+  // entry source check
+  if (route.entry === "text" && !_pipe.src.prompt) { msg.innerHTML = '<span style="color:#c66;">Enter a prompt first.</span>'; return; }
+  if (route.entry === "image" && !_pipe.src.imageDataUrl) { msg.innerHTML = '<span style="color:#c66;">Pick a source image first.</span>'; return; }
+  const runId = "route-" + Date.now();
+  const rec = {
+    runId, routeId: route.id, label: route.label, entry: route.entry,
+    prompt: _pipe.src.prompt || "",
+    imageBase64: route.entry === "image" ? String(_pipe.src.imageDataUrl).replace(/^data:[^;]+;base64,/, "") : null,
+    steps: route.steps.map((s, i) => ({ phase: s.phase, backend: _pipe.backends[i] || "kaggle", template: _pipe.picks[i],
+      workflow: (_pipe.backends[i] === "local")
+        ? ((_pipe.localWf && _pipe.localWf[i]) || (((PHASES[s.phase] || {}).out === "audio" ? _pipe.localAudioWorkflows : _pipe.localWorkflows)[0] || ""))
+        : undefined })),
+    stepIdx: 0, status: "running", slug: null, ts: Date.now(),
+  };
+  const store = _routeStore(); store[runId] = rec; _saveRouteStore(store);
+  _pipe.running[runId] = true;
+  msg.innerHTML = '<span style="color:#cb6;">Starting route…</span>';
+  logToSheet(rec, "queued");
+  runRoute(runId);
+}
+
+// Drive a route from its persisted record. Re-entrant + resumable: each
+// call advances at most one transition then re-schedules itself.
+async function runRoute(runId) {
+  const store = _routeStore(); const rec = store[runId];
+  if (!rec || rec.status === "done" || rec.status === "failed") return;
+  const step = rec.steps[rec.stepIdx];
+  if (!step) {
+    rec.status = "done"; _saveRouteStore(store); _pipe.running[runId] = false;
+    logToSheet(rec, "done");
+    const m = document.getElementById("ppQueueMsg");
+    if (m && _pipe.selRoute && _pipe.selRoute.id === rec.routeId) {
+      const isAudio = rec._outFile && /\.(wav|mp3|flac|ogg|m4a)(\b|\?|$)/i.test(rec._outFile);
+      const isVideo = rec._outFile && /\.(mp4|webm|mov)(\b|\?|$)/i.test(rec._outFile);
+      m.innerHTML = '<span style="color:#6c8;">✓ Route complete' + (rec._outFile ? ' → <code>' + rec._outFile + '</code>' : "") + '.</span>' +
+        (isAudio ? ' <button id="ppPlay" style="padding:3px 10px; background:rgba(80,160,120,0.5); color:#dfe; border:1px solid rgba(120,220,160,0.5); border-radius:5px; cursor:pointer; font-size:11px;">▶ Play</button>'
+                 + ' <button id="ppAmb" style="padding:3px 10px; background:rgba(90,120,200,0.5); color:#def; border:1px solid rgba(140,170,240,0.5); border-radius:5px; cursor:pointer; font-size:11px;">🔁 Ambient</button>'
+         : isVideo ? ' <button id="ppWatch" style="padding:3px 10px; background:rgba(150,90,200,0.5); color:#edf; border:1px solid rgba(200,150,240,0.5); border-radius:5px; cursor:pointer; font-size:11px;">▶ Watch</button>'
+                 : ' <span style="color:#789;">Asset is in your local library.</span>');
+      const pb = document.getElementById("ppPlay");
+      if (pb) pb.addEventListener("click", () => playClip(rec._outFile));
+      const ab = document.getElementById("ppAmb");
+      if (ab) ab.addEventListener("click", () => setAmbient(rec._outFile));
+      const vb = document.getElementById("ppWatch");
+      if (vb) vb.addEventListener("click", () => playVideo(rec._outFile));
+    }
+    _pipe._refreshJobs && _pipe._refreshJobs(); return;
+  }
+  const setStat = (txt) => { const el = document.getElementById("ppStepStat" + rec.stepIdx); if (el) el.textContent = txt; };
+
+  try {
+    // ── Determine this step's INPUT (entry source or prior output) ──
+    if (step.backend === "gemini") {
+      // Gemini = text→image. Synchronous. Normally the entry text2img step.
+      if (!step._submitted) {
+        setStat("✦ generating…");
+        const r = await fetch("/ai/image", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: rec.prompt || rec.label }) });
+        const j = await r.json();
+        if (!r.ok || !j.image) throw new Error(j.error || ("gemini http " + r.status));
+        // images are small enough to persist (survives refresh); meshes are not
+        step.outImageB64 = j.image;
+        step._submitted = true; step._done = true;
+        rec.stepIdx++; _saveRouteStore(store);
+        setStat("✓ image");
+        return runRoute(runId);
+      }
+    } else if (step.backend === "local") {
+      const _audioPhase = (PHASES[step.phase] || {}).out === "audio";
+      if (_audioPhase) {
+        // v915 — local ComfyUI text → audio. Submit the prompt once
+        // (returns a promptId), then poll /comfyui/audio-gen/<id>.
+        if (!step._submitted) {
+          const promptText = (rec.stepIdx === 0 && rec.entry === "text") ? rec.prompt : (rec.prompt || _stepParams(rec.label).prompt || "");
+          if (!promptText) throw new Error("no prompt for local audio step");
+          const wf = step.workflow || (_pipe.localAudioWorkflows[0] || "");
+          if (!wf) throw new Error("no local audio workflow (export one to comfyui-audio-workflows/)");
+          setStat("🖥 submitting (" + wf + ")…");
+          const r = await fetch("/comfyui/audio-gen", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workflow: wf, prompt: promptText }) });
+          const j = await r.json();
+          if (!r.ok || !j.ok || !j.promptId) throw new Error(j.error || ("comfyui audio submit http " + r.status));
+          step.localPromptId = j.promptId; step._submitted = true; _saveRouteStore(store);
+          setStat("🖥 queued");
+        }
+        const pr = await fetch("/comfyui/audio-gen/" + encodeURIComponent(step.localPromptId), { cache: "no-store" });
+        const pj = await pr.json();
+        if (!pj.ok) throw new Error(pj.error || "comfyui audio poll error");
+        if (!pj.done) {
+          setStat("🖥 generating…");
+          clearTimeout(_pipe.timers[runId]);
+          _pipe.timers[runId] = setTimeout(() => runRoute(runId), 6000);
+          return;
+        }
+        const outs = Array.isArray(pj.outputs) ? pj.outputs : [];
+        const audRx = /\.(wav|mp3|flac|ogg|m4a)$/i;
+        const pick = outs.find(o => audRx.test(o.filename)) || outs[0];
+        if (!pick) throw new Error("comfyui produced no audio output");
+        step.outUrl = pick.url;
+        const isLast = rec.stepIdx === rec.steps.length - 1;
+        if (isLast) {
+          rec._outFile = pick.url;
+          try { await fetch("/assets/import-url", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: pick.url, opts: { name: "route-" + Date.now() } }) }); } catch {}
+        }
+        step._done = true; rec.stepIdx++; _saveRouteStore(store);
+        setStat("✓ audio");
+        return runRoute(runId);
+      }
+      // Local ComfyUI mesh-gen, driven by an exported workflow JSON. Submit
+      // once (returns a promptId), then poll /comfyui/mesh-gen/<id> like a
+      // Kaggle job — so it's resumable and non-blocking.
+      if (!step._submitted) {
+        let b64in;
+        if (rec.stepIdx === 0) b64in = rec.imageBase64;          // image-entry route
+        else b64in = await _prevOutputB64(rec, rec.stepIdx);     // prior image output
+        if (!b64in) throw new Error("no input image for local step");
+        const wf = step.workflow || (_pipe.localWorkflows[0] || "");
+        if (!wf) throw new Error("no local workflow selected (export one to comfyui-workflows/)");
+        setStat("🖥 submitting (" + wf + ")…");
+        const r = await fetch("/comfyui/mesh-gen", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workflow: wf, image: "data:image/png;base64," + b64in }) });
+        const j = await r.json();
+        if (!r.ok || !j.ok || !j.promptId) throw new Error(j.error || ("comfyui submit http " + r.status));
+        step.localPromptId = j.promptId; step._submitted = true; _saveRouteStore(store);
+        setStat("🖥 queued");
+      }
+      // poll mesh-gen status
+      const pr = await fetch("/comfyui/mesh-gen/" + encodeURIComponent(step.localPromptId), { cache: "no-store" });
+      const pj = await pr.json();
+      if (!pj.ok) throw new Error(pj.error || "comfyui poll error");
+      if (!pj.done) {
+        setStat("🖥 generating…");
+        clearTimeout(_pipe.timers[runId]);
+        _pipe.timers[runId] = setTimeout(() => runRoute(runId), 6000);
+        return;
+      }
+      const outs = Array.isArray(pj.outputs) ? pj.outputs : [];
+      const want = (PHASES[step.phase] && PHASES[step.phase].out) || "mesh";
+      const meshRx = /\.(glb|gltf|obj|ply)$/i, imgRx = /\.(png|jpe?g|webp)$/i;
+      const pick = outs.find(o => (want === "image" ? imgRx : meshRx).test(o.filename))
+                || outs.find(o => meshRx.test(o.filename)) || outs[0];
+      if (!pick) throw new Error("comfyui produced no output file");
+      step.outUrl = pick.url;
+      const isLast = rec.stepIdx === rec.steps.length - 1;
+      if (isLast) {
+        rec._outFile = pick.url;
+        try { await fetch("/assets/import-url", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: pick.url, opts: { name: "route-" + Date.now() } }) }); } catch {}
+      }
+      step._done = true; rec.stepIdx++; _saveRouteStore(store);
+      setStat("✓ mesh");
+      return runRoute(runId);
+    } else {
+      // Kaggle backend (default). Submit once, then poll to completion.
+      if (!step._submitted) {
+        const params = _stepParams(rec.label);
+        if (rec.stepIdx === 0) {
+          if (rec.entry === "text") params.prompt = rec.prompt;
+          else params.imageBase64 = rec.imageBase64;
+        } else {
+          const b64 = await _prevOutputB64(rec, rec.stepIdx);
+          _feedInput(params, rec.steps[rec.stepIdx - 1].phase, b64);
+        }
+        setStat("☁ submitting…");
+        const r = await fetch("/kaggle/submit", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template: step.template, params }) });
+        const j = await r.json();
+        if (!r.ok || !j.slug) throw new Error(j.error || ("submit http " + r.status));
+        step.slug = j.slug; step._submitted = true; rec.slug = j.slug; _saveRouteStore(store);
+        setStat("☁ queued " + j.slug);
+      }
+      // poll status
+      const jr = await fetch("/kaggle/jobs", { cache: "no-store" });
+      const jd = await jr.json();
+      const job = (jd.jobs || []).find(x => x.slug === step.slug);
+      const phase = String((job && (job.lastStatus || job.status)) || "").toLowerCase();
+      if (phase === "error" || phase === "cancelled") throw new Error("kaggle " + phase);
+      if (phase !== "complete") {
+        setStat("☁ " + (phase || "running") + "…");
+        clearTimeout(_pipe.timers[runId]);
+        _pipe.timers[runId] = setTimeout(() => runRoute(runId), 9000);   // keep polling
+        return;
+      }
+      // complete → record the output FILE path (re-fetched on demand; never
+      // stuff multi-MB mesh bytes into localStorage)
+      setStat("⬇ downloading…");
+      const dr = await fetch("/kaggle/download", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: step.slug }) });
+      const dd = await dr.json();
+      const files = Array.isArray(dd.files) ? dd.files : [];
+      const want = (PHASES[step.phase] && PHASES[step.phase].out) || "mesh";
+      const f = _pickOutput(files, want);
+      const isLast = rec.stepIdx === rec.steps.length - 1;
+      if (!isLast && !f) throw new Error("no " + want + " in output");
+      step.outFile = f;
+      if (isLast) rec._outFile = f;
+      step._done = true; rec.stepIdx++; _saveRouteStore(store);
+      setStat("✓ done");
+      return runRoute(runId);
+    }
+
+    // gemini fell through without a next action (shouldn't happen) — advance
+    rec.stepIdx++; _saveRouteStore(store); return runRoute(runId);
+  } catch (e) {
+    rec.status = "failed"; rec.error = (e && e.message) || String(e); _saveRouteStore(store); _pipe.running[runId] = false;
+    logToSheet(rec, "failed: " + (rec.error || ""));
+    setStat("✗ " + rec.error);
+    const msg = document.getElementById("ppQueueMsg");
+    if (msg) msg.innerHTML = '<span style="color:#c66;">Route failed at step ' + (rec.stepIdx + 1) + ': ' + rec.error + '</span>';
+    _pipe._refreshJobs && _pipe._refreshJobs();
+    return;
+  }
+}
+
+// Resume any unfinished routes (phone-off / refresh parity for Kaggle steps).
+function reconcileRoutes() {
+  const store = _routeStore();
+  for (const [runId, rec] of Object.entries(store)) {
+    if (rec.status === "running" && !_pipe.running[runId]) {
+      // a Kaggle step mid-flight will resume polling; a not-yet-submitted
+      // synchronous gemini step will re-run cleanly; a local ComfyUI step
+      // re-polls /comfyui/{mesh,audio}-gen/<promptId> (ComfyUI history is
+      // durable), so it resumes too.
+      _pipe.running[runId] = true;
+      runRoute(runId);
+    }
+  }
+  _pipe._refreshJobs && _pipe._refreshJobs();
+}
+
+// ─── Init ────────────────────────────────────────────────
+renderCats();
+renderList();
+discoverAll();    // async — populates protocol set + meta overrides
+const initial = location.hash.replace(/^#/, "");
+if (initial && state.demos.some(d => d.id === initial)) {
+  select(initial);
+}
+window.addEventListener("hashchange", () => {
+  const id = location.hash.replace(/^#/, "");
+  if (id && state.demos.some(d => d.id === id)) select(id);
+});
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

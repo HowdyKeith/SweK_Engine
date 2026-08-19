@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Arena -- a learner that beats its baselines</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --panel:#0a1c12; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:920px; font-size:12px; }
+  header b { color:var(--green); } header code { color:var(--cyan); }
+  .wrap { padding:16px 18px; display:grid; grid-template-columns:1fr 1fr; gap:18px; max-width:1000px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:12px 14px; }
+  .card h2 { margin:0 0 8px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.07em; }
+  canvas { display:block; width:100%; height:auto; border-radius:5px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th,td { text-align:left; padding:4px 6px; border-bottom:1px solid #12281b; }
+  th { color:var(--dim); font-weight:normal; font-size:10px; text-transform:uppercase; }
+  td.n { text-align:right; }
+  .bar { height:14px; border-radius:3px; }
+  .controls { display:flex; gap:14px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 16px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .ctl { display:flex; flex-direction:column; gap:2px; } .ctl label { font-size:10px; color:var(--dim); text-transform:uppercase; }
+  input[type=range] { width:150px; accent-color:var(--cyan); }
+  .note { max-width:1000px; margin:16px 18px 24px; color:var(--dim); font-size:11px; border-top:1px solid var(--line); padding-top:10px; }
+  .note b { color:var(--cyan); } .full { grid-column:1 / -1; }
+  .win { color:var(--green); font-weight:bold; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Arena &mdash; a learner that beats its baselines</h1>
+  <p>Not a mockup: this page runs <code>brain/agent/arena.js</code> &mdash; the exact module the gate runs. A deterministic engagement (an agent, a goal, threats on patrol) raced by four policies: <b>random</b>, a greedy <b>dash</b>, a reactive <b>reflex</b>, and a <b>learned</b> bandit that picks among four tactics (rush / flank / hold / <b>flow</b>, the GPU brain solved field) and updates its values from reward. Everything below is read straight out of the run &mdash; the Q-weights, the picks, the per-arm reward &mdash; not animated stand-ins. The kill condition is on <code>predictions.html</code>.</p>
+</header>
+<div class="controls" style="padding:0 18px;">
+  <button id="run">&#9654; Run the ladder</button>
+  <div class="ctl"><label>Seed</label><input type="range" id="seed" min="1" max="50" value="12" /></div>
+  <div class="ctl"><label>Episodes</label><input type="range" id="eps" min="80" max="400" step="40" value="240" /></div>
+  <span id="status" style="color:var(--green);font-size:11px;"></span>
+</div>
+<div class="wrap">
+  <div class="card"><h2>The ladder &mdash; total reward over the run</h2><div id="table"></div></div>
+  <div class="card"><h2>What the bandit learned (live Q-weights)</h2><div id="qbars"></div></div>
+  <div class="card full"><h2>Learning curve &mdash; the learned arm's reward per episode</h2><canvas id="curve" width="960" height="180"></canvas></div>
+  <div class="card full"><h2>One brain-flow engagement &mdash; the agent (cyan) following the GPU brain field around the threats (red) to the goal (green)</h2><canvas id="arena" width="960" height="300"></canvas></div>
+</div>
+<div class="note" id="verdict"></div>
+<script type="module">
+import { runLadderAsync, makeArena, runEpisode, threatAt, TACTICS, solveArenaFlowPerTick, flowTacticPerTick, sum, mean, makeRng } from "./brain/agent/arena.js";
+
+const $ = (id) => document.getElementById(id);
+const COLORS = { random:"#e8736a", greedy:"#ffcc66", reflex:"#c9a0ff", learned:"#33ccff" };
+
+function drawCurve(rewards) {
+  const c = $("curve"), g = c.getContext("2d"), W = c.width, H = c.height, pad = 24;
+  g.clearRect(0,0,W,H);
+  const lo = Math.min(...rewards), hi = Math.max(...rewards), rng = (hi-lo)||1;
+  const x = (i) => pad + (W-2*pad)*i/(rewards.length-1), y = (v) => H-pad - (H-2*pad)*(v-lo)/rng;
+  g.strokeStyle = "#12281b"; g.beginPath(); g.moveTo(pad,y(0)); g.lineTo(W-pad,y(0)); g.stroke();
+  // raw (faint) + smoothed (bright)
+  g.strokeStyle = "#33ccff33"; g.beginPath(); rewards.forEach((v,i)=>{ i?g.lineTo(x(i),y(v)):g.moveTo(x(i),y(v)); }); g.stroke();
+  const win = 12, sm = rewards.map((_,i)=>{ const s=Math.max(0,i-win),e=Math.min(rewards.length,i+win+1); return mean(rewards.slice(s,e)); });
+  g.strokeStyle = "#33ccff"; g.lineWidth = 2; g.beginPath(); sm.forEach((v,i)=>{ i?g.lineTo(x(i),y(v)):g.moveTo(x(i),y(v)); }); g.stroke(); g.lineWidth = 1;
+  g.fillStyle = "#6a8a78"; g.font = "10px ui-monospace"; g.fillText("early", pad, H-6); g.fillText("late", W-pad-24, H-6);
+}
+
+async function drawArena(seed) {
+  // replay a single BRAIN-FLOW engagement (per-tick field) and draw it
+  const c = $("arena"), g = c.getContext("2d"), W = c.width, H = c.height;
+  const arena = makeArena((seed + 40*7919)>>>0);
+  const pt = await solveArenaFlowPerTick(arena);
+  const res = runEpisode(arena, flowTacticPerTick(pt), makeRng((seed+40*13)>>>0));
+  const S = Math.min(W/arena.size, H/arena.size), ox = (W-S*arena.size)/2, oy = (H-S*arena.size)/2;
+  g.clearRect(0,0,W,H); g.strokeStyle = "#0e2016";
+  for (let i=0;i<=arena.size;i++){ g.beginPath(); g.moveTo(ox+i*S,oy); g.lineTo(ox+i*S,oy+arena.size*S); g.stroke(); g.beginPath(); g.moveTo(ox,oy+i*S); g.lineTo(ox+arena.size*S,oy+i*S); g.stroke(); }
+  const cell = (p,col,r)=>{ g.fillStyle=col; g.beginPath(); g.arc(ox+(p[0]+0.5)*S, oy+(p[1]+0.5)*S, r, 0, 7); g.fill(); };
+  // threat patrol traces
+  for (const th of arena.threats){ g.strokeStyle="#e8736a44"; g.beginPath(); for(let t=0;t<arena.steps;t++){ const tp=threatAt(th,t); (t?g.lineTo:g.moveTo).call(g, ox+(tp[0]+0.5)*S, oy+(tp[1]+0.5)*S); } g.stroke(); cell(threatAt(th, res.steps), "#e8736a", S*0.32); }
+  // agent path
+  g.strokeStyle="#33ccff"; g.lineWidth=2; g.beginPath(); res.path.forEach((p,i)=>{ (i?g.lineTo:g.moveTo).call(g, ox+(p[0]+0.5)*S, oy+(p[1]+0.5)*S); }); g.stroke(); g.lineWidth=1;
+  cell(arena.goal, "#9fe6c0", S*0.34); cell(arena.start, "#ffcc66", S*0.24); cell(res.path[res.path.length-1], "#33ccff", S*0.28);
+}
+
+function render(r) {
+  const tot = {}; for (const k of Object.keys(r.arms)) tot[k] = sum(r.arms[k]);
+  const goalPct = (a) => Math.round(100 * a.filter(v=>v>0).length / a.length);
+  const order = ["random","greedy","reflex","learned"];
+  const best = order.reduce((b,k)=> tot[k]>tot[b]?k:b);
+  $("table").innerHTML = "<table><tr><th>policy</th><th>total</th><th>avg</th><th>%goal</th></tr>" +
+    order.map(k=>"<tr><td style='color:"+COLORS[k]+"'>"+(k===best?"&#9679; ":"")+k+"</td><td class='n "+(k===best?"win":"")+"'>"+tot[k].toFixed(0)+"</td><td class='n'>"+mean(r.arms[k]).toFixed(1)+"</td><td class='n'>"+goalPct(r.arms[k])+"%</td></tr>").join("") + "</table>";
+  const qmax = Math.max(...Object.values(r.Q).map(Math.abs), 1);
+  $("qbars").innerHTML = Object.keys(r.Q).map(k=>{ const v=r.Q[k], w=Math.round(100*Math.abs(v)/qmax); const col = v>=0?"#33ccff":"#e8736a";
+    return "<div style='margin:7px 0'><div style='display:flex;justify-content:space-between;font-size:11px'><span>"+k+"  <span style='color:var(--dim)'>&#215;"+r.counts[k]+"</span></span><span style='color:"+col+"'>Q "+v.toFixed(1)+"</span></div><div class='bar' style='width:"+w+"%;background:"+col+";opacity:.7'></div></div>"; }).join("") +
+    "<div style='color:var(--dim);font-size:10px;margin-top:8px'>the bandit tried each tactic, kept the reward it saw, and committed to the one that paid &mdash; learned, not told.</div>";
+  drawCurve(r.arms.learned);
+  drawArena(+$("seed").value);
+  const q = Math.floor(r.M/4), early = mean(r.arms.learned.slice(0,q)), late = mean(r.arms.learned.slice(-q));
+  $("verdict").innerHTML = "<b>What this run shows:</b> the learner scored <b>"+tot.learned.toFixed(0)+"</b> against the hand reflex's "+tot.reflex.toFixed(0)+", the greedy dash's "+tot.greedy.toFixed(0)+", and random's "+tot.random.toFixed(0)+" &mdash; and it climbed from "+early.toFixed(1)+" early to "+late.toFixed(1)+" late as it learned. <b>What it will not tell you:</b> this is a fact about <i>this</i> arena and this threat density, not a law &mdash; change the world and the ranking can change. That honesty is the difference between a measured agent and a demo that always wins.";
+  $("status").textContent = "ran " + r.M + " episodes x 4 policies on seed " + $("seed").value;
+}
+
+async function go(){ $("status").textContent = "running..."; await new Promise(r=>setTimeout(r,10)); render(await runLadderAsync(+$("seed").value, +$("eps").value)); }
+$("run").onclick = go; $("seed").oninput = ()=>drawArena(+$("seed").value);
+go();
+</script>
+</body>
+</html>

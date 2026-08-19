@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Jolt Destructible Arena">
+<meta name="demo:desc" content="A wall built from boxes joined by breakable Jolt constraints: it stands rigid until you hit it, then the joints at the impact break and it crumbles. Click to lob a boulder. Real Jolt physics, deterministic destruction (lockstep-safe).">
+<meta name="demo:category" content="physics">
+<title>Jolt Destructible Arena</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --stone:#8a94a6; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; overflow:hidden; }
+  #hud { position:fixed; top:12px; left:14px; z-index:5; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:6px 12px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  .stat { color:var(--dim); font-size:12px; }
+  .stat b { color:#dbe7ff; }
+  canvas { display:block; cursor:crosshair; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>&#9670; Jolt Destructible Arena</h1>
+  <div class="row"><button onclick="rebuild()">Rebuild wall</button><button onclick="addCrew()">Add crew</button><button onclick="flingCrew()">Fling crew at wall</button><span class="stat" id="engine">loading Jolt&hellip;</span></div>
+  <div class="stat">click to lob a boulder &middot; joints <b id="intact">0</b> intact / <b id="broke">0</b> broken &middot; boulders <b id="shots">0</b> &middot; crew get flung</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { createJoltBackend } from "./physics/jolt/joltLoader.js";
+import { createStructures } from "./physics/jolt/joltStructures.js";
+import { createRagdoll } from "./physics/jolt/joltRagdoll.js";
+
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+function resize() { cvs.width = innerWidth; cvs.height = innerHeight; } addEventListener("resize", resize); resize();
+
+// world<->screen (side view, x horizontal, y up). meters -> pixels.
+const PX = 46, GY = 90;   // px per meter, ground y offset from bottom
+function wx(x) { return cvs.width / 2 + x * PX; }
+function wy(y) { return cvs.height - GY - y * PX; }
+function sx(px) { return (px - cvs.width / 2) / PX; }
+function sy(py) { return (cvs.height - GY - py) / PX; }
+
+let backend = null, world = null, S = null, wallIdx = [], boulders = [], shots = 0, ragdolls = [];
+
+async function init() {
+  try { backend = await createJoltBackend(); document.getElementById("engine").textContent = "Jolt physics"; rebuild(); }
+  catch (e) { document.getElementById("engine").textContent = "Jolt failed to load (open from the SweK server, not file://)"; }
+}
+function rebuild() {
+  if (!backend) return;
+  if (world && world.destroy) world.destroy();
+  world = backend.createWorld({ gravity: [0, -9.8, 0] });
+  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [40, 0.5, 0.5] });   // ground
+  S = createStructures(world);
+  const wall = S.addWall({ x: 0, y: 0, z: 0, cols: 7, rows: 6, half: 0.5 });
+  wallIdx = wall.idxs; boulders = []; shots = 0; ragdolls = [];
+}
+function addCrew() {
+  if (!world) return;
+  for (let k = 0; k < 3; k++) ragdolls.push(createRagdoll(world, { x: 3.5 + k * 1.4, y: 1.6, z: 0, scale: 0.85 }));
+}
+window.addCrew = addCrew;
+function flingCrew() {
+  for (const rag of ragdolls) { const c = rag.center(); const dir = c[0] >= 0 ? -1 : 1; rag.fling(dir * 30, 7, 0, 5); }
+}
+window.flingCrew = flingCrew;
+addEventListener("pointerdown", (e) => {
+  if (!world) return;
+  const tx = sx(e.clientX), ty = sy(e.clientY);
+  // launch a boulder from the lower-left toward the click, fast enough to arc in
+  const px = -9, py = 1.2, dx = tx - px, dy = ty - py, d = Math.hypot(dx, dy) || 1;
+  const speed = 22;
+  const i = world.addBox({ type: "dynamic", pos: [px, py, 0], half: [0.55, 0.55, 0.55], density: 5 });
+  world.setVelocity(i, [dx / d * speed, dy / d * speed + 3, 0]);
+  boulders.push(i); shots++;
+});
+
+function box(i, col) { const xf = world.readTransforms(); const x = xf[i * 7], y = xf[i * 7 + 1], qz = xf[i * 7 + 5], qw = xf[i * 7 + 6];
+  const ang = Math.atan2(2 * qz * qw, 1 - 2 * qz * qz); ctx.save(); ctx.translate(wx(x), wy(y)); ctx.rotate(-ang);
+  ctx.fillStyle = col; ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 1.5; const h = 0.5 * PX; ctx.fillRect(-h, -h, h * 2, h * 2); ctx.strokeRect(-h, -h, h * 2, h * 2); ctx.restore(); }
+
+function draw() {
+  ctx.fillStyle = "#04060d"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  // ground
+  ctx.fillStyle = "#0c1526"; ctx.fillRect(0, wy(0), cvs.width, cvs.height); ctx.strokeStyle = "#1c2942"; ctx.beginPath(); ctx.moveTo(0, wy(0)); ctx.lineTo(cvs.width, wy(0)); ctx.stroke();
+  if (world) {
+    for (const i of wallIdx) box(i, "#8a94a6");
+    for (const rag of ragdolls) for (const i of rag.idxs()) box(i, "#5fe08a");
+    for (const i of boulders) box(i, "#f6a623");
+  }
+}
+function tick() {
+  if (world) { world.step(1 / 60, 2); S.update();
+    document.getElementById("intact").textContent = S.activeCount(); document.getElementById("broke").textContent = S.brokenCount(); document.getElementById("shots").textContent = shots;
+  }
+  draw(); requestAnimationFrame(tick);
+}
+init(); tick();
+</script>
+</body>
+</html>

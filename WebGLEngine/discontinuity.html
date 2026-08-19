@@ -1,0 +1,146 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The repair I recommended twice, on trial (v3644)</title>
+<meta name="demo:desc" content="Across a discontinuity the vertex stencil halves the peak error and doubles the contaminated band - integrated it is 20% worse. It is a rank repair, not a general widening, and applying it only where the rank is deficient keeps both benefits.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+</style></head><body><div id="w">
+<h1>The repair I recommended twice, on trial</h1>
+<div class="sub">Two rounds recommended the vertex stencil as the only repair for an undetermined gradient that
+needs no boundary data &mdash; and both named the same untested assumption in as many words: <b>it assumes a
+distant cell is informative</b>. Across a discontinuity it is not, and here it is the <b>widening</b> rather than
+the boundary condition being measured.</div>
+<div class="law"><b>The key is exact.</b> The field is piecewise linear, so on either side the true gradient is a
+<i>known constant</i>, and any cell whose whole stencil lies on one side must return it exactly. The interface sits
+on a mesh line, so no cell straddles it and every cell average is exact.</div>
+<h2>1. Two defects in one number</h2>
+<div class="panel"><button id="mix" class="good">show the mixed measurement, then the separated one</button><table id="t0"></table></div>
+<div class="law">My first census reported the face stencil 100% wrong on <i>clean</i> cells and the vertex stencil
+exact &mdash; which reads as the discontinuity punishing the narrow stencil, and is nothing of the kind. <b>The
+1.000 is the two rank-deficient corner cells returning a zero gradient</b>, a defect the vertex stencil repairs and
+which has no connection to the interface at all. Excluded from both columns, both stencils are exact away from the
+jump.</div>
+<h2>2. The measurement</h2>
+<div class="panel">
+  <div class="row"><button id="go" class="good">count the contaminated band</button></div>
+  <canvas id="cv" width="620" height="620" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>The widening contaminates exactly twice as many cells and reaches twice as far</b> &mdash;
+0.33 to 0.67 cells, independent of mesh size. <b>And it halves the peak error</b>, because it averages more data.
+The two effects pull opposite ways, so a peak-error comparison alone would have called the widening better.</div>
+<div class="law"><b>Integrated over the band it is about 20% worse</b> &mdash; twice the cells at ~55% of the peak.
+A peak and a band are not comparable by the peak. This is the first measurement in the arc where the repair I
+recommended twice is <i>worse</i> than not applying it, on a problem it was never designed for. (The peak growing
+with refinement is <b>correct</b>: a jump has no finite gradient, so a cell-sized difference over a shrinking cell
+must diverge as 1/h.)</div>
+<h2>3. The synthesis</h2>
+<div class="panel"><button id="synth" class="good">apply it only where the rank is deficient</button><table id="t2"></table></div>
+<div class="law"><b>Targeting keeps the narrow contamination and repairs the rank.</b> Same crossing count and
+integrated damage as the face stencil, with no deficient cells left over. Two rounds ago the lesson was that a rule
+applied where no repair was needed can only do harm; this is that lesson arriving from the other side. <b>The
+widening is a rank repair, not a general improvement.</b></div>
+<div class="law">So the recommendation is narrower than it was two rounds ago, which is the point of measuring it:
+<b>Dirichlet where the data exists; the vertex stencil only at cells whose rank is actually deficient; never as a
+blanket widening.</b> Graded by <code>physics/mesh/discontinuity-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/rank-repair.html" style="color:#9ab6e8">rank repair</a>,
+<a href="/rank-repair-3d.html" style="color:#9ab6e8">rank repair 3D</a>.</div>
+<script type="module">
+import { makeTriMesh, gradientLS } from "/physics/mesh/triReconstruct.mjs";
+import { vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+import { contaminationCensus, piecewiseCells, stencilCrosses } from "/physics/mesh/discontinuity.mjs";
+const $ = (i) => document.getElementById(i);
+function gradWith(u, mm, nbrs) {
+    const gx = new Float64Array(u.length), gy = new Float64Array(u.length);
+    for (let t = 0; t < u.length; t++) {
+        let sxx = 0, sxy = 0, syy = 0, sxu = 0, syu = 0;
+        for (const q of nbrs[t]) {
+            const dx = mm.cx[q] - mm.cx[t], dy = mm.cy[q] - mm.cy[t], du = u[q] - u[t], w = 1 / (dx * dx + dy * dy);
+            sxx += w * dx * dx; sxy += w * dx * dy; syy += w * dy * dy; sxu += w * dx * du; syu += w * dy * du;
+        }
+        const det = sxx * syy - sxy * sxy, tr = sxx + syy;
+        if (Math.abs(det) > 1e-10 * Math.max(tr * tr, 1e-300)) { gx[t] = (syy * sxu - sxy * syu) / det; gy[t] = (sxx * syu - sxy * sxu) / det; }
+    }
+    return { gx, gy };
+}
+const setup = (n) => {
+    const m = makeTriMesh({ nx: n, ny: n, h: 20 / n, skew: 0 });
+    const { u, side } = piecewiseCells(m, {});
+    const g0 = gradientLS(u, m);
+    const skip = new Uint8Array(m.tri.length);
+    for (let t = 0; t < m.tri.length; t++) if (g0.rank[t] < 2) skip[t] = 1;
+    return { m, u, side, skip, vn: vertexNeighbours(m) };
+};
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+$("mix").onclick = () => {
+    const { m, skip, vn } = setup(24);
+    const a = contaminationCensus(m, m.nbr, { gradFn: gradWith });
+    const b = contaminationCensus(m, vn, { gradFn: gradWith });
+    const c = contaminationCensus(m, m.nbr, { gradFn: gradWith, skipMask: skip });
+    const d = contaminationCensus(m, vn, { gradFn: gradWith, skipMask: skip });
+    rows($("t0"), ["census", "face, clean-cell worst", "vertex, clean-cell worst", "reading"], [
+        ["rank-deficient cells INCLUDED", "<span class='bad'>" + a.worstClean.toExponential(3) + "</span>",
+            "<span class='ok'>" + b.worstClean.toExponential(3) + "</span>",
+            "<span class='bad'>looks like the jump punishing the narrow stencil</span>"],
+        ["rank-deficient cells EXCLUDED", "<span class='ok'>" + c.worstClean.toExponential(3) + "</span>",
+            "<span class='ok'>" + d.worstClean.toExponential(3) + "</span>",
+            "<span class='ok'>both exact &mdash; it was a different defect</span>"]]);
+};
+$("go").onclick = () => {
+    const { m, side, skip, vn } = setup(24);
+    const face = contaminationCensus(m, m.nbr, { gradFn: gradWith, skipMask: skip });
+    const vert = contaminationCensus(m, vn, { gradFn: gradWith, skipMask: skip });
+    const cf = stencilCrosses(m, m.nbr, side), cv = stencilCrosses(m, vn, side);
+    const cv2 = $("cv"), ctx = cv2.getContext("2d"), W = cv2.width, H = cv2.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    let xlo = Infinity, xhi = -Infinity; for (const v of m.vx) { xlo = Math.min(xlo, v); xhi = Math.max(xhi, v); }
+    const X = (x) => 10 + (x - xlo) / (xhi - xlo) * (W - 20), Y = (y) => H - 10 - (y - xlo) / (xhi - xlo) * (H - 20);
+    for (let t = 0; t < m.tri.length; t++) {
+        const [a, b, c] = m.tri[t];
+        ctx.beginPath(); ctx.moveTo(X(m.vx[a]), Y(m.vy[a])); ctx.lineTo(X(m.vx[b]), Y(m.vy[b]));
+        ctx.lineTo(X(m.vx[c]), Y(m.vy[c])); ctx.closePath();
+        ctx.fillStyle = cf[t] ? "rgba(255,80,80,0.95)" : (cv[t] ? "rgba(232,196,154,0.75)"
+            : (side[t] < 0 ? "rgba(40,60,95,0.7)" : "rgba(45,80,70,0.7)"));
+        ctx.fill(); ctx.strokeStyle = "#141a26"; ctx.stroke();
+    }
+    ctx.fillStyle = "#f0a8a0"; ctx.fillText("red = contaminated with the FACE stencil", 14, 18);
+    ctx.fillStyle = "#e8c49a"; ctx.fillText("tan = contaminated ONLY once the stencil is widened", 14, 34);
+    rows($("t"), ["stencil", "crossing cells", "peak error", "integrated", "reach (cells)"], [
+        ["face", face.nCross, face.worstCross.toFixed(2), face.sumCross.toFixed(1), face.reach.toFixed(2)],
+        ["vertex", "<span class='bad'>" + vert.nCross + "</span>", "<span class='ok'>" + vert.worstCross.toFixed(2) + "</span>",
+            "<span class='bad'>" + vert.sumCross.toFixed(1) + "</span>", "<span class='bad'>" + vert.reach.toFixed(2) + "</span>"],
+        ["vertex / face", (vert.nCross / face.nCross).toFixed(2) + "x",
+            "<span class='ok'>" + (vert.worstCross / face.worstCross).toFixed(2) + "x</span>",
+            "<span class='bad'>" + (vert.sumCross / face.sumCross).toFixed(2) + "x</span>",
+            (vert.reach / face.reach).toFixed(2) + "x"]]);
+};
+$("synth").onclick = () => {
+    const { m, skip, vn } = setup(24);
+    const targeted = m.nbr.map((list, t) => (skip[t] ? vn[t] : list));
+    const face = contaminationCensus(m, m.nbr, { gradFn: gradWith, skipMask: skip });
+    const vert = contaminationCensus(m, vn, { gradFn: gradWith, skipMask: skip });
+    const tgt = contaminationCensus(m, targeted, { gradFn: gradWith });
+    rows($("t2"), ["stencil policy", "crossing cells", "integrated", "clean-cell worst", "verdict"], [
+        ["face everywhere", face.nCross, face.sumCross.toFixed(1), "&mdash;", "<span class='bad'>leaves the rank defect</span>"],
+        ["vertex everywhere", "<span class='bad'>" + vert.nCross + "</span>", "<span class='bad'>" + vert.sumCross.toFixed(1) + "</span>",
+            "&mdash;", "<span class='bad'>repairs rank, doubles the band</span>"],
+        ["vertex only where deficient", "<span class='ok'>" + tgt.nCross + "</span>", "<span class='ok'>" + tgt.sumCross.toFixed(1) + "</span>",
+            "<span class='ok'>" + tgt.worstClean.toExponential(2) + "</span>", "<span class='ok'>both, at no extra cost</span>"]]);
+};
+</script>
+</div></body></html>

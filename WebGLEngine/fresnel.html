@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fresnel (near-field) diffraction</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 12px 14px; margin-bottom: 13px; }
+  canvas { width: 100%; height: 230px; border: 1px solid #1a2a22; background: #06100c; display: block;
+           /* v2872 -- height:auto was MISSING: this canvas scaled to 100% width with a fixed height attribute,
+              so on any window wider than its natural size the plot was STRETCHED. Responsive is not the same as
+              undistorted, and it looked deliberate. */
+           height: auto; }
+  label { color: #6f8a7c; margin-right: 6px; }
+  input[type=range] { width: 260px; vertical-align: middle; }
+  .num { color: #9fe8c0; } .dim { color: #6f8a7c; } .warn { color: #e0c58a; }
+  table td { padding: 1px 14px 1px 0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Fresnel (near-field) diffraction</h1>
+  <div class="sub">The far-field lab propagates to infinity. This one shows the pattern <em>on the way there</em>
+    &mdash; and slide the screen far enough and it becomes the far-field answer.</div>
+
+  <div class="card">
+    <div><label>screen distance z</label><input id="z" type="range" min="0" max="1000" value="380">
+      <span class="num" id="zv"></span></div>
+    <div style="margin-top:6px"><label>slit width</label><input id="a" type="range" min="20" max="300" value="100">
+      <span class="num" id="av"></span></div>
+    <table style="margin-top:8px">
+      <tr><td class="dim">Fresnel number F = a&sup2;/&lambda;z</td><td class="num" id="F"></td></tr>
+      <tr><td class="dim">regime</td><td class="num" id="reg"></td></tr>
+      <tr><td class="dim">shape difference vs far-field module</td><td id="rms"></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="dim">single slit &mdash; <span style="color:#7fe0a4">near field (Fresnel)</span> vs
+      <span style="color:#8aa8e0">far field (Fraunhofer)</span>, each scaled to its own peak</div>
+    <canvas id="slit" width="880" height="230"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="dim">straight edge &mdash; intensity across the geometric shadow boundary</div>
+    <canvas id="edge" width="880" height="230"></canvas>
+    <div class="dim" id="edgeNote" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<script type="module">
+import { slitFresnel, slitFresnelAtAngles, knifeEdgeIntensity, fresnelNumber, regime, profileRms } from "/physics/optics/fresnel.js";
+import { slitAnalytic } from "/physics/optics/diffraction.js";
+
+const $ = (id) => document.getElementById(id);
+const LAMBDA = 500e-6;            // 500 nm in mm
+
+function plot(cv, series, opts = {}) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = "#1a2a22"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const y = H - 10 - (H - 30) * i / 4; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  if (opts.unity) { const y = H - 10 - (H - 30) / (opts.max || 1); ctx.strokeStyle = "#2c463a"; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.setLineDash([]); }
+  for (const s of series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.beginPath();
+    const mx = opts.max || Math.max(...s.data) || 1;
+    s.data.forEach((v, i) => {
+      const x = W * i / (s.data.length - 1), y = H - 10 - (H - 30) * (v / mx);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  }
+}
+
+function draw() {
+  const z = 2 + Math.pow(10, $("z").value / 1000 * 3.4);      // 2 .. ~5000 mm, log-ish
+  const a = $("a").value / 1000;                               // 0.02 .. 0.30 mm
+  $("zv").textContent = z.toFixed(1) + " mm";
+  $("av").textContent = (a * 1000).toFixed(0) + " um";
+  const F = fresnelNumber(a, LAMBDA, z);
+  $("F").textContent = F.toFixed(3);
+  $("reg").textContent = regime(a, LAMBDA, z);
+
+  const half = 4 * a;
+  const xs = []; for (let i = -300; i <= 300; i++) xs.push(i * half / 300);
+  const near = slitFresnel(a, LAMBDA, z, xs);
+  const sinT = xs.map((x) => x / z);
+  const far = slitAnalytic(a, LAMBDA, sinT);
+  const rms = profileRms(near, far);
+  $("rms").innerHTML = `<span class="${rms < 0.01 ? "num" : "warn"}">${rms.toFixed(4)}</span>` +
+    (rms < 0.01 ? ' <span class="dim">- the two instruments agree here</span>'
+                : ' <span class="dim">- only the near-field result is valid here</span>');
+
+  plot($("slit"), [
+    { data: far, color: "#8aa8e0" },
+    { data: near, color: "#7fe0a4" },
+  ]);
+
+  // knife edge over a fixed v range
+  const vs = []; for (let i = 0; i <= 600; i++) vs.push(-4 + i * 8 / 600);
+  const ie = vs.map(knifeEdgeIntensity);
+  plot($("edge"), [{ data: ie, color: "#7fe0a4" }], { max: 1.5, unity: true });
+  $("edgeNote").innerHTML = `at the shadow boundary the intensity is exactly <span class="num">1/4</span> of
+    unobstructed; the first fringe overshoots to <span class="num">1.37</span>. Dashed line is unobstructed
+    intensity. Neither number was put in &mdash; both fall out of the Fresnel integrals.`;
+}
+
+$("z").oninput = $("a").oninput = draw;
+draw();
+</script>
+</body>
+</html>

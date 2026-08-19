@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!--
+  catalog.html -- the physics subsystem catalog, rendered. RIG-ONLY (imports ./tools/catalog/catalog.mjs, which runs
+  the live fingerprint; resolves only from the engine root, like server.html / couple.html / physics-lab.html).
+
+  Holds no data of its own: it calls buildCatalog(), which merges the live fingerprint hash with the ledger's module
+  list and the catalogue's blurbs, and draws the result. Every row is verified by catalog-selfcheck.mjs at ship time,
+  so what this page shows is exactly the library the fingerprint proves.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK -- Subsystem Catalog</title>
+<style>
+  :root { --bg:#000; --amber:#ff9f00; --orange:#ff7700; --cyan:#33ccff; --panel:#12100a; --text:#ffcc66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Antonio","Arial Narrow",sans-serif; letter-spacing:.02em; padding:16px; }
+  .bar { background:var(--amber); color:#000; border-radius:0 22px 0 0; padding:8px 16px; font-size:22px; font-weight:700; text-transform:uppercase; }
+  .lede { color:#b8935a; font-size:13px; margin:10px 2px 14px; max-width:900px; line-height:1.5; }
+  .master { font-family:ui-monospace,monospace; font-size:12px; color:var(--cyan); word-break:break-all; margin:0 2px 14px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:1px solid #2a2210; vertical-align:top; }
+  th { color:var(--amber); text-transform:uppercase; letter-spacing:.1em; font-size:11px; position:sticky; top:0; background:#0a0800; }
+  tr:hover td { background:#0e0c05; }
+  .name { color:var(--cyan); font-weight:700; white-space:nowrap; }
+  .mod, .gate, .hash { font-family:ui-monospace,monospace; font-size:11px; color:#c79a52; }
+  .gate.none { color:#6a5a38; font-style:italic; }
+  .n { color:#7a6a40; text-align:right; }
+  #err { color:#ff7766; font-size:13px; padding:14px; }
+</style>
+</head>
+<body>
+<div class="bar">SweK &middot; Subsystem Catalog</div>
+<div class="lede" id="lede">Loading the live fingerprint&hellip;</div>
+<div class="master" id="master"></div>
+<table id="tbl"><thead><tr><th>#</th><th>Subsystem</th><th>What it is</th><th>Modules</th><th>Gate</th><th>sha-256</th></tr></thead><tbody id="rows"></tbody></table>
+<div id="err"></div>
+
+<script type="module">
+try {
+  const { buildCatalog } = await import("./tools/catalog/catalog.mjs");
+  const { rows, master } = buildCatalog();
+  document.getElementById("lede").textContent = `Every deterministic physics subsystem folded into the cross-architecture fingerprint, in fingerprint order. ${rows.length} subsystems -- each row's hash is the live fingerprint's, its modules the ledger's; catalog-selfcheck.mjs proves the index matches the library.`;
+  document.getElementById("master").textContent = "MASTER  " + master;
+  const tb = document.getElementById("rows");
+  rows.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="n">${i + 1}</td>`
+      + `<td class="name">${r.name}</td>`
+      + `<td>${r.blurb}</td>`
+      + `<td class="mod">${r.modules.join("<br>")}</td>`
+      + `<td class="gate ${r.gate ? "" : "none"}">${r.gate || "(broader gate)"}</td>`
+      + `<td class="hash">${r.hash.slice(0, 16)}…</td>`;
+    tb.appendChild(tr);
+  });
+} catch (e) {
+  document.getElementById("err").textContent = "Catalog failed to load (this page is rig-only -- serve it from the engine root): " + e;
+}
+</script>
+</body>
+</html>

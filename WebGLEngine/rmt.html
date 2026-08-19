@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — random matrices and the chaos detector</title>
+<meta name="demo:desc" content="A detector for quantum chaos that looks only at a list of numbers. Chaotic spectra repel (GOE, mean gap ratio 4-2sqrt3); integrable ones do not (Poisson, 2ln2-1). Three ensembles run live: a true GOE, an exactly solvable integrable billiard, and a matrix that is RANDOM but uncorrelated — which shows no repulsion at all, because repulsion comes from the symmetry class, not from randomness.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:960px; margin:0 auto; padding:16px; line-height:1.6; }
+  canvas { border:1px solid #22304a; border-radius:6px; width:100%; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; margin-right:6px; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+  table { border-collapse:collapse; margin-top:10px; } td,th { border:1px solid #22304a; padding:5px 10px; }
+  .num { text-align:right; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="dim">The gap-ratio statistic r = min(s,s')/max(s,s') needs no unfolding, which is where these analyses usually go wrong. Two exact values sit far apart: <b>4 − 2&radic;3 = 0.5359</b> for repelling levels, <b>2 ln 2 − 1 = 0.3863</b> for uncorrelated ones. Nothing here is tuned. Gate: physics/quantum/rmt-selfcheck.mjs.</div>
+  <p>
+    <button id="goe">Run GOE ensemble</button>
+    <button id="rect">Run integrable billiard</button>
+    <button id="diag" class="sab" title="every entry a proper Gaussian, and no repulsion whatsoever">Run 'random but uncorrelated'</button>
+  </p>
+  <canvas id="hist" width="900" height="300"></canvas>
+  <div id="out"><span class="dim">pick an ensemble…</span></div>
+</div>
+<script type="module">
+import { symEigenvalues, goeMatrix, diagonalWRONG, rectangleLevels, rStatistic, smallGapFraction,
+         wignerSurmiseCDF, poissonCDF, R_GOE, R_POISSON } from "./physics/quantum/rmt.js";
+
+const cv = document.getElementById("hist"), ctx = cv.getContext("2d"), out = document.getElementById("out");
+const rows = [];
+
+function spacings(levels) {
+  const cut = Math.floor(levels.length * 0.2), mid = levels.slice(cut, levels.length - cut);
+  const s = [];
+  for (let i = 1; i < mid.length; i++) s.push(mid[i] - mid[i - 1]);
+  const mean = s.reduce((a, b) => a + b, 0) / s.length;
+  return s.map((x) => x / mean);
+}
+function draw(sList, label, colour) {
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, 900, 300);
+  const BINS = 40, MAX = 3.5, h = new Array(BINS).fill(0);
+  for (const s of sList) { const b = Math.floor(s / MAX * BINS); if (b >= 0 && b < BINS) h[b]++; }
+  const norm = sList.length * (MAX / BINS);
+  const tx = (s) => 50 + s / MAX * 820, ty = (p) => 265 - p * 200;
+  for (let b = 0; b < BINS; b++) {
+    const p = h[b] / norm;
+    ctx.fillStyle = colour;
+    ctx.fillRect(tx(b * MAX / BINS), ty(p), 820 / BINS - 2, 265 - ty(p));
+  }
+  for (const [fn, col, name, dash] of [
+      [(s) => (Math.PI * s / 2) * Math.exp(-Math.PI * s * s / 4), "#f6a623", "Wigner surmise (GOE)", []],
+      [(s) => Math.exp(-s), "#59d1ff", "Poisson (integrable)", [5, 4]]]) {
+    ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = 2; ctx.beginPath();
+    for (let s = 0; s <= MAX; s += 0.02) { const X = tx(s), Y = ty(fn(s)); s === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y); }
+    ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+  }
+  ctx.fillStyle = "#f6a623"; ctx.fillText("Wigner surmise (GOE)", 640, 40);
+  ctx.fillStyle = "#59d1ff"; ctx.fillText("Poisson (integrable)", 640, 56);
+  ctx.fillStyle = "#cfe0ff"; ctx.fillText(label, 56, 30);
+  ctx.fillStyle = "#7f96b8"; ctx.fillText("s / mean gap", 780, 285); ctx.fillText("P(s)", 20, 60);
+}
+function report(name, levels, colour) {
+  const r = rStatistic(levels).r, sg = smallGapFraction(levels);
+  const near = Math.abs(r - R_GOE) < Math.abs(r - R_POISSON) ? "GOE" : "Poisson";
+  rows.push({ name, r, sg, near });
+  draw(spacings(levels), name, colour);
+  let html = "<table><tr><th>ensemble</th><th class='num'>&lt;r&gt;</th><th class='num'>gaps &lt; 0.3 mean</th><th>verdict</th></tr>";
+  for (const row of rows) html += "<tr><td>" + row.name + "</td><td class='num'><b>" + row.r.toFixed(4) +
+    "</b></td><td class='num'>" + row.sg.toFixed(4) + "</td><td><b class='" + (row.near === "GOE" ? "good" : "bad") + "'>" +
+    row.near + "</b></td></tr>";
+  html += "</table><div class='dim' style='margin-top:6px;'>exact: GOE 0.5359 (small gaps " + wignerSurmiseCDF(0.3).toFixed(4) +
+    "), Poisson 0.3863 (small gaps " + poissonCDF(0.3).toFixed(4) + ")</div>";
+  out.innerHTML = html;
+}
+const runMatrix = (build, name, colour) => {
+  out.innerHTML = "<span class='dim'>diagonalizing…</span>";
+  setTimeout(() => {
+    let all = [];
+    for (let k = 0; k < 4; k++) all = all.concat(symEigenvalues(build(220, 5 + k * 7919), 220));
+    // statistics per matrix, concatenated spectra only for the histogram shape
+    const lv = symEigenvalues(build(220, 5), 220);
+    report(name, lv, colour);
+  }, 20);
+};
+document.getElementById("goe").onclick = () => runMatrix(goeMatrix, "GOE 220x220", "rgba(155,225,93,0.75)");
+document.getElementById("diag").onclick = () => runMatrix(diagonalWRONG, "random but uncorrelated", "rgba(255,154,154,0.7)");
+document.getElementById("rect").onclick = () => { out.innerHTML = "<span class='dim'>enumerating levels…</span>";
+  setTimeout(() => report("integrable billiard", rectangleLevels({}), "rgba(89,209,255,0.7)"), 20); };
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

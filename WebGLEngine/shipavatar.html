@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Ship avatar">
+<meta name="demo:desc" content="A flying ship in space as an avatar/status panel. Reacts to mood/gauges (speed), alerts (erratic flight), and critical states (shield impacts); dodges incoming messages. Works standalone with no game feed.">
+<title>🚀 Ship Avatar — SweK Engine</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>
+  * { box-sizing:border-box; } html,body { margin:0; height:100%; overflow:hidden; background:#02040a; }
+  #view { position:fixed; inset:0; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; font:11px/1.4 ui-monospace,Consolas,monospace; color:#6f9; letter-spacing:.5px; pointer-events:none; text-shadow:0 0 6px #000; }
+  #hud b { color:#9fd8ff; }
+  #alert { color:#5fffa0; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="hud"><b>SHIP AVATAR</b> · <span id="alert">nominal</span> · energy <span id="energy">50%</span></div>
+<script type="module">
+  import { mountShipView } from "/shipview.js";
+  const view = document.getElementById("view");
+  const ship = mountShipView(view, { avatar: true, glbUrl: "/GPU_Assets/ships/avatar.glb" });
+  window.shipAvatar = ship;   // engine/listener can call .setEnergy/.setAlert/.impact/.incoming/.ufo
+
+  const $ = id => document.getElementById(id);
+  function applyMood(raw) {
+    const s = (typeof raw === "string" ? raw : (raw && (raw.mood || raw.value || raw.name)) || "").toLowerCase();
+    let energy = 0.5, alert = "green";
+    if (/alarm|critical|angry|danger|red|panic/.test(s)) { alert = "red"; energy = 0.85; }
+    else if (/warn|concern|alert|yellow|nervous|busy/.test(s)) { alert = "yellow"; energy = 0.7; }
+    else if (/happy|excite|energetic|hype|joy|pump/.test(s)) { energy = 0.9; }
+    else if (/calm|idle|sleep|sad|down|tired|low/.test(s)) { energy = 0.28; }
+    ship.setEnergy(energy); ship.setAlert(alert);
+    $("energy").textContent = Math.round(energy * 100) + "%";
+    $("alert").textContent = alert === "red" ? "RED ALERT" : alert === "yellow" ? "yellow alert" : "nominal";
+    $("alert").style.color = alert === "red" ? "#ff7b7b" : alert === "yellow" ? "#ffcf6b" : "#5fffa0";
+  }
+  async function pollMood() {
+    try { const r = await fetch("/avatar/mood", { cache: "no-store" }); if (r.ok) applyMood(await r.json()); } catch (e) {}
+  }
+  pollMood(); setInterval(pollMood, 4000);
+
+  // v1284 — react to REAL events in real time (mood changes, quips, TV toasts/alerts)
+  // via the bridge's /avatar/events SSE. Mood poll above stays as a slow fallback.
+  (function subscribeEvents(){
+    try {
+      const es = new EventSource("/avatar/events");
+      es.onmessage = (m) => {
+        let ev = null; try { ev = JSON.parse(m.data); } catch (e) {}
+        if (!ev) return;
+        const critical = /alarm|critical|red|panic/.test(((ev.mood || "") + " " + (ev.level || "")).toLowerCase());
+        if (ev.kind === "mood") { applyMood({ mood: ev.mood }); if (critical) { try { ship.impact(); } catch (e) {} } }
+        else if (ev.kind === "quip") { try { ship.incoming(); } catch (e) {} }
+        else if (ev.kind === "toast") { try { ship.incoming(); } catch (e) {} if (critical) { try { ship.impact(); } catch (e) {} } }
+      };
+      es.onerror = () => {};   // EventSource auto-reconnects; mood poll covers gaps
+    } catch (e) {}
+  })();
+</script>
+<script src="kiosk.js"></script>
+</body>
+</html>

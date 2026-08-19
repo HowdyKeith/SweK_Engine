@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="SweK Architecture">
+<meta name="demo:desc" content="An animated map of the engine's insides for the portfolio: the multi-runtime core feeding the physics facade (SweK CPU / box3d / Jolt), the content-to-voxels filter pipeline, the comic reader FX, the GPU Brain, Endless Sky, the nebula/wormhole/living-box showcase, persistence + RAG, peers, and the QA-gated ship ritual. Data pulses flow along the real dependencies. Hand-built, self-contained.">
+<meta name="demo:category" content="fx">
+<title>SweK Architecture</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --lime:#9be15d; --violet:#b98cff; }
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#cfe0ff; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:16px; top:12px; color:var(--amber); letter-spacing:.18em; text-transform:uppercase; z-index:2; font-weight:700; }
+  #sub { position:fixed; left:16px; top:30px; color:#5f7aa0; font-size:11px; z-index:2; }
+  #leg { position:fixed; right:16px; top:12px; color:#5f7aa0; font-size:11px; z-index:2; text-align:right; line-height:1.6; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; SweK Engine &mdash; Architecture</div>
+<div id="sub">multi-runtime WebGL2 / WebGPU / Node LAN portfolio engine</div>
+<div id="leg"><span style="color:#f6a623">&#9632;</span> core &nbsp; <span style="color:#59d1ff">&#9632;</span> physics/render &nbsp; <span style="color:#9be15d">&#9632;</span> AI/showcase &nbsp; <span style="color:#b98cff">&#9632;</span> data/ship</div>
+<script>
+const C = { amber: "#f6a623", cyan: "#59d1ff", lime: "#9be15d", violet: "#b98cff" };
+// nodes: x,y are fractions of the canvas; grouped by colour
+const N = {
+  server:   { x: .085, y: .50, w: 128, h: 46, label: "Node Server\n:8787", c: C.amber, big: 1 },
+  runtimes: { x: .085, y: .74, w: 128, h: 40, label: "WebGL2 / WebGPU\n/ Canvas2D", c: C.amber },
+  peers:    { x: .085, y: .26, w: 128, h: 40, label: "Peers /\nCloudflare tunnel", c: C.violet },
+
+  facade:   { x: .30, y: .30, w: 116, h: 40, label: "Physics\nFacade", c: C.cyan, big: 1 },
+  voxel:    { x: .30, y: .52, w: 116, h: 38, label: "Voxelizer", c: C.cyan },
+  brain:    { x: .30, y: .74, w: 116, h: 40, label: "GPU Brain", c: C.lime, big: 1 },
+
+  cpu:      { x: .52, y: .18, w: 96, h: 32, label: "SweK CPU", c: C.cyan },
+  box3d:    { x: .52, y: .30, w: 96, h: 32, label: "box3d", c: C.cyan },
+  jolt:     { x: .52, y: .42, w: 96, h: 32, label: "Jolt", c: C.cyan },
+  filters:  { x: .52, y: .55, w: 96, h: 38, label: "Filters\nfire/water/blob\nphysics/plasma", c: C.cyan },
+  flow:     { x: .52, y: .70, w: 96, h: 30, label: "Flow-fields", c: C.lime },
+  policy:   { x: .52, y: .80, w: 96, h: 30, label: "Policy MLP", c: C.lime },
+  pilot:    { x: .52, y: .90, w: 96, h: 28, label: "esPilot", c: C.lime },
+
+  reader:   { x: .73, y: .46, w: 108, h: 38, label: "Comic Reader\n+ Page FX", c: C.cyan },
+  reel:     { x: .73, y: .60, w: 108, h: 32, label: "Physics Reel\n+ avatar", c: C.cyan },
+  es:       { x: .73, y: .82, w: 108, h: 40, label: "Endless Sky\ncombat / co-op", c: C.lime },
+  show:     { x: .73, y: .28, w: 108, h: 38, label: "Showcase\nnebula / wormhole", c: C.lime },
+  living:   { x: .73, y: .14, w: 108, h: 32, label: "Living Box", c: C.lime },
+
+  store:    { x: .92, y: .42, w: 96, h: 34, label: "SQLite\nStore", c: C.violet },
+  rag:      { x: .92, y: .58, w: 96, h: 34, label: "RAG\nsqlite-vec", c: C.violet },
+  ship:     { x: .92, y: .78, w: 96, h: 40, label: "Ship Ritual\nQA Gate", c: C.violet, big: 1 },
+};
+const E = [
+  ["server","facade"],["server","voxel"],["server","brain"],["server","runtimes"],["peers","server"],
+  ["facade","cpu"],["facade","box3d"],["facade","jolt"],
+  ["voxel","filters"],["brain","flow"],["brain","policy"],["brain","pilot"],
+  ["filters","reader"],["filters","reel"],["cpu","reel"],["box3d","reel"],["jolt","reel"],
+  ["reader","show"],["filters","show"],["show","living"],
+  ["pilot","es"],["policy","es"],["flow","es"],["es","living"],
+  ["reader","store"],["es","store"],["brain","rag"],["server","rag"],
+  ["reel","ship"],["es","ship"],["show","ship"],["store","ship"],
+];
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+function resize() { W = cv.width = innerWidth * DPR; H = cv.height = innerHeight * DPR; cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px"; }
+addEventListener("resize", resize); resize();
+function px(n) { return { x: n.x * W, y: n.y * H, w: n.w * DPR, h: n.h * DPR }; }
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+let T = 0;
+function frame() {
+  T += 0.016; ctx.clearRect(0, 0, W, H);
+  // faint grid
+  ctx.strokeStyle = "rgba(30,45,74,0.35)"; ctx.lineWidth = 1; const g = 34 * DPR;
+  for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // edges + flowing pulses
+  for (let i = 0; i < E.length; i++) {
+    const a = px(N[E[i][0]]), b = px(N[E[i][1]]); const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    ctx.strokeStyle = "rgba(89,209,255,0.16)"; ctx.lineWidth = 1 * DPR; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    const p = ((T * 0.28 + i * 0.137) % 1), qx = ax + (bx - ax) * p, qy = ay + (by - ay) * p; const col = N[E[i][1]].c;
+    ctx.fillStyle = col; ctx.globalAlpha = 0.85 * (1 - Math.abs(p - 0.5) * 0.6); ctx.beginPath(); ctx.arc(qx, qy, 2.4 * DPR, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  // nodes
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const k in N) { const n = N[k], q = px(n), pulse = 0.5 + 0.5 * Math.sin(T * 1.6 + q.x * 0.01);
+    ctx.shadowColor = n.c; ctx.shadowBlur = (n.big ? 20 : 10) * DPR * (0.5 + pulse * 0.5);
+    ctx.fillStyle = "rgba(8,13,24,0.94)"; roundRect(q.x, q.y, q.w, q.h, 8 * DPR); ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = n.c; ctx.lineWidth = (n.big ? 2 : 1.2) * DPR; ctx.globalAlpha = 0.6 + pulse * 0.4; roundRect(q.x, q.y, q.w, q.h, 8 * DPR); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = n.c; ctx.font = (n.big ? "700 " : "") + (10.5 * DPR) + "px ui-monospace,monospace";
+    const lines = n.label.split("\n"); lines.forEach((ln, li) => ctx.fillText(ln, q.x + q.w / 2, q.y + q.h / 2 + (li - (lines.length - 1) / 2) * 13 * DPR));
+  }
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

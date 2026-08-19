@@ -1,0 +1,111 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The count detects an absent term (v3653)</title>
+<meta name="demo:desc" content="Four atoms close the gap: dihedrals and improper were in neither normal-mode fixture. Removing either term gives the molecule a free internal motion and an extra zero mode - so the counting law detects whether a term contributes at all, which no single-term gate can.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+</style></head><body><div id="w">
+<h1>The count detects an absent term</h1>
+<div class="sub">The previous round graded bonds and angles by a counting law and left the obvious gap:
+<code>dihedrals.js</code> and <code>improper.js</code> were in neither fixture. Four atoms closes it &mdash;
+<b>3N&minus;6 = six vibrations and six zero modes</b> for a non-linear tetratomic.</div>
+<div class="law"><b>And the count does something the separate gates cannot: it notices a term being absent.</b>
+Drop the torsion and rotation about the j&ndash;k bond costs nothing &mdash; <b>a free internal rotation is an
+extra zero mode</b>, so the count falls to 3N&minus;7. Drop the improper and the umbrella goes free the same way.
+Each term's own gate checks its force against a finite difference of <i>its own</i> energy; neither can notice the
+term missing from a molecule, <b>because there is no molecule in it</b>.</div>
+<h2>1. Both minima are constructed, not converged</h2>
+<div class="panel"><button id="g1" class="good">check the stationary points</button><table id="t1"></table></div>
+<div class="law"><b>Torsion:</b> all four atoms in the xy-plane, so &phi; is exactly 180°. With n = 3 and
+&gamma; = 0, <code>V = k<sub>d</sub>(1 + cos 3&phi;)</code> has <code>cos(540°) = &minus;1</code> &mdash; a minimum,
+gradient zero, second derivative +9k<sub>d</sub>. <b>Improper:</b> coplanar means the signed volume
+<code>V6 = a·(b×c)</code> is exactly zero, which <i>is</i> its target.</div>
+<h2>2. Remove a term, gain a zero mode</h2>
+<div class="panel"><button id="g2" class="good">with and without</button><table id="t2"></table></div>
+<div class="law">The torsion adds <b>exactly one mode and touches none of the others</b> &mdash; the five surviving
+frequencies agree to better than 10<sup>&minus;12</sup>. A term that shifted the other five would be coupling where
+it shouldn't. And the improper result was <i>not</i> what I expected: the three in-plane angles look like they
+should hold the centre flat, and they don't &mdash; measured, not assumed.</div>
+<h2>3. A symmetry nobody asked for</h2>
+<div class="panel"><button id="g3" class="good">the planar spectrum</button><table id="t3"></table></div>
+<div class="law"><b>Two exactly-degenerate pairs plus two singletons</b> &mdash; 1 + 1 + 2 + 2 = 6, the spectrum of
+a threefold-symmetric planar centre. That's a consequence of the geometry the fixture was built with, not something
+any term was told to produce. <b>The tolerance is the fixture's own error bar</b>: my first check demanded the
+splitting be under 10<sup>&minus;12</sup> and it went red at 5.2&times;10<sup>&minus;12</sup> &mdash; below the
+Hessian's own measured asymmetry, which is to say at the instrument's floor. <code>hessian()</code> already returns
+that error bar; the comparison is against it. Graded by
+<code>physics/md/torsionModes-selfcheck.mjs</code> from <a href="/gates.html" style="color:#9ab6e8">gates.html</a>.
+Related: <a href="/normal-modes.html" style="color:#9ab6e8">normal modes</a>.</div>
+<script type="module">
+import { bondForces } from "/physics/md/bonds.js";
+import { angleForces } from "/physics/md/angles.js";
+import { dihedralForces } from "/physics/md/dihedrals.js";
+import { improperForces } from "/physics/md/improper.js";
+import { symEigenvalues } from "/physics/quantum/rmt.js";
+import { hessian, massWeight, splitSpectrum, frequencies, torsionalChain, planarCentre,
+         expectedZeros, expectedVibrations } from "/physics/md/normalModes.mjs";
+const $ = (i) => document.getElementById(i);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const makeF = (m, { noDih = false, noImp = false } = {}) => (pos) => {
+    const parts = [bondForces(pos, m.N, m.bonds), angleForces(pos, m.N, m.angles)];
+    if (!noDih && m.dihedrals.length) parts.push(dihedralForces(pos, m.N, m.dihedrals));
+    if (!noImp && m.impropers.length) parts.push(improperForces(pos, m.N, m.impropers));
+    const f = new Float64Array(3 * m.N); let pe = 0;
+    for (const p of parts) { for (let i = 0; i < f.length; i++) f[i] += p.forces[i]; pe += p.pe; }
+    return { forces: f, pe };
+};
+const analyse = (m, o) => {
+    const F = makeF(m, o);
+    let maxF = 0; for (const v of F(m.pos).forces) maxF = Math.max(maxF, Math.abs(v));
+    const { H, n, relAsymmetry } = hessian(F, m.pos, m.N, {});
+    const eigs = symEigenvalues(massWeight(H, n, m.masses), n);
+    const sp = splitSpectrum(eigs);
+    return { maxF, sp, relAsymmetry, w: frequencies(eigs, sp.zeros) };
+};
+$("g1").onclick = () => rows($("t1"), ["fixture", "|F| at the geometry", "Hessian asymmetry", "zeros / expected", "vibrations / expected"],
+    [["torsional chain", torsionalChain({})], ["planar centre", planarCentre({})]].map(([name, m]) => {
+        const r = analyse(m, {});
+        return [name, "<span class='ok'>" + r.maxF.toExponential(2) + "</span>", r.relAsymmetry.toExponential(2),
+            "<span class='ok'>" + r.sp.zeros + " / " + expectedZeros(m.N, m.linear) + "</span>",
+            "<span class='ok'>" + r.sp.vibrations + " / " + expectedVibrations(m.N, m.linear) + "</span>"];
+    }));
+$("g2").onclick = () => {
+    const cF = analyse(torsionalChain({}), {}), cN = analyse(torsionalChain({}), { noDih: true });
+    const pF = analyse(planarCentre({}), {}), pN = analyse(planarCentre({}), { noImp: true });
+    rows($("t2"), ["force field", "zeros", "vibrations", "&omega;", "reading"], [
+        ["chain, with torsion", "<span class='ok'>" + cF.sp.zeros + "</span>", cF.sp.vibrations,
+            cF.w.map((x) => x.toFixed(5)).join(", "), "3N&minus;6"],
+        ["chain, WITHOUT", "<span class='bad'>" + cN.sp.zeros + "</span>", cN.sp.vibrations,
+            cN.w.map((x) => x.toFixed(5)).join(", "), "<span class='bad'>rotation about j&ndash;k is free</span>"],
+        ["planar, with improper", "<span class='ok'>" + pF.sp.zeros + "</span>", pF.sp.vibrations,
+            pF.w.map((x) => x.toFixed(5)).join(", "), "3N&minus;6"],
+        ["planar, WITHOUT", "<span class='bad'>" + pN.sp.zeros + "</span>", pN.sp.vibrations,
+            pN.w.map((x) => x.toFixed(5)).join(", "), "<span class='bad'>the umbrella is free</span>"]]);
+};
+$("g3").onclick = () => {
+    const r = analyse(planarCentre({}), {}), w = r.w;
+    rows($("t3"), ["mode", "&omega;", "note"], [
+        ["1, 2", "<span class='ok'>" + w[0].toFixed(6) + " , " + w[1].toFixed(6) + "</span>",
+            "degenerate pair &mdash; splitting " + (Math.abs(w[0] - w[1]) / w[1]).toExponential(2)],
+        ["3", w[2].toFixed(6), "singleton"],
+        ["4, 5", "<span class='ok'>" + w[3].toFixed(6) + " , " + w[4].toFixed(6) + "</span>",
+            "degenerate pair &mdash; splitting " + (Math.abs(w[3] - w[4]) / w[4]).toExponential(2)],
+        ["6", w[5].toFixed(6), "singleton"],
+        ["instrument floor", r.relAsymmetry.toExponential(2),
+            "<span class='dim'>the Hessian's own asymmetry &mdash; both splittings sit under it</span>"]]);
+};
+</script>
+</div></body></html>

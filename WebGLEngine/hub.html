@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Connectors & devices</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  .sp { flex:1; }
+  .badge { font-size:12px; padding:3px 9px; border-radius:7px; border:1px solid var(--line); color:var(--dim); }
+  .badge.ok { color:var(--ok); border-color:#224a36; background:#10231a; }
+  .badge.no { color:var(--warn); border-color:#5a4a22; background:#221c10; }
+  code { color:var(--go); background:#0c1411; border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-size:12px; }
+  main { max-width:920px; margin:0 auto; padding:16px; }
+  h3 { margin:20px 0 8px; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:11px; }
+  a.card { display:block; text-decoration:none; color:inherit; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px 14px; transition:transform .07s, border-color .15s, background .15s; }
+  a.card:active { transform:scale(.98); }
+  a.card:hover { border-color:#3a5247; background:#15201b; }
+  .card .ic { font-size:22px; }
+  .card .nm { font-weight:600; margin-top:5px; }
+  .card .ds { color:var(--dim); font-size:12.5px; margin-top:3px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🛰️</span> Connectors &amp; devices</span>
+    <span class="sp"></span>
+    <span id="haBadge" class="badge">HA: …</span>
+    <span class="badge" id="base">…</span>
+  </header>
+  <main id="main"></main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const GROUPS = [
+    ["Smart home", [
+      ["🏠","Who's home / presence","Presence, room rules + per-person actions","/presence.html"],
+      ["🌫️","Air quality","PM2.5 + bad-air reactions (cough / purifier)","/air-quality.html"],
+      ["☀️","Solar & energy","Live production / battery / grid gauges","/solar.html"],
+      ["💡","Lights & switches","Every light / switch / valve, on-off-toggle","/ha-switches.html"],
+      ["🧱","Wall switchboard","Kiosk tiles for a wall-mounted phone","/wall.html"],
+      ["🎛️","Custom board","Drop ANY HA entity onto a tile board","/board.html"],
+      ["❄️","Climate / AC","Midea AC: temp, mode, fan, presets, swing","/ac.html"],
+      ["🔔","Doorbell fan-out","Announce + Shield Blink + light on a ring","/doorbell.html"],
+      ["🏠","Arrival fan-out","Greet a person home: avatar + Echo + lights","/arrival.html"],
+      ["📷","CloudEdge camera","Build an RTSP/ONVIF stream for go2rtc","/cloudedge.html"],
+      ["🎥","Camera grid","Tile every go2rtc camera stream on one page","/cams.html"],
+      ["🔥","Nest Protect","Smoke / CO reader","/nest-protect.html"],
+      ["🧩","HA capabilities","What's installed + 1-click HACS installs","/ha-capabilities.html"],
+      ["🗺","HA map","Integrations by reachability: set up / ready / not on network","/ha-diagram.html"],
+    ]],
+    ["Voice & speakers", [
+      ["🗣️","Alexa command","Type a command to an Echo via Home Assistant","/alexa.html"],
+      ["📺","Show on Echo","Open an engine page on an Echo Show screen","/echo-show.html"],
+    ]],
+    ["Shield & devices", [
+      ["🖥️","Connected devices","Live roster of clients (PC / phone / Shield)","/clients.html"],
+      ["📲","Connect a device","LAN address to open on a phone / tablet / Shield","/connect.html"],
+      ["📥","App installer & links","Install links + push APKs to the Shield","/shield-apps.html"],
+      ["📐","Shield display test","Rotation / resolution / DPI over ADB","/shield-display.html"],
+      ["🖥️","spacedesk auto-launch","Open the viewer on the Shield as a 2nd monitor","/spacedesk.html"],
+      ["🎮","Xbox device portal","Xbox dev-mode device portal","/xbox.html"],
+    ]],
+    ["Automation", [
+      ["🤖","MacroDroid / Tasker","Bridge endpoints to fire from a phone","/macrodroid.html"],
+      ["🔊","Push2Run","Phrase / hotkey rules into engine commands","/push2run.html"],
+    ]],
+    ["Engine views", [
+      ["🧑‍🚀","Push an avatar","Hot-swap the live avatar (engine / window / Shield)","/avatar-push.html"],
+      ["🗂️","Asset library","Browse generated 3D/voxel assets · use a mesh as the avatar","/asset-library.html"],
+      ["🧪","Asset Studio","Prompt → image → 3D model in one flow","/asset-studio.html"],
+      ["🎬","Diorama composer","Arrange the avatar stage · export / load","/diorama-composer.html"],
+      ["🔴","Ball alerts","Pulse a light/group on engine events · HA or Alexa","/ball-alerts.html"],
+      ["🧑‍🚀","Avatar window","Standalone avatar stage","/avatar-server.html"],
+      ["📟","Pip-boy models","Model gallery on the pip-boy screen","/pipboy-models.html"],
+      ["🛠️","Bridge status","Server / bridge health page","/server.html"],
+      ["🩺","Bridge health","Runtime, subsystems & clients at a glance","/bridge.html"],
+      ["🔗","Multi-runtime link","VBA ⇄ bridge ⇄ PowerShell ⇄ WebGL — who's connected","/runtimes.html"],
+    ]],
+  ];
+
+  function render(){
+    $("main").innerHTML = GROUPS.map(([name, items]) =>
+      '<h3>' + name + '</h3><div class="grid">' + items.map(it =>
+        '<a class="card" href="' + it[3] + '"><div class="ic">' + it[0] + '</div><div class="nm">' + it[1] + '</div><div class="ds">' + it[2] + '</div></a>'
+      ).join("") + '</div>'
+    ).join("");
+  }
+  render();
+
+  fetch("/net/info", { cache:"no-store" }).then(r => r.json()).then(j => { const b = (j && j.recommended) || (j && j.urls && j.urls[0]) || location.origin; $("base").innerHTML = "this PC: <code>" + String(b).replace(/^https?:\/\//,"") + "</code>"; }).catch(() => { $("base").textContent = location.host; });
+  fetch("/ha/states?domain=person", { cache:"no-store" }).then(r => { const ok = r.ok; r.json().catch(()=>null); const b = $("haBadge"); b.textContent = ok ? "HA connected" : "HA not set up"; b.className = "badge " + (ok ? "ok" : "no"); }).catch(() => { const b = $("haBadge"); b.textContent = "HA not set up"; b.className = "badge no"; });
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

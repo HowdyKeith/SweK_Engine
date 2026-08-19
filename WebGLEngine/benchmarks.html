@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Benchmarks</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 940px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  h2 { font-size: 14px; margin: 0 0 6px; }
+  .sub { color: #6f8a7c; margin-bottom: 16px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 12px 14px; margin-bottom: 14px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 6px 13px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { text-align: right; padding: 3px 9px 3px 0; border-bottom: 1px solid #1a2a22; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #6f8a7c; font-weight: normal; }
+  .pass { color: #7fe0a4; } .fail { color: #e0a0a0; } .dim { color: #6f8a7c; }
+  .win { color: #7fe0a4; } .lose { color: #e0b48a; }
+  pre { white-space: pre-wrap; color: #8fb3a0; margin: 8px 0 0; max-height: 320px; overflow: auto; }
+  label { color: #6f8a7c; margin-right: 10px; }
+  input[type=number] { width: 60px; background: #0a1210; color: #cfe9d8; border: 1px solid #2c463a; font: inherit; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Benchmarks</h1>
+  <div class="sub">Measurements, not impressions. Each one is adjudicated against truth the engine owns.</div>
+
+  <div class="card">
+    <h2>Chunk meshing &mdash; greedy vs RLE vs optimised RLE</h2>
+    <div class="dim">Every path is checked against an independent exposed-face reference derived from readVoxel
+      semantics, so a faster mesher that draws the wrong surface cannot win.</div>
+    <div style="margin-top:10px">
+      <label>iterations <input id="iters" type="number" min="3" max="60" value="15"></label>
+      <button id="bMesh" class="primary">Run mesh benchmark</button>
+      <span class="dim" id="meshBusy"></span>
+    </div>
+    <div id="meshOut"></div>
+  </div>
+
+  <div class="card">
+    <h2>Terrain &mdash; JS vs WASM</h2>
+    <div class="dim">The Rust port's whole purpose is the speedup this prints. Divergence is bounded rather than
+      exact: an ulp of difference between V8 and libm grows through chaotic erosion, which is why the engine keeps
+      one generator per tile.</div>
+    <div style="margin-top:10px">
+      <label><input id="worley" type="checkbox"> worley biome path</label>
+      <button id="bParity">Run parity + speedup</button>
+      <span class="dim" id="parBusy"></span>
+    </div>
+    <div id="parOut"></div>
+
+    <!-- v2858 - THE BUILD FRONT DOOR. This card used to print the command and send you to a console, which by the
+         standing rule means the terrain fast path was never finished. box3d has had POST /box3d/build since v2289;
+         terrain had nothing. Now it does. -->
+    <div id="buildBox" style="margin-top:12px;border-top:1px solid #24382e;padding-top:10px">
+      <div><b>WASM build</b> <span class="dim" id="wasmState">checking&hellip;</span></div>
+      <div style="margin-top:6px">
+        <button id="bBuild">Build terrain-wasm</button>
+        <label class="dim" style="margin-left:6px"><input id="nosimd" type="checkbox"> nosimd</label>
+        <span class="dim" id="buildBusy"></span>
+      </div>
+      <div class="dim" id="buildNote" style="margin-top:6px"></div>
+      <pre id="buildLog" style="display:none;max-height:240px;overflow:auto;margin-top:8px"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const n1 = (x) => (typeof x === "number" ? x.toFixed(1) : "-");
+const n2 = (x) => (typeof x === "number" ? x.toFixed(2) : "-");
+
+async function jget(u) { const r = await fetch(u); return r.json().catch(() => ({ ok: false, error: "bad-json" })); }
+
+async function status() {
+  const s = await jget("/bench/status");
+  if (!s.ok) { $("parOut").innerHTML = '<div class="fail">bridge unreachable</div>'; return; }
+  if (!s.parity.available) {
+    $("bParity").disabled = true;
+    $("parOut").innerHTML = `<div class="dim" style="margin-top:8px">Not runnable yet: ${s.parity.reason}.
+      Build it first:<pre>${s.parity.build}</pre></div>`;
+  }
+}
+
+// ---- terrain-wasm build ------------------------------------------------------------------------------------
+let _pollTimer = null;
+async function wasmStatus() {
+  const s = await jget("/terrain/status");
+  if (!s || !s.ok) { $("wasmState").textContent = "bridge unreachable"; return null; }
+  const a = s.artefacts || {};
+  $("wasmState").innerHTML = a.ready
+    ? '<span class="ok">built</span> &mdash; world/wasm/ present'
+    : '<span class="dim">not built (the engine runs without it &mdash; this is the opt-in fast path)</span>';
+  const notes = [];
+  if (s.missing && s.missing.length) {
+    notes.push('Missing: <b>' + s.missing.join(", ") + '</b>');
+    if (s.install) notes.push('<pre>' + s.install + '</pre>');
+    // The PATH case is the one that wastes an afternoon: the tool IS installed and the server cannot see it.
+    if (s.pathNote) notes.push('<i>' + s.pathNote + '</i>');
+    $("bBuild").disabled = true;
+  } else {
+    $("bBuild").disabled = !!(s.build && s.build.running);
+  }
+  $("buildNote").innerHTML = notes.join("<br>");
+  return s;
+}
+
+async function pollBuild() {
+  const j = await jget("/terrain/log");
+  if (j && j.ok) {
+    $("buildLog").style.display = "block";
+    $("buildLog").textContent = j.log || "";
+    $("buildLog").scrollTop = 1e6;
+    if (!j.running) {
+      clearInterval(_pollTimer); _pollTimer = null;
+      $("buildBusy").textContent = j.exit === 0 ? " done" : " exited " + j.exit;
+      await wasmStatus();
+    }
+  }
+}
+
+$("bBuild").onclick = async () => {
+  $("buildBusy").textContent = " starting\u2026";
+  const r = await fetch("/terrain/build", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nosimd: $("nosimd").checked }),
+  }).then((x) => x.json()).catch(() => ({ ok: false, error: "request failed" }));
+  if (!r.ok) {
+    $("buildBusy").textContent = "";
+    $("buildNote").innerHTML = '<span class="fail">' + (r.message || r.error || "failed") + '</span>';
+    return;
+  }
+  $("buildBusy").textContent = " building\u2026 (this takes a few minutes)";
+  $("bBuild").disabled = true;
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(pollBuild, 2000);
+  pollBuild();
+};
+
+$("bMesh").onclick = async () => {
+  $("bMesh").disabled = true; $("meshBusy").textContent = "running...";
+  const j = await jget("/bench/mesh?iters=" + encodeURIComponent($("iters").value));
+  $("bMesh").disabled = false; $("meshBusy").textContent = "";
+  if (!j.ok) { $("meshOut").innerHTML = `<div class="fail">${j.message || j.error}</div>`; return; }
+  const rows = j.rows.map(r => {
+    const ratio = r.rleOptMs / r.greedyMs;
+    return `<tr>
+      <td>${r.fixture}</td>
+      <td>${n2(r.greedyMs)}</td><td>${n2(r.rleMs)}</td><td>${n2(r.rleOptMs)}</td>
+      <td class="${ratio > 1 ? "lose" : "win"}">${n1(ratio)}x</td>
+      <td>${r.greedyTris}</td><td>${r.rleTris}</td><td>${r.rleOptTris}</td>
+      <td class="${r.rleMatchesRef ? "pass" : "fail"}">${r.rleMatchesRef ? "yes" : "NO"}</td>
+    </tr>`;
+  }).join("");
+  $("meshOut").innerHTML = `
+    <table>
+      <tr><th>fixture</th><th>greedy ms</th><th>RLE ms</th><th>RLE-opt ms</th><th>opt/greedy</th>
+          <th>greedy tris</th><th>RLE tris</th><th>RLE-opt tris</th><th>RLE=ref</th></tr>
+      ${rows}
+    </table>
+    <div class="dim" style="margin-top:8px">${j.note} &mdash; ${j.iters} iterations, ${(j.elapsedMs/1000).toFixed(1)}s.
+      Optimised RLE closes the triangle gap; the remaining time cost is the padded-chunk build, the RLE encode and
+      AO probing, not quad count.</div>`;
+};
+
+$("bParity").onclick = async () => {
+  $("bParity").disabled = true; $("parBusy").textContent = "running (this takes a while)...";
+  const j = await jget("/bench/parity" + ($("worley").checked ? "?worley=1" : ""));
+  $("bParity").disabled = false; $("parBusy").textContent = "";
+  if (j.error === "not-built") {
+    $("parOut").innerHTML = `<div class="dim">${j.message}<pre>${j.build}</pre></div>`; return;
+  }
+  $("parOut").innerHTML =
+    `<div class="${j.ok ? "pass" : "fail"}" style="margin-top:8px">${j.ok ? "within thresholds" : "OUT OF THRESHOLD (exit " + j.exitCode + ")"}</div>
+     <pre>${(j.output || "(no output)").replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</pre>`;
+};
+
+status();
+wasmStatus();
+</script>
+
+<div style="max-width:900px;margin:18px auto;padding:12px 14px;border:1px solid #24382e;background:#0e1512;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#cfe9d8;">
+  <h2 style="font-size:14px;margin:0 0 6px;color:#9fe8c0;">Artifact weight &mdash; what these cost, beside what they do</h2>
+  <div style="color:#6f8a7c;margin-bottom:6px;">
+    Every timing on this page measures what a dependency <i>does</i>. None measured what it <b>costs</b>, so a
+    two-megabyte engine looked free. Both numbers matter and they are different questions: <b>raw</b> is what sits
+    on disk, <b>transferred</b> is what a browser actually downloads. They can disagree about which is bigger.
+  </div>
+  <table id="wt" style="border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;"></table>
+</div>
+<script type="module">
+  fetch("/weight",{cache:"no-store"}).then(r=>r.json()).then(w=>{
+    if(!w||!w.ok) return;
+    const mb=n=>(n/1048576).toFixed(2);
+    const row=b=>'<tr><td style="padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;">'+b.label+
+      '</td><td style="text-align:right;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;">'+mb(b.raw)+' MB</td>'+
+      '<td style="text-align:right;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;color:#9fe8c0;">'+mb(b.gzip)+' MB</td>'+
+      '<td style="text-align:right;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;color:#6f8a7c;">'+b.ratio.toFixed(3)+'</td></tr>';
+    var h='<tr><th style="text-align:left;color:#6f8a7c;font-weight:normal;">dependency</th>'+
+      '<th style="text-align:right;color:#6f8a7c;font-weight:normal;">raw</th>'+
+      '<th style="text-align:right;color:#6f8a7c;font-weight:normal;">transferred (gzip)</th>'+
+      '<th style="text-align:right;color:#6f8a7c;font-weight:normal;">ratio</th></tr>';
+    h+=w.bundles.map(row).join("");
+    if(w.joltVsBox3d) h+='<tr><td colspan="4" style="padding-top:6px;color:#6f8a7c;">Jolt costs <b>'+
+      w.joltVsBox3d.rawRatio.toFixed(2)+'&times;</b> box3d on disk but <b>'+w.joltVsBox3d.gzipRatio.toFixed(2)+
+      '&times;</b> on the wire &mdash; quoting the raw figure overstates the gap by about a quarter.</td></tr>';
+    if(w.threeVsBox3d && !w.threeVsBox3d.orderingAgrees) h+='<tr><td colspan="4" style="color:#e6c877;">'+
+      'three.js is <b>heavier raw</b> ('+w.threeVsBox3d.rawRatio.toFixed(2)+'&times;) and <b>lighter transferred</b> ('+
+      w.threeVsBox3d.gzipRatio.toFixed(2)+'&times;) than box3d &mdash; the ordering flips. JS text gzips to about a fifth; '+
+      'WASM, already a compact binary, only to about a third. A raw-byte table would rank these the wrong way round.</td></tr>';
+    document.getElementById("wt").innerHTML=h;
+  }).catch(()=>{});
+</script>
+</body>
+</html>

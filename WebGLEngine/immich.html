@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Immich</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#7fb3d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  input { padding:6px 8px; background:#0c0f14; color:#e8eef8; border:1px solid #2a3340; border-radius:6px; font:11px ui-monospace,monospace; }
+  input.grow { flex:1; min-width:140px; }
+  button { padding:6px 12px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  .stat { font-size:11px; color:var(--dim); min-height:14px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:6px; }
+  #grid .cell { cursor:pointer; border:1px solid #2a3340; border-radius:6px; overflow:hidden; aspect-ratio:1; background:#0a0e14; }
+  #grid img { width:100%; height:100%; object-fit:cover; display:block; }
+  a { color:#9bd6ff; }
+</style>
+</head>
+<body>
+<header><h1>&#128444;&#65039; Immich</h1><span class="hint">Pull photos from your self-hosted library into GPU_Assets.</span></header>
+<main>
+  <div class="hint">Browse your self-hosted <a href="https://immich.app" target="_blank" rel="noopener">Immich</a> library and pull a photo into GPU_Assets (as a texture / reference). Set the server URL + an API key (asset.read).</div>
+  <div class="row">
+    <input id="url" class="grow" placeholder="http://localhost:2283">
+    <input id="key" type="password" class="grow" placeholder="API key">
+    <button id="connect">Connect</button>
+  </div>
+  <div id="stat" class="stat">checking&hellip;</div>
+  <div id="grid"></div>
+</main>
+<script>
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, error: e && e.message }; }); }
+  function loadRecent() {
+    j("/immich/recent?n=30").then(function (r) {
+      var grid = $("grid"); grid.innerHTML = "";
+      var list = (r && r.assets) || [];
+      if (!list.length) { grid.innerHTML = "<div class='hint' style='grid-column:1/-1;'>no photos returned</div>"; return; }
+      list.forEach(function (a) {
+        var cell = document.createElement("div"); cell.className = "cell"; cell.title = a.name + " \u2014 click to pull into GPU_Assets";
+        var img = document.createElement("img"); img.loading = "lazy"; img.src = "/immich/thumb?id=" + encodeURIComponent(a.id);
+        cell.appendChild(img);
+        cell.addEventListener("click", function () {
+          cell.style.opacity = ".5";
+          j("/immich/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: a.id, name: a.name }) }).then(function (rr) {
+            cell.style.opacity = "1";
+            $("stat").innerHTML = (rr && rr.ok) ? ("<span style='color:#9fe88f'>\u2713 pulled " + (rr.file || "") + " \u2192 GPU_Assets/immich</span>") : ("<span style='color:#f88'>\u2717 " + (((rr && rr.error) || "pull failed") + "").slice(0, 100) + "</span>");
+          });
+        });
+        grid.appendChild(cell);
+      });
+    }).catch(function () { $("grid").innerHTML = "<div class='hint' style='color:#f88'>load failed</div>"; });
+  }
+  function refresh() {
+    j("/immich/config").then(function (c) { var cfg = (c && c.config) || {}; $("url").value = cfg.baseUrl || ""; if (cfg.apiKeySet) $("key").placeholder = "[key saved \u2014 type to replace]"; });
+    j("/immich/status").then(function (s) { $("stat").innerHTML = (s && s.reachable) ? "<span style='color:#9fe88f'>\u2713 connected</span>" : "<span style='color:#caa05a'>not connected \u2014 set URL + key, press Connect</span>"; if (s && s.reachable) loadRecent(); });
+  }
+  $("connect").addEventListener("click", function () {
+    $("stat").textContent = "connecting\u2026";
+    var body = { baseUrl: $("url").value.trim() }; if ($("key").value.trim()) body.apiKey = $("key").value.trim();
+    j("/immich/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function () { $("key").value = ""; refresh(); });
+  });
+  refresh();
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

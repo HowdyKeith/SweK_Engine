@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Interferometer -- metrology of a surface we know exactly</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:8px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 14px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .wrap { padding:6px 18px 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; max-width:940px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:10px; }
+  .card h2 { margin:0 0 8px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.06em; }
+  canvas { display:block; width:100%; height:auto; image-rendering:pixelated; border-radius:5px; background:#01060c; }
+  .read { display:flex; gap:22px; flex-wrap:wrap; padding:2px 18px 16px; }
+  .read div b { color:var(--amber); font-size:16px; } .read div span { color:var(--dim); display:block; font-size:10px; text-transform:uppercase; }
+  .leg { font-size:11px; color:var(--dim); margin:0 18px 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Interferometer &mdash; metrology of a surface we know exactly</h1>
+  <p>A phase-shifting interferometer, simulated. We define a <b>metaball surface</b> we know to the bit, imprint its height as optical phase, and record the four-step fringe pattern a real instrument would. Then we <b>recover the height back from the fringes alone</b> &mdash; the reconstruction never sees the truth &mdash; and grade it against the surface we own. Runs <code>physics/optics/interferometer.js</code>. The instrument is simulated; the optics is real; the answer is checkable.</p>
+</header>
+<div class="controls">
+  <button id="unwrap">Unwrapping: ON</button>
+  <button id="reseed">New surface</button>
+  <span id="note" style="font-size:11px;color:var(--dim);"></span>
+</div>
+<div class="wrap">
+  <div class="card"><h2>The surface (ground truth)</h2><canvas id="cSurf" width="96" height="96"></canvas></div>
+  <div class="card"><h2>Interferogram (what the sensor sees)</h2><canvas id="cFring" width="96" height="96"></canvas></div>
+  <div class="card"><h2>Recovered height</h2><canvas id="cRec" width="96" height="96"></canvas></div>
+  <div class="card"><h2>Error vs truth</h2><canvas id="cErr" width="96" height="96"></canvas></div>
+</div>
+<div class="read" id="read"></div>
+<div class="leg">The surface and recovered-height maps use the same color scale. With unwrapping off, the phase ambiguity shows up as banding in the recovered height and a bright error map. The error map is amplified for visibility.</div>
+<script type="module">
+import { sampleSurface, fourStep, recoverHeight, scoreRecovery, phaseFromHeight, interferogram } from "./physics/optics/interferometer.js";
+const W = 96, H = 96, lambda = 1.0;
+let unwrap = true, seed = 7;
+const $ = (id) => document.getElementById(id);
+
+function rng(s) { let x = s * 2654435761 >>> 0; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }
+function makeBalls() { const r = rng(seed); const n = 3 + (r() * 3 | 0); const b = []; for (let i = 0; i < n; i++) b.push({ cx: 16 + r() * (W - 32), cy: 16 + r() * (H - 32), a: 0.7 + r() * 1.1, s: 7 + r() * 9 }); return b; }
+
+// tiny amber->cyan colormap
+function paint(cv, data, lo, hi, amp = 1) {
+  const g = cv.getContext("2d"), img = g.createImageData(W, H), d = img.data, span = (hi - lo) || 1;
+  for (let k = 0; k < W * H; k++) {
+    let t = ((data[k] - lo) / span) * amp; t = Math.max(0, Math.min(1, t));
+    d[k * 4] = 40 + t * 215; d[k * 4 + 1] = 120 + t * 100; d[k * 4 + 2] = 60 + (1 - t) * 180; d[k * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+function fringePaint(cv, zMap) {
+  const g = cv.getContext("2d"), img = g.createImageData(W, H), d = img.data;
+  for (let k = 0; k < W * H; k++) { const I = 0.5 + 0.5 * Math.cos(phaseFromHeight(zMap[k], lambda)); const v = I * 255; d[k*4]=v; d[k*4+1]=v; d[k*4+2]=v*0.85+20; d[k*4+3]=255; }
+  g.putImageData(img, 0, 0);
+}
+
+function run() {
+  const balls = makeBalls();
+  const truth = sampleSurface(balls, W, H);
+  const frames = fourStep(truth, lambda);
+  const rec = recoverHeight(frames, lambda, W, H, unwrap);
+  const s = scoreRecovery(rec, truth);
+  let lo = Infinity, hi = -Infinity; for (const z of truth) { if (z < lo) lo = z; if (z > hi) hi = z; }
+  const fringes = (hi - lo) / (lambda / 2);
+  // piston-align recovered for display
+  let mr = 0, mt = 0; for (let k = 0; k < rec.length; k++) { mr += rec[k]; mt += truth[k]; } mr /= rec.length; mt /= truth.length;
+  const recShift = rec.map((v) => v - mr + mt);
+  const err = new Float64Array(W * H); for (let k = 0; k < err.length; k++) err[k] = Math.abs(recShift[k] - truth[k]);
+  paint($("cSurf"), truth, lo, hi);
+  fringePaint($("cFring"), truth);
+  paint($("cRec"), recShift, lo, hi);
+  paint($("cErr"), err, 0, Math.max(1e-9, hi - lo), 4);
+  $("read").innerHTML =
+    "<div><b>" + fringes.toFixed(1) + "</b><span>fringes (phase wraps)</span></div>" +
+    "<div><b>" + s.rms.toExponential(1) + "</b><span>rms error vs truth</span></div>" +
+    "<div><b>" + s.peak.toExponential(1) + "</b><span>peak error</span></div>" +
+    "<div><b>" + (unwrap ? "solved" : "ambiguous") + "</b><span>phase unwrap</span></div>";
+  $("note").textContent = unwrap ? "height recovered to machine precision" : "wrapping ambiguity left in -- see the banding";
+}
+$("unwrap").onclick = () => { unwrap = !unwrap; $("unwrap").textContent = "Unwrapping: " + (unwrap ? "ON" : "OFF"); run(); };
+$("reseed").onclick = () => { seed = (seed * 1664525 + 1013904223) >>> 0 % 9999 || 3; run(); };
+run();
+</script>
+</body>
+</html>

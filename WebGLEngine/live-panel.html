@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Panels &mdash; the numbers underneath the view</title>
+<meta name="demo:desc" content="The behind-the-scenes panels a view carries as insets: an FFT spectrum of a vibrating chain whose peak lands on the analytic mode frequency, and |zeta(1/2+it)| along the critical line dipping at the nontrivial zeros. Click an inset to promote it; the old primary is demoted, never dropped.">
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --go:#9fe6c0; --warn:#ffcc66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0 0 4px; color:var(--go); }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:980px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; }
+  .card h2 { margin:0 0 8px; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.55; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  canvas { background:#070b10; border:1px solid var(--line); border-radius:6px; display:block; max-width:100%; }
+  .insets { display:flex; gap:8px; flex-wrap:wrap; }
+  .inset { border:1px solid #2a3242; border-radius:6px; padding:6px 9px; cursor:pointer; background:#111722; font-size:11px; }
+  .inset:hover { border-color:#3d5a80; }
+  .primary { border-color:#2a5a3a; background:#0e1a13; }
+  table { border-collapse:collapse; font-size:11px; }
+  td, th { border:1px solid var(--line); padding:3px 8px; text-align:left; }
+  th { color:var(--dim); font-weight:400; }
+  .ok { color:var(--go); } .bad { color:#ff8a8a; }
+  code { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128200; Live Panels &mdash; the numbers underneath the view</h1>
+  <div class="hint">
+    physics/livePanel.js + physics/viewLayout.js. Both were built, gated and reachable from nothing: their only
+    importer was their own selfcheck, so the arithmetic was proven and <b>no page had ever drawn it</b>. This is
+    that page.
+  </div>
+</header>
+<main>
+
+  <div class="card">
+    <h2>The layout &mdash; one primary, ordered insets</h2>
+    <div class="hint">
+      Click an inset to <b>promote</b> it. The old primary is <b>demoted to an inset, never dropped</b> &mdash; that is
+      the property viewLayout-selfcheck plants against, because a promote that discards the previous view loses
+      whatever you were looking at. The layout encodes to a string, so a view is shareable.
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <div class="insets" id="slots"></div>
+    </div>
+    <div class="hint" style="margin-top:8px;">encoded: <code id="enc">&mdash;</code></div>
+  </div>
+
+  <div class="card">
+    <h2>Spectrum panel &mdash; and it reads the physics rather than decorating it</h2>
+    <div class="hint">
+      A chain of 12 masses is driven in one normal mode, sampled, and run through the strict FFT. <b>THE CLAIM IS NOT
+      THAT IT LOOKS LIKE A SPECTRUM.</b> The peak bin is converted back to a frequency and compared against the
+      chain's <b>analytic</b> mode frequency &mdash; a number the panel is never told. A decoration would draw bars
+      and land anywhere.
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <canvas id="spec" width="620" height="160"></canvas>
+      <table id="specTab"></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Zeta-line panel &mdash; graded against an anchor from outside this engine</h2>
+    <div class="hint">
+      |&zeta;(1/2 + it)| sampled along the critical line. The dips are the nontrivial zeros, and they are compared
+      against the <b>published</b> values &mdash; 14.134725, 21.022040, 25.010858 &mdash; which nothing in this tree
+      computes or could have fitted. That is what makes this a key rather than a mirror: an internal check could only
+      show the panel agreeing with itself.
+      <br><br>
+      <b>READ THE GAP COLUMN AS RESOLUTION, NOT AS ACCURACY.</b> A dip is the index of a local minimum on a sampled
+      curve, and the default sweep takes 190 steps across t = 8&hellip;27 &mdash; a grid spacing of <b>0.1</b>. So the
+      dips land on 14.100, 21.000 and 25.000 because those are the <i>grid points</i>, and the gaps below are bounded
+      by the spacing rather than by anything the panel got right or wrong. <b>An observable that is an index cannot
+      see a shift smaller than one cell</b>; quoting 0.035 here as the panel's precision would be reporting the
+      sampling rate wearing a measurement's clothes. Raise <code>steps</code> and the gaps shrink with the grid.
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <canvas id="zeta" width="620" height="160"></canvas>
+      <table id="zetaTab"></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What this page does not claim</h2>
+    <div class="hint">
+      It does not claim the panels are <i>fast</i>, and it is not a benchmark. The spectrum runs 8192 samples on
+      page load and blocks for as long as that takes. It also does not claim these are the only two panels the
+      layout can hold: <code>validate()</code> takes the known-panel list as an argument, so adding a third is a
+      registration rather than an edit here.
+    </div>
+  </div>
+
+</main>
+<script type="module">
+import { spectrumPanel, zetaLinePanel } from "/physics/livePanel.js";
+import { makeView, makeLayout, promote, encodeLayout } from "/physics/viewLayout.js";
+
+const $ = (id) => document.getElementById(id);
+
+// ---- the layout half -------------------------------------------------------------------------------------
+// THE PAGE DOES NOT KEEP ITS OWN IDEA OF WHICH VIEW IS PRIMARY. promote() returns the new layout and the page
+// re-renders from it, so there is ONE declaration of the arrangement. A second copy here is how the button and
+// the model end up disagreeing about what is on screen.
+let layout = makeLayout(
+    makeView("scene", { kind: "scene" }),
+    [makeView("spectrum", { kind: "panel" }), makeView("zeta-line", { kind: "panel" })],
+);
+function paintLayout() {
+    const slots = $("slots");
+    slots.innerHTML = "";
+    const all = [layout.primary, ...layout.insets];
+    all.forEach((v, i) => {
+        const d = document.createElement("div");
+        d.className = "inset" + (i === 0 ? " primary" : "");
+        d.textContent = (i === 0 ? "\u25A0 primary: " : "\u25AB inset: ") + v.id;
+        // index 0 is the primary; promote() is indexed into the INSETS, so the offset is i-1.
+        if (i > 0) d.onclick = () => { layout = promote(layout, i - 1); paintLayout(); };
+        slots.appendChild(d);
+    });
+    $("enc").textContent = encodeLayout(layout);
+}
+paintLayout();
+
+// ---- the spectrum panel ----------------------------------------------------------------------------------
+const N = 8192, sub = 2;
+const specRows = [];
+for (const mode of [3, 5, 8]) {
+    const sp = spectrumPanel({ mode, N, sub });
+    // Bin -> angular frequency, using the same sampling the panel used. dt = sub/240.
+    const dt = sub / 240;
+    const fpeak = 2 * Math.PI * sp.peak / (N * dt);
+    // The chain's analytic mode frequency: omega_n = 2*sqrt(k/m)*sin(n*pi/(2*(N+1))) for N masses, k=m=1.
+    const n = 12;
+    const exact = 2 * Math.sin(mode * Math.PI / (2 * (n + 1)));
+    const binHz = 2 * Math.PI / (N * dt);
+    specRows.push({ mode, fpeak, exact, bins: Math.abs(fpeak - exact) / binHz, sp });
+}
+$("specTab").innerHTML =
+    "<tr><th>mode</th><th>peak &omega;</th><th>analytic &omega;</th><th>gap (bins)</th></tr>" +
+    specRows.map((r) => "<tr><td>" + r.mode + "</td><td>" + r.fpeak.toFixed(4) + "</td><td>" + r.exact.toFixed(4) +
+        "</td><td class='" + (r.bins < 1.2 ? "ok" : "bad") + "'>" + r.bins.toFixed(2) + "</td></tr>").join("");
+
+(function drawSpectrum(){
+    const c = $("spec"), g = c.getContext("2d");
+    const bars = specRows[0].sp.bars, peak = specRows[0].sp.peak;
+    // Only the low end is interesting -- the mode frequencies live in the first few dozen bins, and drawing all
+    // 4096 would put every one of them in the leftmost pixel.
+    const show = Math.min(bars.length, Math.max(64, peak * 6));
+    let max = 0; for (let i = 1; i < show; i++) if (bars[i] > max) max = bars[i];
+    g.clearRect(0, 0, c.width, c.height);
+    for (let i = 1; i < show; i++) {
+        const h = max > 0 ? (bars[i] / max) * (c.height - 18) : 0;
+        const x = (i / show) * c.width;
+        g.fillStyle = (i === peak) ? "#9fe6c0" : "#2f4a63";
+        g.fillRect(x, c.height - h - 12, Math.max(1, c.width / show - 1), h);
+    }
+    g.fillStyle = "#9fe6c0"; g.font = "11px ui-monospace,monospace";
+    g.fillText("peak bin " + peak + " (mode 3)", 8, 12);
+})();
+
+// ---- the zeta-line panel ---------------------------------------------------------------------------------
+// THE ANCHOR IS FROM THE LITERATURE, NOT FROM THIS TREE. Nothing here computes these; they are what the dips are
+// graded against, which is the whole reason this panel is a key and not a mirror.
+const KNOWN_ZEROS = [14.134725, 21.022040, 25.010858];
+const zp = zetaLinePanel({});
+$("zetaTab").innerHTML =
+    "<tr><th>published zero</th><th>nearest dip</th><th>|gap|</th></tr>" +
+    KNOWN_ZEROS.map((z) => {
+        let best = null, d = Infinity;
+        for (const t of zp.dips) if (Math.abs(t - z) < d) { d = Math.abs(t - z); best = t; }
+        return "<tr><td>" + z.toFixed(6) + "</td><td>" + (best === null ? "&mdash;" : best.toFixed(3)) +
+               "</td><td class='" + (d < 0.2 ? "ok" : "bad") + "'>" + (best === null ? "&mdash;" : d.toFixed(3)) + "</td></tr>";
+    }).join("") +
+    "<tr><td colspan='3' style='color:#8b97a8'>dips found: " + zp.dips.map((t) => t.toFixed(2)).join(", ") + "</td></tr>";
+
+(function drawZeta(){
+    const c = $("zeta"), g = c.getContext("2d");
+    const { ts, curve } = zp;
+    let max = 0; for (const v of curve) if (v > max) max = v;
+    g.clearRect(0, 0, c.width, c.height);
+    g.strokeStyle = "#3d5a80"; g.beginPath();
+    for (let i = 0; i < curve.length; i++) {
+        const x = (i / (curve.length - 1)) * c.width;
+        const y = c.height - 14 - (max > 0 ? (curve[i] / max) * (c.height - 26) : 0);
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+    // The published zeros are drawn as ticks so the eye can check the dips land on them rather than near them.
+    g.strokeStyle = "#9fe6c0"; g.fillStyle = "#9fe6c0"; g.font = "10px ui-monospace,monospace";
+    for (const z of KNOWN_ZEROS) {
+        const f = (z - ts[0]) / (ts[ts.length - 1] - ts[0]);
+        if (f < 0 || f > 1) continue;
+        const x = f * c.width;
+        g.beginPath(); g.moveTo(x, c.height - 14); g.lineTo(x, c.height - 4); g.stroke();
+        g.fillText(z.toFixed(2), Math.min(x - 12, c.width - 34), c.height - 16);
+    }
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

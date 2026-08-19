@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Gauges 3000">
+<meta name="demo:desc" content="A WebGPU glowing avatar core ringed by an LCARS gauge cluster -- animated arcs, needles, and a status ticker, with live core/memory readings where available. WebGPU for the avatar, Canvas2D for the gauges, graceful fallback everywhere.">
+<meta name="demo:category" content="fx">
+<title>Gauges 3000</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  html, body { margin:0; height:100%; background:var(--bg); overflow:hidden; color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #gpu, #ovl { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #ovl { z-index:2; }
+  #cap { position:fixed; left:14px; top:12px; z-index:3; color:var(--amber); letter-spacing:.16em; text-transform:uppercase; font-size:13px; }
+  #eng { position:fixed; right:14px; top:12px; z-index:3; color:var(--dim); font-size:11px; }
+</style>
+</head>
+<body>
+<canvas id="gpu"></canvas>
+<canvas id="ovl"></canvas>
+<div id="cap">&#9670; Gauges 3000</div>
+<div id="eng"></div>
+<script type="module">
+const gpuCanvas = document.getElementById("gpu"), ovl = document.getElementById("ovl"), ctx = ovl.getContext("2d");
+let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);
+function resize() { W = innerWidth; H = innerHeight; for (const c of [gpuCanvas, ovl]) { c.width = W * DPR; c.height = H * DPR; c.style.width = W + "px"; c.style.height = H + "px"; } ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+addEventListener("resize", resize); resize();
+
+// ---- WebGPU avatar core: a fullscreen fragment shader -- amber energy core + cyan pulsing rings + plasma swirl ----
+const SHADER = `
+struct U { time:f32, w:f32, h:f32, pulse:f32 };
+@group(0) @binding(0) var<uniform> u:U;
+@vertex fn vs(@builtin(vertex_index) i:u32) -> @builtin(position) vec4<f32> {
+  var p = array<vec2<f32>,3>(vec2<f32>(-1.0,-1.0), vec2<f32>(3.0,-1.0), vec2<f32>(-1.0,3.0));
+  return vec4<f32>(p[i], 0.0, 1.0);
+}
+@fragment fn fs(@builtin(position) fc:vec4<f32>) -> @location(0) vec4<f32> {
+  let uv = (fc.xy - 0.5 * vec2<f32>(u.w, u.h)) / u.h;
+  let r = length(uv); let t = u.time; let ang = atan2(uv.y, uv.x);
+  var col = vec3<f32>(0.015, 0.02, 0.05);
+  let core = smoothstep(0.26, 0.0, r) * (0.9 + 0.3 * u.pulse);
+  let rings = 0.5 + 0.5 * sin(r * 34.0 - t * 3.0);
+  let ringMask = smoothstep(0.46, 0.14, r) * smoothstep(0.05, 0.12, r);
+  let swirl = 0.5 + 0.5 * sin(ang * 5.0 + t * 1.3 + r * 9.0);
+  col = col + vec3<f32>(0.98, 0.66, 0.14) * core * 1.25;
+  col = col + vec3<f32>(0.35, 0.82, 1.0) * rings * ringMask * 0.55;
+  col = col + vec3<f32>(0.4, 0.7, 1.0) * swirl * smoothstep(0.4, 0.08, r) * 0.16;
+  col = col * smoothstep(1.05, 0.15, r);
+  return vec4<f32>(col, 1.0);
+}`;
+
+let device = null, gpuCtx = null, pipeline = null, ubuf = null, bind = null, format = "bgra8unorm";
+async function initGPU() {
+  if (!navigator.gpu) return false;
+  try {
+    const adapter = await navigator.gpu.requestAdapter(); device = await adapter.requestDevice();
+    gpuCtx = gpuCanvas.getContext("webgpu"); format = navigator.gpu.getPreferredCanvasFormat();
+    gpuCtx.configure({ device, format, alphaMode: "opaque" });
+    const mod = device.createShaderModule({ code: SHADER });
+    pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
+    ubuf = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }] });
+    return true;
+  } catch (e) { return false; }
+}
+function renderGPU(time, pulse) {
+  if (!device) return;
+  device.queue.writeBuffer(ubuf, 0, new Float32Array([time, gpuCanvas.width, gpuCanvas.height, pulse]));
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginRenderPass({ colorAttachments: [{ view: gpuCtx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+  device.queue.submit([enc.finish()]);
+}
+// Canvas2D fallback avatar (radial glow) when WebGPU is unavailable
+function renderCoreCanvas(time, pulse) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.32);
+  g.addColorStop(0, "rgba(246,166,35," + (0.9 + 0.1 * pulse) + ")"); g.addColorStop(0.4, "rgba(246,140,30,0.35)"); g.addColorStop(1, "rgba(4,6,13,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 0.32, 0, 7); ctx.fill();
+  for (let k = 0; k < 5; k++) { const rr = R * (0.08 + k * 0.045) + Math.sin(time * 3 - k) * 3; ctx.strokeStyle = "rgba(89,209,255," + (0.25 - k * 0.03) + ")"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, 7); ctx.stroke(); }
+}
+
+// ---- gauges ----
+const cores = navigator.hardwareConcurrency || 8, mem = navigator.deviceMemory || 8;
+let fps = 60, fpsT = performance.now(), fpsN = 0;
+// v3026 -- REAL SWEK TELEMETRY, through the SAME module the avatar, the fleet view and the minipanel use.
+// A second reading of what "running" means, living in a demo page, is the duplicated-table class this tree has
+// now paid for seven times -- and a demo is exactly where a copy would go unnoticed longest.
+let brainPct = 0, brainState = "unknown";
+(async () => {
+  try {
+    const A = await import("/tools/roundhouse/activity.mjs");
+    const tick = async () => {
+      try {
+        const fp = await (await fetch("/fingerprint", { cache: "no-store" })).json();
+        const a = A.readActivity(fp && fp.roundhouse);
+        brainState = a.state;
+        // Progress, not mere activity -- the same mapping the brain lights use.
+        brainPct = a.state === "running" && a.round != null && a.maxRounds
+          ? Math.max(5, Math.min(100, Math.round((a.round / a.maxRounds) * 100)))
+          : a.state === "running" ? 5 : a.state === "unattended" ? 50 : 0;
+      } catch { brainState = "unknown"; brainPct = 0; }   // a lost bridge is not an idle engine
+    };
+    tick(); setInterval(tick, 20000);
+  } catch {}
+})();
+
+const gauges = [
+  { label: "CORES", unit: "", max: cores, val: () => cores, live: true, col: "#59d1ff" },
+  { label: "MEMORY", unit: "GB", max: mem, val: () => mem, live: true, col: "#5fe08a" },
+  { label: "FRAME", unit: "FPS", max: 120, val: () => fps, live: true, col: "#f6a623" },
+  // v3026 -- SIGNAL was a sine wave. It is the roundhouse now: 0 idle, 25/50/75/100 as a run advances
+  // through its rounds. A gauge on a page called "gauges" that shows a sine wave is a screensaver with a legend.
+  { label: "BRAIN", unit: "%", max: 100, val: () => brainPct, live: true, col: "#59d1ff" },
+  { label: "FLUX", unit: "TW", decorative: true, max: 100, val: (t) => 50 + 40 * Math.sin(t * 1.3 + 1) * Math.cos(t * 0.4), col: "#f6a623" },
+  { label: "SHIELD", unit: "%", decorative: true, max: 100, val: (t) => 78 + 18 * Math.sin(t * 0.5 + 2), col: "#5fe08a" },
+];
+function drawGauge(x, y, rad, g, t) {
+  const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25, frac = Math.max(0, Math.min(1, g.val(t) / g.max));
+  ctx.strokeStyle = "rgba(120,140,180,0.18)"; ctx.lineWidth = rad * 0.14; ctx.beginPath(); ctx.arc(x, y, rad, A0, A1); ctx.stroke();
+  // ticks
+  for (let k = 0; k <= 10; k++) { const a = A0 + (A1 - A0) * k / 10; ctx.strokeStyle = "rgba(120,140,180,0.4)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * rad * 1.1, y + Math.sin(a) * rad * 1.1); ctx.lineTo(x + Math.cos(a) * rad * 1.18, y + Math.sin(a) * rad * 1.18); ctx.stroke(); }
+  // value arc + glow
+  ctx.save(); ctx.shadowColor = g.col; ctx.shadowBlur = 14; ctx.strokeStyle = g.col; ctx.lineWidth = rad * 0.14; ctx.lineCap = "round"; ctx.beginPath(); ctx.arc(x, y, rad, A0, A0 + (A1 - A0) * frac); ctx.stroke(); ctx.restore();
+  // needle
+  const na = A0 + (A1 - A0) * frac; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(na) * rad * 0.82, y + Math.sin(na) * rad * 0.82); ctx.stroke();
+  ctx.fillStyle = g.col; ctx.beginPath(); ctx.arc(x, y, rad * 0.08, 0, 7); ctx.fill();
+  // readout
+  ctx.fillStyle = "#dbe7ff"; ctx.font = "700 " + (rad * 0.34).toFixed(0) + "px ui-monospace, monospace"; ctx.textAlign = "center";
+  ctx.fillText(Math.round(g.val(t)) + (g.unit ? "" : ""), x, y + rad * 0.5);
+  ctx.fillStyle = g.live ? g.col : "var(--dim)"; ctx.font = "600 " + (rad * 0.2).toFixed(0) + "px ui-monospace, monospace";
+  // v3026 -- SAY WHICH NEEDLES MEAN SOMETHING. `live` has been on this data since the page was written and was
+  // never rendered, so three real readings and three sine waves looked identical. A decorative gauge on a demo
+  // page is fine; one that PASSES AS TELEMETRY is not, and the difference is one word on a label.
+  ctx.fillText(g.label + (g.unit ? " " + g.unit : ""), x, y + rad * 1.5);
+  if (g.decorative) { ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = "#7c93b8"; ctx.fillText("decorative", x, y + rad * 1.5 + 12); ctx.restore(); }
+}
+const ticker = "SWEK ENGINE ONLINE  \u00b7  GPU BRAIN NOMINAL  \u00b7  LOCKSTEP LOCKED  \u00b7  ALL SYSTEMS GREEN  \u00b7  ";
+function drawChrome(t) {
+  // avatar frame ring
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.19;
+  ctx.strokeStyle = "rgba(246,166,35,0.6)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, -0.6, Math.PI + 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI + 0.9, Math.PI * 2 - 0.3); ctx.stroke();
+  ctx.strokeStyle = "rgba(89,209,255,0.5)"; ctx.beginPath(); ctx.arc(cx, cy, R * 1.12, t % (Math.PI * 2), t % (Math.PI * 2) + 1.2); ctx.stroke();
+  // status ticker along the bottom
+  ctx.save(); ctx.beginPath(); ctx.rect(0, H - 34, W, 34); ctx.clip(); ctx.fillStyle = "rgba(10,16,32,0.7)"; ctx.fillRect(0, H - 34, W, 34);
+  ctx.fillStyle = "#59d1ff"; ctx.font = "600 13px ui-monospace, monospace"; ctx.textAlign = "left";
+  const tw = ctx.measureText(ticker).width, off = (t * 60) % tw;
+  for (let x = -off; x < W; x += tw) ctx.fillText(ticker, x, H - 12);
+  ctx.restore();
+}
+
+let useGPU = false, start = performance.now();
+function frame() {
+  const t = (performance.now() - start) / 1000;
+  fpsN++; if (performance.now() - fpsT > 500) { fps = Math.round(fpsN * 1000 / (performance.now() - fpsT)); fpsT = performance.now(); fpsN = 0; }
+  const pulse = 0.5 + 0.5 * Math.sin(t * 4);
+  ctx.clearRect(0, 0, W, H);
+  if (useGPU) renderGPU(t, pulse); else renderCoreCanvas(t, pulse);
+  // gauge cluster: a row across the lower third, plus two flanking the core
+  const n = gauges.length, cy = H * 0.5, R = Math.min(W, H) * 0.19;
+  const rowY = H * 0.80, rad = Math.max(34, Math.min(64, W / 14));
+  const per = Math.min(6, n); const spacing = Math.min(W / (per + 1), 190);
+  for (let i = 0; i < n; i++) { const x = W / 2 + (i - (n - 1) / 2) * spacing; drawGauge(x, rowY, rad, gauges[i], t); }
+  drawChrome(t);
+  requestAnimationFrame(frame);
+}
+(async () => { useGPU = await initGPU(); document.getElementById("eng").textContent = useGPU ? "WebGPU avatar" : "Canvas2D fallback"; frame(); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Pip-Boy Models</title>
+<style>
+  :root{ --bg:#04140a; --panel:#08210f; --line:#1c5a30; --accent:#33ff88; --amber:#ffcf6b; --txt:#cdeed9; --dim:#5f9e73; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:radial-gradient(120% 120% at 50% -10%,#0a2614,#02100a); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; overflow:hidden; }
+  #view{ position:fixed; inset:0; }
+  canvas{ display:block; }
+  .panel{ position:fixed; top:14px; left:14px; width:300px; background:rgba(4,20,10,.82); border:1px solid var(--line); border-radius:12px; padding:14px; backdrop-filter:blur(6px); box-shadow:0 10px 30px rgba(0,0,0,.5); max-height:calc(100vh - 28px); max-height:calc(100dvh - 28px); overflow-y:auto; overscroll-behavior:contain; }
+  h1{ margin:0 0 2px; font-size:17px; letter-spacing:1px; color:var(--accent); }
+  .sub{ color:var(--dim); font-size:11.5px; margin-bottom:10px; }
+  label{ display:block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:1px; margin:10px 0 4px; }
+  select,input[type=range]{ width:100%; }
+  select{ background:#06180d; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px; font-family:inherit; font-size:13px; }
+  .row{ display:flex; gap:8px; margin-top:10px; }
+  button{ flex:1; font-family:inherit; font-weight:700; cursor:pointer; border-radius:8px; border:1px solid var(--line); background:#0c2a16; color:var(--txt); padding:8px; font-size:12px; transition:.12s; }
+  button:hover{ border-color:var(--accent); color:#eafff2; }
+  .meta{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line); font-size:11.5px; line-height:1.5; }
+  .meta a{ color:var(--accent); text-decoration:none; word-break:break-all; }
+  .meta a:hover{ text-decoration:underline; }
+  .warn{ color:var(--amber); }
+  #status{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:rgba(4,20,10,.9); border:1px solid var(--line); border-radius:10px; padding:10px 18px; font-size:13px; max-width:560px; text-align:center; }
+  #loadbar{ position:fixed; left:0; right:0; bottom:0; height:3px; background:rgba(4,20,10,.6); z-index:40; display:none; }
+  #loadbarFill{ height:100%; width:0; background:var(--accent,#2bff88); box-shadow:0 0 8px rgba(43,255,136,.6); transition:width .12s linear; }
+  #status.err{ border-color:#a4760f; color:var(--amber); }
+  code{ background:#06180d; border:1px solid var(--line); border-radius:4px; padding:1px 5px; color:#eafff2; }
+  a.back{ position:fixed; top:16px; right:18px; color:var(--dim); font-size:12px; text-decoration:none; }
+  a.back:hover{ color:var(--accent); }
+  #copyout{ width:100%; margin-top:8px; background:#06180d; color:var(--accent); border:1px solid var(--line); border-radius:8px; padding:6px; font:11px ui-monospace,monospace; display:none; height:60px; resize:none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<style>
+  #screenOverlay { position:absolute; left:50%; top:42%; width:240px; height:150px; transform:translate(-50%,-50%); z-index:30; display:none;
+    border:1px solid #2bff88; border-radius:6px; overflow:hidden; resize:both; min-width:90px; min-height:60px;
+    box-shadow:0 0 18px rgba(43,255,136,.4); background:rgba(4,20,11,.5); }
+  #ovHead { height:16px; background:rgba(43,255,136,.18); color:#bfffd9; font:9px ui-monospace,monospace; display:flex; align-items:center; justify-content:space-between; padding:0 6px; cursor:move; user-select:none; }
+  #ovHead .x { cursor:pointer; }
+  #ovBody { position:absolute; left:0; right:0; top:16px; bottom:0; }
+  #ovBody canvas, #ovBody iframe, #ovBody img { width:100%; height:100%; display:block; border:0; object-fit:contain; background:transparent; }
+  #ovUrl { width:100%; margin-top:4px; background:#06200f; color:#2bff88; border:1px solid #1aa257; border-radius:4px; padding:4px 6px; font:11px ui-monospace,monospace; }
+  #cornerPin { position:absolute; inset:0; z-index:25; display:none; pointer-events:none; }
+  #cpCanvas { position:absolute; left:0; top:0; pointer-events:none; }
+  .cpHandle { position:absolute; width:15px; height:15px; margin:-8px 0 0 -8px; border-radius:50%; background:#2bff88; border:2px solid #04140b; box-shadow:0 0 8px rgba(43,255,136,.9); cursor:grab; pointer-events:auto; z-index:26; display:none; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="screenOverlay"><div id="ovHead"><span>SCREEN OVERLAY \u00b7 drag \u00b7 resize \u2727</span><span class="x" id="ovClose">\u2715</span></div><div id="ovBody"></div></div>
+<div id="cornerPin"><canvas id="cpCanvas" width="512" height="320"></canvas><div class="cpHandle" id="cpH0"></div><div class="cpHandle" id="cpH1"></div><div class="cpHandle" id="cpH2"></div><div class="cpHandle" id="cpH3"></div></div>
+<a class="back" href="/">&larr; back to engine</a>
+
+<button id="panelTab" title="Open model + controls" style="position:fixed;top:14px;left:14px;z-index:30;display:none;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(4,20,10,.9);color:var(--accent);cursor:pointer;font:13px ui-monospace,monospace;backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,.45);">&#128295; <span id="panelTabName">Models</span></button>
+<div class="panel">
+  <button id="panelMin" title="Collapse to a tab (full view)" style="position:sticky;float:right;top:0;margin:-4px -4px 0 0;width:26px;height:26px;border:1px solid var(--line);border-radius:7px;background:#06200f;color:var(--accent);cursor:pointer;font-size:16px;line-height:1;">&#8211;</button>
+  <h1>Pip-Boy Models</h1>
+  <div class="sub">drop .glb files in <code>GPU_Assets/pipboy/</code></div>
+  <button id="srcBtn" style="width:100%;margin:2px 0 4px;padding:7px;background:#06200f;color:#7fd1ff;border:1px solid #1aa257;border-radius:5px;cursor:pointer;font:12px ui-monospace,monospace;">&#8505; Where to get these models</button>
+  <div id="srcPanel" style="display:none;margin:0 0 8px;padding:8px;background:#04140b;border:1px solid #1aa257;border-radius:6px;font:11px ui-monospace,monospace;line-height:1.5;"></div>
+  <button id="setPath" style="width:100%;margin:2px 0 6px;padding:7px;background:#123;color:#2bff88;border:1px solid #1aa257;border-radius:5px;cursor:pointer;font:12px ui-monospace,monospace;">&#128193; Set Local Path (assets folder)</button>
+  <div id="setPathMsg" style="font:10px ui-monospace,monospace;color:#7aa;margin:-2px 0 4px;"></div>
+
+  <label>Model</label>
+  <select id="pick"></select>
+
+  <label>Spin (Y) &mdash; face the screen forward</label>
+  <input id="spin" type="range" min="-180" max="180" step="1" value="0" />
+
+  <div class="row">
+    <button id="reset">Reset view</button>
+    <button id="rot">Auto-spin</button>
+  </div>
+  <div class="row">
+    <button id="copy">Copy placement</button>
+  </div>
+  <textarea id="copyout" readonly></textarea>
+
+  <label>Orient &mdash; quick views</label>
+  <div class="row">
+    <button id="vFront">Front</button><button id="vBack">Back</button><button id="vLeft">Left</button>
+  </div>
+  <div class="row">
+    <button id="vRight">Right</button><button id="vTop">Top</button><button id="vBottom">Bottom</button>
+  </div>
+  <div class="row">
+    <button id="favSave">&#9733; Mark favorite</button><button id="favLoad">Load favorite</button>
+  </div>
+
+  <label>Screen content</label>
+  <select id="ovContent">
+    <option value="gauges">Gauges (demo)</option>
+    <option value="dashboard">Live dashboard</option>
+    <option value="fidget">3D fidget</option>
+    <option value="comic">Comic (page flip)</option>
+    <option value="slideshow">Photos (folder)</option>
+    <option value="video">Video</option>
+    <option value="camera">Camera (live)</option>
+    <option value="map">Local Map (OSM)</option>
+    <option value="ai">AI image</option>
+    <option value="avatar">Avatar (live diorama)</option>
+    <option value="image">Image / page URL</option>
+  </select>
+  <select id="ovComic" style="display:none;margin-top:4px;"></select>
+  <input id="ovFolder" type="text" value="screen" placeholder="image folder under GPU_Assets" style="display:none;" />
+  <select id="ovVid" style="display:none;margin-top:4px;"></select>
+  <input id="ovVidUrl" type="text" placeholder="or a video URL (mp4 / webm / m3u8)" style="display:none;" />
+  <input id="ovCamBase" type="text" value="http://localhost:1984" placeholder="go2rtc base" style="display:none;" />
+  <select id="ovCam" style="display:none;margin-top:4px;"></select>
+  <select id="ovCamTransport" style="display:none;margin-top:4px;" title="MJPEG = compatible (proxied). MP4 = low-latency MSE. HLS = buffered.">
+    <option value="mjpeg">MJPEG (compatible)</option>
+    <option value="mp4">MP4 / MSE (low latency)</option>
+    <option value="hls">HLS (buffered)</option>
+  </select>
+  <textarea id="ovCamMap" rows="2" placeholder="alert map (optional) &#8212; entity-text = camera name, one per line&#10;e.g.  front_door = driveway" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;font:11px ui-monospace,monospace;background:#06140b;color:#bfffd9;border:1px solid #1a5;border-radius:4px;resize:vertical;padding:4px;"></textarea>
+  <button id="ovCamDescribe" style="display:none;margin-top:4px;">&#128065; Describe (local AI)</button>
+  <div id="ovCamDescOut" style="display:none;margin-top:4px;font:11px ui-monospace,monospace;color:#bfe6ff;background:#06121c;border:1px solid #1a4a6a;border-radius:4px;padding:5px;white-space:pre-wrap;"></div>
+  <div class="row" id="ovComicNav" style="display:none;">
+    <button id="ovPrev">&lsaquo; Prev</button>
+    <button id="ovAuto">Auto-flip</button>
+    <button id="ovNext">Next &rsaquo;</button>
+  </div>
+  <input id="ovPrompt" type="text" placeholder="describe an image to generate&hellip;" style="display:none;" />
+  <input id="ovMapLoc" type="text" placeholder="map location &mdash; address or lat,lon (e.g. Warwick, RI)" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;" />
+  <div class="row" id="ovAiRow" style="display:none;">
+    <button id="ovGen">Generate</button>
+  </div>
+  <input id="ovUrl" type="text" placeholder="image or page URL" style="display:none;" />
+  <div class="row" id="ovAvatarRow" style="display:none;">
+    <button id="ovCheer">&#128227; Cheer</button>
+  </div>
+
+  <label>Show it</label>
+  <div class="row">
+    <button id="ovToggle">2D overlay</button>
+    <button id="ov3d">On 3D screen</button>
+  </div>
+  <select id="ovMesh" style="display:none;margin-top:4px;"><option value="">&mdash; pick the screen mesh &mdash;</option></select>
+  <div class="row" style="margin-top:4px;">
+    <button id="ov3d2" title="Drive the pip-boy's small 2nd screen independently (clock + stats)">2nd screen</button>
+    <button id="ovBtns" title="Draw tappable buttons on the screen — tap them in 3D to switch what the screen shows">&#9638; Screen buttons</button>
+    <button id="ovAutoCyc" title="Auto-rotate the screen scenes every ~9s (gauges → fidget → stats → perf → avatar), pressing the menu as it goes">&#8635; Auto-rotate</button>
+    <button id="ovFlip" title="Flip the rendered screen 180° — use if the screen content shows upside-down on this model's UVs">&#8645; Flip 180&deg;</button>
+  </div>
+  <select id="ovMesh2" style="display:none;margin-top:4px;"><option value="">&mdash; pick the 2nd-screen mesh &mdash;</option></select>
+  <input id="ovOpacity" type="range" min="20" max="100" value="90" title="2D overlay opacity" />
+  <div class="row">
+    <button id="cpToggle">4-corner pin</button><button id="cpEdit">Edit corners</button>
+  </div>
+
+  <label>Model</label>
+  <div class="row">
+    <button id="ovLights" title="Find the model's emissive / light meshes and switch them on or off">&#128161; Lights</button>
+    <button id="ovRestore" title="Unbind both screens and restore the model's original textures">&#9851; Restore original</button>
+  </div>
+  <div id="ovLightsBox" style="display:none;margin-top:4px;"></div>
+
+  <label>Case RGB lights</label>
+  <div class="row">
+    <input id="rgbColor" type="color" value="#2bff88" style="width:42px;height:28px;padding:0;border:1px solid #1aa257;border-radius:4px;background:#06200f;cursor:pointer;" />
+    <button id="rgbPush">Push color</button><button id="rgbFollow">Follow screen</button>
+  </div>
+
+  <label>Voice &amp; alerts</label>
+  <div class="row">
+    <button id="ovVoice">&#127908; Voice</button><button id="ovAlert">Alert watch</button>
+  </div>
+
+  <div class="meta" id="meta"></div>
+</div>
+
+<div id="status">Loading...</div>
+<div id="loadbar"><div id="loadbarFill"></div></div>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "./vendor/three/jsm/loaders/GLTFLoader.js";
+import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { createPipboyWireframe } from "./ui/pipboyWireframe.js";
+import { buildWireframeHead } from "/face/wireframeHead.js";
+import { asciify } from "/tools/render-qa/asciify.mjs";
+
+// v3240 -- SCREEN 1 SHOWS THE REAL RIG, VIA RENDER-TO-TEXTURE.
+//
+// *** THIS IS THE HOST'S JOB BECAUSE THE HOST OWNS THE RENDERER. *** ui/pipboyWireframe.js is handed THREE and
+// nothing else -- it composes objects and paints canvases, and asking it to render would mean handing it a
+// renderer it has no other use for. It takes a texture instead: setScreen1Texture(tex).
+//
+// THE HEAD IS THE ONE FROM face/wireframeHead.js, WHICH IS THE POINT. thead.html draws the same shape from the
+// same module (v3239), so the Pip-Boy's screen and the head page cannot drift apart -- a second copy of those
+// fifty lines would have been the ninth instance this session of a thing declared twice and compared never.
+//
+// 256x216 IS HALF THE CANVAS SCREEN'S RESOLUTION AND DELIBERATE: the plane is about a centimetre of screen on a
+// rotating unit, and a full-size target costs four times the fill for a picture nobody can read at that size.
+let _headRT = null, _headScene = null, _headCam = null, _headRig = null, _headT = 0;
+function mountHead(){
+  try {
+    if (!_pipWire || !_pipWire.setScreen1Texture) return;
+    if (!_headRT) {
+      _headRT = new THREE.WebGLRenderTarget(256, 216, { depthBuffer: true });
+      _headScene = new THREE.Scene();
+      _headCam = new THREE.PerspectiveCamera(38, 256 / 216, 0.1, 20);
+      _headCam.position.set(0, 0.1, 2.35);
+      _headRig = buildWireframeHead(THREE);
+      _headScene.add(_headRig.root);
+      _headScene.add(new THREE.HemisphereLight(0x88ddff, 0x102018, 0.9));
+    }
+    _pipWire.setScreen1Texture(_headRT.texture);
+    _asciiWire = _pipWire;
+    if (_screen1Mode() === "ascii") _mountAscii();
+  } catch (e) { console.warn("[pipboy] head screen unavailable:", e); }
+}
+// A SLOW IDLE TURN AND A BLINK, AND NOTHING THAT CLAIMS TO BE LIP-SYNC. thead.html's ~450 lines of moods,
+// channels and gestures stayed on that page ON PURPOSE (v3239) -- what is here is the SHAPE, animated only
+// enough that a still image is not mistaken for a frozen screen.
+// v3323 -- *** THE SAME FRAME, AS ASCII, ON THE PIP-BOY'S OWN SCREEN. ***
+// Keith: "can the ascii effect work in the pip boy viewer?" YES, AND CHEAPLY, because the two halves already
+// exist and meet exactly here: setScreen1(fn) hands out a 2D CONTEXT (v3234) and asciify takes RGBA and returns
+// TEXT (v3322). The only new code is readPixels between them.
+//
+// TWO MODES OVER ONE SOURCE, NOT TWO SOURCES. Both paths render THE SAME rig into THE SAME target; only the
+// last step differs. A second head built for the ASCII view would be the copy this tree spends its rounds
+// removing, and would drift the moment either was touched.
+//
+// ?screen1=ascii PICKS IT and the default is unchanged -- a new mode that altered what everybody already sees
+// would be a preference wearing a feature's clothes.
+let _asciiWire = null, _asciiBuf = null;
+function _screen1Mode() {
+    try { return new URLSearchParams(location.search).get("screen1") || "texture"; } catch { return "texture"; }
+}
+function _mountAscii() {
+    if (!_asciiWire || !_headRT) return;
+    // THE TEXTURE IS HANDED BACK FIRST. setScreen1Texture(null) restores the canvas path (v3240); without it the
+    // material keeps sampling the render target while the 2D callback paints underneath, unseen.
+    _asciiWire.setScreen1Texture(null);
+    _asciiWire.setScreen1((ctx, cv) => {
+        if (!_asciiBuf) _asciiBuf = new Uint8Array(256 * 216 * 4);
+        try {
+            const gl = renderer.getContext();
+            const prev = renderer.getRenderTarget();
+            renderer.setRenderTarget(_headRT);
+            gl.readPixels(0, 0, 256, 216, gl.RGBA, gl.UNSIGNED_BYTE, _asciiBuf);
+            renderer.setRenderTarget(prev);
+        } catch (e) { return; }
+        // readPixels is BOTTOM-UP and asciify walks top-down -- the same flip ascii-object.html needs. Without
+        // it the head is upside down and reads as a broken sampler rather than a coordinate convention.
+        const flip = new Uint8ClampedArray(_asciiBuf.length);
+        for (let y = 0; y < 216; y++) flip.set(_asciiBuf.subarray((215 - y) * 256 * 4, (216 - y) * 256 * 4), y * 256 * 4);
+        const r = asciify(flip, 256, 216, { cols: 44 });
+        ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.fillStyle = "#6effa0"; ctx.font = "10px ui-monospace,monospace"; ctx.textBaseline = "top";
+        const lh = cv.height / Math.max(1, r.rows);
+        r.text.split("\n").forEach((line, i) => ctx.fillText(line, 4, i * lh));
+    });
+}
+
+function _headTick(dt){
+  if (!_headRig) return;
+  _headT += dt;
+  _headRig.head.rotation.y = Math.sin(_headT * 0.5) * 0.35;
+  _headRig.head.rotation.x = Math.sin(_headT * 0.31) * 0.10;
+}
+
+// ---- Named model registry --------------------------------------------------
+// Drop each .glb into GPU_Assets/pipboy/ using the `file` name below (or edit
+// `file` to match your download). `rotationY` + `targetSize` are placement
+// defaults; tune live with the Spin slider + "Copy placement", then bake here.
+const MODELS = [
+  { key:"wireframe", name:"\u2726 SweK Wireframe Pip-Boy (default)", file:"", wireframe:true, rotationY:0 },
+  { key:"retro-editable", name:"Retro-Modernized (editable screen)",
+    file:"retro-modernized-pip-boy-editable-screen.glb",
+    url:"https://sketchfab.com/3d-models/retro-modernized-pip-boy-editable-screen-02df9777058e4cdea4fadee7660f7b43",
+    rotationY:0, targetSize:2.2, textured:true, note:"Has an editable screen surface." },
+  { key:"3-billion", name:"The Famous Pip-Boy (3 billion)",
+    file:"the-famous-pip-boy-3-billion.glb",
+    url:"https://sketchfab.com/3d-models/the-famous-pip-boy-3-billion-adec10493e06436c967d5797f7085225",
+    rotationY:0, targetSize:2.2, textured:true, note:"" },
+  { key:"pipboy", name:"Pip-Boy",
+    file:"pipboy.glb",
+    url:"https://sketchfab.com/3d-models/pipboy-d4216090cfa740a491eb89d608971d3a",
+    rotationY:0, targetSize:2.2, textured:true, note:"" },
+  { key:"fo76", name:"FO76 Pip-Boy (untextured)",
+    file:"fo76-pipboy.glb",
+    url:"https://sketchfab.com/3d-models/fo76-pipboy-d78412ada76b422d9a015fa4c293765d",
+    rotationY:0, targetSize:2.2, textured:false, note:"Sketchfab preview shows no baked textures \u2014 expect plain grey." }
+];
+const DIR = "/GPU_Assets/pipboy/";
+
+// ---- Scene -----------------------------------------------------------------
+const view = document.getElementById("view");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05140b);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+camera.position.set(0, 0.5, 4);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+view.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.target.set(0, 0, 0);
+
+scene.add(new THREE.HemisphereLight(0xbfeacb, 0x16301f, 1.05));
+const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(3, 5, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0x9fd8b4, 0.6); fill.position.set(-4, 1, -2); scene.add(fill);
+scene.add(new THREE.AmbientLight(0x335544, 0.5));
+// faint floor grid for scale
+const grid = new THREE.GridHelper(8, 16, 0x1c5a30, 0x123a20); grid.position.y = -1.2; scene.add(grid);
+
+function resize(){ const w = innerWidth, h = innerHeight; camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+addEventListener("resize", resize); resize();
+
+// ---- Model loading ---------------------------------------------------------
+const loader = new GLTFLoader(); enableMeshopt(loader);
+function setLoadBar(pct){ const f = document.getElementById("loadbarFill"); if (f) f.style.width = Math.max(0, Math.min(100, pct)) + "%"; }
+function showLoadBar(on){ const b = document.getElementById("loadbar"); if (b) b.style.display = on ? "block" : "none"; if (!on) setLoadBar(0); }
+let pivot = null, autoRot = false, baseRotY = 0, autoSpin = 0;
+let _pipWire = null;   // v1686 — active wireframe Pip-Boy instance (drives its screens each frame)
+let _afterLoad = null;   // set by the overlay system to (re)bind the 3D screen
+const statusEl = document.getElementById("status");
+const metaEl = document.getElementById("meta");
+const spinEl = document.getElementById("spin");
+
+function setStatus(msg, err){ statusEl.textContent = msg; statusEl.className = err ? "err" : ""; statusEl.style.display = msg ? "" : "none"; }
+
+function clearPivot(){ if (_pipWire){ try { _pipWire.dispose(); } catch {} _pipWire = null; } if (pivot){ scene.remove(pivot); pivot.traverse(o => { if (o.geometry) o.geometry.dispose?.(); if (o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose?.()); } }); pivot = null; } }
+
+function showMeta(cfg, ok){
+  metaEl.innerHTML =
+    "<div><b>" + cfg.name + "</b></div>" +
+    (cfg.note ? "<div class='" + (cfg.textured?"":"warn") + "'>" + cfg.note + "</div>" : "") +
+    "<div style='margin-top:6px'>Source: <a href='" + cfg.url + "' target='_blank' rel='noopener'>Sketchfab \u2197</a></div>" +
+    (ok ? "" : "<div class='warn' style='margin-top:6px'>File not found. Download from the link, export <code>.glb</code>, and drop it in <code>GPU_Assets/pipboy/</code> as <code>" + cfg.file + "</code>.</div>");
+}
+
+function frame(cfg){
+  // measure with the pivot at identity so the box is clean
+  pivot.position.set(0, 0, 0); pivot.scale.setScalar(1);
+  const box = new THREE.Box3().setFromObject(pivot);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const s = (cfg.targetSize || 2) / maxDim;
+  // Recenter the CONTENT (the loaded scene) at the pivot's local origin, THEN scale
+  // the pivot in place. (The old code moved the pivot itself and scaled around its
+  // origin, which left any model whose geometry was offset from the file origin
+  // displaced by center*(s-1) — often far outside the view, so it "loaded" but
+  // never appeared. Models that happened to be origin-centered still showed.)
+  pivot.children.forEach(ch => ch.position.sub(center));
+  pivot.scale.setScalar(s);
+  const dist = (cfg.targetSize || 2) * 1.9;
+  camera.position.set(0, (cfg.targetSize||2) * 0.25, dist);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+function applySpin(){ if (pivot) pivot.rotation.y = baseRotY + THREE.MathUtils.degToRad(+spinEl.value) + autoSpin; }
+
+function load(cfg){
+  clearPivot();
+  if (cfg && (cfg.wireframe || cfg.key === "wireframe")) {
+    // v1839 — the built-in default. Friendly "selected" line, not an error.
+    setStatus("SweK PipBoy selected. Choose your own from the list, or download a new one!", false); showLoadBar(false); showMeta(cfg, false);
+    baseRotY = THREE.MathUtils.degToRad(cfg.rotationY || 0); spinEl.value = 0; autoSpin = 0;
+    try { _pipWire = createPipboyWireframe(THREE); pivot = new THREE.Group(); pivot.add(_pipWire.group); scene.add(pivot); applySpin(); mountHead(); }
+    catch (e) { console.warn("[pipboy] wireframe build failed:", e); }
+    return;
+  }
+  setStatus("Loading " + cfg.file + " ...", false);
+  showLoadBar(true); setLoadBar(0);
+  showMeta(cfg, true);
+  baseRotY = THREE.MathUtils.degToRad(cfg.rotationY || 0);
+  spinEl.value = 0; autoSpin = 0;
+  loader.load(DIR + cfg.file,
+    (gltf) => {
+      pivot = new THREE.Group();
+      pivot.add(gltf.scene);
+      scene.add(pivot);
+      frame(cfg);
+      applySpin();
+      setLoadBar(100); showLoadBar(false);
+      // v1839 — show which model is now active (strip any leading decoration from the label).
+      setStatus(String(cfg.name || cfg.file || "Model").replace(/^[^A-Za-z0-9]+/, "") + " selected.", false);
+      try { _afterLoad && _afterLoad(); } catch (e) {}
+    },
+    (ev) => {
+      if (ev && ev.lengthComputable && ev.total) {
+        const pct = Math.round(ev.loaded / ev.total * 100);
+        setLoadBar(pct);
+        setStatus("Loading " + cfg.file + " \u2014 " + pct + "%", false);
+      } else if (ev && ev.loaded) {
+        // server sent no content-length (gzip / chunked): show bytes instead of %
+        showLoadBar(false);
+        setStatus("Loading " + cfg.file + " \u2014 " + (ev.loaded / 1048576).toFixed(1) + " MB", false);
+      }
+    },
+    (err) => {
+      console.warn("[pipboy] load failed:", cfg.file, err);
+      showLoadBar(false);
+      showMeta(cfg, false);
+      setStatus("Couldn't load " + cfg.file + " \u2014 is it in GPU_Assets/pipboy/?", true);
+      // placeholder so the stage isn't empty — our wireframe Pip-Boy
+      pivot = new THREE.Group();
+      try { _pipWire = createPipboyWireframe(THREE); pivot.add(_pipWire.group); }
+      catch (e2) { pivot.add(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.5), new THREE.MeshStandardMaterial({ color:0x1c5a30, wireframe:true }))); }
+      scene.add(pivot); applySpin();
+    }
+  );
+}
+
+// ---- UI --------------------------------------------------------------------
+let models = MODELS.slice();
+const pick = document.getElementById("pick");
+function rebuildPicker(){ const cur = pick.value; pick.innerHTML = ""; models.forEach((m, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = m.name; pick.appendChild(o); }); if (cur && models[+cur]) pick.value = cur; }
+rebuildPicker();
+pick.addEventListener("change", () => { const m = models[+pick.value]; try { localStorage.setItem("voxelengine.pipboyCurrent", (m && (m.key || m.file)) || ""); } catch (e) {} load(m); collapsePanel(); });
+// ---- v1282: connector UX — collapse the model+controls panel to a mini-tab so the
+// pip-boy fills the view ("full view mode"); the tab reopens it. Picking a model
+// drops you straight into full view. First run (no model ever chosen) stays open
+// on the picker.
+const _panel = document.querySelector(".panel"), _panelTab = document.getElementById("panelTab"), _panelTabName = document.getElementById("panelTabName"), _panelMin = document.getElementById("panelMin");
+function setPanelTabName(){ try { const m = models[+pick.value]; if (m && _panelTabName) _panelTabName.textContent = m.name || "Models"; } catch (e) {} }
+function collapsePanel(){ if (_panel) _panel.style.display = "none"; if (_panelTab) _panelTab.style.display = "block"; setPanelTabName(); try { localStorage.setItem("voxelengine.pipboyPanelOpen", "0"); } catch (e) {} }
+function expandPanel(){ if (_panel) _panel.style.display = "block"; if (_panelTab) _panelTab.style.display = "none"; try { localStorage.setItem("voxelengine.pipboyPanelOpen", "1"); } catch (e) {} }
+if (_panelMin) _panelMin.onclick = collapsePanel;
+if (_panelTab) _panelTab.onclick = expandPanel;
+// Folder-driven: pull every .glb actually in GPU_Assets/pipboy/ (external dir
+// wins) and add any not already in the curated list, so dropping a pip-boy in
+// the folder makes it switchable here without editing this file.
+async function loadFolderModels(){
+  let haveLocal = false;
+  try {
+    const r = await fetch("/assets/sub-glb?sub=pipboy", { cache: "no-store" }).then(r => r.json());
+    if (r && r.ok && Array.isArray(r.files)) {
+      haveLocal = r.files.length > 0;
+      const known = new Set(models.map(m => (m.file || "").toLowerCase()));
+      for (const f of r.files) { if (!known.has(f.toLowerCase())) models.push({ key: f.replace(/\.[^.]+$/, ""), name: f.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "), file: f, url: "#", rotationY: 0, targetSize: 2.2, textured: true, note: "From your pipboy folder." }); }
+      rebuildPicker();
+    }
+  } catch {}
+  // Initial load: if a current pip-boy was chosen before, start it right up;
+  // otherwise fall back to the first model in the list.
+  let start = 0, hadSaved = false;
+  try { const saved = localStorage.getItem("voxelengine.pipboyCurrent"); if (saved) { const i = models.findIndex(m => (m.key || m.file) === saved); if (i >= 0) { start = i; hadSaved = true; } } } catch (e) {}
+  if (models[start]) { pick.value = String(start); load(models[start]); }
+  // connector launch: full view (collapsed) if a model was already picked; else show
+  // the selector. An explicit ?panel=open / ?panel=min query can force it either way.
+  setPanelTabName();
+  const _q = new URLSearchParams(location.search), _pq = _q.get("panel");
+  if (_pq === "open") expandPanel();
+  else if (_pq === "min") collapsePanel();
+  else if (!haveLocal && !hadSaved) {
+    // v1839 — the SweK Wireframe Pip-Boy is the built-in default (always available, no download
+    // needed), so this isn't an error state. Keep the "Where to get" panel COLLAPSED by default
+    // and show a friendly "selected" message instead of "no models found". The links are one tap away.
+    collapsePanel();
+    const p = document.getElementById("srcPanel"), b = document.getElementById("srcBtn");
+    if (p) p.style.display = "none";
+    if (b) b.textContent = "\u2139 Where to get these models";
+    setStatus("SweK PipBoy selected. Choose your own from the list, or download a new one!", false);
+  }
+  else if (hadSaved) collapsePanel();
+  else collapsePanel();   // v1346 — go straight to the Pip-Boy view; tap the mini-tab for controls
+}
+loadFolderModels();
+
+// ---- Model sources info: list every curated model's download link + filename ----
+(function () {
+  const btn = document.getElementById("srcBtn"), panel = document.getElementById("srcPanel");
+  if (!btn || !panel) return;
+  let html = '<div style="color:#7fd6a8;margin-bottom:5px;">Download each from Sketchfab (free account), export <b>.glb</b>, and drop it in <code>GPU_Assets/pipboy/</code> with the filename shown:</div>';
+  for (const m of MODELS) {
+    html += '<div style="margin:6px 0;padding-bottom:6px;border-bottom:1px solid #0d2a18;">'
+      + '<div style="color:#bfffd9;font-weight:bold;">' + m.name + '</div>'
+      + (m.url && m.url !== "#" ? ('<div><a href="' + m.url + '" target="_blank" rel="noopener" style="color:#7fd1ff;word-break:break-all;">' + m.url + '</a></div>') : '<div style="color:#7a8290;">(no source link)</div>')
+      + '<div style="color:#9fe0c0;">save as: <code>' + m.file + '</code></div>'
+      + (m.note ? ('<div style="color:#7a8290;">' + m.note + '</div>') : '')
+      + '</div>';
+  }
+  html += '<div style="color:#7a8290;margin-top:4px;">Any extra <code>.glb</code> you drop in the folder shows up in the Model list automatically.</div>';
+  panel.innerHTML = html;
+  btn.onclick = () => { const show = panel.style.display === "none"; panel.style.display = show ? "block" : "none"; btn.textContent = (show ? "\u25be" : "\u2139") + " Where to get these models"; };
+})();
+
+// ---- Set Local Path: choose the GLOBAL assets folder from here (phone-friendly) ----
+function pickServerPath(start){
+  return new Promise((resolve) => {
+    const ov = document.createElement("div"); ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;";
+    const box = document.createElement("div"); box.style.cssText = "background:#04140b;border:1px solid #2bff88;border-radius:10px;width:min(520px,96vw);max-height:84vh;display:flex;flex-direction:column;overflow:hidden;color:#bfffd9;font:13px ui-monospace,monospace;box-shadow:0 0 30px rgba(43,255,136,.4);";
+    const head = document.createElement("div"); head.style.cssText = "padding:11px 13px;border-bottom:1px solid #1aa257;font-weight:bold;"; head.textContent = "Select assets folder";
+    const cur = document.createElement("div"); cur.style.cssText = "padding:7px 13px;font-size:11px;color:#7fffb0;background:#06200f;word-break:break-all;border-bottom:1px solid #1aa257;";
+    const list = document.createElement("div"); list.style.cssText = "flex:1;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:2px;min-height:180px;";
+    const foot = document.createElement("div"); foot.style.cssText = "padding:9px 13px;border-top:1px solid #1aa257;display:flex;gap:8px;justify-content:flex-end;";
+    const mk = (t, primary) => { const b = document.createElement("button"); b.textContent = t; b.style.cssText = "padding:8px 13px;border-radius:7px;cursor:pointer;font:12px ui-monospace,monospace;" + (primary ? "background:#0c3;color:#021;border:1px solid #2bff88;" : "background:#06200f;color:#bfffd9;border:1px solid #1aa257;"); return b; };
+    const cancel = mk("Cancel", false), choose = mk("Use this folder", true);
+    foot.append(cancel, choose); box.append(head, cur, list, foot); ov.appendChild(box); document.body.appendChild(ov);
+    let here = start || "";
+    const close = (v) => { try { document.body.removeChild(ov); } catch {} resolve(v); };
+    cancel.onclick = () => close(null); choose.onclick = () => close(here || null); ov.onclick = (e) => { if (e.target === ov) close(null); };
+    const row = (label, icon, onClick) => { const r = document.createElement("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;padding:9px;border-radius:6px;cursor:pointer;"; r.onmouseenter = () => r.style.background = "#0a2a18"; r.onmouseleave = () => r.style.background = ""; const i = document.createElement("span"); i.textContent = icon; const t = document.createElement("span"); t.textContent = label; t.style.wordBreak = "break-all"; r.append(i, t); r.onclick = onClick; return r; };
+    async function roots(){ here = ""; cur.textContent = "Drives / start"; list.innerHTML = ""; choose.style.display = "none";
+      const j = await fetch("/fs/roots").then(r => r.json()).catch(() => null);
+      if (!j || !j.ok) { list.appendChild(row("can't read drives (sign in if remote)", "\u26A0", () => {})); return; }
+      if (j.home) list.appendChild(row("Home  " + j.home, "\uD83C\uDFE0", () => browse(j.home)));
+      if (j.engine) list.appendChild(row("Engine folder", "\u2699", () => browse(j.engine)));
+      (j.roots || []).forEach(d => list.appendChild(row(d, "\uD83D\uDCBD", () => browse(d)))); }
+    async function browse(dir){ choose.style.display = ""; const j = await fetch("/fs/list?path=" + encodeURIComponent(dir)).then(r => r.json()).catch(() => null);
+      if (!j || !j.ok) { cur.textContent = dir + " \u2014 " + ((j && j.error) || "no response"); list.innerHTML = "";
+        list.appendChild(row("\uD83D\uDCBD back to drives / start", "\u21a9", () => roots()));
+        const par = dir.replace(/[\\\/]+$/, "").replace(/[\\\/][^\\\/]*$/, "");
+        if (par && par !== dir) list.appendChild(row(".. up to " + par, "\u2B06", () => browse(par)));
+        return; }
+      here = j.path; cur.textContent = j.path; list.innerHTML = "";
+      list.appendChild(row(".. up", "\u2B06", () => { if (j.parent) browse(j.parent); else roots(); }));
+      (j.folders || []).forEach(f => list.appendChild(row(f.name, "\uD83D\uDCC1", () => browse(f.path)))); }
+    if (here) browse(here); else roots();
+  });
+}
+document.getElementById("setPath").onclick = async () => {
+  const msg = document.getElementById("setPathMsg");
+  let startDir = ""; try { const c = await fetch("/config/assets-dir").then(r => r.json()); startDir = (c && c.assetsDir) || ""; } catch {}
+  const p = await pickServerPath(startDir);
+  if (!p) return;
+  msg.textContent = "saving\u2026";
+  const j = await fetch("/config/assets-dir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: p }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+  if (j && j.ok) { msg.textContent = "\u2713 " + p + (j.created && j.created.length ? (" (+" + j.created.join(", ") + ")") : ""); loadFolderModels(); }
+  else { msg.textContent = "\u2717 " + ((j && j.error) || "failed"); }
+};
+
+spinEl.addEventListener("input", applySpin);
+document.getElementById("reset").addEventListener("click", () => { if (models[+pick.value]) frame(models[+pick.value]); });
+document.getElementById("rot").addEventListener("click", (e) => { autoRot = !autoRot; e.target.textContent = autoRot ? "Stop spin" : "Auto-spin"; });
+// Orient quick-views: place the camera on an axis looking at the model center.
+function setView(px, py, pz){ const cfg = models[+pick.value] || {}; const dist = (cfg.targetSize || 2) * 1.9; const v = new THREE.Vector3(px, py, pz); v.normalize().multiplyScalar(dist); camera.position.copy(v); controls.target.set(0, 0, 0); controls.update(); }
+document.getElementById("vFront").onclick = () => setView(0, 0.15, 1);
+document.getElementById("vBack").onclick = () => setView(0, 0.15, -1);
+document.getElementById("vLeft").onclick = () => setView(-1, 0.15, 0);
+document.getElementById("vRight").onclick = () => setView(1, 0.15, 0);
+document.getElementById("vTop").onclick = () => setView(0, 1, 0.0001);
+document.getElementById("vBottom").onclick = () => setView(0, -1, 0.0001);
+document.getElementById("copy").addEventListener("click", () => {
+  const cfg = models[+pick.value];
+  const out = {
+    key: cfg.key, file: cfg.file,
+    rotationY: Math.round((cfg.rotationY || 0) + (+spinEl.value)),
+    targetSize: cfg.targetSize,
+    camera: camera.position.toArray().map(n => +n.toFixed(2)),
+    target: controls.target.toArray().map(n => +n.toFixed(2))
+  };
+  const ta = document.getElementById("copyout");
+  ta.style.display = "block"; ta.value = JSON.stringify(out);
+  try { navigator.clipboard?.writeText?.(ta.value); } catch (e) {}
+});
+
+// ---- Loop ------------------------------------------------------------------
+// v3240 -- *** THE HEAD RIG IS RENDERED INTO A TEXTURE BEFORE THE MAIN PASS, AND THAT ORDER IS THE WHOLE
+// TRICK. *** A render target written AFTER the scene that samples it shows the PREVIOUS frame -- one frame of
+// lag that looks like nothing at all until the head moves, and then looks like a bug nobody can place.
+function renderHeadRT(){
+  if (!_headRT || !_headScene) return;
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(_headRT);
+  renderer.clear();
+  renderer.render(_headScene, _headCam);
+  renderer.setRenderTarget(prev);
+}
+function loop(){ if (autoRot && pivot){ autoSpin += 0.006; applySpin(); } if (_pipWire){ try { _pipWire.update(0.016); } catch {} } try { _headTick(0.016); renderHeadRT(); } catch {} controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+loop();   // initial model load is kicked off by loadFolderModels() (saved current model wins)
+
+// ---- Unified pip-boy screen: one canvas drives a 2D overlay AND the 3D screen mesh ----
+(function initScreen(){
+  const SCV = document.createElement("canvas"); SCV.width = 512; SCV.height = 320; const sctx = SCV.getContext("2d");
+  const cpCanvas = document.getElementById("cpCanvas"), cpCtx = cpCanvas.getContext("2d"); let cpOn = false;
+  const content = document.getElementById("ovContent"), comicSel = document.getElementById("ovComic"), comicNav = document.getElementById("ovComicNav");
+  const prevB = document.getElementById("ovPrev"), nextB = document.getElementById("ovNext"), autoB = document.getElementById("ovAuto"), urlIn = document.getElementById("ovUrl");
+  const folderIn = document.getElementById("ovFolder"), promptIn = document.getElementById("ovPrompt"), aiRow = document.getElementById("ovAiRow"), genBtn = document.getElementById("ovGen");
+  const mapLocIn = document.getElementById("ovMapLoc");
+  const avatarRow = document.getElementById("ovAvatarRow"), cheerBtn = document.getElementById("ovCheer");
+  const vidSel = document.getElementById("ovVid"), vidUrl = document.getElementById("ovVidUrl");
+  const camBase = document.getElementById("ovCamBase"), camSel = document.getElementById("ovCam");
+  const camTransport = document.getElementById("ovCamTransport");
+  // v1190 — alert->camera map for when Frigate entity ids and go2rtc names don't
+  // share a substring. Each line: "entity-text = camera-name". Stored on its own.
+  const camMapEl = document.getElementById("ovCamMap");
+  let camMap = {};
+  function parseCamMap(){ camMap = {}; (camMapEl ? camMapEl.value : "").split(/\n/).forEach(line => { const i = line.indexOf("="); if (i < 0) return; const k = line.slice(0, i).trim().toLowerCase(); const v = line.slice(i + 1).trim(); if (k && v) camMap[k] = v; }); }
+  try { const saved = localStorage.getItem("voxelengine.pipboyCamMap"); if (saved && camMapEl) camMapEl.value = saved; } catch {}
+  parseCamMap();
+  if (camMapEl) camMapEl.onchange = () => { try { localStorage.setItem("voxelengine.pipboyCamMap", camMapEl.value); } catch {} parseCamMap(); };
+  // v1921 — map location persistence + refresh on change
+  try { const savedLoc = localStorage.getItem("voxelengine.pipboyMapLoc"); if (savedLoc && mapLocIn) mapLocIn.value = savedLoc; } catch {}
+  if (mapLocIn) mapLocIn.onchange = () => { try { localStorage.setItem("voxelengine.pipboyMapLoc", mapLocIn.value); } catch {} _map.tiles = null; _map._imgs = null; _map.last = 0; };
+  // v1193 — describe the current camera frame via a local Ollama vision model
+  const camDescBtn = document.getElementById("ovCamDescribe"), camDescOut = document.getElementById("ovCamDescOut");
+  if (camDescBtn) camDescBtn.onclick = async () => {
+    const name = camSel.value; if (!name) { camDescOut.style.display = "block"; camDescOut.textContent = "Pick a camera first."; return; }
+    camDescBtn.disabled = true; const lbl = camDescBtn.textContent; camDescBtn.textContent = "\uD83D\uDC41 \u2026looking"; camDescOut.style.display = "block"; camDescOut.textContent = "asking the local vision model\u2026";
+    try {
+      const u = "/camera/describe?base=" + encodeURIComponent(camBase.value.trim()) + "&src=" + encodeURIComponent(name);
+      const r = await fetch(u).then(x => x.json());
+      if (r.ok) camDescOut.textContent = "\uD83D\uDC41 " + r.text + "\n\u2014 " + r.model;
+      else camDescOut.textContent = "\u2717 " + (r.error || "describe failed") + (r.hint ? "\n" + r.hint : "");
+    } catch (e) { camDescOut.textContent = "\u2717 " + e.message; }
+    camDescBtn.disabled = false; camDescBtn.textContent = lbl;
+  };
+  const toggle = document.getElementById("ovToggle"), btn3d = document.getElementById("ov3d"), meshSel = document.getElementById("ovMesh"), opa = document.getElementById("ovOpacity");
+  const ov = document.getElementById("screenOverlay"), head = document.getElementById("ovHead"), body = document.getElementById("ovBody");
+  const LS = "voxelengine.pipboyScreen"; let st = {}; try { st = JSON.parse(localStorage.getItem(LS) || "{}"); } catch {}
+  if (st.left) { ov.style.left = st.left; ov.style.top = st.top; ov.style.width = st.width; ov.style.height = st.height; ov.style.transform = "none"; }
+  if (st.opacity) opa.value = st.opacity; if (st.url) urlIn.value = st.url;
+  if (st.camT && camTransport) camTransport.value = st.camT;
+  const save = () => { try { localStorage.setItem(LS, JSON.stringify({ left: ov.style.left, top: ov.style.top, width: ov.style.width, height: ov.style.height, opacity: opa.value, content: content.value, url: urlIn.value, camT: (camTransport ? camTransport.value : "mjpeg"), corners: (typeof cpCorners !== "undefined" ? cpCorners : undefined) })); } catch {} };
+
+  let mode = st.content || "gauges"; let staticImg = null; let scrTex = null, scrMesh = null, scrOrig = null;
+  let _screenFlip = false; try { _screenFlip = localStorage.getItem("voxelengine.pipboyFlip") === "1"; } catch {}
+  const comic = { id: null, pages: 0, idx: 0, img: new Image(), auto: null }; comic.img.crossOrigin = "anonymous"; comic.img.onload = () => fitImg(comic.img);
+  function fitImg(img){ sctx.fillStyle = "#000"; sctx.fillRect(0, 0, SCV.width, SCV.height); if (!img || !img.naturalWidth) return; const sc = Math.min(SCV.width / img.naturalWidth, SCV.height / img.naturalHeight); const w = img.naturalWidth * sc, h = img.naturalHeight * sc; sctx.drawImage(img, (SCV.width - w) / 2, (SCV.height - h) / 2, w, h); }
+  // v1921 — Pip-Boy "Local Map" via OSM tiles (free, no Google key). Fetches stitched tiles from the bridge
+  // (/maps/tiles), draws them, then recolors to the Pip-Boy green phosphor look. Location from the input
+  // (address geocoded, or "lat,lon"); defaults to the user's saved spot. Refreshes only when params change.
+  const _map = { last: 0, img: null, tiles: null, lat: null, lon: null, zoom: 15, loading: false, label: "", provider: "osm" };
+  function _pipMapRecolor(){
+    // sample the drawn map and map luminance -> pip-boy green ramp
+    try {
+      const id = sctx.getImageData(0, 0, SCV.width, SCV.height), d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const l = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) / 255;
+        d[i] = Math.round(8 + l * 40); d[i+1] = Math.round(20 + l * 210); d[i+2] = Math.round(12 + l * 90);
+      }
+      sctx.putImageData(id, 0, 0);
+    } catch {}
+  }
+  async function _pipMapFetch(){
+    if (_map.loading) return; _map.loading = true;
+    try {
+      let lat = _map.lat, lon = _map.lon;
+      const raw = (mapLocIn ? mapLocIn.value.trim() : "");
+      if (raw) {
+        const mm = raw.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
+        if (mm) { lat = parseFloat(mm[1]); lon = parseFloat(mm[2]); _map.label = raw; }
+        else { try { const g = await fetch("/maps/geocode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: raw }) }).then(r => r.json()); if (g && g.ok) { lat = g.lat; lon = g.lng; _map.label = g.formatted || raw; } } catch {} }
+      }
+      if (lat == null || lon == null) { _map.loading = false; return; }
+      _map.lat = lat; _map.lon = lon;
+      const j = await fetch("/maps/tiles?lat=" + lat + "&lon=" + lon + "&zoom=" + _map.zoom + "&cols=3&rows=3&provider=" + encodeURIComponent(_map.provider), { cache: "no-store" }).then(r => r.json());
+      if (j && j.ok) { _map.tiles = j; _map.attr = j.attr || ""; }
+    } catch {} finally { _map.loading = false; }
+  }
+  function drawMap(){
+    const ctx = sctx; ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, SCV.width, SCV.height);
+    if (performance.now() - _map.last > 15000 && !_map.loading) { _map.last = performance.now(); _pipMapFetch(); }
+    const T = _map.tiles;
+    if (!T || !T.tiles) { ctx.fillStyle = "#2bff88"; ctx.font = "15px monospace"; ctx.textAlign = "center"; ctx.fillText(_map.loading ? "loading local map\u2026" : "set a location below", SCV.width / 2, SCV.height / 2); ctx.textAlign = "left"; return; }
+    // stitch tiles centered, scaled to fit
+    const ts = T.tileSize || 256, gw = T.cols * ts, gh = T.rows * ts;
+    const sc = Math.min(SCV.width / gw, SCV.height / gh) * 1.4;   // slight zoom-in so the center fills
+    const ox = (SCV.width - gw * sc) / 2, oy = (SCV.height - gh * sc) / 2;
+    let pending = 0;
+    for (const t of T.tiles) {
+      if (!t.dataUrl) continue;
+      let im = _map._imgs && _map._imgs[t.rx + "," + t.ry];
+      if (!im) { im = new Image(); im.src = t.dataUrl; _map._imgs = _map._imgs || {}; _map._imgs[t.rx + "," + t.ry] = im; }
+      if (im.complete && im.naturalWidth) { try { ctx.drawImage(im, ox + t.rx * ts * sc, oy + t.ry * ts * sc, ts * sc, ts * sc); } catch {} } else pending++;
+    }
+    _pipMapRecolor();
+    // center marker + label overlay (drawn after recolor so they stay bright)
+    ctx.fillStyle = "#eaffea"; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(SCV.width / 2, SCV.height / 2, 5, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0; ctx.font = "11px monospace"; ctx.fillStyle = "#bfffd9";
+    if (_map.label) ctx.fillText(_map.label.slice(0, 46), 8, 18);
+    if (_map.attr) { ctx.font = "8px monospace"; ctx.textAlign = "right"; ctx.fillText(_map.attr.slice(0, 40), SCV.width - 4, SCV.height - 4); ctx.textAlign = "left"; }
+  }
+  function drawGauges(){ const ctx = sctx, t = performance.now() / 1000; ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, SCV.width, SCV.height); ctx.strokeStyle = "#2bff88"; ctx.fillStyle = "#2bff88"; ctx.font = "20px monospace"; ctx.lineWidth = 2; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 8;
+    const cx = 130, cy = 185, R = 96; ctx.globalAlpha = .45; for (let i = 1; i <= 3; i++){ ctx.beginPath(); ctx.arc(cx, cy, R * i / 3, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.globalAlpha = 1; const a = t * 1.2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+    const hp = 52 + 45 * Math.sin(t * 0.7); ctx.fillText("HP " + Math.round(hp), 285, 70); ctx.strokeRect(285, 82, 200, 28); ctx.fillRect(287, 84, 196 * hp / 100, 24);
+    ctx.fillText(new Date().toLocaleTimeString(), 285, 180); ctx.fillText("PIP-BOY 3000", 285, 220); ctx.shadowBlur = 0; }
+  // 3D fidget: a tiny spinning scene rendered to its own canvas, then onto SCV
+  let fidget = null;
+  function ensureFidget(){ if (fidget) return fidget; const c = document.createElement("canvas"); c.width = 360; c.height = 360; const r = new THREE.WebGLRenderer({ canvas: c, antialias: true }); r.setSize(360, 360, false); if ("outputColorSpace" in r) r.outputColorSpace = THREE.SRGBColorSpace; const sc = new THREE.Scene(); sc.background = new THREE.Color(0x04140b); const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 100); cam.position.set(0, 0, 4.2); sc.add(new THREE.HemisphereLight(0xbfeacb, 0x16301f, 1.1)); const k = new THREE.DirectionalLight(0x9fffc0, 1.5); k.position.set(3, 4, 5); sc.add(k); const mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(0.85, 0.28, 140, 18), new THREE.MeshStandardMaterial({ color: 0x2bff88, metalness: 0.35, roughness: 0.32, emissive: 0x0a3a1e })); sc.add(mesh); fidget = { c, r, sc, cam, mesh }; return fidget; }
+  function drawFidget(){ const f = ensureFidget(); f.mesh.rotation.x += 0.011; f.mesh.rotation.y += 0.015; f.r.render(f.sc, f.cam); sctx.drawImage(f.c, 0, 0, SCV.width, SCV.height); }
+
+  // v1222 — Avatar (live diorama) on the Pip-Boy screen. The engine's avatar
+  // stage (custom WebGL2) renders to its own hidden canvas (kept in-viewport so
+  // it doesn't auto-pause); we blit its latest frame onto SCV each tick, the same
+  // way drawFidget mirrors its three.js canvas. Cheerleader works here too.
+  let avatarSrc = null;
+  async function ensureAvatar(){
+    if (avatarSrc) return avatarSrc;
+    avatarSrc = { canvas: null, handle: null };
+    try {
+      const c = document.createElement("canvas"); c.width = 512; c.height = 320;
+      c.style.cssText = "position:fixed;left:0;bottom:0;width:256px;height:160px;opacity:0;pointer-events:none;z-index:-1;";
+      document.body.appendChild(c);
+      let url = "RobotExpressive";
+      try { const r = await fetch("/avatar/current", { cache: "no-store" }); if (r.ok) { const j = await r.json(); if (j && j.url) url = j.url; } } catch {}
+      const { mountStage } = await import("./face/avatarStage.js");
+      avatarSrc.canvas = c; avatarSrc.handle = mountStage(c, { scene: "focus", url });
+    } catch (e) { console.warn("[pipboy] avatar mount failed", e); }
+    return avatarSrc;
+  }
+  function blitAvatar(){
+    const c = avatarSrc && avatarSrc.canvas; sctx.fillStyle = "#04140b"; sctx.fillRect(0, 0, SCV.width, SCV.height);
+    if (!c) return;
+    try { const sc = Math.min(SCV.width / c.width, SCV.height / c.height), w = c.width * sc, h = c.height * sc; sctx.drawImage(c, (SCV.width - w) / 2, (SCV.height - h) / 2, w, h); } catch (e) {}
+  }
+
+  // live dashboard: clock + best-effort Home Assistant bits (battery, a temp sensor)
+  const dash = { battery: null, temp: null, last: 0 };
+  async function refreshDash(){
+    try { const so = await fetch("/ha/solar", { cache: "no-store" }).then(r => r.json()).catch(() => null); if (so) { const b = (so.battery != null ? so.battery : (so.soc != null ? so.soc : (so.percent != null ? so.percent : (so.state != null ? so.state : null)))); if (b != null && !isNaN(parseFloat(b))) dash.battery = parseFloat(b); } } catch {}
+    try { const st = await fetch("/ha/states?domain=sensor", { cache: "no-store" }).then(r => r.json()).catch(() => null); const list = Array.isArray(st) ? st : ((st && (st.states || st.entities)) || []); const t = (list || []).find(e => e && /temperature/i.test(e.entity_id || "") && e.state != null && !isNaN(parseFloat(e.state))); if (t) dash.temp = parseFloat(t.state); } catch {}
+  }
+  function drawDash(){ const ctx = sctx, now = new Date(); ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, SCV.width, SCV.height); ctx.fillStyle = "#2bff88"; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 8;
+    ctx.textAlign = "center"; ctx.font = "bold 66px monospace"; ctx.fillText(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), SCV.width / 2, 120);
+    ctx.font = "19px monospace"; ctx.fillText(now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }), SCV.width / 2, 158);
+    ctx.textAlign = "left"; ctx.font = "22px monospace"; let y = 226;
+    if (dash.battery != null) { ctx.fillText("BATTERY  " + Math.round(dash.battery) + "%", 44, y); y += 36; }
+    if (dash.temp != null) { ctx.fillText("TEMP  " + dash.temp.toFixed(1) + "\u00b0", 44, y); y += 36; }
+    if (dash.battery == null && dash.temp == null) { ctx.font = "14px monospace"; ctx.fillText("connect Home Assistant for live data", 44, y); }
+    ctx.shadowBlur = 0; ctx.textAlign = "left"; }
+
+  let raf = null;
+  function tick(){
+    const _n = performance.now(); const _dt = _n - pperf.last; pperf.last = _n;
+    if (_dt > 0 && _dt < 1000) { pperf.ms = pperf.ms ? pperf.ms * 0.9 + _dt * 0.1 : _dt; pperf.fps = 1000 / pperf.ms; pperf.ring.push(_dt); if (pperf.ring.length > 90) pperf.ring.shift(); }
+    if (autoCyc && _n - cycAt > CYC_MS) { cycIdx = (cycIdx + 1) % CYCLE.length; cycAt = _n; gotoScene(CYCLE[cycIdx]); }
+    if (mode === "gauges") drawGauges(); else if (mode === "map") drawMap(); else if (mode === "fidget") drawFidget(); else if (mode === "perf") drawPerf(); else if (mode === "presence") { if (performance.now() - pres.last > 8000) { pres.last = performance.now(); refreshPresence(); } drawPresence(); } else if (mode === "avatar") blitAvatar(); else if (mode === "dashboard") { if (performance.now() - dash.last > 5000) { dash.last = performance.now(); refreshDash(); } drawDash(); } else if ((mode === "image" || mode === "ai") && staticImg) fitImg(staticImg); else if (mode === "video" && vid.readyState >= 2) fitVid(); drawButtons(sctx); if (scrTex) scrTex.needsUpdate = true; if (scr2On) { draw2nd(); if (scrTex2) scrTex2.needsUpdate = true; } if (cpOn) { try { cpCtx.drawImage(SCV, 0, 0, cpCanvas.width, cpCanvas.height); } catch (e) {} } raf = requestAnimationFrame(tick); }
+  function startTick(){ if (!raf) tick(); }
+
+  // comic source (comicBridge)
+  async function loadComicList(){ comicSel.innerHTML = "<option value=''>\u2014 pick a comic \u2014</option>"; try { const j = await fetch("/comics/list").then(r => r.json()); (j && j.comics || []).forEach(c => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.name || c.id; comicSel.appendChild(o); }); } catch {} }
+  async function openComic(id){ comic.id = id; comic.idx = 0; try { const j = await fetch("/comics/pages?id=" + encodeURIComponent(id)).then(r => r.json()); comic.pages = (j && j.count) || 0; } catch { comic.pages = 0; } showPage(0); }
+  function showPage(i){ if (!comic.id || !comic.pages) return; comic.idx = Math.max(0, Math.min(comic.pages - 1, i)); comic.img.src = "/comics/page?id=" + encodeURIComponent(comic.id) + "&i=" + comic.idx; }
+  function setAuto(on){ if (comic.auto) { clearInterval(comic.auto); comic.auto = null; } if (on) comic.auto = setInterval(() => showPage((comic.idx + 1) % Math.max(1, comic.pages)), 3500); autoB.textContent = comic.auto ? "Stop" : "Auto-flip"; }
+  prevB.onclick = () => { if (mode === "slideshow") showSlide(slides.idx - 1); else showPage(comic.idx - 1); };
+  nextB.onclick = () => { if (mode === "slideshow") showSlide(slides.idx + 1); else showPage(comic.idx + 1); };
+  autoB.onclick = () => { if (mode === "slideshow") slideAuto(!slides.auto); else setAuto(!comic.auto); };
+  comicSel.onchange = () => { if (comicSel.value) openComic(comicSel.value); };
+
+  // slideshow: real photos from a GPU_Assets subfolder (default "screen")
+  const slides = { files: [], idx: 0, sub: "screen", img: new Image(), auto: null }; slides.img.crossOrigin = "anonymous"; slides.img.onload = () => fitImg(slides.img);
+  async function loadSlides(sub){ slides.sub = sub || "screen"; slides.idx = 0; try { const j = await fetch("/assets/sub-img?sub=" + encodeURIComponent(slides.sub), { cache: "no-store" }).then(r => r.json()); slides.files = (j && j.files) || []; } catch { slides.files = []; } showSlide(0); }
+  function showSlide(i){ if (!slides.files.length) { sctx.fillStyle = "#04140b"; sctx.fillRect(0, 0, SCV.width, SCV.height); sctx.fillStyle = "#2bff88"; sctx.font = "15px monospace"; sctx.fillText("Drop photos in GPU_Assets/" + slides.sub + "/", 24, 160); return; } slides.idx = (i + slides.files.length) % slides.files.length; slides.img.src = "/GPU_Assets/" + encodeURIComponent(slides.sub) + "/" + encodeURIComponent(slides.files[slides.idx]); }
+  function slideAuto(on){ if (slides.auto) { clearInterval(slides.auto); slides.auto = null; } if (on) slides.auto = setInterval(() => showSlide(slides.idx + 1), 4000); autoB.textContent = slides.auto ? "Stop" : "Auto-flip"; }
+  folderIn.onchange = () => loadSlides(folderIn.value);
+
+  // AI image: prompt -> engine image generator (/ai/image) -> screen
+  genBtn.onclick = async () => { const p = promptIn.value.trim(); if (!p) return; genBtn.textContent = "Generating\u2026"; genBtn.disabled = true; sctx.fillStyle = "#04140b"; sctx.fillRect(0, 0, SCV.width, SCV.height); sctx.fillStyle = "#2bff88"; sctx.font = "16px monospace"; sctx.fillText("generating\u2026", 24, 160);
+    try { const r = await fetch("/ai/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: p }) }).then(x => x.json()); if (r && r.ok && r.image) { staticImg = new Image(); staticImg.onload = () => fitImg(staticImg); staticImg.src = "data:" + (r.mime || "image/png") + ";base64," + r.image; } else { sctx.fillStyle = "#f88"; sctx.fillText("\u2717 " + ((r && r.error) || "generate failed"), 24, 190); } }
+    catch (e) { sctx.fillStyle = "#f88"; sctx.fillText("\u2717 " + e.message, 24, 190); }
+    genBtn.textContent = "Generate"; genBtn.disabled = false; };
+
+  // video: a hidden <video> whose frames are drawn onto the master canvas each
+  // tick (same pattern as the in-world screen-wall showVideo). Plays a file from
+  // GPU_Assets/video/ or any mp4/webm URL; loops, muted (autoplay-safe).
+  const vid = document.createElement("video"); vid.crossOrigin = "anonymous"; vid.loop = true; vid.muted = true; vid.playsInline = true;
+  function fitVid(){ const w = vid.videoWidth, h = vid.videoHeight; sctx.fillStyle = "#000"; sctx.fillRect(0, 0, SCV.width, SCV.height); if (!w || !h) return; const sc = Math.min(SCV.width / w, SCV.height / h); const dw = w * sc, dh = h * sc; sctx.drawImage(vid, (SCV.width - dw) / 2, (SCV.height - dh) / 2, dw, dh); }
+  async function loadVids(){ vidSel.innerHTML = "<option value=''>\u2014 pick a video \u2014</option>"; try { const j = await fetch("/assets/sub-vid?sub=video", { cache: "no-store" }).then(r => r.json()); (j && j.files || []).forEach(f => { const o = document.createElement("option"); o.value = f; o.textContent = f; vidSel.appendChild(o); }); } catch {} }
+  function playVid(src){ if (!src) return; if (hls) { try { hls.destroy(); } catch {} hls = null; }
+    if (/\.m3u8(\?|$)/i.test(src)) {
+      if (vid.canPlayType("application/vnd.apple.mpegurl")) { vid.src = src; vid.play().catch(() => {}); }
+      else { ensureHls().then(H => { if (H) { hls = new H(); hls.loadSource(src); hls.attachMedia(vid); vid.play().catch(() => {}); } else { sctx.fillStyle = "#f88"; sctx.font = "14px monospace"; sctx.fillText("HLS needs hls.js (offline?) \u2014 try mp4 or go2rtc /api/stream.mp4", 16, 160); } }); }
+    } else { vid.src = src; vid.play().catch(() => {}); } }
+  let hls = null;
+  function loadScript(src){ return new Promise(res => { const s = document.createElement("script"); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); }); }
+  async function ensureHls(){ if (window.Hls) return (window.Hls.isSupported && window.Hls.isSupported()) ? window.Hls : null;
+    if (await loadScript("/vendor/hls/hls.min.js")) return (window.Hls && window.Hls.isSupported()) ? window.Hls : null;
+    if (await loadScript("https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js")) { try { fetch("/vendor/hls/install", { method: "POST" }); } catch {} return (window.Hls && window.Hls.isSupported()) ? window.Hls : null; }
+    return null; }
+  vidSel.onchange = () => { if (vidSel.value) playVid("/GPU_Assets/video/" + encodeURIComponent(vidSel.value)); };
+  vidUrl.onchange = () => { const u = vidUrl.value.trim(); if (u) playVid(u); };
+
+  // camera (live): go2rtc streams via the same-origin MJPEG proxy -> master canvas
+  const camImg = new Image(); let camLoop = null, camOn = false;
+  function fitCam(){ const w = camImg.naturalWidth, h = camImg.naturalHeight; if (!w || !h) return; sctx.fillStyle = "#000"; sctx.fillRect(0, 0, SCV.width, SCV.height); const sc = Math.min(SCV.width / w, SCV.height / h); const dw = w * sc, dh = h * sc; sctx.drawImage(camImg, (SCV.width - dw) / 2, (SCV.height - dh) / 2, dw, dh); }
+  async function loadCams(){ camSel.innerHTML = "<option value=''>\u2014 pick a camera \u2014</option>"; try { const j = await fetch("/camera/streams?base=" + encodeURIComponent(camBase.value.trim())).then(r => r.json()); if (j && j.ok) (j.cameras || []).forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; camSel.appendChild(o); }); } catch {} }
+  // Transport choice: MJPEG goes through the same-origin /camera/mjpeg proxy (max
+  // compatibility). MP4 (fragmented/MSE) and HLS load straight from go2rtc into the
+  // shared <video> for lower latency — go2rtc sends CORS and vid.crossOrigin is
+  // "anonymous", so drawing to the canvas stays untainted.
+  let camVidOn = false;
+  function startCam(name){ stopCam(); if (!name) return;
+    const base = camBase.value.trim().replace(/\/+$/, "");
+    const tr = (camTransport && camTransport.value) || "mjpeg";
+    camOn = true;
+    if (tr === "mjpeg") {
+      const u = base + "/api/stream.mjpeg?src=" + encodeURIComponent(name);
+      camImg.src = "/camera/mjpeg?url=" + encodeURIComponent(u) + "&type=mjpeg&t=" + Date.now();
+      const t = () => { if (!camOn) return; try { if (camImg.naturalWidth) fitCam(); } catch {} camLoop = setTimeout(t, 80); }; t();
+    } else {
+      const src = (tr === "hls")
+        ? (base + "/api/stream.m3u8?src=" + encodeURIComponent(name))
+        : (base + "/api/stream.mp4?src=" + encodeURIComponent(name));
+      camVidOn = true; vid.loop = false; playVid(src);
+      const t = () => { if (!camOn) return; try { if (vid.videoWidth) fitVid(); } catch {} camLoop = setTimeout(t, 40); }; t();
+    }
+  }
+  function stopCam(){ camOn = false; if (camLoop) { clearTimeout(camLoop); camLoop = null; } camImg.src = "";
+    if (camVidOn) { try { vid.pause(); } catch {} if (hls) { try { hls.destroy(); } catch {} hls = null; } vid.loop = true; camVidOn = false; } }
+  camBase.onchange = loadCams; camSel.onchange = () => startCam(camSel.value);
+  if (camTransport) camTransport.onchange = () => { if (mode === "camera" && camSel.value) startCam(camSel.value); save(); };
+
+  function applyMode(){ mode = content.value;
+    comicSel.style.display = mode === "comic" ? "block" : "none";
+    folderIn.style.display = mode === "slideshow" ? "block" : "none";
+    comicNav.style.display = (mode === "comic" || mode === "slideshow") ? "flex" : "none";
+    promptIn.style.display = mode === "ai" ? "block" : "none";
+    if (mapLocIn) mapLocIn.style.display = mode === "map" ? "block" : "none";
+    aiRow.style.display = mode === "ai" ? "flex" : "none";
+    urlIn.style.display = mode === "image" ? "block" : "none";
+    if (avatarRow) avatarRow.style.display = mode === "avatar" ? "flex" : "none";
+    if (mode === "avatar") { ensureAvatar(); startTick(); }
+    vidSel.style.display = mode === "video" ? "block" : "none";
+    vidUrl.style.display = mode === "video" ? "block" : "none";
+    camBase.style.display = mode === "camera" ? "block" : "none";
+    camSel.style.display = mode === "camera" ? "block" : "none";
+    if (camTransport) camTransport.style.display = mode === "camera" ? "block" : "none";
+    if (camMapEl) camMapEl.style.display = mode === "camera" ? "block" : "none";
+    if (camDescBtn) camDescBtn.style.display = mode === "camera" ? "block" : "none";
+    if (camDescOut && mode !== "camera") camDescOut.style.display = "none";
+    autoB.textContent = (mode === "slideshow" ? slides.auto : comic.auto) ? "Stop" : "Auto-flip";
+    if (mode === "comic" && comicSel.options.length <= 1) loadComicList();
+    if (mode === "slideshow") loadSlides(folderIn.value || "screen");
+    if (mode === "video") { if (vidSel.options.length <= 1) loadVids(); vid.play().catch(() => {}); } else { try { vid.pause(); } catch {} }
+    if (mode === "camera") { if (camSel.options.length <= 1) loadCams(); if (camSel.value) startCam(camSel.value); } else stopCam();
+    render2D(); save(); }
+  content.onchange = applyMode;
+  if (cheerBtn) cheerBtn.onclick = async () => { const a = await ensureAvatar(); let on = false; try { on = !!(a.handle && a.handle.cheerleader && a.handle.cheerleader.toggle() && a.handle.cheerleader.isOn()); } catch (e) {} cheerBtn.textContent = on ? "\uD83D\uDED1 Stop cheer" : "\uD83D\uDCE3 Cheer"; };
+  urlIn.onchange = () => { const u = urlIn.value.trim(); if (u && /\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/i.test(u)) { staticImg = new Image(); staticImg.crossOrigin = "anonymous"; staticImg.onload = () => fitImg(staticImg); staticImg.src = u; } else { staticImg = null; render2D(); } save(); };
+
+  // 2D overlay
+  let drag = null;
+  head.addEventListener("mousedown", (e) => { if (e.target.id === "ovClose") return; const r = ov.getBoundingClientRect(); ov.style.transform = "none"; ov.style.left = r.left + "px"; ov.style.top = r.top + "px"; drag = { x: e.clientX, y: e.clientY, l: r.left, t: r.top }; e.preventDefault(); });
+  addEventListener("mousemove", (e) => { if (!drag) return; ov.style.left = (drag.l + e.clientX - drag.x) + "px"; ov.style.top = (drag.t + e.clientY - drag.y) + "px"; });
+  addEventListener("mouseup", () => { if (drag) { drag = null; save(); } });
+  try { new ResizeObserver(save).observe(ov); } catch {}
+  document.getElementById("ovClose").onclick = () => { ov.style.display = "none"; toggle.textContent = "2D overlay"; };
+  function render2D(){ if (ov.style.display !== "block") return; body.innerHTML = ""; const u = urlIn.value.trim(); if (mode === "image" && u && !staticImg) { const ifr = document.createElement("iframe"); ifr.src = u; body.appendChild(ifr); } else { body.appendChild(SCV); } }
+  toggle.onclick = () => { const on = ov.style.display !== "block"; ov.style.display = on ? "block" : "none"; toggle.textContent = on ? "Hide 2D" : "2D overlay"; if (on) { render2D(); startTick(); } };
+  opa.oninput = () => { ov.style.opacity = (opa.value / 100); save(); }; ov.style.opacity = (opa.value / 100);
+
+  // 3D screen mesh
+  function refreshMeshPicker(){ const cur = meshSel.value; meshSel.innerHTML = "<option value=''>\u2014 pick the screen mesh \u2014</option>"; const seen = new Set(); if (pivot) pivot.traverse(o => { if (o.isMesh && o.material) { const n = o.name || ("mesh_" + seen.size); if (!seen.has(n)) { seen.add(n); const op = document.createElement("option"); op.value = n; op.textContent = n; meshSel.appendChild(op); } } }); if (cur) meshSel.value = cur; }
+  function unbindScreen(){ try { if (scrMesh && scrOrig) { const m = Array.isArray(scrMesh.material) ? scrMesh.material[0] : scrMesh.material; m.map = scrOrig.map; if ("emissiveMap" in m) m.emissiveMap = scrOrig.emissiveMap; if (m.emissive && scrOrig.emissive) m.emissive.copy(scrOrig.emissive); m.needsUpdate = true; } } catch {} scrMesh = null; scrOrig = null; }
+  function bindScreen(name){ if (!pivot) return; unbindScreen(); let found = null; pivot.traverse(o => { if (!found && o.isMesh && o.name === name) found = o; }); if (!found) return; scrMesh = found; const m = Array.isArray(found.material) ? found.material[0] : found.material; scrOrig = { map: m.map, emissiveMap: ("emissiveMap" in m) ? m.emissiveMap : undefined, emissive: m.emissive && m.emissive.clone() };
+    if (!scrTex) { scrTex = new THREE.CanvasTexture(SCV); if ("colorSpace" in scrTex) scrTex.colorSpace = THREE.SRGBColorSpace; }
+    m.map = scrTex; if ("emissiveMap" in m) { m.emissiveMap = scrTex; if (m.emissive) m.emissive.setRGB(1, 1, 1); } m.needsUpdate = true; applyScreenFlip(); btn3d.textContent = "3D screen \u2713"; startTick(); }
+  meshSel.onchange = () => { if (meshSel.value) bindScreen(meshSel.value); else { unbindScreen(); btn3d.textContent = "On 3D screen"; } try { localStorage.setItem("voxelengine.pipboyMesh", meshSel.value || ""); } catch {} };
+  btn3d.onclick = () => { const show = meshSel.style.display === "none"; meshSel.style.display = show ? "block" : "none"; if (show) { refreshMeshPicker(); const saved = localStorage.getItem("voxelengine.pipboyMesh"); if (saved && !meshSel.value) { meshSel.value = saved; if (meshSel.value) bindScreen(saved); } } };
+
+  // ---- v1280: independent 2nd screen — its own canvas+texture on a 2nd mesh ----
+  const meshSel2 = document.getElementById("ovMesh2"), btn3d2 = document.getElementById("ov3d2");
+  const SCV2 = document.createElement("canvas"); SCV2.width = 256; SCV2.height = 160; const sctx2 = SCV2.getContext("2d");
+  let scrTex2 = null, scr2Mesh = null, scr2Orig = null, scr2On = false;
+  function draw2nd(){ const ctx = sctx2, t = performance.now()/1000, W = SCV2.width, H = SCV2.height;
+    ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "#2bff88"; ctx.fillStyle = "#2bff88"; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 6; ctx.lineWidth = 2;
+    ctx.textAlign = "center"; ctx.font = "bold 30px monospace"; ctx.fillText(new Date().toLocaleTimeString(), W/2, 52);
+    ctx.font = "13px monospace"; ctx.fillText("PIP-BOY \u00b7 AUX", W/2, 78);
+    const v = 0.5 + 0.5*Math.sin(t*0.9); ctx.strokeRect(28, 100, W-56, 16); ctx.fillRect(30, 102, (W-60)*v, 12);
+    const cx = W/2, cy = 140, R = 12; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(t*1.5)*R, cy + Math.sin(t*1.5)*R); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.textAlign = "left"; }
+  function refreshMeshPicker2(){ const cur = meshSel2.value; meshSel2.innerHTML = "<option value=''>\u2014 pick the 2nd-screen mesh \u2014</option>"; const seen = new Set(); if (pivot) pivot.traverse(o => { if (o.isMesh && o.material) { const n = o.name || ("mesh_" + seen.size); if (!seen.has(n)) { seen.add(n); const op = document.createElement("option"); op.value = n; op.textContent = n; meshSel2.appendChild(op); } } }); if (cur) meshSel2.value = cur; }
+  function unbindScreen2(){ try { if (scr2Mesh && scr2Orig) { const m = Array.isArray(scr2Mesh.material) ? scr2Mesh.material[0] : scr2Mesh.material; m.map = scr2Orig.map; if ("emissiveMap" in m) m.emissiveMap = scr2Orig.emissiveMap; if (m.emissive && scr2Orig.emissive) m.emissive.copy(scr2Orig.emissive); m.needsUpdate = true; } } catch {} scr2Mesh = null; scr2Orig = null; }
+  function bindScreen2(name){ if (!pivot) return; unbindScreen2(); let found = null; pivot.traverse(o => { if (!found && o.isMesh && o.name === name) found = o; }); if (!found) return; scr2Mesh = found; const m = Array.isArray(found.material) ? found.material[0] : found.material; scr2Orig = { map: m.map, emissiveMap: ("emissiveMap" in m) ? m.emissiveMap : undefined, emissive: m.emissive && m.emissive.clone() };
+    if (!scrTex2) { scrTex2 = new THREE.CanvasTexture(SCV2); if ("colorSpace" in scrTex2) scrTex2.colorSpace = THREE.SRGBColorSpace; }
+    m.map = scrTex2; if ("emissiveMap" in m) { m.emissiveMap = scrTex2; if (m.emissive) m.emissive.setRGB(1, 1, 1); } m.needsUpdate = true; applyScreenFlip(); scr2On = true; btn3d2.textContent = "2nd screen \u2713"; startTick(); }
+  meshSel2.onchange = () => { if (meshSel2.value) bindScreen2(meshSel2.value); else { unbindScreen2(); scr2On = false; btn3d2.textContent = "2nd screen"; } try { localStorage.setItem("voxelengine.pipboyMesh2", meshSel2.value || ""); } catch {} };
+  function guess2ndMesh(){ if (!pivot) return null; const rx = /screen|display|monitor|crt|lcd|glass|terminal|readout|emis|small|mini|sub|aux/i; const main = meshSel.value || ""; let best = null, bs = -1; pivot.traverse(o => { if (!o.isMesh || !o.material) return; if ((o.name || "") === main) return; const mats = Array.isArray(o.material) ? o.material : [o.material]; let s = 0; if (rx.test(o.name || "")) s += 3; for (const m of mats) { if (!m) continue; if (rx.test(m.name || "")) s += 2; if (m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b)) s += 1; if (m.emissiveMap) s += 1; } if (s > bs) { bs = s; best = o.name || null; } }); return bs >= 2 ? best : null; }
+  btn3d2.onclick = () => { const show = meshSel2.style.display === "none"; meshSel2.style.display = show ? "block" : "none"; if (show) { refreshMeshPicker2(); const saved = localStorage.getItem("voxelengine.pipboyMesh2"); if (saved) { meshSel2.value = saved; if (meshSel2.value) bindScreen2(saved); } else { const g = guess2ndMesh(); if (g) { meshSel2.value = g; bindScreen2(g); setStatus("2nd screen \u2192 " + g + " (pick another below if wrong)", false); setTimeout(() => setStatus("", false), 3000); } else setStatus("No obvious 2nd screen mesh — pick one below.", false); } } };
+
+  // ---- v1490: flip the rendered screen 180° (fixes models whose screen UVs are upside-down).
+  // Rotating the CanvasTexture about its center inverts the overlay without touching the model.
+  function applyScreenFlip(){ const ang = _screenFlip ? Math.PI : 0; for (const tx of [scrTex, scrTex2]) { if (!tx) continue; if (tx.center && tx.center.set) tx.center.set(0.5, 0.5); tx.rotation = ang; tx.needsUpdate = true; } }
+  const ovFlip = document.getElementById("ovFlip");
+  if (ovFlip) { ovFlip.textContent = _screenFlip ? "\u2645 Flipped \u2713" : "\u2645 Flip 180\u00b0"; ovFlip.onclick = () => { _screenFlip = !_screenFlip; try { localStorage.setItem("voxelengine.pipboyFlip", _screenFlip ? "1" : "0"); } catch {} applyScreenFlip(); ovFlip.textContent = _screenFlip ? "\u2645 Flipped \u2713" : "\u2645 Flip 180\u00b0"; }; }
+
+  // ---- v1280: tappable in-screen buttons — raycast the screen mesh, UV → canvas px ----
+  let btnsOn = false, pressed = -1, pressedAt = 0;
+  // v1296 — living screen: auto-rotate scenes + a self-contained perf readout.
+  let autoCyc = false, cycAt = 0, cycIdx = 0, sideAt = -9999;
+  const CYCLE = ["gauges", "fidget", "dashboard", "perf", "presence", "avatar"], CYC_MS = 9000;
+  const pperf = { last: performance.now(), ring: [], fps: 0, ms: 0 };
+  function gotoScene(m){ setMode(m); const i = _btnIdxForMode(m); if (i >= 0) { pressed = i; pressedAt = performance.now(); } sideAt = performance.now(); }
+  // v1303 — "who's home" scene: reads /ha/presence and lists people home/away + occupied rooms.
+  const pres = { data: null, last: 0, err: null };
+  function refreshPresence(){ fetch("/ha/presence", { cache: "no-store" }).then(r => r.json()).then(j => { pres.data = j; pres.err = null; }).catch(e => { pres.err = String(e && e.message || e); }); }
+  function drawPresence(){ const ctx = sctx, W = SCV.width;
+    ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, W, SCV.height);
+    ctx.fillStyle = "#2bff88"; ctx.strokeStyle = "#2bff88"; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 6; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.font = "bold 17px monospace"; ctx.fillText("WHO'S HOME", 22, 34);
+    const j = pres.data;
+    if (!j) { ctx.font = "14px monospace"; ctx.fillText(pres.err ? ("\u2717 " + pres.err) : "reading\u2026", 22, 72); return; }
+    if (j.ok === false) { ctx.font = "14px monospace"; ctx.fillText("\u2717 " + (j.error || "HA error"), 22, 72); return; }
+    const people = j.people || [];
+    if (!people.length) { ctx.shadowBlur = 0; ctx.fillStyle = "#5c7a68"; ctx.font = "14px monospace"; ctx.fillText("no person entities in Home Assistant", 22, 72); }
+    else {
+        ctx.font = "16px monospace"; let y = 66;
+        people.slice(0, 6).forEach(p => { const home = !!p.home; ctx.shadowBlur = home ? 8 : 0; ctx.fillStyle = home ? "#2bff88" : "#5c7a68";
+            ctx.fillText((home ? "\u25CF " : "\u25CB ") + p.name + "   " + (home ? "home" : (p.zone ? p.zone : "away")), 26, y); y += 27; });
+    }
+    const rooms = j.rooms || [], occ = rooms.filter(r => r.occupied);
+    ctx.shadowBlur = 0; ctx.fillStyle = "#1c7a4c"; ctx.fillRect(0, 218, W, 2);
+    ctx.fillStyle = "#9ad6b4"; ctx.font = "13px monospace";
+    ctx.fillText(rooms.length ? (occ.length + " / " + rooms.length + " rooms occupied" + (occ.length ? (": " + occ.slice(0, 3).map(r => r.name).join(", ")) : "")) : "no room sensors", 22, 240);
+  }
+  function drawPerf(){ const ctx = sctx, W = SCV.width, H = SCV.height;
+    ctx.fillStyle = "#04140b"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#2bff88"; ctx.strokeStyle = "#2bff88"; ctx.shadowColor = "#2bff88"; ctx.shadowBlur = 6;
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.font = "bold 17px monospace"; ctx.fillText("PERF \u00b7 pip-boy render", 22, 36);
+    ctx.font = "bold 52px monospace"; ctx.fillText(pperf.fps.toFixed(0) + " fps", 22, 96);
+    ctx.font = "16px monospace"; ctx.fillText(pperf.ms.toFixed(1) + " ms/frame", 22, 124);
+    const ring = pperf.ring; if (ring.length) { const p95 = [...ring].sort((a, b) => a - b)[Math.floor(ring.length * 0.95)] || 0; ctx.fillText("p95  " + p95.toFixed(1) + " ms", 200, 124); }
+    try { const mem = performance.memory; if (mem && mem.usedJSHeapSize) ctx.fillText("heap  " + Math.round(mem.usedJSHeapSize / 1048576) + " MB", 22, 150); } catch (e) {}
+    // rolling frame-time bar graph
+    const gx = 22, gy = 168, gw = W - 44, gh = 70; ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#0d3a24"; ctx.strokeRect(gx, gy, gw, gh);
+    ctx.strokeStyle = "#0d3a24"; ctx.beginPath(); const y16 = gy + gh - (16.7 / 50) * gh; ctx.moveTo(gx, y16); ctx.lineTo(gx + gw, y16); ctx.stroke();
+    const n = ring.length, bw = gw / Math.max(1, n); ctx.fillStyle = "#2bff88";
+    for (let i = 0; i < n; i++){ const v = Math.min(50, ring[i]), bh = (v / 50) * gh; ctx.globalAlpha = ring[i] > 33 ? 1 : 0.7; ctx.fillStyle = ring[i] > 33 ? "#ffcf6b" : "#2bff88"; ctx.fillRect(gx + i * bw, gy + gh - bh, Math.max(1, bw - 1), bh); }
+    ctx.globalAlpha = 1; }
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const screenButtons = [   // rects in MASTER-canvas (SCV 512x320) pixels; tap to switch the screen's content
+    { x: 6,   y: 252, w: 80, h: 52, label: "GAUGES", mode: "gauges",    act: () => setMode("gauges") },
+    { x: 90,  y: 252, w: 80, h: 52, label: "FIDGET", mode: "fidget",    act: () => setMode("fidget") },
+    { x: 174, y: 252, w: 80, h: 52, label: "STATS",  mode: "dashboard", act: () => setMode("dashboard") },
+    { x: 258, y: 252, w: 80, h: 52, label: "PERF",   mode: "perf",      act: () => setMode("perf") },
+    { x: 342, y: 252, w: 80, h: 52, label: "HOME",   mode: "presence",  act: () => setMode("presence") },
+    { x: 426, y: 252, w: 80, h: 52, label: "AVATAR", mode: "avatar",    act: () => setMode("avatar") },
+  ];
+  const _btnIdxForMode = (m) => { for (let i = 0; i < screenButtons.length; i++) if (screenButtons[i].mode === m) return i; return -1; };
+  function setMode(m){ content.value = m; try { applyMode(); } catch {} }
+  function drawButtons(ctx){ if (!btnsOn) return; const now = performance.now();
+    for (let i = 0; i < screenButtons.length; i++){ const b = screenButtons[i], active = (mode === b.mode), hot = (i === pressed && now - pressedAt < 320);
+      ctx.globalAlpha = 0.9; ctx.fillStyle = hot ? "#0e6a38" : (active ? "#093d27" : "#06281a"); ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = hot ? "#9dffc6" : (active ? "#5fffa6" : "#2bff88"); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = hot ? "#caffe0" : "#2bff88"; ctx.font = "bold 13px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(b.label, b.x + b.w/2, b.y + b.h/2); }
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.globalAlpha = 1;
+    drawSideStrip(ctx, now); }
+  // v1296 — cosmetic vertical strip of tiny "buttons" down the right edge. On a scene
+  // change (sideAt set by gotoScene) the cells light up in sequence, as if the menu is
+  // being driven. Glyphs are abstract — they only need to LOOK like options being pressed.
+  function drawSideStrip(ctx, now){ const X = 494, W = 12, N = 9, top = 10, gap = 3;
+    const cellH = (236 - (N - 1) * gap) / N, since = now - sideAt, lit = since < 1100 ? Math.floor(since / 95) : -1;
+    for (let i = 0; i < N; i++){ const y = top + i * (cellH + gap), on = (i === lit) || (lit >= 0 && i < lit && (lit - i) <= 2);
+      ctx.globalAlpha = on ? 1 : 0.5; ctx.fillStyle = on ? "#0e6a38" : "#06281a"; ctx.fillRect(X, y, W, cellH);
+      ctx.strokeStyle = on ? "#9dffc6" : "#1c7a4c"; ctx.lineWidth = 1; ctx.strokeRect(X, y, W, cellH);
+      // a tiny abstract glyph (a couple of dashes) so it reads as a labelled mini-button
+      ctx.strokeStyle = on ? "#caffe0" : "#2bff88"; ctx.beginPath();
+      ctx.moveTo(X + 3, y + cellH * 0.4); ctx.lineTo(X + W - 3, y + cellH * 0.4);
+      if (((i + (sideAt | 0)) & 1) === 0) { ctx.moveTo(X + 3, y + cellH * 0.66); ctx.lineTo(X + W - 5, y + cellH * 0.66); }
+      ctx.stroke(); }
+    ctx.globalAlpha = 1; }
+  function onScreenTap(e){ if (!btnsOn || !scrMesh) return; if (_tapMoved) return;   // it was a camera drag, not a tap
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1; ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    ray.setFromCamera(ndc, camera); const hits = ray.intersectObject(scrMesh, false);
+    if (!hits.length || !hits[0].uv) return; const uv = hits[0].uv, px = uv.x * SCV.width, py = (1 - uv.y) * SCV.height;   // CanvasTexture flipY=true → invert V
+    for (let i = 0; i < screenButtons.length; i++){ const b = screenButtons[i]; if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h){ pressed = i; pressedAt = performance.now(); try { b.act(); } catch {} break; } } }
+  renderer.domElement.addEventListener("click", onScreenTap);
+  let _tapDown = null, _tapMoved = false;
+  renderer.domElement.addEventListener("pointerdown", (e) => { _tapDown = { x: e.clientX, y: e.clientY }; _tapMoved = false; });
+  renderer.domElement.addEventListener("pointermove", (e) => { if (_tapDown && Math.hypot(e.clientX - _tapDown.x, e.clientY - _tapDown.y) > 6) _tapMoved = true; });
+  document.getElementById("ovBtns").onclick = function(){ btnsOn = !btnsOn; this.style.background = btnsOn ? "#0c5a30" : ""; this.textContent = btnsOn ? "\u25A3 Buttons on" : "\u25A3 Screen buttons"; try { localStorage.setItem("voxelengine.pipboyBtns", btnsOn ? "1" : "0"); } catch {} startTick(); };
+  // v1296 — auto-rotate scenes toggle. Turning it on also flips the screen buttons on
+  // so you can see the menu being "pressed" as the scenes cycle.
+  document.getElementById("ovAutoCyc").onclick = function(){ autoCyc = !autoCyc; this.style.background = autoCyc ? "#0c5a30" : ""; this.textContent = autoCyc ? "\u23F8 Rotating" : "\u21BB Auto-rotate";
+    try { localStorage.setItem("voxelengine.pipboyAutoCyc", autoCyc ? "1" : "0"); } catch {}
+    if (autoCyc) { if (!btnsOn) { btnsOn = true; const bb = document.getElementById("ovBtns"); if (bb) { bb.style.background = "#0c5a30"; bb.textContent = "\u25A3 Buttons on"; } try { localStorage.setItem("voxelengine.pipboyBtns", "1"); } catch {} }
+      cycIdx = Math.max(0, CYCLE.indexOf(mode)); cycAt = performance.now(); sideAt = performance.now(); }
+    startTick(); };
+
+  // v1217 — auto-detect the screen surface so the editable-screen model "just works"
+  // on first load (no manual mesh-picking). Scores meshes by name/material name
+  // (screen/display/crt/lcd/glass/terminal), emissive hints, and a thin-quad shape.
+  function guessScreenMesh(){
+    if (!pivot) return null;
+    const rx = /screen|display|monitor|crt|lcd|glass|terminal|readout|emis/i;
+    let best = null, bestScore = -1;
+    pivot.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      let score = 0;
+      if (rx.test(o.name || "")) score += 3;
+      for (const m of mats) {
+        if (!m) continue;
+        if (rx.test(m.name || "")) score += 3;
+        if (m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b)) score += 1;
+        if (m.emissiveMap) score += 1;
+      }
+      try { const g = o.geometry; if (g) { g.computeBoundingBox && g.computeBoundingBox(); const bb = g.boundingBox; if (bb) { const d = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z].sort((a, b) => a - b); if (d[2] > 0 && d[0] < d[2] * 0.12) score += 1; } } } catch (e) {}
+      if (score > bestScore) { bestScore = score; best = o.name || null; }
+    });
+    return bestScore >= 3 ? best : null;   // only auto-pick on a real name/material signal
+  }
+
+  _afterLoad = () => { setTimeout(() => {
+    refreshMeshPicker(); refreshMeshPicker2();
+    // v1280 — restore in-screen buttons toggle + the 2nd screen binding (before the
+    // main-mesh early-return below, so they survive a saved main mesh).
+    try { if (localStorage.getItem("voxelengine.pipboyBtns") === "1") { btnsOn = true; const bb = document.getElementById("ovBtns"); if (bb) { bb.style.background = "#0c5a30"; bb.textContent = "\u25A3 Buttons on"; } } } catch (e) {}
+    try { if (localStorage.getItem("voxelengine.pipboyAutoCyc") === "1") { autoCyc = true; const ac = document.getElementById("ovAutoCyc"); if (ac) { ac.style.background = "#0c5a30"; ac.textContent = "\u23F8 Rotating"; } btnsOn = true; const bb2 = document.getElementById("ovBtns"); if (bb2) { bb2.style.background = "#0c5a30"; bb2.textContent = "\u25A3 Buttons on"; } cycIdx = Math.max(0, CYCLE.indexOf(mode)); cycAt = performance.now(); startTick(); } } catch (e) {}
+    try { const s2 = localStorage.getItem("voxelengine.pipboyMesh2"); if (s2) { meshSel2.style.display = "block"; meshSel2.value = s2; if (meshSel2.value) bindScreen2(s2); } } catch (e) {}
+    const saved = localStorage.getItem("voxelengine.pipboyMesh");
+    if (saved) { meshSel.style.display = "block"; meshSel.value = saved; if (meshSel.value) bindScreen(saved); return; }
+    // first load, nothing saved: try to find the screen automatically
+    const guess = guessScreenMesh();
+    if (guess) { meshSel.style.display = "block"; meshSel.value = guess; bindScreen(guess); try { localStorage.setItem("voxelengine.pipboyMesh", guess); } catch (e) {} setStatus("Screen auto-detected: " + guess + " \u2014 pick a different mesh below if it\u2019s wrong", false); setTimeout(() => setStatus("", false), 3000); }
+  }, 80); };
+
+  // ---- 4-corner pin: homography-warp the master canvas onto the screen quad ----
+  const cornerPin = document.getElementById("cornerPin"); const cpToggle = document.getElementById("cpToggle"), cpEdit = document.getElementById("cpEdit");
+  const cpHandles = [0, 1, 2, 3].map(i => document.getElementById("cpH" + i)); let cpEditing = false;
+  function defaultCorners(){ const w = innerWidth, cx = w / 2, cy = innerHeight * 0.46, bw = Math.min(200, w * 0.16), bh = bw * 0.62; return [[cx - bw, cy - bh], [cx + bw, cy - bh], [cx - bw, cy + bh], [cx + bw, cy + bh]]; } // TL,TR,BL,BR
+  let cpCorners = (st.corners && st.corners.length === 4) ? st.corners.map(c => c.slice()) : defaultCorners();
+  // general 2D projection -> CSS matrix3d (maps source rect corners to dest quad)
+  function adj(m){ return [m[4]*m[8]-m[5]*m[7], m[2]*m[7]-m[1]*m[8], m[1]*m[5]-m[2]*m[4], m[5]*m[6]-m[3]*m[8], m[0]*m[8]-m[2]*m[6], m[2]*m[3]-m[0]*m[5], m[3]*m[7]-m[4]*m[6], m[1]*m[6]-m[0]*m[7], m[0]*m[4]-m[1]*m[3]]; }
+  function mm(a, b){ const c = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++){ let s = 0; for (let k = 0; k < 3; k++) s += a[3*i+k]*b[3*k+j]; c[3*i+j] = s; } return c; }
+  function mv(m, v){ return [m[0]*v[0]+m[1]*v[1]+m[2]*v[2], m[3]*v[0]+m[4]*v[1]+m[5]*v[2], m[6]*v[0]+m[7]*v[1]+m[8]*v[2]]; }
+  function basis(x1,y1,x2,y2,x3,y3,x4,y4){ const m = [x1,x2,x3, y1,y2,y3, 1,1,1]; const v = mv(adj(m), [x4,y4,1]); return mm(m, [v[0],0,0, 0,v[1],0, 0,0,v[2]]); }
+  function applyCornerPin(){ const w = cpCanvas.width, h = cpCanvas.height, c = cpCorners;
+    const S = basis(0,0, w,0, 0,h, w,h), D = basis(c[0][0],c[0][1], c[1][0],c[1][1], c[2][0],c[2][1], c[3][0],c[3][1]); const t = mm(D, adj(S)); for (let i = 0; i < 9; i++) t[i] /= t[8];
+    const m3d = [t[0],t[3],0,t[6], t[1],t[4],0,t[7], 0,0,1,0, t[2],t[5],0,t[8]];
+    cpCanvas.style.transformOrigin = "0 0"; cpCanvas.style.transform = "matrix3d(" + m3d.join(",") + ")"; positionHandles(); }
+  function positionHandles(){ cpHandles.forEach((hh, i) => { hh.style.left = cpCorners[i][0] + "px"; hh.style.top = cpCorners[i][1] + "px"; hh.style.display = (cpOn && cpEditing) ? "block" : "none"; }); }
+  cpHandles.forEach((hh, i) => { hh.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); const move = (ev) => { cpCorners[i] = [ev.clientX, ev.clientY]; applyCornerPin(); }; const up = () => { removeEventListener("mousemove", move); removeEventListener("mouseup", up); save(); }; addEventListener("mousemove", move); addEventListener("mouseup", up); }); });
+  function showCornerPin(on){ cpOn = on; cornerPin.style.display = on ? "block" : "none"; cpToggle.textContent = on ? "Pin: on" : "4-corner pin"; if (on) { applyCornerPin(); startTick(); } positionHandles(); save(); }
+  cpToggle.onclick = () => showCornerPin(!cpOn);
+  cpEdit.onclick = () => { cpEditing = !cpEditing; cpEdit.textContent = cpEditing ? "Done" : "Edit corners"; if (cpEditing && !cpOn) showCornerPin(true); positionHandles(); };
+
+  // ---- favorites: capture the whole orient + screen setup, per model ----
+  function favKey(){ const cfg = models[+pick.value] || {}; return "voxelengine.pipboyFav." + (cfg.file || cfg.key || "x"); }
+  document.getElementById("favSave").onclick = () => { const b = document.getElementById("favSave"); const fav = { cam: camera.position.toArray(), tgt: controls.target.toArray(), spin: +spinEl.value, corners: cpCorners, cpOn, mesh: meshSel.value || "", content: content.value, url: urlIn.value }; try { localStorage.setItem(favKey(), JSON.stringify(fav)); } catch {} b.textContent = "\u2713 Saved"; setTimeout(() => b.textContent = "\u2605 Mark favorite", 1200); };
+  function loadFav(){ let fav = null; try { fav = JSON.parse(localStorage.getItem(favKey()) || "null"); } catch {} if (!fav) return false;
+    if (fav.cam) camera.position.fromArray(fav.cam); if (fav.tgt) controls.target.fromArray(fav.tgt); controls.update();
+    if (fav.spin != null) { spinEl.value = fav.spin; applySpin(); }
+    if (fav.content) { content.value = fav.content; applyMode(); } if (fav.url) urlIn.value = fav.url;
+    if (fav.corners) cpCorners = fav.corners.map(c => c.slice());
+    if (fav.mesh) { meshSel.style.display = "block"; meshSel.value = fav.mesh; bindScreen(fav.mesh); }
+    if (fav.cpOn) showCornerPin(true); else applyCornerPin();
+    return true; }
+  document.getElementById("favLoad").onclick = loadFav;
+  // auto-apply a saved favorite when a model (re)loads
+  const _prevAfter = _afterLoad;
+  _afterLoad = () => { try { _prevAfter && _prevAfter(); } catch {} setTimeout(loadFav, 120); };
+
+  content.value = mode; applyMode(); startTick(); applyCornerPin(); if (pivot) _afterLoad();
+
+  // ---- physical RGB: push the pip-boy screen color to case lights (/rgb/all) ----
+  const rgbColor = document.getElementById("rgbColor"), rgbPush = document.getElementById("rgbPush"), rgbFollow = document.getElementById("rgbFollow");
+  const samp = document.createElement("canvas"); samp.width = samp.height = 1; const sampCtx = samp.getContext("2d"); let rgbTimer = null;
+  async function pushRgb(hex){ try { await fetch("/rgb/all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color: hex }) }); } catch (e) {} }
+  function screenAvgHex(){ try { sampCtx.drawImage(SCV, 0, 0, 1, 1); const d = sampCtx.getImageData(0, 0, 1, 1).data; return "#" + [d[0], d[1], d[2]].map(x => x.toString(16).padStart(2, "0")).join(""); } catch { return rgbColor.value; } }
+  rgbPush.onclick = () => pushRgb(rgbColor.value);
+  rgbFollow.onclick = () => { if (rgbTimer) { clearInterval(rgbTimer); rgbTimer = null; rgbFollow.textContent = "Follow screen"; } else { rgbFollow.textContent = "Following\u2026"; const t = () => { const hex = screenAvgHex(); rgbColor.value = hex; pushRgb(hex); }; t(); rgbTimer = setInterval(t, 2000); } };
+
+  // ---- voice control (browser SpeechRecognition: switch screen by spoken word) ----
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; let recog = null, voiceOn = false;
+  const voiceBtn = document.getElementById("ovVoice");
+  function setContent(v){ content.value = v; applyMode(); }
+  function handleVoice(text){ const t = (text || "").toLowerCase();
+    if (/dashboard|clock|home assistant/.test(t)) setContent("dashboard");
+    else if (/fidget|spin|toy/.test(t)) setContent("fidget");
+    else if (/gauge/.test(t)) setContent("gauges");
+    else if (/comic/.test(t)) setContent("comic");
+    else if (/photo|slide|picture/.test(t)) setContent("slideshow");
+    else if (/camera|security|cam\b/.test(t)) setContent("camera");
+    else if (/video|movie/.test(t)) setContent("video");
+    else if (/next/.test(t)) nextB.click();
+    else if (/back|previous|\bprev/.test(t)) prevB.click();
+    else if (/\bpin\b/.test(t)) showCornerPin(!cpOn);
+    else if (/screen|three ?d|3d/.test(t)) btn3d.click();
+    else { const m = t.match(/show (?:the )?(.+)/); if (m && mode === "camera") { const name = m[1].trim(); for (const o of camSel.options) { if (o.value && o.textContent.toLowerCase().includes(name)) { camSel.value = o.value; startCam(o.value); break; } } } } }
+  if (SR && voiceBtn) {
+    voiceBtn.onclick = () => { if (voiceOn) { voiceOn = false; try { recog.stop(); } catch {} voiceBtn.textContent = "\uD83C\uDFA4 Voice"; return; }
+      recog = new SR(); recog.continuous = true; recog.interimResults = false; recog.lang = "en-US";
+      recog.onresult = (e) => { const r = e.results[e.results.length - 1]; if (r && r.isFinal) handleVoice(r[0].transcript); };
+      recog.onend = () => { if (voiceOn) { try { recog.start(); } catch {} } };
+      recog.onerror = () => {};
+      try { recog.start(); voiceOn = true; voiceBtn.textContent = "\uD83C\uDFA4 Listening\u2026"; } catch {} };
+  } else if (voiceBtn) { voiceBtn.disabled = true; voiceBtn.textContent = "\uD83C\uDFA4 n/a"; voiceBtn.title = "SpeechRecognition not supported here"; }
+
+  // ---- alert watch: HA person/motion detection -> flash RGB + flip to that camera ----
+  const alertBtn = document.getElementById("ovAlert"); let alertOn = false, alertTimer = null; const lastDet = {}; let alertBanner = null;
+  function showBanner(txt){ if (!alertBanner) { alertBanner = document.createElement("div"); alertBanner.style.cssText = "position:absolute;left:0;right:0;top:0;z-index:40;background:rgba(255,40,40,.85);color:#fff;font:bold 13px ui-monospace,monospace;text-align:center;padding:6px;text-shadow:0 0 6px #000;"; document.body.appendChild(alertBanner); } alertBanner.textContent = txt; alertBanner.style.display = "block"; clearTimeout(alertBanner._t); alertBanner._t = setTimeout(() => { if (alertBanner) alertBanner.style.display = "none"; }, 6000); }
+  async function pulseAlert(){ for (const c of ["#ff1020", "#200000", "#ff1020", "#200000", "#ff1020"]) { pushRgb(c); await new Promise(r => setTimeout(r, 220)); } pushRgb(rgbColor.value); }
+  function tryFlipCamera(id){ if (mode !== "camera") { content.value = "camera"; applyMode(); } const idl = id.toLowerCase();
+    setTimeout(() => {
+      const pick = (want) => { const w = want.toLowerCase(); for (const o of camSel.options) { if (o.value && o.value.toLowerCase() === w) { camSel.value = o.value; startCam(o.value); return true; } } for (const o of camSel.options) { if (o.value && o.value.toLowerCase().includes(w)) { camSel.value = o.value; startCam(o.value); return true; } } return false; };
+      // explicit alert map first (entity-text = camera name)
+      for (const k in camMap) { if (idl.includes(k) && pick(camMap[k])) return; }
+      // fallback: camera name appears in the entity id
+      for (const o of camSel.options) { if (o.value && idl.includes(o.value.toLowerCase())) { camSel.value = o.value; startCam(o.value); return; } }
+    }, 500); }
+  async function pollAlerts(){ if (!alertOn) return;
+    try { const lists = await Promise.all([fetch("/ha/states?domain=sensor", { cache: "no-store" }).then(r => r.json()).catch(() => null), fetch("/ha/states?domain=binary_sensor", { cache: "no-store" }).then(r => r.json()).catch(() => null)]);
+      const all = []; for (const st of lists) { const l = Array.isArray(st) ? st : ((st && (st.states || st.entities)) || []); if (Array.isArray(l)) all.push(...l); }
+      for (const e of all) { const id = (e && e.entity_id) || ""; if (!/person|occupancy|motion/i.test(id)) continue; const v = String(e.state).toLowerCase(); const det = (v === "on") || (!isNaN(parseFloat(v)) && parseFloat(v) > 0); const prev = lastDet[id] || false; lastDet[id] = det;
+        if (det && !prev) { showBanner("\u26A0 DETECTED \u2014 " + ((e.attributes && e.attributes.friendly_name) || id)); pulseAlert(); tryFlipCamera(id); } } } catch {} }
+  if (alertBtn) alertBtn.onclick = () => { alertOn = !alertOn; alertBtn.textContent = alertOn ? "Alert: watching" : "Alert watch"; if (alertOn) { if (alertTimer) clearInterval(alertTimer); pollAlerts(); alertTimer = setInterval(pollAlerts, 4000); } else if (alertTimer) { clearInterval(alertTimer); alertTimer = null; } };
+
+  // ---- v1346: Restore original textures (unbind both screens, forget bindings) ----
+  const restoreBtn = document.getElementById("ovRestore");
+  if (restoreBtn) restoreBtn.onclick = () => {
+    unbindScreen(); unbindScreen2(); scr2On = false;
+    if (meshSel)  { meshSel.value = "";  meshSel.style.display = "none"; }
+    if (meshSel2) { meshSel2.value = ""; meshSel2.style.display = "none"; }
+    if (btn3d)  btn3d.textContent  = "On 3D screen";
+    if (btn3d2) btn3d2.textContent = "2nd screen";
+    try { localStorage.removeItem("voxelengine.pipboyMesh"); localStorage.removeItem("voxelengine.pipboyMesh2"); } catch {}
+    setStatus("Restored original textures", false); setTimeout(() => setStatus("", false), 2000);
+  };
+
+  // ---- v1346: model light meshes — detect emissive / light-named meshes, toggle on/off ----
+  const lightsBtn = document.getElementById("ovLights"), lightsBox = document.getElementById("ovLightsBox");
+  const _lightSaved = new Map();   // material.uuid -> { e:Color|null, i:Number }
+  function findLightMeshes(){
+    const out = []; if (!pivot) return out;
+    const NAME = /light|led|lamp|bulb|glow|neon|blink|indicator|lumin|emiss/i;
+    pivot.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const lit = mats.some(m => m && m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.05);
+      if (lit || NAME.test(o.name || "")) out.push(o);
+    });
+    return out;
+  }
+  function setMeshLight(o, on){
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      if (!m) return;
+      if (!_lightSaved.has(m.uuid)) _lightSaved.set(m.uuid, { e: m.emissive ? m.emissive.clone() : null, i: ("emissiveIntensity" in m) ? m.emissiveIntensity : 1 });
+      const sv = _lightSaved.get(m.uuid);
+      if (on) { if (m.emissive && sv.e) m.emissive.copy(sv.e); if ("emissiveIntensity" in m) m.emissiveIntensity = sv.i; }
+      else    { if (m.emissive) m.emissive.setRGB(0, 0, 0); if ("emissiveIntensity" in m) m.emissiveIntensity = 0; }
+      m.needsUpdate = true;
+    });
+  }
+  function renderLights(){
+    const meshes = findLightMeshes();
+    if (!meshes.length) { lightsBox.innerHTML = '<div style="color:#7fd6a8;font-size:11px;padding:4px;">No emissive / light-named meshes found on this model. Tell me the exact mesh names and I can target them directly.</div>'; return; }
+    let html = '<div class="row" style="margin-bottom:4px;"><button id="ovLAllOn">All on</button><button id="ovLAllOff">All off</button></div><div class="row" style="flex-wrap:wrap;gap:4px;">';
+    meshes.forEach((o, i) => { if (o.userData._lt === undefined) o.userData._lt = true; html += '<button class="lt" data-i="' + i + '" style="font-size:11px;padding:5px 8px;">' + ((o.name || ("mesh " + i)).slice(0, 22)) + '</button>'; });
+    html += '</div>';
+    lightsBox.innerHTML = html;
+    const paint = () => lightsBox.querySelectorAll("button.lt").forEach(b => { const o = meshes[+b.dataset.i]; b.style.background = (o.userData._lt === false) ? "" : "#0c5a30"; });
+    lightsBox.querySelectorAll("button.lt").forEach(b => b.onclick = () => { const o = meshes[+b.dataset.i]; const on = (o.userData._lt === false); o.userData._lt = on; setMeshLight(o, on); paint(); });
+    const all = (on) => meshes.forEach(o => { o.userData._lt = on; setMeshLight(o, on); });
+    lightsBox.querySelector("#ovLAllOn").onclick = () => { all(true); paint(); };
+    lightsBox.querySelector("#ovLAllOff").onclick = () => { all(false); paint(); };
+    paint();
+  }
+  if (lightsBtn) lightsBtn.onclick = () => { const show = lightsBox.style.display === "none"; lightsBox.style.display = show ? "block" : "none"; if (show) renderLights(); };
+})();
+
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "format": 0.2,
+  "resolution": {
+    "map_size": { "x": 30, "y": 30 },
+    "pixels_per_grid": 150
+  },
+  "line_of_sight": [
+    [{"x": 16.0, "y": 14.0}, {"x": 28.0, "y": 14.0}],
+    [{"x": 28.0, "y": 14.0}, {"x": 28.0, "y": 26.0}],
+    [{"x": 28.0, "y": 26.0}, {"x": 16.0, "y": 26.0}],
+    [{"x": 16.0, "y": 26.0}, {"x": 16.0, "y": 14.0}],
+    [{"x": 16.0, "y": 18.0}, {"x": 10.0, "y": 18.0}],
+    [{"x": 10.0, "y": 18.0}, {"x": 10.0, "y": 24.0}],
+    [{"x": 10.0, "y": 24.0}, {"x": 16.0, "y": 24.0}]
+  ],
+  "portals": [
+    {
+      "position": {"x": 22.0, "y": 20.0},
+      "bounds": [{"x": 21.5, "y": 20.0}, {"x": 22.5, "y": 20.0}],
+      "closed": false,
+      "freestanding": true,
+      "comment": "Staircase up to Level 1"
+    },
+    {
+      "position": {"x": 16.0, "y": 21.0},
+      "bounds": [{"x": 16.0, "y": 20.0}, {"x": 16.0, "y": 22.0}],
+      "closed": true,
+      "freestanding": false,
+      "secret": true
+    },
+    {
+      "position": {"x": 28.0, "y": 18.0},
+      "bounds": [{"x": 28.0, "y": 17.7}, {"x": 28.0, "y": 18.3}],
+      "closed": true,
+      "freestanding": false,
+      "comment": "Arrow Slit Window"
+    }
+  ],
+  "lights": [
+    {
+      "position": {"x": 13.0, "y": 21.0},
+      "range": 4.0,
+      "intensity": 0.4,
+      "color": "4488ff"
+    }
+  ],
+  "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+}

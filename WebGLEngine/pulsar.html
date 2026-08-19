@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pulsar -- a neutron star as a clock</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:920px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .wrap { padding:10px 18px 18px; display:grid; grid-template-columns:1fr; gap:14px; max-width:920px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:10px 12px; }
+  .card h2 { margin:0 0 8px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.07em; }
+  canvas { display:block; width:100%; height:auto; border-radius:5px; background:#01060c; }
+  .row { display:flex; gap:22px; flex-wrap:wrap; font-size:12px; margin-top:8px; }
+  .row div b { color:var(--amber); font-size:15px; } .row div span { color:var(--dim); display:block; font-size:10px; text-transform:uppercase; }
+  .leg { font-size:11px; color:var(--dim); margin-top:6px; } .leg b { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:2px 18px 8px; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 16px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pulsar &mdash; a neutron star as a clock</h1>
+  <p>A neutron star spins and sweeps two beams from its magnetic poles. Each time a beam crosses the line of sight to us, a pulse arrives. Real pulsars are among the most precise clocks in the universe, and they <b>spin down</b> &mdash; the period lengthens as the star loses energy. This runs <code>physics/pulsar/pulsar.js</code>: the pulse arrival times solve the timing model with only arithmetic and a square root, so the pulse train is <b>bit-identical on every architecture</b> &mdash; folded into the fingerprint, it ticks the same on every box in the fleet.</p>
+</header>
+<div class="controls">
+  <button id="play">&#10073;&#10073; Pause</button>
+  <span id="stat" style="color:var(--green);font-size:11px;"></span>
+</div>
+<div class="wrap">
+  <div class="card"><h2>The spinning star &mdash; a pulse when a beam sweeps past the line of sight</h2>
+    <canvas id="star" width="900" height="300"></canvas>
+    <div class="leg">the dashed line is our line of sight; the star flares when a beam crosses it. Beam rate is exaggerated so the sweep is visible.</div>
+  </div>
+  <div class="card"><h2>The pulse train &mdash; arrival times from the real timing model</h2>
+    <canvas id="train" width="900" height="90"></canvas>
+    <div class="row" id="read"></div>
+    <div class="leg">each tick is a pulse arrival. The interval grows across the train &mdash; the star spinning down &mdash; and every tick sits exactly where the rotational phase reaches a whole turn.</div>
+  </div>
+</div>
+<script type="module">
+import { pulseArrivalTimes, phaseAt, pulseIntervals, periodAt, beamDir } from "./physics/pulsar/pulsar.js";
+const $ = (id) => document.getElementById(id);
+// real timing model (fingerprinted values)
+const F0 = 30, FDOT = -1e-3, N = 200;
+const times = pulseArrivalTimes(F0, FDOT, N), iv = pulseIntervals(times);
+// display uses an exaggerated spin so the beam sweep is watchable; the train below is the real model
+const dispF0 = 0.6, dispFdot = -0.02;
+let t = 0, playing = true, lastPhase = 0, flash = 0, pulseCount = 0, raf = 0;
+
+function drawStar() {
+  const c = $("star"), g = c.getContext("2d"), W = c.width, H = c.height, cx = W * 0.5, cy = H * 0.5;
+  g.clearRect(0, 0, W, H);
+  // line of sight (horizontal dashed to the right = observer)
+  g.strokeStyle = "#2a4a5a"; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(W - 10, cy); g.stroke(); g.setLineDash([]);
+  g.fillStyle = "#3a5a6a"; g.font = "11px monospace"; g.fillText("to observer \u2192", W - 120, cy - 8);
+  // beams (two poles, opposite) sweeping
+  const d = beamDir(t, dispF0, dispFdot), L = Math.min(W, H) * 0.6;
+  for (const s of [1, -1]) {
+    const bx = cx + s * d[0] * L, by = cy + s * d[1] * L;
+    const grad = g.createLinearGradient(cx, cy, bx, by);
+    grad.addColorStop(0, "rgba(120,220,255,0.9)"); grad.addColorStop(1, "rgba(120,220,255,0)");
+    g.strokeStyle = grad; g.lineWidth = 6; g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.stroke();
+  }
+  // the star: glowing sphere, flares on pulse
+  const glow = 18 + flash * 26;
+  const rg = g.createRadialGradient(cx, cy, 2, cx, cy, glow);
+  rg.addColorStop(0, "#ffffff"); rg.addColorStop(0.3, flash > 0.2 ? "#bfefff" : "#8fd6ff"); rg.addColorStop(1, "rgba(60,120,180,0)");
+  g.fillStyle = rg; g.beginPath(); g.arc(cx, cy, glow, 0, 7); g.fill();
+  g.fillStyle = "#eaffff"; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill();
+  g.lineWidth = 1;
+}
+
+function drawTrain() {
+  const c = $("train"), g = c.getContext("2d"), W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H);
+  const span = times[times.length - 1] || 1, X = (tt) => 10 + tt / span * (W - 20);
+  g.strokeStyle = "#1e3a48"; g.beginPath(); g.moveTo(10, H - 16); g.lineTo(W - 10, H - 16); g.stroke();
+  const now = (t * F0 / dispF0);   // map display time to model time roughly, just for the sweep marker
+  for (let n = 0; n < times.length; n++) {
+    const x = X(times[n]), lit = pulseCount === n;
+    g.strokeStyle = lit ? "#ffcc66" : "#2f6d7a"; g.lineWidth = lit ? 2 : 1;
+    g.beginPath(); g.moveTo(x, H - 16); g.lineTo(x, H - 16 - (lit ? 30 : 16)); g.stroke();
+  }
+  g.lineWidth = 1;
+}
+
+function readout() {
+  $("read").innerHTML =
+    "<div><b>" + (periodAt(0, F0, FDOT) * 1000).toFixed(3) + " ms</b><span>period at t0</span></div>" +
+    "<div><b>" + (periodAt(times[times.length - 1], F0, FDOT) * 1000).toFixed(3) + " ms</b><span>period at end</span></div>" +
+    "<div><b>" + ((iv[iv.length - 1] - iv[0]) * 1e6).toFixed(2) + " \u00b5s</b><span>spin-down over train</span></div>" +
+    "<div><b>" + pulseCount + "/" + N + "</b><span>pulses arrived</span></div>";
+}
+
+function frame() {
+  if (!playing) return;
+  t += 0.016;
+  // detect a beam crossing the line of sight: phase passes a half-turn (beam or anti-beam aligns with +x)
+  const ph = phaseAt(t, dispF0, dispFdot) * 2;   // half-turns
+  if (Math.floor(ph) > Math.floor(lastPhase)) { flash = 1; pulseCount = Math.min(N - 1, pulseCount + 1); }
+  lastPhase = ph;
+  flash *= 0.86;
+  drawStar(); drawTrain();
+  if (pulseCount % 4 === 0) readout();
+  $("stat").textContent = "f0 " + F0 + " Hz \u00b7 spin-down " + FDOT + " Hz/s \u00b7 " + N + " pulses \u00b7 phase-exact timing";
+  raf = setTimeout(() => requestAnimationFrame(frame), 16);
+}
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "\u2759\u2759 Pause" : "\u25b6 Play"; if (playing) frame(); };
+readout(); drawStar(); drawTrain(); frame();
+</script>
+</body>
+</html>

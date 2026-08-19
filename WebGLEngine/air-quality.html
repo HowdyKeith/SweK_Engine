@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Air Quality</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:680px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .pm { border:1px solid var(--line); border-radius:13px; padding:16px; margin:10px 0; background:var(--panel); }
+  .pm .nm { color:var(--dim); font-size:12px; }
+  .pm .big { font-size:42px; font-weight:700; line-height:1.1; margin:4px 0; }
+  .pm .unit { font-size:15px; color:var(--dim); font-weight:400; }
+  .pm .band { display:inline-block; padding:4px 11px; border-radius:8px; font-size:12px; font-weight:600; margin-top:4px; }
+  .bar { height:8px; border-radius:5px; background:#0c1411; overflow:hidden; margin-top:10px; border:1px solid var(--line); }
+  .bar > i { display:block; height:100%; border-radius:5px; }
+  .grid { display:flex; gap:10px; flex-wrap:wrap; }
+  .mini { flex:1; min-width:130px; border:1px solid var(--line); border-radius:11px; padding:11px 13px; background:var(--panel); }
+  .mini .nm { color:var(--dim); font-size:12px; }
+  .mini .v { font-size:22px; font-weight:600; margin-top:2px; }
+  #msg { color:var(--dim); font-size:12px; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:7px 12px; font:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🌬️</span> Air Quality <span style="color:var(--dim);font-weight:400;">· via Home Assistant</span></span></header>
+  <main>
+    <div class="note">
+      Reads PM2.5 / temperature / humidity sensors from Home Assistant. A <b>Govee H5106</b> appears here once it's added via the <b>Govee BLE</b> integration (local Bluetooth — needs a BT adapter or ESP32 proxy in range). PM2.5 is shown with health-based color bands. If readings look wild (e.g. 200°F), the BLE decode mis-synced — re-pair / update the integration.
+    </div>
+    <div style="margin-bottom:10px;"><button id="refresh">↻ Refresh</button></div>
+    <div id="msg">loading…</div>
+    <div id="out"></div>
+
+    <div class="note" style="margin-top:16px;">
+      <b>Bad-air reactions:</b> when PM2.5 crosses your threshold, the avatar coughs + warns, and (optionally) an air-purifier switch turns on. Independent of the readings above; needs the monitor in Home Assistant.
+    </div>
+    <div style="border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--panel);">
+      <label style="display:block;color:var(--dim);font-size:12px;margin-bottom:4px;">PM2.5 sensor entity</label>
+      <input id="aEntity" list="pmList" placeholder="sensor.h5106_pm25" style="width:100%;padding:8px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;" />
+      <datalist id="pmList"></datalist>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+        <div style="flex:1;min-width:120px;"><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:4px;">Threshold (µg/m³)</label><input id="aThresh" type="number" min="1" value="35" style="width:100%;padding:8px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;" /></div>
+        <div style="flex:2;min-width:150px;"><label style="display:block;color:var(--dim);font-size:12px;margin-bottom:4px;">Air-purifier switch (optional)</label><input id="aPurifier" placeholder="switch.air_purifier" style="width:100%;padding:8px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;" /></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;"><input id="aReact" type="checkbox" /> React to bad air (avatar cough + warn; turn purifier on)</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;"><input id="aSpeak" type="checkbox" /> Cough + speak the warning aloud (local TTS voice)</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;"><input id="aHaSpeaker" type="checkbox" /> Also play the warning on the Home Assistant speaker</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;color:var(--dim);font-size:12px;"><input id="aAutoOff" type="checkbox" /> also turn the purifier off when air clears</label>
+      <div style="margin-top:10px;"><button id="aSave">Save reactions</button> <span id="aMsg" style="color:var(--dim);font-size:12px;margin-left:6px;"></span></div>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  // US EPA-style PM2.5 (ug/m3) health bands.
+  const BANDS = [
+    { max: 12.0,  label: "Good",                           col: "#41e08a", bg: "#10231a" },
+    { max: 35.4,  label: "Moderate",                       col: "#ffcf6b", bg: "#241f10" },
+    { max: 55.4,  label: "Unhealthy (sensitive groups)",   col: "#ff9d4e", bg: "#241810" },
+    { max: 150.4, label: "Unhealthy",                      col: "#ff6b6b", bg: "#240f0f" },
+    { max: 250.4, label: "Very unhealthy",                 col: "#c77dff", bg: "#1e0f24" },
+    { max: 1e9,   label: "Hazardous",                      col: "#ff5470", bg: "#240a12" },
+  ];
+  function band(v){ for (const b of BANDS) if (v <= b.max) return b; return BANDS[BANDS.length - 1]; }
+
+  function isPM(s){ return s.device_class === "pm25" || /pm\s*2\.?5|particulate/i.test(s.name + " " + s.entity_id); }
+  function airMatch(s){ return isPM(s) || s.device_class === "temperature" || s.device_class === "humidity" || /air.?quality|aqi|\bvoc\b|tvoc|\bco2\b|h5106|govee/i.test(s.name + " " + s.entity_id); }
+
+  async function load(){
+    $("msg").textContent = "reading Home Assistant…";
+    let list = [];
+    try { const r = await fetch("/ha/states?domain=sensor", { cache:"no-store" }); const j = await r.json(); list = Array.isArray(j) ? j : (j && j.entities) || []; }
+    catch (e) { $("msg").textContent = "✗ " + (e && e.message || e); return; }
+    const air = list.filter(airMatch);
+    if (!air.length) { $("msg").textContent = "No air-quality / PM2.5 sensors found. Add the monitor to Home Assistant (Govee BLE), then it'll appear here."; $("out").innerHTML = ""; return; }
+
+    const pm = air.filter(isPM);
+    const temps = air.filter(s => s.device_class === "temperature");
+    const hums = air.filter(s => s.device_class === "humidity");
+    $("msg").textContent = air.length + " sensor" + (air.length === 1 ? "" : "s");
+    let html = "";
+    pm.forEach(s => {
+      const v = parseFloat(s.state); const ok = isFinite(v); const b = ok ? band(v) : null;
+      const pct = ok ? Math.max(2, Math.min(100, (v / 200) * 100)) : 0;
+      html += '<div class="pm"><div class="nm">' + esc(s.name) + '</div>' +
+        '<div class="big">' + (ok ? v : esc(s.state)) + ' <span class="unit">' + esc(s.unit || "µg/m³") + '</span></div>' +
+        (b ? '<span class="band" style="color:' + b.col + ';background:' + b.bg + ';border:1px solid ' + b.col + '33;">' + b.label + '</span>' +
+             '<div class="bar"><i style="width:' + pct + '%;background:' + b.col + ';"></i></div>' : '') +
+        '</div>';
+    });
+    const minis = temps.concat(hums);
+    if (minis.length) {
+      html += '<div class="grid">';
+      minis.forEach(s => { html += '<div class="mini"><div class="nm">' + esc(s.name) + '</div><div class="v">' + esc(s.state) + ' ' + esc(s.unit || (s.device_class === "temperature" ? "°" : "%")) + '</div></div>'; });
+      html += '</div>';
+    }
+    $("out").innerHTML = html;
+    try { $("pmList").innerHTML = pm.map(s => '<option value="' + esc(s.entity_id) + '">').join(""); } catch {}
+  }
+
+  // bad-air reactions config
+  function loadCfg(){ fetch("/air/config", { cache:"no-store" }).then(r => r.json()).then(c => {
+    if (!c) return;
+    $("aEntity").value = c.entity || ""; $("aThresh").value = c.threshold || 35; $("aPurifier").value = c.purifier || "";
+    $("aReact").checked = !!c.react; $("aAutoOff").checked = !!c.autoOff; $("aSpeak").checked = c.speak !== false; $("aHaSpeaker").checked = c.haSpeaker !== false;
+  }).catch(() => {}); }
+  $("aSave").onclick = () => {
+    $("aMsg").textContent = "saving…";
+    const body = { entity: $("aEntity").value.trim(), threshold: parseFloat($("aThresh").value) || 35, purifier: $("aPurifier").value.trim(), react: $("aReact").checked, autoOff: $("aAutoOff").checked, speak: $("aSpeak").checked, haSpeaker: $("aHaSpeaker").checked };
+    fetch("/air/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) })
+      .then(r => r.json()).then(s => { $("aMsg").textContent = s && s.ok ? ("✓ saved" + (s.value != null ? " · reading " + Math.round(s.value) : "")) : "✗ save failed"; })
+      .catch(e => { $("aMsg").textContent = "✗ " + (e && e.message || e); });
+  };
+
+  $("refresh").onclick = load;
+  load(); loadCfg();
+  setInterval(load, 15000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

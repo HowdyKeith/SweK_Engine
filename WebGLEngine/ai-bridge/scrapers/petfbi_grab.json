@@ -1,0 +1,1 @@
+{"task":"Open a PetFBI report URL in Camoufox and extract title, text, JSON-LD, og/meta tags and image URLs for reformatting into a post.","params":[{"name":"--url","required":true,"desc":"PetFBI report URL"},{"name":"--timeout","required":false,"desc":"ms (default 45000)"}]}

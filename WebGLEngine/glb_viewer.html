@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Rigged GLB Viewer</title>
+<meta name="demo:title"  content="Rigged GLB Viewer">
+<meta name="demo:desc"   content="Load a skinned/animated GLB (RigAnything output, Fox.glb, any rigged mesh). Plays skeletal + morph animations, shows the skeleton overlay.">
+<meta name="demo:cats"   content="viewer,3d,rig">
+<meta name="demo:swatch" content="🦴">
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#06070c;color:#bcd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:7px;padding:9px 12px;background:rgba(12,16,30,0.92);border-bottom:1px solid rgba(120,180,220,0.25);align-items:center;flex-wrap:wrap}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1;min-width:120px}
+  #topbar button,#topbar label.btn,#topbar select{padding:6px 10px;border-radius:6px;border:1px solid rgba(120,180,220,0.4);background:rgba(12,18,30,0.85);color:#cdf;font-size:12px;cursor:pointer}
+  #topbar input[type=text]{background:rgba(8,8,18,0.9);color:#cde;border:1px solid rgba(120,180,220,0.3);border-radius:5px;padding:5px 8px;font-size:11px;min-width:140px;flex:1}
+  #topbar select{min-width:110px}
+  #host{flex:1;position:relative;overflow:hidden}
+  #c{position:absolute;inset:0;display:block}
+  #hud{position:absolute;left:10px;top:10px;font-size:11px;color:#9ab;background:rgba(6,8,16,0.55);padding:7px 10px;border-radius:6px;pointer-events:none;max-width:60%;line-height:1.5}
+  #msg{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:11px;color:#9ab;background:rgba(6,8,16,0.6);padding:5px 10px;border-radius:6px}
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🦴 Rigged GLB Viewer</h1>
+    <label class="btn">📂 File<input id="file" type="file" accept=".glb,.gltf" style="display:none"></label>
+    <input id="url" type="text" placeholder="…or a GLB URL" autocomplete="off">
+    <button id="btnUrl">⬇ Load</button>
+    <button id="btnFox" title="Load the Khronos Fox sample (skinned, 3 animations)">🦊 Fox</button>
+    <select id="clip" title="Animation clip"></select>
+    <button id="btnPlay">⏸ Pause</button>
+    <button id="btnLoop" title="Loop">🔁 Loop</button>
+    <select id="speed" title="Playback speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+    <button id="btnBones" title="Show skeleton">🦴 Bones</button>
+    <button id="btnReset">⟲ Reset</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host">
+    <canvas id="c"></canvas>
+    <div id="hud">drag: orbit · wheel: zoom · right-drag: pan</div>
+    <div id="msg"></div>
+  </div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "/vendor/three/jsm/loaders/GLTFLoader.js";
+import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+
+const FOX_URL = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
+const $ = (id) => document.getElementById(id);
+const msg = (t) => { $("msg").textContent = t || ""; };
+$("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06070c);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 5000);
+camera.position.set(3, 2, 4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x202028, 1.1));
+const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(3, 6, 4); scene.add(dir);
+const grid = new THREE.GridHelper(10, 20, 0x2a3550, 0x1a2238); grid.material.opacity = 0.5; grid.material.transparent = true; scene.add(grid);
+
+const loader = new GLTFLoader(); enableMeshopt(loader);
+const clock = new THREE.Clock();
+let mixer = null, current = null, root = null, clips = [], action = null;
+let skelHelper = null, showBones = false, loopOn = true, playing = true;
+
+function resize() {
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+  const h = canvas.clientHeight || canvas.parentElement.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe($("host")); resize();
+
+function clearModel() {
+  if (root) { scene.remove(root); root.traverse(o => { o.geometry?.dispose?.(); }); root = null; }
+  if (skelHelper) { scene.remove(skelHelper); skelHelper = null; }
+  mixer = null; action = null; clips = []; current = null;
+  $("clip").innerHTML = "";
+}
+
+function frameCamera(obj) {
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
+  // Fit the whole bounding SPHERE (handles odd proportions like RobotExpressive's
+  // big head, and animation overflow) using the narrower of vertical/horizontal
+  // FOV so it frames in portrait too, plus padding.
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const r = Math.max(sphere.radius, 1e-3);
+  const center = sphere.center;
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.2, camera.aspect));
+  const dist = (r / Math.sin(Math.min(vFov, hFov) / 2)) * 1.35;   // 1.35 = breathing room
+  controls.target.copy(center);
+  const dir = new THREE.Vector3(0.55, 0.32, 1).normalize();
+  camera.position.copy(center).addScaledVector(dir, dist);
+  camera.near = Math.max(dist / 2000, r / 1000);
+  camera.far = dist + r * 12;
+  camera.updateProjectionMatrix();
+  grid.position.y = box.min.y;
+  controls.update();
+}
+
+function setupAnimations(gltf) {
+  clips = gltf.animations || [];
+  const sel = $("clip"); sel.innerHTML = "";
+  if (!clips.length) { const o = document.createElement("option"); o.textContent = "(no animations)"; sel.appendChild(o); sel.disabled = true; return; }
+  sel.disabled = false;
+  clips.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = c.name || ("clip " + i); sel.appendChild(o); });
+  mixer = new THREE.AnimationMixer(gltf.scene);
+  playClip(0);
+}
+
+function playClip(i) {
+  if (!mixer || !clips[i]) return;
+  if (action) action.stop();
+  action = mixer.clipAction(clips[i]);
+  action.setLoop(loopOn ? THREE.LoopRepeat : THREE.LoopOnce, loopOn ? Infinity : 1);
+  action.clampWhenFinished = true;
+  action.reset().play();
+  action.paused = !playing;
+  current = i; $("clip").value = String(i);
+}
+
+function onLoaded(gltf) {
+  clearModel();
+  root = gltf.scene; scene.add(root);
+  let bones = 0, meshes = 0, morphs = 0;
+  root.traverse(o => {
+    if (o.isBone) bones++;
+    if (o.isMesh || o.isSkinnedMesh) { meshes++; o.frustumCulled = false; if (o.morphTargetInfluences) morphs += o.morphTargetInfluences.length; }
+  });
+  frameCamera(root);
+  setupAnimations(gltf);
+  if (showBones) toggleBones(true);
+  $("hud").innerHTML = `drag: orbit · wheel: zoom · right-drag: pan<br>${meshes} mesh · ${bones} bones · ${clips.length} anim${morphs ? " · " + morphs + " morphs" : ""}`;
+  msg(bones ? "skinned model loaded" : (morphs ? "morph-animated model loaded" : "static model loaded"));
+}
+
+function toggleBones(on) {
+  showBones = on;
+  if (skelHelper) { scene.remove(skelHelper); skelHelper = null; }
+  if (on && root) { skelHelper = new THREE.SkeletonHelper(root); skelHelper.material.linewidth = 2; scene.add(skelHelper); }
+}
+
+async function loadArrayBuffer(buf, label) {
+  try {
+    msg("parsing " + (label || "model") + " …");
+    loader.parse(buf, "", onLoaded, (e) => { msg("parse failed: " + (e?.message || e)); console.error(e); });
+  } catch (e) { msg("parse failed: " + (e?.message || e)); }
+}
+async function loadUrl(url) {
+  if (!url) return;
+  msg("fetching " + url + " …");
+  try { const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status); await loadArrayBuffer(await r.arrayBuffer(), url.split("/").pop()); }
+  catch (e) { msg("fetch failed: " + (e?.message || e)); }
+}
+async function loadAsset(id) {
+  msg("loading asset …");
+  try {
+    const r = await fetch("/assets/get?id=" + encodeURIComponent(id));
+    const j = await r.json();
+    if (!j || j.error || !j.data) { msg("asset data unavailable"); return; }
+    const bin = atob(j.data); const bytes = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+    await loadArrayBuffer(bytes.buffer, "asset." + ((j.meta && j.meta.dataExt) || "glb"));
+  } catch (e) { msg("asset load failed: " + (e?.message || e)); }
+}
+
+// render loop
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = clock.getDelta();
+  if (mixer && playing) mixer.update(dt * parseFloat($("speed").value || "1"));
+  controls.update();
+  renderer.render(scene, camera);
+}
+tick();
+
+// controls
+$("file").addEventListener("change", async (e) => { const f = e.target.files?.[0]; if (!f) return; await loadArrayBuffer(await f.arrayBuffer(), f.name); });
+$("btnUrl").addEventListener("click", () => loadUrl($("url").value.trim()));
+$("btnFox").addEventListener("click", () => { $("url").value = FOX_URL; loadUrl(FOX_URL); });
+$("clip").addEventListener("change", (e) => playClip(parseInt(e.target.value, 10)));
+$("btnPlay").addEventListener("click", () => { playing = !playing; if (action) action.paused = !playing; $("btnPlay").textContent = playing ? "⏸ Pause" : "▶ Play"; });
+$("btnLoop").addEventListener("click", () => { loopOn = !loopOn; $("btnLoop").style.opacity = loopOn ? "1" : "0.5"; if (current != null) playClip(current); });
+$("btnBones").addEventListener("click", () => { toggleBones(!showBones); $("btnBones").style.opacity = showBones ? "1" : "0.6"; });
+$("btnReset").addEventListener("click", () => { if (root) frameCamera(root); });
+$("btnBones").style.opacity = "0.6";
+
+// boot
+const q = new URLSearchParams(location.search);
+if (q.get("asset")) loadAsset(q.get("asset"));
+else if (q.get("src")) { $("url").value = q.get("src"); loadUrl(q.get("src")); }
+else msg("Pick a GLB, paste a URL, or hit 🦊 Fox to test skeletal playback.");
+</script>
+</body>
+</html>

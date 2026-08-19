@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Remote Desktop</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;}
+  #w{max-width:1060px;margin:0 auto;padding:16px;}
+  h1{font-size:17px;margin:0 0 2px;} .sub{color:#6f8a7c;margin-bottom:12px;}
+  .card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px;}
+  button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:5px 12px;margin-right:6px;cursor:pointer;}
+  button:hover:not(:disabled){background:#1d2c24;} button:disabled{opacity:.45;cursor:default;}
+  .primary{border-color:#4c8f6a;color:#b6f0cf;}
+  video{width:100%;max-height:460px;background:#050807;border:1px solid #1a2a22;display:block;}
+  canvas{border:1px solid #1a2a22;image-rendering:pixelated;}
+  .dim{color:#6f8a7c;} .hot{color:#e0a0a0;} .warn{color:#e0c58a;} .ok{color:#7fe0a4;}
+  .stat{display:inline-block;min-width:118px;margin:0 14px 6px 0;vertical-align:top;}
+  .stat b{font-size:19px;} .stat span{display:block;color:#6f8a7c;font-size:11px;}
+  select{font:inherit;background:#0a1210;color:#cfe9d8;border:1px solid #2c463a;padding:4px;}
+</style>
+</head>
+<body>
+<div id="w">
+  <h1>Remote Desktop</h1>
+  <div class="sub">
+    Screen sharing over a media-only peer connection whose SDP and ICE ride the data channel
+    <code>cloudPeer</code> already opened. No new signalling path, no new token, and on a LAN the video never
+    leaves the wire. <b>View only</b> &mdash; a browser cannot inject OS input, so control needs a native helper
+    that isn't installed here, and this page will not pretend otherwise.
+  </div>
+
+  <div class="card">
+    <button id="bStart" class="primary">Start peering</button>
+    <select id="peer"><option value="">(no peers yet)</option></select>
+    <button id="bShare">Share my screen</button>
+    <button id="bStop" disabled>Stop</button>
+    <span class="dim" id="state"></span>
+  </div>
+
+  <div class="card"><video id="v" autoplay playsinline muted></video></div>
+
+  <div class="card">
+    <button id="bProve" class="primary">Prove the link</button>
+    <span class="dim">paints a known pattern, reads it back, and reports two numbers instead of a picture</span>
+    <div id="proof" style="margin-top:9px"></div>
+    <canvas id="pat" width="320" height="200" style="margin-top:8px"></canvas>
+  </div>
+
+  <div class="card dim">
+    <b>Why two numbers.</b> Fidelity alone ranks a <i>frozen</i> stream above a <i>damaged</i> one &mdash; a
+    freeze scores about 0.98 while a blanked region scores about 0.81. The frame counter is painted into the
+    image as binary, so a dead stream shows up as latency where fidelity saw nothing. Neither number is
+    sufficient; together they separate working, stalled, and torn.
+  </div>
+</div>
+
+<script type="module">
+import cloudPeer from "/ui/cloudPeer.js";
+import share from "/ui/screenShare.js";
+import { expectedFrame, compareFrames, decodeCounter, latencyFrames, cellColor, counterBits } from "/ui/screenPattern.js";
+
+const $ = (id) => document.getElementById(id);
+const COLS = 16, ROWS = 10, BITS = 12;
+let frame = 0, sending = null;
+
+$("bStart").onclick = async () => {
+  $("bStart").disabled = true; $("state").textContent = " starting...";
+  try {
+    await cloudPeer.start();
+    share.attach(cloudPeer);
+    share.onRemoteStream((s) => { $("v").srcObject = s; $("state").textContent = " receiving"; });
+    const refresh = () => {
+      const ps = cloudPeer.peers();
+      $("peer").innerHTML = ps.length ? ps.map((p) => '<option value="' + p.id + '">' + p.id + " (" + p.state + ")</option>").join("")
+                                      : '<option value="">(no peers yet)</option>';
+    };
+    cloudPeer.onStatus(refresh); refresh();
+    $("state").textContent = " peering as " + (cloudPeer.status().myId || "?");
+  } catch (e) { $("bStart").disabled = false; $("state").innerHTML = ' <span class="hot">' + e.message + "</span>"; }
+};
+
+$("bShare").onclick = async () => {
+  const id = $("peer").value;
+  if (!id) { $("state").innerHTML = ' <span class="warn">pick a peer first</span>'; return; }
+  try { await share.share(id); sending = id; $("bStop").disabled = false; $("state").textContent = " sharing to " + id; }
+  catch (e) { $("state").innerHTML = ' <span class="hot">' + e.message + "</span>"; }
+};
+$("bStop").onclick = () => { if (sending) share.stop(sending); sending = null; $("bStop").disabled = true; $("state").textContent = " stopped"; };
+
+// ---- prove the link ----------------------------------------------------------------------------------------
+// Paints the pattern, then reads it back from whichever surface is real: the RECEIVED video if one is playing,
+// otherwise the canvas itself. The canvas path is a LOOPBACK -- it proves the arithmetic and the plumbing, not
+// the network, and it says so rather than reporting a suspiciously perfect score as if it were a link test.
+$("bProve").onclick = () => {
+  const c = $("pat"), g = c.getContext("2d", { willReadFrequently: true });
+  const cw = c.width / COLS, ch = c.height / ROWS;
+  frame = (frame + 1) & 0xfff;
+  const bits = counterBits(frame, BITS);
+  for (let b = 0; b < BITS; b++) { g.fillStyle = bits[b] ? "#fff" : "#000"; g.fillRect(b * cw, 0, cw, ch); }
+  for (let cy = 1; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) {
+    const k = cellColor(cx, cy, COLS);
+    g.fillStyle = "rgb(" + k.r + "," + k.g + "," + k.b + ")";
+    g.fillRect(cx * cw, cy * ch, cw, ch);
+  }
+  const vid = $("v"), live = vid.srcObject && vid.videoWidth > 0;
+  let src = c, sw = c.width, sh = c.height, off = null;
+  if (live) { off = document.createElement("canvas"); off.width = vid.videoWidth; off.height = vid.videoHeight;
+              off.getContext("2d").drawImage(vid, 0, 0); src = off; sw = off.width; sh = off.height; }
+  const sg = src.getContext("2d", { willReadFrequently: true });
+  const scw = sw / COLS, sch = sh / ROWS, read = [];
+  const sample = (cx, cy) => { const d = sg.getImageData(Math.floor((cx + 0.5) * scw), Math.floor((cy + 0.5) * sch), 1, 1).data; return { r: d[0], g: d[1], b: d[2] }; };
+  for (let b = 0; b < BITS; b++) read.push(sample(b, 0));
+  const got = decodeCounter(read);
+  for (let cy = 1; cy < ROWS; cy++) for (let cx = 0; cx < COLS; cx++) read.push(sample(cx, cy));
+  let out = "";
+  try {
+    const cmp = compareFrames(expectedFrame(frame, COLS, ROWS, BITS), read);
+    const lat = latencyFrames(frame, got, BITS);
+    const fc = cmp.fidelity > 0.95 ? "ok" : cmp.fidelity > 0.8 ? "warn" : "hot";
+    const lc = lat.frames === null ? "hot" : lat.frames === 0 ? "ok" : lat.frames < 5 ? "warn" : "hot";
+    out = '<div class="stat"><b class="' + fc + '">' + cmp.fidelity.toFixed(3) + "</b><span>fidelity</span></div>"
+        + '<div class="stat"><b class="' + lc + '">' + (lat.frames === null ? "n/a" : lat.frames) + "</b><span>frames behind</span></div>"
+        + '<div class="stat"><b>' + cmp.mismatched + "/" + cmp.cells + "</b><span>cells off (tol " + cmp.tol + ")</span></div>"
+        + '<div class="stat"><b>' + cmp.worstDelta + "</b><span>worst channel delta</span></div>"
+        + '<div class="dim" style="margin-top:4px">' + lat.note + "</div>"
+        + (live ? '<div class="ok">read back from the RECEIVED video -- this measures the actual link</div>'
+                : '<div class="warn">LOOPBACK: no stream is playing, so this read the local canvas. It proves the pattern and the plumbing, NOT the network. Share a screen from a peer and press again for a real number.</div>');
+  } catch (e) { out = '<span class="hot">' + e.message + "</span>"; }
+  $("proof").innerHTML = out;
+};
+</script>
+</body>
+</html>

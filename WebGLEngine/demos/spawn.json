@@ -1,0 +1,5 @@
+{
+    "name": "Spawn",
+    "description": "Default starting view, looking down at origin.",
+    "camera": { "x": 0, "y": 60, "z": 80, "yaw": 0, "pitch": -0.4 }
+}

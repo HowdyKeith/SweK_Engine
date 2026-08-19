@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blobarium — the blob, in real physics, warmed, x-rayed</title>
+<style>
+  :root { --lcars: #ff9c00; --lcars2: #99f; --ink: #d8e4ff; }
+  body { margin: 0; background: #05070d; color: var(--ink); font: 13px/1.5 "DejaVu Sans", system-ui, sans-serif; }
+  #hud { padding: 10px 14px 6px; }
+  #cap { color: var(--lcars); font-weight: bold; letter-spacing: .04em; }
+  #stat { opacity: .78; font-size: 12px; margin-top: 2px; min-height: 18px; }
+  #wrap { display: flex; gap: 14px; padding: 0 14px; flex-wrap: wrap; align-items: flex-start; }
+  canvas { background: #000; border: 1px solid #1d2740; border-radius: 3px; image-rendering: pixelated; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 820px; height: auto; display: block; }
+  .lab { font-size: 11px; opacity: .62; margin: 3px 0 0; }
+  #ctl { padding: 10px 14px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  label { font-size: 12px; }
+  input[type=range] { vertical-align: middle; width: 150px; }
+  button { background: #1a2338; color: var(--lcars); border: 1px solid #33436b; border-radius: 12px;
+           padding: 4px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #24314e; }
+  button:disabled { opacity: .45; cursor: default; }
+  #slab { padding: 6px 14px 16px; max-width: 880px; opacity: .8; font-size: 12px; }
+  b { color: var(--lcars2); font-weight: 600; }
+  .warn { color: #ff6b6b; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">&#9673; Blobarium &mdash; seven lumps, real physics, a chosen temperature &nbsp;&middot;&nbsp; <a href="/physics-lab.html#scene=aquarium&tempK=310&yaw=42&pitch=26&skin=1" style="color:#7fe6b0;text-decoration:none;border:1px solid #1e4a30;padding:1px 7px;border-radius:5px;font-size:12px" title="Open this aquarium in the Physics Lab: drive the temperature, toggle the skin, and see the coupling formula. Runs the same modules, deterministically.">&#129514; open in Physics Lab</a></div>
+  <div id="stat">booting...</div>
+</div>
+
+<div id="wrap">
+  <div>
+    <canvas id="xray" width="128" height="128"></canvas>
+    <div class="lab">the x-ray &mdash; the beam integrates <i>through</i>. this is his shadow.</div>
+  </div>
+  <div>
+    <canvas id="face" width="128" height="128"></canvas>
+    <div class="lab">the face &mdash; the field <i>on</i> the plane. this is his inside, exactly.</div>
+  </div>
+</div>
+
+<div id="ctl">
+  <button id="run">&#9654; run</button>
+  <button id="reset">&#8635; reset</button>
+    <button id="modulate" title="Sweep the temperature between 200 K and boiling, and show the temperature the blob is ACTUALLY exhibiting (measured from its motion) next to the one commanded. The two should track -- that is the honest closed loop.">&#9832; modulate</button>
+    <!-- v2612 -- ONE CLICK TO THE HOLOGRAM, CARRYING HIS CURRENT STATE.
+         Keith: "Can the blobulator/blobarium 1 click I svg page hologram pencil demo, and to a .gif?"
+         The lumps ride in the URL because THE POINT IS TO DRAW *THIS* BLOB -- the one that has been
+         wandering in the tank for a minute -- NOT A FRESH ONE FROM THE SEED. A hologram of a different
+         creature than the one on screen would be a lie that looks like a feature. -->
+    <button id="holo" title="Draw the blob EXACTLY AS HE IS RIGHT NOW, in pencil, through Krbn (MIT, Valeriu Palos). Seven ghosted lumps inside the meshed skin.">&#9673; HOLOGRAM</button>
+  <label>warmth: <span id="tval">0.000</span> <span id="kval" title="">(-- K)</span> <input id="temp" type="range" min="0" max="100" value="0"></label>
+  <label>cut depth: <span id="dval">0.00</span> <input id="dcut" type="range" min="-120" max="120" value="0"></label>
+</div>
+
+<div id="slab">
+  <b>What this is.</b> Seven lumps. <b>blobFieldAt</b> sums them into a field &mdash; that field is the blob, and it
+  is a <b>closed form</b>, exact at every instant. <b>box3d</b> moves the seven centres. The formula travels with
+  them, so nothing is ever baked, advected, or smeared.
+  <br><br>
+  <b>Why not a grid.</b> Bake the field into 64&sup3; and advect it out-and-back so it <i>ends where it started</i>:
+  the peak falls to <b>75.3% &rarr; 63.0% &rarr; 55.8% &rarr; 50.5%</b> while the <b>mass stays constant</b>. He does
+  not evaporate &mdash; <b>he dissolves</b>. That is numerical diffusion, and it <i>is</i> the heat equation: the
+  measured <b>D = 0.01141</b>, dead constant at every timestep. <b>The aquarium was never at zero kelvin.</b>
+  <br><br>
+  <b>It is not a Kelvin, and it cannot be.</b> Einstein's relation is <b>D = kT/&gamma;</b> &mdash; the
+  fluctuation-dissipation theorem. A temperature is a <i>ratio</i> of random kicks to drag. Shove a box3d body and
+  let go: its speed reads <b>1, 1, 1, 1</b>. <b>There is no drag.</b> With &gamma; = 0 there is no dissipation, so
+  there is <b>no temperature to name</b> &mdash; only kicks with nothing to be in equilibrium with. Worse: a
+  <i>position</i> random walk is the <b>overdamped</b> limit, which assumes &gamma; &rarr; &infin;. <b>This slider and
+  this solver assume opposite physics.</b> The slider says D, and D is what it means.
+  <br><br>
+  <b>The warmth slider is real.</b> Einstein 1905: &lt;x&sup2;&gt; = 2Dt per axis. It jitters the <b>seven centres</b>,
+  not a grid. The peak <b>wanders</b> &mdash; sometimes <i>above</i> where it started, because lumps drift together
+  and overlap builds a taller peak. <b>That is what a temperature looks like: fluctuation, not decay.</b> And it has a
+  floor the grid does not have: the peak can never fall below the tallest single lump's amplitude, because
+  <b>each lump keeps its amplitude forever.</b>
+  <br><br>
+  <b>The one number that matters.</b> box3d gets a <b>collision radius</b>, not the <b>field radius</b>. Hand it the
+  field radius and it blows the blob apart <b>5.4&times; in one second</b> &mdash; correctly, because a rigid solver's
+  job is to <i>remove</i> interpenetration and a metaball's peak <i>is</i> interpenetration. Two correct things
+  wanting opposite outcomes. <b>coreScale = 0.15</b> is where they agree, and it is a <i>choice</i>, not a discovery.
+</div>
+
+<script type="module">
+  import { blobFieldAt, blobRadonAt, makeBlobs, ISO } from "./simulation/tomo/blobPhantom.js";
+  import { blobsToBodies, bodiesToBlobs } from "./physics/blobBodies.js";
+  import { jitterCentres, peakFloor, lcg } from "./physics/blobThermal.js";
+  import { plane, cutFace } from "./simulation/tomo/blobCut.js";
+  import { kelvinOfWarmth, SCENARIOS } from "./physics/blobKelvin.js";
+  import { commandedT, modulatorD, measuredT } from "./physics/tempModulator.js";
+  import { vitals, diagnose, closestPair as vitalsClosestPair } from "./physics/blobVitals.js";
+  import { box3d } from "./physics/box3d/box3dLoader.js";
+
+  const SEED = 20260715;
+  const XN = 128, FN = 128;
+  const $ = (id) => document.getElementById(id);
+  const stat = $("stat");
+
+  let blobs = makeBlobs(7, SEED);
+  let basePair = null;   // captured at reset -- 'together' means CHANGED, not merely large
+  let world = null, ids = null, running = false, rnd = lcg(SEED), steps = 0;
+  let floor = peakFloor(blobs);
+
+  async function boot() {
+    try {
+      await box3d.init();
+      const st = box3d.status();
+      if (!st.ready) {
+        // AN HONEST FAILURE, NOT A SILENT FALLBACK. If box3d is not here, this page is a lie and says so.
+        stat.innerHTML = '<span class="warn">box3d is not ready: ' + (st.reason || "unknown") +
+          ' &mdash; THE BLOB WILL NOT MOVE. This page has no fallback ON PURPOSE: a blobarium with fake physics is a screensaver.</span>';
+        $("run").disabled = true;
+        draw();
+        return;
+      }
+      world = box3d.createWorld({});
+      // v2602 -- THE BLOBARIUM HAD NO FLOOR, AND HE HAD BEEN STANDING ON A BUG.
+      //
+      // Keith asked "were you able to determine if box3d supported y?" -- it does, completely; addBox falls
+      // y 5 -> 0.1602 in one second. blobsToBodies had been calling addShip, THE ENDLESS SKY SHIP CONSTRUCTOR:
+      // "a planar, drag-free, non-rotating body", with NO y PARAMETER. Every lump was a planar ES ship, so THE
+      // BLOB COULD NOT FALL -- and the only thing keeping him in frame was that fact.
+      //
+      // Fix the constructor and he leaves immediately: peak 0.000, ZERO LIT PIXELS. He was never floating; HE
+      // WAS NEVER FALLING. box3dLoader.js line 21 has shown the ground plane in its own worked example this
+      // entire time.
+      world.addBox({ type: "static", pos: [0, -2.2, 0], half: [50, 0.5, 50] });
+        // v2610 -- AND FOUR WALLS. THE FLOOR WAS ONLY HALF THE TANK.
+        //
+        // Keith: "lets stabilize the tank." MEASURED, 60 simulated seconds at max warmth, real box3d, in NODE:
+        //
+        //     no walls:   furthest lump from the axis  1.70 -> 4.63 -> 6.37 AND STILL CLIMBING
+        //     walls:      furthest lump from the axis  1.70 -> 2.52 -> 3.11 (the walls are at 3)
+        //
+        // WARMTH IS A RANDOM WALK. <x^2> = 2Dt GROWS FOREVER AND HAS NO RESTORING FORCE. The floor caught him
+        // in y -- rock solid at -1.68 the whole minute -- AND NOTHING AT ALL HELD HIM IN x OR z. Each lump
+        // diffused independently until they stopped overlapping and the creature stopped existing.
+        //
+        // AND THE PEAK RECOVERS WITH THE WALLS ON: 3.404 at sixty seconds, having wandered 2.9 -> 2.0 -> 2.6
+        // -> 2.3 -> 1.9 -> 3.4. THAT IS v2596's WANDERING PEAK, CONFIRMED OVER A MINUTE INSTEAD OF A GLANCE.
+        //
+        // The teleport question answered itself: setTransform CAN walk a centre into a wall, and box3d's solver
+        // EJECTS IT ON THE NEXT STEP. Not a clean reflection. IT HOLDS.
+        for (const [wx, wz] of [[3, 0], [-3, 0], [0, 3], [0, -3]])
+          world.addBox({ type: "static", pos: [wx, 0, wz], half: wx ? [0.5, 3, 3] : [3, 3, 0.5] });
+      ids = blobsToBodies(blobs, world); basePair = vitalsClosestPair(blobs);   // coreScale 0.15 -- the COLLISION radius, NOT the field radius
+      stat.textContent = "box3d ready — seven centres are bodies. press run.";
+      draw();
+    } catch (e) {
+      stat.innerHTML = '<span class="warn">box3d failed to load: ' + e.message + '</span>';
+      $("run").disabled = true;
+      draw();
+    }
+  }
+
+  function peakNow() {
+    let m = 0;
+    for (let i = 0; i < 3000; i++) {
+      const x = (i % 15) / 15 * 4 - 2, y = ((i / 15 | 0) % 15) / 15 * 4 - 2, z = ((i / 225 | 0) % 15) / 15 * 4 - 2;
+      const v = blobFieldAt(x, y, z, blobs);
+      if (v > m) m = v;
+    }
+    return m;
+  }
+  function closestPair() {
+    let m = Infinity;
+    for (let i = 0; i < blobs.length; i++) for (let j = i + 1; j < blobs.length; j++)
+      m = Math.min(m, Math.hypot(blobs[i].x - blobs[j].x, blobs[i].y - blobs[j].y, blobs[i].z - blobs[j].z));
+    return m;
+  }
+
+  function drawXray() {
+    const cv = $("xray"), g = cv.getContext("2d");
+    const img = g.createImageData(XN, XN);
+    const vals = new Float32Array(XN * XN);
+    let mx = 0;
+    for (let j = 0; j < XN; j++) for (let i = 0; i < XN; i++) {
+      const v = blobRadonAt((i / XN) * 4 - 2, 0.6, (j / XN) * 4 - 2, blobs);
+      vals[j * XN + i] = v;
+      if (v > mx) mx = v;
+    }
+    for (let k = 0; k < vals.length; k++) {
+      const c = Math.max(0, Math.min(255, Math.round((vals[k] / (mx || 1)) * 255)));
+      img.data[k * 4] = c; img.data[k * 4 + 1] = c; img.data[k * 4 + 2] = Math.min(255, c + 20); img.data[k * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
+
+  function drawFace() {
+    const d = Number($("dcut").value) / 100;
+    $("dval").textContent = d.toFixed(2);
+    const face = cutFace(plane(0, 0, 1, d), blobs, { w: FN, h: FN, extent: 2 });
+    const cv = $("face"), g = cv.getContext("2d");
+    const img = g.createImageData(FN, FN);
+    // FIXED SCALE, unlike the x-ray. The face is a MEASUREMENT -- normalising it would hide the rise and fall.
+    for (let i = 0; i < face.data.length; i++) {
+      const c = Math.max(0, Math.min(255, Math.round(face.data[i] * 64)));
+      img.data[i * 4] = c; img.data[i * 4 + 1] = Math.min(255, c + 8); img.data[i * 4 + 2] = Math.min(255, c + 26); img.data[i * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
+
+  function draw() { drawXray(); drawFace(); }
+
+  function report() {
+    const p = peakNow(), sep = closestPair();
+    const D = Number($("temp").value) / 100 * 0.02;
+    // v2602 -- "floor" MEANT TWO THINGS ON THIS LINE. The amplitude floor (the tallest lump's own peak,
+    // which the field can never fall below) and the GROUND at y = -2.2 that he now lands on. SAME WORD, TWO
+    // MEANINGS, ONE STATUS LINE -- the "xray"/`new Blob()` collision again, except this time I built it.
+    // THE FOUR GAUGES. Each one is a death I actually shipped -- NOT a hypothetical.
+    const v = vitals(blobs, basePair);
+    const d = diagnose(v);
+    if (d === "well") {
+      stat.textContent = "step " + steps + " \u2014 well \u2014 peak " + v.peak.toFixed(3) +
+        " (min possible " + v.floor.toFixed(3) + ", above) \u2014 closest pair " + v.closestPair.toFixed(3) +
+        " \u2014 D " + D.toFixed(5) + (D === 0 ? " (cold)" : "");
+    } else {
+      // NOT A MOOD. A DIAGNOSIS, naming the version that shipped it.
+      stat.innerHTML = '<span class="warn">step ' + steps + " \u2014 " + d + "</span>";
+    }
+  }
+
+  function frame() {
+    if (!running) return;
+    // v2618 -- MODULATE sweeps the commanded temperature over time and drives the slider from it. The Kelvin
+    // chain is honest (v2617) and the closed loop is gated (commanded T == emergent T), so the slider position
+    // is a real temperature command, not a decoration.
+    let D;
+    if (modulating) {
+      modT += 1 / 60;
+      const Tcmd = commandedT(modT, MOD_PARAMS);
+      D = modulatorD(modT, KSCEN, MOD_PARAMS);
+      $("temp").value = String(Math.min(100, D / 0.02 * 100));
+      // readback: the temperature the blob is ACTUALLY exhibiting, from a sliding window of its own motion
+      modWin.push(blobs.map((b) => [b.x, b.y, b.z]));
+      if (modWin.length > MOD_WIN_STEPS) modWin.shift();
+      if (modWin.length === MOD_WIN_STEPS) {
+        const disp = blobs.map((b, j) => [b.x - modWin[0][j][0], b.y - modWin[0][j][1], b.z - modWin[0][j][2]]);
+        const Tmeas = measuredT(disp, (MOD_WIN_STEPS - 1) / 60, KSCEN);
+        // The commanded T is the honest number (set via the gated Kelvin chain). The tank reading is LOWER
+        // because gravity, the four walls, and inter-lump collisions cap the blob's displacement -- at a
+        // constant 373 K command the tank reads ~146 K. That is not the modulator failing; it is confinement,
+        // and the label says so rather than letting the mismatch look like a bug. The clean closed loop
+        // (commanded == emergent) is proven in FREE diffusion by the gate.
+        $("kval").textContent = "(cmd " + Tcmd.toFixed(0) + " K, tank ~" + Tmeas.toFixed(0) + " K confined)";
+      } else {
+        $("kval").textContent = "(cmd " + Tcmd.toFixed(0) + " K)";
+      }
+      $("tval").textContent = D.toFixed(3);
+    } else {
+      D = Number($("temp").value) / 100 * 0.02;
+      $("tval").textContent = D.toFixed(3);
+      showKelvin(D);
+    }
+    if (world) { world.step(1 / 60); bodiesToBlobs(world, blobs, ids); }
+    // WARMTH GOES ON THE CENTRES, NOT ON A GRID. That is the whole argument of this page.
+    if (D > 0) {
+      jitterCentres(blobs, { D, dt: 1 / 60, rnd });
+      // Put the warmth back into the solver, or box3d and the field disagree about where he is.
+      //
+      // v2597 CALLED THIS setTransform(id, b.x, b.y, b.z) -- THREE LOOSE NUMBERS. The real signature is
+      // setTransform(idx, p, q) with p AND q as ARRAYS (box3dLoader.js:49 -> p[0], p[1], p[2], q[0]...).
+      // So p was a NUMBER, p[0] was undefined, and the page fed undefined into the wasm: MEASURED, THE BODY'S
+      // POSITION BECAME NaN. DRAGGING THE WARMTH SLIDER MADE THE BLOB VANISH, AND IT SHIPPED THAT WAY.
+      //
+      // And the QUATERNION has to be read back, not passed as identity -- warmth would silently un-rotate him
+      // every single frame, which would have looked like physics and been an assignment.
+      if (world && world.setTransform) {
+        const tr = world.readTransforms();
+        blobs.forEach((b, i) => {
+          const o = ids[i] * 7;
+          world.setTransform(ids[i], [b.x, b.y, b.z], [tr[o + 3], tr[o + 4], tr[o + 5], tr[o + 6]]);
+        });
+      }
+    }
+    steps++;
+    draw(); report();
+    requestAnimationFrame(frame);
+  }
+
+  $("run").addEventListener("click", () => {
+    running = !running;
+    $("run").innerHTML = running ? "&#10073;&#10073; pause" : "&#9654; run";
+    if (running) frame();
+  });
+  // v2612 -- ONE CLICK TO THE HOLOGRAM. The lumps travel in the URL: krbn.html reads them and draws THIS
+  // blob, not a fresh one from the seed. A hologram of a different creature than the one on screen would be
+  // a lie that looks like a feature.
+  document.getElementById("modulate").addEventListener("click", () => {
+    modulating = !modulating;
+    modT = 0; modWin = [];
+    const btn = document.getElementById("modulate");
+    btn.style.color = modulating ? "var(--hot, #ffb454)" : "";
+    if (!modulating) { $("temp").value = "0"; showKelvin(0); }   // hand control back to the slider, cold
+  });
+  document.getElementById("holo").addEventListener("click", () => {
+    const pack = blobs.map((b) => [b.x, b.y, b.z, b.r, b.a].map((v) => (+v).toFixed(4)).join(",")).join(";");
+    window.open("/krbn.html?lumps=" + encodeURIComponent(pack), "_blank", "noopener");
+  });
+
+  $("reset").addEventListener("click", () => {
+    blobs = makeBlobs(7, SEED); floor = peakFloor(blobs); rnd = lcg(SEED); steps = 0;
+    if (box3d.status().ready) { world = box3d.createWorld({}); world.addBox({ type: "static", pos: [0, -2.2, 0], half: [50, 0.5, 50] }); ids = blobsToBodies(blobs, world); basePair = vitalsClosestPair(blobs); }
+    draw(); report();
+  });
+  $("dcut").addEventListener("input", () => { drawFace(); });
+  // v2617 -- THE WARMTH IN KELVIN, UNDER A STATED SCENARIO. The number never travels without its
+  // assumptions: the tooltip carries the scenario sentence, because A KELVIN READING WITHOUT ITS SCENARIO IS
+  // A NUMBER PRETENDING TO BE A MEASUREMENT. The default is the PHYSICAL scenario (1.5 um particle, real-time
+  // clock); the obvious '10 um cell' reading would show 60,000 K, which is stylised, not measured.
+  const KSCEN = SCENARIOS.bacterium;
+  // v2618 -- modulator state. Sweep 200 K to boiling over 20 s; measure emergent T over a ~2 s window.
+  const MOD_PARAMS = { Tlo: 200, Thi: 373.15, periodSec: 20, shape: "sine" };
+  const MOD_WIN_STEPS = 120;
+  let modulating = false, modT = 0, modWin = [];
+  function showKelvin(D) {
+    const T = kelvinOfWarmth(D, KSCEN);
+    const el = $("kval");
+    el.textContent = "(" + T.toFixed(0) + " K)";
+    el.title = T.toFixed(1) + " K assuming " + KSCEN.name + " -- " + KSCEN.models;
+  }
+  showKelvin(0);
+  $("temp").addEventListener("input", () => { const D = Number($("temp").value) / 100 * 0.02; $("tval").textContent = D.toFixed(3); showKelvin(D); });
+
+  boot();
+</script>
+</body>
+</html>

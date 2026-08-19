@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GPU Brain Fleet &mdash; Training Pool</title>
+<style>
+  :root {
+    --bg:#000; --panel:#0a0a12; --amber:#ff9f1c; --amber2:#ffcc80; --gold:#ffd45c;
+    --purple:#b48ce0; --blue:#7fb0ff; --red:#ff5a4d; --green:#5ee06a; --dim:#4a4a60; --ink:#12121c;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--amber2);
+    font-family:'Antonio','Oswald','Arial Narrow',sans-serif; letter-spacing:.5px; }
+  body { padding:14px 16px 40px; min-height:100vh; }
+  .bar { display:flex; align-items:stretch; gap:8px; margin-bottom:12px; }
+  .elbow { width:80px; background:var(--amber); border-radius:34px 0 0 34px; flex:0 0 auto; }
+  .title { flex:1; background:var(--ink); border-radius:0 18px 18px 0; padding:10px 20px; display:flex;
+    align-items:center; justify-content:space-between; }
+  .title h1 { margin:0; font-size:26px; font-weight:600; text-transform:uppercase; color:var(--gold);
+    letter-spacing:2px; }
+  .live { display:flex; align-items:center; gap:8px; font-size:15px; text-transform:uppercase; color:var(--amber); }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--dim); box-shadow:0 0 0 rgba(94,224,106,0); }
+  .dot.on { background:var(--green); animation:pulse 1.4s infinite; }
+  .dot.err { background:var(--red); }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(94,224,106,.5);} 70%{box-shadow:0 0 0 9px rgba(94,224,106,0);} 100%{box-shadow:0 0 0 0 rgba(94,224,106,0);} }
+
+  .pool { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px; }
+  .metric { background:var(--panel); border-radius:8px; border-left:8px solid var(--amber); padding:10px 14px; }
+  .metric .k { font-size:13px; text-transform:uppercase; color:var(--purple); letter-spacing:1.5px; }
+  .metric .v { font-size:38px; font-weight:600; color:var(--gold); line-height:1.05; }
+  .metric.steps { border-left-color:var(--green); }
+  .metric.reward { border-left-color:var(--blue); }
+  .metric.training { border-left-color:var(--purple); }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+  .brain { background:var(--panel); border-radius:10px; padding:12px 14px; border-top:4px solid var(--dim);
+    display:flex; flex-direction:column; gap:8px; }
+  .brain.training { border-top-color:var(--green); }
+  .brain.dead { opacity:.45; }
+  .brow { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .gpu { font-size:18px; color:var(--amber2); text-transform:uppercase; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; max-width:190px; }
+  .role { font-size:12px; text-transform:uppercase; background:var(--amber); color:#000; border-radius:10px;
+    padding:2px 10px; font-weight:600; letter-spacing:1px; }
+  .role.nav { background:var(--blue); } .role.policy { background:var(--purple); }
+  .stat3 { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .cell { background:var(--ink); border-radius:6px; padding:6px 8px; }
+  .cell .k { font-size:11px; text-transform:uppercase; color:var(--purple); letter-spacing:1px; }
+  .cell .v { font-size:24px; font-weight:600; color:var(--gold); }
+  .cell .v.muted { color:var(--dim); }
+  .stepbar { height:6px; background:var(--ink); border-radius:3px; overflow:hidden; }
+  .stepbar > i { display:block; height:100%; background:linear-gradient(90deg,var(--green),var(--gold)); width:0; }
+  .seclabel { font-size:11px; text-transform:uppercase; color:var(--purple); letter-spacing:1.5px; }
+  .domains { display:flex; flex-direction:column; gap:3px; }
+  .dom { display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:center;
+    background:var(--ink); border-radius:5px; padding:3px 9px; border-left:3px solid var(--purple); }
+  .dom .dn { font-size:13px; text-transform:uppercase; color:var(--amber2); letter-spacing:1px; }
+  .dom .ds { font-size:16px; font-weight:600; color:var(--gold); }
+  .dom .dr { font-size:12px; color:var(--blue); min-width:46px; text-align:right; }
+  .dom .dr.muted { color:var(--dim); }
+  .foot { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--dim); }
+  .foot .tag { text-transform:uppercase; letter-spacing:1px; }
+  .foot .tag.on { color:var(--green); } .foot .tag.idle { color:var(--amber); }
+  .empty { background:var(--panel); border-radius:10px; border-left:8px solid var(--amber); padding:26px 22px;
+    font-size:22px; text-transform:uppercase; color:var(--amber2); letter-spacing:1px; }
+  .empty small { display:block; color:var(--purple); font-size:15px; margin-top:8px; letter-spacing:1px; }
+  .updated { margin-top:14px; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="elbow"></div>
+    <div class="title">
+      <h1>GPU Brain Fleet &middot; Training Pool</h1>
+      <div class="live"><span id="dot" class="dot"></span><span id="livetxt">connecting</span></div>
+    </div>
+  </div>
+
+  <div class="pool">
+    <div class="metric"><div class="k">Brains</div><div class="v" id="m-count">0</div></div>
+    <div class="metric training"><div class="k">Training</div><div class="v" id="m-training">0</div></div>
+    <div class="metric steps"><div class="k">Pool Steps</div><div class="v" id="m-steps">0</div></div>
+    <div class="metric"><div class="k">Pool Buffer</div><div class="v" id="m-buffer">0</div></div>
+    <div class="metric reward"><div class="k">Mean Reward</div><div class="v" id="m-reward">&mdash;</div></div>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div class="updated" id="updated"></div>
+
+<script type="module">
+import { fleetTrainingSummary } from "./brain/fleetSummary.js";
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n == null ? "\u2014" : Number(n).toLocaleString());
+const fmtR = (n) => (n == null ? "\u2014" : Number(n).toFixed(3));
+const age = (ms) => (ms == null ? "" : ms < 1000 ? "now" : ms < 60000 ? Math.round(ms / 1000) + "s" : Math.round(ms / 60000) + "m");
+
+function setLive(state) {
+  const dot = $("dot"), txt = $("livetxt");
+  dot.className = "dot" + (state === "ok" ? " on" : state === "err" ? " err" : "");
+  txt.textContent = state === "ok" ? "live" : state === "err" ? "bridge unreachable" : "connecting";
+}
+
+function render(sum) {
+  $("m-count").textContent = sum.count;
+  $("m-training").textContent = sum.training;
+  $("m-steps").textContent = fmt(sum.totalSteps);
+  $("m-buffer").textContent = fmt(sum.totalBuffer);
+  $("m-reward").innerHTML = sum.meanReward == null ? "&mdash;" : fmtR(sum.meanReward);
+
+  const grid = $("grid");
+  if (!sum.count) {
+    grid.innerHTML = '<div class="empty">No brains connected<small>Start a GPU Brain demo to begin training</small></div>';
+    return;
+  }
+  const maxSteps = Math.max(1, ...sum.rows.map((r) => r.steps));
+  grid.innerHTML = sum.rows.map((r) => {
+    const roleClass = r.role === "nav" || r.role === "fields" ? "nav" : r.role === "policy" ? "policy" : "";
+    const rewardMuted = r.avgReward == null ? " muted" : "";
+    const pct = Math.round((r.steps / maxSteps) * 100);
+    return `
+      <div class="brain ${r.training ? "training" : ""} ${r.live ? "" : "dead"}">
+        <div class="brow">
+          <span class="gpu" title="${r.gpu}">${r.gpu}</span>
+          <span class="role ${roleClass}">${r.role}</span>
+        </div>
+        <div class="seclabel">Attack policy</div>
+        <div class="stat3">
+          <div class="cell"><div class="k">Steps</div><div class="v">${fmt(r.steps)}</div></div>
+          <div class="cell"><div class="k">Buffer</div><div class="v">${fmt(r.buffer)}</div></div>
+          <div class="cell"><div class="k">Reward</div><div class="v${rewardMuted}">${fmtR(r.avgReward)}</div></div>
+        </div>
+        <div class="stepbar"><i style="width:${pct}%"></i></div>
+        ${r.domains && r.domains.length ? '<div class="seclabel">Domain trainers</div><div class="domains">' +
+          r.domains.map((d) => `<div class="dom"><span class="dn">${d.name}</span><span class="ds">${fmt(d.steps)}</span><span class="dr${d.avgReward == null ? " muted" : ""}">${fmtR(d.avgReward)}</span></div>`).join("") +
+          '</div>' : ''}
+        <div class="foot">
+          <span class="tag ${r.training ? "on" : "idle"}">${r.training ? "training" : "idle"}</span>
+          <span>${r.solveMs == null ? "" : r.solveMs.toFixed(1) + "ms"} &middot; ${age(r.ageMs)}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function poll() {
+  try {
+    const j = await fetch("/ai/brain/fleet", { cache: "no-store" }).then((r) => r.json());
+    setLive("ok");
+    render(fleetTrainingSummary(j.brains || []));
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) {
+    setLive("err");
+    $("updated").textContent = "bridge not reachable -- is the server up on :8787?";
+  }
+}
+poll();
+setInterval(poll, 1500);
+</script>
+</body>
+</html>

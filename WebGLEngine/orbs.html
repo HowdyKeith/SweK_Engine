@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>State orbs (v3357)</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{padding:14px 18px 48px;max-width:1000px}
+  h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#8fd0a8;letter-spacing:.5px}
+  .sub{color:#7d9c8b}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid #1d2a22;vertical-align:middle}
+  th{color:#8fd0a8;font-weight:normal;border-bottom:1px solid #2b4033}
+  code{color:#b6f0cf}
+</style>
+</head>
+<body>
+<div id="wrap">
+<h1>State orbs &mdash; six states, each one the engine already knows</h1>
+<div class="sub">
+  The idea is <a href="https://github.com/Jakubantalik/thinking-orbs" style="color:#8fb4e8">thinking-orbs</a>
+  (MIT, React + npm &mdash; <b>not installable here and not installed</b>). What was taken is not the animation:
+  it is that <b>a state names a verb</b>. A generic spinner is decoration; six distinguishable states are
+  information.
+  <br><br>
+  <b>And a spinner that spins forever is the black-screen-without-a-reason failure in a new costume</b> &mdash;
+  worse than a blank area, because it looks like an answer. So the binding rule, which is gated:
+  <b>every state here corresponds to a distinction the engine already draws and already refuses to collapse.</b>
+  Each was won in a round, and the round is named beside it.
+</div>
+
+<h2>The six</h2>
+<table id="t"><thead><tr>
+  <th style="width:80px">64px</th><th style="width:44px">20px</th><th style="width:130px">state</th>
+  <th style="width:150px">must NOT read as</th><th>the round that separated them</th>
+</tr></thead><tbody></tbody></table>
+
+<h2>What it refuses</h2>
+<div class="sub">
+  <b>An unknown state draws nothing.</b> <code>dotsAt("loading", …)</code> returns <code>null</code> rather than
+  a default orb &mdash; a generic spinner is exactly what this module exists instead of, so it must not be
+  reachable by typo.
+  <br><br>
+  <b>Plain 2D canvas arcs.</b> No WebGL, no <code>ctx.filter</code>, no SVG filters &mdash; the same pixels
+  everywhere, and it draws while the GPU path is down, which is the trick <code>ray-march-demo</code> and
+  <code>biome-map-demo</code> already use.
+  <b>One shared clock</b>, so every orb resumes in phase; six independent ones drift apart within seconds.
+  <b>A hidden tab does zero work</b>, not less. <b>Reduced motion renders a static representative frame</b>
+  rather than nothing &mdash; the state still reads. <b>devicePixelRatio capped at 2.</b>
+  <br><br>
+  <b>Wired into server.html at v3359</b> &mdash; an orb sits beside every render-QA page row, and its state comes
+  from the <i>same expression</i> that writes the text label, never a second reading. One loop finds every
+  <code>data-orb</code> canvas anywhere on the page, so it generalises without touching more of a 480 KB file.
+  <br><br>
+  <b>And the wiring found a missing distinction.</b> That row showed <i>never run / pass / FAIL</i> and had
+  nowhere to put TIMEOUT &mdash; which v3076 established is <b>not</b> a failure, because null is the exit code
+  of a process that was killed. The module had the state; the row did not. It shows it now.
+  </div>
+</div>
+<script type="module">
+import { ORB_STATES, STATE_NAMES, drawOrb, clockNow, dprCap, reducedMotion } from "/ui/stateOrb.js";
+const ink = "#cfe9d8";
+const rows = STATE_NAMES.map((name) => {
+  const s = ORB_STATES[name];
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><canvas width="64" height="64" style="width:64px;height:64px"></canvas></td>
+    <td><canvas width="20" height="20" style="width:20px;height:20px"></canvas></td>
+    <td><b>${s.label}</b></td><td class="sub">${s.notThe}</td>
+    <td class="sub">${s.won} &mdash; separated there, and collapsing them again is what this orb refuses</td>`;
+  document.querySelector("#t tbody").appendChild(tr);
+  const [a, b] = tr.querySelectorAll("canvas");
+  for (const c of [a, b]) { const d = dprCap(devicePixelRatio); c.width = c.clientWidth * d || c.width; c.height = c.width; }
+  return { name, ctxs: [[a.getContext("2d"), a.width], [b.getContext("2d"), b.width]] };
+});
+
+// ONE CLOCK, ONE LOOP. A hidden tab does ZERO work rather than less (v2771/v3051), and reduced motion paints
+// one static frame and then stops entirely rather than animating slowly.
+let stopped = false;
+function frame(now) {
+  if (document.hidden) return void setTimeout(() => requestAnimationFrame(frame), 250);
+  const t = clockNow(now);
+  for (const r of rows) for (const [ctx, size] of r.ctxs) drawOrb(ctx, r.name, t, size, ink);
+  if (reducedMotion()) { stopped = true; return; }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !stopped) requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "hud": {
+    "type": "checkbox",
+    "value": true,
+    "text": "Show LCARS system readout"
+  },
+  "speed": {
+    "type": "slider",
+    "value": 50,
+    "step": 5,
+    "min": 10,
+    "max": 100,
+    "text": "Drift speed"
+  }
+}

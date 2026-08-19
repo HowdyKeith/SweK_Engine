@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Jarzynski / stochastic thermodynamics</title>
+<meta name="demo:desc" content="A Brownian particle in a stiffening trap, graded by the Jarzynski equality: <exp(-W/kT)> = exp(-dF/kT) holds EXACTLY over nonequilibrium trajectories at any driving speed, against the closed-form dF = (kT/2)ln(k1/k0). Watch work histograms accumulate, the second law appear as <W> >= dF, and the sabotage where every trajectory is statistically perfect while the reported free energy is wrong — visible only to the Jarzynski key. v3283: the Crooks theorem joined the gate — run the protocol backward and the forward and reverse work histograms must cross exactly at dF, with a log-ratio slope of 1/kT.">
+<style>
+  html,body { margin:0; height:100%; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:960px; margin:0 auto; padding:16px; }
+  canvas { border:1px solid #22304a; border-radius:6px; display:block; width:100%; }
+  #bar { margin:10px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:5px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  button.on { outline:2px solid #f6a623; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+  #hud { line-height:1.7; margin-top:8px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="dim" style="margin-bottom:8px;">Each burst runs 400 trajectories of a Brownian particle while the trap stiffens k: 1 &rarr; 4. The histogram is the work W per trajectory; the orange line is the exact &Delta;F = (kT/2)ln4 = 0.6931. Jarzynski says &lt;e<sup>-W</sup>&gt; recovers &Delta;F exactly at ANY speed, while &lt;W&gt; sits above it (second law).</div>
+  <canvas id="c" width="920" height="360"></canvas>
+  <div id="bar">
+    <label>protocol steps <select id="speed"><option value="4" selected>4 (slammed)</option><option value="16">16</option><option value="60">60 (gentle)</option></select></label>
+    <button id="burst">Run 400 trajectories</button>
+    <button id="clear">Clear</button>
+    <button id="sabW" class="sab" title="work increment missing its 1/2 — every trajectory statistically perfect, only the Jarzynski key disagrees">Sabotage: work ledger</button>
+    <button id="sabN" class="sab" title="noise variance halved — caught by equipartition immediately">Sabotage: noise</button>
+  </div>
+  <div id="hud">run a burst…</div>
+</div>
+<script type="module">
+import { makeRng, ouStep, ouStepNoiseWRONG, workIncrement, workIncrementWRONG } from "./physics/langevin/langevin.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), hud = document.getElementById("hud");
+const kT = 1, gamma = 1, k0 = 1, k1 = 4, dFexact = 0.5 * kT * Math.log(k1 / k0);
+let works = [], sumExp = 0, sumW = 0, sumX2 = 0, nX2 = 0;
+let step = ouStep, workInc = workIncrement, rng = makeRng((Date.now() & 0xffff) | 1);
+
+function runBurst(steps, n = 400) {
+  const ks = []; for (let i = 0; i <= steps; i++) ks.push(k0 * Math.pow(k1 / k0, i / steps));
+  for (let t = 0; t < n; t++) {
+    let x = Math.sqrt(kT / k0) * rng.gauss(), W = 0;
+    for (let i = 1; i < ks.length; i++) { W += workInc(x, ks[i - 1], ks[i]); x = step(x, ks[i], 0.08, kT, gamma, rng); sumX2 += x * x * ks[i] / kT; nX2++; }
+    works.push(W); if (works.length > 20000) works.shift();
+    sumExp += Math.exp(-W / kT); sumW += W;
+  }
+  draw();
+}
+function draw() {
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, W, H);
+  if (!works.length) return;
+  const lo = -0.5, hi = 3.5, bins = 90, hist = new Array(bins).fill(0);
+  for (const w of works) { const b = Math.floor((w - lo) / (hi - lo) * bins); if (b >= 0 && b < bins) hist[b]++; }
+  const peak = Math.max(...hist, 1);
+  const bx = (b) => 30 + b / bins * (W - 60);
+  for (let b = 0; b < bins; b++) { const h = hist[b] / peak * (H - 70);
+    ctx.fillStyle = "rgba(89,209,255,0.55)"; ctx.fillRect(bx(b), H - 34 - h, (W - 60) / bins - 1, h); }
+  const xAt = (v) => 30 + (v - lo) / (hi - lo) * (W - 60);
+  ctx.strokeStyle = "#f6a623"; ctx.setLineDash([]); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(xAt(dFexact), 20); ctx.lineTo(xAt(dFexact), H - 34); ctx.stroke();
+  ctx.fillStyle = "#f6a623"; ctx.fillText("dF exact = " + dFexact.toFixed(4), xAt(dFexact) + 6, 30);
+  const meanW = sumW / works.length;
+  ctx.strokeStyle = "#9be15d"; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(xAt(meanW), 20); ctx.lineTo(xAt(meanW), H - 34); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#9be15d"; ctx.fillText("<W> = " + meanW.toFixed(3), xAt(meanW) + 6, 46);
+  ctx.fillStyle = "#7f96b8"; ctx.fillText("work W per trajectory", W / 2 - 60, H - 12);
+
+  const dFj = -kT * Math.log(sumExp / works.length);
+  const jOk = Math.abs(dFj - dFexact) < 0.05, eq = nX2 ? sumX2 / nX2 : 1, eqOk = Math.abs(eq - 1) < 0.08;
+  hud.innerHTML =
+    works.length + " trajectories · Jarzynski -kT ln&lt;e<sup>-W</sup>&gt; = <b class='" + (jOk ? "good" : "bad") + "'>" + dFj.toFixed(4) + "</b>" +
+    " vs exact " + dFexact.toFixed(4) + " <b class='" + (jOk ? "good" : "bad") + "'>" + (jOk ? "MATCHES" : "WRONG") + "</b>" +
+    " · &lt;W&gt; = " + meanW.toFixed(3) + " (&ge; dF: second law, dissipation " + (meanW - dFexact).toFixed(3) + ")<br>" +
+    "trajectory health (equipartition along the paths, k&lt;x&sup2;&gt;/kT &rarr; 1): <b class='" + (eqOk ? "good" : "bad") + "'>" + eq.toFixed(3) + "</b>" +
+    " — <span class='dim'>the work-ledger sabotage keeps this GREEN while the Jarzynski line goes red: the paths cannot testify against the ledger. The gate (physics/langevin/langevin-selfcheck.mjs) pins all of it.</span>";
+}
+document.getElementById("burst").onclick = () => runBurst(parseInt(document.getElementById("speed").value, 10));
+document.getElementById("clear").onclick = () => { works = []; sumExp = 0; sumW = 0; sumX2 = 0; nX2 = 0; draw(); hud.textContent = "cleared"; };
+document.getElementById("sabW").onclick = function () { const on = workInc === workIncrement; workInc = on ? workIncrementWRONG : workIncrement; this.classList.toggle("on", on); };
+document.getElementById("sabN").onclick = function () { const on = step === ouStep; step = on ? ouStepNoiseWRONG : ouStep; this.classList.toggle("on", on); };
+draw();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

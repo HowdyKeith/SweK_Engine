@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Audio Lab — Web Audio Synthesis Explorer</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Audio Lab">
+<meta name="demo:desc"   content="Web Audio synthesis explorer — oscillators, filters, FX chains.">
+<meta name="demo:cats"   content="audio">
+<meta name="demo:swatch" content="♪">
+
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    background: #0a0a14;
+    color: #cfd;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    min-height: 100vh;
+}
+.titlebar {
+    padding: 10px 16px;
+    background: linear-gradient(180deg, #14142a 0%, #0a0a14 100%);
+    border-bottom: 1px solid #233;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.titlebar h1 { margin: 0; font-size: 14px; color: #9cf; letter-spacing: 1.5px; }
+.tabs { display: flex; background: #06060c; border-bottom: 1px solid #233; }
+.tab {
+    padding: 10px 22px; cursor: pointer; color: #889;
+    border-right: 1px solid #233; transition: 0.15s all;
+}
+.tab:hover { background: #111; color: #cfd; }
+.tab.active { background: #0a3a2a; color: #4f8; border-bottom: 2px solid #4f8; }
+.panel { display: none; padding: 18px; max-width: 1200px; }
+.panel.active { display: block; }
+h2 {
+    color: #9cf; font-size: 13px; margin: 0 0 10px 0; letter-spacing: 1px;
+    padding-bottom: 6px; border-bottom: 1px solid #233;
+}
+canvas { display: block; background: #06060c; border: 1px solid #233; border-radius: 4px; margin: 10px 0; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 1400px; height: auto; display: block; }
+.control-row { margin: 8px 0; padding: 6px 0; }
+button {
+    background: #14302a; color: #4f8; border: 1px solid #4f8;
+    padding: 6px 14px; border-radius: 3px; cursor: pointer; margin: 3px;
+    font-family: inherit; font-size: 11px;
+}
+button:hover { background: #205040; }
+button.preset { background: #302014; border-color: #fc4; color: #fc4; }
+button.preset:hover { background: #503020; }
+select, input[type=range] {
+    background: #112; color: #cfd; border: 1px solid #2a4;
+    padding: 4px; font-family: inherit; font-size: 11px;
+}
+input[type=range] { width: 160px; }
+label { color: #aab; margin-right: 6px; }
+.val { color: #cfd; margin-left: 4px; min-width: 40px; display: inline-block; }
+.legend { color: #889; font-size: 10px; margin-top: 4px; }
+.note { color: #fc4; font-size: 10px; padding: 4px 8px; background: #1a1a2a; border-left: 3px solid #fc4; margin: 8px 0; }
+kbd { background: #112; padding: 1px 5px; border-radius: 2px; border: 1px solid #233; color: #cfd; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+    <h1>🎛 AUDIO LAB — Web Audio Synthesis Explorer</h1>
+    <div style="color:#889;">distilled from voice-to-Ollama chat thread</div>
+</div>
+
+<div class="tabs">
+    <div class="tab active" data-tab="mic">🎤 Mic + Waveform</div>
+    <div class="tab" data-tab="osc">⊿ Oscillators + LFO</div>
+    <div class="tab" data-tab="filter">▼ Biquad Filter</div>
+    <div class="tab" data-tab="reverb">🏛 Convolution Reverb</div>
+    <div class="tab" data-tab="synth">🎹 Subtractive Synth</div>
+    <div class="tab" data-tab="fm">🌐 FM Synthesis</div>
+</div>
+
+<!-- ============ Mic + Waveform ============ -->
+<div id="panel-mic" class="panel active">
+    <h2>Microphone Input & Live Waveform</h2>
+    <div class="note">Click "Start Mic" to enable. Browsers require user gesture to access mic.</div>
+    <button id="btn-mic">▶ Start Mic</button>
+    <button id="btn-stop-mic">■ Stop</button>
+    <canvas id="mic-canvas" width="1100" height="220"></canvas>
+    <div class="legend">Time-domain waveform via AnalyserNode.getByteTimeDomainData(). Update rate: rAF (~60 Hz).</div>
+</div>
+
+<!-- ============ Oscillators ============ -->
+<div id="panel-osc" class="panel">
+    <h2>Oscillators + LFO Modulation</h2>
+    <div class="control-row">
+        <label>Type:</label>
+        <select id="osc-type">
+            <option value="sine">sine — pure tone</option>
+            <option value="square">square — buzzy, hollow</option>
+            <option value="sawtooth">sawtooth — bright, harmonically rich</option>
+            <option value="triangle">triangle — soft, hollow</option>
+        </select>
+        <label>Freq:</label>
+        <input type="range" id="osc-freq" min="60" max="2000" value="440">
+        <span class="val" id="osc-freq-val">440 Hz</span>
+        <button id="btn-osc-play">▶ Play 2s</button>
+    </div>
+    <div class="control-row">
+        <label>LFO → Frequency (vibrato):</label>
+        Rate <input type="range" id="lfo1-rate" min="0.1" max="15" step="0.1" value="4">
+        <span class="val" id="lfo1-rate-val">4.0 Hz</span>
+        Depth <input type="range" id="lfo1-depth" min="0" max="300" value="40">
+        <span class="val" id="lfo1-depth-val">40 Hz</span>
+    </div>
+    <div class="control-row">
+        <label>LFO → Amplitude (tremolo):</label>
+        Rate <input type="range" id="lfo2-rate" min="0.1" max="12" step="0.1" value="6">
+        <span class="val" id="lfo2-rate-val">6.0 Hz</span>
+        Depth <input type="range" id="lfo2-depth" min="0" max="0.5" step="0.01" value="0.15">
+        <span class="val" id="lfo2-depth-val">0.15</span>
+    </div>
+    <canvas id="osc-scope" width="1100" height="180"></canvas>
+</div>
+
+<!-- ============ Filter ============ -->
+<div id="panel-filter" class="panel">
+    <h2>BiquadFilterNode — Parameter Explorer</h2>
+    <div class="control-row">
+        <label>Type:</label>
+        <select id="filter-type">
+            <option value="lowpass">lowpass — cuts high frequencies</option>
+            <option value="highpass">highpass — cuts low frequencies</option>
+            <option value="bandpass">bandpass — isolates a band</option>
+            <option value="notch">notch — removes a narrow band</option>
+            <option value="peaking">peaking — boosts a band</option>
+        </select>
+        <label>Cutoff:</label>
+        <input type="range" id="filter-freq" min="100" max="8000" value="1200">
+        <span class="val" id="filter-freq-val">1200 Hz</span>
+        <label>Q:</label>
+        <input type="range" id="filter-q" min="0.1" max="25" step="0.1" value="4">
+        <span class="val" id="filter-q-val">4.0</span>
+    </div>
+    <button id="btn-filter-play">▶ Play Sawtooth Through Filter (3s)</button>
+    <div class="note">Sawtooth (rich harmonics) + lowpass = classic analog subtractive sound. Increase Q for resonance.</div>
+</div>
+
+<!-- ============ Reverb ============ -->
+<div id="panel-reverb" class="panel">
+    <h2>Convolution Reverb — Procedural Impulse Responses</h2>
+    <div class="control-row">
+        <button class="preset" id="reverb-cave">🏔 Cave (3.8s)</button>
+        <button class="preset" id="reverb-hall">🏛 Hall (4.5s)</button>
+        <button class="preset" id="reverb-plate">📀 Plate (1.8s)</button>
+        <button class="preset" id="reverb-room">🏠 Room (0.6s)</button>
+    </div>
+    <button id="btn-reverb-play">▶ Play Reverberated Tone</button>
+    <div id="reverb-status" class="legend">No impulse loaded yet</div>
+    <div class="note">
+        Impulse generated as white noise × exponential decay, stereo. Real-world IRs (recorded
+        in actual spaces) sound more natural, but procedural is enough to demonstrate convolution.
+    </div>
+</div>
+
+<!-- ============ Subtractive Synth ============ -->
+<div id="panel-synth" class="panel">
+    <h2>Polyphonic Subtractive Synth — Play with Keyboard</h2>
+    <div class="note">
+        <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd>
+        = notes (white keys) &nbsp; • &nbsp; <kbd>Z</kbd>/<kbd>X</kbd> = octave down/up
+    </div>
+    <div class="control-row">
+        <label>Osc:</label>
+        <select id="synth-osc"><option value="sawtooth">sawtooth</option><option value="square">square</option></select>
+        <label>Filter Cutoff:</label>
+        <input type="range" id="synth-cutoff" min="200" max="6000" value="2400">
+        <label>Resonance:</label>
+        <input type="range" id="synth-q" min="0.5" max="20" step="0.1" value="6">
+    </div>
+    <div class="control-row">
+        <label>Filter ADSR:</label>
+        A <input type="range" id="adsr-a" min="10" max="800" value="40">
+        D <input type="range" id="adsr-d" min="50" max="1500" value="250">
+        S <input type="range" id="adsr-s" min="0" max="100" value="50">
+        R <input type="range" id="adsr-r" min="100" max="2500" value="600">
+    </div>
+    <button id="btn-synth-chord">▶ Test Chord</button>
+    <canvas id="synth-scope" width="1100" height="160"></canvas>
+    <div id="synth-status" class="legend">Click anywhere on the page then press A-J. Voices: 0</div>
+</div>
+
+<!-- ============ FM ============ -->
+<div id="panel-fm" class="panel">
+    <h2>FM Synthesis — Carrier/Modulator Ratios</h2>
+    <div class="control-row">
+        <label>Carrier:</label>
+        <input type="range" id="fm-carrier" min="60" max="800" value="220">
+        <span class="val" id="fm-carrier-val">220 Hz</span>
+        <label>Mod Ratio:</label>
+        <select id="fm-ratio">
+            <option value="0.5">0.5:1 (sub-harmonic)</option>
+            <option value="1">1:1 (unison)</option>
+            <option value="2" selected>2:1 (bright)</option>
+            <option value="3">3:1</option>
+            <option value="5">5:1</option>
+            <option value="7">7:1 (metallic / bell)</option>
+            <option value="11">11:1 (clangorous)</option>
+        </select>
+        <label>Index:</label>
+        <input type="range" id="fm-index" min="0" max="25" value="6">
+        <span class="val" id="fm-index-val">6.0</span>
+    </div>
+    <button id="btn-fm-play">▶ Play FM (2.5s)</button>
+    <div class="note">
+        FM bell tones: ratio 7:1 + high index. FM bass: ratio 2:1 + low index.
+        Index controls how many sidebands are produced — higher index = brassier, more inharmonic.
+    </div>
+</div>
+
+<script>
+// =============================================================================
+// Audio Lab — single-file synthesis explorer.
+// Distilled from a long voice-to-Ollama chat thread covering Web Audio API
+// oscillators, filters, reverb, AudioWorklets, MIDI, LFOs, ADSR, FM, additive,
+// subtractive, granular, vector, and physical modeling.
+// =============================================================================
+
+let ctx;             // shared AudioContext (lazy-created on first user gesture)
+let micAnalyser, micStream, micRafId;
+
+function ensureCtx() {
+    if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+}
+
+// ----- Tab switching -----
+document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+        document.getElementById("panel-" + t.dataset.tab).classList.add("active");
+    });
+});
+
+// ----- Mic + waveform -----
+document.getElementById("btn-mic").onclick = async () => {
+    ensureCtx();
+    if (micStream) return;
+    try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const src = ctx.createMediaStreamSource(micStream);
+        micAnalyser = ctx.createAnalyser();
+        micAnalyser.fftSize = 2048;
+        src.connect(micAnalyser);
+        drawMicWaveform();
+    } catch (e) {
+        alert("Mic permission denied or unavailable: " + (e?.message ?? e));
+    }
+};
+
+document.getElementById("btn-stop-mic").onclick = () => {
+    if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+    }
+    if (micRafId) cancelAnimationFrame(micRafId);
+    const c = document.getElementById("mic-canvas");
+    c.getContext("2d").clearRect(0, 0, c.width, c.height);
+};
+
+function drawMicWaveform() {
+    const c = document.getElementById("mic-canvas");
+    const cx = c.getContext("2d");
+    const buf = new Uint8Array(micAnalyser.fftSize);
+    function frame() {
+        if (!micStream) return;
+        micAnalyser.getByteTimeDomainData(buf);
+        cx.fillStyle = "#06060c";
+        cx.fillRect(0, 0, c.width, c.height);
+        cx.strokeStyle = "#4f8";
+        cx.lineWidth = 2;
+        cx.beginPath();
+        const step = c.width / buf.length;
+        for (let i = 0; i < buf.length; i++) {
+            const v = (buf[i] - 128) / 128;
+            const y = c.height / 2 + v * c.height * 0.45;
+            i === 0 ? cx.moveTo(0, y) : cx.lineTo(i * step, y);
+        }
+        cx.stroke();
+        micRafId = requestAnimationFrame(frame);
+    }
+    frame();
+}
+
+// ----- Oscillators + LFO -----
+function bindVal(id, valId, fmt) {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(valId);
+    const update = () => valEl.textContent = fmt(el.value);
+    el.addEventListener("input", update);
+    update();
+}
+bindVal("osc-freq", "osc-freq-val", v => v + " Hz");
+bindVal("lfo1-rate", "lfo1-rate-val", v => (+v).toFixed(1) + " Hz");
+bindVal("lfo1-depth", "lfo1-depth-val", v => v + " Hz");
+bindVal("lfo2-rate", "lfo2-rate-val", v => (+v).toFixed(1) + " Hz");
+bindVal("lfo2-depth", "lfo2-depth-val", v => (+v).toFixed(2));
+bindVal("filter-freq", "filter-freq-val", v => v + " Hz");
+bindVal("filter-q", "filter-q-val", v => (+v).toFixed(1));
+bindVal("fm-carrier", "fm-carrier-val", v => v + " Hz");
+bindVal("fm-index", "fm-index-val", v => (+v).toFixed(1));
+
+document.getElementById("btn-osc-play").onclick = () => {
+    ensureCtx();
+    const osc = ctx.createOscillator();
+    osc.type = document.getElementById("osc-type").value;
+    osc.frequency.value = +document.getElementById("osc-freq").value;
+
+    // LFO 1 → frequency
+    const lfo1 = ctx.createOscillator();
+    lfo1.frequency.value = +document.getElementById("lfo1-rate").value;
+    const lfo1Gain = ctx.createGain();
+    lfo1Gain.gain.value = +document.getElementById("lfo1-depth").value;
+    lfo1.connect(lfo1Gain).connect(osc.frequency);
+
+    // Amp envelope + LFO 2 (tremolo)
+    const amp = ctx.createGain();
+    const baseAmp = 0.3;
+    amp.gain.value = baseAmp;
+    const lfo2 = ctx.createOscillator();
+    lfo2.frequency.value = +document.getElementById("lfo2-rate").value;
+    const lfo2Gain = ctx.createGain();
+    lfo2Gain.gain.value = +document.getElementById("lfo2-depth").value * baseAmp;
+    lfo2.connect(lfo2Gain).connect(amp.gain);
+
+    osc.connect(amp).connect(ctx.destination);
+
+    // Analyser for scope
+    const scopeAnalyser = ctx.createAnalyser();
+    scopeAnalyser.fftSize = 2048;
+    amp.connect(scopeAnalyser);
+    drawScope("osc-scope", scopeAnalyser, 2.2);
+
+    const now = ctx.currentTime;
+    amp.gain.setValueAtTime(0, now);
+    amp.gain.linearRampToValueAtTime(baseAmp, now + 0.05);
+    amp.gain.setValueAtTime(baseAmp, now + 1.9);
+    amp.gain.linearRampToValueAtTime(0, now + 2.0);
+
+    osc.start(now);
+    lfo1.start(now);
+    lfo2.start(now);
+    osc.stop(now + 2.1);
+    lfo1.stop(now + 2.1);
+    lfo2.stop(now + 2.1);
+};
+
+function drawScope(canvasId, analyser, durationSec) {
+    const c = document.getElementById(canvasId);
+    const cx = c.getContext("2d");
+    const buf = new Uint8Array(analyser.fftSize);
+    const t0 = performance.now();
+    function frame() {
+        if (performance.now() - t0 > durationSec * 1000) {
+            cx.fillStyle = "#06060c"; cx.fillRect(0, 0, c.width, c.height);
+            return;
+        }
+        analyser.getByteTimeDomainData(buf);
+        cx.fillStyle = "#06060c"; cx.fillRect(0, 0, c.width, c.height);
+        cx.strokeStyle = "#9cf"; cx.lineWidth = 2;
+        cx.beginPath();
+        const step = c.width / buf.length;
+        for (let i = 0; i < buf.length; i++) {
+            const v = (buf[i] - 128) / 128;
+            const y = c.height / 2 + v * c.height * 0.45;
+            i === 0 ? cx.moveTo(0, y) : cx.lineTo(i * step, y);
+        }
+        cx.stroke();
+        requestAnimationFrame(frame);
+    }
+    frame();
+}
+
+// ----- Filter -----
+document.getElementById("btn-filter-play").onclick = () => {
+    ensureCtx();
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.value = 220;
+    const filter = ctx.createBiquadFilter();
+    filter.type = document.getElementById("filter-type").value;
+    filter.frequency.value = +document.getElementById("filter-freq").value;
+    filter.Q.value = +document.getElementById("filter-q").value;
+    const amp = ctx.createGain();
+    amp.gain.value = 0.25;
+    osc.connect(filter).connect(amp).connect(ctx.destination);
+    const now = ctx.currentTime;
+    amp.gain.setValueAtTime(0, now);
+    amp.gain.linearRampToValueAtTime(0.25, now + 0.05);
+    amp.gain.setValueAtTime(0.25, now + 2.7);
+    amp.gain.linearRampToValueAtTime(0, now + 3.0);
+    osc.start(now);
+    osc.stop(now + 3.1);
+};
+
+// ----- Reverb -----
+let currentImpulse = null;
+
+function buildImpulse(duration, decay) {
+    const len = ctx.sampleRate * duration;
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+        const data = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * decay));
+        }
+    }
+    return buf;
+}
+
+function setImpulse(name, duration, decay) {
+    ensureCtx();
+    currentImpulse = buildImpulse(duration, decay);
+    document.getElementById("reverb-status").textContent = `Loaded: ${name} (${duration}s, decay ${decay})`;
+}
+
+document.getElementById("reverb-cave").onclick  = () => setImpulse("Cave",  3.8, 0.085);
+document.getElementById("reverb-hall").onclick  = () => setImpulse("Hall",  4.5, 0.055);
+document.getElementById("reverb-plate").onclick = () => setImpulse("Plate", 1.8, 0.12);
+document.getElementById("reverb-room").onclick  = () => setImpulse("Room",  0.6, 0.2);
+
+document.getElementById("btn-reverb-play").onclick = () => {
+    if (!currentImpulse) { alert("Load an impulse first."); return; }
+    ensureCtx();
+    const osc = ctx.createOscillator();
+    osc.frequency.value = 440;
+    const conv = ctx.createConvolver();
+    conv.buffer = currentImpulse;
+    const dry = ctx.createGain(); dry.gain.value = 0.35;
+    const wet = ctx.createGain(); wet.gain.value = 0.6;
+    osc.connect(dry).connect(ctx.destination);
+    osc.connect(conv).connect(wet).connect(ctx.destination);
+    const now = ctx.currentTime;
+    osc.start(now);
+    osc.stop(now + 0.4);
+};
+
+// ----- Subtractive synth + keyboard -----
+let curOctave = 4;
+const voices = new Map();   // key → {osc, filter, gain}
+const noteMap = { a:261.63, s:293.66, d:329.63, f:349.23, g:392.0, h:440.0, j:493.88 };
+
+function adsr() {
+    return {
+        a: +document.getElementById("adsr-a").value / 1000,
+        d: +document.getElementById("adsr-d").value / 1000,
+        s: +document.getElementById("adsr-s").value / 100,
+        r: +document.getElementById("adsr-r").value / 1000,
+    };
+}
+
+function noteOn(key) {
+    if (voices.has(key)) return;
+    ensureCtx();
+    const baseFreq = noteMap[key];
+    if (!baseFreq) return;
+    const freq = baseFreq * Math.pow(2, curOctave - 4);
+    const osc = ctx.createOscillator();
+    osc.type = document.getElementById("synth-osc").value;
+    osc.frequency.value = freq;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    const cutoff = +document.getElementById("synth-cutoff").value;
+    filter.Q.value = +document.getElementById("synth-q").value;
+    filter.frequency.value = cutoff;
+    const amp = ctx.createGain();
+    amp.gain.value = 0;
+    osc.connect(filter).connect(amp).connect(ctx.destination);
+    const env = adsr();
+    const t0 = ctx.currentTime;
+    amp.gain.setValueAtTime(0, t0);
+    amp.gain.linearRampToValueAtTime(0.25, t0 + env.a);
+    amp.gain.linearRampToValueAtTime(0.25 * env.s, t0 + env.a + env.d);
+    filter.frequency.setValueAtTime(cutoff * 0.4, t0);
+    filter.frequency.linearRampToValueAtTime(cutoff, t0 + env.a);
+    filter.frequency.linearRampToValueAtTime(cutoff * (0.4 + 0.6 * env.s), t0 + env.a + env.d);
+    osc.start(t0);
+    voices.set(key, { osc, filter, gain: amp });
+    refreshSynthStatus();
+}
+
+function noteOff(key) {
+    const v = voices.get(key);
+    if (!v) return;
+    voices.delete(key);
+    const env = adsr();
+    const t0 = ctx.currentTime;
+    v.gain.gain.cancelScheduledValues(t0);
+    v.gain.gain.setValueAtTime(v.gain.gain.value, t0);
+    v.gain.gain.linearRampToValueAtTime(0, t0 + env.r);
+    v.osc.stop(t0 + env.r + 0.05);
+    refreshSynthStatus();
+}
+
+function refreshSynthStatus() {
+    document.getElementById("synth-status").textContent =
+        `Octave: ${curOctave}  ·  Active voices: ${voices.size}`;
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k === "z") { curOctave = Math.max(2, curOctave - 1); refreshSynthStatus(); return; }
+    if (k === "x") { curOctave = Math.min(6, curOctave + 1); refreshSynthStatus(); return; }
+    if (noteMap[k]) { e.preventDefault(); noteOn(k); }
+});
+document.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (noteMap[k]) noteOff(k);
+});
+
+document.getElementById("btn-synth-chord").onclick = () => {
+    ["a", "d", "g"].forEach((k, i) => setTimeout(() => {
+        noteOn(k);
+        setTimeout(() => noteOff(k), 1200);
+    }, i * 60));
+};
+
+// ----- FM synthesis -----
+document.getElementById("btn-fm-play").onclick = () => {
+    ensureCtx();
+    const carrierFreq = +document.getElementById("fm-carrier").value;
+    const ratio = +document.getElementById("fm-ratio").value;
+    const index = +document.getElementById("fm-index").value;
+    const carrier = ctx.createOscillator();
+    const mod = ctx.createOscillator();
+    const modGain = ctx.createGain();
+    carrier.frequency.value = carrierFreq;
+    mod.frequency.value = carrierFreq * ratio;
+    modGain.gain.value = carrierFreq * index;   // depth scales with carrier for stable timbre
+    mod.connect(modGain).connect(carrier.frequency);
+    const amp = ctx.createGain();
+    amp.gain.value = 0;
+    carrier.connect(amp).connect(ctx.destination);
+    const now = ctx.currentTime;
+    amp.gain.setValueAtTime(0, now);
+    amp.gain.linearRampToValueAtTime(0.3, now + 0.02);
+    amp.gain.setValueAtTime(0.3, now + 2.0);
+    amp.gain.linearRampToValueAtTime(0, now + 2.5);
+    carrier.start(now); mod.start(now);
+    carrier.stop(now + 2.6); mod.stop(now + 2.6);
+};
+
+refreshSynthStatus();
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

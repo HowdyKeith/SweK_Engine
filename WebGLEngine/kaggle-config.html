@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Kaggle Config</title>
+    <style>
+        :root {
+            --bg:     #0a0e16;
+            --panel:  #131826;
+            --border: #553a7a;
+            --text:   #cfd;
+            --dim:    #9bc;
+            --accent: #c9b;
+        }
+        html, body {
+            margin: 0; padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-monospace, Menlo, monospace;
+            min-height: 100vh;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        header .title {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 0.04em;
+        }
+        header .links a {
+            color: var(--dim);
+            text-decoration: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            margin-left: 4px;
+        }
+        header .links a.active {
+            color: var(--accent);
+            background: rgba(85, 58, 122, 0.3);
+        }
+        #host {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+        /* Pull the wizard / cache panel from their fixed positioning into
+           this page's main area so they stack normally on phone. */
+        #host > div[style*="position: fixed"] {
+            position: static !important;
+            top: auto !important;
+            left: auto !important;
+            transform: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: none !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+        }
+        .return-link {
+            text-align: center;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .return-link a {
+            color: var(--dim);
+            text-decoration: none;
+            font-size: 11px;
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <span class="title">⚙ KAGGLE CONFIG</span>
+        <span class="links">
+            <a href="?view=setup" id="link-setup">⚙ Setup</a>
+            <a href="?view=cache" id="link-cache">📦 Cache</a>
+        </span>
+    </header>
+    <div id="host"></div>
+    <div class="return-link">
+        <a href="/control.html">← Return to control.html</a>
+    </div>
+
+    <script type="module">
+        // Pick which panel to mount based on the ?view= query param.
+        // Defaults to setup so first-time users land on it.
+        const params = new URLSearchParams(location.search);
+        const view = params.get("view") || "setup";
+        const host = document.getElementById("host");
+
+        // Visually mark which link is active
+        document.getElementById("link-" + view)?.classList.add("active");
+
+        try {
+            if (view === "cache") {
+                const mod = await import("./ui/kaggleDatasetCache.js");
+                const panel = mod.mountKaggleDatasetCache();
+                panel.open();
+                // The panel's close button removes the panel root from
+                // document.body and sets internal state to null. We can't
+                // intercept that cleanly, but since this page is dedicated
+                // to one panel, "close" effectively means "return", which
+                // the bottom link handles.
+            } else {
+                const mod = await import("./ui/kaggleSetupWizard.js");
+                const wiz = mod.mountKaggleSetupWizard();
+                wiz.open();
+            }
+            // The panels mount onto document.body. Re-parent into #host so
+            // our CSS overrides apply (static positioning, full width).
+            requestAnimationFrame(() => {
+                const stray = document.body.querySelectorAll('body > div[style*="position: fixed"]');
+                stray.forEach(d => host.appendChild(d));
+            });
+        } catch (e) {
+            host.innerHTML = '<div style="color:#c66; padding:16px; text-align:center;">Failed to load: ' + (e?.message || e) + '</div>';
+        }
+    </script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

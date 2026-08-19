@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — the method instruments</title>
+<meta name="demo:desc" content="Three instruments that measure the lab rather than the physics: the proposer registry (which knobs a machine may turn, and on whose evidence), the knob registry (which instruments are governed and which are deliberately not), and periodic boundaries for molecular dynamics. None of them has a picture to show, so this page shows their keys and their gates instead of pretending otherwise.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:940px; margin:0 auto; padding:18px; line-height:1.7; }
+  .card { border:1px solid #22304a; border-radius:8px; padding:12px 14px; margin-top:12px; }
+  h3 { margin:0 0 4px; font-size:14px; color:#9fb4d8; font-weight:normal; }
+  .dim { color:#7f96b8; } code { color:#9fb4d8; }
+  .key { border-left:2px solid #2b6ea8; padding-left:10px; margin-top:7px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">The method instruments</h2>
+  <div class="dim">Most instruments here measure a physical constant. These three measure the lab: what it is allowed to tune, what it has chosen not to govern, and whether a fluid in a box is a fluid or a surface. They had no front door until now because none of them has a picture, and a page that invented one would be worse than the absence. What they have instead is a key and a gate, so that is what is shown.</div>
+  <div id="out"><span class="dim">loading the registry…</span></div>
+</div>
+<script type="module">
+import { INSTRUMENTS } from "./physics/instruments.mjs";
+// v3408 -- FOUR MORE JOINED, because the alternative was a second page that said the same thing about a
+// different four. These instruments measure the lab rather than the physics, none of them has a picture to
+// show, and a page that invented one would be worse than the absence they already record honestly.
+const WANT = ["proposers", "knob-registry", "md-pbc",
+              "clocks", "perceptual-diff", "render-accountability", "recon-quality",
+              "coverage-triage"];
+const out = document.getElementById("out");
+out.innerHTML = "";
+for (const id of WANT) {
+  const i = INSTRUMENTS.find((x) => x.id === id);
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = i
+    ? "<h3>" + i.name + " <span class='dim'>· " + i.area + "</span></h3>" +
+      "<div class='dim'>" + i.measures + "</div>" +
+      "<div class='key'>" + i.key + "</div>" +
+      "<div class='dim' style='margin-top:7px;'>gate: <code>" + i.gate + "</code>" +
+      (i.device ? " · roundhouse device: <code>" + i.device + "</code>" : "") + "</div>"
+    : "<h3>" + id + "</h3><div class='dim'>not in the registry</div>";
+  out.appendChild(el);
+}
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

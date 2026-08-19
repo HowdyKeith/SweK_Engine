@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI-TARS · Local Test</title>
+<!--
+  v974 — try UI-TARS on THIS PC before dedicating a box. Flow:
+    1. Detect local Ollama (:11434) + a UI-TARS GGUF; pull if missing.
+    2. "Use local" points the bridge at localhost Ollama.
+    3. Share a screen/window, snapshot a frame, type an instruction, and see
+       the model's Thought + Action (no clicks are performed — observe only).
+  Heads-up: a 7B vision model shares the 8GB Pascal with the engine + ComfyUI,
+  so expect slow, several-seconds-per-step responses under contention.
+-->
+<style>
+  :root{ --bg:#0b1016; --panel:#121a24; --edge:#243a52; --ink:#dce7f5; --dim:#7d93ad;
+    --accent:#6ca8ff; --amber:#ffb14e; --green:#3ecf8e; --bad:#e06a6a; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;}
+  header{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--edge);}
+  header h1{font-size:16px;margin:0;font-weight:600;}
+  .pill{font-size:12px;padding:3px 9px;border-radius:11px;background:#1a2735;color:var(--dim);}
+  .pill.on{background:rgba(62,207,142,.18);color:var(--green);} .pill.off{background:rgba(224,106,106,.18);color:var(--bad);}
+  main{max-width:760px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:11px;padding:14px;}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin:0 0 10px;}
+  .btns{display:flex;flex-wrap:wrap;gap:9px;}
+  button{font-family:inherit;font-size:14px;font-weight:600;border:none;border-radius:8px;padding:10px 15px;cursor:pointer;transition:filter .12s;}
+  button:hover{filter:brightness(1.12);} button:disabled{opacity:.45;cursor:not-allowed;}
+  .primary{background:var(--accent);color:#04121f;} .ghost{background:#1a2735;color:var(--ink);border:1px solid var(--edge);}
+  input{width:100%;background:#0c141d;border:1px solid var(--edge);border-radius:8px;color:var(--ink);font:inherit;padding:10px;}
+  video,canvas{width:100%;border-radius:9px;border:1px solid var(--edge);background:#000;display:block;}
+  canvas{display:none;}
+  pre{background:#0c141d;border:1px solid var(--edge);border-radius:8px;padding:11px;white-space:pre-wrap;
+    word-break:break-word;font-size:13px;color:var(--ink);max-height:240px;overflow:auto;margin:0;}
+  .hint{font-size:12px;color:var(--dim);line-height:1.5;margin:8px 0 0;}
+  code{background:#0c141d;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;color:var(--amber);}
+</style>
+</head>
+<body>
+  <header><h1>UI-TARS — Local Test</h1><span class="pill" id="stat">checking…</span></header>
+  <main>
+    <div class="card">
+      <h2>1 · Local model</h2>
+      <div class="btns">
+        <button class="ghost" id="detect">🔍 Detect local Ollama</button>
+        <button class="primary" id="useLocal">📍 Use local (:11434)</button>
+      </div>
+      <pre id="detectOut" style="margin-top:11px;display:none"></pre>
+      <p class="hint">No UI-TARS model yet? In a terminal run <code id="pullCmd">ollama pull hf.co/mradermacher/UI-TARS-1.5-7B-GGUF:Q4_K_M</code> then Detect again.</p>
+    </div>
+
+    <div class="card">
+      <h2>2 · Screen</h2>
+      <div class="btns"><button class="ghost" id="share">🖥 Share a screen / window</button></div>
+      <video id="vid" autoplay muted playsinline style="margin-top:11px;display:none"></video>
+      <canvas id="cv"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>3 · Ask</h2>
+      <input id="instr" placeholder="e.g. Click the blue Compose button">
+      <div class="btns" style="margin-top:10px"><button class="primary" id="ask" disabled>🧠 Snapshot + Ask</button></div>
+      <p class="hint">Observe-only — the model returns its Thought + Action; nothing is clicked for you. This is the dry-run to judge whether it understands your screen.</p>
+      <pre id="out" style="margin-top:11px;display:none"></pre>
+    </div>
+
+    <div class="card">
+      <h2>4 · Drive the composer</h2>
+      <textarea id="goal" rows="3" style="width:100%;background:#0c141d;border:1px solid var(--edge);border-radius:8px;color:var(--ink);font:inherit;padding:10px;resize:vertical" placeholder="Goal for UI-TARS (or load the composer draft)"></textarea>
+      <div class="btns" style="margin-top:10px">
+        <button class="ghost" id="loadDraft">⤵ Load composer draft</button>
+        <button class="primary" id="stepBtn" disabled>▷ Step</button>
+        <button class="ghost" id="autoBtn" disabled>⏩ Auto-run</button>
+        <button class="ghost" id="stopBtn" disabled>⏹ Stop</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:11px;font-size:13px;color:var(--bad)">
+        <input type="checkbox" id="arm"> ARM real mouse/keyboard execution (default off = visualize only)
+      </label>
+      <canvas id="drive" style="margin-top:11px;display:none"></canvas>
+      <pre id="driveLog" style="margin-top:10px;display:none"></pre>
+      <p class="hint">Visualize-only by default — each step draws where UI-TARS <i>would</i> click and what it would type, on the captured frame. Real execution needs BOTH this checkbox AND <code>uiTars.config({executeEnabled:true})</code> on the rig; until both are set nothing touches your mouse. Keep the Facebook composer visible in the shared window, watch each step, and Stop anytime.</p>
+    </div>
+  </main>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const J=(u,m,b)=>fetch(u,{method:m||"GET",headers:{"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+  let stream=null;
+
+  function refresh(){
+    J("/uitars/status").then(s=>{
+      const p=$("stat");
+      if(s && s.reachable){ p.className="pill on"; p.textContent=(s.mode||"")+" · "+(s.model||"model")+" · reachable"; }
+      else { p.className="pill off"; p.textContent=(s&&s.mode||"")+" · unreachable"; }
+    }).catch(()=>{ $("stat").className="pill off"; $("stat").textContent="bridge offline"; });
+  }
+
+  $("detect").addEventListener("click", async ()=>{
+    const o=$("detectOut"); o.style.display="block"; o.textContent="detecting…";
+    const r=await J("/uitars/detect-local").catch(e=>({ok:false,error:String(e)}));
+    o.textContent=JSON.stringify(r,null,2);
+    if(r && r.suggestedPull) $("pullCmd").textContent=r.suggestedPull;
+  });
+  $("useLocal").addEventListener("click", async ()=>{
+    const r=await J("/uitars/use-local","POST",{}).catch(()=>null);
+    $("detectOut").style.display="block";
+    $("detectOut").textContent=r?("now using: "+JSON.stringify(r.config,null,2)):"failed";
+    refresh();
+  });
+
+  $("share").addEventListener("click", async ()=>{
+    try{
+      stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:1},audio:false});
+      const v=$("vid"); v.srcObject=stream; v.style.display="block"; $("ask").disabled=false;
+      $("stepBtn").disabled=false; $("autoBtn").disabled=false;
+      stream.getVideoTracks()[0].addEventListener("ended",()=>{ $("ask").disabled=true; $("stepBtn").disabled=true; $("autoBtn").disabled=true; v.style.display="none"; });
+    }catch(e){ alert("screen share cancelled or unavailable: "+e.message); }
+  });
+
+  $("ask").addEventListener("click", async ()=>{
+    const v=$("vid"), cv=$("cv");
+    if(!v.videoWidth){ alert("no frame yet"); return; }
+    cv.width=v.videoWidth; cv.height=v.videoHeight;
+    cv.getContext("2d").drawImage(v,0,0);
+    const shot=cv.toDataURL("image/png");
+    const o=$("out"); o.style.display="block"; o.textContent="thinking… (first call loads the model — can take a while)";
+    $("ask").disabled=true;
+    const r=await J("/uitars/act","POST",{screenshot:shot,instruction:$("instr").value||"Describe what you see and the next action."}).catch(e=>({ok:false,error:String(e)}));
+    $("ask").disabled=false;
+    o.textContent = (r && (r.text||r.thought||r.action)) ? [r.thought?("Thought: "+r.thought):"", r.action?("Action: "+r.action):"", r.text?("\n"+r.text):""].filter(Boolean).join("\n") : JSON.stringify(r,null,2);
+  });
+
+  // ---- v977 driver: visualize (default) + double-gated execution ----
+  function parseAction(text){
+    const line = ((text.match(/Action:\s*([^\n]+)/i)||[,""])[1]||"").trim() || String(text||"").trim();
+    const thought = ((text.match(/Thought:\s*([^\n]+)/i)||[,""])[1]||"").trim();
+    const a = { kind:"unknown", raw:line, thought };
+    const fn=/(\w+)\s*\(/.exec(line); if(fn) a.kind=fn[1].toLowerCase();
+    const box=/\(\s*(\d+)\s*,\s*(\d+)\s*\)/.exec(line);
+    if(box && /click|double|single|drag|scroll/.test(a.kind)){ a.x=+box[1]; a.y=+box[2]; }
+    const content=/content\s*=\s*['"]([\s\S]*?)['"]\s*\)/i.exec(line); if(content) a.content=content[1];
+    const key=/key\s*=\s*['"]([^'"]*)['"]/i.exec(line); if(key) a.key=key[1];
+    const dir=/direction\s*=\s*['"]([^'"]*)['"]/i.exec(line); if(dir) a.direction=dir[1];
+    return a;
+  }
+  function logDrive(m){ const p=$("driveLog"); p.style.display="block"; p.textContent=(m+"\n\n"+p.textContent).slice(0,4000); }
+  function drawOverlay(a,w,h){
+    const d=$("drive"); d.style.display="block"; d.style.width="100%"; d.width=w; d.height=h;
+    const ctx=d.getContext("2d"); ctx.drawImage($("cv"),0,0);
+    if(a.x!=null){ const r=Math.max(16,w/55); ctx.strokeStyle="#ff3b6b"; ctx.lineWidth=Math.max(2,w/350);
+      ctx.beginPath(); ctx.arc(a.x,a.y,r,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(a.x-r*1.6,a.y); ctx.lineTo(a.x+r*1.6,a.y); ctx.moveTo(a.x,a.y-r*1.6); ctx.lineTo(a.x,a.y+r*1.6); ctx.stroke(); }
+    ctx.fillStyle="rgba(255,59,107,.92)"; ctx.font="600 "+Math.max(16,w/65)+"px system-ui";
+    ctx.fillText(a.kind+(a.content?(": "+a.content.slice(0,42)):"")+(a.key?(" ["+a.key+"]"):""), 14, Math.max(26,w/55));
+  }
+  let _hist=[], _running=false;
+  function stopDrive(){ _running=false; $("stopBtn").disabled=true; }
+  async function driveStep(){
+    const v=$("vid"); if(!v.videoWidth){ alert("share a screen first (step 2)"); return true; }
+    const cv=$("cv"); cv.width=v.videoWidth; cv.height=v.videoHeight; cv.getContext("2d").drawImage(v,0,0);
+    const shot=cv.toDataURL("image/png");
+    const instr=($("goal").value||"Describe the next UI action.")+(_hist.length?("\nDone so far: "+_hist.join(" | ")):"")+"\nReturn ONLY the single next Thought + Action.";
+    const r=await J("/uitars/act","POST",{screenshot:shot,instruction:instr}).catch(e=>({ok:false,error:String(e)}));
+    if(!r||!r.ok){ logDrive("act failed: "+((r&&r.error)||"")); return true; }
+    const a=parseAction(r.action||"");
+    drawOverlay(a,v.videoWidth,v.videoHeight);
+    logDrive((a.thought?("🧠 "+a.thought+"\n"):"")+"➡ "+a.raw);
+    _hist.push(a.kind+(a.x!=null?("("+a.x+","+a.y+")"):"")+(a.content?(":"+a.content.slice(0,20)):"")); if(_hist.length>8)_hist.shift();
+    if($("arm").checked){
+      const er=await J("/uitars/execute","POST",{action:a}).catch(e=>({ok:false,error:String(e)}));
+      logDrive(er&&er.executed?"✓ executed on desktop":(er&&er.dryRun?"(server execution disabled — visualize only; set executeEnabled on the rig)":("⚠ "+((er&&er.error)||"not executed"))));
+    }
+    if(a.kind==="finished"){ logDrive("✅ finished"); return true; }
+    return false;
+  }
+  $("loadDraft").addEventListener("click", async ()=>{
+    const r=await J("/facebook/draft").catch(()=>null);
+    const t=(r&&r.draft&&r.draft.text)||"";
+    $("goal").value = t
+      ? ("Locate the Facebook post composer (the 'What's on your mind?' box), click it, type EXACTLY this text, then click the Post button.\nTEXT: "+t)
+      : "Open the Facebook post composer and type a short hello, then locate the Post button.";
+    _hist=[];
+  });
+  $("stepBtn").addEventListener("click", ()=>{ driveStep(); });
+  $("autoBtn").addEventListener("click", async ()=>{
+    if(_running) return; _running=true; $("stopBtn").disabled=false; _hist=[];
+    for(let i=0;i<12 && _running;i++){ const done=await driveStep(); if(done) break; await new Promise(r=>setTimeout(r,1200)); }
+    stopDrive();
+  });
+  $("stopBtn").addEventListener("click", stopDrive);
+
+  refresh();
+})();
+</script>
+</body>
+</html>

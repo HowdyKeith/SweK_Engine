@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SweK X4 Telemetry — MD scaffold.
+     Gathers player money / ship / sector and POSTs a JSON snapshot to the SweK bridge
+     every few seconds. EDIT $bridgeUrl below. The data-gathering is standard MD; the
+     single line that calls djfhe_http is marked <!-- WIRE djfhe_http --> — confirm that
+     signal/cue name against djfhe_http's current documentation on your rig.
+     Honest note (from the assistant): this script is untested here (no X4 in the sandbox).
+     If it doesn't fire, capture the X4 debug log and I'll correct the http call. -->
+<mdscript name="SweK_X4_Telemetry" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <cues>
+    <cue name="SweK_Init">
+      <conditions>
+        <event_game_loaded/>
+      </conditions>
+      <actions>
+        <set_value name="$bridgeUrl" exact="'http://127.0.0.1:8787/x4/state'"/>
+        <set_value name="$intervalSeconds" exact="3"/>
+      </actions>
+      <cues>
+        <cue name="SweK_Tick" instantiate="true">
+          <conditions>
+            <event_cue_signalled cue="SweK_Init"/>
+          </conditions>
+          <delay exact="$intervalSeconds * 1s"/>
+          <actions>
+            <!-- Gather a snapshot. Adjust property lookups to taste. -->
+            <set_value name="$ship"   exact="player.primaryship"/>
+            <set_value name="$json"   exact="''"/>
+            <set_value name="$json"   exact="
+              '{'
+              + '\&quot;player\&quot;:\&quot;' + player.name + '\&quot;,'
+              + '\&quot;money\&quot;:' + (player.money / 1Cr) + ','
+              + '\&quot;ship\&quot;:\&quot;' + (($ship) ? $ship.name : 'none') + '\&quot;,'
+              + '\&quot;shipHull\&quot;:' + (($ship) ? ($ship.hull.percent) : 0) + ','
+              + '\&quot;shipShield\&quot;:' + (($ship) ? ($ship.shieldpercent) : 0) + ','
+              + '\&quot;sector\&quot;:\&quot;' + (player.sector ? player.sector.name : 'unknown') + '\&quot;'
+              + '}'"/>
+
+            <!-- WIRE djfhe_http: replace the line below with djfhe_http's documented
+                 "make an HTTP request" signal. Conceptually:
+                   POST  url=$bridgeUrl   body=$json   contentType='application/json'
+                 djfhe_http typically exposes this via a raise_lua_event / signal_cue with
+                 a param table { method:'POST', url:$bridgeUrl, body:$json }. Confirm names. -->
+            <raise_lua_event name="'djfhe_http.request'"
+                             param="'POST|' + $bridgeUrl + '|application/json|' + $json"/>
+
+            <signal_cue_instantly cue="SweK_Tick"/>
+          </actions>
+        </cue>
+      </cues>
+    </cue>
+  </cues>
+</mdscript>

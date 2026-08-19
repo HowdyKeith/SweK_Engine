@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Verification Console</title>
+<style>
+  :root { --amber:#ffcc66; --amber2:#ff9f00; --cyan:#33ccff; --green:#9fe6c0; --bg:#06140c; --panel:#0b1f16; --line:#1e4a30; --bad:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#dfeee6; font:14px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; padding:24px; }
+  h1 { color:var(--amber); font-size:20px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px; }
+  .sub { color:#6f8f7f; margin:0 0 20px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center; }
+  button { background:var(--panel); color:var(--amber); border:1px solid var(--line); border-radius:14px 4px 14px 4px; padding:10px 18px; font:inherit; font-weight:600; cursor:pointer; letter-spacing:1px; }
+  button:hover { background:var(--line); color:#fff; }
+  button.cyan { color:var(--cyan); }
+  input[type=file] { color:#6f8f7f; font:inherit; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin-bottom:16px; }
+  .master { font-size:13px; word-break:break-all; }
+  .master b { color:var(--cyan); }
+  table { border-collapse:collapse; width:100%; font-size:12px; margin-top:8px; }
+  td { padding:3px 8px; border-bottom:1px solid #10281c; }
+  td.h { color:var(--green); word-break:break-all; }
+  .verdict { font-size:16px; font-weight:700; padding:12px 16px; border-radius:12px; }
+  .verdict.ok { color:#06140c; background:var(--green); }
+  .verdict.bad { color:#fff; background:var(--bad); }
+  .hint { color:#6f8f7f; font-size:12px; }
+  .diverged { color:var(--bad); }
+</style>
+</head>
+<body>
+  <h1>SweK Verification Console</h1>
+  <p class="sub">Run the cross-architecture fingerprint and prove two machines agree &mdash; no terminal.</p>
+
+  <div class="row">
+    <button id="btnFp">Run fingerprint</button>
+    <button id="btnAtt" class="cyan">Save attestation&hellip;</button>
+    <span class="hint">Run on each machine. Save the attestation on one, load it on the other to compare.</span>
+  </div>
+
+  <div class="row">
+    <input type="file" id="peerFile" accept="application/json" />
+    <button id="btnCmp" class="cyan">Compare peer attestation</button>
+    <span class="hint">Load another machine's saved attestation to prove byte agreement.</span>
+  </div>
+
+  <div class="row">
+    <button id="btnLock">Lockstep self-test</button>
+    <span class="hint">Two peers, same inputs, headless &mdash; prove they stay bit-identical and time the fast-forward.</span>
+  </div>
+
+  <div class="row">
+    <button id="btnRepro">Reproducibility check</button>
+    <span class="hint">Point the fingerprint at sample computations &mdash; watch it flag the ones that secretly aren't deterministic.</span>
+  </div>
+
+  <div id="result"></div>
+
+<script type="module">
+  import { computeFingerprint } from "./tools/fingerprint/fingerprint.mjs";
+  import { attestation, compareAttestations, verdict } from "./tools/fingerprint/attest.mjs";
+  import { verifyLockstep, makeSession, runTimeline, firstDivergence } from "./physics/lockstep.js";
+  import { checkDeterminism, EXAMPLE_PROBES } from "./tools/repro/harness.js";
+
+  const result = document.getElementById("result");
+  const detectArch = () => (navigator.userAgent.match(/arm64|aarch64/i) ? "arm64?" : "x64?") + " (" + (navigator.platform || "web") + ")";
+
+  function showFingerprint() {
+    const t0 = performance.now();
+    const { subsystems, master } = computeFingerprint();
+    const ms = (performance.now() - t0).toFixed(0);
+    const rows = subsystems.map((s) => `<tr><td>${s.name}</td><td class="h">${s.hash.slice(0, 24)}&hellip;</td></tr>`).join("");
+    result.innerHTML = `<div class="card">
+      <div class="master">MASTER <b>${master}</b></div>
+      <div class="hint">${subsystems.length} subsystems &middot; computed in ${ms} ms &middot; ${detectArch()}</div>
+      <table>${rows}</table>
+      <div class="hint" style="margin-top:8px">Identical MASTER on another machine = whole-engine bit-identity.</div>
+    </div>`;
+  }
+
+  function saveAttestation() {
+    const host = prompt("Name this machine (for the report):", "this-machine") || "this-machine";
+    const att = attestation({ arch: detectArch(), host, version: "browser" });
+    const blob = new Blob([JSON.stringify(att, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "swek-attestation-" + host + ".json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    result.innerHTML = `<div class="card"><div class="master">Saved attestation for <b>${host}</b> &mdash; master ${att.master.slice(0, 16)}&hellip;</div>
+      <div class="hint">Carry this file to the other machine and use &ldquo;Compare peer attestation&rdquo; there.</div></div>`;
+  }
+
+  function comparePeer() {
+    const f = document.getElementById("peerFile").files[0];
+    if (!f) { result.innerHTML = `<div class="card"><span class="diverged">Choose a peer attestation file first.</span></div>`; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      let peer;
+      try { peer = JSON.parse(reader.result); } catch { result.innerHTML = `<div class="card"><span class="diverged">That file is not valid attestation JSON.</span></div>`; return; }
+      const local = attestation({ arch: detectArch(), host: "this-machine", version: "browser" });
+      const res = compareAttestations(local, peer);
+      const line = verdict(res, "this machine", peer.host || "peer");
+      let body = `<div class="verdict ${res.identical ? "ok" : "bad"}">${res.identical ? "&#10003; " : "&#10007; "}${line}</div>`;
+      if (!res.identical) {
+        if (res.diverged.length) body += `<p class="diverged">Diverged subsystems: ${res.diverged.join(", ")}</p>`;
+        if (res.onlyA.length) body += `<p class="hint">Only on this machine: ${res.onlyA.join(", ")}</p>`;
+        if (res.onlyB.length) body += `<p class="hint">Only on peer: ${res.onlyB.join(", ")}</p>`;
+      }
+      body += `<div class="hint">this machine ${local.master.slice(0, 16)}&hellip; &middot; peer ${(peer.master || "?").slice(0, 16)}&hellip;</div>`;
+      result.innerHTML = `<div class="card">${body}</div>`;
+    };
+    reader.readAsText(f);
+  }
+
+  document.getElementById("btnFp").onclick = showFingerprint;
+  document.getElementById("btnAtt").onclick = saveAttestation;
+  document.getElementById("btnCmp").onclick = comparePeer;
+
+  function lockstepTest() {
+    const bodies = [{ m: 1, r: [-1, 0, 0], v: [0, -0.3, 0] }, { m: 1, r: [1, 0, 0], v: [0, 0.3, 0] }, { m: 0.5, r: [0, 1.2, 0], v: [0.4, 0, 0] }];
+    const T = []; for (let f = 0; f < 600; f++) { const inp = []; if (f === 100) inp.push({ body: 0, dvx: 0.05 }); if (f === 300) inp.push({ body: 1, dvy: 0.05 }); T.push(inp); }
+    const v = verifyLockstep(bodies.map((b) => ({ ...b, r: [...b.r], v: [...b.v] })), T, { dt: 0.01 });
+    // desync demo
+    const A = runTimeline(makeSession(bodies.map((b) => ({ ...b, r: [...b.r], v: [...b.v] })), { dt: 0.01 }), T);
+    const T2 = T.map((x, f) => (f === 250 ? [...x, { body: 2, dvx: 0.001 }] : x));
+    const B = runTimeline(makeSession(bodies.map((b) => ({ ...b, r: [...b.r], v: [...b.v] })), { dt: 0.01 }), T2);
+    const dframe = firstDivergence(A, B);
+    // headless speed
+    const N = 20000, S = makeSession(bodies.map((b) => ({ ...b, r: [...b.r], v: [...b.v] })), { dt: 0.01 }), empty = Array.from({ length: N }, () => []);
+    const t0 = performance.now(); runTimeline(S, empty); const fps = N / ((performance.now() - t0) / 1000);
+    result.innerHTML = `<div class="card">
+      <div class="verdict ${v.inSync ? "ok" : "bad"}">${v.inSync ? "&#10003; " : "&#10007; "}Two peers, same inputs: ${v.inSync ? "IN LOCKSTEP over " + v.frames + " frames" : "DESYNC at " + v.desyncFrame}</div>
+      <p class="hint">Injected desync (extra impulse on one peer at frame 250) caught at frame <b style="color:var(--cyan)">${dframe}</b>.</p>
+      <p class="hint">Headless speed: <b style="color:var(--cyan)">${Math.round(fps).toLocaleString()} frames/sec</b> &mdash; ${Math.round(fps / 60)}x realtime, no render. The same step replays matches and lets a lagging peer catch up.</p>
+    </div>`;
+  }
+  document.getElementById("btnLock").onclick = lockstepTest;
+
+  function reproCheck() {
+    const res = checkDeterminism(EXAMPLE_PROBES);
+    const rows = res.map((r) => `<tr><td>${r.deterministic ? "&#10003;" : "&#10007;"}</td><td>${r.name}</td><td style="color:${r.deterministic ? "var(--green)" : "var(--bad)"}">${r.deterministic ? "reproducible" : "NOT deterministic"}</td></tr>`).join("");
+    const bad = res.filter((r) => !r.deterministic).length;
+    result.innerHTML = `<div class="card">
+      <div class="master">Reproducibility check &mdash; <b>${res.length}</b> sample computations, <b style="color:var(--bad)">${bad}</b> flagged</div>
+      <table>${rows}</table>
+      <div class="hint" style="margin-top:8px">Each probe is run several times; if its result isn't bit-identical every run, it's reaching for Math.random, the clock, or something else that won't reproduce. Point this at your own functions to find the ones that secretly won't.</div>
+    </div>`;
+  }
+  document.getElementById("btnRepro").onclick = reproCheck;
+</script>
+</body>
+</html>

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<!-- v1261 (dungeon arc, slice 1) — Universal VTT loader. Drop a downloaded .dd2vtt /
+     .uvtt / .df2vtt file (Dungeondraft / Dungeon Alchemist / DungeonFog / donjon2uvtt)
+     and it renders in 3D: the map image as the floor, line_of_sight walls extruded to a
+     chosen height, portals as doors, and the embedded lights as point lights. This is
+     the foundation the rest of the arc builds on (variable heights, multi-level, spawns,
+     AI). Coordinates are in grid squares; 1 square = 1 world unit. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UVTT dungeon loader</title>
+<style>
+  :root{ --ink:#e7ddc7; --dim:#9a8f78; --accent:#d8b15a; --line:#3a3322; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#0b0a08; color:var(--ink);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; overflow:hidden; }
+  #view{ position:fixed; inset:0; display:block; }
+  #panel{ position:fixed; left:12px; top:12px; background:rgba(12,11,8,.82); border:1px solid var(--line);
+    border-radius:10px; padding:11px 13px; backdrop-filter:blur(6px); max-width:300px; }
+  h1{ font-size:15px; margin:0 0 6px; color:var(--accent); letter-spacing:.3px; }
+  .row{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+  button,select,input[type=file]{ font:13px inherit; color:var(--ink); background:#16130c; border:1px solid var(--line);
+    border-radius:7px; padding:6px 9px; cursor:pointer; }
+  input[type=range]{ flex:1; }
+  label{ color:var(--dim); font-size:12px; white-space:nowrap; }
+  .dim{ color:var(--dim); font-size:12px; }
+  #status{ margin-top:8px; font:12px ui-monospace,monospace; color:var(--dim); }
+  #drop{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(10,9,6,.6); border:3px dashed var(--accent); z-index:9; font-size:18px; color:var(--accent); }
+  a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="panel">
+  <h1>⛓ UVTT dungeon loader</h1>
+  <!-- v3818 -- SHIPPED MAPS, so the page has something to show before anybody has a file. The list is NOT
+       typed here: it comes from maps/uvtt/presets.mjs, which maps/uvtt/presets-selfcheck.mjs also reads. -->
+  <div class="row"><label>Preset</label><select id="preset" style="flex:1;"><option value="">(choose a shipped map)</option></select></div>
+  <div id="presetNote" class="dim" style="margin-top:4px; display:none;"></div>
+  <div class="row"><input type="file" id="file" accept=".uvtt,.dd2vtt,.df2vtt,.json" style="flex:1;"></div>
+  <div class="row"><label>Room height</label><input type="range" id="wh" min="0.5" max="8" step="0.25" value="3"></div>
+  <div class="row"><label>Floor relief</label><input type="range" id="relief" min="0" max="4" step="0.25" value="0"></div>
+  <div class="row"><label>Levels</label><input type="range" id="levels" min="1" max="4" step="1" value="1"><span id="lvlN" class="dim" style="width:14px;">1</span></div>
+  <div class="row"><label>Image</label><input type="checkbox" id="img" checked><label style="margin-left:8px;">Doors/lights</label><input type="checkbox" id="extras" checked><label style="margin-left:8px;">Ceiling</label><input type="checkbox" id="ceil"><label style="margin-left:8px;">Torches</label><input type="checkbox" id="torches" checked><label style="margin-left:8px;" title="Creatures lurk in the dark — only visible when lit by a torch, a glowing mushroom, or the boss aura">Lurk</label><input type="checkbox" id="lurk" checked></div>
+  <div class="row"><label>Seed</label><input type="number" id="seed" value="1337" style="width:74px; font:13px ui-monospace,monospace;"><button id="reroll" style="flex:0 0 auto;">🎲 Reroll</button><label style="margin-left:6px;">Mon</label><input type="checkbox" id="mon" checked><label style="margin-left:4px;">Loot</label><input type="checkbox" id="tre" checked></div>
+  <div class="row"><label>Spawn density</label><input type="range" id="density" min="0" max="3" step="0.25" value="1"></div>
+  <div class="row"><button id="runSim" class="" style="flex:1;">▶ Run raid</button><button id="resetSim" style="flex:1;">⟲ Reset</button><button id="vizPhero" style="flex:0 0 auto;" title="show pheromone trails">🟢 Trails</button><button id="astar" style="flex:0 0 auto; opacity:0.55;" title="route via the engine's real shared NavGrid A* (same code the WAD/CS bots use), vs the fast flow-field">🧭 NavGrid</button></div>
+  <div id="simhud" style="margin-top:6px; font:11px ui-monospace,monospace; color:var(--accent);">■ idle — load a dungeon, set Levels, then Run raid</div>
+  <div id="status">Drop a <b>.dd2vtt</b> / .uvtt file anywhere, or use the picker. Get them from a cartographer, Dungeon Alchemist, or generate one with donjon + donjon2uvtt.</div>
+</div>
+<div id="drop">⬇ drop a .dd2vtt / .uvtt file</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { NavGrid } from "./simulation/navGrid.js";
+import { describeMapArt } from "./maps/uvtt/mapArt.mjs";   // v3818 -- decide from the bytes, not from an Image event   // the engine's real shared pathfinder (same code the WAD/CS bots use)
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0a08);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 4000);
+camera.position.set(0, 24, 24);
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+const hemi = new THREE.HemisphereLight(0xfff1d6, 0x10100a, 0.65); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 0.7); sun.position.set(10, 30, 12); scene.add(sun);
+
+function resize(){ const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+const statusEl = document.getElementById("status");
+// v3818 -- *** THE MAP-ART VERDICT AND THE MAP SUMMARY RACE, AND EITHER ORDER HAPPENS. ***
+// The verdict arrives when the image finishes decoding; the summary is written at the end of rebuildAll().
+// A first attempt had noteArt() APPEND to whatever was on screen, which worked for six presets and lost the
+// note on the seventh -- the decode had lost the race and the summary overwrote it. MEASURED, not reasoned:
+// keep-60-lvl2 came back with no note while its identical sibling had one. So the note is now STATE rather
+// than an append, and setStatus re-renders it whichever way the race goes.
+let artNote = "";
+const setStatus = (m, err) => {
+  statusEl.innerHTML = m + (artNote ? " \u00b7 " + artNote : "");
+  statusEl.style.color = err ? "#ff8c8c" : "var(--dim)";
+  statusEl.dataset.msg = m;
+};
+const noteArt = (m) => { artNote = m; setStatus(statusEl.dataset.msg || "", false); };
+
+let levels = [];                          // built level groups in the scene
+let lastData = null, roomH = 3, relief = 0, levelCount = 1, showImg = true, showExtras = true, showCeiling = false, showTorches = true;
+let lightReveal = true;   // v1289 — creatures only visible when lit (torch / glowing mushroom / boss aura)
+let flickers = [], glowAnim = [];         // animated torch lights + mushroom glows
+const MUSH = [
+  { name: "haste",  col: 0x66ff66, mult: 1.6,  dur: 6  },
+  { name: "might",  col: 0xff5a5a, mult: 1.3,  dur: 8  },
+  { name: "ghost",  col: 0x66ccff, mult: 1.45, dur: 6  },
+  { name: "luck",   col: 0xffe066, mult: 1.15, dur: 10 },
+];
+const px = (p) => (p && p.x !== undefined) ? p.x : (Array.isArray(p) ? p[0] : 0);
+const py = (p) => (p && p.y !== undefined) ? p.y : (Array.isArray(p) ? p[1] : 0);
+
+// value noise for floor relief
+function hash2(x, y){ let h = (x*374761393 + y*668265263) | 0; h = Math.imul(h ^ (h>>>13), 1274126177); return ((h ^ (h>>>16)) >>> 0) / 4294967295; }
+function vnoise2(x, y){
+  const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  const a=hash2(xi,yi), b=hash2(xi+1,yi), c=hash2(xi,yi+1), d=hash2(xi+1,yi+1);
+  return (a*(1-u)+b*u)*(1-v) + (c*(1-u)+d*u)*v;
+}
+
+// ===== slice 3: procedural spawn pass (seeded, depth-scaled) =====
+let seed = 1337, density = 1, showMon = true, showTre = true;
+let spawnsAnim = [];            // { mesh, kind, phase, baseY }
+let spawnTotals = { mon: 0, tre: 0, value: 0, weight: 0 };
+function mulberry32(a){ return function(){ a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+
+// loot tiers: deeper = rarer. carryable items carry weight + value (used by later AI slices).
+const TREASURE = [
+  { name:"coins",  col:0xc88a2a, weight:2, value:5,   geo:"coin"  },
+  { name:"silver", col:0xcfd6e0, weight:3, value:15,  geo:"coin"  },
+  { name:"gold",   col:0xffcf4a, weight:5, value:40,  geo:"chest" },
+  { name:"gem",    col:0x7ad6ff, weight:1, value:120, geo:"gem"   },
+  { name:"relic",  col:0xff7ad6, weight:8, value:400, geo:"relic" },
+];
+const MONSTERS = [
+  { name:"slime",  col:0x6fcf6f, size:0.5,  emis:0   },
+  { name:"rat",    col:0x9a7a5a, size:0.45, emis:0   },
+  { name:"goblin", col:0x6fae5f, size:0.7,  emis:0   },
+  { name:"orc",    col:0x4a7a3a, size:0.95, emis:0   },
+  { name:"wraith", col:0x8a6fd0, size:0.85, emis:0.5 },
+];
+const tierByDepth = (rng, depth) => { const r = Math.pow(rng(), 1/(1 + depth*0.6)); return Math.min(4, Math.floor(r*5)); };
+
+function treasureMesh(t){
+  let geo;
+  if (t.geo === "coin")  geo = new THREE.CylinderGeometry(0.26, 0.26, 0.07, 16);
+  else if (t.geo === "gem")  geo = new THREE.OctahedronGeometry(0.3);
+  else if (t.geo === "relic") geo = new THREE.TorusGeometry(0.22, 0.08, 8, 18);
+  else geo = new THREE.BoxGeometry(0.5, 0.34, 0.34);   // chest
+  const mat = new THREE.MeshStandardMaterial({ color: t.col, metalness: 0.6, roughness: 0.3, emissive: t.col, emissiveIntensity: t.geo==="gem"||t.geo==="relic" ? 0.35 : 0.08 });
+  return new THREE.Mesh(geo, mat);
+}
+function monsterMesh(m, rng){
+  rng = rng || Math.random;
+  const g = new THREE.Group();
+  const size = m.size * (0.82 + rng()*0.42);                       // size variety
+  const col = new THREE.Color(m.col); col.offsetHSL((rng()-0.5)*0.08, (rng()-0.5)*0.16, (rng()-0.5)*0.08);  // hue/tone variety
+  const body = new THREE.Mesh(new THREE.SphereGeometry(size*0.45, 12, 10), new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, emissive: col, emissiveIntensity: m.emis }));
+  body.scale.y = 0.76 + rng()*0.2; g.add(body);
+  const eye = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  for (const sx of [-1, 1]){ const e = new THREE.Mesh(new THREE.SphereGeometry(size*0.08, 6, 6), eye); e.position.set(sx*size*0.16, size*0.12, size*0.4); g.add(e); }
+  const horns = (rng()*3)|0;                                        // 0-2 procedural horns
+  if (horns){ const hm = new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.6 });
+    for (let i = 0; i < horns; i++){ const a = (i/Math.max(1,horns))*6.283 + rng(); const h = new THREE.Mesh(new THREE.ConeGeometry(size*0.07, size*0.32, 5), hm); h.position.set(Math.cos(a)*size*0.2, size*0.44, Math.sin(a)*size*0.2); h.rotation.z = (rng()-0.5)*0.5; g.add(h); } }
+  return { mesh: g, size };
+}
+function mushroomMesh(col, size, emis){
+  const grp = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05*size, 0.08*size, 0.3*size, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.9 })); stem.position.y = 0.15*size; grp.add(stem);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2*size, 10, 8, 0, 6.283, 0, 1.5), new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: emis, roughness: 0.5 })); cap.scale.y = 0.7; cap.position.y = 0.32*size; grp.add(cap);
+  return { grp, cap };
+}
+function trapMesh(){
+  return new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0x342b22, roughness: 1, emissive: 0x000000, emissiveIntensity: 0 }));
+}
+
+// scatter monsters + treasure across a level's floor; depth scales count + rarity.
+function spawnLevel(g, depth, W, H, levelSeed, rec){
+  if (density <= 0) return;
+  const rng = mulberry32(levelSeed >>> 0), margin = 2;
+  const place = () => [ margin + rng()*(W-2*margin) - W/2, margin + rng()*(H-2*margin) - H/2 ];
+  if (showTre){
+    const nT = Math.round((6 + depth*3) * density);
+    for (let i=0;i<nT;i++){ const t = TREASURE[tierByDepth(rng, depth)]; const [x,z] = place();
+      const mesh = treasureMesh(t); mesh.position.set(x, 0.35, z); mesh.userData = { kind:"treasure", tier:t.name, weight:t.weight, value:t.value };
+      g.add(mesh); spawnsAnim.push({ mesh, kind:"treasure", phase: rng()*6.28, baseY: 0.35 });
+      spawnTotals.tre++; spawnTotals.value += t.value; spawnTotals.weight += t.weight;
+      if (rec) rec.loot.push({ mesh, x, z, value: t.value, weight: t.weight, taken: false });
+    }
+  }
+  if (showMon){
+    const nM = Math.round((4 + depth*2) * density);
+    for (let i=0;i<nM;i++){ const tier = MONSTERS[tierByDepth(rng, depth)]; const [x,z] = place();
+      const mm = monsterMesh(tier, rng); mm.mesh.position.set(x, mm.size*0.4, z); mm.mesh.userData = { kind:"monster", type:tier.name, awake:false };
+      g.add(mm.mesh); spawnsAnim.push({ mesh: mm.mesh, kind:"monster", phase: rng()*6.28, baseY: mm.size*0.4 });
+      spawnTotals.mon++;
+      if (rec) rec.monsters.push({ mesh: mm.mesh, x, z, type: tier.name, size: mm.size, speed: 1.6 + mm.size*0.6, awake: false, carrying: null, mode: "idle", baseY: mm.size*0.4, sensed: false, stuckT: 0, dead: false });
+    }
+  }
+  // MUSHROOMS, three tiers: small (light only), big (light + potion), glue-trap (sticky, deadly-ish)
+  const addMush = (col, sz, emis, kind, effect) => { const [x,z] = place();
+    const mu = mushroomMesh(col, sz, emis); mu.grp.position.set(x, 0, z); g.add(mu.grp);
+    const lt = new THREE.PointLight(col, kind === "small" ? 1.1 : 2.2, kind === "small" ? 3.5 : 5.5, 2); lt.position.set(0, 0.42*sz, 0); mu.grp.add(lt);
+    if (rec) rec.mushrooms.push({ mesh: mu.grp, cap: mu.cap, light: lt, x, z, kind, effect: effect || null, eaten: false, revealed: false });
+    glowAnim.push({ cap: mu.cap, light: lt, base: lt.intensity, phase: rng()*6.28 });
+  };
+  const nSmall = Math.round((3 + depth) * Math.min(1.6, density));
+  for (let i = 0; i < nSmall; i++) addMush(0x8ad0ff, 0.7, 0.7, "small", null);          // pale-blue glowcaps — pure light
+  const nBig = Math.max(1, Math.round((1 + depth*0.7) * Math.min(1.3, density)));
+  for (let i = 0; i < nBig; i++){ const e = MUSH[(rng()*MUSH.length)|0]; addMush(e.col, 1.3, 0.9, "big", e); }   // big = eat for potion
+  const nGlue = Math.round(depth*0.7 * Math.min(1.2, density));
+  for (let i = 0; i < nGlue; i++) addMush(0xbfff5a, 1.15, 0.55, "glue", null);          // sickly green glue-traps (deeper)
+
+  // FLOOR TRAPS — pressure plates: lethal spike/pit or a non-lethal snare. Trigger on step.
+  const nTrap = Math.round((1 + depth*1.2) * Math.min(1.4, density));
+  for (let i = 0; i < nTrap; i++){ const [x,z] = place(); const lethal = rng() < 0.6;
+    const plate = trapMesh(); plate.position.set(x, 0.03, z); g.add(plate);
+    if (rec) rec.traps.push({ mesh: plate, x, z, lethal, armed: true, revealed: false });
+  }
+}
+
+function disposeGroup(g){ g.traverse(o => { o.geometry?.dispose?.(); if (o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose?.()); } }); }
+function clearAll(){ for (const g of levels){ scene.remove(g); disposeGroup(g); } levels = []; }
+
+// build ONE level at world Y = yBase; returns its group (also added to scene + levels[])
+function buildLevel(data, yBase){
+  const res = data.resolution || {};
+  const size = res.map_size || { x: 20, y: 20 };
+  const W = size.x, H = size.y, cx = W/2, cz = H/2;
+  const g = new THREE.Group(); g.position.y = yBase; scene.add(g); levels.push(g);
+  g.userData = { W, H, res };
+
+  // FLOOR: flat image plane, or (relief>0) a tiled voxel floor with varied heights
+  if (relief > 0){
+    const reliefMat = new THREE.MeshStandardMaterial({ color: 0x4a4334, roughness: 1, vertexColors: false });
+    const step = Math.max(1, Math.round(Math.max(W, H) / 40));   // keep tile count sane
+    const tile = new THREE.InstancedMesh(new THREE.BoxGeometry(step, 1, step), reliefMat, Math.ceil(W/step)*Math.ceil(H/step)+4);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3();
+    const col = new THREE.Color(); let idx = 0;
+    for (let gx = 0; gx < W; gx += step) for (let gz = 0; gz < H; gz += step){
+      const hy = relief * vnoise2(gx*0.16, gz*0.16);
+      p.set(gx + step/2 - cx, hy/2 - 0.5, gz + step/2 - cz); s.set(step, Math.max(0.2, hy + 0.5), step);
+      m.compose(p, q, s); tile.setMatrixAt(idx, m);
+      const t = hy / (relief || 1); col.setRGB(0.22 + t*0.28, 0.20 + t*0.24, 0.15 + t*0.16); tile.setColorAt(idx, col);
+      idx++;
+    }
+    tile.count = idx; tile.instanceMatrix.needsUpdate = true; if (tile.instanceColor) tile.instanceColor.needsUpdate = true;
+    g.add(tile);
+  } else {
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2418, roughness: 1 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, H), floorMat); floor.rotation.x = -Math.PI/2; g.add(floor);
+    if (showImg && data.image){
+      // v3818 -- *** THE VERDICT COMES FROM THE BYTES, SYNCHRONOUSLY, BEFORE ANY Image EXISTS. ***
+      // Waiting on onload/onerror was measured INTERMITTENT: both keep-60 files carry the same failing data
+      // URL, and once the browser has failed that URL it does not reliably re-fire either event on a fresh
+      // Image -- so the note appeared on one run and not the next. A VERDICT THAT DEPENDS ON A CACHE IS NOT
+      // A PROPERTY OF THE MAP. describeMapArt reads the PNG header instead. See maps/uvtt/mapArt.mjs.
+      const art = describeMapArt(data.image);
+      if (!art.usable){ noteArt(art.why); }
+      else {
+        const im = new Image();
+        im.onload = () => { const tex = new THREE.Texture(im); tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true;
+          floorMat.map = tex; floorMat.color.set(0xffffff); floorMat.needsUpdate = true; };
+        im.onerror = () => noteArt("map art is a valid PNG header but would not decode \u2014 geometry only");
+        im.src = "data:image/png;base64," + data.image;
+      }
+    }
+  }
+  const sq = (x, y) => new THREE.Vector3(x - cx, 0, y - cz);
+
+  // WALLS: floor(0) -> roomH
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x8a7a52, roughness: 0.85 });
+  const segs = [];
+  const collect = (poly) => { if (Array.isArray(poly) && poly.length >= 2) for (let i = 0; i < poly.length - 1; i++) segs.push([poly[i], poly[i+1]]); };
+  (data.line_of_sight || []).forEach(collect); (data.objects_line_of_sight || []).forEach(collect);
+  for (const [pa, pb] of segs){
+    const a = sq(px(pa), py(pa)), b = sq(px(pb), py(pb));
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz); if (len < 1e-4) continue;
+    const wm = new THREE.Mesh(new THREE.BoxGeometry(len, roomH, 0.12), wallMat);
+    wm.position.set((a.x+b.x)/2, roomH/2, (a.z+b.z)/2); wm.rotation.y = -Math.atan2(dz, dx);
+    g.add(wm);
+  }
+  g.userData.segs = segs.length;
+
+  // PROCEDURAL WALL TORCHES — flickering sconces spaced along the longer walls
+  if (showTorches){
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa83a });
+    for (const [pa, pb] of segs){
+      const a = sq(px(pa), py(pa)), b = sq(px(pb), py(pb));
+      const dx = b.x-a.x, dz = b.z-a.z, len = Math.hypot(dx, dz); if (len < 3) continue;
+      const n = Math.max(1, Math.floor(len / 6)), nx = -dz/len, nz = dx/len;
+      for (let i = 1; i <= n; i++){ const t = i/(n+1), wx = a.x + dx*t + nx*0.25, wz = a.z + dz*t + nz*0.25;
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.34, 6), flameMat); flame.position.set(wx, roomH*0.62, wz); g.add(flame);
+        const pl = new THREE.PointLight(0xffb353, 7, roomH*3.4, 2); pl.position.set(wx, roomH*0.62, wz); g.add(pl);
+        flickers.push({ light: pl, flame, base: 7, phase: Math.random()*6.28 });
+      }
+    }
+  }
+
+  // CEILING (optional)
+  if (showCeiling){
+    const cm = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ color: 0x1a160e, side: THREE.DoubleSide, roughness: 1 }));
+    cm.rotation.x = Math.PI/2; cm.position.y = roomH; g.add(cm);
+  }
+
+  // DOORS + LIGHTS
+  if (showExtras){
+    (data.portals || []).forEach(pp => {
+      const bounds = pp.bounds || []; if (bounds.length < 2) return;
+      const a = sq(px(bounds[0]), py(bounds[0])), b = sq(px(bounds[1]), py(bounds[1]));
+      const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 0.5;
+      const dm = new THREE.Mesh(new THREE.BoxGeometry(len, roomH*0.78, 0.22), new THREE.MeshStandardMaterial({ color: pp.closed === false ? 0x3f7a3f : 0x6b3f1f, roughness: 0.7 }));
+      dm.position.set((a.x+b.x)/2, roomH*0.39, (a.z+b.z)/2); dm.rotation.y = -Math.atan2(dz, dx); g.add(dm);
+    });
+    (data.lights || []).forEach(l => {
+      const pos = l.position || l; const w = sq(px(pos), py(pos));
+      let cc = 0xffd9a0; if (typeof l.color === "string"){ const hex = l.color.replace(/[^0-9a-f]/ig, ""); if (hex.length >= 6) cc = parseInt(hex.slice(-6), 16); }
+      const pl = new THREE.PointLight(cc, (l.intensity != null ? l.intensity : 1) * 6, (l.range || 4) * 1.4, 2);
+      pl.position.set(w.x, roomH * 0.6, w.z); g.add(pl);
+    });
+  }
+  return g;
+}
+
+// procedural staircase descending from yTop to yBot over a short +X run at (sx,sz)
+function buildStairs(yTop, yBot, sx, sz){
+  const g = new THREE.Group(); scene.add(g); levels.push(g);
+  const drop = yTop - yBot, steps = Math.max(4, Math.ceil(drop / 0.45)), run = 4.0;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9a8a5a, roughness: 0.9 });
+  for (let i = 0; i < steps; i++){
+    const y = yTop - (i + 0.5) * (drop / steps);
+    const stair = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, run/steps + 0.3), mat);
+    stair.position.set(sx, y, sz + (i / steps) * run);
+    g.add(stair);
+  }
+  return g;
+}
+
+// ===== slice 4: lazy per-level activation + two AI populations =====
+let gap = 5.5;
+const sim = { running: false, levels: [], explorers: [], grunts: [], king: null, boss: null, nav: null, engineNav: null, knownTraps: [], hordeScore: 0, escapedScore: 0, emitT: 0, vizT: 0, viz: false, astar: false, msg: "" };
+const BOSS_R = 9;                         // magic-light boss detection radius
+const levelY = (i) => -i * gap;
+// v1289 — light-gated stealth. A creature is "lit" if it's inside the radius of any
+// live torch or glowing-mushroom point light ON ITS LEVEL (level isolated by world-Y).
+// Uses getWorldPosition so it works whether the light/mesh is parented to a level group
+// or the scene. meshLit() short-circuits to true when the Lurk toggle is off.
+const _litLP = new THREE.Vector3(), _litMP = new THREE.Vector3();
+function litAt(wx, wy, wz){
+  for (const f of flickers){ const L = f.light; if (!L || L.intensity <= 0.05) continue; L.getWorldPosition(_litLP); if (Math.abs(_litLP.y - wy) > gap*0.6) continue; const r = (L.distance || 6)*0.8, dx = _litLP.x - wx, dz = _litLP.z - wz; if (dx*dx + dz*dz < r*r) return true; }
+  for (const m of glowAnim){ const L = m.light; if (!L || L.intensity <= 0.05) continue; L.getWorldPosition(_litLP); if (Math.abs(_litLP.y - wy) > gap*0.6) continue; const r = (L.distance || 3)*0.85, dx = _litLP.x - wx, dz = _litLP.z - wz; if (dx*dx + dz*dz < r*r) return true; }
+  return false;
+}
+function meshLit(mesh){ if (!lightReveal) return true; mesh.getWorldPosition(_litMP); return litAt(_litMP.x, _litMP.y, _litMP.z); }
+const dist2 = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+function moveToward(a, tx, tz, sp, dt){ const dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz); if (d > 1e-3){ const s = Math.min(d, sp * dt); a.x += dx/d*s; a.z += dz/d*s; } return d; }
+function nearestLoot(lvl, x, z){ let best = null, bd = 1e9; for (const t of lvl.loot){ if (t.taken) continue; const d = dist2(x, z, t.x, t.z); if (d < bd){ bd = d; best = t; } } return best; }
+
+// mushrooms: agents that walk over an uneaten one get a temporary potion effect (speed + tint)
+function applyEffect(a, e){
+  a.effMult = e.mult; a.effT = e.dur;
+  if (a.mesh) a.mesh.traverse(o => { if (o.material && o.material.emissive){ if (o._em0 == null) o._em0 = o.material.emissiveIntensity; o.material.emissive.setHex(e.col); o.material.emissiveIntensity = 0.7; } });
+}
+function tickEffect(a, dt){
+  if (a.effT > 0){ a.effT -= dt; if (a.effT <= 0){ a.effMult = 1; if (a.mesh) a.mesh.traverse(o => { if (o.material && o.material.emissive && o._em0 != null){ o.material.emissiveIntensity = o._em0; } }); } }
+  return a.effMult || 1;
+}
+function eatNearby(a, lvl, li, sensed){
+  if (lvl.mushrooms) for (const mu of lvl.mushrooms){ if (mu.eaten) continue;
+    if (mu.kind === "small") continue;                                   // pure light, not eaten
+    if (dist2(a.x, a.z, mu.x, mu.z) < 0.55){
+      if (mu.kind === "glue"){
+        if (sensed){ if (!mu.revealed){ mu.revealed = true; revealGlue(mu); knowTrap(mu.x, mu.z, li); } continue; }   // boss-aware: knows + avoids
+        mu.eaten = true; mu.mesh.visible = false; mu.light.intensity = 0; mu.revealed = true; revealGlue(mu); knowTrap(mu.x, mu.z, li);
+        a.stuckT = 3.0; setSim("caught in a glue-trap mushroom!");
+      } else { mu.eaten = true; mu.mesh.visible = false; mu.light.intensity = 0; applyEffect(a, mu.effect); setSim("ate a " + mu.effect.name + " mushroom (+speed)"); }
+    }
+  }
+}
+function revealGlue(mu){ if (mu.cap && mu.cap.material){ mu.cap.material.color.setHex(0xff5a2a); mu.cap.material.emissive.setHex(0x882200); } }
+function revealTrap(t){ t.revealed = true; if (t.mesh.material){ t.mesh.material.color.setHex(0xff3a2a); t.mesh.material.emissive.setHex(0x551008); t.mesh.material.emissiveIntensity = 0.6; } }
+function knowTrap(x, z, li){ sim.knownTraps.push({ x, z, level: li }); }
+// step on a trap: boss-aware agents reveal + avoid; others trigger (lethal -> dead, snare -> stuck)
+function stepTraps(a, lvl, li, sensed){
+  if (!lvl.traps) return; for (const t of lvl.traps){ if (!t.armed) continue;
+    if (dist2(a.x, a.z, t.x, t.z) < 0.6){
+      if (sensed){ if (!t.revealed){ revealTrap(t); knowTrap(t.x, t.z, li); } continue; }
+      t.armed = false; revealTrap(t); knowTrap(t.x, t.z, li);
+      if (t.lethal){ a.dead = true; setSim("a trap sprang — one fell!"); } else { a.stuckT = 2.5; setSim("snared by a trap!"); }
+    }
+  }
+}
+function nearestKnownTrap(a, li, r){ let best = null, bd = r; for (const k of sim.knownTraps){ if (k.level !== li) continue; const d = dist2(a.x, a.z, k.x, k.z); if (d < bd){ bd = d; best = k; } } return best; }
+
+// ---- slice 5: wall-aware navgrid + BFS flow-field + pheromone (slime-mold) economy ----
+// Walls are identical on every level (same map), so one navgrid + one home flow-field is shared.
+function collectSegs(data, W, H){
+  const cx = W/2, cz = H/2, out = [];
+  const P = (p) => ({ x: (p && p.x !== undefined ? p.x : (Array.isArray(p) ? p[0] : 0)) - cx, z: (p && p.y !== undefined ? p.y : (Array.isArray(p) ? p[1] : 0)) - cz });
+  const add = (poly) => { if (Array.isArray(poly) && poly.length >= 2) for (let i = 0; i < poly.length-1; i++) out.push([P(poly[i]), P(poly[i+1])]); };
+  (data.line_of_sight || []).forEach(add); (data.objects_line_of_sight || []).forEach(add);
+  return out;
+}
+function buildNav(W, H, segs, stair){
+  const gw = Math.max(1, Math.ceil(W)), gh = Math.max(1, Math.ceil(H));
+  const blocked = new Uint8Array(gw * gh);
+  const cellX = (x) => Math.max(0, Math.min(gw-1, Math.floor(x + W/2)));
+  const cellZ = (z) => Math.max(0, Math.min(gh-1, Math.floor(z + H/2)));
+  const centerX = (cx) => cx + 0.5 - W/2, centerZ = (cz) => cz + 0.5 - H/2;
+  for (const [a, b] of segs){                                  // rasterize walls into blocked cells
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x-a.x, b.z-a.z)));
+    for (let s = 0; s <= steps; s++){ const t = s/steps; blocked[cellZ(a.z+(b.z-a.z)*t)*gw + cellX(a.x+(b.x-a.x)*t)] = 1; }
+  }
+  // BFS home-distance field from the stair (open cells only) -> flow-field carry-home, wall-aware
+  const home = new Int32Array(gw*gh).fill(-1);
+  let sx = cellX(stair.x), sz = cellZ(stair.z), start = sz*gw + sx;
+  if (blocked[start]){ outer: for (let r = 1; r < Math.max(gw,gh); r++){ for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++){ const nx = sx+dx, nz = sz+dz; if (nx<0||nz<0||nx>=gw||nz>=gh) continue; const ni = nz*gw+nx; if (!blocked[ni]){ start = ni; break outer; } } } }
+  const q = [start]; home[start] = 0; let head = 0;
+  while (head < q.length){ const c = q[head++], cx = c%gw, cz = (c/gw)|0, d = home[c];
+    for (const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx = cx+dx, nz = cz+dz; if (nx<0||nz<0||nx>=gw||nz>=gh) continue; const ni = nz*gw+nx; if (blocked[ni] || home[ni] >= 0) continue; home[ni] = d+1; q.push(ni); } }
+  return { gw, gh, blocked, home, cellX, cellZ, centerX, centerZ };
+}
+// gradient-descent on the home field toward the stair (routes around walls)
+function flowStep(a, nav, sp, dt){
+  if (!nav){ return; }
+  const cx = nav.cellX(a.x), cz = nav.cellZ(a.z); let bv = nav.home[cz*nav.gw+cx], bx = cx, bz = cz;
+  if (bv < 0){ moveToward(a, nav.centerX(cx), nav.centerZ(cz), sp, dt); return; }
+  for (const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){ const nx = cx+dx, nz = cz+dz; if (nx<0||nz<0||nx>=nav.gw||nz>=nav.gh) continue; const h = nav.home[nz*nav.gw+nx]; if (h >= 0 && h < bv){ bv = h; bx = nx; bz = nz; } }
+  moveToward(a, nav.centerX(bx), nav.centerZ(bz), sp, dt);
+}
+// ---- true point-to-point A* on the navgrid (optional; toggle sim.astar) ----
+function astar(nav, sx, sz, tx, tz){
+  const { gw, gh, blocked } = nav, N = gw*gh, idx = (x,z) => z*gw+x;
+  const nearestOpen = (x,z) => { if (!blocked[idx(x,z)]) return idx(x,z); for (let r=1;r<Math.max(gw,gh);r++){ for (let dz=-r;dz<=r;dz++) for (let dx=-r;dx<=r;dx++){ const nx=x+dx, nz=z+dz; if (nx<0||nz<0||nx>=gw||nz>=gh) continue; if (!blocked[idx(nx,nz)]) return idx(nx,nz); } } return idx(x,z); };
+  const s = nearestOpen(sx,sz), t = nearestOpen(tx,tz);
+  if (s === t) return [{ x: nav.centerX(t%gw), z: nav.centerZ((t/gw)|0) }];
+  const came = new Int32Array(N).fill(-1), g = new Float32Array(N).fill(Infinity), f = new Float32Array(N).fill(Infinity);
+  const tx2 = t%gw, tz2 = (t/gw)|0, heur = (c) => Math.hypot((c%gw)-tx2, ((c/gw)|0)-tz2);
+  g[s] = 0; f[s] = heur(s);
+  const open = [s], inopen = new Uint8Array(N); inopen[s] = 1;
+  const nb = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];
+  let iter = 0, maxIter = N*4, found = false;
+  while (open.length && iter++ < maxIter){
+    let bi = 0; for (let i=1;i<open.length;i++) if (f[open[i]] < f[open[bi]]) bi = i;
+    const c = open.splice(bi,1)[0]; inopen[c] = 0;
+    if (c === t){ found = true; break; }
+    const cx = c%gw, cz = (c/gw)|0;
+    for (const [dx,dz,w] of nb){ const nx = cx+dx, nz = cz+dz; if (nx<0||nz<0||nx>=gw||nz>=gh) continue; const ni = idx(nx,nz); if (blocked[ni]) continue;
+      if (dx !== 0 && dz !== 0){ if (blocked[idx(cx+dx,cz)] || blocked[idx(cx,cz+dz)]) continue; }   // no corner cutting
+      const tg = g[c] + w; if (tg < g[ni]){ came[ni] = c; g[ni] = tg; f[ni] = tg + heur(ni); if (!inopen[ni]){ open.push(ni); inopen[ni] = 1; } } }
+  }
+  if (!found && came[t] < 0) return null;
+  const path = []; let c = t, guard = 0; while (c !== s && c >= 0 && guard++ < N){ path.push({ x: nav.centerX(c%gw), z: nav.centerZ((c/gw)|0) }); c = came[c]; }
+  path.reverse(); return path;
+}
+function pathWaypoint(a, nav, tx, tz){
+  const tkey = nav.cellZ(tz)*nav.gw + nav.cellX(tx);
+  if (a._ptgt !== tkey || !a._path || a._pi >= a._path.length){
+    a._path = sim.engineNav ? sim.engineNav.findPath(a.x, a.z, tx, tz)        // engine's real shared pathfinder
+                            : astar(nav, nav.cellX(a.x), nav.cellZ(a.z), nav.cellX(tx), nav.cellZ(tz));  // fallback
+    a._ptgt = tkey; a._pi = 0;
+  }
+  if (!a._path || !a._path.length) return null;
+  let wp = a._path[a._pi];
+  if (dist2(a.x, a.z, wp.x, wp.z) < 0.45){ a._pi++; if (a._pi >= a._path.length) return { x: tx, z: tz }; wp = a._path[a._pi]; }
+  return wp;
+}
+// seek an arbitrary target (loot): A* when on, else straight steering (slice-4 behavior)
+function navSeek(a, nav, tx, tz, sp, dt){
+  if (sim.astar && nav){ const wp = pathWaypoint(a, nav, tx, tz); if (wp){ moveToward(a, wp.x, wp.z, sp, dt); return; } }
+  moveToward(a, tx, tz, sp, dt);
+}
+// head home to the stair: A* when on, else the BFS flow-field (slice-5 behavior)
+function navHome(a, nav, stair, sp, dt){
+  if (sim.astar && nav){ const wp = pathWaypoint(a, nav, stair.x, stair.z); if (wp){ moveToward(a, wp.x, wp.z, sp, dt); return; } }
+  flowStep(a, nav, sp, dt);
+}
+function pheroDeposit(rec, nav, x, z, amt){ const c = nav.cellZ(z)*nav.gw + nav.cellX(x); rec.tre[c] = Math.min(1.5, rec.tre[c] + amt); }
+function pheroStep(rec, nav){                                   // diffuse + decay (slime-mold)
+  const gw = nav.gw, gh = nav.gh, tre = rec.tre, nx = rec.treNext;
+  for (let z = 0; z < gh; z++) for (let x = 0; x < gw; x++){ const c = z*gw+x; let sum = tre[c], n = 1;
+    if (x>0){ sum += tre[c-1]; n++; } if (x<gw-1){ sum += tre[c+1]; n++; }
+    if (z>0){ sum += tre[c-gw]; n++; } if (z<gh-1){ sum += tre[c+gw]; n++; }
+    nx[c] = (sum/n) * 0.92; }
+  rec.tre = nx; rec.treNext = tre;
+}
+function pheroClimb(a, rec, nav, sp, dt){                       // steer toward strongest neighbor trail
+  const cx = nav.cellX(a.x), cz = nav.cellZ(a.z); let bv = -1, bx = cx, bz = cz;
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++){ const nx = cx+dx, nz = cz+dz; if (nx<0||nz<0||nx>=nav.gw||nz>=nav.gh) continue; const v = rec.tre[nz*nav.gw+nx]; if (v > bv){ bv = v; bx = nx; bz = nz; } }
+  if (bv > 0.06){ moveToward(a, nav.centerX(bx), nav.centerZ(bz), sp, dt); return bv; }
+  return 0;
+}
+function makeGrunt(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 7), new THREE.MeshStandardMaterial({ color: 0x9a3a3a, roughness: 0.6, emissive: 0x5a1010, emissiveIntensity: 0.5 }));
+  body.scale.y = 0.8; g.add(body); scene.add(g);
+  const bottom = sim.levels.length - 1, st = sim.levels[bottom].stair;
+  return { mesh: g, x: st.x + (Math.random()-0.5), z: st.z + (Math.random()-0.5), level: bottom, carrying: null, state: "seek", dead: false, stuckT: 0, sensed: false };
+}
+function stepGrunts(dt){
+  const nav = sim.nav; if (!nav || !sim.levels.length) return;
+  const cap = 12, interval = 1.3, sp = 2.5, bottom = sim.levels.length - 1;
+  const lootLeft = sim.levels.some(l => l.loot.some(t => !t.taken));
+  sim.emitT += dt;
+  if (lootLeft && sim.grunts.length < cap && sim.emitT > interval){ sim.emitT = 0; sim.grunts.push(makeGrunt()); }
+  for (const g of sim.grunts){
+    if (g.dead) continue;
+    const lvl = sim.levels[g.level];
+    g.sensed = !!(sim.boss && sim.boss.level === g.level && dist2(g.x, g.z, sim.boss.x, sim.boss.z) < BOSS_R);
+    if (g.stuckT > 0){ g.stuckT -= dt; g.mesh.position.set(g.x, levelY(g.level) + 0.3, g.z); continue; }
+    const em = tickEffect(g, dt); eatNearby(g, lvl, g.level, g.sensed); stepTraps(g, lvl, g.level, g.sensed); const gs = sp * em;
+    if (g.dead){ g.mesh.visible = false; continue; }
+    if (g.carrying){
+      pheroDeposit(lvl, nav, g.x, g.z, 0.9*dt);                 // lay recruit trail home
+      navHome(g, nav, lvl.stair, gs*0.55, dt);                  // weighed-down, wall-aware
+      g.carrying.mesh.position.set(g.x, 0.5, g.z);
+      if (dist2(g.x, g.z, lvl.stair.x, lvl.stair.z) < 1.0){
+        if (g.level < bottom){ g.level++; g.x = lvl.stair.x; g.z = lvl.stair.z; }
+        else { sim.hordeScore += g.carrying.value; g.carrying.mesh.visible = false; g.carrying = null; g.state = "seek"; }
+      }
+    } else {
+      const loot = nearestLoot(lvl, g.x, g.z);
+      if (loot && dist2(g.x, g.z, loot.x, loot.z) < 0.7){ loot.taken = true; g.carrying = loot; pheroDeposit(lvl, nav, g.x, g.z, 1.3); g.state = "carry"; }
+      else if (loot){ if (pheroClimb(g, lvl, nav, gs, dt) <= 0.06) navSeek(g, nav, loot.x, loot.z, gs, dt); g.state = "seek"; }
+      else if (g.level > 0){ navHome(g, nav, lvl.stair, gs, dt); if (dist2(g.x, g.z, lvl.stair.x, lvl.stair.z) < 1.0){ g.level--; g.x = lvl.stair.x; g.z = lvl.stair.z; } g.state = "climb"; }
+      else { moveToward(g, (Math.random()-0.5)*lvl.W*0.6, (Math.random()-0.5)*lvl.H*0.6, gs*0.5, dt); }
+    }
+    g.mesh.position.set(g.x, levelY(g.level) + 0.3, g.z);
+    g.mesh.visible = !g.dead && (meshLit(g.mesh) || g.sensed);   // v1289 — lurk in the dark (boss aura also reveals)
+  }
+  sim.grunts = sim.grunts.filter(g => !g.dead);
+}
+function updatePheroViz(){
+  for (let i = 0; i < sim.levels.length; i++){
+    const lvl = sim.levels[i], nav = sim.nav; if (!nav) continue;
+    if (sim.viz && lvl.active){
+      if (!lvl.vizPts){
+        const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(nav.gw*nav.gh*3), 3));
+        lvl.vizPts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x55ff88, size: 0.5, transparent: true, opacity: 0.7 }));
+        lvl.vizPts.position.y = levelY(i) + 0.15; scene.add(lvl.vizPts); levels.push(lvl.vizPts);
+      }
+      const pos = lvl.vizPts.geometry.attributes.position.array; let n = 0;
+      for (let z = 0; z < nav.gh; z++) for (let x = 0; x < nav.gw; x++){ const v = lvl.tre[z*nav.gw+x]; if (v > 0.08){ pos[n++] = nav.centerX(x); pos[n++] = 0; pos[n++] = nav.centerZ(z); } }
+      lvl.vizPts.geometry.setDrawRange(0, n/3); lvl.vizPts.geometry.attributes.position.needsUpdate = true; lvl.vizPts.visible = true;
+    } else if (lvl.vizPts){ lvl.vizPts.visible = false; }
+  }
+}
+
+function makeExplorer(i, n){
+  const g = new THREE.Group();
+  const cols = [0x4fd0ff, 0x6fe08a, 0xffd34f, 0xff7ad6];
+  const body = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.1, 8), new THREE.MeshStandardMaterial({ color: cols[i % cols.length], roughness: 0.5, emissive: cols[i % cols.length], emissiveIntensity: 0.25 }));
+  body.rotation.x = Math.PI; body.position.y = 0.55; g.add(body);
+  scene.add(g);
+  return { mesh: g, x: (i - (n-1)/2) * 1.4, z: -sim.levels[0].H/2 + 3, level: 0, carry: 0, carryVal: 0, done: false, dead: false, stuckT: 0 };
+}
+function startSim(){
+  if (!sim.levels.length){ setSim("load a dungeon first"); return; }
+  resetSim();
+  const n = 4; for (let i = 0; i < n; i++) sim.explorers.push(makeExplorer(i, n));
+  sim.running = true; setSim("running");
+}
+function resetSim(){
+  for (const e of sim.explorers){ scene.remove(e.mesh); }
+  for (const g of sim.grunts){ scene.remove(g.mesh); }
+  sim.explorers = []; sim.grunts = []; sim.hordeScore = 0; sim.escapedScore = 0; sim.running = false; sim.emitT = 0;
+  sim.knownTraps = [];
+  for (const lvl of sim.levels){ lvl.active = false; if (lvl.tre) lvl.tre.fill(0); if (lvl.vizPts) lvl.vizPts.visible = false;
+    for (const m of lvl.monsters){ m.awake = false; m.carrying = null; m.mode = "idle"; m.stuckT = 0; m.dead = false; m.sensed = false; m.mesh.visible = true; }
+    if (lvl.traps) for (const t of lvl.traps){ t.armed = true; t.revealed = false; if (t.mesh.material){ t.mesh.material.color.setHex(0x342b22); t.mesh.material.emissive.setHex(0x000000); t.mesh.material.emissiveIntensity = 0; } } }
+}
+function stepSim(dt){
+  if (!sim.running) return;
+  const EXPL = 4.2, AWAKE_R = 14, ATTACK_R = 1.6;
+  for (const e of sim.explorers){
+    if (e.done || e.dead) continue;
+    const lvl = sim.levels[e.level];
+    if (!lvl.active){ lvl.active = true; for (const m of lvl.monsters) m.awake = true; setSim("level " + e.level + " awoke!"); }
+    if (e.stuckT > 0){ e.stuckT -= dt; e.mesh.position.set(e.x, levelY(e.level) + 0.05, e.z); continue; }
+    const em = tickEffect(e, dt); eatNearby(e, lvl, e.level, false); stepTraps(e, lvl, e.level, false); const espd = EXPL * em;
+    if (e.dead){ scene.remove(e.mesh); continue; }
+    const kt = nearestKnownTrap(e, e.level, 2.6);                    // heroes flee revealed traps if they can
+    if (kt){ moveToward(e, e.x + (e.x - kt.x), e.z + (e.z - kt.z), espd, dt); e.mesh.position.set(e.x, levelY(e.level) + 0.05, e.z); continue; }
+    const loot = nearestLoot(lvl, e.x, e.z);
+    if (loot){ navSeek(e, sim.nav, loot.x, loot.z, espd, dt); if (dist2(e.x, e.z, loot.x, loot.z) < 0.7){ loot.taken = true; loot.mesh.visible = false; e.carry++; e.carryVal += loot.value; } }
+    else if (e.level < sim.levels.length - 1){ navHome(e, sim.nav, lvl.stair, espd, dt); if (dist2(e.x, e.z, lvl.stair.x, lvl.stair.z) < 0.8){ e.level++; e.x = sim.levels[e.level].stair.x; e.z = sim.levels[e.level].stair.z + 1; } }
+    else { e.done = true; sim.escapedScore += e.carryVal; setSim("a squad extracted " + e.carryVal + " gold!"); }
+    e.mesh.position.set(e.x, levelY(e.level) + 0.05, e.z);
+  }
+  sim.explorers = sim.explorers.filter(e => !e.dead);
+  // monsters (awake): grab loot -> barely drag toward the down-stairs (the horde) -> deliver;
+  // drop loot + lunge when an explorer is close (prefer to attack).
+  for (let li = 0; li < sim.levels.length; li++){
+    const lvl = sim.levels[li]; if (!lvl.active) continue;
+    for (const m of lvl.monsters){
+      if (!m.awake || m.dead) continue;
+      m.sensed = !!(sim.boss && sim.boss.level === li && dist2(m.x, m.z, sim.boss.x, sim.boss.z) < BOSS_R);   // within the boss's light = knows mushroom/trap types
+      if (m.stuckT > 0){ m.stuckT -= dt; m.mesh.position.x = m.x; m.mesh.position.z = m.z; continue; }
+      const em = tickEffect(m, dt); eatNearby(m, lvl, li, m.sensed); stepTraps(m, lvl, li, m.sensed); const ms = m.speed * em;
+      if (m.dead){ m.mesh.visible = false; continue; }
+      let near = null, nd = AWAKE_R;
+      for (const e of sim.explorers){ if (e.done || e.dead || e.level !== li) continue; const d = dist2(m.x, m.z, e.x, e.z); if (d < nd){ nd = d; near = e; } }
+      if (near && nd < ATTACK_R + 2){
+        if (m.carrying){ const t = m.carrying; t.taken = false; t.mesh.visible = true; t.x = m.x; t.z = m.z; m.carrying = null; }
+        moveToward(m, near.x, near.z, ms * 1.25, dt); m.mode = "attack";
+      } else if (m.carrying){
+        navHome(m, sim.nav, lvl.stair, ms * 0.5, dt); m.mode = "drag";            // wall-aware carry-home
+        pheroDeposit(lvl, sim.nav, m.x, m.z, 0.6*dt);                         // lay recruit trail
+        m.carrying.mesh.position.set(m.x, 0.5, m.z);
+        if (dist2(m.x, m.z, lvl.stair.x, lvl.stair.z) < 0.9){ sim.hordeScore += m.carrying.value; m.carrying.mesh.visible = false; m.carrying = null; m.mode = "idle"; }
+      } else {
+        const loot = nearestLoot(lvl, m.x, m.z);
+        if (loot){ if (pheroClimb(m, lvl, sim.nav, ms, dt) <= 0.06) navSeek(m, sim.nav, loot.x, loot.z, ms, dt); if (dist2(m.x, m.z, loot.x, loot.z) < 0.6){ loot.taken = true; m.carrying = loot; } m.mode = "fetch"; }
+        else if (sim.boss && sim.boss.level === li && !m.sensed){ moveToward(m, sim.boss.x, sim.boss.z, ms*0.6, dt); m.mode = "rally"; }   // drift into the boss's light
+        else { m.mode = "idle"; }
+      }
+      m.mesh.position.x = m.x; m.mesh.position.z = m.z;
+    }
+    lvl.monsters = lvl.monsters.filter(mm => !mm.dead);
+  }
+  for (const lvl of sim.levels){ if (lvl.active) pheroStep(lvl, sim.nav); }   // diffuse + decay trails
+  stepGrunts(dt);                                                            // king's grunt economy
+  sim.vizT += dt; if (sim.vizT > 0.12){ sim.vizT = 0; updatePheroViz(); }
+  setSimHud();
+}
+function setSim(msg){ sim.msg = msg; setSimHud(); }
+function setSimHud(){
+  const el = document.getElementById("simhud"); if (!el) return;
+  const awake = sim.levels.filter(l => l.active).length;
+  const carrying = sim.explorers.reduce((s, e) => s + e.carryVal, 0);
+  el.innerHTML = (sim.running ? "▶ " : "■ ") + (sim.msg || "idle") +
+    ` · 🧭 ${carrying} gold (out ${sim.escapedScore}) · 👑 horde ${sim.hordeScore} (${sim.grunts.length} grunts) · awake ${awake}/${sim.levels.length}`;
+}
+
+function rebuildAll(){
+  clearAll();
+  spawnsAnim = []; flickers = []; glowAnim = []; spawnTotals = { mon: 0, tre: 0, value: 0, weight: 0 };
+  hemi.intensity = showTorches ? 0.16 : 0.65; sun.intensity = showTorches ? 0.12 : 0.7;   // dim so torches/mushrooms read
+  resetSim(); sim.levels = []; sim.king = null; sim.boss = null; sim.knownTraps = [];
+  if (!lastData) return;
+  const res = lastData.resolution || {}, size = res.map_size || { x:20, y:20 };
+  const W = size.x, H = size.y; gap = roomH + 2.5;
+  const stair = { x: -W/2 + 3, z: -H/2 + 1 };
+  const navSegs = collectSegs(lastData, W, H);
+  sim.nav = buildNav(W, H, navSegs, stair);                    // flow-field grid (fast default path)
+  sim.engineNav = new NavGrid({ minX: -W/2, minZ: -H/2, maxX: W/2, maxZ: H/2 }, navSegs.map(([a,b]) => ({ x1: a.x, z1: a.z, x2: b.x, z2: b.z })), 1.5);   // the engine's shared A* (real pathfinding, same as the WAD/CS bots)
+  for (let i = 0; i < levelCount; i++){
+    const rec = { y: -i*gap, W, H, active: false, _li: i, loot: [], monsters: [], mushrooms: [], traps: [], stair, tre: new Float32Array(sim.nav.gw*sim.nav.gh), treNext: new Float32Array(sim.nav.gw*sim.nav.gh), vizPts: null };
+    const g = buildLevel(lastData, -i * gap);
+    spawnLevel(g, i, W, H, (seed + i*101) >>> 0, rec);                // depth = level index
+    sim.levels.push(rec);
+    if (i > 0) buildStairs(-(i-1)*gap, -i*gap, stair.x, stair.z);     // connect prior level down to this one
+  }
+  // king/queen throne on the deepest level — where the horde drags loot
+  if (sim.levels.length){
+    const bottom = sim.levels[sim.levels.length - 1];
+    const throne = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 1.0), new THREE.MeshStandardMaterial({ color: 0x5a2a6a, roughness: 0.6, emissive: 0x3a1248, emissiveIntensity: 0.4 }));
+    seat.position.y = 0.7; throne.add(seat);
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 5), new THREE.MeshStandardMaterial({ color: 0xffcf4a, emissive: 0xffcf4a, emissiveIntensity: 0.5 }));
+    crown.position.y = 1.7; throne.add(crown);
+    throne.position.set(0, -(sim.levels.length-1)*gap, 0); scene.add(throne); levels.push(throne); sim.king = throne;
+
+    // MAGIC LIGHT BOSS — a wraith that reads mushroom/trap types in a radius. Minions
+    // stay in its light to learn which mushrooms are treasure and which to leave un-triggered.
+    const bottomLi = sim.levels.length - 1, by = -(sim.levels.length-1)*gap;
+    const boss = new THREE.Group();
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 14), new THREE.MeshStandardMaterial({ color: 0xb060ff, emissive: 0x7822d6, emissiveIntensity: 0.8, roughness: 0.35 }));
+    orb.scale.y = 1.15; orb.position.y = 1.0; boss.add(orb);
+    const bl = new THREE.PointLight(0xc080ff, 4, BOSS_R * 1.6, 2); bl.position.set(0, 1.2, 0); boss.add(bl);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(BOSS_R, 0.14, 8, 48), new THREE.MeshBasicMaterial({ color: 0xb060ff, transparent: true, opacity: 0.32 }));
+    ring.rotation.x = Math.PI/2; ring.position.y = 0.06; boss.add(ring);
+    boss.position.set(2, by, 2); scene.add(boss); levels.push(boss);
+    sim.boss = { mesh: boss, ring, orb, x: 2, z: 2, level: bottomLi, radius: BOSS_R };
+    glowAnim.push({ cap: orb, light: bl, base: 4, phase: 1.7 });   // reuse the glow pulse on the boss orb
+  }
+  const span = Math.max(W, H);
+  controls.target.set(0, -(levelCount-1)*gap/2, 0);
+  camera.position.set(0, span*0.7 + 6, span*0.95); controls.update();
+  setStatus(`${W}×${H} sq · ${levelCount} level${levelCount>1?"s":""} · 🪙 ${spawnTotals.tre} loot (value ${spawnTotals.value}, weight ${spawnTotals.weight}) · 👾 ${spawnTotals.mon} monsters · seed ${seed}. Deeper = rarer + tougher.`);
+  setSimHud();
+}
+
+function loadText(text){
+  artNote = "";                          // a new map gets its own verdict
+  try { lastData = JSON.parse(text); }
+  catch(e){ setStatus("Not valid JSON / UVTT: " + e.message, true); return; }
+  if (!lastData.resolution){ setStatus("Missing 'resolution' — is this a UVTT file?", true); return; }
+  rebuildAll();
+}
+function readFile(f){ setStatus("Reading " + f.name + " …"); const r = new FileReader(); r.onload = () => loadText(String(r.result)); r.onerror = () => setStatus("Read failed", true); r.readAsText(f); }
+
+document.getElementById("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) readFile(f); });
+
+// v3818 -- the shipped maps. They go through loadText, THE SAME FUNCTION A DROPPED FILE GOES THROUGH, so a
+// preset that renders proves the real path and not a special case built for demos.
+(async () => {
+  const sel = document.getElementById("preset"), note = document.getElementById("presetNote");
+  let presets = [], dir = "maps/uvtt";
+  try {
+    const m = await import("./maps/uvtt/presets.mjs");
+    presets = m.UVTT_PRESETS; dir = m.UVTT_PRESET_DIR;
+  } catch (e) { sel.parentElement.style.display = "none"; return; }
+  for (const p of presets){ const o = document.createElement("option"); o.value = p.file; o.textContent = p.label; sel.appendChild(o); }
+  sel.addEventListener("change", async () => {
+    const p = presets.find(x => x.file === sel.value);
+    if (!p){ note.style.display = "none"; return; }
+    note.style.display = "block";
+    note.innerHTML = p.note + (p.pairsWith ? "<br><b>Pairs with:</b> " + p.pairsWith : "");
+    setStatus("Loading " + p.file + " \u2026");
+    try {
+      const r = await fetch("./" + dir + "/" + p.file, { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      loadText(await r.text());
+    } catch (e) { setStatus("Could not load " + p.file + ": " + e.message, true); }
+  });
+})();
+document.getElementById("wh").addEventListener("input", (e) => { roomH = parseFloat(e.target.value); if (lastData) rebuildAll(); });
+document.getElementById("relief").addEventListener("input", (e) => { relief = parseFloat(e.target.value); if (lastData) rebuildAll(); });
+document.getElementById("levels").addEventListener("input", (e) => { levelCount = parseInt(e.target.value, 10); document.getElementById("lvlN").textContent = levelCount; if (lastData) rebuildAll(); });
+document.getElementById("img").addEventListener("change", (e) => { showImg = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("extras").addEventListener("change", (e) => { showExtras = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("ceil").addEventListener("change", (e) => { showCeiling = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("torches").addEventListener("change", (e) => { showTorches = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("lurk").addEventListener("change", (e) => { lightReveal = e.target.checked; });
+document.getElementById("seed").addEventListener("change", (e) => { seed = parseInt(e.target.value, 10) || 0; if (lastData) rebuildAll(); });
+document.getElementById("reroll").addEventListener("click", () => { seed = (Math.random()*1e9)|0; document.getElementById("seed").value = seed; if (lastData) rebuildAll(); });
+document.getElementById("density").addEventListener("input", (e) => { density = parseFloat(e.target.value); if (lastData) rebuildAll(); });
+document.getElementById("mon").addEventListener("change", (e) => { showMon = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("tre").addEventListener("change", (e) => { showTre = e.target.checked; if (lastData) rebuildAll(); });
+document.getElementById("runSim").addEventListener("click", function(){
+  if (sim.running){ sim.running = false; this.textContent = "▶ Run raid"; setSim("paused"); }
+  else if (sim.explorers.length){ sim.running = true; this.textContent = "⏸ Pause"; setSim("running"); }
+  else { startSim(); this.textContent = "⏸ Pause"; }
+});
+document.getElementById("resetSim").addEventListener("click", () => { resetSim(); document.getElementById("runSim").textContent = "▶ Run raid"; if (lastData) rebuildAll(); setSim("reset"); });
+document.getElementById("vizPhero").addEventListener("click", function(){ sim.viz = !sim.viz; this.style.opacity = sim.viz ? "1" : "0.55"; updatePheroViz(); });
+document.getElementById("astar").addEventListener("click", function(){ sim.astar = !sim.astar; this.style.opacity = sim.astar ? "1" : "0.55"; for (const a of [...sim.explorers, ...sim.grunts]){ a._path = null; a._ptgt = -1; } setSim(sim.astar ? "engine NavGrid pathfinding on" : "flow-field steering"); });
+
+const dropEl = document.getElementById("drop");
+addEventListener("dragover", (e) => { e.preventDefault(); dropEl.style.display = "flex"; });
+addEventListener("dragleave", (e) => { if (e.target === dropEl) dropEl.style.display = "none"; });
+addEventListener("drop", (e) => { e.preventDefault(); dropEl.style.display = "none"; const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+
+let _t0 = performance.now();
+(function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, ((now||performance.now()) - _t0)/1000); _t0 = now||performance.now();
+  stepSim(dt);
+  for (const fl of flickers){ const f = 0.72 + 0.28*Math.sin(now*0.013 + fl.phase) + (Math.random()-0.5)*0.12; fl.light.intensity = fl.base * Math.max(0.3, f); if (fl.flame) fl.flame.scale.setScalar(0.85 + 0.3*f); }
+  for (const gl of glowAnim){ const p = 0.7 + 0.3*Math.sin(now*0.004 + gl.phase); gl.light.intensity = gl.base * p; if (gl.cap && gl.cap.material) gl.cap.material.emissiveIntensity = 0.6 + 0.5*p; }
+  if (sim.boss && sim.boss.ring){ sim.boss.ring.material.opacity = 0.22 + 0.14*Math.sin(now*0.003); sim.boss.ring.rotation.z = now*0.0004; }
+  for (const a of spawnsAnim){
+    a.phase += dt;
+    if (a.kind === "treasure"){ a.mesh.rotation.y += dt * 1.1; a.mesh.position.y = a.baseY + Math.sin(a.phase*2)*0.08; }
+    else { a.mesh.position.y = a.baseY + Math.abs(Math.sin(a.phase*3))*0.06; a.mesh.rotation.y += dt*0.4; a.mesh.visible = meshLit(a.mesh); }   // v1289 — placed monsters lurk in the dark too
+  }
+  controls.update(); renderer.render(scene, camera);
+})(_t0);
+</script>
+</body>
+</html>

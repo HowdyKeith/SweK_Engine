@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Presence</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; justify-content:space-between; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:720px; margin:0 auto; padding:14px; }
+  h2 { font-size:12px; letter-spacing:1.4px; text-transform:uppercase; color:var(--go); border-bottom:1px solid var(--line); padding-bottom:5px; margin:20px 0 10px; }
+  .note { background:#0e1620; border:1px solid #233040; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:8px; }
+  .note b { color:var(--ink); }
+  .cards { display:flex; gap:10px; flex-wrap:wrap; }
+  .person { flex:1; min-width:150px; border:1px solid var(--line); border-radius:11px; padding:12px 14px; background:var(--panel); }
+  .person .nm { font-size:15px; margin-bottom:6px; }
+  .pill { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; border:1px solid; }
+  .pill.home { color:var(--home); border-color:#224a36; background:#10231a; }
+  .pill.away { color:var(--away); border-color:var(--line); background:#10151d; }
+  .pill.zone { color:var(--go); border-color:#22405e; background:#0e1a26; }
+  .room { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border:1px solid var(--line); border-radius:8px; margin:5px 0; background:var(--panel); }
+  .room .k { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .st-occ { color:var(--occ); font-weight:bold; } .st-clear { color:var(--dim); }
+  .dev { color:var(--dim); font-size:12px; padding:3px 0; }
+  .dev .h { color:var(--home); }
+  #msg { color:var(--dim); font-size:12px; }
+  button { background:#101a23; color:var(--go); border:1px solid #224a5e; border-radius:8px; padding:6px 11px; font:inherit; cursor:pointer; }
+  .muted { color:var(--dim); }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">📍</span> Presence <span style="color:var(--dim);font-weight:400;">· via Home Assistant</span></span>
+    <button id="refresh">↻</button>
+  </header>
+  <main>
+    <div id="msg">loading…</div>
+
+    <h2>Engine reactions</h2>
+    <div class="note" style="margin-bottom:8px;">When the engine window is open, it can react to arrivals/departures. These are stored locally and read by the engine within a few seconds.</div>
+    <label style="display:flex;align-items:center;gap:9px;margin:7px 0;cursor:pointer;"><input type="checkbox" id="reactChk"> <span>React to arrivals / departures <span class="muted">(a toast + the avatar greets / says bye)</span></span></label>
+    <label style="display:flex;align-items:center;gap:9px;margin:7px 0;cursor:pointer;"><input type="checkbox" id="dimChk"> <span>Dim the engine when nobody is home <span class="muted">(wakes when someone returns)</span></span></label>
+
+    <h2>Routing & room actions</h2>
+    <label style="display:flex;align-items:center;gap:9px;margin:7px 0;cursor:pointer;"><input type="checkbox" id="watchChk"> <span>Broadcast presence to all displays <span class="muted">(the avatar greets / says bye on phone, pip-boy, Shield — anywhere an avatar view is open)</span></span></label>
+    <div class="note" style="margin-top:8px;">Room rules: when a room becomes <b>occupied</b> (or <b>clears</b>), run an engine command. <b>Room match</b> is a substring of the sensor's name. Needs "Broadcast presence" on.</div>
+    <table id="ruleTable"><thead><tr><th>Room match</th><th>When</th><th>Action</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="rMatch" list="roomList" placeholder="room name…" style="flex:1;min-width:110px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <datalist id="roomList"></datalist>
+      <select id="rWhen" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="occupied">occupied</option><option value="clear">clears</option></select>
+      <select id="rAct" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="demo">Run demo</option><option value="next">Next demo</option><option value="console">Console line</option><option value="ha-on">Light/switch ON</option><option value="ha-off">Light/switch OFF</option><option value="ha-toggle">Toggle light/switch</option><option value="ha-open">Valve OPEN (watering)</option><option value="ha-close">Valve CLOSE</option><option value="water">Water zone for Ns</option></select>
+      <input id="rVal" placeholder="demo id / JS line" style="flex:1;min-width:110px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <button id="rAdd">+ Add</button>
+    </div>
+
+    <div class="note" style="margin-top:14px;">Per-person rules: when a specific person <b>arrives</b> (or <b>leaves</b>), run an engine command. Match is a substring of the person's name.</div>
+    <table id="pruleTable"><thead><tr><th>Person match</th><th>When</th><th>Action</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="pMatch" list="peopleList" placeholder="person…" style="flex:1;min-width:90px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <datalist id="peopleList"></datalist>
+      <select id="pWhen" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="arrive">arrives</option><option value="leave">leaves</option></select>
+      <span class="muted">only if</span>
+      <input id="pIfPerson" list="peopleList" placeholder="(any)" style="flex:0 0 90px;min-width:80px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <select id="pIfState" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="away">is away</option><option value="home">is home</option></select>
+    </div>
+    <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap;align-items:center;">
+      <span class="muted">do</span>
+      <select id="pAct" style="padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;"><option value="demo">Run demo</option><option value="next">Next demo</option><option value="console">Console line</option><option value="shield">Open on Shield TV</option><option value="ha-on">Light/switch ON</option><option value="ha-off">Light/switch OFF</option><option value="ha-toggle">Toggle light/switch</option><option value="ha-open">Valve OPEN (watering)</option><option value="ha-close">Valve CLOSE</option><option value="water">Water zone for Ns</option></select>
+      <input id="pVal" placeholder="demo id / JS line" style="flex:1;min-width:120px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <input id="pIp" placeholder="Shield IP" value="192.168.50.114" style="display:none;flex:0 0 120px;padding:7px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">
+      <button id="pAdd">+ Add</button>
+    </div>
+
+    <h2 id="hPeople" style="display:none;">People</h2>
+    <div class="cards" id="people"></div>
+
+    <h2 id="hRooms" style="display:none;">Room occupancy</h2>
+    <div id="rooms"></div>
+
+    <h2 id="hDevices" style="display:none;">Devices</h2>
+    <div id="devices"></div>
+
+    <div class="note" id="emptyNote" style="display:none;margin-top:16px;">
+      Nothing presence-related is in Home Assistant yet. For <b>"is someone home"</b>, add a <b>device_tracker</b> — the HA Companion app on each phone (GPS + zones) is the most reliable, or router/ping/Bluetooth trackers — then create <b>person</b> entities. For <b>room occupancy</b>, add motion or mmWave presence sensors (e.g. Aqara FP2, ESPresence, motion sensors) — they show up as <b>binary_sensor</b> with device_class occupancy/presence/motion.
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  // v1305 — per-person avatar mapping (assign an imported GLB to each person)
+  let avatarFiles = [], personAvatars = {};
+  fetch("/avatar/imported", { cache:"no-store" }).then(r => r.json()).then(j => { avatarFiles = (j && j.files) || []; }).catch(() => {});
+  fetch("/presence/avatars", { cache:"no-store" }).then(r => r.json()).then(j => { personAvatars = (j && j.avatars) || {}; load(); }).catch(() => {});
+  function load(){
+    fetch("/ha/presence", { cache:"no-store" }).then(r => r.json()).then(j => {
+      if (!j || j.ok === false) { $("msg").textContent = "✗ " + ((j && j.error) || "couldn't reach HA"); return; }
+      const people = j.people || [], rooms = j.rooms || [], devices = j.devices || [], zones = j.zones || [];
+      const nothing = !people.length && !rooms.length && !devices.length;
+      $("emptyNote").style.display = nothing ? "block" : "none";
+      if (nothing) { $("msg").innerHTML = (j.configured === false) ? "Home Assistant isn't configured on the bridge yet." : "No presence entities found."; ["hPeople","hRooms","hDevices"].forEach(id=>$(id).style.display="none"); $("people").innerHTML=$("rooms").innerHTML=$("devices").innerHTML=""; return; }
+      const occ = rooms.filter(r => r.occupied).length;
+      $("msg").innerHTML = "<b style='color:var(--home)'>" + j.homeCount + "</b> home · " + j.awayCount + " away" + (rooms.length ? (" · <b style='color:var(--occ)'>" + occ + "</b>/" + rooms.length + " rooms occupied") : "");
+
+      // people
+      $("hPeople").style.display = people.length ? "block" : "none";
+      $("people").innerHTML = people.map(p => {
+        const pill = p.home ? '<span class="pill home">● home</span>' : (p.zone ? '<span class="pill zone">● ' + esc(p.zone) + '</span>' : '<span class="pill away">○ away</span>');
+        const opts = ['<option value="">(no avatar)</option>'].concat(avatarFiles.map(f => '<option value="' + esc(f.url) + '"' + (personAvatars[p.name] === f.url ? ' selected' : '') + '>' + esc(f.name) + '</option>')).join("");
+        return '<div class="person"><div class="nm">' + esc(p.name) + '</div>' + pill +
+          '<select class="avSel" data-person="' + esc(p.name) + '" title="avatar shown when this person arrives" style="margin-top:8px;width:100%;padding:6px;background:#10151d;color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;">' + opts + '</select></div>';
+      }).join("");
+      $("people").querySelectorAll(".avSel").forEach(sel => { sel.addEventListener("change", () => { const per = sel.getAttribute("data-person"); if (sel.value) personAvatars[per] = sel.value; else delete personAvatars[per]; fetch("/presence/avatars", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ avatars: personAvatars }) }).catch(() => {}); }); });
+      try { const pl = $("peopleList"); if (pl) pl.innerHTML = people.map(p => '<option value="' + esc(p.name) + '">').join(""); } catch {}
+
+      // rooms
+      $("hRooms").style.display = rooms.length ? "block" : "none";
+      $("rooms").innerHTML = rooms.map(r =>
+        '<div class="room"><span>' + esc(r.name) + ' <span class="k">' + esc(r.kind) + '</span></span><span class="' + (r.occupied ? "st-occ" : "st-clear") + '">' + (r.occupied ? "● occupied" : "○ clear") + '</span></div>'
+      ).join("");
+      try { const dl = $("roomList"); if (dl) dl.innerHTML = rooms.map(r => '<option value="' + esc(r.name) + '">').join(""); } catch {}
+
+      // devices (secondary)
+      $("hDevices").style.display = devices.length ? "block" : "none";
+      $("devices").innerHTML = devices.map(d =>
+        '<div class="dev">' + esc(d.name) + ' — ' + (d.home ? '<span class="h">home</span>' : esc(d.zone || d.state)) + '</div>'
+      ).join("") + (zones.length ? ('<div class="dev muted" style="margin-top:6px;">zones: ' + zones.map(z => esc(z.name) + " (" + z.count + ")").join(", ") + '</div>') : "");
+    }).catch(e => { $("msg").textContent = "✗ " + e; });
+  }
+  $("refresh").onclick = load;
+  // v1301 — engine-reaction toggles (shared localStorage flags the engine reads)
+  const RW = "voxelengine.presenceWire", DM = "voxelengine.presenceAwayDim";
+  try { $("reactChk").checked = localStorage.getItem(RW) === "1"; $("dimChk").checked = localStorage.getItem(DM) === "1"; } catch {}
+  $("reactChk").addEventListener("change", () => { try { localStorage.setItem(RW, $("reactChk").checked ? "1" : "0"); } catch {} });
+  $("dimChk").addEventListener("change", () => { try { localStorage.setItem(DM, $("dimChk").checked ? "1" : "0"); } catch {} });
+
+  // v1302 — routing watch toggle + room-rule editor
+  fetch("/presence/state", { cache:"no-store" }).then(r => r.json()).then(s => { $("watchChk").checked = !!(s && s.watch); }).catch(() => {});
+  $("watchChk").addEventListener("change", () => { fetch("/presence/watch", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ on: $("watchChk").checked }) }).catch(() => {}); });
+
+  let rules = [];
+  function actLabel(a){ if (!a) return "—"; if (a.kind === "water") return "water " + a.entity_id + " " + (a.seconds || 30) + "s"; if (a.kind === "ha") return (a.service === "turn_on" ? "on " : a.service === "turn_off" ? "off " : a.service === "open_valve" ? "open " : a.service === "close_valve" ? "close " : "toggle ") + a.entity_id; if (a.cmd === "demo:set") return "demo " + ((a.args && a.args.id) || ""); if (a.cmd === "demo:next") return "next demo"; if (a.cmd === "console:exec") return "exec: " + (((a.args && a.args.line) || "")).slice(0, 30); return a.cmd; }
+  function renderRules(){
+    const tb = $("ruleTable").querySelector("tbody"); tb.innerHTML = "";
+    if (!rules.length) { tb.innerHTML = '<tr><td colspan="4" class="muted">no rules yet</td></tr>'; return; }
+    rules.forEach((r, i) => { const when = r.onOccupied ? "occupied" : "clears"; const act = r.onOccupied || r.onClear;
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<td>' + esc(r.match) + '</td><td>' + when + '</td><td>' + esc(actLabel(act)) + '</td>';
+      const td = document.createElement("td"); const b = document.createElement("button"); b.textContent = "✕"; b.style.cssText = "padding:3px 8px;"; b.onclick = () => { rules.splice(i, 1); saveRules(); }; td.appendChild(b); tr.appendChild(td); tb.appendChild(tr); });
+  }
+  function saveRules(){ fetch("/presence/rules", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ rules }) }).then(r => r.json()).then(j => { if (j && j.rules) rules = j.rules; renderRules(); }).catch(() => renderRules()); }
+  fetch("/presence/rules", { cache:"no-store" }).then(r => r.json()).then(j => { rules = (j && j.rules) || []; renderRules(); }).catch(() => renderRules());
+  $("rAct").addEventListener("change", () => { const at = $("rAct").value; $("rVal").placeholder = at === "water" ? "valve.front_lawn 30  (entity + seconds)" : at.startsWith("ha-") ? "entity_id (light.x / switch.x)" : (at === "console" ? "JS line" : at === "demo" ? "demo id" : ""); });
+  $("rAdd").onclick = () => {
+    const match = $("rMatch").value.trim(); if (!match) return;
+    const when = $("rWhen").value, at = $("rAct").value, val = $("rVal").value.trim();
+    let act = null;
+    if (at === "demo") { if (!val) return; act = { cmd:"demo:set", args:{ id: val } }; }
+    else if (at === "next") { act = { cmd:"demo:next" }; }
+    else if (at === "console") { if (!val) return; act = { cmd:"console:exec", args:{ line: val } }; }
+    else if (at.startsWith("ha-")) { if (!val) return; const svc = at === "ha-on" ? "turn_on" : at === "ha-off" ? "turn_off" : at === "ha-open" ? "open_valve" : at === "ha-close" ? "close_valve" : "toggle"; act = { kind:"ha", domain: val.split(".")[0], service: svc, entity_id: val }; }
+    else if (at === "water") { if (!val) return; const parts = val.split(/\s+/); const ent = parts[0]; const secs = parseInt(parts[1], 10) || 30; act = { kind:"water", entity_id: ent, zone: ent, seconds: secs }; }
+    const rule = { match }; if (when === "occupied") rule.onOccupied = act; else rule.onClear = act;
+    rules.push(rule); $("rMatch").value = ""; $("rVal").value = ""; saveRules();
+  };
+
+  // v1303/1304 — per-person rules (optional condition + Shield action)
+  let pRules = [];
+  let _netBase = null;
+  fetch("/net/info", { cache:"no-store" }).then(r => r.json()).then(j => { _netBase = (j && j.recommended) || (j && j.urls && j.urls[0]) || null; }).catch(() => {});
+  function shieldPipUrl(){ const b = _netBase || (location.origin + "/"); return b.replace(/\/?$/, "/") + "pipboy-models.html"; }
+  function pActLabel(a){ if (!a) return "—"; if (a.kind === "water") return "water " + a.entity_id + " " + (a.seconds || 30) + "s"; if (a.kind === "ha") return (a.service === "turn_on" ? "on " : a.service === "turn_off" ? "off " : a.service === "open_valve" ? "open " : a.service === "close_valve" ? "close " : "toggle ") + a.entity_id; if (a.kind === "shield") return "Shield \u2192 " + String(a.url || "").replace(/^https?:\/\//, "").slice(0, 30); if (a.cmd === "demo:set") return "demo " + ((a.args && a.args.id) || ""); if (a.cmd === "demo:next") return "next demo"; if (a.cmd === "console:exec") return "exec: " + (((a.args && a.args.line) || "")).slice(0, 30); return a.cmd; }
+  function renderPRules(){
+    const tb = $("pruleTable").querySelector("tbody"); tb.innerHTML = "";
+    if (!pRules.length) { tb.innerHTML = '<tr><td colspan="4" class="muted">no rules yet</td></tr>'; return; }
+    pRules.forEach((r, i) => { const when = (r.onArrive ? "arrives" : "leaves") + (r.if ? (" · if " + r.if.person + " " + (r.if.home ? "home" : "away")) : ""); const act = r.onArrive || r.onLeave;
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<td>' + esc(r.match) + '</td><td>' + esc(when) + '</td><td>' + esc(pActLabel(act)) + '</td>';
+      const td = document.createElement("td"); const b = document.createElement("button"); b.textContent = "✕"; b.style.cssText = "padding:3px 8px;"; b.onclick = () => { pRules.splice(i, 1); savePRules(); }; td.appendChild(b); tr.appendChild(td); tb.appendChild(tr); });
+  }
+  function savePRules(){ fetch("/presence/person-rules", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ rules: pRules }) }).then(r => r.json()).then(j => { if (j && j.rules) pRules = j.rules; renderPRules(); }).catch(() => renderPRules()); }
+  fetch("/presence/person-rules", { cache:"no-store" }).then(r => r.json()).then(j => { pRules = (j && j.rules) || []; renderPRules(); }).catch(() => renderPRules());
+  $("pAct").addEventListener("change", () => { const at = $("pAct").value; $("pIp").style.display = at === "shield" ? "" : "none"; $("pVal").placeholder = at === "shield" ? shieldPipUrl() : at === "water" ? "valve.front_lawn 30  (entity + seconds)" : at.startsWith("ha-") ? "entity_id (light.x / switch.x)" : (at === "console" ? "JS line" : "demo id"); });
+  $("pAdd").onclick = () => {
+    const match = $("pMatch").value.trim(); if (!match) return;
+    const when = $("pWhen").value, at = $("pAct").value, val = $("pVal").value.trim();
+    let act = null;
+    if (at === "demo") { if (!val) return; act = { cmd:"demo:set", args:{ id: val } }; }
+    else if (at === "next") { act = { cmd:"demo:next" }; }
+    else if (at === "console") { if (!val) return; act = { cmd:"console:exec", args:{ line: val } }; }
+    else if (at === "shield") { act = { kind:"shield", url: (val || shieldPipUrl()), ip: ($("pIp").value.trim() || "192.168.50.114") }; }
+    else if (at.startsWith("ha-")) { if (!val) return; const svc = at === "ha-on" ? "turn_on" : at === "ha-off" ? "turn_off" : at === "ha-open" ? "open_valve" : at === "ha-close" ? "close_valve" : "toggle"; act = { kind:"ha", domain: val.split(".")[0], service: svc, entity_id: val }; }
+    else if (at === "water") { if (!val) return; const parts = val.split(/\s+/); const ent = parts[0]; const secs = parseInt(parts[1], 10) || 30; act = { kind:"water", entity_id: ent, zone: ent, seconds: secs }; }
+    const rule = { match }; if (when === "arrive") rule.onArrive = act; else rule.onLeave = act;
+    const ifp = $("pIfPerson").value.trim(); if (ifp) rule.if = { person: ifp, home: $("pIfState").value === "home" };
+    pRules.push(rule); $("pMatch").value = ""; $("pVal").value = ""; $("pIfPerson").value = ""; savePRules();
+  };
+  load();
+  setInterval(load, 10000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

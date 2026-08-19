@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<!-- v1257 (#6) — WebGL2 -> VBA FPS control path, FIRST SLICE (Option C: browser owns
+     the camera, VBA mirrors). Pointer-lock + WASD + mouse-look run a first-person
+     camera locally over a small reference scene (grid + landmark cubes), and the pose
+     is PUBLISHED to the bridge (POST /fps/state) at a fixed rate. A VBA stub polls
+     GET /fps/state to mirror the same camera in its OpenGL window
+     (ai-bridge/fps-vba/modFPSControl.bas). This page is the testable browser<->bridge
+     half; the real engine can publish the same shape from its own FPS controller. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FPS control — engine → bridge → VBA</title>
+<style>
+  :root{ --ink:#cfe6ff; --dim:#7c9ec0; --accent:#4fd08a; --warn:#ffb454; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#06090e; color:var(--ink);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; overflow:hidden; }
+  #view{ position:fixed; inset:0; display:block; cursor:crosshair; }
+  #hud{ position:fixed; left:12px; top:12px; background:rgba(6,12,18,.78); border:1px solid #1c3349;
+    border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); font:12px/1.5 ui-monospace,Consolas,monospace;
+    min-width:210px; }
+  #hud b{ color:#dff1ff; }
+  .k{ color:var(--dim); }
+  .v{ color:#aee9c8; }
+  #pub{ margin-top:8px; }
+  #pub.on{ color:var(--accent); } #pub.off{ color:var(--warn); }
+  #lock{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(4,8,12,.55); cursor:pointer; }
+  #lock div{ background:rgba(8,16,24,.92); border:1px solid #234; border-radius:12px; padding:18px 22px;
+    text-align:center; max-width:360px; }
+  kbd{ background:#11202c; border:1px solid #2a4256; border-radius:4px; padding:1px 6px; color:#bfe6ff; font-size:12px; }
+  .row{ margin-top:8px; }
+  button{ font:13px inherit; color:var(--ink); background:#0e1c26; border:1px solid #234; border-radius:8px; padding:6px 10px; cursor:pointer; }
+  button.accent{ background:var(--accent); color:#04130d; font-weight:700; border-color:var(--accent); }
+  .stick{ position:fixed; width:108px; height:108px; border-radius:50%; border:1px solid #2a4a64;
+    background:rgba(10,22,32,.4); display:none; pointer-events:none; z-index:5; }
+  .stick .knob{ position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px;
+    border-radius:50%; background:rgba(79,208,138,.5); border:1px solid #4fd08a; }
+  body.touch #lock .k{ display:block; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="stick" id="stickL"><div class="knob"></div></div>
+<div class="stick" id="stickR"><div class="knob"></div></div>
+<div id="hud">
+  <b>FPS control · slice 1</b>
+  <div class="row"><span class="k">pos </span><span class="v" id="hPos">0.0, 1.6, 0.0</span></div>
+  <div><span class="k">yaw </span><span class="v" id="hYaw">0.0</span><span class="k">  pitch </span><span class="v" id="hPitch">0.0</span></div>
+  <div><span class="k">publish </span><span class="v" id="hRate">30</span><span class="k"> Hz</span></div>
+  <div id="pub" class="off">● publishing OFF</div>
+  <div class="row">
+    <button id="pubBtn" class="accent">▶ Publish pose</button>
+    <button id="flyBtn" title="Toggle fly / walk">🛸 Fly</button>
+  </div>
+  <div class="row k" id="hIn">input: keyboard / mouse</div>
+  <div class="row k" id="hPost">last POST: —</div>
+</div>
+<div id="lock"><div>
+  <b>Click to capture the mouse</b>
+  <div class="row k"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · mouse look · <kbd>Shift</kbd> sprint · <kbd>Space</kbd>/<kbd>Ctrl</kbd> up/down (fly) · <kbd>Esc</kbd> release</div>
+</div></div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { buildFpsScene } from "./fpsScene.js";
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06090e);
+scene.fog = new THREE.Fog(0x06090e, 18, 60);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 500);
+
+// reference scene: lights + ground grid + seeded landmark cubes (shared with the mirror)
+buildFpsScene(THREE, scene);
+
+function resize(){ const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+// ---- first-person camera state -------------------------------------------
+const pos = new THREE.Vector3(0, 1.6, 6);
+let yaw = 0, pitch = 0;          // radians; YXZ euler
+let fly = false;
+const keys = Object.create(null);
+const SPEED = 6, SPRINT = 2.0, EYE = 1.6, LOOK_RATE = 2.8;
+// external analog input (touch sticks + gamepad), folded into step() alongside kbd/mouse.
+// move: x = strafe (right+), y = stick-down+ (forward = -y);  look: x = right+, y = down+
+const touchMove = { x: 0, y: 0 }, touchLook = { x: 0, y: 0 };
+const padMove = { x: 0, y: 0 }, padLook = { x: 0, y: 0 };
+let padSprint = false, padUp = 0, padInfo = "—";
+const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+
+const lockEl = document.getElementById("lock");
+canvas.addEventListener("click", () => canvas.requestPointerLock && canvas.requestPointerLock());
+document.addEventListener("pointerlockchange", () => { lockEl.style.display = (document.pointerLockElement === canvas) ? "none" : "flex"; });
+document.addEventListener("mousemove", (e) => {
+  if (document.pointerLockElement !== canvas) return;
+  yaw   -= e.movementX * 0.0024;
+  pitch -= e.movementY * 0.0024;
+  pitch = Math.max(-1.5, Math.min(1.5, pitch));
+});
+addEventListener("keydown", (e) => { keys[e.code] = true; if (e.code === "Space") e.preventDefault(); });
+addEventListener("keyup",   (e) => { keys[e.code] = false; });
+
+document.getElementById("flyBtn").addEventListener("click", function(){ fly = !fly; this.classList.toggle("accent", fly); this.textContent = fly ? "🚶 Walk" : "🛸 Fly"; });
+
+function step(dt){
+  const f = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));   // forward (xz)
+  const r = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));    // right (xz)
+  const sprint = (keys["ShiftLeft"] || keys["ShiftRight"] || padSprint);
+  const sp = SPEED * (sprint ? SPRINT : 1) * dt;
+  if (keys["KeyW"]) pos.addScaledVector(f, sp);
+  if (keys["KeyS"]) pos.addScaledVector(f, -sp);
+  if (keys["KeyD"]) pos.addScaledVector(r, sp);
+  if (keys["KeyA"]) pos.addScaledVector(r, -sp);
+  // analog move (touch + gamepad): forward = -y, strafe = x
+  const mx = clamp1(touchMove.x + padMove.x), my = clamp1(touchMove.y + padMove.y);
+  if (mx || my){ pos.addScaledVector(f, -my * sp); pos.addScaledVector(r, mx * sp); }
+  // analog look (touch + gamepad): rate-based, unlike mouse deltas
+  const lx = touchLook.x + padLook.x, ly = touchLook.y + padLook.y;
+  if (lx || ly){ yaw -= lx * LOOK_RATE * dt; pitch -= ly * LOOK_RATE * dt; pitch = Math.max(-1.5, Math.min(1.5, pitch)); }
+  if (fly){
+    if (keys["Space"] || padUp > 0) pos.y += sp;
+    if (keys["ControlLeft"] || keys["ControlRight"] || padUp < 0) pos.y -= sp;
+  } else {
+    pos.y = EYE;
+  }
+  camera.position.copy(pos);
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+}
+
+// ---- gamepad (Shield / any controller) -------------------------------------
+function pollGamepad(){
+  padMove.x = padMove.y = padLook.x = padLook.y = 0; padSprint = false; padUp = 0;
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null; for (const p of pads){ if (p){ gp = p; break; } }
+  if (!gp){ padInfo = "—"; return; }
+  padInfo = (gp.id || "gamepad").slice(0, 18);
+  const dz = (v) => Math.abs(v) < 0.16 ? 0 : v;
+  padMove.x = dz(gp.axes[0] || 0); padMove.y = dz(gp.axes[1] || 0);   // left stick
+  padLook.x = dz(gp.axes[2] || 0); padLook.y = dz(gp.axes[3] || 0);   // right stick
+  const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const val = (i) => (gp.buttons[i] ? gp.buttons[i].value : 0);
+  padSprint = b(5) || b(10) || val(7) > 0.5;                          // RB / L3 / RT
+  if (fly){ if (b(0)) padUp = 1; if (b(1)) padUp = -1; }              // A up / B down
+}
+
+// ---- dual touch sticks (phone) ---------------------------------------------
+(function touchSticks(){
+  const isTouch = matchMedia("(pointer:coarse)").matches || ("ontouchstart" in window);
+  if (!isTouch) return;
+  document.body.classList.add("touch");
+  const R = 50;   // max knob travel (px)
+  const stL = document.getElementById("stickL"), stR = document.getElementById("stickR");
+  const knL = stL.querySelector(".knob"), knR = stR.querySelector(".knob");
+  const active = {};   // identifier -> { side, ox, oy }
+  function show(st, x, y){ st.style.left = (x - 54) + "px"; st.style.top = (y - 54) + "px"; st.style.display = "block"; }
+  function knob(kn, dx, dy){ kn.style.transform = "translate(" + dx + "px," + dy + "px)"; }
+  function start(t){
+    const left = t.clientX < innerWidth / 2;
+    if (left && active.L == null){ active.L = t.identifier; show(stL, t.clientX, t.clientY); }
+    else if (!left && active.R == null){ active.R = t.identifier; show(stR, t.clientX, t.clientY); }
+  }
+  function move(t){
+    let side = null, st = null;
+    if (t.identifier === active.L){ side = "L"; st = stL; } else if (t.identifier === active.R){ side = "R"; st = stR; } else return;
+    const cx = parseFloat(st.style.left) + 54, cy = parseFloat(st.style.top) + 54;
+    let dx = t.clientX - cx, dy = t.clientY - cy;
+    const len = Math.hypot(dx, dy) || 1; if (len > R){ dx = dx / len * R; dy = dy / len * R; }
+    knob(side === "L" ? knL : knR, dx, dy);
+    if (side === "L"){ touchMove.x = dx / R; touchMove.y = dy / R; }
+    else { touchLook.x = dx / R; touchLook.y = dy / R; }
+  }
+  function end(t){
+    if (t.identifier === active.L){ active.L = null; stL.style.display = "none"; knob(knL, 0, 0); touchMove.x = touchMove.y = 0; }
+    else if (t.identifier === active.R){ active.R = null; stR.style.display = "none"; knob(knR, 0, 0); touchLook.x = touchLook.y = 0; }
+  }
+  addEventListener("touchstart", (e) => { for (const t of e.changedTouches) start(t); }, { passive: true });
+  addEventListener("touchmove",  (e) => { for (const t of e.changedTouches) move(t); e.preventDefault(); }, { passive: false });
+  addEventListener("touchend",   (e) => { for (const t of e.changedTouches) end(t); }, { passive: true });
+  addEventListener("touchcancel",(e) => { for (const t of e.changedTouches) end(t); }, { passive: true });
+})();
+
+// ---- pose publishing (browser is authoritative; bridge is the mailbox) -----
+let publishing = false, lastPub = 0;
+const RATE_HZ = 30, prevPos = new THREE.Vector3();
+const pubEl = document.getElementById("pub"), postEl = document.getElementById("hPost");
+document.getElementById("pubBtn").addEventListener("click", function(){
+  publishing = !publishing; this.textContent = publishing ? "⏸ Stop publish" : "▶ Publish pose";
+  pubEl.className = publishing ? "on" : "off"; pubEl.textContent = publishing ? "● publishing ON" : "● publishing OFF";
+});
+function publish(now){
+  if (!publishing || now - lastPub < 1000 / RATE_HZ) return;
+  const dtv = Math.max(1e-3, (now - lastPub) / 1000); lastPub = now;
+  const vel = [(pos.x - prevPos.x) / dtv, (pos.y - prevPos.y) / dtv, (pos.z - prevPos.z) / dtv];
+  prevPos.copy(pos);
+  fetch("/fps/state", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pos: [pos.x, pos.y, pos.z], yaw, pitch, vel, src: "fpscontrol" }) })
+    .then(r => r.json()).then(j => { postEl.textContent = j && j.ok ? ("last POST: ok @ " + new Date(j.ts).toLocaleTimeString()) : "last POST: failed"; })
+    .catch(() => { postEl.textContent = "last POST: bridge unreachable"; });
+}
+
+const hPos = document.getElementById("hPos"), hYaw = document.getElementById("hYaw"), hPitch = document.getElementById("hPitch");
+const hIn = document.getElementById("hIn");
+let prevT = performance.now();
+(function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - prevT) / 1000); prevT = now;
+  pollGamepad();
+  step(dt);
+  publish(now);
+  hPos.textContent = pos.x.toFixed(1) + ", " + pos.y.toFixed(1) + ", " + pos.z.toFixed(1);
+  hYaw.textContent = (yaw % (Math.PI * 2)).toFixed(2); hPitch.textContent = pitch.toFixed(2);
+  const usingTouch = touchMove.x || touchMove.y || touchLook.x || touchLook.y;
+  hIn.textContent = "input: " + (padInfo !== "—" ? "🎮 " + padInfo : usingTouch ? "👆 touch sticks" : "keyboard / mouse");
+  renderer.render(scene, camera);
+})(prevT);
+</script>
+</body>
+</html>

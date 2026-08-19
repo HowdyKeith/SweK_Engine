@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK Page Index -- launch and assemble</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:13px 18px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+  h1 { margin:0 0 3px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0 0 8px; color:var(--dim); font-size:12px; max-width:900px; } header b { color:var(--green); }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input[type=search] { flex:1; min-width:220px; background:#0a1c12; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:7px 10px; font:12px ui-monospace,monospace; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 13px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .count { color:var(--dim); font-size:11px; }
+  main { padding:14px 18px 40px; }
+  #dash { display:none; margin-bottom:18px; }
+  #dash.on { display:block; }
+  #dash h2 { font-size:12px; color:var(--cyan); text-transform:uppercase; margin:0 0 8px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  .tile { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#04100a; }
+  .tile.panel { max-width:230px; }
+  .tile .th { display:flex; justify-content:space-between; align-items:center; padding:5px 9px; border-bottom:1px solid var(--line); font-size:11px; color:var(--amber); }
+  .tile .th a { color:var(--cyan); text-decoration:none; } .tile .th button { padding:2px 7px; font-size:10px; }
+  .tile iframe { width:100%; height:230px; border:0; background:#01060c; }
+  .tile.panel iframe { height:150px; }
+  .grp { margin:16px 0 6px; font-size:12px; color:var(--cyan); text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid var(--line); padding-bottom:3px; }
+  .grp.panels { color:var(--amber); }
+  .item { display:flex; gap:9px; align-items:flex-start; padding:5px 6px; border-radius:5px; }
+  .item:hover { background:#0a180f; }
+  .item input { margin-top:3px; }
+  .item .body { flex:1; min-width:0; }
+  .item a { color:var(--green); text-decoration:none; font-weight:600; } .item a:hover { text-decoration:underline; }
+  .item.panel a { color:var(--amber); }
+  .item .d { color:var(--dim); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.place { display:flex; flex-wrap:wrap; gap:3px; align-items:center; margin-left:auto; padding-left:10px; }
+.place.dim { opacity:.35; }
+.tchip { display:inline-flex; align-items:center; gap:2px; font-size:9.5px; line-height:1.4; padding:0 4px;
+         border:1px solid #24402f; border-radius:4px; color:#7f9c8c; cursor:pointer; white-space:nowrap; }
+.tchip.on { background:#123021; border-color:#3f8f63; color:#bff0d2; }
+.tchip input { width:9px; height:9px; margin:0; }
+.psep { color:#3f8f63; font-size:9px; padding:0 3px; }
+.item { display:flex; align-items:center; }
+.item .body { min-width:0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SweK Page Index &mdash; launch and assemble</h1>
+  <p>Every page in the engine, grouped and searchable. Check any set to <b>assemble a live dashboard</b> of tiles you watch side by side. The <b>panels</b> group at the top are extracted mini-panels &mdash; just the live-mind or a single gauge &mdash; that tile small and compact. Each tile is its own document, so heavy pages stay isolated.</p>
+  <div class="bar">
+    <input type="search" id="q" placeholder="filter pages by name or description..." autocomplete="off" />
+    <span class="count" id="count"></span>
+    <button id="toggle">Show dashboard</button>
+    <button id="clear">Clear</button>
+  </div>
+</header>
+<main>
+  <section id="dash"><h2 id="dashh">Dashboard</h2><div class="tiles" id="tiles"></div></section>
+  <div id="list"></div>
+</main>
+<script>
+// v3228 -- *** THIS WAS A BAKED LITERAL OF 256 ENTRIES ON A PAGE THAT CALLS ITSELF "EVERY PAGE IN THE ENGINE".
+// THE TREE HAS 315. *** Fifty-two pages assigned to a drawer at v3227 were not in it at all -- roundhouse,
+// device, models, gates, instruments, ct, fanbeam, kerr, kepler, ising, schrodinger, ship, changelog, AND THIS
+// FILE ITSELF. It was generated once and never regenerated, which is the second-copy defect this session has
+// found in nine files (MODES), three (the gate-file walk), four (a mesher's liveness) and 59 of 82 (the stated
+// runtimes). Here the second copy was the page whose entire job is being the complete list.
+//
+// IT IS DERIVED NOW: tools/ship/buildPageIndex.mjs walks the tree with pageReach's own walker and writes
+// page-index.json, and the GROUP comes from tools/ship/pageSections.mjs rather than being typed beside it -- so
+// a page's drawer and its index group CANNOT disagree. The old table said "other" for 150 pages, which reads
+// like a decision; an empty group reads like the question it actually is.
+//
+// *** AND THERE IS NO FALLBACK LITERAL, ON PURPOSE. *** A stale copy kept "just in case the fetch fails" is the
+// exact thing being removed, and it would fail silently while looking complete.
+let PAGES = [];
+const $ = (id) => document.getElementById(id);
+const sel = new Set(JSON.parse(localStorage.getItem("swek-dash") || "[]"));
+const save = () => localStorage.setItem("swek-dash", JSON.stringify([...sel]));
+
+function renderList() {
+  const q = $("q").value.toLowerCase();
+  const groups = {}; let shown = 0;
+  for (const p of PAGES) {
+    if (q && !(p.t.toLowerCase().includes(q) || p.d.toLowerCase().includes(q) || p.f.toLowerCase().includes(q) || p.g.includes(q))) continue;
+    (groups[p.g] = groups[p.g] || []).push(p); shown++;
+  }
+  const order = ["panels","console","brain / agent","ground truth","cosmic","physics","fluid","blobs","voxel / world","science","endless sky","other"];
+  const keys = Object.keys(groups).sort((a,b)=>{ const ia=order.indexOf(a), ib=order.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  let h = "";
+  for (const g of keys) {
+    h += "<div class='grp" + (g==="panels"?" panels":"") + "'>" + g + " <span class='count'>(" + groups[g].length + ")</span></div>";
+    for (const p of groups[g]) {
+      // a demo or built-in has NO FILE to put in a tile, so it gets no checkbox -- offering one would add a
+      // dashboard entry that renders an engine URL with nothing behind it
+      const box = p.noTile
+        ? "<span style='width:13px;display:inline-block;flex:none;' title='" +
+          (p.kind === "demo" ? "a demo" : "a built-in") + " — exists only while the engine runs, so it cannot be a dashboard tile'></span>"
+        : "<input type='checkbox' data-f='" + p.f + "'" + (sel.has(p.f) ? " checked" : "") + " />";
+      const tag = p.kind === "demo" ? " \ud83c\udfac" : p.kind === "builtin" ? " \ud83c\udfa1" : "";
+      h += "<div class='item" + (p.p?" panel":"") + "'>" + box +
+           "<div class='body'><a href='/" + p.f + "' target='_blank' rel='noopener'>" + p.t + "</a>" + tag +
+           (p.d ? " <span class='d'>" + p.d + "</span>" : "") + "</div>" + placeCells(p) + "</div>";
+    }
+  }
+  $("list").innerHTML = h;
+  $("count").textContent = shown + " / " + PAGES.length + " entries" + (sel.size ? " · " + sel.size + " in dashboard" : "");
+  document.querySelectorAll(".item input").forEach((c) => c.onchange = () => { c.checked ? sel.add(c.dataset.f) : sel.delete(c.dataset.f); save(); renderDash(); renderList(); });
+}
+
+// v3577 -- *** WHERE EACH PAGE APPEARS, AS CHECKBOXES BESIDE IT. ***
+// Keith's design: the list, and on the right of each page name a checkbox for every place it could show up.
+// FOUR INDEPENDENT FACTS, because they are independent in fact -- a page can be a big button without being in a
+// topic drawer, and a topic page is usually not an application.
+//
+//   auto        follow pagePlacement.mjs's suggestion for topics. A CHECKBOX RATHER THAN A SILENT DEFAULT, so
+//               "nobody decided" and "somebody decided to let the tool decide" are DIFFERENT STATES.
+//   topics      which drawers list it. Keith: "a page such as Cosmic Map could show some or all or none of the
+//               sections" -- so it is a SET, and the old registry could not say that because SECTIONS.pages is
+//               a partition. One small chip per topic, checked = listed there.
+//   big         a big button on server.html, under the topics section.
+//   apps        listed in the Applications panel on the render page.
+//
+// *** EVERY WRITE IS ONE PAGE, AND THE UI REPAINTS FROM THE SERVER'S ECHO. *** Sending the whole table on each
+// click would lose a concurrent edit from another tab, and painting from the click is the defect v3575 found in
+// the tunnel checkbox: a control reporting a write it had never confirmed.
+let TOPICS = [], PLACE = {}, placeErr = "";
+
+function placeCells(p) {
+  if (p.noTile) return "<div class='place dim' title='a demo or built-in has no file to place'></div>";
+  const r = PLACE[p.f] || { topics: [], bigButton: false, apps: false, auto: false, from: "none" };
+  const chip = (t) => {
+    const on = r.topics.includes(t.id);
+    return "<label class='tchip" + (on ? " on" : "") + "' title='" + t.label +
+           (t.used >= t.cap ? " — AT THE CAP OF " + t.cap : "") + "'>" +
+           "<input type='checkbox' data-place='topic' data-f='" + p.f + "' data-t='" + t.id + "'" +
+           (on ? " checked" : "") + " />" + t.label.replace(/ .*/, "") + "</label>";
+  };
+  const flag = (k, label, on, title) =>
+    "<label class='tchip" + (on ? " on" : "") + "' title='" + title + "'>" +
+    "<input type='checkbox' data-place='" + k + "' data-f='" + p.f + "'" + (on ? " checked" : "") + " />" + label + "</label>";
+  return "<div class='place'>" +
+    flag("auto", "auto", r.auto,
+         "follow the suggester for topics rather than pinning one. Ticked and still unplaced shows as auto-unreached, because the suggester refuses to guess") +
+    flag("bigButton", "big", r.bigButton, "a big button on server.html, under the topics section") +
+    flag("apps", "apps", r.apps, "listed in the Applications panel on the render page") +
+    "<span class='psep' title='from: " + r.from + "'>" + (r.from === "sections" ? "\u25cf" : r.from === "override" ? "\u25c6" : r.from === "auto" ? "\u25b3" : "\u00b7") + "</span>" +
+    TOPICS.map(chip).join("") + "</div>";
+}
+
+async function savePlace(file, entry) {
+  try {
+    const r = await fetch("/pages/placements", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                 body: JSON.stringify({ file, entry }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j && j.error || "rejected");
+    if (j.entry) PLACE[file] = j.entry;                 // the SERVER'S resolved truth, not our click
+    placeErr = "";
+    if (j.overCap && j.overCap.length)
+      placeErr = "over the cap of 15: " + j.overCap.map((o) => o.label + " (" + o.count + ")").join(", ");
+  } catch (e) { placeErr = "could not save " + file + ": " + ((e && e.message) || e); }
+  renderList();
+}
+
+document.addEventListener("change", (ev) => {
+  const c = ev.target;
+  if (!c || c.tagName !== "INPUT" || !c.dataset || !c.dataset.place) return;
+  const f = c.dataset.f;
+  const cur = PLACE[f] || { topics: [], bigButton: false, apps: false, auto: false };
+  const entry = { topics: cur.topics.slice(), bigButton: !!cur.bigButton, apps: !!cur.apps, auto: !!cur.auto };
+  if (c.dataset.place === "topic") {
+    const t = c.dataset.t;
+    entry.topics = c.checked ? [...new Set([...entry.topics, t])] : entry.topics.filter((x) => x !== t);
+  } else entry[c.dataset.place] = c.checked;
+  savePlace(f, entry);
+});
+
+function renderDash() {
+  const byF = Object.fromEntries(PAGES.map(p=>[p.f,p]));
+  $("dash").classList.toggle("on", sel.size > 0 && $("dash").dataset.open === "1");
+  $("dashh").textContent = "Dashboard (" + sel.size + ")";
+  $("tiles").innerHTML = [...sel].map(f => {
+    const p = byF[f] || {t:f,p:0};
+    return "<div class='tile" + (p.p?" panel":"") + "'><div class='th'><a href='/" + f + "' target='_blank' rel='noopener'>" + p.t + "</a>" +
+           "<button data-rm='" + f + "'>remove</button></div><iframe src='/" + f + "' loading='lazy'></iframe></div>";
+  }).join("");
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { sel.delete(b.dataset.rm); save(); renderDash(); renderList(); });
+}
+
+$("q").oninput = renderList;
+$("toggle").onclick = () => { $("dash").dataset.open = $("dash").dataset.open === "1" ? "0" : "1"; $("toggle").textContent = $("dash").dataset.open === "1" ? "Hide dashboard" : "Show dashboard"; renderDash(); };
+$("clear").onclick = () => { sel.clear(); save(); renderDash(); renderList(); };
+$("dash").dataset.open = "0";
+
+// AN EMPTY LIST AND A FAILED FETCH LOOK IDENTICAL, and one of them is a page that quietly stopped working.
+// v3575 -- *** THE LAUNCH PANEL'S CONTENTS LIVE HERE NOW, AND THE PANEL IS GONE FROM server.html. ***
+// Two lists claiming to be complete is the second-copy defect this file's own header is about, and it had
+// grown a third instance: page-index.json (340 pages) and launch-index.json (451 entries) were both "the
+// whole engine", disagreed by 111, and were reachable from two buttons a few pixels apart.
+//
+// THEY DO NOT HOLD THE SAME THING, WHICH IS WHY THIS IS A MERGE AND NOT A DELETION. page-index.json is
+// PAGES ONLY. launch-index.json also carries 49 DEMOS and 54 BUILT-INS -- engine states that exist only
+// while it runs, have no file to open, and were therefore invisible here. That distinction was the one
+// thing v3552 built the launch index to preserve, so it is carried across rather than flattened: every
+// folded entry keeps its kind, and a demo is not offered to the dashboard because there is no page to
+// put in a tile.
+Promise.all([
+  fetch("/page-index.json").then((r) => { if (!r.ok) throw new Error("page-index.json answered " + r.status); return r.json(); }),
+  fetch("/launch-index.json").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  // the placement layer is OPTIONAL: without the bridge running, the list still renders and the checkboxes
+  // simply do not appear. A page index that refused to load because an editor endpoint was absent would be a
+  // worse failure than the one it was trying to report.
+  fetch("/pages/placements").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+]).then(([j, L, P]) => {
+  if (P && P.ok) { TOPICS = P.topics || []; PLACE = P.pages || {}; }
+  PAGES = j.pages || [];
+  let added = 0, kinds = { demo: 0, builtin: 0 };
+  if (L && L.entries) {
+    const have = new Set(PAGES.map((p) => p.f));
+    for (const e of L.entries) {
+      if (e.kind === "page") {
+        // a page the walker missed: fold it in rather than let the two lists disagree
+        if (!have.has(e.id)) { PAGES.push({ f: e.id, t: e.display, d: "", g: e.section || "", p: e.section ? 1 : 0, kind: "page" }); added++; have.add(e.id); }
+        continue;
+      }
+      kinds[e.kind] = (kinds[e.kind] || 0) + 1;
+      PAGES.push({ f: e.href.replace(/^\//, ""), t: e.display, kind: e.kind,
+                   d: e.kind === "demo" ? "engine demo — boots the engine into this mode" : "engine built-in — a mode, not a file",
+                   g: e.section || "", p: e.section ? 1 : 0, noTile: true });
+      added++;
+    }
+  }
+  renderList(); renderDash();
+  const g = PAGES.filter((p) => p.g).length;
+  $("count").insertAdjacentHTML("afterend",
+    '<span style="color:var(--dim);font-size:11px;margin-left:8px;">' + g + " in a drawer, " +
+    (PAGES.length - g) + " ungrouped &mdash; ungrouped is a to-do list, not a category" +
+    (L ? ("; folded in " + added + " from the launch index (" + kinds.demo + " demos, " + kinds.builtin +
+          " built-ins)") : "; LAUNCH INDEX DID NOT LOAD &mdash; demos and built-ins are missing from this list") +
+    "</span>");
+}).catch((e) => {
+  document.body.insertAdjacentHTML("afterbegin",
+    '<div style="background:#3a1d1d;color:#f0b6b6;padding:9px 14px;font-size:12px;">' +
+    "page-index.json did not load (" + String(e.message) +
+    "). THIS PAGE HAS NO BAKED FALLBACK ON PURPOSE: a stale built-in list is the defect v3228 removed, and it " +
+    "would look complete while being wrong. Run <code>node tools/ship/buildPageIndex.mjs</code>.</div>");
+});
+</script>
+</body>
+</html>

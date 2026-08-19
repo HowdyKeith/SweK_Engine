@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🐛 Debug Console — Voxel Engine</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #08090c; color: #cde; font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+  #wrap { display: flex; flex-direction: column; height: 100%; }
+  header { padding: 8px 14px; background: #11141a; border-bottom: 1px solid #2a2e36; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 14px; font-weight: 600; color: #8df; flex: 1; }
+  header .meta { font-size: 10px; color: #677; }
+  .btn { padding: 5px 10px; border-radius: 4px; border: 1px solid #356; background: #0c1620; color: #cde; font-size: 11px; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: #1a2838; }
+  .btn.on  { background: #1e3a1e; border-color: #4a8a4a; color: #beb; }
+  .btn.bad { background: #3a1e1e; border-color: #8a4a4a; color: #ebb; }
+  .filter-row { padding: 6px 14px; background: #0d1118; border-bottom: 1px solid #2a2e36; display: flex; gap: 8px; align-items: center; }
+  .filter-row input { flex: 1; padding: 4px 8px; background: #0a0c12; border: 1px solid #2a3038; color: #cde; font-family: inherit; font-size: 11px; }
+  .filter-row .chip { font-size: 10px; padding: 3px 8px; border-radius: 3px; border: 1px solid #2a3038; cursor: pointer; opacity: 0.55; }
+  .filter-row .chip.on { opacity: 1; }
+  .filter-row .chip[data-src="engine"] { color: #8df; }
+  .filter-row .chip[data-src="shield"] { color: #fda; }
+  .filter-row .chip[data-src="roku"]   { color: #cdf; }
+  .filter-row .chip[data-src="phone"]  { color: #fbf; }
+  .filter-row .chip[data-src="bridge"] { color: #8fa; }
+  .filter-row .chip[data-src="other"]  { color: #999; }
+  #log { flex: 1; overflow-y: scroll; padding: 6px 0;
+         /* v747 — explicit selection so users can copy log content */
+         user-select: text; -webkit-user-select: text; cursor: text; }
+  .line { padding: 1px 14px; white-space: pre-wrap; word-break: break-word; line-height: 1.4;
+          user-select: text; -webkit-user-select: text; }
+  .line:hover { background: #11141a; }
+  .ts { color: #556; margin-right: 8px; user-select: text; }
+  .src { display: inline-block; min-width: 56px; padding: 0 4px; border-radius: 3px; margin-right: 6px; font-weight: 600; font-size: 10px; text-align: center; user-select: none; }
+  /* v747 — small icon prefix for level so warn/error scan readable at a glance */
+  .lvl-icon { display: inline-block; width: 14px; text-align: center; margin-right: 4px; opacity: 0.7; user-select: none; }
+  .src.engine { background: #1e3a52; color: #8df; }
+  .src.shield { background: #523a1e; color: #fda; }
+  .src.roku   { background: #2a2a5a; color: #cdf; }
+  .src.phone  { background: #4a1e4a; color: #fbf; }
+  .src.bridge { background: #1e4a3a; color: #8fa; }
+  .src.other  { background: #2a2a2a; color: #999; }
+  /* v747 — stronger contrast for warnings + errors */
+  .level.warn  { color: #ffd166; font-weight: 500; }
+  .level.error { color: #ff6b5e; font-weight: 600; }
+  .level.info  { color: #cde; }
+  .level.debug { color: #889; }
+  .level.log   { color: #b8c5d0; }
+  /* v747 — auto-scroll-paused indicator: shows when user scrolls up */
+  #scrollFollow { display: none; position: absolute; right: 24px; bottom: 38px;
+                  background: #1d3a52; color: #cde; padding: 6px 12px;
+                  border-radius: 4px; border: 1px solid #356; cursor: pointer;
+                  font-size: 11px; box-shadow: 0 2px 10px rgba(0,0,0,.5);
+                  z-index: 9999; user-select: none; }
+  #scrollFollow.on { display: block; }
+  #scrollFollow:hover { background: #2a5a7a; }
+  .status-bar { padding: 4px 14px; background: #0d1118; border-top: 1px solid #2a2e36; font-size: 10px; color: #678; display: flex; gap: 14px; }
+  .status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #d44; display: inline-block; margin-right: 4px; }
+  .status-bar .dot.on { background: #5d8; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🐛 Debug Console</h1>
+    <span class="meta">unified stream from engine + Shield + Roku + phone</span>
+    <button class="btn" id="btnCapture" title="Toggle engine console.log mirroring to bridge">🎙 Capture engine console: OFF</button>
+    <button class="btn" id="btnPause" title="Pause autoscroll/incoming lines">⏸ Pause</button>
+    <button class="btn" id="btnCopy" title="Copy all currently-visible lines to clipboard (respects filter)">📋 Copy visible</button>
+    <button class="btn bad" id="btnClear" title="Clear visible log (local only — leaves the bridge ring + disk intact)">🗑 Clear view</button>
+    <button class="btn bad" id="btnClearRing" title="Clear the bridge's in-memory ring AND truncate the disk log (debug.log + debug.log.1). Use when starting a fresh repro.">💣 Clear ring + disk</button>
+    <a class="btn" id="lnkDownload" href="/debug/log" target="_blank" download="debug.log" title="Download the raw NDJSON log file" style="text-decoration:none;">⬇ Download log</a>
+  </header>
+  <div class="filter-row">
+    <span style="font-size:10px; color:#678;">filter:</span>
+    <input type="text" id="filterIn" placeholder="substring match — e.g. 'error' or 'ufo'">
+    <span class="chip on" data-src="engine">engine</span>
+    <span class="chip on" data-src="shield">shield</span>
+    <span class="chip on" data-src="roku">roku</span>
+    <span class="chip on" data-src="phone">phone</span>
+    <span class="chip on" data-src="bridge">bridge</span>
+    <span class="chip on" data-src="other">other</span>
+  </div>
+  <div id="log"></div>
+  <div id="scrollFollow" title="Click to jump to bottom and resume auto-scrolling">↓ jump to latest · auto-scroll paused</div>
+  <div class="status-bar">
+    <span><span class="dot" id="connDot"></span> <span id="connText">connecting…</span></span>
+    <span id="lineCount">0 lines</span>
+    <span id="dropCount" style="color:#a76;"></span>
+    <span id="diskStats" style="color:#789;">disk: —</span>
+    <span style="flex:1; text-align:right;">subscribed sources update live · close tab to unsubscribe</span>
+  </div>
+</div>
+<script>
+"use strict";
+const logEl = document.getElementById("log");
+const filterIn = document.getElementById("filterIn");
+const lineCountEl = document.getElementById("lineCount");
+const dropCountEl = document.getElementById("dropCount");
+const captureBtn  = document.getElementById("btnCapture");
+const pauseBtn    = document.getElementById("btnPause");
+const clearBtn    = document.getElementById("btnClear");
+const connDot     = document.getElementById("connDot");
+const connText    = document.getElementById("connText");
+
+let paused = false;
+let captureOn = false;
+let lineCount = 0;
+let droppedLines = 0;
+const MAX_LINES = 2000;
+const knownSources = new Set(["engine", "shield", "roku", "phone", "bridge"]);
+
+// Source filter state
+const enabledSources = new Set(["engine", "shield", "roku", "phone", "bridge", "other"]);
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const src = chip.dataset.src;
+    if (enabledSources.has(src)) { enabledSources.delete(src); chip.classList.remove("on"); }
+    else { enabledSources.add(src); chip.classList.add("on"); }
+    refilterAll();
+  });
+});
+
+function refilterAll() {
+  const f = (filterIn.value || "").toLowerCase();
+  for (const line of logEl.children) {
+    const src = line.dataset.src || "other";
+    const text = line.textContent.toLowerCase();
+    const visible = enabledSources.has(knownSources.has(src) ? src : "other")
+                 && (!f || text.includes(f));
+    line.style.display = visible ? "" : "none";
+  }
+}
+filterIn.addEventListener("input", refilterAll);
+
+function appendLine(d) {
+  if (paused) { droppedLines++; updateCounts(); return; }
+  const div = document.createElement("div");
+  const src = String(d.src || "other");
+  const srcTag = knownSources.has(src) ? src : "other";
+  div.className = "line";
+  div.dataset.src = srcTag;
+  // v743 — backlog lines slightly dimmed so user can spot the divider
+  if (d._backlog) div.style.opacity = "0.72";
+  const ts = new Date(d.ts || Date.now()).toLocaleTimeString("en-US", { hour12: false }) + "." + String(((d.ts || Date.now()) % 1000)).padStart(3, "0");
+  const lvl = String(d.level || "log");
+  const line = String(d.line || "").replace(/[\r\n]+/g, " · ");
+  // v747 — level icon prefix for at-a-glance scanning
+  const lvlIcon = ({ error: "✗", warn: "⚠", info: "ℹ", debug: "·", log: "•" })[lvl] || "•";
+  div.innerHTML =
+    `<span class="ts">${ts}</span>` +
+    `<span class="src ${srcTag}">${src}</span>` +
+    `<span class="lvl-icon">${lvlIcon}</span>` +
+    `<span class="level ${lvl}">${ansiToHtml(line)}</span>`;
+  logEl.appendChild(div);
+  lineCount++;
+  // Trim old lines if we exceed cap (keep recency)
+  while (logEl.children.length > MAX_LINES) logEl.removeChild(logEl.firstChild);
+  // Filter visibility
+  const f = (filterIn.value || "").toLowerCase();
+  const visible = enabledSources.has(srcTag) && (!f || line.toLowerCase().includes(f));
+  div.style.display = visible ? "" : "none";
+  // v747 — smart auto-scroll. Only scroll to bottom when:
+  //   (a) the user is already near the bottom (within 30px), AND
+  //   (b) there's no active selection in the log
+  // This lets the user scrub up to read older lines / drag-select text
+  // without the new-arrivals scroll yanking them back down. The
+  // #scrollFollow chip appears when auto-scroll is paused; clicking
+  // it (or scrolling back to bottom) re-enables follow.
+  if (visible && shouldAutoScroll()) {
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  updateCounts();
+}
+
+// v747 — auto-scroll arbiter. Returns true when we should snap to the
+// bottom for incoming lines. False when the user has scrolled up to
+// read history OR is actively selecting text.
+function shouldAutoScroll() {
+  // User has an active text selection inside the log?
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    // Check if selection anchor lives inside the log element
+    let node = sel.anchorNode;
+    while (node) {
+      if (node === logEl) return false;
+      node = node.parentNode;
+    }
+  }
+  // User scrolled up more than 30px from the bottom?
+  const dist = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight;
+  return dist < 30;
+}
+
+// Show/hide the "jump to latest" chip when user scrolls
+const scrollFollowEl = document.getElementById("scrollFollow");
+logEl.addEventListener("scroll", () => {
+  const dist = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight;
+  scrollFollowEl.classList.toggle("on", dist > 30);
+});
+scrollFollowEl.addEventListener("click", () => {
+  logEl.scrollTop = logEl.scrollHeight;
+  scrollFollowEl.classList.remove("on");
+});
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+// v751 — ANSI SGR escape parser. Converts \x1b[...m sequences to nested
+// styled <span> tags so log lines retaining ANSI colors (e.g. Node's
+// chalk output, some Shield logcat tools) render with colors instead of
+// raw escape characters. Supports standard 8/16 colors, bright variants,
+// bold/dim/italic/underline, 256-color (38;5;N), and 24-bit (38;2;R;G;B).
+const ANSI_RE = /\x1b\[([\d;]*)m/g;
+const ANSI_8 = ["#000","#c33","#3a3","#cc3","#36c","#c3c","#3cc","#bbb"];
+const ANSI_16 = ["#666","#f66","#6f6","#ff6","#69f","#f6f","#6ff","#fff"];
+function ansiToHtml(text) {
+  if (text.indexOf("\x1b[") < 0) return escapeHtml(text);
+  let out = "";
+  let lastIdx = 0;
+  let style = { fg: null, bg: null, bold: false, dim: false, italic: false, underline: false };
+  let openSpan = false;
+  function styleStr(s) {
+    const parts = [];
+    if (s.fg) parts.push("color:" + s.fg);
+    if (s.bg) parts.push("background:" + s.bg);
+    if (s.bold) parts.push("font-weight:700");
+    if (s.dim) parts.push("opacity:0.65");
+    if (s.italic) parts.push("font-style:italic");
+    if (s.underline) parts.push("text-decoration:underline");
+    return parts.join(";");
+  }
+  function flush(upTo) {
+    const chunk = text.slice(lastIdx, upTo);
+    if (chunk) {
+      if (openSpan) { out += "</span>"; openSpan = false; }
+      const s = styleStr(style);
+      if (s) { out += `<span style="${s}">${escapeHtml(chunk)}</span>`; }
+      else { out += escapeHtml(chunk); }
+    }
+  }
+  let m;
+  while ((m = ANSI_RE.exec(text)) !== null) {
+    flush(m.index);
+    // parse SGR codes
+    const codes = m[1].split(";").filter(s => s.length).map(Number);
+    if (codes.length === 0) codes.push(0);
+    let i = 0;
+    while (i < codes.length) {
+      const c = codes[i];
+      if (c === 0) { style = { fg: null, bg: null, bold: false, dim: false, italic: false, underline: false }; }
+      else if (c === 1) style.bold = true;
+      else if (c === 2) style.dim = true;
+      else if (c === 3) style.italic = true;
+      else if (c === 4) style.underline = true;
+      else if (c === 22) { style.bold = false; style.dim = false; }
+      else if (c === 23) style.italic = false;
+      else if (c === 24) style.underline = false;
+      else if (c >= 30 && c <= 37) style.fg = ANSI_8[c - 30];
+      else if (c >= 40 && c <= 47) style.bg = ANSI_8[c - 40];
+      else if (c >= 90 && c <= 97) style.fg = ANSI_16[c - 90];
+      else if (c >= 100 && c <= 107) style.bg = ANSI_16[c - 100];
+      else if (c === 39) style.fg = null;
+      else if (c === 49) style.bg = null;
+      else if (c === 38 || c === 48) {
+        const which = c === 38 ? "fg" : "bg";
+        const mode = codes[i + 1];
+        if (mode === 5) {
+          // 256-color palette
+          const n = codes[i + 2] || 0;
+          style[which] = ansi256(n);
+          i += 2;
+        } else if (mode === 2) {
+          // 24-bit truecolor
+          const r = codes[i + 2] || 0, g = codes[i + 3] || 0, b = codes[i + 4] || 0;
+          style[which] = `rgb(${r},${g},${b})`;
+          i += 4;
+        }
+      }
+      i++;
+    }
+    lastIdx = m.index + m[0].length;
+  }
+  flush(text.length);
+  return out;
+}
+// 256-color palette resolver (16 base + 6x6x6 cube + 24 greys)
+function ansi256(n) {
+  if (n < 8) return ANSI_8[n];
+  if (n < 16) return ANSI_16[n - 8];
+  if (n < 232) {
+    const m = n - 16;
+    const r = Math.floor(m / 36); const g = Math.floor((m % 36) / 6); const b = m % 6;
+    const lvl = v => v === 0 ? 0 : 55 + v * 40;
+    return `rgb(${lvl(r)},${lvl(g)},${lvl(b)})`;
+  }
+  const grey = 8 + (n - 232) * 10;
+  return `rgb(${grey},${grey},${grey})`;
+}
+function updateCounts(){
+  lineCountEl.textContent = lineCount + " lines";
+  dropCountEl.textContent = droppedLines > 0 ? `(${droppedLines} dropped while paused)` : "";
+}
+
+// Buttons
+captureBtn.addEventListener("click", () => {
+  captureOn = !captureOn;
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "debug:capture:set", on: captureOn }));
+  }
+  captureBtn.textContent = captureOn ? "🎙 Capture engine console: ON" : "🎙 Capture engine console: OFF";
+  captureBtn.classList.toggle("on", captureOn);
+});
+pauseBtn.addEventListener("click", () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
+  pauseBtn.classList.toggle("on", paused);
+  if (!paused) droppedLines = 0;
+  updateCounts();
+});
+clearBtn.addEventListener("click", () => {
+  logEl.innerHTML = "";
+  lineCount = 0; droppedLines = 0;
+  updateCounts();
+});
+
+// v747 — Copy visible lines to clipboard. Iterates the log children,
+// skips display:none entries (filtered out), assembles plain text.
+const copyBtn = document.getElementById("btnCopy");
+copyBtn.addEventListener("click", async () => {
+  const lines = [];
+  for (const child of logEl.children) {
+    if (child.style.display === "none") continue;
+    // Use textContent so HTML markup is stripped, then collapse the
+    // various spans' content with single spaces.
+    lines.push(child.textContent.replace(/\s+/g, " ").trim());
+  }
+  const text = lines.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = copyBtn.textContent;
+    copyBtn.textContent = `✓ copied ${lines.length} lines`;
+    copyBtn.classList.add("on");
+    setTimeout(() => { copyBtn.textContent = orig; copyBtn.classList.remove("on"); }, 1500);
+  } catch (e) {
+    // Fallback for older browsers / non-secure contexts
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      copyBtn.textContent = `✓ copied ${lines.length} lines (legacy)`;
+      setTimeout(() => { copyBtn.textContent = "📋 Copy visible"; }, 1500);
+    } catch { alert("Copy failed — your browser may not support clipboard API. Use ⬇ Download log instead."); }
+    document.body.removeChild(ta);
+  }
+});
+
+// v745 — clear-ring-and-disk button. Sends WS msg to the bridge which
+// truncates ai-bridge/debug.log + removes debug.log.1 + empties the
+// in-memory ring. Confirms first since this is destructive.
+const clearRingBtn = document.getElementById("btnClearRing");
+clearRingBtn.addEventListener("click", () => {
+  if (!confirm("This will permanently delete the bridge's in-memory ring AND the disk log files (debug.log + debug.log.1). Continue?")) return;
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "debug:ring:clear" }));
+    // Also clear the local view so the user sees an immediate effect
+    logEl.innerHTML = "";
+    lineCount = 0; droppedLines = 0;
+    updateCounts();
+  }
+});
+
+// v745 — poll /debug/log/stats every 5s to show disk usage in status bar
+const diskStatsEl = document.getElementById("diskStats");
+async function refreshDiskStats() {
+  try {
+    const r = await fetch("/debug/log/stats");
+    if (!r.ok) return;
+    const j = await r.json();
+    const a = (j.activeBytes / 1024).toFixed(1);
+    const ar = j.archiveBytes > 0 ? ` + archive ${(j.archiveBytes / 1024).toFixed(1)}KB` : "";
+    const cap = (j.maxBytes / 1024 / 1024).toFixed(0);
+    diskStatsEl.textContent = `disk: ${a}KB / ${cap}MB${ar} · ring: ${j.ringSize}/${j.ringMax}`;
+  } catch { diskStatsEl.textContent = "disk: —"; }
+}
+refreshDiskStats();
+setInterval(refreshDiskStats, 5000);
+
+// WebSocket connection. Uses same host as page. Auto-reconnect.
+let ws = null;
+let reconnectTimer = null;
+function setConn(on, text) {
+  connDot.classList.toggle("on", on);
+  connText.textContent = text;
+}
+function connect() {
+  if (ws) try { ws.close(); } catch {}
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const url = `${proto}//${location.host}`;
+  setConn(false, "connecting…");
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    setConn(false, "WS init err: " + e.message);
+    scheduleReconnect();
+    return;
+  }
+  ws.onopen = () => {
+    setConn(true, "connected · subscribed to debug stream");
+    ws.send(JSON.stringify({ type: "client:identify", role: "debug-viewer", label: "Debug Viewer" }));
+    ws.send(JSON.stringify({ type: "debug:subscribe" }));
+  };
+  ws.onclose = () => { setConn(false, "disconnected — retrying…"); scheduleReconnect(); };
+  ws.onerror = () => { setConn(false, "error — retrying…"); };
+  ws.onmessage = (ev) => {
+    let m;
+    try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === "debug:line") appendLine(m);
+    else if (m.type === "debug:backlog" && Array.isArray(m.lines)) {
+      // v743 — replay buffered history. Render each line then a divider
+      // so the user can tell where live stream begins.
+      for (const l of m.lines) appendLine(Object.assign({}, l, { _backlog: true }));
+      const div = document.createElement("div");
+      div.className = "line";
+      div.style.borderTop = "1px dashed #356";
+      div.style.color = "#678";
+      div.style.padding = "4px 14px";
+      div.style.fontStyle = "italic";
+      div.textContent = `── replayed ${m.lines.length} backlog lines · live stream below ──`;
+      logEl.appendChild(div);
+      // v747 — respect smart auto-scroll instead of always jumping
+      if (shouldAutoScroll()) logEl.scrollTop = logEl.scrollHeight;
+    }
+    else if (m.type === "debug:capture:state") {
+      // Bridge tells us the current capture state (might be set by another client)
+      captureOn = !!m.on;
+      captureBtn.textContent = captureOn ? "🎙 Capture engine console: ON" : "🎙 Capture engine console: OFF";
+      captureBtn.classList.toggle("on", captureOn);
+    }
+  };
+}
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 1500);
+}
+connect();
+</script>
+</body>
+</html>

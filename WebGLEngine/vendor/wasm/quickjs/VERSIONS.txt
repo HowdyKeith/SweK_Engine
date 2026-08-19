@@ -1,0 +1,6 @@
+QuickJS-in-WASM for the JS sandbox (vendored loose — SweK excludes node_modules from the zip).
+Packages (from npm, quickjs-emscripten): quickjs-emscripten-core + @jitl/quickjs-wasmfile-release-sync
+(the sync release variant, holds emscripten-module.wasm) + @jitl/quickjs-ffi-types (types+enum consts).
+Loaded via loader.cjs (below), which maps the one bare specifier @jitl/quickjs-ffi-types to the
+vendored copy. Runs untrusted JS with rt.setMemoryLimit + rt.setInterruptHandler (deadline) and NO
+host bindings (guest JS has no require/fetch/process). ~1.5MB.

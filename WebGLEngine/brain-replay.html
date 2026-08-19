@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Brain Replay &mdash; watch it learn, from decision zero</title>
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; padding:22px 18px 60px; }
+  .wrap { max-width:1060px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:16px; margin-bottom:14px; background:rgba(10,20,34,.5); }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  button { padding:6px 13px; background:#17324d; color:#cfe3ff; border:1px solid #2c5a85; border-radius:5px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button.on { background:#2a4d3a; border-color:#4a7d5a; }
+  button:disabled { opacity:.35; cursor:default; }
+  canvas { width:100%; height:400px; display:block; background:#020509; border:1px solid var(--line); border-radius:8px; }
+  #curve { height:150px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  p { color:var(--dim); margin:0 0 8px; }
+  code { color:var(--ink); }
+  input[type=range] { width:220px; vertical-align:middle; }
+  .stat { font-variant-numeric:tabular-nums; }
+  .drop { border:1px dashed #2c5a85; border-radius:8px; padding:22px; text-align:center; color:var(--dim); cursor:pointer; }
+  .drop.hot { border-color:var(--ok); color:var(--ok); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Brain Replay</h1>
+  <p class="sub">The brain records every decision it makes. This plays them back from the first one, as slowly as you like.</p>
+
+  <div class="panel">
+    <h2>What this is, and what it is not</h2>
+    <p><b>It replays what the brain CHOSE and whether it HIT.</b> Every record carries a sequence number, a domain,
+    the option picked, the selection mode, and the outcome. Played from seq&nbsp;0 you can watch the hit rate climb
+    out of noise &mdash; that is the brain learning, in the only terms it wrote down.</p>
+    <p style="margin:0"><b>It does not replay the network changing</b>, and it cannot. The weights are written to
+    one file each and overwritten &mdash; only the latest snapshot survives, so there is no history to play. That is
+    a real gap in the engine, not a limit of this page.</p>
+  </div>
+
+  <div class="panel">
+    <h2>A trace</h2>
+    <p>Traces are <b>opt-in</b>: run the brain with <code>BRAIN_TRACE=1</code> and it writes
+    <code>session-&lt;pid&gt;.jsonl</code> beside its state. Drop one here.</p>
+    <div class="drop" id="drop">drop a <b>session-*.jsonl</b> here &mdash; or click to pick one</div>
+    <input type="file" id="file" accept=".jsonl,.json,.txt" hidden>
+    <div class="row" style="margin-top:10px">
+      <button id="demo">Load a synthetic trace instead</button>
+      <span class="dim" style="font-size:11px">4,000 decisions from a brain that learns. Written by the real writer, so the format is real &mdash; the decisions are not.</span>
+    </div>
+    <div class="row" style="margin-top:8px"><span id="loaded" class="dim stat">nothing loaded</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Decisions, accumulating</h2>
+    <canvas id="cv" width="1400" height="800"></canvas>
+    <div class="row" style="margin-top:10px">
+      <button id="play" disabled>Play</button>
+      <button id="rew" disabled>Rewind to 0</button>
+      <span class="dim" style="margin-left:8px">speed <input id="speed" type="range" min="1" max="500" step="1" value="30"><b id="speedN">30</b>/frame</span>
+      <span class="dim">scrub <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"></span>
+    </div>
+    <div class="row" style="margin-top:8px"><span id="lbl" class="dim stat">&mdash;</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Hit rate &mdash; the thing that is actually learning</h2>
+    <canvas id="curve" width="1400" height="300"></canvas>
+    <p style="margin:8px 0 0"><b>A rolling window, not a running total.</b> A cumulative average buries the last
+    thousand decisions under the first thousand and makes every brain look like it plateaued. The window shows what
+    it is doing <em>now</em>.</p>
+  </div>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+const cu = $("curve"), cx2 = cu.getContext("2d");
+
+let recs = [];        // the decisions, in order
+let header = null;    // the {t:"session"} record, if the file had one
+let doms = [];        // domains, in first-seen order
+let choices = new Map();
+let at = 0;           // how many decisions are "played"
+let playing = false, raf = 0, speed = 30;
+
+// THE FORMAT IS NOT GUESSED. Generated by brain/trace.mjs itself and read off disk:
+//   {"t":"session","at":1784229115729,"build":"unknown","pid":4242}
+//   {"t":"d","seq":1,"id":"u0","dom":"attack","choice":"opt2","mode":"emphasis","hit":0,"p":0.58}
+//   {"t":"truncated","after":200000,"why":"..."}
+// Note `build` came out "unknown" in that run -- the field EXISTS but can be absent-in-spirit, so nothing here
+// depends on it. `p` is optional: trace.mjs omits it rather than faking one when the mode has no probability.
+function parse(text) {
+  const out = [], seen = [];
+  let head = null, truncated = null, bad = 0;
+  for (const line of text.split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    let r;
+    try { r = JSON.parse(s); } catch { bad++; continue; }
+    if (r.t === "session") { head = r; continue; }
+    if (r.t === "truncated") { truncated = r; continue; }
+    if (r.t !== "d") continue;   // a record type this page does not know is not an error; it is a newer brain
+    out.push(r);
+    if (r.dom && !seen.includes(r.dom)) seen.push(r.dom);
+  }
+  return { recs: out, head, truncated, bad };
+}
+
+function load(text, what) {
+  const p = parse(text);
+  if (!p.recs.length) { $("loaded").innerHTML = "<span class='hot'>no decision records in that file</span>" + (p.bad ? " (" + p.bad + " unparseable lines)" : ""); return; }
+  recs = p.recs; header = p.head;
+  doms = [...new Set(recs.map((r) => r.dom))];
+  choices = new Map();
+  for (const d of doms) choices.set(d, [...new Set(recs.filter((r) => r.dom === d).map((r) => r.choice))]);
+  at = 0;
+  $("play").disabled = false; $("rew").disabled = false;
+  const hits = recs.filter((r) => r.hit).length;
+  $("loaded").innerHTML = "<b>" + what + "</b> &middot; <b>" + recs.length.toLocaleString() + "</b> decisions &middot; " +
+    doms.length + " domains (" + doms.join(", ") + ") &middot; overall hit rate <b>" + (100 * hits / recs.length).toFixed(1) + "%</b>" +
+    (header && header.build ? " &middot; build <b>" + header.build + "</b>" : "") +
+    (p.truncated ? " &middot; <span class='warn'>TRUNCATED after " + p.truncated.after + "</span>" : "") +
+    (p.bad ? " &middot; <span class='hot'>" + p.bad + " unparseable lines skipped</span>" : "");
+  draw(); drawCurve();
+}
+
+// ---- the 3D-ish view: every decision is a point at (seq, domain, choice) --------------------------------------
+// Colour is the outcome. Played from zero you WATCH THE RED THIN OUT -- that is the learning, and it is the only
+// picture of it the trace can honestly support.
+function draw() {
+  ctx.fillStyle = "#020509"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!recs.length) {
+    ctx.fillStyle = "#3a4f66"; ctx.font = "22px ui-monospace, monospace"; ctx.textAlign = "center";
+    ctx.fillText("load a trace", cv.width / 2, cv.height / 2); ctx.textAlign = "left";
+    return;
+  }
+  const W = cv.width, H = cv.height;
+  const rows = doms.length;
+  const bandH = (H - 90) / rows;
+  // an oblique projection: seq runs right, choice runs INTO the picture within each domain band
+  for (let d = 0; d < rows; d++) {
+    const y0 = 50 + d * bandH;
+    ctx.strokeStyle = "#0f2438"; ctx.beginPath(); ctx.moveTo(60, y0 + bandH - 12); ctx.lineTo(W - 20, y0 + bandH - 12); ctx.stroke();
+    ctx.fillStyle = "#5b7699"; ctx.font = "13px ui-monospace, monospace";
+    ctx.fillText(doms[d], 8, y0 + bandH / 2);
+  }
+  const n = Math.max(1, at);
+  const step = Math.max(1, Math.floor(n / 9000));   // never draw more points than a canvas can show
+  for (let i = 0; i < at; i += step) {
+    const r = recs[i];
+    const d = doms.indexOf(r.dom); if (d < 0) continue;
+    const cs = choices.get(r.dom) || [];
+    const ci = Math.max(0, cs.indexOf(r.choice));
+    const depth = cs.length > 1 ? ci / (cs.length - 1) : 0;
+    const y0 = 50 + d * bandH;
+    const x = 60 + (i / recs.length) * (W - 90) + depth * 26;    // the oblique shear = the choice axis
+    const y = y0 + bandH - 16 - depth * 26 - (r.hit ? 10 : 0);
+    ctx.fillStyle = r.hit ? "rgba(127,227,196,0.55)" : "rgba(255,138,106,0.45)";
+    ctx.fillRect(x, y, 2, 2);
+  }
+  // the playhead
+  const px = 60 + (at / recs.length) * (W - 90);
+  ctx.strokeStyle = "#ffd27f"; ctx.beginPath(); ctx.moveTo(px, 30); ctx.lineTo(px, H - 20); ctx.stroke();
+  ctx.fillStyle = "#5b7699"; ctx.font = "12px ui-monospace, monospace";
+  ctx.fillText("seq 0", 60, 24); ctx.fillText("seq " + recs.length.toLocaleString(), W - 150, 24);
+  ctx.fillStyle = "#7fe3c4"; ctx.fillText("hit", W - 60, H - 4);
+  ctx.fillStyle = "#ff8a6a"; ctx.fillText("miss", W - 30, H - 4);
+
+  const win = recs.slice(Math.max(0, at - 400), at);
+  const wr = win.length ? win.filter((r) => r.hit).length / win.length : 0;
+  $("lbl").innerHTML = "decision <b>" + at.toLocaleString() + "</b> / " + recs.length.toLocaleString() +
+    " &middot; hit rate over the last 400: <b class='" + (wr > 0.6 ? "ok" : wr > 0.4 ? "warn" : "hot") + "'>" +
+    (100 * wr).toFixed(1) + "%</b>" + (at ? " &middot; " + recs[at - 1].dom + " chose <b>" + recs[at - 1].choice + "</b> (" + (recs[at - 1].mode || "no mode") + ")" : "");
+}
+
+// ---- the curve -----------------------------------------------------------------------------------------------
+function drawCurve() {
+  cx2.fillStyle = "#020509"; cx2.fillRect(0, 0, cu.width, cu.height);
+  if (!recs.length) return;
+  const W = cu.width, H = cu.height, WIN = Math.max(50, Math.floor(recs.length / 60));
+  cx2.strokeStyle = "#0f2438";
+  for (const f of [0.25, 0.5, 0.75]) { const y = H - 20 - f * (H - 40); cx2.beginPath(); cx2.moveTo(40, y); cx2.lineTo(W - 10, y); cx2.stroke(); }
+  cx2.fillStyle = "#3a4f66"; cx2.font = "11px ui-monospace, monospace";
+  cx2.fillText("100%", 4, 24); cx2.fillText("50%", 8, H / 2); cx2.fillText("0%", 12, H - 22);
+  // ROLLING window, not cumulative: a running total buries the last 1000 decisions under the first 1000 and makes
+  // every brain look like it plateaued.
+  let run = 0;
+  const pts = [];
+  for (let i = 0; i < recs.length; i++) {
+    run += recs[i].hit ? 1 : 0;
+    if (i >= WIN) run -= recs[i - WIN].hit ? 1 : 0;
+    if (i >= WIN) pts.push([40 + (i / recs.length) * (W - 50), H - 20 - (run / WIN) * (H - 40)]);
+  }
+  cx2.strokeStyle = "#2c5a85"; cx2.lineWidth = 1.5; cx2.beginPath();
+  pts.forEach((p, i) => (i ? cx2.lineTo(p[0], p[1]) : cx2.moveTo(p[0], p[1])));
+  cx2.stroke();
+  // the played portion, brighter
+  cx2.strokeStyle = "#7fe3c4"; cx2.beginPath();
+  const cut = Math.floor((at / recs.length) * pts.length);
+  pts.slice(0, cut).forEach((p, i) => (i ? cx2.lineTo(p[0], p[1]) : cx2.moveTo(p[0], p[1])));
+  cx2.stroke(); cx2.lineWidth = 1;
+  const px = 40 + (at / recs.length) * (W - 50);
+  cx2.strokeStyle = "#ffd27f"; cx2.beginPath(); cx2.moveTo(px, 10); cx2.lineTo(px, H - 20); cx2.stroke();
+}
+
+function frame() {
+  if (!playing) return;
+  at = Math.min(recs.length, at + speed);
+  $("scrub").value = String((at / recs.length) * 100);
+  draw(); drawCurve();
+  if (at >= recs.length) { playing = false; $("play").textContent = "Play"; $("play").classList.remove("on"); return; }
+  raf = requestAnimationFrame(frame);
+}
+
+$("play").onclick = () => {
+  playing = !playing;
+  $("play").textContent = playing ? "Pause" : "Play";
+  $("play").classList.toggle("on", playing);
+  if (playing) { if (at >= recs.length) at = 0; frame(); } else cancelAnimationFrame(raf);
+};
+$("rew").onclick = () => { at = 0; $("scrub").value = "0"; draw(); drawCurve(); };
+$("speed").oninput = (e) => { speed = +e.target.value; $("speedN").textContent = speed; };
+$("scrub").oninput = (e) => { at = Math.round((+e.target.value / 100) * recs.length); draw(); drawCurve(); };
+
+$("drop").onclick = () => $("file").click();
+$("file").onchange = async (e) => { const f = e.target.files[0]; if (f) load(await f.text(), f.name); };
+for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("hot"); });
+for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("hot"); });
+$("drop").addEventListener("drop", async (e) => { const f = e.dataTransfer.files[0]; if (f) load(await f.text(), f.name); });
+
+// A synthetic trace, and it says so. Written in the trace's real record shape so the page can be exercised
+// without a rig -- but a demo that pretends to be real data is worse than no demo.
+$("demo").onclick = () => {
+  let s = 20250716;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const DOMS = ["attack", "aggro", "civdef"];
+  const lines = [JSON.stringify({ t: "session", at: Date.now(), build: "synthetic", pid: 0 })];
+  for (let i = 0; i < 4000; i++) {
+    const skill = Math.min(0.86, 0.18 + (i / 4000) * 0.72);
+    lines.push(JSON.stringify({ t: "d", seq: i + 1, id: "u" + (i % 12), dom: DOMS[i % 3],
+      choice: "opt" + (1 + Math.floor(rnd() * 4)), mode: rnd() < 0.1 ? "sampled" : "emphasis",
+      hit: rnd() < skill ? 1 : 0, p: rnd() }));
+  }
+  load(lines.join("\n"), "synthetic (not a real brain)");
+};
+
+draw();
+</script>
+</body>
+</html>

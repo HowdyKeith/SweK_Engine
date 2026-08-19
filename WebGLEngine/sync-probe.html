@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Sync Walk Probe</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 11px 13px; margin-bottom: 12px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 5px 12px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid #16241d; }
+  th { color: #6f8a7c; font-weight: normal; }
+  td.ms { text-align: right; }
+  .dim { color: #6f8a7c; } .hot { color: #e0a0a0; } .warn { color: #e0c58a; } .ok { color: #7fe0a4; }
+  .big { font-size: 20px; }
+  .verdict { padding: 9px 11px; border: 1px solid #2c463a; background: #0a1210; margin-top: 8px; }
+  pre { white-space: pre-wrap; color: #8fb3a0; margin: 6px 0 0; background: #0a1210; padding: 8px; border: 1px solid #1a2a22; overflow: auto; }
+  .stat { display: inline-block; min-width: 108px; margin: 0 14px 6px 0; vertical-align: top; }
+  .stat span { display: block; color: #6f8a7c; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Sync Walk Probe</h1>
+  <div class="sub">
+    <code>/sync/status</code> calls <code>listModels(root)</code>, which walks the whole asset tree
+    <b>synchronously, uncached, on every hit</b> &mdash; and both the peer radar and the settings hub poll it.
+    On Keith's Windows rig that endpoint timed out after 4000&nbsp;ms. This times that exact walk, using that
+    exact function, and reports where the milliseconds went.
+  </div>
+
+  <div class="card">
+    <button id="bRun" class="primary">Measure the walk</button>
+    <span class="dim" id="state"></span>
+    <div class="sub" style="margin:8px 0 0">
+      It walks twice. The first pays whatever cold cost exists; the second does not. A big gap means the cost is
+      per-boot. A small gap means <i>every poll</i> pays it.
+    </div>
+  </div>
+
+  <div class="card" id="out" style="display:none"></div>
+  <div class="card" id="slow" style="display:none"></div>
+
+  <div class="card">
+    <div class="dim">
+      <b>What this is allowed to conclude:</b> almost nothing. It can see two things &mdash; time in
+      <code>readdir</code> and time in <code>stat</code> &mdash; and each is consistent with several causes it
+      cannot tell apart from inside the process. The outcome worth having may be the negative one: if this
+      comes back fast, the walk is <i>not</i> why <code>/sync/status</code> timed out, the leading candidate is
+      wrong, and the four seconds are still unexplained somewhere else.
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var bRun = document.getElementById("bRun"), state = document.getElementById("state");
+  var out = document.getElementById("out"), slow = document.getElementById("slow");
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]; }); };
+  var stat = function (v, label, cls) { return '<div class="stat"><b class="big ' + (cls || "") + '">' + esc(v) + "</b><span>" + esc(label) + "</span></div>"; };
+
+  bRun.addEventListener("click", function () {
+    bRun.disabled = true; state.textContent = " walking (this blocks the server thread, same as the real call)...";
+    out.style.display = "none"; slow.style.display = "none";
+    var t0 = Date.now();
+    fetch("/sync/walk-probe", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+      bRun.disabled = false; state.textContent = " round trip " + (Date.now() - t0) + " ms";
+      out.style.display = "";
+      if (!d || d.ok === false) {
+        out.innerHTML = '<div class="hot"><b>Refused &mdash; nothing was measured.</b></div>'
+          + '<pre>' + esc((d && d.error) || "no response") + "</pre>"
+          + '<div class="dim">root: <b>' + esc(d && d.root) + "</b> (" + esc(d && d.rootSource) + ")</div>";
+        return;
+      }
+      // The cost split is the only discriminator this probe has, so lead with it.
+      var dom = d.statMs > d.readdirMs ? "stat" : "readdir";
+      out.innerHTML =
+        stat(d.coldMs + " ms", "cold walk", d.coldMs >= 4000 ? "hot" : d.coldMs >= 1000 ? "warn" : "ok") +
+        stat(d.warmMs + " ms", "warm walk", d.warmMs >= 1000 ? "warn" : "ok") +
+        stat(d.readdirMs + " ms", "in readdir", dom === "readdir" ? "warn" : "dim") +
+        stat(d.statMs + " ms", "in stat", dom === "stat" ? "warn" : "dim") +
+        stat(d.files, "model files") +
+        stat(d.dirs, "directories") +
+        stat(d.msPerFile == null ? "n/a" : d.msPerFile + " ms", "per file") +
+        stat(d.maxDepth + (d.depthCapHit ? " (CAPPED)" : ""), "max depth", d.depthCapHit ? "hot" : "") +
+        '<div class="dim" style="margin-top:6px">root <b>' + esc(d.root) + "</b> &mdash; " + esc(d.rootSource) + "</div>" +
+        '<div class="verdict ' + (d.exceedsFreshMachineTimeout ? "hot" : "ok") + '">' + esc(d.verdict) + "</div>" +
+        '<div class="sub" style="margin-top:8px">' + esc(d.note) + "</div>" +
+        (d.depthCapHit ? '<div class="verdict hot">The depth-8 cap was hit, so the walk did NOT see the whole tree &mdash; the file count below is a floor, not a total.</div>' : "");
+
+      if (d.slowest && d.slowest.length) {
+        slow.style.display = "";
+        var rows = d.slowest.map(function (s) {
+          return "<tr><td>" + esc(s.name) + '</td><td class="ms ' + (s.ms >= 50 ? "hot" : s.ms >= 5 ? "warn" : "dim") + '">' + esc(s.ms) + " ms</td></tr>";
+        }).join("");
+        slow.innerHTML = "<div><b>Slowest individual stat calls</b></div>"
+          + '<div class="sub">A tree that is merely large has many fast stats. A handful of individually expensive ones is a different shape &mdash; that is what a cloud placeholder being hydrated on access, or an on-access scanner, looks like. This page reports the shape; it does not name the cause.</div>'
+          + "<table><tr><th>file</th><th class=\"ms\">stat cost</th></tr>" + rows + "</table>";
+      }
+    }).catch(function (e) {
+      bRun.disabled = false;
+      state.textContent = "";
+      out.style.display = "";
+      out.innerHTML = '<div class="hot"><b>The probe request itself failed.</b></div><pre>' + esc(e && e.message) + "</pre>"
+        + '<div class="dim">If this is a timeout rather than a refusal, the walk is slow enough to kill its own instrument &mdash; which is itself the answer.</div>';
+    });
+  });
+})();
+</script>
+</body>
+</html>

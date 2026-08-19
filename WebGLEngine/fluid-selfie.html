@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Fluid Selfie">
+<meta name="demo:desc" content="A running fluid wearing a skin made of its own X-ray shadows. The physics is SPH, and its kernel is the blobulator's kernel -- metaballs picked it in 1986 for looking like wax, fluid dynamics picked it in 2003 for being smooth and compact, and they are the same function. So the fluid's sinogram is closed-form: written down exactly, never integrated. The scanner gathers its views one per frame while the fluid keeps moving, so the smear you see is real, not an effect -- and it is worst when the fluid moves by about its own structure size during the scan, which is why real CT scanners are fast and patients hold their breath. Momentum is conserved to 1.6e-15, the kernel integrates to 1 to fourteen decimals, and a particle lattice recovers a density nobody told it.">
+<meta name="demo:category" content="simulation">
+<title>Fluid Selfie</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<style>
+  html,body { margin:0; height:100%; background:#050810; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:440px; pointer-events:none; }
+  #cap { color:#6ff0d6; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.75; }
+  #note { color:#6f86ab; margin-top:8px; line-height:1.45; font-size:11.5px; }
+  #sino { position:fixed; right:14px; top:12px; z-index:4; border:1px solid #2a4a5a; border-radius:6px; image-rendering:pixelated; width:220px; }
+  #slab { position:fixed; right:14px; top:190px; z-index:4; color:#6f86ab; font-size:10.5px; width:220px; text-align:center; line-height:1.45; }
+  #ctl { position:fixed; left:14px; bottom:14px; z-index:4; background:rgba(6,12,20,.93); border:1px solid #24525a; border-radius:10px; padding:11px 14px; }
+  #ctl label { color:#6ff0d6; display:block; margin-bottom:6px; font-size:11px; }
+  input[type=range] { width:300px; }
+  #sval { color:#f6a623; }
+  #btns { position:fixed; right:14px; bottom:14px; z-index:4; display:flex; gap:8px; }
+  button { background:rgba(8,16,24,.92); color:#6ff0d6; border:1px solid #2a5a6a; border-radius:16px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#f6a623; border-color:#7a5a2a; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Fluid Selfie &mdash; a skin of its own shadows</div><div id="stat"></div><div id="note"></div></div>
+<canvas id="sino" width="64" height="48"></canvas>
+<div id="slab">the shadows, gathered one view per frame &mdash; while the fluid keeps moving</div>
+<div id="btns"><button id="tSkin" class="on">the shadow-skin</button><button id="tTrue">the real fluid</button><button id="tPts">particles</button></div>
+<div id="ctl"><label>scan speed: <span id="sval">1</span> view per frame &nbsp;&mdash;&nbsp; <span id="prog"></span></label><input id="spd" type="range" min="1" max="24" step="1" value="1"></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { createSphWorld } from "./physics/sph/sph.js";
+import { reconstruct } from "./simulation/tomo/fbp.js";
+import { marchScalarField } from "./simulation/MarchingCubes.js";
+
+const H = 0.22, MASS = 0.02;
+// THE BOX MUST FIT INSIDE THE SCANNER. FBP reconstructs within the unit circle and needs the object compactly
+// supported inside it -- the 108% lesson from the selfie round. The first version of this page let the fluid pile
+// up to y = 1.1, whose support reaches r = 1.47, hanging a third of the fluid out of its own scanner and biasing
+// the whole skin. Worst corner here reaches 0.873, comfortably inside the 0.9 the reconstruction judges.
+const BOUNDS = [-0.42, -0.42, -0.25, 0.42, 0.5, 0.25];
+const NDET = 48, NANG = 36, GN = 26, NZ = 16, ZMIN = -0.36, ZMAX = 0.36;
+
+const w = createSphWorld({ h: H, mass: MASS, restDensity: 250, stiffness: 2.5, viscosity: 0.25, gravity: [0, -9.81, 0] });
+let seed = 4242;
+const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+for (let i = 0; i < 110; i++) w.addParticle([(rnd()-0.5)*0.5, 0.1 + rnd()*0.35, (rnd()-0.5)*0.3]);
+const M0 = w.totalMomentum();   // momentum is conserved to 1.6e-15 -- gated in physicsSuite, not claimed here
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x050810);
+const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.01, 100);
+cam.position.set(1.5, 0.8, 1.7);
+const ctr = new OrbitControls(cam, renderer.domElement); ctr.enableDamping = true; ctr.target.set(0, 0.05, 0);
+addEventListener("resize", () => { cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+scene.add(new THREE.AmbientLight(0x224055, 1.5));
+const key = new THREE.DirectionalLight(0xd8f4ff, 1.5); key.position.set(2, 3, 1.5); scene.add(key);
+const rim = new THREE.DirectionalLight(0xff9ad8, 0.7); rim.position.set(-2, -0.5, -2); scene.add(rim);
+scene.add(new THREE.Mesh(new THREE.BoxGeometry(BOUNDS[3]-BOUNDS[0], BOUNDS[4]-BOUNDS[1], BOUNDS[5]-BOUNDS[2]),
+  new THREE.MeshBasicMaterial({ color: 0x1a3550, wireframe: true, transparent: true, opacity: 0.4 })));
+
+const pts = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0x6ff0d6, size: 0.02 }));
+pts.geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(w.particles.length*3), 3));
+pts.visible = false; scene.add(pts);
+
+let skinMesh = null, trueMesh = null;
+const skinMat = new THREE.MeshStandardMaterial({ color: 0xff9ad8, roughness: 0.32, metalness: 0.14, emissive: 0x2a0a20, emissiveIntensity: 0.45, transparent: true, opacity: 0.95 });
+const trueMat = new THREE.MeshStandardMaterial({ color: 0x4a7a9a, wireframe: true, transparent: true, opacity: 0.45 });
+
+// --- the scanner. It gathers views ONE AT A TIME while the fluid keeps running, exactly as a real one does.
+let views = [], scanning = 0, lastSkinErr = null, lastTris = 0, scanSeconds = 0, scanStart = 0;
+function gatherView(k) {
+  const th = Math.PI * k / NANG;
+  const rows = [];
+  for (let zi = 0; zi < NZ; zi++) {
+    const z = ZMIN + (ZMAX-ZMIN)*(zi+0.5)/NZ;
+    const row = new Float64Array(NDET);
+    for (let i = 0; i < NDET; i++) row[i] = w.shadowAt(-1 + (i+0.5)*2/NDET, th, z);
+    rows.push(row);
+  }
+  return { th, rows };
+}
+function rebuildSkin() {
+  const vol = new Float32Array(GN*GN*NZ);
+  for (let zi = 0; zi < NZ; zi++) {
+    const data = new Float64Array(NANG*NDET), angles = new Float64Array(NANG);
+    views.forEach((v, j) => { angles[j] = v.th; for (let i = 0; i < NDET; i++) data[j*NDET+i] = v.rows[zi][i]; });
+    const img = reconstruct({ data, angles, nAngles: views.length, nDet: NDET, ds: 2/NDET }, GN);
+    for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) vol[(zi*GN + j)*GN + i] = Math.max(0, img[j*GN+i]);
+  }
+  let mx = 0; for (const v of vol) if (v > mx) mx = v;
+  const iso = marchScalarField(vol, GN, GN, NZ, mx*0.36);
+  if (skinMesh) { scene.remove(skinMesh); skinMesh.geometry.dispose(); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(iso.positions), 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(iso.normals), 3));
+  skinMesh = new THREE.Mesh(g, skinMat);
+  // marchScalarField returns grid coordinates (i, j, k), and this volume is indexed i<->x, j<->y, k<->z already.
+  // So the skin needs a scale and an offset and NOTHING ELSE -- no rotation. (The first version set the transform
+  // six times over, each line overwriting the last, and ended on a rotation that put the skin in a frame the fluid
+  // was never in.)
+  skinMesh.scale.set(2/GN, 2/GN, (ZMAX - ZMIN)/NZ);
+  skinMesh.position.set(-1, -1, ZMIN);
+  skinMesh.visible = document.getElementById("tSkin").classList.contains("on");
+  scene.add(skinMesh);
+  lastTris = iso.positions.length/9;
+  // MEASURE the skin against where the fluid ACTUALLY IS, right now, on the same grid
+  let se = 0, ref = 0;
+  for (let zi = 0; zi < NZ; zi += 2) {
+    const z = ZMIN + (ZMAX-ZMIN)*(zi+0.5)/NZ;
+    for (let j = 0; j < GN; j += 2) for (let i = 0; i < GN; i += 2) {
+      const x = -1 + 2*(i+0.5)/GN, y = -1 + 2*(j+0.5)/GN;
+      if (x*x + y*y > 0.81) continue;
+      const t = w.fieldAt(x, y, z);
+      se += (vol[(zi*GN + j)*GN + i] - t)**2; ref += t*t;
+    }
+  }
+  lastSkinErr = ref > 1e-12 ? Math.sqrt(se/ref)*100 : null;
+  scanSeconds = (performance.now() - scanStart)/1000;
+}
+document.getElementById("note").innerHTML =
+  "The physics is <b>SPH</b>, and its kernel <i>is</i> the blobulator's &mdash; metaballs chose it in 1986 for looking like wax, fluid dynamics in 2003 for being smooth and compact. Same function. " +
+  "So the fluid's shadows are <b>closed-form</b>: written down exactly, never integrated (checked to 1.4e-14). " +
+  "<b>The scanner gathers one view per frame while the fluid keeps falling</b> &mdash; so the smear is real. Speed the scan up and the skin sharpens.";
+const $ = (id) => document.getElementById(id);
+$("tSkin").onclick = (e) => { e.target.classList.toggle("on"); if (skinMesh) skinMesh.visible = e.target.classList.contains("on"); };
+$("tTrue").onclick = (e) => { e.target.classList.toggle("on"); if (trueMesh) trueMesh.visible = e.target.classList.contains("on"); };
+$("tPts").onclick = (e) => { e.target.classList.toggle("on"); pts.visible = e.target.classList.contains("on"); };
+$("spd").oninput = () => { $("sval").textContent = $("spd").value; };
+
+function drawSino() {
+  const cv = $("sino"), g = cv.getContext("2d");
+  cv.height = Math.max(1, views.length);
+  const img = g.createImageData(NDET, Math.max(1, views.length));
+  let mx = 1e-9;
+  for (const v of views) for (const x of v.rows[NZ>>1]) if (x > mx) mx = x;
+  views.forEach((v, j) => { for (let i = 0; i < NDET; i++) {
+    const t = Math.min(1, v.rows[NZ>>1][i]/mx), k = (j*NDET+i)*4;
+    img.data[k] = 255*t; img.data[k+1] = 190*t; img.data[k+2] = 120*t; img.data[k+3] = 255; } });
+  g.putImageData(img, 0, 0);
+}
+let frame = 0;
+function loop() {
+  for (let s = 0; s < 3; s++) w.step(0.0009, BOUNDS);
+  const P = pts.geometry.attributes.position.array;
+  w.particles.forEach((p, i) => { P[i*3] = p.x; P[i*3+1] = p.y; P[i*3+2] = p.z; });
+  pts.geometry.attributes.position.needsUpdate = true;
+  pts.geometry.computeBoundingSphere();
+  // gather views at the chosen rate -- the fluid moves between them, and that is the whole point
+  const rate = parseInt($("spd").value, 10);
+  if (views.length === 0) scanStart = performance.now();
+  for (let n = 0; n < rate && views.length < NANG; n++) views.push(gatherView(views.length));
+  $("prog").textContent = views.length < NANG ? "gathering " + views.length + "/" + NANG : "";
+  if (views.length >= NANG) { rebuildSkin(); drawSino(); views = []; }
+  else if (frame % 4 === 0) drawSino();
+  const m = w.totalMomentum();
+  let rho = 0; for (const p of w.particles) rho = Math.max(rho, p.rho);
+  $("stat").innerHTML =
+    w.particles.length + " particles &middot; peak density <b>" + rho.toFixed(0) + "</b> kg/m&sup3; (rest 250)" +
+    "<br>skin: <b style='color:#ff9ad8'>" + lastTris.toLocaleString() + "</b> triangles from shadows alone" +
+    (lastSkinErr !== null ? " &middot; error vs the real fluid <b style='color:#7fe3c4'>" + lastSkinErr.toFixed(1) + "%</b>" : "") +
+    "<br>last scan took <b>" + scanSeconds.toFixed(2) + "s</b> &mdash; the fluid kept moving through all of it";
+  frame++;
+  ctr.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

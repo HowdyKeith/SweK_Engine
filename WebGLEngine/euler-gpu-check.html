@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Euler adjudicator">
+<meta name="demo:desc" content="The compressible Euler kernel was written on a machine with no GPU, so this page is the check, and it runs on your hardware. It has a better test available than the lattice adjudicator did: a strong shock compresses gas by exactly (gamma+1)/(gamma-1), which is 6.000 at gamma 1.4 -- an answer known since Rankine and Hugoniot in the 1870s and written nowhere in the kernel. So the GPU is not merely asked to agree with the CPU; it is asked to find that number alone. There is a sabotage button that makes the kernel's equation of state 2% wrong, so you can watch the check go red.">
+<meta name="demo:category" content="simulation">
+<meta name="demo:needs" content="webgpu">
+<title>Euler adjudicator</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#04060e; color:#9fb2d4; font:13px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:900px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { color:#f6a623; letter-spacing:.15em; text-transform:uppercase; font-size:15px; margin:0 0 4px; }
+  .sub { color:#7fb2d4; max-width:76ch; margin-bottom:18px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th { text-align:left; color:#5f7aa0; font-size:10px; letter-spacing:.13em; text-transform:uppercase; padding:0 10px 8px 0; border-bottom:1px solid #1c2740; }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid #101827; }
+  .nm { color:#cfe0f6; } .ex { color:#6f86ab; font-size:11px; }
+  .ok { color:#7fe3c4; font-weight:700; } .bad { color:#ff8a8a; font-weight:700; } .run { color:#f6a623; }
+  #verdict { margin:22px 0 8px; font-size:15px; }
+  .note { color:#6f86ab; font-size:11.5px; max-width:80ch; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:16px; padding:8px 14px; font:600 11px ui-monospace,monospace; cursor:pointer; margin-right:8px; }
+  button.sab { color:#ff9a9a; border-color:#5a2a2a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; Euler adjudicator &mdash; the GPU must find 6.000</h1>
+  <div class="sub">This kernel has never run where it was written &mdash; no GPU there. So it is judged here, on <b>your</b> machine, and it gets a harder test than the lattice did. A strong shock compresses gas by exactly <b>(&gamma;+1)/(&gamma;&minus;1)</b> &mdash; 6.000 at &gamma;&nbsp;=&nbsp;1.4 &mdash; a result from the 1870s that appears nowhere in the kernel. The GPU is not asked to agree with me. It is asked to find that number by itself.</div>
+  <div><button id="run">run the check</button><button id="sab" class="sab">sabotage the kernel</button></div>
+  <table><thead><tr><th style="width:50%">test</th><th style="width:26%">result</th><th style="width:14%">verdict</th></tr></thead><tbody id="rows"></tbody></table>
+  <div id="verdict"></div>
+  <div class="note" id="note"></div>
+</div>
+<script type="module">
+import { makeEuler } from "./simulation/euler/euler2d.js";
+// v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
+// AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
+// not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { EULER_WGSL } from "./simulation/euler/eulerShader.js";
+
+const GAMMA = 1.4, EXACT = (GAMMA + 1) / (GAMMA - 1);   // 6.000 -- Rankine-Hugoniot, not a number the kernel knows
+let sabotage = false;
+const rowsEl = document.getElementById("rows");
+const row = (n, e) => { const tr = document.createElement("tr");
+  tr.innerHTML = '<td><div class="nm">' + n + '</div><div class="ex">' + e + '</div></td><td class="run">running&hellip;</td><td></td>';
+  rowsEl.appendChild(tr); return tr; };
+function settle(tr, text, ok) {
+  tr.children[1].className = ""; tr.children[1].textContent = text;
+  tr.children[2].innerHTML = '<span class="' + (ok?"ok":"bad") + '">' + (ok?"AGREES":"DISAGREES") + "</span>";
+  return ok;
+}
+const sodInit = (nx) => (i) => i < nx/2 ? { rho: 1, u: 0, p: 1000 } : { rho: 1, u: 0, p: 0.01 };
+async function gpuSod(nx, ny, tEnd) {
+  const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!_p.available) throw new Error(_p.message);
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error("no WebGPU adapter");
+  const dev = await adapter.requestDevice();
+  let src = EULER_WGSL;
+  // the sabotage: the equation of state, 2% wrong. gamma sets the compression a shock can reach, so this should
+  // move 6.000 somewhere else entirely -- and if the adjudicator cannot see that, it cannot see anything.
+  if (sabotage) src = src.replace("(P.scal.y - 1.0) * (uSrc[k + 3u]", "(P.scal.y - 1.02) * (uSrc[k + 3u]");
+  const mod = dev.createShaderModule({ code: src });
+  const info = await mod.getCompilationInfo?.();
+  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
+  const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const n = nx * ny, bytes = n * 4 * 4;
+  const mk = () => dev.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+  const A = mk(), B = mk();
+  const init = new Float32Array(n * 4), f = sodInit(nx);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const s = f(i), k = (j*nx + i)*4;
+    init[k] = s.rho; init[k+1] = 0; init[k+2] = 0; init[k+3] = s.p/(GAMMA-1);
+  }
+  dev.queue.writeBuffer(A, 0, init);
+  const par = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bg = (a, b) => dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: a } }, { binding: 1, resource: { buffer: b } }, { binding: 2, resource: { buffer: par } }] });
+  const bgAB = bg(A, B), bgBA = bg(B, A);
+  const wg = [Math.ceil(nx/8), Math.ceil(ny/8), 1];
+  // fixed dt from the CPU's own CFL at the start -- the GPU cannot reduce over the whole grid without another kernel,
+  // and a shared, conservative dt is the honest way to compare the two solvers rather than two different timesteps
+  const probe = makeEuler({ nx, ny, gamma: GAMMA, bc: "outflow", order: 1, init: sodInit(nx) });
+  const dt = probe.cflDt(0.4) * 0.5;
+  let t = 0, flip = 0;
+  while (t < tEnd) {
+    for (const dir of [0, 1]) {
+      dev.queue.writeBuffer(par, 0, new Uint32Array([nx, ny, dir, 0]));
+      dev.queue.writeBuffer(par, 16, new Float32Array([dt, GAMMA, 0, 0]));
+      const enc = dev.createCommandEncoder(); const p = enc.beginComputePass();
+      p.setPipeline(pipe); p.setBindGroup(0, flip % 2 === 0 ? bgAB : bgBA);
+      p.dispatchWorkgroups(wg[0], wg[1], wg[2]); p.end();
+      dev.queue.submit([enc.finish()]); flip++;
+    }
+    t += dt;
+  }
+  const readSrc = flip % 2 === 0 ? A : B;
+  const read = dev.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const enc = dev.createCommandEncoder(); enc.copyBufferToBuffer(readSrc, 0, read, 0, bytes);
+  dev.queue.submit([enc.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const out = new Float32Array(read.getMappedRange().slice(0)); read.unmap();
+  return { out, dt, t };
+}
+document.getElementById("sab").onclick = (e) => {
+  sabotage = !sabotage;
+  e.target.textContent = sabotage ? "sabotage: ON (the equation of state is wrong)" : "sabotage the kernel";
+  e.target.style.color = sabotage ? "#ff6a6a" : "";
+};
+document.getElementById("run").onclick = async () => {
+  rowsEl.innerHTML = ""; document.getElementById("verdict").innerHTML = ""; document.getElementById("note").innerHTML = "";
+  let allOk = true;
+  const r1 = row("the GPU and the CPU are the same solver", "both first-order Godunov + HLLC, same problem, same dt");
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const NX = 400, NY = 8, T = 3;
+    const g = await gpuSod(NX, NY, T);
+    const cpu = makeEuler({ nx: NX, ny: NY, gamma: GAMMA, bc: "outflow", order: 1, init: sodInit(NX) });
+    let t = 0; while (t < g.t - 1e-12) { cpu.step(g.dt); t += g.dt; }
+    let worst = 0, ref = 0;
+    for (let i = 0; i < NX; i++) {
+      const gr = g.out[((4)*NX + i)*4], cr = cpu.get(i, 4)[0];
+      worst = Math.max(worst, Math.abs(gr - cr)); ref = Math.max(ref, cr);
+    }
+    const rel = worst / ref;
+    allOk = settle(r1, "worst density disagreement " + (rel*100).toFixed(3) + "% of peak", rel < 0.02) && allOk;
+
+    const r2 = row("the GPU finds the exact shock ratio alone", "(gamma+1)/(gamma-1) = 6.000 -- Rankine-Hugoniot, 1870s");
+    await new Promise(r => setTimeout(r, 30));
+    // v2469 -- the end time MUST scale with the cell count, and this row was wrong on Keith's rig until it did.
+    // The cells are unit-sized, so an 800-cell domain is twice as LONG as a 400-cell one. The convergence that set
+    // this tolerance (13.7% at 200 cells -> 4.0% at 400 -> 0.42% at 800) was measured with t scaled as 6*nx/400 --
+    // t=12 at 800 cells -- and the page then stopped at t=6, so the shock had travelled half as far and first order
+    // had half as many cells to sharpen it. The GPU dutifully reported 5.730 and the page called it a failure. The
+    // CPU, run the same way, gives 5.730 too, to three decimals. The kernel was right; the question was wrong.
+    const g2 = await gpuSod(800, 8, 12);
+    let peak = 0;
+    for (let i = 0; i < 800; i++) peak = Math.max(peak, g2.out[((4)*800 + i)*4]);
+    const err = Math.abs(peak - EXACT) / EXACT;
+    // first order at 800 cells earns 0.42% on the CPU -- measured, v2462. 2% is loose enough for f32 and a shared
+    // conservative dt, and far too tight for a wrong equation of state.
+    allOk = settle(r2, peak.toFixed(3) + " vs the exact 6.000 (" + (err*100).toFixed(2) + "%)", err < 0.02) && allOk;
+
+    document.getElementById("verdict").innerHTML = allOk
+      ? '<span class="ok">The GPU found Rankine-Hugoniot on its own.</span>'
+      : '<span class="bad">The GPU is NOT solving the Euler equations correctly.</span>';
+    document.getElementById("note").innerHTML = sabotage
+      ? "Sabotage is ON &mdash; the kernel's equation of state is 2% wrong, which moves the compression a shock can reach. If the rows above are red, the check works. That is the only reason this button exists."
+      : (allOk ? "The kernel is deliberately first-order &mdash; writing MUSCL-Hancock blind, with no compiler and no GPU, would have been a gamble. First order smears the shock, so its peak converges to 6.000 from below: 13.7% off at 200 cells, 4.0% at 400, 0.42% at 800 (measured on the CPU). This runs at 800. Press <b>sabotage</b> and run again to watch it fail."
+               : "Something real is wrong. Run with sabotage OFF to be sure it is not the deliberate corruption.");
+  } catch (e) {
+    settle(r1, e.message, false);
+    document.getElementById("verdict").innerHTML = '<span class="bad">Could not run: ' + e.message + "</span>";
+    document.getElementById("note").innerHTML = "WebGPU is needed here (Chrome or Edge). The CPU solver is unaffected and still runs everywhere.";
+  }
+};
+</script>
+</body>
+</html>

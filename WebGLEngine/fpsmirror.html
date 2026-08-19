@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!-- v1258 (#6) — Browser MIRROR (replicated multi-window pattern). Read-only: polls
+     GET /fps/state and renders the same reference world (shared fpsScene.js) from the
+     mirrored camera pose, smoothly eased. No input — this is a spectator surface for a
+     phone, the Shield, or a second monitor showing exactly what the authoritative
+     controller (fpscontrol.html, or the real engine) is publishing. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FPS mirror — bridge → this screen</title>
+<style>
+  :root{ --ink:#cfe6ff; --dim:#7c9ec0; --ok:#4fd08a; --warn:#ffb454; --bad:#ff7b7b; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#06090e; color:var(--ink);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; overflow:hidden; }
+  #view{ position:fixed; inset:0; display:block; }
+  #hud{ position:fixed; left:12px; top:12px; background:rgba(6,12,18,.78); border:1px solid #1c3349;
+    border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); font:12px/1.5 ui-monospace,Consolas,monospace; min-width:210px; }
+  #hud b{ color:#dff1ff; } .k{ color:var(--dim); } .v{ color:#aee9c8; }
+  #state{ margin-top:8px; font-weight:700; }
+  .badge{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  #note{ position:fixed; right:12px; bottom:12px; color:var(--dim); font-size:11px; max-width:50vw; text-align:right; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hud">
+  <b>FPS mirror · read-only</b>
+  <div><span class="k">source </span><span class="v" id="hSrc">—</span></div>
+  <div><span class="k">pos </span><span class="v" id="hPos">—</span></div>
+  <div><span class="k">yaw </span><span class="v" id="hYaw">—</span><span class="k"> pitch </span><span class="v" id="hPitch">—</span></div>
+  <div><span class="k">age </span><span class="v" id="hAge">—</span></div>
+  <div id="state"><span class="badge" style="background:var(--dim)"></span>waiting for a published pose…</div>
+</div>
+<div id="note">Mirroring <code>/fps/state</code>. Start the controller (or the engine) and hit Publish.</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { buildFpsScene } from "./fpsScene.js";
+
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06090e);
+scene.fog = new THREE.Fog(0x06090e, 18, 60);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 500);
+buildFpsScene(THREE, scene);   // identical world to the controller
+
+function resize(){ const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+// target pose (from the bridge) + smoothed render pose
+const tgt = { pos: new THREE.Vector3(0, 1.6, 6), yaw: 0, pitch: 0, have: false };
+const cur = { pos: new THREE.Vector3(0, 1.6, 6), yaw: 0, pitch: 0 };
+
+const hSrc = document.getElementById("hSrc"), hPos = document.getElementById("hPos");
+const hYaw = document.getElementById("hYaw"), hPitch = document.getElementById("hPitch");
+const hAge = document.getElementById("hAge"), stateEl = document.getElementById("state");
+function setState(color, text){ stateEl.innerHTML = "<span class='badge' style='background:" + color + "'></span>" + text; }
+
+// poll the mailbox a few times a second; the render loop eases toward it
+let lastAge = null;
+async function poll(){
+  try {
+    const j = await (await fetch("/fps/state", { cache: "no-store" })).json();
+    if (j && j.ok && j.pose){
+      const p = j.pose;
+      tgt.pos.set(p.pos[0], p.pos[1], p.pos[2]); tgt.yaw = p.yaw; tgt.pitch = p.pitch; tgt.have = true;
+      lastAge = j.ageMs;
+      hSrc.textContent = p.src || "engine";
+      hPos.textContent = p.pos.map(n => n.toFixed(1)).join(", ");
+      hYaw.textContent = p.yaw.toFixed(2); hPitch.textContent = p.pitch.toFixed(2);
+      hAge.textContent = (j.ageMs != null ? j.ageMs + " ms" : "—");
+      if (j.ageMs != null && j.ageMs > 1500) setState("var(--warn)", "stale — controller paused?");
+      else setState("var(--ok)", "live mirror");
+    } else {
+      setState("var(--dim)", "no pose published yet");
+    }
+  } catch { setState("var(--bad)", "bridge unreachable"); }
+}
+poll(); setInterval(poll, 250);
+
+// short-arc yaw easing so wrap-around doesn't spin the camera
+function easeAngle(a, b, k){ let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI; if (d < -Math.PI) d += Math.PI * 2; return a + d * k; }
+
+(function loop(){
+  requestAnimationFrame(loop);
+  const k = 0.18;
+  cur.pos.lerp(tgt.pos, k);
+  cur.yaw = easeAngle(cur.yaw, tgt.yaw, k);
+  cur.pitch += (tgt.pitch - cur.pitch) * k;
+  camera.position.copy(cur.pos);
+  camera.rotation.set(cur.pitch, cur.yaw, 0, "YXZ");
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Flesh &mdash; skin that follows the skeleton</title>
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; padding:22px 18px 60px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:16px; margin-bottom:14px; background:rgba(10,20,34,.5); }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  button { padding:6px 13px; background:#17324d; color:#cfe3ff; border:1px solid #2c5a85; border-radius:5px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button.on { background:#2a4d3a; border-color:#4a7d5a; }
+  button:disabled { opacity:.35; cursor:default; }
+  canvas { width:100%; height:440px; display:block; background:#020509; border:1px solid var(--line); border-radius:8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  p { color:var(--dim); margin:0 0 8px; }
+  code { color:var(--ink); }
+  input[type=range] { width:130px; vertical-align:middle; }
+  .stat { font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Flesh</h1>
+  <p class="sub">Box3D has no soft bodies. It does not need any &mdash; it is the skeleton, and this is the skin.</p>
+
+  <div class="panel" id="gate" hidden><h2>This build cannot do joints</h2><p style="margin:0" id="gateWhy"></p></div>
+
+  <div class="panel">
+    <h2>What you are looking at</h2>
+    <p>The same eleven bones as <a href="/ragdoll.html" style="color:#7fd1ff">ragdoll.html</a>, simulated by Box3D as
+    rigid boxes. Every frame, the boxes are converted to <b>segments</b> &mdash; a bone is a segment with a radius,
+    not a point &mdash; and a capsule distance field is marched into a surface.</p>
+    <p style="margin:0"><b>Nothing here is sculpted, and nothing is stored between frames.</b> The skin is a pure
+    function of where the bones are right now, which is why two machines running the same recording grow the same
+    skin. A deterministic skeleton wearing a non-deterministic skin would throw that away at the last step.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Drop it</h2>
+    <canvas id="cv" width="1280" height="880"></canvas>
+    <div class="row" style="margin-top:10px">
+      <button id="go" disabled>Drop</button>
+      <button id="shove" disabled>Shove</button>
+      <button id="reset" disabled>Reset</button>
+      <button id="skel">Show bones</button>
+      <button id="jig" class="on">Jiggle</button>
+      <button id="mode" class="on">Skin: hybrid</button>
+      <span class="dim" style="margin-left:8px">grid <input id="cells" type="range" min="14" max="44" step="2" value="28"><b id="cellsN">28</b></span>
+      <span class="dim">blend <input id="blend" type="range" min="0" max="40" step="2" value="16"><b id="blendN">0.16</b></span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <span id="lbl" class="dim stat">&mdash;</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>The cost, measured here, live</h2>
+    <p style="margin:0 0 6px">A 60fps frame is 16.7ms for <em>everything</em> &mdash; physics, skin, and draw. Pull
+    the grid slider up and watch the skin eat the budget: the field is cheap and the march is not, and cells scale
+    as the cube.</p>
+    <div class="row"><span id="cost" class="dim stat">&mdash;</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>What this is not</h2>
+    <p><b>Three skins. The hybrid is the default because it measured best.</b> Take the <em>shape</em> from the
+    capsules (smooth, analytic, cheap) and the <em>bulge</em> from the fluid: <code>field = capsule - strength *
+    max(0, rho - rest)/rest</code>. Where the flesh is crowded the field drops and the surface moves outward --
+    because the particles really are crowded, not because a spring was tuned to pretend. At rest the bulge is zero
+    and it <em>is</em> the capsule skin (measured: 856 triangles against the capsule's 844, 1% apart).</p>
+    <p>Measured on the dev box, 28-cell grid, 500 particles, real 11-bone rig:</p>
+    <table style="border-collapse:collapse;font-size:11px;margin:0 0 8px">
+      <tr style="color:#5b7699"><td style="padding:2px 14px 2px 0">mode</td><td style="padding-right:14px">total</td><td style="padding-right:14px">triangles</td><td></td></tr>
+      <tr><td style="padding-right:14px">spring lag</td><td style="padding-right:14px">2.8ms</td><td style="padding-right:14px">904</td><td class="dim">smooth, no volume</td></tr>
+      <tr><td style="padding-right:14px">raw SPH</td><td style="padding-right:14px" class="hot">22.8ms</td><td style="padding-right:14px">1212</td><td class="dim">volume, but lumpy AND over frame budget</td></tr>
+      <tr style="color:#7fe3c4"><td style="padding-right:14px"><b>hybrid</b></td><td style="padding-right:14px"><b>14.3ms</b></td><td style="padding-right:14px"><b>968</b></td><td>smooth AND volume, fits 60fps</td></tr>
+    </table>
+    <p style="margin:0 0 8px">The fluid step is 10.7ms of that 14.3 &mdash; <b>the cost is the physics now, not the
+    skin</b>, which is where it should be. The lumpiness of the raw SPH skin is the <em>kernel width</em>, not the
+    particle count: 400 particles gave 1408 triangles, 900 gave 1424. More particles never fixes it.</p>
+    <p><b>Two skins, and neither is the upgrade.</b> The <em>spring lag</em> draws a smooth capsule union and
+    fakes weight with a damped spring per bone: 904 triangles for about 2ms. The <em>SPH particles</em> are a real
+    fluid -- 500 of them, bound to the bones, with pressure -- and the skin is their actual density. It costs
+    roughly seven times as much and it is lumpier at any resolution that fits a frame. <b>It buys exactly one
+    thing, and the spring cannot do it at any stiffness: volume.</b> Fold a limb and the particles in the crook
+    have nowhere to go, so the pressure rises -- measured at <b>+14%</b> mean density on a 115-degree fold. Watch
+    the density readout while you shove it.</p>
+    <p><b>The honest budget</b> (measured on the dev box, JIT warmed): 500 particles is ~11ms of physics, and the
+    skin sampling is ~3.4ms at an 18-cell grid, ~6ms at 22, ~21ms at 28. Pull the grid slider up in SPH mode and
+    it stops fitting in a frame. That is not a bug to fix later; it is what a real fluid costs.</p>
+    <p><b>It is a lag, not a simulation.</b> Each bone's flesh trails its own motion by a damped spring, so a limb
+    that stops abruptly has its skin keep going for a few frames and settle. That reads as weight. It is <em>not</em>
+    pressure, volume preservation, flesh colliding with flesh, or anything an FEM would give you &mdash; and you
+    still cannot push the skin independently of the bone under it. This engine owns two real solvers
+    (<code>gpu/ClothSim.js</code>, <code>physics/sph/sph.js</code>) and this is neither. <b>Calling it a soft body
+    would be a lie; it is a skin with lag.</b> <em>That paragraph is about the spring mode, and it is why the SPH
+    mode exists.</em></p>
+    <p><b>The state is in one place, deliberately.</b> <code>boneField</code> is a pure function of the bones and
+    stays that way &mdash; the spring lives in front of it, in <code>fleshDynamics.js</code>, stepped once per
+    <em>tick</em> at a fixed dt. Integrated with a variable frame delta instead, two machines would grow two
+    different skins by frame 300, and nothing on screen would look wrong.</p>
+    <p style="margin:0"><b>The blend is a trade, not a free win.</b> It rounds the silhouette as well as filling the
+    creases. Turn it to zero and you can see every capsule; turn it up and the figure inflates into a snowman.</p>
+  </div>
+</div>
+
+<script type="module">
+import { box3d } from "./physics/box3d/box3dLoader.js";
+import { boneField, fitGrid, bonesFromTransforms } from "./physics/soft/boneField.js";
+import { marchScalarField } from "./simulation/MarchingCubes.js";
+import { FleshDynamics } from "./physics/soft/fleshDynamics.js";
+import { FleshSph, hybridGrid, DT } from "./physics/soft/fleshSph.js";   // DT: THE step the solver takes, not a copy
+  import { cflNumber } from "./physics/sph/cfl.js";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let world = null, tick = 0, running = false, shoveAt = -1, showSkel = false;
+let cells = 28, blend = 0.16;
+let dyn = null, jiggle = true;
+let sph = null, mode = "hybrid";   // "spring" = the v2526 lag; "sph" = raw particle density; "hybrid" = capsule shape + fluid bulge
+let HALVES = [];
+let posed = null;   // the bones as of the last TICK, lagged. Declared HERE (with the other top-level lets, before the top-level `await box3d.init()`) so build() can null it during init without hitting a temporal-dead-zone throw.
+let lastCost = { field: 0, march: 0, tris: 0 };   // declared early for the same reason: skin()/draw() read it during the init build() call, which runs before the old declaration site.
+
+// The rig. Same numbers as ragdoll.html -- these are the bodies Box3D simulates.
+const BONES = [
+  ["pelvis",    [0, 6.0, 0],       [0.34, 0.20, 0.20]],
+  ["chest",     [0, 6.62, 0],      [0.40, 0.34, 0.22]],
+  ["head",      [0, 7.32, 0],      [0.24, 0.26, 0.24]],
+  ["upperArmL", [-0.72, 6.72, 0],  [0.30, 0.14, 0.14]],
+  ["lowerArmL", [-1.42, 6.72, 0],  [0.32, 0.11, 0.11]],
+  ["upperArmR", [0.72, 6.72, 0],   [0.30, 0.14, 0.14]],
+  ["lowerArmR", [1.42, 6.72, 0],   [0.32, 0.11, 0.11]],
+  ["thighL",    [-0.22, 5.30, 0],  [0.16, 0.42, 0.16]],
+  ["shinL",     [-0.22, 4.44, 0],  [0.13, 0.42, 0.13]],
+  ["thighR",    [0.22, 5.30, 0],   [0.16, 0.42, 0.16]],
+  ["shinR",     [0.22, 4.44, 0],   [0.13, 0.42, 0.13]],
+];
+const JOINTS = [
+  ["weld",      0, 1, [0, 6.32, 0],     null,     null],
+  ["weld",      1, 2, [0, 7.02, 0],     null,     null],
+  ["spherical", 1, 3, [-0.42, 6.72, 0], [-1,0,0], 90],
+  ["revolute",  3, 4, [-1.06, 6.72, 0], [0,0,1],  [0, 145]],
+  ["spherical", 1, 5, [0.42, 6.72, 0],  [1,0,0],  90],
+  ["revolute",  5, 6, [1.06, 6.72, 0],  [0,0,1],  [-145, 0]],
+  ["spherical", 0, 7, [-0.22, 5.76, 0], [0,-1,0], 60],
+  ["revolute",  7, 8, [-0.22, 4.88, 0], [1,0,0],  [-145, 0]],
+  ["spherical", 0, 9, [0.22, 5.76, 0],  [0,-1,0], 60],
+  ["revolute",  9, 10, [0.22, 4.88, 0], [1,0,0],  [-145, 0]],
+];
+
+const st = await box3d.init();
+if (!st.ready) {
+  $("gate").hidden = false;
+  $("gateWhy").innerHTML = "Box3D WASM is not built here. Run <code>physics/box3d/build-box3d-wasm-clang.sh</code>. <span class='dim'>(" + st.reason + ")</span>";
+} else {
+  const probe = box3d.createWorld({ gravity: [0, -9.8, 0] });
+  const has = typeof probe.supportsJoints === "function" && probe.supportsJoints();
+  probe.destroy();
+  if (!has) {
+    $("gate").hidden = false;
+    $("gateWhy").innerHTML = "This <code>box3d.wasm</code> predates v2515 and has no joint exports. Re-run <code>physics/box3d/build-box3d-wasm-clang.sh</code>.";
+  } else {
+    $("go").disabled = false; $("reset").disabled = false;
+    build();
+  }
+}
+
+function build() {
+  if (world) world.destroy();
+  world = box3d.createWorld({ gravity: [0, -9.8, 0] });
+  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [30, 0.5, 30] });
+  HALVES = [[30, 0.5, 30]];
+  const idx = {};
+  for (const [name, pos, half] of BONES) { idx[name] = world.addBox({ type: "dynamic", pos, half, density: 1 }); HALVES.push(half); }
+  for (const [kind, a, b, anchor, axis, lim] of JOINTS) {
+    const A = idx[BONES[a][0]], B = idx[BONES[b][0]];
+    if (kind === "weld") world.jointWeld(A, B, anchor, 8, 0.5);
+    else if (kind === "spherical") world.jointSpherical(A, B, anchor, axis, lim);
+    else world.jointRevolute(A, B, anchor, axis, lim[0], lim[1]);
+  }
+  tick = 0; shoveAt = -1;
+  dyn = new FleshDynamics(BONES.length);
+  posed = null;
+  // Seeded against the REST pose, which is what the particles are bound to. Rebuilt on reset so the flesh does
+  // not remember the last fall.
+  sph = new FleshSph(bonesFromTransforms(world.readTransforms(), HALVES, { skip: [0] }), { count: 500 });
+  draw();
+}
+
+// lastCost is declared up top (early) to avoid a temporal-dead-zone throw during init
+
+// posed is declared up top (with the other lets) so it is initialized before build() runs; draw() reads it and never advances it.
+
+function skin() {
+  const bones = posed || bonesFromTransforms(world.readTransforms(), HALVES, { skip: [0] });
+  const g = fitGrid(bones, cells, blend);
+  let t = performance.now();
+  // TWO SKINS, AND THEY ARE NOT THE SAME SURFACE. boneField is a smooth capsule union: cheap and pretty, and it
+  // knows nothing about pressure. The SPH field is the actual particle density: it costs ~7x, it is lumpier at
+  // any resolution we can afford, and it is the only one that preserves volume. Neither is the upgrade.
+  // THREE SKINS. The hybrid is the default because it measured best on every axis that matters: 968 triangles
+  // against the spring's 904 (so, smooth) and 14.3ms against the raw fluid's 22.8ms (so, it fits a frame) -- AND
+  // it preserves volume, which the spring cannot do at any stiffness.
+  //
+  // The pressure is read at 12 cells and interpolated onto the 28-cell shape. That is not a cheat: pressure is a
+  // smooth slowly-varying field, and the sharp features live in the capsules, which are analytic. Reading the
+  // SHAPE coarse would be the cheat.
+  const f = mode === "sph"
+    ? sph.sampleGrid(g.dimX, g.dimY, g.dimZ, g.origin, g.cellSize, 500)
+    : mode === "hybrid"
+    ? hybridGrid(bones, sph, g, 12, { blend, strength: 0.12 })
+    : boneField(bones, g.dimX, g.dimY, g.dimZ, { origin: g.origin, cellSize: g.cellSize, blend });
+  const tField = performance.now() - t;
+  t = performance.now();
+  const m = marchScalarField(f, g.dimX, g.dimY, g.dimZ, 0, { origin: g.origin, cellSize: g.cellSize });
+  const tMarch = performance.now() - t;
+  lastCost = { field: tField, march: tMarch, tris: m.triangleCount, grid: g.dimX + "x" + g.dimY + "x" + g.dimZ };
+  return { m, bones };
+}
+
+function draw() {
+  ctx.fillStyle = "#020509"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!world) return;
+  const { m, bones } = skin();
+  const s = 92, ox = cv.width / 2, oy = cv.height - 95;
+  ctx.strokeStyle = "#16304d"; ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(cv.width, oy); ctx.stroke();
+
+  // Painter's algorithm on triangle depth. Not a renderer -- this page is about the SURFACE, and a depth sort is
+  // enough to show whether the skin is closed and whether the limbs merged.
+  const P = m.positions, N = m.normals, tris = [];
+  for (let i = 0; i < P.length; i += 9) {
+    tris.push({ i, z: (P[i + 2] + P[i + 5] + P[i + 8]) / 3 });
+  }
+  tris.sort((a, b) => a.z - b.z);
+  for (const { i } of tris) {
+    const nz = N[i + 2], ny = N[i + 1];
+    const lit = Math.max(0.16, 0.5 * ny + 0.62 * nz);
+    ctx.fillStyle = "rgb(" + (70 + 150 * lit | 0) + "," + (110 + 130 * lit | 0) + "," + (140 + 110 * lit | 0) + ")";
+    ctx.beginPath();
+    ctx.moveTo(P[i] * s + ox, -P[i + 1] * s + oy);
+    ctx.lineTo(P[i + 3] * s + ox, -P[i + 4] * s + oy);
+    ctx.lineTo(P[i + 6] * s + ox, -P[i + 7] * s + oy);
+    ctx.closePath(); ctx.fill();
+  }
+  if (showSkel) {
+    ctx.strokeStyle = "#ffd27f"; ctx.lineWidth = 2;
+    for (const b of bones) {
+      ctx.beginPath();
+      ctx.moveTo(b.a[0] * s + ox, -b.a[1] * s + oy);
+      ctx.lineTo(b.b[0] * s + ox, -b.b[1] * s + oy);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
+    $("lbl").innerHTML = "tick <b>" + tick + "</b> &middot; " + bones.length + " bones &middot; <b>" + lastCost.tris +
+    "</b> triangles &middot; hash <b>" + (world.stateHash() >>> 0).toString(16).padStart(8, "0") + "</b>" +
+    (mode !== "spring"
+      ? " &middot; <b>" + sph.seeded + "</b> particles &middot; density <b>" + sph.meanDensity().toFixed(0) + "</b>/1000"
+      : jiggle && dyn ? " &middot; flesh trailing <b>" + (dyn.peakLag() * 100).toFixed(1) + "cm</b>" : " &middot; <span class='dim'>jiggle off</span>");
+  // v2581 -- THE CFL NUMBER, ON A PANEL. v2563 measured it and NOTHING EVER SHOWED IT.
+  //
+  // CFL = max|v| * dt / h. Above 1 the fastest particle crosses more than a smoothing length in a single step:
+  // it TELEPORTS PAST the neighbours it was supposed to interact with, and the solver stops solving
+  // Navier-Stokes. IT DOES NOT BLOW UP. IT DOES NOT NaN. IT QUIETLY RETURNS A FIELD THAT IS FINITE, PLAUSIBLE,
+  // AND NOT A SOLUTION TO ANYTHING.
+  //
+  // THAT IS WHY IT NEEDS A LIGHT: THE ONE FAILURE MODE HERE IS THE ONE THAT LOOKS LIKE SUCCESS. v2563 put the
+  // threshold near 44 m/s -- a kaiju punch -- and then left the number in a selfcheck's stdout for eighteen
+  // versions, where nobody goes on purpose.
+  //
+  // DT is IMPORTED from fleshSph, never typed here: a hardcoded 1/120 would be a SECOND COPY of the number that
+  // decides whether this verdict is true, and the copy would go stale in silence.
+  if (mode !== "spring" && sph) {
+    try {
+      const c = cflNumber(sph.world ?? sph, sph.h, DT);
+      const bad = !c.finite || c.courant > 1;
+      $("lbl").innerHTML += ' &middot; CFL <b style="color:' +
+        (bad ? "#ff6b6b" : c.courant > 0.5 ? "#ffb454" : "#6ee7a8") + '">' +
+        (c.finite ? c.courant.toFixed(3) : "NaN") + "</b>" +
+        (bad ? ' <b style="color:#ff6b6b">NOT SOLVING NAVIER-STOKES</b>' : "");
+    } catch (e) {
+      // SAY SO. A silent catch would leave the light dark BECAUSE IT IS BROKEN, which is indistinguishable
+      // from the light being dark because everything is fine.
+      $("lbl").innerHTML += ' &middot; <b style="color:#ff6b6b">CFL unavailable: ' + e.message + "</b>";
+    }
+  }
+
+  const tot = lastCost.field + lastCost.march;
+  const over = tot > 16.7;
+  $("cost").innerHTML = "grid <b>" + lastCost.grid + "</b> &middot; field <b>" + lastCost.field.toFixed(2) +
+    "ms</b> &middot; march <b>" + lastCost.march.toFixed(2) + "ms</b> &middot; total <b class='" +
+    (over ? "hot" : "ok") + "'>" + tot.toFixed(2) + "ms</b> of the 16.7ms budget" +
+    (over ? " &mdash; <span class='hot'>the skin alone is over frame budget</span>" : "");
+}
+
+function frame() {
+  if (!running) return;
+  if (tick === shoveAt) { world.impulse(4, [14, 6, 0]); world.angularImpulse(1, [0, 0, 3]); }
+  world.step(1 / 60, 4);
+  // ONE dynamics step per TICK, here -- never in draw(). draw() runs on rAF and on every slider drag, and a spring
+  // advanced by the UI would make the flesh wobble while the figure stands still. Same law as the shove.
+  const raw = bonesFromTransforms(world.readTransforms(), HALVES, { skip: [0] });
+  if (mode === "spring") posed = jiggle ? dyn.step(raw) : raw;
+  else { sph.step(raw); posed = raw; }   // both fluid modes need the particles stepped
+  tick++;
+  draw();
+  requestAnimationFrame(frame);
+}
+
+$("go").onclick = () => { running = !running; $("go").textContent = running ? "Pause" : "Drop"; $("shove").disabled = !running; if (running) frame(); };
+$("shove").onclick = () => { shoveAt = tick + 2; };
+$("reset").onclick = () => { running = false; $("go").textContent = "Drop"; $("shove").disabled = true; build(); };
+$("skel").onclick = () => { showSkel = !showSkel; $("skel").classList.toggle("on", showSkel); if (!running) draw(); };
+$("jig").onclick = () => { jiggle = !jiggle; $("jig").classList.toggle("on", jiggle); if (dyn) dyn.reset(); };
+const MODES = ["hybrid", "spring", "sph"];
+const MODE_LABEL = { hybrid: "Skin: hybrid", spring: "Skin: spring lag", sph: "Skin: SPH particles" };
+$("mode").onclick = () => {
+  mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+  $("mode").textContent = MODE_LABEL[mode];
+  $("mode").classList.toggle("on", mode !== "spring");
+  $("jig").disabled = mode !== "spring";   // the spring is not running in the fluid modes; a live toggle would lie
+  if (!running && world) draw();
+};
+$("cells").oninput = (e) => { cells = +e.target.value; $("cellsN").textContent = cells; if (!running && world) draw(); };
+$("blend").oninput = (e) => { blend = +e.target.value / 100; $("blendN").textContent = blend.toFixed(2); if (!running && world) draw(); };
+</script>
+</body>
+</html>

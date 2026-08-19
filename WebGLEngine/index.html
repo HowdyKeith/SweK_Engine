@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SweK Engine</title>
+    <link rel="stylesheet" href="./ui/lcars.css">
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        /* Round 305 — scope full-screen canvas rule to ONLY #glCanvas.
+           The unscoped `canvas { width:100vw; height:100vh }` rule was
+           stretching every overlay canvas (WorkerEcgHud, OBJ preview,
+           thumbnails) to fill the viewport — bug visible as a giant
+           "biomeDecor" text bleed over the terrain, plus a huge
+           overdraw cost (FPS 60 → 10). All non-#glCanvas canvases
+           inherit their natural attribute dimensions. */
+        #glCanvas { display: block; width: 100vw; height: 100vh; }
+        /* Round 35 — Earth in moon sky (now replaced by 3D billboard in
+           round 38; HTML overlay disabled). Kept for fallback / mobile.
+           Tag with .moon-active to enable; default hidden. */
+        #earth-overlay {
+            display: none;       /* 3D billboard handles it now */
+            position: fixed; top: 8vh; right: 6vw;
+            width: 28vh; height: 28vh; max-width: 320px; max-height: 320px;
+            border-radius: 50%; overflow: hidden;
+            opacity: 0; pointer-events: none;
+            z-index: 5;
+        }
+        /* Round 42 — demo mode switcher, LCARS-themed pill button. */
+        #demo-mode-button {
+            position: fixed; top: 8px; left: 36px;        /* v670 — moved up just below the top, ~1/4 inch from left edge (was top:60/left:60) so AVATAR removal + AI tabs shift right opens up space here */
+            padding: 6px 18px 5px;
+            background: #f90;
+            border: none;
+            color: #000;
+            font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 12px;
+            border-radius: 14px;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+            z-index: 9080;
+            min-width: 200px;
+            transition: background 120ms;
+        }
+        #demo-mode-button:hover {
+            background: #ffb733;
+        }
+        #demo-mode-button .mode-label {
+            display: block;
+            font-size: 13px;
+            line-height: 1.05;
+        }
+        #demo-mode-button .mode-hint {
+            display: block;
+            font-size: 9px;
+            opacity: 0.65;
+            margin-top: 2px;
+            letter-spacing: 0.12em;
+            color: rgba(0, 0, 0, 0.75);
+        }
+        /* v466 — persistent 3rd line: how to change demos / get help. */
+        #demo-mode-button .mode-sub {
+            display: block;
+            font-size: 8px;
+            opacity: 0.5;
+            margin-top: 1px;
+            letter-spacing: 0.1em;
+            color: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <script>
+    // v1953 — CLEAN / single-app mode. When the engine is opened with ?clean=1 (the demo/app
+    // launcher pills add it), suppress ALL the dock chrome + minitabs so a single demo/app fills
+    // the screen with no side rails — the "eye-icon-hide-all, pre-clicked" behavior. A small floating
+    // 👁 button (added by main.js) brings the chrome back. Must run BEFORE ./ui/minitabLayout.js and
+    // the dock build, so it lives here in the early inline script.
+    (function () {
+      try {
+        var q = location.search;
+        if (/[?&]clean=1\b/.test(q) || /[?&]single=1\b/.test(q)) {
+          window.SWEK_CLEAN = true;
+          window.MINITAB_LAYOUT_OFF = true;          // read by ui/minitabLayout.js on import
+          var st = document.createElement("style");
+          st.textContent = "html.swek-clean-hide .dock-tab,html.swek-clean-hide .dock-drawer{display:none !important;}";
+          document.head.appendChild(st);
+          document.documentElement.classList.add("swek-clean-hide");
+        }
+      } catch (e) {}
+    })();
+    </script>
+    <script>
+    // v1555 - 127 -> LAN boot redirect. If the full render opens on a loopback host
+    // (127.x / localhost / ::1), the phone-connect QR encodes an unreachable address and
+    // the HA panel flags it. As soon as the bridge can name a real LAN IP we bounce there,
+    // preserving path/query/hash. Guards: at most one bounce per tab (no loops); opt out
+    // with ?no127 or localStorage 'voxelengine.stay127'=1; never throws, never blocks boot.
+    (function () {
+      try {
+        var h = location.hostname;
+        var loop = (h === "localhost" || h === "::1" || h === "[::1]" || /^127\./.test(h));
+        if (!loop) return;
+        if (/[?&]no127\b/.test(location.search)) return;
+        try { if (localStorage.getItem("voxelengine.stay127") === "1") return; } catch (e) {}
+        try { if (sessionStorage.getItem("voxelengine.did127") === "1") return; } catch (e) {}   // already tried this tab
+        var ctrl = ("AbortController" in window) ? new AbortController() : null;
+        var to = setTimeout(function () { try { ctrl && ctrl.abort(); } catch (e) {} }, 2500);
+        fetch("/net/info", { cache: "no-store", signal: ctrl ? ctrl.signal : undefined })
+          .then(function (r) { return r.json(); })
+          .then(function (n) {
+            clearTimeout(to);
+            try { sessionStorage.setItem("voxelengine.did127", "1"); } catch (e) {}
+            var rec = n && n.recommended;   // e.g. http://192.168.50.40:8787/
+            if (!rec) return;
+            var ru; try { ru = new URL(rec); } catch (e) { return; }
+            var rh = ru.hostname;
+            if (!rh || rh === h || rh === "localhost" || /^127\./.test(rh) || rh === "::1") return;   // nothing better
+            location.replace(ru.origin + location.pathname + location.search + location.hash);
+          })
+          .catch(function () { clearTimeout(to); });
+      } catch (e) { /* never block the engine */ }
+    })();
+    </script>
+    <canvas id="glCanvas"></canvas>
+    <script>
+      // v1965 — KIOSK mode: the clean loader (play.html) frames the engine with ?kiosk=1 so a demo shows
+      // WITHOUT the index chrome (avatar/gauge diorama, mini-icon rail tools, minitabs, dock pills). Pure
+      // presentation — sets a class early so CSS hides them; the engine + demo boot exactly as normal.
+      (function(){
+        try {
+          var q = new URLSearchParams(location.search);
+          if (q.get("kiosk") === "1" || q.get("kiosk") === "true") {
+            document.documentElement.classList.add("swek-kiosk");
+            var s = document.createElement("style");
+            s.textContent =
+              "html.swek-kiosk #demoChrome," +
+              "html.swek-kiosk .lcars-minitab," +
+              "html.swek-kiosk [id^='ve-'][id$='-btn']," +
+              "html.swek-kiosk #phone-qr-btn," +
+              "html.swek-kiosk #dayNightHud," +
+              "html.swek-kiosk .demospill { display:none !important; }";
+            document.head.appendChild(s);
+          }
+        } catch(e){}
+      })();
+    </script>
+    <div id="earth-overlay">
+        <video id="earth-video" autoplay loop muted playsinline onerror="this.style.display='none'"></video>
+        <script>
+          // v2836 -- THE INTRO VIDEO IS RETIRED. intro.mp4 was a decorative engine intro that is not in use,
+          // and even the guarded HEAD probe below still put two 404s in the console on every single load --
+          // enough to fail world-default, world-rle, world-biomes and world-rle-biomes in render QA on
+          // noConsoleErrors while every pixel check passed. A page that cries wolf on every boot trains you to
+          // ignore its console, which is the only place a real error was ever going to appear.
+          (function () {
+            var v = document.getElementById('earth-video');
+            if (v) v.style.display = 'none';
+          })();
+        </script>
+    </div>
+    <button id="demo-mode-button" type="button">
+        <span class="mode-label">PLEASE WAIT — ENGINE STARTING</span>
+        <span class="mode-hint">starting up…</span>
+        <span class="mode-sub">click to choose ▼  ·  press ? for help</span>
+    </button>
+    <!-- v1209 — device-aware entry. Adds an always-available "Simple view" link
+         to the lightweight panel hub (panels.html), and on iPad / low-memory /
+         no-WebGL2 devices offers it up front. Capable devices (Shield TV, desktop)
+         just run the full engine. Defensive: never blocks engine boot. -->
+    <script>
+    (function () {
+      try {
+        var forced = false;
+        try { forced = /[?&]forceengine=1/i.test(location.search || ""); } catch (e0) {}
+        var hasGL2 = false;
+        try { var c = document.createElement("canvas"); c.width = 2; c.height = 2; var pg = c.getContext("webgl2"); hasGL2 = !!pg;
+              try { var lc = pg && pg.getExtension("WEBGL_lose_context"); if (lc) lc.loseContext(); } catch (e3) {} } catch (e) {}
+        var hasWebGPU = false; try { hasWebGPU = !!(navigator.gpu); } catch (e2) {}
+        var canEngine = hasGL2 || hasWebGPU;   // v2728 -- the engine is multi-runtime (WebGL2 OR WebGPU); either one counts
+        var ua = navigator.userAgent || "";
+        var iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+        var mem = (typeof navigator.deviceMemory === "number") ? navigator.deviceMemory : null;
+        var lowMem = (mem != null && mem <= 2);
+        var limited = !forced && (!canEngine || iOS || lowMem);   // forceEngine=1 always bypasses; else offer the simple view only to the truly limited
+
+        // always-available corner link
+        var link = document.createElement("a");
+        link.href = "/panels.html"; link.textContent = "\u25A3 SweK View";
+        link.style.cssText = "position:fixed;left:10px;bottom:10px;z-index:99998;background:rgba(4,20,11,.82);color:#7fd6a8;border:1px solid #1aa257;border-radius:7px;padding:6px 11px;font:12px ui-monospace,monospace;text-decoration:none;";
+        var addLink = function () { if (document.body) document.body.appendChild(link); };
+
+        var dismissed = false; try { dismissed = localStorage.getItem("voxelengine.simpleViewDismiss") === "1"; } catch (e) {}
+        var addBanner = function () {
+          if (!document.body || !limited || dismissed) return;
+          var b = document.createElement("div");
+          b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:99999;background:#06200f;border-bottom:1px solid #2bff88;color:#dfe7f2;font:13px/1.4 ui-monospace,monospace;padding:11px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 18px rgba(0,0,0,.5);";
+          var msg = document.createElement("span"); msg.style.cssText = "flex:1;min-width:180px;";
+          msg.innerHTML = (!canEngine)
+            ? "This device can\u2019t run the 3D engine (no WebGL2 or WebGPU). The <b>Simple view</b> has the home controls, comics reader and more \u2014 all lightweight."
+            : "This device (iPad / tablet) may struggle with the full 3D engine. Want the lightweight <b>Simple view</b> instead?";
+          var go = document.createElement("a"); go.href = "/panels.html"; go.textContent = "Open Simple view \u2192";
+          go.style.cssText = "background:#0c3;color:#021;border:1px solid #2bff88;border-radius:7px;padding:8px 13px;text-decoration:none;font-weight:bold;";
+          var stay = document.createElement("button"); stay.textContent = canEngine ? "Try the full engine" : "Dismiss";
+          stay.style.cssText = "background:#16202c;color:#cde;border:1px solid #2a3340;border-radius:7px;padding:8px 13px;cursor:pointer;font:13px ui-monospace,monospace;";
+          stay.onclick = function () { try { localStorage.setItem("voxelengine.simpleViewDismiss", "1"); } catch (e) {} try { b.remove(); } catch (e2) {} };
+          b.appendChild(msg); b.appendChild(go); b.appendChild(stay); document.body.appendChild(b);
+        };
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { addLink(); addBanner(); });
+        else { addLink(); addBanner(); }
+      } catch (e) { /* never block the engine */ }
+    })();
+    </script>
+    <!-- v1293 — first-run SETUP overlay: pick Server vs Full mode + offer to open the
+         Windows firewall for port 8787 (so phones/Shield/TV on the LAN can reach this
+         PC). Shows once. Self-contained; never blocks the engine. Distinct from the
+         Ollama first-run population modal (ui/firstRunModal.js). -->
+    <script>
+    (function firstRunSetup(){
+      try {
+        var done = false, hasMode = false;
+        try { done = localStorage.getItem("voxelengine.firstRunSetup") === "1"; } catch (e) {}
+        try { hasMode = !!localStorage.getItem("voxelengine.bootMode"); } catch (e) {}
+        if (done || hasMode) return;                 // only the very first run, before any mode is chosen
+        var mark = function(){ try { localStorage.setItem("voxelengine.firstRunSetup", "1"); } catch (e) {} };
+        var build = function(){
+          if (!document.body) return;
+          var ov = document.createElement("div");
+          ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(2,6,4,.86);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font:14px/1.5 ui-monospace,monospace;color:#dfe7f2;";
+          var card = document.createElement("div");
+          card.style.cssText = "max-width:440px;width:92%;background:#0a1410;border:1px solid #2bff88;border-radius:14px;padding:20px 22px;box-shadow:0 18px 60px rgba(0,0,0,.6);";
+          card.innerHTML =
+            '<div style="font-size:16px;font-weight:bold;color:#2bff88;letter-spacing:.5px;margin-bottom:4px;">Welcome to SweK Engine</div>' +
+            '<div style="color:#9ab;margin-bottom:14px;">First run \u2014 how do you want to start?</div>' +
+            '<div style="display:flex;gap:10px;margin-bottom:16px;">' +
+              '<button id="frFull" style="flex:1;background:#10231a;color:#2bff88;border:1px solid #224a36;border-radius:9px;padding:12px;cursor:pointer;font:inherit;">\u25b6 Full engine<div style="color:#7d958a;font-size:11px;margin-top:3px;">the complete 3D render</div></button>' +
+              '<button id="frServer" style="flex:1;background:#101a23;color:#7fd0ff;border:1px solid #224a5e;border-radius:9px;padding:12px;cursor:pointer;font:inherit;">\ud83d\udda5 Server<div style="color:#7d958a;font-size:11px;margin-top:3px;">lean bridge + live debug</div></button>' +
+            '</div>' +
+            '<div style="border-top:1px solid #1f2b24;padding-top:13px;">' +
+              '<div style="margin-bottom:7px;">Open the Windows firewall for port <b>8787</b>?<div style="color:#7d958a;font-size:11px;margin-top:2px;">lets your phone / Shield / TV on the same network reach this PC. You can change it later in System.</div></div>' +
+              '<div style="display:flex;gap:9px;align-items:center;"><button id="frFw" style="background:#231a10;color:#ffcf6b;border:1px solid #5a4a1f;border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit;">Open firewall</button><span id="frFwMsg" style="color:#7d958a;font-size:12px;"></span></div>' +
+            '</div>' +
+            '<div style="text-align:right;margin-top:16px;"><button id="frSkip" style="background:none;color:#7d958a;border:none;cursor:pointer;font:inherit;text-decoration:underline;">skip</button></div>';
+          ov.appendChild(card); document.body.appendChild(ov);
+          var $ = function(id){ return card.querySelector("#" + id); };
+          // firewall status hint
+          fetch("/sys/firewall/status", { cache: "no-store" }).then(function(r){ return r.json(); }).then(function(j){
+            var m = $("frFwMsg"); if (!m) return;
+            if (j && j.win === false) { m.textContent = "(Windows only)"; $("frFw").disabled = true; $("frFw").style.opacity = .5; }
+            else if (j && j.ruleExists) { m.textContent = "\u2713 already allowed"; m.style.color = "#9fe88f"; }
+          }).catch(function(){});
+          $("frFw").addEventListener("click", function(){
+            var m = $("frFwMsg"); m.textContent = "requesting (approve the UAC prompt)\u2026"; m.style.color = "#ffcf6b";
+            fetch("/sys/firewall/allow", { method: "POST" }).then(function(r){ return r.json(); }).then(function(j){
+              if (j && j.ok) { m.textContent = "\u2713 firewall opened for 8787"; m.style.color = "#9fe88f"; }
+              else { m.textContent = "couldn\u2019t open: " + ((j && j.error) || "denied?"); m.style.color = "#f88"; }
+            }).catch(function(){ m.textContent = "firewall request failed"; m.style.color = "#f88"; });
+          });
+          $("frFull").addEventListener("click", function(){ try { localStorage.setItem("voxelengine.bootMode", "full"); } catch (e) {} mark(); try { ov.remove(); } catch (e2) {} });
+          $("frServer").addEventListener("click", function(){ try { localStorage.setItem("voxelengine.bootMode", "server"); } catch (e) {} mark(); location.href = "/server.html"; });
+          $("frSkip").addEventListener("click", function(){ mark(); try { ov.remove(); } catch (e2) {} });
+        };
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);
+        else build();
+      } catch (e) { /* never block the engine */ }
+    })();
+    </script>
+    <!-- v859 — pre-install window.kpopFavorites so PipAvatar (non-module
+         legacy script) can read favorites for the avatar cycle. Loaded
+         before main.js so the singleton is ready by the time PipAvatar
+         constructs. -->
+    <script type="module" src="./ui/kpopFavorites.js"></script>
+    <script src="./ui/assetMigrate.js"></script>
+    <script src="/engine/visitor-chat.js"></script>
+    <script type="module" src="./main.js"></script>
+
+<!-- v3006 -- HOME ASSISTANT OVER THE RENDER, not on a page you navigate away to.
+     The arrangement is learned from Trooped/QuickBars, an Android TV HA overlay: controls as a TRANSIENT BAR
+     over running content, dismissible, never taking the screen. No code is taken from it -- QuickBars is
+     GPL-3.0 Kotlin and nothing of it is vendored here; what ports is the shape, which is not copyrightable and
+     is the only part that was ever the good idea.
+     WHY OVER THE RENDER: this engine already had thirteen /ha routes and two HA pages, and every one of them
+     required leaving the thing you were looking at. That is the whole defect. -->
+<div id="haBar" style="position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:9999;display:none;
+     background:rgba(10,16,13,.92);border:1px solid #2c463a;border-radius:9px;padding:7px 10px;
+     font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#cfe9d8;max-width:min(92vw,860px);
+     box-shadow:0 6px 24px rgba(0,0,0,.5);">
+  <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+    <span style="color:#6f8a7c;">HA</span>
+    <span id="haBarItems" style="display:flex;gap:6px;flex-wrap:wrap;"></span>
+    <span id="haBarMsg" style="color:#6f8a7c;font-size:11px;"></span>
+    <button id="haBarClose" style="margin-left:auto;background:none;border:0;color:#6f8a7c;cursor:pointer;font:inherit;">close</button>
+  </div>
+</div>
+<script type="module">
+  // Toggled with `h`. A bar you cannot dismiss is a bar over your render, not a tool.
+  const bar = document.getElementById("haBar");
+  const items = document.getElementById("haBarItems");
+  const msg = document.getElementById("haBarMsg");
+  document.getElementById("haBarClose").onclick = () => { bar.style.display = "none"; };
+  addEventListener("keydown", (e) => {
+    if (e.key !== "h" || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target && e.target.tagName;
+    if (t === "INPUT" || t === "TEXTAREA" || (e.target && e.target.isContentEditable)) return;
+    bar.style.display = bar.style.display === "none" ? "block" : "none";
+    if (bar.style.display === "block") load();
+  });
+
+  async function load() {
+    msg.textContent = " loading...";
+    try {
+      const r = await fetch("/ha/states?domain=switch", { cache: "no-store" });
+      const j = await r.json();
+      const list = (Array.isArray(j) ? j : (j && j.states) || []).slice(0, 8);
+      if (!list.length) { msg.textContent = " no switches (or Home Assistant is not configured)"; items.innerHTML = ""; return; }
+      msg.textContent = "";
+      items.innerHTML = list.map((e) =>
+        '<button data-id="' + e.entity_id + '" data-state="' + e.state + '" style="font:inherit;padding:2px 8px;border-radius:5px;cursor:pointer;' +
+        'background:' + (e.state === "on" ? "#1a2c22" : "#16211b") + ';color:' + (e.state === "on" ? "#7fe0a4" : "#9fb8ab") +
+        ';border:1px solid ' + (e.state === "on" ? "#4c8f6a" : "#2c463a") + ';">' +
+        (e.entity_id.split(".")[1] || e.entity_id) + "</button>").join("");
+      for (const b of items.querySelectorAll("button")) b.onclick = () => toggle(b);
+    } catch { msg.textContent = " bridge unreachable"; }
+  }
+
+  async function toggle(btn) {
+    const id = btn.dataset.id, want = btn.dataset.state === "on" ? "off" : "on";
+    btn.disabled = true; msg.textContent = " calling...";
+    try {
+      // THE VERIFIED CALL, not /ha/call. The verdict is about the entity, not the HTTP status: "unconfirmed"
+      // means Home Assistant said yes and the world did not move, which is the case a 200 would have hidden.
+      const r = await fetch("/ha/verified-call", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: "switch", service: want === "on" ? "turn_on" : "turn_off",
+                               data: { entity_id: id }, entityId: id, expect: want }) });
+      const j = await r.json();
+      msg.textContent = j.verdict === "changed" ? " " + id.split(".")[1] + " -> " + j.after
+        : j.verdict === "already" ? " already " + j.after
+        : j.verdict === "unconfirmed" ? " ACCEPTED BUT DID NOT MOVE (" + j.before + ")"
+        : " " + (j.verdict || j.error || "?");
+      await load();
+    } catch { msg.textContent = " call failed"; }
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>

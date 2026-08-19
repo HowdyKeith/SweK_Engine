@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Trading Applications &middot; SweK</title>
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root { --bg:#0c1016; --ink:#dfe8f2; --dim:#8aa; --line:#26303c; --go:#7fd88f; --warn:#e8c05a; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; padding:18px; max-width:860px; }
+  h1 { font-size:21px; margin:0 0 2px; }
+  h2 { font-size:14px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:20px 0 8px; }
+  .hint { color:var(--dim); font-size:13px; margin-bottom:8px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }
+  .app { border:1px solid var(--line); border-radius:11px; padding:12px 14px; background:rgba(255,255,255,0.015); display:flex; flex-direction:column; gap:6px; }
+  .app .t { font-weight:600; }
+  .app .d { font-size:12px; color:var(--dim); flex:1; }
+  .app .meta { font-size:11px; color:var(--dim); }
+  .app a, .app button { align-self:flex-start; background:#14202c; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 12px; cursor:pointer; font:13px system-ui; text-decoration:none; }
+  .app a.go { background:#123020; color:var(--go); border-color:#2a6; font-weight:600; }
+  .tag { font-size:10px; padding:1px 6px; border-radius:8px; border:1px solid var(--line); color:var(--dim); }
+  .tag.py { color:#8fb7ff; border-color:#3a5; }
+  .tag.desk { color:#e8a05a; }
+  .tag.native { color:var(--go); border-color:#2a6; }
+  .tag.skill { color:#b79cff; border-color:#63d; }
+  .note { font-size:11px; color:var(--warn); }
+  code { background:#070b10; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>&#128200; Trading Applications</h1>
+  <div class="hint">Your stock/trade demos in one place &mdash; the SweK-native ones open right here; the external open-source tools are launch/install links (each runs as its own app).</div>
+
+  <h2>Built into SweK</h2>
+  <div class="grid" id="native"></div>
+
+  <h2>External open-source tools <span style="text-transform:none;font-weight:400;">&mdash; verified repos, run on their own</span></h2>
+  <div class="grid" id="external"></div>
+
+  <div class="note" style="margin-top:16px;">&#9888; These are research/simulation tools. Some can place <b>real trades</b> if you connect a broker &mdash; that's entirely opt-in and gated behind keys you set yourself. Nothing here trades on its own, and any "returns" figures on their project pages are their own marketing/backtests, not guarantees. This is a portfolio/demo hub, not financial advice.</div>
+
+<script>
+  var NATIVE = [
+    { t:"AI Trading Floor", d:"SweK's LCARS-style trading floor visualization.", url:"/tradingfloor.html", w:1280, h:820 },
+    { t:"Trader", d:"SweK trader panel.", url:"/trader.html", w:1000, h:820 },
+  ];
+  // Verified 2026-07: repo + language + license confirmed via web search before listing.
+  var EXTERNAL = [
+    { t:"Vibe-Trading", d:"Natural-language finance research agent (HKUDS): backtests, factor analysis, multi-agent swarms. Has its own web UI on :5899. 21/22 tools work with no keys; broker trading is opt-in.", repo:"HKUDS/Vibe-Trading", tags:["py","native"], install:"pip install vibe-trading-ai", run:"vibe-trading serve  (then open http://localhost:5899)", note:"Python-based \u2014 SweK auto-installs Python (winget) when needed, same as the Trader/Doc tools." },
+    { t:"AutoHedge", d:"Autonomous 'hedge fund' of 4 AI agents (Director\u2192Quant\u2192Risk\u2192Execution). FastAPI backend. Can execute LIVE crypto trades on Solana.", repo:"The-Swarm-Corporation/AutoHedge", tags:["py"], install:"pip install autohedge", run:"needs OpenAI/Anthropic + Jupiter keys; can place real trades \u2014 use paper/testing first", note:"Python-based (SweK auto-installs Python via winget). Live-trading capable \u2014 keep it in analysis/paper mode first." },
+    { t:"Fincept Terminal", d:"Open-source Bloomberg-style terminal (Fincept Corp): real-time data, equity research, charting, AI personas. Native C++/Qt desktop app.", repo:"Fincept-Corporation/FinceptTerminal", tags:["desk"], install:"download the desktop installer from GitHub releases", run:"launch the desktop app; connect data sources", note:"Desktop app (download+run), not embeddable. License: AGPL-3.0 + a COMMERCIAL license required for any business/company use." },
+    { t:"AI-Berkshire", d:"Value-investing research framework (Buffett/Munger/Duan/Li methodologies, multi-agent). A Claude Code / Codex SKILL pack \u2014 forces Pass/Fail/Gray-zone verdicts with price ranges, cross-checks data with exact decimal math.", repo:"xbtlin/ai-berkshire", tags:["skill"], install:"git clone https://github.com/xbtlin/ai-berkshire && ./scripts/install-claude-commands.sh", run:"in Claude Code: /investment-research <ticker>", note:"Not an app \u2014 it's a Claude Code skill collection (Python tools for the math). Runs in your coding agent, not the engine." },
+  ];
+
+  function nativeCard(a){
+    var d=document.createElement("div"); d.className="app";
+    d.innerHTML="<div class='t'>"+a.t+"</div><div class='d'>"+a.d+"</div>";
+    var b=document.createElement("a"); b.className="go"; b.textContent="Open \u2197"; b.href="#";
+    b.onclick=function(e){ e.preventDefault(); try{ window.open(a.url,"_blank","width="+(a.w||1000)+",height="+(a.h||820)); }catch(x){ location.href=a.url; } };
+    d.appendChild(b); return d;
+  }
+  function tagHtml(t){ var map={py:["py","Python"],desk:["desk","Desktop app"],native:["native","Web UI"],skill:["skill","Claude Code skill"]}; var m=map[t]||["",t]; return "<span class='tag "+m[0]+"'>"+m[1]+"</span>"; }
+  function extCard(a){
+    var d=document.createElement("div"); d.className="app";
+    d.innerHTML="<div class='t'>"+a.t+" "+(a.tags||[]).map(tagHtml).join(" ")+"</div>"+
+      "<div class='d'>"+a.d+"</div>"+
+      "<div class='meta'>repo: <code>"+a.repo+"</code></div>"+
+      "<div class='meta'>install: <code>"+a.install+"</code></div>"+
+      "<div class='meta'>run: <code>"+a.run+"</code></div>"+
+      (a.note?"<div class='note'>"+a.note+"</div>":"");
+    var b=document.createElement("a"); b.textContent="View on GitHub \u2197"; b.target="_blank"; b.rel="noopener"; b.href="https://github.com/"+a.repo;
+    d.appendChild(b); return d;
+  }
+  var nb=document.getElementById("native"); NATIVE.forEach(function(a){ nb.appendChild(nativeCard(a)); });
+  var eb=document.getElementById("external"); EXTERNAL.forEach(function(a){ eb.appendChild(extCard(a)); });
+</script>
+</body>
+</html>

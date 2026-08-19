@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Tactical Scan">
+<meta name="demo:desc" content="The ship's computer scanning a target: a Sobel edge pass turns the ship sprite into an LCARS vector schematic, a scan line sweeps down and lights the outline, a reticle frames it, and a readout shows hull/shield/weapon. Works on our 2D sprites today -- no 3D model needed.">
+<meta name="demo:category" content="ui">
+<title>Tactical Scan</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; }
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; z-index:3; }
+  #bar { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:3; display:flex; gap:10px; }
+  button { background:rgba(8,14,26,.7); color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:9px 18px; font:600 12px ui-monospace,monospace; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Tactical Scan</div>
+<div id="bar"><button id="rescan">Re-scan target</button><button id="next">Next ship</button></div>
+<script type="module">
+import { TacticalScan } from "./ui/tacticalScan.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0;
+function resize() { W = innerWidth; H = innerHeight; cv.width = W; cv.height = H; }
+addEventListener("resize", resize); resize();
+
+// draw a procedural ship sprite (alpha-cut) onto an offscreen canvas -- stands in for a real ES ship sprite
+function makeShip(kind) {
+  const S = 128, sc = document.createElement("canvas"); sc.width = S; sc.height = S; const g = sc.getContext("2d");
+  g.clearRect(0, 0, S, S); g.translate(S / 2, S / 2);
+  g.fillStyle = "#8fa8c8";
+  if (kind === 0) { // arrow fighter
+    g.beginPath(); g.moveTo(0, -52); g.lineTo(16, 20); g.lineTo(40, 40); g.lineTo(10, 34); g.lineTo(0, 48); g.lineTo(-10, 34); g.lineTo(-40, 40); g.lineTo(-16, 20); g.closePath(); g.fill();
+    g.fillStyle = "#c9d8ef"; g.beginPath(); g.ellipse(0, -18, 7, 16, 0, 0, 6.28); g.fill();
+    g.fillStyle = "#5a7196"; g.fillRect(-6, 34, 4, 12); g.fillRect(2, 34, 4, 12);
+  } else if (kind === 1) { // freighter
+    g.fillRect(-22, -46, 44, 92); g.fillStyle = "#c9d8ef"; g.fillRect(-14, -40, 28, 20);
+    g.fillStyle = "#5a7196"; g.fillRect(-34, -10, 12, 40); g.fillRect(22, -10, 12, 40); g.fillRect(-8, 46, 6, 12); g.fillRect(2, 46, 6, 12);
+  } else { // interceptor
+    g.beginPath(); g.moveTo(0, -54); g.lineTo(8, 0); g.lineTo(46, 30); g.lineTo(30, 34); g.lineTo(6, 22); g.lineTo(0, 44); g.lineTo(-6, 22); g.lineTo(-30, 34); g.lineTo(-46, 30); g.lineTo(-8, 0); g.closePath(); g.fill();
+    g.fillStyle = "#c9d8ef"; g.beginPath(); g.moveTo(0, -40); g.lineTo(5, -8); g.lineTo(-5, -8); g.closePath(); g.fill();
+  }
+  return sc;
+}
+
+const scan = new TacticalScan(); let kind = 0, ship = makeShip(0);
+const state = () => ({ name: ["RAPTOR-CLASS", "MULE FREIGHTER", "SHRIKE INTERCEPTOR"][kind], hull: 0.72, shield: 0.44, weapon: 0.9 });
+function begin() { scan.start(ship, state()); }
+document.getElementById("rescan").addEventListener("click", begin);
+document.getElementById("next").addEventListener("click", () => { kind = (kind + 1) % 3; ship = makeShip(kind); begin(); });
+begin();
+
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; scan.step(dt);
+  ctx.fillStyle = "#04060d"; ctx.fillRect(0, 0, W, H);
+  // faint starfield
+  ctx.fillStyle = "#0a1224"; for (let i = 0; i < 80; i++) ctx.fillRect((i * 149) % W, (i * 97) % H, 1.5, 1.5);
+  const scale = Math.min(W, H) / 200, cx = W / 2, cy = H / 2;
+  // dim ship underneath
+  ctx.globalAlpha = 0.25; ctx.drawImage(ship, cx - ship.width * scale / 2, cy - ship.height * scale / 2, ship.width * scale, ship.height * scale); ctx.globalAlpha = 1;
+  scan.draw(ctx, cx, cy, scale);
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

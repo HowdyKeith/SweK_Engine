@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK — a personal distributed OS</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14.5px/1.6 ui-rounded,system-ui,sans-serif; }
+  a { color:#9ed5ff; text-decoration:none; }
+  main { max-width:900px; margin:0 auto; padding:20px 16px 60px; }
+  /* hero */
+  .hero { padding:22px 0 8px; border-bottom:1px solid var(--line); margin-bottom:24px; }
+  .kicker { font:11.5px ui-monospace,monospace; color:#5ec98e; letter-spacing:.08em; text-transform:uppercase; }
+  h1 { font-size:30px; line-height:1.15; margin:6px 0 10px; font-weight:800; }
+  h1 .g { color:var(--go); }
+  .tag { color:var(--ink); font-size:15px; max-width:680px; }
+  .tag b { color:#8fe0b0; }
+  .sub { color:var(--dim); font-size:13px; margin-top:10px; max-width:680px; }
+  .heroBtns { margin-top:16px; display:flex; gap:9px; flex-wrap:wrap; }
+  .btn { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:9px; padding:10px 16px; font:inherit; font-size:14px; cursor:pointer; font-weight:600; }
+  .btn.amber { background:#2a1d0c; color:#ffb454; border-color:#6a4a1a; }
+  .btn:active { transform:scale(.98); }
+  h2 { font-size:14px; color:#7fdca8; text-transform:uppercase; letter-spacing:.06em; margin:30px 0 12px; font-weight:700; }
+  /* primitives */
+  .prims { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+  .prim { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:15px; position:relative; }
+  .prim .ic { font-size:22px; } .prim h3 { margin:7px 0 4px; font-size:16px; }
+  .prim p { color:var(--dim); font-size:12.5px; margin:0 0 10px; }
+  .prim a.see { font-size:12px; color:#9ed5ff; font-weight:600; }
+  /* fabric feature */
+  .feature { background:linear-gradient(120deg,#0e1a14,#0c1622); border:1px solid #2a5a4a; border-radius:15px; padding:18px; margin-top:14px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  .feature .txt { flex:1; min-width:230px; }
+  .feature h3 { margin:0 0 5px; font-size:19px; } .feature p { color:var(--dim); font-size:13px; margin:0; }
+  /* showcase grid */
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:15px; cursor:pointer; transition:border-color .15s, transform .1s; display:block; color:inherit; }
+  .card:hover { border-color:#2a5a3a; transform:translateY(-2px); }
+  .card .ic { font-size:24px; } .card h3 { margin:6px 0 3px; font-size:15px; }
+  .card p { color:var(--dim); font-size:12px; margin:0; }
+  .card .prim-tag { display:inline-block; margin-top:8px; font:10.5px ui-monospace,monospace; color:#7fdca8; border:1px solid #2a5a3a; border-radius:999px; padding:1px 8px; }
+  /* demo browser */
+  .toggle { display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; margin-bottom:12px; }
+  .toggle button { background:transparent; color:var(--dim); border:0; padding:7px 16px; font:inherit; font-size:13px; cursor:pointer; }
+  .toggle button.on { background:#14241a; color:#8effc4; }
+  #demoNote { color:var(--dim); font-size:12px; margin-bottom:10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips a { font-size:12px; padding:5px 11px; border:1px solid var(--line); border-radius:999px; color:#cfe; background:#0c1410; cursor:pointer; }
+  .chips a:hover { border-color:#2a5a3a; color:#8effc4; }
+  .chips a.dev { border-color:#3a3450; color:#c9bfff; }
+  /* tour */
+  #tourBar { position:sticky; top:0; z-index:20; background:#12230f; border:1px solid #3a6a24; border-radius:12px; padding:12px 15px; margin-bottom:18px; display:none; }
+  #tourBar.on { display:block; }
+  #tourBar .s { font:11px ui-monospace,monospace; color:#8fe08a; }
+  #tourBar .say { color:var(--ink); font-size:14px; margin:4px 0 9px; }
+  #tourBar .nav button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:6px 13px; font-size:12.5px; cursor:pointer; margin-right:7px; }
+  @keyframes glow { 0%,100%{ box-shadow:0 0 0 0 rgba(43,255,136,0);} 50%{ box-shadow:0 0 0 5px rgba(43,255,136,.3);} }
+  .tour-focus { animation:glow 1.2s ease-in-out infinite; border-color:#2bff88 !important; }
+  .foot { color:var(--dim); font-size:11.5px; margin-top:26px; line-height:1.55; border-top:1px solid var(--line); padding-top:14px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="tourBar">
+    <div class="s" id="tourStep"></div>
+    <div class="say" id="tourSay"></div>
+    <div class="nav"><button id="tourNext">next ▸</button><button id="tourEnd">end tour</button></div>
+  </div>
+
+  <div class="hero">
+    <div class="kicker">not a game engine</div>
+    <h1>SweK — a personal <span class="g">distributed OS</span></h1>
+    <div class="tag">Every machine I own runs the <b>same</b> software, so <b>where a program runs</b>, <b>which screen shows it</b>, and <b>which device drives it</b> are runtime parameters — not things I deploy for. The 3D engine you'll see isn't the product; it's the <b>window manager</b>. The product is the fabric underneath it.</div>
+    <div class="sub">Closest ancestor: Plan 9 — compute anywhere, display anywhere, resources addressed uniformly across machines. Built solo over ~1,900 iterations. Everything below runs with no cloud, no deploy step, no accounts.</div>
+    <div class="heroBtns">
+      <button class="btn amber" id="tourBtn">▶ Take the 60-second tour</button>
+      <a class="btn" href="/fabric.html">🕸️ See the fabric live</a>
+      <a class="btn" href="/server.html">🛠 Full control console</a>
+    </div>
+  </div>
+
+  <h2>Three primitives</h2>
+  <div class="prims">
+    <div class="prim" id="prim-run">
+      <div class="ic">🧮</div><h3>Run anywhere</h3>
+      <p>The same program runs identically on any machine — compiled once to WebAssembly, no per-OS builds, no containers.</p>
+      <a class="see" href="/wasm-bench.html">See it → WASM Lab</a>
+    </div>
+    <div class="prim" id="prim-show">
+      <div class="ic">📺</div><h3>Show anywhere</h3>
+      <p>Any view can appear on any screen I own — a laptop, a phone, the TV — as a runtime choice, not a rebuild.</p>
+      <a class="see" href="/thead.html">See it → talking avatar</a>
+    </div>
+    <div class="prim" id="prim-drive">
+      <div class="ic">🎮</div><h3>Drive from anywhere</h3>
+      <p>One device drives what another shows. A phone can pilot a view; a screen can be puppeted from across the room.</p>
+      <a class="see" href="/clients.html">See it → connected devices</a>
+    </div>
+  </div>
+
+  <h2>See all three at once</h2>
+  <a class="feature" href="/fabric.html" id="prim-fabric">
+    <div style="font-size:40px">🕸️</div>
+    <div class="txt">
+      <h3>The Fabric</h3>
+      <p>One trivial computation, run five ways — here, on another machine, shown to a remote screen, driven by another device, and in an isolated runtime. The hash stays identical everywhere (same computation); the "ran on" label changes (it moved). This is the whole thesis in one number.</p>
+    </div>
+    <div class="btn">Open ▸</div>
+  </a>
+
+  <h2>Showcase</h2>
+  <div class="cards" id="showcase"></div>
+
+  <h2>Explore the demos</h2>
+  <div class="toggle">
+    <button id="tgPublic" class="on">👁 Public</button>
+    <button id="tgDev">🛠 Developer</button>
+  </div>
+  <div id="demoNote"></div>
+  <div class="chips" id="demoChips"></div>
+
+  <div class="foot" id="foot">
+    A single codebase across every machine: ~740 coordinated endpoints, a ~22,000-line real-time client, 100+ interactive demos. The engine is the flagship client because it's the hardest one — latency-sensitive, stateful, rich — proving the fabric handles the worst case.
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function niceLabel(id){ return id.replace(/_/g," ").replace(/\b\w/g, m => m.toUpperCase()); }
+function goDemo(id){ return "/play.html?go=" + encodeURIComponent(id) + "&clean=1&tag=" + encodeURIComponent("in-engine demo"); }
+
+// ---- five curated showcases (lead with these) ----
+const SHOWCASE = [
+  { href:"/fabric.html",        ic:"🕸️", t:"The Fabric",       p:"The composite finale — the architecture made visible.", tag:"all three" },
+  { href:"/wasm-bench.html",    ic:"⚗️", t:"WASM Lab",          p:"WASM vs JS on real engine work: terrain, image filters, a miner.", tag:"run anywhere" },
+  { href:"/webgpu-bench.html",  ic:"🖥️", t:"WebGPU Lab",        p:"Real WGSL compute on your GPU: matrix-multiply GFLOP/s + memory bandwidth.", tag:"Chrome/Edge" },
+  { href:"/aibrain.html",       ic:"🧠", t:"AI Brain",          p:"The browser runs enemy AI as a visible simulation feeding the engine.", tag:"the bridge" },
+  { href:"/thead.html",         ic:"👤", t:"Wireframe Head",    p:"A talking 3D avatar driven by real audio amplitude.", tag:"show + drive" },
+  { href:goDemo("battleship"),  ic:"🚢", t:"ABYSS Battleship",  p:"A full 3D naval game — the flagship client, proving the hard case.", tag:"flagship client" },
+];
+$("showcase").innerHTML = SHOWCASE.map(s =>
+  '<a class="card" href="'+esc(s.href)+'"'+(s.href.indexOf("go=")>=0?' target="_blank"':'')+'><div class="ic">'+s.ic+'</div><h3>'+esc(s.t)+'</h3><p>'+esc(s.p)+'</p><span class="prim-tag">'+esc(s.tag)+'</span></a>'
+).join("");
+
+// ---- Public / Developer demo browser ----
+// Public = a hand-curated, presentable subset (safe to show anyone). Developer = every demo in the tree.
+const PUBLIC_IDS = ["aquarium","aquariumEcosystem","boids","ant_colony","cellular_automata","city_builder",
+  "chess3d","snake","tron","alien_swarm","audio_lab","bitcoin_miner","compound_ai","ai_chain","kaiju","space","hell","tech"];
+let ALL = [], mode = "public";
+
+async function loadDemos(){
+  const out = new Map();
+  try {
+    const code = await (await fetch("/demos_code/list",{cache:"no-store"})).json();
+    (code||[]).forEach(e => { const id = String(e.file||"").replace(/\.js$/,""); if (id && id!=="blank_sandbox") out.set(id, { id, dev:true }); });
+  } catch(e){}
+  try {
+    const cat = await (await fetch("/engine-catalog.json",{cache:"no-store"})).json();
+    (cat.builtinDemos||[]).forEach(d => { if (!out.has(d.id)) out.set(d.id, { id:d.id, label:d.label, dev:true }); });
+  } catch(e){}
+  ALL = Array.from(out.values()).sort((a,b)=> a.id.localeCompare(b.id));
+  render();
+}
+function render(){
+  const pub = mode === "public";
+  const list = pub ? ALL.filter(d => PUBLIC_IDS.includes(d.id)) : ALL;
+  $("demoNote").textContent = pub
+    ? "A curated set that's presentable to anyone — polished, self-explanatory demos. ("+list.length+")"
+    : "Every demo in the tree, including rough / work-in-progress ones. ("+list.length+")";
+  $("demoChips").innerHTML = list.map(d =>
+    '<a class="'+(pub?'':'dev')+'" href="'+esc(goDemo(d.id))+'" target="_blank">'+esc(d.label||niceLabel(d.id))+'</a>'
+  ).join("") || '<span style="color:var(--dim)">none</span>';
+}
+$("tgPublic").onclick = () => { mode="public"; $("tgPublic").classList.add("on"); $("tgDev").classList.remove("on"); render(); };
+$("tgDev").onclick = () => { mode="dev"; $("tgDev").classList.add("on"); $("tgPublic").classList.remove("on"); render(); };
+loadDemos();
+
+// ---- 60-second guided tour ----
+const TOUR = [
+  { el:null,          say:"This whole thing is one idea: every machine runs the same software, so where a program runs, what shows it, and what drives it are just settings. Let me point out the three moving parts." },
+  { el:"prim-run",    say:"1 — Run anywhere. The same compiled program runs identically on any machine. No per-OS builds, no containers." },
+  { el:"prim-show",   say:"2 — Show anywhere. Any view can land on any screen — laptop, phone, or the TV — without a rebuild." },
+  { el:"prim-drive",  say:"3 — Drive from anywhere. One device drives what another shows. A phone can pilot a screen across the room." },
+  { el:"prim-fabric", say:"Now all three at once: The Fabric runs one computation five ways and proves the same result moved across machines, screens, and control. Click it — that's the demo to actually watch." },
+  { el:null,          say:"Everything else on this page is evidence. The showcase is five polished pieces; the demo browser has the rest. That's the tour — open The Fabric next." },
+];
+let ti = -1;
+function tourClear(){ TOUR.forEach(s => { if (s.el){ const e=$(s.el); if(e) e.classList.remove("tour-focus"); } }); }
+function tourShow(i){
+  tourClear(); ti = i;
+  if (i >= TOUR.length){ tourEnd(); return; }
+  const s = TOUR[i];
+  $("tourStep").textContent = "tour · " + (i+1) + " / " + TOUR.length;
+  $("tourSay").textContent = s.say;
+  $("tourNext").textContent = i === TOUR.length-1 ? "finish" : "next ▸";
+  if (s.el){ const e=$(s.el); if(e){ e.classList.add("tour-focus"); e.scrollIntoView({behavior:"smooth", block:"center"}); } }
+}
+function tourStart(){ $("tourBar").classList.add("on"); tourShow(0); window.scrollTo({top:0,behavior:"smooth"}); }
+function tourEnd(){ tourClear(); $("tourBar").classList.remove("on"); ti=-1; }
+$("tourBtn").onclick = tourStart;
+$("tourNext").onclick = () => tourShow(ti+1);
+$("tourEnd").onclick = tourEnd;
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

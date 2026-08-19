@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Codemap &mdash; the tree as a city, aged by its own comments</title>
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; padding:20px 16px 60px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:15px; margin-bottom:13px; background:rgba(10,20,34,.5); }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 9px; font-weight:600; }
+  canvas { width:100%; height:460px; display:block; background:#020509; border:1px solid var(--line); border-radius:8px; cursor:grab; }
+  canvas:active { cursor:grabbing; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { padding:5px 11px; background:#17324d; color:#cfe3ff; border:1px solid #2c5a85; border-radius:5px; cursor:pointer; font:11px ui-monospace,monospace; }
+  button.on { background:#2a4d3a; border-color:#4a7d5a; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  p { color:var(--dim); margin:0 0 8px; }
+  code { color:var(--ink); }
+  .key { display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--dim); margin-top:8px; }
+  .key i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  #tip { position:fixed; pointer-events:none; background:#0a1622; border:1px solid #2c5a85; border-radius:5px; padding:5px 8px; font-size:11px; display:none; z-index:9; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; color:var(--dim); font-weight:600; padding:4px 7px; border-bottom:1px solid var(--line); font-size:9px; letter-spacing:.06em; text-transform:uppercase; }
+  td { padding:3px 7px; border-bottom:1px solid rgba(22,48,77,.3); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Codemap</h1>
+  <p class="sub">Every file in this engine, as a building. Height is lines. Colour is the last version that mentioned it.</p>
+
+  <div class="panel">
+    <h2>What this is, and what it is not</h2>
+    <p><a href="https://github.com/cosmtrek/mindwalk" target="_blank" rel="noopener" style="color:#7fd1ff">cosmtrek/mindwalk</a>
+    replays a <b>coding-agent session</b> on a 3D map of a codebase &mdash; it reads the agent's own transcripts and
+    colours each file by how deeply one run touched it. <b>This is not that.</b> This engine is built through a chat
+    window that writes no session files, so replaying a session is not something this box can honestly do, and a
+    visualisation of nothing would be worse than no visualisation.</p>
+    <p style="margin:0">What it maps instead is what this tree already carries: a <code>vNNNN</code> marker in the
+    comments, kept for 2500 versions. That is a real per-file record of <b>when each file was last thought about</b>,
+    mined from a convention that was never meant as telemetry. Not one session &mdash; <b>every session, flattened.</b></p>
+  </div>
+
+  <div class="panel">
+    <h2>The city</h2>
+    <canvas id="cv"></canvas>
+    <div class="row" style="margin-top:9px">
+      <button id="spin" class="on">Spin</button>
+      <button id="mode">Colour: age</button>
+      <button id="hideUnmarked">Hide unmarked</button>
+      <span id="lbl" class="dim" style="margin-left:6px">loading&hellip;</span>
+    </div>
+    <div class="key" id="key"></div>
+  </div>
+
+  <div class="panel">
+    <h2>What the map says</h2>
+    <div id="findings"></div>
+  </div>
+
+  <div class="panel">
+    <h2>The honest limits of this measurement</h2>
+    <p><b>A marker is a floor, not a timestamp.</b> A file that mentions v2100 in a comment <i>about</i> history
+    reads as v2100 even if it was edited this morning without a new marker. It says "this file was thought about at
+    least this recently", nothing stronger.</p>
+    <p style="margin:0"><b>Unmarked is unknown, not old.</b> Half this tree carries no marker at all &mdash; some is
+    third-party, some predates the convention, some was simply never commented. They are grey, not dark red.
+    Guessing an age for them would be exactly the failure this engine's changelog is a record of.</p>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv");
+let data = null, mode = "age", hideUnmarked = false, spin = true;
+let _renderer = null, _raf = 0;
+
+const r = await fetch("/codemap", { cache: "no-store" }).then((x) => x.json()).catch((e) => ({ ok: false, error: String(e) }));
+if (!r || !r.ok) {
+  $("lbl").innerHTML = "<span class='hot'>no /codemap (start the engine server on :8787)</span>";
+} else {
+  data = r;
+  build();
+}
+
+function ageColor(marker, oldest, newest) {
+  // Unmarked is GREY, deliberately: it is unknown, and colouring it "old" would be inventing a fact.
+  if (!marker) return new THREE.Color(0x2c3844);
+  const t = Math.pow((marker - oldest) / Math.max(1, newest - oldest), 2.2);   // gamma: recent work is the signal
+  const c = new THREE.Color();
+  c.setHSL(0.58 - 0.5 * t, 0.55 + 0.35 * t, 0.18 + 0.42 * t);   // deep blue (old) -> hot amber (new)
+  return c;
+}
+
+function build() {
+  const files = data.files, S = data.stats;
+  const { oldest, newest } = S;
+
+  // Group by directory: a district per folder, laid out in a spiral so the big ones do not all crowd the origin.
+  const dirs = {};
+  for (const f of files) (dirs[f.dir] = dirs[f.dir] || []).push(f);
+  const names = Object.keys(dirs).sort((a, b) => dirs[b].length - dirs[a].length);
+
+  // Tear down the previous one first: a fresh WebGLRenderer per click leaks a GL context each time, and browsers
+  // hand out a fixed number before they start refusing.
+  if (_raf) { cancelAnimationFrame(_raf); _raf = 0; }
+  if (_renderer) { _renderer.dispose(); _renderer = null; }
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x04070d, 60, 260);
+  const cam = new THREE.PerspectiveCamera(50, cv.clientWidth / 460, 0.1, 600);
+  const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  _renderer = renderer;
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+  renderer.setSize(cv.clientWidth, 460, false);
+  scene.add(new THREE.AmbientLight(0x668099, 0.6));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(40, 80, 30); scene.add(key);
+
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const placed = [];
+  let n = 0;
+  for (const d of names) {
+    const list = dirs[d].slice().sort((a, b) => b.lines - a.lines);
+    if (hideUnmarked && !list.some((f) => f.marker)) continue;
+    n += list.length;
+  }
+  const mesh = new THREE.InstancedMesh(geo, mat, n);
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+
+  let i = 0, di = 0;
+  for (const d of names) {
+    const list = dirs[d].slice().sort((a, b) => b.lines - a.lines);
+    if (hideUnmarked && !list.some((f) => f.marker)) continue;
+    // districts on a phyllotaxis spiral -- even spacing, no grid seams, and the biggest folder sits centre
+    const a = di * 2.39996, rad = 7 * Math.sqrt(di);
+    const cx = Math.cos(a) * rad, cz = Math.sin(a) * rad;
+    di++;
+    const side = Math.ceil(Math.sqrt(list.length));
+    list.forEach((f, k) => {
+      if (hideUnmarked && !f.marker) return;
+      const gx = cx + ((k % side) - side / 2) * 1.5;
+      const gz = cz + (Math.floor(k / side) - side / 2) * 1.5;
+      // sqrt height: main.js is 23,000 lines and a linear scale would make one tower and 1,679 paving slabs
+      const h = Math.max(0.35, Math.sqrt(f.lines) * 0.34);
+      dummy.position.set(gx, h / 2, gz);
+      dummy.scale.set(1.05, h, 1.05);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      col.copy(mode === "age" ? ageColor(f.marker, oldest, newest) : new THREE.Color().setHSL(0.05 + 0.5 * Math.min(1, f.lines / 3000), 0.6, 0.45));
+      mesh.setColorAt(i, col);
+      placed.push({ f, x: gx, z: gz, h });
+      i++;
+    });
+  }
+  scene.add(mesh);
+
+  const grid = new THREE.GridHelper(240, 40, 0x16304d, 0x0c1b2b);
+  grid.position.y = -0.01; scene.add(grid);
+
+  let t = 0;
+  function loop() {
+    if (spin) t += 0.0016;
+    const rr = 96;
+    cam.position.set(Math.cos(t) * rr, 52, Math.sin(t) * rr);
+    cam.lookAt(0, 0, 0);
+    renderer.render(scene, cam);
+    _raf = requestAnimationFrame(loop);
+  }
+  loop();
+  addEventListener("resize", () => {
+    renderer.setSize(cv.clientWidth, 460, false);
+    cam.aspect = cv.clientWidth / 460; cam.updateProjectionMatrix();
+  });
+
+  $("lbl").innerHTML = "<b>" + S.files.toLocaleString() + "</b> files &middot; <b>" + S.lines.toLocaleString() +
+                       "</b> lines &middot; markers <b>v" + S.oldest + "</b> to <b>v" + S.newest + "</b> &middot; scanned in " + S.ms + "ms";
+
+  $("key").innerHTML =
+    "<span><i style='background:#2c3844'></i>no marker (unknown, not old)</span>" +
+    "<span><i style='background:#16304d'></i>v" + S.oldest + " &mdash; the oldest thing still here</span>" +
+    "<span><i style='background:#7a5a2a'></i>v" + S.median + " &mdash; the median file</span>" +
+    "<span><i style='background:#ffb04a'></i>v" + S.newest + " &mdash; today</span>" +
+    "<span class='dim'>height = &radic;lines</span>";
+
+  findings(S, files);
+}
+
+function findings(S, files) {
+  const marked = files.filter((f) => f.marker);
+  const stale = marked.filter((f) => f.marker < S.newest - 900).length;
+  const recent = marked.filter((f) => f.marker >= S.newest - 20);
+  const big = files.slice().sort((a, b) => b.lines - a.lines).slice(0, 3);
+  const rows = recent.sort((a, b) => b.marker - a.marker).slice(0, 8)
+    .map((f) => "<tr><td class='warn'>v" + f.marker + "</td><td>" + f.lines.toLocaleString() + "</td><td class='dim'>" + f.path + "</td></tr>").join("");
+  $("findings").innerHTML =
+    "<p><b>The median file says v" + S.median + ".</b> This tree is at v" + S.newest + ", so half of it has not been " +
+    "thought about in roughly " + (S.newest - S.median) + " versions. That is not rot &mdash; most of it is finished, " +
+    "and a finished file that nobody has needed to touch is the point. But it is worth knowing which half you are in.</p>" +
+    "<p><b>" + S.unmarked.toLocaleString() + " files (" + Math.round(100 * S.unmarked / S.files) + "%) carry no marker at all</b>, " +
+    "and they are grey above rather than dark. Some is vendored, some predates the convention, some was never commented. " +
+    "Unknown is not the same as old.</p>" +
+    "<p><b>" + stale + " marked files are more than 900 versions behind.</b> The three biggest buildings are " +
+    big.map((f) => "<code>" + f.path + "</code> (" + f.lines.toLocaleString() + " lines, " + (f.marker ? "v" + f.marker : "unmarked") + ")").join(", ") + ".</p>" +
+    "<p style='margin-bottom:4px'><b>Touched in the last 20 versions:</b></p>" +
+    "<table><thead><tr><th>marker</th><th>lines</th><th>file</th></tr></thead><tbody>" + rows + "</tbody></table>";
+}
+
+$("spin").onclick = () => { spin = !spin; $("spin").classList.toggle("on", spin); };
+$("mode").onclick = () => { mode = mode === "age" ? "size" : "age"; $("mode").textContent = "Colour: " + mode; if (data) rebuild(); };
+$("hideUnmarked").onclick = () => { hideUnmarked = !hideUnmarked; $("hideUnmarked").classList.toggle("on", hideUnmarked); if (data) rebuild(); };
+// Reuse the canvas. Do NOT swap the node: `cv` is captured at load, so a replaced node would leave every
+// subsequent render going into a detached canvas -- the buttons would work perfectly and change nothing on screen.
+function rebuild() { build(); }
+</script>
+</body>
+</html>

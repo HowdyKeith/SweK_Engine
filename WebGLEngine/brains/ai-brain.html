@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Bridge · AI Brain</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#0a0c12;color:#dfe3ee;font:13px/1.5 system-ui,Segoe UI,sans-serif}
+  .wrap{display:flex;height:100%}
+  canvas{flex:1;display:block}
+  aside{width:300px;border-left:1px solid #1d2433;padding:14px;overflow:auto}
+  h1{font-size:15px;margin:0 0 4px} .sub{color:#7c879c;margin:0 0 12px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:#172033}
+  .ok{color:#7ee0a6} .bad{color:#ff8a8a}
+  .log{margin-top:12px;font-family:Consolas,monospace;font-size:12px}
+  .log div{padding:2px 0;border-bottom:1px solid #141a27;color:#aeb6c8}
+</style></head>
+<body>
+<div class="wrap">
+  <canvas id="c"></canvas>
+  <aside>
+    <h1>AI Brain</h1>
+    <p class="sub">This browser reads engine state, decides targets, and pushes
+      directives back to the OpenGL engine over the bridge.</p>
+    <div>Link: <span id="status" class="pill bad">offline</span></div>
+    <div style="margin-top:8px">Tick <b id="tick">–</b> · Entities <b id="ents">0</b> ·
+      Alive <b id="alive">0</b></div>
+    <div style="margin-top:8px">Priority target: <b id="target" class="ok">none</b></div>
+    <div class="log" id="log"></div>
+  </aside>
+</div>
+<script src="./bridgeClient.js"></script>
+<script>
+(function(){
+  const c=document.getElementById("c"), g=c.getContext("2d");
+  const $=id=>document.getElementById(id);
+  let state=null, lastTargetId=null;
+  function resize(){c.width=c.clientWidth*devicePixelRatio;c.height=c.clientHeight*devicePixelRatio;}
+  addEventListener("resize",resize); resize();
+
+  function log(msg){const d=document.createElement("div");d.textContent=msg;
+    $("log").prepend(d); while($("log").childElementCount>40)$("log").lastChild.remove();}
+
+  const client=new BridgeClient();
+  client.onStatus=(ok,via)=>{const s=$("status");s.textContent=ok?via:"offline";
+    s.className="pill "+(ok?"ok":"bad");};
+  client.onState=(st)=>{ state=st; decide(); };
+  client.start();
+
+  // Brain: pick the most-wounded alive entity as the priority target; when it
+  // changes, push a {cmd:"target", id} directive to the engine.
+  function decide(){ if(!$("tick")) return;   // v2738 -- page swapped away -> null DOM
+    const ents=BridgeClient.entities(state).filter(e=>e.alive);
+    $("tick").textContent = state.tick!=null?state.tick:"–";
+    $("ents").textContent = BridgeClient.entities(state).length;
+    $("alive").textContent = ents.length;
+    if(!ents.length){ $("target").textContent="none"; return; }
+    ents.sort((a,b)=>((a.hp==null?1e9:a.hp)-(b.hp==null?1e9:b.hp)));
+    const t=ents[0];
+    $("target").textContent="#"+t.id+(t.hp!=null?" (hp "+t.hp+")":"");
+    if(t.id!==lastTargetId){ lastTargetId=t.id; client.send({cmd:"target",id:t.id});
+      log("→ target #"+t.id+(t.hp!=null?" hp "+t.hp:"")); }
+  }
+
+  function draw(){
+    const w=c.width,h=c.height; g.clearRect(0,0,w,h);
+    g.fillStyle="#0a0c12"; g.fillRect(0,0,w,h);
+    const ents=BridgeClient.entities(state);
+    // world->screen: assume world spans ~[-120,120]; auto-fit loosely
+    const R=120*devicePixelRatio, cx=w/2, cy=h/2, s=Math.min(w,h)/ (260*devicePixelRatio);
+    g.strokeStyle="#16203a"; g.beginPath(); g.arc(cx,cy,R*s,0,7); g.stroke();
+    // notional player at origin
+    g.fillStyle="#5bd0ff"; g.beginPath(); g.arc(cx,cy,5*devicePixelRatio,0,7); g.fill();
+    ents.forEach(e=>{
+      const x=cx+e.x*s, y=cy+e.z*s;
+      if(e.id===lastTargetId){ g.strokeStyle="#ffd24a"; g.beginPath();
+        g.moveTo(cx,cy); g.lineTo(x,y); g.stroke();
+        g.strokeStyle="#ffd24a"; g.beginPath(); g.arc(x,y,8*devicePixelRatio,0,7); g.stroke(); }
+      g.fillStyle = e.alive ? "#ff7a7a" : "#46506a";
+      g.beginPath(); g.arc(x,y,4*devicePixelRatio,0,7); g.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body></html>

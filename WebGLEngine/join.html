@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK -- join the fleet</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.6 system-ui, sans-serif; margin: 0 auto; padding: 1.4em; max-width: 46em; }
+  h1 { font-size: 1.5em; margin: 0 0 .1em; }
+  .sub { opacity: .75; margin: 0 0 1.6em; }
+  ol { padding-left: 1.2em; }
+  li { margin-bottom: 1.4em; }
+  pre { background: #8881; padding: .8em; border-radius: 8px; overflow-x: auto; font-size: .86em; }
+  button { padding: .5em 1em; font: inherit; cursor: pointer; border: 1px solid #8886; border-radius: 6px; background: #8881; color: inherit; }
+  .origin { font-family: ui-monospace, monospace; background: #8881; padding: .1em .4em; border-radius: 4px; }
+  .note { font-size: .87em; opacity: .72; }
+</style>
+</head>
+<body>
+<h1>Join the fleet</h1>
+<p class="sub">You reached this page at <span class="origin" id="origin">…</span> — that is the lighthouse
+address, and everything below already has it filled in. Nothing here needs you to know an IP, open a port, or
+configure a router.</p>
+
+<ol>
+<li>
+<strong>Get the engine.</strong> <a id="dl" href="/">download the current build</a>, then unzip it and open the
+<code>WebGLEngine</code> folder inside. You need <a href="https://nodejs.org/" target="_blank" rel="noopener">Node.js</a>
+installed — nothing else.
+</li>
+
+<li>
+<strong>Check in.</strong> From inside <code>WebGLEngine</code>, run this once. The lighthouse URL is already in
+the line, and it is remembered afterwards:
+<pre id="cmd">…</pre>
+<button id="copy">copy the command</button>
+<p class="note">It computes this machine's fingerprint — the same 50-subsystem computation the hub would have run
+if it could reach you — and pushes it here. After the first run, plain
+<code>node tools/roundhouse/lighthouse_checkin.mjs</code> works with no arguments.</p>
+</li>
+
+<li>
+<strong>That's it.</strong> You will appear on the hub's roster with your platform, your master hash, and how long
+ago you checked in. If your hash differs from everyone else's, that is the interesting result, not a failure —
+it is the whole reason a fleet exists.
+<p class="note">To keep checking in, add that command to a scheduled task or cron. It exits non-zero if the
+lighthouse was unreachable, so a retry loop needs nothing else.</p>
+</li>
+</ol>
+
+<p class="note"><strong>Why push and not pull?</strong> The hub normally fetches each peer's fingerprint directly,
+which works on a local network. Your machine is almost certainly behind NAT, so the hub has no address it can
+dial — the connection has to start from your side. That is what this address is for.</p>
+
+<script>
+  const origin = location.origin.replace(/\/+$/, "");
+  document.getElementById("origin").textContent = origin;
+  let cmd = "node tools/roundhouse/lighthouse_checkin.mjs " + origin;
+  document.getElementById("cmd").textContent = cmd;
+  // v2956: hand out EVERY known way in, not just the address this visitor happened to arrive by. Cloudflare
+  // quick tunnels fail and recover unpredictably, so a peer holding several addresses can get in on a day when
+  // the one it was given is down -- and the peer refreshes this list every time it succeeds.
+  fetch("/tunnels").then(r => r.json()).then(t => {
+    const others = (t.ordered || []).filter(u => u !== origin);
+    if (!others.length) return;
+    cmd = "node tools/roundhouse/lighthouse_checkin.mjs " + [origin, ...others].join(" ");
+    document.getElementById("cmd").textContent = cmd;
+    const n = document.createElement("p");
+    n.className = "note";
+    n.textContent = "This command lists " + (others.length + 1) + " known addresses. The peer tries them in order until one answers, so it can still get in on a day when this particular tunnel is down.";
+    document.getElementById("cmd").after(n);
+  }).catch(() => {});
+  document.getElementById("dl").href = origin + "/download";
+  document.getElementById("copy").onclick = async () => {
+    const b = document.getElementById("copy");
+    try { await navigator.clipboard.writeText(cmd); b.textContent = "copied \u2713"; setTimeout(() => b.textContent = "copy the command", 1500); }
+    catch { const r = document.createRange(); r.selectNode(document.getElementById("cmd")); getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent = "select + copy manually"; }
+  };
+</script>
+</body>
+</html>

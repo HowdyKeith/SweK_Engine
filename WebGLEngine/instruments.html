@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Instruments - the SweK physics lab</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1100px;margin:0 auto;padding:18px}
+  h1{font-size:19px;margin:0 0 2px}
+  .sub{color:#6f8a7c;margin-bottom:14px;max-width:80ch}
+  #bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+  button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:4px 11px;cursor:pointer;border-radius:4px}
+  button:hover{background:#1d2c24}
+  button.on{border-color:#4c8f6a;color:#b6f0cf;background:#1a2c22}
+  input[type=text]{flex:1;min-width:180px;background:#0a100d;color:#cfe9d8;border:1px solid #24382e;padding:4px 8px;font:inherit}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;display:flex;flex-direction:column}
+  .card h2{font-size:14px;margin:0 0 2px}
+  .card h2 a{color:#9fe8c0;text-decoration:none;border-bottom:1px dotted #3a5a4a}
+  .card h2 a:hover{color:#b6f0cf}
+  .area{color:#6f8a7c;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .measures{margin:6px 0}
+  .keylab{color:#e6c877;font-size:11px;margin-top:6px}
+  .key{color:#9fb8ab;font-size:12px;flex:1}
+  .foot{margin-top:8px;font-size:11px;color:#6f8a7c;border-top:1px solid #1a2a22;padding-top:6px}
+  code{color:#7fa898}
+  .count{color:#6f8a7c;margin-left:auto}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Instruments</h1>
+  <div class="sub">Every graded instrument in the lab, and <b>what each one is measured against</b>. The rule here
+    is that an instrument is only real if it can be graded against truth we own &mdash; analytic or self-generated.
+    A plausible-looking readout with no checkable answer is decoration, so every card names its key.</div>
+
+  <div id="bar">
+    <input id="q" type="text" placeholder="filter&hellip; (try 'exact', 'emergent', 'gravity')">
+    <span class="count" id="count"></span>
+  </div>
+  <div id="areas" style="margin-bottom:14px"></div>
+  <div class="grid" id="grid"></div>
+
+  <h1 style="margin-top:26px">Suite checks</h1>
+  <div class="sub">Most of this engine's exact keys do not live on a page &mdash; they live in
+    <code>physicsSuite</code>, which runs on every ship. They were not findable anywhere, and in v2881 I rebuilt
+    one that already existed because of it. The same filter above searches these.</div>
+  <table id="suite" style="border-collapse:collapse;width:100%"></table>
+
+  <h1 style="margin-top:26px">Gates &amp; claims</h1>
+  <div class="sub">381 gate files and 240 claims &mdash; the two largest bodies of knowledge here, and until now
+    searchable nowhere. Five times this session something was proposed or rebuilt that the tree already had. The
+    same filter searches these; type <code>hydrostatic</code> or <code>broad</code> and see.</div>
+  <div id="kn" style="max-height:520px;overflow:auto"></div>
+</div>
+
+<script type="module">
+import { INSTRUMENTS, AREAS, suiteChecks } from "./physics/instruments.mjs";
+
+const $ = (id) => document.getElementById(id);
+let area = "", q = "";
+
+function render() {
+  const ql = q.trim().toLowerCase();
+  const list = INSTRUMENTS.filter((i) =>
+    (!area || i.area === area) &&
+    (!ql || (i.name + " " + i.measures + " " + i.key + " " + i.area).toLowerCase().includes(ql)));
+  $("count").textContent = list.length + " of " + INSTRUMENTS.length;
+  $("grid").innerHTML = list.map((i) => `
+    <div class="card">
+      <div class="area">${i.area}</div>
+      <h2><a href="/${i.page}">${i.name}</a></h2>
+      <div class="measures">${i.measures}</div>
+      <div class="keylab">EXACT KEY</div>
+      <div class="key">${i.key}</div>
+      <div class="foot">gate <code>${i.gate.split("/").pop()}</code>${i.device ? ' &middot; roundhouse device <code>' + i.device + "</code>" : ""}</div>
+    </div>`).join("");
+}
+
+$("areas").innerHTML = '<button data-a="" class="on">all</button>' +
+  AREAS.map((a) => `<button data-a="${a}">${a}</button>`).join("");
+$("areas").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  area = b.dataset.a;
+  for (const x of $("areas").querySelectorAll("button")) x.classList.toggle("on", x === b);
+  render();
+});
+// The suite's own checks, surfaced so "does a check for X already exist?" is answerable by looking.
+let SUITE = { gated: [], ungated: [] };
+function renderSuite() {
+  const ql = q.trim().toLowerCase();
+  const g = SUITE.gated.filter((c) => !ql || (c.name + " " + c.exact).toLowerCase().includes(ql));
+  const u = SUITE.ungated.filter((t) => !ql || t.toLowerCase().includes(ql));
+  const rows = g.map((c) => '<tr><td style="padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;color:#9fe8c0">' +
+      c.name + '</td><td style="padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;color:#9fb8ab">' +
+      (c.exact || "") + '</td><td class="area" style="border-bottom:1px solid #1a2a22">gated</td></tr>').join("");
+  const urows = u.slice(0, 60).map((t) => '<tr><td colspan="2" style="padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22;color:#6f8a7c">' +
+      t.slice(0, 260) + '</td><td class="area" style="border-bottom:1px solid #1a2a22;color:#e6c877">ungated</td></tr>').join("");
+  $("suite").innerHTML =
+    '<tr><th style="text-align:left;color:#6f8a7c;font-weight:normal">check</th><th style="text-align:left;color:#6f8a7c;font-weight:normal">exact statement</th><th></th></tr>' +
+    rows + urows +
+    '<tr><td colspan="3" class="dim" style="padding-top:6px">' + g.length + " gated, " + u.length +
+    " ungated (verified but too slow to run every ship, listed so the gap stays visible)</td></tr>";
+}
+
+$("q").addEventListener("input", (e) => { q = e.target.value; render(); renderSuite(); renderKnowledge(); });
+render();
+suiteChecks().then((s) => { SUITE = s; renderSuite(); }).catch(() => {});
+
+// Gates and claims come from a PREBUILT index: a browser cannot walk a filesystem. A prebuilt index rots, so a
+// ship gate rebuilds it and compares -- a stale one fails rather than quietly answering yesterday's question.
+let KN = null;
+function renderKnowledge() {
+  if (!KN) return;
+  const ql = q.trim().toLowerCase();
+  if (!ql) { $("kn").innerHTML = '<div class="dim">' + KN.counts.gates + ' gates and ' + KN.counts.claims +
+      ' claims indexed. Type above to search them &mdash; the list stays hidden until you do, because 621 rows is not a browse.</div>'; return; }
+  const g = KN.gates.filter((x) => (x.id + " " + x.path + " " + x.text).toLowerCase().includes(ql)).slice(0, 40);
+  const c = KN.claims.filter((x) => (x.text + " " + x.id + " " + x.state).toLowerCase().includes(ql)).slice(0, 40);
+  const row = (tag, colour, main, sub) =>
+    '<div style="padding:4px 0;border-bottom:1px solid #1a2a22"><span class="area" style="color:' + colour + '">' + tag +
+    '</span> <span style="color:#9fe8c0">' + main + '</span><div class="dim" style="font-size:11px">' + sub + '</div></div>';
+  $("kn").innerHTML =
+    (g.length ? g.map((x) => row("gate", "#7fe0a4", x.id, x.path + " &mdash; " + x.text)).join("") : "") +
+    (c.length ? c.map((x) => row(x.state, x.state === "open" ? "#e6c877" : x.state === "broken" ? "#f28b8b" : "#6f8a7c",
+                                 x.text, "since " + x.id)).join("") : "") +
+    ((!g.length && !c.length) ? '<div class="dim">no gate or claim matches &mdash; which is itself worth knowing before building one</div>'
+                              : '<div class="dim" style="padding-top:6px">' + g.length + " gates, " + c.length + " claims" +
+                                (g.length === 40 || c.length === 40 ? " (capped at 40 each)" : "") + "</div>");
+}
+fetch("./knowledge-index.json").then((r) => r.json()).then((k) => { KN = k; renderKnowledge(); }).catch(() => {
+  $("kn").innerHTML = '<div class="dim">knowledge-index.json not built &mdash; run node tools/ship/buildKnowledgeIndex.mjs</div>';
+});
+</script>
+</body>
+</html>

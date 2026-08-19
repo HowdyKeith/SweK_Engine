@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EV Admin &mdash; Live Pilots</title>
+<style>
+  :root { --bg:#0a0e0c; --panel:#0e1512; --line:#1d2c24; --ink:#d6f0e2; --dim:#7fa28f; --go:#37ff8a; --cy:#5ad6ff; --warn:#ffc04e; --err:#ff5a5a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:14px; margin:0; color:var(--go); letter-spacing:.5px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--err); }
+  #status { color:var(--dim); font-size:12px; }
+  .spacer { flex:1; }
+  button, select { background:#11201a; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font:inherit; cursor:pointer; }
+  button:hover, select:hover { border-color:#2e4d3c; }
+  .wrap { display:flex; gap:12px; padding:12px; align-items:flex-start; flex-wrap:wrap; }
+  .col { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .col h2 { font-size:11px; margin:0 0 8px; color:var(--cy); font-weight:bold; letter-spacing:.5px; text-transform:uppercase; }
+  #rosterCol { flex:1 1 360px; min-width:320px; }
+  #mapCol { flex:2 1 520px; min-width:340px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:4px 6px; border-bottom:1px solid #16221c; white-space:nowrap; }
+  th { color:var(--dim); font-weight:normal; font-size:10px; text-transform:uppercase; }
+  tr.row { cursor:pointer; }
+  tr.row:hover td { background:#13201a; }
+  .pill { display:inline-block; padding:0 6px; border-radius:8px; font-size:10px; border:1px solid; }
+  .empty { color:var(--dim); padding:18px 6px; font-size:12px; }
+  canvas { display:block; width:100%; height:auto; background:#06100b; border:1px solid var(--line); border-radius:6px; }
+  .maphdr { display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+  .legend { color:var(--dim); font-size:10px; margin-top:6px; }
+  code { color:var(--cy); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128752; EV Admin &mdash; Live Pilots</h1>
+  <span><span class="dot" id="dot"></span> <span id="status">connecting&#8230;</span></span>
+  <span class="spacer"></span>
+  <label style="color:var(--dim);font-size:12px;">refresh
+    <select id="rate" title="poll interval">
+      <option value="1200" selected>1.2s</option>
+      <option value="2500">2.5s</option>
+      <option value="5000">5s</option>
+      <option value="0">paused</option>
+    </select>
+  </label>
+  <button id="refresh" title="poll now">&#8635; Now</button>
+  <button id="specBtn" title="also join the rooms as a read-only peer to catch pure-P2P pilots (host/LAN only)">&#128081; Watch P2P</button>
+</header>
+
+<div class="wrap">
+  <div class="col" id="rosterCol">
+    <h2>Roster &mdash; <span id="rosterCount">0</span> pilots</h2>
+    <div id="rosterBody"><div class="empty">no pilots in range yet</div></div>
+  </div>
+  <div class="col" id="mapCol">
+    <h2>System map</h2>
+    <div class="maphdr">
+      <label style="color:var(--dim);font-size:12px;">system
+        <select id="sysSel"><option value="">(none)</option></select>
+      </label>
+      <span id="sysMeta" style="color:var(--dim);font-size:11px;"></span>
+    </div>
+    <canvas id="map" width="900" height="560"></canvas>
+    <div class="legend">Dots are pilots at their in-system position; the line is heading. The map auto-fits to the pilots in the chosen system. Source: rendezvous presence rooms (HTTP-transport pilots). Pure-P2P pilots show in the roster as present once option B is added.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var POLL = 1200, timer = null, pilots = [], chosenSys = null, lockSys = false;
+
+  function setStatus(ok, txt) { $("dot").style.background = ok ? "var(--go)" : "var(--err)"; $("status").textContent = txt; }
+
+  // flatten {rooms:{R:[packet]}} into a list of pilots tagged with their room
+  function flatten(j) {
+    var out = [];
+    var rooms = (j && j.rooms) || {};
+    for (var R in rooms) { (rooms[R] || []).forEach(function (p) { if (p) { p._room = R; out.push(p); } }); }
+    return out;
+  }
+
+  function systemsOf(list) {
+    var m = {};
+    list.forEach(function (p) { var s = (p.system != null ? String(p.system) : "?"); m[s] = (m[s] || 0) + 1; });
+    return m;
+  }
+
+  function renderSysSel() {
+    var sel = $("sysSel"), counts = systemsOf(pilots);
+    var keys = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    var cur = sel.value;
+    sel.innerHTML = keys.length
+      ? keys.map(function (s) { return '<option value="' + esc(s) + '">sys ' + esc(s) + ' (' + counts[s] + ')</option>'; }).join("")
+      : '<option value="">(none)</option>';
+    // keep the user's pick if still present; else default to the busiest system
+    if (lockSys && cur && counts[cur]) sel.value = cur;
+    else if (keys.length) { sel.value = keys[0]; chosenSys = keys[0]; }
+    chosenSys = sel.value || null;
+  }
+
+  function renderRoster() {
+    $("rosterCount").textContent = pilots.length;
+    var body = $("rosterBody");
+    if (!pilots.length) { body.innerHTML = '<div class="empty">no pilots in range yet</div>'; return; }
+    var rows = pilots.slice().sort(function (a, b) { return String(a.system).localeCompare(String(b.system)); }).map(function (p) {
+      return '<tr class="row" data-sys="' + esc(p.system) + '">'
+        + '<td style="color:var(--ink)">' + esc(p.name || p.id || "?") + '</td>'
+        + '<td style="color:var(--dim)">' + esc(p.shipName || "&mdash;") + '</td>'
+        + '<td style="color:var(--cy)">' + esc(p.system != null ? p.system : "?") + '</td>'
+        + '<td style="color:var(--dim)">' + Math.round(p.x || 0) + ", " + Math.round(p.y || 0) + '</td>'
+        + '<td style="color:var(--dim);font-size:10px">' + esc(p._room || "") + '</td></tr>';
+    }).join("");
+    body.innerHTML = '<table><thead><tr><th>callsign</th><th>ship</th><th>sys</th><th>pos</th><th>room</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    Array.prototype.forEach.call(body.querySelectorAll("tr.row"), function (tr) {
+      tr.onclick = function () { var s = tr.getAttribute("data-sys"); var sel = $("sysSel"); sel.value = s; chosenSys = s; lockSys = true; drawMap(); };
+    });
+  }
+
+  function drawMap() {
+    var cv = $("map"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    var here = pilots.filter(function (p) { return String(p.system) === String(chosenSys); });
+    $("sysMeta").textContent = chosenSys != null ? (here.length + " pilot" + (here.length === 1 ? "" : "s") + " in sys " + chosenSys) : "";
+    // bounds (auto-fit) with a sane default when degenerate
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    here.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+    if (!isFinite(minX) || maxX - minX < 200) { var cx = isFinite(minX) ? (minX + maxX) / 2 : 0; minX = cx - 4000; maxX = cx + 4000; }
+    if (!isFinite(minY) || maxY - minY < 200) { var cy = isFinite(minY) ? (minY + maxY) / 2 : 0; minY = cy - 4000; maxY = cy + 4000; }
+    var pad = 46, spanX = maxX - minX, spanY = maxY - minY;
+    var sc = Math.min((W - pad * 2) / spanX, (H - pad * 2) / spanY);
+    var ox = (W - spanX * sc) / 2, oy = (H - spanY * sc) / 2;
+    var toX = function (x) { return ox + (x - minX) * sc; }, toY = function (y) { return oy + (y - minY) * sc; };
+    // grid
+    ctx.strokeStyle = "#0f1f17"; ctx.lineWidth = 1;
+    for (var gx = 0; gx <= 10; gx++) { var X = pad + gx * (W - pad * 2) / 10; ctx.beginPath(); ctx.moveTo(X, pad); ctx.lineTo(X, H - pad); ctx.stroke(); }
+    for (var gy = 0; gy <= 7; gy++) { var Y = pad + gy * (H - pad * 2) / 7; ctx.beginPath(); ctx.moveTo(pad, Y); ctx.lineTo(W - pad, Y); ctx.stroke(); }
+    // pilots
+    here.forEach(function (p) {
+      var px = toX(p.x), py = toY(p.y);
+      // heading line
+      var hd = (p.heading || 0) * Math.PI / 180;
+      ctx.strokeStyle = "#5ad6ff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(hd) * 16, py + Math.sin(hd) * 16); ctx.stroke();
+      // dot
+      ctx.fillStyle = p._p2p ? "#5ad6ff" : "#37ff8a"; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#0a0e0c"; ctx.lineWidth = 1.5; ctx.stroke();
+      // label
+      ctx.fillStyle = "#d6f0e2"; ctx.font = "11px ui-monospace,monospace"; ctx.textAlign = "left";
+      ctx.fillText(String(p.name || p.id || "?"), px + 9, py + 3);
+      if (p.shipName) { ctx.fillStyle = "#7fa28f"; ctx.font = "9px ui-monospace,monospace"; ctx.fillText(String(p.shipName), px + 9, py + 14); }
+    });
+    if (!here.length) { ctx.fillStyle = "#7fa28f"; ctx.font = "13px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.fillText("no pilots in this system", W / 2, H / 2); }
+  }
+
+  function load() {
+    fetch("/ev/pilots", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.ok === false) {
+        setStatus(false, (j && j.error === "no url") ? "cloud rendezvous not configured (set it in Server Mode > Cloud & Hosting)" : ("rendezvous unreachable" + (j && j.error ? " \u2014 " + j.error : "")));
+        var sp = window._specPilots || {}; pilots = Object.keys(sp).map(function (k) { return sp[k]; });
+        renderSysSel(); renderRoster(); drawMap(); return;
+      }
+      var httpP = flatten(j);
+      window._evRooms = Object.keys((j.rooms) || {});
+      // merge in the P2P spectator's pilots (real positions for pure-P2P pilots); P2P data overrides position-less roster entries
+      var spec = window._specPilots || {}, byId = {};
+      httpP.forEach(function (q) { byId[q.id] = q; });
+      for (var sid in spec) { byId[sid] = spec[sid]; }
+      pilots = Object.keys(byId).map(function (k) { return byId[k]; });
+      var nRooms = window._evRooms.length, specN = Object.keys(spec).length;
+      setStatus(true, pilots.length + " pilot" + (pilots.length === 1 ? "" : "s") + " \u00b7 " + nRooms + " room" + (nRooms === 1 ? "" : "s") + (specN ? " \u00b7 +" + specN + " P2P" : "") + " \u00b7 live");
+      renderSysSel(); renderRoster(); drawMap();
+    }).catch(function () { setStatus(false, "bridge offline"); });
+  }
+
+  function schedule() { if (timer) clearInterval(timer); if (POLL > 0) timer = setInterval(load, POLL); }
+  $("rate").onchange = function () { POLL = parseInt(this.value, 10) || 0; schedule(); if (POLL) load(); };
+  $("refresh").onclick = load;
+  var sb = $("specBtn");
+  if (sb) sb.onclick = function () {
+    if (window._evSpecOn && window._evSpecOn()) { if (window._evSpecStop) window._evSpecStop(); sb.textContent = "\uD83D\uDC51 Watch P2P"; sb.style.color = ""; setTimeout(load, 200); }
+    else if (window._evSpecWatch) { sb.textContent = "\u2026"; window._evSpecWatch(window._evRooms || []).then(function (ok) { sb.textContent = ok ? "\u23F9 Stop P2P" : "\uD83D\uDC51 Watch P2P"; sb.style.color = ok ? "#5ad6ff" : ""; if (!ok && window._evSpecErr) setStatus(false, window._evSpecErr); setTimeout(load, 400); }); }
+  };
+  $("sysSel").onchange = function () { chosenSys = this.value || null; lockSys = !!chosenSys; drawMap(); };
+  load(); schedule();
+})();
+</script>
+<script type="module">
+  import { PresenceManager } from "./ev/presence.js";
+  import { p2pTransport } from "./ev/p2p.js";
+  let _trs = [], _mgrs = [], _pumpT = null, _on = false;
+  window._specPilots = {};
+  window._evSpecOn = function () { return _on; };
+  function pump() {
+    const now = Date.now(), out = {};
+    for (const m of _mgrs) { m.prune(now); for (const p of m.peers.values()) { if (now - p.lastT > m.staleMs) continue; out[p.id] = { id: p.id, name: p.name, system: p.system, x: p.x, y: p.y, heading: p.heading, shipName: p.shipName, _room: m._room, _p2p: true }; } }
+    window._specPilots = out;
+    _pumpT = setTimeout(pump, 600);
+  }
+  window._evSpecWatch = async function (rooms) {
+    window._evSpecStop();
+    let cfg = {}; try { cfg = await fetch("/cloud/p2p-token", { cache: "no-store" }).then(r => r.json()); } catch (e) {}
+    const url = (cfg && cfg.url) || "", tok = (cfg && cfg.token) || "";
+    if (!url) { window._evSpecErr = "no rendezvous URL (set it in Server Mode > Cloud & Hosting)"; return false; }
+    for (const room of (rooms || [])) {
+      try {
+        const mgr = new PresenceManager("spectator-" + Math.random().toString(36).slice(2, 8));
+        const tr = p2pTransport(url.replace(/\/+$/, ""), room, mgr.localId, { token: tok, name: "spectator" });
+        tr.onMessage(m => mgr.applyMessage(m));   // RECEIVE ONLY - never tr.send(), so the admin posts no ship of its own
+        mgr._room = room; _trs.push(tr); _mgrs.push(mgr);
+      } catch (e) {}
+    }
+    _on = _mgrs.length > 0; window._evSpecErr = _on ? "" : "no active rooms to watch yet";
+    if (_on) pump();
+    return _on;
+  };
+  window._evSpecStop = function () {
+    _on = false; if (_pumpT) { clearTimeout(_pumpT); _pumpT = null; }
+    for (const t of _trs) { try { t.close(); } catch (e) {} }
+    _trs = []; _mgrs = []; window._specPilots = {};
+  };
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

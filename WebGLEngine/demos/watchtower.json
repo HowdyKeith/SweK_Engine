@@ -1,0 +1,20 @@
+{
+    "name": "Stone Watchtower",
+    "description": "Hollow stone tower with a stacked ring profile, framed from a low side angle.",
+    "camera": { "x": 18, "y": 30, "z": 18, "yaw": -2.4, "pitch": -0.3 },
+    "structures": [
+        { "kind": "disk",   "cx": 0, "cy": 12, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 13, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 14, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 15, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 16, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 17, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 18, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 19, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "disk",   "cx": 0, "cy": 20, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 21, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 22, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "ring",   "cx": 0, "cy": 23, "cz": 0, "radius": 4, "material": 1 },
+        { "kind": "column", "x": 0, "z": 0, "y0": 13, "y1": 19, "material": 0 }
+    ]
+}

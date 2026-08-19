@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WAD Map — Engine Companion</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="WAD Map">
+<meta name="demo:desc"   content="DOOM WAD map viewer — load a .wad and explore the level geometry.">
+<meta name="demo:cats"   content="game,tool">
+<meta name="demo:swatch" content="W">
+
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    background: #0a0a14;
+    color: #cfd;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    overflow: hidden;
+    min-height: 100vh;
+}
+.titlebar {
+    padding: 8px 14px;
+    background: linear-gradient(180deg, #14142a 0%, #0a0a14 100%);
+    border-bottom: 1px solid #233;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.titlebar h1 {
+    margin: 0;
+    font-size: 14px;
+    color: #9cf;
+    letter-spacing: 1px;
+}
+.status {
+    font-size: 11px;
+}
+.status.online { color: #4f8; }
+.status.offline { color: #f64; }
+#stage {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    height: calc(100vh - 41px);
+}
+#map-panel {
+    flex: 2;
+    background: #06060c;
+    border: 1px solid #233;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+#info-panel {
+    flex: 1;
+    min-width: 280px;
+    max-width: 340px;
+    background: #06060c;
+    border: 1px solid #233;
+    border-radius: 4px;
+    padding: 12px;
+    overflow-y: auto;
+}
+#map-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+h2 {
+    color: #9cf;
+    font-size: 12px;
+    margin: 0 0 6px 0;
+    letter-spacing: 1px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #233;
+}
+.info-row {
+    margin: 4px 0;
+    color: #aab;
+}
+.info-row b { color: #cfd; }
+.bot-line {
+    padding: 2px 4px;
+    margin: 1px 0;
+    border-left: 3px solid #fb4;
+    background: rgba(60,60,80,0.3);
+    font-size: 11px;
+}
+.bot-line.sniper { border-left-color: #8df; }
+.bot-line.heavy  { border-left-color: #f84; }
+.legend {
+    margin-top: 12px;
+    font-size: 10px;
+    color: #889;
+}
+.legend-item { padding: 1px 0; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.dot.player { background: #4f8; }
+.dot.grunt  { background: #fb4; }
+.dot.sniper { background: #8df; }
+.dot.heavy  { background: #f84; }
+</style>
+</head>
+<body>
+<div class="titlebar">
+    <h1>⛯ WAD MAP COMPANION</h1>
+    <div id="status" class="status offline">● connecting…</div>
+</div>
+<div id="stage">
+    <div id="map-panel">
+        <canvas id="map-canvas"></canvas>
+    </div>
+    <div id="info-panel">
+        <h2>LIVE STATE</h2>
+        <div class="info-row">Level: <b id="level-name">—</b></div>
+        <div class="info-row">Health: <b id="player-hp">—</b></div>
+        <div class="info-row">Ammo: <b id="player-ammo">—</b></div>
+        <div class="info-row">Kills: <b id="player-kills">—</b></div>
+        <div class="info-row">Position: <b id="player-pos">—</b></div>
+        <h2 style="margin-top: 14px;">BOTS</h2>
+        <div id="bot-list">no contacts</div>
+        <div class="legend">
+            <div class="legend-item"><span class="dot player"></span>player</div>
+            <div class="legend-item"><span class="dot grunt"></span>bot_grunt</div>
+            <div class="legend-item"><span class="dot sniper"></span>bot_sniper</div>
+            <div class="legend-item"><span class="dot heavy"></span>bot_heavy</div>
+        </div>
+        <h2 style="margin-top: 14px;">CONNECTION</h2>
+        <div class="info-row">Relay: <b>ws://localhost:8787</b></div>
+        <div class="info-row">Frames RX: <b id="frame-count">0</b></div>
+    </div>
+</div>
+
+<script>
+// =============================================================================
+// WadMap companion — connects to the same WSBridge relay the main engine
+// uses, subscribes to wadmap:layout + wadmap:state, renders identical
+// minimap-style view to a larger canvas.
+// =============================================================================
+
+const canvas = document.getElementById("map-canvas");
+const ctx = canvas.getContext("2d");
+const statusEl = document.getElementById("status");
+const levelNameEl = document.getElementById("level-name");
+const playerHpEl = document.getElementById("player-hp");
+const playerAmmoEl = document.getElementById("player-ammo");
+const playerKillsEl = document.getElementById("player-kills");
+const playerPosEl = document.getElementById("player-pos");
+const botListEl = document.getElementById("bot-list");
+const frameCountEl = document.getElementById("frame-count");
+
+let lastLayout = null;
+let lastState = null;
+let frameCount = 0;
+
+function resizeCanvas() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    canvas.width = r.width;
+    canvas.height = r.height;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+// ----- Bridge connection -----
+
+let ws = null;
+let retryTimer = null;
+
+function connect() {
+    try {
+        ws = new WebSocket("ws://localhost:8787");
+    } catch (e) {
+        setOffline();
+        scheduleReconnect();
+        return;
+    }
+    ws.onopen = () => {
+        statusEl.textContent = "● live";
+        statusEl.className = "status online";
+        if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    };
+    ws.onmessage = (e) => {
+        try {
+            const msg = JSON.parse(e.data);
+            handleMessage(msg);
+        } catch (err) {}
+    };
+    ws.onerror = () => {};
+    ws.onclose = () => {
+        setOffline();
+        scheduleReconnect();
+    };
+}
+
+function setOffline() {
+    statusEl.textContent = "● offline (retrying)";
+    statusEl.className = "status offline";
+}
+
+function scheduleReconnect() {
+    if (retryTimer) return;
+    retryTimer = setTimeout(() => { retryTimer = null; connect(); }, 3000);
+}
+
+function handleMessage(msg) {
+    if (msg.type === "wadmap:layout") {
+        lastLayout = msg.data.layout || null;
+        if (lastLayout?.name) levelNameEl.textContent = lastLayout.name;
+        else levelNameEl.textContent = `${lastLayout?.rooms?.length ?? 0} rooms`;
+        draw();
+    } else if (msg.type === "wadmap:state") {
+        lastState = msg.data || null;
+        frameCount++;
+        frameCountEl.textContent = frameCount.toString();
+        updateInfoPanel(lastState);
+        draw();
+    }
+}
+
+function updateInfoPanel(state) {
+    if (!state) return;
+    if (state.fps) {
+        playerHpEl.textContent = Math.round(state.fps.health * 100) + "%";
+        playerAmmoEl.textContent = state.fps.ammo + "";
+        playerKillsEl.textContent = state.fps.kills + "";
+    }
+    if (state.player) {
+        playerPosEl.textContent = `(${state.player.x.toFixed(1)}, ${state.player.z.toFixed(1)})`;
+    }
+    if (state.bots && state.bots.length > 0) {
+        botListEl.innerHTML = state.bots.map(b =>
+            `<div class="bot-line ${b.kind.replace("bot_", "")}">${b.kind} · hp ${b.hp} · ${b.state} · (${b.x.toFixed(0)}, ${b.z.toFixed(0)})</div>`
+        ).join("");
+    } else {
+        botListEl.textContent = "no contacts";
+    }
+}
+
+// ----- Rendering (matches in-engine WadMap _drawMinimap layout) -----
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!lastLayout && !lastState) {
+        ctx.fillStyle = "#445";
+        ctx.font = "13px monospace";
+        ctx.fillText("waiting for engine signal…", 16, 24);
+        return;
+    }
+    const b = computeBounds(lastLayout, lastState);
+    if (!b) return;
+    const wWidth = Math.max(1, b.maxX - b.minX);
+    const wDepth = Math.max(1, b.maxZ - b.minZ);
+    const pad = 30;
+    const scaleX = (canvas.width  - pad*2) / wWidth;
+    const scaleZ = (canvas.height - pad*2) / wDepth;
+    const scale = Math.min(scaleX, scaleZ);
+    const offX = (canvas.width  - wWidth * scale) / 2 - b.minX * scale;
+    const offZ = (canvas.height - wDepth * scale) / 2 - b.minZ * scale;
+    const w2c = (x, z) => ({ cx: offX + x * scale, cy: offZ + z * scale });
+
+    // Rooms
+    if (lastLayout?.rooms) {
+        ctx.lineWidth = 2;
+        for (const r of lastLayout.rooms) {
+            const a = w2c(r.x, r.z);
+            const bo = w2c(r.x + r.w, r.z + r.d);
+            ctx.fillStyle = "rgba(80,140,200,0.20)";
+            ctx.strokeStyle = "rgba(150,180,220,0.85)";
+            ctx.fillRect(a.cx, a.cy, bo.cx - a.cx, bo.cy - a.cy);
+            ctx.strokeRect(a.cx, a.cy, bo.cx - a.cx, bo.cy - a.cy);
+            ctx.fillStyle = "rgba(200,220,255,0.85)";
+            ctx.font = "11px monospace";
+            ctx.fillText(r.id ?? "", a.cx + 5, a.cy + 16);
+        }
+    }
+    // Corridors
+    if (lastLayout?.corridors && lastLayout?.rooms) {
+        const byId = {};
+        for (const r of lastLayout.rooms) byId[r.id] = r;
+        ctx.strokeStyle = "rgba(180,140,80,0.7)";
+        ctx.lineWidth = 3;
+        for (const c of lastLayout.corridors) {
+            const a = byId[c.from], bo = byId[c.to];
+            if (!a || !bo) continue;
+            const ap = w2c(a.x + a.w/2, a.z + a.d/2);
+            const bp = w2c(bo.x + bo.w/2, bo.z + bo.d/2);
+            ctx.beginPath();
+            ctx.moveTo(ap.cx, ap.cy);
+            ctx.lineTo(bp.cx, bp.cy);
+            ctx.stroke();
+        }
+    }
+    // Bots
+    if (lastState?.bots) {
+        for (const bot of lastState.bots) {
+            const p = w2c(bot.x, bot.z);
+            ctx.fillStyle = bot.kind === "bot_sniper" ? "#8df" :
+                            bot.kind === "bot_heavy"  ? "#f84" : "#fb4";
+            ctx.beginPath();
+            ctx.arc(p.cx, p.cy, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    // Player
+    if (lastState?.player) {
+        const p = w2c(lastState.player.x, lastState.player.z);
+        ctx.fillStyle = "#4f8";
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, 7, 0, Math.PI * 2);
+        ctx.fill();
+        const yaw = lastState.player.yaw ?? 0;
+        const dx = Math.sin(yaw) * 14;
+        const dz = Math.cos(yaw) * 14;
+        ctx.strokeStyle = "#4f8";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.cx, p.cy);
+        ctx.lineTo(p.cx + dx, p.cy + dz);
+        ctx.stroke();
+    }
+}
+
+function computeBounds(layout, state) {
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    if (layout?.rooms?.length) {
+        for (const r of layout.rooms) {
+            minX = Math.min(minX, r.x);
+            minZ = Math.min(minZ, r.z);
+            maxX = Math.max(maxX, r.x + r.w);
+            maxZ = Math.max(maxZ, r.z + r.d);
+        }
+    }
+    if (state?.player) {
+        minX = Math.min(minX, state.player.x - 6);
+        minZ = Math.min(minZ, state.player.z - 6);
+        maxX = Math.max(maxX, state.player.x + 6);
+        maxZ = Math.max(maxZ, state.player.z + 6);
+    }
+    if (state?.bots) {
+        for (const bot of state.bots) {
+            minX = Math.min(minX, bot.x - 4);
+            minZ = Math.min(minZ, bot.z - 4);
+            maxX = Math.max(maxX, bot.x + 4);
+            maxZ = Math.max(maxZ, bot.z + 4);
+        }
+    }
+    if (!isFinite(minX)) return null;
+    const pad = 8;
+    return { minX: minX - pad, minZ: minZ - pad, maxX: maxX + pad, maxZ: maxZ + pad };
+}
+
+connect();
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>
