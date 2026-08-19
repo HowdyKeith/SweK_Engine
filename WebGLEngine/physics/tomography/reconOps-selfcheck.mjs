@@ -68,9 +68,22 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
        "v3616 left the SAME power iteration written in BOTH sirt.mjs and matchedAdjoint.mjs -- two " +
        "declarations of one thing, in the arc whose subject is two declarations of one thing");
     const ang = angleSet(12), N = 32, nDet = 32;
-    ok("...and the delegating step agrees with the general one",
-       Math.abs(sirtMod.stepFor(N, ang, nDet).step - powerStep((r) => backProject(r, N, ang, nDet), N, ang, nDet).step) === 0,
+    // v3847 -- THE REFERENCE OPERATOR HERE FOLLOWS THE DEFAULT, because that is what stepFor is FOR. When the
+    // default moved to matchedBackProject this check went red against a backProject reference, which is the
+    // ratchet working: the step IS a property of the operator, and a stepFor that did not move with it would
+    // hand the matched iteration a step derived for a different matrix (7.6x its own ceiling -- outside
+    // Landweber's bound, and it diverges).
+    ok("...and the delegating step agrees with the general one, ON THE DEFAULT OPERATOR",
+       Math.abs(sirtMod.stepFor(N, ang, nDet).step - powerStep((r) => matchedBackProject(r, N, ang, nDet), N, ang, nDet).step) === 0,
        "exactly, because it is the same code called two ways");
+    ok("...and stepForUnmatched still delegates too, for the operator the gates drive on the record",
+       Math.abs(sirtMod.stepForUnmatched(N, ang, nDet).step - powerStep((r) => backProject(r, N, ang, nDet), N, ang, nDet).step) === 0,
+       "the old step is kept reachable by name rather than by a literal");
+    ok("!! and the two steps are genuinely different numbers, so 'follows the operator' has content",
+       sirtMod.stepFor(N, ang, nDet).step !== sirtMod.stepForUnmatched(N, ang, nDet).step,
+       `matched ${sirtMod.stepFor(N, ang, nDet).step.toExponential(4)} against unmatched ` +
+       `${sirtMod.stepForUnmatched(N, ang, nDet).step.toExponential(4)} -- a check that could not tell these ` +
+       "apart would pass whichever operator stepFor was wired to");
 }
 
 // ---- 3. THE PAGE'S OWN NUMBERS, RE-DERIVED FROM THE PAGE'S OWN CONSTANTS ----------------------------------------------
@@ -149,10 +162,26 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const server = fs.readFileSync(path.join(ENGINE, "server.html"), "utf8");
     ok("ct.html is reachable from server.html", server.includes("ct.html"),
        "so this comparison has a door -- the page existed since v2814 and the modules built on it never did");
-    const l = landweber(radon(phantomField(48, [{ cx: 0, cy: 0, a: 0.6, b: 0.6, rho: 1 }]), 48, angleSet(12), 48),
-        48, angleSet(12), 48, { iters: 20, every: 10 });
-    ok("landweber still defaults to backProject, so v3613's readings stay reproducible", l.history.length === 2 && l.step > 0,
-       "step " + l.step.toExponential(3) + " -- the default is unchanged; the page shows BOTH and the choice is Keith's");
+    // *** v3847 -- THE DEFAULT MOVED TO matchedBackProject, AND THIS CHECK NOW ACTUALLY TESTS WHICH OPERATOR
+    // IT IS. *** The old form asserted `l.history.length === 2 && l.step > 0`, which is true of ANY operator --
+    // it pinned that landweber RAN, not that it ran the one the sentence named. A check whose text names a
+    // specific default while its condition cannot distinguish two defaults is a MENTION TEST, and it would
+    // have stayed green through exactly the change this round makes.
+    const N0 = 48, ang0 = angleSet(12);
+    const sino0 = radon(phantomField(N0, [{ cx: 0, cy: 0, a: 0.6, b: 0.6, rho: 1 }]), N0, ang0, N0);
+    const run = (adjoint) => landweber(sino0, N0, ang0, N0, { iters: 20, every: 10, adjoint });
+    const dflt = run(null);
+    const asMatched = run((r) => matchedBackProject(r, N0, ang0, N0));
+    const asShipped = run((r) => backProject(r, N0, ang0, N0));
+    const same = (a, b) => a.step === b.step && a.x.every((v, i) => v === b.x[i]);
+    ok("!! landweber DEFAULTS TO matchedBackProject (v3847), asserted by IDENTITY of the result",
+       same(dflt, asMatched) && !same(dflt, asShipped),
+       `default step ${dflt.step.toExponential(3)} is bit-identical to the explicitly-matched run and ` +
+       `DIFFERENT from the explicitly-unmatched one (${asShipped.step.toExponential(3)}). The old check here ` +
+       "could not tell those apart -- it asserted only that the loop ran");
+    ok("...and the old operator is still reachable by name, so the turn-round stays drivable",
+       asShipped.step > 0 && asShipped.step !== asMatched.step,
+       "pass `adjoint: backProject` -- v3616's finding is held on the record by sirt-selfcheck, not by prose");
 }
 
 console.log(fails ? "\nreconOps-selfcheck: " + fails + " FAILED" : "\nreconOps-selfcheck: all checks pass");

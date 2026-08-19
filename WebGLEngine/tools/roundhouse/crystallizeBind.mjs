@@ -104,6 +104,10 @@ export function buildCrystallize(hyp, base = {}) {
 export const crystallizeDevice = {
     // WHAT THE PLANT OVERTURNS, as data. NOTE THE OBSERVABLE IS THE ENSEMBLE MEAN, NOT THE SINGLE-SEED
     // exponent: the shift is only ~1.6 per-seed sigma, so quoting one seed would be the ising.L mistake.
+    // v3851 -- KNOB PLANT, DECLARED. `periodic` is a BOUNDARY CONDITION handed to transformTimes and
+    // seedEnsemble: the growth runs differently from the first step, and the whole path from that input to the
+    // fitted Avrami exponent is graded.
+    plantKind: "knob",
     planted: { knob: "periodic", observable: "mean",
                note: "no minimum-image wrapping starves face cells of nuclei; site-saturated mean 2.9629 -> 2.7361, about 3.8 standard errors over six seeds but only 1.6 per-seed sigma" },
     modes: ["exponent", "spread", "discrimination"],

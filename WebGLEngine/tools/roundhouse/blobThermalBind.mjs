@@ -299,6 +299,11 @@ export const blobThermalDevice = {
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose.
     // The floor mode is NOT listed: it is blind to this knob BY DESIGN, and claiming it as coverage would be
     // counting an invariant that never looked.
+    // v3851 -- KNOB PLANT, DECLARED. axisFactor is handed to jitterCentres, so it scales the STEP THE
+    // WALKERS ACTUALLY TAKE; the reading (msd / (6 t)) is untouched. The walk is a physics input and the whole
+    // path from it to dErrFrac is graded. NOT a reader plant, even though the defect is an Einstein-
+    // Smoluchowski factor -- the factor is applied to the motion, not to the inference from it.
+    plantKind: "knob",
     planted: { knob: "axisFactor", observable: "dErrFrac",
                note: "sqrt(D*dt) instead of sqrt(2*D*dt) -- walks at half the commanded D; dErrFrac 0.0070 -> 0.5035" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were

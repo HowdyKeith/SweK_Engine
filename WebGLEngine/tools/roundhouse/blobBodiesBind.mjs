@@ -96,6 +96,13 @@ function buildBlobBodies({ mode = "roundtrip", config = {} } = {}) {
 export const blobBodiesDevice = {
     // WHAT THE PLANT OVERTURNS, named on the device so plantedCoverage reads it rather than grepping prose:
     // shiftKept 1.0000 -> 0.0000, while peakKept and massKept both IMPROVE to a perfect 1.0000.
+    // v3851 -- *** METHOD PLANT, AND CALLING IT A KNOB WOULD HAVE BEEN WRONG. *** Nothing about the problem
+    // moves: same blobs, same velocity, same dt, same observables. What is substituted is the SAMPLING RULE
+    // inside the semi-Lagrangian step -- trilinear interpolation becomes Math.round to the nearest voxel, so
+    // a departure point a quarter of a cell back rounds into the cell it started in and THE FIELD NEVER
+    // MOVES. That is seismic's third kind (v3400) and xpbd's shape (v3460): a whole scheme swapped for
+    // another, with the inputs and the reading both untouched.
+    plantKind: "method",
     planted: { knob: "nearest", observable: "shiftKept",
                note: "nearest-neighbour sampling stalls the field; the loss columns call that perfect" },
     modes: ["roundtrip", "bodies"],

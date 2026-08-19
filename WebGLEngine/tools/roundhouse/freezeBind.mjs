@@ -21,16 +21,54 @@
 // THE CONTROL MODE COMPARES FIELDS, NOT FRONTS, and that is not a detail: a front is a CELL INDEX, and the
 // front-based version of this control survived a 3% freeze-only timestep sabotage because two genuinely
 // different runs quantised onto the same cell.
+//
+// ================================================================================================================
+// *** v3850 -- THAT SABOTAGE IS NOW A DECLARED PLANT, AND IT WAS SITTING IN THE PARAGRAPH ABOVE. ***
+// ================================================================================================================
+//
+// v3619 ran a 3% freeze-only timestep perturbation, measured that the FIELD control catches it and the FRONT
+// control does not, wrote the sentence, and threw the measurement away. A MEASUREMENT MADE AND DISCARDED IS
+// NOT COVERAGE -- the third time this session that exact shape has turned up (freesurface's minimum-cell,
+// flip3d's flat divergence, and now this), and the reason the census read three devices as bare that had all
+// already run their own plants.
+//
+// MEASURED, the two arms, reproducing v3619's sentence to the digit:
+//     controlFieldMirror   3.1332e-14  ->  6.3459e-5     A SEPARATION OF 2.0e9, off machine zero
+//     controlFrontTie      true        ->  true          THE FRONT-BASED CONTROL DOES NOT NOTICE AT ALL
+//     fronts               0.03475761193510985 in BOTH arms, identical to every digit
+//
+// *** THE SECOND LINE IS THE ROUND. *** A plant that only proved the field control works would be ordinary;
+// this one proves WHY THE FIELD COMPARISON EXISTS, because the obvious front-based version of the same control
+// passes the defect through untouched. The two runs really are different -- the field says so by nine orders
+// -- and they quantise onto the same cell, so the cheaper observable reads a perfect tie.
+//
+// *** "control" IS modes[0] ON PURPOSE. *** probeModePlant compares the plant against
+// `modes.find(m => m !== plantMode)`, so the primary must be THE MODE THAT OWNS THE DECLARED OBSERVABLE --
+// controlFieldMirror exists only in the control branch. With "asymmetry" first the census would build an arm
+// with no controlFieldMirror in it and report this device DECLARED BUT DEAD, which is precisely what mpmrefine
+// read from v3802 until v3849. THE DEFAULT IS UNTOUCHED: freezeDefaults still returns "asymmetry".
+// ================================================================================================================
 "use strict";
 import {
     LIQUIDS, pairFor, alpha, frontExact, ratioParts, twoPhase, reversibility,
 } from "../../physics/thermal/freeze.mjs";
 import { MATERIALS } from "../../physics/thermal/stefan.mjs";
 
+// "control" FIRST: see the header -- controlFieldMirror lives only in that branch, and the contract compares
+// the plant against modes[0].
+export const FREEZE_MODES = ["control", "asymmetry", "reversibility", "slowfreeze"];
+
 export const FREEZE_OBSERVABLES = [
     "ratioExact", "ratioSolver", "diffusivityPart", "lambdaPart", "productCheck",
     "meltFront", "freezeFront", "controlFrontTie", "controlFieldMirror",
     "addRemove", "roundTrip", "mushyShare",
+    // *** v3850 -- COMPLETED. These keys were RETURNED BY THE BUILDER AND NEVER DECLARED, and nothing
+    // caught it because this device was not in labDevices-selfcheck's observable-honesty check --
+    // that list held 17 devices and none of the thermal four. Planting them put them in it. An
+    // UNDECLARED OBSERVABLE IS INVISIBLE TO EVERY CONSUMER THAT READS THE LIST RATHER THAN THE CODE,
+    // which is the whole reason the list exists. ***
+    "kind", "material", "exactRatio", "cells", "meltExact", "freezeExact", "meltRelErr", "freezeRelErr",
+    "alphaSolid", "alphaLiquid", "samples", "note",
 ];
 
 const num = (v, d) => (Number.isFinite(+v) ? +v : d);
@@ -42,7 +80,8 @@ export function freezeDefaults(hyp = {}) {
     c.dT = Math.min(200, Math.max(1, num(c.dT, 25)));
     c.n = Math.min(600, Math.max(60, num(c.n, 150) | 0));
     c.tEnd = Math.min(36000, Math.max(60, num(c.tEnd, 3600)));
-    if (!["asymmetry", "control", "reversibility"].includes(h.mode)) h.mode = "asymmetry";
+    // THE VALIDATOR MUST LIST THE PLANT MODE, or `slowfreeze` reverts and both arms read identically (v3806).
+    if (!FREEZE_MODES.includes(h.mode)) h.mode = "asymmetry";
     h.config = c;
     return h;
 }
@@ -66,14 +105,18 @@ function asymmetryRun(c) {
     };
 }
 
-function controlRun(c) {
+function controlRun(c, { planted = false } = {}) {
     // ONE SUBSTANCE BOTH PHASES. Direction must stop mattering entirely.
     const solid = MATERIALS[c.material];
     const same = { solid, liquid: solid, L: solid.L, Tm: solid.Tm };
     const r = ratioParts({ ...same, dT: c.dT, t: c.tEnd });
     const len = 4 * r.melt.front;
-    const m = twoPhase({ ...same, dT: c.dT, freeze: false, n: c.n, len, tEnd: c.tEnd });
-    const f = twoPhase({ ...same, dT: c.dT, freeze: true, n: c.n, len, tEnd: c.tEnd });
+    // *** THE PLANT: a 3% timestep perturbation ON THE FREEZE BRANCH ONLY. It is deliberately tiny and
+    // deliberately one-sided -- a symmetric change would move both runs together and the mirror would hold. ***
+    const CFL = 0.2;
+    const m = twoPhase({ ...same, dT: c.dT, freeze: false, n: c.n, len, tEnd: c.tEnd, cfl: CFL });
+    const f = twoPhase({ ...same, dT: c.dT, freeze: true, n: c.n, len, tEnd: c.tEnd,
+                         cfl: planted ? CFL * 1.03 : CFL });
     let mirror = 0;
     for (let i = 0; i < m.H.length; i++) mirror = Math.max(mirror, Math.abs(f.H[i] - (m.rhoL - m.H[i])));
     return {
@@ -102,12 +145,18 @@ function reversibilityRun(c) {
 export function buildFreeze(hyp, base = {}) {
     const h = freezeDefaults({ ...hyp, config: { ...(base || {}), ...(hyp && hyp.config) } });
     if (h.mode === "control") return { kind: "control", ...controlRun(h.config) };
+    // The plant runs the CONTROL fixture -- same substance both phases, same everything -- and differs only
+    // in the freeze branch's timestep, so the separation belongs to the defect and not to a second fixture.
+    if (h.mode === "slowfreeze") return { kind: "slowfreeze", ...controlRun(h.config, { planted: true }) };
     if (h.mode === "reversibility") return { kind: "reversibility", ...reversibilityRun(h.config) };
     return { kind: "asymmetry", ...asymmetryRun(h.config) };
 }
 
 export const freezeDevice = {
-    modes: ["asymmetry", "control", "reversibility"],
+    modes: FREEZE_MODES,
+    // *** controlFieldMirror, and "control" is modes[0] so the contract has it in both arms. The FRONT-based
+    // observables are BLIND to this plant and that is the point -- see the header. ***
+    plantMode: "slowfreeze", plantFlips: "controlFieldMirror", plantKind: "mode",
     name: "freeze-solidification",
     observables: FREEZE_OBSERVABLES,
     build: buildFreeze,

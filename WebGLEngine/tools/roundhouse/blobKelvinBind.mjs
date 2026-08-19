@@ -87,6 +87,10 @@ export function buildKelvin(hyp, base = {}) {
 export const blobKelvinDevice = {
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose:
     // the calibration moves by exactly 3/2 while the round trip stays exact.
+    // v3851 -- KNOB PLANT, DECLARED. dragK is a coefficient in the SCENARIO the run is handed -- slip drag
+    // in place of stick -- so it perturbs the physics upstream of every observable and the whole path to
+    // boilingKelvin is graded.
+    plantKind: "knob",
     planted: { knob: "dragK", observable: "boilingKelvin",
                note: "slip drag (4*pi*eta*r) instead of stick (6*pi); roundTripErrFrac is blind to it, and roomTravelFrac becomes impossible at 1.1784" },
     // v3191 -- EXPORTED so nothing has to GUESS. A probed mode count is a LOWER BOUND: you can only ask

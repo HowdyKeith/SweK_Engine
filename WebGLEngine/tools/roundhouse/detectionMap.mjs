@@ -29,7 +29,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseRegistry, readsPlantedKnob } from "./plantedCoverage.mjs";
+import { parseRegistry, readsPlantedKnob, declaredPlantMode } from "./plantedCoverage.mjs";
 
 /** Comparable form of one observable. Booleans and strings count -- iscoOutside is a KEY, not decoration. */
 function comparable(v) {
@@ -52,7 +52,13 @@ export async function deviceDetection(device) {
         let a, b;
         try {
             a = await device.build({ mode });
-            b = await device.build({ mode, config: { planted: true } });
+            // *** v3851 -- BOTH SPELLINGS, THE SAME FIX plantedCoverage MADE AT v3685 AND THIS FILE NEVER GOT. ***
+            // freeRotationBind's signature is `build({ mode, config = {}, planted = false })` -- planted is a
+            // SIBLING of config, not a key inside it. Turning only `config.planted` built NOMINAL TWICE, saw
+            // nothing move, and reported a live plant (it deletes the whole gyroscopic term) as DECLARED BUT
+            // DEAD. MEASURED: freerotation was this file's only dead plant and is not dead. A FALSE NEGATIVE IS
+            // THE EXPENSIVE DIRECTION -- it sends somebody to repair a plant that already works.
+            b = await device.build({ mode, planted: true, config: { planted: true } });
         } catch { perMode.push({ mode, error: "build-threw" }); continue; }
         const keys = [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])].filter((k) => k !== "planted");
         const movedHere = [];
@@ -101,16 +107,32 @@ export async function detectionMap(engRoot, { DEVICE_NAMES, getDevice }) {
     const rows = parseRegistry(engRoot);
     const devices = [], unparsed = DEVICE_NAMES.filter((n) => !rows.some((r) => r.name === n));
     const noPlant = [], unloadable = [];
+    const modePlants = [];
     for (const row of rows) {
         const reads = readsPlantedKnob(engRoot, row.file);
         if (!reads) { noPlant.push(row.name); continue; }
         let device;
         try { device = await getDevice(row.name); } catch { unloadable.push(row.name); continue; }
+        // *** v3851 -- A MODE PLANT HAS NO KNOB FOR THIS INSTRUMENT TO TURN, AND PROBING IT WITH ONE PRODUCES A
+        // FALSE DEAD READING. *** readsPlantedKnob is a `\bplanted\b` grep over code, so a bind whose plant is a
+        // MODE still trips it if the word appears as a local -- meltBind's `frontRun(c, { planted })`,
+        // freezeBind's `controlRun`, vaporizeBind's `ratioRun`, all three arriving with the v3850 thermal
+        // plants. Their `planted` is an internal argument set BY THE MODE BRANCH; nothing reads it off the
+        // hypothesis, so config.planted moves nothing and all three read DECLARED BUT DEAD while their plants
+        // fire perfectly (plantedCoverage --verify lists every one of them moving its declared observable).
+        //
+        // *** THEY ARE REPORTED IN THEIR OWN CATEGORY RATHER THAN DROPPED. *** plantedCoverage checks the mode
+        // plant BEFORE the knob path for exactly this reason and keeps the two apart because THEY ARE NOT THE
+        // SAME EVIDENCE. This instrument asks "what does turning the knob fail to move", which is not a
+        // question a mode plant has -- so it says so, and a reader looking for those devices finds them named
+        // here instead of finding them mislabelled.
+        if (declaredPlantMode(device)) { modePlants.push(row.name); continue; }
         devices.push({ name: row.name, ...(await deviceDetection(device)) });
     }
     const withPlant = devices.filter((d) => !d.declaredButDead);
     return {
         parsed: rows.length, registered: DEVICE_NAMES.length, unparsed, noPlant, unloadable,
+        modePlants,
         devices,
         // THE THREE ANSWERS, DERIVED.
         blindObservables: devices.flatMap((d) => d.blindToThisPlant.map((o) => d.name + "." + o)).sort(),
@@ -159,6 +181,8 @@ async function main() {
     console.log("  A device with one detector has not been asked what its detector cannot see.");
     for (const d of r.soleDetectorDevices) console.log("    " + d);
 
+    if (r.modePlants.length) console.log("\n  MODE PLANTS -- not probed here, because there is no knob to turn: " +
+        r.modePlants.join(", ") + "\n  (they are adjudicated by plantedCoverage's probeModePlant, which builds the plant MODE)");
     if (r.deadPlants.length) console.log("\n  DECLARED BUT DEAD (a plant that moves nothing): " + r.deadPlants.join(", "));
     if (r.unloadable.length) console.log("  UNLOADABLE: " + r.unloadable.join(", "));
 

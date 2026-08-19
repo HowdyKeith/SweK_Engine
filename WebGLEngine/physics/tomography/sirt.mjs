@@ -78,7 +78,42 @@
 // fallen +0.0957 -> +0.0776. A round must not move a verdict it is not about (v3679), and this round is about
 // which operator answers which question -- not about whether SIRT beats FBP.
 //
-// THE SPLIT, AND BOTH DEFAULTS ARE RIGHT FOR THEIR QUESTION:
+// ================================================================================================================
+// *** v3847 -- THE SPLIT LASTED ONE ROUND. KEITH READ THE NUMBERS AND CHOSE ONE DEFAULT: MATCHED, EVERYWHERE. ***
+// ================================================================================================================
+//
+// v3846 measured the crossover and offered three ways to spend it; the call was TAKE THE REGRESSION. The
+// reasoning is not that the matched operator scores better -- IT DOES NOT, at two of the three angle counts
+// below -- but that A FIXED-POINT ITERATION THAT WALKS AWAY FROM THE DATA IS NOT A DEFENSIBLE DEFAULT
+// WHATEVER IT SCORES ON ONE PHANTOM. v3616's finding stands: the old pair is not a descent method, and a
+// method that is not a descent method should not be the thing this tree hands out by name.
+//
+// *** THE COST IS PAID ON PURPOSE AND IS WRITTEN DOWN RATHER THAN ABSORBED: ***
+//
+//     nAngles     FBP        v3613 operator     v3847 default (matched)     delta
+//        12     0.874950     0.970618           0.952483                    -0.018135
+//        30     0.956257     0.987556           0.979565                    -0.007991
+//       120     0.987036     0.996503           0.996897                    +0.000394
+//
+// FINDING 1's headline gain falls +0.0957 -> +0.0776 at twelve views. *** ITS ORDERING AND EVERY ASSERTION
+// BUILT ON IT STILL HOLD -- the sparse end is still where a method choice buys most, now by 7.86x rather than
+// 10.1x, and SIRT still beats FBP at every angle count. THE FINDING SURVIVES; ITS NUMBERS MOVED. *** Both
+// tables are kept in MEASURED_V3613 (methodHalf and methodHalfUnderV3613Operator) so the cost stays visible
+// instead of being quietly overwritten.
+//
+// WHAT IT BUYS: the residual descends monotonically for as long as it is run, so the BUDGET STOPS BEING
+// LOAD-BEARING. 300 iterations is now merely a budget rather than an accidental regulariser, and running
+// longer is now a straightforward improvement instead of a way to make the answer worse.
+//
+// THE OLD OPERATOR IS NOT GONE, IT IS UNNAMED: pass `adjoint: (r) => backProject(...)`, and stepForUnmatched
+// derives its step. The gates drive it that way to keep the turn-round on the record rather than in prose.
+//
+// v3846's SPLIT ENTRY POINTS SURVIVE AS ALIASES. sirtDescent() and landweberDescent() now agree with the
+// default; they are kept because the NAME still carries the claim, and they are aliases rather than second
+// implementations, so there is no way for them to drift.
+//
+// ---------------------------------------------------------------------------------------------------------
+// v3846's SPLIT, FOR THE RECORD -- SUPERSEDED BY THE ABOVE:
 //
 //     sirt()         RECONSTRUCTION -- "what does the object look like". Defaults to backProject, UNCHANGED,
 //                    so every published correlation here stays reproducible. It must be STOPPED EARLY.
@@ -163,7 +198,16 @@ import { binaryPair, PAIR, LATTICE_ANGLES, PLUS_DIAGONALS } from "./ambiguity.mj
  * convergence section of the gate measures it rather than assuming it. A typed 0.002 would have been a magic
  * number that quietly stops working the day N changes.
  */
-export const stepFor = (N, angles, nDet, opts) => powerStep((r) => backProject(r, N, angles, nDet), N, angles, nDet, opts);
+// *** v3847 -- stepFor FOLLOWS THE DEFAULT OPERATOR, because the step IS a property of the operator. *** The
+// power iteration estimates lambda_max(B A), and B changed, so the number changes: at N = 48 / 24 angles the
+// step moves 7.2226e-3 -> 9.4431e-4 and at N = 96 it moves 3.6240e-3 -> 4.7575e-4. LEAVING stepFor ON
+// backProject WOULD HAVE HANDED THE MATCHED ITERATION A STEP DERIVED FOR A DIFFERENT MATRIX -- roughly 7.6x
+// its own ceiling, which is outside Landweber's bound and diverges. THE TWO HALVES MOVE TOGETHER OR NEITHER
+// MOVES.
+export const stepFor = (N, angles, nDet, opts) => powerStep((r) => matchedBackProject(r, N, angles, nDet), N, angles, nDet, opts);
+
+/** The OLD step, for the OLD operator. Kept so the gates can drive the unmatched pair on the record. */
+export const stepForUnmatched = (N, angles, nDet, opts) => powerStep((r) => backProject(r, N, angles, nDet), N, angles, nDet, opts);
 
 /** x <- x + step * A^T (b - A x). Both operators are the SHIPPED ones; nothing new is modelled here. */
 export const sirt = (sino, N, angles, nDet, opts) => landweber(sino, N, angles, nDet, opts);
@@ -265,7 +309,10 @@ export const MEASURED_V3613 = {
         "OPERATOR PAIR THEY WERE TAKEN WITH; what changes is what the iteration can be said to be MINIMISING. " +
         "The seeded fixed points are UNAFFECTED and in fact stronger: b - A x is exactly zero there, so the " +
         "update is B(0) = 0 for ANY LINEAR B, which v3615 drives with a deliberately absurd one.",
-    methodHalf: { 12: { fbp: 0.874950, sirt: 0.970618 }, 30: { fbp: 0.956257, sirt: 0.987556 }, 120: { fbp: 0.987036, sirt: 0.996503 } },
+    // *** v3847 -- REWRITTEN. These are the readings under the MATCHED default; the v3613 column is kept
+    // beside them because a table that silently changed its own numbers would hide the cost of the decision.
+    methodHalf: { 12: { fbp: 0.874950, sirt: 0.952483 }, 30: { fbp: 0.956257, sirt: 0.979565 }, 120: { fbp: 0.987036, sirt: 0.996897 } },
+    methodHalfUnderV3613Operator: { 12: { fbp: 0.874950, sirt: 0.970618 }, 30: { fbp: 0.956257, sirt: 0.987556 }, 120: { fbp: 0.987036, sirt: 0.996503 } },
     bothSeedsFitExactly: { fromAResidual: 0, fromCResidual: 0, atLatticeAngles: 2 },
     controlWithDiagonals: { fromCResidual: 1.010, scoreGap: 0.3403 },
     refutedPrediction: "I expected the zero-start answer to be the MEAN of the two truths, since Landweber from " +

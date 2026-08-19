@@ -13,15 +13,49 @@
 // CONVERGES JUST AS TIDILY, ratio 2.018. IT IS CONVERGING TO ZERO, because the floor is going to zero.
 // A CONVERGENCE TEST GRADES THE SOLVER AND ASSUMES THE FIXTURE; ONLY AN INVARIANCE CHECK GRADES THE FIXTURE. ***
 
+// ================================================================================================================
+// *** v3851 -- THE PLANT WORKED AND THE CENSUS COULD NOT ADJUDICATE IT, AND THE REASON IS A TYPE. ***
+// (Found on the parallel line as v3849 and merged here onto v3846's fixed-extent fixture -- the two findings
+// are independent and both stand: THAT fixture had an unchecked degree of freedom, THIS interface had an
+// unreadable declaration.)
+// ================================================================================================================
+//
+// plantedCoverage listed this device as DECLARED BUT DEAD -- "declared observable fixtureInvariant is not a
+// finite number in both modes" -- and it has been the ONLY entry on that list. THE PLANT WAS NEVER BROKEN:
+// `cellfloor` moves the floor's world height 1.5 -> 0.75 between levels exactly as its header says. What was
+// broken is that `fixtureInvariant` IS A BOOLEAN, and probeModePlant requires a finite NUMBER in both arms so
+// that it can watch the declared quantity MOVE. true -> false is a flip a human reads instantly and the
+// census cannot measure at all.
+//
+// *** SO THE NUMBER THE BOOLEAN WAS HIDING IS NOW THE DECLARED ONE, AND THE BOOLEAN IS DERIVED FROM IT RATHER
+// THAN COMPUTED BESIDE IT. *** floorDriftFrac is the worst fractional departure of the floor's world height
+// from its value at the coarsest level; fixtureInvariant is that number being under the tolerance. ONE
+// DECLARATION, TWO READINGS -- which is the rule this tree applies everywhere else, and applying it here is
+// what makes the two incapable of disagreeing. *** THE SAME RULE IS APPLIED TO THE OTHER TWO INVARIANCE
+// BOOLEANS IN THIS FILE, massInvariant AND v3846'S extentInvariant, because a rule stated once and applied
+// once is a special case rather than a rule. ***
+//
+// MEASURED, the two arms: floorDriftFrac 0 -> 0.5, off an EXACT zero (the floor is pinned in world units, so
+// its drift is not small, it is nothing). floorHeights [1.5, 1.5] -> [1.5, 0.75].
+//
+// *** A PLANT THAT FIRES AND CANNOT BE ASKED ABOUT IS INDISTINGUISHABLE, IN THE CENSUS, FROM NO PLANT AT ALL,
+// and this one sat that way since v3802. The lesson is not "declare a number" -- it is that THE CENSUS'S
+// CONTRACT IS PART OF THE INTERFACE, and a bind that satisfies its own gate while failing the contract is
+// exactly the shape v3766 keeps naming: REACHABLE AND FINDABLE ARE TWO DIFFERENT EDITS. ***
+
 import { makeGrid } from "../../physics/mpm/transfer.mjs";
 import { lame } from "../../physics/mpm/constitutive.mjs";
 import { restBlock, centreOfMass, step } from "../../physics/mpm/step.mjs";
 
 export const REFINE_OBSERVABLES = [
     "levels", "values", "diffs", "ratio", "converges",
-    "floorHeights", "fixtureInvariant", "totalMasses", "massInvariant", "order",
+    // v3851 -- EACH INVARIANCE IS DECLARED AS THE NUMBER FIRST AND THE BOOLEAN SECOND. See the header: the
+    // census can only watch a FINITE QUANTITY move, so the *DriftFrac keys are what it grades and the
+    // *Invariant booleans are what the gates read.
+    "floorHeights", "floorDriftFrac", "fixtureInvariant",
+    "totalMasses", "massDriftFrac", "massInvariant", "order",
     // v3846 -- TWO MORE THINGS THE RATIO CANNOT SEE, both found by lifting this study to the 3D loop.
-    "blockExtents", "extentInvariant", "restVmax", "comDrift", "restedAtSample",
+    "blockExtents", "extentDriftFrac", "extentInvariant", "restVmax", "comDrift", "restedAtSample",
 ];
 
 export const REFINE_MODES = ["refine", "cellfloor"];
@@ -104,12 +138,22 @@ export async function buildRefine(hyp, base = {}) {
     out.comDrift = rows.map((r) => r.comDrift);
 
     // *** THE FIXTURE MUST BE THE SAME PROBLEM AT EVERY LEVEL, AND THIS IS THE CHECK THE RATIO CANNOT MAKE. ***
-    const f0 = out.floorHeights[0];
-    out.fixtureInvariant = out.floorHeights.every((v) => Math.abs(v - f0) < 1e-9);
-    const m0 = out.totalMasses[0];
-    out.massInvariant = out.totalMasses.every((v) => Math.abs(v - m0) < 1e-9);
-    const e0 = out.blockExtents[0];
-    out.extentInvariant = out.blockExtents.every((v) => Math.abs(v - e0) < 1e-9);
+    // v3851 -- THE NUMBER IS PRIMARY AND THE BOOLEAN IS DERIVED FROM IT. Computing the two separately would
+    // let them disagree; deriving one from the other means the census's numeric reading and the gate's
+    // pass/fail reading are THE SAME MEASUREMENT seen twice. driftFrac is worst FRACTIONAL departure from the
+    // coarsest level's value, so it is comparable across quantities with different units -- and it falls back
+    // to an exact equality test when the reference value is zero, where a fraction is undefined.
+    const driftFrac = (xs) => {
+        const a0 = xs[0];
+        if (!(Math.abs(a0) > 0)) return xs.every((v) => v === a0) ? 0 : Infinity;
+        return Math.max(...xs.map((v) => Math.abs(v - a0) / Math.abs(a0)));
+    };
+    out.floorDriftFrac = driftFrac(out.floorHeights);
+    out.fixtureInvariant = out.floorDriftFrac < 1e-9;
+    out.massDriftFrac = driftFrac(out.totalMasses);
+    out.massInvariant = out.massDriftFrac < 1e-9;
+    out.extentDriftFrac = driftFrac(out.blockExtents);
+    out.extentInvariant = out.extentDriftFrac < 1e-9;
     // REST_TOL is a speed, in world units per second, against a collapse whose peak speed is ~3.9: 1e-2 is a
     // quarter of a percent of the motion the study is about. It is a NUMBER IN THE SOURCE so loosening it is
     // a deliberate act, the same rule the baselines elsewhere in this tree follow.
@@ -129,7 +173,10 @@ export async function buildRefine(hyp, base = {}) {
 export const refineDevice = {
     modes: REFINE_MODES,
     // "refine" is FIRST so the contract compares the plant against the mode that owns the invariance.
-    plantMode: "cellfloor", plantFlips: "fixtureInvariant", plantKind: "mode",
+    // v3851 -- plantFlips NAMES THE NUMBER, not the boolean derived from it. probeModePlant must watch a
+    // finite quantity MOVE; true -> false is not something it can measure, and this device was the census's
+    // only DECLARED BUT DEAD entry for that reason alone.
+    plantMode: "cellfloor", plantFlips: "floorDriftFrac", plantKind: "mode",
     name: "mpm-self-convergence", observables: REFINE_OBSERVABLES,
     build: buildRefine, defaults: refineDefaults,
 };

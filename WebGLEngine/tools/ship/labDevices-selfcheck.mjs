@@ -17,6 +17,9 @@ import { buildCT, ctDevice } from "../roundhouse/tomographyBind.mjs";
 import { buildInterferometer, interferometerDevice } from "../roundhouse/interferometerBind.mjs";
 import { buildFluid, fluidDevice } from "../roundhouse/fluidBind.mjs";
 import { buildThermal, thermalDevice } from "../roundhouse/thermalBind.mjs";
+import { buildMelt, meltDevice } from "../roundhouse/meltBind.mjs";            // v3850 - the thermal four join section 7
+import { buildFreeze, freezeDevice } from "../roundhouse/freezeBind.mjs";
+import { buildVaporize, vaporizeDevice } from "../roundhouse/vaporizeBind.mjs";
 import { buildPipe, pipeDevice } from "../roundhouse/pipe3dBind.mjs";
 import { buildGeometry, geometryDevice } from "../roundhouse/geometryBind.mjs";
 import { buildKH, khDevice } from "../roundhouse/khBind.mjs";
@@ -433,7 +436,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     ["ct", buildCT, ctDevice, ["parallel", "fan"]],
                     ["interferometer", buildInterferometer, interferometerDevice, ["recover", "nounwrap"]],
                     ["windtunnel", buildFluid, fluidDevice, ["balance", "drag", "sourceconfusion"]],   // v3845: + the declared reader plant
-                    ["thermal", buildThermal, thermalDevice, ["diffuse", "convect"]],
+                    ["thermal", buildThermal, thermalDevice, ["diffuse", "convect", "onedmoment"]],   // v3850: + the declared reader plant
                     ["pipe3d", buildPipe, pipeDevice, ["profile", "noslip"]],
                     ["geometry", buildGeometry, geometryDevice, ["sphere", "converge", "blob"]],
                     ["born", buildBorn, bornDevice, ["validity", "error", "scaling"]],
@@ -443,7 +446,17 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     ["chaos", buildChaos, chaosDevice, ["fixed", "doubling", "feigenbaum", "lyapunov"]],
                     ["splat", buildSplat, splatDevice, ["integral", "compose", "perspective", "shear", "precision"]],
                     ["discovery", buildDiscovery, discoveryDevice, ["kepler", "splat", "logistic", "nolaw", "visviva"]],
-                    ["probe", buildProbe, probeDevice, ["precession", "isco", "closure", "firstorder", "capture", "findisco", "mission", "pilot"]]];
+                    ["probe", buildProbe, probeDevice, ["precession", "isco", "closure", "firstorder", "capture", "findisco", "mission", "pilot"]],
+                    // *** v3850 -- THE THERMAL FOUR JOIN THIS CHECK, AND ADDING THEM FOUND SOMETHING. *** This
+                    // list held 17 devices and none of melt / freeze / vaporize, so their builders had been
+                    // returning keys that were never in their declared observable lists -- `kind`, `rows`,
+                    // `samples`, `material`, `cells`, `note`, `allPenaltiesEqualR` and more. An UNDECLARED
+                    // OBSERVABLE IS INVISIBLE TO EVERY CONSUMER THAT READS THE LIST RATHER THAN THE CODE,
+                    // which is the whole reason the list exists. Declared at v3850; this row is what keeps
+                    // them declared.
+                    ["melt", buildMelt, meltDevice, ["front", "stall", "naive"]],
+                    ["freeze", buildFreeze, freezeDevice, ["control", "reversibility", "slowfreeze"]],
+                    ["vaporize", buildVaporize, vaporizeDevice, ["ratio", "key", "trilemma", "celsius"]]];
     for (const [n, build, dev, modes] of checks) {
         let undeclared = [];
         for (const mode of modes) {

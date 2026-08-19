@@ -20,7 +20,33 @@
 // a small periodic box with these walls will not reproduce it exactly, so the OBSERVABLE here is the measured
 // motion, and any claim about a specific critical value is the caller's to make and the sim's to refuse.
 
+// ================================================================================================================
+// *** v3850 -- PLANTED, AND THE PLANT IS A DIMENSION. ***
+// ================================================================================================================
+//
+// The diffuse key measures alpha from how a hot spot spreads: <r^2> = 4*alpha*t IN TWO DIMENSIONS, so
+// alpha = d<r^2>/dt / 4. *** THE 1-D LAW IS <r^2> = 2*alpha*t, AND USING IT HERE IS ONE CHARACTER. *** It is
+// the canonical dimension confusion in a diffusion measurement, it produces a perfectly finite and
+// plausible-looking diffusivity, and nothing about the number's shape gives it away -- the spot still spreads,
+// the fit is still clean, the answer is simply twice what it should be.
+//
+// *** THIS IS A READER PLANT AND IS DECLARED AS ONE. *** plantedError.mjs's distinction: a knob plant perturbs
+// a physics INPUT and grades the whole path; a reader plant substitutes the MEASUREMENT, and is the honest
+// choice when the failure being reproduced has no input that produces it. THE WHOLE POINT OF THIS KEY IS THAT
+// alpha IS NEVER WRITTEN INTO THE COLLISION -- it is inferred from the spreading -- so there is no lattice you
+// can hand this solver that makes a correct moment-fit come out wrong. The defect lives in the inference.
+//
+// MEASURED, the two arms: alphaErrFrac 1.754e-5 -> 1.0000, a separation of 5.7e4, with alphaMeasured going
+// 0.099998 -> 0.199996 against an alphaTheory of 0.100000 that DOES NOT MOVE. *** THE KEY AND THE READING
+// SEPARATE CLEANLY: the theory side is computed from tau_g and is untouched, so the whole excursion belongs to
+// the measurement being graded. ***
+//
+// NOT CLAIMED: that this grades convection. `convect` and `rayleigh` are untouched by the plant -- it lives in
+// the diffuse branch's moment fit -- and ONE PLANT TESTS ONE CLAIM.
+
 import { makeThermal, diffusivityOf } from "../../simulation/lbm/thermal2d.js";
+
+export const THERMAL_MODES = ["diffuse", "convect", "rayleigh", "onedmoment"];
 
 export const THERMAL_OBSERVABLES = [
     "alphaMeasured", "alphaTheory", "alphaErrFrac",
@@ -52,7 +78,9 @@ export function thermalDefaults(hyp) {
     // checkMode to read: defaults() replaced it with "diffuse" and the new branch below never ran. My own
     // guard, working on me one round after I shipped it -- which is the cheapest possible way to find that a
     // new mode needs declaring.
-    if (!["diffuse", "convect", "rayleigh"].includes(h.mode)) h.mode = "diffuse";
+    // THE VALIDATOR MUST LIST THE PLANT MODE, or `onedmoment` reverts to `diffuse`, both arms read an
+    // IDENTICAL number, and the plant fires at nothing -- v3806's lesson on flip2d.
+    if (!THERMAL_MODES.includes(h.mode)) h.mode = "diffuse";
     return h;
 }
 
@@ -77,7 +105,7 @@ export async function buildThermal(hyp, base = {}) {
     const h = thermalDefaults({ ...hyp, config: { ...(hyp && hyp.config), ...base } });
     const c = h.config;
 
-    if (h.mode === "diffuse") {
+    if (h.mode === "diffuse" || h.mode === "onedmoment") {
         // a hot spot in still fluid, no gravity: pure diffusion, so alpha is the only thing acting
         const cx = c.nx / 2, cy = c.ny / 2;
         const sim = makeThermal({
@@ -92,8 +120,10 @@ export async function buildThermal(hyp, base = {}) {
         for (let t = warm; t < c.steps; t++) sim.step();
         const m1 = secondMoment(sim);
         if (m0 == null || m1 == null || !(m1 > m0)) return { error: "diffusion-not-measurable (spot vanished or did not spread)" };
-        // <r^2> = 4 alpha t in 2D -> alpha = d<r^2>/dt / 4
-        const alphaMeasured = (m1 - m0) / (4 * (c.steps - t0));
+        // <r^2> = 4 alpha t in 2D -> alpha = d<r^2>/dt / 4.
+        // *** THE PLANT: the 1-D law <r^2> = 2 alpha t, which is the same fit read in the wrong dimension. ***
+        const moment = h.mode === "onedmoment" ? 2 : 4;
+        const alphaMeasured = (m1 - m0) / (moment * (c.steps - t0));
         const alphaTheory = diffusivityOf(c.tauG);
         let mn = Infinity, mx = -Infinity;
         for (let k = 0; k < c.nx * c.ny; k++) { const v = sim.T[k]; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -196,4 +226,7 @@ export const thermalDevice = {
     // that adding one was a change to the SIMULATION -- but the simulation was here, unlisted, along with the
     // observables that grade it (convecting, convectingIsThreshold, raCritMeasured). The missing piece was one
     // string in one array.
-    modes: ["diffuse", "convect", "rayleigh"], name: "thermal-convection", observables: THERMAL_OBSERVABLES, build: buildThermal, defaults: thermalDefaults };
+    // "diffuse" stays FIRST: it owns alphaErrFrac, and the contract compares the plant against modes[0].
+    modes: THERMAL_MODES,
+    plantMode: "onedmoment", plantFlips: "alphaErrFrac", plantKind: "reader",
+    name: "thermal-convection", observables: THERMAL_OBSERVABLES, build: buildThermal, defaults: thermalDefaults };

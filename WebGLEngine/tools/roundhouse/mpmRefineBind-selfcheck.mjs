@@ -82,7 +82,38 @@ console.log("\n2. THE FIXTURE MUST BE THE SAME PROBLEM AT EVERY LEVEL");
         "MORE NODES OVER THE SAME MATERIAL ***");
     ok("!! the device DECLARES the plant, with `refine` first",
         DEVICE_NAMES.includes("mpmrefine") && refineDevice.plantMode === "cellfloor" &&
-        refineDevice.plantFlips === "fixtureInvariant" && REFINE_MODES[0] === "refine");
+        refineDevice.plantFlips === "floorDriftFrac" && REFINE_MODES[0] === "refine");
+
+    // *** v3851 -- AND THE DECLARED OBSERVABLE MUST SATISFY THE CENSUS'S CONTRACT, WHICH IS THE THING THAT
+    // WAS ACTUALLY BROKEN AND WHICH NO CHECK HERE WAS ASKING. *** This device declared `fixtureInvariant`, a
+    // BOOLEAN, from v3802 to v3850. The plant fired the whole time -- this gate's own section 3 proves it --
+    // and plantedCoverage still read mpmrefine as DECLARED BUT DEAD, its only such entry, because
+    // probeModePlant must watch a finite NUMBER move and true -> false is not a number.
+    //
+    // *** A PLANT THAT FIRES AND CANNOT BE ASKED ABOUT IS, IN THE CENSUS, INDISTINGUISHABLE FROM NO PLANT AT
+    // ALL. So the contract is asserted HERE, beside the declaration, rather than being discovered by a report
+    // nobody runs on a per-device basis. ***
+    const declared = refineDevice.plantFlips;
+    ok("!! the DECLARED observable is a finite number in BOTH arms -- the census's actual contract",
+        typeof good[declared] === "number" && Number.isFinite(good[declared]) &&
+        typeof bad[declared] === "number" && Number.isFinite(bad[declared]) &&
+        good[declared] !== bad[declared],
+        `${declared} ${good[declared]} -> ${bad[declared]}, off an EXACT zero (the floor is pinned in world ` +
+        "units, so its drift is not small, it is nothing). *** THE OLD DECLARATION NAMED A BOOLEAN AND THIS " +
+        "CHECK WOULD HAVE CAUGHT IT ON THE DAY ***");
+
+    // AND THE RULE IS APPLIED TO ALL THREE INVARIANCES, not just the declared one -- a rule stated once and
+    // applied once is a special case. extentInvariant is v3846's, and it was a boolean computed beside a
+    // number in exactly the same way.
+    ok("...and every invariance boolean is DERIVED from its number, so the two cannot disagree",
+        good.fixtureInvariant === (good.floorDriftFrac < 1e-9) &&
+        bad.fixtureInvariant === (bad.floorDriftFrac < 1e-9) &&
+        good.massInvariant === (good.massDriftFrac < 1e-9) &&
+        good.extentInvariant === (good.extentDriftFrac < 1e-9),
+        "one declaration, two readings -- the census's numeric view and this gate's pass/fail view are THE " +
+        "SAME MEASUREMENT, rather than two thresholds computed beside each other. floorDriftFrac " +
+        good.floorDriftFrac + " / massDriftFrac " + good.massDriftFrac.toExponential(2) +
+        " / extentDriftFrac " + good.extentDriftFrac.toExponential(2));
 }
 
 console.log("\n3. AND THE RATIO CANNOT SEE THE PLANT");

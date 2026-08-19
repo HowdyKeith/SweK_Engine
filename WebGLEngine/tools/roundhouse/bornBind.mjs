@@ -115,6 +115,11 @@ export async function buildBorn(hyp, base = {}) {
 
 export const bornDevice = {
     // WHAT THE PLANT OVERTURNS, as data so plantedCoverage reads it off the device rather than grepping prose.
+    // v3851 -- KNOB PLANT, DECLARED. plantedCoverage's wall is at ZERO undeclared and this bind was one of
+    // six sitting past it. `half` goes INTO bornSlab/bornError -- the approximation being graded -- while
+    // phaseShift and exactSlab, the reference side, never see it. So a physics input is perturbed and the
+    // WHOLE PATH from that input to errorScalingExponent is graded, which is v3393's definition of a knob.
+    plantKind: "knob",
     planted: { knob: "contrastHalf", observable: "errorScalingExponent",
                note: "n = 1 + delta instead of sqrt(1 + delta) doubles the Born phase; the error stops being quadratic (2.0073 -> 1.0574)" },
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were

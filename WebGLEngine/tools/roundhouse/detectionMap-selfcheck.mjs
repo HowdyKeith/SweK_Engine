@@ -55,6 +55,22 @@ async function main() {
         ok("!! ...and a plant that moves NOTHING is DECLARED BUT DEAD, not a tidy clean sheet",
             dead.declaredButDead === true && dead.detectorCount === 0,
             "a map with no movement in it would otherwise read as a good result. A DECLARED KNOB THAT TURNS NOTHING IS THE WORST CASE, not the best");
+
+        // *** v3851 -- AND THE KNOB IS SPELLED TWO WAYS, WHICH IS HOW THE ONLY DEAD PLANT IN THE REAL LAB GOT
+        // THERE. *** freeRotationBind's signature is `build({ mode, config = {}, planted = false })` -- planted
+        // is a SIBLING of config. This sweep set config.planted only, so it built NOMINAL TWICE and reported a
+        // plant that deletes the whole gyroscopic term as dead. plantedCoverage fixed the same bug at v3685 and
+        // this file never got the fix; freerotation was its one dead plant for 422 versions.
+        const sibling = {
+            modes: ["a", "b"],
+            build: ({ mode, planted = false }) => ({ x: planted ? 1 : 0, y: mode === "a" ? 2 : 3 }),
+        };
+        const sib = await deviceDetection(sibling);
+        ok("!! *** a knob spelled as a SIBLING of config is turned too, not read as a dead plant ***",
+            sib.declaredButDead === false && sib.observablesMoved.join() === "x",
+            "THE FALSE NEGATIVE IS THE EXPENSIVE DIRECTION: it sends somebody to repair a plant that already " +
+            "works. The sweep's job is to turn the knob HOWEVER THE BIND SPELLS IT -- not to make 106 devices " +
+            "agree on a parameter shape, which is a different round and a much larger one");
     }
 
     // ---- 3. A ONE-MODE DEVICE CANNOT BE ASKED, AND SAYS SO ----------------------------------------------
@@ -95,6 +111,22 @@ async function main() {
         ok("...and every device that declares a plant has one that moves something",
             r.deadPlants.length === 0,
             "REPORTED rather than asserted as a target: a dead plant arriving tomorrow must show up here, and the check above is what would say so");
+
+        // *** v3851 -- MODE PLANTS ARE NAMED, NOT PROBED, AND THAT DISTINCTION IS THE OTHER HALF OF THE FALSE
+        // NEGATIVE. *** readsPlantedKnob is a `\bplanted\b` grep over code, so a bind whose plant is a MODE
+        // trips it whenever the word appears as a local -- which is exactly what v3850's thermal plants did
+        // (meltBind's `frontRun(c, { planted })`, freezeBind's `controlRun`, vaporizeBind's `ratioRun`). Their
+        // planted flag is set BY THE MODE BRANCH and nothing reads it off the hypothesis, so this instrument's
+        // knob moves nothing and all three read DECLARED BUT DEAD while their plants fire perfectly.
+        ok("!! *** a bind whose plant is a MODE is reported as one, rather than probed with a knob it has not got ***",
+            Array.isArray(r.modePlants) && r.modePlants.length > 0 &&
+            r.modePlants.every((n) => !r.deadPlants.includes(n)),
+            r.modePlants.join(", ") + " -- adjudicated by plantedCoverage's probeModePlant, which builds the " +
+            "plant MODE and watches the DECLARED observable. Probing them here produced three dead readings " +
+            "off three working plants, which is the same expensive direction as the sibling knob above");
+        ok("...and the categories do not overlap, so nothing is counted twice or lost between them",
+            r.modePlants.every((n) => !r.noPlant.includes(n) && !r.devices.some((d) => d.name === n)),
+            "a device is probed, named as a mode plant, or has no plant -- exactly one of the three");
         ok("...and NO device rests on a single observable -- reported, because it is a result and not a rule",
             Array.isArray(r.soleDetectorDevices),
             `${r.soleDetectorDevices.length} sole-detector devices. THE FEAR WAS UNFOUNDED AND THAT IS A MEASUREMENT: section 1 proves this ` +
