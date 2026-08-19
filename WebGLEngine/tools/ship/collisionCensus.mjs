@@ -104,7 +104,17 @@ export function collisionGates() {
 /** Spawn one gate under the loader hook and read back that process's STATS. */
 export function censusOne(rel, { timeoutMs = 120000 } = {}) {
     const out = path.join(os.tmpdir(), "swek-collide-" + process.pid + "-" + Math.random().toString(36).slice(2) + ".jsonl");
-    const r = spawnSync(process.execPath, ["--import", HOOK, rel],
+    // *** v3900 -- A file:// URL, NOT A PATH, AND THIS IS THE WINDOWS CLASS IN ITS THIRD FORM. *** `--import`
+    // goes through the ESM resolver exactly as import() does, so a raw "C:\\..." makes Node read "c:" as a URL
+    // SCHEME and THE SPAWNED PROCESS DIES BEFORE RUNNING A LINE. On Keith's rig that produced five failures
+    // from one cause: all seven gates reported exit 1 (they never started), nothing dumped stats, both
+    // blind-detection checks had no data to read, and the positive control came back empty. A gate that cannot
+    // START is indistinguishable here from a gate that FAILS, which is why the row carries `dumped`.
+    //
+    // CONVERTED HERE RATHER THAN AT THE DECLARATION, because HOOK is also handed to fs.readFileSync by
+    // collisionCensus-selfcheck -- one name, two consumers, and a URL would break the reader. ONE MEANING PER
+    // NAME: HOOK is a path, and the ESM resolver is the caller that needs a URL.
+    const r = spawnSync(process.execPath, ["--import", pathToFileURL(HOOK).href, rel],
         { cwd: ENGINE, timeout: timeoutMs, env: { ...process.env, SWEK_COLLIDE_CENSUS: out, SWEK_COLLIDE_LABEL: rel }, stdio: "ignore" });
     let row = { label: rel, code: r.status, calls: 0, empty: 0, pairs: 0, maxPairs: 0, dumped: false };
     try {

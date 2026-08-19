@@ -87,8 +87,27 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         "verify_zip.py is invoked by the ship ritual");
     // the ratchets are commitment boundaries too: lowering one is irreversible in spirit
     const graveyard = fs.readFileSync(path.join(HERE, "graveyard-selfcheck.mjs"), "utf8");
+    // *** v3900 -- THIS PINNED A CONSTANT THAT WAS DELIBERATELY DELETED, AND A PHRASE THAT NO LONGER EXISTS
+    // ANYWHERE IN THE TREE. *** It required `const BASELINE = <n>;` and the words "MAY SHRINK, MAY NEVER
+    // GROW". v3675 REMOVED that constant on purpose and wrote down why: it had gone 8 -> 14 -> 117 -> 143,
+    // "each raise was honest and each was the same admission: the number goes up when the project builds
+    // another gate-driven analysis primitive. A CONSTANT THAT MUST BE RAISED EVERY TIME THE WORK SUCCEEDS IS
+    // NOT A BASELINE." The phrase is gone too -- it greps zero times. So this check has been red since v3675
+    // for doing its job on a spelling rather than on a property, the same shape androidUpdateDoor carried.
+    //
+    // *** THE PROPERTY SURVIVED THE SPELLING AND IS WHAT GETS ASSERTED. *** The ratchets that still mean
+    // something -- ORPHAN_UTIL_BASELINE and ORPHAN_BASELINE -- are literals in the source, so relaxing one is
+    // a visible edit to a tracked file rather than a number computed at run time from whatever happens to be
+    // there. And graveyard requires every RAISE to carry its reason beside it, which is the half that makes a
+    // literal a commitment rather than a variable. Asked generically, so deleting a dead ceiling stays
+    // possible and adding a new ratchet does not need this file edited.
+    const literals = [...graveyard.matchAll(/const\s+([A-Z][A-Z0-9_]*BASELINE[A-Z0-9_]*)\s*=\s*\d+\s*;/g)].map((m) => m[1]);
     ok("THE RATCHETS keep their baselines as literals, so relaxing one is a deliberate edit",
-        /const BASELINE = \d+;/.test(graveyard) && /MAY SHRINK, MAY NEVER GROW/.test(graveyard));
+        literals.length > 0 && /RAISED FROM \d+ TO \d+|TIGHTENED FROM \d+ TO \d+|LOWERED/.test(graveyard),
+        literals.join(", ") + " -- literals in the source, each raise carrying its reason beside it. " +
+        "NOT `const BASELINE`, which v3675 deleted on purpose: a ceiling that must be raised every time the " +
+        "work succeeds is not a baseline, and a dead one left in the source reads as load-bearing to the next " +
+        "person who would raise it again");
 }
 
 console.log("commitmentBoundary-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

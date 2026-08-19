@@ -46,7 +46,7 @@ function walk(dir, out = []) {
 // ---- 1. NO DYNAMIC IMPORT MAY BE HANDED A FILESYSTEM PATH -------------------------------------------------------
 {
     const files = walk(ENG);
-    const offenders = [];
+    const offenders = [], loaderOffenders = [];
     for (const f of files) {
         let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
         const code = src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -55,9 +55,45 @@ function walk(dir, out = []) {
             offenders.push(path.relative(ENG, f).replace(/\\/g, "/") + " -> import(" + m[1].slice(0, 46) + ")");
         }
     }
+    // *** v3900 -- THE SAME DEFECT WEARS A SECOND SHAPE AND THIS SCAN COULD NOT SEE IT. *** `--import` and
+    // `--experimental-loader` hand their argument to THE SAME ESM RESOLVER as import(), so a raw path breaks
+    // there identically -- but it is a spawn ARGUMENT, not call syntax, so the regex above walks straight past
+    // it. collisionCensus.mjs did exactly this: `spawnSync(execPath, ["--import", HOOK, rel])` with HOOK a
+    // path.join. On Keith's rig every one of its seven spawned gates died before running a line, and the census
+    // reported FIVE failures from that ONE cause -- seven gates "failing", no stats dumped, both blind checks
+    // starved of data and an empty positive control.
+    //
+    // A GUARD THAT KNOWS ONE SPELLING OF A DEFECT WILL WATCH THE OTHER SPELLING SHIP. Same lesson as v3126's
+    // four faces of the self-reference trap, and as this morning's readsPlantedKnob grep counting one plant
+    // shape under a name that said all of them.
+    for (const f of files) {
+        let src = ""; try { src = fs.readFileSync(f, "utf8"); } catch { continue; }
+        const code = src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+        // THE CALL FORM IS LISTED FIRST so `pathToFileURL(HOOK).href` matches as one expression rather than
+        // as the bare identifier `pathToFileURL` -- which is exactly what the first version of this check did,
+        // and it duly reported the line this round had just FIXED. A checker that cannot read the correct form
+        // teaches you to ignore it.
+        const ARG = /["'`]--(?:import|experimental-loader)["'`]\s*,\s*([A-Za-z_$][\w$.]*\s*\([^()]*\)(?:\.\w+)*|path\.(?:join|resolve)\([^)]*\)|[A-Za-z_$][\w$.]*)/g;
+        for (const m of code.matchAll(ARG)) {
+            const arg = m[1].trim();
+            let safe;
+            if (/^pathToFileURL\s*\(/.test(arg)) safe = true;                 // converted at the call site
+            else if (/^path\.(?:join|resolve)/.test(arg)) safe = false;        // a raw path, inline
+            else if (/\(/.test(arg)) safe = false;                            // some other call producing a path
+            // a bare variable is safe only if this file assigns it through pathToFileURL
+            else safe = new RegExp("(?:const|let|var)\\s+" + arg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+                                   "\\s*=\\s*[^;]*pathToFileURL").test(code);
+            if (!safe) loaderOffenders.push(path.relative(ENG, f).replace(/\\/g, "/") + " -> --import " + arg);
+        }
+    }
     ok("!! NO dynamic import is given a raw filesystem path", offenders.length === 0,
        offenders.length ? "WOULD CRASH ON WINDOWS: " + offenders.slice(0, 4).join(" | ")
                         : files.length + " files scanned -- on Windows an absolute path starts with C:, and 'c:' parses as a URL SCHEME, so the loader throws ERR_UNSUPPORTED_ESM_URL_SCHEME");
+    ok("!! ...and NO --import / --experimental-loader FLAG is given one either", loaderOffenders.length === 0,
+       loaderOffenders.length ? "WOULD DIE ON WINDOWS BEFORE RUNNING A LINE: " + loaderOffenders.slice(0, 4).join(" | ")
+                              : "the loader flags resolve through the same ESM machinery as import(), so a raw " +
+                                "path fails there identically -- and it is a spawn ARGUMENT rather than call " +
+                                "syntax, so the scan above cannot see it");
     ok("...and the scan covered the whole tree", files.length > 500, files.length + " source files");
 }
 
