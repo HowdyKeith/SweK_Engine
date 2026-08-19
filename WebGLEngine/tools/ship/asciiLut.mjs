@@ -129,7 +129,11 @@ export function testField(width, height) {
     return g;
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3900 -- GUARDED. This module is loaded by a PAGE as well as run as a CLI, and `process` at module
+// top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
+// whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
+// on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
+if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
     const ramp = rampFrom();
     console.log("[asciiLut] DERIVED ramp (ascending measured coverage):");
     console.log("   " + ramp.map((g) => "'" + g.ch + "'=" + (g.coverage * CELL_PX).toFixed(0) + "/" + CELL_PX).join("  "));

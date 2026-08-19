@@ -98,7 +98,11 @@ let A = null, poll = 0;
 async function tick() {
   try {
     if (!A) A = await import("/tools/roundhouse/activity.mjs");   // guarded by this function's own catch
-    const me = await (await fetch("/fingerprint", { cache: "no-store" })).json();
+    // v3900 -- .ok BEFORE .json(): a 404 returns an HTML page and the parser reports a syntax error
+    // rather than a missing route, which is the wrong sentence for the reader of this panel.
+    const meRes = await fetch("/fingerprint", { cache: "no-store" });
+    if (!meRes.ok) throw new Error("/fingerprint answered " + meRes.status + " " + meRes.statusText);
+    const me = await meRes.json();
     const a = A.readActivity(me && me.roundhouse);
     if (a.state === "running") {
       const done = Number(a.round) || 0, total = Number(a.maxRounds) || 0;

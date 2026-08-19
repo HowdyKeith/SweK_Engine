@@ -55,7 +55,13 @@ const colourFor = (r) => {
   return f >= 0.6 ? "var(--ok)" : (f >= 0.3 ? "var(--warn)" : "var(--bad)");
 };
 try {
-  const j = await (await fetch("/lab/census", { cache: "no-store" })).json();
+  // v3900 -- .ok BEFORE .json(). An HTML error page fed to the JSON parser throws "Unexpected token <",
+  // which tells the reader nothing about what went wrong; the status does. boundaryLint counts this shape
+  // rather than failing it (a caller entitled to treat any failure as "unavailable" may let the parse
+  // throw) -- but the count is RATCHETED, and this page was one of three that pushed it 79 -> 82.
+  const res = await fetch("/lab/census", { cache: "no-store" });
+  if (!res.ok) throw new Error("/lab/census answered " + res.status + " " + res.statusText);
+  const j = await res.json();
   if (!j.ok) throw new Error(j.error || "refused");
   document.getElementById("out").innerHTML = j.rows.map((r) => {
     const pct = r.total ? (100 * r.have / r.total) : 0;

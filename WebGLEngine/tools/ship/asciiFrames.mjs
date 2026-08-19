@@ -110,7 +110,11 @@ export function flickerOnStill(frames) {
                 : "identical source frames differ in " + (100 * c.worst).toFixed(1) + "% of cells -- THE GENERATOR IS FLICKERING" };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3900 -- GUARDED. This module is loaded by a PAGE as well as run as a CLI, and `process` at module
+// top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
+// whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
+// on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
+if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
     const mk = (ch, cols, rows) => Array.from({ length: rows }, () => ch.repeat(cols)).join("\n");
     const good = importFrames({ fps: 12, cols: 8, rows: 3, frames: [mk(".", 8, 3), mk("#", 8, 3)] });
     console.log("[asciiFrames] 2 frames at 12 fps -> ok=" + good.ok + "  duration " + good.durationSec.toFixed(3) + "s");

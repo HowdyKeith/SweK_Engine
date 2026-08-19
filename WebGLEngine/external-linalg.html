@@ -92,7 +92,13 @@ async function load() {
   $("state").textContent = "reading…";
   $("rows").innerHTML = "";
   let r;
-  try { r = await (await fetch("/linalg/grade", { cache: "no-store" })).json(); }
+  // v3900 -- .ok BEFORE .json(). This page's catch already prints e.message and tells the reader to run
+  // the commands below; a status makes that message name the real fault instead of a parser complaint.
+  try {
+    const res = await fetch("/linalg/grade", { cache: "no-store" });
+    if (!res.ok) throw new Error("route answered " + res.status + " " + res.statusText);
+    r = await res.json();
+  }
   catch (e) {
     $("state").textContent = "no route";
     $("state").className = "state warn";

@@ -187,7 +187,11 @@ export function reportLines() {
     return L;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+// v3900 -- GUARDED. This module is loaded by a PAGE as well as run as a CLI, and `process` at module
+// top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
+// whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
+// on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
+if (typeof process !== "undefined" && import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     for (const l of reportLines()) console.log(l);
     process.exit(0);
 }

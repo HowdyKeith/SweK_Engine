@@ -99,7 +99,11 @@ export function fromTextFiles(blobs, opts = {}) {
              order: ordered.map((b) => b.name) };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3900 -- GUARDED. This module is loaded by a PAGE as well as run as a CLI, and `process` at module
+// top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
+// whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
+// on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
+if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
     const g = (ch) => [ch.repeat(6), ch.repeat(6)].join("\n");
     const names = ["frame1.txt", "frame2.txt", "frame10.txt"];
     console.log("[asciiExternal] names as given : " + names.join(", "));
