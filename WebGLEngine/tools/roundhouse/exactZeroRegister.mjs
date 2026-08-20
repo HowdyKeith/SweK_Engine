@@ -10,6 +10,42 @@
 // ceremony the guard exists to force. An entry cannot be added without writing the sentence.
 
 export const EXACT_OK = {
+    // *** v3914 -- TWELVE OF THE THIRTY-TWO CENSUS HAD BEEN UNABLE TO REPORT. *** census-selfcheck was timing
+    // out at 180s, so its exact-zero ledger went unenforced and the fresh list grew to 32 across 16 devices. It
+    // completes at 717s now (v3913 gave it a budget), and these twelve are the two clusters, EXAMINED rather
+    // than waved through -- MOVING AN ENTRY HERE MEANS SOMEBODY LOOKED, and both clusters have a control that
+    // proves the comparison is live rather than vacuous.
+    //
+    // THE VIBRATIONS SUM RULES. sumW2ErrRel and sumW4ErrRel compare the moments of the eigenvalues lambda = w^2,
+    // summed over the module's own frequencies, against closed forms in N: sum(lambda) = 2N(k/m) and
+    // sum(lambda^2) = (6N-2)(k/m)^2. The naming is offset by one on purpose -- "first moment" is the moment of
+    // LAMBDA, so it lands on sumW2 -- and I checked that before assuming a bug, because key4 being computed by
+    // a function called secondMomentKey reads exactly like one.
+    // *** AT N=12 THE TWO SUMS ARE 24 AND 70 -- SMALL INTEGERS, EXACTLY REPRESENTABLE -- so the summation lands
+    // bit-exactly on the closed form. THE CONTROL IS ring AT N=32: there sum(lambda^2) comes out
+    // 189.99999999999997 against 190, a residual of -2.84e-14, WHICH IS WHY ring.sumW4ErrRel IS NOT ON THIS LIST.
+    // The same expression produces a non-zero when the arithmetic stops being exact, so the zeros at N=12 are a
+    // property of the numbers and not of a dead check.
+    "vibrations.moments.sumW2ErrRel": "sum(lambda) over the chain's own frequencies lands bit-exactly on 2N(k/m) = 24 at N=12, a small integer; ring at N=32 shows the same comparison going non-zero, so this is exact arithmetic and not a dead check",
+    "vibrations.moments.sumW4ErrRel": "sum(lambda^2) lands bit-exactly on (6N-2)(k/m)^2 = 70 at N=12; the ring mode's 2.84e-14 residual at N=32 is the control that the expression can miss",
+    "vibrations.trace.sumW2ErrRel": "same chain and same sum rule as moments -- the trace mode probes a different route to the second moment and leaves these two untouched, so the exactness carries across unchanged",
+    "vibrations.trace.sumW4ErrRel": "same as moments.sumW4ErrRel: 70 at N=12 is exactly representable and the sum reaches it to the bit",
+    "vibrations.ring.sumW2ErrRel": "sum(lambda) = 64 at N=32 is exactly representable and the sum lands on it; ITS SIBLING sumW4ErrRel IS NOT ZERO at the same N, which is what makes this a fact about the number rather than about the check",
+    "vibrations.sixNplus6.sumW2ErrRel": "the sixNplus6 plant replaces the FOURTH moment's key only (6N-2 -> 6N+6), so the second-moment comparison is bit-identical to the honest arm and stays exactly zero -- it is the plant's blind partner",
+    //
+    // THE FFT ABSOLUTE KEYS, WHICH ARE EXACT BY CONSTRUCTION AND WHOSE OWN GATE SAYS SO. A constant c gives
+    // |X[0]| = c*N and a sinusoid c*sin gives |X[k]| = c*N/2, both exactly; fftBind-selfcheck asserts
+    // `honest.sinusoidErrFrac === 0` and states "NOT TOLERANCED -- EXACTLY ZERO" in the same breath. Nothing in
+    // fft.js is told either number.
+    // *** THE CONTROL IS THE halfscale PLANT: the same two observables read 0.875 there. *** A check that could
+    // only ever return zero would read zero in that mode too, so these are exact AND demonstrably live -- which
+    // is the pair of properties this register exists to record, and the reason they are not merely tolerated.
+    "fft.absolute.sinusoidErrFrac": "a sinusoid c*sin gives |X[k]| = c*N/2 exactly and fft.js is never told the number; fftBind-selfcheck asserts === 0 deliberately, and the halfscale plant moves it to 0.875",
+    "fft.absolute.mixedToneErrFrac": "same absolute key over two summed tones, exact for the same reason; halfscale moves it to 0.875, so the zero is live rather than unreachable",
+    "fft.parseval.sinusoidErrFrac": "the parseval mode changes WHICH identity is graded, not the absolute keys, so this stays exactly zero alongside its own energy residual",
+    "fft.parseval.mixedToneErrFrac": "as above -- the mixed-tone absolute key is untouched by the parseval route and remains exact",
+    "fft.roundtrip.sinusoidErrFrac": "the roundtrip mode grades inverse-then-forward; the absolute key is computed on the forward pass and is unaffected, so it stays bit-zero",
+    "fft.roundtrip.mixedToneErrFrac": "as above -- roundtrip leaves the absolute keys alone, and halfscale is where these two are shown to move",
     // v3533 -- THE GRAINS STICK ZERO. Below the Coulomb cone (tangential motion < mu*depth) a contact STICKS: the
     // solve resists the entire tangential motion since the previous step, so the applied correction equals that
     // motion exactly and the residual is zero to the bit. It is the sticking half of the friction law (the coneErr
