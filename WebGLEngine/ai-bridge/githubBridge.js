@@ -17,7 +17,14 @@ const SEED_REPOS = [
     "HowdyKeith/swek-blobulator",       // marching-cubes metaballs, 9 checks tied to README claims
     "HowdyKeith/sph-no-tension",        // the SPH tensile fix
 ];
-const DEFAULTS = { owner: "HowdyKeith", token: "", defaultRepo: "", engineRepo: "", showAsPeer: true, monitorRepos: SEED_REPOS.slice() };
+// v3907 -- engineRepo WAS "" WHILE owner WAS ALREADY "HowdyKeith", and that asymmetry made the whole GitHub
+// update source a silent no-op: versionCheck() returned "no repo to check (set engineRepo)" and
+// fetchEngineBuild() returned "no engineRepo set", so cfg.update.autoFetch could be ON and the poller would
+// call githubPull() every interval forever without ever looking at anything. A DEFAULT THAT DISABLES THE
+// FEATURE IS NOT A SAFE DEFAULT, IT IS AN INVISIBLE ONE. Setting it turns on no network traffic by itself:
+// cfg.update.autoFetch and cfg.update.enabled both default to false, so this only makes the manual check
+// and the opt-in poller able to reach the repo they were always meant to reach.
+const DEFAULTS = { owner: "HowdyKeith", token: "", defaultRepo: "", engineRepo: "HowdyKeith/SweK_Engine", showAsPeer: true, monitorRepos: SEED_REPOS.slice() };
 
 function loadCfg() { try { if (fs.existsSync(CFG)) return Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(CFG, "utf8"))); } catch {} return { ...DEFAULTS }; }
 function saveCfg(c) { try { fs.mkdirSync(path.dirname(CFG), { recursive: true }); fs.writeFileSync(CFG, JSON.stringify(c, null, 2), { mode: 0o600 }); } catch {} }
