@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Asteroids (autopilot)</title>
+<!-- universal viewer discovery meta -->
+<meta name="demo:title"  content="Asteroids (autopilot)">
+<meta name="demo:desc"   content="A self-playing UFO hunts drifting rocks and dodges to survive. Tap to add a rock.">
+<meta name="demo:cats"   content="sim,arcade">
+<meta name="demo:swatch" content="🛸">
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1}
+  #topbar button{padding:6px 12px;border-radius:6px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:13px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #sim{background:#000;max-width:100vmin;max-height:100vmin;border-radius:4px;touch-action:none}
+  #footer{padding:8px 12px;font-size:11px;color:#789;text-align:center}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🛸 Asteroids (autopilot)</h1>
+    <button id="btnReset">🔄 Reset</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host"><canvas id="sim" width="512" height="512"></canvas></div>
+  <div id="footer">self-playing: the ship aims, fires, and flees · tap to add a rock</div>
+</div>
+<script>
+"use strict";
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+const canvas = document.getElementById("sim");
+function resize(){ const host=document.getElementById("host"); const s=Math.min(host.clientWidth,host.clientHeight,600); canvas.style.width=s+"px"; canvas.style.height=s+"px"; }
+window.addEventListener("resize", resize); resize();
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+const TAU = Math.PI*2;
+const wrap=(v,m)=>{ v%=m; return v<0?v+m:v; };
+const angDiff=(a,b)=>{ let d=(a-b)%TAU; if(d>Math.PI)d-=TAU; if(d<-Math.PI)d+=TAU; return d; };
+
+let ship, asteroids, bullets, score, lives, wave, fireCd, thrustCd;
+function rockVerts(){ const n=9+((Math.random()*4)|0), v=[]; for(let i=0;i<n;i++) v.push(0.72+Math.random()*0.42); return v; }
+function spawnRock(x,y,size){ const sp=0.4+Math.random()*0.7+ (3-size)*0.25, a=Math.random()*TAU;
+  return { x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, size, r:[0,16,30,46][size], verts:rockVerts(), rot:Math.random()*TAU, vr:(Math.random()*2-1)*0.02 }; }
+function newWave(){ const n=3+wave; asteroids=[]; for(let i=0;i<n;i++){ let x,y; do{ x=Math.random()*W; y=Math.random()*H; }while(Math.hypot(x-W/2,y-H/2)<140); asteroids.push(spawnRock(x,y,3)); } }
+function resetShip(){ ship={ x:W/2, y:H/2, a:-Math.PI/2, vx:0, vy:0, invuln:90, thrust:false }; }
+function reset(){ score=0; lives=3; wave=1; bullets=[]; fireCd=0; thrustCd=0; resetShip(); newWave(); }
+reset();
+document.getElementById("btnReset").addEventListener("click", reset);
+canvas.addEventListener("pointerdown", e=>{ const r=canvas.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width*W, y=(e.clientY-r.top)/r.height*H; asteroids.push(spawnRock(x,y,3)); });
+
+const SHIP_R=12, DODGE=92, TURN=0.085, THRUST=0.12, FRICTION=0.99, BULLET_SP=5.2;
+function nearestRock(){ let best=null,bd=1e9; for(const a of asteroids){ const d=Math.hypot(a.x-ship.x,a.y-ship.y); if(d<bd){bd=d;best=a;} } return {rock:best,d:bd}; }
+
+function update(){
+  const {rock,d}=nearestRock();
+  ship.thrust=false;
+  if(rock){
+    if(d<DODGE){ // flee: face away, thrust
+      const away=Math.atan2(ship.y-rock.y, ship.x-rock.x);
+      ship.a += Math.max(-TURN,Math.min(TURN, angDiff(away,ship.a)));
+      ship.thrust=true;
+    } else { // hunt: lead the target, fire when aimed
+      const t=d/BULLET_SP; const px=rock.x+rock.vx*t, py=rock.y+rock.vy*t;
+      const want=Math.atan2(py-ship.y, px-ship.x);
+      ship.a += Math.max(-TURN,Math.min(TURN, angDiff(want,ship.a)));
+      if(Math.abs(angDiff(want,ship.a))<0.18 && fireCd<=0){ bullets.push({x:ship.x+Math.cos(ship.a)*SHIP_R, y:ship.y+Math.sin(ship.a)*SHIP_R, vx:Math.cos(ship.a)*BULLET_SP, vy:Math.sin(ship.a)*BULLET_SP, life:64}); fireCd=14; }
+      thrustCd--; if(thrustCd<=0){ ship.thrust = (d>180); thrustCd=40+((Math.random()*40)|0); }
+    }
+  }
+  if(ship.thrust){ ship.vx+=Math.cos(ship.a)*THRUST; ship.vy+=Math.sin(ship.a)*THRUST; }
+  ship.vx*=FRICTION; ship.vy*=FRICTION;
+  const sp=Math.hypot(ship.vx,ship.vy), MS=3.6; if(sp>MS){ ship.vx*=MS/sp; ship.vy*=MS/sp; }
+  ship.x=wrap(ship.x+ship.vx,W); ship.y=wrap(ship.y+ship.vy,H);
+  if(ship.invuln>0) ship.invuln--;
+  if(fireCd>0) fireCd--;
+
+  for(const b of bullets){ b.x=wrap(b.x+b.vx,W); b.y=wrap(b.y+b.vy,H); b.life--; }
+  bullets=bullets.filter(b=>b.life>0);
+  for(const a of asteroids){ a.x=wrap(a.x+a.vx,W); a.y=wrap(a.y+a.vy,H); a.rot+=a.vr; }
+
+  // bullet → rock
+  for(let i=asteroids.length-1;i>=0;i--){ const a=asteroids[i];
+    for(let j=bullets.length-1;j>=0;j--){ const b=bullets[j];
+      if(Math.hypot(a.x-b.x,a.y-b.y)<a.r){ bullets.splice(j,1); score+=(4-a.size)*10;
+        if(a.size>1){ for(let k=0;k<2;k++) asteroids.push(spawnRock(a.x,a.y,a.size-1)); }
+        asteroids.splice(i,1); break; } } }
+  // ship → rock
+  if(ship.invuln<=0){ for(const a of asteroids){ if(Math.hypot(a.x-ship.x,a.y-ship.y)<a.r+SHIP_R){ lives--; resetShip(); if(lives<0){ reset(); } break; } } }
+  if(asteroids.length===0){ wave++; newWave(); }
+}
+
+function poly(a){ ctx.beginPath(); const n=a.verts.length; for(let i=0;i<=n;i++){ const k=i%n, ang=a.rot+k/n*TAU, rr=a.r*a.verts[k]; const x=a.x+Math.cos(ang)*rr, y=a.y+Math.sin(ang)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke(); }
+function draw(){
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="#7fd3ff"; ctx.lineWidth=1.6;
+  for(const a of asteroids) poly(a);
+  ctx.fillStyle="#bfe9ff"; for(const b of bullets){ ctx.beginPath(); ctx.arc(b.x,b.y,2.2,0,TAU); ctx.fill(); }
+  if(ship.invuln<=0 || (ship.invuln>>2)&1){ // blink when invulnerable
+    ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+    ctx.beginPath();
+    const p=(ang,len)=>[ship.x+Math.cos(ship.a+ang)*len, ship.y+Math.sin(ship.a+ang)*len];
+    const nose=p(0,16), l=p(2.55,12), r=p(-2.55,12);
+    ctx.moveTo(nose[0],nose[1]); ctx.lineTo(l[0],l[1]); ctx.lineTo(r[0],r[1]); ctx.closePath(); ctx.stroke();
+    if(ship.thrust){ ctx.strokeStyle="#ff8a4a"; const t=p(Math.PI,8+Math.random()*6); ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(t[0],t[1]); ctx.lineTo(r[0],r[1]); ctx.stroke(); }
+  }
+  ctx.fillStyle="#9fd"; ctx.font="13px monospace"; ctx.textAlign="left";
+  ctx.fillText("SCORE "+score, 10, 20);
+  ctx.fillText("WAVE "+wave, 10, 38);
+  ctx.textAlign="right"; ctx.fillText("SHIPS "+Math.max(0,lives), W-10, 20);
+}
+let raf;
+function loop(){ update(); draw(); raf=requestAnimationFrame(loop); }
+loop();
+window.addEventListener("pagehide", ()=>{ if(raf) cancelAnimationFrame(raf); });
+</script>
+<!-- demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

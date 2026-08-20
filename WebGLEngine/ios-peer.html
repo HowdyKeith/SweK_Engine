@@ -1,0 +1,193 @@
+<!doctype html>
+<!-- ios-peer.html -- v2925
+     The iPhone/iPad peer. iOS is NOT Android: there is no Termux, no real Node, no adb push. What CAN run:
+       - the portable physics subset, IN THIS PAGE (pure ES modules, Safari runs them) -- proof the strict core
+         is bit-identical on Apple's JS engine
+       - the magmap GPU kernel on the iPad/iPhone's Apple GPU (WebGPU shipped in Safari 18), graded as a
+         first-class third vendor family
+       - a-Shell (free App Store terminal) as an optional native-ish path for the same subset off the browser
+     What CANNOT: a background compute daemon, an app push, the full spawning suite. This page says so plainly. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK iOS Peer (iPhone / iPad)</title>
+<style>
+  :root { --bg:#0a0e0c; --ink:#cfe9d8; --dim:#7fa78e; --line:#224a36; --go:#6fe39a; --warn:#ffd166; --err:#ff7a76; }
+  body { font: 15px/1.55 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); color: var(--ink); margin: 0; padding: 18px; max-width: 900px; }
+  h1 { font-size: 19px; margin: 0 0 4px; } h2 { font-size: 15px; color: var(--go); border-bottom: 1px solid var(--line); padding-bottom: 4px; margin: 24px 0 10px; }
+  .sub { color: var(--dim); font-size: 12px; } code, pre { background: #0f1712; border: 1px solid var(--line); border-radius: 5px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { text-align: left; padding: 5px 10px 5px 0; vertical-align: top; border-bottom: 1px solid #14251c; } th { color: var(--dim); font-weight: normal; }
+  .yes { color: var(--go); } .no { color: var(--err); } .part { color: var(--warn); } a { color: var(--go); }
+  button { font: inherit; background: #17402a; color: var(--ink); border: 1px solid #2c6a45; border-radius: 6px; padding: 9px 16px; cursor: pointer; } button:disabled { opacity: .45; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #0d1410; margin: 10px 0; }
+  #banner { font-size: 17px; font-weight: bold; margin: 8px 0; } .pass { color: var(--go); } .fail { color: var(--err); }
+</style>
+</head>
+<body>
+<h1>&#127823; SweK iOS Peer &mdash; iPhone / iPad</h1>
+<div class="sub">iOS is a different animal from Android. There is no Termux, no unrestricted Node, and no way to push an app to a phone.
+This page is honest about what an Apple device can and cannot do as a peer, and it runs the parts that DO work, right here.</div>
+
+<h2>what an iOS device can and cannot be</h2>
+<table>
+  <tr><th>capability</th><th>iOS</th><th>why</th></tr>
+  <tr><td>browser front-end (WebGL2)</td><td class="yes">&#10003; full</td><td>Safari runs WebGL2 on every modern iPhone/iPad</td></tr>
+  <tr><td>GPU audition (magmap WGSL)</td><td class="yes">&#10003; full</td><td>WebGPU shipped in Safari 18 (iOS/iPadOS 18); the Apple GPU is a first-class third vendor</td></tr>
+  <tr><td>portable physics subset</td><td class="yes">&#10003; in-page</td><td>the strict core is pure ES modules &mdash; Safari's JS engine runs it with no Node</td></tr>
+  <tr><td>fleet console / hub / invites</td><td class="yes">&#10003; full</td><td>all same-origin web pages; an iPad makes a fine operator console</td></tr>
+  <tr><td>native subset off-browser</td><td class="part">~ a-Shell</td><td>a free App Store terminal with a sandboxed shell; runs the same subset via its JS, slower and manual</td></tr>
+  <tr><td>full 38-check spawning suite</td><td class="no">&#183; no</td><td>needs a process spawner (node:child_process); no iOS runtime provides one</td></tr>
+  <tr><td>background compute daemon</td><td class="no">&#183; no</td><td>iOS backgrounding is stricter than Android Doze &mdash; seconds, not a battery exemption</td></tr>
+  <tr><td>app push to the device</td><td class="no">&#183; no</td><td>no adb equivalent exists on iOS; consent-gated download is the only path (which is cleaner anyway)</td></tr>
+  <!-- v3332 -- TWO SENSES OF "PUSH" SAT ONE ROW APART AND ONLY ONE OF THEM IS IMPOSSIBLE. The row ABOVE means
+       pushing a BUILD onto the device (an adb equivalent), which iOS genuinely does not offer. THIS row means
+       waking the device with a NOTIFICATION, which it does offer and which nothing here had ever built. The
+       old row is left EXACTLY as it was: it was never wrong, it was answering a different question. -->
+  <tr><td>push <i>notification</i> to the device</td><td class="part">~ via ntfy</td><td>v3332: the hub PUTs a line to an ntfy topic and the OS wakes ntfy's app. <b>A doorbell, not a daemon</b> &mdash; it summons a person, it does not run anything</td></tr>
+</table>
+<div class="sub">Bottom line: an iOS device is a <b>GPU-audition and console peer</b>, plus a real (if partial) physics peer via the in-page subset.
+The compute-daemon half that makes the Android peer a background worker has no home on iOS &mdash; that is a property of the platform, not a gap we can code around.</div>
+
+<h2>wake this device from the hub</h2>
+<div class="card">
+  <div class="sub">v3332. The hub publishes one short line to an <a href="https://github.com/binwiederhier/ntfy" style="color:inherit">ntfy</a>
+    topic; iOS wakes ntfy's app and shows it. <b>This does not make the page a background worker</b> &mdash; the notification
+    arrives in ntfy's app, you tap it, and that opens this page. It converts &ldquo;the phone is unreachable&rdquo; into
+    &ldquo;the phone can be summoned&rdquo;, which is a smaller and more honest claim.
+    <br><br>Configure it on the hub, not here: write <code>~/.voxelbridge/ntfy.json</code> or set the
+    <code>SWEK_NTFY_*</code> variables. <b>A public ntfy host with no auth token is refused</b> &mdash; a topic name is not a
+    secret, and anyone who knows it can read <i>and</i> publish.</div>
+  <p><button id="nfStatus">Check hub status</button> <button id="nfTest">Send a test to this device</button></p>
+  <pre id="nfOut" class="sub">not checked yet</pre>
+</div>
+
+<h2>run the portable physics subset &mdash; right here, on this device</h2>
+<div class="card">
+  <div class="sub">This runs the arithmetic-only, answer-key-bearing checks (Basel &pi;, even-zeta closed forms, the strict-trig identity, the
+    Schwarzschild radius and ISCO) directly in Safari's JS engine. If they pass here, the strict core is bit-faithful on Apple's JavaScriptCore.</div>
+  <div style="margin:10px 0"><button id="runSuite">run the portable subset in this browser</button></div>
+  <div id="banner"></div>
+  <table id="suiteOut"></table>
+</div>
+
+<h2>audition this device's GPU &mdash; the magmap kernel</h2>
+<div class="card">
+  <div class="sub">The same unchanged magmap WGSL the Android round runs, on the Apple GPU. Needs iOS/iPadOS 18+ (Safari 18) for WebGPU.
+    The result grades the Apple GPU as its own vendor family against a tolerance set before any Apple GPU met this kernel.</div>
+  <div style="margin:10px 0"><a href="/magmap-android.html"><button>open the GPU audition &rarr;</button></a>
+    <span class="sub">(the same page the Android peer uses; it detects the adapter and names Apple first-class)</span></div>
+</div>
+
+<h2>optional: the native-ish path via a-Shell</h2>
+<div class="card">
+  <div class="sub">a-Shell is a free, notarized App Store terminal that runs a real sandboxed shell (no jailbreak). It has no Node, but it does have a
+    JavaScript engine, so it can run the same portable subset off the browser. Slower and manual, but it is a genuine on-device shell.</div>
+  <pre># in a-Shell, after downloading the peer files (Files app, or curl from your engine):
+curl -fsSL "ORIGIN/tools/roundhouse/portableSuite.mjs" -o portableSuite.mjs
+# a-Shell's `jsc` (JavaScriptCore) runs ES modules:
+jsc -m portableSuite.mjs</pre>
+  <div class="sub">If <code>jsc</code> is not present in your a-Shell build, the in-page runner above is the reliable path &mdash; it uses the same module.</div>
+</div>
+
+<h2>related</h2>
+<table>
+  <tr><td><a href="/android-peer.html">android-peer.html</a></td><td>the Android peer &mdash; the full-featured sibling with a real Node runtime</td></tr>
+  <tr><td><a href="/magmap-android.html">magmap-android.html</a></td><td>the GPU audition, shared by both platforms</td></tr>
+  <tr><td><code>tools/roundhouse/portableSuite.mjs</code></td><td>the runtime-agnostic physics subset this page runs (gate: portableSuite-selfcheck.mjs)</td></tr>
+</table>
+
+<script type="module">
+import { runPortableSuite } from "/tools/roundhouse/portableSuite.mjs";
+const $ = (id) => document.getElementById(id);
+$("runSuite").onclick = () => {
+  $("runSuite").disabled = true;
+  try {
+    const r = runPortableSuite();
+    $("suiteOut").innerHTML = "<tr><th>check</th><th>result</th><th>rel error</th></tr>" +
+      r.checks.map((c) => `<tr><td>${c.name}</td><td class="${c.ok ? "pass" : "fail"}">${c.ok ? "PASS" : "FAIL"}</td><td class="dim">${c.relErr.toExponential(2)}</td></tr>`).join("");
+    $("banner").textContent = r.allPass ? `all ${r.counts.total} pass on this device's JS engine` : `${r.counts.fail} of ${r.counts.total} FAILED`;
+    $("banner").className = r.allPass ? "pass" : "fail";
+  } catch (e) { $("banner").textContent = "error: " + (e && e.message || e); $("banner").className = "fail"; }
+  finally { $("runSuite").disabled = false; }
+};
+</script>
+
+<h2>move files - copyparty on the phone</h2>
+<p class="dim">This page could run the physics subset and <b>not move a single file</b>. copyparty is a one-file
+Python server that runs in a-Shell and speaks http, WebDAV and FTP, with resumable uploads and downloads.</p>
+<p class="dim"><b>SweK does not start it and does not install it for you.</b> It is registered in Auto-Install
+(v3166) with <code>autoRun</code> deliberately OFF: a file server that starts itself is a decision about what is
+exposed and to whom, and that is yours to make, not a registry's.</p>
+<div id="cpBox" style="border:1px solid #1e4a5a;border-radius:6px;padding:8px;margin:8px 0">
+  <button id="cpCheck">check port &amp; install</button>
+  <pre id="cpOut" style="white-space:pre-wrap;margin:6px 0 0;font-size:12px">not checked yet</pre>
+</div>
+<p class="dim"><b>The port is 3923 by default</b> - copyparty's own, and it collides with nothing SweK claims
+(8787 the engine, 8080 spaceprojectsim). <b>There is no auto-allocator, and that is deliberate:</b> the tree's
+<code>freePort()</code> is a KILL - it frees a port by terminating whatever holds it - so a collision here is
+REPORTED for you to resolve, never resolved by force. A port that silently drifted would hand you a URL that
+changes between sessions.</p>
+<p class="dim"><b>Read this before serving read-write.</b> copyparty with no accounts gives everyone on the
+network read/write access to the folder it serves - its own README says so. The command the checker prints for
+iOS is <code>-v .::r</code>, read-only, which is the safer default for a phone. It also carries real CVEs and
+publishes advisories, so a copy left running is a thing to keep updated rather than forget.</p>
+<script>
+// v3169 -- THE CHECKER REPORTS, IT DOES NOT ACT. Three facts on their own evidence (v3040's law from the
+// tunnel checkbox): installed, port free, and who holds it are separate questions with separate answers, and
+// collapsing them into "ready / not ready" is how a control comes to lie about the thing it controls.
+document.getElementById("cpCheck").addEventListener("click", async () => {
+  const out = document.getElementById("cpOut");
+  out.textContent = "checking...";
+  try {
+    const s = await fetch("/economy/copyparty").then((r) => r.json());
+    out.textContent =
+      "installed on THIS box : " + s.installed + (s.installed ? "" : "   <- pip install copyparty, or use Auto-Install") +
+      "\nport " + s.port + " free      : " + s.portFree + (s.portFree ? "" : "   <- held by " + s.portHeldBy) +
+      "\n\nrun it ON THE PHONE, not here:\n  " + s.termux +
+      "\n\nread-only (safer):\n  " + s.aShell +
+      "\n\n" + s.warning;
+  } catch (e) { out.textContent = "FAILED: " + ((e && e.message) || e); }
+});
+
+// v3332 -- the notify front door. THE THREE STATES ARE RENDERED APART, because "nothing is configured",
+// "configured and refused" and "it broke" want three different responses from a reader, and one red word
+// for all three is the failure v3076 named when a timeout was printed as a failure.
+const nfOut = document.getElementById("nfOut");
+async function nfShow() {
+  try {
+    const s = await fetch("/notify").then((r) => r.json());
+    nfOut.textContent =
+      "state   : " + s.state +
+      (s.state === "ready" ? "   (configured, and it will publish)" :
+       s.state === "unconfigured" ? "   (nothing set up -- this is NOT a failure)" :
+                                    "   (set up, and deliberately NOT used)") +
+      "\nserver  : " + (s.server || "-") +
+      "\ntopic   : " + (s.topic || "-") +
+      "\nauth    : " + (s.authed ? "a token is set" : "no token") +
+      (s.why ? "\nwhy     : " + s.why : "") +
+      "\nconfig  : " + s.configPath +
+      "\nlast try: " + (s.last ? (new Date(s.last.at).toLocaleString() + " -- accepted=" + s.last.accepted + (s.last.why ? " (" + s.last.why + ")" : "")) : "never");
+  } catch (e) { nfOut.textContent = "FAILED to reach the hub: " + ((e && e.message) || e); }
+}
+document.getElementById("nfStatus").addEventListener("click", nfShow);
+document.getElementById("nfTest").addEventListener("click", async () => {
+  nfOut.textContent = "publishing...";
+  try {
+    const r = await fetch("/notify/send", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "SweK hub", message: "Test from ios-peer.html. If you are reading this on the phone, the doorbell works.", tags: "bell" }),
+    }).then((x) => x.json());
+    // ACCEPTED IS NOT DELIVERED and the page says so where somebody will actually read it. A 200 means the ntfy
+    // server took the message; whether a phone ever showed it depends on APNs, the device and the app's settings.
+    nfOut.textContent = r.accepted
+      ? "ACCEPTED by the ntfy server" + (r.id ? " (id " + r.id + ")" : "") +
+        "\n\nThat is NOT proof of delivery -- it means the server took it. If no notification appears on the phone,\nthe gap is APNs, the app, or its notification settings, not this hub."
+      : "NOT SENT\nstate: " + (r.state || "-") + "\nwhy  : " + (r.why || "-");
+  } catch (e) { nfOut.textContent = "FAILED to reach the hub: " + ((e && e.message) || e); }
+});
+</script>
+</body>
+</html>

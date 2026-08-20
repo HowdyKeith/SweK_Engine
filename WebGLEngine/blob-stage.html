@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="The Stage">
+<meta name="demo:desc" content="Blobs that want the gauges but can never leave the stage. Each one is drawn to whichever instrument is nearest, so the gauges become the reason to be somewhere and the stage sorts itself into camps. They still have to earn every inch of altitude -- gravity pulls, buoyancy only exists while they are hot, heat only while they spend, and each is flown by the trained policy that learned to hold a height better than a hand-tuned controller. The walls are an invariant, not a force: containment clamps after integration, so nothing tunnels out no matter how hard it is shoved. They lean on the glass instead.">
+<meta name="demo:category" content="fx">
+<title>The Stage</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; font-size:12px; margin-top:5px; line-height:1.5; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:4px; max-width:280px; line-height:1.4; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; flex-direction:column; gap:8px; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; The Stage</div><div id="stat"></div><div id="sub">they want the gauges &middot; they never leave the stage</div></div>
+<div id="ctl"><button id="add">+ blob</button><button id="less">&minus; blob</button><button id="shove">shove them</button></div>
+<script type="module">
+import { makeBlobAgent, makeBlobPolicy, installDefaultPolicy, loadPolicyWeights } from "./fx/avatar/blobGravity.js";
+import { makeStage, makeBody } from "./fx/avatar/blobStage.js";
+import { metaField } from "./fx/avatar/pet.js";
+import { shadeTri } from "./fx/avatar/skins.js";
+import { paintWormhole, paintBlackHole } from "./fx/gauge/spacetimeGauges.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const statEl = document.getElementById("stat"), subEl = document.getElementById("sub");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+installDefaultPolicy();
+let pol = makeBlobPolicy();                                     // baked until the bridge answers
+let polSource = "baked";
+loadPolicyWeights().then(r => { pol = makeBlobPolicy(r.weights); polSource = r.source + (r.score ? " " + r.score.toFixed(2) : ""); });
+const BOUNDS = { x: [-3.0, 3.0], z: [-1.0, 1.0], yMax: 5.6 };
+const GAUGES = [ { id: "wormhole", p: [-2.2, 3.0, 0] }, { id: "blackhole", p: [2.2, 4.3, 0] } ];
+const stage = makeStage({ bounds: BOUNDS, attractors: GAUGES, pull: 2.2, separation: 1.0 });
+let bodies = [];
+function addBlob() {
+  if (bodies.length >= 6) return;
+  const x = (Math.random() - 0.5) * 4;
+  bodies.push(makeBody({ id: "b" + bodies.length, x, z: (Math.random() - 0.5) * 1.2, agent: makeBlobAgent({ energy: 0.6 + Math.random() * 0.4 }) }));
+}
+for (let i = 0; i < 4; i++) addBlob();
+document.getElementById("add").onclick = addBlob;
+document.getElementById("less").onclick = () => bodies.pop();
+document.getElementById("shove").onclick = () => { for (const b of bodies) { b.vx += (Math.random() - 0.5) * 40; b.vz += (Math.random() - 0.5) * 20; } };
+
+const LX = 26, LY = 24, LZ = 9, cell = 0.28, OX = -3.6, OY = -0.4, OZ = -1.26;
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(1 / 30, (now - last) / 1000); last = now;
+  // each blob flies toward the height of the gauge it wants -- the instruments are the reason to be somewhere
+  for (const b of bodies) { const want = GAUGES.find(g => g.id === b.want) || GAUGES[0]; b.agent.step(dt, pol(b.agent.st, want.p[1])); }
+  stage.step(bodies, dt);
+
+  const W = cv.width, H = cv.height, S = Math.min(W / 8.2, H / 7.0);
+  const px = W / 2, groundY = H * 0.88;
+  const sx = (wx) => px + wx * S, sy = (wy) => groundY - wy * S;
+  ctx.clearRect(0, 0, W, H);
+  // the stage: glass walls, a floor, a ceiling. They are an invariant, not a suggestion.
+  ctx.fillStyle = "rgba(10,16,32,0.5)"; ctx.fillRect(sx(BOUNDS.x[0]), sy(BOUNDS.yMax), (BOUNDS.x[1]-BOUNDS.x[0])*S, BOUNDS.yMax*S);
+  ctx.strokeStyle = "rgba(89,209,255,0.30)"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(sx(BOUNDS.x[0]), sy(BOUNDS.yMax), (BOUNDS.x[1]-BOUNDS.x[0])*S, BOUNDS.yMax*S);
+  ctx.fillStyle = "rgba(90,60,50,0.35)"; ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.strokeStyle = "rgba(255,140,90,0.4)"; ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+  // the gauges they want -- the wormhole reads the fullest tank on the stage, the black hole the emptiest
+  const tanks = bodies.map(b => b.agent.st.energy);
+  const hi = tanks.length ? Math.max(...tanks) : 0, lo = tanks.length ? 1 - Math.min(...tanks) : 0;
+  paintWormhole(ctx, sx(GAUGES[0].p[0]), sy(GAUGES[0].p[1]), S * 0.62, hi, now / 1000, { color: [120, 200, 255] });
+  paintBlackHole(ctx, sx(GAUGES[1].p[0]), sy(GAUGES[1].p[1]), S * 0.62, lo, now / 1000, { color: [255, 170, 90] });
+
+  // one field, every blob: they merge when they crowd, because that is what metaballs do
+  const balls = [];
+  for (const b of bodies) { const st = b.agent.st, sq = 1 + Math.max(-0.2, Math.min(0.2, st.vy * 0.035));
+    balls.push({ p: [b.x, st.y + 0.42, b.z], r: 0.44 / sq }, { p: [b.x, st.y + 0.02, b.z], r: 0.3 }); }
+  const f = new Float32Array(LX * LY * LZ);
+  for (let z = 0; z < LZ; z++) { const wz = OZ + cell * z; for (let y = 0; y < LY; y++) { const wy = OY + cell * y; const row = (z * LY + y) * LX;
+    for (let x = 0; x < LX; x++) f[row + x] = metaField(balls, OX + cell * x, wy, wz); } }
+  const mesh = marchScalarField(f, LX, LY, LZ, 1.0, { origin: [OX, OY, OZ], cellSize: cell });
+  const P = mesh.positions, tris = [];
+  for (let i = 0; i + 8 < P.length; i += 9) {
+    const A = [P[i],P[i+1],P[i+2]], B = [P[i+3],P[i+4],P[i+5]], C = [P[i+6],P[i+7],P[i+8]];
+    let nx=(B[1]-A[1])*(C[2]-A[2])-(B[2]-A[2])*(C[1]-A[1]), ny=(B[2]-A[2])*(C[0]-A[0])-(B[0]-A[0])*(C[2]-A[2]), nz=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);
+    const ml = Math.hypot(nx,ny,nz)||1, lit = Math.max(0.15,(nx*0.4+ny*0.75+nz*0.5)/ml);
+    const p3 = [(A[0]+B[0]+C[0])/3,(A[1]+B[1]+C[1])/3,(A[2]+B[2]+C[2])/3];
+    // heat is the material: whichever blob owns this triangle lends it its warmth
+    let hot = 0, bd = 1e9; for (const b of bodies) { const d = Math.hypot(p3[0]-b.x, p3[1]-(b.agent.st.y+0.3)); if (d < bd) { bd = d; hot = b.agent.st.heat; } }
+    tris.push({ z: p3[2], A, B, C, lit, n:[nx/ml,ny/ml,nz/ml], p3, th: 0.55, melt: Math.max(0, Math.min(1, (hot - 0.05) / 0.75)) });
+  }
+  tris.sort((a,b) => a.z - b.z);
+  for (const t of tris) {
+    const c = shadeTri("ice", { lit: t.lit, normal: t.n, thickness: t.th, pos: t.p3, t: now/1000, melt: t.melt });
+    ctx.fillStyle = "rgba("+Math.round(c[0]*255)+","+Math.round(c[1]*255)+","+Math.round(c[2]*255)+","+c[3].toFixed(3)+")";
+    ctx.beginPath(); ctx.moveTo(sx(t.A[0]), sy(t.A[1])); ctx.lineTo(sx(t.B[0]), sy(t.B[1])); ctx.lineTo(sx(t.C[0]), sy(t.C[1])); ctx.closePath(); ctx.fill();
+  }
+  const camps = GAUGES.map(g => bodies.filter(b => b.want === g.id).length);
+  statEl.innerHTML = "policy: " + polSource + "<br>" + bodies.length + " blobs &nbsp; wormhole camp " + camps[0] + " &nbsp; black-hole camp " + camps[1] +
+    "<br>highest " + (bodies.length ? Math.max(...bodies.map(b => b.agent.st.y)).toFixed(2) : "0") + " &nbsp; fullest tank " + hi.toFixed(2);
+  subEl.textContent = "each wants its nearest gauge \u00b7 none of them can leave \u00b7 all of them still have to earn the height";
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

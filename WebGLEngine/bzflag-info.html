@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · BZFlag</title>
+<style>
+  :root { --bg:#080b12; --panel:#0d1220; --line:#1e2a44; --ink:#d8e4f5; --dim:#7d8fa8;
+          --go:#2fd6b0; --cy:#5ad6ff; --warn:#ffc04e; --err:#ff5a5a; --ok:#4ade80; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:15px; margin:0; color:var(--go); letter-spacing:.4px; }
+  header h1 small { color:var(--dim); font-weight:normal; letter-spacing:0; }
+  main { padding:16px; max-width:1000px; }
+  section { border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:12px 14px; margin-bottom:14px; }
+  h2 { font-size:12px; margin:0 0 8px; color:var(--cy); letter-spacing:.4px; text-transform:uppercase; }
+  p { margin:6px 0; }
+  .dim { color:var(--dim); }
+  a.btn, button { font:11px ui-monospace,monospace; padding:4px 11px; border-radius:5px; cursor:pointer;
+                  background:#152136; color:#b9d4ff; border:1px solid #2f486c; text-decoration:none; display:inline-block; }
+  a.btn.go, button.go { background:#10261c; color:#9fe6c0; border-color:#2a6a4a; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  table { border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  td, th { padding:3px 12px 3px 0; text-align:left; }
+  th { color:var(--dim); font-weight:normal; }
+  b.num { color:#9fe6c0; font-weight:normal; }
+  code, pre { background:#070c15; border:1px solid var(--line); border-radius:5px; }
+  code { padding:1px 5px; }
+  pre { padding:8px 10px; overflow:auto; font-size:11px; margin:6px 0; }
+  .gauges { display:flex; gap:10px; flex-wrap:wrap; }
+  .gauge { flex:1; min-width:120px; background:#0a0d12; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .gauge .k { font-size:10px; color:var(--dim); }
+  .gauge .v { font-size:17px; font-weight:bold; color:#9fe6c0; }
+  .warn { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128737; BZFlag <small>&mdash; the world file, the geometry, and the tank</small></h1>
+</header>
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p>A clean-room port of <a href="https://github.com/BZFlag-Dev/bzflag" target="_blank" rel="noopener" style="color:var(--cy)">BZFlag</a>'s
+     world format and tank physics into this engine. The grammar and the constants were read from the 2.4 branch's
+     <code>src/bzfs</code> and <code>src/common/global.cxx</code> and re-implemented. <b>Nothing is copied</b>, and
+     <b>BZFlag's own maps are not vendored</b> &mdash; the map that ships here is original.</p>
+  <p class="dim">Built in the same order as the Endless Sky port: a parser, an adapter, and a coverage instrument that
+     says out loud what has not been done. Then geometry that a test can prove without a GPU. Then something that
+     drives around inside it.</p>
+  <p class="dim"><b>The buttons are in <a href="/server.html" style="color:var(--cy)">server.html</a>, under the BZFlag tab.</b>
+     Start a rendezvous room, launch two GPU Brain pilots into it, watch their kills and losses, and open the viewer
+     already pointed at the right room. There is also a probe that connects <code>bz/net/bzfsClient.mjs</code> to a
+     real <code>bzfs</code> as an observer and reports what the server said &mdash; it never spawns a tank and never
+     sends a position. Those routes spawn processes, so they answer <b>403</b> to anyone who is not the host, an
+     authenticated session, or a LAN peer the operator has exempted.</p>
+  <p class="dim"><b>Drive against the brain, by hand.</b> Start a rendezvous server, start a pilot, and open the viewer with
+     <code>?url=http://host:8788&amp;room=arena</code>. Bots are tinted, so you can tell the GPU Brain from a person.
+     It cannot yet join a real <code>bzfs</code> server &mdash; that is 56 message types over a TCP/UDP hybrid, and a
+     round of its own.</p>
+  <p class="dim">The <b>GPU Brain drives</b> one of these. <code>node brain/bzPilot.mjs --dry-run</code> shows the whole
+     loop without touching a network; point <code>SWEK_BZ_URL</code> at a rendezvous server and two of them will hunt
+     each other. The room, the presence packets and the owner-addressed damage rule are <code>ev/presence.js</code> and
+     <code>ev/esAuthority.js</code> &mdash; unchanged, and written for a game about spaceships.</p>
+  <div class="row" style="margin-top:8px">
+    <a class="btn go" href="/bzflag.html" target="_blank" rel="noopener">Drive it &#8599;</a>
+    <a class="btn" href="/bz/maps/arena.bzw" download>arena.bzw</a>
+    <a class="btn" href="/README-bzflag.md" target="_blank" rel="noopener">README</a>
+    <a class="btn" href="https://github.com/BZFlag-Dev/bzflag" target="_blank" rel="noopener">BZFlag upstream &#8599;</a>
+  </div>
+</section>
+
+<section>
+  <h2>The shipped map</h2>
+  <div class="gauges" id="gauges">
+    <div class="gauge"><div class="k">world</div><div class="v" id="gSize">&mdash;</div><div class="k" id="gName">units across</div></div>
+    <div class="gauge"><div class="k">obstacles</div><div class="v" id="gObs">&mdash;</div><div class="k">boxes, pyramids, bases</div></div>
+    <div class="gauge"><div class="k">triangles</div><div class="v" id="gTri">&mdash;</div><div class="k">walls and ground included</div></div>
+    <div class="gauge"><div class="k">coverage</div><div class="v" id="gCov">&mdash;</div><div class="k">of this map's objects</div></div>
+  </div>
+  <div id="gErr" class="warn" style="margin-top:8px"></div>
+</section>
+
+<section>
+  <h2>Coverage &mdash; what the adapter ignores</h2>
+  <p class="dim">Built first, not last. The guard in <code>bz/tools/bzw-coverage.mjs --selfcheck</code> checks the tables
+     against the adapter source <b>in both directions</b>: a declared keyword the builder never quotes is over-claiming,
+     and a keyword reported as ignored that the builder plainly reads is under-claiming. It scans the raw source,
+     comments included. A coincidence of vocabulary trips it. Move the word, not the guard.</p>
+  <pre id="cov">loading…</pre>
+  <p class="dim">Point it at a real map to see a real number:</p>
+  <pre>node bz/tools/bzw-coverage.mjs path/to/hix.bzw
+node bz/bzw-build.mjs path/to/hix.bzw out.json     # bakes the coverage report into the artifact</pre>
+</section>
+
+<section>
+  <h2>Getting BZFlag's own maps</h2>
+  <p>Not vendored. They belong to BZFlag and ship under its licence.</p>
+  <pre>git clone --depth 1 -b 2.4 https://github.com/BZFlag-Dev/bzflag
+node bz/tools/bzw-selfcheck.mjs      bzflag/misc/maps
+node bz/tools/bzw-geom-selfcheck.mjs bzflag/misc/maps
+node bz/tools/bz-tank-selfcheck.mjs  bzflag/misc/maps</pre>
+  <p class="dim">Then drop any <code>.bzw</code> onto the viewer.</p>
+</section>
+
+<section>
+  <h2>What is proved, and what is not</h2>
+  <table>
+    <tr><th>check</th><th>what it settles</th></tr>
+    <tr><td><code>bzw-selfcheck</code></td><td>the grammar, BZDB's expression language, the world model. <b class="num">108</b> checks.</td></tr>
+    <tr><td><code>bzw-geom-selfcheck</code></td><td>every box and pyramid is a closed, outward-wound solid enclosing exactly the volume arithmetic says. <b class="num">66</b> checks.</td></tr>
+    <tr><td><code>bz-tank-selfcheck</code></td><td>collision against an independent polygon oracle; a jump reaches <code>v&sup2;/2g</code> and no higher; a tank never ends a frame inside anything. <b class="num">81</b> checks.</td></tr>
+    <tr><td><code>bz-mesh-selfcheck</code></td><td>the mesh family: <code>containsPoint</code> exactly as upstream has it, a mesh cube's volume, a tetra as a sixth of its box, per-face flags. <b class="num">84</b> checks.</td></tr>
+    <tr><td><code>bz-protocol-selfcheck</code></td><td>the fifty-six message codes, and exact bytes for everything the client sends &mdash; worked out by hand from the source, because a codec that round-trips against itself proves nothing. <b class="num">90</b> checks.</td></tr>
+    <tr><td><code>bzfs-loopback-probe</code></td><td>the real client against a real TCP server: handshake, framing, and every negative path. <b class="num">21</b> checks. <b>Nobody has pointed it at a real <code>bzfs</code>.</b></td></tr>
+    <tr><td><code>bz-shapes-selfcheck</code></td><td>a <code>sphere divisions 1</code> is an octahedron enclosing exactly <code>(4/3)abc</code>; an N-sided cone is exactly a third of its polygonal base times its height. <b class="num">111</b> checks.</td></tr>
+    <tr><td><code>bz-pilot-selfcheck</code></td><td>the pilot never fires through a wall, never wedges itself, keeps the counterfactual a learner needs. <b class="num">72</b> checks.</td></tr>
+    <tr><td><code>bz-net-selfcheck</code></td><td>a tank on the wire: a tank's id names its owner, a hit is reported and not applied, a replay lands once, a peer who leaves is not a kill. <b class="num">45</b> checks.</td></tr>
+    <tr><td><code>bz-live-probe</code></td><td>two real <code>brain/bzPilot.mjs</code> processes, a real rendezvous server, an owner-addressed kill on the wire &mdash; and a headless peer playing the browser's part, killing one of them. <b class="num">25</b> checks.</td></tr>
+    <tr><td><code>bzw-coverage --selfcheck</code></td><td>the coverage report cannot drift from the code, in either direction. <b class="num">15</b> checks.</td></tr>
+  </table>
+  <p class="dim" style="margin-top:8px">Not proved, because it cannot be, headlessly: what the viewer looks like. Everything it draws
+     was settled before it drew anything, which is the reason for doing it in that order.</p>
+</section>
+
+<section>
+  <h2>Recorded, not simulated</h2>
+  <p><b>Every object keyword in a <code>.bzw</code> is read.</b> Four of them &mdash; <code>textureMatrix</code>,
+     <code>dynamicColor</code>, <code>physics</code> and <code>weapon</code> &mdash; are <b>recorded</b>: parsed, kept
+     by name, inspectable, and nothing animates and nothing shoots. Calling them <i>handled</i> would flatter us;
+     calling them <i>ignored</i> would be the other lie. The report prints two percentages: how much is read, and how
+     much of it is simulated.</p>
+  <p class="dim">Two facts about mesh collision are reproduced rather than improved upon: <code>MeshObstacle::inBox</code>
+     ignores the tank's box and tests only its midpoint, and <code>containsPoint</code> returns false for every point
+     in the universe if the mesh declared no <code>inside</code> or <code>outside</code> point. A port that quietly
+     fixes its source is a port you cannot trust about anything else.</p>
+  <p class="dim">A group transform that is not a rigid motion &mdash; a shear, a non-uniform scale &mdash; cannot be
+     expressed as a position and a rotation. Its geometry is exact; its collision is the axis-aligned lie of its local
+     box. Those obstacles are flagged <code>approx</code> and the world counts them.</p>
+</section>
+
+</main>
+
+<script type="module">
+import { parseBZW } from "./bz/bzwParse.js";
+import { buildWorld } from "./bz/bzwWorld.js";
+import { buildWorldMesh } from "./bz/bzGeom.js";
+import { coverageReport, formatCoverage } from "./bz/bzCoverage.js";
+
+const $ = (id) => document.getElementById(id);
+
+// Everything on this page is computed here, in the browser, from the map itself. There is no /bz/status
+// endpoint to go stale, and no number typed into the HTML by hand.
+fetch("./bz/maps/arena.bzw", { cache: "no-store" })
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then((text) => {
+    const parsed = parseBZW(text);
+    const w = buildWorld(parsed);
+    const mesh = buildWorldMesh(w, { walls: true, ground: true });
+    const cov = coverageReport(parsed);
+
+    $("gSize").textContent = String(w.world.size);
+    $("gName").textContent = (w.world.name || "unnamed") + " · units across";
+    $("gObs").textContent = String(w.obstacles.length);
+    $("gTri").textContent = String(mesh.indices.length / 3);
+    $("gCov").textContent = cov.pctHandled.toFixed(0) + "%";
+    $("cov").textContent = formatCoverage(cov);
+
+    const notes = [];
+    if (w.errors.length) notes.push(`${w.errors.length} parse warnings`);
+    if (w.approx) notes.push(`${w.approx} obstacles with a non-rigid transform: their collision is approximate`);
+    if (w.includes.length) notes.push(`${w.includes.length} include directives, recorded and not followed`);
+    $("gErr").textContent = notes.join(" · ");
+  })
+  .catch((e) => { $("cov").textContent = "could not load bz/maps/arena.bzw — " + e.message; });
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  VBA Engine — Home Assistant ingress panel (PLACEHOLDER BUILD).
+
+  Replace the contents of this www/ folder with your slimmed WebGL engine build.
+  Two hard rules for ingress:
+    1. Use RELATIVE asset paths (./main.js, ./assets/x.glb) — never leading "/".
+    2. Don't assume you're at the site root; you're under a dynamic ingress path.
+
+  Reading Home Assistant state from here: this panel runs as an ingress iframe,
+  so talk to HA via its WebSocket/REST API, or have the engine pull live data
+  from your Node bridge (set the add-on's `bridge_url` option, surfaced below).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VBA Engine</title>
+<style>
+  :root { color-scheme: dark; }
+  html,body { margin:0; height:100%; background:#0b0d12; color:#e7e9ee;
+    font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+  .wrap { display:flex; flex-direction:column; align-items:center;
+    justify-content:center; height:100%; gap:22px; text-align:center; padding:24px; }
+  h1 { margin:0; font-size:18px; letter-spacing:.3px; font-weight:600; }
+  .sub { color:#8b93a7; max-width:46ch; }
+  .status { font-size:12px; color:#8b93a7; }
+  .status b { color:#cfd4e0; font-weight:600; }
+  /* CSS 3D cube — placeholder, swap for your WebGL canvas */
+  .scene { width:120px; height:120px; perspective:600px; }
+  .cube { width:100%; height:100%; position:relative; transform-style:preserve-3d;
+    animation:spin 9s linear infinite; }
+  .face { position:absolute; width:120px; height:120px; border:1px solid #2b67ff55;
+    background:linear-gradient(135deg,#1b2440,#101626); box-shadow:inset 0 0 30px #2b67ff22; }
+  .f1{transform:translateZ(60px)} .f2{transform:rotateY(180deg) translateZ(60px)}
+  .f3{transform:rotateY(90deg) translateZ(60px)} .f4{transform:rotateY(-90deg) translateZ(60px)}
+  .f5{transform:rotateX(90deg) translateZ(60px)} .f6{transform:rotateX(-90deg) translateZ(60px)}
+  @keyframes spin { from{transform:rotateX(0) rotateY(0)} to{transform:rotateX(360deg) rotateY(360deg)} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="scene"><div class="cube">
+      <div class="face f1"></div><div class="face f2"></div><div class="face f3"></div>
+      <div class="face f4"></div><div class="face f5"></div><div class="face f6"></div>
+    </div></div>
+    <div>
+      <h1 id="title">VBA Engine</h1>
+      <div class="sub">Placeholder panel. Drop your slimmed WebGL engine build into
+        this add-on's <code>www/</code> folder (relative paths only).</div>
+    </div>
+    <div class="status" id="status">Bridge: not configured</div>
+  </div>
+
+<script>
+  // Read add-on options if the panel was given any (the supervisor writes them
+  // to /data/options.json; you can also inject them at build time). We probe a
+  // few likely option surfaces without hard-failing.
+  (async () => {
+    const statusEl = document.getElementById("status");
+    const titleEl  = document.getElementById("title");
+
+    // The bridge URL is an add-on option; in a real build you'd template it in.
+    // For the placeholder we look for a ?bridge= query param as an easy override.
+    const params = new URLSearchParams(location.search);
+    const bridge = params.get("bridge") || "";
+    if (params.get("title")) titleEl.textContent = params.get("title");
+
+    if (!bridge) { statusEl.textContent = "Bridge: not configured"; return; }
+    statusEl.innerHTML = "Bridge: connecting to <b>" + bridge + "</b>…";
+    try {
+      const r = await fetch(bridge.replace(/\/$/, "") + "/bridge/state",
+        { headers: { "Accept": "application/json" } });
+      const j = await r.json();
+      const enemies = (j && j.state && Array.isArray(j.state.enemies))
+        ? j.state.enemies.length : "?";
+      const tick = (j && j.state && j.state.tick != null) ? j.state.tick : "?";
+      statusEl.innerHTML = "Bridge: <b>online</b> — tick " + tick + ", enemies " + enemies;
+    } catch (e) {
+      statusEl.innerHTML = "Bridge: <b>unreachable</b> (" + (e && e.message || e) + ")";
+    }
+  })();
+</script>
+</body>
+</html>

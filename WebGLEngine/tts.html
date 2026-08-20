@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Local TTS">
+<meta name="demo:desc" content="Local text-to-speech via Windows SAPI or Piper. Speak aloud on the PC, or render a WAV the browser plays. Runs on the bridge.">
+<meta name="demo:cats" content="tool">
+<title>Local TTS</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 14px; }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:16px 0 6px; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 14px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  input,select,textarea { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px; font:12px ui-monospace,monospace; }
+  textarea { width:100%; min-height:90px; resize:vertical; }
+  select { flex:1 1 200px; }
+  .note { font-size:11px; color:var(--dim); }
+</style>
+<script src="/engine/favicon-inject.js"></script>
+</head>
+<body>
+<div id="bar"><h1>🔊 Local TTS</h1><span id="status">…</span></div>
+<div class="wrap">
+  <p class="lead">Local text-to-speech on the bridge PC. <b>SAPI</b> (Windows, zero install) can speak aloud or render a WAV. <b>say</b> (macOS, zero install) uses the Mac's built-in voices — speaks aloud or renders a WAV. <b>Piper</b> (neural, better quality) renders a WAV the browser plays — needs the piper binary + a voice <code>.onnx</code> model.</p>
+  <p class="lead" style="color:#7fe0a0">→ To make the in-engine avatar speak with this voice, run <code>kpop.useLocalTts(true)</code> in the engine console (sticky; falls back to browser TTS if the bridge is down).</p>
+
+  <div class="ttl">Engine</div>
+  <div class="row">
+    <select id="engine"><option value="sapi">SAPI (Windows)</option><option value="say">say (macOS)</option><option value="piper">Piper (neural)</option></select>
+    <input id="piperBin" placeholder="piper binary (path or 'piper')" style="flex:1 1 200px">
+    <input id="piperModel" placeholder="piper model .onnx path" style="flex:1 1 220px">
+    <button class="btn" id="saveCfg">Save</button>
+    <span id="detect" class="note"></span>
+  </div>
+
+  <div class="ttl">Voice &amp; rate (SAPI)</div>
+  <div class="row">
+    <select id="voice"><option value="">(default voice)</option></select>
+    <label class="note">rate <input id="rate" type="number" value="0" min="-10" max="10" style="width:60px"></label>
+    <button class="btn" id="loadVoices">Load voices</button>
+  </div>
+
+  <div class="ttl">Text</div>
+  <textarea id="text">Pet F B I report. Lost dog in Cranston, Rhode Island. Please share.</textarea>
+  <div class="row" style="margin-top:10px">
+    <button class="btn go" id="speak">Speak aloud (SAPI)</button>
+    <button class="btn" id="render">Render &amp; play</button>
+    <span id="msg" class="note"></span>
+  </div>
+  <audio id="player" controls style="width:100%;margin-top:8px;display:none"></audio>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function getJSON(u){ return fetch(u).then(r=>r.json()); }
+async function postJSON(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}).then(r=>r.json()); }
+
+async function loadStatus(){
+  try{
+    const s = await getJSON("/tts/status"); $("engine").value=s.engine||"sapi"; if(s.piperBin)$("piperBin").value=s.piperBin; if(s.piperModel)$("piperModel").value=s.piperModel; if(s.rate!=null)$("rate").value=s.rate;
+    const d = await getJSON("/tts/detect"); $("detect").textContent = "SAPI "+(d.sapi?"✓":"✕")+" · say "+(d.say?"✓":"✕")+" · Piper "+(d.piper?"✓":"✕"); $("status").textContent="engine: "+(s.engine||"sapi");
+  }catch{ $("status").textContent="bridge offline"; }
+}
+$("saveCfg").onclick = async ()=>{ const r=await postJSON("/tts/config",{engine:$("engine").value,piperBin:$("piperBin").value.trim(),piperModel:$("piperModel").value.trim(),rate:$("rate").value,voice:$("voice").value}); $("msg").textContent="saved ("+r.engine+")"; loadStatus(); };
+$("loadVoices").onclick = async ()=>{ $("msg").textContent="loading voices…"; const r=await getJSON("/tts/voices"); const sel=$("voice"); sel.innerHTML='<option value="">(default voice)</option>'; if(r.ok&&r.voices){ for(const v of r.voices){ const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o);} $("msg").textContent=r.voices.length+" voices ("+r.engine+")"; } else $("msg").textContent="✕ "+(r.error||"no voices"); };
+$("speak").onclick = async ()=>{ $("msg").textContent="speaking on the PC…"; const r=await postJSON("/tts/speak",{text:$("text").value,rate:$("rate").value,voice:$("voice").value,engine:$("engine").value}); $("msg").textContent = r.ok ? "✓ spoke on the bridge box" : ("✕ "+(r.error||"failed")); };
+$("render").onclick = async ()=>{ $("msg").textContent="rendering…"; const r=await postJSON("/tts/speak",{text:$("text").value,rate:$("rate").value,voice:$("voice").value,wav:true}); if(r.ok&&r.wav){ const p=$("player"); p.src=r.wav+"?t="+Date.now(); p.style.display="block"; p.play(); $("msg").textContent="✓ "+r.engine+" → playing"; } else $("msg").textContent="✕ "+(r.error||"failed"); };
+loadStatus();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

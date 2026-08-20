@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — waveguide cutoffs</title>
+<meta name="demo:desc" content="A hollow metal pipe carries nothing below its cutoff frequency. TE and TM modes come from the same 2D eigenproblem differing only in a boundary condition, and that difference decides which mode is dominant: solving TM with the wrong condition returns a tidy, plausible cutoff for a pipe that does not exist. The mode SET is what catches it, not the frequencies.">
+<style>
+  html,body{margin:0;background:#05070d;color:#cfe0ff;font:13px ui-monospace,Menlo,monospace}
+  #w{max-width:900px;margin:0 auto;padding:18px;line-height:1.65}
+  canvas{border:1px solid #22304a;border-radius:6px;width:100%}
+  button{background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:6px 11px;font:12px ui-monospace,monospace;cursor:pointer;margin-right:6px}
+  button.sab{border-color:#5a2230;color:#ff9a9a}
+  table{border-collapse:collapse;margin-top:10px}td,th{border:1px solid #22304a;padding:5px 10px}
+  .num{text-align:right}.dim{color:#7f96b8}.good{color:#9be15d}.bad{color:#ff9a9a}
+</style>
+</head>
+<body><div id="w">
+<h2 style="margin:0 0 4px;">Waveguide cutoffs</h2>
+<div class="dim">Below its cutoff a hollow pipe carries <b>nothing</b>. Above it, a discrete set of modes, all from one 2D eigenproblem on the cross-section. <b>TE and TM differ only in a boundary condition</b> &mdash; E<sub>z</sub> must vanish on a conductor (Dirichlet, so there is no TM<sub>10</sub>), H<sub>z</sub> has a vanishing normal derivative (Neumann, so TE<sub>10</sub> exists and is what every guide is designed around). Gate: <code>physics/em/waveguide-selfcheck.mjs</code>.</div>
+<p><button id="run">Diagonalise the cross-section</button>
+   <button id="sab" class="sab" title="Solve TM with the Neumann operator">Sabotage: wrong boundary condition</button><span id="st" class="dim"></span></p>
+<canvas id="c" width="880" height="220"></canvas>
+<div id="out"></div>
+</div>
+<script type="module">
+import { measureCutoffs, cutoffFrequency } from "./physics/em/waveguide.js";
+const c=document.getElementById("c"),x=c.getContext("2d"),out=document.getElementById("out"),st=document.getElementById("st");
+const A=2,B=1;
+function draw(te,tm,sab){
+  x.fillStyle="#05070d";x.fillRect(0,0,880,220);
+  const all=[...te.ks,...tm.ks]; const max=Math.max(...all)*1.1;
+  const tx=k=>50+k/max*800;
+  x.strokeStyle="#22304a";x.strokeRect(50,20,800,180);
+  const row=(ks,modes,y,col,label)=>{
+    x.fillStyle="#7f96b8";x.fillText(label,8,y+4);
+    for(let i=0;i<ks.length;i++){
+      x.strokeStyle=col;x.lineWidth=2;x.beginPath();x.moveTo(tx(ks[i]),y-16);x.lineTo(tx(ks[i]),y+16);x.stroke();x.lineWidth=1;
+      if(modes&&modes[i]) {x.fillStyle=col;x.fillText(modes[i].m+","+modes[i].n,tx(ks[i])-8,y-22);}
+    }
+  };
+  row(te.ks,te.modes,70,"rgba(155,225,93,0.95)","TE");
+  row(tm.ks,tm.modes,140,"rgba(89,209,255,0.95)","TM");
+  if(sab){x.strokeStyle="rgba(255,154,154,0.9)";x.setLineDash([4,3]);x.beginPath();x.moveTo(tx(sab),20);x.lineTo(tx(sab),200);x.stroke();x.setLineDash([]);
+    x.fillStyle="#ff9a9a";x.fillText("sabotaged TM",tx(sab)+4,196);}
+  x.fillStyle="#7f96b8";x.fillText("cutoff wavenumber k_c",700,214);
+}
+function go(sabotage){
+  st.textContent=" diagonalising…";setTimeout(()=>{
+    const te=measureCutoffs({kind:"TE",nx:32,ny:16,a:A,b:B,count:4});
+    const tm=measureCutoffs({kind:"TM",nx:32,ny:16,a:A,b:B,count:4});
+    const sab=sabotage?measureCutoffs({kind:"TE",nx:32,ny:16,a:A,b:B,count:1}).ks[0]:null;
+    draw(te,tm,sab);
+    let h="<table><tr><th>family</th><th>mode</th><th class='num'>measured k</th><th class='num'>exact</th></tr>";
+    for(let i=0;i<3;i++) h+="<tr><td>TE</td><td>("+te.modes[i].m+","+te.modes[i].n+")</td><td class='num'>"+te.ks[i].toFixed(5)+"</td><td class='num'>"+te.exact[i].toFixed(5)+"</td></tr>";
+    for(let i=0;i<2;i++) h+="<tr><td>TM</td><td>("+tm.modes[i].m+","+tm.modes[i].n+")</td><td class='num'>"+tm.ks[i].toFixed(5)+"</td><td class='num'>"+tm.exact[i].toFixed(5)+"</td></tr>";
+    h+="</table>";
+    h+="<div class='dim' style='margin-top:7px'>TM/TE = <b>"+(tm.ks[0]/te.ks[0]).toFixed(5)+"</b> against &radic;5 = "+Math.sqrt(5).toFixed(5)+
+       " &middot; TE<sub>01</sub> and TE<sub>20</sub> are <b class='good'>degenerate</b> for a 2:1 guide ("+te.ks[1].toFixed(6)+" and "+te.ks[2].toFixed(6)+
+       ") &middot; the Neumann problem drops one eigenvalue at "+te.dropped.toExponential(1)+", zero because a constant has no curvature"+
+       "<br>WR-90 X-band guide (a = 22.86 mm): TE<sub>10</sub> cutoff <b>"+(cutoffFrequency(1,0,0.02286,0.01016)/1e9).toFixed(4)+" GHz</b>, the catalogue figure.</div>";
+    if(sabotage) h+="<div class='bad' style='margin-top:6px'>SABOTAGE: solving TM with the Neumann operator returns "+sab.toFixed(4)+
+       " instead of "+tm.ks[0].toFixed(4)+" &mdash; that is TE<sub>10</sub>, a mode TM does not have. A tidy, plausible cutoff for a pipe that does not exist, which is why the mode SET is checked and not only the frequencies.</div>";
+    out.innerHTML=h;st.textContent="";
+  },20);
+}
+document.getElementById("run").onclick=()=>go(false);
+document.getElementById("sab").onclick=()=>go(true);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body></html>

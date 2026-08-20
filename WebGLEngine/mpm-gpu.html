@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Drift">
+<meta name="demo:desc" content="The same material point method mpm.html runs at 25 particles, on the GPU at 65,536 and more. The CPU loop costs 1.9 microseconds a particle, so this scene would take it 125 milliseconds a step and eight steps a second, where the page asks for hundreds. Every stage of the kernel is the graded module it came from, and it holds NO material constant at all: the stiffness, the friction coefficient and the plastic clamp limits are computed by physics/mpm in JavaScript and arrive as uniforms, so there is nothing to retype and nothing that can silently disagree. WGSL has no float atomics, so the particle-to-grid scatter accumulates in fixed point -- which makes it bit-deterministic run to run, and costs the free-fall key about as much as single precision costs it anyway. The free-fall readout is the honest one: 4.7e-6 where the CPU reads 8.9e-16, because this is f32 and that gap is the hardware, not the kernel.">
+<meta name="demo:category" content="simulation">
+<meta name="demo:needs" content="webgpu">
+<title>Drift &mdash; MPM on the GPU</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#05070d; color:#9fb2d4; font:12px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:1180px; margin:0 auto; padding:18px 16px 50px; }
+  h1 { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:14px; margin:0 0 6px; }
+  .sub { color:#7f96b8; max-width:96ch; margin-bottom:14px; line-height:1.55; }
+  .row { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  button, select { background:#111a26; color:#c9d8ee; border:1px solid #2a3a4a; border-radius:6px; padding:6px 11px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:default; }
+  label { color:#6f86ab; }
+  canvas { background:#000; border:1px solid #1b2536; border-radius:8px; display:block; width:100%; max-width:1148px; }
+  #stats { margin-top:12px; line-height:1.75; color:#8fa6c6; }
+  #stats b { color:#cfe0f6; }
+  .ok { color:#7fe3c4; } .warn { color:#f6a623; } .bad { color:#ff8a8a; }
+  #err { display:none; margin:26px 0; padding:16px; border:1px solid #4a2530; border-radius:8px; color:#ff9a9a; line-height:1.7; }
+  #err a { color:#9fd6ff; }
+  .note { color:#5f7699; margin-top:12px; max-width:96ch; line-height:1.55; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; Drift &mdash; the material point method on the GPU</h1>
+  <div class="sub">
+    <b>The same loop <a href="/mpm.html" style="color:#9fd6ff">mpm.html</a> runs, and the same modules the gates grade.</b>
+    Every stage of the kernel is one of them: the APIC transfer, the grid solve, neo-Hookean stress, the force
+    scatter and the return mapping. <b>The kernel holds no material constant at all</b> &mdash; stiffness, friction
+    coefficient and plastic clamp limits are all computed in JavaScript by <code>physics/mpm</code> and passed in
+    as uniforms, so there is nothing retyped that could quietly disagree.
+    The CPU page runs 25 particles. This one runs tens of thousands, and the arithmetic is underneath.
+  </div>
+
+  <div id="err"></div>
+
+  <div class="row">
+    <button id="run">run</button>
+    <button id="stop" disabled>stop</button>
+    <button id="reset">reset</button>
+    <label>scene <select id="scene">
+      <option value="freefall">free fall &mdash; the key, visible</option>
+      <option value="column" selected>collapsing column</option>
+      <option value="pile">granular pile &mdash; Drucker-Prager</option>
+    </select></label>
+    <label>grid <select id="res">
+      <option value="64">64 cells</option>
+      <option value="128" selected>128 cells</option>
+      <option value="256">256 cells</option>
+    </select></label>
+    <label>substeps <select id="sub">
+      <option value="2">2</option><option value="4" selected>4</option>
+      <option value="8">8</option><option value="16">16</option>
+    </select></label>
+    <label id="frictionWrap" style="display:none">friction <select id="friction">
+      <option value="25">25&deg;</option><option value="35">35&deg;</option><option value="45" selected>45&deg;</option>
+    </select></label>
+  </div>
+
+  <canvas id="c" width="1148" height="574"></canvas>
+  <div id="stats">not started</div>
+  <div class="note" id="footnote"></div>
+</div>
+
+<script type="module">
+import { MPM_WGSL, packParams, fixedPointScales, clampLimits, PF, PARTICLE_FLOATS } from "/physics/mpm/gpuKernel.mjs";
+import { lame } from "/physics/mpm/constitutive.mjs";
+import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
+import { restBlock, centreOfMass } from "/physics/mpm/step.mjs";
+// v3816 -- THE DETECTOR IS ui/webgpuProbe.mjs AND IT IS NOT RE-DECLARED HERE. This page originally carried its
+// own `if (!navigator.gpu) throw "This browser has no WebGPU"`, which is TRUE ABOUT THE FACT AND WRONG ABOUT
+// THE CAUSE over http://<lan-ip>:8787 -- and it is the exact defect webgpuProbe.mjs was written for at v3666,
+// in the words that module's header quotes as the ones to stop saying.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+
+const cv = document.getElementById("c");
+const GY = -9.81;
+
+// *** THE TIMESTEP IS NOT CHOSEN, IT IS DERIVED, AND THAT IS WHAT MAKES THE FINE GRIDS RUNNABLE AT ALL. ***
+// mpm.html runs h = 0.5 at dt = 1/240. An explicit MPM step is limited by the wave speed crossing a cell, so
+// refining the grid without shrinking the step in proportion does not make the material more detailed -- IT
+// MAKES IT EXPLODE. dt = h/120 holds the CFL number at exactly the value the graded loop already runs at, so
+// choosing 256 cells changes the resolution and changes nothing about the stability.
+const dtFor = (h) => h / 120;
+
+// *** THE WALLS STAND THREE CELLS IN, AND mpm.html SHIPPED THIS WRONG ONCE. *** A quadratic stencil reaches
+// one cell each way, so a particle resting a fraction above the domain edge has a stencil base of -1: a node
+// row that does not exist and that both halves of the transfer skip. Measured on the CPU page: a block on a
+// frictionless floor lost 99.9% of its horizontal momentum with the wall at one cell.
+const WALL = { lo: 3, hi: 3, sticky: false };
+
+// Density is held at the CPU page's, so the material is the same one however many particles carry it: the
+// fixture takes vol0 = spacing^2 and m = density * vol0, which is exactly mpm.html's 0.1 over 0.0625.
+const DENSITY = 1.6;
+
+const SCENES = {
+  freefall: { domW: 8, domH: 8, block: { x: 2, y: 3.6, w: 4, h: 4 }, walls: null, mode: 1,
+              note: "No floor. The centre of mass must follow the analytic fall whatever the block does internally." },
+  column:   { domW: 8, domH: 8, block: { x: 3, y: 0.12, w: 2, h: 5.6 }, walls: WALL, mode: 1,
+              note: "A column onto a floor. No analytic answer exists, so the key is a DIRECTION: energy can only fall." },
+  pile:     { domW: 8, domH: 8, block: { x: 2.6, y: 0.12, w: 2.8, h: 3.4 }, walls: WALL, mode: 2,
+              note: "Drucker-Prager. A HIGHER FRICTION ANGLE MUST GIVE A NARROWER PILE -- the one key here that a material behaving nothing like sand would fail." },
+};
+
+let dev = null, pipes = {}, bind = null, renderPipe = null, renderBind = null, ctx = null, fmt = null;
+let bufParts = null, bufAcc = null, bufGv = null, bufFlags = null, bufUni = null, bufRead = null, bufRenderUni = null;
+let scene = null, N = 0, nodes = 0, h = 0, dt = 0, nx = 0, ny = 0, steps = 0, timer = null;
+let com0 = null, comNow = null, lastRead = 0, reading = false, msEwma = 0, saturation = 0;
+let particleTemplate = null;
+
+const fail = (m) => {
+  const e = document.getElementById("err");
+  e.style.display = "block";
+  e.innerHTML = m + "<br><br><span style='color:#7f96b8'>The CPU version of this loop runs anywhere: " +
+    "<a href='/mpm.html'>mpm.html</a>. The physics is identical &mdash; the same modules, and this kernel is " +
+    "adjudicated against them cell by cell on <a href='/mpm-gpu-check.html'>mpm-gpu-check.html</a>.</span>";
+};
+
+const RENDER_WGSL = `
+struct RU { scale: vec2<f32>, offset: vec2<f32>, vmax: f32, pad0: f32, pad1: f32, pad2: f32 };
+@group(0) @binding(0) var<uniform> R: RU;
+@group(0) @binding(1) var<storage, read> parts: array<f32>;
+struct VOut { @builtin(position) pos: vec4<f32>, @location(0) tint: f32 };
+@vertex
+fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+  let base = ii * ${PARTICLE_FLOATS}u;
+  let p = vec2<f32>(parts[base + 0u], parts[base + 1u]);
+  let v = vec2<f32>(parts[base + 2u], parts[base + 3u]);
+  let corner = vec2<f32>(f32(vi & 1u), f32((vi >> 1u) & 1u)) * 2.0 - 1.0;
+  let ndc = p * R.scale + R.offset;
+  var o: VOut;
+  o.pos = vec4<f32>(ndc + corner * vec2<f32>(0.0022, 0.0044), 0.0, 1.0);
+  o.tint = clamp(length(v) / R.vmax, 0.0, 1.0);
+  return o;
+}
+@fragment
+fn fs(i: VOut) -> @location(0) vec4<f32> {
+  let cold = vec3<f32>(0.30, 0.62, 0.95);
+  let hot  = vec3<f32>(1.00, 0.79, 0.36);
+  return vec4<f32>(mix(cold, hot, i.tint), 1.0);
+}`;
+
+async function initGPU() {
+  // ASK THE MODULE WHY, NOT WHETHER. `navigator.gpu` being undefined has two causes wearing one label, and
+  // only one of them is about the browser: over a LAN IP on plain http the browser HAS WebGPU and simply does
+  // not expose it to this origin. Naming the wrong one sends the reader to their driver.
+  const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!probe.available) throw new Error(probe.message);
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) throw new Error("WebGPU is present but this system offered no adapter. PRESENCE IS NOT " +
+      "CAPABILITY -- a blocklisted driver or a headless session both look like this.");
+  dev = await adapter.requestDevice();
+  dev.lost.then((i) => fail("The GPU device was lost: " + i.reason));
+
+  const mod = dev.createShaderModule({ code: MPM_WGSL });
+  const info = await mod.getCompilationInfo?.();
+  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
+  for (const stage of ["clear", "p2g", "grid", "g2p"]) {
+    pipes[stage] = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: stage } });
+  }
+  const rmod = dev.createShaderModule({ code: RENDER_WGSL });
+  ctx = cv.getContext("webgpu");
+  fmt = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device: dev, format: fmt, alphaMode: "opaque" });
+  renderPipe = dev.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: rmod, entryPoint: "vs" },
+    fragment: { module: rmod, entryPoint: "fs", targets: [{ format: fmt }] },
+    primitive: { topology: "triangle-strip" },
+  });
+}
+
+function buildScene() {
+  const key = document.getElementById("scene").value;
+  scene = SCENES[key];
+  document.getElementById("frictionWrap").style.display = key === "pile" ? "" : "none";
+
+  const cells = Number(document.getElementById("res").value);
+  nx = cells; ny = Math.round(cells * scene.domH / scene.domW);
+  h = scene.domW / nx;
+  dt = dtFor(h);
+  nodes = (nx + 1) * (ny + 1);
+
+  // two particles per cell per axis, which is the ratio mpm.html already uses (spacing 0.25 at h 0.5)
+  const spacing = h / 2;
+  const cols = Math.max(2, Math.round(scene.block.w / spacing));
+  const rows = Math.max(2, Math.round(scene.block.h / spacing));
+  const vol0 = spacing * spacing, m = DENSITY * vol0;
+
+  // *** THE BLOCK MUST START CLEAR OF THE WALL AND THE CLEARANCE IS IN CELLS, NOT IN METRES. *** The wall
+  // stands three cells in; at 64 cells that is 0.375 and at 256 it is 0.094, so a fixed offset that looked
+  // fine on one grid would have started the material INSIDE the boundary on another -- and a block embedded
+  // in the wall does not fail, it just quietly sheds the momentum the wall zeroes.
+  const bx = scene.walls ? Math.max(scene.block.x, (scene.walls.lo + 1) * h) : scene.block.x;
+  const by = scene.walls ? Math.max(scene.block.y, (scene.walls.lo + 1) * h) : scene.block.y;
+
+  // restBlock is SQUARE and these blocks are not, so it is called once per lattice site: the page decides
+  // WHERE a particle goes and the graded fixture decides WHAT a particle at rest is -- rest velocity, zero
+  // affine matrix, identity F, identity F0 and identity Fp. None of that is retyped here.
+  const ps = [];
+  for (let a = 0; a < cols; a++) {
+    for (let b = 0; b < rows; b++) {
+      ps.push(restBlock({ n: 1, spacing, x0: bx + a * spacing, y0: by + b * spacing, m, vol0 })[0]);
+    }
+  }
+  N = ps.length;
+
+  particleTemplate = new Float32Array(N * PARTICLE_FLOATS);
+  ps.forEach((p, i) => {
+    const o = i * PARTICLE_FLOATS;
+    particleTemplate[o + PF.px] = p.x; particleTemplate[o + PF.py] = p.y;
+    particleTemplate[o + PF.f00] = 1; particleTemplate[o + PF.f11] = 1;
+    particleTemplate[o + PF.p00] = 1; particleTemplate[o + PF.p11] = 1;
+  });
+  com0 = centreOfMass(ps);
+  comNow = { x: com0.x, y: com0.y };
+  return { m, vol0 };
+}
+
+function allocate({ m, vol0 }) {
+  for (const b of [bufParts, bufAcc, bufGv, bufFlags, bufUni, bufRead, bufRenderUni]) b?.destroy?.();
+  const mk = (size, usage) => dev.createBuffer({ size, usage });
+  const ST = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
+  bufParts = mk(N * PARTICLE_FLOATS * 4, ST);
+  bufAcc = mk(nodes * 5 * 4, ST);
+  bufGv = mk(nodes * 4 * 4, ST);
+  bufFlags = mk(16, ST);
+  bufUni = mk(96, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+  bufRenderUni = mk(32, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+  bufRead = dev.createBuffer({ size: N * PARTICLE_FLOATS * 4 + 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+
+  dev.queue.writeBuffer(bufParts, 0, particleTemplate);
+  dev.queue.writeBuffer(bufFlags, 0, new Uint32Array([0, 0, 0, 0]));
+
+  const scales = fixedPointScales({ h });
+  const cl = clampLimits();
+  const mat = lame(500, 0.3);
+  const alpha = alphaOf(Number(document.getElementById("friction").value));
+  dev.queue.writeBuffer(bufUni, 0, packParams({
+    nx, ny, nParticles: N, plasticMode: scene.mode, h, dt, gx: 0, gy: GY,
+    mu: mat.mu, lambda: mat.lambda, alpha, pmass: m, pvol: vol0,
+    thetaC: cl.thetaC, thetaS: cl.thetaS, walls: scene.walls, scales,
+  }));
+
+  const entries = [
+    { binding: 0, resource: { buffer: bufUni } },
+    { binding: 1, resource: { buffer: bufParts } },
+    { binding: 2, resource: { buffer: bufAcc } },
+    { binding: 3, resource: { buffer: bufGv } },
+    { binding: 4, resource: { buffer: bufFlags } },
+  ];
+  bind = {};
+  for (const stage of ["clear", "p2g", "grid", "g2p"]) {
+    bind[stage] = dev.createBindGroup({ layout: pipes[stage].getBindGroupLayout(0), entries });
+  }
+  renderBind = dev.createBindGroup({
+    layout: renderPipe.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: bufRenderUni } }, { binding: 1, resource: { buffer: bufParts } }],
+  });
+  const sx = 2 / scene.domW, sy = 2 / scene.domH;
+  dev.queue.writeBuffer(bufRenderUni, 0, new Float32Array([sx, sy, -1, -1, Math.sqrt(2 * 9.81 * scene.domH), 0, 0, 0]));
+
+  steps = 0; msEwma = 0; saturation = 0; lastRead = 0;
+  return scales;
+}
+
+function gpuSteps(n) {
+  const wg = (x) => Math.ceil(x / 64);
+  const enc = dev.createCommandEncoder();
+  for (let s = 0; s < n; s++) {
+    for (const [stage, count] of [["clear", nodes * 5], ["p2g", N], ["grid", nodes], ["g2p", N]]) {
+      const p = enc.beginComputePass();
+      p.setPipeline(pipes[stage]); p.setBindGroup(0, bind[stage]);
+      p.dispatchWorkgroups(wg(count)); p.end();
+    }
+  }
+  dev.queue.submit([enc.finish()]);
+  steps += n;
+}
+
+function draw() {
+  const enc = dev.createCommandEncoder();
+  const pass = enc.beginRenderPass({ colorAttachments: [{
+    view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 },
+    loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(renderPipe); pass.setBindGroup(0, renderBind);
+  pass.draw(4, N); pass.end();
+  dev.queue.submit([enc.finish()]);
+}
+
+// *** THE CENTRE OF MASS IS READ BACK AND SUMMED IN f64 RATHER THAN ACCUMULATED ON THE GPU, AND THAT IS A
+// CORRECTION RATHER THAN A PREFERENCE. *** It was a fixed-point accumulator first. A fixed-point add rounds by
+// half a step whatever the magnitude, so N of them cost sqrt(N)/(2*scale) while the range must still cover the
+// whole domain -- and those two requirements part company at about sixteen thousand particles. The readout
+// carried a hundred times more noise than the physics floor it exists to display. See
+// comAccumulatorPossible() in physics/mpm/gpuKernel.mjs for the arithmetic.
+async function readback() {
+  if (reading) return;
+  reading = true;
+  try {
+    const enc = dev.createCommandEncoder();
+    enc.copyBufferToBuffer(bufParts, 0, bufRead, 0, N * PARTICLE_FLOATS * 4);
+    enc.copyBufferToBuffer(bufFlags, 0, bufRead, N * PARTICLE_FLOATS * 4, 16);
+    dev.queue.submit([enc.finish()]);
+    await bufRead.mapAsync(GPUMapMode.READ);
+    const raw = bufRead.getMappedRange();
+    const f = new Float32Array(raw, 0, N * PARTICLE_FLOATS);
+    saturation = new Uint32Array(raw, N * PARTICLE_FLOATS * 4, 4)[0];
+    const ps = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const o = i * PARTICLE_FLOATS;
+      ps[i] = { m: com0.m / N, x: f[o + PF.px], y: f[o + PF.py] };
+    }
+    const c = centreOfMass(ps);
+    comNow = { x: c.x, y: c.y };
+    bufRead.unmap();
+  } catch (e) { console.error("[swek] readback:", e); }
+  reading = false;
+}
+
+function report(scales) {
+  const wantY = com0.y + GY * dt * dt * (steps * (steps + 1) / 2);
+  const err = Math.abs(comNow.y - wantY), drift = Math.abs(comNow.x - com0.x);
+  const isFall = scene.walls === null;
+  const cls = err < 1e-4 ? "ok" : err < 1e-2 ? "warn" : "bad";
+  const satCls = saturation === 0 ? "ok" : "bad";
+  document.getElementById("stats").innerHTML =
+    "<b>" + N.toLocaleString() + "</b> particles on a <b>" + nx + " &times; " + ny + "</b> grid " +
+    "(" + nodes.toLocaleString() + " nodes)   cell <b>" + h.toFixed(5) + "</b>   step <b>" + dt.toExponential(3) + " s</b>" +
+    "   fixed point <b>2^" + Math.log2(scales.mass) + " / 2^" + Math.log2(scales.mom) + " / 2^" + Math.log2(scales.force) + "</b>" +
+    "<br>step " + steps.toLocaleString() + "   sim time " + (steps * dt).toFixed(4) + " s" +
+    "   frame " + (msEwma ? msEwma.toFixed(1) + " ms" : "&mdash;") +
+    "   saturated scatters <b class='" + satCls + "'>" + saturation + "</b>" +
+    "<br>centre of mass y <b>" + comNow.y.toFixed(9) + "</b>" +
+    (isFall ? "   analytic <b>" + wantY.toFixed(9) + "</b>   parabola error <b class='" + cls + "'>" +
+      err.toExponential(3) + "</b>   sideways drift <b class='" + (drift < 1e-5 ? "ok" : "warn") + "'>" +
+      drift.toExponential(3) + "</b>"
+     : "   <span style='color:#5f7699'>(no analytic answer with a floor in the way &mdash; switch to free fall for the key)</span>");
+
+  document.getElementById("footnote").innerHTML = scene.note +
+    "<br><br><b>What the free-fall number should read, and why it is not round-off.</b> The CPU page shows this " +
+    "error at 1e-15. <b>This one cannot and must not.</b> The kernel runs in single precision and accumulates " +
+    "the scatter in fixed point, and both were measured: the loop earns the discrete parabola at about " +
+    "<b>4.7e-6</b> over 120 steps, against 8.9e-16 for the same loop in f64. That gap is the hardware. A page " +
+    "showing round-off on a machine that cannot deliver it would be inviting somebody to tune a correct loop " +
+    "until the number improved." +
+    "<br><br><b>The error grows with step count and that is arithmetic, not decay.</b> It is measured against " +
+    "the DISCRETE fall the integrator actually produces, g&middot;dt&sup2;&middot;n(n+1)/2, and not the textbook " +
+    "g&middot;t&sup2;/2 &mdash; symplectic Euler advects with the velocity after the kick, so those differ by " +
+    "exactly one half-step. Grading against the continuous form would manufacture a growing error on a correct loop." +
+    "<br><br><b>Saturated scatters must stay at zero.</b> The fixed-point range is derived from peaks measured " +
+    "on the graded loop and scaled to this cell size, with 32&times; headroom. An i32 accumulator that overflows " +
+    "does not crash &mdash; it wraps, and the material then does something plausible and wrong &mdash; so the " +
+    "kernel counts the event instead of letting it be invisible. If that number is not zero, nothing on screen " +
+    "is physics.";
+}
+
+let scales = null;
+
+async function reset() {
+  stop();
+  try {
+    if (!dev) await initGPU();
+    const fixture = buildScene();
+    scales = allocate(fixture);
+    await readback();
+    draw();
+    report(scales);
+  } catch (e) { fail(e.message); }
+}
+
+function frame() {
+  const t0 = performance.now();
+  gpuSteps(Number(document.getElementById("sub").value));
+  draw();
+  const ms = performance.now() - t0;
+  msEwma = msEwma ? msEwma * 0.9 + ms * 0.1 : ms;
+  if (steps - lastRead > 60) { lastRead = steps; readback().then(() => report(scales)); }
+  else report(scales);
+}
+
+function stop() {
+  if (timer) { clearInterval(timer); timer = null; }
+  document.getElementById("stop").disabled = true;
+  document.getElementById("run").disabled = false;
+}
+
+document.getElementById("run").onclick = () => {
+  if (timer || !dev) return;
+  document.getElementById("run").disabled = true;
+  document.getElementById("stop").disabled = false;
+  timer = setInterval(frame, 1000 / 60);
+};
+document.getElementById("stop").onclick = stop;
+document.getElementById("reset").onclick = reset;
+for (const id of ["scene", "res", "friction"]) document.getElementById(id).onchange = reset;
+
+reset();
+</script>
+</body>
+</html>

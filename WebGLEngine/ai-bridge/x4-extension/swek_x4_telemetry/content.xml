@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SweK X4 Telemetry extension manifest. Copy this folder into <X4>\extensions\.
+     Depends on djfhe's HTTP client mod (folder renamed to "djfhe_http"). -->
+<content id="swek_x4_telemetry"
+         name="SweK X4 Telemetry"
+         description="Pushes player/ship/sector telemetry to the SweK Engine ai-bridge over HTTP (POST /x4/state). Requires the djfhe_http mod and Protected UI Mode OFF."
+         author="SweK"
+         version="100"
+         date="2026-06-13"
+         save="0"
+         enabled="true">
+  <dependency id="djfhe_http" optional="false"/>
+  <text language="44" name="SweK X4 Telemetry"
+        description="Pushes telemetry to the SweK Engine bridge."/>
+</content>

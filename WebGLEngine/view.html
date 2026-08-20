@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>SweK Engine — GLB Viewer</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #1c1735 0%, #08060f 80%);
+    color: #cfd;
+    font-family: ui-monospace, Menlo, monospace;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  #c { display:block; width:100%; height:100%; }
+  /* Top: source + meta */
+  #top {
+    position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(120,140,200,0.25);
+    border-radius: 999px; padding: 6px 14px;
+    font-size: 12px; color: #cfd; letter-spacing: .02em;
+    pointer-events: none; max-width: 92vw;
+    white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+  }
+  #top .name { color:#cfd; }
+  #top .meta { color:#89a; margin-left:8px; font-size:11px; }
+  /* Status text (e.g. loading / error) */
+  #status {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.65); border: 1px solid rgba(120,140,200,0.4);
+    border-radius: 10px; padding: 12px 20px;
+    font-size: 13px; color: #cfd; display:none;
+  }
+  #status.error { color: #f88; border-color: #844; }
+  /* Bottom action bar — only visible in queue mode */
+  #actions {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom)) 16px;
+    display: none; justify-content: space-around; align-items: center;
+    background: linear-gradient(to top, rgba(8,6,15,0.85) 0%, rgba(8,6,15,0) 100%);
+    pointer-events: none;
+  }
+  #actions.on { display: flex; }
+  #actions button {
+    pointer-events: auto;
+    background: rgba(20,16,30,0.92);
+    color: #cfd; border: 1px solid rgba(120,140,200,0.4);
+    border-radius: 999px; padding: 10px 18px;
+    font: bold 14px ui-monospace, Menlo, monospace;
+    min-width: 88px; cursor: pointer;
+    transition: transform .15s ease, background .15s ease;
+  }
+  #actions button:active { transform: scale(0.92); }
+  #actions .discard { color:#f88; border-color: #844; }
+  #actions .skip    { color:#cb9; border-color: #654; }
+  #actions .keep    { color:#7ec; border-color: #485; }
+  /* Tiny help text */
+  #help {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 80px;
+    font-size: 10px; color: #678; text-align: center;
+    pointer-events: none; max-width: 90vw;
+  }
+  #help.off { display: none; }
+  /* Swipe-action flash */
+  #flash {
+    position: fixed; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    font: bold 64px ui-monospace, Menlo, monospace;
+    pointer-events: none; z-index: 50;
+    text-shadow: 0 4px 22px rgba(0,0,0,0.7);
+  }
+  #flash.discard { color: #f88; }
+  #flash.keep    { color: #7ec; }
+  #flash.skip    { color: #cb9; }
+  /* v647 — "Send to engine" button in single mode */
+  #send {
+    position: fixed; top: 50px; right: 12px;
+    padding: 8px 14px;
+    background: rgba(40, 28, 70, 0.92); color: #c9f;
+    border: 1px solid #553a7a; border-radius: 8px;
+    font: bold 12px ui-monospace, Menlo, monospace;
+    cursor: pointer; display: none; z-index: 30;
+  }
+  #send.on { display: block; }
+  #send:active { transform: scale(0.94); }
+  #send.sent { background: rgba(40, 80, 60, 0.92); color: #7ec; border-color: #485; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="top"><span class="name">—</span> <span class="meta"></span></div>
+<div id="status">loading…</div>
+<div id="actions">
+  <button class="discard" id="aDiscard" title="Swipe left">← Discard</button>
+  <button class="skip"    id="aSkip"    title="Swipe down">↓ Skip</button>
+  <button class="keep"    id="aKeep"    title="Swipe right">Keep →</button>
+</div>
+<div id="help">drag = rotate · pinch = zoom · swipe ← discard, → keep, ↓ skip</div>
+<div id="flash"></div>
+<button id="send" title="Spawn this mesh in the live engine at the camera">📡 Send to engine</button>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+/* v3108 -- OFFLINE-FIRST, the same fix battleship3d.html took at v1989 after "the game was unloadable on a
+   LAN-only box". This page carried three bare CDN <script> tags while the engine ships its own three, so it
+   rendered perfectly on any machine with internet and was dead on the box the engine is actually for.
+   Vendored first, CDN only as the fallback -- the fallback is the check that makes "the CDN will be there"
+   a claim this page can survive being wrong about. boundaryLint's UNVERIFIED_EXTERNAL_URL now fails on the
+   bare form, so this cannot quietly come back. */
+let THREE, OrbitControls, GLTFLoader;
+try {
+  THREE = await import("/vendor/three/three.module.js");
+  ({ OrbitControls } = await import("/vendor/three/jsm/controls/OrbitControls.js"));
+  ({ GLTFLoader } = await import("/vendor/three/jsm/loaders/GLTFLoader.js"));
+} catch {
+  THREE = await import("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.min.js");
+  ({ OrbitControls } = await import("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/OrbitControls.js"));
+  ({ GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"));
+}
+/* the body below was written against the r128 globals, so keep that surface rather than rewrite 380 lines */
+THREE = { ...THREE, OrbitControls, GLTFLoader };
+try { if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; } catch {}
+
+// ---------- v645 Standalone GLB viewer ----------
+// URL params:
+//   ?glb=URL                — view a single GLB
+//   ?queue=lab              — walk through Kaggle Lab results (localStorage)
+//   ?queue=creatures        — walk through saved Gemini creatures
+//   ?queue=urls&list=a,b,c  — explicit list (comma-separated)
+//   ?bg=transparent         — transparent canvas (for embed)
+//   ?autorotate=0           — disable auto-rotate
+// In queue mode the action buttons + swipe gestures decide what to do
+// with each entry (Discard / Skip / Keep). Discard calls back to the
+// appropriate library to forget. Keep just advances to the next.
+
+const params = new URLSearchParams(location.search);
+const qsGlb       = params.get("glb");
+const qsQueue     = params.get("queue");
+const qsBg        = params.get("bg");
+const qsAutoRotate = params.get("autorotate") !== "0";
+
+const topEl     = document.getElementById("top");
+const statusEl  = document.getElementById("status");
+const actionsEl = document.getElementById("actions");
+const flashEl   = document.getElementById("flash");
+const helpEl    = document.getElementById("help");
+
+function setStatus(text, isError) {
+    if (!text) { statusEl.style.display = "none"; return; }
+    statusEl.textContent = text;
+    statusEl.classList.toggle("error", !!isError);
+    statusEl.style.display = "block";
+}
+function setMeta(name, meta) {
+    topEl.querySelector(".name").textContent = name || "—";
+    topEl.querySelector(".meta").textContent = meta || "";
+}
+
+// ---------- Three.js setup ----------
+const canvas = document.getElementById("c");
+const scene  = new THREE.Scene();
+if (qsBg !== "transparent") scene.background = new THREE.Color(0x0a081a);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: qsBg === "transparent" });
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+camera.position.set(2, 1.5, 3);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 0.2;
+controls.maxDistance = 50;
+controls.autoRotate = !!qsAutoRotate;
+controls.autoRotateSpeed = 0.6;
+
+// Lighting — bright enough that most untextured GLBs read well
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(2, 4, 3); scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.35); rim.position.set(-3, 1, -2); scene.add(rim);
+
+// Soft grid + ground disc for scale reference
+const grid = new THREE.GridHelper(20, 20, 0x445, 0x223);
+grid.position.y = 0;
+scene.add(grid);
+
+function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+let currentModel = null;
+function clearModel() {
+    if (!currentModel) return;
+    scene.remove(currentModel);
+    currentModel.traverse(o => {
+        if (o.geometry) o.geometry.dispose?.();
+        if (o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of mats) {
+                for (const k of ["map","normalMap","roughnessMap","metalnessMap","emissiveMap","aoMap"]) m[k]?.dispose?.();
+                m.dispose?.();
+            }
+        }
+    });
+    currentModel = null;
+}
+
+const loader = new THREE.GLTFLoader();
+
+// ---- v647: 8-color palette for voxel creatures (mirrors gpu/voxelCreature.js) ----
+const CREATURE_PALETTE = [
+    [0.60, 0.60, 0.64], [0.86, 0.24, 0.20], [0.95, 0.55, 0.18], [0.93, 0.85, 0.26],
+    [0.34, 0.72, 0.34], [0.30, 0.78, 0.82], [0.30, 0.46, 0.86], [0.93, 0.93, 0.96],
+];
+
+// Build a Three.js InstancedMesh of unit cubes from a voxel array. Each
+// voxel is [x, y, z, colorIndex] (the same shape buildVoxelMesh consumes
+// in the engine). Centered on the centroid so OrbitControls frames it.
+function buildVoxelGroup(voxels) {
+    if (!Array.isArray(voxels) || voxels.length === 0) return null;
+    let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const v of voxels) {
+        const x = v[0] | 0, y = v[1] | 0, z = v[2] | 0;
+        if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
+    }
+    const ox = (minX + maxX) / 2, oy = (minY + maxY) / 2, oz = (minZ + maxZ) / 2;
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: false });
+    const mesh = new THREE.InstancedMesh(geo, mat, voxels.length);
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+    for (let i = 0; i < voxels.length; i++) {
+        const v = voxels[i];
+        const x = (v[0] | 0) - ox, y = (v[1] | 0) - oy, z = (v[2] | 0) - oz;
+        dummy.position.set(x, y, z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+        let ci = v[3] | 0; if (ci < 0 || ci > 7) ci = 0;
+        const c = CREATURE_PALETTE[ci];
+        color.setRGB(c[0], c[1], c[2]);
+        mesh.setColorAt(i, color);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    // Wrap in a group so the framing code can treat it like a model root
+    const group = new THREE.Group();
+    group.add(mesh);
+    group.userData.bbox = { sizeY: (maxY - minY) || 1, sizeMax: Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1 };
+    return group;
+}
+
+function loadVoxels(voxels, label, meta) {
+    clearModel();
+    const group = buildVoxelGroup(voxels);
+    if (!group) { setStatus("no voxel data (older save? respawn via the engine to refresh)"); setMeta(label, meta); return; }
+    const bbox = group.userData.bbox;
+    // Feet on grid
+    group.position.y = bbox.sizeY / 2;
+    scene.add(group);
+    currentModel = group;
+    const dist = bbox.sizeMax * 2.2;
+    camera.position.set(dist * 0.6, dist * 0.5, dist * 0.9);
+    camera.near = Math.max(0.01, dist / 1000);
+    camera.far  = dist * 50;
+    camera.updateProjectionMatrix();
+    controls.target.set(0, bbox.sizeY / 2, 0);
+    controls.update();
+    setStatus(null);
+    setMeta(label, meta);
+}
+
+function loadGlb(url, label, meta) {
+    setStatus("loading " + (label || url) + "…");
+    setMeta(label || url, meta);
+    clearModel();
+    loader.load(url, (gltf) => {
+        const root = gltf.scene || gltf.scenes?.[0];
+        if (!root) { setStatus("no scene in GLB", true); return; }
+        // Frame the model
+        const box = new THREE.Box3().setFromObject(root);
+        const size = new THREE.Vector3(); box.getSize(size);
+        const center = new THREE.Vector3(); box.getCenter(center);
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        // Place feet on grid
+        root.position.sub(center);
+        root.position.y += size.y / 2;
+        scene.add(root);
+        currentModel = root;
+        // Camera: enough distance to see the whole thing, ~30deg above
+        const dist = maxDim * 2.2;
+        camera.position.set(dist * 0.6, dist * 0.5, dist * 0.9);
+        camera.near = Math.max(0.01, dist / 1000);
+        camera.far  = dist * 50;
+        camera.updateProjectionMatrix();
+        controls.target.set(0, size.y / 2, 0);
+        controls.update();
+        setStatus(null);
+    }, undefined, (err) => {
+        console.error("[viewer] load failed:", err);
+        setStatus("failed: " + (err?.message || "GLB load error"), true);
+    });
+}
+
+function render() {
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(render);
+}
+render();
+
+// ---------- Queue mode ----------
+// Each entry: { url, label, meta, onDiscard }
+let queueEntries = [];
+let queueIdx = 0;
+
+function buildQueue() {
+    const q = qsQueue;
+    if (!q) return [];
+    if (q === "lab") {
+        try {
+            const raw = JSON.parse(localStorage.getItem("voxelengine.kaggleLabSlugs") || "{}");
+            return Object.entries(raw)
+                .filter(([, v]) => v.completed && v.url && !v.error)
+                .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
+                .map(([slug, v]) => ({
+                    url:   v.url,
+                    label: v.kind || slug,
+                    meta:  v.template + " · " + new Date(v.ts || 0).toLocaleDateString(),
+                    onDiscard: () => {
+                        const m = JSON.parse(localStorage.getItem("voxelengine.kaggleLabSlugs") || "{}");
+                        delete m[slug];
+                        localStorage.setItem("voxelengine.kaggleLabSlugs", JSON.stringify(m));
+                    },
+                }));
+        } catch { return []; }
+    }
+    if (q === "creatures") {
+        try {
+            const raw = JSON.parse(localStorage.getItem("voxelengine.aiCreatures") || "[]");
+            return raw.slice().reverse().map(c => ({
+                url:    null,
+                voxels: Array.isArray(c.voxelData) ? c.voxelData : null,   // v647: render real voxels when present
+                label:  c.name,
+                meta:   (c.prompt || "") + " · " + new Date(c.ts || 0).toLocaleDateString(),
+                onDiscard: () => {
+                    const all = JSON.parse(localStorage.getItem("voxelengine.aiCreatures") || "[]");
+                    const idx = all.findIndex(x => x.name === c.name);
+                    if (idx >= 0) { all.splice(idx, 1); localStorage.setItem("voxelengine.aiCreatures", JSON.stringify(all)); }
+                },
+            }));
+        } catch { return []; }
+    }
+    if (q === "all_glb") {
+        // v647 — walk every .glb under GPU_Assets/ via the bridge's
+        // /assets/list endpoint. Useful for cleaning out unloved meshes
+        // accumulated from old kaiju acquisitions, Kaggle Lab tests, etc.
+        // SYNC fetch is acceptable here because buildQueue is async-aware.
+        return "__async_all_glb__";   // sentinel — handled by buildQueueAsync
+    }
+    if (q === "urls") {
+        const list = (params.get("list") || "").split(",").map(s => s.trim()).filter(Boolean);
+        return list.map(u => ({ url: u, label: u.split("/").pop() || u, meta: "" }));
+    }
+    return [];
+}
+
+function showQueueItem(i) {
+    if (i < 0 || i >= queueEntries.length) {
+        setStatus("queue done — " + queueEntries.length + " items reviewed");
+        setMeta("queue done");
+        clearModel();
+        actionsEl.classList.remove("on");
+        helpEl.classList.add("off");
+        return;
+    }
+    const e = queueEntries[i];
+    if (e.voxels) {
+        // v647 — render saved voxels as InstancedMesh (queue=creatures)
+        loadVoxels(e.voxels, `[${i+1}/${queueEntries.length}] ${e.label}`, e.meta);
+        return;
+    }
+    if (!e.url) {
+        clearModel();
+        setStatus("(no 3D data — saved as metadata only)\n" + (e.label || ""), false);
+        setMeta(e.label, e.meta);
+        return;
+    }
+    loadGlb(e.url, `[${i+1}/${queueEntries.length}] ${e.label}`, e.meta);
+}
+
+function flash(kind) {
+    flashEl.className = kind;
+    flashEl.textContent = kind === "discard" ? "✗" : kind === "keep" ? "★" : "↓";
+    flashEl.style.display = "flex";
+    setTimeout(() => { flashEl.style.display = "none"; }, 350);
+}
+function doAction(kind) {
+    if (queueIdx < 0 || queueIdx >= queueEntries.length) return;
+    const e = queueEntries[queueIdx];
+    if (kind === "discard" && typeof e.onDiscard === "function") {
+        try { e.onDiscard(); } catch (err) { console.warn("[viewer] discard failed:", err); }
+    }
+    flash(kind);
+    queueIdx += 1;
+    showQueueItem(queueIdx);
+}
+
+// Wire action buttons + swipe gestures
+async function initQueueMode() {
+    let entries = buildQueue();
+    // Async branch for queue=all_glb (sentinel returned by buildQueue)
+    if (entries === "__async_all_glb__") {
+        setStatus("scanning /assets/list…");
+        try {
+            const r = await fetch("/assets/list", { cache: "no-store" });
+            if (!r.ok) { setStatus("/assets/list unreachable", true); return; }
+            const j = await r.json();
+            const formats = j?.formats || {};
+            entries = Object.keys(formats)
+                .filter(name => formats[name].glb)
+                .map(name => ({
+                    url:   "/GPU_Assets/" + name + ".glb",
+                    label: name,
+                    meta:  "from GPU_Assets",
+                    onDiscard: null,   // we don't delete server files from the viewer (safety)
+                }));
+            setStatus(null);
+        } catch (e) { setStatus("/assets/list failed: " + e.message, true); return; }
+    }
+    queueEntries = entries;
+    if (queueEntries.length === 0) {
+        setStatus("queue '" + qsQueue + "' is empty");
+        return;
+    }
+    actionsEl.classList.add("on");
+    showQueueItem(0);
+    document.getElementById("aDiscard").addEventListener("click", () => doAction("discard"));
+    document.getElementById("aSkip").addEventListener("click", () => doAction("skip"));
+    document.getElementById("aKeep").addEventListener("click", () => doAction("keep"));
+    // Swipe gestures
+    let p0 = null;
+    canvas.addEventListener("pointerdown", (e) => { p0 = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true });
+    canvas.addEventListener("pointerup",   (e) => {
+        if (!p0) return;
+        const dx = e.clientX - p0.x, dy = e.clientY - p0.y, dt = Date.now() - p0.t;
+        p0 = null;
+        if (dt > 400) return;
+        const ax = Math.abs(dx), ay = Math.abs(dy);
+        if (ax > 80 && ax > ay * 1.4)        doAction(dx > 0 ? "keep" : "discard");
+        else if (ay > 80 && dy > ax * 1.4)   doAction("skip");
+    }, { passive: true });
+}
+
+// v647 — Send to Engine button (single mode only): POST /viewer/spawn to
+// broadcast a spawn request to all WS clients. The engine catches it and
+// drops the mesh at the camera. Lets phone reviewers commit a mesh to
+// the live PC engine without re-opening the Kaggle Lab panel.
+function wireSendButton(glbUrl, label) {
+    const btn = document.getElementById("send");
+    btn.classList.add("on");
+    btn.addEventListener("click", async () => {
+        const prev = btn.textContent;
+        btn.disabled = true; btn.textContent = "Sending…";
+        try {
+            const r = await fetch("/viewer/spawn", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: glbUrl, label }),
+            });
+            const j = await r.json();
+            if (r.ok && j.ok) {
+                btn.textContent = "✓ Sent";
+                btn.classList.add("sent");
+                setTimeout(() => { btn.textContent = prev; btn.classList.remove("sent"); btn.disabled = false; }, 2200);
+            } else {
+                btn.textContent = "✗ Failed";
+                setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 2200);
+            }
+        } catch (e) {
+            btn.textContent = "✗ " + (e.message || "error");
+            setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 2500);
+        }
+    });
+}
+
+if (qsQueue) {
+    initQueueMode();
+} else if (qsGlb) {
+    loadGlb(qsGlb, qsGlb.split("/").pop() || qsGlb, "");
+    helpEl.textContent = "drag = rotate · pinch = zoom";
+    wireSendButton(qsGlb, qsGlb.split("/").pop() || qsGlb);
+} else {
+    setStatus("pass ?glb=URL  or  ?queue=lab|creatures|all_glb");
+    setMeta("SweK Engine GLB Viewer", "");
+}
+</script>
+</body>
+</html>

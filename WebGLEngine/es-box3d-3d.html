@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<!-- es-box3d-3d.html — v3825 — LONG SILENCE, ROUND A: a real 3D render pass for the box3d fight.
+     The SAME battle es-box3d.html runs in 2D canvas, now drawn with Three.js: each ship is a hull mesh that
+     follows box3d's real (x, 0, z) and a heading-yaw, under a free OrbitControls camera. The sim is UNCHANGED --
+     box3d still holds Y at 0, heading is still a scalar the flight model owns -- so the ships play exactly like
+     flat Endless Sky space; only the view is 3D (the camera not being locked to the plane is a pure rendering
+     decision). Hull source is the procedural generator lifted from shipview.js's pipeline (the low-risk of the
+     three options in the plan); makeHull() is the seam where a sprite-loft or a GLB slots in later.
+     Verification lives in ev/esFlight3dMath-selfcheck.mjs (the coordinate/heading answer key). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).">
+<title>SweK &middot; Endless Sky on Box3D &mdash; 3D</title>
+<style>
+  html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #hud { position:fixed; top:8px; left:10px; right:10px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; z-index:2; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  #mode { padding:2px 8px; border-radius:5px; border:1px solid #2a6a4a; background:#10261c; color:#9fe6c0; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  a { color:#5ad6ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  #hint { position:fixed; bottom:8px; left:10px; color:#5f7590; z-index:2; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b style="color:#2fd6b0">&#128640; Endless Sky on Box3D &mdash; 3D</b>
+  <span id="mode" class="fallback">detecting&hellip;</span>
+  <span id="stat" style="color:#7d8fa8"></span>
+  <a href="/es-box3d.html" title="the original 2D canvas view of this same fight">2D view &#8599;</a>
+  <a href="/es-box3d-fly3d.html" title="Round B: ships actually fly in 3D -- pitch, altitude, 3D dogfight">Round B: 3D flight &#8599;</a>
+</div>
+<div id="hint">drag to orbit &middot; scroll to zoom &middot; ships collide on box3d, the plane is unchanged &mdash; only the camera is free</div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
+import { headingVector } from "/ev/flightModel.js";
+import { DEFAULT_W, decide as tacticsDecide, applyBrainWeights } from "/ev/esTactics.js";
+import { createESBox3D } from "/physics/esBox3d.js";
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
+import { shipTransform, fleetBounds, sceneScale } from "/ev/esFlight3dMath.js";
+
+// ---- the fight (identical setup to es-box3d.html; the sim is what Round A must not change) ------------------
+const CLASSES = [
+  { id: 1, name: "Raider",   shield: 80,  armor: 60, speed: 340, accel: 240, maneuver: 11, dps: 12 },
+  { id: 2, name: "Marauder", shield: 120, armor: 90, speed: 300, accel: 200, maneuver: 8,  dps: 18 },
+  { id: 3, name: "Corsair",  shield: 60,  armor: 40, speed: 400, accel: 280, maneuver: 14, dps: 8  },
+];
+const SHOT = { speed: 1050, life: 1.7, dmgShield: 14, dmgArmor: 12, cooldownMs: 360 };
+const HIT_RADIUS = 90;
+const W_A = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W);
+const W_B = { ...DEFAULT_W };
+const WORLD_HALF = 1900, S = sceneScale(WORLD_HALF, 30);   // world -> scene units (same span the 2D view shows)
+
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+function makeFleet(team, center, count, rng) {
+  return spawnEnemies(CLASSES, {}, center, { count, team, minR: 150, spread: 500, rnd: rng }).map((e, i) => ({
+    ...e, id: team + "#" + i, team, vx: e.vx || 0, vy: e.vy || 0,
+    dps: (e.cls && e.cls.dps) || e.dps || 10, _cool: 0, _tgtId: null, _fleeing: false,
+  }));
+}
+function snapshot(fleet) { const o = []; for (const e of fleet) if (!e.dead) o.push({ id: e.id, x: e.x, y: e.y, team: e.team, shield: e.shield, armor: e.armor, maxShield: e.maxShield, maxArmor: e.maxArmor, dps: e.dps, dead: false }); return o; }
+function sideDriveShots(mine, foes, weights, esbx, dt, nowMs) {
+  const shots = [];
+  for (const e of mine) {
+    if (e.dead) continue;
+    const d = tacticsDecide(e, foes, weights, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
+    e._fleeing = !!d.fleeing; e._tgtId = (d.target && !d.target._flee) ? d.target.id : null;
+    if (!d.target) continue;
+    const ai = stepAI(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });
+    esbx.driveShip(e._bx, { turn: ai.turn, thrust: ai.thrust }, dt);
+    if (ai.firing && d.engaging && nowMs >= (e._cool || 0)) {
+      e._cool = nowMs + SHOT.cooldownMs; const dir = headingVector(e.heading);
+      shots.push({ team: e.team, x: e.x, y: e.y, vx: dir.x * SHOT.speed, vy: dir.y * SHOT.speed, life: SHOT.life });
+    }
+  }
+  return shots;
+}
+function advanceShots(shots, ships, dt) {
+  const rr = HIT_RADIUS * HIT_RADIUS, alive = [];
+  for (const sh of shots) {
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
+    if (sh.life <= 0) continue;
+    let hit = false;
+    for (const e of ships) { if (e.dead || e.team === sh.team) continue; const dx = e.x - sh.x, dy = e.y - sh.y; if (dx * dx + dy * dy <= rr) { if (applyDamage(e, SHOT.dmgShield, SHOT.dmgArmor)) e.dead = true; hit = true; break; } }
+    if (!hit) alive.push(sh);
+  }
+  return alive;
+}
+
+// ---- Three.js scene (shipview.js's pipeline, one scene, many hulls) ----------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x03060d);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(0, 46, 62);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.target.set(0, 0, 0);
+controls.minDistance = 8; controls.maxDistance = 260;
+
+scene.add(new THREE.HemisphereLight(0xafe6ff, 0x0a1420, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(30, 60, 40); scene.add(key);
+const fill = new THREE.DirectionalLight(0x6fb8ff, 0.4); fill.position.set(-40, 12, -30); scene.add(fill);
+scene.add(new THREE.AmbientLight(0x223a55, 0.5));
+// the plane the fight lives on, faint, so the eye has ground truth for depth
+const grid = new THREE.GridHelper(60, 24, 0x1b3350, 0x0e1c30); scene.add(grid);
+// starfield
+(function stars() {
+  const N = 700, g = new THREE.BufferGeometry(), p = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) { const r = 300 + Math.random() * 1500, th = Math.random() * 6.283, ph = Math.acos(2 * Math.random() - 1); p[i*3]=r*Math.sin(ph)*Math.cos(th); p[i*3+1]=r*Math.cos(ph); p[i*3+2]=r*Math.sin(ph)*Math.sin(th); }
+  g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fd8ff, size: 1.4, sizeAttenuation: false, transparent: true, opacity: 0.8 })));
+})();
+
+// TEAM MATERIALS -- match the 2D view's team colours (A cyan, B amber).
+const TEAM = {
+  A: { hull: new THREE.MeshStandardMaterial({ color: 0x8fb6d0, metalness: 0.7, roughness: 0.35 }),
+       glow: new THREE.MeshStandardMaterial({ color: 0x4fd0ff, emissive: 0x2f86ff, emissiveIntensity: 1.4 }) },
+  B: { hull: new THREE.MeshStandardMaterial({ color: 0xd0b08f, metalness: 0.7, roughness: 0.35 }),
+       glow: new THREE.MeshStandardMaterial({ color: 0xff9a4f, emissive: 0xff6a2a, emissiveIntensity: 1.4 }) },
+};
+
+// makeHull(team) -> a hull Group whose local nose is +X (the convention esFlight3dMath assumes). Lifted from
+// shipview.js's procedural ship. THIS IS THE SEAM: a sprite-lofted hull or a per-class GLB replaces this body
+// without touching the transform math or the sim.
+function makeHull(team) {
+  const m = TEAM[team] || TEAM.A, g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, 2.6, 14), m.hull); body.rotation.z = Math.PI / 2; g.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.9, 14), m.hull); nose.rotation.z = -Math.PI / 2; nose.position.x = 1.6; g.add(nose);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 1.9), m.hull); wing.position.x = -0.2; g.add(wing);
+  const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.18, 12), m.glow); eng.rotation.z = Math.PI / 2; eng.position.x = -1.35; g.add(eng);
+  g.scale.setScalar(0.9);
+  return g;
+}
+
+// shots as one Points cloud, refilled each frame
+const shotGeo = new THREE.BufferGeometry();
+let shotPos = new Float32Array(0);
+shotGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(3), 3));
+const shotPts = new THREE.Points(shotGeo, new THREE.PointsMaterial({ color: 0xbfe6ff, size: 3, sizeAttenuation: false, transparent: true, opacity: 0.95 }));
+scene.add(shotPts);
+
+const hulls = new Map();      // ship.id -> THREE.Group
+function ensureHull(e) { let h = hulls.get(e.id); if (!h) { h = makeHull(e.team); scene.add(h); hulls.set(e.id, h); } return h; }
+function clearHulls() { for (const h of hulls.values()) scene.remove(h); hulls.clear(); }
+
+// ---- battle state ----
+let A = [], B = [], shots = [], t = 0, esbx = null, ready = false, wins = { A: 0, B: 0 };
+function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, 0, 0] }) : planarFallbackWorld(); }
+function newBattle() {
+  clearHulls();
+  const rng = makeRng((Math.random() * 1e9) | 0);
+  A = makeFleet("A", { x: -1300, y: 0 }, 6, rng); B = makeFleet("B", { x: 1300, y: 0 }, 6, rng);
+  esbx = createESBox3D(makeWorld(), { shipHalf: 60 });
+  for (const e of A.concat(B)) e._bx = esbx.add(e, e.stats);
+  shots = []; t = 0;
+}
+
+function syncScene() {
+  // place every live hull at box3d's real transform; drop hulls whose ship died.
+  const live = new Set();
+  for (const e of A.concat(B)) {
+    if (e.dead) continue;
+    live.add(e.id);
+    const h = ensureHull(e), tf = shipTransform(e);
+    h.position.set(tf.pos[0] * S, 0, tf.pos[2] * S);
+    h.rotation.y = tf.rotY;
+  }
+  for (const id of [...hulls.keys()]) if (!live.has(id)) { const h = hulls.get(id); scene.remove(h); hulls.delete(id); }
+
+  // shots
+  const n = shots.length;
+  if (shotPos.length !== n * 3) shotPos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { shotPos[i*3] = shots[i].x * S; shotPos[i*3+1] = 0; shotPos[i*3+2] = shots[i].y * S; }
+  shotGeo.setAttribute("position", new THREE.BufferAttribute(shotPos, 3));
+  shotGeo.setDrawRange(0, n);
+  shotGeo.attributes.position.needsUpdate = true;
+}
+
+function frame() {
+  const dt = 1 / 30, nowMs = t * 1000;
+  const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
+  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
+  else {
+    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs);
+    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);
+    esbx.step(dt); esbx.sync();
+    shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
+  }
+  syncScene();
+  controls.update();
+  renderer.render(scene, camera);
+  document.getElementById("stat").textContent =
+    `A ${A.filter((e) => !e.dead).length} vs B ${B.filter((e) => !e.dead).length}  ·  battles A:${wins.A} B:${wins.B}  ·  ${ready ? "box3d" : "fallback"} collisions`;
+  requestAnimationFrame(frame);
+}
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+(async () => {
+  const modeEl = document.getElementById("mode");
+  let st = { ready: false }; try { st = await box3d.init(); } catch (e) { st = { ready: false, reason: e && e.message }; }
+  ready = !!st.ready;
+  modeEl.textContent = ready ? "box3d WASM · 3D" : "JS fallback · 3D (build the WASM on the Box3D page)";
+  modeEl.className = ready ? "" : "fallback";
+  newBattle(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

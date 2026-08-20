@@ -1,0 +1,210 @@
+<!doctype html>
+<!-- v3824 -- FIRST DRAW OF THE SLUG TEXT RENDERER ON A REAL GPU.
+     text/ (slugFont, slugAtlas, slugText, slugShader, slugEval) was merged at v3823 as a gated library with
+     nothing calling it -- its own note said "Nothing has been drawn on a real GPU." This page is that first
+     draw: it loads one quadratic TrueType font, packs the curve/band atlas once, and renders the SAME 272 KiB
+     of data at eight sizes from 8 px to a wall-filling title with identical fidelity, which is the whole claim
+     of outline-from-texture text. The "Cross-check vs CPU" button closes the last gap the note left open: it
+     reads the framebuffer back and compares coverage to slugEval.slugRender at the same points.
+     Font: IBM Plex Serif Regular, (c) 2017 IBM Corp., Reserved Font Name "Plex", SIL OFL 1.1
+     (vendor/fonts/IBMPlexSerif-OFL.txt). Slug algorithm (c) 2017 Eric Lengyel, MIT OR Apache-2.0. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:desc" content="The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.">
+<title>SweK &middot; Slug text</title>
+<style>
+  :root { --bg:#070b09; --line:#16261d; --dim:#5f8f74; --ink:#9fe6c0; --warn:#ffcf6b; --bad:#ff8a8a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--ink);
+    font:13px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  header { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:8px 12px; border-bottom:1px solid var(--line); background:#0a120e; }
+  header b { color:#cdeede; }
+  .chip { border:1px solid var(--line); border-radius:6px; padding:3px 9px; color:var(--dim); white-space:nowrap; }
+  .chip.on { color:#0a120e; background:var(--ink); border-color:var(--ink); }
+  button.chip { cursor:pointer; background:transparent; font:inherit; }
+  button.chip:hover { color:var(--ink); border-color:var(--ink); }
+  #wrap { padding:0; }
+  canvas { display:block; width:100%; height:auto; background:#050806; }
+  #stat { padding:6px 12px; color:var(--dim); border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    white-space:pre-wrap; }
+  #stat .ok { color:var(--ink); } #stat .warn { color:var(--warn); } #stat .bad { color:var(--bad); }
+  #note { padding:10px 12px; color:var(--dim); max-width:1000px; }
+  #note b { color:var(--ink); } #note a { color:var(--ink); }
+  code { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <b>&#9998; Slug text</b>
+  <span class="chip">outlines on the GPU</span>
+  <span class="chip" id="cFont">IBM Plex Serif</span>
+  <span class="chip" id="cMem">&hellip;</span>
+  <button class="chip" id="bVerify">&#9654; Cross-check vs CPU</button>
+  <span id="cVerify" style="color:var(--dim)"></span>
+</header>
+<div id="wrap"><canvas id="c" width="1200" height="720"></canvas></div>
+<div id="stat">loading font&hellip;</div>
+<div id="note">
+  One quadratic TrueType font, packed <b>once</b> into a curve texture (Bezier control points) and a band texture,
+  is drawn below at eight sizes from 8&nbsp;px to a wall-filling title &mdash; the same bytes, no atlas rebuilt and
+  no size-dependent baking, because the fragment shader reads the outline and solves for coverage per pixel. That
+  is the point of Slug: text stays sharp at any size and in perspective. The cost is a per-fragment loop over the
+  curves in a band (measured 5&ndash;15 tests/sample), so it is the right tool for UI, labels and titles and the
+  wrong one for a static wall of body text. <b>Cross-check vs CPU</b> renders one glyph to a float buffer, reads it
+  back, and compares coverage to <code>slugEval.slugRender</code> at matching points &mdash; the on-GPU check the
+  library shipped without.
+  <div style="margin-top:8px;font-size:11px;">
+    Font: <b>IBM Plex Serif</b> &copy; 2017 IBM Corp., Reserved Font Name &ldquo;Plex&rdquo;, SIL OFL 1.1
+    (<code>vendor/fonts/IBMPlexSerif-OFL.txt</code>). <span id="slugNotice"></span>
+  </div>
+</div>
+
+<script type="module">
+import { parseFont } from "/text/slugFont.js";
+import { SlugFontGPU, SlugTextBatch } from "/text/slugText.js";
+import { slugRender } from "/text/slugEval.js";
+
+const cvs = document.getElementById("c");
+const statEl = document.getElementById("stat");
+const FONT_URL = "/vendor/fonts/IBMPlexSerif-Regular.ttf";
+const SAMPLE = "Sphinx of black quartz, judge my vow \u2014 0123456789";
+const SIZES = [8, 11, 14, 18, 24, 36, 64, 132];
+// Every glyph the page draws must be in the packed set; an unlisted char maps to .notdef.
+const CHARS = " " + SAMPLE + "SweK\u00b7Slugtext\u2014ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,'";
+
+function say(html) { statEl.innerHTML = html; }
+function fail(msg) { say('<span class="bad">' + msg + "</span>"); }
+
+// The Slug matrix is four rows read as (m.x, m.y, -, m.w): clip = m.x*X + m.y*Y + m.w. Vertices arrive already
+// in PIXELS (em * size), y-up with the baseline at Y=0, so this only has to translate the baseline origin to a
+// screen pixel and scale pixels to clip. y-down screen: screenRow = py - Y.
+function placeRows(W, H, px, py) {
+  return new Float32Array([
+    2 / W, 0, 0, (2 / W) * px - 1,
+    0, 2 / H, 0, 1 - (2 / H) * py,
+    0, 0, 0, 0,
+    0, 0, 0, 1,
+  ]);
+}
+
+let gl, font, fontGPU, batch;
+
+async function init() {
+  gl = cvs.getContext("webgl2", { antialias: false, premultipliedAlpha: true });
+  if (!gl) return fail("This page needs WebGL2 (Chrome/Edge/Firefox/Safari 15+).");
+
+  let ab;
+  try { const r = await fetch(FONT_URL); if (!r.ok) throw new Error("HTTP " + r.status); ab = await r.arrayBuffer(); }
+  catch (e) { return fail("Could not load the font at " + FONT_URL + " (" + e.message + ")."); }
+
+  try { font = parseFont(ab); }
+  catch (e) { return fail("parseFont failed: " + e.message + " (Slug needs quadratic TrueType/glyf outlines, not CFF/OTTO)."); }
+
+  try { fontGPU = new SlugFontGPU(gl, font, CHARS, { format: "16f" }); batch = new SlugTextBatch(fontGPU); }
+  catch (e) { return fail("Atlas/shader build failed: " + e.message); }
+
+  document.getElementById("slugNotice").textContent = fontGPU.notice || "";
+  const kb = (fontGPU.byteSize / 1024).toFixed(0);
+  document.getElementById("cMem").textContent = kb + " KiB atlas";
+  say('<span class="ok">ready</span> \u00b7 ' + font.numGlyphs + " glyphs in the font \u00b7 " +
+      Object.keys(CHARS).length + " chars packed \u00b7 curve+band atlas " + kb + " KiB \u00b7 " +
+      "logWidth " + fontGPU.logWidth + " (MAX_TEXTURE_SIZE " + gl.getParameter(gl.MAX_TEXTURE_SIZE) + ")");
+
+  draw();
+  window.addEventListener("resize", draw);
+}
+
+function sizeCanvasToCSS() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const cssW = cvs.clientWidth || 1200;
+  const w = Math.round(cssW * dpr);
+  // Height grows with the sizes we stack, so the big title is never clipped.
+  let h = 24 * dpr;
+  for (const s of SIZES) h += (s + Math.max(10, s * 0.35)) * dpr;
+  h = Math.round(h);
+  if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+  return dpr;
+}
+
+function draw() {
+  if (!batch) return;
+  const dpr = sizeCanvasToCSS();
+  const W = cvs.width, H = cvs.height;
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0.02, 0.031, 0.024, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+
+  let y = 24 * dpr;                                   // top padding, in device px
+  for (const s of SIZES) {
+    const px = s * dpr;                               // device-pixel em size
+    y += px;                                          // advance to this line's baseline (ascender room above)
+    batch.set((s <= 14 ? SAMPLE + "   (" + s + "px)" : SAMPLE), { size: px, color: [0.72, 0.95, 0.81, 1] });
+    batch.draw(placeRows(W, H, 20 * dpr, y), [W, H]);
+    y += Math.max(10, s * 0.35) * dpr;               // gap to next line
+  }
+}
+
+// --- The check the library shipped without: GPU framebuffer vs slugEval.slugRender at matching points. --------
+document.getElementById("bVerify").onclick = () => {
+  const out = document.getElementById("cVerify");
+  if (!fontGPU) { out.textContent = "not ready"; return; }
+  const ext = gl.getExtension("EXT_color_buffer_float");
+  if (!ext) { out.innerHTML = '<span style="color:var(--bad)">no EXT_color_buffer_float (cannot read float coverage)</span>'; return; }
+
+  const gi = font.glyphIndex("g".codePointAt(0));    // a glyph with a bowl, a stem and a descender
+  const entry = fontGPU.entryFor(gi);
+  if (!entry || entry.empty) { out.textContent = "test glyph missing from atlas"; return; }
+  const bb = font.outline(gi).bbox;                  // em units
+  const T = 256;
+  const s = 0.8 * T / Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0);          // px per em, glyph fills ~80% of the tile
+  const px = T / 2 - ((bb.x0 + bb.x1) / 2) * s;      // centre the glyph's em bbox in the tile
+  const py = T / 2 + ((bb.y0 + bb.y1) / 2) * s;      // (screenRow = py - Y, so + centres it)
+
+  // Render the single glyph to a float target.
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA16F, T, T);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) { out.textContent = "float FBO incomplete"; gl.bindFramebuffer(gl.FRAMEBUFFER, null); return; }
+  gl.viewport(0, 0, T, T);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  const one = new SlugTextBatch(fontGPU);
+  one.set("g", { size: s, color: [1, 1, 1, 1] });
+  one.draw(placeRows(T, T, px, py), [T, T]);
+
+  const buf = new Float32Array(T * T * 4);
+  gl.readPixels(0, 0, T, T, gl.RGBA, gl.FLOAT, buf);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  one.destroy(); gl.deleteFramebuffer(fbo); gl.deleteTexture(tex);
+
+  // Compare. readPixels is bottom-left origin; derive em straight from clip so orientation cannot be got wrong.
+  const atlas = fontGPU.atlas, emsPerPixel = [1 / s, 1 / s];
+  let sumAbs = 0, maxAbs = 0, n = 0, inked = 0;
+  for (let r = 0; r < T; r++) for (let col = 0; col < T; col++) {
+    const clipX = 2 * (col + 0.5) / T - 1, clipY = 2 * (r + 0.5) / T - 1;
+    const Xl = (clipX + 1) * T / 2 - px, Yl = (clipY - 1) * T / 2 + py;   // layout px (inverse of placeRows)
+    const ex = Xl / s, ey = Yl / s;                                        // em
+    const cpu = slugRender(atlas, entry, ex, ey, emsPerPixel);
+    const gpu = buf[(r * T + col) * 4];               // premultiplied white -> R channel is coverage
+    if (cpu > 0.001 || gpu > 0.001) inked++;
+    const d = Math.abs(gpu - cpu); sumAbs += d; if (d > maxAbs) maxAbs = d; n++;
+  }
+  const mean = sumAbs / n;
+  const cls = maxAbs < 0.05 ? "ok" : (maxAbs < 0.15 ? "warn" : "bad");
+  const col = cls === "ok" ? "var(--ink)" : cls === "warn" ? "var(--warn)" : "var(--bad)";
+  out.innerHTML = '<span style="color:' + col + '">glyph \u2018g\u2019 @ ' + s.toFixed(0) + "px \u00b7 " +
+    inked + " inked px \u00b7 mean |GPU\u2212CPU| " + mean.toFixed(4) + " \u00b7 max " + maxAbs.toFixed(4) +
+    (cls === "ok" ? " \u2713 matches slugEval" : " \u2014 see console") + "</span>";
+  if (cls !== "ok") console.warn("[slug-text] cross-check mean", mean, "max", maxAbs, "at", s.toFixed(1), "px/em");
+};
+
+init().catch((e) => { console.error(e); fail("init failed: " + (e.message || e)); });
+</script>
+</body>
+</html>

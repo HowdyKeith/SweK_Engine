@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Fleet Bench</title>
+<!--
+     v3214 -- THE LAST ROUTE-OWNING BRIDGE WITH NO FRONT DOOR.
+
+     bridgeCensus has named benchCollectBridge.js (/fleetbench) as real debt for rounds: dispatched, gated, and
+     findable only by knowing the URL. v2985 built the fan-out and nothing could press it.
+
+     *** THIS PAGE RENDERS THE BRIDGE'S REFUSALS AS PROMINENTLY AS ITS RANKINGS, WHICH IS THE ENTIRE DESIGN OF
+     THE THING IT FRONTS. *** fleetBench.rank() returns four verdicts and three of them are refusals:
+       ranked        a comparable, correct score
+       diverged      a peer produced a TIME but the wrong ANSWER -- not ranked, however fast it was
+       incomparable  the fleet is running more than one engine version or workload, so NOTHING is declared fastest
+       failed        unreachable -- never zero, because a missing peer is not a slow one
+     A page that showed only the winners would turn a careful instrument into a league table, which is the
+     failure its own source warns about: "a fleet table looks authoritative in a way a single number does not".
+-->
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 11px 13px; margin-bottom: 12px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 5px 12px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  textarea { background: #0a1210; color: #cfe9d8; border: 1px solid #2c463a; font: inherit; padding: 6px 8px; width: 100%; height: 68px; box-sizing: border-box; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid #16241d; }
+  th { color: #6f8a7c; font-weight: normal; }
+  td.ms { text-align: right; }
+  .ranked { color: #7fe0a4; } .diverged { color: #e0a0a0; } .incomparable { color: #e0c58a; }
+  .failed { color: #9aa8a0; } .dim { color: #6f8a7c; } .warn { color: #e0c58a; }
+  .why { color: #8fb3a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Fleet Bench</h1>
+  <div class="sub">One workload, run on every peer, ranked only where ranking would not mislead.
+    <span class="dim">Bridge: <code>/fleetbench</code> &mdash; built v2985, given a door v3214.</span></div>
+
+  <div class="card">
+    <div><b>This box</b> <span id="selfMsg" class="dim">&mdash; not asked yet</span></div>
+    <div id="self" style="margin-top:6px"></div>
+    <button id="bSelf" style="margin-top:8px">Score this box</button>
+  </div>
+
+  <div class="card">
+    <div class="dim">Peer base URLs, one per line (for example <code>http://192.168.11.40:8787</code>).
+      An empty list is REFUSED rather than quietly meaning &ldquo;all&rdquo; &mdash; the bridge refuses it too.</div>
+    <textarea id="urls" spellcheck="false" placeholder="http://peer-one:8787&#10;http://peer-two:8787"></textarea>
+    <div style="margin-top:8px">
+      <button id="bCollect" class="primary">Collect from the fleet</button>
+      <label class="dim"><input type="checkbox" id="incSelf" checked> include this box</label>
+    </div>
+    <div id="msg" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <div id="verdictLine"></div>
+    <div id="noteLine" class="dim" style="margin:4px 0 8px"></div>
+    <table id="tbl"><thead><tr><th>host</th><th>arch</th><th>engine</th><th class="ms">ms</th><th>verdict</th></tr></thead><tbody></tbody></table>
+    <div id="whys" style="margin-top:8px"></div>
+    <div id="caveat" class="dim" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// THE BRIDGE BEING ABSENT IS AN ORDINARY STATE AND IT IS NAMED. A page that showed an empty table when the
+// server has no benchCollectBridge would be reporting "no peers" for a reason that has nothing to do with peers
+// -- the same distinction lab-export.html draws, and the one this tree keeps finding people had collapsed.
+async function ask(url, opts) {
+  let r;
+  try { r = await fetch(url, opts); }
+  catch (e) { return { ok: false, error: "unreachable", message: "could not reach this server: " + e.message }; }
+  if (r.status === 404) return { ok: false, error: "no-bridge",
+    message: "this server has no /fleetbench route -- benchCollectBridge is not dispatched here. That is not the same as a fleet with no peers." };
+  try { return await r.json(); }
+  catch (e) { return { ok: false, error: "bad-json", message: "the route answered with something that is not JSON" }; }
+}
+
+$("bSelf").onclick = async () => {
+  $("selfMsg").textContent = "\u2014 asking\u2026";
+  const j = await ask("/fleetbench/score");
+  if (!j || j.ok === false) {
+    $("selfMsg").innerHTML = '<span class="diverged">' + esc(j && (j.message || j.error) || "no answer") + "</span>";
+    $("self").innerHTML = ""; return;
+  }
+  $("selfMsg").textContent = "";
+  const s = j.score || {};
+  $("self").innerHTML =
+    '<b>' + esc(j.host) + "</b> " + esc(j.arch) + "/" + esc(j.platform) + " " + esc(j.engineVersion) +
+    ' &mdash; <b class="ranked">' + esc(s.ms) + "ms</b> " +
+    // THE CORRECTNESS RESIDUAL COMES FROM THE SAME RUN THAT PRODUCED THE TIME, and showing the time without it
+    // would be exactly the "fast wrong answer" the bridge refuses to rank.
+    '<span class="dim">residual ' + esc(s.correct) + " on workload " + esc(s.workload) + "</span>";
+};
+
+$("bCollect").onclick = async () => {
+  const urls = $("urls").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  if (!urls.length && !$("incSelf").checked) {
+    $("msg").innerHTML = '<span class="warn">Refused: no peers and this box excluded. A collection over nothing is not an empty fleet, it is an unasked question.</span>';
+    return;
+  }
+  $("msg").textContent = "collecting from " + urls.length + " peer(s)\u2026";
+  $("bCollect").disabled = true;
+  const j = await ask("/fleetbench/collect", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls, includeSelf: $("incSelf").checked }),
+  });
+  $("bCollect").disabled = false;
+  if (!j || j.ok === false) {
+    $("msg").innerHTML = '<span class="diverged">' + esc(j && (j.message || j.error) || "no answer") + "</span>";
+    $("resultCard").style.display = "none"; return;
+  }
+  $("msg").textContent = "";
+  render(j);
+};
+
+function render(j) {
+  $("resultCard").style.display = "";
+  const rows = j.rows || [];
+  const ranked = (j.ranked || []).length;
+
+  // THE HEADLINE IS THE REFUSAL WHEN THERE IS ONE. `fastest` is null whenever the fleet is incomparable, and a
+  // page that printed the first row as the winner regardless would be inventing a verdict the tool declined.
+  const incomparable = rows.filter((r) => r.verdict === "incomparable").length;
+  if (!j.fastest) {
+    $("verdictLine").innerHTML = '<b class="incomparable">NOTHING DECLARED FASTEST</b> <span class="dim">&mdash; ' +
+      (incomparable ? "the fleet is not running one comparable build" : "no peer produced a comparable, correct score") + "</span>";
+  } else {
+    $("verdictLine").innerHTML = '<b class="ranked">fastest: ' + esc(j.fastest.host) + "</b> " +
+      '<span class="dim">' + esc(j.fastest.score && j.fastest.score.ms) + "ms &mdash; " + ranked + " of " +
+      esc(j.collected) + " ranked, " + esc(j.reachable) + " reachable</span>";
+  }
+  $("noteLine").textContent = (j.note || "") + (j.workload ? "  [workload " + j.workload + "]" : "");
+
+  const tb = $("tbl").querySelector("tbody");
+  tb.innerHTML = rows.map((r) => {
+    const v = r.verdict || (r.ok === false ? "failed" : "");
+    const ms = r.score && r.score.ms != null ? r.score.ms : "\u2014";
+    return "<tr><td>" + esc(r.host || r.url) + "</td><td>" + esc(r.arch || "") + "</td><td>" +
+           esc(r.engineVersion || "") + '</td><td class="ms ' + esc(v) + '">' + esc(ms) +
+           '</td><td class="' + esc(v) + '">' + esc(v.toUpperCase()) + "</td></tr>";
+  }).join("");
+
+  // EVERY REFUSAL CARRIES ITS REASON. `why` is written by rank() for exactly this, and dropping it would leave
+  // a red row with no way to tell a wrong answer from an unreachable box.
+  const whys = rows.filter((r) => r.why);
+  $("whys").innerHTML = whys.length
+    ? whys.map((r) => '<div class="why">&bull; <b>' + esc(r.host || r.url) + "</b>: " + esc(r.why) + "</div>").join("")
+    : '<span class="dim">no refusals to explain</span>';
+  $("caveat").textContent = j.caveat || "";
+}
+</script>
+</body>
+</html>

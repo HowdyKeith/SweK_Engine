@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="demo:title" content="Model comparison">
+<meta name="demo:category" content="roundhouse">
+<title>Model comparison - which model earns the cheap slot</title>
+<style>
+  html,body{margin:0;background:#0a0d0f;color:#d6e0e6;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1000px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#7e8b93;margin-bottom:14px}
+  .card{border:1px solid #232d33;background:#0e1417;padding:12px 14px;margin-bottom:13px}
+  table{border-collapse:collapse;width:100%}
+  th,td{text-align:left;padding:3px 10px 3px 0;border-bottom:1px solid #182026;vertical-align:middle}
+  th{color:#7e8b93;font-weight:normal}
+  input,select{background:#0a1114;color:#d6e0e6;border:1px solid #2a353c;font:inherit;padding:2px 5px}
+  input[type=number]{width:64px}
+  button{font:inherit;background:#161e22;color:#d6e0e6;border:1px solid #2c383f;padding:5px 12px;margin-right:6px;cursor:pointer}
+  button:hover:not(:disabled){background:#1d272c}button:disabled{opacity:.45;cursor:default}
+  .primary{border-color:#4a8f7a;color:#b6f0dc}
+  .num{color:#9fd8c8}.dim{color:#7e8b93}.win{color:#7fe0a4}.wrong{color:#e8b98a}.bad{color:#e8a0a0}
+  pre{white-space:pre-wrap;background:#080c0e;border:1px solid #182026;padding:10px;overflow-x:auto;font-size:12px}
+  .bar{height:8px;background:#182026;margin-top:6px}
+  .bar > i{display:block;height:100%;background:#4a8f7a}
+  .pill{border:1px solid #2a353c;padding:0 6px;margin-right:4px;color:#9fd8c8}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Model comparison</h1>
+  <div class="sub">Point several machines at the same physics and let the measurement decide. Every model is
+    judged by the <em>same gate</em>, so this is a comparison rather than an impression.</div>
+
+  <div class="card">
+    <div class="dim" style="margin-bottom:6px">Peers &mdash; one model each, held resident for the whole run, so
+      nothing swaps. A <em>remote</em> peer uses none of your hardware, so it runs fully parallel with the local
+      ones and names its model instead of being sized. State each machine's memory honestly: a model that does not fit spills to system RAM and
+      drops an order of magnitude without ever looking like a failure.</div>
+    <table id="peers"><thead><tr><th>name</th><th>url</th><th>kind</th><th>memory GB</th><th></th></tr></thead>
+      <tbody id="peerRows"></tbody></table>
+    <button id="addPeer" style="margin-top:8px">add peer</button>
+    <button id="preview">preview assignment</button>
+    <div id="assign" class="dim" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <label class="dim">caller</label>
+    <select id="caller">
+      <option value="mock">mock (no model &mdash; proves the harness, runs the REAL sims)</option>
+      <option value="ollama">ollama (each peer's assigned model proposes)</option>
+    </select>
+    <label class="dim" style="margin-left:12px">runs per device</label><input id="runsPer" type="number" min="1" max="20" value="3">
+    <label class="dim" style="margin-left:12px">max rounds</label><input id="maxRounds" type="number" min="1" max="8" value="4">
+    <div style="margin-top:8px">
+      <label class="dim">devices</label>
+      <select id="devMode"><option value="all">all of them</option><option value="fast">the fast ones only</option></select>
+      <span class="dim" id="devNote"></span>
+    </div>
+    <div style="margin-top:10px">
+      <button id="go" class="primary">run matrix</button>
+      <button id="stop" disabled>stop</button>
+      <span class="dim" id="status"></span>
+    </div>
+    <div class="bar"><i id="prog" style="width:0%"></i></div>
+  </div>
+
+  <div class="card">
+    <div class="dim">outcomes as they land &mdash; <span class="win">crystallised</span> the claim stood,
+      <span class="wrong">refused</span> the model was wrong, <span class="bad">malformed</span> it could not
+      state a claim at all. Those last two have opposite fixes.</div>
+    <table><thead><tr><th>model</th><th>peer</th><th style="width:90px">runs</th><th style="width:80px">win</th>
+      <th style="width:90px">refused</th><th style="width:100px">malformed</th><th style="width:110px">s/round</th></tr></thead>
+      <tbody id="live"><tr><td colspan="7" class="dim">no run yet</td></tr></tbody></table>
+  </div>
+
+  <div class="card" id="reportCard" style="display:none">
+    <div class="dim">collated report</div>
+    <pre id="report"></pre>
+  </div>
+</div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+async function jget(u,o){const r=await fetch(u,o);return r.json().catch(()=>({ok:false,error:"bad-json"}));}
+
+// Sensible starting fleet -- edit freely. A CPU peer is NOT excluded: this workload is batch, so a small model
+// on a slow box still collects the same RATE, only its latency column differs.
+const DEFAULT_PEERS=[
+  {name:"rig",   url:"http://localhost:11434", kind:"gpu",     memoryGB:8},
+  {name:"mac-a", url:"http://mac-a:11434",     kind:"unified", memoryGB:16},
+  {name:"gemini",url:"remote",                 kind:"remote",  model:"gemini-2.5-flash"},
+];
+const FAST_DEVICES=["geometry","chaos","kepler","quantum","born","kerr","ising"];
+
+function peerRow(p={name:"",url:"",kind:"gpu",memoryGB:8}){
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><input class="pn" value="${esc(p.name)}" size="8"></td>
+    <td><input class="pu" value="${esc(p.url)}" size="26"></td>
+    <td><select class="pk">
+      <option value="gpu"${p.kind==="gpu"?" selected":""}>VRAM</option>
+      <option value="unified"${p.kind==="unified"?" selected":""}>unified</option>
+      <option value="cpu"${p.kind==="cpu"?" selected":""}>CPU only</option>
+      <option value="remote"${p.kind==="remote"?" selected":""}>remote API</option></select></td>
+    <td><input class="pm" type="number" min="2" max="256" value="${p.memoryGB||8}" title="ignored for a remote peer -- it uses none of your hardware">
+        <input class="pmodel" value="${esc(p.model||"")}" size="16" placeholder="remote model tag" style="display:${p.kind==="remote"?"":"none"}"></td>
+    <td><button class="rm">remove</button></td>`;
+  tr.querySelector(".rm").onclick=()=>tr.remove();
+  // a remote peer names its model instead of being sized -- it uses none of the fleet's hardware
+  const sync=()=>{
+    const remote=tr.querySelector(".pk").value==="remote";
+    tr.querySelector(".pmodel").style.display=remote?"":"none";
+    tr.querySelector(".pm").style.display=remote?"none":"";
+  };
+  tr.querySelector(".pk").onchange=sync; sync();
+  return tr;
+}
+function readPeers(){
+  return [...$("peerRows").children].map(tr=>{
+    const kind=tr.querySelector(".pk").value, mem=parseInt(tr.querySelector(".pm").value)||8;
+    const p={name:tr.querySelector(".pn").value.trim(), url:tr.querySelector(".pu").value.trim(), kind};
+    if(kind==="remote"){ p.model=tr.querySelector(".pmodel").value.trim(); p.provider="gemini"; }
+    // unified memory is one pool shared with the OS, so the bridge wants totalRamGB and reserves from it
+    else if(kind==="unified") p.totalRamGB=mem; else p.memoryGB=mem;
+    return p;
+  }).filter(p=>p.name&&p.url);
+}
+DEFAULT_PEERS.forEach(p=>$("peerRows").appendChild(peerRow(p)));
+$("addPeer").onclick=()=>$("peerRows").appendChild(peerRow());
+
+$("preview").onclick=async()=>{
+  // Start a matrix with zero devices? No -- instead ask /models per peer, which is cheap and answers the same
+  // question: what can this machine actually hold?
+  const peers=readPeers(); if(!peers.length){$("assign").textContent="add a peer first";return;}
+  const out=[];
+  for(const p of peers){
+    if(p.kind==="remote"){ out.push(`${p.name} (remote) -> ${p.model||"NO MODEL NAMED"}  [uses none of your hardware; paced for free-tier rate limits]`); continue; }
+    const mem=p.totalRamGB||p.memoryGB;
+    const m=await jget(`/device/models?memoryGB=${mem}&kind=${p.kind}`);
+    if(!m.ok){out.push(`${p.name}: bridge unreachable`);continue;}
+    const best=m.peer&&m.peer.best;
+    out.push(`${p.name} (${mem}GB ${p.kind}) -> ${best||"NOTHING FITS"}${m.peer&&m.peer.cappedByThroughput?`  [CPU: capped at ${m.peer.cappedByThroughput}B, memory is not the constraint here]`:""}`);
+  }
+  $("assign").innerHTML=out.map(esc).join("<br>");
+};
+
+let runId=null, timer=null;
+$("devMode").onchange=()=>{
+  $("devNote").textContent=$("devMode").value==="fast"?`(${FAST_DEVICES.length} quick devices)`:"(every registered device; fluid ones take minutes each)";
+};
+$("devMode").onchange();
+
+function renderLive(rows){
+  if(!rows.length){$("live").innerHTML='<tr><td colspan="7" class="dim">no runs yet</td></tr>';return;}
+  const by=new Map();
+  for(const r of rows){
+    const k=r.model+"|"+r.peer;
+    if(!by.has(k)) by.set(k,{model:r.model,peer:r.peer,n:0,win:0,refused:0,malformed:0,other:0,ms:0});
+    const a=by.get(k); a.n++; a.ms+=r.msPerRound||0;
+    if(r.outcome==="crystallised")a.win++; else if(r.outcome==="refused")a.refused++;
+    else if(r.outcome==="malformed")a.malformed++; else a.other++;
+  }
+  const p=(x,n)=>n?((x/n)*100).toFixed(0)+"%":"-";
+  $("live").innerHTML=[...by.values()].map(a=>{
+    const usable=a.n-a.other;
+    return `<tr><td class="num">${esc(a.model)}</td><td class="dim">${esc(a.peer)}</td><td>${a.n}</td>
+      <td class="win">${p(a.win,usable)}</td><td class="wrong">${p(a.refused,usable)}</td>
+      <td class="bad">${p(a.malformed,usable)}</td><td class="dim">${(a.ms/a.n/1000).toFixed(1)}</td></tr>`;
+  }).join("");
+}
+
+$("go").onclick=async()=>{
+  const peers=readPeers();
+  if(!peers.length){$("status").textContent=" add at least one peer";return;}
+  $("go").disabled=true;$("stop").disabled=false;$("reportCard").style.display="none";
+  $("status").textContent=" starting...";
+  const body={caller:$("caller").value,runsPer:parseInt($("runsPer").value),maxRounds:parseInt($("maxRounds").value),peers};
+  if($("devMode").value==="fast") body.devices=FAST_DEVICES;
+  const s=await jget("/device/bench/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!s.ok){$("status").textContent=" "+(s.message||s.error);$("go").disabled=false;$("stop").disabled=true;return;}
+  runId=s.runId;
+  $("assign").innerHTML=s.assignments.map(a=>esc(`${a.peer} -> ${a.model||"(nothing fits: "+(a.reason||"")+")"}`)).join("<br>");
+  const total=s.total||1;
+  timer=setInterval(async()=>{
+    const p=await jget("/device/progress?id="+encodeURIComponent(runId));
+    if(!p.ok){clearInterval(timer);$("status").textContent=" lost the run";$("go").disabled=false;$("stop").disabled=true;return;}
+    renderLive(p.rounds||[]);
+    $("prog").style.width=Math.min(100,((p.rounds||[]).length/total)*100)+"%";
+    $("status").textContent=` ${(p.rounds||[]).length} / ${total} runs - ${(p.elapsedMs/1000).toFixed(0)}s`;
+    if(p.done){
+      clearInterval(timer);$("go").disabled=false;$("stop").disabled=true;$("status").textContent="";
+      if(p.error){$("report").textContent="run failed: "+p.error;$("reportCard").style.display="";return;}
+      if(p.result){$("report").textContent=p.result.report;$("reportCard").style.display="";}
+    }
+  },1000);
+};
+$("stop").onclick=async()=>{
+  if(!runId)return;
+  $("status").textContent=" stopping after the current run...";
+  await jget("/device/bench/stop?id="+encodeURIComponent(runId));
+};
+</script>
+</body>
+</html>

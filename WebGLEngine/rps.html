@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Rock · Paper · Scissors — cyclic dominance</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Rock · Paper · Scissors">
+<meta name="demo:desc"   content="May-Leonard cyclic-competition cellular automaton.">
+<meta name="demo:cats"   content="sim,cellular">
+<meta name="demo:swatch" content="R">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; width:100%; background:#04030a; color:#9fc;
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace; overflow:hidden; }
+  #wrap { display:flex; flex-direction:column; height:100%; }
+  #topbar { display:flex; gap:8px; padding:10px 12px; background:rgba(15,20,35,0.85);
+            border-bottom:1px solid rgba(180,140,220,0.25); align-items:center; }
+  #topbar h1 { margin:0; font-size:14px; font-weight:600; color:#cdf; flex:1; }
+  #topbar button { padding:6px 12px; border-radius:6px; border:1px solid rgba(180,140,220,0.4);
+                   background:rgba(10,16,30,0.85); color:#cdf; font-size:13px; cursor:pointer; }
+  #topbar button:active { background:rgba(180,140,220,0.3); }
+  #canvasHost { flex:1; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  #sim { background:#000; max-width:100vmin; max-height:100vmin; border-radius:4px;
+         box-shadow:0 0 30px rgba(120,80,200,0.25); touch-action:none; }
+  #legend { position:absolute; bottom:8px; left:8px; display:flex; gap:10px; font-size:11px;
+            background:rgba(0,0,0,0.55); padding:6px 10px; border-radius:5px; }
+  #legend .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px;
+                 vertical-align:middle; }
+  #footer { padding:8px 12px; font-size:11px; color:#789; text-align:center; }
+  #unsupported { padding:40px; text-align:center; color:#f88; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🪨📄✂️ Cyclic Dominance</h1>
+    <button id="btnReseed" title="Randomize">🎲 Reseed</button>
+    <button id="btnBack" title="Back to control">← Back</button>
+  </div>
+  <div id="canvasHost">
+    <canvas id="sim" width="256" height="256"></canvas>
+    <div id="legend">
+      <span><span class="dot" style="background:#ff404a"></span>Rock</span>
+      <span><span class="dot" style="background:#40ff66"></span>Paper</span>
+      <span><span class="dot" style="background:#4d72ff"></span>Scissors</span>
+    </div>
+  </div>
+  <div id="footer">May-Leonard cyclic competition · tap canvas to reset</div>
+</div>
+<script>
+"use strict";
+
+document.getElementById("btnBack").addEventListener("click", function(){
+  // Same-window nav (phone has no tabs/popups per user pref)
+  window.location.href = "/control.html";
+});
+
+const SIM_SIZE = 256;
+// v822 — let (not const) for the universal viewer protocol; STEPS_PER_FRAME stays const
+let ALPHA = 1.2, BETA = 1.0, DT = 0.04, DIFFUSE_WEIGHT = 0.20;
+const STEPS_PER_FRAME = 4;
+
+const canvas = document.getElementById("sim");
+
+// Size canvas to viewport (square, fits min(viewportW, viewportH))
+function resizeDisplay(){
+  const host = document.getElementById("canvasHost");
+  const size = Math.min(host.clientWidth, host.clientHeight, 600);
+  canvas.style.width  = size + "px";
+  canvas.style.height = size + "px";
+  // Pixel buffer stays at SIM_SIZE for performance — CSS scales it up
+}
+window.addEventListener("resize", resizeDisplay);
+resizeDisplay();
+
+const gl = canvas.getContext("webgl2", { antialias:false, depth:false, preserveDrawingBuffer:true });
+if (!gl) {
+  document.getElementById("canvasHost").innerHTML =
+    '<div id="unsupported">WebGL2 not supported on this device.<br>Try a different browser.</div>';
+} else {
+  const fext = gl.getExtension("EXT_color_buffer_float");
+  if (!fext) {
+    document.getElementById("canvasHost").innerHTML =
+      '<div id="unsupported">Float textures (EXT_color_buffer_float) not supported.<br>Most modern mobile browsers support it; try updating.</div>';
+  } else {
+    initSim();
+  }
+}
+
+function initSim(){
+  const VS = `#version 300 es
+  in vec2 aPos;
+  out vec2 vUV;
+  void main(){
+    vUV = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
+  }`;
+
+  const UPDATE_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUV;
+  out vec4 outColor;
+  uniform sampler2D uState;
+  uniform vec2 uTexel;
+  uniform float uAlpha;
+  uniform float uBeta;
+  uniform float uDt;
+  uniform float uDiffW;
+  void main(){
+    vec3 self = texture(uState, vUV).rgb;
+    vec3 sum = vec3(0.0);
+    for (int y = -1; y <= 1; y++)
+      for (int x = -1; x <= 1; x++)
+        sum += texture(uState, fract(vUV + vec2(float(x), float(y)) * uTexel)).rgb;
+    vec3 mean = sum / 9.0;
+    vec3 diffused = mix(self, mean, uDiffW);
+    float r = diffused.r, p = diffused.g, s = diffused.b;
+    float dr = r * (uBeta * s - uAlpha * p);
+    float dp = p * (uBeta * r - uAlpha * s);
+    float ds = s * (uBeta * p - uAlpha * r);
+    vec3 next = diffused + vec3(dr, dp, ds) * uDt;
+    next = max(next, vec3(0.0));
+    float total = next.r + next.g + next.b;
+    if (total > 0.001) next /= total;
+    outColor = vec4(next, 1.0);
+  }`;
+
+  const DISPLAY_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUV;
+  out vec4 outColor;
+  uniform sampler2D uState;
+  void main(){
+    vec3 col = texture(uState, vUV).rgb;
+    float mx = max(col.r, max(col.g, col.b));
+    float t = smoothstep(0.30, 0.55, mx);
+    vec3 dominant;
+    if      (col.r >= col.g && col.r >= col.b) dominant = vec3(1.0, 0.25, 0.30);
+    else if (col.g >= col.r && col.g >= col.b) dominant = vec3(0.25, 1.0, 0.40);
+    else                                       dominant = vec3(0.30, 0.45, 1.0);
+    vec3 blended = mix(col * 1.4, dominant, t * 0.6);
+    vec2 c2 = vUV - 0.5;
+    float vig = 1.0 - smoothstep(0.45, 0.72, length(c2));
+    blended *= vig;
+    outColor = vec4(blended, 1.0);
+  }`;
+
+  function compile(type, src){
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      console.error("[rps] compile:", gl.getShaderInfoLog(sh)); return null;
+    }
+    return sh;
+  }
+  function link(vs, fs){
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs);
+    gl.bindAttribLocation(p, 0, "aPos");
+    gl.linkProgram(p);
+    return gl.getProgramParameter(p, gl.LINK_STATUS) ? p : null;
+  }
+  function createTex(){
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, SIM_SIZE, SIM_SIZE, 0, gl.RGBA, gl.FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    return t;
+  }
+  function createFBO(tex){
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    return fb;
+  }
+  function seedRandom(tex){
+    const data = new Float32Array(SIM_SIZE * SIM_SIZE * 4);
+    for (let i = 0; i < SIM_SIZE * SIM_SIZE; i++){
+      const r = Math.random(), p = Math.random(), s = Math.random();
+      const sum = r + p + s;
+      data[i*4+0] = r/sum;
+      data[i*4+1] = p/sum;
+      data[i*4+2] = s/sum;
+      data[i*4+3] = 1.0;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, SIM_SIZE, SIM_SIZE, gl.RGBA, gl.FLOAT, data);
+  }
+
+  const vs = compile(gl.VERTEX_SHADER, VS);
+  const updateProg  = link(vs, compile(gl.FRAGMENT_SHADER, UPDATE_FS));
+  const displayProg = link(vs, compile(gl.FRAGMENT_SHADER, DISPLAY_FS));
+  if (!updateProg || !displayProg) {
+    console.error("[rps] shader link failed");
+    return;
+  }
+
+  const verts = new Float32Array([-1, -1, 3, -1, -1, 3]);
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  let texA = createTex(), texB = createTex();
+  let fboA = createFBO(texA), fboB = createFBO(texB);
+  let readingFromA = true;
+
+  // v732 — multiplayer state
+  let mySpecies = -1;   // -1 = not joined yet; 0=R, 1=P, 2=S
+  let ws = null;
+  let playerCount = 1;
+
+  // Deterministic seed function — same seed = same field on every device
+  function mulberry32(seed){
+    return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function seedDeterministic(seedNum){
+    const rng = mulberry32(seedNum || 12345);
+    const data = new Float32Array(SIM_SIZE * SIM_SIZE * 4);
+    for (let i = 0; i < SIM_SIZE * SIM_SIZE; i++){
+      const r = rng(), p = rng(), s = rng();
+      const sum = r + p + s;
+      data[i*4+0] = r/sum; data[i*4+1] = p/sum; data[i*4+2] = s/sum; data[i*4+3] = 1.0;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, texA);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, SIM_SIZE, SIM_SIZE, gl.RGBA, gl.FLOAT, data);
+    readingFromA = true;
+  }
+
+  // Paint a small patch of one species at a given UV (0..1, 0..1)
+  function paintPatch(u, v, species){
+    const RADIUS = 12;
+    const cx = Math.floor(u * SIM_SIZE);
+    const cy = Math.floor((1 - v) * SIM_SIZE);   // V is bottom-up in WebGL
+    const data = new Float32Array(RADIUS*2 * RADIUS*2 * 4);
+    for (let y = 0; y < RADIUS*2; y++) for (let x = 0; x < RADIUS*2; x++) {
+      const dx = x - RADIUS, dy = y - RADIUS;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      const i = (y * RADIUS*2 + x) * 4;
+      if (d < RADIUS) {
+        const amt = 1.0 - d/RADIUS;
+        data[i+0] = species === 0 ? amt : 0.02;
+        data[i+1] = species === 1 ? amt : 0.02;
+        data[i+2] = species === 2 ? amt : 0.02;
+        data[i+3] = 1.0;
+      } else {
+        // Will be skipped via partial bounds; fill harmless small values
+        data[i+0] = 0.33; data[i+1] = 0.33; data[i+2] = 0.33; data[i+3] = 1.0;
+      }
+    }
+    const x0 = Math.max(0, cx - RADIUS), y0 = Math.max(0, cy - RADIUS);
+    const w = Math.min(RADIUS*2, SIM_SIZE - x0), h = Math.min(RADIUS*2, SIM_SIZE - y0);
+    if (w <= 0 || h <= 0) return;
+    const tex = readingFromA ? texA : texB;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, w, h, gl.RGBA, gl.FLOAT, data);
+  }
+
+  function reseed(){
+    // Generate a new seed and broadcast to all
+    const seedNum = Math.floor(Math.random() * 0x7fffffff);
+    seedDeterministic(seedNum);
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: "rps:seed", seed: seedNum }));
+    }
+  }
+  // Initial seed (will be overridden if a multiplayer game's already in progress)
+  seedDeterministic(Date.now() & 0x7fffffff);
+
+  // Tap canvas = paint your species; button = reseed (broadcasts)
+  function canvasPaint(e){
+    e.preventDefault();
+    if (mySpecies < 0) return;   // not joined yet
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches?.[0] || e.changedTouches?.[0] || e;
+    const u = (t.clientX - rect.left) / rect.width;
+    const v = 1 - (t.clientY - rect.top) / rect.height;
+    if (u < 0 || u > 1 || v < 0 || v > 1) return;
+    paintPatch(u, v, mySpecies);
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: "rps:paint", u, v, species: mySpecies }));
+    }
+  }
+  canvas.addEventListener("click", canvasPaint);
+  canvas.addEventListener("touchend", canvasPaint);
+  document.getElementById("btnReseed").addEventListener("click", reseed);
+
+  // Connect to multiplayer WS
+  function statusLine(){
+    const f = document.getElementById("footer") || document.querySelector("#wrap > div:last-child");
+    if (f) {
+      const names = ["🪨 ROCK", "📄 PAPER", "✂️ SCISSORS"];
+      f.innerHTML = (mySpecies >= 0
+        ? `You are <span style="color:${["#ff404a","#40ff66","#4d72ff"][mySpecies]}">${names[mySpecies]}</span>`
+        : "Joining…") + ` · ${playerCount} player${playerCount===1?"":"s"} · tap canvas to paint your color`;
+    }
+  }
+  function connectWs(){
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    try {
+      ws = new WebSocket(proto + "//" + location.host + "/");
+      ws.addEventListener("open", () => {
+        ws.send(JSON.stringify({ type: "client:identify", role: "phone", label: "Phone (rps.html)" }));
+        ws.send(JSON.stringify({ type: "rps:join" }));
+      });
+      ws.addEventListener("message", ev => {
+        try {
+          const m = JSON.parse(ev.data);
+          if (m.type === "rps:welcome") { mySpecies = m.species; statusLine(); }
+          else if (m.type === "rps:players") { playerCount = m.count; statusLine(); }
+          else if (m.type === "rps:paint") { paintPatch(m.u, m.v, m.species); }
+          else if (m.type === "rps:seed")  { seedDeterministic(m.seed); }
+        } catch {}
+      });
+      ws.addEventListener("close", () => setTimeout(connectWs, 2000));
+    } catch (e) { console.warn("[rps] ws err:", e.message); }
+  }
+  connectWs();
+  statusLine();
+
+  // Cache uniform locations once
+  const uTexel  = gl.getUniformLocation(updateProg, "uTexel");
+  const uAlpha  = gl.getUniformLocation(updateProg, "uAlpha");
+  const uBeta   = gl.getUniformLocation(updateProg, "uBeta");
+  const uDt     = gl.getUniformLocation(updateProg, "uDt");
+  const uDiffW  = gl.getUniformLocation(updateProg, "uDiffW");
+  const uStateU = gl.getUniformLocation(updateProg, "uState");
+  const uStateD = gl.getUniformLocation(displayProg, "uState");
+
+  function frame(){
+    gl.useProgram(updateProg);
+    gl.bindVertexArray(vao);
+    gl.viewport(0, 0, SIM_SIZE, SIM_SIZE);
+    gl.uniform2f(uTexel, 1/SIM_SIZE, 1/SIM_SIZE);
+    gl.uniform1f(uAlpha, ALPHA);
+    gl.uniform1f(uBeta,  BETA);
+    gl.uniform1f(uDt,    DT);
+    gl.uniform1f(uDiffW, DIFFUSE_WEIGHT);
+    gl.uniform1i(uStateU, 0);
+    for (let s = 0; s < STEPS_PER_FRAME; s++){
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, readingFromA ? texA : texB);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, readingFromA ? fboB : fboA);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      readingFromA = !readingFromA;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(displayProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readingFromA ? texA : texB);
+    gl.uniform1i(uStateD, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  console.log("[rps.html] initialized — May-Leonard simulation running");
+  requestAnimationFrame(frame);
+}
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        { name: "alpha", label: "α (predation)", min: 0.5, max: 2.5, step: 0.05, default: 1.2, set: (v) => { ALPHA = v; } },
+        { name: "beta", label: "β (mobility)", min: 0.5, max: 2.0, step: 0.05, default: 1.0, set: (v) => { BETA = v; } },
+        { name: "dt", label: "dt", min: 0.01, max: 0.1, step: 0.005, default: 0.04, set: (v) => { DT = v; } },
+        { name: "diffuse", label: "Diffuse weight", min: 0.0, max: 0.5, step: 0.02, default: 0.2, set: (v) => { DIFFUSE_WEIGHT = v; } },
+    ];
+    function getCanvas() {
+        return document.getElementById("sim");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

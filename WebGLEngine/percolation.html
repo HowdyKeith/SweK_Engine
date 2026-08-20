@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — bond percolation</title>
+<meta name="demo:desc" content="Open each bond with probability p and ask whether a path crosses the system. The threshold p_c = 1/2 is EXACT (Kesten, from self-duality), and the finite-size key needs no allowance: on an L x (L+1) rectangle the horizontal crossing probability at p = 1/2 is exactly 1/2 at every size. Drag p across the threshold and watch the spanning cluster appear; the counter accumulates real crossing statistics against the exact value.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { display:flex; gap:14px; padding:16px; flex-wrap:wrap; }
+  canvas { border:1px solid #22304a; border-radius:6px; image-rendering:pixelated; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <canvas id="lat" width="400" height="392"></canvas>
+    <div style="margin-top:8px;">
+      <label>p <input id="pS" type="range" min="0.30" max="0.70" step="0.005" value="0.5" style="width:200px;vertical-align:middle;"></label>
+      <span id="pV">0.500</span>
+      <button id="fresh" style="background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:4px 10px;font:12px ui-monospace,monospace;cursor:pointer;">New realization</button>
+    </div>
+    <div id="hud" style="margin-top:6px;line-height:1.6;">…</div>
+  </div>
+  <div style="flex:1;min-width:340px;">
+    <div class="dim" style="margin-bottom:6px;">crossing probability vs p, accumulated from every realization you draw (dots), with the exact point (1/2, 1/2) marked — Kesten's duality holds at EVERY finite L, so there is no finite-size excuse if the dot misses. Gate: physics/percolation/percolation-selfcheck.mjs.</div>
+    <canvas id="plot" width="500" height="330" style="width:100%;max-width:620px;"></canvas>
+  </div>
+</div>
+<script type="module">
+import { makeRng, makeUF } from "./physics/percolation/percolation.js";
+
+const L = 48, W = L + 1, H = L;
+let p = 0.5, seed = (Date.now() & 0xffff) | 1;
+const stats = new Map();   // p (rounded) -> {hits, n}
+const lat = document.getElementById("lat"), lctx = lat.getContext("2d");
+const plot = document.getElementById("plot"), pctx = plot.getContext("2d");
+const hud = document.getElementById("hud");
+
+function realize() {
+  const rng = makeRng(seed++);
+  const uf = makeUF(W * H + 2), SRC = W * H, SNK = W * H + 1;
+  const hb = [], vb = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (x === 0) uf.union(SRC, i);
+    if (x === W - 1) uf.union(SNK, i);
+    if (x + 1 < W && rng() < p) { uf.union(i, i + 1); hb.push([x, y]); }
+    if (y + 1 < H && rng() < p) { uf.union(i, i + W); vb.push([x, y]); }
+  }
+  const crossed = uf.find(SRC) === uf.find(SNK);
+  const spanRoot = crossed ? uf.find(SRC) : -1;
+  const key = Math.round(p * 200) / 200;
+  const s = stats.get(key) || { hits: 0, n: 0 };
+  s.n++; if (crossed) s.hits++;
+  stats.set(key, s);
+  // draw: bonds, spanning cluster highlighted
+  lctx.fillStyle = "#05070d"; lctx.fillRect(0, 0, 400, 392);
+  const sx = (x) => 8 + x * 8, sy = (y) => 8 + y * 8;
+  const drawBond = (x, y, dx, dy) => {
+    const i = y * W + x, on = uf.find(i) === spanRoot && spanRoot >= 0;
+    lctx.strokeStyle = on ? "rgba(155,225,93,0.95)" : "rgba(89,209,255,0.35)";
+    lctx.beginPath(); lctx.moveTo(sx(x), sy(y)); lctx.lineTo(sx(x + dx), sy(y + dy)); lctx.stroke();
+  };
+  for (const [x, y] of hb) drawBond(x, y, 1, 0);
+  for (const [x, y] of vb) drawBond(x, y, 0, 1);
+  hud.innerHTML = "this realization: " + (crossed ? "<b class='good'>CROSSED</b>" : "<b class='bad'>no crossing</b>") +
+    " · at p = 0.500 the exact probability is <b>1/2</b> — " +
+    "<span class='dim'>running tally at your current p below</span>";
+  drawPlot();
+}
+function drawPlot() {
+  pctx.fillStyle = "#05070d"; pctx.fillRect(0, 0, 500, 330);
+  const tx = (pp) => 40 + (pp - 0.30) / 0.40 * 440, ty = (q) => 300 - q * 270;
+  pctx.strokeStyle = "#22304a"; pctx.strokeRect(40, 30, 440, 270);
+  pctx.strokeStyle = "rgba(246,166,35,0.7)"; pctx.setLineDash([4, 4]);
+  pctx.beginPath(); pctx.moveTo(tx(0.5), 30); pctx.lineTo(tx(0.5), 300); pctx.stroke();
+  pctx.beginPath(); pctx.moveTo(40, ty(0.5)); pctx.lineTo(480, ty(0.5)); pctx.stroke(); pctx.setLineDash([]);
+  pctx.fillStyle = "#f6a623"; pctx.beginPath(); pctx.arc(tx(0.5), ty(0.5), 5, 0, 6.3); pctx.fill();
+  pctx.fillText("(1/2, 1/2) exact", tx(0.5) + 8, ty(0.5) - 8);
+  for (const [pp, s] of stats) {
+    if (s.n < 3) continue;
+    pctx.fillStyle = "rgba(155,225,93,0.9)";
+    pctx.beginPath(); pctx.arc(tx(pp), ty(s.hits / s.n), Math.min(6, 2 + Math.log2(s.n)), 0, 6.3); pctx.fill();
+  }
+  pctx.fillStyle = "#7f96b8"; pctx.fillText("p", 486, 316); pctx.fillText("P(cross)", 44, 24);
+}
+document.getElementById("pS").oninput = (e) => { p = parseFloat(e.target.value); document.getElementById("pV").textContent = p.toFixed(3); };
+document.getElementById("fresh").onclick = realize;
+setInterval(realize, 450);
+realize();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Scrape console (Camoufox)">
+<meta name="demo:desc" content="Drive Camoufox: rendered source, run JS, screenshot, grab a network resource. PC bridge.">
+<meta name="demo:cats" content="tool">
+<title>Scrape console — Camoufox</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:9px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  #bar h1 { font-size:14px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { max-width:960px; margin:0 auto; padding:14px; }
+  input[type=text], textarea { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px 10px; font:13px ui-monospace,monospace; width:100%; }
+  textarea { resize:vertical; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 13px; font:12px ui-monospace,monospace; cursor:pointer; white-space:nowrap; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .btn.danger { color:var(--bad); border-color:#5a2330; }
+  .row { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .row > input[type=text] { flex:1 1 240px; }
+  .verbs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .field { margin-bottom:10px; }
+  .field label { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:4px; }
+  .note { font-size:11px; color:var(--dim); line-height:1.5; margin:0 0 12px; }
+  .note a { color:var(--blue); }
+  #out { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:10px; min-height:120px; max-height:60vh; overflow:auto; }
+  #out pre { margin:0; white-space:pre-wrap; word-break:break-word; font-size:11px; color:#bcd; }
+  #out img { max-width:100%; border:1px solid var(--edge); border-radius:4px; }
+  #outhead { font-size:11px; color:var(--amber); margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>🕸 Scrape console</h1>
+  <span id="status">checking daemon…</span>
+</div>
+<div class="wrap">
+  <p class="note">Drives Camoufox on the PC bridge — your IE WebBrowser control, reborn. Needs Camoufox installed first (<a href="/camoufox.html">install &amp; detect →</a>). The browser stays warm between actions, so navigate once then read/inject/grab repeatedly.</p>
+
+  <div class="row">
+    <input type="text" id="url" placeholder="https://example.com" value="https://example.com">
+    <button class="btn" id="go">Navigate</button>
+    <button class="btn danger" id="close">Close browser</button>
+  </div>
+
+  <div class="verbs">
+    <button class="btn" id="bSource">Get rendered source</button>
+    <button class="btn" id="bShot">Screenshot</button>
+    <button class="btn" id="bEval">Run JS ▾</button>
+    <button class="btn" id="bGrab">Grab resource ▾</button>
+  </div>
+
+  <div class="field" id="evalField" style="display:none">
+    <label>JS to run / inject (return a value, or mutate the page)</label>
+    <textarea id="expr" rows="3">document.title</textarea>
+    <div style="margin-top:6px"><button class="btn" id="evalRun">Run JS</button></div>
+  </div>
+
+  <div class="field" id="grabField" style="display:none">
+    <label>Grab the first network response whose URL contains…</label>
+    <input type="text" id="grabPat" placeholder="e.g. staticmap  or  /maps/  or  .png">
+    <div style="margin-top:6px"><button class="btn" id="grabRun">Grab (navigates current URL &amp; captures)</button></div>
+  </div>
+
+  <div id="outhead"></div>
+  <div id="out"><pre>Ready.</pre></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function setOut(head, node) { $("outhead").textContent = head || ""; const o = $("out"); o.innerHTML = ""; if (typeof node === "string") { const p = document.createElement("pre"); p.textContent = node; o.appendChild(p); } else if (node) o.appendChild(node); }
+function busy(b) { document.querySelectorAll(".btn").forEach(x => x.disabled = b); $("status").textContent = b ? "working…" : ($("status").dataset.base || ""); }
+
+async function api(op, body) {
+  const r = await fetch("/scrape/" + op, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  return r.json();
+}
+async function refreshStatus() {
+  try { const s = await fetch("/scrape/status").then(r => r.json()); const t = s.running ? (s.ready ? "daemon ready" : "daemon starting…") : "daemon idle"; $("status").textContent = t; $("status").dataset.base = t; }
+  catch { $("status").textContent = "bridge offline"; }
+}
+
+$("go").onclick = async () => { busy(true); const r = await api("goto", { url: $("url").value.trim() }).catch(e => ({ ok: false, error: String(e) })); setOut(r.ok ? "→ " + (r.url || "") : "navigate failed", r.ok ? ("Loaded " + (r.url || "")) : (r.error || "error")); busy(false); refreshStatus(); };
+$("close").onclick = async () => { busy(true); await api("close").catch(() => {}); setOut("", "Browser closed."); busy(false); refreshStatus(); };
+
+$("bSource").onclick = async () => { busy(true); const r = await api("content", { url: $("url").value.trim() || undefined }).catch(e => ({ ok: false, error: String(e) })); if (r.ok) setOut((r.html ? r.html.length.toLocaleString() : 0) + " chars · " + (r.url || ""), r.html || ""); else setOut("error", r.error || "failed"); busy(false); refreshStatus(); };
+$("bShot").onclick = async () => { busy(true); const r = await api("screenshot", {}).catch(e => ({ ok: false, error: String(e) })); if (r.ok && r.dataBase64) { const img = new Image(); img.src = "data:image/png;base64," + r.dataBase64; setOut("screenshot · " + (r.url || ""), img); } else setOut("error", r.error || "failed"); busy(false); refreshStatus(); };
+
+$("bEval").onclick = () => { $("evalField").style.display = $("evalField").style.display === "none" ? "block" : "none"; };
+$("evalRun").onclick = async () => { busy(true); const r = await api("evaluate", { expr: $("expr").value }).catch(e => ({ ok: false, error: String(e) })); setOut(r.ok ? "result" : "error", r.ok ? JSON.stringify(r.result, null, 2) : (r.error || "failed")); busy(false); refreshStatus(); };
+
+$("bGrab").onclick = () => { $("grabField").style.display = $("grabField").style.display === "none" ? "block" : "none"; };
+$("grabRun").onclick = async () => { busy(true); const pat = $("grabPat").value.trim(); const r = await api("grab", { urlPattern: pat, url: $("url").value.trim() || undefined }).catch(e => ({ ok: false, error: String(e) })); if (r.ok && r.dataBase64) { const ct = r.contentType || ""; if (ct.startsWith("image/")) { const img = new Image(); img.src = "data:" + ct + ";base64," + r.dataBase64; setOut("grabbed " + ct + " · " + (r.url || ""), img); } else { setOut("grabbed " + ct + " · " + (r.url || "") + " (" + Math.round((r.dataBase64.length * 3 / 4)) + " bytes, base64 shown)", r.dataBase64.slice(0, 4000)); } } else setOut("error", r.error || "no match"); busy(false); refreshStatus(); };
+
+refreshStatus();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

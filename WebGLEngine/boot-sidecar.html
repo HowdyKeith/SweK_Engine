@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — boot sidecar reports</title>
+<meta name="demo:desc" content="Slow startup work handed to a helper process, so boot reads a timestamped file instead of talking to the outside world. This page shows every known sidecar report in the three states the contract defines and never collapses them into two: no report is not the same as a stale one, and a stale one is not the same as fresh. A malformed report reads as ABSENT, because a file the server trusts at boot is a trust surface.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:900px; margin:0 auto; padding:18px; line-height:1.65; }
+  .card { border:1px solid #22304a; border-radius:8px; padding:11px 13px; margin-top:11px; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; } .warn { color:#f6a623; }
+  code { color:#9fb4d8; } pre { background:#0a0e18; border:1px solid #17202f; border-radius:6px; padding:9px; overflow:auto; max-height:220px; }
+  .pill { border:1px solid #24344e; border-radius:11px; padding:1px 9px; font-size:11px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">Boot sidecar reports</h2>
+  <div class="dim">Three rules. <b>Portable by construction</b> — PowerShell is a producer, not the contract, so a report hand-emitted by a shell script reads identically and the Mac half of the fleet is not left unmeasured. <b>Staleness is stated, never silent</b> — an input newer than the report makes it stale, and an input that cannot be checked is <i>assumed</i> stale. <b>A sidecar measures and never grades</b> — verdict-shaped keys are refused at write time and at read time, because a helper that writes <code>{"ok": true}</code> and is believed has moved the grading to the least supervised process in the fleet. Gate: <code>ai-bridge/bootSidecar-selfcheck.mjs</code>.</div>
+  <div id="out"><span class="dim">reading…</span></div>
+  <div class="dim" style="margin-top:14px;">Produce one: <code>node ai-bridge/catalogSnapshot.mjs</code> · <code>node tools/ship/planSnapshot.mjs</code></div>
+</div>
+<script>
+const KNOWN = [
+  { name: "install catalog", report: "./ai-bridge/catalog-snapshot.json", input: "./ai-bridge/install_catalog.json",
+    note: "MEASURED SAVING: 0.53ms. install_catalog heads server.js's boot-work list and on the reference box it is not a boot cost at all — this is kept as the contract's working reference implementation, not as a fix." },
+  { name: "gate plan", report: "./tools/ship/gate-plan-snapshot.json", input: "./tools/ship/gate-timings.json",
+    note: "the planner needs the import graph and the timings file, neither of which a browser can build, so the front door reads a snapshot instead of computing one." },
+];
+const VERDICT = ["ok","pass","passed","failed","healthy","status","verdict","valid","success","result"];
+
+(async () => {
+  const out = document.getElementById("out");
+  out.innerHTML = "";
+  for (const k of KNOWN) {
+    const card = document.createElement("div");
+    card.className = "card";
+    let rep = null, why = null;
+    try {
+      const r = await fetch(k.report, { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      rep = await r.json();
+    } catch (e) { why = "no report — the work has not been done (this is not 'nothing found')"; }
+
+    let state = "MISSING", cls = "bad";
+    if (rep) {
+      const problems = [];
+      if (rep.schemaVersion !== 1) problems.push("schemaVersion " + rep.schemaVersion);
+      if (!rep.producedBy) problems.push("no producedBy — an anonymous report cannot be audited");
+      if (!rep.producedAt || isNaN(Date.parse(rep.producedAt))) problems.push("no usable producedAt");
+      if (!Array.isArray(rep.observations)) problems.push("observations is not an array");
+      else for (const o of rep.observations) {
+        const bad = Object.keys(o || {}).filter((x) => VERDICT.includes(x.toLowerCase()));
+        if (bad.length) { problems.push("an observation carries a VERDICT (" + bad.join(", ") + ")"); break; }
+      }
+      if (problems.length) { state = "INVALID"; cls = "bad"; why = "treated as ABSENT (fail closed): " + problems.join("; "); rep = null; }
+      else {
+        const producedMs = Date.parse(rep.producedAt);
+        let staleWhy = null;
+        try {
+          const h = await fetch(k.input, { method: "HEAD", cache: "no-store" });
+          const lm = h.headers.get("last-modified");
+          if (lm && Date.parse(lm) > producedMs) staleWhy = k.input.split("/").pop() + " changed after the report was made";
+        } catch { staleWhy = "input could not be checked — assuming stale"; }
+        const ageS = Math.max(0, Math.round((Date.now() - producedMs) / 1000));
+        if (staleWhy) { state = "STALE"; cls = "warn"; why = staleWhy + " — usable as a hint; refresh after the page is up"; }
+        else { state = "FRESH"; cls = "good"; why = ageS + "s old, by " + rep.producedBy; }
+      }
+    }
+    card.innerHTML = "<div><b>" + k.name + "</b> <span class='pill " + cls + "'>" + state + "</span></div>" +
+      "<div class='dim' style='margin-top:3px;'>" + why + "</div>" +
+      "<div class='dim' style='margin-top:5px;'>" + k.note + "</div>" +
+      (rep ? "<div class='dim' style='margin-top:6px;'>" + rep.observations.length + " observation(s), produced by <b>" + rep.producedBy +
+        "</b></div><pre>" + JSON.stringify(rep.observations.slice(0, 3), null, 1) + "</pre>" : "");
+    out.appendChild(card);
+  }
+})();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

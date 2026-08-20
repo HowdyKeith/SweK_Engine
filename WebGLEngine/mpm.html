@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MPM — Material Point Method</title>
+<meta name="demo:desc" content="Runs the graded 2D MPM loop and draws it. Shows the free-fall key live: the centre of mass follows the analytic parabola whatever the material does internally, and the readout says how far off it is.">
+<style>
+  :root { --bg:#05070d; --fg:#cfe; --dim:#7a8; --ok:#7f9; --warn:#fc6; --bad:#f77; }
+  body { background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; margin:0; padding:14px; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:12px; max-width:80ch; line-height:1.45; margin-bottom:12px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  button, select { background:#111a26; color:var(--fg); border:1px solid #2a3a4a; border-radius:6px; padding:5px 10px; font-size:12px; }
+  button:disabled { opacity:.45; }
+  canvas { background:#000; border:1px solid #223; border-radius:8px; display:block; }
+  #stats { color:var(--dim); font-size:12px; margin-top:10px; line-height:1.6; font-family:ui-monospace,monospace; }
+  b.ok { color:var(--ok); } b.warn { color:var(--warn); } b.bad { color:var(--bad); }
+</style>
+</head>
+<body>
+<h1>MPM — Material Point Method</h1>
+<div class="sub">
+  Runs <b>the same 2D loop the gates grade</b> — <code>physics/mpm/step.mjs</code>, composing the APIC transfer,
+  the grid step, neo-Hookean stress, the return mapping and the force scatter. Nothing here re-implements the
+  physics; this page only draws it and reports the key.
+  <b>The key is a property of the whole loop:</b> a freely falling block's centre of mass follows the analytic
+  parabola <i>whatever the material does internally</i> — internal stress cannot move it, and neither can
+  plasticity. The readout below is that error, live.
+</div>
+
+<div class="row">
+  <button id="run">Run free fall</button>
+  <button id="stop" disabled>Stop</button>
+  <button id="reset">Reset</button>
+  <label>plasticity <select id="plastic"><option value="1">on</option><option value="0">off</option></select></label>
+  <label>scene <select id="preset">
+    <option value="freefall">free fall — the parabola key</option>
+    <option value="column">collapsing column — energy can only fall</option>
+    <option value="pile">granular pile — friction angle changes the spread</option>
+    <option value="twomat">two materials — soft meets stiff, no contact code</option>
+  </select></label>
+  <label id="frictionWrap" style="display:none">friction <select id="friction">
+    <option value="25">25°</option><option value="35">35°</option>
+    <option value="45" selected>45°</option>
+  </select></label>
+</div>
+
+<canvas id="c" width="520" height="520"></canvas>
+<div id="stats">not started</div>
+
+<script type="module">
+import { makeGrid } from "/physics/mpm/transfer.mjs";
+import { lame } from "/physics/mpm/constitutive.mjs";
+import { restBlock, centreOfMass, step } from "/physics/mpm/step.mjs";
+import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
+import { materialBlock, totalPx } from "/physics/mpm/heteroMaterial.js";   // v3840 -- two-material collision preset
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const DT = 1 / 240, GY = -9.81, H = 0.5;
+
+// *** THE WALLS STAND THREE CELLS IN, AND v3798 PROVED THAT IS NOT COSMETIC. A quadratic stencil reaches one
+// cell each way, so a particle resting a fraction above the domain edge has a stencil base of -1 -- a node row
+// that does not exist and that both halves of the transfer skip. THIS PAGE SHIPPED WITH lo:1 AND WAS WRONG:
+// a block sliding on a frictionless floor lost 99.9% of its horizontal momentum that way, and the collapsing
+// column's dissipation read 91.0% where the truth is 57.3%. ***
+const WALL = { lo: 3, hi: 3, sticky: false };
+
+const PRESETS = {
+  freefall: { nx: 16, ny: 16, block: { n: 5, spacing: 0.25, x0: 2, y0: 6 }, walls: null, plastic: true,
+              note: "No floor. The centre of mass must follow the analytic fall exactly, however the block wobbles." },
+  column:   { nx: 16, ny: 16, block: { n: 6, spacing: 0.2, x0: 3, y0: 2.2, m: 0.1, vol0: 0.04 },
+              walls: WALL, plastic: true,
+              note: "A column onto a floor. No analytic answer exists, so the key is a DIRECTION: energy can only fall." },
+  pile:     { nx: 48, ny: 16, block: { n: 6, spacing: 0.2, x0: 12, y0: 2.2, m: 0.1, vol0: 0.04 },
+              walls: WALL, plastic: "dp",
+              note: "Drucker-Prager. A HIGHER FRICTION ANGLE MUST GIVE A NARROWER PILE -- the one key here that a material behaving nothing like sand would fail." },
+  twomat:   { nx: 16, ny: 16, gy: 0, walls: null, plastic: false,
+              blocks: [
+                { n: 4, spacing: 0.25, x0: 2.5, y0: 6, m: 0.1, vol0: 0.0625, vx: 3, E: 80, tag: "soft" },
+                { n: 4, spacing: 0.25, x0: 5.5, y0: 6, m: 0.1, vol0: 0.0625, vx: -3, E: 2000, tag: "stiff" },
+              ],
+              note: "A SOFT block (blue, left) meets a STIFF one (orange) on ONE shared grid, no gravity. There is NO contact code in physics/mpm/ -- they stop and never overlap because two bodies cannot hold different velocities at the same node, and the soft one squashes far more. Total momentum is conserved across the pair." },
+};
+
+let preset = PRESETS.freefall, params = lame(500, 0.3);
+const domW = () => preset.nx * H, domH = () => preset.ny * H;
+
+let ps = null, g = null, n = 0, c0 = null, timer = null;
+
+// world -> canvas: y is flipped because a canvas grows downward and the physics does not
+const sx = (x) => (x / domW()) * cv.width;
+const sy = (y) => cv.height - (y / domH()) * cv.height;
+
+function reset() {
+  stop();
+  const key = document.getElementById("preset").value;
+  preset = PRESETS[key];
+  document.getElementById("frictionWrap").style.display = key === "pile" ? "" : "none";
+  params = { ...lame(500, 0.3), alpha: alphaOf(Number(document.getElementById("friction").value)) };
+  if (preset.blocks) {                                  // v3840 -- two-material: one shared grid, per-block material
+    ps = [];
+    for (const b of preset.blocks) for (const p of materialBlock({ ...b, mat: lame(b.E, 0.3) })) ps.push(p);
+  } else {
+    ps = restBlock(preset.block);
+  }
+  g = makeGrid(preset.nx, preset.ny, H);
+  c0 = centreOfMass(ps);
+  n = 0;
+  draw();
+  report();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // the grid, faintly, so the particle-to-node relationship is visible rather than implied
+  ctx.strokeStyle = "#16202c"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 16; i++) {
+    const p = (i / 16) * cv.width;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, cv.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(cv.width, p); ctx.stroke();
+  }
+  for (const p of ps) {
+    ctx.fillStyle = p.tag === "soft" ? "#7fd8ff" : p.tag === "stiff" ? "#ffb066" : "#7fd8ff";
+    ctx.fillRect(sx(p.x) - 2, sy(p.y) - 2, 4, 4);
+  }
+  const c = centreOfMass(ps);
+  ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(sx(c.x), sy(c.y), 5, 0, 2 * Math.PI); ctx.stroke();
+}
+
+function report() {
+  if (preset.blocks) {                                  // v3840 -- two-material: the key is momentum, not the parabola
+    const px = totalPx(ps);
+    document.getElementById("stats").innerHTML =
+      "step " + n + "   t " + (n * DT).toFixed(3) + " s   particles " + ps.length + "<br>" +
+      "total momentum p<sub>x</sub> <b class='" + (Math.abs(px) < 1e-6 ? "ok" : "warn") + "'>" + px.toExponential(3) + "</b>" +
+      "   (starts at 0, conserved across the collision)<br>" +
+      "<span style='color:#7a8'>Soft (blue) and stiff (orange) share ONE grid. No contact code exists; they stop " +
+      "and never overlap because two bodies cannot hold different velocities at the same node, and the soft block " +
+      "squashes far more.</span>";
+    return;
+  }
+  const c = centreOfMass(ps);
+  // *** THE ANALYTIC VALUE IS THE DISCRETE ONE. Symplectic-Euler advects with the velocity AFTER the kick, so
+  // the fall after n steps is g*dt^2*n(n+1)/2 -- one half-step of drift from the textbook g*t^2/2. Using the
+  // continuous form here would show a growing "error" on a CORRECT loop, which is v3794's declared plant.
+  const want = c0.y + GY * DT * DT * (n * (n + 1) / 2);
+  const err = Math.abs(c.y - want), drift = Math.abs(c.x - c0.x);
+  const cls = err < 1e-9 ? "ok" : err < 1e-4 ? "warn" : "bad";
+  document.getElementById("stats").innerHTML =
+    "step " + n + "   t " + (n * DT).toFixed(3) + " s   particles " + ps.length + "<br>" +
+    "centre of mass y " + c.y.toFixed(9) + "   analytic " + want.toFixed(9) + "<br>" +
+    "parabola error <b class='" + cls + "'>" + err.toExponential(3) + "</b>" +
+    "   sideways drift <b class='" + (drift === 0 ? "ok" : "warn") + "'>" + drift.toExponential(3) + "</b>" +
+    "<br><span style='color:#7a8'>The error is measured against the DISCRETE fall the integrator actually " +
+    "produces, not the textbook g·t²/2 — those differ by one half-step, and grading against the continuous " +
+    "form would show a growing error on a correct loop.</span>";
+}
+
+function tick() {
+  const off = document.getElementById("plastic").value === "0";
+  const plastic = off ? false : preset.plastic;
+  const gy = preset.gy != null ? preset.gy : GY;        // v3840 -- twomat runs with no gravity
+  for (let i = 0; i < 4; i++) { step(ps, g, { dt: DT, gy, params, plastic, walls: preset.walls }); n++; }
+  draw(); report();
+  // A block that has left the box is not a measurement -- stop rather than integrate what nobody can see.
+  if (!preset.walls && gy !== 0 && centreOfMass(ps).y < 0.5) stop();
+}
+
+function stop() {
+  if (timer) { clearInterval(timer); timer = null; }
+  document.getElementById("stop").disabled = true;
+  document.getElementById("run").disabled = false;
+}
+
+document.getElementById("run").onclick = () => {
+  if (timer) return;
+  document.getElementById("run").disabled = true;
+  document.getElementById("stop").disabled = false;
+  timer = setInterval(tick, 1000 / 60);
+};
+document.getElementById("stop").onclick = stop;
+document.getElementById("reset").onclick = reset;
+document.getElementById("preset").onchange = reset;
+document.getElementById("friction").onchange = reset;
+
+reset();
+</script>
+</body>
+</html>

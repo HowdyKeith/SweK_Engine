@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Engine Console</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    }
+    iframe {
+      border: 0; width: 100%; height: 100%;
+      display: block;
+    }
+    /* Voyager-blue status strip — tiny, hover to expand. Tells you at
+       a glance what URL the iframe is pointing at so misconfigurations
+       are obvious. */
+    #status {
+      position: fixed;
+      top: 0; left: 0;
+      color: #9cf;
+      background: rgba(0, 0, 0, 0.75);
+      border-bottom-right-radius: 12px;
+      border-right: 2px solid #9cf;
+      border-bottom: 2px solid #9cf;
+      padding: 6px 14px 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      z-index: 9999;
+      opacity: 0.35;
+      transition: opacity 0.2s ease;
+      user-select: none;
+    }
+    #status:hover { opacity: 1; }
+    #status .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #fc6;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    #status .url {
+      color: #bde0ff;
+      text-transform: lowercase;
+      letter-spacing: 0;
+      font-weight: 400;
+      margin-left: 8px;
+    }
+    /* "Reload iframe" button only appears when status is hovered. */
+    #status a {
+      color: #fc6;
+      text-decoration: none;
+      margin-left: 12px;
+      border-bottom: 1px dotted #fc6;
+    }
+    #status a:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <iframe id="engine" src="BRIDGE_URL_PLACEHOLDER/"
+          allow="microphone; camera; clipboard-read; clipboard-write; fullscreen"></iframe>
+  <div id="status">
+    <span class="dot"></span>ENGINE CONSOLE
+    <span class="url">→ BRIDGE_URL_PLACEHOLDER</span>
+    <a href="#" onclick="document.getElementById('engine').src=document.getElementById('engine').src;return false;">reload</a>
+  </div>
+
+  <script>
+    // Watch the iframe's onload to confirm the engine responded. If it
+    // doesn't load within ~3s we light the dot red as a quick visual
+    // signal that the Node relay is probably not running.
+    (function () {
+      const ifr = document.getElementById('engine');
+      const dot = document.querySelector('#status .dot');
+      let loaded = false;
+      ifr.addEventListener('load', () => {
+        loaded = true;
+        dot.style.background = '#7fd66f';
+      });
+      setTimeout(() => {
+        if (!loaded) dot.style.background = '#c66';
+      }, 3000);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Gray-Scott reaction-diffusion</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Gray-Scott RD">
+<meta name="demo:desc"   content="Reaction-diffusion patterns: spots, stripes, mitosis-like blobs.">
+<meta name="demo:cats"   content="sim">
+<meta name="demo:swatch" content="G">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1}
+  #topbar button{padding:6px 12px;border-radius:6px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:13px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+  #sim{background:#000;max-width:100vmin;max-height:100vmin;border-radius:4px;touch-action:none}
+  #footer{padding:8px 12px;font-size:11px;color:#789;text-align:center}
+  /* v2873 -- the action fills the page (no canvas rule existed). Per-cell grid: display grows, backing store untouched. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🌊 Gray-Scott reaction-diffusion</h1>
+    <button id="btnReseed">🎲 Reseed</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host"><canvas id="sim" width="256" height="256"></canvas></div>
+  <div id="footer" id="fps">Pearson preset · tap to reseed</div>
+</div>
+<script type="module">
+import { setupPhoneSim } from "./utils/phoneSim.js";
+
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const SIM_SIZE = 256;
+// Pearson presets (F, K, du, dv). Different presets produce different patterns.
+// v822 — let (not const) so the universal viewer protocol can tune them live
+let F = 0.0367, K = 0.0649;
+let DU = 0.16, DV = 0.08, DT = 1.0;
+
+const UPDATE_FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+uniform sampler2D uState;
+uniform vec2 uTexel;
+uniform float uF, uK, uDt, uDu, uDv;
+void main(){
+  vec2 c=vUV;
+  vec2 cv=texture(uState,c).rg;
+  vec2 sum=(texture(uState,c+vec2(0,uTexel.y)).rg + texture(uState,c-vec2(0,uTexel.y)).rg +
+            texture(uState,c+vec2(uTexel.x,0)).rg + texture(uState,c-vec2(uTexel.x,0)).rg)*0.2 +
+           (texture(uState,c+uTexel).rg + texture(uState,c-uTexel).rg +
+            texture(uState,c+vec2(uTexel.x,-uTexel.y)).rg + texture(uState,c+vec2(-uTexel.x,uTexel.y)).rg)*0.05;
+  vec2 lap=sum-cv;
+  float U=cv.r, V=cv.g;
+  float dU = uDu*lap.r - U*V*V + uF*(1.0-U);
+  float dV = uDv*lap.g + U*V*V - (uF+uK)*V;
+  outColor = vec4(clamp(U+dU*uDt,0.0,1.0), clamp(V+dV*uDt,0.0,1.0), 0.0, 1.0);
+}`;
+
+const DISPLAY_FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+uniform sampler2D uState;
+vec3 viridis(float t){
+  t=clamp(t,0.0,1.0);
+  return vec3(0.267+t*(0.105+t*(-2.30+t*(5.28+t*(-3.42)))),
+              0.005+t*(1.405+t*(-0.95+t*(0.51+t*(-0.07)))),
+              0.330+t*(0.965+t*(-2.36+t*(2.39+t*(-0.51)))));
+}
+void main(){
+  float v=texture(uState,vUV).g;
+  vec3 col=viridis(clamp(v*1.8,0.0,1.0));
+  vec2 c2=vUV-0.5;
+  col *= 1.0 - smoothstep(0.45,0.72,length(c2));
+  outColor=vec4(col,1.0);
+}`;
+
+function seed(gl, tex, size) {
+  const data = new Float32Array(size*size*4);
+  for (let y=0;y<size;y++) for (let x=0;x<size;x++) {
+    const i=(y*size+x)*4;
+    data[i+0]=1.0; data[i+1]=0.0; data[i+3]=1.0;
+    const dx=x-size/2, dy=y-size/2;
+    if (dx*dx+dy*dy < 16*16) {
+      data[i+0]=0.5+Math.random()*0.1; data[i+1]=0.25+Math.random()*0.1;
+    }
+  }
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, size, size, gl.RGBA, gl.FLOAT, data);
+}
+
+const sim = setupPhoneSim({
+  canvas: document.getElementById("sim"),
+  simSize: SIM_SIZE,
+  stepsPerFrame: 12,
+  updateFS: UPDATE_FS,
+  displayFS: DISPLAY_FS,
+  seed,
+  updateUniforms(gl, prog) {
+    gl.uniform2f(gl.getUniformLocation(prog, "uTexel"), 1/SIM_SIZE, 1/SIM_SIZE);
+    gl.uniform1f(gl.getUniformLocation(prog, "uF"), F);
+    gl.uniform1f(gl.getUniformLocation(prog, "uK"), K);
+    gl.uniform1f(gl.getUniformLocation(prog, "uDt"), DT);
+    gl.uniform1f(gl.getUniformLocation(prog, "uDu"), DU);
+    gl.uniform1f(gl.getUniformLocation(prog, "uDv"), DV);
+    gl.uniform1i(gl.getUniformLocation(prog, "uState"), 0);
+  },
+  displayUniforms(gl, prog) {
+    gl.uniform1i(gl.getUniformLocation(prog, "uState"), 0);
+  },
+});
+if (sim.error) document.getElementById("host").innerHTML = `<div style="padding:40px;color:#f88">${sim.error}</div>`;
+document.getElementById("btnReseed").addEventListener("click", () => sim.reseed && sim.reseed());
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        { name: "feed", label: "Feed rate (F)", min: 0.02, max: 0.08, step: 0.001, default: 0.0367, set: (v) => { F = v; } },
+        { name: "kill", label: "Kill rate (K)", min: 0.05, max: 0.075, step: 0.001, default: 0.0649, set: (v) => { K = v; } },
+        { name: "du", label: "Diffuse U (Du)", min: 0.05, max: 0.3, step: 0.01, default: 0.16, set: (v) => { DU = v; } },
+        { name: "dv", label: "Diffuse V (Dv)", min: 0.02, max: 0.15, step: 0.01, default: 0.08, set: (v) => { DV = v; } },
+        { name: "dt", label: "Time step (dt)", min: 0.5, max: 2.0, step: 0.1, default: 1.0, set: (v) => { DT = v; } },
+    ];
+    function getCanvas() {
+        return document.getElementById("sim");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

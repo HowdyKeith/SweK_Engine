@@ -1,0 +1,12 @@
+{
+ "note": "v3185 -- UNTRACEABLE CLAIM RATCHET. A TALLY, not a list: v3142 proved a list of keys misses a site that GREW, because several tells in one file collapse to one key. A violation is a NEW gate OR a gate whose count ROSE. These 26 are NOT approved -- each needs its author to state the config that produced the number, which is domain knowledge, and guessing one would be FABRICATING PROVENANCE. Re-freeze deliberately with SWEK_FREEZE_CLAIM_TRACE=1 node tools/roundhouse/claimTrace-selfcheck.mjs",
+ "captured": "v3185",
+ "total": 47,
+ "untraceable": 18,
+ "gates": {
+  "escapeBudget": 6,
+  "khConvergence": 7,
+  "refinementWindow": 2,
+  "thermalScaling": 3
+ }
+}

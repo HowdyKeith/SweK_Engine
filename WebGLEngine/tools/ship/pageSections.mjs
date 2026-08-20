@@ -1,0 +1,367 @@
+// WebGLEngine/tools/ship/pageSections.mjs
+//
+// v3227 -- WHICH PAGES LIVE BEHIND WHICH CHIP, IN ONE PLACE.
+//
+// *** MEASURED, NOT ASSUMED: ARRIVING PAGES HELD 96 OF THE TREE'S 315 PAGES. *** Its own comment calls it "a
+// curated front for recent work, not a second directory" and says "when a page stops being recent it drops off
+// here" -- and nothing ever had. A flat row of 96 is the pile v2513 built the section to prevent, arriving from
+// the other side: not an inbox nobody fills, an inbox nobody empties.
+//
+// THE MECHANISM WAS ALREADY GENERIC AND NOBODY HAD USED IT FOR THIS. server.html pairs any
+// `<button class="gtab" data-tab="X">` in #gaugeTabBar with `<div class="gpanel" data-panel="X">` and toggles
+// the pair, so a chip that opens a drawer of related pages needs NO new JavaScript -- only a registry saying
+// which pages belong to which chip, and a slot to put them in.
+//
+// *** THE RENDERER MOVES THE EXISTING ANCHOR, IT DOES NOT REBUILD IT. *** Every page here already has an <a> in
+// the Arriving row carrying its label and its hand-written title. Recreating those from this file would put the
+// text in two places and guarantee they drift -- the defect this session has found in nine files (MODES), three
+// (the gate-file walk) and four (a mesher's liveness). Moving the node means ONE ASSIGNMENT, TWO CONSEQUENCES,
+// AND NO SECOND EDIT: it appears in the panel because it left Arriving, not because somebody deleted a line.
+//
+// TEN PER PANEL IS KEITH'S LIMIT AND pageSections-selfcheck ENFORCES IT. A drawer of 25 is the flat row again
+// with a lid on it.
+
+export const SECTIONS = [
+    // --- THE BIG PLAYERS. Keith: "roundhouse is part of the Physics Lab Roundhouse AI, a major component of the
+    // main physics lab link, so they would be on the same panel together." One subject, one drawer.
+    { id: "physicslab", tab: "physicslab", label: "Physics Lab", note: "the lab and the Roundhouse AI that drives it",
+      // v3672 -- instrument-bench.html JOINS, and it is one of the THREE PAGES pageReach HAS NAMED AS INVISIBLE
+      // FOR DOZENS OF ROUNDS. It belongs here by MECHANISM and not by name: it fetches /instruments/list and
+      // /instruments/report, which is instruments.html's own pair, and it exists because 34 of 104 instruments
+      // carried page: null -- runnable only by typing a selfcheck path. A FRONT DOOR THAT WAS ITSELF UNREACHABLE.
+      pages: ["physics-lab.html", "roundhouse.html", "device.html", "models.html", "gates.html",
+              "instruments.html", "instrument-bench.html", "catalog.html", "lab-export.html",
+              "run-inspector.html", "frugon.html",
+              // v3818 -- THE STATISTICAL-MECHANICS DOOR BELONGS WITH THE LAB, not in a thermal drawer of its
+              // own. It exists because seven graded modules had no way in at all, which is a LAB problem
+              // rather than a physics-topic problem -- the same reasoning that put instrument-bench.html here.
+              "statistical-mechanics.html"] },
+    // v3328 -- SAMPLING & METHODS, named by Keith. Eleven instruments that are ABOUT HOW YOU MEASURE rather
+    // than about a physical system -- samplers, Langevin, HMC benches, consistency, Binder budgets. They filled
+    // cosmic, matter and systools to their ten-page cap at v3324 and sat in Arriving with a reason recorded,
+    // because A PANEL IS ABOUT SOMETHING and cramming them into "matter" would have made that label a lie.
+    //
+    // *** IT IS ALSO A SUB-MENU OF THE PHYSICS LAB, WHICH IS THE PART THAT MATTERS. *** Keith: "they would want
+    // to be also a sub menu in the physics lab main pane." A method instrument is not a sibling of the lab, it
+    // is a VIEW OF THE LAB'S OWN MACHINERY -- so the section declares parentTab, and the lab pane shows it as a
+    // drawer within itself rather than a fourteenth panel competing beside it.
+    // v3329 -- NO tab OF ITS OWN. v3328 gave this a top-level chip and panel and that was the thing Keith was
+    // asking to avoid: a THIRTEENTH BUTTON on a row already carrying twelve, to hold pages that belong to the
+    // lab. The section still exists so the mover knows where these pages go -- but its SLOT lives inside the
+    // physicslab panel, so the links appear as a group WITHIN the lab and each still opens its own page.
+    { id: "sampling", tab: null, parentTab: "physicslab", label: "Sampling & Methods",
+      note: "how you measure, rather than what you measure -- samplers, estimators and their answer keys",
+      // v3674 -- live-panel.html JOINS, and this drawer's own note is why: "how you measure, rather than what you
+      // measure -- samplers, estimators and their ANSWER KEYS". Both panels on that page are estimators carrying a
+      // key the estimator is never told -- an FFT peak against the chain's ANALYTIC mode frequency, and dips in
+      // |zeta(1/2+it)| against the PUBLISHED zeros. It is not filed under the physics it happens to draw
+      // (vibrations, zeta) because what the page is FOR is showing that a panel reads the real computation.
+      pages: ["samplers.html", "langevin.html", "diffusion.html", "kuramoto.html",
+              "bayes-fit.html", "binder-budget.html", "consistency.html", "floor-atlas.html",
+              // v3689 -- external-linalg.html is filed HERE, not under Mac System: this drawer is "how you
+              // measure ... and their ANSWER KEYS", and an outside LAPACK reference is exactly an answer key.
+              // Mac System lists it too, as a view -- the ownership claim is the one that decides the anchor.
+              // v3693 -- ssim-compare.html joins Sampling & Methods for the same reason external-linalg did:
+              // this drawer is "how you measure ... and their ANSWER KEYS", and the page's whole subject is that
+              // TWO WHOLE-IMAGE NUMBERS CANNOT SEE A LOCAL DEFECT while the map can.
+              // v3705 -- curriculum.html joins Sampling & Methods: the drawer is "how you measure ... and their
+              // ANSWER KEYS", and this page's entire content is subjects paired with the gate that would decide
+              // each one.
+              "live-panel.html", "external-linalg.html", "ssim-compare.html", "curriculum.html"] },
+
+    // --- the instruments, split three ways because 25 in one drawer is the flat row with a lid on it
+    { id: "optics", tab: "optics", label: "Optics & Imaging", note: "diffraction, interferometry, tomography, reconstruction",
+      pages: ["fresnel.html", "fresnel-join.html", "diffraction.html", "interferometer.html", "ct.html", "fanbeam.html",
+              "tomography.html", "sinogram-gpu.html", "kriging.html", "spatial-agreement.html", "splat-lab.html"] },
+    { id: "cosmic", tab: "cosmic", label: "Cosmic & Relativity", note: "black holes, orbits, lensing, special functions",
+      pages: ["kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
+              "kepler.html", "meijer-g.html", "elliptic.html", "rmt.html", "landau-zener.html", "hmc.html"] },
+    // v3633: THE 15-PAGE RATCHET FIRED AND IT WAS RIGHT. Five electromagnetism pages had been filed under
+    // "Cosmic & Relativity" one round at a time -- each defensible on its own, and the drawer reached 16 while
+    // its own note still said "black holes, orbits, lensing, special functions". THE COUNT WAS REPORTING A
+    // TAXONOMY DRIFT, not a shortage of room, and widening the cap would have hidden exactly that. They have
+    // their own drawer now; cosmic falls to 11 and reads like its note again.
+    { id: "em", tab: "em", label: "Electromagnetism", note: "fields, grids, boundaries, and what discretising them costs",
+      pages: ["current-loop.html", "fdtd.html", "skin-depth.html", "grid-refinement.html", "regrid-cost.html"] },
+    // v3644: THE 15-PAGE RATCHET FIRED AGAIN, AND AGAIN IT WAS REPORTING A TAXONOMY DRIFT RATHER THAN A SHORTAGE
+    // OF ROOM -- the same thing it caught at v3633. Eleven pages about REMAPS, LIMITERS, GRADIENTS and MESH RANK
+    // had accumulated in the Electromagnetism drawer one round at a time, each defensible because the arc started
+    // in EM, while its own note still said "fields, grids, boundaries". NONE OF THEM IS ABOUT ELECTROMAGNETISM.
+    // They have their own drawer; em falls to 5 and reads like its note again. SECOND TIME THIS RATCHET HAS
+    // CAUGHT THE SAME DRIFT IN ELEVEN ROUNDS, WHICH IS THE ARGUMENT FOR KEEPING IT AT 15.
+    { id: "discretise", tab: "discretise", label: "Discretisation & Meshes", note: "remaps, limiters, and the gradients a mesh gives you",
+      pages: ["remap-order.html", "remap-2d.html", "limiter-seam.html", "tri-limiter.html",
+              "gradient-join.html", "node-gradient.html"] },
+    // v3649: THE 15-PAGE RATCHET, THIRD TIME (v3633 EM out of Cosmic, v3644 meshes out of EM, now this). The
+    // drawer reached sixteen and the split is a real subject boundary rather than a shelf being tidied: the six
+    // above are about MOVING AND LIMITING DATA ON A MESH, and the ten below are about WHAT A BOUNDARY CAN AND
+    // CANNOT TELL YOU -- rank, repairs, wall conditions, reconstruction order. THREE FIRES IN SEVENTEEN ROUNDS,
+    // EACH ONE A DRIFT RATHER THAN A SHORTAGE OF ROOM, WHICH IS THE ARGUMENT FOR KEEPING THE CAP AT 15.
+    { id: "boundaries", tab: "boundaries", label: "Boundaries & Reconstruction", note: "what a boundary can and cannot determine, and what a row is worth",
+      pages: ["boundary-rank.html", "tet-rank.html", "rank-repair.html", "rank-repair-3d.html",
+              "discontinuity.html", "wall-condition.html", "curved-wall.html", "quadratic-recon.html",
+              "quadratic-wall.html", "row-weight.html", "weight-scaling.html"] },
+    // v3670 -- *** NEW SECTION, KEITH'S ASK: "anything ha/home assistant that is unsorted belongs under smart
+    // home." MEMBERSHIP IS DERIVED BY MECHANISM, NOT BY NAME. *** A filename test would have taken ac.html and
+    // wall.html (which never say "ha") and left out nothing useful; a STRING test for "homeassistant" took 28
+    // pages including credits.html and ev.html, which merely LINK to one -- v3448's defect exactly, a prose
+    // mention counting as a consumer. The test that holds is: DOES THE PAGE CALL A HOUSE ENDPOINT
+    // (/ha, /doorbell, /arrival, /presence, /alexa, /shield, /nest, /solar). That is 25 unclaimed pages.
+    //
+    // THE SECOND CUT IS THE ONE THAT NEEDED JUDGEMENT AND IT IS REPORTED RATHER THAN HIDDEN: of those 25, the
+    // share of each page's endpoints that are house endpoints separates them. control.html reads 9 house
+    // endpoints OUT OF 60 -- it is a dashboard that happens to show the house, not a house page -- and
+    // index.html (2/5), hub.html (1/2), board.html (2/3), pipboy-models.html (3/28), clients.html, connect.html
+    // and avatar-push.html are the same shape: they call /shield/exec or read a sensor while being about
+    // something else. THOSE EIGHT ARE DELIBERATELY LEFT UNCLAIMED and the reason is here rather than in a
+    // changelog nobody re-reads. The seventeen below are pages whose SUBJECT is the house.
+    //
+    // *** I TRIED TO SHIP THIS AT 17 OVER A CAP OF 15 AND THE GATE REFUSED, CORRECTLY, AND I HAD THE CAP WRONG.
+    // *** I had it filed as a REVIEW TRIGGER that reports -- true of the over-cap CHIP on server.html, false of
+    // this gate, which FAILS. Two things wearing one label, in my own notes. The seventeen came down to fifteen
+    // by SUBJECT and not by convenience: shield-apps.html and shield-display.html are about the Nvidia Shield
+    // as a DEVICE (install an APK, set a display) and are not Home Assistant, which is what Keith actually
+    // asked for; they belong in System Tools if anywhere. THE CUT LANDING EXACTLY ON THE CAP IS WORTH
+    // DISTRUSTING and is flagged rather than presented as a tidy result -- if the honest set is really 16, the
+    // answer is a split or a raised cap WITH A MEASUREMENT, not a page quietly dropped to make this go green.
+    //
+    // AND THE DRAWER IS NOW FULL ON ITS FIRST DAY, so the next house page is a real decision rather than an
+    // append. v3633/v3644/v3649 each found this cap reporting a SUBJECT DRIFT; this is the first time it has
+    // reported a subject that is simply large.
+    // v3689 -- *** "Mac System" IS A VIEW, NOT A SECOND CLAIM, AND THAT DISTINCTION IS THE WHOLE DESIGN. ***
+    // Keith: a consolidated panel a Mac can go to, WITHOUT removing anything from where it already lives. Those
+    // are different operations. The static `pages` list is an OWNERSHIP claim -- pageSections-selfcheck demands
+    // an ANCHOR for the drawer to move, and an anchor can only be moved to one place, so listing raycast.html
+    // here as well as in System Tools would fight over one element and one of the two drawers would lose it.
+    // The placement layer supports topics[] as an ARRAY and would render a second copy happily, but every page
+    // below is ALREADY claimed by a static section, which is the layer that moves.
+    //
+    // SO THIS DRAWER CARRIES NO pages AT ALL. It is rendered from macPages() into its own slot, building its own
+    // anchors the way the Unsorted drawer does -- nothing is moved, nothing is un-claimed, and the pages keep
+    // their existing homes exactly as asked.
+    //
+    // MEMBERSHIP IS BY WHAT A PAGE CALLS, NOT BY WHAT IT MENTIONS. A text scan for "mac|macos|Apple Silicon"
+    // returned TEN pages including server.html and predictions.html, which merely DISCUSS a Mac -- v3448's
+    // prose-mention defect, and the third time this session a name test has been wrong. The list is pages that
+    // drive a Mac-side route or a .command launcher IN THEIR OWN SCRIPT, plus external-linalg.html, which is
+    // Mac-only by construction (it needs clang and Accelerate).
+    { id: "macsystem", tab: "macsystem", label: "Mac System",
+      note: "everything that needs a Mac: the .command launchers, the Raycast peer, the tunnel, and the LAPACK key",
+      pages: [] },
+
+    { id: "smarthome", tab: "smarthome", label: "Smart Home", note: "Home Assistant, the Android TV Device, announcements and the house sensors",
+      pages: ["home.html", "ha-switches.html", "ha-capabilities.html", "ha-diagram.html", "presence.html",
+              "arrival.html", "doorbell.html", "alexa.html", "echo-show.html", "agenda.html",
+              "air-quality.html", "nest-protect.html", "solar.html", "ac.html", "wall.html"] },
+    { id: "matter", tab: "matter", label: "Matter & Chaos", note: "statistical mechanics, quantum, dynamics",
+      // v3669 -- phase-change.html joins "matter": melting, freezing, gasification and crystallisation are
+      // statistical/thermal physics and this drawer's own note already says so. Matter goes to 14 of 15 --
+      // AT THE CAP'S EDGE, and the next arrival here should be read as the ratchet asking whether a
+      // "Phase & Thermal" drawer has arrived rather than as a shortage of room (v3633, v3644, v3649).
+      pages: ["phase-change.html", "angle-of-repose.html", "ising.html", "schrodinger.html", "logistic.html", "md-demo.html", "probe-lab.html",
+              "discovery-lab.html", "kinematic.html", "physics-showcase.html", "percolation.html",
+              "gravity-waves.html", "normal-modes.html", "torsion-modes.html"] },
+
+    // --- Keith: "rig is a SweK System Tool. i am pretty sure that tests like 400 things." Not a verify page.
+    { id: "systools", tab: "systools", label: "System Tools", note: "the rig, the ship ritual, the record",
+      // v3823 -- raycast.html AND ascii-video.html LEAVE THIS DRAWER, back to Unsorted, at Keith's request:
+      // "Ascii video, and raycast need to be moved out of System Tools and moved to swek engine unsorted."
+      // They were filed here by what they drive (v3672 raycast: Detect/Install/Run over a Mac peer; v3775
+      // ascii-video: a player-and-validator, not a renderer) -- kept in this note so the reasoning is not lost
+      // -- but the ask overrides the taxonomy. Dropping them from `pages` un-claims them, and the Unsorted
+      // drawer builds its own anchors from every unclaimed page, so they land there with no other change. Their
+      // hover-link <a>s already exist in server.html for the mover to find.
+      pages: ["rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
+              "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
+              // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
+              // page to the sort list ... most of the settings are connected to other things." It had a TOOLBAR
+              // link only -- above the Arriving header, so the mover could not take it and the drawer would have
+              // rendered empty (the page-index.html toolbar trap this gate already records). An Arriving anchor
+              // was added in server.html so there is an <a> to move. FILED BY WHAT IT DRIVES: its controls POST to
+              // the engine, cloud, tunnel, brain and hosting subsystems -- operating the rig, which is this
+              // drawer's note, not a physical subject of its own.
+              "settings.html"] },
+
+    // v3229 -- sphere-impostor and raymarch-live MOVED HERE OUT OF THE RENDER QA DRAWER. They are not QA
+    // TOOLING, they are two of the 315 SUBJECTS render-qa opens, and filing them beside the QA control surface
+    // implied they were special when they were only the two I happened to be looking at. They belong beside
+    // ray-march-demo and raymarch-gl-demo, which were already here.
+    // codemap and wallpaper came OUT to make room: a code-city visualisation and a desktop wallpaper engine are
+    // the weakest fits in a voxel/render PIPELINE drawer, and ten is the limit.
+    { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
+      pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",
+              "raymarch-gl-demo.html", "raymarch-live.html", "sphere-impostor.html", "volume-cache.html",
+              "krbn.html", "amplified-diff.html",
+              "csg.html", "biome-map-demo.html",
+              "backend-dom.html"] },
+    // v3252 -- amplified-diff joins the render drawer and krbn-compare moves to Arriving: TEN IS THE LIMIT and
+    // a comparison tool belongs beside the things it compares. krbn-compare is a SUBJECT comparison; this is the
+    // instrument, and Keith can swap them back in one line if that reads wrong on the rig.
+
+    // --- Keith: "ragdoll is box3d rigged character integration."
+    { id: "box3d", tab: "box3d", label: "Box3D & Cross-Arch", note: "deterministic simulation, replay, and reproducing it on other machines",
+      // v3434 -- Cross-Arch merges in at SEVEN. Both panels were about ONE question -- does the same input give
+      // the same answer -- and they differed only in whether the second run is a replay or a different CPU.
+      // Keith can split them again in one line if that reads wrong on the rig (v3252's precedent).
+      // v3672 -- box3d-contacts.html JOINS, the third and last of pageReach's named invisible pages. It imports
+      // physics/box3d/box3dLoader.js, so it is a box3d surface by MECHANISM; its own title says what it is for
+      // ("the overlay, and what it may claim"), which is this drawer's question about a solver's own output.
+      pages: ["box3d-replay.html", "box3d-info.html", "box3d-contacts.html", "ragdoll.html",
+              "magmap-android.html", "fingerprint.html", "benchmarks.html", "fleet-bench.html"] },
+
+    { id: "blobs", tab: "blobs", label: "Blobs", note: "the authoring surface and the aquarium",
+      pages: ["blob-studio.html", "blobarium.html", "blobulator.html"] },
+
+    { id: "face", tab: "face", label: "Face & Population", note: "landmarks, the mirror, the GPU population field",
+      pages: ["face-mirror.html", "population.html"] },
+
+    // v3230 -- PetFBI: a real project inside the engine with three pages and no drawer. It is also the example
+    // Keith reached for when describing a TAILORED FRONT DOOR -- "a PetFBI person who posts lost pets on
+    // Facebook would go to their server.html and only see the petfbi options".
+    { id: "petfbi", tab: "petfbi", label: "PetFBI", note: "lost-pet boards, setup, and the posting flow",
+      pages: ["petfbi.html", "petfbi-board.html", "petfbi-setup.html"] },
+
+    // --- appended to panels that ALREADY EXIST. Keith offered to rename a chip if appending were impossible;
+    // it is not impossible, so the live gauges and the related pages share one drawer instead of two chips that
+    // both mean the same thing.
+    { id: "brain", tab: "brain", label: "GPU Brain", note: "appended to the existing panel",
+      pages: ["panel-brain.html", "brain-bench.html", "brain-replay.html", "agent-arena.html", "fleet-arena.html",
+              "policy-mass.html"] },
+    // v3434 -- "Policy Mass" was one page and RL policy work IS brain work; it joins GPU Brain at six.
+    // Keith: "celltrack is a big button item, it is it's own very large science project." NOTHING ELSE IN HERE.
+    { id: "celltrack", tab: "celltrack", label: "Cell Tracking", note: "appended -- its own project, on purpose",
+      pages: ["celltrack.html"] },
+    { id: "fluidgpu", tab: "fluidgpu", label: "Fluid", note: "appended",
+      pages: ["lbm3d-gpu.html", "euler-gpu-check.html", "fluid-selfie.html", "wind-tunnel.html",
+              "multigrid.html", "couple.html",
+              // v3795 -- mpm.html JOINS. Filed with the other solvers rather than in a physics-lab drawer
+              // because it is A SOLVER RUNNING, not an instrument reporting: it draws the same loop
+              // physics/mpm/step.mjs runs and the gates grade, and re-implements none of it.
+              "mpm.html",
+              // v3809 -- THE GPU PAIR JOINS THE SAME DRAWER AS THE CPU PAGE, not a GPU drawer of its own.
+              // mpm-gpu.html runs the SAME graded loop mpm.html runs, and mpm-gpu-check.html is to it what
+              // euler-gpu-check.html (already here) is to its kernel. Filing the kernel away from the loop it
+              // reimplements would put the two halves of one claim behind different chips.
+              "mpm-gpu.html", "mpm-gpu-check.html"] },
+    // v3434 -- "Cross-Arch" merged into Box3D above.
+    { id: "nearshare", tab: "nearshare", label: "NearShare", note: "appended",
+      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html"] },
+    // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
+    // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
+];
+
+/** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
+// v3434 -- KEITH'S RULE, RAISED FROM TEN: "allow the panel to grow past 10, but when it reaches the 15th item,
+// that is when we need to consider a new panel." TEN WAS TOO TIGHT AND THE EVIDENCE WAS EIGHTEEN PANELS, FIVE OF
+// THEM HOLDING THREE PAGES OR FEWER -- a cap that forces a new drawer per stray page trades one flat row for a
+// flat row of drawers. Fifteen is the point at which a panel stops being readable at a glance, and the rule is
+// RETROACTIVE: panels that fit under another heading and stay at or under fourteen when merged should merge.
+export const MAX_PER_PANEL = 15;
+
+/**
+ * Pages DELIBERATELY LEFT IN ARRIVING, with the reason -- because an unplaced page and a page nobody has got to
+ * look identical, and the second one gets placed by a guess.
+ */
+export const UNPLACED = new Map([
+    // *** v3358 -- PARKED IN ARRIVING DELIBERATELY, BECAUSE THEY OWE A MEASUREMENT NOBODY BUT KEITH CAN GIVE. ***
+    // These four were filed in drawers, which is where a page goes when it is FINISHED. They are not finished:
+    // each exists to produce a report from real hardware and none ever has (deviceOwed.mjs: received kinds NONE).
+    // A drawer is where a page goes to be found once; Arriving is where it stays until somebody acts on it, and
+    // that is the correct shelf for a page holding an open obligation. Each moves to a drawer the day its verdict
+    // lands, and `node tools/render-qa/deviceOwed.mjs` prints which are still outstanding.
+    ["hmc-bench.html", "OWES A DEVICE VERDICT (swek-hmc-bench): the WGSL leapfrog kernel graded against the CPU mirror at a measured f32 floor. Needs one real-GPU run; no verdict has ever arrived"],
+    ["ising-bench.html", "OWES A DEVICE VERDICT (swek-ising-bench): the Philox checkerboard kernel at ZERO tolerance -- bit-exact or rejected, no margin to interpret. Needs one real-GPU run"],
+    ["magmap-bench.html", "OWES A DEVICE VERDICT (swek-magmap-bench): the magnetostatics kernel against its float-gap floor. Needs one real-GPU run"],
+    ["consistency-fleet.html", "OWES A DEVICE VERDICT (swek-consistency-route): one side of a consistency-board pair, run on a peer. The board cannot assemble a cross-machine pair until at least one arrives"],
+
+    ["predict.html", "Keith: 'i assume predictions are physics labs items, if we are not sure they can stay in Arriving Pages and I will move those later.' NOT SURE -- these read as project-record pages rather than instruments"],
+    ["predictions.html", "same: an open-predictions record, which is a different kind of thing from a lab device"],
+    ["mc-flesh.html", "pulled OUT of celltrack: Keith says celltrack is its own large project and nothing else belongs in it. Grouping by subject rather than by machinery would have been a guess"],
+    ["flesh.html", "pulled out of celltrack for the same reason -- Keith: 'i forget the other too right now', so placing it would be my guess and not his"],
+    ["paramecium.html", "pulled out of celltrack for the same reason: a single-celled organism is celltrack's SUBJECT, not its machinery, and the gate rejected 'same' as a reason because a one-word note is how a decision becomes a shrug"],
+    ["economy.html", "the spaceprojectsim economy probe: it belongs with a simulator that is not part of this tree"],
+    ["join.html", "the fleet invite page -- it is a DOOR for somebody else, not a page of this project's own"],
+    ["panel-gauge.html", "a panel fragment rather than a destination"],
+    ["krbn-compare.html", "displaced from Voxel & Render at v3252 to keep that drawer at ten when amplified-diff.html joined it -- a subject comparison rather than an instrument, and Keith can swap them back in one line"],
+    ["verify.html", "Keith: 'i am betting those last 3 pages are probably physics... i will look at those visually'. I had filed it under Rig Verify by NAME, and rig.html -- the system tool that runs about four hundred tests -- is in System Tools, so the chip and the page were never the same subject"],
+    ["trace-truth.html", "same trio: probably a physics page rather than a rig-verification surface, and Keith will judge it on sight now that moving one is a one-line edit"],
+    ["physics-verified.html", "same trio -- and the name says physics louder than it says verify"],
+    ["codemap.html", "came OUT of Voxel & Render to make room: a code-city visualisation is not part of a voxel/render pipeline, and ten is the limit"],
+    ["wallpaper.html", "came OUT of Voxel & Render for the same reason: a desktop wallpaper engine shares a renderer with that drawer and not a subject"],
+]);
+
+/** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */
+export function claimedPages() {
+    const out = new Set();
+    for (const s of SECTIONS) for (const p of s.pages) out.add(p);
+    return out;
+}
+
+/** The shape an export hands back: flat, readable, and editable by a person in a text box. */
+export function toJSON() {
+    return { version: 1, maxPerPanel: MAX_PER_PANEL,
+             sections: SECTIONS.map((s) => ({ id: s.id, tab: s.tab, label: s.label, note: s.note, pages: s.pages.slice() })) };
+}
+
+/**
+ * v3230 -- PROFILES: A TAILORED FRONT DOOR.
+ *
+ * Keith: "we shipped a version that only showed a certain set... a PetFBI person who posts lost pets on
+ * Facebook would go to their server.html and only see the petfbi options. we have all the rest of the pages
+ * complete and their functions already in the SweK Engine."
+ *
+ * A profile NAMES SECTIONS. It does not copy them, and it does not carry pages of its own -- a profile that
+ * listed pages would be a third declaration of which page lives where, after the drawers and the page index,
+ * and this session has watched that go wrong in nine files, three, four, and 59 of 82.
+ *
+ * *** A PROFILE IS A FILTER, NOT A PERMISSION, AND SAYING SO IS LOAD-BEARING. *** Hiding a chip does not remove
+ * the page from the build, unlink the route, or stop anybody typing the URL. Every page still ships and still
+ * works. If somebody ever needs a front door that genuinely WITHHOLDS something, that is a different mechanism
+ * with a different name -- and the moment this one is mistaken for it is the moment it becomes dangerous.
+ *
+ * THE DEFAULT IS EVERY SECTION. An absent or unknown profile shows the whole engine, because a typo in a config
+ * file must not silently hide two thirds of the front door.
+ */
+export const PROFILES = new Map([
+    ["petfbi", { label: "PetFBI", sections: ["petfbi", "systools"],
+                 note: "the lost-pet workflow plus the system tools needed to run the box it lives on" }],
+    ["physics", { label: "Physics", sections: ["physicslab", "optics", "cosmic", "matter", "fluidgpu", "box3d"],
+                  note: "the lab, the instruments and the solvers -- nothing about peers, ships or desktops" }],
+    ["fleet", { label: "Fleet", sections: ["box3d", "nearshare", "systools", "brain"],
+                note: "the machines and what runs on them" }],
+]);
+
+/** The sections a profile shows. An unknown or absent profile shows EVERYTHING, deliberately. */
+export function sectionsFor(profile) {
+    const p = PROFILES.get(String(profile || ""));
+    if (!p) return SECTIONS.slice();
+    return SECTIONS.filter((s) => p.sections.includes(s.id));
+}
+
+/**
+ * v3231 -- CHIP GROUPS: THE SAME IDEA ONE LEVEL UP.
+ *
+ * The drawers fixed a row of 96 PAGE links. The CHIP row then had 32 buttons of its own, which is the same
+ * problem wearing the mechanism that solved it. Keith named the first two groupings: the four game chips belong
+ * together under "Game Theory", and "Rig Verify" is part of "System Tools".
+ *
+ * *** THE MEMBER CHIP IS MOVED INTO THE GROUP'S PANEL, NOT RECREATED THERE. *** Each of those buttons already
+ * carries a click listener wired at load, a live status span the bridges write into, and a data-tab that pairs
+ * it with its own panel. Rebuilding one would mean re-registering all three, and the status span would go quiet
+ * in a way nobody would notice until they wanted it. appendChild MOVES the node with its listener attached --
+ * the same move the page drawers use, for the same reason.
+ *
+ * THE MEMBER'S OWN PANEL IS UNTOUCHED and still opens where it always did. A group is a place to FIND the chip,
+ * not a new home for what the chip does.
+ */
+export const CHIP_GROUPS = [
+    { id: "gametheory", tab: "gametheory", label: "Game Theory",
+      note: "the agents that play games, and the games they play",
+      chips: ["endlesssky", "bzflag", "rocketleague", "ev"] },
+    // Keith: "'Rig Verify' should be part of System Tools on Server.html". The systools chip already exists and
+    // already holds the system-tool PAGES, so the group and the drawer are the same chip -- which is right:
+    // rig.html and the Rig Verify surface are the same subject seen from two sides.
+    { id: "systools", tab: "systools", label: "System Tools",
+      note: "the rig, the ship ritual, the record -- and the live verify surface",
+      chips: ["verify"] },
+];

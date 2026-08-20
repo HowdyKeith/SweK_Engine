@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Flight sandbox</title>
+<style>
+  :root { --bg:#05070e; --ink:#e7eef8; --dim:#8b97a8; --acc:#5aa8ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:radial-gradient(1100px 640px at 50% -12%, #0a1224 0%, var(--bg) 62%); color:var(--ink); font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:30px 22px 64px; }
+  .crumb { font:12px ui-monospace,monospace; color:var(--dim); margin-bottom:16px; } .crumb a { color:#7fd1ff; text-decoration:none; }
+  h1 { margin:0; font-size:34px; font-weight:800; letter-spacing:.3px; background:linear-gradient(90deg,#7fc0ff,#5aa8ff 55%,#c78bff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .tag { color:var(--dim); font-size:16px; margin:6px 0 24px; max-width:780px; }
+  .pipe { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:8px 0 26px; }
+  .stage { background:linear-gradient(180deg,#0d1526,#0a0f1a); border:1px solid #1b2740; border-radius:13px; padding:14px; }
+  .stage .k { font:10.5px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.6px; color:#7f9bcf; }
+  .stage .v { font-size:14px; font-weight:700; margin-top:3px; } .stage .s { color:var(--dim); font-size:12px; margin-top:3px; }
+  h2 { font-size:20px; margin:32px 0 6px; letter-spacing:.4px; } p.body { color:#b9c4d4; max-width:830px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; margin-top:14px; }
+  a.card { display:flex; flex-direction:column; gap:7px; padding:18px; min-height:132px; background:linear-gradient(180deg,#0d1320,#0a0f18); border:1px solid #1b2740; border-radius:14px; text-decoration:none; color:var(--ink); transition:border-color .14s, transform .14s, box-shadow .14s; }
+  a.card:hover { transform:translateY(-3px); border-color:var(--acc); box-shadow:0 12px 30px -14px #5aa8ff77; }
+  a.card .ico { font-size:30px; } a.card .ttl { font-size:17px; font-weight:700; } a.card .d { font-size:13px; color:#93a0b3; flex:1; }
+  .badge { align-self:flex-start; font:10px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.5px; padding:2px 7px; border-radius:99px; border:1px solid #2f486c; color:#9db6d6; background:#0b1320; }
+  ul.road { color:#b9c4d4; max-width:830px; line-height:1.85; padding-left:20px; } ul.road b { color:#eef3fa; } ul.road .done { color:#8fe6b8; }
+  .quote { margin:26px 0 0; padding:14px 18px; border-left:3px solid #2f486c; color:#a9b6c8; font-style:italic; max-width:820px; }
+  .foot { margin-top:34px; display:flex; gap:18px; flex-wrap:wrap; font-size:14px; } .foot a { color:#7fd1ff; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crumb"><a href="/gallery.html">&#129526; Gallery</a> &nbsp;/&nbsp; Flight sandbox</div>
+  <h1>&#128760; Flight sandbox</h1>
+  <p class="tag">An <b style="color:#8fb4ff">Endless Sky</b> dogfight where ships are flown by a <b style="color:#c78bff">GPU
+     Brain</b>, collide as real <b style="color:#8fe6c8">Box3D</b> bodies, and render in <b>WebGPU 3D</b>. Every piece
+     is yours &mdash; this is where they come together.</p>
+
+  <div class="pipe">
+    <div class="stage"><div class="k">Content</div><div class="v">Endless Sky</div><div class="s">ships, weapons, systems</div></div>
+    <div class="stage"><div class="k">Physics</div><div class="v">Box3D ships</div><div class="s">planar bodies, deterministic</div></div>
+    <div class="stage"><div class="k">Flight model</div><div class="v">heading + thrust</div><div class="s">the same integrator players use</div></div>
+    <div class="stage"><div class="k">Pilots</div><div class="v">GPU Brain</div><div class="s">learned tactics policy</div></div>
+    <div class="stage"><div class="k">View</div><div class="v">WebGPU 3D</div><div class="s">orbit &amp; chase cameras</div></div>
+  </div>
+
+  <h2>What it is</h2>
+  <p class="body">Two fleets pick targets with a tactics policy, fly with the engine's flight model, and shove each
+     other around as Box3D bodies while shots resolve hits. It runs today in a fast 2D top-down view, and now in a
+     WebGPU 3D view rendering the exact same simulation &mdash; render swapped, sim untouched. Because Box3D is
+     deterministic across machines, this sandbox can eventually run in lockstep across the whole fleet.</p>
+
+  <h2>See it</h2>
+  <div class="grid">
+    <a class="card" href="/es-box3d.html"><div class="ico">&#128640;</div><div class="ttl">Endless Sky 2D</div><div class="d">Tactics-policy pilots fight it out top-down, colliding as Box3D bodies. Fast, and fun to watch.</div><span class="badge">2D &middot; Box3D</span></a>
+    <a class="card" href="/flight-gpu.html"><div class="ico">&#128760;</div><div class="ttl">Flight GPU 3D</div><div class="d">The exact same fight in WebGPU 3D, with cinematic orbit and chase cameras.</div><span class="badge">WebGPU &middot; Box3D</span></a>
+    <a class="card" href="/flight-coop.html"><div class="ico">&#128101;</div><div class="ttl">Co-op Lockstep</div><div class="d">Two peers step the same world from each other's inputs and verify a per-tick hash &mdash; watch it stay locked under latency.</div><span class="badge">Lockstep &middot; Box3D</span></a>
+  </div>
+
+  <h2>The road ahead</h2>
+  <ul class="road">
+    <li><span class="done">&#10003; Slice one &mdash;</span> <b>WebGPU 3D view</b> over the existing sim (done).</li>
+    <li><span class="done">&#10003; Player ship &mdash;</span> <b>take the stick</b> in <a href="/flight-gpu.html" style="color:#7fd1ff">Flight GPU</a>: hit Fly, then A/D + W + Space to dogfight among the Brain's pilots.</li>
+    <li><span class="done">&#10003; Weapon FX &mdash;</span> muzzle flashes, impact &amp; kill bursts, and engine glow are in <a href="/flight-gpu.html" style="color:#7fd1ff">Flight GPU</a>. Next: a cockpit view.</li>
+    <li><span class="done">&#10003; Lockstep demo &mdash;</span> <b>Co-op lockstep</b> is live: two peers, shared world, per-tick hash verification, latency-resilient (<code>esAuthority</code> + the proven determinism). Next: the real fleet transport across boxes.</li>
+    <li><span class="done">&#10003; Black hole &mdash;</span> a lensed backdrop, a Box3D gravity well, and <b>depth-aware</b> lensing of the ships themselves in <a href="/flight-gpu.html" style="color:#7fd1ff">Flight GPU</a> (hit "Black hole"): ships behind the hole warp and vanish into the shadow, ships in front pass by undistorted, and drifting too close means the hole eats you.</li>
+    <li><b>Dogfight training</b> &mdash; a reward so the GPU Brain gets visibly better on camera.</li>
+  </ul>
+
+  <div class="quote">"Thanks for showing such an amazing game and keeping it alive." &mdash; the kind of thing people still say under
+     Endless&nbsp;Sky / Escape&nbsp;Velocity playthroughs, years later. This is how you keep showing it.</div>
+
+  <div class="foot">
+    <a href="/gallery.html">&#129526; Demo Gallery &rarr;</a>
+    <a href="/box3d.html">&#129482; The Box3D substrate &rarr;</a>
+    <a href="/">&#127758; Full engine &rarr;</a>
+  </div>
+</div>
+</body>
+</html>

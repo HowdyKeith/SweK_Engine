@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Connect a device</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  main { max-width:640px; margin:0 auto; padding:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 15px; margin-bottom:13px; }
+  .card h3 { margin:0 0 4px; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .url { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .url code { flex:1; font:16px/1.4 ui-monospace,monospace; color:var(--go); word-break:break-all; background:#0e141d; border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
+  .url.big code { font-size:20px; font-weight:600; }
+  button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line); background:#0e141d; color:var(--ink); padding:10px 14px; white-space:nowrap; }
+  button.go { background:color-mix(in srgb,var(--go) 16%,#0e141d); color:var(--go); border-color:color-mix(in srgb,var(--go) 45%,var(--line)); font-weight:600; }
+  .sub { color:var(--dim); font-size:12.5px; margin-top:8px; }
+  .addr { display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--line); }
+  .addr:first-of-type { border-top:0; }
+  .addr code { flex:1; font:13px ui-monospace,monospace; color:var(--ink); word-break:break-all; }
+  .addr.virt code { color:var(--dim); } .addr .tag { font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+  .addr button { padding:6px 11px; font-size:12px; }
+  .shield { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+  .shield:first-of-type { border-top:0; }
+  .shield .nm { flex:1; } .shield .ip { color:var(--dim); font-size:12px; }
+  .empty { color:var(--dim); font-size:13px; }
+  #msg { color:var(--dim); font-size:12.5px; min-height:18px; margin-top:4px; }
+  .meta { color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">📲</span> Connect a device</span></header>
+  <main>
+    <div class="card">
+      <h3>Open this on the same Wi-Fi</h3>
+      <div class="url big"><code id="recUrl">…</code><button class="go" id="copyRec">Copy</button></div>
+      <div class="sub">On a phone or tablet, open this in Chrome on the same network. <span class="meta" id="portNote"></span></div>
+    </div>
+    <div class="card">
+      <h3>Or by name (mDNS)</h3>
+      <div class="url"><code id="mdnsUrl">…</code><button id="copyMdns">Copy</button></div>
+      <div class="sub">Friendlier to type; works when your network resolves <code>.local</code> names.</div>
+    </div>
+    <div class="card">
+      <h3>Push to a connected Shield</h3>
+      <div id="shields"><div class="empty">No Shields connected right now.</div></div>
+      <div id="msg"></div>
+    </div>
+    <div class="card">
+      <h3>All addresses</h3>
+      <div id="addrs"></div>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let REC = "";
+
+  async function copy(text, btn){
+    try { await navigator.clipboard.writeText(text); } catch { const t=document.createElement("textarea"); t.value=text; document.body.appendChild(t); t.select(); try{document.execCommand("copy");}catch{} t.remove(); }
+    if (btn){ const o=btn.textContent; btn.textContent="✓ copied"; setTimeout(()=>btn.textContent=o, 1200); }
+  }
+  $("copyRec").onclick = () => copy(REC, $("copyRec"));
+  $("copyMdns").onclick = () => copy($("mdnsUrl").textContent, $("copyMdns"));
+
+  async function loadNet(){
+    let n; try { n = await (await fetch("/net/info",{cache:"no-store"})).json(); } catch { return; }
+    REC = n.recommended || (n.urls && n.urls[0]) || "";
+    $("recUrl").textContent = REC || "no LAN address found";
+    $("mdnsUrl").textContent = n.mdns || "";
+    $("portNote").textContent = "Bridge port " + n.port + ".";
+    const ifs = n.interfaces || (n.lanIps||[]).map(a => ({ address:a, virtual:false }));
+    $("addrs").innerHTML = ifs.map(x => {
+      const url = "http://" + x.address + ":" + n.port + "/";
+      return '<div class="addr' + (x.virtual?' virt':'') + '"><code>' + esc(url) + '</code>' + (x.virtual?'<span class="tag">virtual</span>':'') + (x.iface?'<span class="tag">'+esc(x.iface)+'</span>':'') + '<button data-u="' + esc(url) + '">copy</button></div>';
+    }).join("") || '<div class="empty">none</div>';
+    $("addrs").querySelectorAll("button").forEach(b => b.onclick = () => copy(b.getAttribute("data-u"), b));
+  }
+
+  async function loadShields(){
+    let c; try { c = await (await fetch("/clients",{cache:"no-store"})).json(); } catch { return; }
+    const sh = (c.clients||[]).filter(x => x.device === "shield");
+    if (!sh.length) { $("shields").innerHTML = '<div class="empty">No Shields connected right now.</div>'; return; }
+    $("shields").innerHTML = sh.map(s => '<div class="shield"><span class="nm">📺 ' + esc(s.label||"Shield") + ' <span class="ip">' + esc(s.ip) + '</span></span><button class="go" data-ip="' + esc(s.ip) + '">Open engine here</button></div>').join("");
+    $("shields").querySelectorAll("button").forEach(b => b.onclick = () => openOnShield(b.getAttribute("data-ip")));
+  }
+  async function openOnShield(ip){
+    if (!REC) { $("msg").textContent = "no LAN url to push"; return; }
+    $("msg").textContent = "opening on " + ip + "…";
+    try { const r = await (await fetch("/shield/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"openUrl",ip,url:REC})})).json();
+      $("msg").textContent = r && r.ok ? ("✓ opened the engine on " + ip) : ("✗ " + (r && r.error || "failed")); }
+    catch (e) { $("msg").textContent = "✗ " + e; }
+  }
+
+  function refresh(){ loadNet(); loadShields(); }
+  refresh(); setInterval(loadShields, 5000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

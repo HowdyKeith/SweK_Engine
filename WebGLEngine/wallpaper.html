@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Wallpaper</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:#04070d; }
+  canvas { display:block; width:100vw; height:100vh; }
+  /* LCARS chrome. Hidden by default: a wallpaper that shouts is a wallpaper you turn off in a week. */
+  #hud { position:fixed; left:26px; bottom:22px; font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+         color:#ffb046; letter-spacing:.09em; text-transform:uppercase; pointer-events:none;
+         opacity:0; transition:opacity .6s; text-shadow:0 0 12px rgba(0,0,0,.9); }
+  #hud.on { opacity:.82; }
+  #hud .bar { display:inline-block; width:74px; height:7px; background:#1b2836; border-radius:4px; overflow:hidden;
+              vertical-align:middle; margin:0 8px; }
+  #hud .bar i { display:block; height:100%; width:0%; background:#ff9c3f; transition:width .5s; }
+  #hud b { color:#9fd7ff; font-weight:600; }
+  #paused { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+            font:12px ui-monospace,monospace; color:#3a4f66; letter-spacing:.2em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span>CPU <span class="bar"><i id="bCpu"></i></span><b id="vCpu">--</b></span>
+  <span style="margin-left:16px">GPU <span class="bar"><i id="bGpu"></i></span><b id="vGpu">--</b></span>
+  <span style="margin-left:16px">RAM <span class="bar"><i id="bRam"></i></span><b id="vRam">--</b></span>
+  <span style="margin-left:16px" id="vTrack"></span>
+</div>
+<div id="paused">paused</div>
+
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+
+// SweK as a Windows desktop wallpaper, via Lively (rocksdanister/lively).
+//
+// Lively renders an HTML FILE OR A WEB ADDRESS as the desktop. The engine already serves this page, so the whole
+// integration is: point Lively at http://<host>:8787/wallpaper.html. No packaging, no port, no second renderer.
+//
+// THE HOOKS ARE LIVELY'S, VERIFIED AGAINST THEIR WIKI RATHER THAN GUESSED (Web-Guide-V: System Data):
+//   livelyWallpaperPlaybackChanged(d)  -- pause/play. Lively calls this when a fullscreen app takes over.
+//   livelySystemInformation(d)         -- CPU / GPU / RAM load
+//   livelyAudioListener(a)             -- FFT bands
+//   livelyCurrentTrack(d)              -- now playing
+//   livelyPropertyListener(name, val)  -- the settings UI, driven by LivelyProperties.json
+//
+// Lively calls these as GLOBALS on window. They are optional: if this page is opened in a plain browser, none of
+// them ever fire and it just runs. That is why they are attached to window rather than imported.
+//
+// THE ONE THAT MATTERS IS PLAYBACK. A wallpaper that keeps marching a scalar field at 60fps while you play a game
+// is not a wallpaper, it is a tax. Lively tells us to stop; we actually stop -- cancelAnimationFrame, not a
+// `paused` flag that keeps the loop spinning and skips the body.
+
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x04070d, 0.0042);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 3000);
+
+scene.add(new THREE.HemisphereLight(0x2a3450, 0x0a0f16, 0.75));
+const key = new THREE.PointLight(0xff8a4a, 2.2, 900, 1.5); key.position.set(0, 90, 40); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fd7ff, 0.55); rim.position.set(-1, 0.5, 1); scene.add(rim);
+
+const mat = new THREE.MeshStandardMaterial({ color: 0xd8ecff, roughness: 0.42, metalness: 0.08, flatShading: false });
+let mesh = null;
+
+// blobulator's own recipe: inverse-square Blinn metaballs, field = 1 - sum, marched at 0.
+const LX = 30, LY = 22, LZ = 16, CS = 4.2, minDim = Math.min(LX, LY, LZ), plane = LX * LY;
+const N = 7;
+const balls = [];
+// SEEDED, not Math.random(). A wallpaper that is different every login cannot be reported, screenshotted, or
+// reproduced -- and this engine's whole discipline is that a picture is worth sending.
+let seed = 20250716;
+const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+for (let i = 0; i < N; i++) {
+  balls.push({ x: rnd() * LX, y: rnd() * LY, z: LZ * 0.5 + (rnd() - 0.5) * LZ * 0.3,
+               rad: 0.16 + rnd() * 0.13, vx: 0.10 + rnd() * 0.16, rise: 0.05 + rnd() * 0.09,
+               bob: rnd() * 6.28, zw: 0.4 + rnd() * 0.5, zp: rnd() * 6.28, base: 0 });
+  balls[i].base = balls[i].rad;
+}
+
+const field = new Float32Array(LX * LY * LZ);
+let audioPunch = 0;   // 0..1, driven by Lively's FFT when present
+
+function rebuild(t) {
+  const cx = [], cy = [], cz = [], cr2 = [];
+  for (const b of balls) {
+    // audio swells the blobs. With no Lively audio this stays 0 and they just drift.
+    const r = (b.base * (1 + audioPunch * 0.5)) * minDim;
+    cx.push(b.x); cy.push(b.y); cz.push(b.z + Math.sin(t * b.zw + b.zp) * LZ * 0.14); cr2.push(r * r);
+  }
+  for (let z = 0; z < LZ; z++) for (let y = 0; y < LY; y++) {
+    const row = z * plane + y * LX;
+    for (let x = 0; x < LX; x++) {
+      let s = 0;
+      for (let k = 0; k < cx.length; k++) {
+        const dx = x - cx[k], dy = y - cy[k], dz = z - cz[k];
+        s += cr2[k] / (dx * dx + dy * dy + dz * dz + 0.35);
+      }
+      field[row + x] = 1.0 - s;
+    }
+  }
+  const m = marchScalarField(field, LX, LY, LZ, 0, { origin: [-(LX * CS) / 2, -(LY * CS) / 2, -(LZ * CS) / 2], cellSize: CS });
+  if (mesh) { mesh.geometry.dispose(); scene.remove(mesh); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(m.positions instanceof Float32Array ? m.positions : new Float32Array(m.positions), 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(m.normals instanceof Float32Array ? m.normals : new Float32Array(m.normals), 3));
+  mesh = new THREE.Mesh(g, mat);
+  scene.add(mesh);
+  return m.triangleCount;
+}
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+// FIXED dt, tick-indexed. Same law as everything else here: a wallpaper driven by frame delta drifts, and two
+// machines showing "the same" wallpaper would not be.
+const DT = 1 / 30;
+let tick = 0, raf = 0, running = false;
+
+function step() {
+  const t = tick * DT;
+  for (const b of balls) {
+    b.x += b.vx * DT; b.y += b.rise * DT + Math.sin(t * 1.7 + b.bob) * DT * (LY * 0.02);
+    if (b.x > LX * 1.02) { b.x = -LX * 0.05; }
+    if (b.y > LY * 0.98) { b.y = -LY * 0.04; }
+  }
+  audioPunch *= 0.90;   // decay, so a beat is a pulse and not a step change
+  rebuild(t);
+  const orb = t * 0.055;
+  camera.position.set(Math.cos(orb) * 190, 42 + Math.sin(orb * 0.7) * 22, Math.sin(orb) * 190);
+  camera.lookAt(0, 0, 0);
+  renderer.render(scene, camera);
+  tick++;
+}
+
+function loop() { if (!running) return; step(); raf = requestAnimationFrame(loop); }
+function play() { if (running) return; running = true; document.getElementById("paused").style.display = "none"; loop(); }
+function pause() { running = false; cancelAnimationFrame(raf); document.getElementById("paused").style.display = "flex"; }
+
+// The browser's own signal, for when this is opened in a tab rather than as a wallpaper. Lively has its own hook
+// below; this covers the ordinary case and costs one line.
+document.addEventListener("visibilitychange", () => (document.hidden ? pause() : play()));
+play();
+
+// ---- Lively's hooks. All optional; in a plain browser none of them ever fire. -------------------------------
+const pct = (v) => Math.max(0, Math.min(100, Number(v) || 0));
+function gauge(barId, valId, v) {
+  const p = pct(v);
+  document.getElementById(barId).style.width = p.toFixed(0) + "%";
+  document.getElementById(valId).textContent = p.toFixed(0) + "%";
+  // LCARS turns amber then red as it climbs, because a gauge that is one colour is a picture of a gauge.
+  document.getElementById(barId).style.background = p > 85 ? "#ff5a4a" : p > 60 ? "#ffb046" : "#ff9c3f";
+}
+
+window.livelyWallpaperPlaybackChanged = (d) => {
+  // THE IMPORTANT ONE. Lively fires this when a fullscreen app takes the screen. Stop the loop outright --
+  // cancelAnimationFrame, not a flag the loop keeps spinning over.
+  try { const j = typeof d === "string" ? JSON.parse(d) : d; (j && j.IsPaused) ? pause() : play(); }
+  catch { play(); }
+};
+
+window.livelySystemInformation = (d) => {
+  try {
+    const j = typeof d === "string" ? JSON.parse(d) : d;
+    document.getElementById("hud").classList.add("on");
+    gauge("bCpu", "vCpu", j.CurrentCpuUsage);
+    gauge("bGpu", "vGpu", j.CurrentGpuUsage);
+    gauge("bRam", "vRam", j.CurrentRamUsage);
+  } catch { /* a malformed payload is not worth killing the wallpaper over */ }
+};
+
+window.livelyAudioListener = (a) => {
+  // Lively hands over FFT bands. Take the low end -- that is the beat, and the blobs should breathe with it
+  // rather than strobe with the hi-hats.
+  try {
+    const arr = typeof a === "string" ? JSON.parse(a) : a;
+    if (!arr || !arr.length) return;
+    let lo = 0; const n = Math.max(1, Math.floor(arr.length * 0.18));
+    for (let i = 0; i < n; i++) lo += Math.abs(Number(arr[i]) || 0);
+    audioPunch = Math.min(1, Math.max(audioPunch, (lo / n) * 1.4));
+  } catch { /* ignore */ }
+};
+
+window.livelyCurrentTrack = (d) => {
+  try {
+    const j = typeof d === "string" ? JSON.parse(d) : d;
+    const t = j && (j.Title || j.title);
+    document.getElementById("vTrack").textContent = t ? "\u266a " + String(t).slice(0, 42) : "";
+    if (t) document.getElementById("hud").classList.add("on");
+  } catch { /* ignore */ }
+};
+
+window.livelyPropertyListener = (name, val) => {
+  if (name === "hud") document.getElementById("hud").classList.toggle("on", !!val);
+  else if (name === "blobs") { /* count is fixed at build; a live change would re-seed and jump */ }
+  else if (name === "speed") { for (const b of balls) b.vx = 0.10 + (Number(val) || 50) / 500; }
+};
+</script>
+</body>
+</html>

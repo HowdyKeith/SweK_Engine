@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Voxel Viewer / Generator</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#cdf;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:6px;padding:8px 10px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center}
+  #topbar h1{margin:0;font-size:13px;font-weight:600;color:#cdf;flex:1}
+  .btn{padding:5px 10px;border-radius:5px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:12px;cursor:pointer;white-space:nowrap}
+  .btn:active{background:rgba(180,140,220,0.3)}
+  .btn.accent{border-color:#ffd84a;background:rgba(60,50,20,0.7)}
+  .btn.danger{border-color:#f77;color:#fcc}
+  #tabs{display:flex;gap:0;background:rgba(15,20,35,0.6);border-bottom:1px solid rgba(180,140,220,0.15)}
+  #tabs .tab{flex:1;padding:8px;text-align:center;font-size:12px;cursor:pointer;color:#9af;border-bottom:2px solid transparent}
+  #tabs .tab.on{color:#cdf;border-bottom-color:#ffd84a;background:rgba(60,50,20,0.25)}
+  .panel{flex:1;display:none;flex-direction:column;overflow:hidden;position:relative}
+  .panel.on{display:flex}
+  #genInput{display:flex;gap:6px;padding:8px;background:rgba(10,16,30,0.6)}
+  #prompt{flex:1;padding:8px;background:#0c0f14;color:#cdf;border:1px solid #355;border-radius:5px;font-size:13px}
+  #canvasHost{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #vcanvas{background:#000;width:100%;height:100%;touch-action:none}
+  #vcCaption{position:absolute;top:8px;left:8px;font-size:11px;color:#9af;background:rgba(0,0,0,0.6);padding:4px 8px;border-radius:4px;max-width:70%}
+  #vcStatus{position:absolute;bottom:8px;left:8px;right:8px;text-align:center;font-size:11px;color:#789;pointer-events:none}
+  #genActions{display:flex;gap:6px;padding:8px;background:rgba(10,16,30,0.6)}
+  #genActions .btn{flex:1}
+  #imgCanvas{max-width:100%;max-height:100%;border-radius:4px;background:#000}
+  #gallery{flex:1;overflow-y:auto;padding:8px}
+  .gentry{position:relative;background:rgba(15,20,35,0.7);border:1px solid rgba(180,140,220,0.2);border-radius:6px;padding:8px;margin-bottom:6px;touch-action:pan-y;display:flex;gap:8px;align-items:flex-start}
+  .gentry .thumb{width:72px;height:72px;border-radius:4px;background:#04030a;flex-shrink:0;object-fit:cover}
+  .gentry .body{flex:1;min-width:0}
+  .gentry h3{margin:0 0 4px;font-size:13px;color:#cdf;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gentry .prompt{font-size:11px;color:#9af;margin:0 0 4px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gentry .meta{font-size:10px;color:#789}
+  .gentry .badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(180,140,220,0.25);color:#cdf;margin-right:4px;text-transform:uppercase}
+  .gentry .badge.img{background:rgba(255,200,80,0.3);color:#ffe066}
+  .gentry .swipe-overlay{position:absolute;top:0;right:0;bottom:0;display:flex;align-items:center;padding-right:12px;color:#f88;font-weight:600;pointer-events:none;opacity:0;transition:opacity 0.2s}
+  .gentry.swiping{transition:transform 0.05s}
+  .gentry .actions{display:flex;gap:6px;margin-top:6px}
+  .gentry .actions .btn{flex:1;font-size:11px;padding:4px 8px}
+  .empty{text-align:center;color:#789;padding:30px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🧊 Voxel Viewer / Generator</h1>
+    <button class="btn" id="btnBack">← Back</button>
+  </div>
+  <div id="tabs">
+    <div class="tab on" data-tab="voxel">🧊 Voxel</div>
+    <div class="tab" data-tab="image">🖼 Image</div>
+    <div class="tab" data-tab="gallery">📚 Gallery</div>
+  </div>
+
+  <!-- VOXEL PANEL -->
+  <div class="panel on" id="panel-voxel">
+    <!-- v737 — quick preset buttons. Tap to fill the prompt + generate. -->
+    <div style="display:flex;gap:4px;padding:6px 8px;background:rgba(10,16,30,0.4);overflow-x:auto;white-space:nowrap;">
+      <button class="btn preset" data-p="asteroid">🪨 asteroid</button>
+      <button class="btn preset" data-p="UFO flying saucer">🛸 UFO</button>
+      <button class="btn preset" data-p="spaceship">🚀 spaceship</button>
+      <button class="btn preset" data-p="scorpion">🦂 scorpion</button>
+      <button class="btn preset" data-p="beetle">🪲 beetle</button>
+      <button class="btn preset" data-p="spider">🕷 spider</button>
+      <button class="btn preset" data-p="centipede">🐛 centipede</button>
+      <button class="btn preset" data-p="ant">🐜 ant</button>
+      <button class="btn preset" data-p="dragon">🐲 dragon</button>
+      <button class="btn preset" data-p="robot">🤖 robot</button>
+    </div>
+    <div id="genInput">
+      <input type="text" id="prompt" placeholder='e.g. "spaceship", "cat sitting", "asteroid"' />
+      <button class="btn accent" id="btnGen">✨ Generate</button>
+    </div>
+    <div id="canvasHost">
+      <canvas id="vcanvas" width="800" height="800"></canvas>
+      <div id="vcCaption" style="display:none;"></div>
+      <div id="vcStatus">tap "Generate" — drag to rotate · pinch to zoom</div>
+      <!-- v3321 -- THE MESHER COMPARISON NEEDED A SETUP STEP, WHICH IS WHY NOBODY EVER RAN IT.
+           ?mesher=greedy only takes effect inside a load handler, so with nothing loaded the flag did nothing
+           visible and there was nothing to compare. A comparison needs THE SAME VOXELS BOTH TIMES, and an
+           asset picked by hand is not a fixture. -->
+      <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button id="vcFixture" style="font:inherit;padding:3px 10px;background:#16211b;color:#cfe9d8;border:1px solid #4c8f6a;border-radius:5px;cursor:pointer"
+          title="Load a built-in test object with large coplanar faces -- the case greedy meshing exists for. Same voxels every time, so the two meshers are comparable.">Load test object</button>
+        <span id="vcMeshOut" style="font-size:12px;color:#6f8a7c"></span>
+      </div>
+    </div>
+    <!-- v887 — voxel orientation (front-view realign). 90° snaps + reset;
+         persists with the saved creature. -->
+    <div id="orientBar" style="display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:6px 0;">
+      <span style="font-size:11px;color:#9af;letter-spacing:0.05em;">FRONT-FACE</span>
+      <button class="btn ovx" data-axis="yaw"   data-deg="-90">◀ turn</button>
+      <button class="btn ovx" data-axis="yaw"   data-deg="90">turn ▶</button>
+      <button class="btn ovx" data-axis="pitch" data-deg="-90">▲ tip</button>
+      <button class="btn ovx" data-axis="pitch" data-deg="90">tip ▼</button>
+      <button class="btn ovx" data-axis="roll"  data-deg="90">↻ roll</button>
+      <button class="btn ovx" id="ovxReset">reset</button>
+      <span id="ovxReadout" style="font-size:10px;color:#789;">0 / 0 / 0°</span>
+    </div>
+    <div id="genActions">
+      <button class="btn" id="btnClear">🗑 Clear</button>
+      <button class="btn" id="btnRegen">🔁 Regen</button>
+      <button class="btn accent" id="btnSave">💾 Save</button>
+    </div>
+  </div>
+
+  <!-- IMAGE PANEL -->
+  <div class="panel" id="panel-image">
+    <div id="genInput">
+      <input type="text" id="imgPrompt" placeholder='e.g. "futuristic city skyline at sunset"' />
+      <button class="btn accent" id="btnImgGen">✨ Generate</button>
+    </div>
+    <div id="canvasHost">
+      <img id="imgCanvas" style="display:none;" />
+      <div id="imgStatus" style="position:absolute;text-align:center;font-size:13px;color:#789;">tap "Generate" to make an image</div>
+    </div>
+    <div id="genActions">
+      <button class="btn" id="btnImgClear">🗑 Clear</button>
+      <button class="btn" id="btnImgDownload">⬇ Download</button>
+      <button class="btn accent" id="btnImgSave">💾 Save</button>
+    </div>
+  </div>
+
+  <!-- GALLERY PANEL -->
+  <div class="panel" id="panel-gallery">
+    <div id="gallery">
+      <div class="empty">No saved models yet — generate something in the Voxel tab and tap 💾 Save.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+// Tab switching
+document.querySelectorAll("#tabs .tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll("#tabs .tab").forEach(x => x.classList.toggle("on", x === t));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "panel-" + t.dataset.tab));
+    if (t.dataset.tab === "gallery") loadGallery();
+  });
+});
+
+// ---------- WebGL2 voxel renderer ----------
+const canvas = document.getElementById("vcanvas");
+function resizeCanvas() {
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(r.width * dpr);
+  canvas.height = Math.floor(r.height * dpr);
+}
+window.addEventListener("resize", resizeCanvas);
+
+const gl = canvas.getContext("webgl2", { antialias: true, depth: true, preserveDrawingBuffer: true });
+if (!gl) document.getElementById("vcStatus").textContent = "WebGL2 not supported on this device";
+
+const VS = `#version 300 es
+in vec3 aPos;
+in vec3 aNormal;
+in vec3 aColor;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+out vec3 vNormal;
+out vec3 vColor;
+void main(){
+  vNormal = mat3(uModel) * aNormal;
+  vColor = aColor;
+  gl_Position = uMVP * uModel * vec4(aPos, 1.0);
+}`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vNormal;
+in vec3 vColor;
+out vec4 outColor;
+void main(){
+  vec3 L = normalize(vec3(0.5, 0.9, 0.7));
+  float d = max(dot(normalize(vNormal), L), 0.0);
+  vec3 c = vColor * (0.35 + 0.7 * d);
+  outColor = vec4(c, 1.0);
+}`;
+
+function compile(type, src) {
+  const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(sh)); return null; }
+  return sh;
+}
+let prog = null;
+if (gl) {
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.bindAttribLocation(prog, 0, "aPos");
+  gl.bindAttribLocation(prog, 1, "aNormal");
+  gl.bindAttribLocation(prog, 2, "aColor");
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error(gl.getProgramInfoLog(prog)); prog = null; }
+  gl.enable(gl.DEPTH_TEST);
+}
+
+// Palette: matches generateAsset spec (0 grey, 1 red, 2 orange, 3 yellow, 4 green, 5 cyan, 6 blue, 7 white)
+const PALETTE = [
+  [0.55, 0.55, 0.55],
+  [0.90, 0.20, 0.20],
+  [0.95, 0.55, 0.10],
+  [0.95, 0.90, 0.25],
+  [0.25, 0.85, 0.30],
+  [0.20, 0.85, 0.95],
+  [0.25, 0.45, 0.95],
+  [0.95, 0.95, 0.95],
+];
+
+// Build mesh from voxel array [[x,y,z,c],...]. Only emit visible faces.
+// v2579 -- ?mesher=greedy. THE OLD PATH IS THE DEFAULT AND IS UNTOUCHED.
+//
+// buildVoxelMesh (below) emits one quad per visible face. mesh/voxelMeshGreedy.js merges coplanar same-colour
+// faces into maximal rectangles: on a 32^3 chunk of real terrain with three materials that is 4548 faces down
+// to 1373 -- 3.31x less geometry for the same surface.
+//
+// WHY A SEPARATE MODULE SCRIPT AND NOT AN import HERE: this page is a PLAIN <script>, not type="module".
+// Changing that would make every function in it DEFERRED AND MODULE-SCOPED, and every onclick in the markup
+// would stop finding its callback. THE PAGE WOULD BREAK IN A WAY THAT LOOKS LIKE NOTHING HAPPENING. So the
+// module at the bottom hangs the greedy builder on window, and this picker consults it AT CALL TIME -- which is
+// inside a fetch handler, long after defer resolves.
+//
+// THE DEFAULT IS UNCHANGED ON PURPOSE. The geometry is proven correct (mesh/voxelMeshGreedy-selfcheck.mjs:
+// winding by cross product, drop-in buffer contract, colour seams, palette index 0) -- but PROVEN CORRECT and
+// LOOKS RIGHT ON A SCREEN ARE DIFFERENT CLAIMS. Add ?mesher=greedy, look at both, then decide.
+// v2866 -- RECORD WHAT WAS ASKED FOR AND WHAT ACTUALLY RAN, so the fallback is observable instead of merely
+// logged. The console.warn below was honest but unverifiable: a warning nobody reads is the same as no warning,
+// and claim v2579 ("a flag that lies is worse than no flag") is settled by exactly this pair being equal.
+// Render QA asserts requested === used, so a silent fallback now FAILS a run instead of waiting for someone to
+// notice the geometry looks familiar.
+window.__swekMesher = { requested: null, used: null, indices: null };
+
+function pickMesher() {
+  const want = new URLSearchParams(location.search).get('mesher');
+  window.__swekMesher.requested = want || 'default';
+  if (want === 'greedy') {
+    if (typeof window.buildVoxelMeshGreedy === 'function') {
+      window.__swekMesher.used = 'greedy';
+      return function (voxels) {
+        const m = window.buildVoxelMeshGreedy(voxels);
+        try { window.__swekMesher.indices = (m && m.indices && m.indices.length) || null; } catch (e) {}
+        return m;
+      };
+    }
+    // SAY SO. Falling back silently would mean ?mesher=greedy RENDERS THE OLD MESH AND REPORTS THE NEW ONE --
+    // a flag that cannot fail is decoration, and a flag that lies about which code ran is worse than no flag.
+    console.warn('[voxel-viewer] ?mesher=greedy requested but mesh/voxelMeshGreedy.js did not load. Using the per-face mesher.');
+  }
+  window.__swekMesher.used = 'default';
+  return function (voxels) {
+    const m = buildVoxelMesh(voxels);
+    try { window.__swekMesher.indices = (m && m.indices && m.indices.length) || null; } catch (e) {}
+    return m;
+  };
+}
+
+// v3321 -- *** A FIXTURE, BECAUSE A MEASUREMENT WITHOUT A FRONT DOOR DOES NOT GET TAKEN. ***
+// Keith: "can it load a default prepared object to show test?" The greedy-vs-per-face comparison has been on
+// the open list for dozens of rounds and never run, because running it meant generating or picking an asset
+// first -- and a comparison whose input changes between runs is not a comparison.
+//
+// THE SHAPE IS CHOSEN FOR THE THING UNDER TEST. Greedy meshing merges COPLANAR ADJACENT FACES, so a fixture of
+// scattered single voxels would show no gain and prove nothing -- it would make the mesher look useless when
+// the fixture was simply wrong. This is a hollow slab with a stepped ridge: LARGE FLAT REGIONS for greedy to
+// merge, plus steps and a hollow interior so it is not a trivial box that flatters the result.
+//
+// DETERMINISTIC, WITH NO RANDOMNESS ANYWHERE. Same voxels every run, on every machine, so two numbers taken a
+// minute apart are about the MESHER and not about the object.
+function buildFixtureVoxels() {
+    const v = [], W = 24, D = 24, H = 10;
+    const put = (x, y, z) => v.push([x, y, z]);
+    for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+        put(x, 0, z);                                    // floor slab -- one big coplanar face per side
+        if (x === 0 || x === W - 1 || z === 0 || z === D - 1) for (let y = 1; y < 4; y++) put(x, y, z);   // walls
+    }
+    // A STEPPED RIDGE: greedy merges along the flats and MUST break at every step. A fixture with no breaks
+    // would not show whether the mesher stops merging where it should.
+    for (let s = 0; s < 6; s++) for (let x = 4 + s; x < W - 4; x++) for (let z = 8; z < 16; z++) put(x, 4 + s, z);
+    for (let y = 4; y < H; y++) put(2, y, 2);            // a lone column -- the case with NO neighbours to merge
+    return v;
+}
+
+function loadFixture() {
+    const voxels = buildFixtureVoxels();
+    currentModel = { name: "fixture", prompt: "built-in test object", voxels };
+    currentOrient = { yaw: 0, pitch: 0, roll: 0 };
+    try { syncOrientUI(); } catch (e) {}
+    const mesh = pickMesher()(voxels);
+    uploadMesh(mesh, voxels);
+    autoSpin = true;
+    dist = (bounds && bounds.rad || 20) * 3 + 8;
+    yaw = 0.6; pitch = 0.35;
+    // *** THE NUMBER GOES ON THE PAGE, NOT IN THE CONSOLE. *** requested-vs-used is the whole point of the flag
+    // and it was only readable by typing __swekMesher at a prompt -- which is the console-only front door this
+    // tree keeps ruling out. A flag that lies about which code ran is worse than no flag; a flag nobody reads
+    // is the same thing more quietly.
+    const m = window.__swekMesher || {};
+    const el = document.getElementById("vcMeshOut");
+    if (el) {
+        const tris = m.indices ? (m.indices / 3) : null;
+        el.innerHTML = "<b>" + voxels.length + "</b> voxels &middot; mesher requested <b>" + (m.requested || "?") +
+            "</b>, used <b style=\"color:" + (m.requested !== "default" && m.used !== m.requested ? "#e0c58a" : "#b6f0cf") +
+            "\">" + (m.used || "?") + "</b>" + (tris ? " &middot; <b>" + tris + "</b> triangles" : "") +
+            (m.requested !== "default" && m.used !== m.requested
+                ? " &mdash; REQUESTED AND USED DISAGREE: the module did not load, and this render is the OTHER mesher."
+                : "");
+    }
+}
+
+// The button, and ?fixture=1 so ONE URL IS THE WHOLE TEST -- open it, read the number, add &mesher=greedy,
+// read it again. Wired on DOMContentLoaded because this is a classic script in <head> order.
+addEventListener("DOMContentLoaded", () => {
+    const b = document.getElementById("vcFixture");
+    if (b) b.addEventListener("click", () => { try { loadFixture(); } catch (e) { console.warn("[voxel-viewer] fixture failed:", e); } });
+    if (new URLSearchParams(location.search).get("fixture") === "1") {
+        // AFTER the GL context exists. Loading before uploadMesh has a context would fail in a way that looks
+        // like a broken fixture rather than a race.
+        setTimeout(() => { try { loadFixture(); } catch (e) { console.warn("[voxel-viewer] fixture failed:", e); } }, 60);
+    }
+});
+
+function buildVoxelMesh(voxels) {
+  const set = new Set(voxels.map(v => `${v[0]},${v[1]},${v[2]}`));
+  const positions = [], normals = [], colors = [], indices = [];
+  const FACES = [
+    { n: [ 1, 0, 0], v: [[ 0.5,-0.5,-0.5],[ 0.5, 0.5,-0.5],[ 0.5, 0.5, 0.5],[ 0.5,-0.5, 0.5]], d: [ 1, 0, 0] },
+    { n: [-1, 0, 0], v: [[-0.5,-0.5, 0.5],[-0.5, 0.5, 0.5],[-0.5, 0.5,-0.5],[-0.5,-0.5,-0.5]], d: [-1, 0, 0] },
+    { n: [ 0, 1, 0], v: [[-0.5, 0.5,-0.5],[ 0.5, 0.5,-0.5],[ 0.5, 0.5, 0.5],[-0.5, 0.5, 0.5]], d: [ 0, 1, 0] },
+    { n: [ 0,-1, 0], v: [[-0.5,-0.5, 0.5],[ 0.5,-0.5, 0.5],[ 0.5,-0.5,-0.5],[-0.5,-0.5,-0.5]], d: [ 0,-1, 0] },
+    { n: [ 0, 0, 1], v: [[ 0.5,-0.5, 0.5],[ 0.5, 0.5, 0.5],[-0.5, 0.5, 0.5],[-0.5,-0.5, 0.5]], d: [ 0, 0, 1] },
+    { n: [ 0, 0,-1], v: [[-0.5,-0.5,-0.5],[-0.5, 0.5,-0.5],[ 0.5, 0.5,-0.5],[ 0.5,-0.5,-0.5]], d: [ 0, 0,-1] },
+  ];
+  for (const [x, y, z, c] of voxels) {
+    const col = PALETTE[Math.max(0, Math.min(7, c | 0))] || PALETTE[0];
+    for (const F of FACES) {
+      const nx = x + F.d[0], ny = y + F.d[1], nz = z + F.d[2];
+      if (set.has(`${nx},${ny},${nz}`)) continue;   // hidden face — skip
+      const baseIdx = positions.length / 3;
+      // Reverse winding for inward-facing? Check: faces use cw vertex order looking from outside
+      // The vertex order above is correct CCW from outside; emit two triangles.
+      for (let i = 0; i < 4; i++) {
+        positions.push(x + F.v[i][0], y + F.v[i][1], z + F.v[i][2]);
+        normals.push(F.n[0], F.n[1], F.n[2]);
+        colors.push(col[0], col[1], col[2]);
+      }
+      indices.push(baseIdx, baseIdx + 1, baseIdx + 2, baseIdx, baseIdx + 2, baseIdx + 3);
+    }
+  }
+  return {
+    positions: new Float32Array(positions),
+    normals: new Float32Array(normals),
+    colors: new Float32Array(colors),
+    indices: new Uint32Array(indices),
+    bounds: computeBounds(voxels),
+  };
+}
+function computeBounds(voxels) {
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const [x, y, z] of voxels) {
+    if (x < lo[0]) lo[0] = x; if (x > hi[0]) hi[0] = x;
+    if (y < lo[1]) lo[1] = y; if (y > hi[1]) hi[1] = y;
+    if (z < lo[2]) lo[2] = z; if (z > hi[2]) hi[2] = z;
+  }
+  return { lo, hi, cx: (lo[0]+hi[0])/2, cy: (lo[1]+hi[1])/2, cz: (lo[2]+hi[2])/2,
+           rad: Math.max(hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]) / 2 + 1 };
+}
+
+let vao = null, vbo = null, ebo = null, indexCount = 0, bounds = null;
+// v3452 -- *** THE CAMERA IS FRAMED FROM THE VOXELS, NOT FROM THE MESH, AND THAT IS THE WHOLE FIX. ***
+//
+// Keith ran ?mesher=greedy on the rig, clicked Load test object, and got A BLACK SCREEN WITH "1506 voxels ...
+// used greedy - 92 triangles" PRINTED BESIDE IT. The mesh was real. Nothing rasterised.
+//
+// THE CAUSE: TWO MESHERS, ONE FIELD NAME, TWO INCOMPATIBLE SHAPES.
+//     buildVoxelMesh       -> bounds { lo, hi, cx, cy, cz, rad }     <- what this page reads
+//     buildVoxelMeshGreedy -> bounds { min, max }                    <- no cx/cy/cz/rad at all
+// This function used to do `bounds = mesh.bounds`, and the render loop guards it with `bounds ? bounds.cx : 0`.
+// *** THAT GUARD TESTS FOR ABSENCE, AND GREEDY'S BOUNDS IS A PERFECTLY TRUTHY OBJECT WITH DIFFERENT KEYS. *** So
+// cx came back UNDEFINED rather than 0, `ex = cx + r * ...` became NaN, the view and model matrices went NaN,
+// and EVERY VERTEX LANDED NOWHERE. A null check cannot catch a wrong shape, and the failure is silent because
+// `(bounds && bounds.rad || 20)` quietly absorbed the other missing field.
+//
+// IT WAS NEVER FIXTURE-SPECIFIC: all three upload sites framed off the mesh, so EVERY generated model and every
+// gallery item was equally invisible under ?mesher=greedy. The test object is just where somebody finally looked.
+//
+// *** AND THE FIX IS NOT "TEACH THE PAGE THE SECOND SHAPE". A BOUNDING BOX IS A PROPERTY OF THE MODEL, NOT OF
+// THE MESHING STRATEGY. Two meshers fed the same voxels MUST frame identically -- if the camera depends on which
+// mesher ran, the two columns are not comparable, and comparing them is the one thing this page exists to do.
+// So bounds is derived ONCE from the voxels and the mesher cannot influence it at all. *** (v3446's precedent:
+// when sixty-six devices agreed and one did not, the outlier was fixed rather than the shared reader widened --
+// here the shared reader stops asking the outlier in the first place.)
+function uploadMesh(mesh, voxels) {
+  if (!gl || !prog) return;
+  if (vao) gl.deleteVertexArray(vao);
+  if (vbo) gl.deleteBuffer(vbo);
+  if (ebo) gl.deleteBuffer(ebo);
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  // Interleaved: 9 floats per vertex (pos3 + norm3 + col3)
+  const n = mesh.positions.length / 3;
+  const interleaved = new Float32Array(n * 9);
+  for (let i = 0; i < n; i++) {
+    interleaved[i*9+0] = mesh.positions[i*3+0];
+    interleaved[i*9+1] = mesh.positions[i*3+1];
+    interleaved[i*9+2] = mesh.positions[i*3+2];
+    interleaved[i*9+3] = mesh.normals[i*3+0];
+    interleaved[i*9+4] = mesh.normals[i*3+1];
+    interleaved[i*9+5] = mesh.normals[i*3+2];
+    interleaved[i*9+6] = mesh.colors[i*3+0];
+    interleaved[i*9+7] = mesh.colors[i*3+1];
+    interleaved[i*9+8] = mesh.colors[i*3+2];
+  }
+  vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, interleaved, gl.STATIC_DRAW);
+  const stride = 9 * 4;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 3*4);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 6*4);
+  ebo = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+  indexCount = mesh.indices.length;
+  // FROM THE VOXELS WHEN WE HAVE THEM. The mesh's own bounds is left untouched -- greedy's gate asserts its
+  // { min, max } shape and that assertion stays true; it simply stops being what the camera consults.
+  bounds = voxels ? computeBounds(voxels) : mesh.bounds;
+}
+
+// ---------- Orbit camera ----------
+let yaw = 0.6, pitch = 0.35, dist = 30, autoSpin = true;
+const touch = { down: false, lx: 0, ly: 0, pinchD: 0 };
+canvas.addEventListener("pointerdown", e => {
+  touch.down = true; touch.lx = e.clientX; touch.ly = e.clientY;
+  autoSpin = false;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointerup", e => { touch.down = false; });
+canvas.addEventListener("pointermove", e => {
+  if (!touch.down) return;
+  const dx = e.clientX - touch.lx, dy = e.clientY - touch.ly;
+  touch.lx = e.clientX; touch.ly = e.clientY;
+  yaw += dx * 0.01;
+  pitch += dy * 0.01;
+  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch));
+});
+canvas.addEventListener("wheel", e => { e.preventDefault(); dist = Math.max(5, Math.min(120, dist + e.deltaY * 0.02)); }, { passive: false });
+// Touch pinch zoom
+let lastPinch = 0;
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (lastPinch > 0) dist = Math.max(5, Math.min(120, dist * (lastPinch / d)));
+    lastPinch = d;
+    e.preventDefault();
+  }
+}, { passive: false });
+canvas.addEventListener("touchend", () => { lastPinch = 0; });
+
+// ---------- Matrix math (minimal) ----------
+function mat4Identity() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+function mat4Perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far+near)*nf, -1,
+    0, 0, 2*far*near*nf, 0,
+  ]);
+}
+function mat4LookAt(ex, ey, ez, tx, ty, tz, ux, uy, uz) {
+  let fx = tx-ex, fy = ty-ey, fz = tz-ez;
+  let fl = 1/Math.hypot(fx, fy, fz); fx *= fl; fy *= fl; fz *= fl;
+  let sx = fy*uz - fz*uy, sy = fz*ux - fx*uz, sz = fx*uy - fy*ux;
+  let sl = 1/Math.hypot(sx, sy, sz); sx *= sl; sy *= sl; sz *= sl;
+  const ux2 = sy*fz - sz*fy, uy2 = sz*fx - sx*fz, uz2 = sx*fy - sy*fx;
+  return new Float32Array([
+    sx, ux2, -fx, 0,
+    sy, uy2, -fy, 0,
+    sz, uz2, -fz, 0,
+    -(sx*ex + sy*ey + sz*ez), -(ux2*ex + uy2*ey + uz2*ez), (fx*ex + fy*ey + fz*ez), 1,
+  ]);
+}
+function mat4Translate(x, y, z) {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+}
+function mat4Mul(a, b) {
+  const out = new Float32Array(16);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    let s = 0; for (let k = 0; k < 4; k++) s += a[i*4+k] * b[k*4+j]; out[i*4+j] = s;
+  }
+  return out;
+}
+
+let autoT = 0;
+function render() {
+  if (!gl || !prog || indexCount === 0) {
+    requestAnimationFrame(render);
+    return;
+  }
+  resizeCanvas();
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0.02, 0.01, 0.05, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+
+  if (autoSpin) { autoT += 0.012; yaw += 0.005; }
+  const aspect = canvas.width / Math.max(1, canvas.height);
+  const proj = mat4Perspective(Math.PI / 4, aspect, 0.5, 500);
+  const cx = bounds ? bounds.cx : 0, cy = bounds ? bounds.cy : 0, cz = bounds ? bounds.cz : 0;
+  const r = dist;
+  const ex = cx + r * Math.cos(pitch) * Math.sin(yaw);
+  const ey = cy + r * Math.sin(pitch);
+  const ez = cz + r * Math.cos(pitch) * Math.cos(yaw);
+  const view = mat4LookAt(ex, ey, ez, cx, cy, cz, 0, 1, 0);
+  const model = _voxelModelMat(cx, cy, cz);
+  const mvp = mat4Mul(view, proj);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog, "uMVP"), false, mvp);
+  gl.uniformMatrix4fv(gl.getUniformLocation(prog, "uModel"), false, model);
+  gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0);
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ---------- Generate + save / clear ----------
+let currentModel = null;   // { name, prompt, voxels, orientation? }
+
+// v887 — voxel orientation override (front-view realign). Some generated /
+// Gemini / imported voxels arrive overhead or on their side; these 90° snaps
+// let the user stand them up + face front. Persisted IN the saved creature
+// record (voxels are records, not URLs), so the choice travels with the model
+// and the in-world/forward-facing path can read it later. Rotation is applied
+// about the model's own center so it doesn't swing out of frame.
+let currentOrient = { yaw: 0, pitch: 0, roll: 0 };
+
+// Standard column-major 4x4 multiply (A*B). Local + self-contained so it does
+// not depend on this file's row-indexed mat4Mul; the shader applies uModel in
+// standard column-major (uMVP * uModel * pos).
+function _cmul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++)
+    o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3];
+  return o;
+}
+function _cTranslate(x, y, z) {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+}
+// Column-major Ry·Rx·Rz from yaw/pitch/roll degrees (matches avatarOrientation).
+function _cRot(o) {
+  const d2r = Math.PI/180, y=(o.yaw||0)*d2r, x=(o.pitch||0)*d2r, z=(o.roll||0)*d2r;
+  const cy=Math.cos(y),sy=Math.sin(y),cx=Math.cos(x),sx=Math.sin(x),cz=Math.cos(z),sz=Math.sin(z);
+  const Rz=[cz,sz,0, -sz,cz,0, 0,0,1];
+  const Rx=[1,0,0, 0,cx,sx, 0,-sx,cx];
+  const Ry=[cy,0,-sy, 0,1,0, sy,0,cy];
+  const m3=(a,b)=>{const o3=new Array(9);for(let c=0;c<3;c++)for(let r=0;r<3;r++)o3[c*3+r]=a[r]*b[c*3]+a[3+r]*b[c*3+1]+a[6+r]*b[c*3+2];return o3;};
+  const R=m3(m3(Ry,Rx),Rz);
+  return new Float32Array([R[0],R[1],R[2],0, R[3],R[4],R[5],0, R[6],R[7],R[8],0, 0,0,0,1]);
+}
+// Model matrix = T(center) · R · T(-center) so rotation pivots on the model.
+function _voxelModelMat(cx, cy, cz) {
+  if (!currentOrient || (!currentOrient.yaw && !currentOrient.pitch && !currentOrient.roll)) return mat4Identity();
+  return _cmul(_cTranslate(cx, cy, cz), _cmul(_cRot(currentOrient), _cTranslate(-cx, -cy, -cz)));
+}
+
+
+async function generateVoxel() {
+  const prompt = document.getElementById("prompt").value.trim();
+  if (!prompt) { document.getElementById("vcStatus").textContent = "type a prompt first"; return; }
+  document.getElementById("vcStatus").textContent = "generating…";
+  document.getElementById("vcCaption").style.display = "none";
+  try {
+    const r = await fetch("/ai/asset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      document.getElementById("vcStatus").textContent = "err: " + (j.error || "unknown");
+      return;
+    }
+    currentModel = { name: j.name, prompt, voxels: j.voxels };
+    currentOrient = { yaw: 0, pitch: 0, roll: 0 };   // v887 — fresh model, no override yet
+    syncOrientUI();
+    const mesh = pickMesher()(j.voxels);
+    uploadMesh(mesh, j.voxels);
+    autoSpin = true;
+    dist = (bounds.rad || 10) * 3 + 8;
+    yaw = 0.6; pitch = 0.35;
+    document.getElementById("vcCaption").style.display = "block";
+    document.getElementById("vcCaption").textContent = `${j.name} · ${j.voxels.length} voxels`;
+    document.getElementById("vcStatus").textContent = "drag to rotate · pinch to zoom · tap Save to keep it";
+  } catch (e) {
+    document.getElementById("vcStatus").textContent = "fetch err: " + e.message;
+  }
+}
+
+document.getElementById("btnGen").addEventListener("click", generateVoxel);
+document.getElementById("btnRegen").addEventListener("click", generateVoxel);
+document.getElementById("prompt").addEventListener("keydown", e => { if (e.key === "Enter") generateVoxel(); });
+// v737 — preset buttons fill prompt + auto-generate
+document.querySelectorAll(".preset").forEach(b => {
+  b.addEventListener("click", () => {
+    document.getElementById("prompt").value = b.dataset.p;
+    generateVoxel();
+  });
+});
+document.getElementById("btnClear").addEventListener("click", () => {
+  indexCount = 0; currentModel = null;
+  document.getElementById("vcCaption").style.display = "none";
+  document.getElementById("vcStatus").textContent = "cleared — generate a new model";
+});
+// v887 — orientation toolbar wiring + readout sync.
+function _normDeg(d){ d = d % 360; if (d < 0) d += 360; return d; }
+function syncOrientUI(){
+  const ro = document.getElementById("ovxReadout");
+  if (ro) ro.textContent = (currentOrient.yaw|0) + " / " + (currentOrient.pitch|0) + " / " + (currentOrient.roll|0) + "°";
+}
+(function bindOrientBar(){
+  document.querySelectorAll("#orientBar .ovx").forEach(function(b){
+    if (b.id === "ovxReset") {
+      b.addEventListener("click", function(){ currentOrient = { yaw:0, pitch:0, roll:0 }; syncOrientUI(); });
+      return;
+    }
+    b.addEventListener("click", function(){
+      const axis = b.getAttribute("data-axis");
+      const deg = parseFloat(b.getAttribute("data-deg")) || 0;
+      currentOrient[axis] = _normDeg((currentOrient[axis] || 0) + deg);
+      // mark the in-memory record dirty so an immediate save captures it
+      if (currentModel) currentModel.orientation = currentOrient;
+      syncOrientUI();
+    });
+  });
+  syncOrientUI();
+})();
+
+document.getElementById("btnSave").addEventListener("click", async () => {
+  if (!currentModel) { document.getElementById("vcStatus").textContent = "nothing to save"; return; }
+  // v738 — snapshot the current canvas to a 128x128 thumbnail so the
+  // gallery can show a visual preview, not just text.
+  let thumbnail = null;
+  try {
+    // Force a synchronous render pass before reading pixels so the canvas
+    // isn't blank (WebGL clears the drawing buffer after composite).
+    // Re-trigger the render loop by calling drawElements one more time.
+    if (gl && prog && indexCount > 0 && vao) {
+      // Same draw call the render loop uses, but immediate so the buffer
+      // is full of pixels when we toDataURL it.
+      const aspect = canvas.width / Math.max(1, canvas.height);
+      const proj = mat4Perspective(Math.PI / 4, aspect, 0.5, 500);
+      const cx = bounds ? bounds.cx : 0, cy = bounds ? bounds.cy : 0, cz = bounds ? bounds.cz : 0;
+      const r = dist;
+      const ex = cx + r * Math.cos(pitch) * Math.sin(yaw);
+      const ey = cy + r * Math.sin(pitch);
+      const ez = cz + r * Math.cos(pitch) * Math.cos(yaw);
+      const view = mat4LookAt(ex, ey, ez, cx, cy, cz, 0, 1, 0);
+      const mvp = mat4Mul(view, proj);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.02, 0.01, 0.05, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(prog);
+      gl.bindVertexArray(vao);
+      gl.uniformMatrix4fv(gl.getUniformLocation(prog, "uMVP"), false, mvp);
+      gl.uniformMatrix4fv(gl.getUniformLocation(prog, "uModel"), false, _voxelModelMat(cx, cy, cz));
+      gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0);
+    }
+    const thumb = document.createElement("canvas");
+    thumb.width = 128; thumb.height = 128;
+    const tctx = thumb.getContext("2d");
+    tctx.fillStyle = "#04030a"; tctx.fillRect(0, 0, 128, 128);
+    tctx.drawImage(canvas, 0, 0, 128, 128);
+    thumbnail = thumb.toDataURL("image/jpeg", 0.7);   // smaller than png
+  } catch (e) { console.warn("thumbnail err:", e.message); }
+  try {
+    const r = await fetch("/assets/saved", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", name: currentModel.name, prompt: currentModel.prompt, voxels: currentModel.voxels, thumbnail, orientation: currentOrient }),
+    });
+    const j = await r.json();
+    document.getElementById("vcStatus").textContent = j.ok ? "saved · " + j.count + " in gallery" : ("save err: " + (j.error || "?"));
+  } catch (e) {
+    document.getElementById("vcStatus").textContent = "save err: " + e.message;
+  }
+});
+
+// ---------- IMAGE TAB ----------
+async function generateImage() {
+  const prompt = document.getElementById("imgPrompt").value.trim();
+  if (!prompt) { document.getElementById("imgStatus").textContent = "type a prompt first"; return; }
+  document.getElementById("imgStatus").textContent = "generating image (may take ~5s)…";
+  document.getElementById("imgStatus").style.display = "block";
+  document.getElementById("imgCanvas").style.display = "none";
+  try {
+    const r = await fetch("/ai/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const j = await r.json();
+    if (!j.ok) {
+      document.getElementById("imgStatus").textContent = "err: " + (j.error || "unknown");
+      return;
+    }
+    const img = document.getElementById("imgCanvas");
+    img.src = `data:${j.mime};base64,${j.image}`;
+    img.style.display = "block";
+    img.dataset.b64 = j.image;
+    img.dataset.mime = j.mime;
+    document.getElementById("imgStatus").style.display = "none";
+  } catch (e) {
+    document.getElementById("imgStatus").textContent = "fetch err: " + e.message;
+  }
+}
+document.getElementById("btnImgGen").addEventListener("click", generateImage);
+document.getElementById("imgPrompt").addEventListener("keydown", e => { if (e.key === "Enter") generateImage(); });
+document.getElementById("btnImgClear").addEventListener("click", () => {
+  document.getElementById("imgCanvas").style.display = "none";
+  document.getElementById("imgStatus").style.display = "block";
+  document.getElementById("imgStatus").textContent = "cleared";
+});
+document.getElementById("btnImgDownload").addEventListener("click", () => {
+  const img = document.getElementById("imgCanvas");
+  if (!img.dataset.b64) return;
+  const a = document.createElement("a");
+  a.href = img.src;
+  a.download = "gemini-image-" + Date.now() + ".png";
+  a.click();
+});
+
+// v738 — image save-to-gallery. Stores image entry with kind=image so the
+// shared gallery shows it alongside voxel models. Re-uses /assets/saved.
+document.getElementById("btnImgSave").addEventListener("click", async () => {
+  const img = document.getElementById("imgCanvas");
+  if (!img.dataset.b64) { document.getElementById("imgStatus").style.display = "block"; document.getElementById("imgStatus").textContent = "nothing to save"; return; }
+  const prompt = document.getElementById("imgPrompt").value.trim();
+  try {
+    const r = await fetch("/assets/saved", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "save",
+        kind: "image",
+        name: (prompt || "image").slice(0, 40),
+        prompt,
+        image: img.dataset.b64,
+        mime: img.dataset.mime || "image/png",
+      }),
+    });
+    const j = await r.json();
+    document.getElementById("imgStatus").style.display = "block";
+    document.getElementById("imgStatus").textContent = j.ok ? `saved · ${j.count} in gallery` : ("save err: " + (j.error || "?"));
+  } catch (e) {
+    document.getElementById("imgStatus").style.display = "block";
+    document.getElementById("imgStatus").textContent = "save err: " + e.message;
+  }
+});
+
+// ---------- GALLERY TAB (tinder swipe-to-delete) ----------
+async function loadGallery() {
+  const host = document.getElementById("gallery");
+  host.innerHTML = "<div class='empty'>loading…</div>";
+  try {
+    const r = await fetch("/assets/saved");
+    const j = await r.json();
+    if (!j.items || j.items.length === 0) {
+      host.innerHTML = "<div class='empty'>No saved models yet — generate something in the Voxel tab and tap 💾 Save.</div>";
+      return;
+    }
+    host.innerHTML = "";
+    for (const it of j.items) {
+      const div = document.createElement("div");
+      div.className = "gentry";
+      div.dataset.id = it.id;
+      const typeBadge = (it.kind === "image") ? '<span class="badge img">IMG</span>' : '<span class="badge">VOX</span>';
+      const meta = (it.kind === "image")
+        ? `${typeBadge}image · ${new Date(it.ts).toLocaleString()}`
+        : `${typeBadge}${(it.voxels || []).length} voxels · ${new Date(it.ts).toLocaleString()}`;
+      const thumbSrc = it.thumbnail
+        ? it.thumbnail
+        : (it.kind === "image" && it.image ? `data:${it.mime || "image/png"};base64,${it.image}` : "");
+      const thumbEl = thumbSrc
+        ? `<img class="thumb" src="${thumbSrc}" alt="">`
+        : `<div class="thumb" style="background:linear-gradient(135deg,#1a2040 0%,#2a1840 100%);display:flex;align-items:center;justify-content:center;font-size:30px;">${it.kind === "image" ? "🖼" : "🧊"}</div>`;
+      div.innerHTML = `
+        ${thumbEl}
+        <div class="body">
+          <h3>${escapeHtml(it.name)}</h3>
+          <p class="prompt">${escapeHtml(it.prompt || "(no prompt)")}</p>
+          <p class="meta">${meta}</p>
+          <div class="swipe-overlay">🗑 release to delete</div>
+          <div class="actions">
+            <button class="btn" data-act="view">👁 View</button>
+            <button class="btn danger" data-act="delete">🗑 Delete</button>
+          </div>
+        </div>`;
+      // Swipe-to-delete handlers
+      let sx = 0, dx = 0, swiping = false;
+      div.addEventListener("touchstart", e => {
+        sx = e.touches[0].clientX; swiping = true;
+      });
+      div.addEventListener("touchmove", e => {
+        if (!swiping) return;
+        dx = e.touches[0].clientX - sx;
+        if (dx < 0) {
+          div.classList.add("swiping");
+          div.style.transform = `translateX(${dx}px)`;
+          div.querySelector(".swipe-overlay").style.opacity = Math.min(1, -dx / 100);
+        }
+      });
+      div.addEventListener("touchend", async () => {
+        swiping = false;
+        if (dx < -120) {
+          div.style.transform = "translateX(-100%)";
+          setTimeout(() => deleteEntry(it.id, div), 200);
+        } else {
+          div.style.transform = "";
+          div.querySelector(".swipe-overlay").style.opacity = 0;
+        }
+        dx = 0;
+      });
+      // Click View → load into appropriate tab
+      div.querySelector('[data-act="view"]').addEventListener("click", () => {
+        if (it.kind === "image" && it.image) {
+          const img = document.getElementById("imgCanvas");
+          img.src = `data:${it.mime || "image/png"};base64,${it.image}`;
+          img.style.display = "block";
+          img.dataset.b64 = it.image;
+          img.dataset.mime = it.mime || "image/png";
+          document.getElementById("imgStatus").style.display = "none";
+          document.querySelector('#tabs .tab[data-tab="image"]').click();
+          return;
+        }
+        if (!it.voxels || it.voxels.length === 0) return;
+        const mesh = pickMesher()(it.voxels);
+        uploadMesh(mesh, it.voxels);
+        currentModel = it;
+        currentOrient = (it.orientation && typeof it.orientation === "object")
+            ? { yaw: it.orientation.yaw|0, pitch: it.orientation.pitch|0, roll: it.orientation.roll|0 }
+            : { yaw: 0, pitch: 0, roll: 0 };   // v887 — restore saved front-view
+        syncOrientUI();
+        autoSpin = true;
+        dist = (bounds.rad || 10) * 3 + 8;
+        document.getElementById("vcCaption").style.display = "block";
+        document.getElementById("vcCaption").textContent = `${it.name} · ${it.voxels.length} voxels`;
+        document.querySelector('#tabs .tab[data-tab="voxel"]').click();
+      });
+      div.querySelector('[data-act="delete"]').addEventListener("click", () => deleteEntry(it.id, div));
+      host.appendChild(div);
+    }
+  } catch (e) {
+    host.innerHTML = `<div class='empty'>load err: ${e.message}</div>`;
+  }
+}
+async function deleteEntry(id, div) {
+  try {
+    await fetch("/assets/saved", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    if (div && div.parentNode) div.parentNode.removeChild(div);
+    const host = document.getElementById("gallery");
+    if (host.children.length === 0) host.innerHTML = "<div class='empty'>gallery empty</div>";
+  } catch (e) { alert("delete err: " + e.message); }
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// Initial render frame trigger
+setTimeout(resizeCanvas, 50);
+</script>
+<!-- v2579 -- the greedy mesher, loaded as a SEPARATE module so the classic script above keeps its globals.
+     Module scripts are deferred; the plain script only reads window.buildVoxelMeshGreedy at CALL time (inside a
+     fetch handler), so the ordering is fine. If this fails to load, ?mesher=greedy warns and falls back LOUDLY. -->
+<script type="module">
+  import { buildVoxelMeshGreedy } from './mesh/voxelMeshGreedy.js';
+  window.buildVoxelMeshGreedy = buildVoxelMeshGreedy;
+</script>
+</body>
+</html>

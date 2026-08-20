@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · EV Loader</title>
+<style>
+  :root { --bg:#070b12; --panel:#0d131d; --edge:#1d2a3a; --ink:#dfe9f6; --dim:#8aa0bb; --accent:#5aa9ff; --gold:#ffcf7a; --good:#7fe0b0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(1200px 700px at 70% -10%, #11203a 0%, var(--bg) 60%); color:var(--ink); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; padding:26px; }
+  .wrap { max-width:760px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 2px; }
+  h1 small { color:var(--dim); font-size:13px; font-weight:400; }
+  .lead { color:var(--dim); margin:6px 0 18px; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:12px; padding:16px 18px; margin:12px 0; }
+  .clean { border-color:#2f4a3a; background:#0b1410; }
+  .clean b { color:var(--good); }
+  .step { display:flex; gap:12px; align-items:flex-start; }
+  .num { flex:none; width:26px; height:26px; border-radius:50%; background:#13243c; border:1px solid var(--edge); color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; margin-top:1px; }
+  .step h3 { margin:0 0 4px; font-size:15px; }
+  .step p { margin:0 0 6px; color:var(--dim); }
+  a.link { color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(90,169,255,.35); }
+  a.link:hover { border-bottom-color:var(--accent); }
+  .src { display:block; background:#0a111c; border:1px solid var(--edge); border-radius:8px; padding:9px 11px; margin:7px 0; text-decoration:none; color:var(--ink); }
+  .src:hover { border-color:var(--accent); }
+  .src.primary { border-color:#3f86e6; background:#0c1727; }
+  .src .t { font-weight:600; }
+  .src .u { color:var(--dim); font-size:12px; word-break:break-all; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin:7px 0; }
+  .dl { flex:1 1 220px; display:block; background:#0c1727; border:1px solid #2c4a6e; border-radius:8px; padding:9px 11px; text-decoration:none; color:var(--ink); }
+  .dl:hover { border-color:var(--accent); }
+  .dl .t { font-weight:600; }
+  .dl .u { color:var(--dim); font-size:11px; word-break:break-all; }
+  .tag { font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--edge); color:var(--dim); margin-left:6px; }
+  .tag.free { color:var(--good); border-color:#2f4a3a; }
+  .tag.you { color:var(--gold); border-color:#5a4a2a; }
+  .launch { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(180deg,#2b6fd6,#1f56ad); border:1px solid #3f86e6; color:#fff; font:inherit; font-weight:700; font-size:15px; padding:11px 20px; border-radius:10px; cursor:pointer; }
+  .launch:hover { filter:brightness(1.08); }
+  .note { color:var(--dim); font-size:12.5px; }
+  code { background:#0a111c; border:1px solid var(--edge); border-radius:5px; padding:1px 5px; color:#cfe3ff; font-size:12.5px; }
+  hr { border:none; border-top:1px solid var(--edge); margin:18px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EV Loader <small>— bring your own data, then fly in Stellar Atlas</small></h1>
+  <p class="lead">Stellar Atlas is an independent, clean-room engine that reads <i>Escape Velocity</i>&ndash;format data files. It can't ship the game's worlds or art &mdash; you point it at a copy you're entitled to, and it flies your galaxy locally in the browser.</p>
+
+  <div class="card clean">
+    <b>Clean-room, your files only.</b> <span class="note">This engine contains no EV content. Its parser is built from the published byte-layout spec (the
+    <a class="link" href="https://andrews05.github.io/evstuff/guides/evnbible.html" target="_blank" rel="noopener">EV Nova Bible</a>), not from any game files. Everything you load is parsed on your machine &mdash; nothing is uploaded.</span>
+  </div>
+
+  <div class="card">
+    <div class="step">
+      <div class="num">1</div>
+      <div style="flex:1">
+        <h3>Get an EV data set</h3>
+        <p>Ambrosia Software closed in 2019 and the registration server is gone, so the community keeps the games running. <b>escape-velocity.games</b> is the modern home: EV Nova <b>Community Edition</b> (Windows) and <b>WineNova</b> (Mac), plus <b>EV Classic</b> and <b>EV Override</b> as free Total Conversions.</p>
+        <a class="src primary" href="http://escape-velocity.games/" target="_blank" rel="noopener">
+          <span class="t">escape-velocity.games &mdash; community home <span class="tag">start here</span></span>
+          <span class="u">http://escape-velocity.games/</span>
+        </a>
+        <div class="row">
+          <a class="dl" href="https://download.escape-velocity.games/EV_Nova_Community_Edition.zip" target="_blank" rel="noopener">
+            <span class="t">&#x2B07; EV Nova Community Edition</span><span class="u">Windows &middot; .zip</span>
+          </a>
+          <a class="dl" href="https://download.escape-velocity.games/EVNova_1.1_b2.10.5_Mac.dmg" target="_blank" rel="noopener">
+            <span class="t">&#x2B07; WineNova</span><span class="u">macOS &middot; .dmg</span>
+          </a>
+        </div>
+        <a class="src" href="http://escape-velocity.games/docs" target="_blank" rel="noopener">
+          <span class="t">Install &amp; data-format docs <span class="tag you">incl. your EV Nova User Guide</span></span>
+          <span class="u">http://escape-velocity.games/docs</span>
+        </a>
+        <a class="src" href="https://evn.fandom.com/wiki/Game_Installers" target="_blank" rel="noopener">
+          <span class="t">Alternative: EVN Wiki installers <span class="tag">+ DecoderRing to register a legit copy</span></span>
+          <span class="u">https://evn.fandom.com/wiki/Game_Installers</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step">
+      <div class="num">2</div>
+      <div>
+        <h3>Find the data file</h3>
+        <p>Inside an EV Nova install the universe lives in the <code>Nova Files</code> folder &mdash; <code>nova.ndat</code> (or <code>.rez</code>) plus any plug-in files. Classic Mac copies use the game's resource fork; <code>.bin</code> (MacBinary) and AppleDouble work too. Any one of those is what you load next.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step">
+      <div class="num">3</div>
+      <div>
+        <h3>Load it into Stellar Atlas</h3>
+        <p>Launch the engine below, then <b>drag your data file onto the window</b> (or click to pick it). It parses locally and drops you on the galaxy map &mdash; click a system to fly in. Bring a friend on the same data file and you'll see each other as ghost ships.</p>
+        <button class="launch" id="launch">&#x1F680; Launch Stellar Atlas &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="card">
+    <h3 style="margin:0 0 4px">Just want to fly something free?</h3>
+    <p class="note" style="margin:0 0 7px"><b>Endless Sky</b> is a fully free, open-source game in the same spirit (GPL v3, hundreds of contributors). It uses its own data format, so it won't load in Stellar Atlas &mdash; but it's a great standalone if you don't want to chase EV files.</p>
+    <a class="src" href="https://endless-sky.github.io/" target="_blank" rel="noopener">
+      <span class="t">Endless Sky &mdash; official site <span class="tag free">free &amp; open source</span></span>
+      <span class="u">https://endless-sky.github.io/</span>
+    </a>
+    <a class="src" href="https://github.com/endless-sky/endless-sky" target="_blank" rel="noopener">
+      <span class="t">Endless Sky &mdash; source on GitHub</span>
+      <span class="u">https://github.com/endless-sky/endless-sky</span>
+    </a>
+  </div>
+</div>
+<script>
+  // Open the engine in this same window when launched from the Applications popup, or a new tab if opened directly.
+  document.getElementById("launch").addEventListener("click", function () {
+    try { window.location.href = "/ev.html"; } catch (e) { window.open("/ev.html", "_blank"); }
+  });
+</script>
+</body>
+</html>

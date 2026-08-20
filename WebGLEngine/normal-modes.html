@@ -1,0 +1,126 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A counting law grades a force field (v3652)</title>
+<meta name="demo:desc" content="Normal modes are the Hessian of the MD force field already in the tree, graded by counting laws from geometry - 3N-6 and six zeros for a bent molecule, 3N-5 and five for a linear one. The linear case returns seven, and the reason is that the cosine-harmonic angle is quartic at 180 degrees.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>A counting law grades a force field</h1>
+<div class="sub">Bonds, angles, dihedrals and improper were each gated separately when they were built. Normal
+modes grade them <b>together</b>, through a quantity none of them computes &mdash; the second derivative of the
+potential &mdash; and every key here is a fact about space rather than a number anybody typed.</div>
+<div class="law"><b>A non-linear molecule of N atoms has exactly 3N&minus;6 vibrations and six zero modes</b>
+(three translations, three rotations). <b>A linear one has 3N&minus;5 and five</b>, because rotation about the
+axis moves nothing. Those zeros must come out at machine zero &mdash; so one check grades every force term at
+once.</div>
+<h2>1. The count</h2>
+<div class="panel"><button id="g1" class="good">diagonalise all three</button><table id="t1"></table></div>
+<div class="law">Every fixture is an <b>exact stationary point by construction</b> &mdash; every bond at
+<code>r0</code>, every angle at <code>cos0</code>, so each term sits at its own minimum and the total force is zero
+with no optimiser tolerance anywhere in the key.</div>
+<h2>2. Two routes sharing no code</h2>
+<div class="panel"><button id="g2" class="good">diatomic against &radic;(k/&mu;)</button><table id="t2"></table></div>
+<div class="law">The roundhouse's <code>bond</code> mode reaches this number by <b>integrating the molecule and
+counting oscillations</b>. This reaches it by a <b>numerical second derivative and an eigenvalue</b>. No shared
+code between the two paths, and they agree to 3&times;10<sup>&minus;12</sup>.</div>
+<h2>3. What the count found in shipped code</h2>
+<div class="panel"><button id="g3" class="good">why the linear molecule returns seven</button><table id="t3"></table></div>
+<div class="law"><b>The count is right; the potential is not.</b> <code>V = ½k(cos t &minus; cos t₀)²</code> with
+<code>cos t₀ = &minus;1</code> gives <code>(ε²/2)²</code> near straight &mdash; <b>quartic</b>, so the second
+derivative is exactly zero and <b>the bending force constant vanishes</b>. A linear molecule built with this term
+has no restoring force against bending, and its degenerate bend is missing.</div>
+<div class="law"><code>angles.js</code> says <i>why</i> it is cosine-harmonic &mdash; avoiding <code>acos</code>
+to keep cross-arch determinism, a real reason and a good one &mdash; and never mentions that the choice degenerates
+at 180°. <b>Not a bug: a documented trade with one end undocumented</b>, and a counting law from geometry is what
+exposed it in a term that had already passed its own gate. Nothing was changed in <code>angles.js</code>; the limit
+is now written down.</div>
+<h2>4. The load-bearing negative</h2>
+<div class="panel"><button id="g4" class="good">move it off equilibrium</button><table id="t4"></table></div>
+<div class="law"><b>Translations are zero modes at any geometry; rotations only at a stationary point.</b> The
+potential cannot see <i>where</i> the molecule is, but it can see how it is <i>turned</i> unless the forces vanish.
+So "I got six zeros" is evidence the geometry is at a minimum &mdash; and a fixture that never checked its own
+equilibrium could report the wrong count and look right. Graded by
+<code>physics/md/normalModes-selfcheck.mjs</code> from <a href="/gates.html" style="color:#9ab6e8">gates.html</a>.</div>
+<script type="module">
+import { bondForces } from "/physics/md/bonds.js";
+import { angleForces } from "/physics/md/angles.js";
+import { symEigenvalues } from "/physics/quantum/rmt.js";
+import { hessian, massWeight, splitSpectrum, frequencies, diatomic, bentTriatomic, linearTriatomic,
+         expectedZeros, expectedVibrations } from "/physics/md/normalModes.mjs";
+const $ = (i) => document.getElementById(i);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const forceFn = (m) => (pos) => {
+    const b = bondForces(pos, m.N, m.bonds);
+    const a = m.angles.length ? angleForces(pos, m.N, m.angles) : { forces: new Float64Array(3 * m.N), pe: 0 };
+    const f = new Float64Array(3 * m.N);
+    for (let i = 0; i < f.length; i++) f[i] = b.forces[i] + a.forces[i];
+    return { forces: f, pe: b.pe + a.pe };
+};
+const analyse = (m, pos) => {
+    const F = forceFn(m), at = pos || m.pos;
+    let maxF = 0; for (const v of F(at).forces) maxF = Math.max(maxF, Math.abs(v));
+    const { H, n, relAsymmetry } = hessian(F, at, m.N, {});
+    const eigs = symEigenvalues(massWeight(H, n, m.masses), n);
+    const sp = splitSpectrum(eigs);
+    return { sp, maxF, relAsymmetry, w: frequencies(eigs, sp.zeros) };
+};
+$("g1").onclick = () => {
+    rows($("t1"), ["molecule", "|F| at start", "zeros", "vibrations", "gap", "&omega;"],
+        [["diatomic", diatomic({})], ["bent triatomic", bentTriatomic({})], ["linear triatomic", linearTriatomic({})]]
+        .map(([name, m]) => {
+            const r = analyse(m), ez = expectedZeros(m.N, m.linear), ev = expectedVibrations(m.N, m.linear);
+            const good = r.sp.zeros === ez;
+            return [name, "<span class='ok'>" + r.maxF.toExponential(2) + "</span>",
+                "<span class='" + (good ? "ok" : "bad") + "'>" + r.sp.zeros + " / " + ez + "</span>",
+                "<span class='" + (good ? "ok" : "bad") + "'>" + r.sp.vibrations + " / " + ev + "</span>",
+                r.sp.gap.toExponential(2), r.w.map((x) => x.toFixed(4)).join(", ")];
+        }));
+};
+$("g2").onclick = () => {
+    rows($("t2"), ["k", "masses", "Hessian route", "&radic;(k/&mu;)", "relative"],
+        [{ k: 3.5, m1: 1, m2: 16 }, { k: 12, m1: 12, m2: 16 }, { k: 0.8, m1: 1, m2: 1 }].map((p) => {
+            const m = diatomic(p), r = analyse(m);
+            return [p.k, p.m1 + " / " + p.m2, r.w[0].toFixed(12), m.omegaExact.toFixed(12),
+                "<span class='ok'>" + (Math.abs(r.w[0] - m.omegaExact) / m.omegaExact).toExponential(2) + "</span>"];
+        }));
+};
+$("g3").onclick = () => {
+    const m = linearTriatomic({});
+    const bend = (eps) => {
+        const p = Float64Array.from(m.pos);
+        p[3] = 1.16 * Math.cos(eps); p[4] = 1.16 * Math.sin(eps);
+        return angleForces(p, 3, m.angles).pe;
+    };
+    const es = [0.02, 0.04, 0.08, 0.16], vs = es.map(bend);
+    rows($("t3"), ["bend &epsilon;", "V(&epsilon;)", "ratio to previous", "reading"],
+        es.map((e, i) => [e.toFixed(3), vs[i].toExponential(4),
+            i ? "<span class='bad'>" + (vs[i] / vs[i - 1]).toFixed(3) + "</span>" : "&mdash;",
+            i ? "<span class='bad'>quartic (a quadratic well would give 4)</span>" : "<span class='dim'>baseline</span>"]));
+};
+$("g4").onclick = () => {
+    const m = bentTriatomic({});
+    const off = Float64Array.from(m.pos); off[3] += 0.17; off[7] -= 0.11;
+    const at = analyse(m), away = analyse(m, off);
+    rows($("t4"), ["geometry", "|F|", "zero modes", "largest zero", "reading"], [
+        ["at equilibrium", "<span class='ok'>" + at.maxF.toExponential(2) + "</span>",
+            "<span class='ok'>" + at.sp.zeros + "</span>", at.sp.largestZero.toExponential(2),
+            "3 translations + 3 rotations"],
+        ["displaced", "<span class='bad'>" + away.maxF.toExponential(2) + "</span>",
+            "<span class='warn'>" + away.sp.zeros + "</span>", away.sp.largestZero.toExponential(2),
+            "<span class='warn'>translations only &mdash; rotations are not zero modes here</span>"]]);
+};
+</script>
+</div></body></html>

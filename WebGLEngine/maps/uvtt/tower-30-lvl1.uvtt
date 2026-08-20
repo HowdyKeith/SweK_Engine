@@ -1,0 +1,45 @@
+{
+  "format": 0.2,
+  "resolution": {
+    "map_size": { "x": 30, "y": 30 },
+    "pixels_per_grid": 150
+  },
+  "line_of_sight": [
+    [{"x": 2.0, "y": 2.0}, {"x": 14.0, "y": 2.0}],
+    [{"x": 14.0, "y": 2.0}, {"x": 14.0, "y": 6.0}],
+    [{"x": 14.0, "y": 8.0}, {"x": 14.0, "y": 14.0}],
+    [{"x": 14.0, "y": 14.0}, {"x": 2.0, "y": 14.0}],
+    [{"x": 2.0, "y": 14.0}, {"x": 2.0, "y": 2.0}],
+    [{"x": 14.0, "y": 6.0}, {"x": 22.0, "y": 14.0}],
+    [{"x": 14.0, "y": 8.0}, {"x": 20.0, "y": 14.0}],
+    [{"x": 22.0, "y": 14.0}, {"x": 28.0, "y": 14.0}],
+    [{"x": 28.0, "y": 14.0}, {"x": 28.0, "y": 26.0}],
+    [{"x": 28.0, "y": 26.0}, {"x": 16.0, "y": 26.0}],
+    [{"x": 16.0, "y": 26.0}, {"x": 16.0, "y": 14.0}],
+    [{"x": 20.0, "y": 14.0}, {"x": 16.0, "y": 14.0}]
+  ],
+  "portals": [
+    {
+      "position": {"x": 14.0, "y": 7.0},
+      "bounds": [{"x": 14.0, "y": 6.0}, {"x": 14.0, "y": 8.0}],
+      "closed": true,
+      "freestanding": false
+    },
+    {
+      "position": {"x": 22.0, "y": 20.0},
+      "bounds": [{"x": 21.5, "y": 20.0}, {"x": 22.5, "y": 20.0}],
+      "closed": false,
+      "freestanding": true,
+      "comment": "Staircase down to Level 2"
+    }
+  ],
+  "lights": [
+    {
+      "position": {"x": 8.0, "y": 8.0},
+      "range": 6.0,
+      "intensity": 0.75,
+      "color": "ffaa44"
+    }
+  ],
+  "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+}

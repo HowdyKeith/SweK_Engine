@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SweK Engine — Face Avatar</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Face Avatar">
+<meta name="demo:desc"   content="Procedural face avatar with expressions.">
+<meta name="demo:cats"   content="ai,face">
+<meta name="demo:swatch" content="F">
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at center, #1a1230 0%, #060410 80%);
+    color: #fc9;
+    font-family: monospace;
+    overflow: hidden;
+  }
+  #wrap {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    user-select: none;
+  }
+  #face-svg {
+    width: min(80vmin, 520px);
+    height: min(80vmin, 520px);
+  }
+  #status {
+    margin-top: 14px;
+    font-size: 12px;
+    color: rgba(255, 153, 0, 0.7);
+    letter-spacing: 2px;
+  }
+  #status .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #444;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  #status .dot.on { background: #5eff8a; }
+  #emotion {
+    margin-top: 6px;
+    font-size: 18px;
+    color: #ff9933;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  #hint {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: rgba(252, 153, 0, 0.4);
+  }
+  /* v720 — when loaded inside the phone control iframe (?voice=phone),
+     hide all the scaffolding text so it's JUST the face. */
+  body.phone-mode #emotion,
+  body.phone-mode #status,
+  body.phone-mode #hint { display: none; }
+</style>
+</head>
+<body>
+<script>
+  // Set the phone-mode class as early as possible (before the face SVG
+  // renders) so there's no visual flash of the hidden chrome.
+  try {
+    if (new URLSearchParams(location.search).get("voice") === "phone") {
+      document.body && (document.body.className += " phone-mode");
+      document.addEventListener("DOMContentLoaded", function(){
+        document.body.classList.add("phone-mode");
+      });
+    }
+  } catch {}
+</script>
+<div id="wrap">
+  <svg id="face-svg" viewBox="-100 -100 200 200">
+    <!-- Head -->
+    <circle id="head" cx="0" cy="0" r="80" fill="#ffd884" stroke="#a87a2a" stroke-width="3"/>
+    <!-- Eyebrows -->
+    <path id="brow-l" d="M -45 -35 L -20 -35" stroke="#3a2a18" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <path id="brow-r" d="M 20 -35 L 45 -35" stroke="#3a2a18" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <!-- Eyes (whites + pupils) -->
+    <ellipse id="eye-l" cx="-30" cy="-15" rx="14" ry="14" fill="#fff" stroke="#3a2a18" stroke-width="2"/>
+    <ellipse id="eye-r" cx="30"  cy="-15" rx="14" ry="14" fill="#fff" stroke="#3a2a18" stroke-width="2"/>
+    <circle id="pupil-l" cx="-30" cy="-15" r="6" fill="#1a1208"/>
+    <circle id="pupil-r" cx="30"  cy="-15" r="6" fill="#1a1208"/>
+    <!-- Cheek blush -->
+    <ellipse id="blush-l" cx="-45" cy="15" rx="10" ry="6" fill="#ff7799" opacity="0"/>
+    <ellipse id="blush-r" cx="45"  cy="15" rx="10" ry="6" fill="#ff7799" opacity="0"/>
+    <!-- Mouth -->
+    <path id="mouth" d="M -22 28 Q 0 42 22 28" stroke="#3a2a18" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <!-- Optional speak bubble -->
+    <text id="speak-text" x="0" y="80" text-anchor="middle" fill="#ff9933" font-family="monospace" font-size="11" opacity="0"></text>
+  </svg>
+  <div id="emotion">— idle —</div>
+  <div id="status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
+</div>
+<div id="hint">Listener events stream here — try the LSTN menu in the engine, or run <code>Send-VoxelToast.ps1 -Tama happy</code></div>
+<script type="module" src="./face/faceAvatar.js">
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas") || document.querySelector("svg");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trace Truth -- SweK as a 4D ground-truth generator</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:12px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 16px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  select { background:#0a1c12; color:var(--ink); border:1px solid var(--line); border-radius:4px; padding:5px; font:12px ui-monospace,monospace; }
+  .ctl { display:flex; flex-direction:column; gap:2px; } .ctl label { font-size:10px; color:var(--dim); text-transform:uppercase; }
+  .wrap { padding:4px 18px 16px; display:grid; grid-template-columns:1fr; gap:14px; max-width:980px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:10px 12px; }
+  .card h2 { margin:0 0 8px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.07em; }
+  canvas { display:block; width:100%; height:auto; border-radius:5px; background:#020a06; }
+  .grade { display:flex; gap:22px; flex-wrap:wrap; font-size:12px; }
+  .grade div b { color:var(--amber); font-size:15px; } .grade div span { color:var(--dim); display:block; font-size:10px; text-transform:uppercase; }
+  .note { max-width:980px; margin:12px 18px 24px; color:var(--dim); font-size:11px; border-top:1px solid var(--line); padding-top:10px; } .note b { color:var(--cyan); }
+  .leg { font-size:11px; color:var(--dim); } .leg i { font-style:normal; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trace Truth &mdash; SweK as a 4D ground-truth generator</h1>
+  <p>The inversion of a method like Trace Anything. That kind of model is handed a video and must <b>estimate</b> where every point went in 3D. SweK is a simulation &mdash; it <b>knows</b>. It runs <code>tools/groundtruth/traceField.js</code>: a deterministic moving scene whose every 3D track is exact, projected to the 2D observations an estimator would see. Below: the observations on the left, the true tracks on the right, and a naive estimator graded against SweK's exact answer. The observation is a ray &mdash; depth is genuinely lost &mdash; so recovering 3D is real inference, and the ground truth is what makes it gradeable.</p>
+</header>
+<div class="controls">
+  <button id="play">&#10073;&#10073; Pause</button>
+  <div class="ctl"><label>Seed</label><input type="range" id="seed" min="1" max="40" value="12" /></div>
+  <div class="ctl"><label>Naive estimator</label>
+    <select id="est"><option value="mid">assume mid-depth (flat)</option><option value="near">assume near plane</option><option value="truth">the true depth (cheat)</option></select>
+  </div>
+  <button id="dl" title="Export the ground truth as a trajectory field (control points + true-visibility confidence + camera) in a Trace-Anything-compatible schema, so an estimator output can be scored against it.">&#8681; Export ground truth (.json)</button>
+  <span id="status" style="color:var(--green);font-size:11px;"></span>
+</div>
+<div class="wrap">
+  <div class="card"><h2>What the estimator sees &mdash; 2D observations (with trails)</h2><canvas id="obs" width="960" height="300"></canvas>
+    <div class="leg" style="margin-top:6px;">bright = visible; hollow = hidden behind a solid this frame. Depth is not given &mdash; two points on the same ray look identical.</div></div>
+  <div class="card"><h2>The actual rendered frame &mdash; depth image the estimator consumes (z-buffered)</h2><canvas id="vid" width="512" height="320"></canvas>
+    <div class="leg" style="margin-top:6px;">brighter = nearer. Points a nearer splat covers are gone from this frame &mdash; point-vs-point self-occlusion, straight from the depth buffer.</div></div>
+  <div class="card"><h2>The estimator's grade vs SweK's exact 3D truth</h2>
+    <div class="grade" id="grade"></div>
+    <div class="leg" style="margin-top:8px;"><i>EPE</i> = mean 3D end-point error against the true track. The "cheat" estimator uses the true depth and scores ~0 &mdash; proof the pipeline is exact; the honest estimators must guess depth and pay for it.</div>
+  </div>
+</div>
+<div class="note" id="verdict"></div>
+<script type="module">
+import { makeScene, makeOccluders, groundTruth, renderFrames, exportTraceAnything, project, unproject, scoreEstimate, CAM } from "./tools/groundtruth/traceField.js";
+const $ = (id) => document.getElementById(id);
+let scene, gt, frame = 0, playing = true, raf = 0;
+
+let occ;
+let rend;
+function build() { const sd = +$("seed").value; scene = makeScene(sd); occ = makeOccluders(sd); gt = groundTruth(scene, CAM, occ); rend = renderFrames(scene, occ); frame = 0; }
+
+// a naive estimator: recover 3D from each 2D observation by GUESSING a depth, then score against truth
+function estimate(mode) {
+  const est = [];
+  const allDepth = gt.depth.flat(); const midD = allDepth.reduce((a,b)=>a+b,0)/allDepth.length; const nearD = Math.min(...allDepth);
+  for (let p=0;p<gt.nPoints;p++){ const tr=[];
+    for (let f=0;f<gt.nFrames;f++){ const [u,v]=gt.obs2d[p][f];
+      const d = mode==="truth" ? gt.depth[p][f] : (mode==="near" ? nearD : midD);
+      tr.push(unproject(u,v,d));
+    } est.push(tr);
+  }
+  return est;
+}
+
+function drawObs() {
+  const c=$("obs"), g=c.getContext("2d"), W=c.width, H=c.height;
+  g.clearRect(0,0,W,H);
+  // fit the observations to the canvas
+  const us=gt.obs2d.flat().map(o=>o[0]), vs=gt.obs2d.flat().map(o=>o[1]);
+  const lo=[Math.min(...us),Math.min(...vs)], hi=[Math.max(...us),Math.max(...vs)];
+  const sx=(W-40)/((hi[0]-lo[0])||1), sy=(H-40)/((hi[1]-lo[1])||1), s=Math.min(sx,sy);
+  const X=(u)=>20+(u-lo[0])*s, Y=(v)=>20+(v-lo[1])*s;
+  // trails
+  for (let p=0;p<gt.nPoints;p++){ g.strokeStyle="#1e4a5a"; g.beginPath();
+    for (let f=Math.max(0,frame-10); f<=frame; f++){ const o=gt.obs2d[p][f]; (f===Math.max(0,frame-10)?g.moveTo:g.lineTo).call(g, X(o[0]), Y(o[1])); } g.stroke();
+  }
+  // current points -- visible bright, occluded dimmed (hidden behind a solid)
+  for (let p=0;p<gt.nPoints;p++){ const o=gt.obs2d[p][frame]; const vis = !gt.visible || gt.visible[p][frame];
+    if (vis){ g.fillStyle="#33ccff"; g.beginPath(); g.arc(X(o[0]),Y(o[1]),2.2,0,7); g.fill(); }
+    else { g.strokeStyle="#40312a"; g.lineWidth=1; g.beginPath(); g.arc(X(o[0]),Y(o[1]),2.0,0,7); g.stroke(); } }
+}
+
+function render() {
+  const grades = ["truth","mid","near"].map(m=>({m, s:scoreEstimate(estimate(m), gt.tracks3d, gt.visible)}));
+  const sel = $("est").value; const chosen = grades.find(x=>x.m===sel);
+  const label = {truth:"true depth (cheat)", mid:"assume mid-depth", near:"assume near plane"};
+  $("grade").innerHTML = grades.map(x=>"<div><b style='color:"+(x.m==="truth"?"#9fe6c0":(x.m===sel?"#ffcc66":"#6a8a78"))+"'>"+x.s.epe.toFixed(3)+"</b><span>"+label[x.m]+" EPE</span></div>").join("") +
+    "<div><b>"+(chosen.s.within05*100).toFixed(0)+"%</b><span>selected within 0.5</span></div>"+
+    "<div><b style='color:#e8736a'>"+(chosen.s.visibleFrac*100).toFixed(0)+"%</b><span>points visible ("+occ.length+" occluders)</span></div>";
+  $("verdict").innerHTML = "<b>What this shows:</b> the cheat estimator, handed the true depth, scores <b>"+grades[0].s.epe.toFixed(3)+"</b> &mdash; the pipeline is exact, so any error above that is the estimator's, not SweK's. The honest estimators must guess the depth the observation threw away, and their end-point error is exactly what a real method like Trace Anything would be graded on &mdash; against a truth that, here, is not itself a guess.";
+  $("status").textContent = "seed "+$("seed").value+" \u00b7 "+gt.nPoints+" points \u00b7 frame "+frame+"/"+gt.nFrames;
+}
+
+function drawFrame() {
+  const c=$("vid"), g=c.getContext("2d"), W=rend.W, H=rend.H; const img=g.createImageData(W,H); const z=rend.frames[frame%rend.nFrames];
+  let lo=Infinity,hi=-Infinity; for(const v of z){ if(isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } } const rng=(hi-lo)||1;
+  for(let i=0;i<z.length;i++){ const j=i*4; if(isFinite(z[i])){ const t=1-(z[i]-lo)/rng; const c2=40+Math.round(t*200); img.data[j]=c2*0.4; img.data[j+1]=c2; img.data[j+2]=c2*0.9; img.data[j+3]=255; } else { img.data[j]=2; img.data[j+1]=10; img.data[j+2]=6; img.data[j+3]=255; } }
+  const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=H; tmp.getContext("2d").putImageData(img,0,0);
+  g.imageSmoothingEnabled=false; g.clearRect(0,0,c.width,c.height); g.drawImage(tmp,0,0,c.width,c.height);
+}
+function loop() { if (!playing) return; drawObs(); drawFrame(); frame=(frame+1)%gt.nFrames; if (frame%4===0) render(); raf=setTimeout(()=>requestAnimationFrame(loop), 90); }
+function start(){ build(); drawObs(); drawFrame(); render(); }
+$("play").onclick = () => { playing=!playing; $("play").textContent = playing?"\u2759\u2759 Pause":"\u25b6 Play"; if(playing) loop(); };
+$("seed").oninput = () => { build(); drawObs(); drawFrame(); render(); };
+$("est").onchange = render;
+$("dl").onclick = () => {
+  const ex = exportTraceAnything(scene, occ);
+  const blob = new Blob([JSON.stringify(ex)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "swek-truth-seed" + $("seed").value + ".json"; a.click(); URL.revokeObjectURL(a.href);
+};
+start(); loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Wormhole Jump">
+<meta name="demo:desc" content="Ellis-metric wormhole with real gravitational lensing, now showing the LIVING vorton-swirled nebula of each system -- the far one through the throat, the near one bending around it. Hit Jump to fly through. WebGPU / WebGL2 / Canvas2D, all from one verified reference.">
+<meta name="demo:category" content="fx">
+<title>Wormhole Jump</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; }
+  html,body { margin:0; height:100%; background:#02030a; overflow:hidden; color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; z-index:3; }
+  #tier { position:fixed; right:14px; top:12px; color:#7c93b8; font-size:11px; z-index:3; }
+  #bar { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:3; display:flex; gap:10px; }
+  button { background:rgba(8,14,26,.7); color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:9px 18px; font:600 12px ui-monospace,monospace; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  #hint { position:fixed; left:50%; bottom:64px; transform:translateX(-50%); color:#7c93b8; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Wormhole Jump</div>
+<div id="tier"></div>
+<div id="hint">drag to widen / narrow the lensing</div>
+<div id="bar"><button id="jump">&#10148; Jump through</button></div>
+<script type="module">
+import { WORMHOLE_NEBULA_GLSL_FS, WORMHOLE_NEBULA_WGSL, renderWormholeNebulaCPU, NV } from "./fx/wormhole/wormholeNebula.js";
+import { makeVortons, step2D } from "./fx/vorton/vortonNebula.js";
+
+const cv = document.getElementById("c"), tierEl = document.getElementById("tier");
+let W = 0, H = 0, DPR = Math.min(2, devicePixelRatio || 1);
+const P = { k: 1.0, a: 0.5, camL: 7.0, maxPsi: 1.35, sigma: 0.35, gain: 0.5, camFar: 5.3 };
+const V = makeVortons(7);   // the vortons stirring both skies
+let jumpT = null;
+
+function resize() { W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR); cv.width = W; cv.height = H; cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px"; }
+addEventListener("resize", resize); resize();
+
+let drag = false, lx = 0;
+cv.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; });
+addEventListener("pointerup", () => drag = false);
+addEventListener("pointermove", e => { if (!drag) return; P.maxPsi = Math.max(0.5, Math.min(1.55, P.maxPsi + (e.clientX - lx) * 0.002)); lx = e.clientX; });
+document.getElementById("jump").addEventListener("click", () => { jumpT = 0; });
+
+async function initWebGPU() {
+  if (!navigator.gpu) return null;
+  const adapter = await navigator.gpu.requestAdapter(); if (!adapter) return null;
+  const dev = await adapter.requestDevice(); const ctx = cv.getContext("webgpu"); if (!ctx) return null;
+  const fmt = navigator.gpu.getPreferredCanvasFormat(); ctx.configure({ device: dev, format: fmt, alphaMode: "opaque" });
+  const vs = `@vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{ var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3)); return vec4f(p[i],0,1);}`;
+  const mod = dev.createShaderModule({ code: vs + "\n" + WORMHOLE_NEBULA_WGSL });
+  const pipe = dev.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
+  const ubuf = dev.createBuffer({ size: 48 + NV * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // res+8f+pad(48) then array<vec4f,NV>
+  const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }] });
+  const arr = new Float32Array((48 + NV * 16) / 4);
+  return { draw() { arr[0] = W; arr[1] = H; arr[2] = P.k; arr[3] = P.a; arr[4] = P.camL; arr[5] = P.maxPsi; arr[6] = P.sigma * P.sigma; arr[7] = P.gain; arr[8] = P.camFar;
+      for (let i = 0; i < NV; i++) { const v = V[i], b = 12 + i * 4; arr[b] = v.x; arr[b + 1] = v.y; arr[b + 2] = v.s; arr[b + 3] = 0; }
+      dev.queue.writeBuffer(ubuf, 0, arr);
+      const enc = dev.createCommandEncoder(); const pass = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] }); pass.setPipeline(pipe); pass.setBindGroup(0, bind); pass.draw(3); pass.end(); dev.queue.submit([enc.finish()]); } };
+}
+function initWebGL2() {
+  const gl = cv.getContext("webgl2"); if (!gl) return null;
+  const vsSrc = `#version 300 es\nvoid main(){ vec2 p[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.)); gl_Position=vec4(p[gl_VertexID],0.,1.);}`;
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(o); return o; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vsSrc)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, WORMHOLE_NEBULA_GLSL_FS)); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw gl.getProgramInfoLog(pr);
+  gl.useProgram(pr); const u = (n) => gl.getUniformLocation(pr, n);
+  const uRes = u("uRes"), uK = u("uK"), uA = u("uA"), uCamL = u("uCamL"), uMaxPsi = u("uMaxPsi"), uSig2 = u("uSig2"), uGain = u("uGain"), uCamFar = u("uCamFar"), uVortons = u("uVortons"), vv = new Float32Array(NV * 3);
+  return { draw() { gl.viewport(0, 0, W, H); gl.uniform2f(uRes, W, H); gl.uniform1f(uK, P.k); gl.uniform1f(uA, P.a); gl.uniform1f(uCamL, P.camL); gl.uniform1f(uMaxPsi, P.maxPsi); gl.uniform1f(uSig2, P.sigma * P.sigma); gl.uniform1f(uGain, P.gain); gl.uniform1f(uCamFar, P.camFar);
+      for (let i = 0; i < NV; i++) { vv[i * 3] = V[i].x; vv[i * 3 + 1] = V[i].y; vv[i * 3 + 2] = V[i].s; } gl.uniform3fv(uVortons, vv);
+      gl.drawArrays(gl.TRIANGLES, 0, 3); } };
+}
+function initCanvas2D() {
+  const ctx = cv.getContext("2d"); const s = 3;
+  return { draw() { const w = Math.max(64, Math.floor(W / s)), h = Math.max(64, Math.floor(H / s)); const buf = renderWormholeNebulaCPU(w, h, Object.assign({ vortons: V }, P)); const img = new ImageData(buf, w, h); const tmp = new OffscreenCanvas(w, h); tmp.getContext("2d").putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(tmp, 0, 0, W, H); } };
+}
+function step() { step2D(V, 1 / 60, P.sigma); if (jumpT != null) { jumpT += 1 / 60; const p = Math.min(1, jumpT / 3.2); P.camL = 7.0 - 14.0 * p; if (p >= 1) { jumpT = null; P.camL = -7.0; } } }
+
+(async () => {
+  let tier = "Canvas2D", r = null;
+  try { r = await initWebGPU(); if (r) tier = "WebGPU"; } catch (e) {}
+  if (!r) { try { r = initWebGL2(); if (r) tier = "WebGL2"; } catch (e) {} }
+  if (!r) r = initCanvas2D();
+  tierEl.textContent = tier + " \u00b7 Ellis lensing \u00b7 living nebula";
+  (function loop() { step(); try { r.draw(); } catch (e) { tierEl.textContent = "render error"; } requestAnimationFrame(loop); })();
+})();
+</script>
+</body>
+</html>

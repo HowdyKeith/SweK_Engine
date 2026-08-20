@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Splat Viewer</title>
+<!--
+  v2859 -- REBUILT ON SPARK (sparkjsdev/spark, World Labs, MIT), REPLACING BOTH AHOLO AND GaussianSplats3D.
+
+  THE HISTORY, BECAUSE IT EXPLAINS THE FORMAT LIST. This page was written at v920/v921 against
+  vendor/aholo-viewer/index.js -- a file that was never vendored, so the page had been dead ever since, surfacing
+  in render QA as a 404 on a script nobody ever shipped. v2858 rebuilt it on mkkellogg/GaussianSplats3D, which
+  worked but could NOT read .spz or .sog, so the original page's advertised formats had to be narrowed.
+
+  SPARK RESTORES THE ORIGINAL INTENT. It reads .ply (including compressed), .spz, .splat, .ksplat AND .sog --
+  a superset of both previous choices, and exactly the list this page promised in 2026. It is also actively
+  developed (2.x, streamable LoD, 100M+ splats) where GaussianSplats3D's own README declares itself no longer in
+  active development and points here.
+
+  AND IT IS A BETTER FIT FOR THIS ENGINE SPECIFICALLY. Spark's SplatMesh is a first-class THREE.Object3D: you add
+  it to an ordinary THREE scene and it composites with meshes in the normal pipeline. GaussianSplats3D wraps its
+  own Viewer that owns the renderer and camera. This engine is Three.js all the way down, so a splat you can drop
+  into a scene graph beside everything else is the shape that will still be right when this page grows.
+
+  NO SharedArrayBuffer PROBLEM. GaussianSplats3D's default sort needed COOP/COEP headers on EVERY response this
+  server sends -- a global change to fix one page -- so v2858 had to disable shared memory and take a slower sort.
+  Spark targets plain WebGL2 with no cross-origin-isolation requirement, so that whole tradeoff disappears.
+
+  INSTALLS ITSELF ON FIRST USE. No npm, no build, no three shell commands. If /vendor/spark/spark.module.js is
+  absent the page POSTs /vendor/spark/ensure and the bridge fetches the one prebuilt ES module (ai-bridge/
+  ensureSpark.js -- same mechanism as ensureThree/ensureHtmx, pinned version, two sources). three comes from the
+  engine's own vendored copy, not a CDN.
+-->
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/three/three.module.js",
+    "three/addons/": "/vendor/three/jsm/",
+    "@sparkjsdev/spark": "/vendor/spark/spark.module.js"
+} }
+</script>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; overflow: hidden; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+         padding: 8px 12px; background: rgba(10,18,14,.92); border-bottom: 1px solid #24382e; }
+  #bar b { color: #9fe8c0; }
+  input[type=text] { flex: 1; min-width: 220px; background: #0a100d; color: #cfe9d8; border: 1px solid #24382e; padding: 5px 8px; font: inherit; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 5px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  .dim { color: #6f8a7c; } .hot { color: #f28b8b; } .ok { color: #7fe0a4; }
+  #msg { position: fixed; left: 50%; top: 46%; transform: translate(-50%,-50%); z-index: 5; max-width: 640px;
+         text-align: center; background: rgba(10,18,14,.92); border: 1px solid #24382e; padding: 14px 18px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <b>Splat Viewer</b>
+  <input id="url" type="text" placeholder="/GPU_Assets/scene.spz   (.ply .spz .splat .ksplat .sog)">
+  <button id="load" class="primary" disabled>Load</button>
+  <span class="dim" id="state">starting...</span>
+</div>
+<div id="msg" class="dim">
+  Point this at a Gaussian-splat capture: <b>.ply</b> (incl. compressed), <b>.spz</b>, <b>.splat</b>, <b>.ksplat</b> or <b>.sog</b>.<br>
+  Drop captures in your assets folder and load them as <code>/GPU_Assets/&lt;name&gt;</code>.
+  <div style="margin-top:8px" id="libstate"></div>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const setState = (t, cls) => { $("state").textContent = t; $("state").className = cls || "dim"; };
+const say = (h) => { $("msg").style.display = "block"; $("msg").innerHTML = h; };
+const hide = () => { $("msg").style.display = "none"; };
+
+// FIRST-USE INSTALL. Ask the bridge whether the module is vendored; if not, ask it to fetch it. The user is told
+// what is happening and why -- a page that silently pulls a megabyte is not better than one that says so.
+async function ensureLib() {
+  let st = null;
+  try { st = await fetch("/vendor/spark/status", { cache: "no-store" }).then(r => r.json()); } catch {}
+  if (st && st.present) return true;
+  $("libstate").innerHTML = '<span class="dim">First use: fetching the Spark renderer (' +
+    ((st && st.version) || "pinned") + ', MIT, one file) ...</span>';
+  setState("installing...");
+  let r = null;
+  try {
+    r = await fetch("/vendor/spark/ensure", { method: "POST" }).then(x => x.json());
+  } catch (e) { r = { ok: false, error: String((e && e.message) || e) }; }
+  if (r && (r.ok || r.present)) {
+    $("libstate").innerHTML = '<span class="ok">Renderer installed.</span>';
+    return true;
+  }
+  $("libstate").innerHTML =
+    '<span class="hot">Could not fetch the Spark renderer.</span><br>' +
+    '<span class="dim">' + ((r && r.error) || "unknown error") + '</span><br>' +
+    '<span class="dim">This needs the network once. Everything else in the engine works without it.</span>';
+  return false;
+}
+
+let SPARK = null, THREE = null;
+async function boot() {
+  if (!(await ensureLib())) { setState("renderer unavailable", "hot"); return; }
+  try {
+    THREE = await import("three");
+    SPARK = await import("@sparkjsdev/spark");
+  } catch (e) {
+    setState("renderer failed to load", "hot");
+    say('<span class="hot">The module is on disk but would not load.</span><br><span class="dim">' +
+        String((e && e.message) || e).slice(0, 300) + '</span>');
+    return;
+  }
+  $("load").disabled = false;
+  setState("ready", "ok");
+}
+
+$("load").onclick = async () => {
+  const url = $("url").value.trim();
+  if (!url) { setState("enter a path first", "hot"); return; }
+  if (!SPARK || !THREE) return;
+  setState("loading...");
+  hide();
+  try {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+    camera.position.set(0, 0, 3);
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    renderer.domElement.style.position = "fixed";
+    renderer.domElement.style.inset = "0";
+
+    const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // A SplatMesh is an ordinary THREE object -- this is the whole reason for choosing Spark here.
+    const splats = new SPARK.SplatMesh({ url });
+    splats.quaternion.set(1, 0, 0, 0);
+    scene.add(splats);
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    setState("rendering", "ok");
+  } catch (e) {
+    setState("failed", "hot");
+    say('<span class="hot">Could not load that scene.</span><br><span class="dim">' +
+        String((e && e.message) || e).slice(0, 300) + '</span><br>' +
+        '<span class="dim">Supported: .ply .spz .splat .ksplat .sog</span>');
+  }
+};
+
+boot();
+</script>
+</body>
+</html>

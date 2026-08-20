@@ -1,0 +1,38 @@
+{
+  "_comment": "Delivery-mode slim build. The slimmer copies ONLY these globs from the full WebGL engine into the add-on's www/. This is a STARTING allowlist — tune it to the minimum your HA panel actually needs, then re-run slim-build.mjs. Anything not listed is left out of the HA delivery (the full engine stays intact in the repo).",
+  "engineRoot": "../WebGLEngine",
+  "out": "ha-vbaengine-addon/vbaengine_panel/www",
+  "include": [
+    "index.html",
+    "main.js",
+    "core/**",
+    "engine/**",
+    "render/**",
+    "renderer/**",
+    "scene/**",
+    "camera/**",
+    "shaders/**",
+    "gpu/**",
+    "mesh/**",
+    "input/**",
+    "meta/**"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/_archive*/**",
+    "**/*.bak",
+    "**/wads/**",
+    "**/models/**",
+    "**/demos/**",
+    "**/demos_code/**",
+    "**/simulation/**",
+    "**/gameplay/**",
+    "**/multiplayer/**",
+    "**/ai/**",
+    "**/ai-bridge/**",
+    "**/face*/**",
+    "**/sounds/**",
+    "**/media/**"
+  ],
+  "rewriteAbsolutePaths": true
+}

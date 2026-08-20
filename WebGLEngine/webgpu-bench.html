@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — WebGPU Lab</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:16px; margin-bottom:14px; }
+  h2 { font-size:15px; margin:0 0 4px; } .sub { color:var(--dim); font-size:12.5px; margin:0 0 12px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  label { font-size:12px; color:var(--dim); }
+  select { background:#0c1410; color:var(--ink); border:1px solid var(--line); border-radius:8px; font:13px; padding:6px 8px; }
+  button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:9px 15px; font:inherit; font-size:13px; cursor:pointer; }
+  button:active { transform:scale(.98); }
+  button:disabled { opacity:.5; cursor:default; }
+  .bars { margin-top:10px; }
+  .bar { display:flex; align-items:center; gap:8px; margin:6px 0; font:12px ui-monospace,monospace; }
+  .bar .lbl { width:120px; color:var(--dim); }
+  .bar .track { flex:1; height:20px; background:#0c1410; border:1px solid var(--line); border-radius:5px; overflow:hidden; position:relative; }
+  .bar .fill { height:100%; background:linear-gradient(90deg,#1a6a3a,#3fd07a); width:0; transition:width .4s ease; }
+  .bar .val { width:130px; text-align:right; color:var(--ink); }
+  .diag { font:12px ui-monospace,monospace; color:var(--dim); white-space:pre-wrap; background:#0c1410; border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:8px; }
+  .bad { color:#f6a; } .ok { color:#7fe0a0; } .warn { color:#e8c060; }
+  a { color:#9ed5ff; }
+  table { width:100%; border-collapse:collapse; font:12px ui-monospace,monospace; margin-top:6px; }
+  td { padding:3px 6px; border-bottom:1px solid var(--line); } td:first-child { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">SweK Engine <span class="g">// WebGPU Lab</span></div>
+  <div style="margin-left:auto;font-size:12px;color:var(--dim);"><a href="/wasm-bench.html">WASM Lab</a> &middot; <a href="/">home</a></div>
+</header>
+<main>
+  <div class="card">
+    <h2>GPU compute benchmark</h2>
+    <p class="sub">Runs real WGSL compute shaders on your GPU and measures throughput &mdash; tiled matrix multiply (GFLOP/s) and a large streaming read/write (memory GB/s). Everything runs locally in the browser; nothing is uploaded.</p>
+    <div class="row">
+      <label>Matrix size</label>
+      <select id="msize">
+        <option value="512">512 x 512</option>
+        <option value="1024" selected>1024 x 1024</option>
+        <option value="2048">2048 x 2048</option>
+      </select>
+      <label>Bandwidth buffer</label>
+      <select id="bwsize">
+        <option value="16">64 MB</option>
+        <option value="64" selected>256 MB</option>
+        <option value="128">512 MB</option>
+      </select>
+      <button id="run" disabled>Run benchmark</button>
+    </div>
+    <div class="bars" id="bars" style="display:none;">
+      <div class="bar"><span class="lbl">Matrix multiply</span><span class="track"><span class="fill" id="fillMM"></span></span><span class="val" id="valMM">&mdash;</span></div>
+      <div class="bar"><span class="lbl">Memory bandwidth</span><span class="track"><span class="fill" id="fillBW"></span></span><span class="val" id="valBW">&mdash;</span></div>
+    </div>
+    <div class="diag" id="diag">checking WebGPU&hellip;</div>
+  </div>
+
+  <div class="card" id="adapterCard" style="display:none;">
+    <h2>Adapter</h2>
+    <table id="adapterTbl"></table>
+  </div>
+</main>
+
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+const $ = (id) => document.getElementById(id);
+const diag = $("diag");
+function say(html, cls) { diag.className = "diag" + (cls ? " " + cls : ""); diag.innerHTML = html; }
+
+let device = null, adapter = null;
+
+// --- LAAS-inspired: fail LOUDLY with the exact things to check, no silent no-op ---
+async function initGPU() {
+  if (!navigator.gpu) {
+    // v3845 -- THIS PAGE'S OWN HEADER SAYS "fail LOUDLY with the exact things to check", and every item on that
+    // list is about the browser or the machine. Over http://<lan-ip> all three send the reader somewhere the
+    // fault is not: the browser is fine, acceleration is on, chrome://gpu says hardware accelerated, and the
+    // origin is what withheld navigator.gpu. A loud checklist pointed at the wrong subsystem is worse than a
+    // quiet one, so the checklist is kept for the case it was written for and the origin gets its own answer.
+    const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    say(p.reason === "insecure-origin"
+      ? "<b class='bad'>" + p.message + "</b>\n\n(For a benchmark that runs everywhere, try the WASM Lab link above.)"
+      : "<b class='bad'>WebGPU is not available in this browser.</b>\n\nThis benchmark needs WebGPU (there is no WebGL fallback here).\nThings to check:\n  - Use Chrome/Edge/Brave/Arc 113+ on a desktop or laptop (Safari/Firefox: partial or off).\n  - Enable hardware acceleration in the browser settings.\n  - Visit chrome://gpu and confirm 'WebGPU' is 'Hardware accelerated'.\n\n(For a benchmark that runs everywhere, try the WASM Lab link above.)", "bad");
+    return false;
+  }
+  try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }); }
+  catch (e) { say("<b class='bad'>requestAdapter threw:</b> " + e.message, "bad"); return false; }
+  if (!adapter) { say("<b class='bad'>WebGPU present but no GPU adapter was granted.</b>\nOn laptops this can mean the browser is on the integrated GPU or acceleration is off. Check chrome://gpu.", "bad"); return false; }
+  try { device = await adapter.requestDevice(); }
+  catch (e) { say("<b class='bad'>requestDevice threw:</b> " + e.message, "bad"); return false; }
+  device.addEventListener?.("uncapturederror", (ev) => say("<b class='bad'>GPU error:</b> " + ev.error.message, "bad"));
+
+  // Show adapter info (best-effort; fields are optional per spec)
+  const info = (adapter.info) || (await adapter.requestAdapterInfo?.().catch(() => null)) || {};
+  const feat = [...(adapter.features || [])].slice(0, 8).join(", ") || "(none reported)";
+  const lim = adapter.limits || {};
+  $("adapterCard").style.display = "block";
+  $("adapterTbl").innerHTML =
+    row("vendor", info.vendor || "(hidden)") + row("architecture", info.architecture || "(hidden)") +
+    row("device", info.device || info.description || "(hidden)") +
+    row("max workgroup / dim", lim.maxComputeWorkgroupSizeX || "?") +
+    row("max buffer size", fmtBytes(lim.maxBufferSize || lim.maxStorageBufferBindingSize || 0)) +
+    row("features", feat);
+  say("<span class='ok'>WebGPU ready.</span> Pick sizes and press Run.", "ok");
+  return true;
+}
+function row(k, v) { return "<tr><td>" + k + "</td><td>" + v + "</td></tr>"; }
+function fmtBytes(b) { return b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? (b / 1e6).toFixed(0) + " MB" : b + " B"; }
+
+// --- Benchmark 1: tiled matrix multiply, C = A x B (N x N). Reports GFLOP/s. ---
+const MM_WGSL = (N, TILE) => `
+const N : u32 = ${N}u;
+@group(0) @binding(0) var<storage, read> A : array<f32>;
+@group(0) @binding(1) var<storage, read> B : array<f32>;
+@group(0) @binding(2) var<storage, read_write> C : array<f32>;
+var<workgroup> As : array<f32, ${TILE * TILE}>;
+var<workgroup> Bs : array<f32, ${TILE * TILE}>;
+@compute @workgroup_size(${TILE}, ${TILE})
+fn main(@builtin(global_invocation_id) gid : vec3<u32>,
+        @builtin(local_invocation_id) lid : vec3<u32>) {
+  let row = gid.y; let col = gid.x;
+  var acc : f32 = 0.0;
+  let tiles = N / ${TILE}u;
+  for (var t : u32 = 0u; t < tiles; t = t + 1u) {
+    As[lid.y * ${TILE}u + lid.x] = A[row * N + (t * ${TILE}u + lid.x)];
+    Bs[lid.y * ${TILE}u + lid.x] = B[(t * ${TILE}u + lid.y) * N + col];
+    workgroupBarrier();
+    for (var k : u32 = 0u; k < ${TILE}u; k = k + 1u) {
+      acc = acc + As[lid.y * ${TILE}u + k] * Bs[k * ${TILE}u + lid.x];
+    }
+    workgroupBarrier();
+  }
+  if (row < N && col < N) { C[row * N + col] = acc; }
+}`;
+
+async function benchMatmul(N) {
+  const TILE = 16;
+  const bytes = N * N * 4;
+  const A = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const B = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const C = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE });
+  // fill A,B with deterministic data via a mapped staging buffer
+  const stage = new Float32Array(N * N);
+  for (let i = 0; i < stage.length; i++) stage[i] = ((i * 2654435761) % 1000) / 1000;
+  device.queue.writeBuffer(A, 0, stage);
+  device.queue.writeBuffer(B, 0, stage);
+
+  const mod = device.createShaderModule({ code: MM_WGSL(N, TILE) });
+  const pipeline = device.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: A } }, { binding: 1, resource: { buffer: B } }, { binding: 2, resource: { buffer: C } },
+  ]});
+  const groups = N / TILE;
+  const dispatchOnce = () => {
+    const enc = device.createCommandEncoder();
+    const pass = enc.beginComputePass();
+    pass.setPipeline(pipeline); pass.setBindGroup(0, bind);
+    pass.dispatchWorkgroups(groups, groups); pass.end();
+    device.queue.submit([enc.finish()]);
+  };
+  dispatchOnce(); await device.queue.onSubmittedWorkDone();          // warm-up (compile + first run)
+  const iters = N >= 2048 ? 3 : N >= 1024 ? 6 : 12;
+  const t0 = performance.now();
+  for (let i = 0; i < iters; i++) dispatchOnce();
+  await device.queue.onSubmittedWorkDone();
+  const secs = (performance.now() - t0) / 1000 / iters;
+  A.destroy(); B.destroy(); C.destroy();
+  const flops = 2 * N * N * N;                                       // one mul + one add per inner step
+  return { gflops: flops / secs / 1e9, msPer: secs * 1000 };
+}
+
+// --- Benchmark 2: streaming read+write (out[i] = in[i]*1.000001 + 1) over a big buffer. Reports GB/s. ---
+const BW_WGSL = `
+@group(0) @binding(0) var<storage, read> src : array<f32>;
+@group(0) @binding(1) var<storage, read_write> dst : array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = gid.x;
+  if (i < arrayLength(&src)) { dst[i] = src[i] * 1.000001 + 1.0; }
+}`;
+
+async function benchBandwidth(mb) {
+  const elems = (mb * 1024 * 1024) / 4;
+  const bytes = elems * 4;
+  const src = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const dst = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE });
+  device.queue.writeBuffer(src, 0, new Float32Array(Math.min(elems, 1 << 20)));   // partial init is fine for timing
+  const mod = device.createShaderModule({ code: BW_WGSL });
+  const pipeline = device.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: src } }, { binding: 1, resource: { buffer: dst } },
+  ]});
+  const groups = Math.ceil(elems / 256);
+  const dispatchOnce = () => {
+    const enc = device.createCommandEncoder();
+    const pass = enc.beginComputePass();
+    pass.setPipeline(pipeline); pass.setBindGroup(0, bind);
+    pass.dispatchWorkgroups(groups); pass.end();
+    device.queue.submit([enc.finish()]);
+  };
+  dispatchOnce(); await device.queue.onSubmittedWorkDone();
+  const iters = 20;
+  const t0 = performance.now();
+  for (let i = 0; i < iters; i++) dispatchOnce();
+  await device.queue.onSubmittedWorkDone();
+  const secs = (performance.now() - t0) / 1000 / iters;
+  src.destroy(); dst.destroy();
+  const moved = bytes * 2;                                            // one read + one write
+  return { gbps: moved / secs / 1e9, msPer: secs * 1000 };
+}
+
+async function run() {
+  $("run").disabled = true; $("bars").style.display = "block";
+  $("valMM").textContent = "running\u2026"; $("valBW").textContent = "\u2014";
+  $("fillMM").style.width = "0"; $("fillBW").style.width = "0";
+  try {
+    const N = parseInt($("msize").value, 10);
+    const mm = await benchMatmul(N);
+    $("valMM").textContent = mm.gflops.toFixed(1) + " GFLOP/s";
+    $("fillMM").style.width = Math.min(100, mm.gflops / 50) + "%";   // ~5 TFLOP/s = full bar
+    say("<span class='ok'>Matrix " + N + "\u00b3 done:</span> " + mm.gflops.toFixed(1) + " GFLOP/s (" + mm.msPer.toFixed(1) + " ms/iter). Running bandwidth\u2026", "ok");
+
+    $("valBW").textContent = "running\u2026";
+    const mb = parseInt($("bwsize").value, 10);
+    const bw = await benchBandwidth(mb);
+    $("valBW").textContent = bw.gbps.toFixed(1) + " GB/s";
+    $("fillBW").style.width = Math.min(100, bw.gbps / 5) + "%";       // ~500 GB/s = full bar
+    say("<span class='ok'>Done.</span> Matrix " + N + "\u00b3: " + mm.gflops.toFixed(1) + " GFLOP/s \u00b7 Bandwidth (" + (mb * 4) + " MB): " + bw.gbps.toFixed(1) + " GB/s.\nNumbers vary run-to-run; treat them as a rough profile of THIS machine's GPU, not an absolute score.", "ok");
+  } catch (e) {
+    say("<b class='bad'>Benchmark failed:</b> " + (e && e.message || e), "bad");
+  } finally {
+    $("run").disabled = false;
+  }
+}
+
+(async () => {
+  const ok = await initGPU();
+  if (ok) { $("run").disabled = false; $("run").addEventListener("click", run); }
+})();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

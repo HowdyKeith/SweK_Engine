@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mass vs Merit</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 16px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 12px 14px; margin-bottom: 14px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 6px 13px; margin: 0 6px 6px 0; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  th, td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid #1a2a22; }
+  th { color: #6f8a7c; font-weight: normal; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .dim { color: #6f8a7c; } .ok { color: #7fe0a4; } .warn { color: #e6c877; } .hot { color: #f28b8b; }
+  .verdict { font-size: 14px; margin: 2px 0 4px; }
+  .rho { font-variant-numeric: tabular-nums; }
+  .bar { display:inline-block; height:9px; vertical-align:middle; background:#2c463a; }
+  .bar.merit { background:#3a6b50; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 92px; background:#0a100d; color:#cfe9d8; border:1px solid #24382e; font: inherit; padding:6px; }
+  .domhdr { color:#9fe8c0; margin-top:10px; }
+  code { color:#9fb8ab; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Mass vs Merit</h1>
+  <div class="sub">Does the brain put its probability mass on the options that actually work? An aggregate hit
+    rate can't answer that &mdash; a brain at 45% could be learning, or confidently choosing what fails, and those
+    look identical in a ratio. Ranking <b>mass</b> (how much it favours an option) against <b>merit</b> (how well
+    that option works) tells them apart.</div>
+
+  <div class="card" id="status"><span class="dim">loading&hellip;</span></div>
+
+  <div class="card">
+    <div style="margin-bottom:6px"><b>Demonstrations</b> <span class="dim">&mdash; known-answer traces, no captured session needed</span></div>
+    <button id="bAll" class="primary">Run all three</button>
+    <button data-demo="learning">Learning</button>
+    <button data-demo="backwards">Backwards</button>
+    <button data-demo="noise">Noise</button>
+    <div class="dim" style="margin-top:6px">The whole point of the tool is that it can say <span class="hot">BACKWARDS</span>.
+      A tool that could only ever report "looks fine" would be decoration, so that case is one of the three.</div>
+  </div>
+
+  <div class="card">
+    <div style="margin-bottom:6px"><b>Analyse a real trace</b> <span class="dim">&mdash; paste a <code>session.jsonl</code></span></div>
+    <textarea id="traceIn" placeholder='Paste a captured trace here (one JSON record per line: {"t":"session",...} then {"t":"d",...} decisions). Turn capture on with BRAIN_TRACE=1 &mdash; see status above.'></textarea>
+    <div style="margin-top:6px"><button id="bAnalyse" class="primary">Analyse</button><span class="dim" id="busy"></span></div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+async function jget(url, opts) {
+  const r = await fetch(url, opts);
+  return r.json().catch(() => ({ ok: false, error: "bad-json" }));
+}
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+// ---- rendering ----------------------------------------------------------------------------------------------
+function renderDomain(dom, d) {
+  const v = d.verdict || { text: "", cls: "dim" };
+  const rho = (d.rho === null || d.rho === undefined) ? "n/a" : d.rho.toFixed(3);
+  const rows = d.rows || [];
+  const maxMass = Math.max(0.0001, ...rows.map((r) => r.mass));
+  let h = '<div class="domhdr">' + esc(dom) + ' &mdash; ' + d.n + ' sampled decisions, ' + rows.length + ' options'
+        + (d.dropped ? ' <span class="dim">(' + d.dropped + ' dropped, too few samples)</span>' : '') + '</div>';
+  h += '<div class="verdict ' + esc(v.cls) + '">rho <span class="rho">' + rho + '</span> &mdash; ' + esc(v.text) + '</div>';
+  if (rows.length) {
+    h += '<table><tr><th>option</th><th class="num">n</th><th>mass (favours)</th><th>merit (works)</th></tr>';
+    for (const r of rows) {
+      const mw = Math.round(90 * r.mass / maxMass), rw = Math.round(90 * r.merit);
+      h += '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.n + '</td>'
+         + '<td><span class="bar" style="width:' + mw + 'px"></span> ' + r.mass.toFixed(3) + '</td>'
+         + '<td><span class="bar merit" style="width:' + rw + 'px"></span> ' + (100 * r.merit).toFixed(1) + '%</td></tr>';
+    }
+    h += '</table>';
+  }
+  return h;
+}
+function renderResult(title, a) {
+  let h = '<div class="card"><div style="margin-bottom:2px"><b>' + esc(title) + '</b></div>';
+  h += '<div class="dim">' + a.recs + ' decisions, ' + a.sampledN + ' sampled-with-p'
+     + (a.truncated ? ' &nbsp;[truncated after ' + a.truncated + ']' : '')
+     + (a.bad ? ' &nbsp;[' + a.bad + ' unparseable]' : '') + '</div>';
+  if (a.message) h += '<div class="warn" style="margin-top:4px">' + esc(a.message) + '</div>';
+  const doms = a.domains || {};
+  for (const [dom, d] of Object.entries(doms)) h += renderDomain(dom, d);
+  if (!Object.keys(doms).length && !a.message) h += '<div class="dim">nothing to rank</div>';
+  h += '</div>';
+  return h;
+}
+function show(html, append) { if (append) $("out").insertAdjacentHTML("afterbegin", html); else $("out").innerHTML = html; }
+
+// ---- actions ------------------------------------------------------------------------------------------------
+async function loadStatus() {
+  const s = await jget("/policymass/status");
+  if (!s.ok) { $("status").innerHTML = '<span class="hot">status unavailable: ' + esc(s.error || "?") + '</span>'; return; }
+  const cap = s.capture || {};
+  $("status").innerHTML =
+    '<div>Capture: <b class="' + (cap.envHint ? "ok" : "dim") + '">' + (cap.envHint ? "BRAIN_TRACE=1 (on for this server)" : "off (default)") + '</b></div>'
+    + '<div class="dim" style="margin-top:4px">' + esc(cap.howToCapture || "") + '</div>'
+    + '<div class="dim" style="margin-top:4px">' + esc(s.reads || "") + '</div>';
+}
+async function runDemo(which, append) {
+  const r = await jget("/policymass/demo?which=" + encodeURIComponent(which));
+  if (!r.ok) { show('<div class="card hot">demo failed: ' + esc(r.error || "?") + '</div>', append); return; }
+  for (const dm of r.demos.slice().reverse()) show(renderResult("Demo: " + dm.label, dm), true);
+}
+async function analyse() {
+  const text = $("traceIn").value;
+  if (!text.trim()) { $("busy").textContent = " paste a trace first"; return; }
+  $("busy").textContent = " analysing\u2026";
+  const r = await fetch("/policymass/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+  const a = await r.json().catch(() => ({ ok: false, error: "bad-json" }));
+  $("busy").textContent = "";
+  if (!a.ok) { show('<div class="card hot">' + esc(a.message || a.error || "failed") + '</div>', true); return; }
+  show(renderResult("Uploaded trace", a), true);
+}
+
+$("bAll").onclick = () => runDemo("all", false);
+document.querySelectorAll("button[data-demo]").forEach((b) => b.onclick = () => runDemo(b.dataset.demo, true));
+$("bAnalyse").onclick = analyse;
+loadStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Switchboard</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:15px/1.4 ui-rounded,system-ui,sans-serif; overflow:hidden; }
+  #bar { display:flex; align-items:center; gap:12px; padding:10px 14px; }
+  #clock { font-size:22px; font-weight:700; letter-spacing:.02em; }
+  #bar .sp { flex:1; }
+  #bar button { background:#0f161b; color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font:inherit; cursor:pointer; }
+  #bar button.on { color:#ffcf6b; border-color:#5a4a22; }
+  #wakeDot { width:9px; height:9px; border-radius:50%; background:#2a3a40; }
+  #wakeDot.on { background:#41e08a; box-shadow:0 0 8px #41e08a; }
+  #scenes { display:flex; gap:8px; padding:0 14px 8px; flex-wrap:wrap; }
+  #scenes button { background:#161410; color:#ffcf6b; border:1px solid #4a3f22; border-radius:999px; padding:7px 14px; font:inherit; font-size:13px; cursor:pointer; }
+  #scenes button:active { transform:scale(.96); }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; padding:0 14px 18px; height:calc(100% - 56px); overflow:auto; align-content:start; }
+  .tile { border:1px solid var(--line); border-radius:18px; background:#0f161b; min-height:118px; padding:0; display:flex; flex-direction:column; transition:transform .07s, background .15s, box-shadow .15s; overflow:hidden; }
+  .tile .tap { flex:1; padding:14px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; }
+  .tile:active { transform:scale(.98); }
+  .tile .ico { font-size:26px; opacity:.5; transition:opacity .15s; }
+  .tile .nm { font-weight:600; font-size:16px; }
+  .tile .st { font-size:12px; color:var(--dim); margin-top:2px; }
+  .tile.on { background:linear-gradient(160deg,#2a2410,#15110a); border-color:#5a4a22; box-shadow:0 0 0 1px #5a4a2255, 0 6px 22px #00000055; }
+  .tile.on .ico { opacity:1; color:#ffcf6b; }
+  .tile.on .st { color:#ffcf6b; }
+  .tile.sw.on { background:linear-gradient(160deg,#10231a,#0a1611); border-color:#224a36; }
+  .tile.sw.on .ico, .tile.sw.on .st { color:#41e08a; }
+  .tile.valve.on { background:linear-gradient(160deg,#10202b,#0a141b); border-color:#1f4a5a; }
+  .tile.valve.on .ico, .tile.valve.on .st { color:#5cc8ff; }
+  .ctrls { padding:0 12px 11px; display:flex; flex-direction:column; gap:7px; }
+  .ctrls input[type=range] { width:100%; accent-color:#ffcf6b; }
+  .ctrls .ct input[type=range] { accent-color:#9fd0ff; }
+  .tile.dragging { opacity:.5; }
+  .tile.arrange .tap { cursor:move; }
+  body.arrange .tile { outline:2px dashed #ffd066; }
+  #msg, #empty { color:var(--dim); padding:14px; font-size:14px; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <span id="clock">--:--</span><span id="wakeDot" title="screen kept awake"></span>
+    <span class="sp"></span>
+    <button id="arrange">✎ Arrange</button>
+    <button id="full">⛶ Fullscreen</button>
+  </div>
+  <div id="scenes"></div>
+  <div id="msg" style="display:none;"></div>
+  <div id="grid"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const onlyIds = (new URLSearchParams(location.search).get("ids") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const ICON = { light:"💡", switch:"🔌", valve:"🚿", fan:"🌀" };
+  const ORDER_KEY = "swek.wall.order." + (onlyIds.join(",") || "all");
+
+  let ents = [], order = [], arrange = false;
+  try { order = JSON.parse(localStorage.getItem(ORDER_KEY) || "[]") || []; } catch (e) { order = []; }
+  function saveOrder() { try { localStorage.setItem(ORDER_KEY, JSON.stringify(order)); } catch (e) {} }
+
+  async function fetchDomain(d){ try { const r = await fetch("/ha/states?domain=" + d, { cache:"no-store" }); if (!r.ok) return []; const j = await r.json(); return Array.isArray(j) ? j : (j && j.entities) || []; } catch { return []; } }
+  function dimmable(e){ const m = e.supported_color_modes || []; return e.domain === "light" && !(m.length === 1 && m[0] === "onoff"); }
+  function ctCapable(e){ const m = e.supported_color_modes || []; return e.domain === "light" && m.indexOf("color_temp") >= 0 && e.min_color_temp_kelvin && e.max_color_temp_kelvin; }
+  function isOn(e){ const s = String(e.state).toLowerCase(); return e.domain === "valve" ? (s === "open" || s === "opening") : s === "on"; }
+
+  async function load(){
+    const [lights, switches, valves, scenes] = await Promise.all([fetchDomain("light"), fetchDomain("switch"), fetchDomain("valve"), fetchDomain("scene")]);
+    let all = lights.concat(switches, valves);
+    if (onlyIds.length) { all = onlyIds.map(id => all.find(e => e.entity_id === id)).filter(Boolean); }
+    // apply saved order, with any new entities appended
+    const byId = {}; all.forEach(e => byId[e.entity_id] = e);
+    const ordered = order.filter(id => byId[id]).map(id => byId[id]);
+    all.forEach(e => { if (order.indexOf(e.entity_id) < 0) ordered.push(e); });
+    ents = ordered; order = ents.map(e => e.entity_id); saveOrder();
+
+    renderScenes(scenes);
+    if (!ents.length) { $("msg").style.display = "block"; $("msg").textContent = onlyIds.length ? "None of the requested entities were found." : "No light / switch entities in Home Assistant yet."; $("grid").innerHTML = ""; return; }
+    $("msg").style.display = "none";
+    render();
+  }
+
+  function renderScenes(scenes){
+    $("scenes").innerHTML = (scenes || []).map(s => '<button data-scene="' + esc(s.entity_id) + '">🎬 ' + esc(s.name) + '</button>').join("");
+    $("scenes").querySelectorAll("button[data-scene]").forEach(b => b.onclick = () => call("scene", "turn_on", { entity_id: b.getAttribute("data-scene") }));
+  }
+
+  function render(){
+    $("grid").innerHTML = ents.map(e => {
+      const on = isOn(e), cls = e.domain === "switch" ? "sw" : e.domain;
+      let stext = e.domain === "valve" ? (on ? "open" : "closed") : (on ? "on" : "off");
+      if (on && dimmable(e) && e.brightness != null) stext = Math.round(e.brightness / 255 * 100) + "%";
+      let ctrls = "";
+      if (on && dimmable(e)) {
+        const pct = e.brightness != null ? Math.round(e.brightness / 255 * 100) : 100;
+        ctrls += '<input type="range" min="1" max="100" value="' + pct + '" data-bri="' + esc(e.entity_id) + '" />';
+        if (ctCapable(e)) { const k = e.color_temp_kelvin || Math.round((e.min_color_temp_kelvin + e.max_color_temp_kelvin) / 2); ctrls += '<div class="ct"><input type="range" min="' + e.min_color_temp_kelvin + '" max="' + e.max_color_temp_kelvin + '" value="' + k + '" data-ct="' + esc(e.entity_id) + '" /></div>'; }
+      }
+      return '<div class="tile ' + cls + (on ? " on" : "") + (arrange ? " arrange" : "") + '" data-eid="' + esc(e.entity_id) + '" draggable="' + arrange + '">' +
+        '<div class="tap"><div class="ico">' + (ICON[e.domain] || "⚪") + '</div><div><div class="nm">' + esc(e.name) + '</div><div class="st">' + stext + '</div></div></div>' +
+        (ctrls ? '<div class="ctrls">' + ctrls + '</div>' : "") + '</div>';
+    }).join("");
+    wireTiles();
+  }
+
+  function wireTiles(){
+    $("grid").querySelectorAll(".tile").forEach(t => {
+      const eid = t.getAttribute("data-eid");
+      t.querySelector(".tap").onclick = () => { if (!arrange) toggle(eid); };
+      const bri = t.querySelector("input[data-bri]"); if (bri) { bri.oninput = debounce(() => call("light", "turn_on", { entity_id: eid, brightness_pct: parseInt(bri.value, 10) }, true), 250); bri.onpointerdown = (e) => e.stopPropagation(); }
+      const ct = t.querySelector("input[data-ct]"); if (ct) { ct.oninput = debounce(() => call("light", "turn_on", { entity_id: eid, color_temp_kelvin: parseInt(ct.value, 10) }, true), 250); ct.onpointerdown = (e) => e.stopPropagation(); }
+    });
+    if (arrange) wireDrag();
+  }
+
+  let dragEid = null;
+  function wireDrag(){
+    $("grid").querySelectorAll(".tile").forEach(t => {
+      t.ondragstart = (e) => { dragEid = t.getAttribute("data-eid"); t.classList.add("dragging"); try { e.dataTransfer.effectAllowed = "move"; } catch (x) {} };
+      t.ondragend = () => { t.classList.remove("dragging"); dragEid = null; };
+      t.ondragover = (e) => { e.preventDefault(); };
+      t.ondrop = (e) => { e.preventDefault(); const overId = t.getAttribute("data-eid"); if (!dragEid || dragEid === overId) return; const from = order.indexOf(dragEid), to = order.indexOf(overId); order.splice(to, 0, order.splice(from, 1)[0]); saveOrder(); ents = order.map(id => ents.find(x => x.entity_id === id)).filter(Boolean); render(); };
+    });
+  }
+
+  function debounce(fn, ms){ let t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); }; }
+  async function call(domain, service, data, quiet){ try { await fetch("/ha/call", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ domain, service, data }) }); } catch {} if (!quiet) setTimeout(load, 700); }
+  async function toggle(eid){
+    const e = ents.find(x => x.entity_id === eid); if (!e) return;
+    const on = isOn(e), domain = eid.split(".")[0];
+    const service = domain === "valve" ? (on ? "close_valve" : "open_valve") : (on ? "turn_off" : "turn_on");
+    e.state = domain === "valve" ? (on ? "closed" : "open") : (on ? "off" : "on"); render();
+    call(domain, service, { entity_id: eid });
+  }
+
+  $("arrange").onclick = () => { arrange = !arrange; $("arrange").classList.toggle("on", arrange); document.body.classList.toggle("arrange", arrange); render(); };
+  $("full").onclick = () => { try { (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement); } catch {} };
+
+  function tick(){ const d = new Date(); $("clock").textContent = d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); }
+  tick(); setInterval(tick, 10000);
+  let wl = null;
+  async function wake(){ try { if ("wakeLock" in navigator) { wl = await navigator.wakeLock.request("screen"); $("wakeDot").classList.add("on"); wl.addEventListener("release", () => $("wakeDot").classList.remove("on")); } } catch { $("wakeDot").classList.remove("on"); } }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") wake(); });
+  document.addEventListener("click", () => { if (!wl) wake(); });
+  wake();
+
+  load();
+  setInterval(() => { if (!arrange) load(); }, 6000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

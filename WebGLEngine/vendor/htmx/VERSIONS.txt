@@ -1,0 +1,4 @@
+htmx.org 2.0.10 -> htmx.2.0.10.min.js (from registry.npmjs.org, verified 2026-07-03)
+htmx-ext-sse 2.2.4 -> htmx-ext-sse.2.2.4.min.js
+Source: npm pack htmx.org@2.0.10 / htmx-ext-sse@2.2.4
+Stable 2.x line (NOT the 4.0 beta, which rewrites SSE). Core ~14k gz, no build step, single script tag.

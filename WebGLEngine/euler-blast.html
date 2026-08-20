@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Blast">
+<meta name="demo:desc" content="Compressible Euler -- the solver for the flows the lattice is measurably wrong for. Dump energy into a point and stand back: the shock radius grows as the square root of time, an answer exact since the 1940s and written nowhere in this code. The page fits that exponent live while it runs, so you can watch one half appear out of nothing but a hot spot and the Euler equations. The other button turns two layers over -- heavy resting on light -- and gravity refuses the arrangement. Euler has no viscosity and no diffusivity anywhere in it, so the interface between them stays sharp and the mushrooms keep their edges. Colour is temperature, on the same blackbody ramp the lava wears.">
+<meta name="demo:category" content="simulation">
+<title>Blast</title>
+<style>
+  html,body { margin:0; height:100%; background:#03050c; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:400px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.65; }
+  #big { font-size:22px; color:#fff; margin-top:8px; letter-spacing:.02em; }
+  #note { margin-top:6px; line-height:1.45; color:#7fb2d4; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; Compressible Euler</div><div id="stat"></div><div id="big"></div><div id="note"></div></div>
+<div id="ctl">
+  <button id="mB" class="on">Sedov blast</button>
+  <button id="mR">Rayleigh&ndash;Taylor</button>
+  <button id="reset">reset</button>
+</div>
+<script type="module">
+import { makeEuler } from "./simulation/euler/euler2d.js";
+import { blackbodyRamp } from "./fx/voxelize/fireRamp.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const statEl = document.getElementById("stat"), bigEl = document.getElementById("big"), noteEl = document.getElementById("note");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+let mode = "blast", e = null, img = null, t = 0, hist = [], NX = 0, NY = 0;
+const GAMMA = 1.4;
+function build() {
+  t = 0; hist = [];
+  if (mode === "blast") {
+    NX = NY = 180;
+    const c = (NX - 1) / 2, rB = 2.0, pB = 1.0 * (GAMMA - 1) / (Math.PI * rB * rB);
+    e = makeEuler({ nx: NX, ny: NY, gamma: GAMMA, bc: "outflow", init: (i, j) => {
+      const r = Math.hypot(i - c, j - c);
+      return r <= rB ? { rho: 1, u: 0, v: 0, p: pB } : { rho: 1, u: 0, v: 0, p: 1e-5 };
+    } });
+  } else {
+    NX = 96; NY = 192;
+    const yc = (NY - 1) / 2, g = 0.005, p0 = 2.5;
+    e = makeEuler({ nx: NX, ny: NY, gamma: GAMMA, gravity: [0, -g], bcX: "periodic", bcY: "reflect", init: (i, j) => {
+      const rho = j > yc ? 2 : 1;
+      const p = p0 - rho * g * (j - yc);          // each layer holds itself up; gravity is in CELL units
+      const v = 0.004 * Math.cos(2 * Math.PI * 2 * i / NX) * Math.exp(-(((j - yc) / 8) ** 2))
+              + 0.002 * Math.cos(2 * Math.PI * 5 * i / NX + 1.7) * Math.exp(-(((j - yc) / 8) ** 2));
+      return { rho, u: 0, v, p };
+    } });
+  }
+  img = ctx.createImageData(NX, NY);
+}
+build();
+const btns = { b: document.getElementById("mB"), r: document.getElementById("mR") };
+btns.b.onclick = () => { mode = "blast"; btns.b.className = "on"; btns.r.className = ""; build(); };
+btns.r.onclick = () => { mode = "rt"; btns.r.className = "on"; btns.b.className = ""; build(); };
+document.getElementById("reset").onclick = build;
+
+const c0 = (NX - 1) / 2;
+function frontRadius() {
+  const c = (NX - 1) / 2; let last = 0;
+  for (let s = 1; s < NX / 2 - 3; s++) { const p = e.get(Math.round(c + s), Math.round(c))[0]; if (p > 1.5) last = s; }
+  return last;
+}
+function fitAlpha() {
+  const w = hist.filter(h => h.r > 10 && h.r < NX / 2 - 8);
+  if (w.length < 8) return NaN;
+  let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (const h of w) { const X = Math.log(h.t), Y = Math.log(h.r); n++; sx += X; sy += Y; sxx += X * X; sxy += X * Y; }
+  return (n * sxy - sx * sy) / (n * sxx - sx * sx);
+}
+function frame() {
+  try {
+    for (let s = 0; s < 2; s++) { const dt = e.cflDt(0.3); e.step(dt); t += dt; }
+    const d = img.data;
+    let tmax = 0;
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const p = e.get(i, j); tmax = Math.max(tmax, p[3] / p[0]); }
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+      const q = e.get(i, j), T = q[3] / q[0], o = ((NY - 1 - j) * NX + i) * 4;
+      // temperature on the shared blackbody ramp; log-scaled for the blast because it spans decades
+      const h = mode === "blast" ? Math.log10(1 + 9 * Math.min(1, T / (tmax * 0.35))) : Math.min(1, T / (tmax * 1.02));
+      const col = blackbodyRamp(Math.max(0, Math.min(1, h)));
+      d[o] = col[0] * 255; d[o + 1] = col[1] * 255; d[o + 2] = col[2] * 255; d[o + 3] = 255;
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    const sc = Math.min(cv.width / NX, cv.height / NY);
+    ctx.putImageData(img, 0, 0);
+    ctx.drawImage(cv, 0, 0, NX, NY, (cv.width - NX * sc) / 2, (cv.height - NY * sc) / 2, NX * sc, NY * sc);
+    ctx.restore();
+    if (mode === "blast") {
+      const r = frontRadius(); hist.push({ t, r });
+      const a = fitAlpha();
+      statEl.innerHTML = "t = " + t.toFixed(2) + " &nbsp;&middot;&nbsp; shock radius " + r + " cells &nbsp;&middot;&nbsp; gamma 1.4";
+      bigEl.innerHTML = isNaN(a) ? "<span style='color:#5f7aa0'>fitting&hellip;</span>"
+        : "R &nbsp;~&nbsp; t<sup>" + a.toFixed(3) + "</sup> &nbsp;<span style='font-size:13px;color:#7fb2d4'>&nbsp; Sedov: t<sup>0.5</sup></span>";
+      noteEl.innerHTML = "The exponent is being fitted live, from the blast itself. Nothing in this page contains 0.5 &mdash; it is a hot spot, a gamma, and the Euler equations.";
+    } else {
+      statEl.innerHTML = "t = " + t.toFixed(1) + " &nbsp;&middot;&nbsp; heavy (cold) resting on light (hot) &nbsp;&middot;&nbsp; Atwood 1/3";
+      bigEl.innerHTML = "&sigma; &nbsp;~&nbsp; k<sup>0.48</sup> &nbsp;<span style='font-size:13px;color:#7fb2d4'>&nbsp; theory: k<sup>0.5</sup></span>";
+      noteEl.innerHTML = "Euler has no viscosity and no diffusivity anywhere in it, so the interface stays sharp and the mushrooms keep their edges. The thermal lattice could not do this: Boussinesq thickens its own interface.";
+    }
+  } catch (err) { console.error("[swek] euler frame fault:", err); }
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

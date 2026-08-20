@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Box3D Replay &mdash; scrub the physics, and find the frame that broke</title>
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; padding:22px 18px 60px; }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 20px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:16px; margin-bottom:14px; background:rgba(10,20,34,.5); }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  button { padding:6px 13px; background:#17324d; color:#cfe3ff; border:1px solid #2c5a85; border-radius:5px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:disabled { opacity:.35; cursor:default; }
+  input[type=range] { width:100%; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  .big { font-size:20px; }
+  canvas { width:100%; height:340px; display:block; background:#020509; border:1px solid var(--line); border-radius:8px; }
+  code { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  th { text-align:left; color:var(--dim); font-weight:600; padding:4px 7px; border-bottom:1px solid var(--line); font-size:9px; letter-spacing:.06em; text-transform:uppercase; }
+  td { padding:4px 7px; border-bottom:1px solid rgba(22,48,77,.35); font-variant-numeric:tabular-nums; }
+  p { color:var(--dim); margin:0 0 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Box3D Replay</h1>
+  <p class="sub">Scrub recorded physics. Ask which frame broke. Ask whether the thread count changed the answer.</p>
+
+  <div class="panel" id="gate" hidden>
+    <h2>This build cannot replay</h2>
+    <p style="margin:0" id="gateWhy"></p>
+  </div>
+
+  <div class="panel">
+    <h2>What this is</h2>
+    <p>Box3D records world mutations and embeds <b>its own state hashes</b> as it goes. This page replays a
+    recording through <code>b3RecPlayer</code> and asks it three questions we could not ask before:</p>
+    <p><b>Which frame broke?</b> &mdash; <code>box3dSyncCompare.js</code> locates a cross-peer divergence by
+    checkpoint, which means "somewhere in these 150 ticks". The player names the exact frame. The library was always
+    150&times; more precise than the tool we built on it.</p>
+    <p><b>Does the thread count change the physics?</b> &mdash; replaying at a different worker count re-partitions
+    the constraint graph, so the same arithmetic happens in a different order. Every embedded hash must still match.
+    That is not a tautology: <code>a+b+c</code> is not <code>(a+c)+b</code> in floats.</p>
+    <p style="margin:0"><b>What did it look like?</b> &mdash; the player exposes a real world, so the slider below is
+    a scrubber with O(interval) backward seek off a keyframe ring.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Record or load</h2>
+    <div class="row">
+      <button id="rec">Record a scenario here</button>
+      <button id="save" disabled>Save .b3rec</button>
+      <label style="font-size:11px;color:var(--dim);cursor:pointer;padding:6px 13px;border:1px solid #2c5a85;border-radius:5px;">
+        Load a .b3rec<input type="file" id="file" accept=".b3rec" hidden>
+      </label>
+      <span id="recState" class="dim"></span>
+    </div>
+    <p style="margin:8px 0 0">A recording made on another machine is the honest test: load it here and Box3D decides
+    whether this build reproduces it, hash for hash. Nobody has to trust a number pasted between windows.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Scrub</h2>
+    <canvas id="cv" width="1200" height="680"></canvas>
+    <div class="row" style="margin-top:10px">
+      <button id="play" disabled>Play</button>
+      <button id="back" disabled>&#9664;</button>
+      <button id="fwd" disabled>&#9654;</button>
+      <span id="frameLbl" class="dim" style="min-width:150px">&mdash;</span>
+    </div>
+    <input type="range" id="scrub" min="0" max="0" value="0" disabled style="margin-top:8px">
+  </div>
+
+  <div class="panel">
+    <h2>Does the thread count change the physics?</h2>
+    <div class="row">
+      <button id="threads" disabled>Replay at 1, 2, 4, 8 workers</button>
+      <span id="thrState" class="dim"></span>
+    </div>
+    <table><thead><tr><th>workers</th><th>frames</th><th>verdict</th></tr></thead><tbody id="thrRows"></tbody></table>
+    <div class="big" id="thrVerdict" style="margin-top:10px">&mdash;</div>
+    <p style="margin:6px 0 0" id="thrWhy"></p>
+  </div>
+</div>
+
+<script type="module">
+import { box3d, Box3DPlayer, supportsReplay } from "./physics/box3d/box3dLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let bytes = null, player = null, playing = false;
+
+const st = await box3d.init();
+if (!st.ready) {
+  $("gate").hidden = false;
+  $("gateWhy").innerHTML = "Box3D WASM is not built here. <code>physics/box3d/build-box3d-wasm-clang.sh</code> on a box with emsdk. <span class='dim'>(" + st.reason + ")</span>";
+} else if (!supportsReplay(box3d._mod)) {
+  // v2508 added these exports. An older box3d.js does not have them, and calling one gives "not a function",
+  // which tells the operator nothing. Ask first, and say the useful thing.
+  $("gate").hidden = false;
+  $("gateWhy").innerHTML = "This <code>box3d.wasm</code> predates v2508 and has no replay API. Re-run <code>physics/box3d/build-box3d-wasm-clang.sh</code> to pick up the recording and player exports.";
+} else {
+  $("rec").disabled = false;
+}
+
+function draw() {
+  ctx.fillStyle = "#020509"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!player) return;
+  const xf = player.transforms(), n = xf.length / 7;
+  // A recording carries no camera. Fit to what the bodies actually occupy rather than guess a scale that happens
+  // to suit the one scenario I wrote.
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (let i = 0; i < n; i++) {
+    const x = xf[i * 7], y = xf[i * 7 + 1];
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+  const s = Math.min(cv.width / (spanX * 1.25), cv.height / (spanY * 1.25));
+  const ox = cv.width / 2 - ((minX + maxX) / 2) * s, oy = cv.height / 2 + ((minY + maxY) / 2) * s;
+  for (let i = 0; i < n; i++) {
+    const x = xf[i * 7] * s + ox, y = -xf[i * 7 + 1] * s + oy, qw = xf[i * 7 + 6];
+    // yaw from the quaternion, so a box visibly rotates rather than sliding like a sprite
+    const qx = xf[i * 7 + 3], qy = xf[i * 7 + 4], qz = xf[i * 7 + 5];
+    const yaw = Math.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz));
+    ctx.save(); ctx.translate(x, y); ctx.rotate(yaw);
+    const d = Math.min(1, 0.35 + i / Math.max(1, n));
+    ctx.fillStyle = "rgba(" + Math.round(120 * d + 40) + "," + Math.round(200 * d) + "," + Math.round(255 * d) + ",.8)";
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.restore();
+  }
+  ctx.fillStyle = "#5b7699"; ctx.font = "12px ui-monospace,monospace";
+  ctx.fillText(n + " bodies", 10, 18);
+}
+
+function refresh() {
+  if (!player) return;
+  const f = player.frame(), total = player.frameCount();
+  $("scrub").value = String(f);
+  const dv = player.diverged() ? " <span class='hot'>DIVERGED at " + player.divergeFrame() + "</span>" : "";
+  $("frameLbl").innerHTML = "frame " + f + " / " + total + dv;
+  draw();
+}
+
+$("rec").onclick = async () => {
+  $("rec").disabled = true; $("recState").textContent = "recording\u2026";
+  const w = box3d.createWorld({ gravity: [0, -9.8, 0] });
+  w.startRecording();
+  w.addBox({ type: "static", pos: [0, -1, 0], half: [20, 1, 20] });
+  for (let i = 0; i < 24; i++) {
+    w.addBox({ type: "dynamic", pos: [(i % 4) * 1.1 - 1.65, 1 + Math.floor(i / 4) * 1.3, (Math.floor(i / 4) % 3) * 1.1 - 1.1], half: [0.5, 0.5, 0.5], density: 1 + (i % 3) * 0.25 });
+  }
+  for (let t = 0; t < 600; t++) {
+    if (t % 60 === 0) {
+      const idx = 1 + ((t / 60) | 0) % 24;
+      w.impulse(idx, [Math.cos(t * 0.7) * 3, 2, Math.sin(t * 0.7) * 3]);
+      w.angularImpulse(idx, [0.3, Math.cos(t * 0.3) * 0.4, 0.2]);
+    }
+    w.step(1 / 60, 4);
+  }
+  bytes = w.stopRecording();
+  w.destroy();
+  $("recState").innerHTML = "<span class='ok'>" + (bytes.length / 1024).toFixed(1) + " KB</span>";
+  $("rec").disabled = false; $("save").disabled = false;
+  openPlayer(1);
+};
+
+$("file").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  bytes = new Uint8Array(await f.arrayBuffer());
+  $("recState").innerHTML = "loaded <span class='ok'>" + f.name + "</span> (" + (bytes.length / 1024).toFixed(1) + " KB)";
+  $("save").disabled = false;
+  openPlayer(1);
+};
+
+$("save").onclick = () => {
+  if (!bytes) return;
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+  const a = document.createElement("a"); a.href = url; a.download = "recording.b3rec"; a.click();
+  URL.revokeObjectURL(url);
+};
+
+function openPlayer(workers) {
+  if (player) player.destroy();
+  player = new Box3DPlayer(box3d._mod);
+  let info;
+  try { info = player.open(bytes, workers); }
+  catch (e) { $("recState").innerHTML = "<span class='hot'>" + e.message + "</span>"; player = null; return null; }
+  $("scrub").max = String(info.frameCount);
+  $("scrub").disabled = false;
+  for (const b of ["play", "back", "fwd", "threads"]) $(b).disabled = false;
+  refresh();
+  return info;
+}
+
+$("scrub").oninput = () => { if (!player) return; player.seek(parseInt($("scrub").value, 10)); refresh(); };
+$("fwd").onclick = () => { if (player) { player.step(); refresh(); } };
+$("back").onclick = () => { if (player) { player.seek(Math.max(0, player.frame() - 1)); refresh(); } };
+$("play").onclick = () => {
+  playing = !playing;
+  $("play").textContent = playing ? "Pause" : "Play";
+  const tick = () => {
+    if (!playing || !player) return;
+    if (!player.step()) { playing = false; $("play").textContent = "Play"; refresh(); return; }
+    refresh();
+    requestAnimationFrame(tick);
+  };
+  if (playing) tick();
+};
+
+$("threads").onclick = async () => {
+  if (!bytes) return;
+  $("threads").disabled = true; $("thrRows").innerHTML = ""; $("thrState").textContent = "replaying\u2026";
+  const rows = [];
+  for (const n of [1, 2, 4, 8]) {
+    const p = new Box3DPlayer(box3d._mod);
+    let info;
+    try { info = p.open(bytes, n); } catch (e) { p.destroy(); continue; }
+    let frames = 0;
+    while (p.step()) frames++;
+    rows.push({ asked: n, got: info.workerCount, frames, diverged: p.diverged(), at: p.divergeFrame() });
+    p.destroy();
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + (r.asked === r.got ? r.asked : r.asked + " <span class='dim'>(clamped to " + r.got + ")</span>") + "</td>" +
+                   "<td>" + r.frames + "</td>" +
+                   "<td>" + (r.diverged ? "<span class='hot'>DIVERGED at frame " + r.at + "</span>" : "<span class='ok'>identical, hash for hash</span>") + "</td>";
+    $("thrRows").appendChild(tr);
+  }
+  // A build that clamps every request to 1 ran the same thing four times. That is not a cross-thread result, and
+  // printing four green ticks for it would be a control that cannot fail.
+  const distinct = new Set(rows.map((r) => r.got));
+  const v = $("thrVerdict"), w = $("thrWhy");
+  if (distinct.size < 2) {
+    v.textContent = "Inconclusive"; v.className = "big warn";
+    w.textContent = "Every worker count clamped to " + [...distinct][0] + " -- this is a single-threaded WASM build (no pthreads), so nothing was re-partitioned and this test could not have failed. That is not a pass.";
+  } else if (rows.some((r) => r.diverged)) {
+    v.textContent = "The thread count changes the physics"; v.className = "big hot";
+    w.textContent = "A real determinism bug, and the exact frame is above -- box3d found it, we did not have to bracket it. Worth reporting upstream with the recording attached.";
+  } else {
+    v.textContent = "Thread count does not move a float"; v.className = "big ok";
+    w.textContent = distinct.size + " different worker counts, identical physics, checked against box3d's own state hashes. Re-partitioning the constraint graph changed the order of the arithmetic and changed no answer.";
+  }
+  $("thrState").textContent = "done";
+  $("threads").disabled = false;
+  openPlayer(1);
+};
+
+draw();
+</script>
+</body>
+</html>

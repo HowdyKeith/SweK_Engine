@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<!--
+  physics-lab.html -- 3D physics showcase. RIG-ONLY (runs from the engine root so its ES imports of ./physics/xpbd/*
+  resolve; will not preview in a standalone sandbox, like couple.html / server.html / fingerprint.html).
+
+  A single bench that runs the engine's deterministic physics modules live and draws them in 3D. Each scene imports the
+  same gated code the fingerprint proves bit-identical -- the inflating balloon is volume.js, the bulging muscle is
+  muscleVolume.js composing volume with contraction, the flapping flag is windCloth.js sampling a wind field. Pick a
+  scene, drive its slider, and watch the verified solver run. This page holds no physics; it only renders.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK -- Physics Lab</title>
+<style>
+  :root { --bg:#000; --amber:#ff9f00; --orange:#ff7700; --cyan:#33ccff; --panel:#12100a; --text:#ffcc66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Antonio","Arial Narrow",sans-serif; letter-spacing:.03em; }
+  #wrap { display:flex; gap:14px; padding:14px; min-height:100vh; }
+  #stageCol { flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
+  #panel { flex:0 0 300px; display:flex; flex-direction:column; gap:10px; }
+  .bar { background:var(--amber); color:#000; border-radius:0 22px 0 0; padding:8px 16px; font-size:20px; font-weight:700; text-transform:uppercase; }
+  .block { background:var(--panel); border-left:6px solid var(--orange); border-radius:0 0 0 18px; padding:12px 14px; }
+  .block h3 { margin:0 0 8px; font-size:13px; letter-spacing:.14em; color:var(--amber); text-transform:uppercase; }
+  canvas { background:#05070d; border:2px solid var(--orange); border-radius:14px; width:100%; display:block; }
+  select, button { font-family:inherit; font-size:14px; background:#241a08; color:var(--text); border:1px solid var(--orange); border-radius:8px; padding:7px 10px; cursor:pointer; }
+  button.lcars { background:var(--orange); color:#000; font-weight:700; text-transform:uppercase; }
+  button.lcars.on { background:var(--cyan); }
+  button:hover { filter:brightness(1.15); }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; margin:8px 0; text-transform:uppercase; letter-spacing:.06em; }
+  input[type=range] { width:150px; accent-color:var(--orange); }
+  .val { color:var(--cyan); min-width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .hint { font-size:11px; color:#b8935a; line-height:1.5; text-transform:none; letter-spacing:normal; }
+  #status { font-size:12px; color:var(--cyan); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageCol">
+    <div class="bar">SweK &middot; Physics Lab</div>
+    <canvas id="stage" width="900" height="640"></canvas>
+    <div class="block"><div id="status">initialising&hellip;</div><div class="hint" id="sceneHint"></div></div>
+  </div>
+  <div id="panel">
+    <div class="bar" style="border-radius:22px 0 0 0">Scene</div>
+    <div class="block">
+      <select id="presetSel" style="width:100%;margin-bottom:8px"><option value="">\u2014 start from a preset \u2014</option></select>
+      <div style="display:flex;gap:6px;margin-bottom:8px"><input id="presetName" placeholder="name this scene" style="flex:1;min-width:0;background:#06140c;border:1px solid #1e4a30;color:#9fe6c0;border-radius:6px;padding:4px 7px;font-size:12px"><button id="savePresetBtn" title="Pin the current scene to your shelf (saved in this browser)">Save</button><button id="delPresetBtn" title="Delete the selected saved preset">Del</button></div>
+      <select id="sceneSel" style="width:100%"></select>
+      <div class="hint" id="sceneDesc" style="margin-top:8px"></div>
+    </div>
+    <div class="block"><h3>Drive</h3><div id="params"></div></div>
+    <div class="block"><h3>Coupling</h3><div id="formula" style="font-family:ui-monospace,monospace;font-size:12px;color:#7fe6b0;line-height:1.5;margin-bottom:10px;word-break:break-word"></div><div id="chain" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px"></div></div>
+    <!-- v3587 -- CAN THE ROUNDHOUSE WORK ON THIS SCENE? The drill-down, where you would look for it.
+         v3595 -- *** THE BUTTON NOW RUNS. *** v3587 shipped it disabled with the reason in its tooltip,
+         because the intersection between the registered proposers and these twelve scenes was ZERO. That
+         stopped being true when gyro-spin (v3591) and pile-friction (v3593) registered, and paintRoundhouse
+         DID enable the button for pile and gyroscope -- against a file with no click handler in it anywhere.
+         AN ENABLED CONTROL THAT SWALLOWS A PRESS IS WORSE THAN THE DISABLED ONE IT REPLACED: the disabled
+         version named what was missing, this one just looked broken. The handler is below; it PROPOSES and
+         never applies, which is what tier 'propose' means and what the tooltip has always said. -->
+    <div class="block"><h3>Roundhouse</h3>
+      <div class="hint" style="margin-bottom:6px">Whether this scene could be handed to the physics AI, and what would adjudicate it.</div>
+      <div id="rhVerdict" style="font-size:12px;margin-bottom:6px">&mdash;</div>
+      <div id="rhKey" class="hint" style="margin-bottom:8px"></div>
+      <div class="btns"><button id="initiateBtn" style="width:100%" disabled title="No proposer is registered for this scene. A proposer needs an adjudicator that can say both yes AND no; an invented one is a control that cannot fail.">Initiate AI workers</button></div>
+      <div id="rhRun" style="margin-top:8px;font-size:11px;line-height:1.45"></div>
+    </div>
+    <div class="block"><h3>Contrast</h3><div class="hint" style="margin-bottom:6px">Flip A/B to see what one parameter changes.</div><select id="contrastSel" style="width:100%;margin-bottom:8px"><option value="">\u2014 pick a pair \u2014</option></select><div class="btns"><button id="flipBtn" style="width:100%" disabled>A / B</button></div></div>
+    <div class="block">
+      <h3>View</h3>
+      <div class="btns"><button class="lcars" id="playBtn">Pause</button><button id="resetBtn">Reset</button><button id="spinBtn" class="on">Spin: on</button><button id="skinBtn">Skin: off</button></div>
+      <div class="btns" style="margin-top:8px"><button id="linkBtn" style="width:100%">&#128279; Copy scene link</button></div>
+      <label class="row">Yaw <input type="range" id="yaw" min="0" max="360" value="35" /><span class="val" id="yawv">35</span></label>
+      <label class="row">Pitch <input type="range" id="pitch" min="-60" max="60" value="18" /><span class="val" id="pitchv">18</span></label>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { generateIcosphere, buildEdges, enclosedVolume, volumeSubstep } from "./physics/xpbd/volume.js";
+import { buildMuscleBelly, contractMuscle, muscleVolumeSubstep, bellyShape } from "./physics/xpbd/muscleVolume.js";
+import { buildClothConstraints } from "./physics/xpbd/clothMesh.js";
+import { colorConstraints } from "./physics/xpbd/xpbd.js";
+import { windClothSubstep, maxStrain } from "./physics/xpbd/windCloth.js";
+import { buildVectorGrid, sampledFieldSubstep } from "./physics/xpbd/sampledField.js";
+import { frictionalPileSubstep, pileShape } from "./physics/xpbd/frictionalContact.js";
+import { buildAnisotropicCloth, anisotropicSubstep, extent } from "./physics/xpbd/anisotropy.js";
+import { lcg } from "./physics/blobThermal.js";
+import { strictJitterCentres } from "./physics/strictGaussian.js";
+import { strictGaussian } from "./physics/strictGaussian.js";
+import { warmthOfKelvin, SCENARIOS } from "./physics/blobKelvin.js";
+import { measuredT } from "./physics/tempModulator.js";
+import { planarFallbackWorld } from "./physics/planarFallbackWorld.js";
+import { metaballField2d, ISO2D } from "./physics/metaball2d.js";
+import { centrifugeStep, bandR } from "./physics/centrifuge.js";
+import { makeGyro, gyroStep } from "./physics/gyroscope.js";
+import { makePendulumWave, pendulumStep, angleSpread } from "./physics/pendulumWave.js";
+import { keplerPair, orbitStep, totalEnergy, angularMomentum, separation } from "./physics/orbit.js";
+import { makeChain, setMode, modeFreq, chainStep, energy as chainEnergy } from "./physics/vibrations.js";
+import { makeFigureEight, orbitStep as orbitStepFig, FIG8_PERIOD } from "./physics/figureEight.js";
+import { schwarzschildRadius as bhRs3, photonSphere as bhPh3, iscoRadius as bhIsco3, circularSpeed as bhVc3, makeParticle as bhMake3, step as bhStep3 } from "./physics/blackHole.js";
+import { makeSolarSystem as makeSolarSys, ELEMENTS as SS_ELEM } from "./physics/solarSystem.js";
+import { surfaceGeom as nsSurf3, makeOrbit as nsMake3, stepOrbit as nsStep3, compactness as nsC3, escapeFraction as nsEsc3 } from "./physics/neutronStar.js";
+import { chandrasekharMass as wdMch, radiusSolar as wdRadius, radiusKm as wdRadiusKm } from "./physics/whiteDwarf.js";
+import { makeParticle as plMake3, step as plStep3, speedSq as plSpeed3 } from "./physics/plasma.js";
+import { makeApproach as imMake3, stepApproach as imStep3, criticalImpactParameter as imBcrit, impactSpeed as imVimp } from "./physics/impact.js";
+import { STARS as CAT_STARS, position3D as catPos, colorFromTemp as catColor, absoluteMagnitude as catAbsMag, count as catCount } from "./ev/starCatalog.js";
+import { renderWhole as rnWhole3, distributedRender as rnDist3, sliceRows as rnSlice3 } from "./tools/render/render.js";
+import { planWork as rcPlan, honestTransport as rcHonest, faultyTransport as rcFaulty, renderCluster as rcCluster } from "./tools/render/renderCluster.js";
+import { scanScreen as hoScan, twoSources as hoSources, fringeSpacing as hoSpacing, recoverSeparation as hoRecover } from "./physics/hologram.js";
+import { PRESETS, CONTRASTS } from "./physics/labPresets.js";
+import { encodeScene, decodeScene } from "./physics/presetCodec.js";
+
+const cvs = document.getElementById("stage"), ctx = cvs.getContext("2d");
+const off = document.createElement("canvas"), octx = off.getContext("2d");
+let skinMode = false;
+
+const SCENES = {
+  balloon: {
+    label: "Balloon  (volume / pressure)",
+    desc: "A closed mesh under a single global volume constraint. Drive the pressure to inflate or deflate; at rest it conserves volume.",
+    params: [{ name: "inflation", label: "Inflation", min: 0.4, max: 2.4, default: 1.6, step: 0.05 }],
+    build() {
+      const sph = generateIcosphere(2);
+      const edges = buildEdges(sph.pos, sph.tris, 0.0004), batches = colorConstraints(edges);
+      const restVol = enclosedVolume(sph.pos, sph.tris);
+      const state = { pos: Float64Array.from(sph.pos), vel: new Float64Array(sph.n * 3), invMass: new Float64Array(sph.n).fill(1) };
+      return { state, edges, tris: sph.tris, n: sph.n, batches, restVol };
+    },
+    step(s, p) { volumeSubstep(s.state, s.edges, s.batches, s.tris, s.restVol, { dt: 0.016, iterations: 8, inflation: p.inflation, gravity: [0, 0, 0] }); },
+    status(s) { return "volume " + enclosedVolume(s.state.pos, s.tris).toFixed(2) + " / rest " + s.restVol.toFixed(2); },
+  },
+  muscle: {
+    label: "Muscle  (volume + contractile fibres)",
+    desc: "An elongated closed mesh whose axial fibres contract. Volume is conserved, so shortening forces the belly to bulge -- a biological actuator composed from two constraints.",
+    params: [{ name: "activation", label: "Activation", min: 0, max: 1, default: 0.7, step: 0.05 }],
+    build() {
+      const belly = buildMuscleBelly(2, 2.2), batches = colorConstraints(belly.edges);
+      const restVol = enclosedVolume(belly.pos, belly.tris);
+      const state = { pos: Float64Array.from(belly.pos), vel: new Float64Array(belly.n * 3), invMass: new Float64Array(belly.n).fill(1) };
+      return { state, edges: belly.edges, tris: belly.tris, n: belly.n, batches, restVol };
+    },
+    step(s, p) { contractMuscle(s.edges, p.activation, 0.35); muscleVolumeSubstep(s.state, s.edges, s.batches, s.tris, s.restVol, { dt: 0.016, iterations: 10, useVolume: true }); },
+    status(s) { const sh = bellyShape(s.state.pos, s.n); return "length " + sh.length.toFixed(2) + "  girth " + sh.girth.toFixed(2) + "  vol " + enclosedVolume(s.state.pos, s.tris).toFixed(2); },
+  },
+  flag: {
+    label: "Flag  (cloth in a sampled wind)",
+    desc: "A cloth pinned at its pole in a sampled wind field. The wind and the edge constraints negotiate into a billow; the fabric flaps but holds together.",
+    params: [{ name: "wind", label: "Wind", min: 0, max: 9, default: 5, step: 0.5 }],
+    build() {
+      const W = 14, H = 9, SP = 0.18, N = W * H;
+      const { cons } = buildClothConstraints(W, H, SP, { structural: 0.0, shear: 0.0005, bending: 0.002 });
+      const batches = colorConstraints(cons);
+      const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N).fill(1);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; pos[3 * i] = x * SP - 1.2; pos[3 * i + 1] = 0.8 - y * SP; pos[3 * i + 2] = 0; if (x === 0) invMass[i] = 0; }
+      const g = { nx: 8, ny: 8, nz: 8, ox: -2, oy: -2, oz: -1.5, sp: 0.6 };
+      const field = { grid: buildVectorGrid(g.nx, g.ny, g.nz, g.ox, g.oy, g.oz, g.sp, () => [0, 0, 1]), dims: g };
+      const edges = cons.map((c) => [c.i, c.j]);
+      return { state: { pos, vel, invMass }, edges, cons, n: N, batches, field };
+    },
+    step(s, p) { windClothSubstep(s.state, s.cons, s.batches, s.field, { dt: 0.016, iterations: 12, gravity: [0, -2, 0], windStrength: p.wind }); },
+    status(s) { return "strain " + maxStrain(s.state.pos, s.cons).toFixed(3) + "  (fabric holding)"; },
+  },
+  pile: {
+    label: "Pile  (granular friction / repose)",
+    desc: "Grains dropped onto a floor, each a two-way frictional contact. Friction lets them stack into a heap with an angle of repose instead of spreading flat -- chaotic but bit-reproducible.",
+    params: [{ name: "mu", label: "Friction", min: 0.05, max: 0.9, default: 0.5, step: 0.05 }],
+    ground: true, pointR: 3.2,
+    build() {
+      const cols = 5, rows = 5, layers = 5, N = cols * rows * layers, R = 0.09;
+      const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N).fill(1);
+      let k = 0; for (let ly = 0; ly < layers; ly++) for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { pos[3 * k] = (c - 2) * R * 2.05 + (ly % 2) * 0.01; pos[3 * k + 1] = 0.5 + ly * R * 2.1; pos[3 * k + 2] = (r - 2) * R * 2.05; k++; }
+      return { state: { pos, vel, invMass }, edges: [], n: N, R };
+    },
+    step(s, p) { frictionalPileSubstep(s.state, [0, 1, 0], 0, p.mu, { dt: 0.016, iterations: 6, gravity: [0, -10, 0], radius: s.R }); },
+    status(s) { const sh = pileShape(s.state.pos, s.n); return "height " + sh.height.toFixed(2) + "  radius " + sh.radius.toFixed(2) + "  aspect " + (sh.height / (sh.radius + 1e-6)).toFixed(2); },
+  },
+  stretch: {
+    label: "Stretch  (anisotropic cloth)",
+    desc: "A cloth hung from its top edge with a stiff warp and a soft weft. Under its own weight it sags far more along the compliant direction than the stiff one -- direction-dependent stiffness from a per-edge compliance.",
+    params: [{ name: "weft", label: "Weft give", min: 0.00002, max: 0.003, default: 0.0015, step: 0.00002 }],
+    build() {
+      const W = 12, H = 12, SP = 0.16, N = W * H;
+      const cons = buildAnisotropicCloth(W, H, SP, 0.00001, 0.0015), batches = colorConstraints(cons);
+      const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N).fill(1);
+      for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) { const i = z * W + x; pos[3 * i] = (x - W / 2) * SP; pos[3 * i + 1] = 0; pos[3 * i + 2] = z * SP; if (z === 0) invMass[i] = 0; }
+      const edges = cons.map((c) => [c.i, c.j]);
+      return { state: { pos, vel, invMass }, edges, cons, batches, n: N, W, H };
+    },
+    step(s, p) { for (const c of s.cons) if (c.dir === "weft") c.compliance = p.weft; anisotropicSubstep(s.state, s.cons, s.batches, { dt: 0.016, iterations: 14, force: [0, 0, 3] }); },
+    status(s) { return "warp " + extent(s.state.pos, s.n, 0).toFixed(2) + "  weft " + extent(s.state.pos, s.n, 2).toFixed(2) + "  (soft dir stretches more)"; },
+  },
+  swirl: {
+    label: "Swirl  (sampled vector field)",
+    desc: "Particles carried by an external volumetric field, sampled trilinearly at each point -- the OpenStorm coupling. Here the field is a rotation, so the particles circulate as if caught in an eddy.",
+    params: [{ name: "strength", label: "Field", min: 0.3, max: 3, default: 1.4, step: 0.1 }],
+    pointR: 2.6,
+    build() {
+      const g = { nx: 8, ny: 8, nz: 8, ox: -1.4, oy: -1.4, oz: -1.4, sp: 0.4 };
+      const field = { grid: buildVectorGrid(g.nx, g.ny, g.nz, g.ox, g.oy, g.oz, g.sp, (x, y, z) => [-z, 0.12, x]), dims: g };
+      const N = 90, pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N).fill(1);
+      for (let i = 0; i < N; i++) { const a = (i * 2.399963), rr = 0.25 + (i % 9) * 0.09; pos[3 * i] = Math.cos(a) * rr; pos[3 * i + 1] = -0.9 + (i % 7) * 0.25; pos[3 * i + 2] = Math.sin(a) * rr; }
+      return { state: { pos, vel, invMass }, edges: [], field, n: N };
+    },
+    step(s, p) { sampledFieldSubstep(s.state, s.field, { dt: 0.016, strength: p.strength, damping: 0.008 }); },
+    status(s) { let r = 0; for (let i = 0; i < s.n; i++) { const x = s.state.pos[3 * i], z = s.state.pos[3 * i + 2]; r += Math.sqrt(x * x + z * z); } return "mean radius " + (r / s.n).toFixed(2) + "  (circulating)"; },
+  },
+  diffusion: {
+    label: "Diffusion  (thermal coupling: warmth drives Brownian motion)",
+    desc: "The Blobarium's thermal coupling. A temperature sets a diffusion coefficient by Stokes-Einstein, which sets the Brownian kick on the blob centres; a temperature read back from their measured wander tracks the one you dialled in. The Brownian kick uses the strict-libm Gaussian (erfinv on the proven strict erf), so this coupling is now cross-architecture bit-identical -- fingerprint subsystem thermal-diffusion.",
+    params: [{ name: "tempK", label: "Temp (K)", min: 250, max: 373, default: 300, step: 1 }],
+    pointR: 4.5, blobs: true, blobR: 0.5,
+    build() {
+      const scen = SCENARIOS.bacterium, rnd = lcg(20260715), N = 7;
+      const centres = []; for (let i = 0; i < N; i++) centres.push({ x: (i - 3) * 0.12, y: ((i % 3) - 1) * 0.12, z: ((i % 2) - 0.5) * 0.24 });
+      return { state: { pos: new Float64Array(3 * N), vel: new Float64Array(3 * N), invMass: new Float64Array(N).fill(1) }, edges: [], n: N, centres, rnd, scen, ring: [], box: 1.4, commandedK: 300, measK: null, D: null };
+    },
+    step(s, p) {
+      s.commandedK = p.tempK; const D = warmthOfKelvin(p.tempK, s.scen); s.D = D;
+      strictJitterCentres(s.centres, { D, dt: 1 / 60, rnd: s.rnd });
+      for (const b of s.centres) for (const k of ["x", "y", "z"]) { if (b[k] > s.box) b[k] = 2 * s.box - b[k]; else if (b[k] < -s.box) b[k] = -2 * s.box - b[k]; }
+      for (let i = 0; i < s.n; i++) { s.state.pos[3 * i] = s.centres[i].x; s.state.pos[3 * i + 1] = s.centres[i].y; s.state.pos[3 * i + 2] = s.centres[i].z; }
+      s.ring.push(s.centres.map((b) => [b.x, b.y, b.z])); const W = 120; if (s.ring.length > W) s.ring.shift();
+      if (s.ring.length === W) { const old = s.ring[0], disp = []; for (let i = 0; i < s.n; i++) disp.push([s.centres[i].x - old[i][0], s.centres[i].y - old[i][1], s.centres[i].z - old[i][2]]); s.measK = measuredT(disp, W / 60, s.scen); }
+    },
+    status(s) { return "commanded " + s.commandedK.toFixed(0) + "K   measured " + (s.measK == null ? "\u2026" : s.measK.toFixed(0) + "K") + "   D " + (s.D == null ? "\u2026" : s.D.toExponential(2)); },
+  },
+  aquarium: {
+    label: "Aquarium  (box3d collision + thermal drive)",
+    desc: "The full Blobarium physics minus the blobby render: seven centres as colliding rigid bodies, warmth driving their Brownian jostle against a soft trap. Collisions keep them from overlapping. RUNS ON box3d WASM ON THE RIG; here (and anywhere the WASM is not built) it uses the planar-fallback world the lockstep gate proves deterministic, so bodies collide in the x-z plane.",
+    params: [{ name: "tempK", label: "Temp (K)", min: 250, max: 373, default: 320, step: 1 }],
+    pointR: 3, bodyRadius: 0.16, blobs: true, blobR: 0.34,
+    build() {
+      const w = planarFallbackWorld(), N = 7, rnd = lcg(20260715), scen = SCENARIOS.bacterium, half = 0.16;
+      for (let i = 0; i < N; i++) { const a = i / N * 6.283185; w.addBox({ pos: [Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5], half }); }
+      return { state: { pos: new Float64Array(3 * N), vel: new Float64Array(3 * N), invMass: new Float64Array(N).fill(1) }, edges: [], n: N, world: w, rnd, scen, kTrap: 6, damp: 0.9, commandedK: 320 };
+    },
+    step(s, p) {
+      s.commandedK = p.tempK; const D = warmthOfKelvin(p.tempK, s.scen), dt = 1 / 60, kick = Math.sqrt(2 * D * dt) * 7;
+      const tr = s.world.readTransforms(), vel = s.world.readVelocities();
+      for (let i = 0; i < s.n; i++) { const px = tr[i * 7], pz = tr[i * 7 + 2], vx = vel[i * 3], vz = vel[i * 3 + 2];
+        s.world.impulse(i, [strictGaussian(s.rnd) * kick - s.kTrap * px * dt - s.damp * vx * dt, 0, strictGaussian(s.rnd) * kick - s.kTrap * pz * dt - s.damp * vz * dt]); }
+      s.world.step(dt);
+      const t2 = s.world.readTransforms(); for (let i = 0; i < s.n; i++) { s.state.pos[3 * i] = t2[i * 7]; s.state.pos[3 * i + 1] = t2[i * 7 + 1]; s.state.pos[3 * i + 2] = t2[i * 7 + 2]; }
+    },
+    status(s) { let mind = Infinity, sp = 0; const p = s.state.pos; for (let i = 0; i < s.n; i++) { sp += Math.sqrt(p[3 * i] ** 2 + p[3 * i + 2] ** 2); for (let j = i + 1; j < s.n; j++) { const dx = p[3 * i] - p[3 * j], dz = p[3 * i + 2] - p[3 * j + 2], d = Math.sqrt(dx * dx + dz * dz); if (d < mind) mind = d; } } return "commanded " + s.commandedK.toFixed(0) + "K   cloud " + (sp / s.n).toFixed(2) + "   nearest pair " + mind.toFixed(2) + " (>= 2*radius = collision holding)"; },
+  },
+  centrifuge: {
+    label: "Centrifuge  (rotating-frame sedimentation)",
+    desc: "A mixture spun in a fluid. Centrifugal force flings each particle outward against Stokes drag, and the balance gives a sedimentation coefficient s = 2a\u00b2\u0394\u03c1/9\u03b7 that grows with the square of size and with excess density -- so the heavy-big particles (red) race to the wall, the light-small (cyan) lag near the axis, and the mixture separates into bands. Pure mechanics, not chemistry. Cross-architecture bit-identical.",
+    params: [{ name: "omega", label: "Spin \u03c9", min: 0.3, max: 1.3, default: 0.7, step: 0.02 }],
+    pointR: 3.4,
+    build() {
+      const spec = [{ a: 0.6, rho: 1.5, c: "#33ccff" }, { a: 0.9, rho: 2.0, c: "#ffcc44" }, { a: 1.3, rho: 2.6, c: "#ff5533" }];
+      const parts = [], colors = []; let k = 0;
+      for (let sp = 0; sp < 3; sp++) for (let i = 0; i < 14; i++) { parts.push({ r: 0.1 + 0.004 * i, theta: k * 2.399963, a: spec[sp].a, rho: spec[sp].rho, species: sp }); colors.push(spec[sp].c); k++; }
+      const N = parts.length;
+      return { state: { pos: new Float64Array(3 * N), vel: new Float64Array(3 * N), invMass: new Float64Array(N).fill(1) }, edges: [], n: N, parts, colors, rMax: 1, rotor: 0, ground: true };
+    },
+    step(s, p) {
+      centrifugeStep(s.parts, { omega: p.omega, dt: 1 / 60, rhoF: 1, eta: 1, rMax: s.rMax }); s.rotor += 0.02;
+      for (let i = 0; i < s.n; i++) { const pt = s.parts[i], th = pt.theta + s.rotor; s.state.pos[3 * i] = pt.r * Math.cos(th); s.state.pos[3 * i + 1] = 0; s.state.pos[3 * i + 2] = pt.r * Math.sin(th); }
+    },
+    status(s) { return "bands (mean r):  light " + bandR(s.parts, 0).toFixed(2) + "   medium " + bandR(s.parts, 1).toFixed(2) + "   heavy " + bandR(s.parts, 2).toFixed(2) + "   \u2014 separated by s"; },
+  },
+  gyroscope: {
+    label: "Gyroscope  (precession)",
+    desc: "A spinning flywheel pivoted at one end. Gravity should tip it over, but its angular momentum turns the pull sideways: the axis sweeps a cone around the vertical instead of falling -- precession. Raise the spin and the precession SLOWS (rate = mg\u2113/|L|), the gyroscope's counterintuitive signature. Pure angular-momentum mechanics, cross-architecture bit-identical.",
+    params: [{ name: "omega", label: "Spin \u03c9", min: 20, max: 90, default: 40, step: 1 }],
+    build() {
+      const g = makeGyro({ omega: 40, I: 1, axis: [0.48, 0.88, 0] }), ringN = 18, N = 2 + ringN;
+      const edges = [[0, 1]]; for (let i = 0; i < ringN; i++) edges.push([2 + i, 2 + (i + 1) % ringN]); for (let i = 0; i < ringN; i += 3) edges.push([1, 2 + i]);
+      return { state: { pos: new Float64Array(3 * N), vel: new Float64Array(3 * N), invMass: new Float64Array(N).fill(1) }, edges, n: N, gyro: g, ringN, phase: 0, len: 1.15, discR: 0.42 };
+    },
+    step(s, p) {
+      const g = s.gyro, cur = Math.sqrt(g.L[0] ** 2 + g.L[1] ** 2 + g.L[2] ** 2), k = p.omega / cur;
+      g.L[0] *= k; g.L[1] *= k; g.L[2] *= k;                 // set |L| = I*omega live (I = 1) so the slider changes the rate
+      gyroStep(g, { tipTorque: 12, dt: 1 / 60 }); s.phase += p.omega * 0.015;
+      const mag = Math.sqrt(g.L[0] ** 2 + g.L[1] ** 2 + g.L[2] ** 2), ax = [g.L[0] / mag, g.L[1] / mag, g.L[2] / mag];
+      const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      let u = cr(ax, [0, 1, 0]); let un = Math.sqrt(u[0] ** 2 + u[1] ** 2 + u[2] ** 2); if (un < 1e-6) { u = cr(ax, [1, 0, 0]); un = Math.sqrt(u[0] ** 2 + u[1] ** 2 + u[2] ** 2); } u = [u[0] / un, u[1] / un, u[2] / un];
+      const v = cr(ax, u), P = s.state.pos;
+      P[0] = 0; P[1] = 0; P[2] = 0; const tip = [ax[0] * s.len, ax[1] * s.len, ax[2] * s.len]; P[3] = tip[0]; P[4] = tip[1]; P[5] = tip[2];
+      for (let i = 0; i < s.ringN; i++) { const a = s.phase + i / s.ringN * 6.283185, c = Math.cos(a), sn = Math.sin(a), o = 3 * (2 + i); P[o] = tip[0] + s.discR * (c * u[0] + sn * v[0]); P[o + 1] = tip[1] + s.discR * (c * u[1] + sn * v[1]); P[o + 2] = tip[2] + s.discR * (c * u[2] + sn * v[2]); }
+    },
+    status(s) { const g = s.gyro, mag = Math.sqrt(g.L[0] ** 2 + g.L[1] ** 2 + g.L[2] ** 2); return "spin |L| " + mag.toFixed(0) + "   axis tilt cos " + (g.L[1] / mag).toFixed(2) + " (held)   \u2014 faster spin precesses slower"; },
+  },
+  "pendulum-wave": {
+    label: "Pendulum wave",
+    desc: "Fifteen pendulums whose lengths are tuned so the longest does k swings each cycle, the next k+1, and so on. Released together they start in step, fan into a travelling wave, fold into two groups and finer patterns, then -- because every one completes a whole number of swings at once -- snap back into step and repeat. Each is an exact harmonic oscillator (strict-trig rotation), so the re-sync is perfect and cross-architecture bit-identical.",
+    params: [{ name: "k", label: "Swings k", min: 12, max: 34, default: 20, step: 1 }],
+    pointR: 4,
+    build() {
+      const s = { N: 15, kCur: 0, spacing: 0.16, top: 0.85, dispL: [], wave: null };
+      s.rebuild = (k) => { s.wave = makePendulumWave({ N: s.N, k, cycle: 60, amp: 0.32, dt: 1 / 60 }); const Ls = s.wave.pend.map((p) => p.L), mx = Math.max(...Ls); s.dispL = Ls.map((L) => 0.5 + 0.95 * (L / mx)); };
+      s.rebuild(20); s.kCur = 20;
+      const pts = 2 * s.N, edges = []; for (let i = 0; i < s.N; i++) edges.push([2 * i, 2 * i + 1]);
+      s.state = { pos: new Float64Array(3 * pts), vel: new Float64Array(3 * pts), invMass: new Float64Array(pts).fill(1) }; s.edges = edges; s.n = pts;
+      return s;
+    },
+    step(s, p) {
+      if (p.k !== s.kCur) { s.rebuild(p.k); s.kCur = p.k; }
+      pendulumStep(s.wave);
+      const off = (s.N - 1) / 2, P = s.state.pos;
+      for (let i = 0; i < s.N; i++) { const th = s.wave.pend[i].theta, L = s.dispL[i], x = (i - off) * s.spacing, pv = 3 * (2 * i), bb = 3 * (2 * i + 1); P[pv] = x; P[pv + 1] = s.top; P[pv + 2] = 0; P[bb] = x; P[bb + 1] = s.top - L * Math.cos(th); P[bb + 2] = L * Math.sin(th); }
+    },
+    status(s) { return "cycle t " + s.wave.t.toFixed(1) + " / " + s.wave.cycle + "   spread " + angleSpread(s.wave).toFixed(3) + "   (0 = in step; re-syncs every cycle)"; },
+  },
+  orbit: {
+    label: "Orbit  (two-body gravity)",
+    desc: "Two bodies under Newton's gravity, integrated by symplectic velocity-Verlet. The light body traces a closed ellipse with the heavy one at a focus; the trail shows the path. Energy stays bounded and angular momentum is conserved, so the orbit does not spiral -- a forward-Euler step would open it into a spiral within a few laps. Only +,-,*,/,sqrt, so it is cross-architecture bit-identical.",
+    params: [{ name: "e", label: "Eccentricity", min: 0, max: 0.7, default: 0.4, step: 0.02 }],
+    pointR: 3,
+    build() {
+      const s = { eCur: 0, trail: [], K: 150 };
+      s.rebuild = (e) => { s.sys = keplerPair({ G: 1, m1: 1, m2: 0.001, a: 1, e }); s.trail = []; };
+      s.rebuild(0.4); s.eCur = 0.4;
+      const pts = 2 + s.K;
+      s.state = { pos: new Float64Array(3 * pts), vel: new Float64Array(3 * pts), invMass: new Float64Array(pts).fill(1) };
+      s.edges = []; for (let i = 0; i < s.K - 1; i++) s.edges.push([2 + i, 2 + i + 1]);
+      s.n = pts; s.colors = ["#ffcc44", "#33ccff"]; for (let i = 0; i < s.K; i++) s.colors.push("#215038");
+      return s;
+    },
+    step(s, p) {
+      if (p.e !== s.eCur) { s.rebuild(p.e); s.eCur = p.e; }
+      for (let k = 0; k < 12; k++) orbitStep(s.sys, 0.002);
+      const b = s.sys.bodies, P = s.state.pos;
+      P[0] = b[0].r[0]; P[1] = b[0].r[1]; P[2] = b[0].r[2]; P[3] = b[1].r[0]; P[4] = b[1].r[1]; P[5] = b[1].r[2];
+      s.trail.push([b[1].r[0], b[1].r[1], b[1].r[2]]); if (s.trail.length > s.K) s.trail.shift();
+      for (let i = 0; i < s.K; i++) { const t = s.trail[i] || s.trail[0] || [0, 0, 0], o = 3 * (2 + i); P[o] = t[0]; P[o + 1] = t[1]; P[o + 2] = t[2]; }
+    },
+    status(s) { return "separation " + separation(s.sys).toFixed(3) + "   energy " + totalEnergy(s.sys).toFixed(4) + " (bounded)   L " + angularMomentum(s.sys).toFixed(4) + " (conserved)"; },
+  },
+  vibrations: {
+    label: "Vibrations  (normal modes)",
+    desc: "A row of masses on springs, ends pinned. Set it in a normal mode -- shape sin(j\u03c0n/(N+1)) -- and the whole string oscillates at one frequency with its pattern frozen in space, a standing wave. Mode j has j humps and rings at \u03c9_j = 2\u221a(k/m)\u00b7sin(j\u03c0/2(N+1)); higher modes ring faster. Any vibration is a sum of these. Symplectic and cross-architecture bit-identical.",
+    params: [{ name: "mode", label: "Mode j", min: 1, max: 12, default: 3, step: 1 }],
+    pointR: 4,
+    build() {
+      const s = { N: 12, jCur: 0, amp: 0.5 };
+      s.rebuild = (j) => { s.chain = makeChain({ N: s.N, k: 1, m: 1 }); setMode(s.chain, j, s.amp); };
+      s.rebuild(3); s.jCur = 3;
+      const pts = s.N + 2, im = new Float64Array(pts).fill(1); im[0] = 0; im[pts - 1] = 0;
+      s.edges = []; for (let i = 0; i < pts - 1; i++) s.edges.push([i, i + 1]);
+      s.state = { pos: new Float64Array(3 * pts), vel: new Float64Array(3 * pts), invMass: im }; s.n = pts;
+      return s;
+    },
+    step(s, p) {
+      if (p.mode !== s.jCur) { s.rebuild(p.mode); s.jCur = p.mode; }
+      for (let k = 0; k < 3; k++) chainStep(s.chain, 1 / 240);
+      const N = s.N, P = s.state.pos, spacing = 1.8 / (N + 1);
+      P[0] = -0.9; P[1] = 0; P[2] = 0;
+      for (let n = 0; n < N; n++) { const o = 3 * (n + 1); P[o] = -0.9 + spacing * (n + 1); P[o + 1] = s.chain.x[n]; P[o + 2] = 0; }
+      const r = 3 * (N + 1); P[r] = 0.9; P[r + 1] = 0; P[r + 2] = 0;
+    },
+    status(s) { return "mode " + s.jCur + "   frequency " + modeFreq(s.chain, s.jCur).toFixed(3) + "   energy " + chainEnergy(s.chain).toFixed(3) + " (bounded)  \u2014 a standing wave"; },
+  },
+  "figure-eight": {
+    label: "Figure-eight  (three-body)",
+    desc: "Three equal masses given exactly the right push chase each other forever around a single figure-eight curve -- never colliding, never escaping, each a third of a period behind the next on the same track. Found numerically in 1993, proved to exist in 2000, and stable only for one precise set of initial conditions. Same N-body gravity and symplectic step as the orbit scene, so it is cross-architecture bit-identical.",
+    params: [{ name: "trail", label: "Trail", min: 40, max: 400, default: 220, step: 20 }],
+    pointR: 5,
+    build() {
+      const s = { sys: makeFigureEight(), trails: [[], [], []], K: 220, cols: ["#ff5a5a", "#5affa0", "#5a9cff"] };
+      const maxPts = 3 + 3 * s.K;
+      s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+      s.n = 3; s.edges = []; s.colors = [...s.cols];
+      return s;
+    },
+    step(s, p) {
+      s.K = p.trail | 0;
+      for (let k = 0; k < 6; k++) orbitStepFig(s.sys, 0.0005);
+      const P = s.state.pos, b = s.sys.bodies;
+      for (let i = 0; i < 3; i++) { s.trails[i].push([b[i].r[0], b[i].r[1], b[i].r[2]]); if (s.trails[i].length > s.K) s.trails[i].shift(); }
+      // layout: 3 bodies, then each body's trail
+      const cols = [], edges = []; let idx = 0;
+      for (let i = 0; i < 3; i++) { P[3 * idx] = b[i].r[0]; P[3 * idx + 1] = b[i].r[1]; P[3 * idx + 2] = b[i].r[2]; cols[idx] = s.cols[i]; idx++; }
+      for (let i = 0; i < 3; i++) { const tr = s.trails[i]; for (let j = 0; j < tr.length; j++) { const o = 3 * idx; P[o] = tr[j][0]; P[o + 1] = tr[j][1]; P[o + 2] = tr[j][2]; cols[idx] = s.cols[i]; if (j > 0) edges.push([idx - 1, idx]); idx++; } }
+      s.n = idx; s.colors = cols; s.edges = edges;
+    },
+    status(s) { return "three-body figure-eight   period " + FIG8_PERIOD.toFixed(3) + "   one curve, three dancers a third of a period apart"; },
+  },
+    "black-hole": {
+      label: "Black hole  (Paczynski-Wiita)",
+      desc: "A black hole with nothing imaginary in it. The gravity is real; a Paczynski-Wiita potential reproduces the true relativistic structure a Newtonian point mass cannot -- an event horizon (the dark ring), a photon sphere, an innermost stable circular orbit at 6GM/c^2, and orbits that PRECESS instead of closing. Start outside the ISCO and the orbit is stable and slowly precesses; start inside and it plunges through the horizon and is captured. Pure arithmetic, so it is cross-architecture bit-identical.",
+      params: [{ name: "r0", label: "Start radius", min: 4, max: 20, default: 10, step: 0.5 }],
+      pointR: 5,
+      build() {
+        const G = 1, M = 1, c = 1, rs = bhRs3(M, G, c);
+        const s = { G, M, c, rs, r0: 10, K: 320, trail: [], p: null };
+        s.reset = (r0) => { s.r0 = r0; s.p = bhMake3(r0, 1.05 * bhVc3(r0, M, G, rs)); s.trail = []; };
+        s.reset(10);
+        const maxPts = 2 + s.K + 48;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 2; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        if (Math.abs((p.r0 || 10) - s.r0) > 1e-6) s.reset(p.r0 || 10);
+        for (let k = 0; k < 8 && !s.p.captured; k++) bhStep3(s.p, 0.01, s.M, s.G, s.rs);
+        s.trail.push([s.p.r[0], 0, s.p.r[1]]); if (s.trail.length > s.K) s.trail.shift();
+        const P = s.state.pos, cols = [], edges = []; let idx = 0;
+        P[0] = 0; P[1] = 0; P[2] = 0; cols[idx] = "#0a0c10"; idx++;                                  // the hole
+        P[3 * idx] = s.p.r[0]; P[3 * idx + 1] = 0; P[3 * idx + 2] = s.p.r[1]; cols[idx] = s.p.captured ? "#ff5a5a" : "#ffcc66"; idx++;   // the star
+        const ringStart = idx;                                                                        // event-horizon ring
+        for (let a = 0; a < 48; a++) { const th = a / 48 * Math.PI * 2; P[3 * idx] = s.rs * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = s.rs * Math.sin(th); cols[idx] = "#7a2a2a"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+        edges.push([idx - 1, ringStart]);
+        for (let j = 0; j < s.trail.length; j++) { const t = s.trail[j]; P[3 * idx] = t[0]; P[3 * idx + 1] = t[1]; P[3 * idx + 2] = t[2]; cols[idx] = "#33ccff"; if (j > 0) edges.push([idx - 1, idx]); idx++; }   // precession trail
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) {
+        return "horizon " + s.rs.toFixed(2) + "   photon sphere " + bhPh3(s.M, s.G, s.c).toFixed(2) + "   ISCO " + bhIsco3(s.M, s.G, s.c).toFixed(2) + "   r0 " + s.r0.toFixed(1) + "   " + (s.p.captured ? "CAPTURED -- plunged through the horizon" : (s.r0 < 6 ? "inside the ISCO -- unstable" : "outside the ISCO -- precessing"));
+      },
+    },
+    "solar-system": {
+      label: "Solar system  (real orbital elements)",
+      desc: "The real solar system, built from standard orbital elements -- each planet's true semi-major axis, eccentricity and mass -- dropped into the same N-body gravity engine. Real data, baked from a JPL-style element set rather than fetched live, so it stays deterministic and needs no internet. Kepler's laws are not imposed here, they emerge: the inner planets sweep fast, the outer ones crawl, and period-squared grows as radius-cubed. Pure arithmetic, cross-architecture bit-identical.",
+      params: [{ name: "planets", label: "Planets", min: 2, max: 8, default: 6, step: 1 }],
+      pointR: 4,
+      build() {
+        const SC = 0.15;
+        const s = { np: 6, SC, sys: null, trails: [], K: 380, cols: ["#ffd94a", "#b0b0b0", "#e8c07a", "#4a90d9", "#d9603a", "#e8b96a", "#e6d59a", "#8fd9e6", "#5a7de6"] };
+        s.reset = (n) => { s.np = n; s.sys = makeSolarSys(n); s.trails = Array.from({ length: n + 1 }, () => []); };
+        s.reset(6);
+        const maxPts = 9 + 9 * s.K;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 7; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const n = p.planets | 0; if (n !== s.np) s.reset(n);
+        for (let k = 0; k < 4; k++) orbitStep(s.sys, 0.004);
+        const b = s.sys.bodies, P = s.state.pos, SC = s.SC, cols = [], edges = []; let idx = 0;
+        for (let i = 0; i < b.length; i++) { s.trails[i].push([b[i].r[0] * SC, b[i].r[1] * SC, b[i].r[2] * SC]); if (s.trails[i].length > s.K) s.trails[i].shift(); }
+        for (let i = 0; i < b.length; i++) { P[3 * idx] = b[i].r[0] * SC; P[3 * idx + 1] = b[i].r[1] * SC; P[3 * idx + 2] = b[i].r[2] * SC; cols[idx] = s.cols[i] || "#fff"; idx++; }
+        for (let i = 1; i < b.length; i++) { const tr = s.trails[i]; for (let j = 0; j < tr.length; j++) { const o = 3 * idx; P[o] = tr[j][0]; P[o + 1] = tr[j][1]; P[o + 2] = tr[j][2]; cols[idx] = s.cols[i] || "#fff"; if (j > 0) edges.push([idx - 1, idx]); idx++; } }
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) { return s.np + " planets on real orbital elements   inner sweep fast, outer crawl   Kepler III: T^2 grows as a^3"; },
+    },
+    "neutron-star": {
+      label: "Neutron star  (real 1.4 M-sun, 11 km)",
+      desc: "A canonical neutron star with real documented specs -- Schwarzschild radius ~4 km, compactness ~0.2, escape velocity ~0.6c. The same relativistic gravity as the black hole, but with a SURFACE (the dark ring): its innermost stable orbit sits just above that surface, so an orbit that plunges IMPACTS the surface rather than falling through a horizon. Start high and it precesses; start low and it hits the ground. Pure arithmetic, cross-architecture bit-identical.",
+      params: [{ name: "r0", label: "Start radius (rs=2 units)", min: 5.4, max: 16, default: 9, step: 0.5 }],
+      pointR: 5,
+      build() {
+        const M = 1.4, R = 11, surf = nsSurf3(M, R);
+        const s = { M, R, surf, r0: 9, K: 320, trail: [], p: null };
+        s.reset = (r0) => { s.r0 = r0; s.p = nsMake3(r0, 1.02); s.trail = []; };
+        s.reset(9);
+        const maxPts = 2 + s.K + 48;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 2; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        if (Math.abs((p.r0 || 9) - s.r0) > 1e-6) s.reset(p.r0 || 9);
+        for (let k = 0; k < 8 && !s.p.impacted; k++) nsStep3(s.p, 0.008, s.surf);
+        s.trail.push([s.p.r[0], 0, s.p.r[1]]); if (s.trail.length > s.K) s.trail.shift();
+        const P = s.state.pos, cols = [], edges = []; let idx = 0;
+        P[0] = 0; P[1] = 0; P[2] = 0; cols[idx] = "#dfe8ff"; idx++;                                   // the neutron star (bright)
+        P[3 * idx] = s.p.r[0]; P[3 * idx + 1] = 0; P[3 * idx + 2] = s.p.r[1]; cols[idx] = s.p.impacted ? "#ff5a5a" : "#ffcc66"; idx++;   // the orbiter
+        const ringStart = idx;                                                                        // the SURFACE ring
+        for (let a = 0; a < 48; a++) { const th = a / 48 * Math.PI * 2; P[3 * idx] = s.surf * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = s.surf * Math.sin(th); cols[idx] = "#3a5a9a"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+        edges.push([idx - 1, ringStart]);
+        for (let j = 0; j < s.trail.length; j++) { const t = s.trail[j]; P[3 * idx] = t[0]; P[3 * idx + 1] = t[1]; P[3 * idx + 2] = t[2]; cols[idx] = "#33ccff"; if (j > 0) edges.push([idx - 1, idx]); idx++; }
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) { return "surface " + s.surf.toFixed(2) + " (rs=2 units)   ISCO 6   compactness " + nsC3(s.M, s.R).toFixed(2) + "   v_esc " + nsEsc3(s.M, s.R).toFixed(2) + "c   " + (s.p.impacted ? "IMPACTED the surface" : (s.r0 < 6 ? "below the ISCO -- unstable" : "precessing")); },
+    },
+    "white-dwarf": {
+      label: "White dwarf -> supernova  (real Chandrasekhar physics)",
+      desc: "A white dwarf held up by electron degeneracy pressure, with the real mass-radius relation that runs BACKWARDS: drag the mass up and the star gets SMALLER (R ~ M^-1/3), the counterintuitive but documented signature of degenerate matter. Push it past the Chandrasekhar limit (~1.44 solar masses) and degeneracy pressure loses -- the star collapses and its ejecta expand outward, a real Type Ia supernova triggered by a threshold, not an effect. No fireball painted on; the physics is the whole show. (Gated but honestly NOT in the cross-arch fingerprint -- its fractional powers are not bit-identical guaranteed like sqrt is.)",
+      params: [{ name: "mass", label: "Mass (solar masses)", min: 0.3, max: 1.6, default: 0.6, step: 0.02 }],
+      pointR: 4,
+      build() {
+        const s = { mass: 0.6, Mch: wdMch(2), boom: 0, K: 64 };
+        const maxPts = 2 * s.K + 4;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const m = p.mass || 0.6;
+        if (m >= s.Mch) s.boom += 1; else s.boom = 0;                         // collapsed: eject shell grows with time
+        const P = s.state.pos, cols = [], edges = []; let idx = 0;
+        const SCALE = 40;
+        if (m < s.Mch) {
+          const R = wdRadius(m) * SCALE;                                       // the star: a disc that SHRINKS as mass rises
+          const ringStart = idx;
+          for (let a = 0; a < s.K; a++) { const th = a / s.K * Math.PI * 2; P[3 * idx] = R * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = R * Math.sin(th); cols[idx] = "#eaf0ff"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+          edges.push([idx - 1, ringStart]);
+          P[3 * idx] = 0; P[3 * idx + 1] = 0; P[3 * idx + 2] = 0; cols[idx] = "#dfe8ff"; idx++;   // core
+        } else {
+          const R = 0.15 + s.boom * 0.02;                                      // ejecta shell expanding outward (real, not a fireball)
+          const ringStart = idx;
+          for (let a = 0; a < s.K; a++) { const th = a / s.K * Math.PI * 2; P[3 * idx] = R * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = R * Math.sin(th); cols[idx] = "#ffcc66"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+          edges.push([idx - 1, ringStart]);
+          P[3 * idx] = 0; P[3 * idx + 1] = 0; P[3 * idx + 2] = 0; cols[idx] = "#ff7a3a"; idx++;   // collapsed remnant
+        }
+        s.n = idx; s.colors = cols; s.edges = edges; s.mass = m;
+      },
+      status(s) { return s.mass < s.Mch ? ("stable white dwarf   radius " + wdRadiusKm(s.mass).toFixed(0) + " km   (heavier = smaller)   Chandrasekhar limit " + s.Mch.toFixed(2)) : ("PAST THE CHANDRASEKHAR LIMIT (" + s.Mch.toFixed(2) + ") -- collapsed, ejecta expanding: a Type Ia supernova"); },
+    },
+    "plasma": {
+      label: "Plasma -- a charged particle in a magnetic bottle",
+      desc: "A charged particle spiralling along the field lines of a magnetic bottle under the Lorentz force F = qv x B. The field is weak in the middle and strong at both ends; drag the pitch down (more motion along the field) and the particle sits in the LOSS CONE and runs straight out the end, drag it up and the particle mirrors, reflects, and stays trapped, bouncing back and forth. A magnetic force does no work, so the speed never changes -- the trajectory only turns. Real confinement, pure arithmetic (Boris pusher, no trig), cross-architecture bit-identical.",
+      params: [{ name: "vpar", label: "Along-field velocity (pitch)", min: 0.2, max: 1.6, default: 0.4, step: 0.05 }],
+      pointR: 3,
+      build() {
+        const s = { vpar: 0.4, K: 900, trail: [], p: null, B0: 1, L: 5 };
+        s.reset = (vpar) => { s.vpar = vpar; s.p = plMake3(1.0, vpar); s.trail = []; };
+        s.reset(0.4);
+        const maxPts = s.K + 40;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        if (Math.abs((p.vpar || 0.4) - s.vpar) > 1e-6) s.reset(p.vpar || 0.4);
+        for (let k = 0; k < 6; k++) plStep3(s.p, 0.02, s.B0, s.L);
+        s.trail.push([s.p.r[0], s.p.r[2], s.p.r[1]]); if (s.trail.length > s.K) s.trail.shift();     // z along horizontal for view
+        const P = s.state.pos, cols = [], edges = []; let idx = 0;
+        // the two mirror "ends" of the bottle, as reference markers on the axis
+        for (const zz of [-s.L, s.L]) { P[3 * idx] = zz; P[3 * idx + 1] = 0; P[3 * idx + 2] = 0; cols[idx] = "#3a5a9a"; idx++; }
+        for (let j = 0; j < s.trail.length; j++) { const t = s.trail[j]; P[3 * idx] = t[0]; P[3 * idx + 1] = t[1]; P[3 * idx + 2] = t[2]; cols[idx] = j === s.trail.length - 1 ? "#ffcc66" : "#33ccff"; if (j > 0) edges.push([idx - 1, idx]); idx++; }
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) { const escaping = s.p.zMax > s.L; return "speed^2 " + plSpeed3(s.p).toFixed(3) + " (constant -- no work done)   reflections " + s.p.reflections + "   max|z| " + s.p.zMax.toFixed(1) + "   " + (escaping ? "IN THE LOSS CONE -- escaping out the end" : "TRAPPED -- mirroring inside the bottle"); },
+    },
+    "impact": {
+      label: "Asteroid impact -- approach, entry, energy (no theatre)",
+      desc: "An asteroid approaching a planet, with gravity bending its path. Aim it with the impact-parameter slider: inside the capture radius (which is WIDER than the planet, because gravity focuses the approach) it curves in and hits; outside it, gravity slings it past on a hyperbolic flyby. The thin ring is the sliver of atmosphere. No fireball is drawn -- the physics is the approach, the escape-speed floor on the impact, the one-half m v-squared energy and the cube-root crater scaling, all in the gate. The vacuum approach is sqrt-only and fingerprinted; the exponential atmosphere and crater law are gated-only.",
+      params: [{ name: "b", label: "Impact parameter (aim)", min: 0, max: 3.2, default: 1.3, step: 0.1 }],
+      pointR: 4,
+      build() {
+        const s = { b: 1.3, K: 700, trail: [], p: null, GM: 1, R: 1 };
+        s.reset = (b) => { s.b = b; s.p = imMake3(-20, b, 1, 0); s.trail = []; };
+        s.reset(1.3);
+        const maxPts = s.K + 100;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        if (Math.abs((p.b || 1.3) - s.b) > 1e-6) s.reset(p.b || 1.3);
+        for (let k = 0; k < 6 && !s.p.hit && !s.p.missed; k++) imStep3(s.p, 0.02, s.GM, s.R);
+        s.trail.push([s.p.r[0], 0, s.p.r[1]]); if (s.trail.length > s.K) s.trail.shift();
+        const P = s.state.pos, cols = [], edges = []; let idx = 0;
+        const planetStart = idx;                                                              // the planet surface
+        for (let a = 0; a < 40; a++) { const th = a / 40 * Math.PI * 2; P[3 * idx] = s.R * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = s.R * Math.sin(th); cols[idx] = "#33ccff"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+        edges.push([idx - 1, planetStart]);
+        const atmStart = idx;                                                                 // the sliver of atmosphere
+        for (let a = 0; a < 40; a++) { const th = a / 40 * Math.PI * 2; P[3 * idx] = 1.14 * s.R * Math.cos(th); P[3 * idx + 1] = 0; P[3 * idx + 2] = 1.14 * s.R * Math.sin(th); cols[idx] = "#2a6a5a"; if (a > 0) edges.push([idx - 1, idx]); idx++; }
+        edges.push([idx - 1, atmStart]);
+        for (let j = 0; j < s.trail.length; j++) { const t = s.trail[j]; P[3 * idx] = t[0]; P[3 * idx + 1] = 0; P[3 * idx + 2] = t[2]; cols[idx] = s.p.hit ? "#ff5a5a" : "#ffcc66"; if (j > 0) edges.push([idx - 1, idx]); idx++; }
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) { const bc = imBcrit(s.GM, s.R, 1); return "capture radius " + bc.toFixed(2) + " (planet radius 1 -- gravity focuses)   impact speed " + imVimp(s.GM, s.R, 1).toFixed(2) + " (>= escape)   " + (s.p.hit ? "IMPACT" : s.p.missed ? "flyby -- missed" : (s.b < bc ? "inside capture radius -- will hit" : "outside -- slinging past")); },
+    },
+    "star-catalog": {
+      label: "Star catalog -- real recorded stars (baked snapshot)",
+      desc: "A baked snapshot of real stars -- position, distance, brightness, temperature -- loaded with no live fetch. Each point sits in its recorded direction and glows in its true colour, hot stars blue and cool stars red. Drag the slider from the flat celestial sphere (the sky as seen from Earth, all stars pinned to one dome) out to their true distances: the pattern you know from the ground pulls apart into real 3D, and Deneb -- modest to the eye -- sails far out past everything, because it only looks faint from fifteen hundred light-years away.",
+      params: [{ name: "depth", label: "Flat sky  <->  true distance", min: 0, max: 1, default: 1, step: 0.05 }],
+      pointR: 5,
+      build() {
+        const stars = CAT_STARS.map((st) => {
+          const p = catPos(st); const r = Math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) || 1;
+          return { st, dir: [p[0] / r, p[1] / r, p[2] / r], logD: Math.log10(st.distLy + 2), col: catColor(st.tempK) };
+        });
+        const s = { depth: 1, stars };
+        const maxPts = stars.length + 4;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const depth = p.depth !== undefined ? p.depth : 1;
+        const P = s.state.pos, cols = []; let idx = 0;
+        const toHex = (c) => "#" + c.map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+        for (const e of s.stars) {
+          const rad = 8 * (1 - depth) + e.logD * 3.2 * depth;
+          P[3 * idx] = e.dir[0] * rad; P[3 * idx + 1] = e.dir[2] * rad; P[3 * idx + 2] = e.dir[1] * rad;
+          cols[idx] = e.st.name === "Sun" ? "#ffe08a" : toHex(e.col); idx++;
+        }
+        s.n = idx; s.colors = cols; s.edges = [];
+      },
+      status(s) {
+        const noSun = s.stars.filter((e) => e.st.name !== "Sun");
+        const lum = noSun.reduce((a, b) => (catAbsMag(a.st) < catAbsMag(b.st) ? a : b));
+        return catCount() + " real stars, baked (no live fetch)   most luminous: " + lum.st.name + " (abs mag " + catAbsMag(lum.st).toFixed(1) + ", " + lum.st.distLy.toFixed(0) + " ly)   hot=blue, cool=red";
+      },
+    },
+    "distributed-render": {
+      label: "Distributed render -- one frame split across peers",
+      desc: "A deterministic raytraced frame, split into horizontal bands and handed to that many peers. Each cyan line marks a seam between two peers' slices -- and the image runs straight through it, because determinism makes the bands fit flush with no blending and no data exchanged between machines. Drag the peer count: the seams move, but the picture never changes by a single pixel, because the assembled frame is bit-for-bit what one machine would render alone. This is the whole lockstep story as a picture -- split the work, verify by recompute, get the identical result.",
+      params: [{ name: "peers", label: "Peers (slices)", min: 1, max: 8, default: 4, step: 1 }],
+      pointR: 3,
+      build() {
+        const W = 44, H = 32;
+        const s = { W, H, peers: 4, solo: rnWhole3(W, H), dist: null };
+        s.reset = (peers) => { s.peers = peers; s.dist = rnDist3(W, H, peers); };
+        s.reset(4);
+        const maxPts = W * H + 4;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const peers = p.peers || 4;
+        if (peers !== s.peers) s.reset(peers);
+        const seamRows = new Set(rnSlice3(s.H, s.peers).map((b) => b[0]));    // first row of each band
+        const P = s.state.pos, cols = []; let idx = 0; const SC = 0.28;
+        for (let y = 0; y < s.H; y++) for (let x = 0; x < s.W; x++) {
+          const inten = s.dist[y * s.W + x];
+          P[3 * idx] = (x - s.W / 2) * SC; P[3 * idx + 1] = 0; P[3 * idx + 2] = (y - s.H / 2) * SC;
+          if (seamRows.has(y) && y > 0) { cols[idx] = "#33ccff"; }            // mark the seam between peers
+          else { const g = Math.round((0.15 + 0.85 * inten) * 255); const hx = g.toString(16).padStart(2, "0"); cols[idx] = "#" + hx + hx + hx; }
+          idx++;
+        }
+        s.n = idx; s.colors = cols; s.edges = [];
+      },
+      status(s) {
+        let same = s.dist.length === s.solo.length; for (let i = 0; i < s.solo.length && same; i++) if (s.dist[i] !== s.solo[i]) same = false;
+        return s.peers + (s.peers === 1 ? " peer" : " peers") + "   assembled == solo render: " + (same ? "TRUE (bit-identical)" : "MISMATCH") + "   frame " + s.W + "x" + s.H + "   seams (cyan) are invisible in the image";
+      },
+    },
+    "render-cluster": {
+      label: "Render cluster -- peers verified, a fault caught",
+      desc: "The distributed render wired to a coordinator that does not trust its peers. Eight bands are handed to four peers; each returned band is verified by recomputing it and comparing, and any band that fails -- garbage from a dishonest peer, or nothing from an offline one -- is caught and rebuilt by the coordinator itself. Pick a faulty peer with the slider: its bands light up amber (caught and recovered) but the image behind them does not change by a single pixel, because a peer that lies about its pixels cannot corrupt the frame. This is the piece that makes it safe to hand render work to machines you do not control.",
+      params: [{ name: "faulty", label: "Faulty peer (0 = all honest)", min: 0, max: 4, default: 0, step: 1 }],
+      pointR: 3,
+      build() {
+        const W = 44, H = 32, nPeers = 4, nSlices = 8;
+        const s = { W, H, nPeers, nSlices, faulty: 0, solo: rnWhole3(W, H), r: null };
+        s.rowPeer = new Array(H).fill(0);
+        for (const b of rcPlan(H, nSlices, nPeers)) for (let y = b.y0; y < b.y1; y++) s.rowPeer[y] = b.peer;
+        s.reset = (faulty) => { s.faulty = faulty; s.r = rcCluster(W, H, nSlices, nPeers, faulty > 0 ? rcFaulty(faulty - 1) : rcHonest()); };
+        s.reset(0);
+        const maxPts = W * H + 4;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const faulty = p.faulty || 0;
+        if (faulty !== s.faulty) s.reset(faulty);
+        const P = s.state.pos, cols = []; let idx = 0; const SC = 0.28; const f = s.r.frame;
+        for (let y = 0; y < s.H; y++) for (let x = 0; x < s.W; x++) {
+          P[3 * idx] = (x - s.W / 2) * SC; P[3 * idx + 1] = 0; P[3 * idx + 2] = (y - s.H / 2) * SC;
+          const inten = f[y * s.W + x];
+          if (faulty > 0 && s.rowPeer[y] === faulty - 1) { const g = Math.round((0.2 + 0.8 * inten) * 255); cols[idx] = "#" + g.toString(16).padStart(2, "0") + Math.round(g * 0.7).toString(16).padStart(2, "0") + "22"; }  // amber = caught + recovered
+          else { const g = Math.round((0.15 + 0.85 * inten) * 255); const hx = g.toString(16).padStart(2, "0"); cols[idx] = "#" + hx + hx + hx; }
+          idx++;
+        }
+        s.n = idx; s.colors = cols; s.edges = [];
+      },
+      status(s) {
+        let same = true; for (let i = 0; i < s.solo.length && same; i++) if (s.r.frame[i] !== s.solo[i]) same = false;
+        return s.nPeers + " peers, " + s.nSlices + " slices   verified " + s.r.verified + "   recovered " + s.r.recovered + "   frame == solo: " + (same ? "TRUE" : "MISMATCH") + (s.faulty > 0 ? "   (peer " + (s.faulty - 1) + " faulty -- caught, rebuilt)" : "   (all honest)");
+      },
+    },
+    "hologram": {
+      label: "Hologram -- interference fringes (real wave optics)",
+      desc: "The optics under a hologram: two coherent point sources (an object beam and a reference beam) overlapping on a screen. Where their waves arrive in step they add and brighten; where they arrive out of step they cancel -- so the screen fills with fringes, drawn here as the bright curve, spaced exactly lambda*D/d. Drag the source separation: wider sources write finer fringes. The whole thing exists only because light adds as amplitude, carrying phase, not as intensity -- and because the spacing encodes the geometry, the separation reads straight back out of the pattern. Record, then reconstruct. Real physics, gated (but trig-based, so not in the cross-arch fingerprint).",
+      params: [{ name: "sep", label: "Source separation", min: 8, max: 60, default: 20, step: 2 }],
+      pointR: 3,
+      build() {
+        const s = { sep: 20, lambda: 0.5, D: 1000, HW: 60, N: 240, scan: null };
+        s.reset = (sep) => { s.sep = sep; s.scan = hoScan(hoSources(sep), s.lambda, s.D, s.HW, s.N); };
+        s.reset(20);
+        const maxPts = s.N + 4;
+        s.state = { pos: new Float64Array(3 * maxPts), vel: new Float64Array(3 * maxPts), invMass: new Float64Array(maxPts).fill(1) };
+        s.n = 0; s.edges = []; s.colors = [];
+        return s;
+      },
+      step(s, p) {
+        const sep = p.sep || 20;
+        if (Math.abs(sep - s.sep) > 1e-6) s.reset(sep);
+        const P = s.state.pos, cols = [], edges = []; let idx = 0; const SC = 0.13;
+        const maxI = Math.max(...s.scan.I) || 1;
+        // two source markers below the screen
+        P[3 * idx] = -sep / 2 * SC; P[3 * idx + 1] = 0; P[3 * idx + 2] = -3; cols[idx] = "#9fe6c0"; idx++;
+        P[3 * idx] = sep / 2 * SC; P[3 * idx + 1] = 0; P[3 * idx + 2] = -3; cols[idx] = "#9fe6c0"; idx++;
+        // the fringe pattern: intensity as height + colour along the screen
+        const first = idx;
+        for (let i = 0; i < s.N; i++) {
+          const t = s.scan.I[i] / maxI;
+          P[3 * idx] = s.scan.xs[i] * SC; P[3 * idx + 1] = t * 3; P[3 * idx + 2] = 0;
+          const g = Math.round((0.15 + 0.85 * t) * 255); cols[idx] = "#" + g.toString(16).padStart(2, "0") + Math.round(g * 0.72).toString(16).padStart(2, "0") + "33";
+          if (i > 0) edges.push([idx - 1, idx]); idx++;
+        }
+        s.n = idx; s.colors = cols; s.edges = edges;
+      },
+      status(s) {
+        const recovered = hoRecover(s.scan.spacing, s.lambda, s.D);
+        return "fringe spacing " + s.scan.spacing.toFixed(1) + " (formula " + hoSpacing(s.lambda, s.D, s.sep).toFixed(1) + ")   " + s.scan.peaks.length + " bright fringes   reconstructed separation " + recovered.toFixed(1) + " (actual " + s.sep + ")";
+      },
+    },
+};
+
+let scene, sceneDef, params = {}, playing = true, spin = true, spinAngle = 0;
+
+// Per-scene governing formula and coupling chain (field -> ... -> result), shown in the Coupling panel.
+const FORMULAS = {
+  balloon:   { formula: "C_vol = V/V\u2080 \u2212 inflation,  one global constraint over all vertices", chain: ["pressure", "volume constraint", "whole mesh"] },
+  muscle:    { formula: "rest \u2190 rest\u2080\u00b7(1 \u2212 contraction\u00b7activation),  volume conserved \u21d2 bulge", chain: ["activation", "fibre rest length", "volume constraint", "girth bulge"] },
+  flag:      { formula: "v += (gravity + wind\u00b7sampled)\u00b7dt,  then the XPBD cloth solve", chain: ["wind field", "sampled force", "cloth constraints", "billow"] },
+  pile:      { formula: "Coulomb:  |\u0394v_tangential| \u2264 \u03bc\u00b7depth", chain: ["gravity", "grain contacts", "friction \u03bc", "angle of repose"] },
+  stretch:   { formula: "compliance(edge) = warp or weft, by edge direction", chain: ["edge direction", "per-edge compliance", "XPBD", "directional sag"] },
+  swirl:     { formula: "z = trilinear(field, position),  v += z\u00b7strength\u00b7dt", chain: ["sampled field", "trilinear", "force", "advection"] },
+  diffusion: { formula: "D = k_B\u00b7T / (6\u03c0\u00b7\u03b7\u00b7r)  [Stokes\u2013Einstein],   \u03c3 = \u221a(2D\u00b7dt),   z = \u221a2\u00b7erfinv(2u\u22121)", chain: ["temperature T", "diffusion D", "Brownian step \u03c3", "measured T"] },
+  aquarium:  { formula: "impulse = kick(T) \u2212 trap\u00b7x \u2212 damp\u00b7v,  box3d resolves overlaps", chain: ["temperature", "Brownian impulse", "box3d collision", "jostling cloud"] },
+  centrifuge:{ formula: "s = 2a\u00b2(\u03c1_p\u2212\u03c1_f)/9\u03b7  [Svedberg],   dr/dt = s\u00b7\u03c9\u00b2\u00b7r", chain: ["spin \u03c9", "centrifugal force", "Stokes drag", "sedimentation by s"] },
+  gyroscope: { formula: "dL/dt = \u03c4 = \u2212mg\u2113(\u00e2 \u00d7 \u1e91),   \u03a9 = mg\u2113/|L|", chain: ["spin |L|", "gravity torque", "dL/dt \u22a5 axis", "precession"] },
+  "pendulum-wave": { formula: "T_n = cycle/(k+n),   \u03b8_n\u2033 = \u2212\u03c9_n\u00b2\u03b8_n  (exact rotation)", chain: ["tuned lengths", "staggered periods", "travelling wave", "re-sync each cycle"] },
+  orbit:     { formula: "a = \u2212G\u00b7M\u00b7r/|r|\u00b3,  velocity-Verlet;   T\u00b2 \u221d a\u00b3", chain: ["gravity 1/r\u00b2", "symplectic step", "closed ellipse", "conserved E, L"] },
+  vibrations:{ formula: "m\u00b7x\u2099\u2033 = k(x\u2099\u208b\u2081 \u2212 2x\u2099 + x\u2099\u208a\u2081),   \u03c9_j = 2\u221a(k/m)\u00b7sin(j\u03c0/2(N+1))", chain: ["springs couple", "normal modes", "standing wave", "\u03c9 climbs with j"] },
+  "figure-eight": { formula: "three equal masses, a = \u2212G\u00b7\u03a3 m\u00b7r/|r|\u00b3,  one shared curve", chain: ["exact push", "N-body gravity", "periodic orbit", "choreography"] },
+};
+
+function project(x, y, z, f) {
+  const yaw = (parseFloat(document.getElementById("yaw").value) + spinAngle) * Math.PI / 180, pit = parseFloat(document.getElementById("pitch").value) * Math.PI / 180;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit);
+  const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+  const y2 = cp * y - sp * z1, z2 = sp * y + cp * z1;
+  const d = 6, s = f.scale * d / (d + z2);
+  return [f.cx + x1 * s, f.cy - y2 * s, z2];
+}
+function bounds(s) { let m = 0; for (let i = 0; i < s.n; i++) { const x = s.state.pos[3 * i], y = s.state.pos[3 * i + 1], z = s.state.pos[3 * i + 2]; const r = Math.sqrt(x * x + y * y + z * z); if (r > m) m = r; } return m; }
+
+function renderSkin(f) {
+  // screen-space metaball: project the centres, evaluate the same cubic kernel in 2D on a quarter-res buffer, threshold
+  const scale = 0.25, ow = Math.max(2, Math.round(cvs.width * scale)), oh = Math.max(2, Math.round(cvs.height * scale));
+  off.width = ow; off.height = oh;
+  const p = scene.state.pos, R = (scene.blobR || 0.4) * f.scale * scale;
+  const b2 = []; for (let i = 0; i < scene.n; i++) { const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f); b2.push({ x: a[0] * scale, y: a[1] * scale, r: R, a: 2, depth: a[2] }); }
+  const img = octx.createImageData(ow, oh), d = img.data;
+  for (let py = 0; py < oh; py++) for (let px = 0; px < ow; px++) {
+    const v = metaballField2d(b2, px, py), o = (py * ow + px) * 4;
+    if (v >= ISO2D) { const t = Math.min(1, (v - ISO2D) / 2.5); d[o] = 40 + t * 180; d[o + 1] = 150 + t * 90; d[o + 2] = 200 + t * 55; d[o + 3] = 235; }
+    else { d[o + 3] = 0; }
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(off, 0, 0, cvs.width, cvs.height);
+}
+
+function render() {
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  const r = Math.max(bounds(scene), 0.5), f = { cx: cvs.width / 2, cy: cvs.height / 2, scale: Math.min(cvs.width, cvs.height) * 0.34 / r };
+  if (skinMode && scene.blobs) { renderSkin(f); return; }
+  const p = scene.state.pos;
+  if (scene.ground) {
+    ctx.strokeStyle = "rgba(80,120,160,0.35)"; ctx.lineWidth = 1;
+    const g = 1.1; for (let t = -3; t <= 3; t++) {
+      const a = project(t * g / 3, 0, -g, f), b = project(t * g / 3, 0, g, f), c = project(-g, 0, t * g / 3, f), d = project(g, 0, t * g / 3, f);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.moveTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.stroke();
+    }
+  }
+  for (const e of scene.edges) {
+    const i = e[0] ?? e.i, j = e[1] ?? e.j;
+    const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f), b = project(p[3 * j], p[3 * j + 1], p[3 * j + 2], f);
+    const depth = (a[2] + b[2]) / 2, shade = Math.max(0.15, Math.min(1, 0.6 + depth * 0.18));
+    ctx.strokeStyle = e.muscle ? `rgba(120,220,255,${shade})` : `rgba(255,150,40,${shade})`;
+    ctx.lineWidth = e.muscle ? 1.6 : 1;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  const pr = scene.pointR ?? 2;
+  if (scene.bodyRadius) {
+    const rad = scene.bodyRadius * f.scale;
+    for (let i = 0; i < scene.n; i++) { const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f); ctx.strokeStyle = "rgba(120,220,255,0.7)"; ctx.fillStyle = "rgba(60,120,180,0.25)"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(a[0], a[1], rad, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#ffcc66"; ctx.beginPath(); ctx.arc(a[0], a[1], 2, 0, 7); ctx.fill(); }
+    return;
+  }
+  for (let i = 0; i < scene.n; i++) { const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f); const pinned = scene.state.invMass[i] === 0; ctx.fillStyle = scene.colors ? scene.colors[i] : (pinned ? "#ff3322" : "#ffcc66"); ctx.beginPath(); ctx.arc(a[0], a[1], pinned ? 3.5 : pr, 0, 7); ctx.fill(); }
+}
+
+const sel = document.getElementById("sceneSel");
+for (const id of Object.keys(SCENES)) { const o = document.createElement("option"); o.value = id; o.textContent = SCENES[id].label; sel.appendChild(o); }
+const presetSel = document.getElementById("presetSel");
+function applyPreset(p) {
+  if (!p || !SCENES[p.scene]) return;
+  sel.value = p.scene; selectScene(p.scene);
+  document.querySelectorAll("#params input").forEach((inp, i) => { const pr = sceneDef.params[i]; if (pr && p.params && p.params[pr.name] !== undefined) { inp.value = p.params[pr.name]; inp.dispatchEvent(new Event("input")); } });
+  if (p.yaw !== undefined) { document.getElementById("yaw").value = p.yaw; document.getElementById("yawv").textContent = p.yaw; }
+  if (p.pitch !== undefined) { document.getElementById("pitch").value = p.pitch; document.getElementById("pitchv").textContent = p.pitch; }
+  const wantSkin = !!p.skin && !!sceneDef.blobs;
+  if (wantSkin !== skinMode) { skinMode = wantSkin; skinBtn.classList.toggle("on", skinMode); skinBtn.textContent = skinMode ? "Skin: on" : "Skin: off"; }
+  if (p.spin !== undefined && p.spin !== spin) { spin = p.spin; spinBtn.classList.toggle("on", spin); spinBtn.textContent = spin ? "Spin: on" : "Spin: off"; }
+}
+// user preset shelf -- saved in this browser, restored through the same path as the curated ones
+const USER_KEY = "swek-lab-userpresets";
+function loadUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || "[]"); } catch { return []; } }
+function storeUser(list) { try { localStorage.setItem(USER_KEY, JSON.stringify(list)); } catch { /* storage off: shelf is session-only */ } }
+function refreshPresets() {
+  presetSel.innerHTML = "<option value=''>\u2014 start from a preset \u2014</option>";
+  const gc = document.createElement("optgroup"); gc.label = "Starters";
+  PRESETS.forEach((p, i) => { const o = document.createElement("option"); o.value = "c:" + i; o.textContent = p.name; gc.appendChild(o); });
+  presetSel.appendChild(gc);
+  const user = loadUser();
+  if (user.length) { const gu = document.createElement("optgroup"); gu.label = "Your presets"; user.forEach((u, i) => { const o = document.createElement("option"); o.value = "u:" + i; o.textContent = u.name; gu.appendChild(o); }); presetSel.appendChild(gu); }
+}
+presetSel.onchange = () => {
+  const v = presetSel.value; if (!v) return;
+  if (v.startsWith("c:")) applyPreset(PRESETS[+v.slice(2)]);
+  else if (v.startsWith("u:")) { const u = loadUser()[+v.slice(2)]; if (u) applyPreset(decodeScene(u.enc)); }
+};
+document.getElementById("savePresetBtn").onclick = () => {
+  const nameInput = document.getElementById("presetName"); const name = (nameInput.value || "").trim() || (sel.value + " " + new Date().toLocaleTimeString());
+  const list = loadUser(); list.push({ name, enc: serializeState() }); storeUser(list); nameInput.value = ""; refreshPresets();
+  presetSel.value = "u:" + (list.length - 1);
+};
+document.getElementById("delPresetBtn").onclick = () => {
+  const v = presetSel.value; if (!v.startsWith("u:")) return; const list = loadUser(); list.splice(+v.slice(2), 1); storeUser(list); refreshPresets();
+};
+// contrast pairs: pick a pair, then flip A/B to re-run the scene on the other side
+const contrastSel = document.getElementById("contrastSel"), flipBtn = document.getElementById("flipBtn");
+CONTRASTS.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = c.name; contrastSel.appendChild(o); });
+let activeContrast = null, activeSide = 0;
+function applyContrastSide() {
+  const c = activeContrast; if (!c) return;
+  applyPreset({ scene: c.scene, params: c.sides[activeSide].params, yaw: c.yaw, pitch: c.pitch, skin: c.skin });
+  flipBtn.textContent = "Showing " + (activeSide === 0 ? "A" : "B") + ": " + c.sides[activeSide].label + "  \u2014 flip to " + (activeSide === 0 ? "B" : "A");
+}
+contrastSel.onchange = () => { const v = contrastSel.value; if (v === "") { activeContrast = null; flipBtn.disabled = true; flipBtn.textContent = "A / B"; return; } activeContrast = CONTRASTS[+v]; activeSide = 0; flipBtn.disabled = false; applyContrastSide(); };
+flipBtn.onclick = () => { if (!activeContrast) return; activeSide = 1 - activeSide; applyContrastSide(); };
+function selectScene(id) {
+  sceneDef = SCENES[id]; scene = sceneDef.build(); params = {}; for (const pr of sceneDef.params) params[pr.name] = pr.default;
+  const box = document.getElementById("params"); box.innerHTML = "";
+  for (const pr of sceneDef.params) {
+    const row = document.createElement("label"); row.className = "row";
+    const val = document.createElement("span"); val.className = "val"; val.textContent = pr.default.toFixed(2);
+    const inp = document.createElement("input"); inp.type = "range"; inp.min = pr.min; inp.max = pr.max; inp.step = pr.step; inp.value = pr.default;
+    inp.oninput = () => { params[pr.name] = parseFloat(inp.value); val.textContent = params[pr.name].toFixed(2); };
+    row.append(pr.label + " ", inp, val); box.appendChild(row);
+  }
+  document.getElementById("sceneDesc").textContent = sceneDef.desc;
+  updateCoupling(id);
+  render();
+}
+function updateCoupling(id) {
+  const fx = FORMULAS[id] || { formula: "", chain: [] };
+  document.getElementById("formula").textContent = fx.formula;
+  const box = document.getElementById("chain"); box.innerHTML = "";
+  fx.chain.forEach((stage, i) => {
+    const pill = document.createElement("span");
+    pill.textContent = stage;
+    pill.style.cssText = "padding:3px 8px;border:1px solid #1e4a30;border-radius:10px;background:#06140c;color:#9fe6c0;font-size:11px;white-space:nowrap";
+    box.appendChild(pill);
+    if (i < fx.chain.length - 1) { const arr = document.createElement("span"); arr.textContent = "\u2192"; arr.style.cssText = "color:#ff9f00;font-weight:700"; box.appendChild(arr); }
+  });
+}
+// v3587 -- the Roundhouse drill-down. Reads the triage and the LIVE proposer registry, and refuses to imply
+// more than either supports.
+let RH = null;
+fetch("/roundhouse/lab-scenes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))
+  .then((j) => { if (j && j.ok) { RH = j; paintRoundhouse(sel.value); } })
+  .catch(() => { /* absent bridge leaves the panel at its default dash rather than claiming a verdict */ });
+
+function paintRoundhouse(id) {
+  const v = document.getElementById("rhVerdict"), k = document.getElementById("rhKey"),
+        b = document.getElementById("initiateBtn");
+  if (!RH) { v.textContent = "bridge not reachable"; return; }
+  const row = (RH.scenes || []).find((r) => r.scene === id);
+  if (!row) { v.textContent = "no triage row for this scene"; k.textContent = ""; b.disabled = true; return; }
+  if (row.registered) {
+    v.innerHTML = "<b style='color:var(--good,#6fe39b)'>registered</b> &mdash; knob <code>" + row.knob + "</code>";
+    b.disabled = false;
+    b.title = "Runs the proposer's propose() and shows the candidate. It does NOT adopt: that needs the adopt tier.";
+  } else if (row.eligible === "candidate") {
+    // *** CANDIDATE IS NOT REGISTERED, AND THE BUTTON STAYS DISABLED. *** Enabling it here would imply an
+    // adjudicator exists, and the whole point of the triage is that nobody has written one yet.
+    v.innerHTML = "<b style='color:#ffcc66'>candidate</b> &mdash; knob <code>" + row.knob +
+                  "</code>, no proposer registered";
+    b.disabled = true;
+    b.title = "An independent key exists for this scene but no adjudicator has been written. registerProposer " +
+              "requires one that can say both yes AND no.";
+  } else {
+    v.innerHTML = "<b style='color:#7f9c8c'>refused</b> &mdash; knob <code>" + row.knob + "</code>";
+    b.disabled = true;
+    b.title = "This scene has no independent measurable a knob search could be right or wrong about.";
+  }
+  k.textContent = row.key || row.reason || "";
+}
+
+sel.addEventListener("change", () => paintRoundhouse(sel.value));
+
+// v3595 -- THE HANDLER THE BUTTON NEVER HAD. It calls the route, and it renders BOTH halves of the answer:
+// what the score wanted, and what the adjudicator would stand behind. Showing only the second would hide the
+// refusal that is the whole point of the loop; showing only the first is what v3594 found runProposer doing,
+// where the only possible output was "refused" on all eight proposers.
+const rhRun = document.getElementById("rhRun");
+const esc = (v) => String(v).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const num = (v) => (typeof v === "number" ? (Math.abs(v) >= 1e-3 && Math.abs(v) < 1e6 ? v.toPrecision(5) : v.toExponential(3)) : esc(JSON.stringify(v)));
+document.getElementById("initiateBtn").onclick = async () => {
+  const btn = document.getElementById("initiateBtn"), scene = sel.value;
+  btn.disabled = true; rhRun.innerHTML = "<span class='hint'>running the proposer...</span>";
+  try {
+    const res = await fetch("/roundhouse/lab-scene-run?scene=" + encodeURIComponent(scene), { cache: "no-store" });
+    const j = await res.json();
+    // A refusal from the route is RENDERED, not swallowed: the two error codes mean different things and a
+    // bare "failed" would make an unwritten adjudicator look like a broken server.
+    if (!j || !j.ok) {
+      rhRun.innerHTML = "<b style='color:#ffcc66'>" + esc((j && j.error) || "request failed") + "</b>" +
+                        (j && j.message ? "<div class='hint'>" + esc(j.message) + "</div>" : "");
+      return;
+    }
+    const out = [];
+    for (const r of j.runs) {
+      const gv = r.greedyVerdict || {}, av = r.acceptedVerdict || null;
+      out.push("<div style='border:1px solid #1e4a30;border-radius:6px;padding:6px 7px;margin-bottom:6px'>");
+      out.push("<div><b>" + esc(r.id) + "</b> <span class='hint'>tier " + esc(r.tier) + " &middot; " +
+               r.tried + " candidates &middot; " + r.adjudicated + " adjudicated &middot; " + r.ms + " ms</span></div>");
+      // THE GREEDY PICK AND ITS VERDICT. It is expected to be refused -- the search maximises a preference and
+      // the key is the independent thing that says no -- so a refusal here is the loop working, not failing.
+      out.push("<div style='margin-top:4px'>search wanted <code>" + esc(r.knobs.join(",")) + " = " + num(r.greedy) +
+               "</code> &rarr; <b style='color:" + (gv.pass ? "#6fe39b" : "#ffcc66") + "'>" +
+               (gv.pass ? "accepted" : "refused") + "</b></div>");
+      if (!gv.pass && gv.evidence && gv.evidence.reason)
+        out.push("<div class='hint'>" + esc(gv.evidence.reason) + "</div>");
+      if (r.accepted === null || r.accepted === undefined)
+        out.push("<div style='margin-top:4px'><b style='color:#ffcc66'>no candidate survived adjudication</b>" +
+                 "<div class='hint'>a real answer: the proposer offered nothing this instrument's key will stand behind</div></div>");
+      else
+        out.push("<div style='margin-top:4px'><b style='color:var(--good,#6fe39b)'>adjudicated: " +
+                 esc(r.knobs.join(",")) + " = " + num(r.accepted) + "</b> <span class='hint'>(rank " +
+                 r.acceptedRank + " of " + r.tried + ")</span></div>" +
+                 (av && av.evidence && av.evidence.law ? "<div class='hint'>" + esc(av.evidence.law) + "</div>" : ""));
+      out.push("<div class='hint' style='margin-top:4px'>" + r.scored.map((s) =>
+                 num(s.candidate) + (s.pass === true ? " ok" : s.pass === false ? " x" : " -")).join(" &middot; ") +
+               "</div>");
+      out.push("</div>");
+    }
+    // *** THE PAGE SAYS WHAT IT DID NOT DO. *** The route cannot apply a value and the tier forbids it; a
+    // reader who assumed the scene had been retuned would be wrong in the direction that matters.
+    out.push("<div class='hint'>PROPOSED, NOT APPLIED -- tier 'propose' means a person or a gate sets the value. " +
+             "The scene above is unchanged.</div>");
+    rhRun.innerHTML = out.join("");
+  } catch (e) {
+    rhRun.innerHTML = "<b style='color:#ffcc66'>" + esc(e && e.message ? e.message : e) + "</b>";
+  } finally { btn.disabled = false; paintRoundhouse(sel.value); }
+};
+sel.onchange = () => selectScene(sel.value);
+document.getElementById("resetBtn").onclick = () => selectScene(sel.value);
+const playBtn = document.getElementById("playBtn");
+playBtn.onclick = () => { playing = !playing; playBtn.classList.toggle("on", !playing); playBtn.textContent = playing ? "Pause" : "Play"; };
+const spinBtn = document.getElementById("spinBtn");
+spinBtn.onclick = () => { spin = !spin; spinBtn.classList.toggle("on", spin); spinBtn.textContent = spin ? "Spin: on" : "Spin: off"; };
+const skinBtn = document.getElementById("skinBtn");
+skinBtn.onclick = () => { skinMode = !skinMode; skinBtn.classList.toggle("on", skinMode); skinBtn.textContent = skinMode ? "Skin: on" : "Skin: off"; };
+document.getElementById("yaw").oninput = (e) => document.getElementById("yawv").textContent = e.target.value;
+document.getElementById("pitch").oninput = (e) => document.getElementById("pitchv").textContent = e.target.value;
+
+let frame = 0;
+function loop() {
+  if (playing) { for (let k = 0; k < 2; k++) sceneDef.step(scene, params); frame++; }
+  if (spin) spinAngle = (spinAngle + 0.3) % 360;
+  render();
+  document.getElementById("status").textContent = `${sel.value}  |  frame ${frame}  |  ${sceneDef.status(scene)}`;
+  requestAnimationFrame(loop);
+}
+
+// ---- save / load: the scene state lives in the URL, so a saved scene is a link (same encoding as the shelf) ----
+function currentState() {
+  return { scene: sel.value, params: { ...params }, yaw: +document.getElementById("yaw").value, pitch: +document.getElementById("pitch").value, skin: skinMode, spin };
+}
+function serializeState() { return encodeScene(currentState()); }
+function restoreFromHash() {
+  const st = decodeScene(location.hash); if (!st || !SCENES[st.scene]) return false;
+  applyPreset(st); return true;
+}
+document.getElementById("linkBtn").onclick = () => {
+  const url = location.origin + location.pathname + "#" + serializeState();
+  history.replaceState(null, "", url);
+  const btn = document.getElementById("linkBtn");
+  const done = () => { btn.textContent = "\u2713 Link copied"; setTimeout(() => (btn.textContent = "\uD83D\uDD17 Copy scene link"), 1400); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, done); else done();
+};
+
+refreshPresets();
+if (!restoreFromHash()) selectScene(Object.keys(SCENES)[0]);
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+// Phase-2 step 4: the mesh `FeatureSource` (docs/DESIGN.md §3.1–3.2).
+//
+// This is the payoff of the shared seam: a triangle mesh is *one more*
+// implementation of the same interface the analytic primitives use. Because
+// everything from the stage-2 contract onward (visibility, abstraction, styling,
+// backend) is generic over `raycast` + `projectedSilhouettes`, a mesh that
+// supplies those renders through the existing pipeline — hidden-line visibility
+// included — with no fork.
+//
+// Features produced: the view-dependent **silhouette** (interpolated zero-set,
+// chained) plus the view-independent **creases** (sharp dihedral edges) and
+// **boundaries** (open edges), each as chained polyline `Curve`s.
+import { cross, dot, normalize, sub } from "../math/vec3.js";
+import { cameraFrame, projectionMatrix, projectPoint } from "../math/camera.js";
+import { HalfEdgeMesh } from "./halfedge.js";
+import { buildTriangleBVH, getBvhMode } from "./bvh.js";
+import { chainVertexEdges, facetedSilhouetteLoops, silhouetteChains, silhouetteLoops } from "./silhouette.js";
+// A mesh counts as a *capped* solid once its largest planar smoothing group covers
+// at least this fraction of its surface area (an extrusion's lid clears it easily;
+// an organic mesh with an incidental coplanar triangle-pair does not).
+const FLAT_FACET_MIN = 0.02;
+import { computeCurvature } from "./curvature.js";
+import { StreamlineAtlas } from "./mesh-hatch.js";
+import { suggestiveContourChains } from "./suggestive.js";
+import { autoName } from "../scene/auto-id.js";
+import { EPS_ABS } from "../curve/epsilon.js";
+export class Mesh {
+    kind = "mesh";
+    id;
+    autoNamed;
+    he;
+    aabb;
+    suggestiveOpt;
+    _curv;
+    bvhEnabled;
+    _bvh;
+    /**
+     * A *faceted* mesh — a hard-edged polyhedron (cube, gem, low-poly), where most
+     * interior edges are creases. Its silhouette is the exact face-based contour
+     * (not the smooth interpolated zero-set, which wanders across flat faces) and it
+     * shades flat per face. A predominantly smooth mesh (sphere, torus, knot, the
+     * gravity sheet — few or no creases) keeps the interpolated path unchanged.
+     */
+    faceted;
+    /**
+     * A *capped* solid — smooth walls meeting flat lids at crease rims (an extruded
+     * rounded slab, the Slack tiles). Neither faceted (its walls are smooth) nor
+     * plainly smooth (the shared-normal zero-set would wander a phantom contour across
+     * the flat lids). Its contour — both the drawn outline and the fillable region —
+     * is the **exact face-based contour**: a clean closed loop that hugs the real
+     * rounded edges and joins the rim creases, so the hatch clips to real edges and the
+     * outline never dangles. Shading stays smooth via the crease-aware corner normals,
+     * which is what keeps the flat lids from doming. (The interpolated zero-set, even a
+     * crease-aware one, is open arcs that leave gaps on a thin lid — hence the face
+     * contour here.)
+     */
+    capped;
+    constructor(input, opts = {}, id) {
+        this.autoNamed = id === undefined;
+        this.id = id ?? autoName(this.kind);
+        this.he = HalfEdgeMesh.build(input, opts);
+        this.aabb = boundsOf(this.he.positions);
+        this.bvhEnabled = opts.bvh ?? true;
+        this.suggestiveOpt = opts.suggestive ? (opts.suggestive === true ? {} : opts.suggestive) : false;
+        const interior = this.he.edges.filter((e) => !e.boundary).length;
+        const creases = this.he.creases().length;
+        this.faceted = creases > 0 && creases >= 0.5 * interior;
+        this.capped = !this.faceted && creases > 0 && this.he.flatFacetFraction >= FLAT_FACET_MIN;
+    }
+    /** Curvature precompute, lazily (only when suggestive contours are requested). */
+    curvature() {
+        return (this._curv ??= computeCurvature(this.he));
+    }
+    bounds() {
+        return this.aabb;
+    }
+    /** Self-occlusion depth tolerance for the exact depth-buffer QI (docs/DESIGN.md
+     *  §3.3.6). A *smooth* mesh's silhouette is the interpolated zero-set, which
+     *  floats off the flat facets by up to a facet's chord-sagitta, so a self-hit
+     *  only counts as a genuine (separate-sheet) occlusion beyond ~an edge length.
+     *  A *faceted* mesh has exactly-flat faces and its crease/silhouette points lie
+     *  exactly on those facets — the raycast is exact — so it needs no such slack;
+     *  the base analytic floor alone keeps the visible/hidden boundary crisp instead
+     *  of smeared across a whole face. */
+    selfNudge() {
+        // A capped solid still *draws* an interpolated silhouette (it floats off the
+        // facets), so it keeps the smooth slack; only a faceted mesh is exact everywhere.
+        return this.faceted ? 0 : 0.75 * this.he.meanEdgeLength;
+    }
+    extractFeatures(cam) {
+        const feats = [];
+        const P = this.he.positions;
+        const asPolyline = (idxs) => idxs.map((v) => P[v]);
+        // A faceted mesh's silhouette edges are all creases (a facing flip needs an
+        // angle between the faces), so the crease features below already draw the whole
+        // outline — emitting a separate silhouette would double it. A smooth mesh has
+        // no such edges, so its silhouette is the interpolated zero-set.
+        //
+        // Every feature carries a stable `id` (temporal coherence): view-independent
+        // chains (creases/boundaries) are keyed on their minimal vertex index — fully
+        // stable; view-dependent chains (silhouette/suggestive) on their minimal
+        // crossed mesh edge — stable for as long as that edge stays crossed.
+        // A capped solid draws its exact face-based contour: a *closed* loop that hugs
+        // the real rounded edges and joins the rim creases. The interpolated zero-set —
+        // even the crease-aware one — is a set of *open* arcs that terminate at the
+        // creases, and on a thin lid those arcs are short stubs that don't reach the rim,
+        // leaving dangling gaps in the outline. The face contour has no such seam and is
+        // smooth at any reasonable tessellation. A plain smooth mesh keeps the classic
+        // interpolated zero-set; a faceted mesh draws neither (its creases trace it all).
+        if (this.capped) {
+            facetedSilhouetteLoops(this.he, cam).forEach((loop, i) => {
+                if (loop.length >= 2)
+                    feats.push({ type: "silhouette", owner: this.id, id: `${this.id}/silhouette:${i}`, curve: { kind: "polyline", pts: loop }, attrs: {} });
+            });
+        }
+        else if (!this.faceted) {
+            for (const c of silhouetteChains(this.he, cam)) {
+                if (c.pts.length >= 2)
+                    feats.push({ type: "silhouette", owner: this.id, id: `${this.id}/silhouette:${c.key}`, curve: { kind: "polyline", pts: c.pts }, attrs: {} });
+            }
+        }
+        for (const c of chainVertexEdges(this.he.creases().map((e) => [e.v0, e.v1]))) {
+            if (c.vertices.length >= 2)
+                feats.push({ type: "crease", owner: this.id, id: `${this.id}/crease:${c.key}`, curve: { kind: "polyline", pts: asPolyline(c.vertices) }, attrs: {} });
+        }
+        for (const c of chainVertexEdges(this.he.boundaries().map((e) => [e.v0, e.v1]))) {
+            if (c.vertices.length >= 2)
+                feats.push({ type: "boundary", owner: this.id, id: `${this.id}/boundary:${c.key}`, curve: { kind: "polyline", pts: asPolyline(c.vertices) }, attrs: {} });
+        }
+        if (this.suggestiveOpt) {
+            for (const c of suggestiveContourChains(this.he, cam, this.curvature(), this.suggestiveOpt)) {
+                if (c.pts.length >= 2)
+                    feats.push({
+                        type: "suggestive",
+                        owner: this.id,
+                        id: `${this.id}/suggestive:${c.key}`,
+                        curve: { kind: "polyline", pts: c.pts },
+                        attrs: c.strength < 1 ? { strength: c.strength } : {},
+                    });
+            }
+        }
+        return feats;
+    }
+    /** The apparent contour used to seed QI crossings and bound hatch: the exact
+     *  face-based outline for a faceted or capped solid, the interpolated zero-set for
+     *  a plainly smooth mesh. */
+    silhouetteWorld(cam) {
+        // Both faceted and capped solids fill from the exact face contour — a closed
+        // loop that hugs real edges. (A capped solid's *drawn* silhouette is the
+        // crease-aware curve, but that terminates at rims and can't bound a region.)
+        if (this.faceted || this.capped)
+            return facetedSilhouetteLoops(this.he, cam);
+        return silhouetteLoops(this.he, cam);
+    }
+    projectedSilhouettes(cam) {
+        const P = projectionMatrix(cam);
+        return this.silhouetteWorld(cam)
+            .filter((loop) => loop.length >= 2)
+            .map((loop) => ({ kind: "polyline", pts: loop.map((p) => projectPoint(P, p).point) }));
+    }
+    /** The fillable region(s): closed silhouette loops. The scene's per-sample clip
+     *  carves the visible surface and shades it via this source's `raycast` normals. */
+    hatchRegions(cam, _light) {
+        const Pm = projectionMatrix(cam);
+        const out = [];
+        for (const loop of this.silhouetteWorld(cam)) {
+            if (loop.length < 4)
+                continue;
+            const a = loop[0];
+            const b = loop[loop.length - 1];
+            const closed = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-9;
+            if (!closed)
+                continue; // only closed contours are fillable
+            out.push({
+                owner: this.id,
+                outline: { kind: "polyline", pts: loop.map((p) => projectPoint(Pm, p).point) },
+                mode: "single",
+                angle: 0,
+                tone: 0.5,
+            });
+        }
+        return out;
+    }
+    /** Curvature-driven hatch: streamlines of the principal-direction field (dir1
+     *  for family 0, dir2 for family 1). Returns `[]` on isotropic surfaces (e.g. a
+     *  sphere), so the scene falls back to straight parallel hatch. (docs/DESIGN.md §2.6)
+     *
+     *  Temporal coherence: streamlines come from a static object-space
+     *  `StreamlineAtlas` (traced once per density level, cached on the source —
+     *  intrinsic geometry, like the curvature field). The camera only picks the
+     *  atlas *level*; it never re-seeds, so lines cannot drift or pop under
+     *  camera motion except at discrete level switches, which purely add or
+     *  remove the finest level. */
+    hatchField(cam, opts) {
+        const desired = this.screenToWorldSpacing(cam, opts.spacingPx);
+        const curv = this.curvature();
+        const atlas = (f) => (this._atlas[f] ??= new StreamlineAtlas(this.he, curv, this.atlasBaseSpacing(), f));
+        const f0 = atlas(0).curvesFor(desired);
+        if (f0.length === 0)
+            return [];
+        const families = [{ curves: f0 }];
+        if (opts.maxFamilies >= 2) {
+            const f1 = atlas(1).curvesFor(desired);
+            if (f1.length)
+                families.push({ curves: f1 });
+        }
+        return families;
+    }
+    _atlas = [];
+    /** Level-0 (coarsest) atlas spacing: a quarter of the bounds diagonal — a
+     *  view-independent reference density the LOD ladder halves from. */
+    atlasBaseSpacing() {
+        const b = this.aabb;
+        return 0.25 * Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+    }
+    /** Convert a desired on-screen hatch spacing (px) to a world-space separation,
+     *  by measuring screen pixels per world unit at the object centre. The probe
+     *  runs along the camera's *right* axis, so the estimate is exact for ortho
+     *  and, for perspective, depends only on the distance to the object — not on
+     *  the view direction. That matters for the discrete atlas level: an orbit at
+     *  constant distance must not jitter the demand across a level boundary. */
+    screenToWorldSpacing(cam, spacingPx) {
+        const P = projectionMatrix(cam);
+        const b = this.aabb;
+        const c = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+        const sc = projectPoint(P, c).point;
+        const r = cameraFrame(cam).right;
+        const q = projectPoint(P, [c[0] + r[0], c[1] + r[1], c[2] + r[2]]).point;
+        const pxPerWorld = Math.hypot(q[0] - sc[0], q[1] - sc[1]);
+        return spacingPx / (pxPerWorld || 1);
+    }
+    /** The BVH over this mesh's triangles, built on first use. Static scaffold
+     *  (docs/DESIGN.md §0.4): `he.positions` is readonly and never mutated, so one
+     *  build lasts the instance's life. Lazy rather than eager because `Mesh` is
+     *  public API — a consumer may only ever want `extractFeatures` /
+     *  `projectedSilhouettes` and never cast a ray. Mirrors `curvature()` above. */
+    bvh() {
+        return (this._bvh ??= buildTriangleBVH(this.he, this.aabb));
+    }
+    /** Möller–Trumbore ray–triangle intersection; interpolated crease-aware corner
+     *  normals for shading, face normal for the front/back flag.
+     *
+     *  The BVH only narrows *which* faces are tested — it is pure culling in front of
+     *  an unchanged intersector, offering candidates in ascending face index exactly
+     *  as the old full scan visited them (see src/mesh/bvh.ts for why that ordering
+     *  is load-bearing). Brute force is the same code path with a null candidate set,
+     *  never a second implementation: that is what makes the parity tests meaningful. */
+    raycast(ray) {
+        const mode = getBvhMode();
+        if (!this.bvhEnabled || mode === "off" || this.he.faceCount === 0) {
+            return this.intersectFaces(ray, null);
+        }
+        const fast = this.intersectFaces(ray, this.bvh().candidates(ray));
+        if (mode !== "verify")
+            return fast;
+        // Fail loudly, never silently (.claude/rules/numerical-robustness.md): a BVH
+        // that drops a hit must not degrade quietly into a wrong-but-plausible render.
+        assertSameHits(fast, this.intersectFaces(ray, null), this.id, ray);
+        return fast;
+    }
+    /** `faces === null` ⇒ scan every face in index order (the pre-BVH behavior). */
+    intersectFaces(ray, faces) {
+        const { origin: o, dir: d } = ray;
+        const P = this.he.positions;
+        const CN = this.he.cornerNormals;
+        const hits = [];
+        const n = faces === null ? this.he.faceCount : faces.length;
+        for (let i = 0; i < n; i++) {
+            const f = faces === null ? i : faces[i];
+            const t = this.he.triangles[f];
+            const p0 = P[t[0]];
+            const p1 = P[t[1]];
+            const p2 = P[t[2]];
+            const e1 = sub(p1, p0);
+            const e2 = sub(p2, p0);
+            const h = cross(d, e2);
+            const a = dot(e1, h);
+            if (Math.abs(a) < EPS_ABS)
+                continue; // ray parallel to the triangle
+            const inv = 1 / a;
+            const s = sub(o, p0);
+            const u = inv * dot(s, h);
+            if (u < 0 || u > 1)
+                continue;
+            const q = cross(s, e1);
+            const v = inv * dot(d, q);
+            if (v < 0 || u + v > 1)
+                continue;
+            const tHit = inv * dot(e2, q);
+            const point = [o[0] + d[0] * tHit, o[1] + d[1] * tHit, o[2] + d[2] * tHit];
+            // A faceted mesh shades flat: return the face normal so each facet reads as a
+            // single uniform tone. A smooth mesh interpolates the *corner* normals so it
+            // shades continuously light→dark — and, because those normals are crease-aware,
+            // a flat lid meeting rounded walls at a crease still shades flat rather than
+            // being averaged into a spurious dome.
+            const fn = this.he.faceNormals[f];
+            let normal;
+            if (this.faceted) {
+                normal = fn;
+            }
+            else {
+                const w0 = 1 - u - v;
+                const n0 = CN[3 * f];
+                const n1 = CN[3 * f + 1];
+                const n2 = CN[3 * f + 2];
+                normal = normalize([
+                    w0 * n0[0] + u * n1[0] + v * n2[0],
+                    w0 * n0[1] + u * n1[1] + v * n2[1],
+                    w0 * n0[2] + u * n1[2] + v * n2[2],
+                ]);
+            }
+            const frontFacing = dot(fn, d) < 0;
+            hits.push({ t: tHit, point, normal, frontFacing });
+        }
+        return hits.sort((p, q) => p.t - q.t);
+    }
+}
+/** Bit-exact Hit[] comparison for `setBvhMode("verify")`. Object.is, not ===, so a
+ *  +0/-0 drift in a normal is caught rather than shrugged off. */
+function assertSameHits(fast, slow, id, ray) {
+    const where = `${id} ray o=[${ray.origin}] d=[${ray.dir}]`;
+    if (fast.length !== slow.length) {
+        throw new Error(`BVH divergence (${where}): ${fast.length} hits vs ${slow.length} brute-force`);
+    }
+    for (let i = 0; i < fast.length; i++) {
+        const a = fast[i];
+        const b = slow[i];
+        const same = Object.is(a.t, b.t) &&
+            a.frontFacing === b.frontFacing &&
+            Object.is(a.point[0], b.point[0]) && Object.is(a.point[1], b.point[1]) && Object.is(a.point[2], b.point[2]) &&
+            Object.is(a.normal[0], b.normal[0]) && Object.is(a.normal[1], b.normal[1]) && Object.is(a.normal[2], b.normal[2]);
+        if (!same) {
+            throw new Error(`BVH divergence (${where}) at hit ${i}: t=${a.t} vs ${b.t}, ` +
+                `point=[${a.point}] vs [${b.point}], normal=[${a.normal}] vs [${b.normal}], ` +
+                `frontFacing=${a.frontFacing} vs ${b.frontFacing}`);
+        }
+    }
+}
+function boundsOf(positions) {
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const p of positions) {
+        for (let i = 0; i < 3; i++) {
+            if (p[i] < min[i])
+                min[i] = p[i];
+            if (p[i] > max[i])
+                max[i] = p[i];
+        }
+    }
+    return { min: [min[0], min[1], min[2]], max: [max[0], max[1], max[2]] };
+}
+//# sourceMappingURL=mesh-source.js.map

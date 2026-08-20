@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lineage &#183; SweK</title>
+<link rel="icon" href="/favicon.ico" />
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 700px at 50% -10%, #0d1a14 0%, #060a09 60%, #040706 100%);
+    color: #dfeee7; font: 15px/1.68 ui-rounded, system-ui, -apple-system, sans-serif;
+    display: flex; align-items: flex-start; justify-content: center; padding: 40px 18px 64px; box-sizing: border-box;
+  }
+  .card {
+    max-width: 560px; width: 100%;
+    background: linear-gradient(160deg, #0b1712, #0a1016);
+    border: 1px solid rgba(150, 200, 175, 0.28); border-radius: 18px;
+    padding: 30px 30px 26px; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+    position: relative;
+  }
+  .star { text-align: center; color: #7fbf9e; font-size: 22px; margin-bottom: 8px; }
+  .photo { text-align: center; margin: 0 0 16px; }
+  .photo img {
+    max-width: 220px; width: 70%; border-radius: 12px;
+    border: 1px solid rgba(150, 200, 175, 0.3); box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5); display: inline-block;
+  }
+  .photo .cap { color: #7fbf9e; font-size: 11.5px; letter-spacing: 0.05em; margin-top: 7px; }
+  h1 { text-align: center; font-size: 21px; font-weight: 700; color: #eafff4; margin: 0 0 18px; }
+  p { margin: 0 0 14px; }
+  .back {
+    display: inline-block; margin-top: 10px; color: #9fc7b4; text-decoration: none;
+    border: 1px solid rgba(150, 190, 175, 0.35); border-radius: 999px; padding: 7px 18px;
+    font-size: 13px; letter-spacing: 0.04em; transition: all .15s ease;
+  }
+  .back:hover { background: rgba(40, 90, 70, 0.18); color: #c9ead9; }
+  .foot { text-align: center; margin-top: 18px; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="star">&#10022;</div>
+    <div class="photo" id="ded-photo">
+      <img src="/dedication.jpg" alt="Steve Swerling" onerror="document.getElementById('ded-photo').style.display='none'" />
+      <div class="cap">Steve Swerling</div>
+    </div>
+    <h1>For my father, Steve Swerling</h1>
+    <p>This project is dedicated to the memory of my father, <b>Steve Swerling</b> &#8212; one of the founding engineers of <b>Mentor Graphics</b>.</p>
+    <p>In 1981, he and a small team bet a company on an idea. Rather than build their own computers, they would build software for machines that could each stand alone <i>or</i> link together as peers &#8212; sharing compute directly, with no mainframe bottleneck in the middle. They chose the Apollo workstation, and Mentor Graphics went on to become one of the giants of electronic design automation: the software the world still uses to design the chips inside nearly everything.</p>
+    <p>Some forty years later, without knowing that history, I spent nineteen hundred-odd iterations building my own small version of the same idea &#8212; a fabric of ordinary machines, each running the whole system, linked together as peers. It turns out it runs in the family.</p>
+    <p>Thanks, Dad. This one's yours too.</p>
+    <div class="foot"><a class="back" href="/server.html">&#8592; Back</a></div>
+  </main>
+</body>
+</html>

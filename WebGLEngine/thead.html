@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK — Wireframe Head</title>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#06080a; color:var(--ink); font:13px ui-rounded,system-ui,sans-serif; }
+  #wrap { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; }
+  #bar { position:fixed; left:0; right:0; bottom:0; display:flex; gap:7px; padding:9px 12px; flex-wrap:wrap; align-items:center; background:linear-gradient(0deg,#06080aee,#06080a55,transparent); z-index:5; }
+  button { background:#0c1712cc; color:#8effc4; border:1px solid #2a5a3a; border-radius:9px; padding:8px 12px; font:inherit; font-size:12.5px; cursor:pointer; }
+  button:active { transform:scale(.97); }
+  button.on { background:#123a26; color:#adffd0; }
+  #say { flex:1; min-width:150px; background:#0c1410; color:var(--ink); border:1px solid #2a5a3a; border-radius:9px; padding:8px 11px; font:inherit; }
+  #tag { position:fixed; top:10px; left:12px; font:11px ui-monospace,monospace; color:#5ec98e; opacity:.75; z-index:5; }
+  #mood { position:fixed; top:10px; right:12px; z-index:5; }
+  #mood select { background:#0c1410cc; color:#cfe; border:1px solid #2a5a3a; border-radius:8px; padding:5px 8px; font:12px; }
+  #navpad { position:fixed; right:12px; bottom:64px; z-index:6; background:#06080aaa; border:1px solid #1d3a2b; border-radius:12px; padding:7px; backdrop-filter:blur(5px); }
+  #navpad .npgrid { display:grid; grid-template-columns:repeat(3,34px); grid-auto-rows:30px; gap:4px; }
+  #navpad button { background:#0c1712; color:#8effc4; border:1px solid #2a5a3a; border-radius:7px; font-size:14px; cursor:pointer; padding:0; line-height:1; }
+  #navpad button:hover { background:#153826; }
+  #navpad button:active { transform:scale(.92); }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<script>
+/* v3656 -- ?embed=1, ADDED BECAUSE A GATE FOUND IT MISSING, NOT BECAUSE ANYBODY REPORTED IT.
+   ui/avatarSwitch.js has mounted this page with ?embed=1 since v3556 and the page never read the word.
+   Same defect as blob-avatar.html, found the same round by ui/avatarSwitch-embed-selfcheck.mjs, which is
+   the point of writing the rule as a CLASS: Keith reported ONE of these three. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("embed") !== "1") return;
+    document.documentElement.setAttribute("data-embed", "1");
+    var st = document.createElement("style");
+    st.textContent = 'html[data-embed="1"] ' + "#tag, #mood, #cap, #navpad, #bar".split(",").map(function (s) { return s.trim(); })
+      .join(', html[data-embed="1"] ') + ' { display: none !important; }' +
+      'html[data-embed="1"] body { overflow: hidden; }';
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+</script>
+<div id="tag">SweK · default wireframe head (no model loaded)</div>
+<div id="mood"><select id="moodSel" title="expression">
+  <option value="neutral">😐 neutral</option><option value="happy">🙂 happy</option>
+  <option value="sad">🙁 sad</option><option value="surprised">😮 surprised</option><option value="angry">😠 angry</option>
+</select>
+  <!-- v3117 -- THE FRONT DOOR. ui/faceRig.js would otherwise be a module with no caller, which v3115 spent a
+       whole round establishing is unfinished work wearing a finished shape. This is also the only way to answer
+       whether the mapping reads as a face rather than as a puppet, which needs a real one. -->
+  <button id="faceBtn" title="drive this head from your webcam">face: off</button>
+  <span id="faceState" style="font-size:11px;color:#8b97a8;margin-left:6px;"></span>
+</div>
+<!-- v3124 -- EXPRESSIVE CAPTION MARKUP AS AN INPUT. The head has had talk(), mood(), gesture() and (since
+     v3117) continuous channels; what it never had was a way to be TOLD what to express in the notation captions
+     already use. Type a line with ALL-CAPS, [sighs], [joyful] or *whispers* and watch. -->
+<div id="cap" style="position:fixed;left:12px;bottom:12px;z-index:5;display:flex;gap:6px;align-items:center;">
+  <input id="capIn" placeholder="[joyful] We DID it!" style="width:340px;background:#0c1410cc;color:#cfe;border:1px solid #2a5a3a;border-radius:8px;padding:6px 9px;font:12px system-ui">
+  <button id="capBtn">speak it</button>
+  <span id="capMsg" style="font-size:11px;color:#8b97a8;max-width:32ch"></span>
+  <span id="capClock" style="font-size:11px;color:#8b97a8;"></span>
+</div>
+<!-- v1963 — manual 3D navigation pad. Hover shows the keyboard key for each motion. -->
+<div id="navpad">
+  <div class="npgrid">
+    <button data-nav="up"        title="Move up · key: R / PageUp">▲</button>
+    <button data-nav="rotUp"     title="Look up · key: W">⤒</button>
+    <button data-nav="in"        title="Zoom in · key: + / =">＋</button>
+    <button data-nav="left"      title="Move left · key: A / ←">◀</button>
+    <button data-nav="recenter"  title="Re-center / orient · key: Home / 0">⊚</button>
+    <button data-nav="right"     title="Move right · key: D / →">▶</button>
+    <button data-nav="down"      title="Move down · key: F / PageDown">▼</button>
+    <button data-nav="rotDown"   title="Look down · key: S">⤓</button>
+    <button data-nav="out"       title="Zoom out · key: - / _">－</button>
+    <button data-nav="rotLeft"   title="Rotate left · key: Q / ,">⟲</button>
+    <button data-nav="orient"    title="Face front (reset orientation) · key: Backspace">⌂</button>
+    <button data-nav="rotRight"  title="Rotate right · key: E / .">⟳</button>
+  </div>
+</div>
+<div id="bar">
+  <input id="say" placeholder="type something and press Talk…" value="Hello, I am the default SweK wireframe head." />
+  <button id="talkBtn">🗣 Talk</button>
+  <button id="blinkBtn">😑 Blink</button>
+  <button id="lookBtn" class="on">👀 Auto-look</button>
+  <button id="nodBtn">🙂 Nod</button>
+  <button id="shakeBtn">🙅 Shake</button>
+  <label style="display:inline-flex;gap:5px;align-items:center;color:#8effc4;font-size:11.5px">expr <input id="exprSlider" type="range" min="0" max="2" step="0.05" value="1" style="width:80px;vertical-align:middle"></label>
+  <button id="wireBtn" class="on">▦ Wire</button>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "/vendor/three/jsm/loaders/GLTFLoader.js";
+import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
+import { buildWireframeHead } from "/face/wireframeHead.js";
+
+const cv = document.getElementById("cv");
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06080a);
+const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+cam.position.set(0, 0.15, 3.1);
+const controls = new OrbitControls(cam, renderer.domElement);
+controls.enableDamping = true; controls.target.set(0, 0.05, 0);
+controls.minDistance = 1.6; controls.maxDistance = 6;
+
+scene.add(new THREE.HemisphereLight(0x88ddff, 0x102018, 0.7));
+const key = new THREE.PointLight(0x66ffcc, 0.8, 20); key.position.set(2, 3, 3); scene.add(key);
+
+// ---------- the procedural wireframe head/torso ----------
+// v3239 -- *** THE SHAPE MOVED TO face/wireframeHead.js AND THIS PAGE NOW ASKS FOR IT. ***
+// The Pip-Boy's main screen wants the same head, and a second copy of these fifty lines would be the ninth
+// instance this session of a thing declared twice and compared never. THE ANIMATION BELOW DID NOT MOVE: the
+// moods, the live channels, the face-rig feed and the gesture vocabulary are ~450 lines that only this page
+// uses, and relocating them would have been a large refactor with real regression risk to solve a problem
+// nobody has. THE SHAPE IS WHAT WOULD DIVERGE; the animation is not.
+// The names below are exactly the ones this file used before, so everything downstream is untouched.
+const _rig = buildWireframeHead(THREE);
+scene.add(_rig.root);
+const { head, jaw, jawMesh, JAW_PIVOT_Y, skull, crown, eyeL, eyeR, browL, browR, moodCurve, lipRing, neck, torso,
+        mats, mkWire, wireMat, WIRE, WIRE2 } = _rig;
+// ---------- expression + animation state ----------
+const state = {
+  talking: false, talkEnergy: 0, talkUntil: 0,
+  blink: 0, blinkT: 0, nextBlink: 1.5 + Math.random()*3,
+  look: new THREE.Vector2(0,0), lookTarget: new THREE.Vector2(0,0), autoLook: true, nextLook: 1,
+  nod: 0, shake: 0, tilt: 0, bounce: 0, dance: 0, bow: 0,
+  mood: "neutral", exprGain: 1.0,
+  // v3117 -- LIVE CHANNELS, shaped EXACTLY like a MOODS entry so the frame below can take either without
+  // knowing which. Same-shape is the point: a second vocabulary would drift from the first the moment anyone
+  // added a channel to one of them. null = fall back to the named mood.
+  channels: null, faceJaw: null, signalLost: false,
+  // v3125 -- WHERE THE CHANNELS CAME FROM, because gain must stop at measured data. Defaults to "caption"
+  // (authored); ui/faceRig.js passes "face".
+  channelSource: "caption",
+};
+const MOODS = {
+  // mouthCurve: +smile (∪) / -frown (∩) / 0 flat.  o: force a round open "o" mouth.
+  neutral:   { brow: 0.0,  mouthCurve: 0.0,  eye: 1.0,  o: false },
+  happy:     { brow: 0.12, mouthCurve: 1.0,  eye: 0.95, o: false },
+  sad:       { brow: -0.18,mouthCurve: -0.9, eye: 1.0,  o: false },
+  surprised: { brow: 0.30, mouthCurve: 0.0,  eye: 1.28, o: true  },
+  angry:     { brow: -0.34,mouthCurve: -0.45,eye: 0.82, o: false },
+};
+
+// ---------- public API (so the engine / TTS can drive it) ----------
+// Mirrors the alive-layer vocabulary: talk(seconds), blink(), look(x,y), mood(name), nod(), shake().
+const api = {
+  talk(seconds){ state.talking = true; state.talkUntil = performance.now() + (seconds>0?seconds*1000:900); },
+  stopTalk(){ state.talking = false; },
+  blink(){ state.blinkT = 0.001; },
+  look(x, y){ state.autoLook = false; state.lookTarget.set(Math.max(-1,Math.min(1,x)), Math.max(-1,Math.min(1,y))); },
+  autoLook(on){ state.autoLook = on !== false; },
+  mood(name){ if (MOODS[name]) state.mood = name; },
+  expression(gain){ state.exprGain = Math.max(0, Math.min(2, gain)); },   // 0..2 intensity of jaw + mood
+  // v1963 — the full avatar gesture vocabulary, expressed with HEAD parts only (the body versions map to
+  // head motions): wave->tilt, jump->bounce, dance->sway, bow->deep nod, point->look, speak->talk.
+  gesture(name){
+    switch (String(name||"").toLowerCase()){
+      case "wave":  state.tilt = 1; break;
+      case "jump":  state.bounce = 1; break;
+      case "dance": state.dance = 1.2; break;
+      case "bow":   state.bow = 1; break;
+      case "point": api.look((Math.random()*2-1), 0.3); setTimeout(()=>api.autoLook(true), 1500); break;
+      case "speak": api.talk(1.6); break;
+      case "nod":   state.nod = 1; break;
+      case "shake": state.shake = 1; break;
+      default: break;
+    }
+  },
+  emote(mood, gestures){ if (mood) api.mood(mood); (gestures||[]).forEach(g => api.gesture(g)); },
+  nod(){ state.nod = 1; },
+  shake(){ state.shake = 1; },
+  wireframe(on){ mats.forEach(m => m.wireframe = on !== false); },
+
+  // v3117 -- THE CONTINUOUS SURFACE. The head has always had a hinged jaw, tilting brows, scaling eyes and a
+  // curving mouth; the only way in was FIVE NAMED MOODS. A face has no moods -- it has coefficients -- so this
+  // exposes what the rig could always do. Pass null to hand control back to the named moods.
+  //   brow  -0.4..0.4   mouthCurve -1..1 (+smile / -frown)   eye 0.8..1.3   o bool   jaw 0..1
+  channels(ch, source){
+    state.channelSource = source === "face" ? "face" : "caption";
+    if (!ch) { state.channels = null; state.faceJaw = null; return; }
+    state.channels = {
+      brow: Math.max(-0.4, Math.min(0.4, +ch.brow || 0)),
+      mouthCurve: Math.max(-1, Math.min(1, +ch.mouthCurve || 0)),
+      eye: Math.max(0.6, Math.min(1.4, ch.eye == null ? 1 : +ch.eye)),
+      o: !!ch.o,
+    };
+    state.faceJaw = ch.jaw == null ? null : Math.max(0, Math.min(1, +ch.jaw));
+  },
+
+  // v3117 -- *** SIGNAL LOST IS NOT AN EXPRESSION. *** With continuous channels the naive failure -- every
+  // coefficient at zero -- is a PERFECTLY CONVINCING NEUTRAL FACE, which is a more persuasive lie than the
+  // robot's version of the same bug because the head looks deliberate. So losing the face changes the WIRE
+  // COLOUR, which no expression can imitate: a face can be calm, but no face is amber.
+  signalLost(on){
+    state.signalLost = on !== false;
+    const c = state.signalLost ? 0xffcc66 : null;
+    mats.forEach(m => { if (c === null) { if (m.userData._c0 != null) m.color.setHex(m.userData._c0); }
+                        else { if (m.userData._c0 == null) m.userData._c0 = m.color.getHex(); m.color.setHex(c); } });
+    if (state.signalLost) { state.channels = null; state.faceJaw = null; }
+  },
+};
+// v3125 -- loaded once and held. If the import fails the loop falls back to the previous arithmetic rather
+// than freezing the head: a rig that stops moving because a MIXER did not load is a worse failure than a rig
+// whose gain is applied too broadly.
+let _rigMix = null;
+import("/ui/rigMix.js").then((m) => { _rigMix = m; }).catch((e) => console.warn("[thead] rigMix unavailable, using legacy gain:", e && e.message));
+
+window.sweKHead = api;
+
+// v3124 -- caption markup -> the rig. The parser is pure and lives in ui/captionExpression.js; this page only
+// supplies text and shows what came back, including the tags it did NOT understand.
+(function () {
+  const inp = document.getElementById("capIn"), btn = document.getElementById("capBtn"), msg = document.getElementById("capMsg");
+  if (!btn) return;
+  const run = async () => {
+    const { parseExpressiveCaption, segmentToRig } = await import("/ui/captionExpression.js");
+    const { segments, unknownTags } = parseExpressiveCaption(inp.value || "");
+    if (!segments.length) { msg.textContent = "nothing to speak"; msg.style.color = "#8b97a8"; return; }
+    // UNRECOGNISED TAGS ARE SHOWN, not dropped. If a caption says [bewildered] and the face does nothing, the
+    // viewer cannot otherwise tell whether the tag is unsupported or the head is broken.
+    msg.textContent = unknownTags.length ? "unrecognised tag(s): " + unknownTags.join(", ") : "";
+    msg.style.color = unknownTags.length ? "#fc6" : "#8b97a8";
+
+    // v3127 -- ANCHORED TO A CLOCK RATHER THAN TO WALL TIME. The timeline is FRACTIONS, so the same segments
+    // follow real audio progress when a clip is playing and a stopwatch when nothing is. v3124 scheduled on
+    // estimates alone with no knowledge of whether audio existed, so a clip longer than the guess left the face
+    // blank mid-sentence -- drift that reads as bad acting rather than as a bug.
+    const { planTimeline, readClock, sampleAt, sampleAtChar, clockLine, spokenTextOf } = await import("/ui/captionClock.js");
+    const timeline = planTimeline(segments);
+    const started = performance.now();
+    let lastSeg = -1, boundary = null;
+
+    // v3128 -- THE BROWSER HAS BEEN FIRING WORD BOUNDARIES ALL ALONG AND NOTHING LISTENED. onboundary reports
+    // the character it has reached AS IT SPEAKS -- not a fraction, an actual position -- which is a better
+    // clock than anything derived and costs nothing.
+    //
+    // *** THE TEXT HANDED TO THE ENGINE MUST BE spokenTextOf(segments), NOT THE RAW CAPTION. *** charIndex
+    // indexes what was SPOKEN, and the markup contains [tags] that are never uttered; resolving a charIndex
+    // against the typed line drifts by the length of every tag consumed -- 17 characters on a two-tag line,
+    // and it would look perfect on a tagless one.
+    const spoken = spokenTextOf(segments);
+    try {
+      if (window.speechSynthesis && spoken) {
+        const utt = new SpeechSynthesisUtterance(spoken);
+        utt.onboundary = (e) => { if (Number.isFinite(e.charIndex)) boundary = { charIndex: e.charIndex, spokenLength: timeline.spokenLength }; };
+        // A voice that never fires onboundary simply leaves `boundary` null and the clock falls to its next
+        // tier -- support is uneven across voices, and the fallback is the whole reason the tiers exist.
+        utt.onend = () => { boundary = { charIndex: timeline.spokenLength, spokenLength: timeline.spokenLength }; };
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utt);
+      }
+    } catch (e) { /* no speech engine: the estimated clock still drives the face */ }
+    const drive = () => {
+      const el = (typeof _wavEl !== "undefined" && _wavEl && !_wavEl.ended) ? _wavEl : null;
+      const c = readClock(el, (performance.now() - started) / 1000, timeline.estimatedSeconds, boundary);
+      // NAME THE CLOCK. A measured clock and a guessed one drive the same face; only this line tells anyone
+      // which they are looking at.
+      if (clockEl) { clockEl.textContent = clockLine(c); clockEl.style.color = c.clock === "measured" ? "#8b97a8" : "#fc6"; }
+      // An ALIGNED clock carries a character, not a fraction -- resolve it by character so a long word cannot
+      // round into the wrong segment.
+      const i = c.clock === "aligned" ? sampleAtChar(timeline, c.charIndex) : sampleAt(timeline, c.progress);
+      if (i >= 0 && i !== lastSeg) { lastSeg = i; applySeg(segments[i]); }
+      if (c.progress < 1) requestAnimationFrame(drive);
+      else { api.channels(null); api.expression(1); }
+    };
+    const applySeg = (seg) => {
+      const rig = segmentToRig(seg);
+      {
+        if (rig.mood) api.mood(rig.mood);
+        // NULL CHANNELS MEANS "THE CAPTION SAID NOTHING ABOUT THE FACE" -- hand control back to the named
+        // mood rather than pushing a neutral pose the line never asked for.
+        api.channels(rig.channels);
+        if (rig.gesture) api.gesture(rig.gesture);
+        api.expression(rig.jawScale);
+        api.talk(1.2);
+      }
+    };
+    requestAnimationFrame(drive);
+  };
+  btn.addEventListener("click", run);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+})();
+
+// v3117 -- drive the head from a real face, on demand. Loaded lazily: the MediaPipe bundle is ~12 MB and this
+// page is useful without it, so nobody who just wants to look at the head pays for the camera stack.
+(function () {
+  const btn = document.getElementById("faceBtn"), out = document.getElementById("faceState");
+  if (!btn) return;
+  let tracker = null, rig = null;
+  const say = (st) => {
+    // NAME WHICH UNKNOWN. "nobody in frame" and "tracker not running" are different facts with different
+    // fixes -- the lighting versus the button -- and one word for both would undo the point of the colour.
+    out.textContent = st === "live" ? "face: live"
+      : st === "noface" ? "NOT DETECTED (camera on, nobody in frame)"
+      : "UNAVAILABLE (camera not running)";
+    out.style.color = st === "live" ? "#8b97a8" : "#fc6";
+  };
+  btn.addEventListener("click", async () => {
+    if (rig) { rig.stop(); rig = null; if (tracker) { tracker.stop(); tracker = null; } btn.textContent = "face: off"; out.textContent = ""; api.signalLost(false); return; }
+    btn.disabled = true; out.textContent = "loading MediaPipe (~12 MB, first time only)...";
+    try {
+      const [{ MediaPipeFaceTracker }, { attachFaceRig }] = await Promise.all([
+        import("/face/MediaPipeFaceTracker.js"), import("/ui/faceRig.js"),
+      ]);
+      tracker = new MediaPipeFaceTracker();
+      await tracker.start();
+      rig = attachFaceRig(api, tracker, { onState: say });
+      btn.textContent = "face: on";
+    } catch (e) {
+      // The failure is NAMED. A button that silently goes back to "off" teaches people the feature is flaky
+      // rather than that the camera was refused.
+      out.textContent = "failed: " + (e && e.message ? e.message : e); out.style.color = "#f88";
+      if (tracker) { try { tracker.stop(); } catch {} tracker = null; }
+    } finally { btn.disabled = false; }
+  });
+})();
+
+// ---------- real audio-amplitude talking (Web Audio analyser) ----------
+// Preferred path: ask the bridge to render the text to a WAV (/kpop/speak-wav), play it through an
+// AnalyserNode, and drive the jaw from the REAL RMS amplitude of the speech — genuine lip-flap, not a
+// synthetic envelope. Falls back to browser SpeechSynthesis (no amplitude) or the synthetic envelope.
+let _audioCtx = null, _analyser = null, _ampData = null, _ampActive = false;
+function _ensureAudio(){
+  if (!_audioCtx) { try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); _analyser = _audioCtx.createAnalyser(); _analyser.fftSize = 512; _ampData = new Uint8Array(_analyser.fftSize); } catch(e){ return false; } }
+  if (_audioCtx.state === "suspended") { try { _audioCtx.resume(); } catch(e){} }
+  return !!_audioCtx;
+}
+// current mouth amplitude from the analyser (0..1 RMS), or null if not driving from audio
+function _liveAmp(){
+  if (!_ampActive || !_analyser) return null;
+  _analyser.getByteTimeDomainData(_ampData);
+  let sum = 0; for (let i=0;i<_ampData.length;i++){ const v=(_ampData[i]-128)/128; sum += v*v; }
+  const rms = Math.sqrt(sum/_ampData.length);
+  return Math.min(1, rms*3.2); // scale RMS up into a lively jaw range
+}
+
+async function playWavAmplitude(text){
+  if (!_ensureAudio()) return false;
+  try {
+    const r = await fetch("/kpop/speak-wav", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text: text }) });
+    const j = await r.json();
+    if (!j || !j.ok || !j.url) return false;
+    // v3108 -- boundaryLint UNCHECKED_ERROR_BODY, found once HTML joined the walk. Without .ok a 404 page
+    // arrives as bytes and decodeAudioData fails with a codec error that says nothing about the real cause.
+    const wav = await fetch(j.url);
+    if (!wav.ok) return false;
+    const buf = await wav.arrayBuffer();
+    const audioBuf = await _audioCtx.decodeAudioData(buf);
+    const src = _audioCtx.createBufferSource(); src.buffer = audioBuf;
+    src.connect(_analyser); _analyser.connect(_audioCtx.destination);
+    _ampActive = true; state.talking = true; state.talkUntil = performance.now() + audioBuf.duration*1000 + 150;
+    src.onended = () => { _ampActive = false; state.talking = false; };
+    src.start();
+    return true;
+  } catch(e){ return false; }
+}
+
+// talk driven by typed text: try real-WAV amplitude first, then SpeechSynthesis, then synthetic envelope.
+async function sayText(t){
+  t = (t||"").trim(); if (!t) return;
+  const words = t.split(/\s+/).filter(Boolean).length || 1;
+  const ok = await playWavAmplitude(t);
+  if (ok) return;                                   // real amplitude driving the jaw
+  // fallbacks:
+  api.talk(Math.min(6, 0.35 + words*0.28));
+  try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(t); u.rate=1; speechSynthesis.cancel(); speechSynthesis.speak(u); u.onend = () => { state.talkUntil = Math.min(state.talkUntil, performance.now()+120); }; } } catch(e){}
+}
+
+// ---------- listen to the engine's cross-window PIP / TTS bus (best-effort) ----------
+// The avatar windows receive postMessage for tts start/stop; honor them if they arrive.
+window.addEventListener("message", (e) => {
+  const d = e.data; if (!d || typeof d !== "object") return;
+  if (d.type === "tts" || d.tts) { if (d.state === "start" || d.on) api.talk(d.seconds || 2); else if (d.state === "end" || d.off) api.stopTalk(); }
+  if (d.type === "mood" && d.mood) api.mood(d.mood);
+  if (d.type === "audio_amp" && typeof d.amp === "number") { state.talking = true; state.talkEnergy = d.amp; state.talkUntil = performance.now()+120; }
+  if (d.type === "speak" && d.text) api.talk(Math.min(6, 0.4 + String(d.text).split(/\s+/).length*0.25));
+  if (d.type === "gesture" && d.gesture) api.gesture(d.gesture);
+  if ((d.type === "emote" || d.type === "announce") && (d.mood || d.gestures)) api.emote(d.mood, d.gestures);
+});
+
+// v1963 — subscribe to the engine's avatar event stream so the head expresses whatever the avatar does
+// (mood + gestures), head-parts only. Best-effort: if the stream isn't there, the head still works solo.
+try {
+  const es = new EventSource("/avatar/events");
+  es.onmessage = (ev) => {
+    try {
+      const a = JSON.parse(ev.data); if (!a) return;
+      if (a.kind === "mood" && a.mood) api.mood(a.mood);
+      else if (a.kind === "announce" || a.kind === "avatar") { if (a.mood) api.mood(a.mood); if (a.text) api.talk(Math.min(6, 0.4 + String(a.text).split(/\s+/).length*0.25)); (a.gestures||[]).forEach(g => api.gesture(g)); }
+    } catch(_){}
+  };
+  es.onerror = () => {};   // stream optional
+} catch(_){}
+
+// ---------- controls ----------
+const $ = (id)=>document.getElementById(id);
+$("talkBtn").onclick = () => sayText($("say").value);
+$("say").addEventListener("keydown", e => { if (e.key === "Enter") sayText($("say").value); });
+$("blinkBtn").onclick = () => api.blink();
+$("lookBtn").onclick = function(){ state.autoLook = !state.autoLook; this.classList.toggle("on", state.autoLook); };
+$("nodBtn").onclick = () => api.nod();
+$("shakeBtn").onclick = () => api.shake();
+$("wireBtn").onclick = function(){ const on = !mats[0].wireframe; api.wireframe(on); this.classList.toggle("on", on); };
+$("moodSel").onchange = function(){ api.mood(this.value); };
+$("exprSlider").oninput = function(){ api.expression(parseFloat(this.value)); };
+
+// v1963 — manual 3D navigation (buttons + keyboard) driving OrbitControls. Each button's title shows its key.
+const _home = { pos: cam.position.clone(), tgt: controls.target.clone() };
+function nav(action){
+  const panStep = 0.15, zoomStep = 1.15, rotStep = 0.13;
+  const off = new THREE.Vector3().subVectors(cam.position, controls.target);
+  switch(action){
+    case "left":   cam.position.x -= panStep; controls.target.x -= panStep; break;
+    case "right":  cam.position.x += panStep; controls.target.x += panStep; break;
+    case "up":     cam.position.y += panStep; controls.target.y += panStep; break;
+    case "down":   cam.position.y -= panStep; controls.target.y -= panStep; break;
+    case "in":     off.multiplyScalar(1/zoomStep); cam.position.copy(controls.target).add(off); break;
+    case "out":    off.multiplyScalar(zoomStep);   cam.position.copy(controls.target).add(off); break;
+    case "rotLeft":  rotateAroundTarget(-rotStep, 0); break;
+    case "rotRight": rotateAroundTarget(rotStep, 0);  break;
+    case "rotUp":    rotateAroundTarget(0, -rotStep); break;
+    case "rotDown":  rotateAroundTarget(0, rotStep);  break;
+    case "recenter": controls.target.set(0,0.05,0); break;
+    case "orient": case "home": cam.position.copy(_home.pos); controls.target.copy(_home.tgt); break;
+  }
+  controls.update();
+}
+function rotateAroundTarget(dTheta, dPhi){
+  const off = new THREE.Vector3().subVectors(cam.position, controls.target);
+  const sph = new THREE.Spherical().setFromVector3(off);
+  sph.theta += dTheta; sph.phi = Math.max(0.15, Math.min(Math.PI-0.15, sph.phi + dPhi));
+  off.setFromSpherical(sph); cam.position.copy(controls.target).add(off);
+}
+document.getElementById("navpad").addEventListener("click", (e) => { const b = e.target.closest("button[data-nav]"); if (b) nav(b.getAttribute("data-nav")); });
+// keyboard: mirrors the button titles
+const KEYMAP = { KeyA:"left", ArrowLeft:"left", KeyD:"right", ArrowRight:"right", KeyR:"up", PageUp:"up", KeyF:"down", PageDown:"down",
+  Equal:"in", NumpadAdd:"in", Minus:"out", NumpadSubtract:"out", KeyW:"rotUp", KeyS:"rotDown", KeyQ:"rotLeft", Comma:"rotLeft",
+  KeyE:"rotRight", Period:"rotRight", Home:"recenter", Digit0:"recenter", Backspace:"orient" };
+window.addEventListener("keydown", (e) => {
+  if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;   // don't steal typing
+  const a = KEYMAP[e.code]; if (a){ e.preventDefault(); nav(a); }
+});
+
+// ---------- animation loop ----------
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last)/1000); last = now;
+  const t = now/1000;
+  // v3117 -- ONE PLACE STILL RESOLVES WHAT THE RIG READS. Live channels win when present; otherwise the
+  // named mood, exactly as before. Nothing downstream changes, which is why the shapes had to match.
+  const mood = state.channels || MOODS[state.mood];
+
+  // talking: prefer REAL audio amplitude (from the WAV analyser); else a synthetic syllable envelope.
+  const amp = _liveAmp();
+  if (amp != null) {
+    state.talking = true;
+    state.talkEnergy += (amp - state.talkEnergy) * 0.55;      // follow real speech RMS
+  } else if (state.talking && now < state.talkUntil) {
+    const env = 0.5 + 0.5*Math.sin(t*22) * (0.6 + 0.4*Math.sin(t*7.3));
+    state.talkEnergy += ((Math.max(0, env)) - state.talkEnergy) * 0.4;
+  } else { state.talking = false; state.talkEnergy += (0 - state.talkEnergy)*0.2; }
+  // expression intensity scales how big the jaw + mood read
+  // v3117 -- a FACE drives the jaw directly when one is being read; speech amplitude otherwise. Deliberately
+  // NOT blended: a mouth driven half by your face and half by a synthetic syllable envelope is a mouth doing
+  // neither, and which one is in charge would stop being answerable.
+  // v3125 -- ONE RESOLVER OWNS THE PRECEDENCE. Three drivers arrived in eight rounds (channels at v3117, a
+  // tracked jaw at v3121, caption volume at v3124) and the ordering was spelled out by the shape of three
+  // ternaries in this loop. exprGain multiplied BOTH branches, so a shouted caption scaled the USER'S REAL
+  // TRACKED JAW -- a caption editorialising a live face, reading as expressiveness rather than as a bug.
+  const _mix = _rigMix ? _rigMix.mixRig({
+    faceChannels: state.channelSource === "face" ? state.channels : null,
+    captionChannels: state.channelSource === "caption" ? state.channels : null,
+    moodChannels: MOODS[state.mood],
+    faceJaw: state.faceJaw, audioAmp: amp, talkEnergy: state.talkEnergy, gain: state.exprGain,
+  }) : null;
+  const jawOpen = (_mix ? _mix.jaw : (state.faceJaw != null ? state.faceJaw : state.talkEnergy) * state.exprGain) * 0.5;
+  jaw.rotation.x = jawOpen; jaw.position.y = -0.12 - jawOpen*0.04;
+
+  // blink: quick scale-y pinch of the eyeballs
+  state.nextBlink -= dt;
+  if (state.nextBlink <= 0 && state.blinkT === 0) { state.blinkT = 0.001; state.nextBlink = 2 + Math.random()*4; }
+  if (state.blinkT > 0) { state.blinkT += dt; const b = state.blinkT; const closed = b < 0.09 ? b/0.09 : b < 0.18 ? 1-(b-0.09)/0.09 : 0; state.blink = closed; if (b > 0.18) state.blinkT = 0; }
+  const eyeOpen = (1 - state.blink) * mood.eye;
+  eyeL.ball.scale.y = eyeR.ball.scale.y = Math.max(0.06, eyeOpen);
+
+  // eye aim (auto-look wanders; manual look eases to target)
+  if (state.autoLook) { state.nextLook -= dt; if (state.nextLook <= 0) { state.lookTarget.set((Math.random()*2-1)*0.7, (Math.random()*2-1)*0.5); state.nextLook = 0.8 + Math.random()*2.2; } }
+  state.look.lerp(state.lookTarget, 0.08);
+  for (const eye of [eyeL, eyeR]) { eye.pupil.position.x = state.look.x*0.045; eye.pupil.position.y = state.look.y*0.04; eye.g.rotation.y = state.look.x*0.5; eye.g.rotation.x = -state.look.y*0.4; }
+
+  // brows from mood, scaled by expression intensity
+  const browTilt = _mix ? _mix.brow : mood.brow * state.exprGain;
+  browL.rotation.z = browTilt; browR.rotation.z = -browTilt;
+  browL.position.y = browR.position.y = 0.38 + (mood.brow>0?mood.brow*0.05*state.exprGain:0);
+
+  // MOUTH: openness from the jaw (talking) or a fixed round "o" for surprised.
+  const talkOpen = Math.min(1, state.talkEnergy * 1.6);         // 0..1 how open the jaw is
+  const openness = mood.o ? Math.max(0.7, talkOpen) : talkOpen;
+  // moodCurve = the expression lip line. +curve => ∪ smile (flip), -curve => ∩ frown, ~0 => flat.
+  const curve = _mix ? _mix.mouthCurve : mood.mouthCurve * state.exprGain;
+  moodCurve.rotation.z = curve >= 0 ? Math.PI : 0;              // base arc is ∩ (frown); flip to ∪ for a smile
+  moodCurve.scale.set(1, Math.max(0.05, Math.abs(curve)), 1);   // ~0 => flat line (neutral)
+  // as the mouth opens, the curve becomes the UPPER lip (lift it a touch) and fades so the open ring reads
+  moodCurve.position.y = -0.04 + openness * 0.05;
+  moodCurve.material.opacity = 0.9 * (1 - openness * 0.7);
+  // lipRing = the open mouth. Grows TALL as the jaw drops; a rounder ellipse for the surprised "o".
+  lipRing.visible = openness > 0.06;
+  lipRing.scale.set(0.92 + (mood.o ? 0.05 : 0), 0.12 + openness * (mood.o ? 1.15 : 0.95), 1);
+  lipRing.position.y = -0.06 - openness * 0.06;                  // opening drops with the jaw
+  lipRing.material.opacity = Math.min(0.95, 0.3 + openness);
+
+  // nod / shake one-shots
+  if (state.nod > 0) { state.nod = Math.max(0, state.nod - dt*2.2); head.rotation.x = Math.sin((1-state.nod)*Math.PI*2)*0.25*state.nod; }
+  if (state.shake > 0) { state.shake = Math.max(0, state.shake - dt*2.0); head.rotation.y += Math.sin((1-state.shake)*Math.PI*3)*0.06; }
+  // v1963 — head-only gesture expressions
+  if (state.tilt > 0)   { state.tilt = Math.max(0, state.tilt - dt*1.6);   head.rotation.z += Math.sin((1-state.tilt)*Math.PI*2)*0.22*state.tilt; }
+  if (state.bounce > 0) { state.bounce = Math.max(0, state.bounce - dt*1.8); head.position.y += Math.abs(Math.sin((1-state.bounce)*Math.PI*2))*0.12*state.bounce; }
+  if (state.dance > 0)  { state.dance = Math.max(0, state.dance - dt*0.9);  head.rotation.z += Math.sin(t*7)*0.12*Math.min(1,state.dance); head.position.x = Math.sin(t*7)*0.05*Math.min(1,state.dance); }
+  else head.position.x += (0 - head.position.x)*0.1;
+  if (state.bow > 0)    { state.bow = Math.max(0, state.bow - dt*1.3);    head.rotation.x += Math.sin((1-state.bow)*Math.PI)*0.5*state.bow; }
+  // gentle idle sway + breathing
+  head.rotation.z = Math.sin(t*0.6)*0.02;
+  head.position.y = Math.sin(t*1.1)*0.012;
+  if (state.shake <= 0) head.rotation.y += (0 - head.rotation.y)*0.05;
+  torso.scale.y = 1 + Math.sin(t*1.1)*0.01;
+
+  // color pulse when talking (feels alive)
+  const glow = state.talking ? 0.5 + 0.5*Math.sin(t*10) : 0;
+  skull.material.color.setHex(WIRE); skull.material.color.offsetHSL(0, 0, glow*0.12);
+
+  controls.update();
+  renderer.render(scene, cam);
+  requestAnimationFrame(frame);
+}
+
+function resize(){ const w = cv.clientWidth, h = cv.clientHeight; renderer.setSize(w, h, false); cam.aspect = w/h; cam.updateProjectionMatrix(); }
+window.addEventListener("resize", resize); resize();
+requestAnimationFrame(frame);
+
+// greet on load so it's obviously alive
+setTimeout(() => sayText("Hello, I am the default SweK wireframe head."), 500);
+console.log("[thead] default wireframe head ready. Drive it: sweKHead.talk(2), .blink(), .look(x,y), .mood('happy'), .nod(), .shake()");
+
+// If a real head/torso model exists in THead/, load it and dim the wireframe to a "socket" guide.
+// Otherwise the procedural wireframe head above stays as the default (like Pip-Boy's default).
+fetch("/thead/list", { cache:"no-store" }).then(r=>r.json()).then(info => {
+  if (!info || !info.hasModels || !info.models || !info.models.length) return; // stay wireframe default
+  const url = info.models[0].url;
+  document.getElementById("tag").textContent = "SweK · THead model: " + info.models[0].file;
+  enableMeshopt(new GLTFLoader()).load(url, (gltf) => {
+    const m = gltf.scene;
+    // frame it roughly where the wireframe head sits
+    const box = new THREE.Box3().setFromObject(m); const size = box.getSize(new THREE.Vector3()); const center = box.getCenter(new THREE.Vector3());
+    const s = 1.4 / (Math.max(size.x, size.y, size.z) || 1); m.scale.setScalar(s);
+    m.position.sub(center.multiplyScalar(s)); m.position.y += 0.1;
+    scene.add(m);
+    // fade the wireframe placeholder right down (keep it faint as a rig guide)
+    mats.forEach(mm => { mm.opacity = 0.12; });
+    console.log("[thead] loaded THead model:", info.models[0].file, "— wireframe dimmed to a guide.");
+  }, undefined, (err) => { console.warn("[thead] model load failed, keeping wireframe default:", err && err.message); });
+}).catch(()=>{});
+</script>
+<script>window.SHOWCASE_ID="head";</script>
+<script src="/ui/showcaseNav.js"></script>
+</body>
+</html>

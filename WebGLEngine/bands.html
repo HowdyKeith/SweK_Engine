@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — band structure</title>
+<meta name="demo:desc" content="An electron in a periodic potential cannot have just any energy. The Kronig-Penney relation says exactly which: allowed when |RHS| <= 1, forbidden otherwise, with no approximation in the statement. The forbidden gap is the falsifier — a region the theory declares EMPTY, which is a stronger claim than an agreement within a tolerance.">
+<style>
+  html,body{margin:0;background:#05070d;color:#cfe0ff;font:13px ui-monospace,Menlo,monospace}
+  #w{max-width:900px;margin:0 auto;padding:18px;line-height:1.65}
+  canvas{border:1px solid #22304a;border-radius:6px;width:100%}
+  button{background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:6px 11px;font:12px ui-monospace,monospace;cursor:pointer;margin-right:6px}
+  .dim{color:#7f96b8}.good{color:#9be15d}.bad{color:#ff9a9a}
+</style>
+</head>
+<body><div id="w">
+<h2 style="margin:0 0 4px;">Band structure and forbidden gaps</h2>
+<div class="dim">The curve is the Kronig-Penney right-hand side. Where it lies inside the shaded strip [&minus;1, 1] an electron may exist; where it leaves, <b>no state can exist at all</b>. Green marks are energies from a Bloch eigenproblem that has never been told any of this. Gate: <code>physics/quantum/kronigPenney-selfcheck.mjs</code>.</div>
+<p><button id="run">Diagonalise the lattice</button><span id="st" class="dim"></span></p>
+<canvas id="c" width="880" height="320"></canvas>
+<div id="out" class="dim"></div>
+</div>
+<script type="module">
+import { kpRhs, bandEdges, gaps, numericEdges } from "./physics/quantum/kronigPenney.js";
+const c=document.getElementById("c"),x=c.getContext("2d"),out=document.getElementById("out"),st=document.getElementById("st");
+const P={V0:20,a:1,b:0.2},EMAX=40;
+const EX=bandEdges({...P,eMax:EMAX}),GAPS=gaps(EX,P);
+function draw(num){
+  x.fillStyle="#05070d";x.fillRect(0,0,880,320);
+  const tx=E=>50+E/EMAX*800, ty=v=>160-v*55;
+  x.fillStyle="rgba(89,209,255,0.10)";x.fillRect(50,ty(1),800,ty(-1)-ty(1));
+  x.fillStyle="#59d1ff";x.fillText("|RHS| ≤ 1 : allowed",700,ty(1)-6);
+  for(const [lo,hi] of GAPS){x.fillStyle="rgba(255,154,154,0.13)";x.fillRect(tx(lo),20,tx(hi)-tx(lo),280);}
+  x.strokeStyle="#22304a";x.strokeRect(50,20,800,280);
+  x.strokeStyle="rgba(246,166,35,0.95)";x.beginPath();let started=false;
+  for(let E=0.05;E<=EMAX;E+=0.02){const v=kpRhs(E,P);if(!Number.isFinite(v)||Math.abs(v)>6){started=false;continue;}
+    const X=tx(E),Y=ty(Math.max(-6,Math.min(6,v)));started?x.lineTo(X,Y):x.moveTo(X,Y);started=true;}
+  x.stroke();
+  for(const e of EX){x.strokeStyle="rgba(246,166,35,0.45)";x.beginPath();x.moveTo(tx(e),20);x.lineTo(tx(e),300);x.stroke();}
+  if(num) for(const E of num){if(E>EMAX)continue;x.fillStyle="rgba(155,225,93,0.95)";x.beginPath();x.arc(tx(E),300,5,0,6.3);x.fill();}
+  x.fillStyle="#ff9a9a";x.fillText("shaded = forbidden",640,40);
+  x.fillStyle="#7f96b8";x.fillText("E",840,314);
+}
+document.getElementById("run").onclick=()=>{
+  st.textContent=" diagonalising…";setTimeout(()=>{
+    const ne=numericEdges({...P,n:800,count:5});
+    draw(ne.all);
+    const per=new Set(ne.periodic.map(v=>v.toFixed(6)));
+    const label=ne.all.slice(0,7).map(v=>per.has(v.toFixed(6))?"P":"A").join("");
+    const worst=Math.max(...ne.all.slice(0,6).map((v,i)=>Math.abs(v-EX[i])/EX[i]));
+    const total=GAPS.reduce((s,[lo,hi])=>s+(hi-lo),0);
+    out.innerHTML="exact edges "+EX.slice(0,6).map(e=>e.toFixed(4)).join(", ")+
+      "<br>numeric &nbsp;&nbsp;&nbsp;"+ne.all.slice(0,6).map(e=>e.toFixed(4)).join(", ")+
+      " &nbsp;— worst relative <b>"+worst.toExponential(2)+"</b>"+
+      "<br>edge alternation between k=0 and k=π/L: <b class='good'>"+label+"</b> (band theory requires P,A,A,P,P,A,A)"+
+      "<br><b>"+total.toFixed(2)+"</b> of energy is forbidden across "+GAPS.length+" gaps, and no computed state sits in the interior of any of them."+
+      "<br><span class='bad'>Note:</span> a numeric edge sits just below its exact partner, so it can land inside a gap by ~0.02. An edge-to-edge test would call a correctly converging solver wrong — the gap <b>interior</b> is the honest region to police.";
+    st.textContent="";
+  },20);
+};
+draw(null);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body></html>

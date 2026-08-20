@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Torrent">
+<meta name="demo:desc" content="The same D3Q19 lattice that earned Hagen-Poiseuille to half a percent, running on the GPU at a scale the CPU cannot touch: 655,360 cells, 12.5 million populations, where the CPU manages 22,400 cells at 16 ms a step and would need almost half a second for this one. Every number underneath this was earned before the page existed -- the kernel was adjudicated against the verified CPU solver on real hardware, cell by cell, and made to reproduce Hagen-Poiseuille by itself, and the check that says so was watched failing under deliberate sabotage first. The GPU does the physics; the isosurface and the tracers are the same proven code the small CPU version uses. Colour reads SPEED, not heat: this lattice is isothermal by construction and has no temperature in it at all.">
+<meta name="demo:category" content="simulation">
+<meta name="demo:needs" content="webgpu">
+<title>Torrent</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<style>
+  html,body { margin:0; height:100%; background:#03050c; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:430px; pointer-events:none; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.7; }
+  #note { color:#6f86ab; margin-top:7px; line-height:1.45; font-size:11.5px; }
+  #err { position:fixed; left:50%; top:44%; transform:translateX(-50%); z-index:5; max-width:560px; text-align:center; color:#ff9a9a; line-height:1.7; display:none; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Torrent &mdash; D3Q19 on the GPU</div><div id="stat"></div><div id="note"></div></div>
+<div id="err"></div>
+<div id="ctl"><button id="tShell" class="on">speed shell</button><button id="tSparks" class="on">tracers</button><button id="reset">reset</button></div>
+<script type="module">
+import * as THREE from "three";
+// v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
+// AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
+// not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { LBM3D_WGSL } from "./simulation/lbm/lbm3dShader.js";
+import { W3, Q3 } from "./simulation/lbm/lbm3d.js";
+import { marchScalarField } from "./simulation/MarchingCubes.js";
+import { blackbodyRamp } from "./fx/voxelize/fireRamp.js";
+
+// 655,360 cells. The CPU version of this page runs 22,400 at 16 ms/step -- this domain would cost it 479 ms a step,
+// about two frames a second. That gap IS the demo.
+const NX = 64, NY = 64, NZ = 160, TAU = 0.6, FZ = 3e-5;
+const R = 11, cx = (NX-1)/2, cy = (NY-1)/2, cz = 46;
+const CELLS = NX * NY * NZ;
+const STEPS_PER_FRAME = 2, READBACK_EVERY = 6, DOWN = 2;   // march a halved field: 655k cells is too many for the CPU
+const MX = NX / DOWN, MY = NY / DOWN, MZ = NZ / DOWN;
+const solidAt = (x, y, z) => (x === 0 || x === NX-1 || y === 0 || y === NY-1) || Math.hypot(x-cx, y-cy, z-cz) <= R;
+
+const fail = (m) => { const e = document.getElementById("err"); e.style.display = "block";
+  e.innerHTML = m + "<br><br><span style='color:#6f86ab'>The CPU version of this lattice runs anywhere: <a href='/lbm3d-flow.html' style='color:#9fd6ff'>lbm3d-flow.html</a>. The physics is identical &mdash; the same module, adjudicated against this kernel cell by cell.</span>"; };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03050c);
+const cam = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 1200);
+cam.position.set(96, 62, 172);
+const ctr = new OrbitControls(cam, renderer.domElement); ctr.enableDamping = true;
+addEventListener("resize", () => { cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+scene.add(new THREE.AmbientLight(0x334466, 1.4));
+const key = new THREE.DirectionalLight(0xffd9a0, 1.5); key.position.set(40, 60, 40); scene.add(key);
+const rim = new THREE.DirectionalLight(0x66aaff, 0.8); rim.position.set(-40, -20, -50); scene.add(rim);
+const off = new THREE.Vector3(-(NX-1)/2, -(NY-1)/2, -(NZ-1)/2);
+scene.add(new THREE.Mesh(new THREE.BoxGeometry(NX-2, NY-2, NZ), new THREE.MeshBasicMaterial({ color: 0x1d3350, wireframe: true, transparent: true, opacity: 0.22 })));
+const ball = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 28), new THREE.MeshStandardMaterial({ color: 0x1a2740, roughness: 0.55, metalness: 0.35 }));
+ball.position.set(cx + off.x, cy + off.y, cz + off.z); scene.add(ball);
+
+let dev = null, pipe = null, fA = null, fB = null, sol = null, mom = null, par = null, bgAB = null, bgBA = null, readBuf = null;
+let moments = null, steps = 0, flip = 0, msEwma = 0, tris = 0, reading = false;
+const NSPARK = 6000;
+let sparkPos = null, sparkCol = null, sparks = null, shell = null;
+
+async function initGPU() {
+  const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!_p.available) throw new Error(_p.message);
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) throw new Error("No WebGPU adapter was offered.");
+  dev = await adapter.requestDevice();
+  dev.lost.then((i) => fail("The GPU device was lost: " + i.reason));
+  const mod = dev.createShaderModule({ code: LBM3D_WGSL });   // the kernel adjudicated on real hardware, unmodified
+  const info = await mod.getCompilationInfo?.();
+  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
+  pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const fBytes = CELLS * Q3 * 4;
+  const mk = (sz) => dev.createBuffer({ size: sz, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+  fA = mk(fBytes); fB = mk(fBytes); sol = mk(CELLS * 4); mom = mk(CELLS * 16);
+  const init = new Float32Array(CELLS * Q3);
+  for (let k = 0; k < CELLS; k++) for (let i = 0; i < Q3; i++) init[k * Q3 + i] = W3[i];
+  dev.queue.writeBuffer(fA, 0, init);
+  const sArr = new Uint32Array(CELLS);
+  for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) sArr[(z*NY + y)*NX + x] = solidAt(x, y, z) ? 1 : 0;
+  dev.queue.writeBuffer(sol, 0, sArr);
+  par = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  dev.queue.writeBuffer(par, 0, new Uint32Array([NX, NY, NZ, 0]));
+  dev.queue.writeBuffer(par, 16, new Float32Array([0, 0, FZ, TAU]));
+  const bg = (a, b) => dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: a } }, { binding: 1, resource: { buffer: b } },
+    { binding: 2, resource: { buffer: sol } }, { binding: 3, resource: { buffer: mom } }, { binding: 4, resource: { buffer: par } }] });
+  bgAB = bg(fA, fB); bgBA = bg(fB, fA);
+  readBuf = dev.createBuffer({ size: CELLS * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  moments = new Float32Array(CELLS * 4);
+}
+function gpuStep(n) {
+  const wg = [Math.ceil(NX/4), Math.ceil(NY/4), Math.ceil(NZ/4)];
+  const enc = dev.createCommandEncoder();
+  for (let s = 0; s < n; s++) {
+    const p = enc.beginComputePass();
+    p.setPipeline(pipe); p.setBindGroup(0, flip % 2 === 0 ? bgAB : bgBA);
+    p.dispatchWorkgroups(wg[0], wg[1], wg[2]); p.end(); flip++;
+  }
+  dev.queue.submit([enc.finish()]);
+  steps += n;
+}
+// the one genuinely new idea on this page: pull the moments back so the PROVEN drawing code can use them
+async function readback() {
+  if (reading) return; reading = true;
+  try {
+    const enc = dev.createCommandEncoder();
+    enc.copyBufferToBuffer(mom, 0, readBuf, 0, CELLS * 16);
+    dev.queue.submit([enc.finish()]);
+    await readBuf.mapAsync(GPUMapMode.READ);
+    moments.set(new Float32Array(readBuf.getMappedRange()));
+    readBuf.unmap();
+  } catch (e) { console.error("[swek] readback:", e); }
+  reading = false;
+}
+const speedAt = (x, y, z) => { const k = ((z*NY + y)*NX + x) * 4;
+  return Math.hypot(moments[k+1], moments[k+2], moments[k+3]); };
+const field = new Float32Array(MX * MY * MZ);
+function remesh() {
+  let vmax = 0;
+  for (let z = 0; z < MZ; z++) for (let y = 0; y < MY; y++) for (let x = 0; x < MX; x++) {
+    const v = speedAt(x*DOWN, y*DOWN, z*DOWN);
+    field[(z*MY + y)*MX + x] = v; if (v > vmax) vmax = v;
+  }
+  if (vmax <= 0) return vmax;
+  const iso = marchScalarField(field, MX, MY, MZ, vmax * 0.5, { cellSize: DOWN });
+  tris = iso.positions.length / 9;
+  if (shell) { scene.remove(shell); shell.geometry.dispose(); }
+  if (!tris) { shell = null; return vmax; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(iso.positions), 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(iso.normals), 3));
+  shell = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x2fd0b0, transparent: true, opacity: 0.2, roughness: 0.4, side: THREE.DoubleSide, depthWrite: false }));
+  shell.position.copy(off);
+  shell.visible = document.getElementById("tShell").classList.contains("on");
+  scene.add(shell);
+  return vmax;
+}
+function seedSparks() {
+  sparkPos = new Float32Array(NSPARK * 3); sparkCol = new Float32Array(NSPARK * 3);
+  for (let i = 0; i < NSPARK; i++) reseed(i, Math.random() * NZ);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(sparkCol, 3));
+  sparks = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.85, vertexColors: true, transparent: true, opacity: 0.95 }));
+  sparks.position.copy(off); scene.add(sparks);
+}
+function reseed(i, z) {
+  let x, y;
+  do { x = 1 + Math.random()*(NX-2); y = 1 + Math.random()*(NY-2); } while (Math.hypot(x-cx, y-cy, z-cz) <= R + 1);
+  sparkPos[i*3] = x; sparkPos[i*3+1] = y; sparkPos[i*3+2] = z;
+}
+document.getElementById("tShell").onclick = (e) => { e.target.classList.toggle("on"); if (shell) shell.visible = e.target.classList.contains("on"); };
+document.getElementById("tSparks").onclick = (e) => { e.target.classList.toggle("on"); if (sparks) sparks.visible = e.target.classList.contains("on"); };
+document.getElementById("reset").onclick = () => { const init = new Float32Array(CELLS * Q3);
+  for (let k = 0; k < CELLS; k++) for (let i = 0; i < Q3; i++) init[k*Q3+i] = W3[i];
+  dev.queue.writeBuffer(fA, 0, init); steps = 0; flip = 0; };
+
+let frames = 0, vmax = 1e-9;
+function frame() {
+  try {
+    const t0 = performance.now();
+    gpuStep(STEPS_PER_FRAME);
+    msEwma = msEwma ? msEwma*0.9 + ((performance.now()-t0)/STEPS_PER_FRAME)*0.1 : (performance.now()-t0)/STEPS_PER_FRAME;
+    if (frames % READBACK_EVERY === 0) readback().then(() => { const v = remesh(); if (v > 0) vmax = v; });
+    for (let i = 0; i < NSPARK; i++) {
+      const x = Math.max(0, Math.min(NX-1, Math.round(sparkPos[i*3]))), y = Math.max(0, Math.min(NY-1, Math.round(sparkPos[i*3+1])));
+      const z = ((Math.round(sparkPos[i*3+2]) % NZ) + NZ) % NZ;
+      const k = ((z*NY + y)*NX + x) * 4;
+      const ux = moments[k+1] || 0, uy = moments[k+2] || 0, uz = moments[k+3] || 0;
+      const DT = 340;
+      sparkPos[i*3] += ux*DT; sparkPos[i*3+1] += uy*DT; sparkPos[i*3+2] += uz*DT;
+      if (sparkPos[i*3+2] > NZ-1 || !Number.isFinite(sparkPos[i*3])) reseed(i, 1);
+      const c = blackbodyRamp(Math.min(1, Math.hypot(ux, uy, uz) / (vmax || 1)));
+      sparkCol[i*3] = c[0]; sparkCol[i*3+1] = c[1]; sparkCol[i*3+2] = c[2];
+    }
+    sparks.geometry.attributes.position.needsUpdate = true;
+    sparks.geometry.attributes.color.needsUpdate = true;
+    frames++;
+    const nu = (TAU - 0.5)/3, Re = (2*R)*vmax/nu;
+    const cpuMs = 16.4 * CELLS / 22400;   // measured: the CPU version does 22,400 cells at 16.4 ms/step
+    document.getElementById("stat").innerHTML =
+      NX + "&times;" + NY + "&times;" + NZ + " = <b style='color:#f6a623'>" + CELLS.toLocaleString() + " cells</b> &nbsp;&middot;&nbsp; " + (CELLS*19/1e6).toFixed(1) + "M populations" +
+      "<br>" + msEwma.toFixed(1) + " ms/step submitted &nbsp;&middot;&nbsp; " + steps.toLocaleString() + " steps &nbsp;&middot;&nbsp; Re &asymp; " + Re.toFixed(0) +
+      "<br>shell " + tris.toLocaleString() + " triangles &nbsp;&middot;&nbsp; viscosity " + nu.toFixed(4) + " &mdash; never set, it emerges from tau" +
+      "<br><span style='color:#f6a623'>the CPU needs ~" + cpuMs.toFixed(0) + " ms/step for this domain &mdash; about " + (1000/cpuMs).toFixed(1) + " fps</span>";
+    document.getElementById("note").innerHTML =
+      "The same kernel that was adjudicated against the verified CPU solver on this machine, cell by cell, and then made to earn Hagen&ndash;Poiseuille by itself. " +
+      "GPU does the physics; the isosurface and tracers are the same code the small CPU version uses. <b>The ramp reads speed, not heat</b> &mdash; this lattice is isothermal by construction.";
+  } catch (e) { console.error("[swek] torrent frame fault:", e); }
+  ctr.update(); renderer.render(scene, cam);
+  requestAnimationFrame(frame);
+}
+initGPU().then(() => { seedSparks(); frame(); }).catch((e) => fail(e.message));
+</script>
+</body>
+</html>

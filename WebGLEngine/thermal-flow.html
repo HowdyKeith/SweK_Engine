@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Convection">
+<meta name="demo:desc" content="The thermal lattice, made visible. A second distribution carries heat the way the first carries momentum, and one line couples them: hot fluid is lighter. Heat a layer from below and nothing happens -- the heat just conducts through -- until the Rayleigh number crosses 1708, and then the fluid organises itself into rolls. Nothing in the code contains that number; drag the slider across it and watch it decide. Or turn the layers over -- heavy resting on light -- and gravity refuses the arrangement: the interface goes unstable and overturns into mushrooms. The colour is the temperature, on the same blackbody ramp the lava uses, because here the heat really is the material.">
+<meta name="demo:category" content="simulation">
+<title>Convection</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; image-rendering:pixelated; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:340px; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; font-size:12px; margin-top:5px; line-height:1.6; }
+  #verdict { font-size:12px; margin-top:6px; line-height:1.45; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+  #raWrap { background:rgba(16,22,36,.92); border:1px solid #3a3060; border-radius:10px; padding:8px 11px; }
+  input[type=range] { width:170px; accent-color:#f6a623; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; Convection</div><div id="stat"></div><div id="verdict"></div></div>
+<div id="ctl">
+  <button id="mRB" class="on">Rayleigh&ndash;B&eacute;nard</button>
+  <button id="mRT">Rayleigh&ndash;Taylor</button>
+  <div id="raWrap"><div style="font-size:10px;color:#5f7aa0;margin-bottom:4px;">Rayleigh number &mdash; drag across 1708</div><input id="ra" type="range" min="2.7" max="4.9" step="0.01" value="3.45"></div>
+  <button id="reset">reset</button>
+</div>
+<script type="module">
+import { makeThermal } from "./simulation/lbm/thermal2d.js";
+import { blackbodyRamp } from "./fx/voxelize/fireRamp.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const statEl = document.getElementById("stat"), verdictEl = document.getElementById("verdict");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+const NX = 160, NY = 80, TAU = 0.8;
+const RA_C = 1707.76;                                   // Rayleigh's number. The code below never uses it to decide anything.
+let mode = "rb", m = null, img = null, steps = 0;
+function targetRa() { return Math.pow(10, parseFloat(document.getElementById("ra").value)); }
+function build() {
+  const H = NY - 2, nu = (TAU - 0.5) / 3, alpha = nu;
+  img = ctx.createImageData(NX, NY); steps = 0;
+  if (mode === "rb") {
+    // hot floor, cold ceiling, walls that HOLD their temperature: the classic driven cell
+    const gbeta = targetRa() * nu * alpha / (1.0 * H * H * H);
+    m = makeThermal({ nx: NX, ny: NY, tau: TAU, tauG: TAU, gravity: -1, beta: -gbeta, Thot: 0.5, Tcold: -0.5,
+      init: (x, y) => ({ T: 0.5 - (y - 0.5) / H + 0.02 * Math.sin(7 * Math.PI * x / NX) * Math.sin(Math.PI * (y - 0.5) / H) }) });
+  } else {
+    // heavy resting on light, and walls that add nothing: an initial-value problem gravity will not tolerate
+    const yc = (NY - 1) / 2;
+    m = makeThermal({ nx: NX, ny: NY, tau: 0.53, tauG: 0.53, gravity: -1, beta: -3e-4, adiabatic: true, slip: true,
+      init: (x, y) => { const yi = yc + 1.6 * Math.cos(2 * Math.PI * 3 * x / NX) + 0.7 * Math.cos(2 * Math.PI * 7 * x / NX + 1);
+        return { T: -(0.5) * Math.tanh((y - yi) / 2) }; } });
+  }
+}
+build();
+const btns = { rb: document.getElementById("mRB"), rt: document.getElementById("mRT") };
+btns.rb.onclick = () => { mode = "rb"; btns.rb.className = "on"; btns.rt.className = ""; build(); };
+btns.rt.onclick = () => { mode = "rt"; btns.rt.className = "on"; btns.rb.className = ""; build(); };
+document.getElementById("ra").oninput = () => { if (mode === "rb") build(); };
+document.getElementById("reset").onclick = build;
+
+function frame() {
+  try {
+    for (let s = 0; s < 3; s++) { m.step(); steps++; }
+    const d = img.data;
+    let peak = 0;
+    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+      const k = y * NX + x, p = k * 4;
+      if (m.solid[k]) { const wall = y === 0 ? [90, 30, 20] : [20, 34, 66];
+        d[p] = wall[0]; d[p+1] = wall[1]; d[p+2] = wall[2]; d[p+3] = 255; continue; }
+      // the colour IS the temperature, on the same ramp the lava wears
+      const c = blackbodyRamp(Math.max(0, Math.min(1, m.T[k] + 0.5)));
+      d[p] = c[0] * 255; d[p+1] = c[1] * 255; d[p+2] = c[2] * 255; d[p+3] = 255;
+      peak = Math.max(peak, Math.abs(m.ux[k]), Math.abs(m.uy[k]));
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    const sc = Math.min(cv.width / NX, cv.height / NY);
+    ctx.putImageData(img, 0, 0);
+    ctx.drawImage(cv, 0, 0, NX, NY, (cv.width - NX * sc) / 2, (cv.height - NY * sc) / 2, NX * sc, NY * sc);
+    ctx.restore();
+    const moving = peak > 2e-4;
+    if (mode === "rb") {
+      const Ra = m.Ra;
+      statEl.innerHTML = "Rayleigh number <b style='color:#f6a623'>" + Math.round(Ra).toLocaleString() + "</b> &nbsp;&middot;&nbsp; critical value 1,708" +
+        "<br>viscosity " + m.nu.toFixed(4) + " and diffusivity " + m.alpha.toFixed(4) + ", both emergent from tau" +
+        "<br>" + steps.toLocaleString() + " lattice steps &nbsp; peak speed " + peak.toExponential(1);
+      verdictEl.innerHTML = Ra < RA_C
+        ? "<span style='color:#7fb2d4'>Below 1,708 &mdash; the heat simply conducts through. " + (moving ? "Still settling." : "The fluid is not moving at all.") + "</span>"
+        : "<span style='color:#ffb46a'>Above 1,708 &mdash; the fluid has organised itself into rolls. Nobody told it that number.</span>";
+    } else {
+      statEl.innerHTML = "heavy fluid resting on light &nbsp;&middot;&nbsp; adiabatic walls (they add no heat)" +
+        "<br>" + steps.toLocaleString() + " lattice steps &nbsp; peak speed " + peak.toExponential(1);
+      verdictEl.innerHTML = "<span style='color:#ffb46a'>Gravity will not tolerate the arrangement. The interface is overturning &mdash; spikes of cold fall, bubbles of hot rise.</span>";
+    }
+  } catch (e) { console.error("[swek] thermal frame fault:", e); }
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

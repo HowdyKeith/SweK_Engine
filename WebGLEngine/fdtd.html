@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Maxwell on a grid</title>
+<meta name="demo:desc" content="The only solver here that can be told in advance exactly how wrong it will be. Discretising Maxwell gives waves that travel slightly slow, by a closed-form factor, so what is graded is not 'the answer is right' but 'the answer is wrong by exactly this much'. At the magic timestep S=1 the error is exactly zero, and taking a SMALLER step makes it worse.">
+<style>
+  html,body{margin:0;background:#05070d;color:#cfe0ff;font:13px ui-monospace,Menlo,monospace}
+  #w{max-width:900px;margin:0 auto;padding:18px;line-height:1.65}
+  canvas{border:1px solid #22304a;border-radius:6px;width:100%}
+  button{background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:6px 11px;font:12px ui-monospace,monospace;cursor:pointer;margin-right:6px}
+  table{border-collapse:collapse;margin-top:10px}td,th{border:1px solid #22304a;padding:5px 10px}
+  .num{text-align:right}.dim{color:#7f96b8}.good{color:#9be15d}.bad{color:#ff9a9a}
+</style>
+</head>
+<body><div id="w">
+<h2 style="margin:0 0 4px;">Maxwell on a grid</h2>
+<div class="dim">Every other device here asks whether the simulation matches the right answer. This one knows its error in advance: discretising Maxwell gives &omega; = (2/dt)&middot;asin(S&middot;sin(k&middot;dx/2)), so the numerical phase velocity is a <b>formula</b>. The curve below is that formula; the dots are the grid. Gate: <code>tools/roundhouse/fdtd-selfcheck.mjs</code>.</div>
+<p><button id="run">Sweep the Courant number</button><span id="st" class="dim"></span></p>
+<canvas id="c" width="880" height="300"></canvas>
+<div id="out"></div>
+</div>
+<script type="module">
+import { numericalPhaseVelocity } from "./simulation/em/fdtd1d.js";
+import { fdtdDevice } from "./tools/roundhouse/fdtdBind.mjs";
+const c=document.getElementById("c"),x=c.getContext("2d"),out=document.getElementById("out"),st=document.getElementById("st");
+const PPW=12;
+function draw(pts){
+  x.fillStyle="#05070d";x.fillRect(0,0,880,300);
+  const tx=s=>50+(s-0.1)/0.95*800, ty=v=>270-(v-0.94)/0.075*240;
+  x.strokeStyle="#22304a";x.strokeRect(50,20,800,250);
+  x.strokeStyle="rgba(246,166,35,0.95)";x.beginPath();
+  for(let s=0.1;s<=1.0;s+=0.005){const v=numericalPhaseVelocity(s,PPW);const X=tx(s),Y=ty(v);s<=0.105?x.moveTo(X,Y):x.lineTo(X,Y);}
+  x.stroke();
+  x.fillStyle="#f6a623";x.fillText("closed form  vp/c = ω/(S·k·dx)",600,44);
+  for(const p of pts){x.fillStyle="rgba(155,225,93,0.95)";x.beginPath();x.arc(tx(p.S),ty(p.m),4,0,6.3);x.fill();}
+  x.strokeStyle="rgba(89,209,255,0.5)";x.setLineDash([4,4]);x.beginPath();x.moveTo(50,ty(1));x.lineTo(850,ty(1));x.stroke();x.setLineDash([]);
+  x.fillStyle="#59d1ff";x.fillText("vp/c = 1 — reached ONLY at the magic step S = 1",300,ty(1)-8);
+  x.fillStyle="#7f96b8";x.fillText("S (Courant number)",700,290);x.fillText("vp/c",56,16);
+}
+document.getElementById("run").onclick=async()=>{
+  st.textContent=" running real grids…";await new Promise(r=>setTimeout(r,20));
+  const pts=[],rows=[];
+  for(const S of [0.3,0.5,0.7,0.9,1.0]){
+    const r=await fdtdDevice.build({mode:"dispersion",config:{S,pointsPerWavelength:PPW}});
+    if(r.error) continue;
+    pts.push({S,m:r.vpMeasured});rows.push({S,...r});
+  }
+  draw(pts);st.textContent="";
+  let h="<table><tr><th>S</th><th class='num'>predicted vp/c</th><th class='num'>measured</th><th class='num'>|diff|</th></tr>";
+  for(const r of rows) h+="<tr><td>"+r.S+"</td><td class='num'>"+r.vpPredicted.toFixed(6)+"</td><td class='num'>"+r.vpMeasured.toFixed(6)+"</td><td class='num'>"+r.vpErrAbs.toExponential(2)+"</td></tr>";
+  h+="</table>";
+  const magic=await fdtdDevice.build({mode:"magic",config:{pointsPerWavelength:PPW}});
+  h+="<div style='margin-top:8px'>magic step S=1 error <b class='good'>"+magic.magicErr+"</b> (exactly zero) · at S=0.5 it is <b class='bad'>"+magic.offMagicErr.toExponential(2)+
+     "</b> — <b>a SMALLER timestep is WORSE</b>, which is the opposite of every instinct about numerical methods.</div>";
+  const ls=await fdtdDevice.build({mode:"lightspeed",config:{}});
+  h+="<div class='dim' style='margin-top:6px'>time of flight gives c = "+ls.cMeasured.toExponential(6)+" m/s against the SI literal "+ls.cExact.toExponential(6)+
+     ". The reference is a literal on purpose: comparing against the module's own C0 would score a perfect zero for any value, including a wrong one.</div>";
+  out.innerHTML=h;
+};
+draw([]);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body></html>

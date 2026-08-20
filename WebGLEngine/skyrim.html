@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Skyrim — Dragonborn">
+<meta name="demo:desc" content="Live Skyrim SE/AE player stats (level, health/magicka/stamina, gold, location) via a Papyrus-written JSON file. Runs on the PC bridge.">
+<title>🐉 Skyrim — SweK Engine</title>
+<style>
+  :root { --bg:#0b0a08; --panel:#15120c; --edge:#3a3120; --gold:#d8b15a; --ice:#9fd8e6; --txt:#e7ddc7; --dim:#8a7d63; --hp:#c0512f; --mp:#3f7fc0; --sp:#3f9f5a; --bad:#ff7b7b; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; }
+  body { background:radial-gradient(ellipse at 50% -10%, #1a160e 0%, #0b0a08 60%, #050403 100%); color:var(--txt); font:14px/1.45 "Inter",system-ui,Segoe UI,Roboto,sans-serif; min-height:100vh; }
+  #bar { display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--edge); position:sticky; top:0; background:linear-gradient(180deg,#15120c,#0b0a08); }
+  #bar h1 { font-size:18px; margin:0; letter-spacing:3px; text-transform:uppercase; font-weight:600; color:var(--gold); }
+  #bar h1 small { color:var(--ice); font-size:11px; letter-spacing:2px; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { padding:16px 18px 60px; max-width:920px; margin:0 auto; }
+  h2 { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:var(--gold); margin:22px 0 10px; border-bottom:1px solid var(--edge); padding-bottom:5px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px 15px; flex:1; min-width:140px; }
+  .lbl { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; }
+  .big { font-size:30px; font-weight:700; margin-top:3px; color:var(--gold); }
+  .med { font-size:18px; font-weight:600; margin-top:4px; color:var(--ice); }
+  .bar { height:20px; border:1px solid var(--edge); border-radius:4px; background:#0a0805; position:relative; overflow:hidden; margin-top:7px; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; transition:width .4s ease; }
+  .bar.hp > i { background:linear-gradient(90deg,#5a1f12,var(--hp)); }
+  .bar.mp > i { background:linear-gradient(90deg,#1f3f5a,var(--mp)); }
+  .bar.sp > i { background:linear-gradient(90deg,#1f5a2f,var(--sp)); }
+  .bar > b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+  #offline { text-align:center; padding:55px 20px; color:var(--dim); }
+  code { color:var(--ice); }
+</style>
+</head>
+<body>
+<div id="bar"><h1>Skyrim <small>DRAGONBORN</small></h1><span id="status">connecting…</span></div>
+<div class="wrap">
+  <div id="offline">No link to Skyrim.<br><span class="lbl" style="text-transform:none;letter-spacing:0;max-width:540px;display:inline-block;margin-top:10px;">Install PapyrusUtil SE + the SweK telemetry script (see <code>ai-bridge/skyrim-extension/</code>), then point the connector's <code>filePath</code> at the JSON the script writes and enable it.</span></div>
+  <div id="content" style="display:none;">
+    <div class="row">
+      <div class="card"><div class="lbl">Dragonborn</div><div class="med" id="name">—</div></div>
+      <div class="card"><div class="lbl">Level</div><div class="big" id="level">—</div></div>
+      <div class="card"><div class="lbl">Gold</div><div class="big" id="gold" style="color:var(--ice);">—</div></div>
+    </div>
+    <h2>Attributes</h2>
+    <div class="row">
+      <div class="card"><div class="lbl">Health</div><div class="bar hp"><i id="hpfill" style="width:0%"></i><b id="hptxt">—</b></div></div>
+      <div class="card"><div class="lbl">Magicka</div><div class="bar mp"><i id="mpfill" style="width:0%"></i><b id="mptxt">—</b></div></div>
+      <div class="card"><div class="lbl">Stamina</div><div class="bar sp"><i id="spfill" style="width:0%"></i><b id="sptxt">—</b></div></div>
+    </div>
+    <h2>Location</h2>
+    <div class="row"><div class="card"><div class="med" id="location">—</div></div></div>
+  </div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : null;
+  const fmt = n => (n == null ? "—" : Math.round(n).toLocaleString());
+  function barPct(v, mx) { v = num(v); mx = num(mx); if (v == null) return null; if (mx && mx > 0) return Math.max(0, Math.min(100, v / mx * 100)); return Math.max(0, Math.min(100, v)); }
+  function setBar(fill, txt, v, mx) { const p = barPct(v, mx); $(fill).style.width = (p != null ? p : 0) + "%"; $(txt).textContent = v != null ? Math.round(v) + (mx ? " / " + Math.round(mx) : "") : "—"; }
+  function render(s) {
+    if (!s || !s.ready || !s.data) {
+      $("offline").style.display = "block"; $("content").style.display = "none";
+      $("status").textContent = s && s.error ? ("(" + s.error + ")") : "no link";
+      return;
+    }
+    const d = s.data;
+    $("status").textContent = "● LINKED" + (s.ageMs != null ? " · " + Math.round(s.ageMs / 1000) + "s" : "");
+    $("offline").style.display = "none"; $("content").style.display = "block";
+    $("name").textContent = d.name || "Dragonborn";
+    $("level").textContent = d.level != null ? d.level : "—";
+    $("gold").textContent = d.gold != null ? fmt(d.gold) : "—";
+    setBar("hpfill", "hptxt", d.health, d.healthMax);
+    setBar("mpfill", "mptxt", d.magicka, d.magickaMax);
+    setBar("spfill", "sptxt", d.stamina, d.staminaMax);
+    $("location").textContent = d.location || "—";
+  }
+  async function load() { try { render(await (await fetch("/skyrim/state", { cache: "no-store" })).json()); } catch (e) { $("status").textContent = "bridge unreachable"; } }
+  load(); setInterval(load, 2000);
+</script>
+<script src="kiosk.js"></script>
+</body>
+</html>

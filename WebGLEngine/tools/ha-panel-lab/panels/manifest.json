@@ -1,0 +1,16 @@
+{
+  "panels": [
+    {
+      "file": "solar-3d-card.js",
+      "tag": "solar-3d-card",
+      "name": "Solar 3D Card",
+      "config": {
+        "battery_entity": "sensor.solar_battery_level",
+        "sun_entity": "sun.sun",
+        "weather_entity": "weather.home",
+        "title": "Solar",
+        "height": 360
+      }
+    }
+  ]
+}

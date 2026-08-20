@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Asset Studio</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  main { max-width:680px; margin:0 auto; padding:16px; }
+  .step { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 15px; margin-bottom:14px; }
+  .step h3 { margin:0 0 10px; font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .step h3 .n { display:inline-block; width:20px; height:20px; line-height:20px; text-align:center; border-radius:50%; background:var(--go); color:#06140e; font-weight:800; margin-right:7px; }
+  textarea, input, select { width:100%; padding:9px 11px; background:#0e141d; color:var(--ink); border:1px solid var(--line); border-radius:8px; font:inherit; }
+  textarea { resize:vertical; min-height:54px; }
+  .row { display:flex; gap:9px; flex-wrap:wrap; } .row > * { flex:1; min-width:130px; }
+  button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line); background:#0e141d; color:var(--ink); padding:9px 14px; }
+  button.go { background:color-mix(in srgb, var(--go) 16%, #0e141d); color:var(--go); border-color:color-mix(in srgb, var(--go) 45%, var(--line)); font-weight:600; }
+  button.go:disabled { opacity:.4; cursor:default; }
+  button.alt { color:var(--dim); }
+  .preview { margin-top:11px; text-align:center; }
+  .preview img { max-width:100%; max-height:300px; border-radius:10px; border:1px solid var(--line); }
+  .preview .ph { color:var(--dim); font-size:13px; padding:26px; border:1px dashed var(--line); border-radius:10px; }
+  .jobs { display:flex; flex-direction:column; gap:8px; }
+  .job { display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:#0e141d; }
+  .job .nm { font-weight:600; flex:1; word-break:break-word; }
+  .job .eng { color:var(--dim); font-size:12px; }
+  .st { font-size:11px; text-transform:uppercase; letter-spacing:.05em; border:1px solid var(--line); border-radius:6px; padding:2px 8px; }
+  .st.queued { color:var(--dim); } .st.running { color:var(--warn); border-color:#5a4a22; } .st.done { color:var(--ok); border-color:#224a36; } .st.error { color:var(--red); border-color:#5a2222; }
+  .hint { color:var(--dim); font-size:12.5px; margin-top:9px; }
+  .ck { display:flex; align-items:center; gap:8px; margin-top:11px; cursor:pointer; color:var(--ink); font-size:13px; }
+  .hint a { color:var(--go); }
+  #msg { color:var(--dim); font-size:12.5px; margin-top:10px; min-height:18px; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🧪</span> Asset Studio</span><span style="flex:1"></span><button id="gear" class="alt">⚙ Setup</button></header>
+  <main>
+    <div class="step" id="setup" style="display:none;">
+      <h3>⚙ Setup</h3>
+      <div style="color:var(--dim);font-size:12px;margin-bottom:6px;">Image generation</div>
+      <div class="row">
+        <div><label style="color:var(--dim);font-size:12px;">Provider</label>
+          <select id="prov"><option value="gemini">Gemini (Nano Banana)</option><option value="ideogram">Ideogram</option></select></div>
+        <div><label style="color:var(--dim);font-size:12px;">Status</label><div id="keyStat" style="padding:9px 0;font-size:13px;color:var(--dim);">…</div></div>
+      </div>
+      <div class="row" style="margin-top:7px;">
+        <input id="keyIn" type="password" placeholder="paste API key" style="flex:2;" />
+        <button class="go" id="keySave" style="flex:0 0 auto;">Save key</button>
+      </div>
+      <div style="color:var(--dim);font-size:12px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:12px;">Meshy 6 (cloud image→3D · no local GPU)</div>
+      <div class="row" style="align-items:center;">
+        <div id="meshyStat" style="font-size:13px;color:var(--dim);flex:1;">…</div>
+      </div>
+      <div class="row" style="margin-top:7px;">
+        <input id="meshyKey" type="password" placeholder="Meshy API key (msy_…)" style="flex:2;" />
+        <button class="go" id="meshySave" style="flex:0 0 auto;">Save key</button>
+      </div>
+      <div style="color:var(--dim);font-size:12px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:12px;">ComfyUI (local mesh engine)</div>
+      <div class="row" style="align-items:center;">
+        <div id="cyStat" style="font-size:13px;color:var(--dim);flex:1;">…</div>
+        <button class="go" id="cyLaunch" style="flex:0 0 auto;">▶ Launch ComfyUI</button>
+      </div>
+      <div id="setupMsg" class="hint"></div>
+    </div>
+    <div class="step">
+      <h3><span class="n">1</span> Source image</h3>
+      <textarea id="prompt" placeholder="describe the thing — e.g. a chunky brass steampunk owl, studio lighting, plain background"></textarea>
+      <div class="row" style="margin-top:9px;">
+        <button class="go" id="gen">🎨 Generate image</button>
+        <button class="alt" id="pickBtn">📷 Use a photo</button>
+        <input id="file" type="file" accept="image/*" style="display:none;" />
+      </div>
+      <div class="preview" id="preview"><div class="ph">No image yet — generate one or pick a photo.</div></div>
+    </div>
+
+    <div class="step">
+      <h3><span class="n">2</span> Turn it into a 3D model</h3>
+      <div class="row">
+        <div><label style="color:var(--dim);font-size:12px;">Engine</label>
+          <select id="engine">
+            <option value="meshy">Meshy 6 (cloud · no GPU)</option>
+            <option value="kaggle-trellis2">Trellis 2 (Kaggle GPU)</option>
+            <option value="sparc3d">Sparc3D (Kaggle GPU)</option>
+            <option value="hunyuan">Hunyuan3D (Kaggle GPU)</option>
+            <option value="trellis2">Trellis 2 (local)</option>
+            <option value="comfyui">ComfyUI (local workflow)</option>
+          </select>
+        </div>
+        <div><label style="color:var(--dim);font-size:12px;">Name</label><input id="name" placeholder="model name" /></div>
+      </div>
+      <button class="go" id="make" disabled style="margin-top:11px;width:100%;">🧊 Make 3D model</button>
+      <label class="ck" id="autoWrap"><input id="autoAv" type="checkbox" /> Auto-set it as my live avatar the moment it's ready</label>
+      <div class="hint">Mesh jobs run on the PC engine / Kaggle (whichever you picked) — the engine must be running to drain the queue. ComfyUI needs the local server up.</div>
+    </div>
+
+    <div class="step">
+      <h3><span class="n">3</span> Mesh queue</h3>
+      <div class="jobs" id="jobs"><div class="hint">No mesh jobs yet.</div></div>
+      <div class="hint">When one finishes it lands in the <a href="/asset-library.html">asset library</a> — open it and tap 🧑‍🚀 to make it your live avatar.</div>
+    </div>
+    <div id="msg"></div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let srcB64 = null, srcMime = "image/png";
+
+  function showImage(b64, mime){
+    srcB64 = b64; srcMime = mime || "image/png";
+    $("preview").innerHTML = '<img src="data:' + srcMime + ';base64,' + b64 + '" alt="source" />';
+    $("make").disabled = false;
+  }
+
+  $("gen").onclick = async () => {
+    const prompt = $("prompt").value.trim();
+    if (!prompt) { $("msg").textContent = "type a prompt first"; return; }
+    $("gen").disabled = true; $("msg").textContent = "🎨 generating image…";
+    try {
+      const r = await (await fetch("/ai/image", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ prompt }) })).json();
+      if (r && r.ok && r.image) { showImage(r.image, r.mime); if (!$("name").value.trim()) $("name").value = prompt.slice(0, 40); $("msg").textContent = "✓ image ready — now make it 3D"; }
+      else { $("msg").textContent = "✗ " + (r && r.error === "no_api_key" ? "no image API key set (configure Gemini/Ideogram)" : (r && r.error || "image failed")); }
+    } catch (e) { $("msg").textContent = "✗ " + e; }
+    $("gen").disabled = false;
+  };
+
+  $("pickBtn").onclick = () => $("file").click();
+  $("file").onchange = () => {
+    const f = $("file").files[0]; if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => { const s = String(fr.result); const m = s.match(/^data:(image\/[a-z+]+);base64,(.+)$/i); if (m) { showImage(m[2], m[1]); if (!$("name").value.trim()) $("name").value = f.name.replace(/\.[^.]+$/, "").slice(0, 40); $("msg").textContent = "✓ photo loaded — now make it 3D"; } };
+    fr.readAsDataURL(f);
+  };
+
+  $("make").onclick = async () => {
+    if (!srcB64) { $("msg").textContent = "generate or pick an image first"; return; }
+    const name = $("name").value.trim() || "model", engine = $("engine").value;
+    $("make").disabled = true; $("msg").textContent = "🧊 queueing mesh job…";
+    try {
+      const r = await (await fetch("/gen/queue", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ type:"mesh", imageBase64: srcB64, name, engine }) })).json();
+      $("msg").textContent = r && r.ok ? ("🧊 queued “" + name + "” on " + engine) : ("✗ " + (r && r.error || "queue failed"));
+      loadJobs();
+    } catch (e) { $("msg").textContent = "✗ " + e; }
+    $("make").disabled = false;
+  };
+
+  // auto-avatar toggle
+  fetch("/gen/auto-avatar", { cache:"no-store" }).then(r => r.json()).then(j => { $("autoAv").checked = !!(j && j.on); }).catch(()=>{});
+  $("autoAv").onchange = () => { fetch("/gen/auto-avatar", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ on: $("autoAv").checked }) }).then(r => r.json()).then(j => { $("msg").textContent = j && j.on ? "✓ new meshes will auto-become your avatar" : "auto-avatar off"; }).catch(()=>{}); };
+
+  let _doneSeen = new Set(), _primed = false;
+  async function loadJobs(){
+    let j; try { j = await (await fetch("/gen/queue", { cache:"no-store" })).json(); } catch { return; }
+    const mesh = ((j && j.jobs) || []).filter(x => x.type === "mesh").sort((a,b) => (b.ts||0) - (a.ts||0));
+    // flash when a mesh newly finishes (and auto-avatar already swapped it server-side)
+    for (const m of mesh) {
+      if (m.status === "done" && !_doneSeen.has(m.id)) { _doneSeen.add(m.id); if (_primed) $("msg").textContent = ($("autoAv").checked ? "🧑‍🚀 “" : "✅ “") + (m.prompt||"model") + ($("autoAv").checked ? "” is now your live avatar" : "” is ready — open the asset library to use it"); }
+    }
+    _primed = true;
+    if (!mesh.length) { $("jobs").innerHTML = '<div class="hint">No mesh jobs yet.</div>'; return; }
+    $("jobs").innerHTML = mesh.map(m => {
+      const st = (m.status || "queued");
+      return '<div class="job"><div class="nm">' + esc(m.prompt || "model") + '<div class="eng">' + esc(m.engine || "") + (m.error ? ' · ' + esc(String(m.error).slice(0,60)) : '') + '</div></div><span class="st ' + st + '">' + st + '</span></div>';
+    }).join("");
+  }
+  // ---- setup drawer: image-gen provider/key + ComfyUI ----
+  $("gear").onclick = () => { const s = $("setup"); const open = s.style.display === "none"; s.style.display = open ? "block" : "none"; if (open) refreshSetup(); };
+  async function refreshSetup(){
+    try { const p = await (await fetch("/ai/image-provider", { cache:"no-store" })).json(); if (p && p.provider) $("prov").value = p.provider; } catch {}
+    refreshKeyStat(); refreshComfy(); refreshMeshy();
+  }
+  async function refreshKeyStat(){
+    try { const ks = await (await fetch("/ai/keys", { cache:"no-store" })).json(); const st = ks && ks[$("prov").value];
+      $("keyStat").innerHTML = st && st.set ? '<span style="color:var(--ok)">✓ key set</span> ·' + (st.tail ? ' …' + st.tail : '') : '<span style="color:var(--warn)">no key</span>'; }
+    catch { $("keyStat").textContent = "?"; }
+  }
+  $("prov").onchange = () => { fetch("/ai/image-provider", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ provider: $("prov").value }) }).catch(()=>{}); refreshKeyStat(); };
+  $("keySave").onclick = async () => {
+    const key = $("keyIn").value.trim(); if (!key) { $("setupMsg").textContent = "paste a key first"; return; }
+    $("setupMsg").textContent = "saving…";
+    try { const r = await (await fetch("/ai/key", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ provider: $("prov").value, key }) })).json();
+      $("setupMsg").textContent = r && r.ok ? "✓ key saved" : ("✗ " + (r && r.error || "failed")); $("keyIn").value = ""; refreshKeyStat(); }
+    catch (e) { $("setupMsg").textContent = "✗ " + e; }
+  };
+  async function refreshMeshy(){
+    try { const m = await (await fetch("/meshy/key", { cache:"no-store" })).json();
+      $("meshyStat").innerHTML = m && m.set ? ('<span style="color:var(--ok)">✓ key set</span>' + (m.tail ? ' · …' + m.tail : '')) : '<span style="color:var(--warn)">no key</span> — add one to use the Meshy 6 engine'; }
+    catch { $("meshyStat").textContent = "?"; }
+  }
+  $("meshySave").onclick = async () => {
+    const key = $("meshyKey").value.trim(); if (!key) { $("setupMsg").textContent = "paste a Meshy key first"; return; }
+    $("setupMsg").textContent = "saving…";
+    try { const r = await (await fetch("/meshy/key", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ key }) })).json();
+      $("setupMsg").textContent = r && r.set ? "✓ Meshy key saved" : "✗ save failed"; $("meshyKey").value = ""; refreshMeshy(); }
+    catch (e) { $("setupMsg").textContent = "✗ " + e; }
+  };
+  async function refreshComfy(){
+    try { const s = await (await fetch("/comfyui/state", { cache:"no-store" })).json();
+      $("cyStat").innerHTML = s.running ? '<span style="color:var(--ok)">● running</span> (pid ' + s.pid + ')' : (s.installed ? '<span style="color:var(--dim)">○ stopped</span>' : '<span style="color:var(--warn)">not installed</span>');
+      $("cyLaunch").style.display = s.running ? "none" : (s.installed ? "inline-block" : "none"); }
+    catch { $("cyStat").textContent = "?"; }
+  }
+  $("cyLaunch").onclick = async () => {
+    $("setupMsg").textContent = "launching ComfyUI…";
+    try { const r = await (await fetch("/comfyui/launch", { method:"POST", headers:{ "Content-Type":"application/json" }, body: "{}" })).json();
+      $("setupMsg").textContent = r && r.ok ? ("▶ ComfyUI " + (r.note || "launched") + (r.pid ? " (pid " + r.pid + ")" : "")) : ("✗ " + (r && r.error || "failed")); setTimeout(refreshComfy, 1500); }
+    catch (e) { $("setupMsg").textContent = "✗ " + e; }
+  };
+
+  loadJobs(); setInterval(loadJobs, 3000);
+</script>
+</body>
+</html>

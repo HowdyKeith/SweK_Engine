@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Multi-runtime link</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  header .sp { flex:1; }
+  .meta { color:var(--dim); font-size:12px; }
+  main { max-width:760px; margin:0 auto; padding:14px 16px; }
+  .rtbar { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:12px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .rtbar .now { font-size:13px; } .rtbar .now b { color:var(--ink); }
+  .rtbar .avail { color:var(--dim); font-size:12px; margin-left:6px; }
+  .rtbar .seg { display:flex; align-items:center; gap:8px; }
+  .rtbar .seglbl { color:var(--dim); font-size:12px; }
+  .sg { font:inherit; font-size:13px; cursor:pointer; border:1px solid var(--line); background:#0e141d; color:var(--dim); padding:5px 14px; border-radius:8px; }
+  .sg.on { background:color-mix(in srgb,var(--go) 18%,#0e141d); color:var(--go); border-color:color-mix(in srgb,var(--go) 45%,var(--line)); font-weight:600; }
+  .sg:disabled { opacity:.4; cursor:default; }
+  .rtbar .note { color:var(--dim); font-size:11.5px; flex-basis:100%; }
+  .diagram { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:8px; }
+  svg { width:100%; height:auto; display:block; }
+  .edge { stroke-width:2.5; fill:none; opacity:.85; }
+  .edge.online { stroke-dasharray:6 7; animation:flow 1s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset:-26; } }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin:6px 0 2px; color:var(--dim); font-size:12px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin-top:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:12px 14px; border-left:3px solid var(--off); }
+  .card .hd { display:flex; align-items:center; gap:8px; }
+  .card .nm { font-weight:600; flex:1; }
+  .card .st { font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .card .role { color:var(--dim); font-size:12.5px; margin-top:6px; }
+  .card .kv { color:var(--dim); font-size:12px; margin-top:7px; line-height:1.6; }
+  .card .kv b { color:var(--ink); font-weight:600; }
+  .card .lnk { color:var(--dim); font-size:11.5px; margin-top:7px; font-family:ui-monospace,monospace; word-break:break-word; opacity:.85; }
+  #updated { color:var(--dim); font-size:11px; margin-top:12px; text-align:center; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🔗</span> Multi-runtime link</span>
+    <span class="sp"></span>
+    <span class="meta" id="summary"></span>
+  </header>
+  <main>
+    <div class="rtbar">
+      <div class="now">Bridge running on <b id="curRt">…</b><span class="avail" id="bunAvail"></span></div>
+      <div class="seg"><span class="seglbl">Launch under:</span><button id="useNode" class="sg">Node</button><button id="useBun" class="sg">Bun</button></div>
+      <div class="note" id="rtNote">Choice is written to <code>use_bun.flag</code> and applies on the next bridge restart.</div>
+    </div>
+    <div class="diagram"><div id="svgwrap"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--ok)"></i>online</span>
+      <span><i style="background:var(--warn)"></i>stale (&lt;5m)</span>
+      <span><i style="background:#3a4a42"></i>offline</span>
+      <span><i style="background:#2a3138"></i>never seen</span>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div id="updated"></div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const POS = { bridge:{x:330,y:240}, vba:{x:140,y:118}, kpop:{x:520,y:118}, webgl:{x:330,y:404} };
+  const EDGES = [["bridge","vba"],["bridge","kpop"],["bridge","webgl"]];
+  const COL = { online:"var(--ok)", stale:"var(--warn)", offline:"#3a4a42", never:"#2a3138" };
+
+  function ageTxt(ms){ if (ms==null) return "never"; if (ms<2000) return "live"; if (ms<60000) return Math.round(ms/1000)+"s ago"; if (ms<3600000) return Math.round(ms/60000)+"m ago"; return Math.round(ms/3600000)+"h ago"; }
+
+  function node(r){
+    const p = POS[r.id]; if (!p) return "";
+    const c = COL[r.state] || COL.never, w = r.id==="bridge"?168:172, h = r.id==="bridge"?64:70;
+    const x = p.x - w/2, y = p.y - h/2;
+    const icon = ({bridge:"🛰️",vba:"📊",kpop:"🎧",webgl:"🌐"})[r.id] || "•";
+    const sub = r.id==="bridge" ? (r.detail.runtime==="bun"?"Bun ":"Node ")+(r.detail.version||"") : (r.state==="never" ? "never seen" : r.state + " · " + ageTxt(r.ageMs));
+    return '<g>' +
+      '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="13" fill="var(--panel)" stroke="'+c+'" stroke-width="'+(r.id==="bridge"?2.5:2)+'"/>' +
+      '<text x="'+p.x+'" y="'+(p.y-8)+'" text-anchor="middle" fill="var(--ink)" font-size="14" font-weight="600">'+icon+' '+esc(r.label)+'</text>' +
+      '<text x="'+p.x+'" y="'+(p.y+13)+'" text-anchor="middle" fill="'+c+'" font-size="12">'+esc(sub)+'</text>' +
+    '</g>';
+  }
+
+  function render(data){
+    const rt = {}; (data.runtimes||[]).forEach(r => rt[r.id] = r);
+    let online = 0; (data.runtimes||[]).forEach(r => { if (r.id!=="bridge" && r.state==="online") online++; });
+    $("summary").textContent = online + " of 3 runtimes online";
+
+    // edges (colored by the spoke runtime's state)
+    let edges = "";
+    for (const [a,b] of EDGES){ const pa=POS[a], pb=POS[b], st=(rt[b]&&rt[b].state)||"never"; const c=COL[st]||COL.never;
+      edges += '<line class="edge '+(st==="online"?"online":"")+'" x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="'+c+'"/>'; }
+    const nodes = (data.runtimes||[]).map(node).join("");
+    $("svgwrap").innerHTML = '<svg viewBox="0 0 660 470" xmlns="http://www.w3.org/2000/svg">'+edges+nodes+'</svg>';
+
+    // detail cards
+    $("cards").innerHTML = (data.runtimes||[]).map(r => {
+      const c = COL[r.state] || COL.never;
+      let kv = "";
+      const d = r.detail || {};
+      if (r.id==="bridge") kv = "runtime <b>"+esc((d.runtime==="bun"?"Bun ":"Node ")+(d.version||""))+"</b> · pid "+d.pid+"<br>uptime <b>"+Math.round((d.uptimeSec||0)/60)+"m</b> · port "+d.port;
+      else if (r.id==="vba") kv = "ticks <b>"+(d.totalTicks||0)+"</b> · queued directives <b>"+(d.queuedDirectives||0)+"</b>";
+      else if (r.id==="webgl") kv = "clients <b>"+(d.count||0)+"</b><br>💻 "+(d.pc||0)+" · 📱 "+(d.phone||0)+" · 📺 "+(d.shield||0);
+      return '<div class="card" style="border-left-color:'+c+'"><div class="hd"><span class="nm">'+esc(r.label)+'</span><span class="st" style="color:'+c+'">'+esc(r.state)+'</span></div>'+
+        '<div class="role">'+esc(r.role)+'</div>'+
+        (kv?'<div class="kv">'+kv+'</div>':'')+
+        (r.id!=="bridge"?'<div class="kv">last seen <b>'+ageTxt(r.ageMs)+'</b></div>':'')+
+        (d.link?'<div class="lnk">'+esc(d.link)+'</div>':'')+
+      '</div>';
+    }).join("");
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  }
+
+  async function load(){ try { const j = await (await fetch("/bridge/runtimes",{cache:"no-store"})).json(); if (j && j.runtimes) render(j); } catch {} }
+
+  // ---- runtime switch (Bun/Node) ----
+  let bunAvail = false;
+  function setSeg(useBun){ $("useBun").classList.toggle("on", useBun); $("useNode").classList.toggle("on", !useBun); }
+  async function loadRuntime(){
+    try {
+      const [rt, pref] = await Promise.all([
+        fetch("/runtime",{cache:"no-store"}).then(r=>r.json()).catch(()=>null),
+        fetch("/runtime/prefer",{cache:"no-store"}).then(r=>r.json()).catch(()=>null)
+      ]);
+      if (rt){ $("curRt").textContent = (rt.runtime==="bun"?"Bun ":"Node ") + (rt.version||""); bunAvail = !!rt.bunAvailable; $("bunAvail").textContent = bunAvail ? "· Bun is on PATH" : "· Bun not found on PATH"; }
+      setSeg(!!(pref && pref.useBun));
+      $("useBun").disabled = !bunAvail;
+    } catch {}
+  }
+  async function setPref(useBun){
+    if (useBun && !bunAvail) { $("rtNote").textContent = "Bun isn't on PATH — install Bun or keep Node."; return; }
+    setSeg(useBun);
+    try {
+      const r = await (await fetch("/runtime/prefer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({useBun})})).json();
+      setSeg(!!(r && r.useBun));
+      $("rtNote").innerHTML = "✓ saved — relaunch the bridge (<code>START_BUN_Full.bat</code>) to run under <b>" + (r && r.useBun ? "Bun" : "Node") + "</b>.";
+    } catch { $("rtNote").textContent = "couldn't save the preference"; }
+  }
+  $("useBun").onclick = () => setPref(true);
+  $("useNode").onclick = () => setPref(false);
+  loadRuntime();
+
+  load(); setInterval(load, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>3D Volume Cache (v3041)</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { padding: 14px 18px 40px; max-width: 1180px; }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  h2 { font-size: 12px; margin: 22px 0 6px; color: #8fd0a8; letter-spacing: 0.5px; }
+  .sub { color: #6f8a7c; max-width: 900px; margin-bottom: 6px; }
+  .panel { border: 1px solid #24382e; padding: 10px 12px; margin: 8px 0; background: #0d1411; }
+  button { background: #16241d; color: #cfe9d8; border: 1px solid #2e4a3b; padding: 5px 10px; font: inherit; cursor: pointer; margin: 2px 4px 2px 0; }
+  button:hover { background: #1e3227; }
+  button.warn { border-color: #6a4030; color: #e8bfa8; }
+  button.good { border-color: #2e6a4a; }
+  .verdict { font-size: 13px; padding: 8px 10px; margin: 6px 0; border-left: 3px solid #2e4a3b; }
+  .pass { color: #8fe0a8; border-left-color: #3f8f5f; }
+  .halt { color: #f0b0a0; border-left-color: #a05040; }
+  .idle { color: #7f9a8c; }
+  table { border-collapse: collapse; margin: 4px 0; }
+  td { padding: 1px 14px 1px 0; }
+  td.k { color: #6f8a7c; }
+  canvas { width: 460px; height: 320px; border: 1px solid #24382e; background: #000; image-rendering: pixelated; }
+  .cols { display: flex; gap: 14px; flex-wrap: wrap; }
+  .note { color: #6f8a7c; max-width: 460px; }
+  .law { color: #9ab8a8; border-left: 3px solid #2e4a3b; padding-left: 10px; margin: 6px 0; max-width: 900px; }
+  code { color: #b8d8c4; }
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<h1>3D texture as a DERIVED CACHE of the RLE chunk</h1>
+<div class="sub">
+  The RLE is canonical. The 3D texture is derived from it, invalidatable, and never a source. This page is the
+  front door: it derives the cache, proves parity voxel by voxel, and -- the part worth watching -- lets you break
+  it in the two ways that matter and shows what each control does and does not see.
+</div>
+
+<div class="law">
+  A disagreement between the cache and its source is a FINDING, not a glitch. Nothing on this page repairs a
+  divergence. Re-deriving is a separate button you press after you know why.
+</div>
+
+<h2>1. SOURCE (canonical)</h2>
+<div class="panel">
+  <div class="note">An engine-order chunk (<code>world/chunk.js</code>: <code>idx = x + sx*z + sx*sz*y</code>), encoded to RLE.
+    The live engine chunk is 16x64x16; this fixture is wider so the ray march has something to look at, and the gate
+    runs the 16x64x16 shape.</div>
+  <table id="srcTable"></table>
+  <button id="btnCarve" class="warn">edit the SOURCE (carve a box)</button>
+  <button id="btnReset">reset source</button>
+</div>
+
+<h2>2. CACHE (derived)</h2>
+<div class="panel">
+  <table id="volTable"></table>
+  <button id="btnDerive" class="good">re-derive from RLE</button>
+  <span class="note">deliberate, manual, and never automatic on a divergence</span>
+</div>
+
+<h2>3. PARITY -- position-sensitive, coordinate-reporting, read-only</h2>
+<div class="panel">
+  <div class="note">Built via <code>decodeRLE</code> (linear run walk). Verified via <code>getRLEIndexed</code>
+    (binary search over the prefix index). Two different read paths through the same RLE, so the check has power
+    over a bug in either one.</div>
+  <div id="parity" class="verdict idle">not run yet</div>
+  <button id="btnCheck" class="good">run parity check</button>
+  <button id="btnFlip" class="warn">SABOTAGE: flip one byte in the cache</button>
+  <button id="btnSwap" class="warn">SABOTAGE: rebuild the cache with x and z swapped</button>
+  <div id="aggregate" class="note"></div>
+</div>
+
+<h2>4. REGION UPDATE -- invalidate a box, re-derive that box</h2>
+<div class="panel">
+  <div class="note">A voxel edit invalidates a box, not the world. The region is derived FROM THE RLE in the
+    sub-block order <code>texSubImage3D</code> wants, so upload bandwidth is proportional to the edit.</div>
+  <div id="region" class="verdict idle">carve the source above, then patch</div>
+  <button id="btnPatch">patch the edited box</button>
+</div>
+
+<h2>5. GPU -- upload R8UI, read it back, compare</h2>
+<div class="panel">
+  <div class="note">Readback is a gate-time operation, not a frame-time one: <code>readPixels</code> stalls the
+    pipeline. Prove the upload path once and on change. Needs a real WebGL2 context.</div>
+  <div id="gpu" class="verdict idle">not run yet</div>
+  <button id="btnUpload" class="good">upload + read back + compare</button>
+  <button id="btnGpuFlip" class="warn">SABOTAGE: corrupt one byte before uploading</button>
+</div>
+
+<h2>6. THE SUBSTITUTION -- same volume, two bindings</h2>
+<div class="panel">
+  <div class="note">Left is the existing path: R8 unorm, material id recovered with
+    <code>int(texelFetch(...).r * 255.0 + 0.5)</code>. Right is this patch: R8UI, <code>usampler3D</code>, the byte
+    itself. Same DDA, same palette, same camera. If the patch is a substitution and not a feature, these are the
+    same picture -- and the pixel compare below says so rather than leaving it to the eye.</div>
+  <div class="cols">
+    <div><canvas id="cA" width="460" height="320"></canvas><div class="note">R8 unorm (default, unchanged)</div></div>
+    <div><canvas id="cB" width="460" height="320"></canvas><div class="note">R8UI (opts.uint, default OFF)</div></div>
+  </div>
+  <div class="row" style="margin-top:8px">yaw <input id="yaw" type="range" min="0" max="360" value="35"> </div>
+  <div id="pix" class="verdict idle">not compared yet</div>
+  <button id="btnPix" class="good">compare the two renders pixel by pixel</button>
+</div>
+
+<h2>7. BRICK MAP -- coarse occupancy, and an invariant that fails two different ways</h2>
+<div class="panel">
+  <div class="note">One byte per 8x8x8 brick, derived from the same RLE: 1 if it holds any solid, 0 if it holds none.
+    A DDA over an RLE world pays an O(log runs) binary search <i>per step</i>, and a world is mostly air.
+    The two failure directions are not the same bug:
+    <b>occupied-but-empty</b> costs speed and misses nothing; <b>empty-but-occupied</b> lets a ray pass through a
+    wall, silently. So they are counted separately.</div>
+  <div id="brick" class="verdict idle">not derived yet</div>
+  <button id="btnBrick" class="good">derive + verify + march</button>
+  <button id="btnAllOnes" class="warn">SABOTAGE: all-ones map</button>
+  <button id="btnAllZeros" class="warn">SABOTAGE: all-zeros map</button>
+  <button id="btnHole" class="warn">SABOTAGE: hole one occupied brick</button>
+  <div id="brickStats" class="note"></div>
+</div>
+
+</div>
+
+<script type="module">
+import { encodeRLE, runStats } from "/voxel/voxelRLE.js";
+import { chunkToRLE, chunkIndexReal } from "/voxel/rleWorldBridge.js";
+import {
+    rleToVolume, volumeAt, volumeIndex, compareVolumeToRLE, describeMismatch,
+    regionFromRLE, applyRegion, restamp, isStale, solidCount, rleFingerprint,
+} from "/voxel/rleVolumeCache.js";
+import { uploadVolume, readbackVolume, compareBuffers, createVolumeTexture, disposeVolumeTexture } from "/render/volumeTexture.js";
+import { VoxelRaymarchPass } from "/render/voxelRaymarchPass.js";
+import { acquireGL } from "/render/glBootstrap.js";
+import { brickMapFromRLE, verifyBrickMap, describeBrickMap, occupancy, traverseBricked, brickIndex } from "/voxel/rleBrickMap.js";
+import { buildIndex, getRLEIndexed } from "/voxel/voxelRLE.js";
+
+// ---- the source chunk (engine order) -------------------------------------------------------------------
+const SX = 48, SY = 32, SZ = 48;
+const DIMS = { sx: SX, sy: SY, sz: SZ };
+const CARVE = { x0: 18, y0: 6, z0: 20, w: 10, h: 8, d: 10 };
+
+function makeChunk() {
+    const v = new Uint8Array(SX * SY * SZ);
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+        const h = Math.min(SY - 1, Math.floor(10 + 6 * Math.sin(x * 0.18) * Math.cos(z * 0.15) + 4 * Math.sin((x + z) * 0.09) + 3 * Math.cos(x * 0.31)));
+        for (let y = 0; y < h; y++) {
+            let id;
+            if (y === h - 1) id = h > 16 ? 3 : (h < 9 ? 2 : 1);
+            else if (y >= h - 3) id = 4;
+            else id = 6;
+            v[chunkIndexReal(x, y, z, DIMS)] = id;
+        }
+    }
+    for (let x = 20; x < 28; x++) for (let z = 20; z < 28; z++) for (let y = 22; y < 27; y++) v[chunkIndexReal(x, y, z, DIMS)] = 5;
+    return v;
+}
+
+let chunk = makeChunk();
+let rle = chunkToRLE(chunk, DIMS, chunkIndexReal);
+let vol = rleToVolume(rle);
+let carved = false;
+
+const $ = (id) => document.getElementById(id);
+const rows = (el, pairs) => { el.innerHTML = pairs.map(([k, v]) => '<tr><td class="k">' + k + "</td><td>" + v + "</td></tr>").join(""); };
+const verdict = (el, cls, text) => { el.className = "verdict " + cls; el.textContent = text; };
+
+function refresh() {
+    const st = runStats(rle);
+    rows($("srcTable"), [
+        ["dims", SX + " x " + SY + " x " + SZ + "  (" + (SX * SY * SZ).toLocaleString() + " voxels)"],
+        ["rle runs", st.runs.toLocaleString() + "   (" + st.voxelsPerRun.toFixed(1) + " voxels/run)"],
+        ["rle bytes", st.rleBytes.toLocaleString() + " vs " + st.flatBytes.toLocaleString() + " flat  (" + st.byteRatio.toFixed(1) + "x)"],
+        ["fingerprint", "0x" + rleFingerprint(rle).toString(16)],
+        ["source edited", carved ? "YES -- a box was carved" : "no"],
+    ]);
+    rows($("volTable"), [
+        ["texture order", "x + dx*(y + dy*z)   -- what texelFetch(ivec3) and texImage3D expect"],
+        ["bytes", vol.data.length.toLocaleString() + " (" + (vol.data.length / 1024).toFixed(1) + " KB, r8uint)"],
+        ["stamped source", "0x" + vol.srcFingerprint.toString(16) + (isStale(vol, rle) ? "   <span style='color:#f0b0a0'>STALE -- source has moved</span>" : "   (matches)")],
+        ["solid voxels", solidCount(vol).toLocaleString()],
+    ]);
+}
+
+function runParity() {
+    const t0 = performance.now();
+    const res = compareVolumeToRLE(vol, rle, { countAll: false });
+    const ms = performance.now() - t0;
+    verdict($("parity"), res.ok ? "pass" : "halt", describeMismatch(res) + "   [" + ms.toFixed(1) + " ms]");
+    // Aggregates are shown next to the verdict on purpose: the axis-swap sabotage makes them agree while the
+    // parity check halts, which is the whole argument for checking coordinates instead of totals.
+    const sv = solidCount(vol);
+    let sr = 0;
+    for (let z = 0; z < SZ; z++) for (let y = 0; y < SY; y++) for (let x = 0; x < SX; x++)
+        if (chunk[chunkIndexReal(x, y, z, DIMS)] !== 0) sr++;
+    $("aggregate").innerHTML = "aggregate check for comparison -- solid voxels: cache " + sv.toLocaleString() +
+        " vs source " + sr.toLocaleString() + "  ->  " +
+        (sv === sr ? "<span style='color:#8fe0a8'>AGREE</span>" : "<span style='color:#f0b0a0'>DISAGREE</span>") +
+        "   (a count is invariant under an axis permutation; it agrees on data that is wrong at every coordinate)";
+    refresh();
+}
+
+$("btnDerive").onclick = () => { vol = rleToVolume(rle); verdict($("parity"), "idle", "cache re-derived from the RLE -- run the check again"); refresh(); };
+$("btnCheck").onclick = runParity;
+
+$("btnFlip").onclick = () => {
+    const x = 7 + Math.floor(Math.random() * 30), y = Math.floor(Math.random() * 14), z = 5 + Math.floor(Math.random() * 30);
+    const i = volumeIndex(x, y, z, vol);
+    vol.data[i] = (vol.data[i] + 1 + Math.floor(Math.random() * 5)) & 7;
+    verdict($("parity"), "idle", "one byte flipped at (" + x + "," + y + "," + z + ") -- run the check and see if it finds it");
+};
+
+$("btnSwap").onclick = () => {
+    // Rebuild the cache reading z where x belongs. Same bytes, same count, every coordinate wrong.
+    const good = rleToVolume(rle);
+    const swapped = { data: new Uint8Array(vol.data.length), dx: SX, dy: SY, dz: SZ, srcFingerprint: vol.srcFingerprint };
+    for (let z = 0; z < SZ; z++) for (let y = 0; y < SY; y++) for (let x = 0; x < SX; x++)
+        swapped.data[volumeIndex(x, y, z, swapped)] = good.data[volumeIndex(z, y, x, good)];
+    vol = swapped;
+    verdict($("parity"), "idle", "cache rebuilt with x and z transposed -- the fingerprint still matches, run the check");
+    refresh();
+};
+
+$("btnCarve").onclick = () => {
+    for (let x = 0; x < CARVE.w; x++) for (let y = 0; y < CARVE.h; y++) for (let z = 0; z < CARVE.d; z++)
+        chunk[chunkIndexReal(CARVE.x0 + x, CARVE.y0 + y, CARVE.z0 + z, DIMS)] = 0;
+    rle = chunkToRLE(chunk, DIMS, chunkIndexReal);
+    carved = true;
+    verdict($("region"), "idle", "source edited. The cache is now stale -- patch the box, or run parity and watch it halt inside it.");
+    refresh();
+};
+$("btnReset").onclick = () => { chunk = makeChunk(); rle = chunkToRLE(chunk, DIMS, chunkIndexReal); vol = rleToVolume(rle); carved = false; verdict($("region"), "idle", "reset"); verdict($("parity"), "idle", "not run yet"); refresh(); };
+
+$("btnPatch").onclick = () => {
+    try {
+        const patch = regionFromRLE(rle, CARVE);
+        applyRegion(vol, patch);
+        restamp(vol, rle);
+        const res = compareVolumeToRLE(vol, rle);
+        verdict($("region"), res.ok ? "pass" : "halt",
+            "patched " + patch.data.length.toLocaleString() + " bytes (" +
+            (100 * patch.data.length / vol.data.length).toFixed(1) + "% of the volume)  ->  " + describeMismatch(res));
+        refresh();
+    } catch (e) { verdict($("region"), "halt", "REFUSED: " + e.message); }
+};
+
+// ---- GPU: upload, read back, compare -------------------------------------------------------------------
+$("btnUpload").onclick = () => runUpload(false);
+$("btnGpuFlip").onclick = () => runUpload(true);
+
+function runUpload(corrupt) {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2");
+    if (!gl) { verdict($("gpu"), "halt", "WebGL2 unavailable -- check chrome://gpu and hardware acceleration. Nothing was measured."); return; }
+    const sent = { data: Uint8Array.from(vol.data), dx: vol.dx, dy: vol.dy, dz: vol.dz };
+    let note = "";
+    if (corrupt) {
+        const i = volumeIndex(12, 4, 30, sent);
+        sent.data[i] = (sent.data[i] + 3) & 7;
+        note = " (a byte was deliberately corrupted at (12,4,30) BEFORE upload, so the readback should find it there)";
+    }
+    const tex = createVolumeTexture(gl);
+    const up = uploadVolume(gl, tex, sent);
+    if (!up.ok) { verdict($("gpu"), "halt", "upload refused: " + up.reason); disposeVolumeTexture(gl, tex); return; }
+    const t0 = performance.now();
+    const rb = readbackVolume(gl, tex, sent.dx, sent.dy, sent.dz);
+    const ms = performance.now() - t0;
+    if (!rb.ok) { verdict($("gpu"), "halt", "readback refused: " + rb.reason); disposeVolumeTexture(gl, tex); return; }
+    // Compare the readback against the CACHE we believe is on the GPU (vol), not against what we sent. If those
+    // differ, that difference is the finding.
+    const res = compareBuffers(rb.data, corrupt ? sent : vol);
+    if (res.ok) verdict($("gpu"), "pass", "GPU holds exactly what was sent: " + res.checked.toLocaleString() + " bytes agree  [readback " + ms.toFixed(0) + " ms]" + note);
+    else verdict($("gpu"), "halt", "DIVERGED at (" + res.first.x + "," + res.first.y + "," + res.first.z + "): sent " +
+        res.first.expected + ", GPU returned " + res.first.actual + "  -- not re-uploaded" + note);
+    disposeVolumeTexture(gl, tex);
+    try { const ext = gl.getExtension("WEBGL_lose_context"); if (ext) ext.loseContext(); } catch {}
+}
+
+// ---- the substitution: two renders of the same volume ---------------------------------------------------
+const passes = {};
+function makePass(canvasId, uint) {
+    // v3050 -- via acquireGL, and RELEASED on pagehide. This page holds TWO long-lived contexts for the
+    // side-by-side compare and used to hand them back to nobody; two tabs of it plus the engine is most of
+    // Chrome's ~16 ceiling, which is the v2777 exhaustion mechanism with a new page attached to it.
+    const c = $(canvasId);
+    const ctx = acquireGL(c);
+    if (!ctx.ok) return null;
+    const p = new VoxelRaymarchPass(ctx.gl, { uint });
+    p.uploadVolume(vol.data, vol.dx, vol.dy, vol.dz);
+    return { gl: ctx.gl, pass: p, canvas: c, ctx };
+}
+function drawBoth() {
+    const yaw = (+$("yaw").value) * Math.PI / 180;
+    const r = 62, eye = [SX / 2 + r * Math.cos(yaw), 34, SZ / 2 + r * Math.sin(yaw)];
+    const tgt = [SX / 2, 10, SZ / 2];
+    let f = [tgt[0] - eye[0], tgt[1] - eye[1], tgt[2] - eye[2]];
+    const fl = Math.hypot(f[0], f[1], f[2]); f = f.map((v) => v / fl);
+    let rt = [f[2], 0, -f[0]]; const rl = Math.hypot(rt[0], rt[1], rt[2]); rt = rt.map((v) => v / rl);
+    const up = [rt[1] * f[2] - rt[2] * f[1], rt[2] * f[0] - rt[0] * f[2], rt[0] * f[1] - rt[1] * f[0]];
+    const cam = { eye, fwd: f, right: rt, up, tanFov: 0.55 };
+    for (const k of ["A", "B"]) {
+        const p = passes[k];
+        if (!p) continue;
+        p.gl.viewport(0, 0, p.canvas.width, p.canvas.height);
+        p.pass.render(cam, p.canvas.width, p.canvas.height);
+    }
+}
+passes.A = makePass("cA", false);
+passes.B = makePass("cB", true);
+// v3052 -- pagehide FIRES FOR BACK-FORWARD CACHE TOO, and I shipped this without checking. Entering bfcache is
+// not leaving: the document is frozen and restored intact on a back-navigation. Disposing the GL context there --
+// with {once:true}, so the listener was gone as well -- meant coming back gave a page whose context had been
+// released and whose cleanup could never run again. A dead page that looks like a broken one.
+// Release only on a REAL unload; on a bfcache restore, reload so the pass and stream rebuild around a fresh
+// context rather than half-living around a stale one.
+addEventListener("pagehide", (e) => { if (e.persisted) return; for (const k of ["A", "B"]) { try { passes[k] && passes[k].pass.dispose(); passes[k] && passes[k].ctx.dispose(); } catch {} } });
+addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+if (!passes.A || !passes.B) {
+    verdict($("pix"), "halt", "WebGL2 unavailable -- the two renders cannot be compared. Everything above this section still works (it is all CPU).");
+} else {
+    $("yaw").oninput = drawBoth;
+    drawBoth();
+}
+
+$("btnPix").onclick = () => {
+    if (!passes.A || !passes.B) { verdict($("pix"), "halt", "WebGL2 unavailable -- nothing measured."); return; }
+    drawBoth();
+    const w = passes.A.canvas.width, h = passes.A.canvas.height;
+    const a = new Uint8Array(w * h * 4), b = new Uint8Array(w * h * 4);
+    passes.A.gl.readPixels(0, 0, w, h, passes.A.gl.RGBA, passes.A.gl.UNSIGNED_BYTE, a);
+    passes.B.gl.readPixels(0, 0, w, h, passes.B.gl.RGBA, passes.B.gl.UNSIGNED_BYTE, b);
+    let diff = 0, worst = 0;
+    for (let i = 0; i < a.length; i += 4) {
+        const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+        if (d !== 0) diff++;
+        if (d > worst) worst = d;
+    }
+    const total = w * h;
+    verdict($("pix"), diff === 0 ? "pass" : "halt",
+        diff === 0
+            ? "IDENTICAL: all " + total.toLocaleString() + " pixels match. The uint binding is a substitution, not a new look."
+            : diff + " of " + total.toLocaleString() + " pixels differ (worst channel delta " + worst + ") -- that is a finding, not a rounding tax. Investigate before adopting.");
+};
+
+// ---- brick map -----------------------------------------------------------------------------------------
+function marchSet(map) {
+    // Fire a fan of rays and count what the marcher had to ask the RLE. An all-ones map consults a brick that is
+    // always occupied, so it is exactly the no-skip baseline -- which is why the sabotage doubles as the control.
+    const prefix = buildIndex(rle);
+    const isSolid = (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= SX || y >= SY || z >= SZ) ? false
+        : getRLEIndexed(rle, prefix, x, y, z) !== 0;
+    let queries = 0, hits = 0, n = 0;
+    const ro = [SX / 2 + 0.37, SY - 1.61, SZ / 2 + 0.29];
+    const out = [], hitBricks = new Set();
+    for (let i = 0; i < 3000; i++) {
+        const a = i * 0.0731 + 0.011, b = (i % 97) * 0.0217 - 1.0;
+        const rd = [Math.cos(a) * Math.cos(b), Math.sin(b) - 0.35, Math.sin(a) * Math.cos(b)];
+        const r = traverseBricked(ro[0], ro[1], ro[2], rd[0], rd[1], rd[2], isSolid, map, 300);
+        n++; queries += r.queries; if (r.hit) hits++;
+        out.push(r.hit ? (r.vx + "," + r.vy + "," + r.vz) : "-");
+        // WHICH bricks this ray set actually decides anything in. Needed because a sabotage aimed at a brick no
+        // ray tests proves nothing, and looks like the sabotage failed.
+        if (r.hit) hitBricks.add(brickIndex((r.vx / map.brick) | 0, (r.vy / map.brick) | 0, (r.vz / map.brick) | 0, map));
+    }
+    return { queries, hits, n, sig: out.join("|"), hitBricks };
+}
+
+let brickBaseline = null;
+function showBrick(map, label) {
+    const res = verifyBrickMap(map, rle);
+    const occ = occupancy(map);
+    const t0 = performance.now();
+    const m = marchSet(map);
+    const ms = performance.now() - t0;
+    const isBase = !brickBaseline;
+    if (isBase) brickBaseline = m;
+    const lostHits = brickBaseline.hits - m.hits;
+    const changed = brickBaseline.sig !== m.sig;
+    // THE LESSON THIS PANEL EXISTS FOR. A map can be UNSAFE and this ray set can still return every answer it
+    // returned before, because no ray happened to decide anything inside the holed brick. That is not the
+    // sabotage failing -- it is the demonstration that MARCHING SOME RAYS IS NOT A PROOF. The invariant is
+    // checked structurally, over every brick, precisely because looking from one viewpoint cannot do it.
+    const unnoticed = !isBase && !res.safe && !changed;
+    verdict($("brick"), res.ok ? "pass" : (res.safe ? "idle" : "halt"),
+        label + " -- " + describeBrickMap(res) +
+        (unnoticed ? "   ||  AND THIS RAY SET DID NOT NOTICE: same answers, same query count. No ray decided anything inside that brick. Marching rays is not a proof; the structural check above is." : ""));
+    $("brickStats").innerHTML =
+        "bricks " + occ.total + " (" + (100 * occ.fraction).toFixed(1) + "% occupied) &nbsp;|&nbsp; " +
+        "3000 rays in " + ms.toFixed(0) + " ms" + (isBase ? " (first run, includes JIT warmup -- compare QUERIES, not ms)" : "") + ": " + m.queries.toLocaleString() + " solid queries, " + m.hits + " hits" +
+        (isBase ? "" :
+            " &nbsp;|&nbsp; vs the exact map: " +
+            (changed
+                ? "<span style='color:#f0b0a0'>ANSWERS CHANGED" + (lostHits > 0 ? ", " + lostHits + " hits LOST" : "") + "</span>"
+                : "<span style='color:#8fe0a8'>identical answers</span>") +
+            ", " + (m.queries > brickBaseline.queries ? "+" : "") +
+            (m.queries - brickBaseline.queries).toLocaleString() + " queries");
+}
+
+const withBase = (fn) => () => {
+    const g = brickMapFromRLE(rle);
+    if (!brickBaseline) showBrick(g, "exact map");
+    showBrick(fn(g), "sabotaged");
+};
+$("btnBrick").onclick = () => { brickBaseline = null; showBrick(brickMapFromRLE(rle), "exact map"); };
+$("btnAllOnes").onclick = withBase((g) => ({ ...g, data: new Uint8Array(g.data.length).fill(1) }));
+$("btnAllZeros").onclick = withBase((g) => ({ ...g, data: new Uint8Array(g.data.length) }));
+$("btnHole").onclick = withBase((g) => {
+    const holed = { ...g, data: Uint8Array.from(g.data) };
+    // Prefer a brick the baseline rays actually resolved a hit in -- otherwise the sabotage is real and
+    // invisible, which reads as a broken button rather than as the point. If none is available, hole any
+    // occupied brick and let the "did not notice" note explain what happened.
+    const used = [...(brickBaseline && brickBaseline.hitBricks ? brickBaseline.hitBricks : [])].filter((i) => holed.data[i]);
+    if (used.length) { holed.data[used[(used.length / 2) | 0]] = 0; return holed; }
+    const occupied = [];
+    for (let i = 0; i < holed.data.length; i++) if (holed.data[i]) occupied.push(i);
+    if (occupied.length) holed.data[occupied[(occupied.length / 2) | 0]] = 0;
+    return holed;
+});
+
+refresh();
+</script>
+</body>
+</html>

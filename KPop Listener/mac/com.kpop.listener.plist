@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kpop.listener</string>
+
+    <!-- PYTHON / SCRIPT / WORKDIR placeholders are filled in by kpop-mac-boot.sh
+         install. Add args here if you want, e.g. the launch-bridge flag. The
+         clip-saver flag is Windows-only, so it is not used on macOS. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>__SCRIPT__</string>
+        <string>--no-startup-toast</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WORKDIR__</string>
+
+    <!-- Start at login and keep it alive if it exits. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/kpop-listener.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/kpop-listener.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

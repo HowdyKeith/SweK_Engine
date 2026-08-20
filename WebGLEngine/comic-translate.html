@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Comic Translator">
+<meta name="demo:desc" content="Front door for ogkalu2/comic-translate -- SOTA comic/manga translation (bubble detection, OCR, inpaint cleaning, LLM translation). Detect, install, and launch it from the engine; the heavy lifting runs on the rig.">
+<meta name="demo:category" content="tools">
+<title>Comic Translator</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --red:#ff5d6c; --dim:#7c93b8; }
+  body { margin:0; background:#04060d; color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; padding:18px; }
+  h1 { font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 4px; }
+  .sub { color:var(--dim); margin-bottom:16px; max-width:640px; line-height:1.5; }
+  .card { background:#0a1020; border:1px solid #16233c; border-radius:10px; padding:14px; margin-bottom:12px; max-width:680px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:8px 15px; font:600 12px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; margin-right:8px; }
+  button:hover:not(:disabled) { border-color:var(--cyan); } button:disabled { opacity:.45; cursor:default; }
+  button.go { color:var(--amber); } button.go:hover:not(:disabled) { border-color:var(--amber); }
+  button.stop { color:var(--red); }
+  .chip { display:inline-block; background:#0c1526; border:1px solid #1c2942; border-radius:20px; padding:4px 11px; margin:3px 6px 3px 0; font-size:12px; }
+  .ok { color:var(--green); } .bad { color:var(--red); } .idle { color:var(--dim); }
+  pre { background:#04060d; border:1px solid #14203a; border-radius:6px; padding:10px; overflow:auto; font-size:11px; color:#b9c9e6; white-space:pre-wrap; max-height:220px; }
+  a { color:var(--cyan); }
+</style>
+</head>
+<body>
+<h1>&#128214; Comic Translator</h1>
+<div class="sub">A front door for <a href="https://github.com/ogkalu2/comic-translate" target="_blank">ogkalu2/comic-translate</a> &mdash; bubble detection, OCR, inpaint cleaning, and LLM translation of comics/manga in many languages and formats (Image, PDF, EPUB, CBR, CBZ). The engine detects, installs, and launches it; the OCR + translation run on this rig (and it can translate with an LLM you configure inside the app, Claude included).</div>
+
+<div class="card">
+  <div id="state" class="idle">Checking&hellip;</div>
+  <div style="margin-top:12px">
+    <button id="bInstall" class="go" onclick="install()">Install</button>
+    <button id="bLaunch" onclick="launch()" disabled>Launch app</button>
+    <button id="bStop" class="stop" onclick="stopJob()" disabled>Stop job</button>
+    <button onclick="refresh()">Refresh</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="color:var(--cyan);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Job log</div>
+  <pre id="log" class="idle">No job running.</pre>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+async function jget(u){ const r=await fetch(u); return r.json(); }
+async function jpost(u){ const r=await fetch(u,{method:"POST",headers:{"content-type":"application/json"},body:"{}"}); return r.json(); }
+
+function render(s){
+  const d = s.detect;
+  const chips = [
+    `<span class="chip ${d.installed?"ok":"bad"}">${d.installed?"&#10003; installed":"&#10007; not installed"}</span>`,
+    `<span class="chip ${d.python?"ok":"bad"}">python: ${d.python||"missing"}</span>`,
+    d.installed ? `<span class="chip">${d.dir.replace(/.*\//,"&hellip;/")}</span>` : ""
+  ].join("");
+  $("state").className = "";
+  $("state").innerHTML = chips + `<div style="margin-top:8px;color:var(--dim)">${d.hint}</div>`;
+  $("bLaunch").disabled = !d.installed || (s.job && !s.job.done);
+  $("bInstall").disabled = (s.job && !s.job.done);
+  $("bStop").disabled = !(s.job && !s.job.done);
+  const log = $("log");
+  if (s.job){ log.className=""; log.textContent = `[${s.job.kind}] ${s.job.done?("exited "+s.job.code):"running "+(s.job.uptimeMs/1000|0)+"s"}\n\n`+(s.job.tail||""); }
+  else { log.className="idle"; log.textContent="No job running."; }
+}
+async function refresh(){ render(await jget("/comic/status")); }
+async function install(){ const r=await jpost("/comic/install"); if(!r.ok) alert("install: "+(r.reason||r.error)); refresh(); }
+async function launch(){ const r=await jpost("/comic/launch"); if(!r.ok) alert("launch: "+(r.reason||r.error)); refresh(); }
+async function stopJob(){ await jpost("/comic/stop"); refresh(); }
+refresh(); setInterval(refresh, 2500);
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fan-beam CT</title>
+<style>
+  html,body{margin:0;background:#0a0c0e;color:#d0dae0;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:920px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#77868f;margin-bottom:14px}
+  .card{border:1px solid #232e36;background:#0e1318;padding:12px 14px;margin-bottom:13px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .panel{text-align:center}
+  canvas{border:1px solid #1c262d;background:#05080a;image-rendering:pixelated;width:200px;height:200px}
+  /* v2872 -- the field fills the page. The backing store stays the simulation grid (96x96 reconstruction grid):
+     one pixel is one cell, and that is the honest resolution. Enlarging the store would invent detail
+     the simulation does not have, so the DISPLAY grows instead and pixelated keeps a cell a square. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block;
+           image-rendering: pixelated; }
+  canvas.wide{width:280px;height:200px}
+  label{color:#77868f;margin-right:6px}input[type=range]{width:250px;vertical-align:middle}
+  .num{color:#9fd8e8}.dim{color:#77868f}.good{color:#7fe0a4}.bad{color:#e8a0a0}
+  .cap{color:#77868f;margin-top:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Fan-beam CT</h1>
+  <div class="sub">A real scanner has a point source, so its rays diverge. Each fan ray is still a straight line
+    through the patient &mdash; rebinning finds which parallel ray it already is.</div>
+
+  <div class="card">
+    <label>source distance D</label><input id="D" type="range" min="60" max="600" value="200">
+    <span class="num" id="Dv"></span>
+    <span class="dim" id="fanv"></span>
+    <div style="margin-top:8px"><label><input id="rebin" type="checkbox" checked> rebin before reconstructing</label>
+      <span class="dim">uncheck to see what the rebinning is actually doing</span></div>
+  </div>
+
+  <div class="card row">
+    <div class="panel"><canvas id="truth" width="96" height="96"></canvas><div class="cap">phantom (truth)</div></div>
+    <div class="panel"><canvas id="sino" class="wide" width="120" height="96"></canvas><div class="cap">fan sinogram</div></div>
+    <div class="panel"><canvas id="recon" width="96" height="96"></canvas><div class="cap" id="rcap">reconstruction</div></div>
+  </div>
+
+  <div class="card">
+    <div>correlation vs truth: <span id="corr" class="num"></span> <span class="dim" id="cmp"></span></div>
+    <div class="dim" style="margin-top:6px" id="note"></div>
+  </div>
+</div>
+
+<script type="module">
+import { phantomField, radon, filteredBackProjection, scoreRecon, angleSet } from "/physics/tomography/ct.js";
+import { fanHalfAngle, fanAngles, betaSet, fanProjection, rebinToParallel } from "/physics/tomography/fanbeam.js";
+
+const $ = (id) => document.getElementById(id);
+const N = 96, nDet = 96;
+const PH = [{cx:0,cy:0,a:0.7,b:0.5,rho:1},{cx:0.25,cy:0.15,a:0.2,b:0.15,rho:0.6},{cx:-0.3,cy:-0.2,a:0.12,b:0.12,rho:-0.4}];
+const img = phantomField(N, PH);
+
+function show(cv, data, w, h) {
+  const ctx = cv.getContext("2d"), im = ctx.createImageData(w, h);
+  let mn = Infinity, mx = -Infinity;
+  for (const v of data) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const r = mx - mn || 1;
+  for (let i = 0; i < w * h; i++) {
+    const g = Math.max(0, Math.min(255, ((data[i] - mn) / r) * 255));
+    im.data[i*4] = g; im.data[i*4+1] = g * 0.97; im.data[i*4+2] = g * 0.9; im.data[i*4+3] = 255;
+  }
+  cv.width = w; cv.height = h; ctx.putImageData(im, 0, 0);
+}
+
+let parCorr = null;
+function draw() {
+  const D = parseInt($("D").value);
+  const gmax = fanHalfAngle(D, N/2*1.05);
+  $("Dv").textContent = D + " px";
+  $("fanv").textContent = "  half fan " + (gmax*180/Math.PI).toFixed(1) + " deg";
+  const angles = angleSet(120), gammas = fanAngles(nDet, gmax), betas = betaSet(240);
+  const fan = fanProjection(img, N, betas, gammas, D);
+
+  show($("truth"), img, N, N);
+  const flatS = []; for (let b = 0; b < 120; b++) for (let g = 0; g < nDet; g++) flatS.push(fan[b*2][g]);
+  show($("sino"), flatS, nDet, 120);
+
+  const rebin = $("rebin").checked;
+  const sino = rebin ? rebinToParallel(fan, betas, gammas, D, angles, nDet, N)
+                     : fan.slice(0, angles.length);
+  const rec = filteredBackProjection(sino, N, angles, nDet, true);
+  show($("recon"), rec, N, N);
+  const c = scoreRecon(rec, img).corr;
+  if (parCorr === null) parCorr = scoreRecon(filteredBackProjection(radon(img,N,angles,nDet),N,angles,nDet,true), img).corr;
+
+  $("rcap").textContent = rebin ? "reconstruction (rebinned)" : "reconstruction (NO rebinning)";
+  $("corr").innerHTML = `<span class="${c > 0.95 ? "good" : "bad"}">${c.toFixed(4)}</span>`;
+  $("cmp").textContent = `(parallel-beam reference: ${parCorr.toFixed(4)})`;
+  $("note").innerHTML = rebin
+    ? `Every fan ray is mapped to the parallel ray it already is &mdash; theta = beta + gamma + pi/2, offset
+       -D sin(gamma) &mdash; and then handed to the same filtered back-projection the parallel instrument uses.`
+    : `<span class="bad">Rebinning off.</span> The fan data is being fed to the parallel reconstruction as if the
+       rays were parallel. They are not, and the image shows it.`;
+}
+$("D").oninput = $("rebin").onchange = draw;
+draw();
+</script>
+</body>
+</html>

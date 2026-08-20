@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LCARS · Trading Floor</title>
+<!--
+  v973 — LCARS Trading Floor. Reads the trader bridge:
+    GET  /trader/trades?name=&limit=   disclosed politician trades (free senate
+                                       data; works with no key — confirmed)
+    GET  /trader/ta/detect             is TradingAgents installed?
+    POST /trader/mirror {name,runTA}   pairs each ticker with the firm's
+                                       buy/sell/hold verdict (slow; local Ollama)
+  Shows trades as ticker bars + an LCARS ledger; when verdicts run, each row
+  gets the firm's call and an AGREE / DIVERGE / HOLD badge vs the politician.
+  SIMULATION / EDUCATION ONLY — not investment advice. Disclosed trades lag
+  30–45 days (STOCK Act); the free senate dataset is historical (2012–2020).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000; --space:#0a0a10;
+    --orange:#f90; --tan:#fc9; --gold:#fc6; --blue:#9cf; --lilac:#c9c;
+    --mars:#c66; --ice:#cdf; --agree:#6c9; --diverge:#e66; --hold:#fc6;
+    --rail:#cc6; --pill-dim:#3a3a4a;
+    --font:"Antonio","Arial Narrow",-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--black);color:var(--tan);
+    font-family:var(--font);letter-spacing:.5px;overflow:hidden;}
+  body{display:flex;flex-direction:column;}
+  .upper{text-transform:uppercase;}
+  /* ---- header ---- */
+  header{display:flex;align-items:flex-end;gap:8px;padding:10px 14px 0;height:64px;flex:0 0 auto;}
+  .cap{width:64px;height:42px;background:var(--orange);border-radius:42px 0 0 0;}
+  .titlewrap{flex:1 1 auto;height:42px;background:var(--orange);border-radius:0 0 0 0;
+    display:flex;align-items:center;padding:0 18px;}
+  .title{font-size:30px;font-weight:700;color:#000;text-transform:uppercase;line-height:1;}
+  .title small{font-size:13px;font-weight:600;color:#311;margin-left:14px;letter-spacing:2px;}
+  .statuspill{height:42px;min-width:230px;background:var(--blue);border-radius:0 42px 0 0;
+    display:flex;align-items:center;justify-content:flex-end;padding:0 22px;color:#001;
+    font-size:14px;font-weight:600;text-transform:uppercase;gap:10px;white-space:nowrap;}
+  .dot{width:11px;height:11px;border-radius:50%;background:#063;box-shadow:0 0 8px #0f6;}
+  .dot.off{background:#633;box-shadow:none;}
+  .dot.busy{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:blink .8s steps(2) infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  /* ---- body grid ---- */
+  .grid{flex:1 1 auto;display:grid;grid-template-columns:150px 1fr;gap:8px;padding:8px 14px 0;min-height:0;}
+  /* left rail */
+  .rail{display:flex;flex-direction:column;gap:6px;min-height:0;}
+  .elbow{height:54px;background:var(--orange);border-radius:0 0 0 42px;}
+  .pill{height:40px;border:none;border-radius:0 0 0 0;color:#001;font-family:var(--font);
+    font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:1px;cursor:pointer;
+    text-align:right;padding:0 14px 4px 0;display:flex;align-items:flex-end;justify-content:flex-end;
+    transition:filter .12s,transform .12s;}
+  .pill:hover{filter:brightness(1.18);} .pill:active{transform:translateX(2px);}
+  .pill.go{background:var(--gold);} .pill.run{background:var(--lilac);} .pill.alt{background:var(--blue);}
+  .pill[disabled]{background:var(--pill-dim);color:#778;cursor:not-allowed;filter:none;}
+  .seg{height:26px;background:var(--mars);border-radius:0;color:#100;font-size:12px;font-weight:600;
+    display:flex;align-items:center;justify-content:flex-end;padding:0 12px 2px 0;text-transform:uppercase;}
+  .seg.b{background:var(--blue);} .seg.o{background:var(--orange);} .seg.t{background:var(--tan);}
+  .railfill{flex:1 1 auto;background:var(--rail);border-radius:0 0 0 22px;min-height:14px;}
+  .nameField{height:40px;background:#11131c;border:2px solid var(--blue);border-radius:0;
+    color:var(--ice);font-family:var(--font);font-size:15px;text-transform:uppercase;
+    letter-spacing:1px;padding:0 10px;text-align:right;}
+  .nameField::placeholder{color:#557;}
+  select.nameField{ -webkit-appearance:none; appearance:none; cursor:pointer; font-size:13px; }
+  select.nameField option{ background:#11131c; color:var(--ice); }
+  /* main */
+  main{display:flex;flex-direction:column;gap:8px;min-height:0;}
+  .floor{flex:0 0 auto;height:34%;min-height:130px;background:#06070d;border:1px solid #1a1c28;
+    border-left:8px solid var(--blue);border-radius:0 14px 0 0;padding:10px 12px 6px;
+    display:flex;flex-direction:column;}
+  .floorhead{display:flex;justify-content:space-between;color:var(--blue);font-size:13px;
+    text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;}
+  .bars{flex:1 1 auto;display:flex;align-items:flex-end;gap:6px;overflow-x:auto;padding-bottom:2px;}
+  .barcol{flex:0 0 46px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;cursor:default;}
+  .barcol .cnt{font-size:12px;color:var(--gold);margin-bottom:2px;}
+  .bar{width:34px;background:var(--blue);border-radius:4px 4px 0 0;min-height:3px;
+    transition:height .6s cubic-bezier(.2,.8,.2,1);position:relative;}
+  .bar.sell{background:var(--mars);} .bar.mix{background:var(--gold);}
+  .bar.agree{background:var(--agree);} .bar.diverge{background:var(--diverge);} .bar.hold{background:var(--hold);}
+  .barcol .tk{font-size:12px;color:var(--ice);margin-top:4px;text-transform:uppercase;
+    max-width:46px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* ledger */
+  .ledger{flex:1 1 auto;background:#06070d;border:1px solid #1a1c28;border-left:8px solid var(--gold);
+    border-radius:0 0 14px 0;overflow-y:auto;padding:8px 10px;min-height:0;}
+  .row{display:grid;grid-template-columns:84px 1.4fr 70px 96px 92px 1fr;align-items:center;gap:8px;
+    padding:6px 8px;margin-bottom:5px;background:#0d0f18;border-radius:18px 6px 6px 18px;
+    opacity:0;transform:translateY(6px);animation:in .4s forwards;}
+  @keyframes in{to{opacity:1;transform:none;}}
+  .tkcap{height:30px;border-radius:16px 4px 4px 16px;display:flex;align-items:center;justify-content:center;
+    color:#001;font-weight:700;font-size:15px;text-transform:uppercase;background:var(--blue);}
+  .tkcap.sell{background:var(--mars);}
+  .who{color:var(--tan);font-size:15px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .who .asset{display:block;color:#778;font-size:11px;letter-spacing:.5px;text-transform:none;}
+  .typ{font-size:13px;font-weight:600;text-transform:uppercase;text-align:center;border-radius:12px;padding:3px 0;}
+  .typ.buy{background:rgba(102,204,153,.18);color:var(--agree);}
+  .typ.sell{background:rgba(204,102,102,.20);color:var(--mars);}
+  .amt{color:var(--gold);font-size:13px;text-align:right;}
+  .date{color:#88a;font-size:12px;text-align:right;}
+  .verdict{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+  .vcall{font-size:13px;font-weight:600;text-transform:uppercase;color:var(--ice);}
+  .badge{font-size:12px;font-weight:700;text-transform:uppercase;padding:3px 10px;border-radius:11px;letter-spacing:1px;}
+  .badge.agree{background:var(--agree);color:#021;} .badge.diverge{background:var(--diverge);color:#200;}
+  .badge.hold{background:var(--hold);color:#210;} .badge.na{background:#23252f;color:#667;}
+  .empty{color:#667;text-align:center;padding:30px;font-size:16px;text-transform:uppercase;letter-spacing:2px;}
+  /* footer */
+  footer{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:6px 14px 12px;}
+  .fcap{width:64px;height:22px;background:var(--lilac);border-radius:0 0 0 22px;}
+  .disc{flex:1 1 auto;height:22px;background:var(--mars);border-radius:0;color:#100;font-size:11px;
+    font-weight:600;display:flex;align-items:center;padding:0 14px;text-transform:uppercase;letter-spacing:1px;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .fend{width:120px;height:22px;background:var(--lilac);border-radius:0 22px 22px 0;}
+</style>
+<script src="/engine/favicon-inject.js"></script>
+</head>
+<body>
+  <header>
+    <div class="cap"></div>
+    <div class="titlewrap"><div class="title">Trading Floor<small id="srcNote">DISCLOSED TRADES × FIRM VERDICT</small></div></div>
+    <div class="statuspill"><span id="taDot" class="dot off"></span><span id="taTxt">TA · CHECKING…</span></div>
+    <div class="cap" style="border-radius:0 42px 0 0;background:var(--blue);"></div>
+  </header>
+
+  <div class="grid">
+    <aside class="rail">
+      <div class="elbow"></div>
+      <button id="goSettings" class="pill" type="button" title="Open Settings to enter your free FMP key (250 calls/day covers congressional)">⚙ Settings ▸</button>
+      <input id="who" class="nameField" placeholder="POLITICIAN" value="Wyden">
+      <select id="src" class="nameField" title="trade data source">
+        <option value="senate">SRC: SENATE (FREE/HIST)</option>
+        <option value="fmp">SRC: FMP (CURRENT)</option>
+      </select>
+      <input id="fmpKey" class="nameField" type="password" placeholder="FMP KEY" style="display:none">
+      <button id="fmpHelp" class="pill" type="button" title="Open the engine's Settings → AI panel to store your FMP key (free — 250 calls/day)" style="display:none">⚙ Set FMP key in Settings ▸</button>
+      <button id="pull" class="pill go">Pull Trades ▸</button>
+      <select id="vmode" class="nameField" title="verdict engine">
+        <option value="ai">VERDICT: AI (FAST)</option>
+        <option value="ta">VERDICT: AGENTS (TA)</option>
+      </select>
+      <button id="run"  class="pill run">Run Verdicts ▸</button>
+      <div class="seg o" id="segCount">0 TRADES</div>
+      <div class="seg b" id="segTickers">0 TICKERS</div>
+      <div class="seg t">LCARS 47-A</div>
+      <div class="seg">FLOOR-976</div>
+      <div class="railfill"></div>
+    </aside>
+
+    <main>
+      <section class="floor">
+        <div class="floorhead"><span>Ticker Activity</span><span id="floorLegend">▮ BUY-LEANING ▮ SELL-LEANING ▮ MIXED</span></div>
+        <div class="bars" id="bars"></div>
+      </section>
+      <section class="ledger" id="ledger">
+        <div class="empty">▸ Pull a politician's disclosed trades to begin</div>
+      </section>
+      <section class="ledger" id="quantWrap" style="margin-top:14px;">
+        <div class="floorhead"><span>&#128202; Quant Tools</span><span style="font-size:11px;opacity:0.7;">qlib &middot; daily_stock_analysis</span></div>
+        <div style="padding:10px 12px;font-size:12px;line-height:1.7;">
+          <div style="margin-bottom:8px;">
+            <b>microsoft/qlib</b> &mdash; AI quant platform (train + backtest + evaluate via <code>qrun</code>).
+            <div style="margin:5px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <span id="qlibState" style="opacity:0.8;">checking&hellip;</span>
+              <select id="qlibRegion" style="background:#0c1622;color:#d8e6f2;border:1px solid #24323f;border-radius:5px;padding:3px 6px;font:11px ui-monospace,monospace;"><option value="us">US</option><option value="cn">CN</option></select>
+              <button class="btn" id="qlibInstall">Install (pip)</button>
+              <button class="btn" id="qlibPrep">Prepare data</button>
+              <input id="qlibCfg" placeholder="workflow_config.yaml path" style="flex:1 1 200px;background:#0c1622;color:#d8e6f2;border:1px solid #24323f;border-radius:5px;padding:4px 8px;font:11px ui-monospace,monospace;">
+              <button class="btn" id="qlibRun">qrun</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <b>zhulinsen/daily_stock_analysis</b> &mdash; Python daily analysis automation.
+            <div style="margin:5px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <span id="dsaState" style="opacity:0.8;">checking&hellip;</span>
+              <button class="btn" id="dsaInstall">Clone + install</button>
+              <button class="btn" id="dsaRun">Run</button>
+            </div>
+          </div>
+          <pre id="quantLog" style="display:none;background:#06090d;border:1px solid #1e2c3a;border-radius:6px;padding:8px 10px;font:10px ui-monospace,monospace;color:#9fd5c0;max-height:200px;overflow:auto;white-space:pre-wrap;margin:6px 0 0;"></pre>
+          <div class="disc" style="margin-top:6px;">Runs the tools locally on this bridge box. Simulation / research / education only &mdash; not investment advice.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <div class="fcap"></div>
+    <div class="disc" id="disc">Simulation / education only — not investment advice. Disclosed trades lag 30–45 days (STOCK Act).</div>
+    <div class="fend"></div>
+  </footer>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const bars = $("bars"), ledger = $("ledger");
+  let _busy = false, _lastTrades = [];
+
+  const dirOf = (s) => { s = String(s||"").toLowerCase();
+    if (/purchase|buy|acqui/.test(s)) return 1;
+    if (/sale|sell|dispos/.test(s)) return -1; return 0; };
+  const setBusy = (on, label) => { _busy = on;
+    const d = $("taDot"), t = $("taTxt");
+    if (on){ d.className = "dot busy"; t.textContent = label || "WORKING…"; }
+    $("pull").disabled = on; $("run").disabled = on; };
+
+  function detectTA(){
+    fetch("/trader/ta/detect").then(r=>r.json()).then(j=>{
+      const d=$("taDot"), t=$("taTxt");
+      if(j && j.installed){ d.className="dot"; t.textContent="TA · READY"+(j.version&&j.version!=="ok"?" "+j.version:""); }
+      else { d.className="dot off"; t.textContent="TA · OFFLINE"; }
+    }).catch(()=>{ $("taDot").className="dot off"; $("taTxt").textContent="TA · NO BRIDGE"; });
+  }
+
+  // aggregate trades → per-ticker {count, net, agree} for the bar floor
+  function aggregate(trades){
+    const m = new Map();
+    for(const t of trades){
+      const tk = String(t.ticker||"").toUpperCase(); if(!tk||tk==="--") continue;
+      const e = m.get(tk) || { tk, count:0, net:0, vdir:null };
+      e.count++; e.net += dirOf(t.type);
+      if(t.taVerdict && /buy|sell|hold/i.test(t.taVerdict)){
+        const vd = dirOf(t.taVerdict.match(/hold/i)?"hold":t.taVerdict);
+        e.vdir = (t.taVerdict.match(/hold/i)) ? 0 : vd;
+      }
+      m.set(tk, e);
+    }
+    return [...m.values()].sort((a,b)=>b.count-a.count);
+  }
+
+  function renderBars(trades){
+    const agg = aggregate(trades);
+    $("segTickers").textContent = agg.length + " TICKERS";
+    const max = Math.max(1, ...agg.map(a=>a.count));
+    bars.innerHTML = "";
+    if(!agg.length){ bars.innerHTML = '<div class="empty" style="margin:auto">No tickers</div>'; return; }
+    agg.forEach((a,i)=>{
+      const col = document.createElement("div"); col.className="barcol";
+      let cls = a.net>0 ? "" : a.net<0 ? "sell" : "mix";
+      // when a verdict exists, recolor by agreement (politician net vs firm vdir)
+      let badge = "";
+      if(a.vdir!==null){
+        if(a.vdir===0){ cls="hold"; badge=" · HOLD"; }
+        else if(Math.sign(a.net||0)===Math.sign(a.vdir)){ cls="agree"; badge=" · AGREE"; }
+        else { cls="diverge"; badge=" · DIVERGE"; }
+      }
+      col.innerHTML =
+        '<div class="cnt">'+a.count+'</div>'+
+        '<div class="bar '+cls+'" style="height:0"></div>'+
+        '<div class="tk" title="'+a.tk+badge+'">'+a.tk+'</div>';
+      bars.appendChild(col);
+      const bar = col.querySelector(".bar");
+      requestAnimationFrame(()=>{ bar.style.height = Math.round(8 + (a.count/max)*100*0.9)+"%"; });
+    });
+  }
+
+  function badgeFor(trade){
+    const v = trade.taVerdict;
+    if(!v) return ['<span class="badge na">—</span>',''];
+    if(/error|offline|not installed/i.test(v)) return ['<span class="badge na" title="'+String(v).replace(/"/g,"")+'">TA OFF</span>',''];
+    if(/\(see above\)/i.test(v)) return ['<span class="badge na">↑</span>',''];
+    const call = (v.match(/buy|sell|hold/i)||[v])[0].toUpperCase();
+    const pdir = dirOf(trade.type), vdir = /hold/i.test(v)?0:dirOf(call);
+    let b;
+    if(vdir===0) b='<span class="badge hold">HOLD</span>';
+    else if(pdir!==0 && Math.sign(pdir)===Math.sign(vdir)) b='<span class="badge agree">AGREE</span>';
+    else if(pdir!==0) b='<span class="badge diverge">DIVERGE</span>';
+    else b='<span class="badge na">—</span>';
+    return [b, call];
+  }
+
+  function renderLedger(trades){
+    _lastTrades = trades || [];
+    ledger.innerHTML = "";
+    if(!trades || !trades.length){ ledger.innerHTML='<div class="empty">No disclosed trades found for that name</div>'; return; }
+    trades.forEach((t,i)=>{
+      const buy = dirOf(t.type) >= 0;
+      const [badge, call] = badgeFor(t);
+      const row = document.createElement("div"); row.className="row";
+      row.style.animationDelay = Math.min(i*22, 600)+"ms";
+      const tk = (t.ticker||"--").toUpperCase();
+      row.innerHTML =
+        '<div class="tkcap '+(buy?"":"sell")+'">'+tk+'</div>'+
+        '<div class="who">'+(t.politician||"—")+'<span class="asset">'+(t.asset||"")+'</span></div>'+
+        '<div class="typ '+(buy?"buy":"sell")+'">'+(buy?"BUY":"SELL")+'</div>'+
+        '<div class="amt">'+(t.amount||"")+'</div>'+
+        '<div class="date">'+(t.transaction_date||"")+'</div>'+
+        '<div class="verdict" title="'+String(t.rationale||"").replace(/"/g,"'")+'">'+(call?'<span class="vcall">FIRM: '+call+'</span>':'')+badge+'</div>';
+      ledger.appendChild(row);
+    });
+  }
+
+  function pull(){
+    if(_busy) return;
+    const name = $("who").value.trim();
+    setBusy(true, "PULLING…");
+    fetch("/trader/trades?name="+encodeURIComponent(name)+"&limit=40")
+      .then(r=>r.json()).then(j=>{
+        setBusy(false);
+        if(!j || !j.ok){ ledger.innerHTML='<div class="empty">'+((j&&j.error)||"trade fetch failed")+'</div>'; return; }
+        $("srcNote").textContent = "SRC: "+String(j.source||"?").toUpperCase()+" · "+(j.count||0)+" REC";
+        $("segCount").textContent = (j.trades?.length||0) + " TRADES";
+        if(j.note) $("disc").textContent = j.note + " — simulation / education only, not investment advice.";
+        renderBars(j.trades||[]);
+        renderLedger(j.trades||[]);
+        detectTA();
+      }).catch(e=>{ setBusy(false); ledger.innerHTML='<div class="empty">bridge error: '+e.message+'</div>'; });
+  }
+
+  function runVerdicts(){
+    if(_busy) return;
+    const name = $("who").value.trim();
+    const mode = $("vmode").value;   // "ai" (fast) | "ta" (TradingAgents)
+    setBusy(true, mode === "ta" ? "AGENTS DEBATING… (SLOW)" : "AI VERDICTS…");
+    fetch("/trader/mirror",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ name, limit:12, mode })})
+      .then(r=>r.json()).then(j=>{
+        setBusy(false); detectTA();
+        if(!j || !j.ok){ $("disc").textContent = (j&&j.error)||"verdict run failed"; return; }
+        renderBars(j.trades||[]);
+        renderLedger(j.trades||[]);
+      }).catch(e=>{ setBusy(false); $("disc").textContent="verdict error: "+e.message; });
+  }
+
+  // v976 — data source: senate-watcher (free/historical) vs FMP (current, needs free key)
+  async function applySource(){
+    const src = $("src").value;
+    $("fmpKey").style.display = (src === "fmp") ? "" : "none";
+    { const h = $("fmpHelp"); if (h) h.style.display = (src === "fmp") ? "" : "none"; }
+    const cfg = { source: (src === "fmp") ? "fmp" : "senate" };
+    const k = $("fmpKey").value.trim(); if (src === "fmp" && k) cfg.apiKey = k;
+    await fetch("/trader/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)}).catch(()=>{});
+  }
+  $("src").addEventListener("change", async ()=>{ await applySource(); pull(); });
+  $("fmpKey").addEventListener("change", async ()=>{ await applySource(); pull(); });
+  // v995 — jump to the engine's Settings → AI panel (where the FMP key is stored
+  // centrally on the bridge). The floor opens via window.open, so window.opener is
+  // the engine page; fall back to the inline field if opened standalone.
+  $("fmpHelp").addEventListener("click", ()=>{
+    const o = window.opener;
+    if (o && !o.closed && o.settings && typeof o.settings.open === "function") { try { o.focus(); } catch {} o.settings.open("ai"); }
+    else { window.open("/settings.html", "_blank", "noopener"); }   // v1040 — standalone: go to the Settings page
+  });
+  // v1040 — always-available path to Settings (FMP key lives there), regardless of source.
+  $("goSettings").addEventListener("click", ()=> window.open("/settings.html", "_blank", "noopener"));
+
+  $("pull").addEventListener("click", pull);
+  $("run").addEventListener("click", runVerdicts);
+  $("who").addEventListener("keydown", (e)=>{ if(e.key==="Enter") pull(); });
+
+  // v1040 — sync the source selector to whatever the bridge actually has saved,
+  // so an FMP-configured bridge reveals the inline FMP KEY field + the Settings
+  // button (previously the dropdown always showed SENATE, hiding the key entry).
+  fetch("/trader/config").then(r=>r.json()).then(cfg=>{
+    const src = (cfg && cfg.config && cfg.config.source) || "senate";
+    if (src === "fmp") { $("src").value = "fmp"; $("fmpKey").style.display = ""; const h=$("fmpHelp"); if(h) h.style.display=""; }
+
+  // v1890 — quant tools (qlib + daily_stock_analysis) detect/install/run + log tail
+  var _qLogSince = 0, _qPoll = null;
+  function quantPoll(){
+    fetch("/quant/log?since="+_qLogSince).then(r=>r.json()).then(function(j){
+      if (j && j.lines && j.lines.length){ var pre=$("quantLog"); pre.style.display="block";
+        j.lines.forEach(function(l){ pre.textContent += (pre.textContent?"\n":"") + (l.stream==="stderr"?"! ":"") + l.text; _qLogSince=Math.max(_qLogSince,l.t); });
+        pre.scrollTop = pre.scrollHeight;
+      }
+      if (j && j.running){ if(!_qPoll) _qPoll=setInterval(quantPoll,1500); }
+      else if (_qPoll){ clearInterval(_qPoll); _qPoll=null; quantRefresh(); }
+    }).catch(function(){});
+  }
+  function quantRefresh(){
+    fetch("/quant/qlib/detect").then(r=>r.json()).then(function(d){
+      $("qlibState").textContent = d.installed ? ("\u2713 installed"+(d.dataReady?" \u00b7 data ready":" \u00b7 no data yet")) : "not installed";
+    }).catch(function(){});
+    fetch("/quant/dsa/detect").then(r=>r.json()).then(function(d){
+      $("dsaState").textContent = d.cloned ? ("\u2713 cloned"+(d.entry?(" \u00b7 "+d.entry):" \u00b7 no entry script found")) : "not cloned";
+    }).catch(function(){});
+  }
+  function quantPost(url, body){ return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then(r=>r.json()); }
+  $("qlibRegion").addEventListener("change", function(){ quantPost("/quant/config",{region:$("qlibRegion").value}).then(quantRefresh); });
+  $("qlibInstall").addEventListener("click", function(){ quantPost("/quant/qlib/install").then(function(r){ if(!r.ok)alert(r.error||"install failed"); _qLogSince=0; quantPoll(); }); });
+  $("qlibPrep").addEventListener("click", function(){ quantPost("/quant/qlib/prepare").then(function(r){ if(!r.ok)alert(r.error||"prepare failed"); _qLogSince=0; quantPoll(); }); });
+  $("qlibRun").addEventListener("click", function(){ var c=$("qlibCfg").value.trim(); if(!c){alert("enter a workflow .yaml path");return;} quantPost("/quant/qlib/run",{config:c}).then(function(r){ if(!r.ok)alert(r.error||"qrun failed"); _qLogSince=0; quantPoll(); }); });
+  $("dsaInstall").addEventListener("click", function(){ quantPost("/quant/dsa/install").then(function(r){ if(!r.ok)alert(r.error||"install failed"); _qLogSince=0; quantPoll(); }); });
+  $("dsaRun").addEventListener("click", function(){ quantPost("/quant/dsa/run").then(function(r){ if(!r.ok)alert(r.error||"run failed"); _qLogSince=0; quantPoll(); }); });
+  quantRefresh();
+
+  }).catch(()=>{}).finally(()=>{ detectTA(); pull(); });
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The control this arc owed (v3645)</title>
+<meta name="demo:desc" content="Two rounds measured zero-Neumann producing a wrong answer and said the assertion was what was false. Here is a field where it is true: on the wall that really is a zero-flux wall it is exact, free and rank-restoring - and on the next wall along it is worse than doing nothing.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>The control this arc owed</h1>
+<div class="sub">Three rounds measured a zero-Neumann repair producing a wrong answer &mdash; 0.547 in 2D, 1.134 in
+3D, worse there than doing nothing &mdash; and each said the same thing: <b>the mechanism is sound and the
+assertion is what is false</b>. Without a field where the assertion is <i>true</i>, that was a claim about one
+field dressed as a claim about a method. Named three times, deferred three times. Here it is.</div>
+<div class="law"><b>The field is <code>u = a + c&middot;y</code></b> &mdash; linear, so the exact key still applies
+and the true gradient is the constant <code>(0, c)</code>, and varying only in y. The left and right walls have
+outward normal <code>&plusmn;x</code>, so <code>grad&middot;n = 0</code> <b>exactly</b>: genuine zero-flux walls.
+Top and bottom have normal <code>&plusmn;y</code> and <code>grad&middot;n = &plusmn;c</code>, which is not zero.
+<b>The same rule is true on one wall and false on another, in the same run, on the same field</b> &mdash; and the
+two rank-deficient corner cells touch one face of each kind.</div>
+<h2>1. The fixture, checked first</h2>
+<div class="panel"><button id="fix" class="good">verify the walls really are what they claim</button><table id="t0"></table></div>
+<h2>2. The control fires</h2>
+<div class="panel">
+  <button id="go" class="good">apply the rule on the true wall, the false wall, and both</button>
+  <canvas id="cv" width="620" height="620" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>On the wall where the assertion is true, zero-Neumann is exact</b> &mdash; rank restored, no
+boundary data needed, no stencil widened, and it leaves the healthy cells alone. Where the wall really <i>is</i> a
+zero-flux wall it is the best of the three repairs by every measure. <b>Two rounds of calling it the dangerous one
+were describing a field, not a method.</b></div>
+<div class="law"><b>On the wall where it is false it is worse than the refusal</b>, and it damages the 92 healthy
+boundary cells. <b>Applied to both faces of the same cell it lands in between and is still wrong</b> &mdash; the
+true row and the false row are averaged by the fit, so <b>a correct condition does not rescue an incorrect one
+sitting beside it</b>. Same code, same mesh, same field; only <i>which faces get the row</i> differs, and the
+answer moves thirteen orders. Rank is restored in every case, including the wrong ones.</div>
+<div class="law">So the recommendation stands and gains a clause: <b>Dirichlet where the data exists; the vertex
+stencil only where the rank is deficient; zero-Neumann where the wall is actually a zero-flux wall</b> &mdash;
+which is a fact about the problem, not about the mesh &mdash; <b>and never as a default</b>, because the same rule
+on the next wall along is worse than doing nothing. Graded by
+<code>physics/mesh/wallCondition-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/rank-repair.html" style="color:#9ab6e8">rank repair</a>,
+<a href="/discontinuity.html" style="color:#9ab6e8">discontinuity</a>.</div>
+<script type="module">
+import { makeTriMesh, gradientLS } from "/physics/mesh/triReconstruct.mjs";
+import { wallField, wallFaces, wallError, gradientWithWalls } from "/physics/mesh/wallCondition.mjs";
+const $ = (i) => document.getElementById(i);
+const M = makeTriMesh({ nx: 24, ny: 24, h: 20 / 24, skew: 0 });
+const { u: U, grad: TRUE } = wallField(M, {});
+const G0 = gradientLS(U, M);
+const MASK = new Uint8Array(M.tri.length);
+for (let t = 0; t < M.tri.length; t++) if (G0.rank[t] < 2) MASK[t] = 1;
+const F = wallFaces(M);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const cell = (v) => "<span class='" + (v < 1e-12 ? "ok" : (v > 0.1 ? "bad" : "warn")) + "'>" + v.toExponential(3) + "</span>";
+$("fix").onclick = () => {
+    let kx = 0, ky = 0, worstX = 0, leastY = Infinity;
+    for (const l of F) for (const f of l) {
+        const d = Math.abs(TRUE[0] * f.nx + TRUE[1] * f.ny);
+        if (f.kind === "x") { kx++; worstX = Math.max(worstX, d); } else { ky++; leastY = Math.min(leastY, d); }
+    }
+    const kinds = [];
+    for (let t = 0; t < M.tri.length; t++) if (MASK[t]) kinds.push("cell " + t + ": " + F[t].map((f) => f.kind).sort().join(","));
+    rows($("t0"), ["check", "value", "reading"], [
+        ["boundary faces", kx + " on x-walls, " + ky + " on y-walls", "derived from the normal, not the coordinate"],
+        ["|grad&middot;n| on an x-wall (worst)", "<span class='ok'>" + worstX.toExponential(3) + "</span>",
+            "<span class='ok'>a genuine zero-flux wall</span>"],
+        ["|grad&middot;n| on a y-wall (least)", "<span class='bad'>" + leastY.toFixed(6) + "</span>",
+            "<span class='bad'>the assertion is false here</span>"],
+        ["deficient cells", kinds.join(" &nbsp;|&nbsp; "), "one face of each kind"]]);
+};
+$("go").onclick = () => {
+    const out = [];
+    const got = {};
+    for (const w of ["none", "x", "y", "all"]) { const r = wallError(M, MASK, { walls: w }); got[w] = r;
+        out.push([w === "none" ? "no rule" : "grad&middot;n = 0 on " + (w === "all" ? "every wall" : w + "-walls"),
+            cell(r.deficient), cell(r.healthy), r.stillLow,
+            w === "none" ? "a refusal" : (r.deficient < 1e-12 ? "<span class='ok'>exact &mdash; the assertion is true</span>"
+                : (r.deficient > got.none.deficient ? "<span class='bad'>worse than doing nothing</span>"
+                    : "<span class='bad'>true and false rows averaged</span>"))]);
+    }
+    rows($("t"), ["rule", "deficient cells", "healthy cells", "still rank&lt;2", "verdict"], out);
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    let lo = Infinity, hi = -Infinity; for (const v of M.vx) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    const X = (x) => 10 + (x - lo) / (hi - lo) * (W - 20), Y = (y) => H - 10 - (y - lo) / (hi - lo) * (H - 20);
+    for (let t = 0; t < M.tri.length; t++) {
+        const [a, b, c] = M.tri[t];
+        ctx.beginPath(); ctx.moveTo(X(M.vx[a]), Y(M.vy[a])); ctx.lineTo(X(M.vx[b]), Y(M.vy[b]));
+        ctx.lineTo(X(M.vx[c]), Y(M.vy[c])); ctx.closePath();
+        const kinds = F[t].map((f) => f.kind);
+        ctx.fillStyle = MASK[t] ? "rgba(255,80,80,0.95)"
+            : (kinds.includes("y") ? "rgba(232,150,120,0.55)"
+                : (kinds.includes("x") ? "rgba(140,224,168,0.5)" : "rgba(40,60,95,0.65)"));
+        ctx.fill(); ctx.strokeStyle = "#141a26"; ctx.stroke();
+    }
+    ctx.fillStyle = "#8fe0a8"; ctx.fillText("green edge = x-wall, where grad.n = 0 is TRUE", 14, 18);
+    ctx.fillStyle = "#e8967a"; ctx.fillText("orange edge = y-wall, where it is FALSE", 14, 34);
+    ctx.fillStyle = "#f0a8a0"; ctx.fillText("red = rank-deficient, touching one of each", 14, 50);
+};
+</script>
+</div></body></html>

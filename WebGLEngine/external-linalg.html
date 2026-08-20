@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>External Linear Algebra &mdash; an answer key nobody here wrote</title>
+<meta name="demo:desc" content="Runs the lab's own rank and det against Accelerate's LAPACK on a Mac. Shows the three commands, the current grade, and the state ABSENT when the reference has not run -- which is not a pass.">
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --go:#9fe6c0; --warn:#ffcc66; --bad:#ff8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0 0 4px; color:var(--go); }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:1000px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; }
+  .card h2 { margin:0 0 8px; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.6; }
+  pre { background:#070b10; border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto;
+        font-size:11px; color:#cfe9d8; margin:8px 0 0; }
+  button { background:#132033; color:var(--ink); border:1px solid #2a3a52; border-radius:6px; padding:5px 11px;
+           font:inherit; font-size:11px; cursor:pointer; }
+  button:hover { border-color:#3d5a80; }
+  table { border-collapse:collapse; font-size:11px; margin-top:8px; width:100%; }
+  td, th { border:1px solid var(--line); padding:3px 8px; text-align:left; }
+  th { color:var(--dim); font-weight:400; }
+  .ok { color:var(--go); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  code { color:var(--warn); }
+  .state { font-size:12px; padding:3px 9px; border-radius:5px; border:1px solid var(--line); display:inline-block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127823; External Linear Algebra &mdash; an answer key nobody here wrote</h1>
+  <div class="hint">
+    <code>physics/control/controlStateSpace.mjs</code> computes rank, det, cholesky and solve with code we wrote,
+    and its own header argues a number is only safe when several <b>independent</b> roads reach it. Every road it
+    has is ours. Accelerate ships LAPACK, written by people who have never seen this tree.
+  </div>
+</header>
+<main>
+
+  <div class="card">
+    <h2>State</h2>
+    <div id="state" class="state">reading&hellip;</div>
+    <div class="hint" id="stateWhy" style="margin-top:8px;"></div>
+    <div style="margin-top:10px;"><button id="refresh">Re-read the grade</button></div>
+    <table id="rows"></table>
+  </div>
+
+  <div class="card">
+    <h2>Run it &mdash; three commands, on a Mac</h2>
+    <div class="hint">
+      <b>THIS PAGE CANNOT RUN LAPACK FOR YOU AND WILL NOT PRETEND TO.</b> Nothing in the browser can compile a C
+      file or link Accelerate, and a button here that appeared to do it would be the worst object in this
+      subject: it would look like corroboration and be a page talking to itself. Copy these into a terminal in
+      the <code>WebGLEngine</code> directory. The last one re-runs the grade above.
+    </div>
+    <pre id="cmds">node tools/roundhouse/externalLinalg.mjs --write-problems
+clang -O2 tools/roundhouse/external-linalg.c -framework Accelerate -o /tmp/exlinalg
+/tmp/exlinalg tools/roundhouse/external-linalg-problems.txt &gt; tools/roundhouse/external-linalg-answers.json
+node tools/roundhouse/externalLinalg.mjs</pre>
+    <div style="margin-top:8px;"><button id="copy">Copy the four lines</button> <span id="copied" class="hint"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>What agreement here would mean, and what it would not</h2>
+    <div class="hint">
+      <b>THE RANK ROWS ARE WORTH MORE THAN THE DETERMINANT ROWS AND THE TABLE SAYS SO.</b> rank decides
+      controllability and observability, and this engine decides it <b>by elimination against a typed tolerance
+      of 1e-9</b> while LAPACK decides it <b>from the singular value spectrum</b>. Those are unrelated
+      derivations of one integer. Two float answers agreeing to 1e-12 can always be an accident of tolerance; an
+      integer agreeing across two unrelated methods cannot.
+      <br><br>
+      The float tolerance shown per row is <b>derived</b> from machine epsilon and the problem's size, not typed.
+      A Hilbert 4&times;4 is in the set on purpose: it is where &ldquo;they agree to 1e-12&rdquo; becomes a claim
+      about the <i>problem</i> rather than about either solver.
+      <br><br>
+      <b>NOT A BENCHMARK.</b> The BLAS underneath will reach the AMX/SME matrix units on Apple Silicon and that
+      is not the reason to do this &mdash; these matrices are 2&times;2 to 4&times;4 and the timing is
+      meaningless. The reason is independence.
+    </div>
+  </div>
+
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+
+// The grade is computed in Node, not here: this page READS a report and never re-implements the comparison.
+// A second copy of the tolerance rule living in a browser would drift from the one in externalLinalg.mjs the
+// first time either changed, which is this tree's most repeated defect.
+async function load() {
+  $("state").textContent = "reading…";
+  $("rows").innerHTML = "";
+  let r;
+  // v3900 -- .ok BEFORE .json(). This page's catch already prints e.message and tells the reader to run
+  // the commands below; a status makes that message name the real fault instead of a parser complaint.
+  try {
+    const res = await fetch("/linalg/grade", { cache: "no-store" });
+    if (!res.ok) throw new Error("route answered " + res.status + " " + res.statusText);
+    r = await res.json();
+  }
+  catch (e) {
+    $("state").textContent = "no route";
+    $("state").className = "state warn";
+    $("stateWhy").textContent = "The /linalg/grade route did not answer (" + (e && e.message || e) +
+      "). Run the commands below in a terminal instead -- the last one prints the same grade.";
+    return;
+  }
+  const st = r.state || "unknown";
+  $("state").textContent = st.toUpperCase();
+  $("state").className = "state " + (st === "agrees" ? "ok" : st === "disagrees" ? "bad" : "warn");
+  $("stateWhy").textContent = r.why || (st === "agrees"
+    ? "Every problem agrees with LAPACK. The rank rows are exact integer agreement across two unrelated methods."
+    : st === "disagrees" ? "At least one problem disagrees -- that is a finding, and the row below names it."
+    : "");
+  const rows = r.rows || [];
+  if (!rows.length) return;
+  $("rows").innerHTML = "<tr><th>problem</th><th>claim</th><th>ours</th><th>LAPACK</th><th>verdict</th></tr>" +
+    rows.map((x) => "<tr><td>" + x.name + "</td><td>" + x.claim + "</td><td>" + fmt(x.value) + "</td><td>" +
+      (x.external === null || x.external === undefined ? "&mdash;" : fmt(x.external)) + "</td><td class='" +
+      (x.agrees ? "ok" : "bad") + "'>" + (x.agrees ? "agree" : (x.missing ? "no answer" : "DIFFER")) +
+      (x.exact ? "  (exact integer)" : (x.tol ? "  tol " + x.tol.toExponential(1) : "")) + "</td></tr>").join("");
+}
+const fmt = (v) => (typeof v === "number" && !Number.isInteger(v)) ? v.toPrecision(10) : String(v);
+
+$("refresh").onclick = load;
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("cmds").textContent); $("copied").textContent = "copied"; }
+  catch (e) { $("copied").textContent = "clipboard refused -- select the block and copy"; }
+};
+load();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

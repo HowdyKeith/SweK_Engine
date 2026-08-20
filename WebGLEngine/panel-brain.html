@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GPU Brain -- live-mind panel</title>
+<style>
+  :root { --bg:#06140c; --dim:#6a8a78; --green:#9fe6c0; --amber:#e8c07a; --red:#e88; --line:#14301f; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:#cfe8d8; font:12px ui-monospace,"SF Mono",Menlo,monospace; }
+  body { display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; }
+  #brain { width:150px; max-width:40vw; }
+  #s { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; }
+  #s.on { color:var(--green); }
+  .wrap { width:100%; max-width:760px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:6px; }
+  .chip { border:1px solid var(--line); border-radius:5px; padding:3px 8px; font-size:11px; }
+  .chip b { color:var(--green); font-weight:600; }
+  .stale { color:var(--amber); }
+  .off { color:var(--red); }
+  #tail { border:1px solid var(--line); border-radius:6px; padding:6px 8px; max-height:46vh; overflow-y:auto; background:#04100a; }
+  .ln { display:flex; gap:8px; padding:1px 0; border-bottom:1px solid #0d2016; }
+  .ln:last-child { border-bottom:0; }
+  .t { color:var(--dim); flex:0 0 6.5em; }
+  .k { flex:0 0 5.5em; }
+  .k.solve { color:var(--green); } .k.hello { color:#7fd1ff; } .k.narrate { color:#cbb0ff; }
+  .msg { flex:1; color:#cfe8d8; }
+  .empty { color:var(--dim); font-style:italic; padding:6px 0; }
+</style>
+</head>
+<body>
+<div id="brain"></div>
+<div id="s">idle</div>
+
+<div class="wrap">
+  <div class="row" id="chips"></div>
+  <div id="tail"><div class="empty">connecting&hellip;</div></div>
+</div>
+
+<script type="module">
+import { mountBrainSvg } from "./ui/brainSvg.js";
+try {
+  mountBrainSvg(document.getElementById("brain"), {
+    pollMs: 2000,
+    onActive: (a) => { const s = document.getElementById("s"); s.textContent = a ? "solving" : "idle"; s.className = a ? "on" : ""; },
+  });
+} catch (e) { document.getElementById("s").textContent = "brain offline"; }
+</script>
+
+<script>
+  // v2964 -- LIFT THE CONSOLE IN. The panel used to be an animated SVG and one word. The brain has always
+  // emitted hellos, solves and narrations, and /ai/brain/health has always known whether it was alive, idle or
+  // stale -- none of it was shown. This reads both in one poll and displays what is actually happening.
+  //
+  // The one thing it must not do is show a stale trace as if it were live: an operator glancing at a panel will
+  // believe it. So the age of the newest line is checked, and an old tail is labelled old rather than presented
+  // as current activity.
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const ago = (ms) => ms == null ? "never" : ms < 1000 ? "now" : ms < 60000 ? Math.round(ms/1000)+"s" : ms < 3600000 ? Math.round(ms/60000)+"m" : Math.round(ms/3600000)+"h";
+  const STALE_MS = 60000;
+
+  async function tick() {
+    let con = null, health = null;
+    try { con = await (await fetch("/ai/brain/console")).json(); } catch {}
+    try { health = await (await fetch("/ai/brain/health")).json(); } catch {}
+
+    const chips = document.getElementById("chips");
+    if (!con && !health) {
+      chips.innerHTML = "<span class='chip off'>brain bridge unreachable</span>";
+      document.getElementById("tail").innerHTML = "<div class='empty'>no connection to the brain bridge &mdash; is the engine running?</div>";
+      return;
+    }
+    const stale = con && con.ageMs != null && con.ageMs > STALE_MS;
+    const bits = [];
+    if (health && health.state) bits.push(`<span class="chip">state <b class="${health.state === "offline" ? "off" : ""}">${esc(health.state)}</b></span>`);
+    if (health && health.detail) bits.push(`<span class="chip">${esc(String(health.detail).slice(0, 70))}</span>`);
+    if (con) bits.push(`<span class="chip ${stale ? "stale" : ""}">last activity <b>${ago(con.ageMs)}</b>${stale ? " (stale)" : ""}</span>`);
+    if (con) bits.push(`<span class="chip">tail <b>${con.kept}</b>/${con.cap}</span>`);
+    chips.innerHTML = bits.join("");
+
+    const tail = (con && con.tail) || [];
+    const el = document.getElementById("tail");
+    if (!tail.length) {
+      el.innerHTML = "<div class='empty'>nothing recorded yet &mdash; the brain has not said hello, solved a field, or narrated since this hub started</div>";
+      return;
+    }
+    el.innerHTML = tail.slice().reverse().map(e => {
+      const t = new Date(e.at).toLocaleTimeString();
+      return `<div class="ln"><span class="t">${esc(t)}</span><span class="k ${esc(e.kind)}">${esc(e.kind)}</span><span class="msg">${esc(e.text)}</span></div>`;
+    }).join("");
+  }
+  tick(); setInterval(tick, 3000);
+</script>
+</body>
+</html>

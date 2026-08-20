@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Turing patterns</title>
+<meta name="demo:desc" content="Diffusion is the process that smooths everything, and Turing showed it can DESTABILISE a uniform state into stripes when the inhibitor diffuses faster than the activator. The Brusselator is used because its algebra is exact: the threshold B_c = (1 + A sqrt(Du/Dv))^2 is closed form and the simulation is never told it. Below it every mode decays however long you wait.">
+<style>
+  html,body{margin:0;background:#05070d;color:#cfe0ff;font:13px ui-monospace,Menlo,monospace}
+  #w{max-width:920px;margin:0 auto;padding:18px;line-height:1.65}
+  canvas{border:1px solid #22304a;border-radius:6px;width:100%}
+  button{background:#132033;color:#cfe0ff;border:1px solid #24344e;border-radius:6px;padding:6px 11px;font:12px ui-monospace,monospace;cursor:pointer;margin-right:6px}
+  .dim{color:#7f96b8}.good{color:#9be15d}.bad{color:#ff9a9a}
+  label{margin-right:14px}
+</style>
+</head>
+<body><div id="w">
+<h2 style="margin:0 0 4px;">Turing patterns</h2>
+<div class="dim">Growth rate of each Fourier mode against the closed form from linear stability. The threshold <b>B<sub>c</sub> = (1 + A&radic;(D<sub>u</sub>/D<sub>v</sub>))&sup2;</b> is exact and the integrator never sees it. Note the second line: <b>equal diffusion cannot destabilise a stable state</b> — but only below the Hopf line B = 1 + A&sup2;, above which the uniform state is already unstable with no diffusion involved. Gate: <code>physics/reaction/brusselator-selfcheck.mjs</code>.</div>
+<p>
+<label>B <input id="B" type="range" min="3" max="12" step="0.25" value="9" style="width:150px;vertical-align:middle"><span id="Bv">9.00</span></label>
+<label><input id="eq" type="checkbox"> equal diffusion (D<sub>v</sub>=D<sub>u</sub>)</label>
+<button id="run">Measure growth rates</button><span id="st" class="dim"></span></p>
+<canvas id="c" width="880" height="300"></canvas>
+<div id="out" class="dim"></div>
+</div>
+<script type="module">
+import { growthRate, criticalB, hopfB, measureGrowth, discreteK } from "./physics/reaction/brusselator.js";
+const c=document.getElementById("c"),x=c.getContext("2d"),out=document.getElementById("out"),st=document.getElementById("st");
+const A=3,Du=1,L=32,n=128;
+const Bel=document.getElementById("B"),eq=document.getElementById("eq");
+Bel.oninput=()=>{document.getElementById("Bv").textContent=(+Bel.value).toFixed(2);draw([]);};
+function params(){return {A,B:+Bel.value,Du,Dv:eq.checked?1:8};}
+function draw(pts){
+  const p=params(),Bc=criticalB(p.A,p.Du,p.Dv);
+  x.fillStyle="#05070d";x.fillRect(0,0,880,300);
+  const tx=k=>50+k/3*800, ty=g=>160-g*38;
+  x.strokeStyle="#22304a";x.strokeRect(50,20,800,260);
+  x.strokeStyle="#22304a";x.beginPath();x.moveTo(50,ty(0));x.lineTo(850,ty(0));x.stroke();
+  x.strokeStyle="rgba(246,166,35,0.95)";x.beginPath();
+  for(let k=0.01;k<=3;k+=0.01){const g=growthRate(k,p);const X=tx(k),Y=ty(g);k<=0.02?x.moveTo(X,Y):x.lineTo(X,Y);}
+  x.stroke();
+  for(const q of pts){x.fillStyle=q.g>0?"rgba(155,225,93,0.95)":"rgba(89,209,255,0.9)";x.beginPath();x.arc(tx(q.k),ty(q.g),4,0,6.3);x.fill();}
+  x.fillStyle="#f6a623";x.fillText("closed form  Re λ(k)",690,44);
+  x.fillStyle="#7f96b8";x.fillText("k",840,ty(0)+16);x.fillText("growth rate",56,16);
+  x.fillStyle=(+Bel.value>Bc)?"#9be15d":"#ff9a9a";
+  x.fillText("B_c = "+Bc.toFixed(4)+(+Bel.value>Bc?"  — above threshold, a band grows":"  — below threshold, everything decays"),56,294);
+}
+document.getElementById("run").onclick=async()=>{
+  st.textContent=" integrating…";await new Promise(r=>setTimeout(r,20));
+  const p=params(),pts=[];let worst=0;
+  for(const mode of [2,3,4,5,6,8]){
+    const r=measureGrowth({...p,mode,n,L});
+    if(r.rate===null) continue;
+    pts.push({k:r.k,g:r.rate});worst=Math.max(worst,Math.abs(r.rate-r.predicted));
+  }
+  draw(pts);st.textContent="";
+  const Bc=criticalB(p.A,p.Du,p.Dv);
+  out.innerHTML="worst |measured − predicted| = <b>"+worst.toExponential(2)+"</b> across six modes · B_c = "+Bc.toFixed(4)+
+    " · Hopf line B = 1 + A² = "+hopfB(p.A)+
+    (eq.checked ? " <br><b class='bad'>equal diffusion:</b> every mode decays below the Hopf line — the Turing mechanism REQUIRES the inhibitor to diffuse faster. Above B="+hopfB(p.A)+" it grows anyway, because the uniform state is already unstable without diffusion." : "");
+};
+draw([]);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body></html>

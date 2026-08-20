@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Lights, Switches &amp; Valves</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:680px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ent { border:1px solid var(--line); border-radius:11px; padding:10px 12px; margin:8px 0; background:var(--panel); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .ent .nm { font-weight:600; flex:1; min-width:140px; }
+  .ent .eid { color:var(--dim); font-size:11px; }
+  .st { padding:4px 9px; border-radius:7px; font-size:12px; border:1px solid var(--line); color:var(--dim); }
+  .st.on { color:var(--ok); border-color:#224a36; background:#10231a; }
+  .st.off { color:var(--dim); }
+  .grp { margin-top:16px; color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:7px 12px; font:inherit; cursor:pointer; }
+  button.off { color:var(--dim); border-color:var(--line); background:#10151d; }
+  button.tg { color:var(--warn); border-color:#5a4a22; background:#221c10; }
+  #msg { color:var(--dim); font-size:12px; }
+  input { padding:7px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">💡</span> Lights, Switches &amp; Valves <span style="color:var(--dim);font-weight:400;">· via Home Assistant</span></span></header>
+  <main>
+    <div class="note">
+      Controls every <b>light.*</b>, <b>switch.*</b> and <b>valve.*</b> entity your Home Assistant exposes. A camera spotlight (CloudEdge / Tuya cam, via <b>Tuya</b>/<b>LocalTuya</b>) shows up as a switch or light; an <b>Orbit B-hyve</b> watering timer shows each nozzle/zone as a <b>valve</b> (Open/Close) once the B-hyve HACS integration is added. The same actions can be fired automatically from a motion or presence rule (Presence panel → rules).
+    </div>
+    <div class="row" style="margin-bottom:8px;">
+      <button id="refresh">↻ Refresh</button>
+      <input id="filter" placeholder="filter by name…" style="flex:1;min-width:140px;" />
+    </div>
+    <div id="msg">loading…</div>
+    <div id="out"></div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let entities = [], filter = "";
+
+  async function fetchDomain(d){ try { const r = await fetch("/ha/states?domain=" + d, { cache:"no-store" }); if (!r.ok) return []; const j = await r.json(); return Array.isArray(j) ? j : (j && j.entities) || []; } catch { return []; } }
+
+  async function load(){
+    $("msg").textContent = "reading Home Assistant…";
+    const [lights, switches, valves] = await Promise.all([fetchDomain("light"), fetchDomain("switch"), fetchDomain("valve")]);
+    entities = lights.concat(switches, valves);
+    if (!entities.length) { $("msg").textContent = "No light / switch / valve entities found. Add your devices to Home Assistant (Tuya / LocalTuya for CloudEdge cams; the Orbit B-hyve integration for watering zones), then they'll appear here."; $("out").innerHTML = ""; return; }
+    $("msg").textContent = entities.length + " controllable entit" + (entities.length === 1 ? "y" : "ies");
+    render();
+  }
+
+  function render(){
+    const f = filter.trim().toLowerCase();
+    const show = entities.filter(e => !f || (e.name + " " + e.entity_id).toLowerCase().indexOf(f) >= 0);
+    const groups = { light: [], switch: [], valve: [] };
+    show.forEach(e => { (groups[e.domain] || (groups[e.domain] = [])).push(e); });
+    let html = "";
+    [["light", "Lights"], ["switch", "Switches"], ["valve", "Valves / watering"]].forEach(([dom, label]) => {
+      const arr = groups[dom] || []; if (!arr.length) return;
+      const isValve = dom === "valve";
+      html += '<div class="grp">' + label + '</div>';
+      arr.sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(e => {
+        const st = String(e.state).toLowerCase();
+        const on = isValve ? (st === "open" || st === "opening") : (st === "on");
+        const onSvc = isValve ? "open_valve" : "turn_on", offSvc = isValve ? "close_valve" : "turn_off";
+        const onLbl = isValve ? "Open" : "On", offLbl = isValve ? "Close" : "Off";
+        const runCtl = isValve ? ('<input class="secs" type="number" min="1" max="3600" value="30" title="seconds" style="width:62px;" />' +
+          '<button class="run" data-eid="' + esc(e.entity_id) + '" title="open this zone for N seconds, then auto-close (drives the avatar water visual)">Run</button>') : "";
+        html += '<div class="ent"><div class="nm">' + esc(e.name) + '<div class="eid">' + esc(e.entity_id) + '</div></div>' +
+          '<span class="st ' + (on ? "on" : "off") + '">' + esc(e.state) + '</span>' +
+          '<div class="row">' +
+          '<button data-eid="' + esc(e.entity_id) + '" data-svc="' + onSvc + '">' + onLbl + '</button>' +
+          '<button class="off" data-eid="' + esc(e.entity_id) + '" data-svc="' + offSvc + '">' + offLbl + '</button>' +
+          '<button class="tg" data-eid="' + esc(e.entity_id) + '" data-svc="toggle">Toggle</button>' +
+          runCtl +
+          '</div></div>';
+      });
+    });
+    $("out").innerHTML = html;
+    $("out").querySelectorAll("button[data-eid]:not(.run)").forEach(b => { b.addEventListener("click", () => call(b.getAttribute("data-eid"), b.getAttribute("data-svc"))); });
+    $("out").querySelectorAll("button.run").forEach(b => { b.addEventListener("click", () => {
+      const eid = b.getAttribute("data-eid");
+      const inp = b.parentNode.querySelector("input.secs");
+      const secs = Math.max(1, parseInt(inp && inp.value, 10) || 30);
+      setMsg("running " + eid + " for " + secs + "s…");
+      fetch("/water/start", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ entity_id: eid, seconds: secs, zone: eid }) })
+        .then(r => r.json()).then(j => { setMsg(j && j.ok ? ("✓ watering " + secs + "s (auto-closes; avatar tank fills)") : "✗ could not start"); setTimeout(load, 700); })
+        .catch(e => setMsg("✗ " + (e && e.message || e)));
+    }); });
+  }
+
+  async function call(entity_id, service){
+    const domain = entity_id.split(".")[0];
+    $("msg").textContent = service.replace("turn_", "") + " " + entity_id + "…";
+    try {
+      const r = await fetch("/ha/call", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ domain, service, data:{ entity_id } }) });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.ok === false) $("msg").textContent = "✗ " + (j.error || "HA error");
+    } catch (e) { $("msg").textContent = "✗ " + (e && e.message || e); }
+    setTimeout(load, 600);   // let HA settle then refresh state
+  }
+
+  $("refresh").onclick = load;
+  $("filter").addEventListener("input", () => { filter = $("filter").value; render(); });
+  load();
+  setInterval(load, 12000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

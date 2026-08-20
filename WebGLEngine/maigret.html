@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Maigret — username OSINT">
+<meta name="demo:desc" content="Search a username across hundreds of sites with Maigret. Runs on the PC bridge (pip install maigret).">
+<meta name="demo:cats" content="tool">
+<title>Maigret — username OSINT</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 14px; }
+  .lead code { color:var(--amber); }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 14px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  input { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px; font:12px ui-monospace,monospace; }
+  .note { font-size:11px; color:var(--dim); }
+  #results { margin-top:14px; display:flex; flex-direction:column; gap:6px; }
+  .hit { display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid #14304a; border-left:4px solid var(--good); border-radius:6px 6px 6px 12px; padding:8px 12px; }
+  .hit .site { color:var(--blue); font-size:13px; min-width:130px; }
+  .hit a { color:var(--amber); font-size:12px; text-decoration:none; word-break:break-all; }
+  .hit a:hover { text-decoration:underline; }
+  #log { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:10px; font-size:11px; white-space:pre-wrap; color:#bcd; margin-top:12px; display:none; }
+</style>
+</head>
+<body>
+<div id="bar"><h1>🔎 Maigret OSINT</h1><span id="status">…</span></div>
+<div class="wrap">
+  <p class="lead">Search a username across hundreds of sites with <b>Maigret</b>, on the bridge PC. Install once: <code>pip install maigret</code> — or hit <b>Install</b> below. Use responsibly — public-account discovery only.</p>
+  <div class="row">
+    <button class="btn" id="install">Install maigret</button>
+    <span id="instSt" class="note"></span>
+  </div>
+  <div class="row">
+    <input id="username" placeholder="username" style="flex:1 1 200px">
+    <label class="note">timeout <input id="timeout" type="number" value="15" min="5" max="60" style="width:60px"></label>
+    <label class="note">top sites <input id="top" type="number" value="0" min="0" max="500" style="width:70px" title="0 = all known sites"></label>
+    <button class="btn go" id="search">Search</button>
+  </div>
+  <div id="summary" class="note"></div>
+  <div id="results"></div>
+  <div id="log"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function getJSON(u){ return fetch(u).then(r=>r.json()); }
+
+async function detect(){
+  try{ const d = await getJSON("/maigret/detect"); $("status").textContent = d.installed ? ("maigret "+(d.version||"ready")) : "not installed — pip install maigret"; }
+  catch{ $("status").textContent="bridge offline"; }
+}
+$("search").onclick = async ()=>{
+  const u = $("username").value.trim(); if(!u){ $("summary").textContent="enter a username"; return; }
+  $("search").disabled=true; $("summary").textContent="searching (this can take a while)…"; $("results").innerHTML=""; $("log").style.display="none";
+  try{
+    const q = new URLSearchParams({ username:u, timeout:$("timeout").value, top:$("top").value });
+    const r = await getJSON("/maigret/search?"+q.toString());
+    if(!r.ok){ $("summary").textContent="✕ "+(r.error||"failed"); }
+    else{
+      $("summary").textContent = r.count+" account"+(r.count===1?"":"s")+" found for “"+r.username+"”"+(r.note?" — "+r.note:"");
+      for(const h of (r.found||[])){
+        const div=document.createElement("div"); div.className="hit";
+        div.innerHTML='<span class="site"></span><a target="_blank" rel="noopener"></a>';
+        div.querySelector(".site").textContent=h.site||"?"; const a=div.querySelector("a"); a.href=h.url; a.textContent=h.url;
+        $("results").appendChild(div);
+      }
+      if(!(r.found||[]).length){ const l=$("log"); l.style.display="block"; l.textContent="No claimed accounts parsed. If maigret ran, the report JSON shape may differ from the parser — check the bridge console."; }
+    }
+  }catch(e){ $("summary").textContent="✕ "+e.message; }
+  $("search").disabled=false;
+};
+detect();
+$("install").onclick = async () => {
+  $("install").disabled=true; $("instSt").textContent="installing maigret (can take a minute)…";
+  try{ const r=await fetch("/maigret/install",{method:"POST"}).then(x=>x.json()); $("instSt").textContent = r.ok ? "✓ installed" : ("✕ "+(r.error||(r.stderr||"").slice(-120))); }
+  catch(e){ $("instSt").textContent="✕ "+e.message; }
+  $("install").disabled=false; detect();
+};
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="demo:title" content="Schrodinger 1D">
+<meta name="demo:category" content="physics lab">
+<title>Schrodinger 1D - levels and tunnelling</title>
+<style>
+  html,body{margin:0;background:#0a0a10;color:#dcd6ea;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:920px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#8a83a0;margin-bottom:14px}
+  .card{border:1px solid #2a2438;background:#12101a;padding:12px 14px;margin-bottom:13px}
+  canvas{border:1px solid #221c30;background:#07060c;display:block}
+  /* v2872 -- the plot fills the page. This canvas is a DRAWING rather than a lattice, so it is scaled
+     by CSS with aspect-ratio held: the backing store keeps its own resolution and the lines stay in
+     proportion. (A field page would use pixelated here; a curve must not.) */
+  canvas { width: 100%; max-width: 1400px; height: auto; display: block; }
+  #lv{width:100%;height:260px}#tn{width:100%;height:220px}
+  label{color:#8a83a0;margin-right:6px}select,input[type=range]{background:#0c0a12;color:#dcd6ea;border:1px solid #342c46;font:inherit}
+  input[type=range]{width:220px;vertical-align:middle}
+  .num{color:#b9a0e8}.dim{color:#8a83a0}.good{color:#8fe0b0}
+  table{border-collapse:collapse;margin-top:8px}td,th{padding:2px 14px 2px 0;text-align:left}th{color:#8a83a0;font-weight:normal}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Schr&ouml;dinger 1D &mdash; levels and tunnelling</h1>
+  <div class="sub">Two systems, one solver, opposite answers: a box whose levels spread apart as n&sup2;, and a
+    spring whose levels are perfectly evenly spaced. Both exact, both recovered from the same grid.</div>
+
+  <div class="card">
+    <label>system</label>
+    <select id="sys"><option value="well">infinite square well</option><option value="osc">harmonic oscillator</option></select>
+    <label style="margin-left:14px">grid N</label><input id="N" type="range" min="100" max="1600" step="100" value="800">
+    <span class="num" id="Nv"></span>
+    <div style="margin-top:8px" class="dim" id="law"></div>
+  </div>
+
+  <div class="card">
+    <canvas id="lv" width="880" height="260"></canvas>
+    <div class="dim" style="margin-top:4px"><span class="good">&#9472;</span> exact levels &nbsp;
+      <span class="num">&#9472;</span> measured from the discretised Hamiltonian</div>
+    <table id="tbl"></table>
+  </div>
+
+  <div class="card">
+    <div class="dim">Barrier tunnelling &mdash; transmission vs energy. Below the dashed line (E = V<sub>0</sub>)
+      a classical particle gets through <em>never</em>.</div>
+    <label style="margin-top:6px;display:inline-block">barrier width</label>
+    <input id="aw" type="range" min="20" max="300" value="100"><span class="num" id="awv"></span>
+    <canvas id="tn" width="880" height="220"></canvas>
+  </div>
+</div>
+
+<script type="module">
+import { squareWellLevels, oscillatorLevels, wellLevel, oscillatorLevel, barrierTransmission } from "/physics/quantum/schrodinger1d.js";
+
+const $=(id)=>document.getElementById(id);
+
+function drawLevels(){
+  const N=parseInt($("N").value); $("Nv").textContent=N;
+  const sys=$("sys").value, count=6;
+  const measured = sys==="well" ? squareWellLevels({L:1,N,count}) : oscillatorLevels({omega:1,N:Math.max(400,N),span:14,count});
+  const exact = sys==="well" ? measured.map((_,i)=>wellLevel(i+1,1)) : measured.map((_,n)=>oscillatorLevel(n,1));
+  $("law").innerHTML = sys==="well"
+    ? 'E<sub>n</sub> = n&sup2;&pi;&sup2;/2 &mdash; the gaps <b>widen</b> as n grows.'
+    : 'E<sub>n</sub> = (n + &frac12;)&omega; &mdash; the gaps are <b>identical</b>, and the ground state sits half a quantum above zero.';
+
+  const c=$("lv"), ctx=c.getContext("2d"), W=c.width, H=c.height, pad=30;
+  ctx.clearRect(0,0,W,H);
+  const top=Math.max(...exact)*1.08;
+  const Y=(E)=>H-pad-(H-2*pad)*(E/top);
+  exact.forEach((E,i)=>{
+    ctx.strokeStyle="#8fe0b0"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pad,Y(E)); ctx.lineTo(W*0.48,Y(E)); ctx.stroke();
+    ctx.strokeStyle="#b9a0e8"; ctx.beginPath(); ctx.moveTo(W*0.52,Y(measured[i])); ctx.lineTo(W-pad,Y(measured[i])); ctx.stroke();
+    ctx.fillStyle="#8a83a0"; ctx.font="11px monospace";
+    ctx.fillText((sys==="well"?"n="+(i+1):"n="+i), W*0.485, Y(E)+4);
+  });
+  ctx.fillStyle="#8a83a0"; ctx.fillText("exact", pad, pad-10); ctx.fillText("measured", W*0.52, pad-10);
+
+  let rows='<tr><th>n</th><th>measured</th><th>exact</th><th>error</th><th>gap</th></tr>';
+  measured.forEach((E,i)=>{
+    const gap = i? (E-measured[i-1]).toFixed(4) : "&mdash;";
+    rows+=`<tr><td>${sys==="well"?i+1:i}</td><td class="num">${E.toFixed(6)}</td><td>${exact[i].toFixed(6)}</td>`+
+          `<td class="dim">${(Math.abs(E-exact[i])/exact[i]*100).toFixed(4)}%</td><td class="num">${gap}</td></tr>`;
+  });
+  $("tbl").innerHTML=rows;
+}
+
+function drawTunnel(){
+  const a=$("aw").value/100; $("awv").textContent=a.toFixed(2);
+  const c=$("tn"), ctx=c.getContext("2d"), W=c.width, H=c.height, pad=30;
+  ctx.clearRect(0,0,W,H);
+  const Emax=4, X=(E)=>pad+(W-2*pad)*E/Emax, Y=(T)=>H-pad-(H-2*pad)*T;
+  ctx.strokeStyle="#221c30"; ctx.beginPath(); ctx.moveTo(pad,Y(0)); ctx.lineTo(W-pad,Y(0)); ctx.stroke();
+  ctx.setLineDash([4,4]); ctx.strokeStyle="#4a3f60";
+  ctx.beginPath(); ctx.moveTo(X(1),pad); ctx.lineTo(X(1),H-pad); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle="#b9a0e8"; ctx.lineWidth=1.8; ctx.beginPath();
+  for(let i=0;i<=400;i++){ const E=Emax*i/400, T=barrierTransmission(E,1,a);
+    const x=X(E), y=Y(T); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.stroke();
+  ctx.fillStyle="#8a83a0"; ctx.font="11px monospace";
+  ctx.fillText("E = V0", X(1)+4, pad+10); ctx.fillText("T=1", pad-24, Y(1)+4); ctx.fillText("E/V0", W-pad-28, H-pad+16);
+  const t05=barrierTransmission(0.5,1,a);
+  ctx.fillStyle="#b9a0e8"; ctx.fillText("T at E=V0/2 : "+t05.toExponential(3), pad+8, pad+14);
+}
+
+$("sys").onchange=$("N").oninput=drawLevels;
+$("aw").oninput=drawTunnel;
+drawLevels(); drawTunnel();
+</script>
+</body>
+</html>

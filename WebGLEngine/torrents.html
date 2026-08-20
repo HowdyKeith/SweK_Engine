@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Torrents — Voxel View">
+<meta name="demo:desc" content="A 3D voxel render of BiglyBT torrents: each tower is a download, lit cubes are progress, color is state, glow is speed.">
+<title>SweK Torrents — Voxel View</title>
+<style>
+  html,body { margin:0; height:100%; background:#060f18; color:#dfe7f2; font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; display:block; }
+  .panel { position:fixed; background:rgba(7,17,26,.82); border:1px solid #1c3346; border-radius:10px; backdrop-filter:blur(4px); }
+  #hud { top:12px; left:12px; padding:10px 13px; max-width:60vw; }
+  #hud h1 { margin:0 0 2px; font-size:14px; color:#7fe0ff; font-weight:700; letter-spacing:.3px; }
+  #hud .sub { color:#9fb3c6; font-size:11.5px; }
+  #stat { margin-top:6px; font-size:12px; color:#bcd6e8; }
+  #legend { bottom:12px; left:12px; padding:9px 12px; font-size:11px; color:#9fb3c6; }
+  #legend .row { display:flex; align-items:center; gap:7px; margin:3px 0; }
+  #legend .sw { width:11px; height:11px; border-radius:2px; display:inline-block; box-shadow:0 0 6px currentColor; }
+  #empty { top:50%; left:50%; transform:translate(-50%,-50%); padding:16px 20px; text-align:center; color:#9fb3c6; display:none; }
+  a { color:#7fc6ff; text-decoration:none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" class="panel">
+  <h1>🧊 Torrents — Voxel View</h1>
+  <div class="sub">drag to orbit · scroll to zoom · BiglyBT via Web Remote</div>
+  <div id="stat">connecting…</div>
+</div>
+<div id="legend" class="panel">
+  <div class="row"><span class="sw" style="background:#2bd6ff;color:#2bd6ff"></span> downloading</div>
+  <div class="row"><span class="sw" style="background:#3bd17a;color:#3bd17a"></span> seeding</div>
+  <div class="row"><span class="sw" style="background:#ffd24a;color:#ffd24a"></span> done</div>
+  <div class="row"><span class="sw" style="background:#e0b56a;color:#e0b56a"></span> checking / queued</div>
+  <div class="row"><span class="sw" style="background:#5a6b7a;color:#5a6b7a"></span> stopped</div>
+</div>
+<div id="empty" class="panel">Not connected to BiglyBT.<br>Set host:port in <b>Settings → Torrents</b>, then reopen this view.</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const TOWER_CUBES = 18;          // voxels tall per tower (100% = all lit)
+const CUBE = 0.85, GAP = 0.18;   // cube size + vertical gap
+const STEP = CUBE + GAP;
+const PITCH = 3.4;               // spacing between towers on the grid
+
+const STATE_COLOR = {
+  downloading: 0x2bd6ff, seeding: 0x3bd17a, done: 0xffd24a,
+  checking: 0xe0b56a, "check-wait": 0xe0b56a, queued: 0xe0b56a, "seed-wait": 0xe0b56a,
+  stopped: 0x5a6b7a,
+};
+const colorFor = (t) => t.done ? STATE_COLOR.done : (STATE_COLOR[t.state] || 0x8aa0b4);
+
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060f18);
+scene.fog = new THREE.Fog(0x060f18, 28, 64);
+
+const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 200);
+camera.position.set(14, 13, 18);
+
+const controls = new OrbitControls(camera, canvas);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
+controls.target.set(0, 2.5, 0); controls.maxPolarAngle = Math.PI * 0.49;
+
+scene.add(new THREE.AmbientLight(0x4a6478, 1.1));
+const key = new THREE.DirectionalLight(0xbfe6ff, 1.4); key.position.set(10, 18, 8); scene.add(key);
+const rim = new THREE.DirectionalLight(0x2b5a7a, 0.7); rim.position.set(-12, 6, -10); scene.add(rim);
+
+const grid = new THREE.GridHelper(60, 30, 0x18506e, 0x0e2434);
+grid.material.opacity = 0.45; grid.material.transparent = true; scene.add(grid);
+
+const towers = new THREE.Group(); scene.add(towers);
+
+// shared, reused across rebuilds
+const boxGeo = new THREE.BoxGeometry(CUBE, CUBE, CUBE);
+const unlitMat = new THREE.MeshStandardMaterial({ color: 0x12222f, transparent: true, opacity: 0.22, roughness: 1, metalness: 0 });
+let litMats = [];   // per-tower lit materials (disposed each rebuild) with pulse params
+
+function labelSprite(text, hex) {
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  const g = cv.getContext("2d");
+  g.fillStyle = "rgba(6,16,24,0.78)"; g.roundRect ? (g.beginPath(), g.roundRect(4, 8, 248, 48, 8), g.fill()) : g.fillRect(4, 8, 248, 48);
+  g.font = "bold 26px ui-monospace,monospace"; g.textBaseline = "middle";
+  g.fillStyle = "#" + hex.toString(16).padStart(6, "0"); g.fillText("\u2588", 12, 33);
+  g.fillStyle = "#dfe7f2"; g.fillText(text.slice(0, 18), 36, 33);
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 2;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  spr.scale.set(4.4, 1.1, 1);
+  return spr;
+}
+
+function clearTowers() {
+  for (const t of towers.children.slice()) {
+    towers.remove(t);
+    t.traverse((o) => {
+      if (o.isSprite && o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    });
+  }
+  for (const m of litMats) m.dispose();
+  litMats = [];
+}
+
+function build(torrents) {
+  clearTowers();
+  const n = torrents.length;
+  if (!n) return;
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  const ox = -(cols - 1) * PITCH / 2, oz = -(rows - 1) * PITCH / 2;
+
+  torrents.forEach((t, i) => {
+    const cx = i % cols, cz = Math.floor(i / cols);
+    const grp = new THREE.Group();
+    grp.position.set(ox + cx * PITCH, 0, oz + cz * PITCH);
+
+    const hex = colorFor(t);
+    const lit = Math.max(t.pct > 0 ? 1 : 0, Math.round((t.pct / 100) * TOWER_CUBES));
+    const litMat = new THREE.MeshStandardMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.4, roughness: 0.35, metalness: 0.1 });
+    // pulse: faster downloads glow harder + quicker
+    const mbps = (t.down || 0) / 1048576;
+    litMat._base = t.done ? 0.55 : 0.35;
+    litMat._amp = t.state === "downloading" ? Math.min(0.7, 0.2 + mbps * 0.12) : 0.06;
+    litMat._rate = t.state === "downloading" ? (1.4 + Math.min(4, mbps)) : 0.5;
+    litMat._phase = i * 0.7;
+    litMats.push(litMat);
+
+    for (let y = 0; y < TOWER_CUBES; y++) {
+      const cube = new THREE.Mesh(boxGeo, y < lit ? litMat : unlitMat);
+      cube.position.y = CUBE / 2 + y * STEP;
+      grp.add(cube);
+    }
+    const label = labelSprite(t.pct.toFixed(0) + "% " + (t.name || ""), hex);
+    label.position.y = TOWER_CUBES * STEP + 1.1;
+    grp.add(label);
+    towers.add(grp);
+  });
+}
+
+// ---- data poll ----
+const statEl = document.getElementById("stat"), emptyEl = document.getElementById("empty");
+const fmt = (b) => b < 1024 ? b + " B/s" : b < 1048576 ? (b / 1024).toFixed(0) + " KB/s" : (b / 1048576).toFixed(1) + " MB/s";
+let lastKey = "";
+async function poll() {
+  let j; try { j = await fetch("/torrent/status").then((r) => r.json()); } catch { j = null; }
+  if (!j || !j.ok) {
+    statEl.textContent = (j && j.error) ? j.error : "not connected";
+    emptyEl.style.display = "block"; clearTowers(); lastKey = ""; return;
+  }
+  emptyEl.style.display = "none";
+  const s = j.session;
+  statEl.textContent = (s ? ("\u2193 " + fmt(s.down) + "   \u2191 " + fmt(s.up) + "   ") : "") + j.count + " torrent" + (j.count === 1 ? "" : "s");
+  // rebuild only when the shape (ids / pct buckets / state) changed, to avoid churn
+  const key = j.torrents.map((t) => t.id + ":" + Math.round(t.pct) + ":" + t.state + ":" + (t.down > 0)).join("|");
+  if (key !== lastKey) { build(j.torrents); lastKey = key; }
+}
+poll(); setInterval(poll, 4000);
+
+// ---- render loop ----
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  for (const m of litMats) m.emissiveIntensity = m._base + m._amp * (0.5 + 0.5 * Math.sin(t * m._rate + m._phase));
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

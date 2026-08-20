@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>RLE Mesh Demo (v2775)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0e0c; color: #cfe9d8; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; overflow: hidden; }
+  #hud { position: fixed; top: 10px; left: 12px; z-index: 2; white-space: pre; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #keys { position: fixed; bottom: 10px; left: 12px; z-index: 2; color: #6f8a7c; text-shadow: 0 1px 2px #000; }
+  canvas { display: block; }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+</head>
+<body>
+<div id="hud">building chunk...</div>
+<div id="keys">[A] AO on/off   [W] wireframe   drag to orbit, scroll to zoom</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { chunkToRLE, chunkIndexReal } from "/voxel/rleWorldBridge.js";
+import { rleMesh } from "/voxel/rleMesh.js";
+import { rleMeshToRenderMesh } from "/voxel/rleRenderMesh.js";
+
+// --- a real-engine-order chunk (world/chunk.js layout: idx = x + sx*z + sx*sz*y), 16 x 64 x 16 ---
+const SX = 16, SY = 64, SZ = 16, DIMS = { sx: SX, sy: SY, sz: SZ };
+const ridx = (x, y, z) => x + SX * z + SX * SZ * y;
+const chunk = new Uint8Array(SX * SY * SZ);
+for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+    const h = Math.max(1, Math.floor(8 + 6 * Math.sin(x * 0.5) * Math.cos(z * 0.4) + 4 * Math.sin((x + z) * 0.3)));
+    for (let y = 0; y < h && y < SY; y++) chunk[ridx(x, y, z)] = (y > h - 2) ? 3 : (y > h - 5) ? 2 : 1;   // grass / dirt / stone
+}
+// a floating block so AO on overhangs and inside corners is obvious
+for (let x = 5; x < 9; x++) for (let z = 5; z < 9; z++) for (let y = 22; y < 26; y++) chunk[ridx(x, y, z)] = 1;
+
+const PALETTE = { 1: [0.65, 0.65, 0.70], 2: [0.60, 0.50, 0.30], 3: [0.30, 0.80, 0.30] };
+const isSolid = (t) => t !== 0;
+
+// --- the pipeline this whole arc built: chunk -> RLE -> rleMesh -> renderer {verts,cols,aos} ---
+const rle = chunkToRLE(chunk, DIMS, chunkIndexReal);
+const mesh = rleMesh(rle, isSolid);
+const render = rleMeshToRenderMesh(mesh, rle, { palette: PALETTE, computeAO: true });
+
+// --- three.js scene ---
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x0a0e0c);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(34, 30, 34);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(SX / 2, 10, SZ / 2);
+controls.update();
+
+const geo = new THREE.BufferGeometry();
+geo.setAttribute("position", new THREE.BufferAttribute(render.verts, 3));
+
+// bake colour * AO into vertex colour (AO IS the shading here); rebuildable when AO toggles
+function applyColors(aoOn) {
+    const cols = new Float32Array(render.cols.length);
+    for (let i = 0, a = 0; i < cols.length; i += 3, a++) {
+        const ao = aoOn ? (0.35 + 0.65 * render.aos[a]) : 1;   // floor so darkest corners aren't pure black
+        cols[i] = render.cols[i] * ao; cols[i + 1] = render.cols[i + 1] * ao; cols[i + 2] = render.cols[i + 2] * ao;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    geo.attributes.color.needsUpdate = true;
+}
+let aoOn = true, wire = false;
+applyColors(aoOn);
+
+const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+const meshObj = new THREE.Mesh(geo, mat);
+scene.add(meshObj);
+
+const hud = document.getElementById("hud");
+function updHud() {
+    hud.textContent = "RLE Mesh Demo v2775   (world/chunk.js order 16x64x16)\n" +
+        "quads " + mesh.quadCount + "   tris " + (render.count / 3) + "   verts " + render.count + "\n" +
+        "AO " + (aoOn ? "ON" : "off") + "   wireframe " + (wire ? "ON" : "off");
+}
+updHud();
+
+addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "a") { aoOn = !aoOn; applyColors(aoOn); updHud(); }
+    else if (k === "w") { wire = !wire; mat.wireframe = wire; updHud(); }
+});
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+(function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MPM in 3D</title>
+<meta name="demo:desc" content="The 3D MPM loop, drawn (v3841). mpm3dBind proved the transfer identities lift to 3D; this is the loop above them -- p2g3, a 27-node stress scatter, gravity, g2p3, a 3x3 deformation-gradient update -- running an elastic block that falls into a box and settles. The graded key is the same one that graded the 2D loop: the centre of mass follows the analytic fall whatever the block does internally (step3d-selfcheck), now in three axes, with a 3x3 Neo-Hookean stress whose Cauchy tensor is symmetric (angular-momentum balance) and which returns NaN for an inverted particle rather than clamping. Drag to orbit. Run/Reset. Answer-key gate: step3d-selfcheck.">
+<style>
+  html,body{margin:0;height:100%;background:#080a0f;color:#cdd8ea;font:13px ui-monospace,monospace;overflow:hidden}
+  #hud{position:fixed;left:10px;top:10px;z-index:5;display:flex;gap:6px;align-items:center}
+  #hud button{background:#182234;color:#cdd8ea;border:1px solid #2e415f;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:3px 10px}
+  #note{position:fixed;left:10px;bottom:8px;z-index:5;color:#728099;font-size:11px;max-width:64ch}
+</style>
+</head>
+<body>
+<div id="hud">
+  <button id="runBtn">&#9654; Run</button>
+  <button id="resetBtn">&#9632; Reset</button>
+  <span id="stat" style="color:#728099"></span>
+</div>
+<div id="note">A 3D MPM elastic block falling into a box &mdash; the same loop as the 2D page, lifted to 27 nodes and a 3&times;3 deformation gradient. The centre of mass follows the analytic fall exactly (gated); the wobble is the material.</div>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { restBlock3, step3, makeGrid3, centreOfMass3 } from "/physics/mpm/step3d.mjs";
+import { lame } from "/physics/mpm/constitutive.mjs";
+
+const NX = 16, H = 0.5, DOM = NX * H, DT = 1 / 240, params = lame(400, 0.3);
+const WALL = { lo: 2, hi: 2 };
+let ps, g, n = 0, running = false, c0 = null;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x080a0f);
+const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+cam.position.set(9, 8, 11);
+const controls = new OrbitControls(cam, renderer.domElement); controls.enableDamping = true; controls.target.set(0, -1, 0);
+
+// the domain box (wireframe), offset so its centre is the origin
+const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(DOM, DOM, DOM)), new THREE.LineBasicMaterial({ color: 0x24344c }));
+scene.add(box);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(DOM, DOM), new THREE.MeshBasicMaterial({ color: 0x0e1622 }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -DOM / 2 + WALL.lo * H; scene.add(floor);
+scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+let points = null;
+function buildPoints() {
+  if (points) scene.remove(points);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(ps.length * 3), 3));
+  points = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x7fd8ff, size: 0.12 }));
+  scene.add(points);
+}
+function syncPoints() {
+  const a = points.geometry.attributes.position.array;
+  for (let i = 0; i < ps.length; i++) { a[i * 3] = ps[i].x - DOM / 2; a[i * 3 + 1] = ps[i].y - DOM / 2; a[i * 3 + 2] = ps[i].z - DOM / 2; }
+  points.geometry.attributes.position.needsUpdate = true;
+}
+
+function reset() {
+  running = false; document.getElementById("runBtn").innerHTML = "&#9654; Run";
+  ps = restBlock3({ n: 5, spacing: 0.35, x0: 3.1, y0: 5.0, z0: 3.1, m: 0.1, vol0: 0.043 });
+  g = makeGrid3(NX, NX, NX, H); n = 0; c0 = centreOfMass3(ps);
+  buildPoints(); syncPoints();
+}
+document.getElementById("runBtn").onclick = (e) => { running = !running; e.target.innerHTML = running ? "&#10073;&#10073; Pause" : "&#9654; Run"; };
+document.getElementById("resetBtn").onclick = reset;
+
+const stat = document.getElementById("stat");
+function tick() {
+  if (running) {
+    for (let i = 0; i < 4; i++) { step3(ps, g, { dt: DT, gy: -9.81, params, walls: WALL }); n++; }
+    syncPoints();
+    if ((n & 15) === 0) { const c = centreOfMass3(ps); stat.textContent = `step ${n}   particles ${ps.length}   COM y ${(c.y - DOM / 2).toFixed(3)}`; }
+  }
+  controls.update();
+  renderer.render(scene, cam);
+  requestAnimationFrame(tick);
+}
+addEventListener("resize", () => { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+reset(); tick();
+</script>
+</body>
+</html>

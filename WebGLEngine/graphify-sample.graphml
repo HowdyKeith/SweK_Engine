@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+  <key id="d0" for="node" attr.name="label" attr.type="string"/>
+  <key id="d1" for="node" attr.name="type" attr.type="string"/>
+  <key id="d2" for="node" attr.name="community" attr.type="string"/>
+  <key id="d3" for="node" attr.name="path" attr.type="string"/>
+  <key id="e0" for="edge" attr.name="type" attr.type="string"/>
+  <key id="e1" for="edge" attr.name="confidence" attr.type="string"/>
+  <graph edgedefault="directed">
+    <node id="main"><data key="d0">main.js</data><data key="d1">module</data><data key="d2">core</data><data key="d3">WebGLEngine/main.js</data></node>
+    <node id="chunkGen"><data key="d0">chunkGenerator.js</data><data key="d1">module</data><data key="d2">terrain</data></node>
+    <node id="terrainGen"><data key="d0">terrainGenerator.js</data><data key="d1">module</data><data key="d2">terrain</data></node>
+    <node id="getHeight"><data key="d0">getHeight()</data><data key="d1">function</data><data key="d2">terrain</data></node>
+    <node id="rigSys"><data key="d0">RigSystem.js</data><data key="d1">class</data><data key="d2">rig</data></node>
+    <node id="ragdoll"><data key="d0">RagdollManager.js</data><data key="d1">class</data><data key="d2">rig</data></node>
+    <node id="botMgr"><data key="d0">BotManager.js</data><data key="d1">class</data><data key="d2">kaiju</data></node>
+    <node id="kaijuAtk"><data key="d0">KaijuAttacks.js</data><data key="d1">module</data><data key="d2">kaiju</data></node>
+    <node id="audioBus"><data key="d0">audioBus.js</data><data key="d1">module</data><data key="d2">audio</data></node>
+    <node id="settings"><data key="d0">settingsHub.js</data><data key="d1">module</data><data key="d2">ui</data></node>
+    <node id="installP"><data key="d0">installPanel.js</data><data key="d1">class</data><data key="d2">ui</data></node>
+    <node id="ollamaP"><data key="d0">ollamaPanel.js</data><data key="d1">class</data><data key="d2">ui</data></node>
+    <node id="ollamaC"><data key="d0">OllamaClient.js</data><data key="d1">class</data><data key="d2">ai</data></node>
+    <node id="updChk"><data key="d0">updateChecker.js</data><data key="d1">module</data><data key="d2">ai</data></node>
+    <node id="glbView"><data key="d0">glb_viewer.html</data><data key="d1">page</data><data key="d2">viewer</data></node>
+    <node id="splatView"><data key="d0">splat_viewer.html</data><data key="d1">page</data><data key="d2">viewer</data></node>
+    <edge source="main" target="chunkGen"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="main" target="settings"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="main" target="installP"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="main" target="updChk"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="main" target="botMgr"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="main" target="audioBus"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="chunkGen" target="terrainGen"><data key="e0">imports</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="chunkGen" target="getHeight"><data key="e0">calls</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="terrainGen" target="getHeight"><data key="e0">defines</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="botMgr" target="rigSys"><data key="e0">calls</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="botMgr" target="kaijuAtk"><data key="e0">calls</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="rigSys" target="ragdoll"><data key="e0">calls</data><data key="e1">INFERRED</data></edge>
+    <edge source="kaijuAtk" target="rigSys"><data key="e0">calls</data><data key="e1">INFERRED</data></edge>
+    <edge source="settings" target="ollamaP"><data key="e0">references</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="ollamaP" target="ollamaC"><data key="e0">calls</data><data key="e1">EXPLICIT</data></edge>
+    <edge source="updChk" target="ollamaC"><data key="e0">references</data><data key="e1">AMBIGUOUS</data></edge>
+    <edge source="installP" target="ollamaP"><data key="e0">references</data><data key="e1">INFERRED</data></edge>
+    <edge source="main" target="glbView"><data key="e0">references</data><data key="e1">AMBIGUOUS</data></edge>
+    <edge source="main" target="splatView"><data key="e0">references</data><data key="e1">AMBIGUOUS</data></edge>
+    <edge source="botMgr" target="audioBus"><data key="e0">calls</data><data key="e1">INFERRED</data></edge>
+  </graph>
+</graphml>

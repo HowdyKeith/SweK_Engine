@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple View &mdash; SweK Engine</title>
+<style>
+  :root { --acc:#2bff88; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:#020a06; color:#dfe7f2; font:16px/1.45 ui-monospace,SFMono-Regular,monospace; }
+  /* TV overscan-safe padding */
+  .wrap { max-width:1100px; margin:0 auto; padding:5vh 5vw; }
+  h1 { color:var(--acc); font-size:26px; margin:0 0 4px; letter-spacing:.5px; }
+  .sub { color:#7fae94; font-size:14px; margin:0 0 22px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+  a.card { display:flex; flex-direction:column; gap:6px; padding:18px; background:#0c0f14; border:1px solid #1f3a28; border-radius:14px; text-decoration:none; color:#dfe7f2; transition:border-color .12s, transform .12s; }
+  a.card:hover, a.card:focus-visible { border-color:var(--acc); transform:translateY(-2px); outline:none; }
+  a.card:focus-visible { outline:3px solid var(--acc); outline-offset:3px; }
+  .ico { font-size:34px; }
+  .ttl { font-size:18px; color:#eef3fa; font-weight:bold; }
+  .desc { font-size:13px; color:#8b97a8; }
+  .tag { align-self:flex-start; margin-top:4px; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; padding:2px 7px; border-radius:99px; border:1px solid #3a5; color:#7fc89a; background:#0e2417; }
+  .card.disabled { opacity:.45; pointer-events:none; }
+  .card.disabled .tag { border-color:#7a4; color:#caa05a; background:#221d10; }
+  .foot { margin-top:26px; font-size:13px; }
+  .foot a { color:#7fd1ff; }
+  .note { color:#7a8290; font-size:12.5px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#128241; SweK View</h1>
+  <div class="sub">Lightweight pages that run on a phone, Android&nbsp;TV, or an older iPad. Use the D-pad / arrows to move, OK / Enter to open.</div>
+  <div class="grid" id="grid"></div>
+  <div class="foot"><a href="/gallery.html">&#129526; Demo Gallery &rarr;</a> &nbsp; <a href="/">&#127758; Open the full 3D engine &rarr;</a> <span class="note" id="glnote"></span></div>
+</div>
+
+<script>
+var hasGL2 = false;
+try { var c = document.createElement("canvas"); hasGL2 = !!(c.getContext("webgl2")); } catch (e) {}
+
+var CARDS = [
+  { icon: "\uD83D\uDDA5\uFE0F", title: "Server View", href: "/server.html", desc: "Server console \u2014 peers, VMs, KPop, updates.", gl: false },
+  { icon: "\uD83E\uDDCD", title: "Avatar View", href: "/avatarstage.html", desc: "The standalone avatar window.", gl: true },
+  { icon: "\uD83E\uDDBE", title: "Pip-Boy Viewer", href: "/pipboy-models.html", desc: "Spin the 3D Pip-Boy models.", gl: true },
+  { icon: "\uD83C\uDFE0", title: "Home Control", href: "/home.html", desc: "Lights, switches, thermostats & temp/humidity sensors.", gl: false },
+  { icon: "\uD83D\uDCDA", title: "Comics & Books", href: "/comics.html", desc: "Read CBZ / CBR / PDF, phone-optimized pages.", gl: false },
+  { icon: "\uD83C\uDFA8", title: "Photo Cube", href: "/voxel-photo-cube.html", desc: "Turn photos into walls of voxels. Flow, mow, gallery.", gl: true },
+  { icon: "\uD83D\uDCE6", title: "GLB Viewer", href: "/glb_viewer.html", desc: "View any .glb 3D model.", gl: true }
+];
+
+var grid = document.getElementById("grid");
+CARDS.forEach(function (card) {
+  var a = document.createElement("a");
+  var blocked = card.gl && !hasGL2;
+  a.className = "card" + (blocked ? " disabled" : "");
+  a.href = blocked ? "#" : card.href;
+  if (!blocked && card.gl) a.target = "_self";
+  a.innerHTML = '<div class="ico">' + card.icon + '</div>'
+    + '<div class="ttl">' + card.title + '</div>'
+    + '<div class="desc">' + card.desc + '</div>'
+    + (card.gl ? ('<span class="tag">' + (blocked ? "needs WebGL2 \u2014 not on this device" : "3D \u00b7 WebGL2") + '</span>') : '<span class="tag">lightweight</span>');
+  grid.appendChild(a);
+});
+
+document.getElementById("glnote").textContent = hasGL2
+  ? "(this device supports WebGL2 \u2014 the 3D engine should at least try to run)"
+  : "(this device has no WebGL2 \u2014 the full engine and 3D pages won\u2019t run here)";
+
+// focus the first card so a TV remote has a starting point
+var first = grid.querySelector("a.card:not(.disabled)"); if (first) try { first.focus(); } catch (e) {}
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

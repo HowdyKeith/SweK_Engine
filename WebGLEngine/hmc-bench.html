@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — HMC leapfrog kernel bench (GPU proposes, CPU adjudicates)</title>
+<meta name="demo:desc" content="The second fleet kernel: HMC's batch leapfrog in WGSL, one thread per chain, pure + - * / arithmetic (no transcendentals to argue rounding about). The device rolls 4096 chains; the CPU recomputes the f64 reference and grades every endpoint against the earned tolerance. The verdict is never the device's — a REJECTED kernel's timing is irrelevant. Submit sends the raw measurement to the fleet ledger; the hub re-grades from the same numbers.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:860px; margin:0 auto; padding:18px; line-height:1.6; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .good { color:#9be15d; } .bad { color:#ff9a9a; } .dim { color:#7f96b8; }
+  pre { background:#0a0e18; border:1px solid #17202f; border-radius:6px; padding:10px; overflow:auto; }
+  table { border-collapse:collapse; margin-top:8px; } td,th { border:1px solid #22304a; padding:4px 10px; text-align:right; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">HMC leapfrog — fleet kernel bench</h2>
+  <div class="dim">4096 chains × 24 leapfrog steps over the standard 2D Gaussian fixture. The GPU proposes endpoints; the CPU recomputes every one in f64 and grades against the earned tolerance (5e-5, floor measured 2.6e-6 by tools/roundhouse/hmcGpu-selfcheck.mjs). A faster kernel that disagrees is REJECTED — its time is irrelevant. This page needs WebGPU: it is a rig instrument, not a sandbox one.</div>
+  <p><button id="run">Run bench</button> <button id="submit" disabled>Submit measurement to fleet ledger</button></p>
+  <div id="out">idle</div>
+  <pre id="json" style="display:none;"></pre>
+</div>
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { WGSL_HMC, HMC_FIXTURE, HMC_TOL, fixtureInv, makeBatch, adjudicateDeviceRun } from "./tools/roundhouse/hmcGpu.mjs";
+
+const out = document.getElementById("out"), jsonEl = document.getElementById("json");
+let report = null;
+
+async function runGpu(device, { qin, pin, n }) {
+  const mod = device.createShaderModule({ code: WGSL_HMC });
+  const pipe = device.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const inv = fixtureInv();
+  const ub = new ArrayBuffer(32), f = new Float32Array(ub), u = new Uint32Array(ub);
+  f[0] = inv[0]; f[1] = inv[1]; f[2] = inv[2]; f[3] = HMC_FIXTURE.mu[0]; f[4] = HMC_FIXTURE.mu[1]; f[5] = HMC_FIXTURE.eps;
+  u[6] = HMC_FIXTURE.L; u[7] = n;
+  const uni = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(uni, 0, ub);
+  const mk = (arr, extra = 0) => { const b = device.createBuffer({ size: arr.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | extra });
+    device.queue.writeBuffer(b, 0, arr); return b; };
+  const bQ = mk(qin), bP = mk(pin);
+  const bQo = device.createBuffer({ size: qin.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+  const bPo = device.createBuffer({ size: pin.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+  const sQ = device.createBuffer({ size: qin.byteLength, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const sP = device.createBuffer({ size: pin.byteLength, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: uni } }, { binding: 1, resource: { buffer: bQ } }, { binding: 2, resource: { buffer: bP } },
+    { binding: 3, resource: { buffer: bQo } }, { binding: 4, resource: { buffer: bPo } } ] });
+  const t0 = performance.now();
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginComputePass();
+  pass.setPipeline(pipe); pass.setBindGroup(0, bg);
+  pass.dispatchWorkgroups(Math.ceil(n / 64));
+  pass.end();
+  enc.copyBufferToBuffer(bQo, 0, sQ, 0, qin.byteLength);
+  enc.copyBufferToBuffer(bPo, 0, sP, 0, pin.byteLength);
+  device.queue.submit([enc.finish()]);
+  await sQ.mapAsync(GPUMapMode.READ); const qout = new Float32Array(sQ.getMappedRange().slice(0)); sQ.unmap();
+  await sP.mapAsync(GPUMapMode.READ); const pout = new Float32Array(sP.getMappedRange().slice(0)); sP.unmap();
+  const ms = performance.now() - t0;
+  for (const b of [uni, bQ, bP, bQo, bPo, sQ, sP]) b.destroy?.();
+  return { qout, pout, ms };
+}
+
+document.getElementById("run").onclick = async () => {
+  // v3845 -- "run it on a machine with a GPU" is advice about HARDWARE, and over http://<lan-ip> the hardware
+  // was never the problem: the browser has WebGPU and withholds it from an insecure origin. Ask which it is.
+  {
+    const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    if (!p.available) {
+      out.innerHTML = "<span class='bad'>" + (p.reason === "insecure-origin" ? p.message
+        : "WebGPU unavailable — this is a rig instrument; run it on a machine with a GPU.") + "</span>";
+      return;
+    }
+  }
+  out.textContent = "requesting adapter…";
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) { out.innerHTML = "<span class='bad'>no adapter</span>"; return; }
+  const device = await adapter.requestDevice();
+  const info = adapter.info || {};
+  const batch = makeBatch(4096, 77);
+  out.textContent = "dispatching 4096 chains…";
+  const { qout, pout, ms } = await runGpu(device, batch);
+  out.textContent = "adjudicating on the CPU (f64 reference for every chain)…";
+  await new Promise((r) => setTimeout(r, 10));
+  const v = adjudicateDeviceRun(batch.qin, batch.pin, qout, pout, batch.n);
+  const verdict = v.pass ? "<b class='good'>ACCEPTED</b>" : "<b class='bad'>REJECTED</b>";
+  out.innerHTML = "adapter: " + (info.vendor || "?") + " / " + (info.architecture || "?") +
+    "<table><tr><th>chains</th><th>kernel ms</th><th>worst |f64−gpu|</th><th>out of tol</th><th>verdict (CPU's, not the device's)</th></tr>" +
+    "<tr><td>" + v.n + "</td><td>" + ms.toFixed(1) + "</td><td>" + v.worst.toExponential(3) + "</td><td>" + v.bad + "</td><td>" + verdict + "</td></tr></table>" +
+    "<div class='dim' style='margin-top:6px;'>tolerance " + HMC_TOL.toExponential(1) + ", earned from the measured f32 floor. A REJECTED kernel's time is irrelevant.</div>";
+  report = { kind: "swek-hmc-bench", version: 3282, at: new Date().toISOString(),
+    adapter: { vendor: info.vendor || null, architecture: info.architecture || null },
+    n: v.n, kernelMs: Math.round(ms * 10) / 10, worst: v.worst, outOfTol: v.bad, tol: v.tol,
+    seed: 77, fixture: HMC_FIXTURE };
+  jsonEl.textContent = JSON.stringify(report, null, 2); jsonEl.style.display = "block";
+  document.getElementById("submit").disabled = false;
+};
+document.getElementById("submit").onclick = async () => {
+  try {
+    const r = await fetch("/android/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) });
+    const j = await r.json();
+    out.innerHTML += "<div>" + (j.ok ? "<span class='good'>submitted — the hub re-grades from these numbers; the verdict above never travels as authority</span>" : "<span class='bad'>submit failed: " + (j.error || r.status) + "</span>") + "</div>";
+  } catch (e) { out.innerHTML += "<div class='bad'>submit failed: " + e.message + "</div>"; }
+};
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

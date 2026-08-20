@@ -1,0 +1,177 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Water waves - the dispersion relation the engine does not have (v3627)</title>
+<meta name="demo:desc" content="Surface gravity waves: omega^2 = g k tanh(k h), a speed predicted from depth alone - drawn against the lattice dispersion of the height-field water the engine actually ships, whose speed is 1/sqrt(2) cells per step and whose stiffness sits exactly on the 2D stability limit.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+ canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ input[type=range]{vertical-align:middle;width:200px}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+</style></head><body><div id="w">
+
+<h1>Water waves &mdash; a speed you can predict from the depth</h1>
+<div class="sub">Linear surface gravity waves obey
+<code>&omega;&sup2; = g&middot;k&middot;tanh(k&middot;h)</code>. Two limits fall out of it and both are elementary:
+<b>shallow</b> (<code>kh &rarr; 0</code>) gives <code>c = &radic;(gh)</code>, the same speed for every wavelength;
+<b>deep</b> (<code>kh &rarr; &infin;</code>) gives <code>c = &radic;(g/k)</code>, so long waves outrun short ones and the
+group travels at <b>exactly half</b> the phase speed. Nothing from any grid appears in either.</div>
+
+<div class="law"><b>Checked the tree before writing a line of this.</b> The engine has <i>three</i> height-field
+waters &mdash; <code>water/waterMath.js</code>, <code>render/WaterField.js</code>, <code>world/waveSystem.js</code>
+&mdash; and not one of them contains <code>g</code>, a depth, a <code>dx</code> or a <code>dt</code>.
+<code>water-selfcheck</code> proves a drop propagates and then decays, and never asks how fast. So the wave speed
+of the engine's water has never been a number anybody could predict. Below it becomes one.</div>
+
+<h2>1. The relation, and the scheme, on the same axes</h2>
+<div class="panel">
+  <button id="drawD" class="good">draw the dispersion</button>
+  <span class="note">phase speed against <code>kh</code>, both normalised to their own long-wave value</span>
+  <canvas id="cvD" width="960" height="300"></canvas>
+  <div class="row note">
+    <span style="color:#8fe0a8">&#9644; real water, c/&radic;(gh)</span>
+    <span style="color:#e8c49a">&#9644; real water, group/phase</span>
+    <span style="color:#9ab6e8">&#9644; the shipped scheme, c(k)/c(0)</span>
+    <span class="dim">&#9644; the shallow limit, 1.0</span>
+  </div>
+</div>
+<div class="law">Both curves fall with <code>k</code>, and that is the trap. One is <b>physics</b> &mdash; short waves
+really are slower &mdash; and the other is <b>a grid error</b>. They are two things wearing one label, and you cannot
+buy the first with the second: <code>c &prop; k<sup>-1/2</sup></code> is a power law and
+<code>2&middot;asin(q&middot;sin(k/2))/k</code> is not one. Fit the scheme's single free constant to the deep-water
+curve and the best it manages still misses by more than 100% across a modest band.</div>
+
+<h2>2. Where the shipped constant sits</h2>
+<div class="panel">
+  <div class="row">
+    <label>stiffness <code>s</code> <input id="stiff" type="range" min="1.2" max="2.3" step="0.01" value="2.0"></label>
+    <span id="stiffv" class="big"></span>
+    <label>damping <input id="damp" type="range" min="0.98" max="1" step="0.001" value="0.995"></label>
+    <span id="dampv"></span>
+    <button id="runS" class="good">run the checkerboard</button>
+  </div>
+  <canvas id="cvS" width="960" height="220"></canvas>
+  <div class="note">Peak amplitude of the worst mode (<code>k<sub>x</sub>=k<sub>y</sub>=&pi;</code>) against step
+  count, log scale. <code>waveStep</code> ships <code>s = 2.0</code>, <code>damping = 0.995</code>.</div>
+</div>
+<div class="law">The checkerboard mode gives <code>sin&sup2;(&omega;/2) = s/2</code>, so the 2D stability limit is
+<code>s &le; 2</code> &mdash; and the shipped value is <b>exactly 2</b>, on the boundary rather than near it. There the
+root is <b>defective</b>: it does not explode, it grows <b>linearly</b>, at exactly 2 per step. Set damping to 1.000
+and watch it climb forever; put it back and it is held. <code>damping</code>'s comment says "lose energy each step"
+&mdash; an artistic knob that turns out to be load-bearing for stability. The file's own line
+<i>"stable for damping in (0,1)"</i> is true, and true for a different reason than it reads.</div>
+
+<h2>3. The numbers</h2>
+<div class="panel">
+  <button id="runT" class="good">check the keys</button>
+  <table id="tK"></table>
+</div>
+
+<div class="law">Graded headless by <code>physics/fluid/gravityWaves-selfcheck.mjs</code>, runnable from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Nothing in <code>water/waterMath.js</code> is
+edited</b> &mdash; it is a competent classic height-field solver and this is about what it can <i>say</i>, not
+about a bug. What is <b>not</b> claimed: that any of this is a shallow-water solver. A solver with a real
+<code>g</code> and a real depth is a separate round with its own keys.</div>
+
+<script type="module">
+import { omega, phaseSpeed, groupSpeed, groupSpeedNumeric, shallowSpeed, deepSpeed, shallowValidity,
+         schemeOmega, schemeMargin, schemePhaseSpeed, schemeLongWaveSpeed, runMode, G_EARTH } from "/physics/fluid/gravityWaves.mjs";
+
+const $ = (id) => document.getElementById(id);
+const rel = (a, b) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-300);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+
+// --- 1: dispersion plot -----------------------------------------------------------------------------------
+$("drawD").onclick = () => {
+    const cv = $("cvD"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H); g.fillStyle = "#080a0f"; g.fillRect(0, 0, W, H);
+    const L = 46, R = 16, T = 14, B = 30;
+    const khMin = 0.05, khMax = 20;
+    const X = (kh) => L + (Math.log10(kh) - Math.log10(khMin)) / (Math.log10(khMax) - Math.log10(khMin)) * (W - L - R);
+    const Y = (v) => T + (1 - v) * (H - T - B);
+    g.strokeStyle = "#232b3d";
+    for (const v of [0, 0.25, 0.5, 0.75, 1]) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke();
+        g.fillStyle = "#68748c"; g.fillText(v.toFixed(2), 6, Y(v) + 4); }
+    for (const kh of [0.1, 1, 10]) { g.strokeStyle = "#1a2130"; g.beginPath(); g.moveTo(X(kh), T); g.lineTo(X(kh), H - B); g.stroke();
+        g.fillStyle = "#68748c"; g.fillText("kh=" + kh, X(kh) - 14, H - 12); }
+    const depth = 1;
+    const plot = (fn, col) => { g.strokeStyle = col; g.lineWidth = 1.8; g.beginPath();
+        let first = true;
+        for (let i = 0; i <= 400; i++) {
+            const kh = khMin * Math.pow(khMax / khMin, i / 400), v = fn(kh);
+            if (!isFinite(v)) continue;
+            const px = X(kh), py = Y(Math.max(0, Math.min(1, v)));
+            if (first) { g.moveTo(px, py); first = false; } else g.lineTo(px, py);
+        }
+        g.stroke(); g.lineWidth = 1; };
+    // real water, normalised to sqrt(gh)
+    plot((kh) => phaseSpeed(kh / depth, depth) / shallowSpeed(depth), "#8fe0a8");
+    plot((kh) => groupSpeed(kh / depth, depth) / phaseSpeed(kh / depth, depth), "#e8c49a");
+    // the scheme: its k has no depth in it, so map kh onto lattice k over the same visual range
+    plot((kh) => { const k = Math.min(Math.PI * 0.98, kh / khMax * Math.PI); const c = schemePhaseSpeed(k, 2);
+                   return c === null ? NaN : c / schemeLongWaveSpeed(2); }, "#9ab6e8");
+    g.strokeStyle = "#2e3c5a"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(L, Y(1)); g.lineTo(W - R, Y(1)); g.stroke(); g.setLineDash([]);
+};
+
+// --- 2: stability ----------------------------------------------------------------------------------------
+const showS = () => { $("stiffv").textContent = "s = " + (+$("stiff").value).toFixed(2) +
+    "  (limit 2.00, q = " + schemeMargin(+$("stiff").value).toFixed(4) + ")";
+    $("dampv").textContent = (+$("damp").value).toFixed(3); };
+$("stiff").oninput = showS; $("damp").oninput = showS; showS();
+$("runS").onclick = () => {
+    const s = +$("stiff").value, d = +$("damp").value;
+    const r = runMode({ kx: Math.PI, ky: Math.PI, s, damping: d, steps: 1200, N: 16 });
+    const cv = $("cvS"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H); g.fillStyle = "#080a0f"; g.fillRect(0, 0, W, H);
+    const L = 50, R = 14, T = 12, B = 24;
+    const lo = -3, hi = 8;
+    const Y = (v) => T + (1 - (Math.log10(Math.max(v, 1e-12)) - lo) / (hi - lo)) * (H - T - B);
+    g.strokeStyle = "#232b3d"; g.fillStyle = "#68748c";
+    for (let e = lo; e <= hi; e += 2) { g.beginPath(); g.moveTo(L, Y(Math.pow(10, e))); g.lineTo(W - R, Y(Math.pow(10, e))); g.stroke();
+        g.fillText("1e" + e, 6, Y(Math.pow(10, e)) + 4); }
+    g.strokeStyle = d >= 1 && s >= 2 ? "#f0a8a0" : "#8fe0a8"; g.lineWidth = 1.8; g.beginPath();
+    r.peaks.forEach((p, i) => { const px = L + i / r.peaks.length * (W - L - R), py = Y(p);
+        if (i === 0) g.moveTo(px, py); else g.lineTo(px, py); });
+    g.stroke(); g.lineWidth = 1;
+    g.fillStyle = "#7c88a0";
+    const last = r.peaks[r.peaks.length - 1];
+    g.fillText("peak after 1200 steps: " + (isFinite(last) ? last.toExponential(3) : "diverged"), L + 8, T + 14);
+};
+
+// --- 3: the keys -----------------------------------------------------------------------------------------
+$("runT").onclick = () => {
+    const out = [];
+    const errs = [0.4, 0.2, 0.1, 0.05].map((kh) => rel(phaseSpeed(kh / 2, 2), shallowSpeed(2)));
+    out.push(["shallow limit c &rarr; &radic;(gh)", errs.map((e) => e.toExponential(2)).join(" &rarr; "),
+        "orders " + errs.slice(1).map((e, i) => Math.log2(errs[i] / e).toFixed(3)).join(", "), "<span class='ok'>2nd order in kh</span>"]);
+    const ed = [5, 10].map((kh) => rel(phaseSpeed(kh / 100, 100), deepSpeed(kh / 100)));
+    out.push(["deep limit c &rarr; &radic;(g/k)", ed.map((e) => e.toExponential(2)).join(" &rarr; "),
+        "ratio " + (ed[0] / ed[1]).toExponential(2), "<span class='ok'>exponential, not a power</span>"]);
+    let w = 0; for (const [k, h] of [[0.05, 2], [0.5, 2], [2, 2], [0.1, 50]]) w = Math.max(w, rel(groupSpeed(k, h), groupSpeedNumeric(k, h)));
+    out.push(["group speed, analytic vs d&omega;/dk", w.toExponential(3), "two routes", "<span class='ok'>agree</span>"]);
+    out.push(["deep water group / phase", (groupSpeed(5, 1000) / phaseSpeed(5, 1000)).toFixed(12), "exactly 1/2",
+        "<span class='ok'>an exact rational</span>"]);
+    const v1 = shallowValidity(0.01);
+    out.push(["how shallow is 'shallow'", "kh &lt; " + v1.kh.toFixed(4), "&lambda; &gt; " + v1.wavelengthsPerDepth.toFixed(1) + " depths",
+        "<span class='warn'>for 1%</span>"]);
+    out.push(["the shipped scheme's long-wave speed", schemeLongWaveSpeed(2).toFixed(12) + " cells/step",
+        "= 1/&radic;2", "<span class='warn'>no metre, no second</span>"]);
+    out.push(["shipped stiffness vs the 2D limit", "s = 2.00 / limit 2.00", "q = " + schemeMargin(2).toFixed(6),
+        "<span class='bad'>exactly on the boundary</span>"]);
+    rows($("tK"), ["key", "measured", "derived", "verdict"], out);
+    void omega; void G_EARTH; void schemeOmega;
+};
+</script>
+</div></body></html>

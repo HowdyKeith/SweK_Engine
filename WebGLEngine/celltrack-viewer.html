@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Cell Track Viewer</title>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  :root { --bg:#070b12; --ink:#cfe3f2; --dim:#7f93a8; --line:#1e2c3a; --accent:#7fd0ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px ui-monospace,SFMono-Regular,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  #top { display:flex; align-items:center; gap:12px; padding:8px 12px; border-bottom:1px solid var(--line); background:#0a1018; flex:none; flex-wrap:wrap; }
+  #top h1 { font-size:13px; margin:0; color:var(--accent); font-weight:600; letter-spacing:0.04em; }
+  #top .sp { flex:1; }
+  select,button { background:#0c1622; color:var(--ink); border:1px solid var(--line); border-radius:5px; font:12px ui-monospace,monospace; padding:4px 9px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  #stage { flex:1; position:relative; }
+  canvas { display:block; width:100%; height:100%; }
+  #scrub { display:flex; align-items:center; gap:10px; padding:8px 14px; border-top:1px solid var(--line); background:#0a1018; flex:none; }
+  #scrub input[type=range] { flex:1; accent-color:var(--accent); }
+  #tlabel { min-width:96px; text-align:right; color:var(--accent); }
+  .chk { display:flex; align-items:center; gap:5px; color:var(--dim); font-size:11px; cursor:pointer; user-select:none; }
+  #legend { position:absolute; top:10px; left:10px; background:rgba(8,14,22,0.82); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:11px; line-height:1.7; pointer-events:none; }
+  #legend b { color:var(--accent); }
+  #msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--dim); padding:0 24px; }
+  #msg a { color:var(--accent); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; vertical-align:middle; margin-right:5px; }
+  .sw { display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:5px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <h1>&#129516; Cell Track Viewer</h1>
+    <select id="dataset" title="which dataset (sample) to view"></select>
+    <label class="chk"><input type="checkbox" id="showTrails" checked> track trails</label>
+    <label class="chk"><input type="checkbox" id="colorByTrack" checked> color by track</label>
+    <label class="chk"><input type="checkbox" id="spin"> auto-spin</label>
+    <span class="sp"></span>
+    <span id="stats" style="color:var(--dim);font-size:11px;"></span>
+    <button id="reload" title="Reload the latest run's tracks">&#8635; Reload</button>
+  </div>
+  <div id="stage">
+    <div id="legend" style="display:none;">
+      <div><span class="dot" style="background:#7fd0ff;"></span>cell (this frame)</div>
+      <div><span class="sw" style="background:#e05cff;"></span>track trail</div>
+      <div><span class="dot" style="background:#ff2d55;"></span>division fork</div>
+    </div>
+    <div id="msg">loading tracks&hellip;</div>
+  </div>
+  <div id="scrub">
+    <button id="playBtn" title="Play / pause time">&#9654;</button>
+    <input type="range" id="time" min="0" max="0" value="0" step="1">
+    <span id="tlabel">t = 0 / 0</span>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+
+const $ = (id) => document.getElementById(id);
+const msg = (html) => { const m = $("msg"); if (!html) { m.style.display = "none"; } else { m.style.display = "flex"; m.innerHTML = html; } };
+
+let renderer, scene, camera;
+let data = null;          // full tracks payload
+let ds = null;            // current dataset {nodes, edges}
+let nodeById = new Map(); // node_id -> {t,z,y,x, trackId}
+let byT = new Map();      // t -> [node_id...]
+let trackOf = new Map();  // node_id -> trackId (lineage/chain id)
+let forks = new Set();    // node_id with >=2 outgoing edges
+let trackColor = new Map();
+let center = new THREE.Vector3(), scaleN = 1;
+let tMax = 0, curT = 0, playing = false;
+
+// three.js objects we rebuild per frame
+let cellPoints = null, trailLines = null, forkPoints = null;
+
+// ---- scene setup ----
+function initThree() {
+  const stage = $("stage");
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setSize(stage.clientWidth, stage.clientHeight);
+  stage.appendChild(renderer.domElement);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, stage.clientWidth / stage.clientHeight, 0.01, 100);
+  camera.position.set(2.2, 1.4, 2.6);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+  const d = new THREE.DirectionalLight(0xffffff, 0.5); d.position.set(3, 5, 2); scene.add(d);
+  addOrbit(renderer.domElement);
+  window.addEventListener("resize", onResize);
+  animate();
+}
+
+function onResize() {
+  const stage = $("stage");
+  renderer.setSize(stage.clientWidth, stage.clientHeight);
+  camera.aspect = stage.clientWidth / stage.clientHeight;
+  camera.updateProjectionMatrix();
+}
+
+// minimal orbit control (drag = rotate, wheel = zoom) so we don't need OrbitControls
+let camTheta = 0.7, camPhi = 1.0, camRad = 3.6, dragging = false, lastX = 0, lastY = 0;
+function addOrbit(dom) {
+  dom.addEventListener("mousedown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener("mouseup", () => dragging = false);
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    camTheta -= (e.clientX - lastX) * 0.008; camPhi -= (e.clientY - lastY) * 0.008;
+    camPhi = Math.max(0.12, Math.min(Math.PI - 0.12, camPhi));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  dom.addEventListener("wheel", (e) => { e.preventDefault(); camRad *= (1 + Math.sign(e.deltaY) * 0.08); camRad = Math.max(0.6, Math.min(12, camRad)); }, { passive: false });
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  if ($("spin").checked && !dragging) camTheta += 0.0035;
+  const x = camRad * Math.sin(camPhi) * Math.sin(camTheta);
+  const y = camRad * Math.cos(camPhi);
+  const z = camRad * Math.sin(camPhi) * Math.cos(camTheta);
+  camera.position.set(x, y, z);
+  camera.lookAt(0, 0, 0);
+  if (renderer && scene) renderer.render(scene, camera);
+}
+
+// ---- data → geometry ----
+// physical scaling so proportions match the real voxel size; then normalize to fit view
+function worldPos(z, y, x, vs) {
+  return new THREE.Vector3(x * vs.x, -y * vs.y, z * vs.z);   // y flipped so it reads upright
+}
+
+function buildIndex() {
+  nodeById = new Map(); byT = new Map(); trackOf = new Map(); forks = new Set();
+  const outAdj = new Map(); const indeg = new Map();
+  for (const [nid, t, z, y, x] of ds.nodes) {
+    nodeById.set(nid, { t, z, y, x });
+    if (!byT.has(t)) byT.set(t, []);
+    byT.get(t).push(nid);
+  }
+  for (const [s, tg] of ds.edges) {
+    if (!outAdj.has(s)) outAdj.set(s, []);
+    outAdj.get(s).push(tg);
+    indeg.set(tg, (indeg.get(tg) || 0) + 1);
+  }
+  for (const [s, outs] of outAdj) if (outs.length >= 2) forks.add(s);
+  // assign a track/lineage id by walking from each root (indeg 0) along primary successors
+  let tid = 0;
+  const starts = [...nodeById.keys()].filter(n => !(indeg.get(n) > 0));
+  for (const s of starts) {
+    let cur = s; let guard = 0;
+    while (cur != null && guard++ < 100000) {
+      trackOf.set(cur, tid);
+      const outs = outAdj.get(cur);
+      cur = outs && outs.length ? outs[0] : null;
+    }
+    tid++;
+  }
+  // any node not reached (e.g. in a cycle) gets its own id
+  for (const n of nodeById.keys()) if (!trackOf.has(n)) trackOf.set(n, tid++);
+  // colors per track
+  trackColor = new Map();
+  for (let i = 0; i < tid; i++) {
+    const c = new THREE.Color(); c.setHSL((i * 0.61803398875) % 1, 0.62, 0.62);
+    trackColor.set(i, c);
+  }
+  // compute center + normalization from bounds
+  const b = data.bounds, vs = data.voxel_scale;
+  const lo = worldPos(b.z[0], b.y[1], b.x[0], vs);   // note y flip: y[1] -> min after flip
+  const hi = worldPos(b.z[1], b.y[0], b.x[1], vs);
+  center = lo.clone().add(hi).multiplyScalar(0.5);
+  const span = Math.max(hi.x - lo.x, Math.abs(hi.y - lo.y), hi.z - lo.z) || 1;
+  scaleN = 2.0 / span;
+}
+
+function P(nid) {
+  const n = nodeById.get(nid); const vs = data.voxel_scale;
+  return worldPos(n.z, n.y, n.x, vs).sub(center).multiplyScalar(scaleN);
+}
+
+function rebuildScene() {
+  for (const o of [cellPoints, trailLines, forkPoints]) if (o) { scene.remove(o); o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }
+  cellPoints = trailLines = forkPoints = null;
+
+  const colorByTrack = $("colorByTrack").checked;
+  const showTrails = $("showTrails").checked;
+
+  // cells at current frame (spheres via Points w/ round sprite feel — use Points)
+  const cur = byT.get(curT) || [];
+  const cpos = []; const ccol = [];
+  for (const nid of cur) {
+    const p = P(nid); cpos.push(p.x, p.y, p.z);
+    const c = colorByTrack ? trackColor.get(trackOf.get(nid)) : new THREE.Color(0x7fd0ff);
+    ccol.push(c.r, c.g, c.b);
+  }
+  if (cpos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(cpos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(ccol, 3));
+    const m = new THREE.PointsMaterial({ size: 0.06, vertexColors: true, sizeAttenuation: true });
+    cellPoints = new THREE.Points(g, m); scene.add(cellPoints);
+  }
+
+  // track trails up to curT (line segments per edge whose target t <= curT)
+  if (showTrails) {
+    const lpos = []; const lcol = [];
+    for (const [s, tg] of ds.edges) {
+      const ns = nodeById.get(s), nt = nodeById.get(tg);
+      if (!ns || !nt) continue;
+      if (nt.t > curT) continue;                    // only draw history up to now
+      const ps = P(s), pt = P(tg);
+      const c = colorByTrack ? trackColor.get(trackOf.get(s)) : new THREE.Color(0xe05cff);
+      lpos.push(ps.x, ps.y, ps.z, pt.x, pt.y, pt.z);
+      lcol.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    }
+    if (lpos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(lpos, 3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(lcol, 3));
+      const m = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75 });
+      trailLines = new THREE.LineSegments(g, m); scene.add(trailLines);
+    }
+  }
+
+  // division forks at/through current frame
+  const fpos = [];
+  for (const nid of forks) {
+    const n = nodeById.get(nid); if (!n || n.t > curT) continue;
+    const p = P(nid); fpos.push(p.x, p.y, p.z);
+  }
+  if (fpos.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(fpos, 3));
+    const m = new THREE.PointsMaterial({ size: 0.12, color: 0xff2d55, sizeAttenuation: true });
+    forkPoints = new THREE.Points(g, m); scene.add(forkPoints);
+  }
+}
+
+function setTime(t) {
+  curT = Math.max(0, Math.min(tMax, t | 0));
+  $("time").value = curT;
+  $("tlabel").textContent = "t = " + curT + " / " + tMax;
+  rebuildScene();
+}
+
+// ---- load ----
+async function load() {
+  msg("loading tracks&hellip;");
+  const _peer = new URLSearchParams(location.search).get("peer");
+  const _tracksUrl = "/celltrack/tracks" + (_peer ? ("?peer=" + encodeURIComponent(_peer)) : "");
+  let j;
+  try { j = await fetch(_tracksUrl, { cache: "no-store" }).then(r => r.json()); }
+  catch (e) { msg("couldn't reach the bridge.<br>Is the SweK server running?"); return; }
+  if (!j || !j.ok) { msg("No tracks yet.<br>" + ((j && j.error) || "") + "<br><br>Run the pipeline first (server-mode &rarr; Cell Tracking &rarr; Run pipeline), then reload."); return; }
+  data = j; tMax = j.tmax || 0;
+  const names = Object.keys(j.datasets);
+  const sel = $("dataset"); sel.innerHTML = "";
+  names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
+  selectDataset(names[0]);
+  msg("");
+  $("legend").style.display = "block";
+}
+
+function selectDataset(name) {
+  ds = data.datasets[name];
+  buildIndex();
+  $("time").min = 0; $("time").max = tMax; $("time").value = 0;
+  $("stats").textContent = ds.nodes.length + " nodes · " + ds.edges.length + " edges · " + (new Set([...trackOf.values()]).size) + " tracks · " + forks.size + " divisions";
+  setTime(0);
+}
+
+// ---- controls ----
+$("time").addEventListener("input", (e) => setTime(+e.target.value));
+$("dataset").addEventListener("change", (e) => selectDataset(e.target.value));
+$("reload").addEventListener("click", load);
+$("showTrails").addEventListener("change", rebuildScene);
+$("colorByTrack").addEventListener("change", rebuildScene);
+$("playBtn").addEventListener("click", () => { playing = !playing; $("playBtn").innerHTML = playing ? "&#10073;&#10073;" : "&#9654;"; });
+setInterval(() => { if (playing && data) { setTime(curT >= tMax ? 0 : curT + 1); } }, 550);
+
+initThree();
+load();
+</script>
+</body>
+</html>

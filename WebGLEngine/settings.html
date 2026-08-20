@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Settings">
+<meta name="demo:desc" content="One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, PetFBI board backend + mailer, plus tool readiness.">
+<meta name="demo:cats" content="tool">
+<title>Settings</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; --line:#14304a; --ink:#cfe6ff; --go:#7fe0a0; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 12px; }
+  .sec { background:var(--panel); border:1px solid #14304a; border-left:4px solid var(--edge); border-radius:6px 6px 6px 12px; padding:12px 14px; margin-bottom:12px; }
+  .sec h2 { font-size:12px; color:var(--blue); text-transform:uppercase; letter-spacing:.05em; margin:0 0 8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  label.f { font-size:11px; color:var(--dim); display:flex; flex-direction:column; gap:3px; flex:1 1 150px; }
+  input,select { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:7px; font:12px ui-monospace,monospace; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:7px 13px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .st { font-size:11px; color:var(--dim); margin-left:6px; }
+  .ready { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { font-size:11px; padding:4px 9px; border-radius:12px; border:1px solid var(--edge); background:#0a1422; color:var(--dim); }
+  .chip.ok { color:var(--good); border-color:#2f6f4a; } .chip.no { color:var(--bad); border-color:#5a2330; }
+  .chip a { color:inherit; text-decoration:none; }
+  .note { font-size:11px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div id="bar"><h1>⚙️ Settings</h1><span id="status">…</span></div>
+<div class="wrap">
+  <p class="lead">One place for the bridge configs that live in <code>~/.voxelbridge/*.json</code>. Each section reads + saves the same endpoints the individual tool panels use. Secrets (API keys, app passwords) are stored on the bridge (0600) and never shown back.</p>
+
+  <div class="sec">
+    <h2>TradingAgents — data source</h2>
+    <div class="row">
+      <label class="f">source<select id="t_source"><option value="senate">senate-watcher (free)</option><option value="fmp">FMP (current)</option><option value="finnhub">finnhub</option></select></label>
+      <label class="f">API key (FMP / finnhub)<input id="t_key" placeholder="leave blank to keep"></label>
+      <button class="btn go" id="t_save">Save</button><span class="st" id="t_st"></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>Local TTS</h2>
+    <div class="row">
+      <label class="f">engine<select id="v_engine"><option value="sapi">SAPI</option><option value="piper">Piper</option></select></label>
+      <label class="f">rate (-10..10)<input id="v_rate" type="number" min="-10" max="10" value="0"></label>
+    </div>
+    <div class="row">
+      <label class="f">piper binary<input id="v_bin" placeholder="piper or full path"></label>
+      <label class="f">piper model .onnx<input id="v_model" placeholder="voice model path"></label>
+      <button class="btn go" id="v_save">Save</button><span class="st" id="v_st"></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>PetFBI — board backend</h2>
+    <div class="row">
+      <label class="f">mode<select id="p_mode"><option value="local">local (this bridge)</option><option value="sheet">Google Sheet</option><option value="sharepoint">SharePoint / Power Automate</option></select></label>
+      <label class="f">sheet / flow URL<input id="p_url" placeholder="web-app or flow URL"></label>
+    </div>
+    <div class="row">
+      <label class="f">secret<input id="p_secret" placeholder="leave blank to keep"></label>
+      <button class="btn go" id="p_save">Save</button><span class="st" id="p_st"></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>PetFBI — email sending</h2>
+    <div class="row">
+      <label class="f">transport<select id="m_mode"><option value="draft">Draft (mailto)</option><option value="smtp">Gmail SMTP</option><option value="outlook">Outlook</option></select></label>
+      <label class="f">Gmail address<input id="m_user" placeholder="you@gmail.com"></label>
+      <label class="f">app password<input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="m_pass" type="password" placeholder="leave blank to keep"></label>
+      <button class="btn go" id="m_save">Save</button><span class="st" id="m_st"></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>Tool readiness</h2>
+    <div class="ready" id="ready"></div>
+    <p class="note" style="margin:8px 0 0">Full route status on the <a href="/health.html" style="color:var(--amber)">health page</a>.</p>
+  </div>
+  <div class="sec">
+    <h2>&#9201; Server console &mdash; minitab auto-minimize</h2>
+    <div class="row">
+      <label class="f">minutes of no change before a Server-console minitab panel auto-minimizes<input id="gsecTimeout" type="range" min="0.5" max="10" step="0.5" value="2"></label>
+      <span class="st" id="gsecTimeoutVal">2 min</span>
+    </div>
+  </div>
+  <div class="sec">
+    <h2>&#128225; Remote Hosting &amp; Cloud</h2>
+    <p class="note" style="margin:0 0 8px">Same controls as the standalone <a href="/hosting.html" style="color:var(--amber)">Remote Hosting page</a> and the Server console's Cloud &amp; Hosting tab. Set a password before you expose a tunnel to the internet.</p>
+    <div class="row">
+      <label class="f">Start SweK on login <span class="st" id="s_bootStat">checking...</span></label>
+      <button class="btn" id="s_bootToggle">toggle</button>
+    </div>
+    <div class="row">
+      <label class="f">Public tunnel (Cloudflare) <span class="st" id="s_cfTunnel">checking...</span></label>
+      <button class="btn go" id="s_cfStart">Start tunnel</button>
+      <button class="btn" id="s_cfStop">Stop</button>
+      <button class="btn" id="s_cfInstall" style="display:none">Install cloudflared</button>
+    </div>
+    <div class="row"><span class="st" id="s_cfUrl" style="word-break:break-all"></span></div>
+    <div class="row">
+      <label class="f">Tailscale <span class="st" id="s_ts">checking...</span></label>
+      <button class="btn" id="s_tsInstall">Install Tailscale</button>
+    </div>
+    <div class="row">
+      <label class="f">Remote landing page (served at the tunnel root)<select id="s_cfLanding"><option value="server.html">Server console</option><option value="index.html">Render (full engine)</option><option value="avatar-server.html">Avatar server</option><option value="control.html">Touch control</option><option value="comics.html">Comics</option><option value="universal-viewer.html">Universal Viewer</option></select></label>
+    </div>
+    <div class="row">
+      <label class="f">Remote-access password (min 6 chars) <span class="st" id="s_authStat"></span><input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="s_authPw" type="password" placeholder="set from this host"></label>
+      <button class="btn go" id="s_authSet">Set</button>
+    </div>
+    <div class="row"><label class="f">Cloud rendezvous <span class="st" id="s_cloudRz">checking...</span></label></div>
+    <div class="row"><label class="f">Cloud AI / compute host <span class="st" id="s_cloudAi">checking...</span></label></div>
+    <div class="row"><label class="f">GCP instances <span class="st" id="s_gcp">checking...</span></label></div>
+  </div>
+  <div class="sec" id="fileaccess">
+    <h2>&#128193; File Access &mdash; self-hosted file/cloud storage</h2>
+    <div style="font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:6px;">Self-hosted file/cloud storage the engine can detect and launch. <b>Nextcloud</b> gives you a private Dropbox/Drive-style server on your own hardware. Install it (Docker), start it, and the engine detects it on :8080.</div>
+    <div id="fa_docker" style="display:none;font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;"></div>
+    <div id="fa_dockerPs" style="display:none;font-size:11px;margin:4px 0;"></div>
+    <div id="fa_wslc" style="display:none;font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;"></div>
+    <div id="fa_list" style="margin-top:2px;"><span class="st">checking&#8230;</span></div>
+    <div id="fa_install" style="display:none;font-size:10px;color:#a99bd0;font-family:ui-monospace,monospace;white-space:pre-wrap;background:#0a0c1a;border:1px solid #3a3056;border-radius:5px;padding:6px 8px;margin-top:6px;"></div>
+    <div class="row" style="margin-top:6px;"><button id="fa_recheck">&#8635; Recheck</button></div>
+  </div>
+  <div class="sec" id="assetsdir">
+    <h2>&#128193; GPU Assets folder</h2>
+    <div style="font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:6px;">Where the engine reads/writes 3D models (served as <code>/GPU_Assets/*</code>). Point it at an external folder (e.g. a bigger drive) instead of the in-engine default. Leaving it blank uses the in-tree <code>GPU_Assets</code>.</div>
+    <div id="ad_status" style="font-size:11px;color:var(--dim);margin-bottom:6px;">checking&#8230;</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="ad_path" type="text" placeholder="/full/path/to/your/assets/folder (blank = default)" style="flex:1;min-width:220px;">
+    </div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:11px;color:#cde;margin-top:6px;cursor:pointer;">
+      <input id="ad_move" type="checkbox"> Move existing assets into the new folder (checks free space first)
+    </label>
+    <div class="row" style="margin-top:6px;gap:6px;">
+      <button id="ad_save">Save</button>
+      <button id="ad_clear">Use default (in-tree)</button>
+    </div>
+    <div id="ad_msg" style="font-size:11px;color:var(--dim);margin-top:6px;min-height:14px;"></div>
+  </div>
+  <div class="sec" id="gdrive">
+    <h2>&#128193; Google Drive auto-update</h2>
+    <div style="font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:6px;">Watches a Google Drive folder for Claude's <code>*.swekupdate.json</code> patches. The folder ID is the long string in the folder's URL. <span style="color:#caa05a;">Tip: when creating the OAuth client, choose <b>Desktop app</b> (not Web application) &mdash; that flow needs no redirect URIs.</span> This lightweight page can now do the full connect too (it doesn't run the 3D engine, so the OAuth request won't get starved).</div>
+    <div class="row"><label class="f">Drive folder ID<input id="d_folder" placeholder="folder ID from the Drive URL"></label></div>
+    <div class="row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input id="d_newname" placeholder="new folder name" value="SweK Engine Updates" style="flex:1;min-width:120px;">
+      <button id="d_create">Create folder on Drive</button>
+    </div>
+    <div class="row"><label class="f"><input type="checkbox" id="d_enabled"> auto-pull updates from this folder</label></div>
+    <div class="row"><label class="f"><input type="checkbox" id="d_push"> push new updates to peers</label></div>
+    <div class="row" style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button id="d_save">Save</button>
+      <button id="d_check">Check now</button>
+      <span class="st" id="d_st">checking...</span>
+    </div>
+    <div id="d_authHint" style="font-size:10px;color:var(--amber);margin-top:4px;display:none;"></div>
+
+    <!-- v1870 — full OAuth Connect UI, so you never need the heavy engine tab -->
+    <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px;">
+      <div style="font-size:12px;font-weight:600;color:#bfe9d6;margin-bottom:4px;">&#128274; Connect personal Drive (OAuth)</div>
+      <div id="d_remoteWarn" style="display:none;font-size:11px;line-height:1.5;color:#ffd9a0;background:#3a2a12;border:1px solid #6a4a20;border-radius:6px;padding:7px 9px;margin:2px 0 8px;"></div>
+      <div class="row" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="file" id="d_json" accept=".json,application/json" style="display:none;">
+        <button id="d_browse">&#128194; Browse for client-secret JSON&hellip;</button>
+        <span style="font-size:10px;color:var(--dim);">or paste the two values below</span>
+      </div>
+      <div class="row"><label class="f">Client ID<input id="d_cid" placeholder="xxxxx.apps.googleusercontent.com" style="font:10.5px ui-monospace,monospace;"></label></div>
+      <div class="row"><label class="f">Client secret<input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="d_csec" type="password" placeholder="GOCSPX-… (client secret)" style="font:10.5px ui-monospace,monospace;"></label></div>
+      <div class="row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <button id="d_connect">Connect Drive</button>
+        <button id="d_recheck">Re-check</button>
+        <span class="st" id="d_oauthSt">checking…</span>
+      </div>
+      <div id="d_signin" style="font-size:11px;margin-top:5px;display:none;"></div>
+    </div>
+  </div>
+  <div class="sec">
+<div id="keyShare" style="margin-top:2px;">
+          <div style="color:var(--go);font-weight:bold;font-size:11px;margin-bottom:4px;">&#128273; Key sharing <span style="color:var(--dim);font-weight:normal;">&mdash; request a key from a peer; it is encrypted to you and you must approve incoming requests with your login password</span></div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+            <select id="keyPeer" title="which peer to ask" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 5px;cursor:pointer;"><option value="">peer&#8230;</option></select>
+            <select id="keyName" title="which key" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 5px;cursor:pointer;">
+              <option value="gemini">gemini</option><option value="openai">openai</option><option value="anthropic">anthropic</option><option value="ha">ha token</option>
+            </select>
+            <button id="keyReqBtn" style="font-size:11px;padding:3px 11px;background:#1a2414;color:#cfe9a0;border:1px solid #3a5a2a;border-radius:5px;cursor:pointer;">Request key</button>
+          </div>
+          <div id="keyReqStatus" style="font-size:10px;color:var(--dim);margin-top:3px;"></div>
+          <div id="keyPending" style="margin-top:5px;display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const getJSON = u => fetch(u).then(r=>r.json());
+const postJSON = (u,b) => fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(r=>r.json());
+
+async function loadAll(){
+  try{
+    const t = await getJSON("/trader/config"); const c=t.config||{}; $("t_source").value=c.source||"senate"; $("t_st").textContent=c.apiKey==="set"?"key ✓":"no key"; $("status").textContent="ready";
+  }catch{ $("status").textContent="bridge offline"; }
+  try{ const v=await getJSON("/tts/status"); $("v_engine").value=v.engine||"sapi"; if(v.piperBin)$("v_bin").value=v.piperBin; if(v.piperModel)$("v_model").value=v.piperModel; if(v.rate!=null)$("v_rate").value=v.rate; }catch{}
+  try{ const p=await getJSON("/petfbi/config"); $("p_mode").value=p.mode||"local"; if(p.sheetUrl)$("p_url").value=p.sheetUrl; $("p_st").textContent=p.sheetConfigured?"sheet set":"local"; }catch{}
+  try{ const m=await getJSON("/petfbi/mailer"); $("m_mode").value=m.mode||"draft"; if(m.smtpUser)$("m_user").value=m.smtpUser; $("m_st").textContent=m.mode==="smtp"?(m.smtpReady?"SMTP ✓":"needs app pw"):(m.mode||"draft"); }catch{}
+  loadReady();
+}
+async function loadReady(){
+  const items = [
+    ["Docs","/doc/detect",j=>j.ready,"/doc.html"],
+    ["TTS","/tts/detect",j=>j.sapi||j.piper,"/tts.html"],
+    ["Scrapling","/scrapling/detect",j=>j.ready,"/scrapling.html"],
+    ["Camoufox","/camoufox/detect",j=>j.ready,"/camoufox.html"],
+    ["Maigret","/maigret/detect",j=>j.installed,"/maigret.html"],
+  ];
+  const box=$("ready"); box.innerHTML="";
+  for(const [name,url,ok,panel] of items){
+    const chip=document.createElement("span"); chip.className="chip"; chip.innerHTML='<a href="'+panel+'">'+name+' …</a>'; box.appendChild(chip);
+    try{ const j=await getJSON(url); const good=!!ok(j); chip.className="chip "+(good?"ok":"no"); chip.querySelector("a").textContent=name+" "+(good?"✓":"✕"); }
+    catch{ chip.className="chip no"; chip.querySelector("a").textContent=name+" ✕"; }
+  }
+}
+
+$("t_save").onclick=async()=>{ const b={source:$("t_source").value}; const k=$("t_key").value.trim(); if(k)b.apiKey=k; const r=await postJSON("/trader/config",b); $("t_st").textContent=(r.config&&r.config.apiKey==="set")?"saved · key ✓":"saved"; $("t_key").value=""; };
+$("v_save").onclick=async()=>{ const r=await postJSON("/tts/config",{engine:$("v_engine").value,piperBin:$("v_bin").value.trim(),piperModel:$("v_model").value.trim(),rate:$("v_rate").value}); $("v_st").textContent="saved ("+(r.engine||"")+")"; };
+$("p_save").onclick=async()=>{ const b={mode:$("p_mode").value}; const u=$("p_url").value.trim(); if(u)b.sheetUrl=u; const s=$("p_secret").value; if(s)b.secret=s; const r=await postJSON("/petfbi/config",b); $("p_st").textContent="saved ("+(r.mode||"")+")"; $("p_secret").value=""; };
+$("m_save").onclick=async()=>{ const b={mode:$("m_mode").value}; const u=$("m_user").value.trim(); if(u)b.user=u; const p=$("m_pass").value; if(p)b.pass=p; const r=await postJSON("/petfbi/mailer",b); $("m_st").textContent=r.mode==="smtp"?(r.smtpReady?"saved · SMTP ✓":"saved · needs app pw"):("saved · "+(r.mode||"")); $("m_pass").value=""; };
+
+loadAll();
+
+// v1820 — File Access (no-render mirror of the full-render Settings section). Shows
+// Nextcloud with status + install command. Uses a timeout-guarded fetch so a slow
+// /bgsvc/status can't hang the section, and falls back to showing the install command
+// from /bgsvc/meta (a fast local lookup) when live status times out.
+const FILE_SVCS=["nextcloud","owncloud","seafile"];
+// v1871 — make sure the Docker daemon is up before a container install. If Docker is installed but
+// the daemon isn't running, launch Docker Desktop and poll until it's ready (up to ~60s). Returns
+// true when Docker is ready to accept commands, false if it couldn't be started.
+async function ensureDockerRunning(statusEl){
+  let d; try{ d=await getJSON("/bgsvc/docker-status"); }catch(e){ return false; }
+  if(d&&d.state==="ready") return true;
+  if(!d||d.state==="not-installed"){ if(statusEl)statusEl.textContent="\u2717 Docker isn't installed. Install Docker first, then try again."; return false; }
+  // installed-stopped: launch it and wait
+  if(statusEl)statusEl.textContent="\u23f3 Docker is installed but not running \u2014 launching Docker Desktop\u2026 (can take ~30\u201360s)";
+  try{ const r=await postJSON("/bgsvc/docker-start",{}); if(!(r&&r.ok)){ if(statusEl)statusEl.textContent="\u2717 "+((r&&r.error)||"couldn't launch Docker Desktop \u2014 start it from the Start menu, then try again."); return false; } }catch(e){ if(statusEl)statusEl.textContent="\u2717 "+e; return false; }
+  for(let i=0;i<20;i++){ await new Promise(res=>setTimeout(res,3000)); let s; try{ s=await getJSON("/bgsvc/docker-status"); }catch(e){ continue; } if(s&&s.state==="ready"){ if(statusEl)statusEl.textContent="\u2713 Docker is running \u2014 continuing\u2026"; loadDockerStatus(); return true; } if(statusEl)statusEl.textContent="\u23f3 waiting for the Docker daemon\u2026 ("+((i+1)*3)+"s)"; }
+  if(statusEl)statusEl.textContent="\u2717 Docker didn't come up in time. Give it another moment and click Install again.";
+  return false;
+}
+function faFetch(url,ms){ return new Promise(res=>{ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms||7000); fetch(url,{signal:c.signal}).then(r=>r.json()).then(j=>{clearTimeout(t);res(j);}).catch(e=>{clearTimeout(t);res({ok:false,error:(e&&e.name==="AbortError")?("timed out after "+(ms||7000)+"ms"):String(e)});}); }); }
+async function loadFileAccess(){
+  const list=$("fa_list"), inst=$("fa_install"); if(!list) return;
+  list.innerHTML="<span class='st'>checking\u2026</span>"; inst.style.display="none";
+  const bsv=await faFetch("/bgsvc/status",8000);
+  if(!bsv||bsv.ok===false||!bsv.services){
+    // status slow — still show install info from meta (fast local lookup)
+    list.innerHTML="<div style='color:#caa05a;font-size:11px;margin-bottom:6px;'>Couldn\u2019t read live status"+(bsv&&bsv.error?(" ("+bsv.error+")"):"")+" \u2014 showing install info. Click Recheck once services are up.</div>";
+    for(const id of FILE_SVCS){
+      const m=await faFetch("/bgsvc/meta?id="+encodeURIComponent(id),5000);
+      if(!m||m.ok===false) continue;
+      const card=document.createElement("div"); card.style.cssText="border:1px solid #1c2531;border-radius:6px;padding:8px 10px;margin-bottom:6px;";
+      card.innerHTML="<b style='color:#cde;'>"+(m.label||id)+"</b>"+(m.note?("<div style='font-size:10px;color:#7a8290;margin-top:3px;line-height:1.5;'>"+m.note+"</div>"):"");
+      if(m.installCmd){ const b=document.createElement("button"); b.textContent="\u2b07 Install command"; b.style.cssText="margin-top:5px;font-size:11px;"; b.onclick=()=>{ inst.style.display="block"; inst.textContent="Install "+(m.label||id)+":\n\n  "+m.installCmd+"\n\nRun this in a terminal (Docker required for Nextcloud), then click Recheck."; }; card.appendChild(b); }
+      list.appendChild(card);
+    }
+    return;
+  }
+  // live status available — render full cards
+  list.innerHTML="";
+  const metas={}; await Promise.all(FILE_SVCS.map(async id=>{ metas[id]=await faFetch("/bgsvc/meta?id="+encodeURIComponent(id),5000); }));
+  for(const id of FILE_SVCS){
+    const s=bsv.services[id]; if(!s) continue;
+    const m=metas[id]||{}, running=!!s.running, onPath=!!s.onPath;
+    const card=document.createElement("div"); card.style.cssText="border:1px solid "+(running?"#1e4a30":"#1c2531")+";border-radius:6px;padding:8px 10px;margin-bottom:6px;";
+    const state=running?("<span style='color:#9fe88f;'>running"+(s.port?" on :"+s.port:"")+"</span>"):(onPath?"<span style='color:#caa05a;'>installed, stopped</span>":"<span style='color:#8b97a8;'>not detected</span>");
+    card.innerHTML="<div style='display:flex;align-items:center;gap:8px;'><span style='color:"+(running?"#9fe88f":"#566")+";'>"+(running?"\u25cf":"\u25cb")+"</span><b style='color:#cde;'>"+(s.label||id)+"</b><span style='margin-left:auto;font-size:11px;'>"+state+"</span></div>";
+    if(m.note){ const n=document.createElement("div"); n.style.cssText="font-size:10px;color:#7a8290;margin-top:4px;line-height:1.5;"; n.textContent=m.note; card.appendChild(n); }
+    const row=document.createElement("div"); row.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;";
+    if(running&&s.port){ const a=document.createElement("a"); a.href="http://localhost:"+s.port; a.target="_blank"; a.rel="noopener"; a.textContent="\u2197 Open"; a.style.cssText="font-size:11px;color:#9fe88f;text-decoration:none;padding:3px 8px;border:1px solid #1e4a30;border-radius:4px;"; row.appendChild(a); }
+    if(!running&&m.installCmd){ const b=document.createElement("button"); b.textContent="\u2b07 Install command"; b.style.cssText="font-size:11px;"; b.onclick=()=>{ inst.style.display="block"; inst.textContent="Install "+(s.label||id)+":\n\n  "+m.installCmd+"\n\nRun this in a terminal, then click Recheck."; }; row.appendChild(b); }
+    if(id==="owncloud"){ const ob=document.createElement("button"); ob.textContent="\u2b07 Install oCIS binary (no Docker)"; ob.title="Download + initialize the oCIS single binary \u2014 no Docker/Colima/QEMU. Best path on older macOS/Linux. On Windows the Docker image is recommended instead."; ob.style.cssText="font-size:11px;"; ob.onclick=async()=>{
+      // v1871 — confirm intent so a mis-click doesn't silently attempt the wrong path.
+      const isWin=/win/i.test(_platform);
+      if(isWin){ if(!confirm("The single-binary oCIS setup targets macOS/Linux. On Windows, the Docker image is the supported path (and you said you want to try Docker on Galaxina).\n\nUse the \u201cInstall now (Docker)\u201d button instead?\n\nOK = cancel this and use Docker.\nCancel = try the binary anyway (will likely fail on Windows).")){ inst.style.display="block"; inst.textContent="\u2192 Use the \u201cInstall now (Docker)\u201d button below. Make sure Docker Desktop is running first."; return; } }
+      else { if(!confirm("Install oCIS as a single binary (no Docker)? This downloads ~80MB and initializes it in place.\n\nOK = install the binary.\nCancel = stop (use the Docker button instead if you prefer the container).")) return; }
+      ob.disabled=true; inst.style.display="block"; inst.textContent="Downloading the oCIS binary + initializing\u2026 (~80MB; can take a minute)"; try{ const r=await postJSON("/ocis/install",{}); if(r&&r.ok){ inst.textContent="\u2713 "+(r.note||"oCIS installed"); if(!row.querySelector(".ocisStart")){ const sb=document.createElement("button"); sb.className="ocisStart"; sb.textContent="\u25b6 Start oCIS"; sb.style.cssText="font-size:11px;"; sb.onclick=async()=>{ sb.disabled=true; try{ const sr=await postJSON("/ocis/start",{}); inst.textContent=(sr&&sr.ok)?("\u2713 oCIS running at https://localhost:9200 \u2014 open it, accept the self-signed cert, log in as admin. Rechecking\u2026"):("\u2717 "+((sr&&sr.error)||"start failed")); setTimeout(loadFileAccess,5000); }catch(e){ inst.textContent="\u2717 "+e; } sb.disabled=false; }; row.appendChild(sb); const pb=document.createElement("button"); pb.className="ocisPw"; pb.textContent="\ud83d\udd11 Show admin password"; pb.title="Reveal the saved oCIS admin password (user: admin) for the 9200 login"; pb.style.cssText="font-size:11px;"; pb.onclick=async()=>{ try{ const pr=await fetch("/ocis/password",{cache:"no-store"}).then(x=>x.json()); if(pr&&pr.ok){ inst.textContent="admin password: "+pr.password+"  (saved in "+(pr.where||"vault")+")"; } else { inst.textContent="\u2717 "+((pr&&pr.error)||"no saved password"); } }catch(e){ inst.textContent="\u2717 "+e; } }; row.appendChild(pb); } } else { inst.textContent="\u2717 "+((r&&r.error)||"oCIS install failed"); } }catch(e){ inst.textContent="\u2717 "+e; } ob.disabled=false; }; row.appendChild(ob); }
+    if(!running&&(m.installCmd||"").match(/^docker\s+run/i)){ const b=document.createElement("button"); b.textContent="\u2699 Install now (Docker)"; b.title="Run the docker container on this box (the engine will start the Docker daemon first if it's stopped)"; b.style.cssText="font-size:11px;"; b.onclick=async()=>{ b.disabled=true; inst.style.display="block";
+      // v1871 — auto-start the Docker daemon if it's installed but stopped, then proceed.
+      const okDocker=await ensureDockerRunning(inst); if(!okDocker){ b.disabled=false; return; }
+      inst.textContent="Starting "+(s.label||id)+" via Docker\u2026 (first run pulls the image)"; try{ const r=await postJSON("/bgsvc/docker-install",{id}); if(r&&r.ok){ inst.textContent="\u2713 "+(r.note||"started")+(r.container?" ("+r.container+")":"")+(r.port?" \u2014 on :"+r.port+" shortly. Rechecking\u2026":""); setTimeout(loadFileAccess,4000); setTimeout(loadDockerContainers,4500); } else if(r&&r.needsDocker){ inst.textContent="\u2717 "+(r.error||"Docker not available"); if(!row.querySelector(".instDocker")){ const d=document.createElement("button"); d.className="instDocker"; d.textContent="\u2699 Install Docker"; d.style.cssText="font-size:11px;"; d.onclick=async()=>{ d.disabled=true; inst.textContent="Installing Docker\u2026 this can take several minutes."; try{ const dr=await postJSON("/bgsvc/docker-ensure",{}); if(dr&&dr.ok){ inst.textContent="\u2713 "+(dr.note||"Docker installed"); } else if(dr&&dr.needsBrew){ inst.textContent="\u2717 "+(dr.error||"Homebrew needed"); if(!row.querySelector(".instBrew")){ const h=document.createElement("button"); h.className="instBrew"; h.textContent="\u2699 Install Homebrew"; h.style.cssText="font-size:11px;"; h.onclick=async()=>{ h.disabled=true; inst.textContent="Installing Homebrew\u2026 (needs your password; may have to finish in Terminal)"; try{ const br=await postJSON("/bgsvc/brew-ensure",{}); if(br&&br.ok){ inst.textContent="\u2713 "+(br.note||"Homebrew installed")+" \u2014 now click Install Docker again."; } else { inst.textContent="\u2717 "+((br&&br.error)||"failed")+(br&&br.manualCmd?("\n\nRun in Terminal:\n  "+br.manualCmd):""); } }catch(e){ inst.textContent="\u2717 "+e; } h.disabled=false; }; row.appendChild(h); } } else { inst.textContent="\u2717 "+((dr&&dr.error)||"Docker install failed"); } }catch(e){ inst.textContent="\u2717 "+e; } d.disabled=false; }; row.appendChild(d); } } else { inst.textContent="\u2717 "+((r&&r.error)||"install failed"); } }catch(e){ inst.textContent="\u2717 "+e; } b.disabled=false; }; row.appendChild(b); }
+    if(!running&&onPath){ const b=document.createElement("button"); b.textContent="\u25b6 Start"; b.style.cssText="font-size:11px;"; b.onclick=async()=>{ await postJSON("/bgsvc/start",{id}); setTimeout(loadFileAccess,2000); }; row.appendChild(b); }
+    if(running&&s.managedPid){ const b=document.createElement("button"); b.textContent="\u25a0 Stop"; b.style.cssText="font-size:11px;"; b.onclick=async()=>{ await postJSON("/bgsvc/stop",{id}); setTimeout(loadFileAccess,1200); }; row.appendChild(b); }
+    card.appendChild(row);
+    const auto=document.createElement("label"); auto.style.cssText="display:flex;gap:6px;align-items:center;font-size:11px;color:#cde;margin-top:6px;cursor:pointer;";
+    const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=!!s.autostart; chk.onchange=async()=>{ await postJSON("/bgsvc/autostart",{id,on:chk.checked}); };
+    auto.append(chk,document.createTextNode("Relaunch on engine boot")); card.appendChild(auto);
+    list.appendChild(card);
+  }
+}
+if($("fa_recheck"))$("fa_recheck").onclick=()=>{ loadDockerStatus(); loadDockerContainers(); loadWslcStatus(); loadFileAccess(); };
+// v1855 — Docker uninstall / cleanup control. Shows what's on disk, confirms, runs Docker's own
+// uninstaller (macOS), then surfaces the leftover-cleanup lines the user pastes into Terminal.
+async function _dockerUninstallFlow(anchorEl){
+  let info; try{ info=await getJSON("/bgsvc/docker-uninstall-info"); }catch(e){ anchorEl.textContent="\u2717 couldn't read Docker install info"; return; }
+  if(!info||!info.ok){ anchorEl.textContent="\u2717 "+((info&&info.error)||"no info"); return; }
+  const msg = (info.note||"Remove Docker?") + "\n\nThe engine will run Docker's own uninstaller and move Docker.app to the Trash. Some leftover files need a couple of sudo lines you'll run yourself (they'll be shown after). Proceed?";
+  if(info.canAutoUninstall){
+    if(!confirm(msg)) return;
+    anchorEl.textContent="\u23f3 uninstalling Docker\u2026";
+    let r; try{ r=await postJSON("/bgsvc/docker-uninstall",{}); }catch(e){ anchorEl.textContent="\u2717 "+e; return; }
+    if(r&&r.ok){
+      anchorEl.innerHTML = "\u2713 "+(r.note||"Docker uninstalled.").replace(/</g,"&lt;");
+      if(info.manual&&info.manual.length){ const pre=document.createElement("pre"); pre.style.cssText="margin:6px 0 0;padding:6px 8px;background:#0a0e14;border:1px solid #24303c;border-radius:5px;color:#bcd;font-size:10px;white-space:pre-wrap;overflow:auto;"; pre.textContent="Leftover cleanup \u2014 paste into Terminal:\n"+info.manual.join("\n"); anchorEl.appendChild(pre); }
+      setTimeout(loadDockerStatus,2500);
+    } else { anchorEl.textContent="\u2717 "+((r&&r.error)||"uninstall failed"); }
+  } else {
+    // can't auto-uninstall (no app / not macOS / partial) \u2014 show the manual steps.
+    let body = info.note||"Manual removal needed.";
+    if(info.manual&&info.manual.length) body += "\n\n"+info.manual.join("\n");
+    alert(body);
+  }
+}
+function _addDockerUninstallLink(container){
+  const u=document.createElement("button");
+  u.textContent="\ud83d\uddd1 Uninstall / clean up Docker";
+  u.title="Remove a failed/partial Docker install (runs Docker's own uninstaller on macOS, then shows leftover-cleanup lines).";
+  u.style.cssText="margin-left:8px;font-size:11px;background:#3a2020;color:#f0b0b0;border:1px solid #6a3030;border-radius:5px;padding:2px 8px;cursor:pointer;";
+  u.onclick=()=>{ _dockerUninstallFlow(container); };
+  container.appendChild(u);
+}
+// v1827 — Docker status banner shown up front (ready / installed-stopped / not-installed)
+let _faDockerPoll=null;
+let _platform="", _dockerState="";
+async function loadDockerStatus(){
+  const el=$("fa_docker"); if(!el) return;
+  let d; try{ d=await getJSON("/bgsvc/docker-status"); }catch(e){ el.style.display="none"; return; }
+  if(!d||!d.ok){ el.style.display="none"; return; }
+  try{ _platform=(d.os&&d.os.name)||_platform; _dockerState=d.state||""; }catch(e){}
+  el.style.display="block"; el.innerHTML="";
+  if(d.state==="ready"){ el.style.cssText="font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;background:#0d2218;border:1px solid #1e4a30;color:#9fe88f;"; el.textContent="\u2713 Docker is ready"+(d.version?(" (engine "+d.version+")"):"")+" \u2014 you can install Nextcloud below."; if(_faDockerPoll){clearInterval(_faDockerPoll);_faDockerPoll=null;} }
+  else if(d.state==="installed-stopped"){ el.style.cssText="font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;background:#2a2410;border:1px solid #5a4a20;color:#e8d8a0;"; const t=document.createElement("span"); t.textContent="\u26a0 Docker is installed but not running. "+(d.hint||""); el.appendChild(t); const b=document.createElement("button"); b.textContent="\u25b6 Launch Docker Desktop"; b.style.cssText="margin-left:8px;font-size:11px;"; b.onclick=async()=>{ b.disabled=true; b.textContent="launching\u2026"; try{ const r=await postJSON("/bgsvc/docker-start",{}); if(r&&r.ok){ t.textContent="\u23f3 "+(r.note||"Docker starting\u2026"); if(!_faDockerPoll)_faDockerPoll=setInterval(loadDockerStatus,4000); } else { t.textContent="\u2717 "+((r&&r.error)||"couldn't launch"); b.disabled=false; b.textContent="\u25b6 Launch Docker Desktop"; } }catch(e){ b.disabled=false; b.textContent="\u25b6 Launch Docker Desktop"; } }; el.appendChild(b); _addDockerUninstallLink(el); }
+  else { el.style.cssText="font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;background:#241018;border:1px solid #5a2030;color:#f0a0b0;"; el.innerHTML=""; const t=document.createElement("span"); t.textContent=(d.incompatible&&d.hint)?("\u2717 "+d.hint):"\u2717 Docker isn't installed. Use the Install Docker button on the Nextcloud card below."; el.appendChild(t); if(d.colimaSuggested){ const cb=document.createElement("button"); cb.textContent="\u2699 Install Colima (Docker for older macOS)"; cb.style.cssText="margin-left:8px;font-size:11px;"; cb.onclick=async()=>{ cb.disabled=true; t.textContent="Installing Colima + docker"+((d.os&&d.os.major&&d.os.major<13)?" + qemu":"")+" via Homebrew, then starting the VM\u2026 (first start downloads a VM image, can take a couple minutes)"; try{ const cr=await postJSON("/bgsvc/colima-ensure",{}); if(cr&&cr.ok){ t.textContent="\u2713 "+(cr.note||"Colima running"); setTimeout(loadDockerStatus,3000); } else if(cr&&cr.needsBrew){ t.textContent="\u2717 "+(cr.error||"Homebrew needed first"); } else if(cr&&cr.qemuFailed){ t.innerHTML="\u2717 "+(cr.error||"QEMU couldn\u2019t be installed").replace(/</g,"&lt;"); } else { t.textContent="\u2717 "+((cr&&cr.error)||"Colima setup failed"); } }catch(e){ t.textContent="\u2717 "+e; } cb.disabled=false; }; el.appendChild(cb); } _addDockerUninstallLink(el); }
+}
+loadDockerStatus();
+loadFileAccess();
+// v1872 — list Docker containers with per-container start/stop/restart + logs. Only shows when Docker is ready.
+async function loadDockerContainers(){
+  const box=$("fa_dockerPs"); if(!box) return;
+  let d; try{ d=await getJSON("/bgsvc/docker-ps"); }catch(e){ box.style.display="none"; return; }
+  if(!d||!d.ok||!d.containers||!d.containers.length){ box.style.display="none"; return; }
+  box.style.display="block"; box.innerHTML="";
+  const hdr=document.createElement("div"); hdr.style.cssText="font-size:11px;color:#9fb3cc;margin:2px 0 4px;"; hdr.textContent="Docker containers ("+d.running+" running / "+d.count+" total):"; box.appendChild(hdr);
+  d.containers.forEach(c=>{
+    const running=c.state==="running";
+    const row=document.createElement("div"); row.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 6px;margin:2px 0;background:#0e1622;border:1px solid #1e2c3a;border-radius:6px;";
+    const dot=document.createElement("span"); dot.textContent=running?"\u25cf":"\u25cb"; dot.style.color=running?"#6fe08f":"#8b97a8"; dot.title=c.state;
+    const nm=document.createElement("span"); nm.style.cssText="font-weight:600;color:#dce8f4;min-width:70px;"; nm.textContent=c.name||c.id;
+    const meta=document.createElement("span"); meta.style.cssText="font-size:10px;color:#7f93a8;flex:1;min-width:120px;"; meta.textContent=(c.image||"")+(c.status?("  \u00b7  "+c.status):"")+(c.ports?("  \u00b7  "+c.ports):"");
+    row.append(dot,nm,meta);
+    const act=async(action)=>{ const bs=row.querySelectorAll("button"); bs.forEach(x=>x.disabled=true); meta.textContent=action+"ing "+(c.name||c.id)+"\u2026"; try{ const r=await postJSON("/bgsvc/docker-container",{name:c.name||c.id,action}); if(r&&r.ok){ setTimeout(()=>{ loadDockerContainers(); loadFileAccess(); },1500); } else { meta.textContent="\u2717 "+((r&&r.error)||"failed"); bs.forEach(x=>x.disabled=false); } }catch(e){ meta.textContent="\u2717 "+e; bs.forEach(x=>x.disabled=false); } };
+    if(running){ const st=document.createElement("button"); st.textContent="\u25a0 Stop"; st.style.cssText="font-size:10px;"; st.onclick=()=>act("stop"); row.appendChild(st); const rs=document.createElement("button"); rs.textContent="\u21BB Restart"; rs.style.cssText="font-size:10px;"; rs.onclick=()=>act("restart"); row.appendChild(rs); }
+    else { const sb=document.createElement("button"); sb.textContent="\u25b6 Start"; sb.style.cssText="font-size:10px;"; sb.onclick=()=>act("start"); row.appendChild(sb); }
+    const lg=document.createElement("button"); lg.textContent="\ud83d\udcc4 Logs"; lg.style.cssText="font-size:10px;"; lg.onclick=async()=>{ let out=row.querySelector(".dlogs"); if(out){ out.remove(); return; } lg.disabled=true; try{ const r=await getJSON("/bgsvc/docker-logs?name="+encodeURIComponent(c.name||c.id)+"&tail=60"); const pre=document.createElement("pre"); pre.className="dlogs"; pre.style.cssText="flex-basis:100%;margin:4px 0 0;padding:6px;background:#080c12;border:1px solid #1e2c3a;border-radius:5px;max-height:180px;overflow:auto;font:10px ui-monospace,monospace;color:#bcd;white-space:pre-wrap;"; pre.textContent=(r&&r.ok)?(r.logs||"(no output)"):("\u2717 "+((r&&r.error)||"couldn't read logs")); row.appendChild(pre); }catch(e){} lg.disabled=false; };
+    row.appendChild(lg);
+    box.appendChild(row);
+  });
+}
+loadDockerContainers();
+// v1869 — WSL container (wslc) status banner (Windows only). Shows installed/ready, needs-update, or
+// not-supported, with the copy-paste install command. Read-only detection (the engine doesn't run
+// `wsl --update` for you — it's a system-level change you run yourself).
+async function loadWslcStatus(){
+  const el=$("fa_wslc"); if(!el) return;
+  let d; try{ d=await getJSON("/bgsvc/wslc-status"); }catch(e){ el.style.display="none"; return; }
+  if(!d||!d.ok||d.supported===false){ el.style.display="none"; return; }   // hide on Mac/Linux
+  el.style.display="block"; el.innerHTML="";
+  const mkCode=(cmd)=>{ const c=document.createElement("code"); c.textContent=cmd; c.style.cssText="background:#0a0e14;border:1px solid #24303c;border-radius:4px;padding:1px 5px;color:#bcd;cursor:pointer;"; c.title="click to copy"; c.onclick=()=>{ try{ navigator.clipboard.writeText(cmd); c.textContent=cmd+"  \u2713"; setTimeout(()=>{c.textContent=cmd;},1200);}catch(e){} }; return c; };
+  if(d.state==="ready"){
+    el.style.cssText="font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;background:#0d2218;border:1px solid #1e4a30;color:#9fe88f;";
+    const t=document.createElement("span"); t.textContent="\u2713 WSL containers (wslc) ready \u2014 "+(d.version||"")+". "+(d.preview?"Public preview; no Compose yet.":""); el.appendChild(t);
+  } else {
+    el.style.cssText="font-size:11px;border-radius:6px;padding:6px 10px;margin:4px 0;background:#141d2a;border:1px solid #2a3f5a;color:#bcd6f0;";
+    const t=document.createElement("span"); t.textContent="\u2139 WSL containers (wslc): not installed. "+(d.hint||"")+"  "; el.appendChild(t);
+    if(d.installCmd){ el.appendChild(mkCode(d.installCmd)); }
+    const re=document.createElement("button"); re.textContent="\u21BB re-check"; re.style.cssText="margin-left:8px;font-size:11px;"; re.onclick=loadWslcStatus; el.appendChild(re);
+  }
+}
+loadWslcStatus();
+
+// v1832 — GPU Assets folder (no-render mirror of the full-render "Assets folder (external)" control).
+async function loadAssetsDir(){
+  const st=$("ad_status"), inp=$("ad_path"); if(!st) return;
+  try{
+    const j=await getJSON("/config/assets-dir");
+    if(j&&j.ok){
+      const src=j.source==="env"?"set by VOXEL_ASSETS_DIR env (overrides this page)":(j.source==="config"?"external folder":"in-tree default");
+      st.innerHTML="Current: <b style='color:#cde'>"+((j.assetsDir||j.inTree||"").replace(/</g,"&lt;"))+"</b> <span style='color:#7a8290'>("+src+")</span>";
+      if(inp&&!inp.value)inp.value=j.assetsDir||"";
+      // env-set means this page can't change it
+      if(j.source==="env"){ $("ad_save").disabled=true; $("ad_clear").disabled=true; $("ad_msg").textContent="The VOXEL_ASSETS_DIR environment variable is set, so the folder can't be changed from here \u2014 unset it and relaunch the bridge to use this control."; }
+    } else { st.textContent="couldn't read current folder"; }
+  }catch(e){ st.textContent="couldn't reach the bridge"; }
+}
+async function saveAssetsDir(move){
+  const inp=$("ad_path"), msg=$("ad_msg");
+  const dir=(inp.value||"").trim();
+  msg.style.color="#9fb3cc"; msg.textContent=move?"Checking free space + moving assets\u2026 (can take a while for big folders)":"Saving\u2026";
+  try{
+    const r=await postJSON("/config/assets-dir",{dir,move:!!move});
+    if(r&&r.ok){
+      msg.style.color="#9fe88f";
+      msg.textContent="\u2713 Saved."+(r.moved!=null?(" Moved "+r.moved+" item(s)."):"")+(dir?"":" Using the in-tree default.")+(r.created&&r.created.length?(" Created subfolders: "+r.created.join(", ")+"."):"")+" Reload the engine pages to pick it up.";
+      loadAssetsDir();
+    } else {
+      msg.style.color="#caa05a"; msg.textContent="\u2717 "+((r&&r.error)||"couldn't save")+(r&&r.freeBytes!=null?(" (need ~"+Math.round(r.neededBytes/1e6)+"MB, free "+Math.round(r.freeBytes/1e6)+"MB)"):"");
+    }
+  }catch(e){ msg.style.color="#f88"; msg.textContent="\u2717 "+e; }
+}
+if($("ad_save"))$("ad_save").onclick=()=>saveAssetsDir($("ad_move")&&$("ad_move").checked);
+if($("ad_clear"))$("ad_clear").onclick=()=>{ if($("ad_path"))$("ad_path").value=""; if($("ad_move"))$("ad_move").checked=false; saveAssetsDir(false); };
+loadAssetsDir();
+
+// v1812 — Google Drive auto-update (no-render). Folder + on/off + status here;
+// OAuth/service-account key setup lives in the full engine Settings panel.
+async function loadDrive(){
+  const st=$("d_st"); if(!st) return;
+  try{
+    const j=await getJSON("/update/drive/status");
+    const fi=$("d_folder"); if(fi&&document.activeElement!==fi)fi.value=j.folderId||"";
+    const en=$("d_enabled"); if(en)en.checked=!!j.enabled;
+    const pu=$("d_push"); if(pu)pu.checked=!!j.pushToPeers;
+    const mode=j.mode||"none";
+    let msg=(mode==="none")?"no key/oauth set yet":(j.configured?("ready · "+mode):(mode+" · set a folder"));
+    if(j.last)msg+=j.last.ok?(" · last: "+((j.last.applied||j.last.pulled)?"update pulled":"up to date")):(" · last: "+(j.last.reason||j.last.error||"error"));
+    st.textContent=msg;
+    const ah=$("d_authHint");
+    if(ah){
+      if(mode==="none"){ ah.style.display="block"; ah.innerHTML="No OAuth/key set yet — use <b>Connect Drive</b> below (paste your Desktop-app Client ID + secret, or browse the client-secret JSON)."; }
+      else ah.style.display="none";
+    }
+  }catch(e){ st.textContent="unavailable"; }
+}
+// v1876 — accept a pasted Drive URL (or an ID with ?query junk) and pull out just the folder ID.
+// e.g. https://drive.google.com/drive/folders/169WoS1q8FN...?dmr=1&ec=... -> 169WoS1q8FN...
+function _normFolderId(s){
+  s=String(s||"").trim();
+  if(!s) return "";
+  var m=s.match(/\/folders\/([A-Za-z0-9_-]+)/);            // full folder URL
+  if(m) return m[1];
+  m=s.match(/[?&]id=([A-Za-z0-9_-]+)/);                    // ...open?id=<ID> form
+  if(m) return m[1];
+  // otherwise it's an ID that may carry a trailing ? query — cut at the first ?/&/slash/space.
+  return s.split(/[?#&/\s]/)[0];
+}
+if($("d_folder"))$("d_folder").addEventListener("blur",function(){ var v=_normFolderId($("d_folder").value); if(v!==$("d_folder").value.trim()) $("d_folder").value=v; });
+if($("d_save"))$("d_save").onclick=async()=>{ const fi=$("d_folder"),en=$("d_enabled"),pu=$("d_push"); const fid=_normFolderId(fi?fi.value:""); if(fi)fi.value=fid; await postJSON("/update/drive/config",{folderId:fid,enabled:!!(en&&en.checked),pushToPeers:!!(pu&&pu.checked)}); loadDrive(); };
+if($("d_check"))$("d_check").onclick=async()=>{ const st=$("d_st"); if(st)st.textContent="checking…"; try{ await postJSON("/update/drive/check",{}); }catch(e){} setTimeout(loadDrive,800); };
+if($("d_create"))$("d_create").onclick=async()=>{ const st=$("d_st"),nm=($("d_newname")?$("d_newname").value.trim():"")||"SweK Engine Updates"; if(st){st.textContent="creating “"+nm+"”…";} try{ const r=await postJSON("/update/drive/create-folder",{name:nm}); if(r&&r.ok&&r.id){ if($("d_folder"))$("d_folder").value=r.id; if(st)st.textContent="✓ created — folder ID filled in"+(r.saved?" + saved":""); setTimeout(loadDrive,600); } else { if(st)st.textContent="✗ "+((r&&r.error)||"could not create")+" — credential may be read-only; create it in Drive and paste the ID."; } }catch(e){ if(st)st.textContent="✗ "+e; } };
+if($("d_enabled"))$("d_enabled").onchange=()=>{ if($("d_save"))$("d_save").onclick(); };
+if($("d_push"))$("d_push").onchange=()=>{ if($("d_save"))$("d_save").onclick(); };
+loadDrive();
+
+// v1870 — full OAuth connect on this lightweight page (no 3D engine = no connection starvation).
+(function(){
+  var connecting=false, pollTimer=null;
+  // remote-session check: loopback OAuth only works in a browser ON the host.
+  getJSON("/self/whoami").then(function(w){
+    if(w&&w.ok&&w.local===false){
+      var host=(w.name||"the host PC"); var el=$("d_remoteWarn"); if(!el)return;
+      el.style.display="block";
+      el.innerHTML="⚠ <b>You're viewing this remotely.</b> Google's sign-in redirects to <code>127.0.0.1</code>, which only works in a browser on the host itself (<b>"+String(host).replace(/</g,"&lt;")+"</b>). Run Connect on "+String(host).replace(/</g,"&lt;")+"'s own browser (localhost:8787/settings.html).";
+    }
+  }).catch(function(){});
+  function loadOauth(){
+    getJSON("/update/drive/oauth-status").then(function(j){
+      var st=$("d_oauthSt"); if(!st)return;
+      if(j&&j.connected){ st.style.color="#9fe88f"; st.textContent="✓ Drive connected"+(j.vaultWhere?(" — secrets in "+j.vaultWhere):" — secrets saved"); var sg=$("d_signin"); if(sg)sg.style.display="none"; }
+      else if(j&&j.pending){ st.style.color="#caa05a"; st.textContent="waiting for Google sign-in…"; showSignin(j.authUrl); }
+      else if(j&&j.error){ st.style.color="#f0a0b0"; st.textContent="✗ "+j.error; }
+      else { st.style.color="#9fb3cc"; st.textContent="not connected — paste your Desktop-app Client ID + secret, then Connect."; }
+    }).catch(function(){ var st=$("d_oauthSt"); if(st){st.style.color="#9fb3cc";st.textContent="(status unavailable)";} });
+  }
+  function showSignin(url){ var sg=$("d_signin"); if(!sg||!url)return; sg.style.display="block"; sg.innerHTML=""; var a=document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener"; a.textContent="→ open Google sign-in"; a.style.cssText="color:#9bd6ff;text-decoration:none;font-weight:600;"; sg.appendChild(a); }
+  // browse for the Desktop-app client-secret JSON ({ installed:{ client_id, client_secret }})
+  if($("d_browse"))$("d_browse").onclick=function(){ if($("d_json"))$("d_json").click(); };
+  if($("d_json"))$("d_json").onchange=function(){
+    var f=$("d_json").files&&$("d_json").files[0]; if(!f)return;
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{ var o=JSON.parse(rd.result); var blk=o.installed||o.web||o; var cid=blk.client_id||"", sec=blk.client_secret||"";
+        if(cid&&$("d_cid"))$("d_cid").value=cid; if(sec&&$("d_csec"))$("d_csec").value=sec;
+        var st=$("d_oauthSt"); if(st){ st.style.color="#9fe88f"; st.textContent=(o.web?"loaded (note: that's a Web client — Desktop app is preferred)":"loaded client ID + secret — click Connect"); }
+      }catch(e){ var st2=$("d_oauthSt"); if(st2){st2.style.color="#f0a0b0";st2.textContent="✗ couldn't parse that JSON";} }
+    };
+    rd.readAsText(f);
+  };
+  if($("d_connect"))$("d_connect").onclick=async function(){
+    var cid=($("d_cid")?$("d_cid").value.trim():""), sec=($("d_csec")?$("d_csec").value.trim():"");
+    if(!cid||!sec){ var st=$("d_oauthSt"); if(st){st.style.color="#caa05a";st.textContent="paste both the Client ID and the secret first";} return; }
+    if($("d_remoteWarn")&&$("d_remoteWarn").style.display!=="none"){ if(!confirm("You appear to be connecting from another machine. Google's sign-in redirects to 127.0.0.1, which won't reach this host's browser.\n\nRun Connect from the host's own browser instead.\n\nContinue anyway?"))return; }
+    connecting=true; var st=$("d_oauthSt"); if(st){st.style.color="#7f93a8";st.textContent="starting Google sign-in…";}
+    $("d_connect").disabled=true;
+    try{
+      await postJSON("/update/drive/oauth-connect",{clientId:cid,clientSecret:sec});
+      if($("d_csec"))$("d_csec").value="";   // don't keep the secret in the field
+      // poll for the sign-in link + result
+      if(pollTimer)clearInterval(pollTimer);
+      pollTimer=setInterval(function(){ getJSON("/update/drive/oauth-status").then(function(j){
+        if(j&&j.pending&&j.authUrl)showSignin(j.authUrl);
+        if(j&&(j.connected||j.error)){ clearInterval(pollTimer); pollTimer=null; $("d_connect").disabled=false; loadOauth(); loadDrive(); }
+      }).catch(function(){}); }, 1500);
+    }catch(e){ if(st){st.style.color="#f0a0b0";st.textContent="✗ "+e;} $("d_connect").disabled=false; }
+  };
+  if($("d_recheck"))$("d_recheck").onclick=function(){ loadOauth(); loadDrive(); };
+  loadOauth();
+})();
+
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+<script>
+  (function(){
+    var $=function(id){return document.getElementById(id);};
+    function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+    function shortHost(u){try{return new URL(u).host;}catch(e){return String(u||"").replace(/^https?:\/\//,"").replace(/\/.*$/,"");}}
+    function base(u){return String(u||"").replace(/\/+$/,"");}
+    var _kc=null; function kc(){ if(!_kc) _kc=import("/ui/chatCrypto.js").catch(function(){return null;}); return _kc; }
+    var _me={name:"this box",lanIp:(window._swekLanIp||"")};
+    fetch("/self/whoami",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){ if(j){ _me.name=j.name||_me.name; _me.lanIp=j.lanIp||_me.lanIp; } }).catch(function(){});
+    function myUrl(){ var ip=_me.lanIp||location.hostname; var port=location.port; return location.protocol+"//"+ip+(port?(":"+port):""); }
+
+    function updKeyPeers(){
+      fetch("/peer/list",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+        var sel=$("keyPeer"); if(!sel) return; var cur=sel.value;
+        var opts='<option value="">peer\u2026</option>';
+        ((j&&j.peers)||[]).forEach(function(pp){ var label=pp.name||pp.ip||shortHost(pp.url); opts+='<option value="'+esc(pp.url)+'">'+esc(label)+'</option>'; });
+        sel.innerHTML=opts; if(cur){ try{ sel.value=cur; }catch(e){} }
+      }).catch(function(){});
+    }
+
+    // requester: ask a peer for a key (ensure our pubkey is published first, so the holder can seal to us)
+    function requestKey(){
+      var peer=$("keyPeer")?$("keyPeer").value:"", keyName=$("keyName")?$("keyName").value:"", st=$("keyReqStatus");
+      if(!peer){ if(st) st.textContent="Pick a peer first."; return; }
+      if(st) st.textContent="Preparing\u2026";
+      kc().then(function(cc){
+        var ensure=(cc&&cc.myFp)?cc.myFp():Promise.resolve(null);
+        ensure.then(function(){
+          if(st) st.textContent="Requesting "+keyName+" from "+shortHost(peer)+"\u2026";
+          fetch(base(peer)+"/key/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keyName:keyName,requesterId:_me.name,requesterName:_me.name,requesterUrl:myUrl()})}).then(function(r){return r.json();}).then(function(res){
+            if(!res||!res.ok){ if(st) st.textContent="Request refused: "+((res&&res.error)||"error"); return; }
+            if(st) st.textContent="Waiting for "+shortHost(peer)+" to approve (they must type their login password)\u2026";
+            pollResult(peer,res.id,keyName,0);
+          }).catch(function(){ if(st) st.textContent="Could not reach "+shortHost(peer)+"."; });
+        });
+      });
+    }
+    function pollResult(peer,id,keyName,tries){
+      var st=$("keyReqStatus");
+      if(tries>60){ if(st) st.textContent="No response from "+shortHost(peer)+" (timed out)."; return; }
+      fetch(base(peer)+"/key/result?id="+encodeURIComponent(id),{cache:"no-store"}).then(function(r){return r.json();}).then(function(res){
+        if(!res||!res.ok){ if(st) st.textContent="Lost the request."; return; }
+        if(res.status==="approved"&&res.envelope){
+          kc().then(function(cc){
+            if(!cc||!cc.openEnvelope){ if(st) st.textContent="Crypto unavailable."; return; }
+            cc.openEnvelope(res.envelope).then(function(val){
+              if(val==null){ if(st) st.textContent="Could not open the key (not sealed to this box?)."; return; }
+              fetch("/key/store",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keyName:keyName,value:val})}).then(function(r){return r.json();}).then(function(s2){
+                if(st) st.textContent=(s2&&s2.ok)?("Received "+keyName+" from "+shortHost(peer)+" and stored it on this box. \u2713"):("Received but store failed: "+((s2&&s2.error)||""));
+                fetch(base(peer)+"/key/ack",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})}).catch(function(){});
+              }).catch(function(){ if(st) st.textContent="Received but could not store."; });
+            });
+          });
+          return;
+        }
+        if(res.status==="denied"){ if(st) st.textContent=shortHost(peer)+" denied the request."; return; }
+        setTimeout(function(){ pollResult(peer,id,keyName,tries+1); },2000);
+      }).catch(function(){ setTimeout(function(){ pollResult(peer,id,keyName,tries+1); },2000); });
+    }
+
+    // holder: pending requests from peers (don't re-render while unchanged, so an in-progress password isn't wiped)
+    var _lastPendingSig="";
+    function pollPending(){
+      fetch("/key/requests",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+        var box=$("keyPending"); if(!box) return;
+        var reqs=(j&&j.ok&&j.requests)||[];
+        var sig=reqs.map(function(r){return r.id;}).join(",");
+        if(sig===_lastPendingSig) return;
+        _lastPendingSig=sig;
+        if(!reqs.length){ box.innerHTML=""; return; }
+        var html="";
+        reqs.forEach(function(rq){
+          html+='<div data-id="'+esc(rq.id)+'" style="border:1px solid #3a3a2a;border-radius:5px;padding:5px;background:#1a1810;">'
+            +'<div style="font-size:11px;color:#ffcf6b;">'+esc(rq.requesterName)+' requests your <b>'+esc(rq.keyName)+'</b> key</div>'
+            +'<div style="display:flex;gap:4px;margin-top:4px;align-items:center;flex-wrap:wrap;">'
+            +'<input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input type="password" class="keyPw" placeholder="login password" style="flex:1;min-width:110px;background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:4px;font:11px ui-monospace,monospace;padding:3px 6px;">'
+            +'<button class="keyApprove" style="font-size:11px;padding:2px 9px;background:#14301a;color:#9fe;border:1px solid #2a5a3a;border-radius:4px;cursor:pointer;">Approve</button>'
+            +'<button class="keyDeny" style="font-size:11px;padding:2px 9px;background:#301414;color:#fbb;border:1px solid #5a2a2a;border-radius:4px;cursor:pointer;">Deny</button>'
+            +'</div><div class="keyMsg" style="font-size:10px;color:var(--dim);margin-top:2px;"></div></div>';
+        });
+        box.innerHTML=html;
+        Array.prototype.forEach.call(box.querySelectorAll("[data-id]"),function(el){
+          var id=el.getAttribute("data-id"), pw=el.querySelector(".keyPw"), msg=el.querySelector(".keyMsg");
+          el.querySelector(".keyApprove").onclick=function(){
+            if(msg) msg.textContent="Authorizing\u2026";
+            fetch("/key/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,password:pw?pw.value:"",approve:true})}).then(function(r){return r.json();}).then(function(res){
+              if(res&&res.ok){ if(msg) msg.textContent="Approved \u2014 key sealed and sent."; _lastPendingSig="__force__"; setTimeout(pollPending,800); }
+              else { if(msg) msg.textContent=(res&&res.error)||"failed"; }
+            }).catch(function(){ if(msg) msg.textContent="error"; });
+          };
+          el.querySelector(".keyDeny").onclick=function(){
+            fetch("/key/approve",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,approve:false})}).then(function(){ _lastPendingSig="__force__"; setTimeout(pollPending,300); }).catch(function(){});
+          };
+        });
+      }).catch(function(){});
+    }
+
+    var rb=$("keyReqBtn"); if(rb) rb.onclick=requestKey;
+    updKeyPeers(); setInterval(updKeyPeers,15000);
+    pollPending(); setInterval(pollPending,3000);
+  })();
+  </script>
+<script>
+// v1762 - minitab auto-minimize timeout slider (shared with server.html via localStorage)
+(function(){
+  var sl=document.getElementById("gsecTimeout"), lab=document.getElementById("gsecTimeoutVal");
+  if(!sl) return;
+  var cur=0; try{ cur=parseInt(localStorage.getItem("swek.gsecTimeoutMs")||"",10); }catch(e){}
+  var mins=(cur&&cur>=5000)?(cur/60000):2; sl.value=mins; if(lab) lab.textContent=mins+" min";
+  function apply(){ var m=parseFloat(sl.value)||2; if(lab) lab.textContent=m+" min"; try{ localStorage.setItem("swek.gsecTimeoutMs", String(Math.round(m*60000))); }catch(e){} }
+  sl.addEventListener("input", apply);
+})();
+</script>
+<script>
+// v1770 - Remote Hosting & Cloud (mirrors the Server-console Cloud & Hosting tab; same endpoints, settings-page styling)
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  if(!$("s_cfTunnel")) return;
+  var gj=function(u){return fetch(u,{cache:"no-store"}).then(function(r){return r.json();}).catch(function(){return null;});};
+  // v1912 — Start-on-login (run SweK on boot). Route already existed; this adds the toggle.
+  function loadBoot(){
+    gj("/sys/autostart").then(function(s){
+      var st=$("s_bootStat"), b=$("s_bootToggle"); if(!st||!b) return;
+      if(!s||!s.ok){ st.textContent="unavailable"; b.style.display="none"; return; }
+      if(s.platform!=="win32" && s.platform!=="darwin"){ st.textContent="Windows/macOS only"; b.style.display="none"; return; }
+      st.textContent = s.enabled ? "\u2713 on (starts at login)" : "off";
+      b.textContent = s.enabled ? "turn off" : "turn on";
+      b.onclick=function(){ b.disabled=true; st.textContent="working..."; pj("/sys/autostart",{on:!s.enabled}).then(function(r){ b.disabled=false; if(r&&r.ok){ loadBoot(); } else { st.textContent="\u2717 "+((r&&r.error)||"failed"); } }); };
+    });
+  }
+  loadBoot();
+  var pj=function(u,b){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(function(r){return r.json();}).catch(function(){return null;});};
+  function loadCloud(){
+    gj("/hosting/tunnel/status").then(function(st){
+      if(st&&st.running&&st.url){ $("s_cfTunnel").textContent="live"; $("s_cfUrl").innerHTML="<a href='"+st.url+"' target='_blank' rel='noopener' style='color:#7fd0ff'>"+st.url+"</a>"; $("s_cfStart").style.display="none"; $("s_cfStop").style.display=""; }
+      else if(st&&st.running){ $("s_cfTunnel").textContent="starting..."; $("s_cfStart").style.display="none"; $("s_cfStop").style.display=""; setTimeout(loadCloud,2500); }
+      else{
+        // v3809 -- PARITY WITH THE SERVER CONSOLE. This page's tunnel status had exactly one thing to say when
+        // a start failed -- "no tunnel running" -- even though the reason (cloudflared missing, wrong PATH,
+        // non-zero exit) was sitting in the same status object the console already renders. So "the start tunnel
+        // option did not work on this page either" was the console bug reproduced on a page that never got the
+        // fix: a control reporting a flat idle state for a real failure. Say why; the install hint below (s_cfInstall,
+        // toggled by /hosting/detect) covers the not-installed case.
+        if(st&&st.reason){ $("s_cfTunnel").innerHTML="<span style='color:#f2b8b8'>could not start</span> \u2014 "+String(st.reason).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c];}); }
+        else{ $("s_cfTunnel").textContent="no tunnel running"; }
+        $("s_cfStart").style.display=""; $("s_cfStop").style.display="none"; $("s_cfUrl").textContent="";
+      }
+    });
+    gj("/hosting/detect").then(function(d){ if(!d)return; $("s_cfInstall").style.display=(d.cloudflared&&d.cloudflared.installed)?"none":""; var tsOk=d.tailscale&&d.tailscale.installed; $("s_ts").textContent=tsOk?"installed":"not installed"; $("s_tsInstall").style.display=tsOk?"none":""; });
+    gj("/hosting/landing").then(function(l){ if(l&&l.page)$("s_cfLanding").value=l.page; });
+    gj("/auth/status").then(function(a){ $("s_authStat").textContent=(a&&a.enabled)?"set (remote login required)":"not set"; });
+    gj("/cloud/status").then(function(c){ $("s_cloudRz").textContent=(c&&c.enabled)?("on"+(c.id?(" - "+c.id):"")):"off (enable in the engine Cloud settings)"; });
+    gj("/compute/status").then(function(ai){ $("s_cloudAi").textContent=(ai&&ai.configured)?(ai.host||"configured"):"none configured"; });
+    gj("/gcloud/instances").then(function(g){ if(!g){$("s_gcp").textContent="unavailable";return;} if(g.error||g.installed===false){$("s_gcp").textContent="gcloud CLI not installed";} else if(g.instances){$("s_gcp").textContent=g.instances.length+" instance(s)";} else $("s_gcp").textContent="-"; });
+  }
+  $("s_cfStart").onclick=function(){ $("s_cfTunnel").textContent="starting..."; pj("/hosting/tunnel",{action:"start"}).then(function(){ setTimeout(loadCloud,1500); }); };
+  $("s_cfStop").onclick=function(){ pj("/hosting/tunnel",{action:"stop"}).then(function(){ setTimeout(loadCloud,800); }); };
+  $("s_cfInstall").onclick=function(){ $("s_cfInstall").textContent="installing..."; pj("/hosting/install",{tool:"cloudflare"}).then(function(){ setTimeout(loadCloud,3000); }); };
+  $("s_tsInstall").onclick=function(){ $("s_tsInstall").textContent="installing..."; pj("/hosting/install",{tool:"tailscale"}).then(function(){ setTimeout(loadCloud,3000); }); };
+  $("s_cfLanding").onchange=function(){ pj("/hosting/landing",{page:$("s_cfLanding").value}); };
+  $("s_authSet").onclick=function(){ var pw=$("s_authPw").value||""; if(pw.length<6){ $("s_authStat").textContent="needs 6+ chars"; return; } pj("/auth/setup",{password:pw}).then(function(j){ $("s_authStat").textContent=(j&&j.ok)?"set (remote login required)":("failed: "+((j&&j.error)||"set it from the host machine")); if(j&&j.ok)$("s_authPw").value=""; }); };
+  loadCloud(); setInterval(loadCloud,30000);
+})();
+</script>
+</body>
+</html>

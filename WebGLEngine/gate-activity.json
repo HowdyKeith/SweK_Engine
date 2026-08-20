@@ -1,0 +1,1006 @@
+{
+ "note": "LAYER 2: what the gate RUNNER knows. A RUNTIME IS NOT A VERDICT, and NEVER TIMED IS NOT FAST.",
+ "age": {
+  "capturedAt": "v3211",
+  "alsoNamed": [
+   "v3285"
+  ],
+  "now": "v3445",
+  "versions": 234
+ },
+ "nodes": [
+  {
+   "id": "acoustics",
+   "state": "no-gate",
+   "gates": [],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "sweep"
+   ]
+  },
+  {
+   "id": "beam",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/beamDevice-selfcheck.mjs",
+    "tools/roundhouse/boundKeys-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "blackhole",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/blackHoleBind-selfcheck.mjs",
+    "tools/roundhouse/configContract-selfcheck.mjs",
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/escapeBudget-selfcheck.mjs",
+    "tools/roundhouse/knobCandidates-selfcheck.mjs",
+    "tools/roundhouse/ollamaRoleCaller-selfcheck.mjs",
+    "tools/roundhouse/plantedError-selfcheck.mjs",
+    "tools/roundhouse/starKeys-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 6,
+   "ms": 265179,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "blobbodies",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/blobBodies-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "blobkelvin",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/blobKelvinBind-selfcheck.mjs",
+    "tools/roundhouse/runDeviceRouted-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 296,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "blobthermal",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/blobThermalBind-selfcheck.mjs",
+    "tools/roundhouse/plasmaKrbn-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 666,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "born",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/sweepDevice-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 253635,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "box3d",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/box3dBind-selfcheck.mjs",
+    "tools/ship/deviceBridge-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 1580,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "centrifuge",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/centrifugeDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "chaos",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 253941,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "clocks",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/clocksPlanted-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "compose",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/compose-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "ct",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/fanKey-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 253995,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "diffusion",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/diffusion-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "discovery",
+   "state": "timed",
+   "gates": [
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 253635,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "eccentric",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/eccentricInspiral-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 469,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "em",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/boundKeys-selfcheck.mjs",
+    "tools/roundhouse/cherenkov-selfcheck.mjs",
+    "tools/roundhouse/crossDevice-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 306,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "fdtd",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/fdtd-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 306,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "fieldnav",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/fieldNav-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "figureeight",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/figureEight-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 195,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "friction",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/friction-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 134,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "galaxy",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/galaxyDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "geometry",
+   "state": "timed",
+   "gates": [
+    "tools/ship/labDevices-selfcheck.mjs",
+    "tools/ship/modelBench-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 261859,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "geostats",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/geostatsDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "gyroscope",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/gyroscope-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 142,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "heidler",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/heidler-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 122,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "hmc",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/hmc-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 306,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "hydrostatic",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/hydrostatic-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "inference",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/inference-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "inspiral",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/errorPairAudit-selfcheck.mjs",
+    "tools/roundhouse/inspiral-selfcheck.mjs",
+    "tools/roundhouse/twoKeyPlants-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 10357,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "interferometer",
+   "state": "timed",
+   "gates": [
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 253635,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "invariants",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/invariantsDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "ising",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/knobCandidates-selfcheck.mjs",
+    "tools/roundhouse/nuisanceKnobs-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 3,
+   "ms": 257375,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "kepler",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/convergenceOrder-selfcheck.mjs",
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/starKeys-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 253941,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "kerr",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/census-selfcheck.mjs",
+    "tools/roundhouse/errorPairAudit-selfcheck.mjs",
+    "tools/roundhouse/kerrIscoKey-selfcheck.mjs",
+    "tools/roundhouse/twoKeyPlants-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 3,
+   "ms": 263990,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "kh",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/errorPairAudit-selfcheck.mjs",
+    "tools/roundhouse/khConvergence-selfcheck.mjs",
+    "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+    "tools/roundhouse/khMichalke-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 263892,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "kuramoto",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/kuramoto-selfcheck.mjs",
+    "tools/roundhouse/starKeys-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "landauzener",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/landauZener-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "langevin",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/langevin-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "lens",
+   "state": "partly",
+   "gates": [
+    "physics/blackhole/emit-selfcheck.mjs",
+    "tools/roundhouse/assumptions-selfcheck.mjs",
+    "tools/roundhouse/corroborationCensus-selfcheck.mjs",
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/deflectAdoption-selfcheck.mjs",
+    "tools/roundhouse/gpuProvenance-selfcheck.mjs",
+    "tools/roundhouse/knobGate-selfcheck.mjs",
+    "tools/roundhouse/lensCorroborated-selfcheck.mjs",
+    "tools/roundhouse/lensDeflectReference-selfcheck.mjs",
+    "tools/roundhouse/lensNuisance-selfcheck.mjs",
+    "tools/roundhouse/lensRawTrig-selfcheck.mjs",
+    "tools/roundhouse/lensTidal-selfcheck.mjs",
+    "tools/roundhouse/magmap-selfcheck.mjs",
+    "tools/roundhouse/refinementWindow-selfcheck.mjs",
+    "tools/roundhouse/responseCensus-selfcheck.mjs",
+    "tools/roundhouse/soundness-selfcheck.mjs"
+   ],
+   "timedGates": 9,
+   "ms": 11209,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "md",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/md-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 161,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "nuclear",
+   "state": "no-gate",
+   "gates": [],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "sweep"
+   ]
+  },
+  {
+   "id": "optics",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/airyRefined-selfcheck.mjs",
+    "tools/roundhouse/airySlitAdoption-selfcheck.mjs",
+    "tools/roundhouse/edgeAdoption-selfcheck.mjs",
+    "tools/roundhouse/edgeFresnel-selfcheck.mjs",
+    "tools/roundhouse/slitQuantisation-selfcheck.mjs",
+    "tools/roundhouse/sweepDevice-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 5,
+   "ms": 297438,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "pbc",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/pbc-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "percolation",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/compose-selfcheck.mjs",
+    "tools/roundhouse/percolation-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "pipe3d",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/pipeFlowKey-selfcheck.mjs",
+    "tools/roundhouse/readerPlant-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 504108,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "plastic",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/plastic-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "poisson",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/poissonDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "probe",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/looseAccounting-selfcheck.mjs",
+    "tools/roundhouse/plantedError-selfcheck.mjs",
+    "tools/roundhouse/policyPilot-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 5,
+   "ms": 261421,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "pulsar",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/pulsarDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "quantum",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/boundKeys-selfcheck.mjs",
+    "tools/roundhouse/libmControl-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 253635,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "reaction",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/reactionDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "rmt",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/rmt-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "seismic",
+   "state": "no-gate",
+   "gates": [],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "sweep"
+   ]
+  },
+  {
+   "id": "spacefill",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/spacefill-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 133,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "spatial",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/spatialAgreement-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "splat",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/refinementKnobs-selfcheck.mjs",
+    "tools/roundhouse/zeroRangeSweep-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 261692,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "tempering",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/tempering-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 306,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "thermal",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/defaultPlacementSweep-selfcheck.mjs",
+    "tools/roundhouse/knobGate-selfcheck.mjs",
+    "tools/roundhouse/rayleighOnset-selfcheck.mjs",
+    "tools/roundhouse/responseCensus-selfcheck.mjs",
+    "tools/roundhouse/thermalScaling-selfcheck.mjs",
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 4,
+   "ms": 768963,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "tidal",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/lensTidal-selfcheck.mjs",
+    "tools/roundhouse/plasmaKrbn-selfcheck.mjs"
+   ],
+   "timedGates": 2,
+   "ms": 2102,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "twobody",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/errorPairAudit-selfcheck.mjs",
+    "tools/roundhouse/twoBody-selfcheck.mjs",
+    "tools/roundhouse/twoBodyPlanted-selfcheck.mjs"
+   ],
+   "timedGates": 3,
+   "ms": 10952,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "twof",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/twoF-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "vibrations",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/vibrationsDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "whitedwarf",
+   "state": "never-timed",
+   "gates": [
+    "tools/roundhouse/whiteDwarfDevice-selfcheck.mjs"
+   ],
+   "timedGates": 0,
+   "ms": null,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "windtunnel",
+   "state": "timed",
+   "gates": [
+    "tools/ship/labDevices-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 253635,
+   "routes": [
+    "import",
+    "sweep"
+   ]
+  },
+  {
+   "id": "wolff",
+   "state": "partly",
+   "gates": [
+    "tools/roundhouse/crossDevice-selfcheck.mjs",
+    "tools/roundhouse/wolff-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 306,
+   "routes": [
+    "import",
+    "name",
+    "sweep"
+   ]
+  },
+  {
+   "id": "zeta",
+   "state": "timed",
+   "gates": [
+    "tools/roundhouse/zeta-selfcheck.mjs"
+   ],
+   "timedGates": 1,
+   "ms": 92,
+   "routes": [
+    "name",
+    "sweep"
+   ]
+  }
+ ],
+ "counts": {
+  "timed": 19,
+  "partly": 19,
+  "never-timed": 26,
+  "no-gate": 3
+ },
+ "byRoute": {
+  "import": 37,
+  "name": 56,
+  "sweep": 30
+ },
+ "namedByNeither": [
+  "acoustics",
+  "nuclear",
+  "seismic"
+ ],
+ "gates": {
+  "total": 788,
+  "timed": 580,
+  "neverTimed": 208,
+  "orphanTimings": []
+ }
+}

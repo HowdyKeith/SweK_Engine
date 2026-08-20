@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — the consistency board</title>
+<meta name="demo:desc" content="A new kind of key: one physical constant, two routes independent in MECHANISM, agreement gated. The Ising critical temperature by Binder cumulant against Fisher amplitude-ratio; the trap's free-energy difference by Jarzynski against Crooks; the LBM's viscosity as configured against what the fluid's shear waves actually do. This is how metrology certifies numbers nobody has a closed form for — independent instruments that agree. Pairs will grow.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:920px; margin:0 auto; padding:18px; line-height:1.65; }
+  table { border-collapse:collapse; width:100%; margin-top:10px; }
+  td,th { border:1px solid #22304a; padding:7px 10px; text-align:left; vertical-align:top; }
+  th { color:#7f96b8; font-weight:normal; }
+  .num { text-align:right; font-weight:bold; }
+  .good { color:#9be15d; } .bad { color:#ff9a9a; } .dim { color:#7f96b8; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">The consistency board</h2>
+  <div class="dim">Every other gate in this lab holds a measurement against algebra or a sabotaged twin. This board holds measurements against EACH OTHER: one constant, two routes that share no mechanism, and a verdict on their agreement. The admission rule: a susceptibility amplitude-ratio and a Binder cumulant weigh different moments; a Jarzynski average and a Crooks fit read different features of the work distribution; a configured viscosity is an input while a shear-decay rate is behaviour. Two seeds of the same estimator do not qualify and never will. Gate: physics/consistency-selfcheck.mjs. Pairs will grow — T_c already has a third candidate route (the specific-heat scaling) waiting on statistics.</div>
+  <p><button id="run">Run the board (real measurements, ~30s)</button></p>
+  <div id="out">idle</div>
+</div>
+<script type="module">
+import { runBoard } from "./physics/consistency.mjs";
+const out = document.getElementById("out");
+document.getElementById("run").onclick = async () => {
+  out.textContent = "measuring — three constants, six routes, nothing cached…";
+  await new Promise((r) => setTimeout(r, 30));
+  const t0 = performance.now();
+  const board = runBoard({ fast: true });
+  const ms = performance.now() - t0;
+  let html = "<table><tr><th>constant</th><th>route A</th><th class='num'>value</th><th>route B</th><th class='num'>value</th><th class='num'>|diff|</th><th class='num'>tol</th><th>verdict</th></tr>";
+  for (const p of board) {
+    const d = (p.a.value != null && p.b.value != null) ? Math.abs(p.a.value - p.b.value) : null;
+    html += "<tr><td>" + p.name + "</td><td class='dim'>" + p.a.route + "</td><td class='num'>" + (p.a.value == null ? "—" : p.a.value.toFixed(4)) +
+      "</td><td class='dim'>" + p.b.route + "</td><td class='num'>" + (p.b.value == null ? "—" : p.b.value.toFixed(4)) +
+      "</td><td class='num'>" + (d == null ? "—" : d.toFixed(4)) + "</td><td class='num'>" + p.tol.toFixed(4) +
+      "</td><td>" + (p.agree ? "<b class='good'>AGREE</b>" : "<b class='bad'>DISAGREE</b>") + "</td></tr>";
+  }
+  html += "</table><div class='dim' style='margin-top:8px;'>" + ms.toFixed(0) + " ms · a DISAGREE row is a finding: some route's mechanism is wrong, and no single-instrument gate would have blinked. The gate proved that shape with a wrong-exponent route that stays smooth and internally consistent while missing the crossing entirely.</div>";
+  out.innerHTML = html;
+};
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

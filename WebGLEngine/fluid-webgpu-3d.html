@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; FLIP/PIC Fluid 3D (WebGPU)</title>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; color:#dfe7f2; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:grab; }
+  #c:active { cursor:grabbing; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:14px; align-items:center; flex-wrap:wrap; max-width:calc(100% - 28px); background:rgba(6,10,22,.66); border:1px solid #1a2440; border-radius:10px; padding:8px 13px; backdrop-filter:blur(6px); }
+  b.t { color:#5fe6d0; } #mode { padding:2px 8px; border-radius:5px; border:1px solid #1f5a52; background:#0a1a17; color:#7fe6d6; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  label { color:#9fb0c8; } input[type=range] { vertical-align:middle; width:88px; }
+  button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#0e1b1a; color:#8fe6d6; border:1px solid #245047; }
+  button:hover { background:#123028; } button.on { background:#1b3a33; color:#bff5e8; }
+  #stat { color:#7f93ab; }
+  #note { position:fixed; left:12px; bottom:10px; z-index:5; color:#5c7088; font-size:11px; background:rgba(6,10,22,.6); border:1px solid #16203a; border-radius:8px; padding:6px 10px; max-width:min(700px,92vw); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span><b class="t">SweK</b> &middot; FLIP/PIC fluid 3D <span id="mode">WebGPU</span></span>
+  <button id="drop">Drop block</button>
+  <button id="dam">Dam break</button>
+  <button id="pause">Pause</button>
+  <button id="glass" class="on">glass</button>
+  <button id="dropbox">drop box</button>
+  <button id="dropball">drop ball</button>
+  <label>FLIP <input id="flip" type="range" min="0" max="100" value="93"><span id="flipv">0.93</span></label>
+  <label>iters <input id="iters" type="range" min="10" max="80" value="40"><span id="itersv">40</span></label>
+  <span id="stat"></span>
+</div>
+<div id="note">3D hybrid FLIP/PIC on a staggered MAC grid: trilinear atomic particle&rarr;grid splat, Jacobi pressure projection, grid&rarr;particle FLIP/PIC blend, RK2 advection. Compute mirrors the unit-tested <b>fluid/flip3d.mjs</b>. Drag to orbit, scroll to zoom. Drop boxes and balls: each becomes a moving SOLID (amber marker) that the fluid splashes off "glass" shades particles as refractive liquid-glass droplets (impostor spheres, fresnel + fake refraction + chromatic tint) &mdash; the technique from the liquid-glass shaders, written directly.mdash; the 3D one-way rigid coupling, mirroring the unit-tested flip3d.mjs. "glass" shades droplets as refractive liquid-glass.</div>
+<script type="module">
+const NX = 48, NY = 48, NZ = 48;
+const N_U = (NX + 1) * NY * NZ, N_V = NX * (NY + 1) * NZ, N_W = NX * NY * (NZ + 1), N_C = NX * NY * NZ;
+const MAX_P = 260000, SCALE = 16384.0;
+const cvs = document.getElementById("c");
+const modeEl = document.getElementById("mode"), statEl = document.getElementById("stat");
+function fallback(m) { modeEl.textContent = "no WebGPU"; modeEl.className = "fallback"; document.getElementById("note").innerHTML = "This demo needs <b>WebGPU</b> (Chrome/Edge 113+, Safari 18+). " + (m || ""); }
+
+// ---- tiny mat4 (column-major) ----
+const M = {
+  persp(fov, asp, n, f) { const t = 1 / Math.tan(fov / 2); return [t / asp,0,0,0, 0,t,0,0, 0,0,(f + n) / (n - f),-1, 0,0,(2 * f * n) / (n - f),0]; },
+  mul(a, b) { const o = new Array(16); for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; },
+  lookAt(e, ct, up) { const z = norm(sub(e, ct)), x = norm(cross(up, z)), y = cross(z, x);
+    return [x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -dot(x, e),-dot(y, e),-dot(z, e),1]; },
+};
+function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+
+if (!navigator.gpu) fallback(); else init().catch(e => { console.error(e); fallback(String(e.message || e)); });
+
+async function init() {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) return fallback("No GPU adapter.");
+  const device = await adapter.requestDevice();
+  const ctx = cvs.getContext("webgpu");
+  const fmt = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format: fmt, alphaMode: "opaque" });
+  let depthTex = null;
+
+  const mk = n => device.createBuffer({ size: n, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+  const bufPos = mk(MAX_P * 4 * 4), bufVel = mk(MAX_P * 4 * 4);   // vec3 padded to vec4
+  const bufUNum = mk(N_U * 4), bufUWt = mk(N_U * 4), bufVNum = mk(N_V * 4), bufVWt = mk(N_V * 4), bufWNum = mk(N_W * 4), bufWWt = mk(N_W * 4);
+  const bufU = mk(N_U * 4), bufV = mk(N_V * 4), bufW = mk(N_W * 4);
+  const bufUP = mk(N_U * 4), bufVP = mk(N_V * 4), bufWP = mk(N_W * 4);
+  const bufP = mk(N_C * 4), bufPN = mk(N_C * 4), bufType = mk(N_C * 4), bufDiv = mk(N_C * 4);
+  const MAX_BODIES = 16;
+  const bufBodyId = mk(N_C * 4);                    // per-cell body index (i32), -1 = none
+  const bufBodies = mk(MAX_BODIES * 4 * 4 * 4);     // MAX_BODIES * 4 vec4 * 4 bytes
+  const BF_STRIDE = 8;                               // fx,fy,fz, tx,ty,tz, pad, pad  (atomic i32, fixed-point)
+  const bufBodyForce = mk(MAX_BODIES * BF_STRIDE * 4);
+  const bufBodyForceStaging = device.createBuffer({ size: MAX_BODIES * BF_STRIDE * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  const BF_SCALE = 4096.0;
+  const bufBodyQuat = mk(MAX_BODIES * 4 * 4);   // per-body orientation quaternion for the oriented-box overlay
+  const quatArr = new Float32Array(MAX_BODIES * 4);
+  const bufParams = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bufCam = device.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+  const COMMON = `
+    struct P { nx:u32, ny:u32, nz:u32, dt:f32, gravity:f32, flip:f32, scale:f32, nParticles:u32, nBodies:u32, pad0:u32, pad1:u32, pad2:u32 };
+    @group(0) @binding(0) var<uniform> pm : P;
+    fn ui(i:u32,j:u32,k:u32)->u32 { return i + (pm.nx+1u)*(j + pm.ny*k); }
+    fn vi(i:u32,j:u32,k:u32)->u32 { return i + pm.nx*(j + (pm.ny+1u)*k); }
+    fn wi(i:u32,j:u32,k:u32)->u32 { return i + pm.nx*(j + pm.ny*k); }
+    fn ci(i:u32,j:u32,k:u32)->u32 { return i + pm.nx*(j + pm.ny*k); }
+    const AIR:i32=0; const FLUID:i32=1; const SOLID:i32=2;`;
+  // body helpers -- only appended to shaders that declare a `bodies` storage binding (stamp + solid)
+  const BODYFN = `
+    fn bodyContains(bi:u32, p:vec3<f32>) -> bool {
+      let base=bi*4u; let b0=bodies[base]; let b1=bodies[base+1u]; let c=vec3<f32>(b0.y,b0.z,b0.w);
+      if(b0.x < 0.5){ let d=p-c; return dot(d,d) <= b1.w*b1.w; }
+      let d=abs(p-c); return d.x<=b1.x && d.y<=b1.y && d.z<=b1.z; }
+    fn bodyVelAt(bi:u32, p:vec3<f32>) -> vec3<f32> {
+      let base=bi*4u; let c=bodies[base].yzw; let v=bodies[base+2u].xyz; let om=bodies[base+3u].xyz; return v + cross(om, p-c); }`;
+  const w = {};
+
+  // stamp bodies into the type grid as SOLID + record which body per cell (bodyId), after mark, before solid
+  w.stamp = COMMON + `
+    @group(0) @binding(1) var<storage,read_write> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read_write> bodyId:array<i32>;
+    @group(0) @binding(3) var<storage,read> bodies:array<vec4<f32>>;
+  ` + BODYFN + `
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nx*pm.ny*pm.nz){return;} bodyId[n]=-1;
+      let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+      if(i==0u||j==0u||k==0u||i>=pm.nx-1u||j>=pm.ny-1u||k>=pm.nz-1u){return;}
+      let p=vec3<f32>(f32(i)+0.5, f32(j)+0.5, f32(k)+0.5);
+      for(var b=0u;b<pm.nBodies;b++){ if(bodyContains(b,p)){ typeG[n]=SOLID; bodyId[n]=i32(b); return; } } }`;
+
+  // two-way: accumulate the fluid pressure force + torque on each body via atomicAdd (fixed-point), read back to JS.
+  w.bodyForce = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> bodyId:array<i32>;
+    @group(0) @binding(3) var<storage,read> p:array<f32>;
+    @group(0) @binding(4) var<storage,read> bodies:array<vec4<f32>>;
+    @group(0) @binding(5) var<storage,read_write> bf:array<atomic<i32>>;
+  ` + BODYFN + `
+    fn addFT(bi:i32, F:vec3<f32>, fpos:vec3<f32>) {
+      let c = bodies[u32(bi)*4u].yzw; let r = fpos - c; let tau = cross(r, F); let SF = 4096.0;
+      let o = u32(bi)*8u;
+      atomicAdd(&bf[o+0u], i32(F.x*SF)); atomicAdd(&bf[o+1u], i32(F.y*SF)); atomicAdd(&bf[o+2u], i32(F.z*SF));
+      atomicAdd(&bf[o+3u], i32(tau.x*SF)); atomicAdd(&bf[o+4u], i32(tau.y*SF)); atomicAdd(&bf[o+5u], i32(tau.z*SF)); }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nx*pm.ny*pm.nz){return;}
+      let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+      if(i>0u){ let A=ci(i-1u,j,k); let B=ci(i,j,k); let ba=bodyId[A]; let bb=bodyId[B]; let fp=vec3<f32>(f32(i),f32(j)+0.5,f32(k)+0.5);
+        if(ba>=0 && typeG[B]==FLUID){ addFT(ba, vec3<f32>(-p[B],0.0,0.0), fp); } else if(bb>=0 && typeG[A]==FLUID){ addFT(bb, vec3<f32>(p[A],0.0,0.0), fp); } }
+      if(j>0u){ let A=ci(i,j-1u,k); let B=ci(i,j,k); let ba=bodyId[A]; let bb=bodyId[B]; let fp=vec3<f32>(f32(i)+0.5,f32(j),f32(k)+0.5);
+        if(ba>=0 && typeG[B]==FLUID){ addFT(ba, vec3<f32>(0.0,-p[B],0.0), fp); } else if(bb>=0 && typeG[A]==FLUID){ addFT(bb, vec3<f32>(0.0,p[A],0.0), fp); } }
+      if(k>0u){ let A=ci(i,j,k-1u); let B=ci(i,j,k); let ba=bodyId[A]; let bb=bodyId[B]; let fp=vec3<f32>(f32(i)+0.5,f32(j)+0.5,f32(k));
+        if(ba>=0 && typeG[B]==FLUID){ addFT(ba, vec3<f32>(0.0,0.0,-p[B]), fp); } else if(bb>=0 && typeG[A]==FLUID){ addFT(bb, vec3<f32>(0.0,0.0,p[A]), fp); } } }`;
+
+  w.clear = COMMON + `
+    @group(0) @binding(1) var<storage,read_write> uN:array<atomic<i32>>;
+    @group(0) @binding(2) var<storage,read_write> uW:array<atomic<i32>>;
+    @group(0) @binding(3) var<storage,read_write> vN:array<atomic<i32>>;
+    @group(0) @binding(4) var<storage,read_write> vW:array<atomic<i32>>;
+    @group(0) @binding(5) var<storage,read_write> wN:array<atomic<i32>>;
+    @group(0) @binding(6) var<storage,read_write> wW:array<atomic<i32>>;
+    @group(0) @binding(7) var<storage,read_write> typeG:array<i32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x;
+      if(n<arrayLength(&uN)){atomicStore(&uN[n],0);atomicStore(&uW[n],0);}
+      if(n<arrayLength(&vN)){atomicStore(&vN[n],0);atomicStore(&vW[n],0);}
+      if(n<arrayLength(&wN)){atomicStore(&wN[n],0);atomicStore(&wW[n],0);}
+      if(n<pm.nx*pm.ny*pm.nz){ let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+        let s=(i==0u||j==0u||k==0u||i==pm.nx-1u||j==pm.ny-1u||k==pm.nz-1u); typeG[n]=select(AIR,SOLID,s); } }`;
+
+  w.p2g = COMMON + `
+    @group(0) @binding(1) var<storage,read_write> uN:array<atomic<i32>>;
+    @group(0) @binding(2) var<storage,read_write> uW:array<atomic<i32>>;
+    @group(0) @binding(3) var<storage,read_write> vN:array<atomic<i32>>;
+    @group(0) @binding(4) var<storage,read_write> vW:array<atomic<i32>>;
+    @group(0) @binding(5) var<storage,read_write> wN:array<atomic<i32>>;
+    @group(0) @binding(6) var<storage,read_write> wW:array<atomic<i32>>;
+    @group(0) @binding(7) var<storage,read> pos:array<vec4<f32>>;
+    @group(0) @binding(8) var<storage,read> vel:array<vec4<f32>>;
+    fn splat(kind:u32, gx:f32, gy:f32, gz:f32, val:f32) {
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz));
+      let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0);
+      for(var dk=0;dk<=1;dk++){ for(var dj=0;dj<=1;dj++){ for(var di=0;di<=1;di++){
+        let i=i0+di; let j=j0+dj; let k=k0+dk;
+        let wt = select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1);
+        // per-component face bounds
+        if(kind==0u){ if(i<0||j<0||k<0||i>i32(pm.nx)||j>=i32(pm.ny)||k>=i32(pm.nz)){continue;}
+          let idx=ui(u32(i),u32(j),u32(k)); atomicAdd(&uN[idx],i32(val*wt*pm.scale)); atomicAdd(&uW[idx],i32(wt*pm.scale)); }
+        else if(kind==1u){ if(i<0||j<0||k<0||i>=i32(pm.nx)||j>i32(pm.ny)||k>=i32(pm.nz)){continue;}
+          let idx=vi(u32(i),u32(j),u32(k)); atomicAdd(&vN[idx],i32(val*wt*pm.scale)); atomicAdd(&vW[idx],i32(wt*pm.scale)); }
+        else { if(i<0||j<0||k<0||i>=i32(pm.nx)||j>=i32(pm.ny)||k>i32(pm.nz)){continue;}
+          let idx=wi(u32(i),u32(j),u32(k)); atomicAdd(&wN[idx],i32(val*wt*pm.scale)); atomicAdd(&wW[idx],i32(wt*pm.scale)); }
+      }}}
+    }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nParticles){return;} let p=pos[n].xyz; let v=vel[n].xyz;
+      splat(0u, p.x, p.y-0.5, p.z-0.5, v.x);
+      splat(1u, p.x-0.5, p.y, p.z-0.5, v.y);
+      splat(2u, p.x-0.5, p.y-0.5, p.z, v.z); }`;
+
+  w.norm = COMMON + `
+    @group(0) @binding(1) var<storage,read> uN:array<i32>; @group(0) @binding(2) var<storage,read> uW:array<i32>;
+    @group(0) @binding(3) var<storage,read> vN:array<i32>; @group(0) @binding(4) var<storage,read> vW:array<i32>;
+    @group(0) @binding(5) var<storage,read> wN:array<i32>; @group(0) @binding(6) var<storage,read> wW:array<i32>;
+    @group(0) @binding(7) var<storage,read_write> u:array<f32>; @group(0) @binding(8) var<storage,read_write> v:array<f32>;
+    @group(0) @binding(9) var<storage,read_write> ww:array<f32>; @group(0) @binding(10) var<storage,read_write> uP:array<f32>;
+    @group(0) @binding(11) var<storage,read_write> vP:array<f32>; @group(0) @binding(12) var<storage,read_write> wP:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x;
+      if(n<arrayLength(&u)){ let a=uW[n]; let val=select(0.0,f32(uN[n])/f32(a),a>0); u[n]=val; uP[n]=val; }
+      if(n<arrayLength(&v)){ let a=vW[n]; let val=select(0.0,f32(vN[n])/f32(a),a>0); v[n]=val; vP[n]=val; }
+      if(n<arrayLength(&ww)){ let a=wW[n]; let val=select(0.0,f32(wN[n])/f32(a),a>0); ww[n]=val; wP[n]=val; } }`;
+
+  w.mark = COMMON + `
+    @group(0) @binding(1) var<storage,read> pos:array<vec4<f32>>;
+    @group(0) @binding(2) var<storage,read_write> typeG:array<i32>;
+    @group(0) @binding(3) var<storage,read_write> v:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x;
+      if(n<arrayLength(&v)){ v[n]=v[n]+pm.gravity*pm.dt; }
+      if(n<pm.nParticles){ let p=pos[n].xyz; let i=i32(floor(p.x)); let j=i32(floor(p.y)); let k=i32(floor(p.z));
+        if(i>0&&j>0&&k>0&&i<i32(pm.nx)-1&&j<i32(pm.ny)-1&&k<i32(pm.nz)-1){ let c=ci(u32(i),u32(j),u32(k)); if(typeG[c]!=SOLID){typeG[c]=FLUID;} } } }`;
+
+  w.solid = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read_write> u:array<f32>; @group(0) @binding(3) var<storage,read_write> v:array<f32>;
+    @group(0) @binding(4) var<storage,read_write> ww:array<f32>;
+    @group(0) @binding(5) var<storage,read> bodyId:array<i32>;
+    @group(0) @binding(6) var<storage,read> bodies:array<vec4<f32>>;
+  ` + BODYFN + `
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x;
+      if(n<arrayLength(&u)){ let i=n%(pm.nx+1u); let j=(n/(pm.nx+1u))%pm.ny; let k=n/((pm.nx+1u)*pm.ny);
+        if(k<pm.nz && j<pm.ny){ var a=SOLID; var b=SOLID; var ba=-1; var bb=-1;
+          if(i>0u&&i<=pm.nx){a=typeG[ci(i-1u,j,k)]; ba=bodyId[ci(i-1u,j,k)];} if(i<pm.nx){b=typeG[ci(i,j,k)]; bb=bodyId[ci(i,j,k)];}
+          if(a==SOLID||b==SOLID){ let bid=select(ba,bb,bb>=0); if(bid>=0){ u[n]=bodyVelAt(u32(bid), vec3<f32>(f32(i),f32(j)+0.5,f32(k)+0.5)).x; } else { u[n]=0.0; } } } }
+      if(n<arrayLength(&v)){ let i=n%pm.nx; let j=(n/pm.nx)%(pm.ny+1u); let k=n/(pm.nx*(pm.ny+1u));
+        if(k<pm.nz){ var a=SOLID; var b=SOLID; var ba=-1; var bb=-1;
+          if(j>0u&&j<=pm.ny){a=typeG[ci(i,j-1u,k)]; ba=bodyId[ci(i,j-1u,k)];} if(j<pm.ny){b=typeG[ci(i,j,k)]; bb=bodyId[ci(i,j,k)];}
+          if(a==SOLID||b==SOLID){ let bid=select(ba,bb,bb>=0); if(bid>=0){ v[n]=bodyVelAt(u32(bid), vec3<f32>(f32(i)+0.5,f32(j),f32(k)+0.5)).y; } else { v[n]=0.0; } } } }
+      if(n<arrayLength(&ww)){ let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+        var a=SOLID; var b=SOLID; var ba=-1; var bb=-1;
+        if(k>0u&&k<=pm.nz){a=typeG[ci(i,j,k-1u)]; ba=bodyId[ci(i,j,k-1u)];} if(k<pm.nz){b=typeG[ci(i,j,k)]; bb=bodyId[ci(i,j,k)];}
+        if(a==SOLID||b==SOLID){ let bid=select(ba,bb,bb>=0); if(bid>=0){ ww[n]=bodyVelAt(u32(bid), vec3<f32>(f32(i)+0.5,f32(j)+0.5,f32(k))).z; } else { ww[n]=0.0; } } } }`;
+
+  w.div = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> u:array<f32>; @group(0) @binding(3) var<storage,read> v:array<f32>;
+    @group(0) @binding(4) var<storage,read> ww:array<f32>; @group(0) @binding(5) var<storage,read_write> dv:array<f32>;
+    @group(0) @binding(6) var<storage,read_write> p:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nx*pm.ny*pm.nz){return;} let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+      if(typeG[n]==FLUID){ dv[n]=u[ui(i+1u,j,k)]-u[ui(i,j,k)]+v[vi(i,j+1u,k)]-v[vi(i,j,k)]+ww[wi(i,j,k+1u)]-ww[wi(i,j,k)]; } else { dv[n]=0.0; p[n]=0.0; } }`;
+
+  w.jac = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> dv:array<f32>;
+    @group(0) @binding(3) var<storage,read> p:array<f32>;
+    @group(0) @binding(4) var<storage,read_write> pn:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nx*pm.ny*pm.nz){return;} let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+      if(i==0u||j==0u||k==0u||i>=pm.nx-1u||j>=pm.ny-1u||k>=pm.nz-1u||typeG[n]!=FLUID){ pn[n]=0.0; return; }
+      var denom=0.0; var sum=0.0;
+      let t0=typeG[ci(i-1u,j,k)]; let t1=typeG[ci(i+1u,j,k)]; let t2=typeG[ci(i,j-1u,k)]; let t3=typeG[ci(i,j+1u,k)]; let t4=typeG[ci(i,j,k-1u)]; let t5=typeG[ci(i,j,k+1u)];
+      if(t0!=SOLID){denom+=1.0; if(t0==FLUID){sum+=p[ci(i-1u,j,k)];}}
+      if(t1!=SOLID){denom+=1.0; if(t1==FLUID){sum+=p[ci(i+1u,j,k)];}}
+      if(t2!=SOLID){denom+=1.0; if(t2==FLUID){sum+=p[ci(i,j-1u,k)];}}
+      if(t3!=SOLID){denom+=1.0; if(t3==FLUID){sum+=p[ci(i,j+1u,k)];}}
+      if(t4!=SOLID){denom+=1.0; if(t4==FLUID){sum+=p[ci(i,j,k-1u)];}}
+      if(t5!=SOLID){denom+=1.0; if(t5==FLUID){sum+=p[ci(i,j,k+1u)];}}
+      pn[n]=select(0.0,(sum - dv[n]/pm.dt)/denom, denom>0.0); }`;
+
+  w.applyP = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> p:array<f32>;
+    @group(0) @binding(3) var<storage,read_write> u:array<f32>; @group(0) @binding(4) var<storage,read_write> v:array<f32>;
+    @group(0) @binding(5) var<storage,read_write> ww:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x;
+      if(n<arrayLength(&u)){ let i=n%(pm.nx+1u); let j=(n/(pm.nx+1u))%pm.ny; let k=n/((pm.nx+1u)*pm.ny);
+        if(k<pm.nz&&j<pm.ny&&i>0u&&i<pm.nx){ let a=ci(i-1u,j,k); let b=ci(i,j,k);
+          if(typeG[a]!=SOLID&&typeG[b]!=SOLID&&(typeG[a]==FLUID||typeG[b]==FLUID)){ u[n]=u[n]-pm.dt*(p[b]-p[a]); } } }
+      if(n<arrayLength(&v)){ let i=n%pm.nx; let j=(n/pm.nx)%(pm.ny+1u); let k=n/(pm.nx*(pm.ny+1u));
+        if(k<pm.nz&&j>0u&&j<pm.ny){ let a=ci(i,j-1u,k); let b=ci(i,j,k);
+          if(typeG[a]!=SOLID&&typeG[b]!=SOLID&&(typeG[a]==FLUID||typeG[b]==FLUID)){ v[n]=v[n]-pm.dt*(p[b]-p[a]); } } }
+      if(n<arrayLength(&ww)){ let i=n%pm.nx; let j=(n/pm.nx)%pm.ny; let k=n/(pm.nx*pm.ny);
+        if(k>0u&&k<pm.nz){ let a=ci(i,j,k-1u); let b=ci(i,j,k);
+          if(typeG[a]!=SOLID&&typeG[b]!=SOLID&&(typeG[a]==FLUID||typeG[b]==FLUID)){ ww[n]=ww[n]-pm.dt*(p[b]-p[a]); } } } }`;
+
+  const g2pSrc = COMMON + `
+    @group(0) @binding(1) var<storage,read> u:array<f32>; @group(0) @binding(2) var<storage,read> v:array<f32>;
+    @group(0) @binding(3) var<storage,read> ww:array<f32>; @group(0) @binding(4) var<storage,read> uP:array<f32>;
+    @group(0) @binding(5) var<storage,read> vP:array<f32>; @group(0) @binding(6) var<storage,read> wP:array<f32>;
+    @group(0) @binding(7) var<storage,read_write> pos:array<vec4<f32>>; @group(0) @binding(8) var<storage,read_write> vel:array<vec4<f32>>;
+    @group(0) @binding(9) var<storage,read> bodies:array<vec4<f32>>;
+  ` + BODYFN + `
+    fn clampi(x:i32,lo:i32,hi:i32)->i32 { return max(lo,min(hi,x)); }
+    fn sU(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx)+1; let H=i32(pm.ny); let D=i32(pm.nz);
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*u[i+W*(j+H*k)]; }}} return s; }
+    fn sUP(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx)+1; let H=i32(pm.ny); let D=i32(pm.nz);
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*uP[i+W*(j+H*k)]; }}} return s; }
+    fn sV(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx); let H=i32(pm.ny)+1; let D=i32(pm.nz);
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*v[i+W*(j+H*k)]; }}} return s; }
+    fn sVP(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx); let H=i32(pm.ny)+1; let D=i32(pm.nz);
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*vP[i+W*(j+H*k)]; }}} return s; }
+    fn sW(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx); let H=i32(pm.ny); let D=i32(pm.nz)+1;
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*ww[i+W*(j+H*k)]; }}} return s; }
+    fn sWP(gx:f32,gy:f32,gz:f32)->f32 { let W=i32(pm.nx); let H=i32(pm.ny); let D=i32(pm.nz)+1;
+      let i0=i32(floor(gx)); let j0=i32(floor(gy)); let k0=i32(floor(gz)); let fx=gx-f32(i0); let fy=gy-f32(j0); let fz=gz-f32(k0); var s=0.0;
+      for(var dk=0;dk<=1;dk++){for(var dj=0;dj<=1;dj++){for(var di=0;di<=1;di++){
+        let i=clampi(i0+di,0,W-1); let j=clampi(j0+dj,0,H-1); let k=clampi(k0+dk,0,D-1);
+        s+=select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*select(1.0-fz,fz,dk==1)*wP[i+W*(j+H*k)]; }}} return s; }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n=g.x; if(n>=pm.nParticles){return;} var p=pos[n].xyz; var vv=vel[n].xyz;
+      let picU=sU(p.x,p.y-0.5,p.z-0.5); let picV=sV(p.x-0.5,p.y,p.z-0.5); let picW=sW(p.x-0.5,p.y-0.5,p.z);
+      let dU=picU-sUP(p.x,p.y-0.5,p.z-0.5); let dV=picV-sVP(p.x-0.5,p.y,p.z-0.5); let dW=picW-sWP(p.x-0.5,p.y-0.5,p.z);
+      let r=pm.flip;
+      vv.x=r*(vv.x+dU)+(1.0-r)*picU; vv.y=r*(vv.y+dV)+(1.0-r)*picV; vv.z=r*(vv.z+dW)+(1.0-r)*picW;
+      // RK2 advect
+      let um=sU(p.x,p.y-0.5,p.z-0.5); let vm=sV(p.x-0.5,p.y,p.z-0.5); let wm=sW(p.x-0.5,p.y-0.5,p.z);
+      let mx=p.x+0.5*pm.dt*um; let my=p.y+0.5*pm.dt*vm; let mz=p.z+0.5*pm.dt*wm;
+      let u2=sU(mx,my-0.5,mz-0.5); let v2=sV(mx-0.5,my,mz-0.5); let w2=sW(mx-0.5,my-0.5,mz);
+      p.x=p.x+pm.dt*u2; p.y=p.y+pm.dt*v2; p.z=p.z+pm.dt*w2;
+      let lo=1.001; let hx=f32(pm.nx)-1.001; let hy=f32(pm.ny)-1.001; let hz=f32(pm.nz)-1.001;
+      if(p.x<lo){p.x=lo; if(vv.x<0.0){vv.x=0.0;}} if(p.x>hx){p.x=hx; if(vv.x>0.0){vv.x=0.0;}}
+      if(p.y<lo){p.y=lo; if(vv.y<0.0){vv.y=0.0;}} if(p.y>hy){p.y=hy; if(vv.y>0.0){vv.y=0.0;}}
+      if(p.z<lo){p.z=lo; if(vv.z<0.0){vv.z=0.0;}} if(p.z>hz){p.z=hz; if(vv.z>0.0){vv.z=0.0;}}
+      // eject from bodies (no-penetration safety net): push to surface, kill inward relative velocity, keep slip
+      for(var b=0u; b<pm.nBodies; b++){
+        let base=b*4u; let b0=bodies[base]; let b1=bodies[base+1u]; let c=vec3<f32>(b0.y,b0.z,b0.w); let d=p-c;
+        if(b0.x < 0.5){
+          let dist=length(d);
+          if(dist < b1.w && dist>1e-5){ let nrm=d/dist; p = c + nrm*b1.w*1.01; let bv=bodyVelAt(b,p); let vn=dot(vv-bv,nrm); if(vn<0.0){ vv=vv-vn*nrm; } }
+        } else {
+          if(abs(d.x)<b1.x && abs(d.y)<b1.y && abs(d.z)<b1.z){
+            let px=b1.x-abs(d.x); let py=b1.y-abs(d.y); let pz=b1.z-abs(d.z);
+            var nrm=vec3<f32>(0.0,0.0,0.0);
+            let sx=select(-1.0,1.0,d.x>=0.0); let sy=select(-1.0,1.0,d.y>=0.0); let sz=select(-1.0,1.0,d.z>=0.0);
+            if(px<=py && px<=pz){ nrm=vec3<f32>(sx,0.0,0.0); p.x=c.x+b1.x*sx*1.01; }
+            else if(py<=pz){ nrm=vec3<f32>(0.0,sy,0.0); p.y=c.y+b1.y*sy*1.01; }
+            else { nrm=vec3<f32>(0.0,0.0,sz); p.z=c.z+b1.z*sz*1.01; }
+            let bv=bodyVelAt(b,p); let vn=dot(vv-bv,nrm); if(vn<0.0){ vv=vv-vn*nrm; }
+          }
+        }
+      }
+      pos[n]=vec4<f32>(p,1.0); vel[n]=vec4<f32>(vv,0.0); }`;
+
+  // ---- render: impostor-sphere particles with liquid-glass shading ----
+  const renderSrc = `
+    struct Cam { vp:mat4x4<f32>, right:vec4<f32>, up:vec4<f32>, eye:vec4<f32>, params:vec4<f32> };
+    @group(0) @binding(0) var<uniform> cam:Cam;
+    @group(0) @binding(1) var<storage,read> pos:array<vec4<f32>>;
+    @group(0) @binding(2) var<storage,read> vel:array<vec4<f32>>;
+    struct VOut { @builtin(position) clip:vec4<f32>, @location(0) uv:vec2<f32>, @location(1) col:vec3<f32>, @location(2) vdir:vec3<f32> };
+    @vertex fn vs(@builtin(vertex_index) vtx:u32, @builtin(instance_index) inst:u32) -> VOut {
+      var cn = array<vec2<f32>,6>(vec2(-1.,-1.),vec2(1.,-1.),vec2(-1.,1.),vec2(-1.,1.),vec2(1.,-1.),vec2(1.,1.));
+      let c = cn[vtx]; let rad = cam.params.x;
+      let center = pos[inst].xyz;
+      let world = center + cam.right.xyz*c.x*rad + cam.up.xyz*c.y*rad;
+      var o:VOut; o.clip = cam.vp * vec4<f32>(world,1.0); o.uv = c;
+      let sp = clamp(length(vel[inst].xyz)/12.0, 0.0, 1.0);
+      let teal=vec3<f32>(0.20,0.62,0.78); let gold=vec3<f32>(0.98,0.78,0.30); let white=vec3<f32>(1.0,1.0,1.0);
+      o.col = select(mix(teal,gold,sp*2.0), mix(gold,white,(sp-0.5)*2.0), sp>0.5);
+      o.vdir = normalize(center - cam.eye.xyz);
+      return o; }
+    @fragment fn fs(i:VOut) -> @location(0) vec4<f32> {
+      let r2 = dot(i.uv,i.uv); if(r2>1.0){ discard; }
+      let nz = sqrt(1.0-r2);
+      let N = vec3<f32>(i.uv, nz);                       // impostor sphere normal (view space)
+      let V = vec3<f32>(0.0,0.0,1.0);
+      let L = normalize(vec3<f32>(0.5,0.7,0.6));
+      let diff = clamp(dot(N,L),0.0,1.0);
+      let fres = pow(1.0 - clamp(N.z,0.0,1.0), 3.0);      // rim / fresnel
+      if(cam.params.y < 0.5){                             // plain shading
+        let col = i.col*(0.35+0.65*diff) + fres*0.5;
+        return vec4<f32>(col,1.0);
+      }
+      // liquid-glass: fake refraction of an environment gradient by the normal, + chromatic split + rim
+      let env = mix(vec3<f32>(0.02,0.05,0.12), vec3<f32>(0.10,0.22,0.30), 0.5+0.5*N.y);
+      let refr = N.xy * 0.35;                              // displacement
+      let cr = mix(env, i.col, 0.5+0.3*refr.x+0.15);       // chromatic-ish channel offsets
+      let cg = mix(env, i.col, 0.5+0.3*(refr.x*0.0));
+      let cb = mix(env, i.col, 0.5-0.3*refr.x+0.15);
+      var glass = vec3<f32>(cr.r, cg.g, cb.b);
+      let spec = pow(clamp(dot(reflect(-L,N),V),0.0,1.0), 40.0);
+      glass = glass*(0.55+0.45*diff) + fres*vec3<f32>(0.6,0.85,1.0)*0.8 + spec*1.2;
+      return vec4<f32>(glass,1.0); }`;
+
+  function comp(code) { return device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } }); }
+  const pClear = comp(w.clear), pP2G = comp(w.p2g), pNorm = comp(w.norm), pMark = comp(w.mark),
+        pStamp = comp(w.stamp), pBodyForce = comp(w.bodyForce),
+        pSolid = comp(w.solid), pDiv = comp(w.div), pJac = comp(w.jac), pApply = comp(w.applyP), pG2P = comp(g2pSrc);
+  const rmod = device.createShaderModule({ code: renderSrc });
+  const pRender = device.createRenderPipeline({ layout: "auto",
+    vertex: { module: rmod, entryPoint: "vs" }, fragment: { module: rmod, entryPoint: "fs", targets: [{ format: fmt }] },
+    primitive: { topology: "triangle-list" }, depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" } });
+  // body markers: amber impostor spheres (bounding sphere) so you can see where the rigid bodies are
+  const bodyRenderSrc = `
+    struct Cam { vp:mat4x4<f32>, right:vec4<f32>, up:vec4<f32>, eye:vec4<f32>, params:vec4<f32> };
+    @group(0) @binding(0) var<uniform> cam:Cam;
+    @group(0) @binding(1) var<storage,read> bodies:array<vec4<f32>>;
+    struct VO { @builtin(position) clip:vec4<f32>, @location(0) uv:vec2<f32> };
+    @vertex fn vs(@builtin(vertex_index) vtx:u32, @builtin(instance_index) inst:u32) -> VO {
+      var cn = array<vec2<f32>,6>(vec2(-1.,-1.),vec2(1.,-1.),vec2(-1.,1.),vec2(-1.,1.),vec2(1.,-1.),vec2(1.,1.));
+      let base=inst*4u; let b0=bodies[base]; let b1=bodies[base+1u]; let center=vec3<f32>(b0.y,b0.z,b0.w);
+      let rad = select(length(b1.xyz), b1.w, b0.x < 0.5);
+      let c=cn[vtx]; let world = center + cam.right.xyz*c.x*rad + cam.up.xyz*c.y*rad;
+      var o:VO; o.clip=cam.vp*vec4<f32>(world,1.0); o.uv=c; return o; }
+    @fragment fn fs(i:VO)->@location(0) vec4<f32> {
+      let r2=dot(i.uv,i.uv); if(r2>1.0){discard;} let nz=sqrt(1.0-r2);
+      let N=vec3<f32>(i.uv,nz); let L=normalize(vec3<f32>(0.5,0.7,0.6));
+      let diff=clamp(dot(N,L),0.0,1.0); let fres=pow(1.0-clamp(N.z,0.0,1.0),3.0);
+      let amber=vec3<f32>(0.95,0.62,0.22);
+      return vec4<f32>(amber*(0.4+0.6*diff) + fres*vec3<f32>(1.0,0.85,0.5)*0.7, 1.0); }`;
+  const brmod = device.createShaderModule({ code: bodyRenderSrc });
+  const pBody = device.createRenderPipeline({ layout: "auto",
+    vertex: { module: brmod, entryPoint: "vs" }, fragment: { module: brmod, entryPoint: "fs", targets: [{ format: fmt }] },
+    primitive: { topology: "triangle-list" }, depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" } });
+
+  // oriented-box wireframe overlay: box-type bodies draw their 12 edges rotated by the orientation quaternion, so
+  // the fluid torque -> spin is VISIBLE (impostor spheres are rotation-invariant, so ball-type bodies are skipped).
+  const boxWireSrc = `
+    struct Cam { vp:mat4x4<f32>, right:vec4<f32>, up:vec4<f32>, eye:vec4<f32>, params:vec4<f32> };
+    @group(0) @binding(0) var<uniform> cam:Cam;
+    @group(0) @binding(1) var<storage,read> bodies:array<vec4<f32>>;
+    @group(0) @binding(2) var<storage,read> quats:array<vec4<f32>>;
+    var<private> E = array<vec3<f32>,24>(
+      vec3<f32>(-1,-1,-1),vec3<f32>(1,-1,-1), vec3<f32>(-1,1,-1),vec3<f32>(1,1,-1), vec3<f32>(-1,-1,1),vec3<f32>(1,-1,1), vec3<f32>(-1,1,1),vec3<f32>(1,1,1),
+      vec3<f32>(-1,-1,-1),vec3<f32>(-1,1,-1), vec3<f32>(1,-1,-1),vec3<f32>(1,1,-1), vec3<f32>(-1,-1,1),vec3<f32>(-1,1,1), vec3<f32>(1,-1,1),vec3<f32>(1,1,1),
+      vec3<f32>(-1,-1,-1),vec3<f32>(-1,-1,1), vec3<f32>(1,-1,-1),vec3<f32>(1,-1,1), vec3<f32>(-1,1,-1),vec3<f32>(-1,1,1), vec3<f32>(1,1,-1),vec3<f32>(1,1,1));
+    struct VO { @builtin(position) clip:vec4<f32> };
+    @vertex fn vs(@builtin(vertex_index) v:u32, @builtin(instance_index) inst:u32) -> VO {
+      let base=inst*4u; let b0=bodies[base]; let b1=bodies[base+1u]; var o:VO;
+      if(b0.x < 0.5){ o.clip=vec4<f32>(2.0,2.0,2.0,1.0); return o; }
+      let center=vec3<f32>(b0.y,b0.z,b0.w); let corner=E[v]*b1.xyz; let q=quats[inst];
+      let t=2.0*cross(q.xyz,corner); let wr=corner + q.w*t + cross(q.xyz,t);
+      o.clip=cam.vp*vec4<f32>(center+wr,1.0); return o; }
+    @fragment fn fs()->@location(0) vec4<f32>{ return vec4<f32>(0.55,0.95,1.0,1.0); }`;
+  const bwmod = device.createShaderModule({ code: boxWireSrc });
+  const pBoxWire = device.createRenderPipeline({ layout: "auto",
+    vertex: { module: bwmod, entryPoint: "vs" }, fragment: { module: bwmod, entryPoint: "fs", targets: [{ format: fmt }] },
+    primitive: { topology: "line-list" }, depthStencil: { format: "depth24plus", depthWriteEnabled: true, depthCompare: "less" } });
+
+  const bg = (pipe, arr) => device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: arr.map((b, i) => ({ binding: i, resource: { buffer: b } })) });
+
+  // ---- seeding ----
+  let nParticles = 0; const posArr = new Float32Array(MAX_P * 4), velArr = new Float32Array(MAX_P * 4);
+  let rs = 12345; const rng = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
+  function seed(x0, y0, z0, x1, y1, z1, per = 2) {
+    nParticles = 0; const st = 1 / per;
+    for (let z = z0 + st * .5; z < z1 && nParticles < MAX_P; z += st) for (let y = y0 + st * .5; y < y1 && nParticles < MAX_P; y += st) for (let x = x0 + st * .5; x < x1 && nParticles < MAX_P; x += st) {
+      const o = nParticles * 4; posArr[o] = x + (rng() - .5) * st * .5; posArr[o + 1] = y + (rng() - .5) * st * .5; posArr[o + 2] = z + (rng() - .5) * st * .5; posArr[o + 3] = 1;
+      velArr[o] = 0; velArr[o + 1] = 0; velArr[o + 2] = 0; velArr[o + 3] = 0; nParticles++;
+    }
+    device.queue.writeBuffer(bufPos, 0, posArr, 0, nParticles * 4);
+    device.queue.writeBuffer(bufVel, 0, velArr, 0, nParticles * 4);
+    device.queue.writeBuffer(bufType, 0, new Int32Array(N_C)); device.queue.writeBuffer(bufP, 0, new Float32Array(N_C));
+  }
+  const presets = { drop: () => seed(NX * .3, NY * .55, NZ * .3, NX * .7, NY * .9, NZ * .7, 2), dam: () => seed(2, 2, 2, NX * .4, NY * .8, NZ - 2, 2) };
+  presets.drop();
+
+  let flip = 0.93, iters = 40, paused = false, glass = 1;
+  // ---- rigid bodies (JS-side kinematics; uploaded to the GPU each frame) ----
+  const bodies = [];
+  const bodyArr = new Float32Array(MAX_BODIES * 16);   // 4 vec4 per body
+  const bodyForces = [];                                // per-body {fx,fy,fz,tx,ty,tz} read back from the GPU reduction, ~1-2 frame latency
+  let bfMapping = false;                                 // guards overlapping mapAsync
+  const qmul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  function stepBodies(dt) {
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i]; if (b.fixed) continue;
+      b.vy += -12 * dt;                                 // gravity
+      const f = bodyForces[i];                          // fluid force + torque from the GPU reduction
+      if (f && b.mass) { b.vx += f.fx / b.mass * dt; b.vy += f.fy / b.mass * dt; b.vz += f.fz / b.mass * dt; }
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      // TORQUE -> spin: integrate angular velocity + orientation quaternion, then feed the spin back to the fluid
+      // (uploadBodies pushes wx/wy/wz into the bodies buffer, which the GPU stamp/solid velocity sampling reads).
+      if (f && b.I) { b.avel[0] += f.tx / b.I * dt; b.avel[1] += f.ty / b.I * dt; b.avel[2] += f.tz / b.I * dt; }
+      const w = b.avel, dq = qmul([w[0], w[1], w[2], 0], b.quat);
+      for (let k = 0; k < 4; k++) b.quat[k] += 0.5 * dq[k] * dt;
+      const qn = Math.hypot(b.quat[0], b.quat[1], b.quat[2], b.quat[3]) || 1; for (let k = 0; k < 4; k++) b.quat[k] /= qn;
+      for (let k = 0; k < 3; k++) b.avel[k] *= 0.995;   // light angular damping
+      b.wx = b.avel[0]; b.wy = b.avel[1]; b.wz = b.avel[2];
+      const rad = b.type === 0 ? b.r : Math.hypot(b.hx, b.hy, b.hz);
+      const lo = 1 + rad, hiX = NX - 1 - rad, hiY = NY - 1 - rad, hiZ = NZ - 1 - rad;
+      if (b.x < lo) { b.x = lo; b.vx = -b.vx * 0.2; } if (b.x > hiX) { b.x = hiX; b.vx = -b.vx * 0.2; }
+      if (b.y < lo) { b.y = lo; b.vy = -b.vy * 0.2; } if (b.y > hiY) { b.y = hiY; b.vy = -b.vy * 0.2; }
+      if (b.z < lo) { b.z = lo; b.vz = -b.vz * 0.2; } if (b.z > hiZ) { b.z = hiZ; b.vz = -b.vz * 0.2; }
+    }
+  }
+  function uploadBodies() {
+    const n = Math.min(bodies.length, MAX_BODIES);
+    for (let i = 0; i < n; i++) { const b = bodies[i], o = i * 16;
+      bodyArr[o] = b.type; bodyArr[o + 1] = b.x; bodyArr[o + 2] = b.y; bodyArr[o + 3] = b.z;
+      bodyArr[o + 4] = b.type === 0 ? 0 : b.hx; bodyArr[o + 5] = b.type === 0 ? 0 : b.hy; bodyArr[o + 6] = b.type === 0 ? 0 : b.hz; bodyArr[o + 7] = b.type === 0 ? b.r : 0;
+      bodyArr[o + 8] = b.vx; bodyArr[o + 9] = b.vy; bodyArr[o + 10] = b.vz; bodyArr[o + 11] = 0;
+      bodyArr[o + 12] = b.wx || 0; bodyArr[o + 13] = b.wy || 0; bodyArr[o + 14] = b.wz || 0; bodyArr[o + 15] = 0;
+      const q = b.quat || [0, 0, 0, 1], qo = i * 4; quatArr[qo] = q[0]; quatArr[qo + 1] = q[1]; quatArr[qo + 2] = q[2]; quatArr[qo + 3] = q[3];
+    }
+    device.queue.writeBuffer(bufBodies, 0, bodyArr, 0, n * 16);
+    device.queue.writeBuffer(bufBodyQuat, 0, quatArr, 0, n * 4);
+    return n;
+  }
+  function writeParams(dt, nb) { const f = new ArrayBuffer(48); const d = new DataView(f);
+    d.setUint32(0, NX, true); d.setUint32(4, NY, true); d.setUint32(8, NZ, true); d.setFloat32(12, dt, true);
+    d.setFloat32(16, -12, true); d.setFloat32(20, flip, true); d.setFloat32(24, SCALE, true); d.setUint32(28, nParticles, true); d.setUint32(32, nb, true);
+    device.queue.writeBuffer(bufParams, 0, f); }
+
+  // ---- camera ----
+  let yaw = 0.7, pitch = 0.5, dist = NX * 1.9;
+  function writeCam() {
+    const cx = NX / 2, cy = NY / 2, cz = NZ / 2;
+    const eye = [cx + dist * Math.cos(pitch) * Math.sin(yaw), cy + dist * Math.sin(pitch), cz + dist * Math.cos(pitch) * Math.cos(yaw)];
+    const view = M.lookAt(eye, [cx, cy, cz], [0, 1, 0]);
+    const proj = M.persp(1.05, cvs.width / cvs.height, 0.5, 1000);
+    const vp = M.mul(proj, view);
+    // camera right/up in world (from view matrix rows)
+    const right = [view[0], view[4], view[8]], up = [view[1], view[5], view[9]];
+    const buf = new Float32Array(64);
+    for (let n = 0; n < 16; n++) buf[n] = vp[n];
+    buf[16] = right[0]; buf[17] = right[1]; buf[18] = right[2]; buf[19] = 0;
+    buf[20] = up[0]; buf[21] = up[1]; buf[22] = up[2]; buf[23] = 0;
+    buf[24] = eye[0]; buf[25] = eye[1]; buf[26] = eye[2]; buf[27] = 0;
+    buf[28] = 0.9; buf[29] = glass; buf[30] = 0; buf[31] = 0;   // params: radius, glass flag
+    device.queue.writeBuffer(bufCam, 0, buf);
+  }
+
+  const WG = n => Math.ceil(n / 64); const big = Math.max(N_U, N_V, N_W, N_C);
+  function frame() {
+    if (!paused) {
+      const dt = 1 / 60; stepBodies(dt); const nb = uploadBodies(); writeParams(dt, nb);
+      const enc = device.createCommandEncoder(); enc.clearBuffer(bufBodyForce); const pass = enc.beginComputePass();
+      pass.setPipeline(pClear); pass.setBindGroup(0, bg(pClear, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufWNum, bufWWt, bufType])); pass.dispatchWorkgroups(WG(big));
+      pass.setPipeline(pP2G); pass.setBindGroup(0, bg(pP2G, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufWNum, bufWWt, bufPos, bufVel])); pass.dispatchWorkgroups(WG(nParticles));
+      pass.setPipeline(pNorm); pass.setBindGroup(0, bg(pNorm, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufWNum, bufWWt, bufU, bufV, bufW, bufUP, bufVP, bufWP])); pass.dispatchWorkgroups(WG(big));
+      pass.setPipeline(pMark); pass.setBindGroup(0, bg(pMark, [bufParams, bufPos, bufType, bufV])); pass.dispatchWorkgroups(WG(Math.max(nParticles, N_V)));
+      pass.setPipeline(pStamp); pass.setBindGroup(0, bg(pStamp, [bufParams, bufType, bufBodyId, bufBodies])); pass.dispatchWorkgroups(WG(N_C));
+      pass.setPipeline(pSolid); pass.setBindGroup(0, bg(pSolid, [bufParams, bufType, bufU, bufV, bufW, bufBodyId, bufBodies])); pass.dispatchWorkgroups(WG(big));
+      pass.setPipeline(pDiv); pass.setBindGroup(0, bg(pDiv, [bufParams, bufType, bufU, bufV, bufW, bufDiv, bufP])); pass.dispatchWorkgroups(WG(N_C));
+      let src = bufP, dst = bufPN;
+      for (let it = 0; it < iters; it++) { pass.setPipeline(pJac); pass.setBindGroup(0, bg(pJac, [bufParams, bufType, bufDiv, src, dst])); pass.dispatchWorkgroups(WG(N_C)); const t = src; src = dst; dst = t; }
+      pass.setPipeline(pApply); pass.setBindGroup(0, bg(pApply, [bufParams, bufType, src, bufU, bufV, bufW])); pass.dispatchWorkgroups(WG(big));
+      pass.setPipeline(pSolid); pass.setBindGroup(0, bg(pSolid, [bufParams, bufType, bufU, bufV, bufW, bufBodyId, bufBodies])); pass.dispatchWorkgroups(WG(big));
+      pass.setPipeline(pBodyForce); pass.setBindGroup(0, bg(pBodyForce, [bufParams, bufType, bufBodyId, src, bufBodies, bufBodyForce])); pass.dispatchWorkgroups(WG(N_C));   // two-way: sum pressure force+torque per body
+      pass.setPipeline(pG2P); pass.setBindGroup(0, bg(pG2P, [bufParams, bufU, bufV, bufW, bufUP, bufVP, bufWP, bufPos, bufVel, bufBodies])); pass.dispatchWorkgroups(WG(nParticles));
+      pass.end();
+      if (src !== bufP) enc.copyBufferToBuffer(src, 0, bufP, 0, N_C * 4);
+      const doRead = !bfMapping && bodies.length > 0;
+      if (doRead) enc.copyBufferToBuffer(bufBodyForce, 0, bufBodyForceStaging, 0, MAX_BODIES * BF_STRIDE * 4);
+      device.queue.submit([enc.finish()]);
+      if (doRead) {
+        bfMapping = true;
+        bufBodyForceStaging.mapAsync(GPUMapMode.READ).then(() => {
+          const a = new Int32Array(bufBodyForceStaging.getMappedRange()).slice(); bufBodyForceStaging.unmap();
+          for (let i = 0; i < bodies.length; i++) { const o = i * BF_STRIDE; bodyForces[i] = { fx: a[o] / BF_SCALE, fy: a[o + 1] / BF_SCALE, fz: a[o + 2] / BF_SCALE, tx: a[o + 3] / BF_SCALE, ty: a[o + 4] / BF_SCALE, tz: a[o + 5] / BF_SCALE }; }
+          bfMapping = false;
+        }).catch(() => { bfMapping = false; });
+      }
+    }
+    writeCam();
+    const enc2 = device.createCommandEncoder();
+    const rp = enc2.beginRenderPass({
+      colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.008, g: 0.014, b: 0.03, a: 1 }, loadOp: "clear", storeOp: "store" }],
+      depthStencilAttachment: { view: depthTex.createView(), depthClearValue: 1.0, depthLoadOp: "clear", depthStoreOp: "store" } });
+    rp.setPipeline(pRender); rp.setBindGroup(0, device.createBindGroup({ layout: pRender.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bufCam } }, { binding: 1, resource: { buffer: bufPos } }, { binding: 2, resource: { buffer: bufVel } }] }));
+    rp.draw(6, nParticles);
+    if (bodies.length > 0) { rp.setPipeline(pBody); rp.setBindGroup(0, device.createBindGroup({ layout: pBody.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bufCam } }, { binding: 1, resource: { buffer: bufBodies } }] })); rp.draw(6, Math.min(bodies.length, MAX_BODIES)); 
+      rp.setPipeline(pBoxWire); rp.setBindGroup(0, device.createBindGroup({ layout: pBoxWire.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: bufCam } }, { binding: 1, resource: { buffer: bufBodies } }, { binding: 2, resource: { buffer: bufBodyQuat } }] })); rp.draw(24, Math.min(bodies.length, MAX_BODIES)); }
+    rp.end(); device.queue.submit([enc2.finish()]);
+    statEl.textContent = nParticles.toLocaleString() + " particles \u00b7 " + bodies.length + " bodies \u00b7 " + NX + "\u00b3 grid";
+    requestAnimationFrame(frame);
+  }
+
+  function resize() { const dpr = Math.min(window.devicePixelRatio || 1, 2); cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr;
+    depthTex = device.createTexture({ size: [cvs.width, cvs.height], format: "depth24plus", usage: GPUTextureUsage.RENDER_ATTACHMENT }); }
+  addEventListener("resize", resize); resize();
+
+  // orbit controls
+  let drag = false, lx = 0, ly = 0;
+  cvs.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; cvs.setPointerCapture(e.pointerId); });
+  cvs.addEventListener("pointerup", e => { drag = false; });
+  cvs.addEventListener("pointermove", e => { if (!drag) return; yaw -= (e.clientX - lx) * 0.008; pitch = Math.max(-1.4, Math.min(1.4, pitch + (e.clientY - ly) * 0.008)); lx = e.clientX; ly = e.clientY; });
+  cvs.addEventListener("wheel", e => { e.preventDefault(); dist = Math.max(NX * 0.7, Math.min(NX * 4, dist * (1 + e.deltaY * 0.001))); }, { passive: false });
+
+  document.getElementById("drop").onclick = () => presets.drop();
+  document.getElementById("dam").onclick = () => presets.dam();
+  const pb = document.getElementById("pause"); pb.onclick = () => { paused = !paused; pb.textContent = paused ? "Play" : "Pause"; pb.className = paused ? "on" : ""; };
+  const gb = document.getElementById("glass"); gb.onclick = () => { glass = glass ? 0 : 1; gb.className = glass ? "on" : ""; };
+  function dropBody(kind) {
+    const x = 6 + Math.random() * (NX - 12), z = 6 + Math.random() * (NZ - 12), y = NY - 6;
+    const density = 0.3 + Math.random() * 1.8;   // < 1 floats, > 1 sinks
+    const rot = [Math.random() * 0.4 - 0.2, Math.random() * 0.4 - 0.2, Math.random() * 0.4 - 0.2, 1]; const rn = Math.hypot(...rot); for (let k = 0; k < 4; k++) rot[k] /= rn;   // small random initial tilt
+    if (kind === "box") { const h = 2.5 + Math.random() * 1.3; const m = density * 8 * h * h * h; bodies.push({ type: 1, x, y, z, hx: h, hy: h, hz: h, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0, fixed: false, density, mass: m, I: m * h * h * 2 / 3, quat: rot, avel: [0, 0, 0] }); }
+    else { const r = 2.5 + Math.random() * 1.5; const m = density * (4 / 3) * Math.PI * r * r * r; bodies.push({ type: 0, x, y, z, r, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0, fixed: false, density, mass: m, I: m * r * r * 0.4, quat: [0, 0, 0, 1], avel: [0, 0, 0] }); }
+    if (bodies.length > MAX_BODIES) { bodies.shift(); bodyForces.shift(); }
+  }
+  document.getElementById("dropbox").onclick = () => dropBody("box");
+  document.getElementById("dropball").onclick = () => dropBody("ball");
+  document.getElementById("flip").oninput = e => { flip = e.target.value / 100; document.getElementById("flipv").textContent = flip.toFixed(2); };
+  document.getElementById("iters").oninput = e => { iters = +e.target.value; document.getElementById("itersv").textContent = iters; };
+
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

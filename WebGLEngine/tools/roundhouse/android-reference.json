@@ -1,0 +1,298 @@
+{
+  "kind": "swek-android-transcript",
+  "version": 2920,
+  "at": "2026-07-24T19:21:05.751Z",
+  "budgetMs": 100000,
+  "note": "reference produced sequentially (concurrency 1) on a 1-cpu container; two slow checks excluded by the shared budget, which is the exclusion rule doing its job | v2921: magmapAndroid appended under the same budget | v2922: androidPeerBridge appended under the same budget | v2923: androidInvite appended | v2924: peerVisibility appended | v2925: iosPeer + portableSuite appended | v2926: audit fixes (trust gate, remoteVisitors, docs)",
+  "host": {
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v22.22.2",
+    "osRelease": "6.18.5",
+    "cpus": 1,
+    "totalMemMB": 3998,
+    "libc": "glibc 2.39"
+  },
+  "probes": null,
+  "checks": [
+    {
+      "name": "agentTrace",
+      "status": "pass",
+      "ms": 72,
+      "exitCode": 0,
+      "tail": "agentTrace-selfcheck: all pass"
+    },
+    {
+      "name": "airyRefined",
+      "status": "pass",
+      "ms": 34990,
+      "exitCode": 0,
+      "tail": "airyRefined-selfcheck: all checks pass"
+    },
+    {
+      "name": "androidInvite",
+      "status": "pass",
+      "ms": 76,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the consent ladder holds as behaviour, not just as a comment"
+    },
+    {
+      "name": "androidPeer",
+      "status": "pass",
+      "ms": 102,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- prerequisites hold statically; five claims now wait on real hardware (root: /home/claude/swek/SweK_Engine_v2912/WebGLEngine)"
+    },
+    {
+      "name": "androidPeerBridge",
+      "status": "pass",
+      "ms": 328,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the front door is gated; install it with: node ai-bridge/installAndroidPeerBridge.mjs"
+    },
+    {
+      "name": "androidVerdict",
+      "status": "pass",
+      "ms": 4641,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the grader is graded; the phone can now vote"
+    },
+    {
+      "name": "blackHoleBind",
+      "status": "pass",
+      "ms": 1053,
+      "exitCode": 0,
+      "tail": "blackHoleBind-selfcheck: all checks pass"
+    },
+    {
+      "name": "blobKelvinBind",
+      "status": "pass",
+      "ms": 93,
+      "exitCode": 0,
+      "tail": "blobKelvinBind-selfcheck: all checks pass"
+    },
+    {
+      "name": "blobThermalBind",
+      "status": "pass",
+      "ms": 543,
+      "exitCode": 0,
+      "tail": "blobThermalBind-selfcheck: all checks pass"
+    },
+    {
+      "name": "box3dBind",
+      "status": "pass",
+      "ms": 387,
+      "exitCode": 0,
+      "tail": "box3dBind-selfcheck: all checks pass"
+    },
+    {
+      "name": "census",
+      "status": "pass",
+      "ms": 47991,
+      "exitCode": 0,
+      "tail": "census-selfcheck: all checks pass"
+    },
+    {
+      "name": "corroborate",
+      "status": "pass",
+      "ms": 4440,
+      "exitCode": 0,
+      "tail": "corroborate-selfcheck: all checks pass"
+    },
+    {
+      "name": "corroborateFully",
+      "status": "pass",
+      "ms": 31504,
+      "exitCode": 0,
+      "tail": "corroborateFully-selfcheck: all checks pass"
+    },
+    {
+      "name": "corroborationCensus",
+      "status": "pass",
+      "ms": 69088,
+      "exitCode": 0,
+      "tail": "corroborationCensus-selfcheck: all checks pass"
+    },
+    {
+      "name": "crossDevice",
+      "status": "pass",
+      "ms": 1203,
+      "exitCode": 0,
+      "tail": "crossDevice-selfcheck: all checks pass"
+    },
+    {
+      "name": "defaultPlacementSweep",
+      "status": "pass",
+      "ms": 20252,
+      "exitCode": 0,
+      "tail": "defaultPlacementSweep-selfcheck: all checks pass"
+    },
+    {
+      "name": "escalateRoute",
+      "status": "pass",
+      "ms": 52,
+      "exitCode": 0,
+      "tail": "escalateRoute-selfcheck: all checks pass"
+    },
+    {
+      "name": "escalateRouteLive",
+      "status": "pass",
+      "ms": 47,
+      "exitCode": 0,
+      "tail": "escalateRouteLive-selfcheck: all pass"
+    },
+    {
+      "name": "gpuProvenance",
+      "status": "pass",
+      "ms": 4312,
+      "exitCode": 0,
+      "tail": "gpuProvenance-selfcheck: all checks pass"
+    },
+    {
+      "name": "iosPeer",
+      "status": "pass",
+      "ms": 319,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the strict core runs on Apple's JS engine, and the Apple GPU is a first-class vendor"
+    },
+    {
+      "name": "lensTidal",
+      "status": "pass",
+      "ms": 2098,
+      "exitCode": 0,
+      "tail": "lensTidal-selfcheck: all checks pass"
+    },
+    {
+      "name": "libmSensitivity",
+      "status": "timeout",
+      "ms": 100013,
+      "exitCode": null,
+      "tail": "  PASS  ulpRel reports the relative size of the perturbation being applied   eps at 1.0 = 2.220e-16 -- this is the denominator of every amplification below"
+    },
+    {
+      "name": "magmap",
+      "status": "pass",
+      "ms": 798,
+      "exitCode": 0,
+      "tail": "magmap-selfcheck: all checks pass"
+    },
+    {
+      "name": "magmapAndroid",
+      "status": "pass",
+      "ms": 680,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the experiment is gated; the phone's GPU can now audition"
+    },
+    {
+      "name": "nuisanceKnobs",
+      "status": "pass",
+      "ms": 2978,
+      "exitCode": 0,
+      "tail": "nuisanceKnobs-selfcheck: all checks pass"
+    },
+    {
+      "name": "ollamaRoleCaller",
+      "status": "pass",
+      "ms": 197,
+      "exitCode": 0,
+      "tail": "ollamaRoleCaller-selfcheck: all checks pass"
+    },
+    {
+      "name": "peerVisibility",
+      "status": "pass",
+      "ms": 371,
+      "exitCode": 0,
+      "tail": "  ALL PASS -- the tunnel is labelled honestly and peer console-age surfaces what was already captured"
+    },
+    {
+      "name": "plantedError",
+      "status": "pass",
+      "ms": 5195,
+      "exitCode": 0,
+      "tail": "plantedError-selfcheck: all checks pass"
+    },
+    {
+      "name": "plasmaKrbn",
+      "status": "pass",
+      "ms": 128,
+      "exitCode": 0,
+      "tail": "plasmaKrbn-selfcheck: all checks pass"
+    },
+    {
+      "name": "policyPilot",
+      "status": "pass",
+      "ms": 2931,
+      "exitCode": 0,
+      "tail": "policyPilot-selfcheck: all checks pass"
+    },
+    {
+      "name": "refinementKnobs",
+      "status": "pass",
+      "ms": 8612,
+      "exitCode": 0,
+      "tail": "refinementKnobs-selfcheck: all checks pass"
+    },
+    {
+      "name": "responseCensus",
+      "status": "timeout",
+      "ms": 100143,
+      "exitCode": null,
+      "tail": ""
+    },
+    {
+      "name": "roleDecompose",
+      "status": "pass",
+      "ms": 321,
+      "exitCode": 0,
+      "tail": "roleDecompose-selfcheck: all pass"
+    },
+    {
+      "name": "roundhouse",
+      "status": "pass",
+      "ms": 64,
+      "exitCode": 0,
+      "tail": "roundhouse-selfcheck: all checks pass"
+    },
+    {
+      "name": "routeBench",
+      "status": "pass",
+      "ms": 155,
+      "exitCode": 0,
+      "tail": "routeBench-selfcheck: all pass"
+    },
+    {
+      "name": "runDeviceRouted",
+      "status": "pass",
+      "ms": 222,
+      "exitCode": 0,
+      "tail": "runDeviceRouted-selfcheck: all checks pass"
+    },
+    {
+      "name": "shedOnset",
+      "status": "pass",
+      "ms": 518,
+      "exitCode": 0,
+      "tail": "shedOnset-selfcheck: all checks pass"
+    },
+    {
+      "name": "swekGates",
+      "status": "pass",
+      "ms": 57,
+      "exitCode": 0,
+      "tail": "swekGates-selfcheck: all pass"
+    },
+    {
+      "name": "zeroRangeSweep",
+      "status": "pass",
+      "ms": 87631,
+      "exitCode": 0,
+      "tail": "zeroRangeSweep-selfcheck: all checks pass"
+    }
+  ],
+  "counts": {
+    "pass": 37,
+    "fail": 0,
+    "timeout": 2,
+    "error": 0
+  }
+}

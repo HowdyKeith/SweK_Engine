@@ -1,0 +1,14 @@
+{
+  "name": "tasker-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single-purpose web control panel that fires Tasker (Android) tasks via AutoRemote / Tasker HTTP / Home Assistant / MQTT. Clone + reconfigure for any 'trigger a thing from a web page' job.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "optionalDependencies": {
+    "mqtt": "^5.0.0"
+  }
+}

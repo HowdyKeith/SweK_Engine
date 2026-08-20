@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Slots</title>
+<style>
+  :root{ --bg:#070b12; --panel:#0e1420; --line:#223247; --accent:#5fb0ff; --gold:#ffcf6b; --txt:#eaf2ff; --dim:#8aa0bf; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:radial-gradient(120% 120% at 50% -10%,#0c1626,#05080f); color:var(--txt); font-family:'Segoe UI',system-ui,sans-serif; }
+  .wrap{ min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:18px; }
+  h1{ margin:0; font-size:24px; letter-spacing:1px; }
+  h1 span{ color:var(--accent); }
+  .sub{ color:var(--dim); font-size:13px; margin-top:-10px; }
+  .cabinet{ background:linear-gradient(180deg,#121d30,#0b1422); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:0 18px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.04); }
+  canvas{ display:block; border-radius:12px; background:#060a11; border:1px solid #1a2740; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 700px; height: auto; display: block; }
+  .hud{ display:flex; gap:14px; align-items:center; justify-content:space-between; margin-top:16px; }
+  .stat{ background:#0a1322; border:1px solid var(--line); border-radius:10px; padding:8px 14px; min-width:104px; text-align:center; }
+  .stat b{ display:block; font-size:22px; color:var(--gold); line-height:1.1; }
+  .stat small{ color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .controls{ display:flex; gap:10px; align-items:center; }
+  button{ font-family:inherit; font-weight:700; cursor:pointer; border-radius:10px; border:1px solid var(--line); background:#142338; color:var(--txt); padding:10px 14px; font-size:14px; transition:.12s; }
+  button:hover{ border-color:var(--accent); }
+  button:disabled{ opacity:.45; cursor:default; border-color:var(--line); }
+  #spin{ background:linear-gradient(180deg,#2a6fd6,#1c4f9e); border-color:#3f86e6; padding:12px 30px; font-size:18px; letter-spacing:1px; }
+  .bet button.on{ background:#274a78; border-color:var(--accent); }
+  .msg{ height:22px; font-size:15px; color:var(--gold); font-weight:700; text-align:center; }
+  .pay{ color:var(--dim); font-size:11.5px; margin-top:4px; text-align:center; max-width:420px; line-height:1.5; }
+  a.back{ color:var(--dim); font-size:12px; text-decoration:none; }
+  a.back:hover{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SweK <span>Slots</span></h1>
+  <div class="sub">a standalone canvas demo &middot; three reels, staggered ease-to-stop</div>
+
+  <div class="cabinet">
+    <canvas id="reels" width="420" height="260"></canvas>
+    <div class="hud">
+      <div class="stat"><b id="credits">100</b><small>credits</small></div>
+      <div class="controls">
+        <div class="bet" style="display:flex;gap:6px;">
+          <button data-bet="1">1</button>
+          <button data-bet="5" class="on">5</button>
+          <button data-bet="10">10</button>
+        </div>
+        <button id="spin">SPIN</button>
+      </div>
+      <div class="stat"><b id="lastwin">0</b><small>last win</small></div>
+    </div>
+    <div class="msg" id="msg">Pull the handle.</div>
+  </div>
+
+  <div class="pay">7 7 7 = 50&times; &middot; BAR&times;3 = 20&times; &middot; &#9670;&times;3 = 15&times; &middot; BELL&times;3 = 10&times; &middot; CH&times;3 = 8&times; &middot; &#9733;&times;3 = 5&times; &middot; two cherries = 3&times;</div>
+  <a class="back" href="/">&larr; back to engine</a>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var cv = document.getElementById("reels"), ctx = cv.getContext("2d");
+  var W = cv.width, H = cv.height;
+  var COLS = 3, ROWS = 3, CW = W/COLS, RH = H/ROWS;
+
+  // symbol set: [key, label, color, payout-for-3]
+  var SYMS = [
+    { k:"seven", t:"7",   c:"#ff5a5a", pay:50 },
+    { k:"bar",   t:"BAR", c:"#ffcf6b", pay:20 },
+    { k:"diam",  t:"\u25C6", c:"#67e0ff", pay:15 },
+    { k:"bell",  t:"\u237E", c:"#ffe08a", pay:10 },
+    { k:"cher",  t:"CH",  c:"#ff7aa8", pay:8 },
+    { k:"star",  t:"\u2605", c:"#b79bff", pay:5 }
+  ];
+  // weighted strip so 7s are rare, low symbols common
+  function buildStrip(){
+    var w = { seven:2, bar:4, diam:5, bell:7, cher:8, star:9 }, strip=[];
+    SYMS.forEach(function(s){ for(var i=0;i<w[s.k];i++) strip.push(s); });
+    for(var i=strip.length-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=strip[i]; strip[i]=strip[j]; strip[j]=t; }
+    return strip;
+  }
+  var reels = [];
+  for(var r=0;r<COLS;r++){ var strip=buildStrip(); reels.push({ strip:strip, pos:Math.random()*strip.length, vel:0, spinning:false, stopAt:0 }); }
+
+  function drawSymbol(s, x, y, w, h, glow){
+    ctx.save();
+    ctx.translate(x+w/2, y+h/2);
+    if(glow){ ctx.shadowColor=s.c; ctx.shadowBlur=18; }
+    ctx.fillStyle=s.c;
+    ctx.font = "bold " + Math.floor(h*0.42) + "px 'Segoe UI',system-ui,sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(s.t, 0, 2);
+    ctx.restore();
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    // payline highlight (center row)
+    ctx.fillStyle="rgba(95,176,255,0.06)";
+    ctx.fillRect(0, RH, W, RH);
+    for(var r=0;r<COLS;r++){
+      var reel=reels[r], n=reel.strip.length;
+      var base = Math.floor(reel.pos);
+      var frac = reel.pos - base;
+      // draw 4 cells so scroll is seamless; center row index = 1
+      for(var k=-1;k<ROWS+1;k++){
+        var idx = ((base+k)%n + n)%n;
+        var sym = reel.strip[idx];
+        var y = (k - frac + 1) * RH;   // +1 so the visible window centers
+        var isPay = !reel.spinning && (k===1);
+        drawSymbol(sym, r*CW, y - RH, CW, RH, isPay);
+      }
+      // column divider
+      if(r>0){ ctx.strokeStyle="#152238"; ctx.beginPath(); ctx.moveTo(r*CW,0); ctx.lineTo(r*CW,H); ctx.stroke(); }
+    }
+    // payline marker
+    ctx.strokeStyle="rgba(95,176,255,0.5)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(6, RH+RH/2); ctx.lineTo(W-6, RH+RH/2); ctx.stroke();
+    ctx.lineWidth=1;
+  }
+
+  // center-row symbol for a reel = strip[ floor(pos)+1 ]
+  function centerSym(reel){ var n=reel.strip.length; return reel.strip[((Math.floor(reel.pos)+1)%n+n)%n]; }
+
+  var credits = parseInt(localStorage.getItem("swek.slots.credits")||"100",10);
+  if(!isFinite(credits)) credits=100;
+  var bet = 5, lastWin = 0, anyMoved=false;
+  var elC=document.getElementById("credits"), elW=document.getElementById("lastwin"), elM=document.getElementById("msg"), elSpin=document.getElementById("spin");
+  function sync(){ elC.textContent=credits; elW.textContent=lastWin; try{ localStorage.setItem("swek.slots.credits", String(credits)); }catch(e){} }
+  sync();
+
+  // bet buttons
+  Array.prototype.forEach.call(document.querySelectorAll(".bet button"), function(b){
+    b.addEventListener("click", function(){
+      if(spinning()) return;
+      bet=parseInt(b.getAttribute("data-bet"),10);
+      document.querySelectorAll(".bet button").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on");
+    });
+  });
+
+  function spinning(){ return reels.some(function(r){ return r.spinning; }); }
+
+  function spin(){
+    if(spinning()) return;
+    if(credits < bet){ elM.textContent="Not enough credits."; if(credits<=0){ credits=100; sync(); elM.textContent="Comped 100 credits. Good luck."; } return; }
+    credits -= bet; lastWin=0; sync();
+    elM.textContent="Spinning...";
+    var now=performance.now();
+    reels.forEach(function(reel, i){
+      reel.spinning=true;
+      reel.vel = 0.55 + Math.random()*0.12;        // symbols per frame-ish
+      reel.stopAt = now + 900 + i*420 + Math.random()*180;  // staggered stops
+    });
+  }
+  elSpin.addEventListener("click", spin);
+  document.addEventListener("keydown", function(e){ if(e.code==="Space"){ e.preventDefault(); spin(); } });
+
+  function evaluate(){
+    var a=centerSym(reels[0]), b=centerSym(reels[1]), c=centerSym(reels[2]);
+    var win=0, label="";
+    if(a.k===b.k && b.k===c.k){ win = a.pay*bet; label = a.t+" "+a.t+" "+a.t+" \u2014 "+a.pay+"x!"; }
+    else { var ch=[a,b,c].filter(function(s){return s.k==="cher";}).length; if(ch>=2){ win=3*bet; label="Two cherries \u2014 3x"; } }
+    lastWin=win;
+    if(win>0){ credits+=win; elM.textContent=(win>=20*bet?"\u2728 JACKPOT \u2014 ":"\u2714 WIN \u2014 ")+label+" (+"+win+")"; burst(win>=20*bet); }
+    else { elM.textContent="No win \u2014 spin again."; }
+    sync();
+  }
+
+  // win particle flair
+  var parts=[];
+  function burst(big){
+    var n = big?90:36;
+    for(var i=0;i<n;i++){ parts.push({ x:W/2, y:H/2, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.5)*7-1.5, life:1, c: big? (Math.random()<0.5?"#ffcf6b":"#67e0ff") : "#5fb0ff" }); }
+  }
+  function drawParts(){
+    for(var i=parts.length-1;i>=0;i--){ var p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=0.02; if(p.life<=0){ parts.splice(i,1); continue; }
+      ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.c; ctx.fillRect(p.x-2,p.y-2,4,4); ctx.globalAlpha=1; }
+  }
+
+  var last=performance.now();
+  function loop(t){
+    var dt=Math.min(50, t-last); last=t;
+    reels.forEach(function(reel){
+      if(reel.spinning){
+        anyMoved=true;
+        if(t < reel.stopAt){ reel.pos = (reel.pos + reel.vel*dt/16.7) % reel.strip.length; }
+        else {
+          // ease the final snap to an integer boundary
+          var target = Math.round(reel.pos);
+          reel.pos += (target - reel.pos)*0.25;
+          if(Math.abs(target-reel.pos) < 0.01){ reel.pos = ((target%reel.strip.length)+reel.strip.length)%reel.strip.length; reel.spinning=false;
+            if(!spinning()){ evaluate(); }
+          }
+        }
+      }
+    });
+    render();
+    if(parts.length) drawParts();
+    requestAnimationFrame(loop);
+  }
+  render();
+  requestAnimationFrame(loop);
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

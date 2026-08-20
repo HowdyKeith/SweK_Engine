@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — the fleet floor atlas</title>
+<meta name="demo:desc" content="Every WGSL kernel here ships a tolerance earned from a floor measured on one machine and doubled. The fleet has been accumulating the same measurement from real silicon in every submitted bench report, and nothing was reading it. This does: worst measured gap per adapter per kernel, with the margin that tolerance actually has on that device. Float gaps and the zero-tolerance integer spin count are kept in separate columns and never pooled, because the aggregate an atlas naturally wants to compute is the meaningless one.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:960px; margin:0 auto; padding:18px; line-height:1.65; }
+  table { border-collapse:collapse; width:100%; margin-top:10px; }
+  td,th { border:1px solid #22304a; padding:6px 10px; text-align:left; }
+  th { color:#7f96b8; font-weight:normal; }
+  .num { text-align:right; }
+  .good { color:#9be15d; } .bad { color:#ff9a9a; } .warn { color:#f6a623; } .dim { color:#7f96b8; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">Fleet floor atlas</h2>
+  <div class="dim">A tolerance in this lab is a measured floor with 2x margin. The floor was measured on ONE machine. This page reads every bench report the fleet has submitted and asks what the margin actually is on each adapter that ran it. <b>Not a leaderboard</b> — speed lives in the perf ledger, and mixing them would rank a fast wrong answer above a slow right one. Float gaps (magmap, hmc-leapfrog) and the exact spin count (ising, tolerance zero) are separate metrics and are never averaged together. Gate: tools/roundhouse/floorAtlas-selfcheck.mjs.</div>
+  <p><button id="load">Load submitted reports</button></p>
+  <div id="out"><span class="dim">idle</span></div>
+</div>
+<script type="module">
+import { foldReport, gradeAtlas, TIGHT_MARGIN } from "./tools/roundhouse/floorAtlas.mjs";
+
+const out = document.getElementById("out");
+const SOURCES = ["magmap-report.json", "magmap-bench.json", "hmc-bench.json", "ising-bench.json"];
+
+document.getElementById("load").onclick = async () => {
+  out.innerHTML = "<span class='dim'>reading roundhouse reports…</span>";
+  let atlas = null; const found = [], missing = [];
+  for (const name of SOURCES) {
+    try {
+      const r = await fetch("/roundhouse/" + name, { cache: "no-store" });
+      if (!r.ok) { missing.push(name); continue; }
+      const j = await r.json();
+      atlas = foldReport(atlas, j);
+      found.push(name);
+    } catch { missing.push(name); }
+  }
+  const g = gradeAtlas(atlas || { entries: {} });
+  const fmt = (e) => e.metric === "float-gap" ? e.worst.toExponential(2) : String(e.worst);
+  const fmtTol = (e) => e.metric === "float-gap" ? (e.tol == null ? "—" : e.tol.toExponential(2)) : "0 (exact)";
+  const cls = (e) => e.margin == null ? (e.worst === 0 ? "good" : "bad") : e.margin < 1 ? "bad" : e.margin < TIGHT_MARGIN ? "warn" : "good";
+  const verdict = (e) => e.margin == null ? (e.worst === 0 ? "bit-exact" : "REJECTED") :
+    e.margin < 1 ? "EXCEEDS TOLERANCE" : e.margin < TIGHT_MARGIN ? "tight" : "comfortable";
+  const rows = [...g.failures, ...g.tight, ...g.comfortable, ...g.exact];
+  let html = "";
+  if (!rows.length) {
+    html = "<div class='warn'>No device reports have been folded yet. Every kernel in this lab is still logic-proven only — " +
+      "the WGSL paths have not run on real silicon here, and this atlas will stay empty and honest until they do.</div>";
+  } else {
+    html = "<table><tr><th>kernel</th><th>adapter</th><th>metric</th><th class='num'>worst measured</th><th class='num'>tolerance</th><th class='num'>margin</th><th class='num'>runs</th><th>verdict</th></tr>";
+    for (const e of rows) html += "<tr><td>" + e.kernel + "</td><td>" + e.adapter + "</td><td class='dim'>" + e.metric +
+      "</td><td class='num'>" + fmt(e) + "</td><td class='num'>" + fmtTol(e) + "</td><td class='num'>" +
+      (e.margin == null ? "—" : (e.margin === Infinity ? "inf" : e.margin.toFixed(2) + "x")) +
+      "</td><td class='num'>" + e.runs + "</td><td><b class='" + cls(e) + "'>" + verdict(e) + "</b></td></tr>";
+    html += "</table>";
+  }
+  html += "<div class='dim' style='margin-top:8px;'>read: " + (found.length ? found.join(", ") : "none") +
+    (missing.length ? " · not present: " + missing.join(", ") : "") +
+    ((atlas && atlas.skipped && atlas.skipped.length) ? "<br>skipped: " + atlas.skipped.map((s) => s.kind + " (" + s.why + ")").join("; ") : "") +
+    "<br>The recorded floor is the WORST any run on that adapter produced, never the median: a tolerance has to cover the bad day, and here the outlier IS the finding.</div>";
+  out.innerHTML = html;
+};
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

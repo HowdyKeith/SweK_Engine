@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Fire Demo</title>
+<style>
+  html, body { margin:0; height:100%; background:#05060a; color:#e6edf7; font:13px ui-sans-serif,system-ui,sans-serif; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:5; background:rgba(10,16,26,.72); border:1px solid #243149;
+         border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); max-width:320px; }
+  #hud h1 { margin:0 0 4px; font-size:15px; } #hud p { margin:4px 0; color:#8ea1bd; font-size:12px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  button, select { font:12px ui-monospace,monospace; padding:5px 11px; border-radius:7px; border:1px solid #2d466b;
+                   background:#16233b; color:#bfe0ff; cursor:pointer; }
+  button.go { background:#3a1c10; color:#ffcf9a; border-color:#7a3d1e; }
+  button.rec { background:#3a1015; color:#ff9aa2; border-color:#6a2a30; }
+  .dim { color:#8ea1bd; font-size:11px; }
+  label.sl { display:flex; align-items:center; gap:6px; color:#8ea1bd; font-size:11px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1>&#128293; Fire Demo</h1>
+  <p>Ray-marched volumetric fire (THREE.Fire, ported) &mdash; a burning skyline. No WASM needed.</p>
+  <div class="row">
+    <label class="sl">flames <input id="count" type="range" min="4" max="40" value="18"></label>
+    <button id="spin" class="go">&#8635; auto-spin: on</button>
+  </div>
+  <div class="row">
+    <select id="dur"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <span class="dim" id="msg"></span>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { createFire } from "/physics/fire/fireMesh.js";
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060a);
+scene.fog = new THREE.FogExp2(0x05060a, 0.012);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize); resize();
+
+scene.add(new THREE.HemisphereLight(0x33405a, 0x0a0a0f, 0.5));
+const key = new THREE.DirectionalLight(0xffb070, 0.4); key.position.set(1, 2, 1); scene.add(key);
+
+// ground
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x0b0e15, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = 0; scene.add(ground);
+
+// a little city + a fire on each building
+const buildings = new THREE.Group(); scene.add(buildings);
+const fires = [];
+function rebuild(n) {
+  for (const f of fires) { scene.remove(f.fire); }
+  fires.length = 0;
+  while (buildings.children.length) buildings.remove(buildings.children[0]);
+  const span = Math.ceil(Math.sqrt(n));
+  let made = 0;
+  for (let gx = 0; gx < span && made < n; gx++) {
+    for (let gz = 0; gz < span && made < n; gz++) {
+      const w = 6 + Math.random() * 6, d = 6 + Math.random() * 6, h = 10 + Math.random() * 28;
+      const x = (gx - span / 2) * 26 + (Math.random() * 6 - 3);
+      const z = (gz - span / 2) * 26 + (Math.random() * 6 - 3);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: 0x11151f, roughness: 0.9, emissive: 0x2a1206, emissiveIntensity: 0.4 }));
+      b.position.set(x, h / 2, z); buildings.add(b);
+      const fire = createFire({ color: new THREE.Color(0xffaa33) });
+      fire.position.set(x, h * 0.62, z);
+      fire.scale.set(w * 1.5, h * 1.25, d * 1.5);
+      scene.add(fire); fires.push({ fire });
+      made++;
+    }
+  }
+}
+rebuild(18);
+
+let spin = true, theta = 0;
+const target = new THREE.Vector3(0, 12, 0);
+function frame() {
+  requestAnimationFrame(frame);
+  const t = (performance.now ? performance.now() : Date.now()) / 1000;
+  for (const f of fires) f.fire.update(t);
+  if (spin) theta += 0.0018;
+  const r = 150;
+  camera.position.set(Math.cos(theta) * r, 55 + Math.sin(theta * 0.6) * 18, Math.sin(theta) * r);
+  camera.lookAt(target);
+  renderer.render(scene, camera);
+}
+frame();
+
+// controls
+const $ = (id) => document.getElementById(id);
+$("count").oninput = (e) => rebuild(+e.target.value);
+$("spin").onclick = () => { spin = !spin; $("spin").textContent = "\u21bb auto-spin: " + (spin ? "on" : "off"); };
+$("rec").onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); $("rec").textContent = "\u25CF Record"; return; }
+  const secs = +($("dur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, canvas)) {
+    $("rec").textContent = "\u25A0 recording " + secs + "s"; $("msg").textContent = "capturing\u2026 a .webm will download";
+    setTimeout(() => { $("rec").textContent = "\u25CF Record"; $("msg").textContent = "saved (ffmpeg -i clip.webm clip.mp4 for slides)"; }, secs * 1000 + 200);
+  } else { $("msg").textContent = "no MediaRecorder here"; }
+};
+</script>
+</body>
+</html>

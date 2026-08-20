@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · EV Sprite Viewer</title>
+<style>
+  :root { --bg:#070b12; --panel:#0d131d; --edge:#1d2a3a; --ink:#dfe9f6; --dim:#8aa0bb; --accent:#5aa9ff; --good:#7fe0b0; --err:#ff8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 system-ui,Segoe UI,Roboto,sans-serif; padding:20px; }
+  h1 { font-size:19px; margin:0 0 2px; } h1 small { color:var(--dim); font-size:12px; font-weight:400; }
+  .lead { color:var(--dim); margin:4px 0 16px; max-width:760px; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  button, select, input { font:inherit; }
+  .btn { background:#13243c; border:1px solid var(--edge); color:var(--ink); border-radius:8px; padding:7px 14px; cursor:pointer; }
+  .btn.primary { background:linear-gradient(180deg,#2b6fd6,#1f56ad); border-color:#3f86e6; color:#fff; font-weight:600; }
+  .btn:hover { border-color:var(--accent); }
+  #drop { border:2px dashed var(--edge); border-radius:12px; padding:26px; text-align:center; color:var(--dim); margin-bottom:16px; }
+  #drop.over { border-color:var(--accent); background:rgba(90,169,255,.06); }
+  .cols { display:flex; gap:18px; flex-wrap:wrap; }
+  .col { flex:1; min-width:280px; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+  .list { max-height:340px; overflow:auto; border:1px solid var(--edge); border-radius:8px; }
+  .row { display:flex; justify-content:space-between; padding:5px 10px; border-bottom:1px solid #14202e; cursor:pointer; }
+  .row:hover { background:#0f1a28; } .row.sel { background:#13243c; }
+  .row .id { color:var(--accent); }
+  canvas { background:#04060a; border:1px solid var(--edge); border-radius:8px; image-rendering:pixelated; }
+  /* v2873 -- the action fills the page. Backing store stays the per-cell grid: one pixel is one cell, so the DISPLAY grows and pixelated keeps a cell square. Enlarging the store would invent detail the sim never computed. */
+  canvas { width: 100%; max-width: 640px; height: auto; display: block; image-rendering: pixelated; }
+  pre { background:#04060a; border:1px solid var(--edge); border-radius:8px; padding:10px; overflow:auto; font:11px/1.4 ui-monospace,Menlo,monospace; color:#b7c8dc; max-height:280px; }
+  .status { color:var(--dim); font-size:12px; }
+  .err { color:var(--err); } .good { color:var(--good); }
+  .tag { font-size:10px; padding:1px 6px; border-radius:10px; border:1px solid var(--edge); color:var(--dim); }
+</style>
+</head>
+<body>
+  <h1>EV Sprite Viewer <small>— Stage 1: decode rlëD / read shän</small></h1>
+  <p class="lead">Load your EV data files (base Nova is fine — include the graphics files so sprites are present),
+    then pick a shän (ship) or a raw rlëD to try decoding it. If a sprite won't decode cleanly, the hex inspector
+    shows the real bytes so the format can be confirmed against your actual files. Everything is parsed locally.</p>
+
+  <div class="bar">
+    <button class="btn primary" id="openBtn">Open data files or .zip…</button>
+    <input id="file" type="file" hidden multiple accept=".zip,.rez,.ndat,.bin,.dat,*">
+    <button class="btn" id="restoreBtn" title="use the same cached data as the flight engine">Use cached data</button>
+    <button class="btn" id="scanBtn" title="scan a folder (e.g. Downloads) for EV data + plug-ins">⌕ Scan Downloads…</button>
+    <span class="status" id="status">no data loaded</span>
+  </div>
+  <div id="scanPanel" style="display:none;margin:10px 0;padding:14px;border:1px solid var(--edge2,#26405e);border-radius:6px;background:#0a0f18">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="scanDir" type="text" placeholder="folder path (e.g. /Users/you/Downloads or C:\\Users\\you\\Downloads)" style="flex:1;min-width:260px;background:#070c15;border:1px solid #26405e;border-radius:3px;color:#cfe2f2;padding:8px 10px;font-family:monospace;font-size:13px">
+      <button class="btn primary" id="scanGo">Scan</button>
+      <button class="btn" id="scanClose">✕</button>
+    </div>
+    <div id="scanHint" style="font-size:11px;color:#6d829a;margin-top:6px">Lists EV data files &amp; plug-ins in that folder. Each is checked against the currently-loaded base: <span style="color:#7ff0a8">adds-only</span> = safe, <span style="color:#ff8a6a">overrides</span> = pair with its base, <span style="color:#57d6ff">standalone</span> = it's a base/TC itself.</div>
+    <div id="scanResults" style="margin-top:10px"></div>
+  </div>
+  <div id="drop">Drop EV data files or a <b>.zip</b> here (base data + <b>Nova Graphics</b>/<b>Nova Ships</b> for sprites) — zips unzip in memory, nothing is written to disk</div>
+
+  <div class="cols">
+    <div class="col">
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <b>Resources</b>
+          <select id="typeSel" class="btn" style="padding:4px 8px"></select>
+          <span class="status" id="typeCount"></span>
+        </div>
+        <div class="list" id="resList"><div class="row"><span class="status" style="padding:6px">load data to list resources</span></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <b>Preview</b> <span class="tag" id="previewTag"></span>
+        <div style="margin-top:8px;display:none" id="rotRow">
+          <label style="font-size:11px;color:var(--dim)">heading <span id="rotVal">0</span>° · frame <span id="rotFrame">0</span></label>
+          <input id="rotSlider" type="range" min="0" max="359" value="0" style="width:100%">
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <button id="playBtn" class="btn" style="font-size:11px">▶ Play</button>
+            <label style="font-size:11px;color:var(--dim)">speed</label>
+            <input id="playSpeed" type="range" min="1" max="30" value="12" style="flex:1">
+            <span id="playFps" style="font-size:11px;color:var(--dim)">12 fps</span>
+            <label style="font-size:11px;color:var(--dim);margin-left:6px"><input type="checkbox" id="playSpin" checked> rotate</label>
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+          <canvas id="cv" width="128" height="128" style="width:256px;height:256px"></canvas>
+          <div class="status" id="previewInfo"></div>
+        </div>
+      </div>
+      <div class="card">
+        <b>Inspector</b> <span class="status">— raw bytes when a sprite won't decode cleanly</span>
+        <button class="btn" id="dumpBtn" style="float:right;padding:3px 10px;font-size:11px" title="download the full raw hex of the selected shän + its rlëD, to send back for analysis">⬇ Dump to file</button>
+        <pre id="inspect">—</pre>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { loadResourceFork, mergeForks } from "./ev/resourceFork.js";
+import { readZip } from "./ev/zipReader.js";
+import { readShan, decodeRLED, shipSprite, extractFrame, headingToFrame, hexdump } from "./ev/sprites.js";
+import { decodePICT } from "./ev/pict.js";
+import { parseMisn, readDesc, parseShip, parseWeap, parseOutfit, parseSpob, buildUniverse } from "./ev/evData.js";
+const $ = (id) => document.getElementById(id);
+let rf = null;
+let selType = null, selId = null;   // currently-selected resource, for the hex dump
+
+// --- reuse the flight engine's IndexedDB cache (same db/store/key) ---
+const EVDB="swek-ev", EVSTORE="data", EVKEY="current";
+function evIdb(){return new Promise((res,rej)=>{const r=indexedDB.open(EVDB,1);r.onupgradeneeded=()=>{r.result.createObjectStore(EVSTORE);};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function evCacheLoad(){try{const db=await evIdb();const rec=await new Promise((res,rej)=>{const tx=db.transaction(EVSTORE,"readonly");const g=tx.objectStore(EVSTORE).get(EVKEY);g.onsuccess=()=>res(g.result);g.onerror=()=>rej(g.error);});db.close();return rec&&rec.files&&rec.files.length?rec:null;}catch(e){return null;}}
+
+async function loadFiles(files){
+  files = Array.from(files||[]); if(!files.length) return;
+  $("status").textContent = `parsing ${files.length} file(s)…`;
+  // Expand any .zip archives in-memory first (no disk, nothing to clean up). Each
+  // zipped entry becomes a candidate EV data blob just like a dropped file.
+  const blobs = [];   // { name, buf:ArrayBuffer }
+  for(const f of files){
+    const isZip = /\.zip$/i.test(f.name);
+    const buf = await f.arrayBuffer();
+    if(isZip){
+      try{
+        $("status").textContent = `unzipping ${f.name}…`;
+        const entries = await readZip(new Uint8Array(buf));
+        for(const e of entries){
+          // skip obvious non-data (readmes, images) — but keep everything that
+          // could be a resource fork / .rez / .ndat; loadResourceFork will reject
+          // anything it can't parse, so we can be permissive here.
+          if(/\.(txt|md|rtf|png|jpg|jpeg|gif|pdf|html?)$/i.test(e.name)) continue;
+          blobs.push({ name: e.name, buf: e.bytes.buffer.slice(e.bytes.byteOffset, e.bytes.byteOffset + e.bytes.byteLength) });
+        }
+      }catch(err){ console.warn("zip", f.name, err.message); $("status").innerHTML = `<span class="err">couldn't read ${f.name}: ${err.message}</span>`; }
+    } else {
+      blobs.push({ name: f.name, buf });
+    }
+  }
+  if(!blobs.length){ $("status").innerHTML='<span class="err">no loadable files (empty zip?)</span>'; return; }
+  $("status").textContent = `parsing ${blobs.length} data file(s)…`;
+  const forks=[];
+  for(const b of blobs){ try{ forks.push(loadResourceFork(b.buf)); }catch(e){ console.warn("skip",b.name,e.message); } }
+  if(!forks.length){ $("status").innerHTML='<span class="err">nothing parsed as EV data</span>'; return; }
+  rf = forks.length===1 ? forks[0] : mergeForks(forks);
+  $("drop").style.display="none";
+  $("status").innerHTML = `<span class="good">${rf.count} resources · ${rf.container}</span>`;
+  populateTypes();
+}
+
+function populateTypes(){
+  const types = rf.typeList();
+  // put the sprite-relevant types first
+  const pref = ["shän","shan","rlëD","rleD","PICT","snd ","snd","mïsn","misn","shïp","ship","wëap","weap","oütf","outf","spöb","spob","spïn","spin"];
+  types.sort((a,b)=>{ const ia=pref.indexOf(a), ib=pref.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b); });
+  $("typeSel").innerHTML = types.map(t=>`<option value="${t}">${t} (${rf.list(t).length})</option>`).join("");
+  $("typeSel").onchange = renderList;
+  renderList();
+}
+
+function renderList(){
+  const t = $("typeSel").value;
+  const items = rf.list(t);
+  $("typeCount").textContent = `${items.length} of type ${t}`;
+  $("resList").innerHTML = items.slice(0,600).map(r=>
+    `<div class="row" data-id="${r.id}"><span><span class="id">#${r.id}</span> ${escapeHtml(r.name||"")}</span><span class="status">${r.length}b</span></div>`
+  ).join("") || `<div class="row"><span class="status" style="padding:6px">none</span></div>`;
+  [...$("resList").querySelectorAll(".row")].forEach(row=>{
+    row.onclick = ()=>{ $("resList").querySelectorAll(".row").forEach(x=>x.classList.remove("sel")); row.classList.add("sel"); preview(t, parseInt(row.dataset.id,10)); };
+  });
+}
+
+let curDec = null, curShan = null;   // for the rotation slider
+let playTimer = null, playHeading = 0, playFrameIdx = 0;   // auto-play animation state
+
+// Render a label/value field table for the resource inspectors.
+function fieldTable(rows){
+  return `<table style="width:100%;border-collapse:collapse;font-size:12px">` +
+    rows.map(([k,v])=>`<tr><td style="color:#8fb;padding:3px 8px 3px 0;white-space:nowrap;vertical-align:top">${k}</td><td style="color:#cfe2f2;font-family:monospace;word-break:break-word">${String(v==null?"—":v).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</td></tr>`).join("") +
+    `</table>`;
+}
+
+function preview(type, id){
+  selType = type; selId = id;
+  if(typeof stopPlay==="function") stopPlay();   // halt any running animation
+  playHeading = 0; playFrameIdx = 0;
+  $("previewTag").textContent = `${type} #${id}`;
+  let dec, shan=null;
+  if(type==="shän"||type==="shan"){
+    shan = readShan(rf, id);
+    $("previewInfo").innerHTML = shan
+      ? `baseImageID <b>${shan.baseImageID}</b> · sets <b>${shan.baseSetCount}</b> · size <b>${shan.baseW}×${shan.baseH}</b> · transp ${shan.baseTransp}`
+      : `<span class="err">not a readable shän</span>`;
+    const r = shipSprite(rf, id);   // shan -> rlëD -> decode
+    dec = r;
+  } else if(type==="rlëD"||type==="rleD"){
+    const bytes = rf.get(type, id);
+    dec = decodeRLED(bytes);
+    $("previewInfo").textContent = "";
+  } else if(type==="PICT"){
+    const bytes = rf.get(type, id);
+    const img = decodePICT(bytes);
+    $("rotRow").style.display="none"; curDec=null;
+    if(img && img.ok){
+      drawFrame(img.width, img.height, img.rgba);
+      $("previewInfo").innerHTML = `<span class="good">PICT ${img.width}×${img.height}</span>`;
+      $("inspect").innerHTML = `<span class="good">decoded PICT ${img.width}×${img.height} · ${img.litPixels} px${img.note?" · "+img.note:""}</span>`;
+    } else {
+      $("previewInfo").innerHTML = `<span class="err">${img&&img.error||"PICT decode failed"}</span>`;
+      $("inspect").textContent = bytes ? hexdump(bytes,0,256) : "—";
+      drawEmpty();
+    }
+    return;
+  } else if(type==="mïsn"||type==="misn"){
+    const bytes = rf.get(type, id);
+    $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no mïsn #${id}</span>`; return; }
+    const m = parseMisn(bytes);
+    const stel = (v)=> v ? `stellar/system ${v}` : "—";
+    const rows = [
+      ["Available at", m.availStel===-1?"anywhere (galaxy-wide)":(m.availStel>=30000?`class/govt pool (${m.availStel})`:`spöb ${m.availStel}`)],
+      ["Offer location", m.availLoc===0?"Mission Computer":m.availLoc>=1?`Bar / Ready Room (loc ${m.availLoc})`:`${m.availLoc}`],
+      ["Avail. requires", m.availBits||"(always available)"],
+      ["On success sets", m.onSuccess||"—"],
+      ["Cargo / count", m.cargoQty||"—"],
+      ["Destination", stel(m.travelStel)],
+      ["Return to", stel(m.returnStel)],
+      ["Pay-unit / terms", m.payUnit!=null?m.payUnit:"—"],
+      ["Reward (header)", m.pay?`${m.pay.toLocaleString()} cr`:"(not stored in mïsn header)"],
+      ["Reward (estimate)", m.cargoQty?`~${(m.cargoQty*1000).toLocaleString()} cr  (qty ${m.cargoQty} × 1000/ton — verify in-game)`:"—"],
+      ["Flags", "0x"+(m.flags||0).toString(16)],
+      ["Text refs (dësc)", (m.descRefs&&m.descRefs.length)?m.descRefs.join(", "):"—"],
+      ["Completion msg", m.compMessage||"—"],
+    ];
+    // try to resolve the briefing text
+    let briefTxt = "";
+    for (const cand of [m.briefDesc, ...(m.descRefs||[])]) { if(cand){ const t=readDesc(rf,cand); if(t&&t.length>8){ briefTxt=t; break; } } }
+    $("previewInfo").innerHTML = `<span class="good">mïsn #${id}</span> — ${m.availLoc>=1?"bar/story":"computer"} mission`;
+    $("inspect").innerHTML =
+      `<table style="width:100%;border-collapse:collapse;font-size:12px">` +
+      rows.map(([k,v])=>`<tr><td style="color:#8fb;padding:3px 8px 3px 0;white-space:nowrap;vertical-align:top">${k}</td><td style="color:#cfe2f2;font-family:monospace;word-break:break-word">${String(v).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</td></tr>`).join("") +
+      `</table>` +
+      (briefTxt?`<div style="margin-top:10px;padding-top:8px;border-top:1px solid #223;color:#aac;font-size:12px;white-space:pre-wrap;max-height:160px;overflow:auto">${briefTxt.replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</div>`:"") +
+      `<div style="margin-top:8px;color:#678;font-size:11px">Tip: if the game pays a specific reward for this mission, compare it to the fields above — a field matching the payout (or cargo×rate) is the reward source.</div>`;
+    return;
+  } else if(type==="shïp"||type==="ship"){
+    const bytes = rf.get(type, id); $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no shïp #${id}</span>`; return; }
+    const s = parseShip(bytes);
+    const wl = (s.weapTypes||[]).map((w,i)=> w>0 ? `wëap ${w}×${(s.weapCounts||[])[i]||1}` : null).filter(Boolean);
+    const rows = [
+      ["Shield", s.shield], ["Armor", s.armor], ["Speed", s.speed],
+      ["Acceleration", s.accel], ["Maneuver (turn)", s.maneuver],
+      ["Cargo holds", s.holds], ["Fuel", s.fuel], ["Free mass", s.freeMass],
+      ["Shield recharge", s.shieldRech], ["Weapons", wl.length?wl.join(", "):"—"],
+    ];
+    $("previewInfo").innerHTML = `<span class="good">shïp #${id}</span> — ship class stats`;
+    $("inspect").innerHTML = fieldTable(rows);
+    // also show the sprite if it has one
+    const r = shipSprite(rf, id);
+    if(r && r.ok && r.frames && r.frames[0]){ curDec=r; curShan={baseSetCount:1}; if(r.frameCount>1){$("rotRow").style.display="block"; renderHeading(+$("rotSlider").value);} else drawFrame(r.sheetW||r.width, r.sheetH||r.height, r.frames[0]); }
+    return;
+  } else if(type==="wëap"||type==="weap"){
+    const bytes = rf.get(type, id); $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no wëap #${id}</span>`; return; }
+    const w = parseWeap(bytes);
+    const rows = [
+      ["Reload (frames)", w.reload], ["Shots/burst", w.count],
+      ["Mass damage", w.massDmg], ["Energy damage", w.energyDmg],
+      ["Guidance", w.guidance], ["Shot speed", w.speed], ["Ammo type", w.ammoType],
+    ];
+    $("previewInfo").innerHTML = `<span class="good">wëap #${id}</span> — weapon stats`;
+    $("inspect").innerHTML = fieldTable(rows);
+    return;
+  } else if(type==="oütf"||type==="outf"){
+    const bytes = rf.get(type, id); $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no oütf #${id}</span>`; return; }
+    const o = parseOutfit(bytes);
+    const descId = id + 3000;   // EV convention: outfit dësc = outfit id + 3000
+    const rows = [
+      ["Mass", o.mass],
+      ["Tech level", o.techLevel||"—"],
+      ["Display weight", o.dispWeight||"—"],
+      ["Mod type / val", `${o.modType} / ${o.modVal}`],
+      ["Cost", "unverified — send an in-game price to pin the field"],
+      ["Description id", descId],
+    ];
+    $("previewInfo").innerHTML = `<span class="good">oütf #${id}</span> — outfit item`;
+    let out = fieldTable(rows);
+    const t = readDesc(rf, descId) || readDesc(rf, id + 4000);
+    if(t) out += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #223;color:#aac;font-size:12px;white-space:pre-wrap;max-height:140px;overflow:auto">${t.replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</div>`;
+    $("inspect").innerHTML = out;
+    return;
+  } else if(type==="spöb"||type==="spob"){
+    const bytes = rf.get(type, id); $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no spöb #${id}</span>`; return; }
+    const s = parseSpob(bytes);
+    const svc = [s.hasBar&&"Bar",s.hasCommodity&&"Commodity",s.canOutfit&&"Outfit",s.canBuyShips&&"Shipyard"].filter(Boolean);
+    const rows = [
+      ["Position", `${s.x}, ${s.y}`], ["Government", s.govt],
+      ["Tech level", s.techLevel], ["Tribute", s.tribute],
+      ["Services", svc.length?svc.join(", "):"none"],
+      ["Landscape PICT", s.landPict||"—"], ["Landing dësc", s.landDesc||"—"],
+    ];
+    $("previewInfo").innerHTML = `<span class="good">spöb #${id}</span> — stellar object`;
+    let out = fieldTable(rows);
+    if(s.landDesc){ const t=readDesc(rf,s.landDesc); if(t) out += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #223;color:#aac;font-size:12px;white-space:pre-wrap;max-height:120px;overflow:auto">${t.replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</div>`; }
+    $("inspect").innerHTML = out;
+    return;
+  } else if(type==="snd "||type==="snd"){
+    const bytes = rf.get("snd ", id) || rf.get(type, id);
+    $("rotRow").style.display="none"; curDec=null; drawEmpty();
+    if(!bytes){ $("previewInfo").innerHTML=`<span class="err">no snd #${id}</span>`; return; }
+    import("./ev/snd.js").then(({ decodeSND, sndToAudioBuffer })=>{
+      const dec = decodeSND(bytes);
+      if(!dec.ok){ $("previewInfo").innerHTML=`<span class="err">${dec.error||"snd decode failed"}</span>`; $("inspect").textContent=hexdump(bytes,0,128); return; }
+      const secs = (dec.pcm.length/dec.channels/dec.sampleRate);
+      $("previewInfo").innerHTML = `<span class="good">snd #${id}</span> — ${dec.encoding}, ${dec.sampleRate} Hz`;
+      $("inspect").innerHTML = fieldTable([
+        ["Encoding", dec.encoding],["Sample rate", dec.sampleRate+" Hz"],
+        ["Channels", dec.channels],["Samples", dec.pcm.length],
+        ["Duration", secs.toFixed(2)+" s"],
+      ]) + `<button id="sndPlay" class="btn" style="margin-top:10px">▶ Play sound</button>`;
+      $("sndPlay").onclick = ()=>{
+        try{
+          const ctx = new (window.AudioContext||window.webkitAudioContext)();
+          const buf = sndToAudioBuffer(ctx, dec);
+          const src = ctx.createBufferSource(); src.buffer=buf; src.connect(ctx.destination); src.start();
+        }catch(e){ $("previewInfo").innerHTML += ` <span class="err">(playback: ${e.message})</span>`; }
+      };
+    });
+    return;
+  } else {
+    const bytes = rf.get(type, id);
+    $("previewInfo").textContent = `${bytes?bytes.byteLength:0} bytes — no decoder for ${type} yet`;
+    $("inspect").textContent = bytes ? hexdump(bytes,0,256) : "—";
+    $("rotRow").style.display="none"; curDec=null; drawEmpty(); return;
+  }
+  if(dec && dec.ok && dec.frames && dec.frames[0]){
+    curDec = dec; curShan = shan || { baseSetCount: 1 };
+    const meta = dec.frameCount ? ` · ${dec.frameCount} frames of ${dec.width}×${dec.height} (${dec.gridW}×${dec.gridH} grid)` : "";
+    $("inspect").innerHTML = `<span class="good">decoded sheet ${dec.sheetW||dec.width}×${dec.sheetH||dec.height}${meta}</span>`;
+    // if there are multiple frames, offer the rotation slider (Stage 2); else show sheet
+    if(dec.frameCount && dec.frameCount > 1){
+      $("rotRow").style.display="block";
+      renderHeading(+$("rotSlider").value);
+    } else {
+      $("rotRow").style.display="none";
+      drawFrame(dec.sheetW||dec.width, dec.sheetH||dec.height, dec.frames[0]);
+    }
+    if(shan) $("previewInfo").innerHTML += ` — <span class="good">rlëD decoded</span>`;
+  } else {
+    $("rotRow").style.display="none"; curDec=null;
+    drawEmpty();
+    $("inspect").textContent = (dec && (dec.error||"")) + "\n\n" + (dec && dec.inspect ? dec.inspect : "");
+  }
+}
+
+// Stage 2: render the single rotation frame for a given heading.
+function renderHeading(headingDeg){
+  if(!curDec) return;
+  const idx = headingToFrame(curDec, curShan, headingDeg);
+  const fr = extractFrame(curDec, idx);
+  if(fr){ drawFrame(fr.width, fr.height, fr.rgba); $("rotVal").textContent = headingDeg; $("rotFrame").textContent = idx; }
+}
+$("rotSlider").oninput = (e)=> renderHeading(+e.target.value);
+
+// --- Auto-play: cycle frames on a timer. Two modes:
+//   rotate ON  -> sweep heading 0..359 (ship rotation preview)
+//   rotate OFF -> step raw frames 0..frameCount-1 (animation, e.g. the cursor)
+function stopPlay(){ if(playTimer){ clearInterval(playTimer); playTimer=null; } $("playBtn").textContent = "▶ Play"; }
+function startPlay(){
+  if(!curDec){ return; }
+  const fps = +$("playSpeed").value;
+  $("playBtn").textContent = "❚❚ Pause";
+  const total = curDec.frameCount || 1;
+  playTimer = setInterval(()=>{
+    if($("playSpin").checked){
+      playHeading = (playHeading + Math.max(4, Math.round(360/Math.max(total,1)))) % 360;
+      $("rotSlider").value = playHeading;
+      renderHeading(playHeading);
+    } else {
+      // raw frame stepping (animation)
+      playFrameIdx = (playFrameIdx + 1) % total;
+      const fr = extractFrame(curDec, playFrameIdx);
+      if(fr){ drawFrame(fr.width, fr.height, fr.rgba); $("rotFrame").textContent = playFrameIdx; }
+    }
+  }, Math.round(1000/fps));
+}
+$("playBtn").onclick = ()=> playTimer ? stopPlay() : startPlay();
+$("playSpeed").oninput = ()=>{ $("playFps").textContent = $("playSpeed").value + " fps"; if(playTimer){ stopPlay(); startPlay(); } };
+
+
+function drawFrame(w,h,rgba){
+  const cv=$("cv"); cv.width=w; cv.height=h;
+  cv.style.width = Math.min(320, w*2)+"px"; cv.style.height="auto";
+  const ctx=cv.getContext("2d");
+  const img=new ImageData(new Uint8ClampedArray(rgba), w, h);
+  ctx.putImageData(img,0,0);
+}
+function drawEmpty(){ const cv=$("cv"); const ctx=cv.getContext("2d"); ctx.clearRect(0,0,cv.width,cv.height); }
+
+function escapeHtml(s){ return String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c])); }
+
+$("openBtn").onclick = ()=>$("file").click();$("dumpBtn").onclick = ()=>{
+  if(!rf || selType==null){ $("inspect").textContent="select a resource first"; return; }
+  // for a shän, dump BOTH the shän and its base rlëD sprite sheet
+  const parts = [];
+  const add = (t,id)=>{ const bytes = rf.get(t,id) || rf.get(t==="rlëD"?"rleD":(t==="shän"?"shan":t), id);
+    if(bytes){ parts.push(`== ${t} #${id} · ${bytes.byteLength} bytes ==\n` + hexdump(bytes, 0, bytes.byteLength)); } };
+  add(selType, selId);
+  if(selType==="shän"||selType==="shan"){ const s=readShan(rf,selId); if(s){ add("rlëD", s.baseImageID); } }
+  const text = parts.join("\n\n");
+  // download as a file (cleaner than pasting hundreds of hex lines into chat)
+  const blob = new Blob([text], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `evsprite_${selType.replace(/[^a-z0-9]/gi,'')}_${selId}.txt`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  $("inspect").textContent = `dumped ${selType} #${selId}` + (parts.length>1?" + its base rlëD":"") + ` to ${a.download} — send me that file.\n\n` + text.slice(0, 1200) + (text.length>1200?"\n… (full data in the file)":"");
+};
+$("file").onchange = (e)=>{ if(e.target.files.length) loadFiles(e.target.files); };
+
+// --- Scan Downloads panel: asks the SweK server (port 8787) to list EV data +
+//     plug-ins in a folder, checks each against the loaded base, and loads the ones
+//     you pick. Falls back gracefully if the server route isn't mounted.
+$("scanBtn").onclick = ()=>{
+  const p = $("scanPanel");
+  p.style.display = p.style.display==="none" ? "block" : "none";
+  if(p.style.display==="block" && !$("scanDir").value){
+    // best-effort default: most people scan Downloads
+    $("scanDir").value = "";
+    $("scanDir").placeholder = navigator.platform.startsWith("Win")
+      ? "C:\\Users\\<you>\\Downloads" : "/Users/<you>/Downloads";
+    $("scanDir").focus();
+  }
+};
+$("scanClose").onclick = ()=>{ $("scanPanel").style.display="none"; };
+
+async function serverScan(dir){
+  // Try the SweK server route. Returns {candidates} or throws.
+  const r = await fetch(`/ev/scan?dir=${encodeURIComponent(dir)}`);
+  if(!r.ok) throw new Error(`scan route returned ${r.status}`);
+  return r.json();
+}
+
+// Compat check IN-BROWSER: fetch a candidate's bytes via the server's static file
+// route (if reachable), parse, and classify vs the loaded base. This lets the panel
+// show tiers even if only /ev/scan exists. If the file can't be fetched, we still
+// list it and let the user load it through the normal picker.
+function classify(candFork){
+  if(!candFork) return {tier:"unreadable", reason:"not parseable as EV data"};
+  const types = candFork.typeList();
+  const core = types.filter(t=>["sÿst","syst","spöb","spob","shïp","ship","gövt","govt"].includes(t)).length;
+  if(core>=3 && candFork.count>400) return {tier:"standalone", reason:`full base/TC — ${candFork.count} resources`, types};
+  if(!rf) return {tier:"no-base", reason:`adds ${candFork.count} resources (no base loaded to compare)`, types};
+  // compare vs loaded base rf
+  let add=0, over=0; const collisions=[];
+  for(const t of types){
+    const baseIds = new Set((rf.list(t)||[]).map(r=>r.id));
+    const o=[]; for(const res of (candFork.list(t)||[])){ if(baseIds.has(res.id)){over++;o.push(res.id);} else add++; }
+    if(o.length) collisions.push({type:t, ids:o.slice(0,20)});
+  }
+  if(over===0) return {tier:"adds-only", reason:`adds ${add} new, overrides nothing — safe`, types, add};
+  return {tier:"overrides", reason:`overrides ${over}, adds ${add} — pair with its intended base`, types, over, add, collisions};
+}
+
+const TIER_COLOR = {"adds-only":"#7ff0a8","overrides":"#ff8a6a","standalone":"#57d6ff","no-base":"#cfe2f2","unreadable":"#6d829a"};
+
+$("scanGo").onclick = async ()=>{
+  const dir = $("scanDir").value.trim();
+  if(!dir){ $("scanResults").innerHTML='<span style="color:#ff8a6a">enter a folder path</span>'; return; }
+  $("scanResults").innerHTML = '<span style="color:#6d829a">scanning…</span>';
+  let data;
+  try { data = await serverScan(dir); }
+  catch(e){
+    $("scanResults").innerHTML =
+      `<div style="color:#ff8a6a;font-size:13px">Can't reach the scan route (${e.message}).</div>`+
+      `<div style="color:#6d829a;font-size:12px;margin-top:6px">The Downloads scan needs the SweK server (port 8787) with the ev-scan route mounted. `+
+      `Until then, use <b>Open data files or .zip…</b> to pick the plug-in pack directly — it unzips in memory and loads the same way.</div>`;
+    return;
+  }
+  const cands = data.candidates||[];
+  if(!cands.length){ $("scanResults").innerHTML='<span style="color:#6d829a">no EV data / plug-in files found in that folder</span>'; return; }
+  // Try to classify each by fetching its bytes through the server inspect route.
+  const rows = await Promise.all(cands.map(async (c)=>{
+    let tier="?", reason="", info=null;
+    try{
+      const r = await fetch(`/ev/inspect?path=${encodeURIComponent(c.path)}`);
+      if(r.ok){ info = await r.json(); tier = info.report?.tier || "?"; reason = info.report?.reason || ""; }
+    }catch(e){}
+    return {c, tier, reason, info};
+  }));
+  $("scanResults").innerHTML =
+    `<div style="font-size:12px;color:#6d829a;margin-bottom:6px">${rows.length} candidate(s) in ${escapeHtml(dir)} — newest first. Check the ones to load.</div>`+
+    rows.map((row,i)=>{
+      const col = TIER_COLOR[row.tier]||"#cfe2f2";
+      const kb = (row.c.size/1024).toFixed(0);
+      return `<label style="display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border:1px solid #1b2a3f;border-radius:4px;margin-bottom:5px;cursor:pointer">
+        <input type="checkbox" class="scanPick" data-path="${escapeHtml(row.c.path)}" style="margin-top:3px">
+        <span style="flex:1">
+          <span style="font-family:monospace;font-size:13px;color:#cfe2f2">${escapeHtml(row.c.name)}</span>
+          <span style="color:#6d829a;font-size:11px"> · ${kb} KB · ${row.c.kind}</span><br>
+          <span style="color:${col};font-size:11px">${row.tier}</span>
+          <span style="color:#8fa;font-size:11px">${escapeHtml(row.reason||"")}</span>
+        </span>
+      </label>`;
+    }).join("")+
+    `<button class="btn primary" id="scanLoad" style="margin-top:8px">Load selected</button>`;
+  $("scanLoad").onclick = async ()=>{
+    const picks = Array.from(document.querySelectorAll(".scanPick:checked")).map(c=>c.dataset.path);
+    if(!picks.length){ return; }
+    $("scanResults").innerHTML = '<span style="color:#6d829a">loading selected…</span>';
+    try{
+      const r = await fetch("/ev/load", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({paths:picks})});
+      const out = await r.json();
+      if(out.error){ $("scanResults").innerHTML=`<span style="color:#ff8a6a">${escapeHtml(out.error)}</span>`; return; }
+      $("status").innerHTML = `<span class="good">loaded via scan: ${out.loaded.map(escapeHtml).join(", ")}${out.tempCleaned?" · temp cleaned":""}</span>`;
+      $("scanResults").innerHTML = `<span style="color:#7ff0a8">loaded ${out.loaded.length} file(s). Re-open or use cached data to view resources.</span>`;
+      // Note: the server loaded them into ITS state; to view here, the flight engine
+      // caches them — press "Use cached data".
+    }catch(e){ $("scanResults").innerHTML=`<span style="color:#ff8a6a">load failed: ${escapeHtml(e.message)}</span>`; }
+  };
+};
+
+$("restoreBtn").onclick = async ()=>{
+  const rec = await evCacheLoad();
+  if(!rec){ $("status").innerHTML='<span class="err">no cached data — load the flight engine first, or open files here</span>'; return; }
+  await loadFiles(rec.files.map(r=>new File([r.bytes], r.name)));
+};
+["dragenter","dragover"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.add("over");}));
+["dragleave","drop"].forEach(ev=>$("drop").addEventListener(ev,e=>{e.preventDefault();$("drop").classList.remove("over");}));
+$("drop").addEventListener("drop",e=>{ if(e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); });
+// auto-try cached data on open
+evCacheLoad().then(rec=>{ if(rec){ $("status").textContent="cached data available — click ‘Use cached data’"; } });
+</script>
+</body>
+</html>

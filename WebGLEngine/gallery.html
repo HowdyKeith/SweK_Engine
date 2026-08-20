@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Demo Gallery</title>
+<style>
+  :root { --bg:#05070e; --ink:#e7eef8; --dim:#8b97a8; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:radial-gradient(1200px 700px at 50% -10%, #0c1424 0%, var(--bg) 60%); color:var(--ink);
+              font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:30px 22px 60px; }
+  header.top { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px; }
+  h1 { margin:0; font-size:30px; letter-spacing:.3px; font-weight:800; background:linear-gradient(90deg,#7fe0ff,#9d8bff 55%,#ff9a6b); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .lede { color:var(--dim); font-size:14px; margin:2px 0 26px; max-width:760px; }
+  .caps { margin-left:auto; display:flex; gap:8px; font:11px ui-monospace,monospace; }
+  .cap { padding:3px 9px; border-radius:99px; border:1px solid #24405e; color:#8fb4d8; }
+  .cap.on { border-color:#2a6a4a; color:#8fe6b8; background:#0e2417; } .cap.off { opacity:.55; }
+  section { margin:30px 0 6px; }
+  .sh { display:flex; align-items:center; gap:12px; margin:0 0 14px; }
+  .sh .bar { width:6px; height:26px; border-radius:6px; }
+  .sh h2 { margin:0; font-size:19px; letter-spacing:.5px; } .sh .st { color:var(--dim); font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+  a.card { position:relative; display:flex; flex-direction:column; gap:8px; padding:20px; min-height:150px;
+           background:linear-gradient(180deg,#0d1320,#0a0f18); border:1px solid #1b2740; border-radius:16px; text-decoration:none; color:var(--ink);
+           transition:border-color .14s, transform .14s, box-shadow .14s; overflow:hidden; }
+  a.card:hover, a.card:focus-visible { transform:translateY(-3px); outline:none; }
+  a.card:focus-visible { outline:3px solid #7fe0ff; outline-offset:3px; }
+  a.card .ico { font-size:36px; line-height:1; }
+  a.card .ttl { font-size:19px; font-weight:700; }
+  a.card .desc { font-size:13.5px; color:#93a0b3; flex:1; }
+  a.card .badges { display:flex; gap:6px; flex-wrap:wrap; }
+  .badge { font:10.5px ui-monospace,monospace; text-transform:uppercase; letter-spacing:.6px; padding:2px 8px; border-radius:99px; border:1px solid #2f486c; color:#9db6d6; background:#0b1320; }
+  .badge.gpu { border-color:#6a3d7a; color:#e0a0ff; background:#1a0e22; }
+  .badge.wgl { border-color:#3a6a4a; color:#9fe6c0; background:#0e2417; }
+  .badge.d2 { border-color:#5a5230; color:#e8d08a; background:#1e1a0c; }
+  .badge.bx { border-color:#2f5a6c; color:#8fd6e6; background:#0b1c22; }
+  .glow { position:absolute; inset:auto -30% -60% auto; width:220px; height:220px; border-radius:50%; filter:blur(50px); opacity:.16; pointer-events:none; }
+  .fallnote { font:10.5px ui-monospace,monospace; color:#c9a05a; }
+  .foot { margin-top:38px; display:flex; gap:18px; flex-wrap:wrap; font-size:14px; }
+  .foot a { color:#7fd1ff; text-decoration:none; } .foot a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>&#129526; SweK Demo Gallery</h1>
+    <div class="caps">
+      <span class="cap" id="capGl">WebGL2</span>
+      <span class="cap" id="capGpu">WebGPU</span>
+    </div>
+  </header>
+  <p class="lede">The fun stuff, in one place &mdash; deterministic Box3D physics, marched-metaball fire, an Endless-Sky
+     dogfight, and a GPU Brain learning to drive it all. Cards tagged <b>WebGPU</b> want Chrome/Edge or Safari&nbsp;18+;
+     everything else runs in any modern browser.</p>
+  <div id="sections"></div>
+  <div class="foot">
+    <a href="/">&#127758; Full 3D engine &rarr;</a>
+    <a href="/panels.html">&#128241; Simple page list &rarr;</a>
+    <a href="/server.html">&#128225; Server &amp; fleet &rarr;</a>
+    <a href="/showcase.html">&#10024; About SweK &rarr;</a>
+  </div>
+</div>
+
+<script>
+var SECTIONS = [
+  { title: "Physics \u00b7 Box3D", sub: "deterministic rigid bodies, proven across the fleet", color: "#3fd6b0", panel: "/box3d.html", cards: [
+    { icon: "\uD83E\uDD9A", ttl: "Box3D Blobs", href: "/box3d-blobs.html", desc: "A tank of real rigid bodies becomes fiery metaballs \u2014 pour, erupt, and watch the lava churn.", badges: ["wgl","bx"] },
+    { icon: "\uD83C\uDFDA\uFE0F", ttl: "Kaiju Demo", href: "/box3d-demo.html", desc: "A procedural city coming down as genuine rigid debris under a rampaging kaiju.", badges: ["wgl","bx"] },
+    { icon: "\uD83D\uDEE0\uFE0F", ttl: "Box3D Control", href: "/box3d-info.html", desc: "Build or pull the WASM, then prove Mac\u2194PC bit-for-bit determinism \u2014 the lockstep precondition.", badges: ["panel"] },
+  ] },
+  { title: "Fire \u00b7 Blobulator", sub: "metaballs marched to a glowing isosurface", color: "#ff8a3c", cards: [
+    { icon: "\uD83E\uDDEA", ttl: "Blobulator", href: "/blobulator.html", desc: "A warm lava lamp and a flaming river of blobs that flow downstream and rise like fiery balloons.", badges: ["wgl"] },
+    { icon: "\u26A1", ttl: "Blobulator GPU", href: "/blobulator-gpu.html", desc: "A WebGPU raymarched SDF \u2014 fire & water presets, Box3D-driven, with the GPU Brain learning to steer it.", badges: ["gpu","bx"] },
+  ] },
+  { title: "Flight \u00b7 Endless Sky", sub: "two AI fleets dogfight on the Box3D substrate", color: "#5aa8ff", panel: "/flight.html", cards: [
+    { icon: "\uD83D\uDE80", ttl: "Endless Sky 2D", href: "/es-box3d.html", desc: "Tactics-policy pilots fight it out top-down, colliding as real Box3D bodies. Fast and fun to watch.", badges: ["d2","bx"] },
+    { icon: "\uD83D\uDEF8", ttl: "Flight GPU 3D", href: "/flight-gpu.html", desc: "The exact same fight, rendered in WebGPU 3D with cinematic orbit and chase cameras.", badges: ["gpu","bx"] },
+    { icon: "\uD83D\uDC65", ttl: "Co-op Lockstep", href: "/flight-coop.html", desc: "Two peers step one world from each other's inputs and verify a per-tick hash \u2014 lockstep you can watch.", badges: ["bx"] },
+  ] },
+  { title: "GPU Brain", sub: "a WebGPU policy network that learns on your GPU", color: "#c78bff", cards: [
+    { icon: "\uD83E\uDDE0", ttl: "Brain Maze", href: "/brain-maze.html", desc: "The Brain feels its way through an obstacle room \u2014 pathfinding you can watch think.", badges: ["wgl"] },
+    { icon: "\u2696\uFE0F", ttl: "Brain Bench", href: "/brain-bench.html", desc: "Which half of a brain belongs on a GPU. Runs both flow-field solvers on YOUR box and reports speed AND accuracy \u2014 a fast wrong field is not a win.", badges: ["gpu"] },
+    { icon: "\uD83D\uDD32", ttl: "Brain Quadrants", href: "/brain-quadrants.html", desc: "The Brain's spatial reasoning, split into quadrants and scored live.", badges: ["wgl"] },
+    { icon: "\uD83C\uDFDF\uFE0F", ttl: "Brain Room", href: "/brain-room.html", desc: "A sandbox room the Brain explores and learns to navigate.", badges: ["wgl"] },
+  ] },
+  { title: "Spacetime", sub: "curved-ray tracing through relativistic geometry", color: "#9d8bff", cards: [
+    { icon: "\uD83C\uDF0C", ttl: "Ellis Wormhole", href: "/wormhole.html", desc: "A traversable wormhole ray-traced through curved spacetime \u2014 look through the throat into another sky.", badges: ["gpu"] },
+    { icon: "\u26AB", ttl: "Black Hole", href: "/blackhole.html", desc: "A Schwarzschild black hole with photon geodesics \u2014 lensed accretion disk, photon ring, and the shadow.", badges: ["gpu"] },
+  ] },
+  { title: "Water & Bench", sub: "shader showcases", color: "#3fd0e6", cards: [
+    { icon: "\uD83C\uDF0A", ttl: "WebGL2 Water", href: "/water.html", desc: "Heightfield ripples, differential-area caustics, and a Fresnel surface \u2014 one self-contained file.", badges: ["wgl"] },
+    { icon: "\uD83D\uDCCA", ttl: "WebGPU Bench", href: "/webgpu-bench.html", desc: "Measure raw compute throughput on your GPU \u2014 matmul and bandwidth kernels.", badges: ["gpu"] },
+  ] },
+];
+var BADGE = { gpu: { cls: "gpu", txt: "WebGPU" }, wgl: { cls: "wgl", txt: "WebGL2" }, d2: { cls: "d2", txt: "2D" }, bx: { cls: "bx", txt: "Box3D" }, panel: { cls: "", txt: "Panel" } };
+
+// feature detection
+var hasGL2 = (function () { try { return !!document.createElement("canvas").getContext("webgl2"); } catch (e) { return false; } })();
+var hasGpu = !!(navigator.gpu);
+function setCap(id, on) { var el = document.getElementById(id); el.className = "cap " + (on ? "on" : "off"); el.textContent = (on ? "\u2713 " : "\u2717 ") + el.textContent.replace(/^[\u2713\u2717]\s*/, ""); }
+setCap("capGl", hasGL2); setCap("capGpu", hasGpu);
+
+var root = document.getElementById("sections");
+SECTIONS.forEach(function (sec) {
+  var s = document.createElement("section");
+  var head = '<div class="sh"><span class="bar" style="background:' + sec.color + '"></span><h2>' + sec.title + '</h2><span class="st">' + sec.sub + '</span>' + (sec.panel ? '<a class="panel" href="' + sec.panel + '" style="margin-left:auto;font:12.5px ui-monospace,monospace;color:' + sec.color + ';text-decoration:none">full panel &rarr;</a>' : '') + '</div>';
+  var grid = document.createElement("div"); grid.className = "grid";
+  sec.cards.forEach(function (c) {
+    var needsGpu = c.badges.indexOf("gpu") >= 0;
+    var a = document.createElement("a");
+    a.className = "card"; a.href = c.href;
+    a.onmouseover = function () { a.style.borderColor = sec.color; a.style.boxShadow = "0 10px 30px -12px " + sec.color + "55"; };
+    a.onmouseout = function () { a.style.borderColor = ""; a.style.boxShadow = ""; };
+    var badges = c.badges.map(function (b) { var d = BADGE[b] || { cls: "", txt: b }; return '<span class="badge ' + d.cls + '">' + d.txt + '</span>'; }).join("");
+    var fall = (needsGpu && !hasGpu) ? '<div class="fallnote">no WebGPU here \u2014 opens its built-in fallback</div>' : "";
+    a.innerHTML = '<div class="glow" style="background:' + sec.color + '"></div>'
+      + '<div class="ico">' + c.icon + '</div>'
+      + '<div class="ttl">' + c.ttl + '</div>'
+      + '<div class="desc">' + c.desc + '</div>' + fall
+      + '<div class="badges">' + badges + '</div>';
+    grid.appendChild(a);
+  });
+  s.innerHTML = head; s.appendChild(grid); root.appendChild(s);
+});
+</script>
+</body>
+</html>

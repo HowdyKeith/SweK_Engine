@@ -1,0 +1,18 @@
+{
+  "note": "x86_64 reference for tools/macSession.mjs. Generated on the sandbox (x64/linux). A DIFFERENT arch producing DIFFERENT values here is the finding the cross-arch claims are about -- it is not automatically a bug, it is the measurement.",
+  "arch": "x64",
+  "platform": "linux",
+  "engineVersion": "v2863",
+  "recordedAt": "2026-07-23T05:16:54.754Z",
+  "stages": {
+    "fingerprint": "347be10159ee6db7012b392fe33c3f5831be6efa2368c56cc20ec1aa03b23e05",
+    "ledger": {
+      "match": 50,
+      "regression": 0,
+      "new": 0
+    },
+    "crossarch-box3d": "65f79e1429f51d44",
+    "crossarch-flesh": "f7586c4988abd861",
+    "mathprobe": "bfb47249248ab6c91bc802ab098bbf5b"
+  }
+}

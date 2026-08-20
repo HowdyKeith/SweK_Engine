@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Parallax Occlusion (v2784)</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display: flex; gap: 16px; padding: 14px; flex-wrap: wrap; }
+  canvas { width: 560px; height: 560px; border: 1px solid #24382e; background: #000; }
+  #side { min-width: 200px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  .row { margin: 8px 0; }
+  input[type=range] { width: 160px; vertical-align: middle; }
+  .note { color: #6f8a7c; margin-top: 10px; max-width: 240px; }
+  .err { color: #e0a0a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div><canvas id="c" width="560" height="560"></canvas>
+    <div class="note" id="note">One flat quad, two triangles. The carved brick depth is entirely the parallax
+      shader (gated identical to the JS reference) -- no extra geometry. Tilt to see the parallax slide.</div></div>
+  <div id="side">
+    <h1>Parallax Occlusion Mapping</h1>
+    <div class="row">tilt X <input id="tx" type="range" min="-60" max="60" value="30"></div>
+    <div class="row">tilt Y <input id="ty" type="range" min="-60" max="60" value="-25"></div>
+    <div class="row">depth <input id="depth" type="range" min="0" max="20" value="9"></div>
+    <div class="row">layers <input id="layers" type="range" min="4" max="64" value="32"></div>
+    <div class="row"><label><input id="pom" type="checkbox" checked> parallax on</label></div>
+  </div>
+</div>
+<script type="module">
+import { PARALLAX_GLSL } from "/render/parallaxOcclusion.js";
+
+const c = document.getElementById("c"), gl = c.getContext("webgl2"), note = document.getElementById("note");
+if (!gl) { note.innerHTML = '<span class="err">WebGL2 unavailable — check chrome://gpu.</span>'; }
+
+// --- bake a brick heightmap into a texture (grayscale: bricks high, mortar low) ---
+function brickTexture() {
+    const N = 256, cv = document.createElement("canvas"); cv.width = cv.height = N;
+    const x = cv.getContext("2d");
+    x.fillStyle = "#222"; x.fillRect(0, 0, N, N);                 // mortar (low)
+    const rows = 8, bh = N / rows, bw = N / 4, m = 4;
+    for (let r = 0; r < rows; r++) {
+        const off = (r % 2) ? bw / 2 : 0;
+        for (let bxi = -1; bxi < 4; bxi++) {
+            const bx = bxi * bw + off, by = r * bh;
+            const g = 180 + ((r * 7 + bxi * 13) % 40);            // slight per-brick variation
+            x.fillStyle = `rgb(${g},${g - 10},${g - 20})`;
+            x.fillRect(bx + m, by + m, bw - 2 * m, bh - 2 * m);   // brick face (high)
+        }
+    }
+    return cv;
+}
+
+function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { note.innerHTML = '<span class="err">shader: ' + gl.getShaderInfoLog(s) + '</span>'; throw 0; } return s; }
+
+const VERT = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPos;
+uniform mat3 uRot;      // quad orientation (tilt)
+uniform vec3 uEye;
+out vec2 vUV;
+out vec3 vViewTan;      // view direction in the quad's tangent space
+void main(){
+    vUV = aPos*0.5+0.5;
+    vec3 world = uRot * vec3(aPos, 0.0);          // quad rotated in place
+    vec3 vdir = normalize(uEye - world);
+    // tangent basis of the rotated quad: T=uRot*x, B=uRot*y, N=uRot*z
+    vec3 T = uRot*vec3(1,0,0), B = uRot*vec3(0,1,0), Nn = uRot*vec3(0,0,1);
+    vViewTan = vec3(dot(vdir,T), dot(vdir,B), dot(vdir,Nn));
+    gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D uHeightMap;
+uniform float uDepth;
+uniform int uLayers;
+uniform bool uPom;
+in vec2 vUV;
+in vec3 vViewTan;
+out vec4 fragColor;
+${PARALLAX_GLSL}
+void main(){
+    vec3 vt = normalize(vViewTan);
+    vec2 uv = uPom ? parallaxUV(vUV, vt, uDepth, uLayers) : vUV;
+    if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){ fragColor=vec4(0.03,0.04,0.05,1.0); return; }
+    float h = texture(uHeightMap, uv).r;
+    // cheap normal from height gradient for a bit of shading pop
+    float e = 1.0/256.0;
+    float hx = texture(uHeightMap, uv+vec2(e,0)).r - texture(uHeightMap, uv-vec2(e,0)).r;
+    float hy = texture(uHeightMap, uv+vec2(0,e)).r - texture(uHeightMap, uv-vec2(0,e)).r;
+    vec3 n = normalize(vec3(-hx*3.0, -hy*3.0, 1.0));
+    vec3 L = normalize(vec3(0.4,0.5,0.8));
+    float lam = 0.4 + 0.6*max(0.0, dot(n,L));
+    vec3 base = vec3(0.72,0.34,0.26)*(0.5+0.5*h);   // brick tint by height
+    fragColor = vec4(base*lam, 1.0);
+}`;
+
+let prog, tex, u = {};
+if (gl) {
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(prog);
+    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, brickTexture());
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    ["uRot", "uEye", "uHeightMap", "uDepth", "uLayers", "uPom"].forEach(n => u[n] = gl.getUniformLocation(prog, n));
+}
+
+const $ = id => document.getElementById(id);
+function rotMat(ax, ay) {
+    const cx = Math.cos(ax), sx = Math.sin(ax), cy = Math.cos(ay), sy = Math.sin(ay);
+    // Ry * Rx, column-major mat3
+    return new Float32Array([cy, 0, -sy, sy * sx, cx, cy * sx, sy * cx, -sx, cy * cx]);
+}
+function draw() {
+    if (!gl) return;
+    gl.viewport(0, 0, c.width, c.height); gl.clearColor(0.03, 0.04, 0.05, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog);
+    gl.uniformMatrix3fv(u.uRot, false, rotMat($("tx").value * Math.PI / 180, $("ty").value * Math.PI / 180));
+    gl.uniform3f(u.uEye, 0, 0, 2.5);
+    gl.uniform1i(u.uHeightMap, 0); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1f(u.uDepth, $("depth").value / 100);
+    gl.uniform1i(u.uLayers, parseInt($("layers").value));
+    gl.uniform1i(u.uPom, $("pom").checked ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+["tx", "ty", "depth", "layers", "pom"].forEach(id => { const el = $(id); el.oninput = el.onchange = draw; });
+draw();
+</script>
+
+<!-- v3253 -- WHAT THIS TECHNIQUE CANNOT DO, ON THE PAGE THAT DEMONSTRATES IT. -->
+<div id="hfLimit" style="max-width:900px;margin:18px auto;padding:12px 14px;border:1px solid #24382e;background:#0e1512;color:#cfe9d8;font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace">
+  <div style="color:#e0c58a;font-weight:600">What parallax occlusion mapping cannot represent</div>
+  <div style="margin-top:6px">
+    POM displaces along a <b>heightfield</b> &mdash; <code>h(u,v)</code>, <b>one height per texel</b>. A function
+    cannot return two values, so an <b>overhang</b>, a <b>hole you can see through</b> and an <b>undercut</b> are
+    not hard for this technique, they are <b>unrepresentable</b>. The silhouette never moves either: however deep
+    the interior looks, the quad's outline stays a quad.
+  </div>
+  <div id="hfReceipt" style="margin-top:8px;color:#b6f0cf"></div>
+  <div style="margin-top:6px;color:#6f8a7c">
+    The loss is not "detail looks worse". On the fixture above the heightfield keeps every solid cell and
+    <b>fills in the empty space underneath the overhang</b> &mdash; which is exactly why POM is convincing and
+    wrong: you never see geometry go missing, you see <b>solid where there should be a gap</b>.
+    <br>SweK already renders the other side of this line: a <b>voxel DDA marches a volume</b>, and a volume has no
+    one-height-per-texel restriction &mdash; see <a href="/ray-march-demo.html" style="color:#9fc7e6">ray-march-demo</a>.
+    <b>The browser has no tessellation stage</b> (neither WebGL2 nor WebGPU exposes one), so the usual answer to
+    this limitation is not available here; marching the volume is.
+  </div>
+</div>
+<script type="module">
+import { overhangVolume, mesoReceipt } from "./tools/render-qa/mesostructure.mjs";
+// THE NUMBER IS COMPUTED ON LOAD, NOT TYPED INTO THE PAGE. A caveat carrying a hand-written figure is a claim
+// that can go stale silently -- and this whole page is about a technique that looks right while being wrong.
+try { document.getElementById("hfReceipt").textContent = mesoReceipt(overhangVolume()); }
+catch (e) { document.getElementById("hfReceipt").textContent = "(the fixture did not load: " + e.message + ")"; }
+</script>
+</body>
+</html>

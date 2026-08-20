@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SweK Engine — AI Brain (VBA bridge)</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="AI Brain">
+<meta name="demo:desc"   content="VBA-bridge visualizer for engine AI state.">
+<meta name="demo:cats"   content="ai">
+<meta name="demo:swatch" content="A">
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #06040d;
+    color: #c8d8ff;
+    font-family: monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+  #wrap {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+  }
+  #map-col {
+    flex: 1;
+    position: relative;
+    background: radial-gradient(ellipse at center, #0c1530 0%, #04060a 70%);
+  }
+  #map {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #title {
+    position: absolute;
+    top: 12px; left: 16px;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: #5ec8ff;
+    text-shadow: 0 0 10px rgba(94, 200, 255, 0.4);
+  }
+  #legend {
+    position: absolute;
+    bottom: 12px; left: 16px;
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 6px 10px;
+    border: 1px solid rgba(94, 200, 255, 0.3);
+    border-radius: 3px;
+    line-height: 1.6;
+  }
+  #legend .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  #side {
+    width: 340px;
+    background: rgba(8, 10, 24, 0.85);
+    border-left: 1px solid rgba(94, 200, 255, 0.18);
+    padding: 14px;
+    overflow-y: auto;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.4);
+  }
+  #side h3 {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #5ec8ff;
+    margin: 16px 0 4px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    border-bottom: 1px solid rgba(94, 200, 255, 0.18);
+    padding-bottom: 3px;
+  }
+  #status {
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(94, 200, 255, 0.3);
+    border-radius: 3px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+  }
+  #status .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #444;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  #status .dot.on { background: #5eff8a; }
+  #stats {
+    font-size: 10px;
+    line-height: 1.7;
+    opacity: 0.85;
+  }
+  #stats .k { color: rgba(94, 200, 255, 0.7); }
+  #stats .v { color: #fff; }
+  #enemy-list {
+    margin-top: 4px;
+  }
+  .enemy-card {
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background: rgba(20, 30, 60, 0.5);
+    border-left: 3px solid #444;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .enemy-card .row1 { color: #fff; }
+  .enemy-card .row2 { opacity: 0.6; font-size: 9px; }
+  #recent-dirs {
+    font-size: 9px;
+    max-height: 120px;
+    overflow-y: auto;
+    color: #98c5ff;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px 6px;
+    border: 1px solid rgba(94, 200, 255, 0.15);
+    line-height: 1.5;
+  }
+  #raw-state {
+    font-size: 9px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 4px 6px;
+    border: 1px solid rgba(94, 200, 255, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+    color: #98c5ff;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map-col">
+    <canvas id="map"></canvas>
+    <div id="title">AI BRAIN — VBA OpenGL bridge</div>
+    <div style="position:absolute;top:34px;left:12px;right:12px;font:11px ui-monospace,monospace;color:#7fdca8;opacity:.85;z-index:4;pointer-events:none;">The browser computes enemy AI as a live, visible simulation — heat = per-cell risk, dots = each agent's intent — and feeds it to a separate OpenGL game over the bridge. Game owns positions; browser owns intents.</div>
+    <div id="legend">
+      <div><span class="dot" style="background:#ffe666"></span> player + predicted</div>
+      <div><span class="dot" style="background:#5ec8ff"></span> idle</div>
+      <div><span class="dot" style="background:#ff9933"></span> seek</div>
+      <div><span class="dot" style="background:#ff5050"></span> attack</div>
+      <div style="margin-top:4px;opacity:0.6;font-size:9px;">heat ramp · cool → warm = safer → riskier cell</div>
+    </div>
+  </div>
+  <div id="side">
+    <div id="status"><span class="dot"></span><span id="status-text">connecting...</span></div>
+    <h3>Game state</h3>
+    <div id="stats">
+      <div><span class="k">tick:</span> <span class="v" id="stat-tick">—</span></div>
+      <div><span class="k">last update:</span> <span class="v" id="stat-age">—</span></div>
+      <div><span class="k">player:</span> <span class="v" id="stat-player">—</span></div>
+      <div><span class="k">enemies:</span> <span class="v" id="stat-enemies">0</span></div>
+    </div>
+    <h3>Player control</h3>
+    <div id="player-ctrl" style="font-size:10px;">
+      <div style="margin-bottom:6px;opacity:0.7;line-height:1.4;">
+        Click the map to send the player to that point.<br>
+        Auto-pilot: brain decides for the player (evade + return-fire).
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button id="btn-autopilot" style="flex:1;padding:4px;background:rgba(150,100,255,0.25);border:1px solid rgba(150,100,255,0.6);color:#fff;cursor:pointer;font-family:monospace;font-size:10px;">AUTO-PILOT: OFF</button>
+        <button id="btn-clear-goto" style="padding:4px 10px;background:rgba(80,80,80,0.4);border:1px solid rgba(150,150,150,0.4);color:#fff;cursor:pointer;font-family:monospace;font-size:10px;" title="Cancel click-to-goto target">×</button>
+      </div>
+      <div id="player-status" style="opacity:0.7;font-size:9px;line-height:1.4;">no target set</div>
+      <div style="margin-top:8px;padding:4px 6px;background:rgba(150,100,255,0.08);border-left:2px solid rgba(150,100,255,0.4);font-size:9px;opacity:0.8;line-height:1.4;">
+        Requires <code>modAICommands</code> to handle the player-control cmds
+        (<code>playerGoto</code>, <code>playerMove</code>, <code>playerTurn</code>, <code>playerFire</code>).
+        Directives queue regardless — check "Last 8 directives" to confirm they're going through.
+      </div>
+    </div>
+    <h3>Map (WAD)</h3>
+    <div id="wad-ctrl" style="font-size:10px;">
+      <div style="margin-bottom:6px;opacity:0.7;line-height:1.4;">
+        Load a Doom WAD to render the actual level walls.<br>
+        Freedoom: <code style="color:#5eff8a">freedoom.github.io</code> · works as a free drop-in.
+      </div>
+      <input id="wad-file" type="file" accept=".wad" style="font-size:10px;color:#ccc;width:100%;margin-bottom:4px;">
+      <select id="wad-map" style="width:100%;font-family:monospace;font-size:10px;padding:3px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(94,200,255,0.3);margin-bottom:4px;display:none;"></select>
+      <div id="wad-status" style="opacity:0.7;font-size:9px;line-height:1.4;">no WAD loaded</div>
+    </div>
+    <h3>Hunt simulation</h3>
+    <div id="sim-ctrl" style="font-size:10px;">
+      <div style="margin-bottom:6px;opacity:0.7;line-height:1.4;">
+        N synthetic agents fight each other locally.<br>
+        No VBA / no bridge — runs entirely in this window.<br>
+        Uses the loaded WAD for walls + line-of-sight.
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+        <button id="btn-sim-toggle" style="flex:1;padding:4px;background:rgba(94,255,138,0.18);border:1px solid rgba(94,255,138,0.55);color:#fff;cursor:pointer;font-family:monospace;font-size:10px;">SIMULATE: OFF</button>
+        <button id="btn-sim-respawn" style="padding:4px 10px;background:rgba(80,80,80,0.4);border:1px solid rgba(150,150,150,0.4);color:#fff;cursor:pointer;font-family:monospace;font-size:10px;" title="Respawn all agents">↻</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+        <span style="opacity:0.7;">spawn N:</span>
+        <input id="sim-count" type="number" min="2" max="16" value="6" style="width:48px;font-family:monospace;font-size:10px;background:rgba(0,0,0,0.5);color:#fff;border:1px solid rgba(94,200,255,0.3);padding:2px 4px;">
+        <span id="sim-stats" style="flex:1;text-align:right;opacity:0.7;">—</span>
+      </div>
+    </div>
+    <h3>AI decisions</h3>
+    <div id="enemy-list"></div>
+    <h3>Thinking log</h3>
+    <div id="think-log" style="font-size:9px;max-height:160px;overflow-y:auto;background:rgba(0,0,0,0.4);padding:4px 6px;border:1px solid rgba(94,200,255,0.15);line-height:1.5;"><div style="opacity:0.4">no decisions yet</div></div>
+    <h3>Last 8 directives sent</h3>
+    <div id="recent-dirs"><div style="opacity:0.4">none yet</div></div>
+    <h3>Raw state (truncated)</h3>
+    <pre id="raw-state"></pre>
+  </div>
+</div>
+<script type="module" src="./ai/aiBrain.js">
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+<script>window.SHOWCASE_ID="aibrain";</script>
+<script src="/ui/showcaseNav.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; ASCII Object</title>
+<!--
+     v3322 -- ANY 3D OBJECT IN THIS ENGINE, VIEWED AS SHAPE-MATCHED ASCII.
+
+     Keith, on DavidHDev/canvas-ui: "the ascii object is amazing. if we could view our avatar or other 3d
+     objects through that, that would be very cool." That library is React/Vue/Svelte source and would need
+     porting -- BUT THE TECHNIQUE NEEDS NOTHING. Luminance into a character ramp is arithmetic over pixels.
+
+     *** THE SOURCE IS THE REAL WIREFRAME HEAD FROM face/wireframeHead.js -- the same module thead.html draws
+     and the Pip-Boy's screen 1 renders (v3239, v3240). NOT A PICTURE OF IT, NOT A COPY OF ITS SHAPE. *** If the
+     head changes, this changes, because there is one definition and three consumers.
+-->
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1000px;margin:0 auto;padding:16px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#6f8a7c;margin-bottom:12px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px}
+  pre{margin:0;font:11px/0.95 ui-monospace,Menlo,Consolas,monospace;color:#8fffb0;white-space:pre;overflow:auto}
+  label{color:#6f8a7c;margin-right:10px}input[type=range]{vertical-align:middle;width:150px}
+  canvas{display:none}
+  .dim{color:#6f8a7c}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>ASCII Object</h1>
+  <div class="sub">The wireframe head, rendered to a texture and sampled into a character ramp.
+    <span class="dim">Same module <b>thead.html</b> draws and the Pip-Boy screen renders &mdash; one definition, three consumers.</span></div>
+
+  <div class="card">
+    <label>columns <input id="cols" type="range" min="40" max="160" value="100"> <b id="colsN">100</b></label>
+    <label><input type="checkbox" id="inv"> invert</label>
+    <label><input type="checkbox" id="spin" checked> spin</label>
+    <span id="status" class="dim"></span>
+  </div>
+
+  <div class="card"><pre id="out">starting…</pre></div>
+
+  <div class="card dim">
+    <b>Ten ramp levels, not seventy.</b> A long ramp looks impressive and quantises noise into visible bands,
+    because adjacent glyphs stop differing in perceived weight.<br>
+    <b>Cells are twice as tall as they are wide</b>, so the sampling grid is corrected 2:1 &mdash; the step a naive
+    ASCII renderer skips, and the reason most come out squashed.<br>
+    <b>Transparent pixels become spaces, not the darkest glyph.</b> A transparent background averages to zero
+    luminance and would fill the frame with a solid block, which is the opposite of what an ASCII view is for.
+  </div>
+</div>
+<canvas id="gl"></canvas>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { buildWireframeHead } from "/face/wireframeHead.js";
+import { asciify } from "/tools/render-qa/asciify.mjs";
+
+const $ = (id) => document.getElementById(id);
+const W = 320, H = 320;                     // SMALL ON PURPOSE: the output is ~100 columns; rendering larger
+                                            // costs fill rate and is thrown away by the sampler on the next line.
+const cv = $("gl"); cv.width = W; cv.height = H;
+
+let renderer, scene, cam, rig, buf;
+try {
+    renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: true });
+    renderer.setClearColor(0x000000, 0);    // TRANSPARENT, so the sampler's alpha rule has something to do
+    scene = new THREE.Scene();
+    cam = new THREE.PerspectiveCamera(38, 1, 0.1, 20);
+    cam.position.set(0, 0.1, 2.4);
+    rig = buildWireframeHead(THREE);
+    scene.add(rig.root);
+    buf = new Uint8Array(W * H * 4);
+} catch (e) {
+    // *** NAME THE ABSENCE. *** No WebGL means no frames, and an empty <pre> would read as a broken sampler.
+    $("out").textContent = "no WebGL context: " + (e && e.message || e) +
+        "\n\nThe ASCII sampler itself needs no GPU -- it is tools/render-qa/asciify.mjs and is gated headlessly.\nWhat is missing here is the SOURCE FRAME, not the conversion.";
+    $("status").textContent = "";
+}
+
+let t = 0;
+function frame() {
+    if (!renderer) return;
+    if ($("spin").checked) { t += 0.016; rig.head.rotation.y = Math.sin(t * 0.6) * 0.6; rig.head.rotation.x = Math.sin(t * 0.37) * 0.12; }
+    renderer.render(scene, cam);
+    const gl = renderer.getContext();
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    // readPixels returns BOTTOM-UP; asciify walks top-down. Without the flip the head renders upside down and
+    // looks like a bug in the sampler rather than a coordinate convention.
+    const flipped = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) flipped.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+    const cols = parseInt($("cols").value, 10);
+    const r = asciify(flipped, W, H, { cols, invert: $("inv").checked });
+    $("out").textContent = r.text;
+    $("status").textContent = r.cols + "x" + r.rows + " cells from a " + W + "x" + H + " frame";
+    requestAnimationFrame(frame);
+}
+$("cols").oninput = () => { $("colsN").textContent = $("cols").value; };
+if (renderer) frame();
+</script>
+</body>
+</html>

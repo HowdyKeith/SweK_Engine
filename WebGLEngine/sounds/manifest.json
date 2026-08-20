@@ -1,0 +1,4 @@
+{
+  "_comment": "List sample names (without .wav extension) here to enable sample preload. Empty array = full procedural mode. The procedural fallback covers all 27 sounds the engine triggers.",
+  "samples": []
+}

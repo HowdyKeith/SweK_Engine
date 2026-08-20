@@ -1,0 +1,1 @@
+{"task":"Open a URL in Camoufox and return its page title (template).","params":[{"name":"--url","required":true,"desc":"page to open"},{"name":"--headless","required":false,"desc":"true/false"}]}

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Doorbell</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:620px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; background:var(--panel); }
+  label { display:block; color:var(--dim); font-size:12px; margin:10px 0 4px; }
+  input, select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .ck { display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > div { flex:1; min-width:130px; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:8px 14px; font:inherit; cursor:pointer; }
+  button.test { color:#ffcf6b; border-color:#5a4a22; background:#221c10; }
+  #msg { color:var(--dim); font-size:12px; margin-top:10px; }
+  code { color:var(--go); }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🔔</span> Doorbell fan-out</span></header>
+  <main>
+    <div class="note">
+      One trigger, many reactions. Fire it from a phone whenever Blink reports a doorbell/motion event — MacroDroid/Tasker → HTTP <b>GET <code>/doorbell/ring</code></b>. It announces on the avatar (quip + TTS + HA speaker), pops the Blink app on the Android TV Device, and can flash a light. Blink stays cloud-only, so the Android TV Device opens the app (no single-camera deep link); the live feed still lives in Blink / on your Echo Show.
+    </div>
+    <div class="card">
+      <div class="row">
+        <div><label>Android TV Device IP</label><input id="shieldIp" data-rt-placeholder="192.168.10.114" placeholder="192.168.10.114" /></div>
+        <div><label>On the Android TV Device</label><select id="shieldAction"><option value="blink">Open the Blink app</option><option value="url">Open a camera URL</option><option value="none">Nothing</option></select></div>
+      </div>
+      <div id="urlRow" style="display:none;"><label>Camera URL (relative ok → resolves to this PC)</label><input id="shieldUrl" data-rt-placeholder="/cloudedge.html or http://…" placeholder="/cloudedge.html or http://…" /></div>
+
+      <label class="ck"><input id="announce" type="checkbox" /> Announce on the avatar</label>
+      <label>Announcement text</label>
+      <input id="quip" data-rt-placeholder="Someone's at the door!" placeholder="Someone's at the door!" />
+      <label class="ck"><input id="speak" type="checkbox" /> Speak it aloud (local TTS + HA speaker)</label>
+
+      <div class="row" style="margin-top:6px;">
+        <div><label>Flash a light/switch (optional)</label><input id="light" data-rt-placeholder="light.porch / switch.x" placeholder="light.porch / switch.x" /></div>
+        <div><label>Auto-off after (sec, 0 = stay)</label><input id="flashSec" type="number" min="0" max="600" /></div>
+      </div>
+
+      <div class="actions">
+        <button id="save">Save</button>
+        <button class="test" id="test">🔔 Test ring</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script type="module">
+  // v3670 -- SECOND CONVERSION TO ui/roundTrip.js (arrival.html was the first, v3455). This page was the
+  // defect in a sharper form than arrival was, because it has FOUR of the six kinds and a button that writes.
+  //
+  // WHAT IT USED TO DO, AND EVERY LINE OF IT IS THE SAME MISTAKE SPELLED DIFFERENTLY:
+  //   $("shieldIp").value = c.shieldIp || "";          a failed fetch leaves ""      -> save posts ""
+  //   $("shieldAction").value = c.shieldAction || "blink";  ...leaves "blink"        -> save posts a CHOICE
+  //   $("announce").checked = c.announce !== false;    ...leaves CHECKED             -> save posts true
+  //   $("flashSec").value = c.flashSec || 0;           ...leaves 0, and the markup ALREADY said value="0"
+  //   .catch(() => {})                                 ...and NOTHING SAYS IT FAILED
+  // Then body() read all eight back and POSTed them. *** AND SO DID "Test ring", which is a button nobody
+  // reads as a write. *** Press test on a page whose config never loaded and the stored config is gone.
+  //
+  // THE ENDPOINT WAS ALWAYS READY FOR THIS AND NOBODY USED IT: setDoorbellCfg is written `if (k in p)`, key by
+  // key, so it MERGES a partial body. Omitting a field is not merely safe here, it is what the server expects;
+  // the page has been sending all eight for no reason since v1319. THAT IS THE FACT collectIfKnown RESTS ON,
+  // and it was CHECKED IN ai-bridge/server.js rather than assumed -- on an endpoint that replaced wholesale,
+  // omitting a field would DELETE it and this conversion would be a data-loss bug wearing a fix's clothes.
+  import { applyLoaded, collectIfKnown } from "/ui/roundTrip.js";
+
+  const $ = (id) => document.getElementById(id);
+  // ONE LIST, USED BY BOTH HALVES. The load and the save drifting apart is how a field ends up guarded on the
+  // way in and unguarded on the way out -- half the fix looks like the fix.
+  const FIELDS = ["shieldIp", "shieldAction", "shieldUrl", "announce", "quip", "speak", "light", "flashSec"];
+  const TEXTISH = ["shieldIp", "shieldUrl", "quip", "light"];
+
+  function syncUrlRow(){ $("urlRow").style.display = $("shieldAction").value === "url" ? "block" : "none"; }
+  $("shieldAction").addEventListener("change", syncUrlRow);
+
+  // A MISSING KEY AND A FAILED FETCH TAKE THE SAME PATH ON PURPOSE: applyLoaded(el, undefined) is the unknown
+  // state for that control's kind, so there is one description of "not loaded" rather than two.
+  function paint(c){ for (const k of FIELDS) applyLoaded($(k), c ? c[k] : undefined); syncUrlRow(); }
+
+  fetch("/doorbell/config", { cache: "no-store" }).then(r => r.json()).then(c => {
+    paint(c);
+    // *** THE FAILURE IS ON THE PAGE NOW. *** The old .catch(() => {}) is the shape placementRender-selfcheck
+    // already calls out by name: a control that fails silently is the control that taught you to trust it
+    // wrongly. The unknown states are visible, but only if you know what they mean.
+    if (!c) $("msg").textContent = "config did not load - fields left blank; Save will not overwrite them";
+  }).catch(() => {
+    paint(null);
+    $("msg").textContent = "config did not load - fields left blank; Save will not overwrite them";
+  });
+
+  function body(){
+    // Trim IN THE CONTROL, not on the way out, so what is sent is exactly what the page shows and there is
+    // ONE declaration of the value. It also means a box holding only spaces reads as UNKNOWN and is omitted,
+    // where the old `.value.trim()` would have posted "" and wiped a good stored value.
+    for (const k of TEXTISH) { const el = $(k); el.value = el.value.trim(); }
+    const b = {};
+    for (const k of FIELDS) collectIfKnown(b, k, $(k));
+    return b;
+  }
+  // KNOWN LIMIT, STATED RATHER THAN DISCOVERED LATER: under these rules an empty box means NOT LOADED, so this
+  // page cannot express "clear this field" -- it never could, since the old code posted "" and the server
+  // coerces `String(p[k] || "")`. What changed is that an empty box no longer CLEARS a value by accident.
+  $("save").onclick = () => { $("msg").textContent = "saving…"; fetch("/doorbell/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(r => r.json()).then(() => $("msg").textContent = "✓ saved").catch(e => $("msg").textContent = "✗ " + (e && e.message || e)); };
+  $("test").onclick = () => { $("msg").textContent = "ringing…"; fetch("/doorbell/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(() => fetch("/doorbell/ring")).then(r => r.json()).then(j => $("msg").textContent = j && j.ok ? ("🔔 fired: " + (j.did || []).join(", ")) : "✗ ring failed").catch(e => $("msg").textContent = "✗ " + (e && e.message || e)); };
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

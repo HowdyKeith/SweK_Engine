@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Asset Library + Tinder">
+<meta name="demo:desc" content="Browse, triage (swipe keep/discard), and delete generated assets. Works on PC, phone, and Shield.">
+<meta name="demo:cats" content="tool">
+<title>Asset Library + Tinder — SweK Engine</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; overflow:hidden; }
+  #bar { display:flex; align-items:center; gap:8px; padding:8px 10px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  #bar h1 { font-size:14px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; flex:0 0 auto; }
+  .seg { display:flex; border:1px solid var(--edge); border-radius:6px; overflow:hidden; }
+  .seg button { background:#0a0d18; color:var(--dim); border:0; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .seg button.on { background:#173656; color:var(--blue); }
+  select, input[type=text] { background:#0a0d18; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:6px 8px; font:12px ui-monospace,monospace; }
+  input[type=text] { min-width:120px; flex:1 1 120px; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.danger { color:var(--bad); border-color:#5a2330; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  #stage { position:absolute; inset:54px 0 0 0; overflow:auto; }
+  /* GRID */
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:10px; padding:12px; }
+  .card { background:var(--panel); border:1px solid #14304a; border-radius:6px 6px 6px 14px; padding:8px; display:flex; flex-direction:column; gap:5px; }
+  .card.keep { border-color:#2f6f4a; } .card.discard { border-color:#6f2f3a; opacity:.7; }
+  .thumb, .swatch { width:100%; aspect-ratio:1/1; border-radius:4px; background:#04070d; display:flex; align-items:center; justify-content:center; font-size:38px; }
+  .thumb { object-fit:cover; image-rendering:auto; }
+  .name { font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .meta { font-size:10px; color:var(--dim); }
+  .tags { font-size:10px; color:var(--amber); min-height:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row { display:flex; gap:5px; }
+  .row .btn { flex:1; padding:5px 0; text-align:center; }
+  .mini { font-size:13px; padding:4px 0; }
+  /* TINDER */
+  #tinder { position:absolute; inset:54px 0 0 0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:14px; }
+  #tcard { width:min(78vw,360px); max-width:360px; background:var(--panel); border:1px solid var(--edge); border-radius:8px 8px 8px 22px; padding:16px; text-align:center; touch-action:pan-y; user-select:none; box-shadow:0 0 30px rgba(90,150,255,.15); }
+  #tcard.swipe { transition:transform .25s ease, opacity .25s ease; }
+  #tthumb { width:100%; aspect-ratio:1/1; border-radius:6px; background:#04070d; display:flex; align-items:center; justify-content:center; font-size:96px; object-fit:cover; }
+  #tname { font-size:16px; color:var(--blue); margin-top:10px; }
+  #tmeta { font-size:12px; color:var(--dim); margin-top:2px; }
+  #ttags { font-size:12px; color:var(--amber); margin-top:4px; min-height:14px; }
+  #tbuttons { display:flex; gap:14px; }
+  #tbuttons .big { width:64px; height:64px; border-radius:50%; border:2px solid var(--edge); background:#0a1422; font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  #tbuttons .big.bad { border-color:#6f2f3a; } #tbuttons .big.good { border-color:#2f6f4a; }
+  #tprog { font-size:12px; color:var(--dim); }
+  .hint { font-size:11px; color:var(--dim); text-align:center; }
+  .empty { padding:40px; text-align:center; color:var(--dim); }
+  #flash { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:#0a1422; border:1px solid var(--edge); color:var(--blue); padding:8px 16px; border-radius:8px; font:13px ui-monospace,monospace; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:50; }
+  #flash.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  /* QUEUE */
+  #queue { position:absolute; inset:54px 0 0 0; display:none; flex-direction:column; }
+  #qadd { padding:12px; border-bottom:1px solid #14304a; display:flex; flex-direction:column; gap:8px; }
+  #qprompts { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px; font:13px ui-monospace,monospace; resize:vertical; width:100%; }
+  .qrow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  #qpause.on { background:#5a4410; color:var(--amber); border-color:#7a5a14; }
+  #qlist { flex:1; overflow:auto; padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+  .job { display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid #14304a; border-radius:6px; padding:8px 10px; }
+  .job .g { font-size:16px; width:20px; text-align:center; flex:0 0 auto; }
+  .job.running { border-color:var(--blue); } .job.done { opacity:.6; } .job.error { border-color:#6f2f3a; }
+  .job .ty { flex:0 0 auto; font-size:10px; color:var(--amber); border:1px solid #5a4410; border-radius:4px; padding:1px 5px; text-transform:uppercase; }
+  .job .p { flex:1; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .job .x { background:none; border:0; color:var(--bad); font-size:15px; cursor:pointer; flex:0 0 auto; }
+  .job .err { font-size:11px; color:var(--bad); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .job.running .g { display:inline-block; animation:spin 1.4s linear infinite; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>📦 Asset Library</h1>
+  <div class="seg"><button id="modeGrid" class="on">▦ Grid</button><button id="modeTinder">🔥 Tinder</button><button id="modeQueue">⏳ Queue</button></div>
+  <input type="text" id="search" placeholder="search name…">
+  <select id="fType"><option value="">all types</option><option>voxel</option><option>mesh</option><option>splat</option><option>image</option><option>other</option></select>
+  <select id="fTag"><option value="">all</option><option value="keep">★ keep</option><option value="discard">✕ discard</option></select>
+  <button class="btn" id="refresh">↻</button>
+  <button class="btn" id="looseToggle" title="Show every model/image in the assets folders, not just catalogued library assets">📂 All files: off</button>
+  <button class="btn danger" id="emptyDiscard">Empty discarded (0)</button>
+  <span id="status">loading…</span>
+</div>
+<div id="stage"><div id="grid"></div></div>
+<div id="tinder">
+  <div id="tprog">—</div>
+  <div id="tcard">
+    <div id="tthumb">🧊</div>
+    <div id="tname">—</div>
+    <div id="tmeta"></div>
+    <div id="ttags"></div>
+  </div>
+  <div id="tbuttons">
+    <button class="big bad" id="tDiscard" title="Discard (←)">👎</button>
+    <button class="big" id="tSkip" title="Skip (↑)">⏭</button>
+    <button class="big good" id="tKeep" title="Keep (→)">👍</button>
+  </div>
+  <button class="btn" id="tSpawn" style="margin-top:2px">🚀 Spawn this into the engine</button>
+  <button class="btn" id="tMove" style="margin-top:2px" title="Move this asset into a subfolder">📁 Move to subfolder…</button>
+  <div class="hint">Swipe the card, tap a button, or use ← ↑ → keys. Keep/Discard just tags — nothing is deleted until you "Empty discarded".</div>
+</div>
+
+<div id="queue">
+  <div id="qadd">
+    <textarea id="qprompts" rows="3" placeholder="One prompt per line — e.g.&#10;humpback whale&#10;stone pagoda&#10;little red mushroom"></textarea>
+    <div class="qrow">
+      <select id="qtype"><option value="voxel">voxel (Gemini · engine)</option><option value="image">image (diffuser · PC)</option><option value="mesh">mesh (chain · PC, exp.)</option></select>
+      <button class="btn" id="qadd-btn">➕ Add to queue</button>
+      <button class="btn" id="qpause">⏸ Pause</button>
+      <button class="btn" id="qclear">Clear finished</button>
+    </div>
+    <div class="hint" id="qnote">Add from any device. <b>voxel</b> runs on the engine (free Gemini); <b>image</b> runs on the PC via the diffuser; <b>mesh</b> is experimental (needs the local img→mesh pipeline). Voxel and image can run at the same time; two GPU jobs never overlap. Results land in the library.</div>
+  </div>
+  <div id="qlist"></div>
+</div>
+
+<div id="flash"></div>
+
+<script>
+const API = {
+  list: (f={}) => { const qs = new URLSearchParams(); for (const k in f) if (f[k]) qs.set(k, f[k]); return fetch("/assets/list?"+qs.toString()).then(r=>r.json()); },
+  tag:  (id, tag, op="add") => fetch("/assets/tag",    { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id, tag, op }) }).then(r=>r.json()),
+  remove:(id) => fetch("/assets/remove", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id }) }).then(r=>r.json()),
+  move: (id, subfolder) => fetch("/assets/move-folder", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id, subfolder }) }).then(r=>r.json()),
+  geom: (id) => fetch("/assets/geom?id="+encodeURIComponent(id)).then(r=>r.json()),
+  looseGeom: (rel) => fetch("/assets/loose-geom?rel="+encodeURIComponent(rel)).then(r=>r.json()),
+};
+const SWATCH = { voxel:"🧊", mesh:"🟦", splat:"✨", image:"🖼", other:"📦" };
+let ALL = [], FILTERED = [], MODE = "grid", tIndex = 0;
+
+const $ = id => document.getElementById(id);
+function hasTag(a, t) { return Array.isArray(a.tags) && a.tags.includes(t); }
+
+function thumbFill(el, a, big) {
+  const t = a.thumbBase64 || a.thumb;
+  if (t) { const src = String(t).startsWith("data:") ? t : ("data:image/png;base64,"+t); el.style.backgroundImage = `url("${src}")`; el.style.backgroundSize="cover"; el.style.backgroundPosition="center"; el.textContent=""; return; }
+  // v1842 — loose image files: show the actual image straight from its /GPU_Assets URL.
+  if (a.loose && a.type === "image" && a.url) { el.style.backgroundImage = `url("${a.url}")`; el.style.backgroundSize="cover"; el.style.backgroundPosition="center"; el.textContent=""; return; }
+  el.textContent = SWATCH[a.type] || "📦";
+  if (!a.loose && (a.type === "mesh" || a.type === "splat") && a.stats && a.stats.hasGeomSample) {
+    API.geom(a.id).then(g => { if (g && g.geomSample && g.geomSample.points) drawCloud(el, g.geomSample, big ? 220 : 116); }).catch(()=>{});
+  }
+  // v1843 — loose mesh/splat: pull the point-cloud sample on demand (same server flattener) and draw it.
+  if (a.loose && (a.type === "mesh" || a.type === "splat") && a.stats && a.stats.hasGeomSample && a.relPath) {
+    API.looseGeom(a.relPath).then(g => { if (g && g.geomSample && g.geomSample.points) drawCloud(el, g.geomSample, big ? 220 : 116); }).catch(()=>{});
+  }
+}
+function drawCloud(el, gs, px) {
+  try {
+    const pts = gs.points, bb = gs.bbox; if (!pts || !pts.length || !bb) return;
+    const cv = document.createElement("canvas"); cv.width = cv.height = px;
+    cv.style.width = "100%"; cv.style.height = "100%"; cv.style.borderRadius = "inherit";
+    const ctx = cv.getContext("2d");
+    const [minx,miny] = bb.min, [maxx,maxy] = bb.max;
+    const sx = (maxx-minx)||1, sy = (maxy-miny)||1, s = Math.max(sx,sy), pad = px*0.08;
+    ctx.fillStyle = "#9ac8ff";
+    for (const p of pts) {
+      const x = pad + ((p[0]-minx)/s) * (px-2*pad);
+      const y = px - (pad + ((p[1]-miny)/s) * (px-2*pad));
+      ctx.fillRect(x, y, 1.5, 1.5);
+    }
+    el.textContent = ""; el.style.backgroundImage = "none"; el.appendChild(cv);
+  } catch {}
+}
+
+function applyFilter() {
+  const q = $("search").value.trim().toLowerCase();
+  const ty = $("fType").value, tg = $("fTag").value;
+  FILTERED = ALL.filter(a =>
+    (!q || (a.name||"").toLowerCase().includes(q) || (a.id||"").toLowerCase().includes(q)) &&
+    (!ty || a.type === ty) &&
+    (!tg || hasTag(a, tg))
+  );
+}
+function discardCount() { return ALL.filter(a => hasTag(a,"discard")).length; }
+
+function render() {
+  applyFilter();
+  $("emptyDiscard").textContent = "Empty discarded ("+discardCount()+")";
+  $("status").textContent = FILTERED.length + " / " + ALL.length + " assets";
+  $("stage").style.display  = MODE==="grid"   ? "block" : "none";
+  $("tinder").style.display = MODE==="tinder" ? "flex"  : "none";
+  $("queue").style.display  = MODE==="queue"  ? "flex"  : "none";
+  if (MODE === "grid") renderGrid();
+  else if (MODE === "tinder") renderTinder();
+  else renderQueue();
+}
+function renderGrid() {
+  const g = $("grid"); g.innerHTML = "";
+  if (!FILTERED.length) { g.innerHTML = '<div class="empty">No assets match. Generate some, or clear filters.</div>'; return; }
+  for (const a of FILTERED) {
+    const card = document.createElement("div");
+    card.className = "card" + (hasTag(a,"keep")?" keep":"") + (hasTag(a,"discard")?" discard":"");
+    const th = document.createElement("div"); th.className = "swatch"; thumbFill(th, a, false);
+    const nm = document.createElement("div"); nm.className = "name"; nm.textContent = a.name || a.id;
+    const mt = document.createElement("div"); mt.className = "meta"; mt.textContent = (a.type||"?") + " · " + (a.source||"?");
+    const tg = document.createElement("div"); tg.className = "tags"; tg.textContent = (a.tags||[]).map(t=>"#"+t).join(" ");
+    const row = document.createElement("div"); row.className = "row";
+    const keep = document.createElement("button"); keep.className = "btn mini"; keep.textContent = hasTag(a,"keep")?"★":"☆"; keep.title="keep";
+    keep.onclick = () => setTriage(a, hasTag(a,"keep")?null:"keep");
+    const disc = document.createElement("button"); disc.className = "btn mini"; disc.textContent = hasTag(a,"discard")?"✕":"·"; disc.title="discard";
+    disc.onclick = () => setTriage(a, hasTag(a,"discard")?null:"discard");
+    const spawn = document.createElement("button"); spawn.className = "btn mini"; spawn.textContent = "🚀"; spawn.title="spawn into running engine";
+    spawn.onclick = () => spawnToEngine(a.id);
+    let av = null;
+    if (a.type === "mesh") { av = document.createElement("button"); av.className = "btn mini"; av.textContent = "🧑‍🚀"; av.title="use as the live avatar"; av.onclick = () => useAsAvatar(a.id); }
+    const del = document.createElement("button"); del.className = "btn mini danger"; del.textContent = "🗑"; del.title="delete now";
+    del.onclick = () => hardDelete(a);
+    row.append(keep, disc, spawn, ...(av ? [av] : []), del);
+    card.append(th, nm, mt, tg, row);
+    g.appendChild(card);
+  }
+}
+async function setTriage(a, want) {
+  const ops = [];
+  for (const t of ["keep","discard"]) {
+    const have = hasTag(a,t);
+    if (want === t && !have) ops.push(API.tag(a.id, t, "add"));
+    if (want !== t && have)  ops.push(API.tag(a.id, t, "remove"));
+  }
+  a.tags = (a.tags||[]).filter(t => t!=="keep" && t!=="discard"); if (want) a.tags.push(want);
+  await Promise.all(ops).catch(()=>{});
+  render();
+}
+async function hardDelete(a) {
+  if (!confirm("Delete \""+(a.name||a.id)+"\" permanently?")) return;
+  await API.remove(a.id).catch(()=>{});
+  ALL = ALL.filter(x => x.id !== a.id);
+  render();
+}
+async function emptyDiscarded() {
+  const victims = ALL.filter(a => hasTag(a,"discard"));
+  if (!victims.length) return;
+  if (!confirm("Permanently delete "+victims.length+" discarded asset(s)?")) return;
+  await Promise.all(victims.map(a => API.remove(a.id).catch(()=>{})));
+  const ids = new Set(victims.map(a=>a.id));
+  ALL = ALL.filter(a => !ids.has(a.id));
+  render();
+}
+
+// ---- TINDER ----
+function renderTinder() {
+  // queue = filtered assets not yet keep/discard-tagged, then the rest
+  const queue = FILTERED;
+  if (!queue.length) { $("tname").textContent = "Nothing to triage"; $("tmeta").textContent=""; $("ttags").textContent=""; $("tthumb").textContent="✅"; $("tprog").textContent="0 / 0"; return; }
+  if (tIndex >= queue.length) tIndex = queue.length - 1;
+  if (tIndex < 0) tIndex = 0;
+  const a = queue[tIndex];
+  $("tprog").textContent = (tIndex+1) + " / " + queue.length;
+  $("tname").textContent = a.name || a.id;
+  $("tmeta").textContent = (a.type||"?") + " · " + (a.source||"?");
+  $("ttags").textContent = (a.tags||[]).map(t=>"#"+t).join(" ");
+  const th = $("tthumb"); th.innerHTML=""; th.style.backgroundImage="none"; th.className=""; th.id="tthumb"; thumbFill(th, a, true);
+}
+async function tinderAct(kind) {
+  const queue = FILTERED; if (!queue.length || tIndex >= queue.length) return;
+  const a = queue[tIndex];
+  const card = $("tcard");
+  if (kind !== "skip") {
+    card.classList.add("swipe");
+    card.style.transform = "translateX("+(kind==="keep"?"":"-")+"120%) rotate("+(kind==="keep"?"":"-")+"12deg)";
+    card.style.opacity = "0";
+    await setTriage(a, kind);   // re-renders ALL filters; we manage index below
+  }
+  tIndex++;
+  setTimeout(() => { card.classList.remove("swipe"); card.style.transform=""; card.style.opacity="1"; if (MODE==="tinder") renderTinder(); }, kind==="skip"?0:230);
+}
+
+// swipe / drag
+(function bindSwipe(){
+  const card = $("tcard"); let x0=null, dx=0;
+  const start = e => { x0 = (e.touches?e.touches[0].clientX:e.clientX); dx=0; card.classList.remove("swipe"); };
+  const move  = e => { if (x0==null) return; dx = (e.touches?e.touches[0].clientX:e.clientX) - x0; card.style.transform = "translateX("+dx+"px) rotate("+(dx*0.04)+"deg)"; };
+  const end   = () => { if (x0==null) return; const t=dx; x0=null; card.style.transform=""; if (t > 70) tinderAct("keep"); else if (t < -70) tinderAct("discard"); };
+  card.addEventListener("touchstart", start, {passive:true}); card.addEventListener("touchmove", move, {passive:true}); card.addEventListener("touchend", end);
+  card.addEventListener("mousedown", start); window.addEventListener("mousemove", e=>{ if(x0!=null) move(e); }); window.addEventListener("mouseup", end);
+})();
+window.addEventListener("keydown", e => {
+  if (MODE !== "tinder") return;
+  if (e.key === "ArrowRight") tinderAct("keep");
+  else if (e.key === "ArrowLeft") tinderAct("discard");
+  else if (e.key === "ArrowUp") tinderAct("skip");
+});
+
+// wiring
+function seg(){ for (const m of ["Grid","Tinder","Queue"]) $("mode"+m).classList.toggle("on", MODE===m.toLowerCase()); }
+$("modeGrid").onclick   = () => { MODE="grid";   stopQueuePoll(); seg(); render(); };
+$("modeTinder").onclick = () => { MODE="tinder"; tIndex=0; stopQueuePoll(); seg(); render(); };
+$("modeQueue").onclick  = () => { MODE="queue";  seg(); render(); startQueuePoll(); };
+$("search").oninput = render; $("fType").onchange = render; $("fTag").onchange = render;
+$("refresh").onclick = load; $("emptyDiscard").onclick = emptyDiscarded;
+$("tKeep").onclick = () => tinderAct("keep"); $("tDiscard").onclick = () => tinderAct("discard"); $("tSkip").onclick = () => tinderAct("skip");
+
+// ---- QUEUE (generation scheduler) ----
+const GEN = {
+  list:   ()            => fetch("/gen/queue").then(r=>r.json()),
+  add:    (prompts,type)=> fetch("/gen/queue", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompts,type})}).then(r=>r.json()),
+  cancel: (id)          => fetch("/gen/cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}).then(r=>r.json()),
+  clear:  (which)       => fetch("/gen/clear", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({which})}).then(r=>r.json()),
+  pause:  (paused)      => fetch("/gen/pause", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paused})}).then(r=>r.json()),
+};
+const GLYPH = { queued:"\u25CB", running:"\u23F3", done:"\u2713", error:"\u26A0" };
+let QJOBS = [], QPAUSED = false, qTimer = null;
+
+async function pollQueue() {
+  try { const j = await GEN.list(); QJOBS = (j&&j.jobs)||[]; QPAUSED = !!(j&&j.paused); paintQueue(); }
+  catch { /* bridge busy/offline — keep last paint */ }
+}
+function paintQueue() {
+  const pb = $("qpause"); pb.textContent = QPAUSED ? "\u25B6 Resume" : "\u23F8 Pause"; pb.classList.toggle("on", QPAUSED);
+  const list = $("qlist"); list.innerHTML = "";
+  if (!QJOBS.length) { list.innerHTML = '<div class="empty">Queue is empty. Add prompts above.</div>'; return; }
+  const order = { running:0, queued:1, error:2, done:3 };
+  const sorted = QJOBS.slice().sort((a,b)=> ((order[a.status]??9)-(order[b.status]??9)) || ((a._seq||0)-(b._seq||0)));
+  for (const j of sorted) {
+    const row = document.createElement("div"); row.className = "job " + j.status;
+    const g = document.createElement("div"); g.className = "g"; g.textContent = GLYPH[j.status] || "\u00B7";
+    const ty = document.createElement("span"); ty.className = "ty"; ty.textContent = j.type || "voxel";
+    const p = document.createElement("div"); p.className = "p"; p.textContent = j.prompt;
+    p.title = j.prompt + (j.error ? (" \u2014 " + j.error) : "") + (j.resultId ? (" \u2192 " + j.resultId) : "");
+    const x = document.createElement("button"); x.className = "x";
+    x.textContent = (j.status==="queued"||j.status==="running") ? "\u2715" : "\uD83D\uDDD1";
+    x.title = (j.status==="queued"||j.status==="running") ? "cancel" : "remove";
+    x.onclick = async () => { await GEN.cancel(j.id).catch(()=>{}); pollQueue(); };
+    row.append(g, ty, p, x);
+    list.appendChild(row);
+  }
+}
+function renderQueue(){ paintQueue(); }
+function startQueuePoll(){ if (qTimer) return; pollQueue(); qTimer = setInterval(pollQueue, 2500); }
+function stopQueuePoll(){ if (qTimer){ clearInterval(qTimer); qTimer = null; } }
+
+$("qadd-btn").onclick = async () => {
+  const lines = $("qprompts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  if (!lines.length) return;
+  await GEN.add(lines, $("qtype").value).catch(()=>{});
+  $("qprompts").value = ""; pollQueue();
+};
+$("qpause").onclick  = async () => { await GEN.pause(!QPAUSED).catch(()=>{}); pollQueue(); };
+$("qclear").onclick  = async () => { await GEN.clear("done").catch(()=>{}); pollQueue(); };
+
+// ---- SPAWN RELAY (page → bridge → running engine) ----
+function flash(msg){ const f=$("flash"); if(!f) return; f.textContent=msg; f.classList.add("show"); clearTimeout(flash._t); flash._t=setTimeout(()=>f.classList.remove("show"),1600); }
+async function spawnToEngine(id){
+  try {
+    const r = await fetch("/spawn/push",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}).then(r=>r.json());
+    flash(r&&r.ok ? "🚀 sent to engine" : ("⚠ "+((r&&r.error)||"failed")));
+  } catch { flash("⚠ bridge offline"); }
+}
+async function useAsAvatar(id){
+  try {
+    const r = await fetch("/assets/use-as-avatar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}).then(r=>r.json());
+    flash(r&&r.ok ? ("🧑‍🚀 live avatar now"+(r.name?": "+r.name:"")) : ("⚠ "+((r&&r.error)||"failed")));
+  } catch { flash("⚠ bridge offline"); }
+}
+$("tSpawn").onclick = () => { const a = FILTERED[tIndex]; if (a) spawnToEngine(a.id); else flash("nothing to spawn"); };
+$("tMove").onclick = async () => {
+  const a = FILTERED[tIndex]; if (!a) { flash("nothing to move"); return; }
+  const sub = prompt("Move \"" + (a.name || a.id) + "\" into which subfolder?\n(e.g. characters, city, keep, favorites)", "");
+  if (sub == null) return; const dest = sub.trim(); if (!dest) return;
+  flash("moving to " + dest + "\u2026");
+  try {
+    const r = await API.move(a.id, dest);
+    if (r && r.ok) { flash("\u2713 moved to " + dest + " (peers updated)"); tIndex++; render(); }
+    else flash("\u2717 " + ((r && (r.error)) || "move failed"));
+  } catch (e) { flash("\u2717 " + (e && e.message || e)); }
+};
+
+async function load() {
+  $("status").textContent = "loading…";
+  try {
+    const j = await API.list(_showLoose ? { loose: "1" } : {});
+    ALL = (j && j.assets) || [];
+    ALL.sort((a,b) => (b.capturedAt||0) - (a.capturedAt||0));
+    render();
+  } catch (e) { $("status").textContent = "bridge not reachable"; }
+}
+let _showLoose = false;
+if ($("looseToggle")) $("looseToggle").onclick = function(){ _showLoose = !_showLoose; this.textContent = "📂 All files: " + (_showLoose ? "on" : "off"); this.classList.toggle("on", _showLoose); load(); };
+load();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

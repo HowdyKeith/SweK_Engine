@@ -1,0 +1,571 @@
+/* FILE: ui/lcars.css
+ * VERSION: v2 — round 79 — Voyager-blue theme
+ *
+ * LCARS-inspired UI theme. Vendored locally so the engine works without
+ * network. Optional Google Fonts import for the Antonio family — if
+ * offline, system condensed sans fallbacks kick in cleanly.
+ *
+ * Palette: Voyager-style blue replaces the previous TNG-style orange
+ * as the default surface color (#9cf, "Federation sky"). Per-panel
+ * accent variants (cyan / pink / green / yellow / red) retained as
+ * distinguishing flags on individual minitabs. CSS variables below
+ * make it cheap to swap the palette again later.
+ *
+ * Not affiliated with CBS/Paramount. Visual idioms (color blocks, pill
+ * shapes, uppercase tracked type) are general sci-fi aesthetic; the
+ * literal LCARS name and specific Trek interface designs aren't
+ * reproduced here.
+ */
+
+:root {
+    --lcars-bg:        #000;
+    --lcars-primary:   #9cf;     /* Voyager sky blue (was #f90 orange) */
+    --lcars-hover:     #bde0ff;
+    --lcars-secondary: #69c;     /* slate blue */
+    --lcars-rail:      #57b;     /* darker rail accent */
+    --lcars-text:      #fff;
+    --lcars-text-on-primary: #000;
+    --lcars-gold:      #fc6;     /* accent for warnings/highlights */
+    --lcars-red:       #c66;
+    --lcars-dim:       #9ab;
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&display=swap");
+
+/* ---- panel chrome ------------------------------------------------ */
+
+.lcars-panel {
+    position: absolute;
+    /* Round 307 — translucent background so the world shows through.
+       Previously `background: #000` rendered as solid black bricks
+       that blocked the terrain wherever an LCARS panel was positioned.
+       0.72 alpha keeps text readable while letting the voxel world
+       remain visible behind STATUS, NARRATIVE, and other panels. */
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    z-index: 9100;
+    user-select: none;
+    pointer-events: auto;
+    border-radius: 0;
+}
+
+/* Header strip — the iconic colored block with the title baked in.
+ * Rounded on the outer edges, square where it meets the body. */
+.lcars-panel-header {
+    background: #9cf;
+    color: #000;
+    padding: 4px 14px 3px;
+    border-radius: 12px 12px 0 0;
+    text-transform: uppercase;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    line-height: 1.1;
+}
+
+.lcars-panel-header-id {
+    font-size: 9px;
+    color: rgba(0, 0, 0, 0.55);
+    font-weight: 400;
+    letter-spacing: 0.1em;
+}
+
+/* Body — left bar continues the header's color block, content sits to its right */
+.lcars-panel-body {
+    display: flex;
+    align-items: stretch;
+}
+.lcars-panel-bar {
+    width: 14px;
+    background: #9cf;
+    flex-shrink: 0;
+}
+.lcars-panel-content {
+    padding: 8px 10px 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Footer — small bar at the bottom for visual closure */
+.lcars-panel-footer {
+    height: 8px;
+    background: #9cf;
+    border-radius: 0 0 12px 12px;
+}
+
+/* ---- rows + labels ----------------------------------------------- */
+
+.lcars-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    min-height: 18px;
+}
+
+.lcars-label {
+    font-size: 10px;
+    color: #fc9;
+    text-transform: uppercase;
+    flex: 0 0 70px;
+    letter-spacing: 0.08em;
+}
+
+.lcars-value {
+    font-size: 10px;
+    color: #fff;
+    flex: 0 0 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- sliders ---------------------------------------------------- */
+
+.lcars-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #2a1a05;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+.lcars-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9cf;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(255, 153, 0, 0.4);
+}
+.lcars-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #9cf;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 4px rgba(255, 153, 0, 0.4);
+}
+
+/* ---- toggles ----------------------------------------------------- */
+
+.lcars-toggle {
+    padding: 2px 12px;
+    background: #333;
+    color: #888;
+    border-radius: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 10px;
+    text-align: center;
+    min-width: 36px;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+.lcars-toggle:hover {
+    background: #555;
+    color: #ccc;
+}
+.lcars-toggle.on {
+    background: #9cf;
+    color: #000;
+}
+.lcars-toggle.on:hover {
+    background: #fb3;
+}
+
+/* ---- radio group (e.g. solid / wire / off) ---------------------- */
+
+.lcars-radio-group {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+}
+.lcars-radio {
+    flex: 1;
+    padding: 2px 6px;
+    background: #222;
+    color: #888;
+    border-radius: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 9px;
+    text-align: center;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+.lcars-radio:hover {
+    background: #444;
+    color: #ccc;
+}
+.lcars-radio.selected {
+    background: #9cf;
+    color: #000;
+}
+
+/* ---- buttons ----------------------------------------------------- */
+
+.lcars-button {
+    padding: 4px 14px;
+    background: #9cf;
+    color: #000;
+    border-radius: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    transition: background 0.1s ease;
+    letter-spacing: 0.05em;
+}
+.lcars-button:hover {
+    background: #fb3;
+}
+.lcars-button.alt {
+    background: #9cf;
+}
+.lcars-button.alt:hover {
+    background: #bdf;
+}
+
+/* ---- text input -------------------------------------------------- */
+
+.lcars-input {
+    flex: 1;
+    background: #110a02;
+    color: #fc9;
+    border: 1px solid #663;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    outline: none;
+}
+.lcars-input:focus {
+    border-color: #9cf;
+}
+
+/* ---- Dock system ------------------------------------------------ */
+/* Edge-attached tabs that slide their drawer in on hover. Tabs stack
+ * vertically on each edge with auto-computed top offsets via JS. */
+
+.dock-tab {
+    position: absolute;
+    z-index: 9050;
+    cursor: pointer;
+    background: #9cf;
+    color: #000;
+    padding: 8px 5px;
+    font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    /* Vertical text top-to-bottom — single short word reads naturally */
+    writing-mode: vertical-rl;
+    text-align: center;
+    user-select: none;
+    transition: background 0.12s ease;
+    pointer-events: auto;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* v1583 — hover/expanded use a brightness filter + outline instead of a fixed background,
+   so minitabLayout's per-tab inline colors still get clear hover/active feedback. */
+.dock-tab:hover    { filter: brightness(1.22); }
+.dock-tab.expanded { filter: brightness(0.82); outline: 2px solid rgba(255,255,255,0.45); outline-offset: -2px; }
+
+.dock-tab-left {
+    left: 0;
+    width: 22px;
+    border-radius: 0 14px 14px 0;
+}
+.dock-tab-right {
+    right: 0;
+    width: 22px;
+    border-radius: 14px 0 0 14px;
+}
+/* v1584 — bottom-edge dock tabs: horizontal pill at the bottom, drawer slides up. */
+.dock-tab-bottom {
+    bottom: 0;
+    height: auto;
+    width: auto;
+    writing-mode: horizontal-tb;
+    border-radius: 14px 14px 0 0;
+    padding: 4px 12px;
+}
+.dock-tab-top {
+    top: 0;
+    height: auto;
+    width: auto;
+    writing-mode: horizontal-tb;
+    border-radius: 0 0 14px 14px;
+    padding: 4px 12px;
+}
+
+.dock-drawer {
+    position: absolute;
+    z-index: 9100;
+    transition: transform 0.25s ease-out;
+    pointer-events: auto;
+    background: #000;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+/* Collapsed: drawer translated fully off the edge (its own width plus
+ * the rail's 22px tab so it disappears completely). Expanded:
+ * drawer's outer edge sits flush against the tab. */
+.dock-drawer-left {
+    left: 22px;
+    transform: translateX(calc(-100% - 22px));
+}
+.dock-drawer-left.expanded  { transform: translateX(0); }
+.dock-drawer-right {
+    right: 22px;
+    transform: translateX(calc(100% + 22px));
+}
+.dock-drawer-right.expanded { transform: translateX(0); }
+/* v1584 — bottom/top drawers slide vertically (offsets set inline by minitabLayout). */
+.dock-drawer-bottom {
+    transform: translateY(calc(100% + 40px));
+}
+.dock-drawer-bottom.expanded { transform: translateY(0); }
+.dock-drawer-top {
+    transform: translateY(calc(-100% - 40px));
+}
+.dock-drawer-top.expanded { transform: translateY(0); }
+
+/* Drawer chrome — thin LCARS title bar with the pin button on the
+ * far end. Sits atop whatever the panel's own internal layout is. */
+.dock-chrome {
+    background: #9cf;
+    color: #000;
+    padding: 3px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 8px 8px 0 0;
+}
+.dock-chrome-title { flex: 1; }
+
+.dock-pin {
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    text-align: center;
+    line-height: 18px;
+    font-size: 12px;
+    transition: background 0.12s ease, color 0.12s ease;
+    user-select: none;
+    flex-shrink: 0;
+}
+.dock-pin:hover         { background: rgba(0, 0, 0, 0.5); }
+.dock-pin.pinned        { background: #000; color: #9cf; }
+
+/* ---- LCARS minitabs (vertical) — round 42 ---------------------------
+ * Used by Audio + Pip when minimized. Slim pill at the screen edge with
+ * rotated label, orange "LCARS" body. Click toggles back to full panel.
+ */
+.lcars-minitab {
+    position: absolute;
+    background: #9cf;
+    color: #000;
+    cursor: pointer;
+    user-select: none;
+    font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    /* writing-mode rotates glyphs 90° CW. Combined with the unicode
+     * arrows we use (▲ for left edge, ▼ for right edge), the arrow
+     * visually points TOWARD the canvas content — right for left tabs,
+     * left for right tabs — matching the click-to-expand direction.
+     * No additional transform: rotate(); the box stays unrotated so
+     * border-radius lands on the geometric side we want. */
+    writing-mode: vertical-rl;
+    padding: 14px 6px;
+    z-index: 9050;
+    transition: background 0.12s ease;
+    text-align: center;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+.lcars-minitab:hover { background: #bde0ff; }
+
+.lcars-minitab.edge-left {
+    left: 0;
+    border-radius: 0 14px 14px 0;        /* flat-left, rounded-right (interior) */
+}
+.lcars-minitab.edge-right {
+    right: 0;
+    border-radius: 14px 0 0 14px;        /* rounded-left (interior), flat-right */
+}
+/* Round 263 — top/bottom horizontal minitabs. writing-mode reset so
+ * the label reads horizontally; rounded edge interior (down for top
+ * tabs, up for bottom tabs) gives the same "click to extend in this
+ * direction" visual cue as the vertical tabs. */
+.lcars-minitab.edge-top {
+    top: 0;
+    writing-mode: horizontal-tb;
+    border-radius: 0 0 14px 14px;
+    padding: 6px 14px;
+}
+.lcars-minitab.edge-bottom {
+    bottom: 0;
+    writing-mode: horizontal-tb;
+    border-radius: 14px 14px 0 0;
+    padding: 6px 14px;
+}
+.lcars-minitab.color-cyan    { background: #67e6ff; }
+.lcars-minitab.color-cyan:hover { background: #94efff; }
+.lcars-minitab.color-pink    { background: #ff8aa8; }
+.lcars-minitab.color-pink:hover { background: #ffadc4; }
+.lcars-minitab.color-green   { background: #7fd66f; }
+.lcars-minitab.color-green:hover { background: #a7e69b; }
+.lcars-minitab.color-red     { background: #c33; color: #fff; }
+.lcars-minitab.color-red:hover { background: #e44; }
+.lcars-minitab.color-yellow  { background: #ffd066; }
+.lcars-minitab.color-yellow:hover { background: #ffe39a; }
+
+/* ---- LCARS top status bar — round 42 -------------------------------
+ * Replaces the old monospace black-rectangle HUD. Mirrors the dock chrome
+ * with rounded pill ends and a thin orange bar.
+ */
+.lcars-status-bar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0;
+    align-items: center;
+    z-index: 9090;
+    pointer-events: none;
+    font-family: "Antonio", "Helvetica Neue", "Helvetica", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.lcars-status-cap-left {
+    width: 28px;
+    height: 32px;
+    background: #9cf;
+    border-radius: 16px 0 0 16px;
+}
+.lcars-status-cap-right {
+    width: 28px;
+    height: 32px;
+    background: #9cf;
+    border-radius: 0 16px 16px 0;
+}
+.lcars-status-mid {
+    height: 32px;
+    background: #000;
+    border-top: 2px solid #9cf;
+    border-bottom: 2px solid #9cf;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: #fc9;
+    font-size: 11px;
+}
+.lcars-status-cell {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+.lcars-status-cell-label {
+    color: #fc9;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+}
+.lcars-status-cell-value {
+    color: #fff;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: right;
+}
+
+/* ---- LCARSMiniTab shared-component additions (round 79) ------------
+ * The auto-slot system positions tabs along an edge in evenly-spaced
+ * "slots" so multiple panels don't manually pick clashing offsets.
+ * Component code lives in ui/LCARSMiniTab.js; these CSS classes are
+ * what it applies to created tabs.
+ *
+ * Voyager-blue minitab variant — explicit class for new tabs that want
+ * the primary palette as a deliberate choice (vs inheriting the default).
+ */
+.lcars-minitab.color-voyager { background: var(--lcars-primary); color: #000; }
+.lcars-minitab.color-voyager:hover { background: var(--lcars-hover); }
+
+/* Gold accent for warning/attention tabs. */
+.lcars-minitab.color-gold    { background: var(--lcars-gold); }
+.lcars-minitab.color-gold:hover { background: #ffd98c; }
+
+/* v1582 — extra distinct variants so the right rail can give every tab its own
+   color (burgundy was referenced by RIG LAB / DOOM / COOKIE SYNC but undefined). */
+.lcars-minitab.color-burgundy { background: #9b2d4f; color: #fff; }
+.lcars-minitab.color-burgundy:hover { background: #b94668; }
+.lcars-minitab.color-purple  { background: #b07cff; color: #1a1030; }
+.lcars-minitab.color-purple:hover { background: #c79dff; }
+.lcars-minitab.color-teal    { background: #3fc9c0; color: #04201d; }
+.lcars-minitab.color-teal:hover { background: #6fe0d8; }
+
+/* Slot-aware positioning. The component sets data-slot and we use it
+ * via attribute selectors to compute bottom/left automatically. Tabs
+ * with explicit inline style.bottom/left still win via specificity. */
+.lcars-minitab.edge-right[data-slot="0"] { bottom:  60px; }
+.lcars-minitab.edge-right[data-slot="1"] { bottom: 180px; }
+.lcars-minitab.edge-right[data-slot="2"] { bottom: 300px; }
+.lcars-minitab.edge-right[data-slot="3"] { bottom: 420px; }
+.lcars-minitab.edge-right[data-slot="4"] { bottom: 540px; }
+.lcars-minitab.edge-right[data-slot="5"] { bottom: 660px; }
+.lcars-minitab.edge-left[data-slot="0"]  { bottom:  60px; }
+.lcars-minitab.edge-left[data-slot="1"]  { bottom: 180px; }
+.lcars-minitab.edge-left[data-slot="2"]  { bottom: 300px; }
+.lcars-minitab.edge-left[data-slot="3"]  { bottom: 420px; }
+.lcars-minitab.edge-left[data-slot="4"]  { bottom: 540px; }
+.lcars-minitab.edge-left[data-slot="5"]  { bottom: 660px; }
+/* Round 263 — top/bottom horizontal slots. Spread across the screen
+ * from the left side, leaving the centerline open for the LCARS
+ * status bar. Slot 0 is closest to the left edge. */
+.lcars-minitab.edge-top[data-slot="0"]    { left:  20px; }
+.lcars-minitab.edge-top[data-slot="1"]    { left: 140px; }
+.lcars-minitab.edge-top[data-slot="2"]    { left: 260px; }
+.lcars-minitab.edge-top[data-slot="3"]    { left: 380px; }
+.lcars-minitab.edge-top[data-slot="4"]    { right: 380px; }
+.lcars-minitab.edge-top[data-slot="5"]    { right: 260px; }
+.lcars-minitab.edge-top[data-slot="6"]    { right: 140px; }
+.lcars-minitab.edge-top[data-slot="7"]    { right:  20px; }
+.lcars-minitab.edge-bottom[data-slot="0"] { left:  20px; }
+.lcars-minitab.edge-bottom[data-slot="1"] { left: 140px; }
+.lcars-minitab.edge-bottom[data-slot="2"] { left: 260px; }
+.lcars-minitab.edge-bottom[data-slot="3"] { left: 380px; }
+
+/* Status pip — small colored dot that sits next to the rotated label,
+ * for connection state etc. The component reads opts.statusDot.color. */
+.lcars-minitab .lcars-minitab-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #444;
+    margin: 4px 0;
+}

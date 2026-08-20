@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Rig</title>
+<!-- v2559 -- THE PAGE THAT DID NOT EXIST.
+     Keith: "You made a page with all the tests I am supposed to click on, like 30 of them... 1 click tests and
+     result shown." I looked. It was not there. predictions.html has 28 claims (the ~30 he remembered) and ZERO
+     buttons -- it shows what was MEASURED, not what he can RUN. So it was described and never built.
+     This is it. 106 selfchecks discovered from disk + 8 things only he can do.
+     THE VERDICT COMES FROM THE PROCESS EXIT CODE, NOT FROM SCRAPING STDOUT. v2544 shipped past a gate because a
+     pipe ate an exit status; a page that grepped "all checks pass" out of text would rebuild that bug in a
+     browser. A CONTROL THAT CANNOT FAIL IS DECORATION. -->
+<meta name="demo:title"  content="Rig">
+<meta name="demo:desc"   content="Every check in the engine, one click each, real exit codes -- plus the eight things only a human at the rig can do.">
+<meta name="demo:cats"   content="tools">
+<meta name="demo:swatch" content="R">
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace; padding:22px; }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:16px; margin-bottom:14px; background:#070c15; }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 12px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  button { font:inherit; font-size:12px; background:#0e2036; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 13px; cursor:pointer; }
+  button:hover { background:#16304d; }
+  button.go { background:#1b4a6b; border-color:#2b6f9e; font-weight:600; }
+  button[disabled] { opacity:.4; cursor:default; }
+  .row { display:flex; align-items:center; gap:10px; padding:7px 9px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; background:#050a12; }
+  .row .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .pth { color:var(--dim); font-size:10.5px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#1d3450; flex:none; }
+  .st { font-size:11px; min-width:74px; text-align:right; }
+  .st.pass { color:var(--ok); } .st.fail { color:var(--hot); } .st.run { color:var(--warn); } .st.idle { color:#2c445e; }
+  pre { margin:6px 0 10px; padding:10px; background:#020509; border:1px solid var(--line); border-radius:7px; color:#9fb8d4; font-size:11px; line-height:1.55; max-height:280px; overflow:auto; white-space:pre-wrap; }
+  .rig { border:1px solid #3a2c14; border-radius:9px; padding:12px; margin-bottom:9px; background:#0c0a06; }
+  .rig .t { color:var(--warn); font-weight:600; margin-bottom:5px; }
+  .rig .w { color:#c9b998; font-size:12px; margin-bottom:5px; }
+  .rig .h { color:var(--dim); font-size:11px; }
+  .rig a { color:#9fd7ff; }
+  .tot { color:var(--dim); font-size:11px; }
+  .note { color:var(--dim); font-size:11px; border-left:2px solid var(--line); padding-left:10px; margin:10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Rig</h1>
+  <p class="sub">Every check in this engine, one click each. The verdict is the process exit code -- not text scraped out of the output.</p>
+
+  <div class="panel">
+    <h2>Only a human at the rig can do these</h2>
+    <div id="rigOnly"></div>
+    <div class="note">
+      These are not tests. They are the pile that has been accumulating in changelogs where nobody could click
+      them. Each says what it unblocks, because "rebuild the wasm" is a chore and "rebuild the wasm, it blocks
+      five things" is a decision.
+    </div>
+  </div>
+
+  <!-- v3458 -- THE LONG RUNS ARE A THIRD CHANNEL ON THIS PAGE AND ARE NEVER MERGED WITH THE OTHER TWO.
+       Keith: the three Run buttons should come off server.html. They were NOT a duplicate of anything here --
+       this page already carried TWO populations kept apart (checks DISCOVERED from the filesystem by
+       rigRunner, and the manual rigOnly list), and the long runs are a THIRD KIND: declared experiments with a
+       DURATION and an edits-source flag, served by /rigjob. Folding them into "Checks" would be the
+       two-things-one-label defect -- a check has an exit code and takes seconds; these take ten to twenty-five
+       minutes and one of them REWRITES THE TREE WHILE IT RUNS. Three populations, three sections, never summed.
+       (v3445's rule: a star bright because its gate ran and a star bright because its value drifted are
+       opposite news.) -->
+  <div class="panel">
+    <h2>Long runs <span id="rjCount" class="tot"></span></h2>
+    <label style="font-size:11px;display:block;margin-bottom:6px"><input type="checkbox" id="rjQuick" /> quick (shape only, settles nothing)</label>
+    <div id="rjList">checking&hellip;</div>
+    <div class="note">
+      CPU-bound lattice runs, <b>one at a time</b> &mdash; two would halve both and settle neither. A job marked
+      <b>EDITS SOURCE</b> mutates the tree while it runs, so run it on a tree nobody has open in an editor.
+      These moved here from the server console at v3458: a console is where you watch a box, and a job you start
+      and come back to in twenty minutes belongs on the page that owns the rig.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Checks <span id="count" class="tot"></span></h2>
+    <div class="bar">
+      <button class="go" id="all">Run all</button>
+      <button id="stop" disabled>Stop</button>
+      <span id="tally" class="tot"></span>
+      <div id="failed" style="display:none;margin-top:8px;padding:8px 10px;border-left:3px solid #a05040;background:#1a1010;color:#f0b0a0;font:12px ui-monospace,monospace;white-space:pre-wrap;"></div>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var checks = [], stopped = false;
+
+  function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
+
+  function render(data) {
+    var ro = document.getElementById("rigOnly");
+    data.rigOnly.forEach(function (r) {
+      var d = el("div", "rig");
+      d.appendChild(el("div", "t", r.title));
+      d.appendChild(el("div", "w", r.why));
+      var h = el("div", "h"); h.textContent = r.how;
+      if (r.link) { h.appendChild(document.createTextNode("  ")); var a = el("a", null, r.link); a.href = r.link; h.appendChild(a); }
+      d.appendChild(h);
+      ro.appendChild(d);
+    });
+
+    checks = data.checks;
+    document.getElementById("count").textContent = "(" + checks.length + " found on disk)";
+    var list = document.getElementById("list");
+    checks.forEach(function (c, i) {
+      var row = el("div", "row");
+      var b = el("button", null, "Run");
+      b.onclick = function () { runOne(i); };
+      c._name = c.name || c.id || c.file || ("check " + i);
+      var nm = el("div", "nm"); nm.textContent = c.name;
+      var p = el("span", "pth", "  " + c.rel); nm.appendChild(p);
+      var st = el("div", "st idle", "not run");
+      row.appendChild(b); row.appendChild(nm); row.appendChild(st);
+      var out = el("pre"); out.style.display = "none";
+      list.appendChild(row); list.appendChild(out);
+      c._st = st; c._out = out; c._btn = b;
+    });
+  }
+
+  function runOne(i) {
+    var c = checks[i];
+    c._st.className = "st run"; c._st.textContent = "running";
+    c._btn.disabled = true;
+    return fetch("/rig/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rel: c.rel }) })
+      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        // THE EXIT CODE IS THE VERDICT. Not a regex over stdout.
+        c._st.className = "st " + (r.ok ? "pass" : "fail");
+        // v3076 -- a killed gate says TIMEOUT, not "FAIL null". null is the exit code of a process that never
+        // returned a verdict; calling that a failure is a confident wrong answer about unfinished work, and it
+        // sits beside real failures with nothing to distinguish them.
+        c._st.textContent = (r.ok ? "pass"
+            : r.timedOut ? "TIMEOUT (" + Math.round((r.timeoutMs || 180000) / 1000) + "s budget)"
+            : "FAIL " + r.code) + (r.ms ? " " + (r.ms / 1000).toFixed(1) + "s" : "");
+        c._out.textContent = r.out || "(no output)";
+        c._out.style.display = r.ok ? "none" : "block";
+        c._btn.disabled = false;
+        c._ok = r.ok; c._timedOut = !!r.timedOut;
+        tally();
+        return r.ok;
+      })
+      .catch(function (e) {
+        c._st.className = "st fail"; c._st.textContent = "error";
+        c._out.textContent = String(e); c._out.style.display = "block";
+        c._btn.disabled = false;
+        c._ok = false; c._errored = true; tally();
+      });
+  }
+
+  // v3076 -- THREE OUTCOMES, NOT TWO, AND A LIST OF WHAT TO LOOK AT.
+  //
+  // Keith asked for a failure-only report, and the reason it matters showed up in the same run that prompted it:
+  // he had to paste every result because nothing here could say "these four are the ones". A tally of
+  // "pass / fail / not run" also folded TIMEOUTS in with failures, which is a different thing needing a different
+  // response -- a real failure wants fixing, a timeout wants a bigger budget or a smaller fixture.
+  function tally() {
+    var p = 0, f = 0, t = 0, e = 0;
+    var bad = [];
+    checks.forEach(function (c) {
+      if (c._ok === true) { p++; return; }
+      if (c._ok !== false) return;                       // not run yet
+      if (c._errored) { e++; bad.push(c._name + " (error)"); }
+      else if (c._timedOut) { t++; bad.push(c._name + " (timeout)"); }
+      else { f++; bad.push(c._name); }
+    });
+    document.getElementById("tally").textContent =
+      p + " pass, " + f + " fail" + (t ? ", " + t + " timeout" : "") + (e ? ", " + e + " error" : "") +
+      ", " + (checks.length - p - f - t - e) + " not run";
+    var box = document.getElementById("failed");
+    if (!box) return;
+    // The whole point: what to look at, in one place, without scrolling past 500 passes.
+    box.style.display = bad.length ? "block" : "none";
+    box.textContent = bad.length ? "NEEDS ATTENTION (" + bad.length + "):  " + bad.join("   |   ") : "";
+  }
+
+  document.getElementById("all").onclick = function () {
+    stopped = false;
+    document.getElementById("all").disabled = true;
+    document.getElementById("stop").disabled = false;
+    var i = 0;
+    (function next() {
+      if (stopped || i >= checks.length) {
+        document.getElementById("all").disabled = false;
+        document.getElementById("stop").disabled = true;
+        return;
+      }
+      runOne(i++).then(next);
+    })();
+  };
+  document.getElementById("stop").onclick = function () { stopped = true; };
+
+  fetch("/rig/list").then(function (r) { return r.json(); }).then(render).catch(function (e) {
+    document.getElementById("list").textContent = "could not reach /rig/list: " + e;
+  });
+})();
+</script>
+
+<script>
+// v3458 -- the long-run channel. Deliberately its own fetch and its own list: /rigjob is a DIFFERENT bridge
+// from /rig (rigJobBridge vs rigRunner) with a different notion of what a job is, and pretending one endpoint
+// serves both would have meant inventing a merged shape neither side actually returns.
+(function(){
+  var esc = function(x){ return String(x==null?"":x).replace(/[&<>"]/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]; }); };
+  function paint(j){
+    var list = document.getElementById("rjList"), cnt = document.getElementById("rjCount");
+    if(!list) return;
+    var jobs = (j && j.jobs) || [], run = (j && j.run) || {};
+    if(cnt) cnt.textContent = jobs.length ? (jobs.length + " job" + (jobs.length===1?"":"s")) : "";
+    if(!jobs.length){ list.textContent = "no long runs are registered"; return; }
+    list.innerHTML = jobs.map(function(job){
+      // A RUNNING JOB DISABLES EVERY BUTTON, NOT JUST ITS OWN -- the bridge refuses a second start with
+      // "busy", and a button that looks live and then refuses is worse than one that says why.
+      // PARITY WITH THE CONSOLE'S RENDERER, READ FROM IT RATHER THAN GUESSED: it carries three things a
+      // first pass would have dropped -- `present` (the script may not be in the tree), `settles` (what the run
+      // actually decides, which is the reason to spend twenty minutes), and the `quick` flag. A replacement
+      // surface missing any of them is not a replacement.
+      var busy = !!run.running;
+      var mine = run.running === job.id;
+      var missing = job.present === false;
+      return '<div style="margin:6px 0;padding:6px 8px;border:1px solid #24405a;border-radius:6px">'
+        + '<button data-rjid="' + esc(job.id) + '"' + (busy || missing ? " disabled" : "") + '>'
+        + (mine ? "running\u2026" : "Run") + '</button> '
+        + '<b>' + esc(job.label) + '</b> '
+        + '<span class="tot">~' + esc(job.minutes) + ' min</span>'
+        + (job.editsSource ? ' <span style="color:#e0a050;font-weight:bold">EDITS SOURCE</span>' : "")
+        + (missing ? ' <span style="color:#f2b8b8">script missing</span>' : "")
+        + (busy && !mine ? ' <span class="tot">waiting on ' + esc(run.running) + '</span>' : "")
+        + (job.settles ? '<div class="tot" style="font-size:10px;margin-top:2px">' + esc(job.settles) + '</div>' : "")
+        + '</div>';
+    }).join("");
+    Array.prototype.forEach.call(list.querySelectorAll("button[data-rjid]"), function(b){
+      b.onclick = function(){
+        b.disabled = true;
+        fetch("/rigjob/run", { method:"POST", headers:{"Content-Type":"application/json"},
+                               body: JSON.stringify({ id: b.getAttribute("data-rjid"), quick: !!(document.getElementById("rjQuick") || {}).checked }) })
+          .then(function(r){ return r.json(); })
+          .then(function(res){ if(res && res.ok===false) alert("could not start: " + (res.message || res.error)); load(); })
+          .catch(function(e){ alert("could not start: " + e); load(); });
+      };
+    });
+  }
+  function load(){
+    fetch("/rigjob/status", { cache:"no-store" }).then(function(r){ return r.json(); }).then(paint)
+      .catch(function(e){ var l = document.getElementById("rjList"); if(l) l.textContent = "could not reach /rigjob/status: " + e; });
+  }
+  load(); setInterval(load, 5000);
+})();
+</script>
+</body>
+</html>

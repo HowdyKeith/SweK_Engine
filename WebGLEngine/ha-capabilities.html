@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Home Assistant</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; position:sticky; top:0; background:#0b1310ee; backdrop-filter:blur(5px); z-index:5; }
+  .title { font-weight:600; letter-spacing:.4px; }
+  .title .g { color:var(--accent); }
+  .spacer { flex:1; }
+  .status { font-size:12px; padding:4px 9px; border-radius:20px; border:1px solid var(--line); }
+  .status.ok { color:var(--go); border-color:#224a36; background:#0d2117; }
+  .status.no { color:var(--warn); border-color:#5a4a1f; background:#211c10; }
+  main { max-width:880px; margin:0 auto; padding:14px; }
+  h2 { font-size:13px; letter-spacing:1.4px; text-transform:uppercase; color:#9bd6ff; border-bottom:1px solid var(--line); padding-bottom:5px; margin:22px 0 10px; }
+  .sub { color:var(--dim); font-size:12px; margin:-4px 0 12px; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--panel); display:flex; gap:12px; align-items:flex-start; }
+  .card.off { opacity:.55; }
+  .badge { flex:0 0 auto; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; margin-top:1px; white-space:nowrap; }
+  .badge.have { color:#04140b; background:var(--go); }
+  .badge.miss { color:#1a1206; background:var(--warn); }
+  .badge.gated { color:var(--dim); background:#16201b; border:1px solid var(--off); }
+  .body { flex:1; min-width:0; }
+  .name { font-weight:600; }
+  .desc { color:var(--dim); margin-top:2px; }
+  .reason { color:var(--warn); margin-top:4px; font-size:12px; }
+  a.inst { color:var(--accent); text-decoration:none; border:1px solid #2a4a5e; border-radius:7px; padding:4px 9px; font-size:12px; white-space:nowrap; display:inline-block; margin-top:5px; }
+  a.inst:hover { background:#10222e; }
+  .tag { font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:5px; padding:1px 5px; margin-left:6px; }
+  .foot { color:var(--dim); font-size:11px; margin-top:18px; }
+  button { background:#10231a; color:var(--go); border:1px solid #224a36; border-radius:8px; padding:6px 11px; font:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🏠</span> Engine ↔ Home Assistant</span>
+    <span class="spacer"></span>
+    <span class="status" id="stat">checking…</span>
+    <button id="openHa" title="Open Home Assistant in a new tab" style="display:none;">Open Home Assistant ↗</button>
+    <button id="refresh" title="re-check">↻</button>
+  </header>
+  <main>
+    <p class="sub" id="intro">Home Assistant is the engine's bridge to the physical house — TVs, speakers, cameras, lights, climate, presence. This panel shows which HA integrations you have, what each unlocks here, what's missing (with a one-click install), and which engine features stay greyed until they're connected.</p>
+
+    <h2>Integrations the engine can use</h2>
+    <p class="sub">Green = loaded in your HA. Amber = not detected — install it in HA to unlock the features below it.</p>
+    <div id="integrations"></div>
+
+    <h2>Engine features that need Home Assistant</h2>
+    <p class="sub">These work great once HA (and the right integration) is connected; until then they're greyed out.</p>
+    <div id="features"></div>
+
+    <p class="foot" id="foot"></p>
+  </main>
+<script src="/ui/haIntegrations.js"></script>
+<script>
+  // Catalog of engine-relevant HA integrations. `detect` = HA component/domain names
+  // (/api/config components ∪ live entity domains). `install` points at the right
+  // install path (HACS repo or core integration docs). `enables` = what it unlocks here.
+  var INTEGRATIONS = window.HA_INTEGRATIONS || [];   // v1350 — shared catalog (ui/haIntegrations.js)
+
+  // Engine features and the integration(s) each needs. anyOf = any one satisfies it.
+  var FEATURES = [
+    { label:"Send video / images to a smart display", needs:["cast","media_player"], anyOf:true, note:"TVs, Nest Hubs, Chromecast." },
+    { label:"Speak through the house speakers",        needs:["tts"],            note:"avatar voice + spoken announcements." },
+    { label:"Media controls (play / pause / volume)",  needs:["media_player"],   note:"on any HA media player." },
+    { label:"Security-camera feeds in the pip-boy",    needs:["frigate"],        note:"or any HA camera entity." },
+    { label:"TV remote (D-pad + app launch)",          needs:["androidtv_remote","roku"], anyOf:true, note:"Android TV or Roku." },
+    { label:"Greet on arrival / note departures",      needs:["person"],         note:"presence-driven." },
+    { label:"Weather-driven sky + clouds",             needs:["weather"],        note:"local conditions → the engine sky." },
+    { label:"House lights react to alerts",            needs:["light"],          note:"battery-full, warnings, mood." },
+    { label:"Climate control (e.g. the Midea AC)",     needs:["midea_ac_lan"],   note:"once added as a climate entity." },
+    { label:"Send a typed command to an Echo",         needs:["alexa_media"],    note:"Alexa command panel → Shed Echo; also voice → engine via a routine." }
+  ];
+
+  var present = {};   // id -> bool
+  var connected = false;
+  var byId = {}; INTEGRATIONS.forEach(function(i){ byId[i.id] = i; });
+
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return ({ "&":"&amp;","<":"&lt;",">":"&gt;" })[c]; }); }
+
+  function renderIntegrations(){
+    var host = document.getElementById("integrations"); host.innerHTML = "";
+    INTEGRATIONS.forEach(function(it){
+      var have = !!present[it.id];
+      var card = document.createElement("div"); card.className = "card" + (have ? "" : "");
+      // v1324 — for HACS repos, build a true 1-click install link (my.home-assistant.io redirect
+      // opens HACS in the user's HA with the repo pre-filled). core stays as the docs link.
+      var href = it.url, gh = it.kind === "HACS" && it.url.match(/github\.com\/([^/]+)\/([^/?#]+)/);
+      if (gh) href = "https://my.home-assistant.io/redirect/hacs_repository/?owner=" + gh[1] + "&repository=" + gh[2] + "&category=integration";
+      card.innerHTML =
+        '<span class="badge ' + (have ? "have" : "miss") + '">' + (have ? "INSTALLED" : "MISSING") + '</span>' +
+        '<div class="body"><div class="name">' + esc(it.label) + '<span class="tag">' + (it.kind === "HACS" ? "HACS" : "core") + '</span></div>' +
+        '<div class="desc">' + esc(it.enables) + '</div>' +
+        (have ? "" : '<a class="inst" target="_blank" rel="noopener" href="' + esc(href) + '">' + (it.kind === "HACS" ? "Install via HACS ↗" : "Add in HA ↗") + '</a>') +
+        '</div>';
+      host.appendChild(card);
+    });
+  }
+
+  function need(f){   // returns {ok, missingLabels:[...]} for a feature
+    if (!connected) return { ok:false, missingLabels:[] };
+    if (f.anyOf) { var any = f.needs.some(function(id){ return present[id]; }); return { ok:any, missingLabels: any ? [] : f.needs.map(function(id){ return (byId[id]||{}).label||id; }) }; }
+    var miss = f.needs.filter(function(id){ return !present[id]; });
+    return { ok: miss.length === 0, missingLabels: miss.map(function(id){ return (byId[id]||{}).label||id; }) };
+  }
+
+  function renderFeatures(){
+    var host = document.getElementById("features"); host.innerHTML = "";
+    FEATURES.forEach(function(f){
+      var n = need(f), ok = n.ok;
+      var card = document.createElement("div"); card.className = "card" + (ok ? "" : " off");
+      var reason = "";
+      if (!ok) { reason = connected
+        ? 'Needs ' + (f.anyOf ? "one of: " : "") + esc(n.missingLabels.join(f.anyOf ? " / " : ", ")) + ' in HA (see above).'
+        : 'Connect Home Assistant to enable.'; }
+      card.innerHTML =
+        '<span class="badge ' + (ok ? "have" : "gated") + '">' + (ok ? "READY" : "GREYED") + '</span>' +
+        '<div class="body"><div class="name">' + esc(f.label) + '</div>' +
+        '<div class="desc">' + esc(f.note || "") + '</div>' +
+        (reason ? '<div class="reason">' + reason + '</div>' : "") +
+        '</div>';
+      host.appendChild(card);
+    });
+  }
+
+  function load(){
+    var stat = document.getElementById("stat");
+    stat.textContent = "checking…"; stat.className = "status";
+    fetch("/ha/capabilities", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      connected = !!(j && j.available);
+      var have = {};
+      var comps = (j && j.components) || [], doms = (j && j.domains) || [];
+      var all = comps.concat(doms);
+      INTEGRATIONS.forEach(function(it){ have[it.id] = it.detect.some(function(d){ return all.indexOf(d) >= 0; }); });
+      present = have;
+      if (connected) { stat.textContent = "✓ connected" + (j.version ? " · HA " + j.version : ""); stat.className = "status ok"; }
+      else if (j && j.configured) { stat.textContent = "✗ configured but unreachable"; stat.className = "status no"; }
+      else { stat.textContent = "✗ not configured"; stat.className = "status no"; }
+      // v1892 — surface an "Open Home Assistant" button when we know the HA URL
+      var openBtn = document.getElementById("openHa");
+      if (openBtn) {
+        if (j && j.url) { openBtn.style.display = ""; openBtn.onclick = function(){ window.open(j.url, "_blank", "noopener"); }; }
+        else { openBtn.style.display = "none"; }
+      }
+      renderIntegrations(); renderFeatures();
+      var got = INTEGRATIONS.filter(function(i){ return present[i.id]; }).length;
+      document.getElementById("foot").textContent = connected
+        ? (got + " of " + INTEGRATIONS.length + " engine-relevant integrations detected. Install any amber one in HA to light up the greyed features.")
+        : "Set your HA URL + a long-lived access token in ai-bridge/ha.config.json (copy ha.config.example.json), or open this panel from Settings → Network → 🏠 Home Assistant capabilities, then re-check. The token stays server-side.";
+    }).catch(function(){
+      connected = false; present = {}; stat.textContent = "✗ bridge unreachable"; stat.className = "status no";
+      renderIntegrations(); renderFeatures();
+    });
+  }
+  document.getElementById("refresh").onclick = load;
+  load();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

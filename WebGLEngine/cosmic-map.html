@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EV cosmic map -- a galaxy you can verify</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:9px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 14px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .wrap { padding:4px 18px 8px; max-width:640px; }
+  canvas { display:block; width:100%; height:auto; border-radius:8px; background:#020610; border:1px solid var(--line); cursor:crosshair; }
+  .read { padding:6px 18px 18px; max-width:640px; font-size:12px; color:var(--dim); } .read b { color:var(--amber); } .read .g { color:var(--green); }
+</style>
+</head>
+<body>
+<header>
+  <h1>EV cosmic map &mdash; a galaxy you can verify</h1>
+  <p><b>Two galaxies, and only one of them is fully connected.</b> A star map for the port, with the verification a map usually lacks. Runs <code>physics/galaxy/cosmicMap.js</code>. The galaxy is proven <b>fully connected</b> (every system reachable), its jump links proven <b>two-way</b>, and any route you plot is the <b>shortest</b> one &mdash; breadth-first, minimal jumps, every hop a real link. Click two systems to route between them; the path drawn is guaranteed the fewest jumps.<br><br>
+  <b>THE LAB</b> swaps the seeded galaxy for the real one: <b>every system is a device</b> and <b>every jump link is a measured relation that says which kind it is</b> &mdash; <code>substrate</code> (the binds import a physics module in common), <code>coupling</code> (two observables agree to ten digits), <code>room</code> (the instrument pages sit in the same panel). <b>It is an archipelago, and that is the finding rather than a fault:</b> on the substrate axis alone 53 of 67 devices have no navigable neighbour at all. Routing to an island <b>refuses</b> instead of inventing a hop. Built by <code>tools/roundhouse/labGalaxy.mjs --write</code>; no clock anywhere in it, so this map is the same on a downloaded build as on the live hub.</p>
+</header>
+<div class="controls">
+  <button id="mode">Show THE LAB</button><button id="reseed">New galaxy</button><button id="clear">Clear route</button>
+  <span id="tourbar" style="display:none;color:var(--dim);font-size:11px">tour:
+    <button id="t_rec">Record</button><button id="t_exp">Export</button>
+    <label style="cursor:pointer">Import<input type="file" id="t_imp" accept=".json,application/json" style="display:none"></label>
+    <button id="t_step">Step</button>
+  </span>
+  <span id="layers" style="display:none;color:var(--dim);font-size:11px">layer:
+    <label><input type="radio" name="lyr" id="l_static" checked> static</label>
+    <label><input type="radio" name="lyr" id="l_runner"> gate runner</label>
+  </span>
+  <span id="kinds" style="display:none;color:var(--dim);font-size:11px">jump links:
+    <label><input type="checkbox" id="k_substrate" checked> substrate</label>
+    <label><input type="checkbox" id="k_coupling" checked> coupling</label>
+    <label><input type="checkbox" id="k_room" checked> room</label></span>
+</div>
+<div class="wrap"><canvas id="cv" width="620" height="480"></canvas></div>
+<div class="read" id="read"></div>
+<script type="module">
+import { makeGalaxy, buildAdj, shortestPath, components, asymmetricLinks, bfsDistances, isValidPath } from "./physics/galaxy/cosmicMap.js";
+// *** LAYER 3 SHARES ONE DEFINITION OF WHAT A TOUR IS WITH ITS GATE. *** labTour.mjs is pure -- no fs, no clock,
+// no BFS of its own -- so this page and tools/roundhouse/labTour-selfcheck.mjs import the SAME module. replay()
+// takes `neighbours` and `shortest` as arguments and is handed cosmicMap's proven BFS from here; a second
+// implementation living in the format module would be the second declaration this project names most often.
+import { newTour, addVisit, addRoute, validate, replay, summarise, galaxyFingerprint } from "./tools/roundhouse/labTour.mjs";
+const cv = document.getElementById("cv"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+let seed = 42, G, adj, from = -1, to = -1, path = null;
+const $ = (id) => document.getElementById(id);
+const pad = 30, sc = (p) => [W / 2 + p.x * (W / 2 - pad), H / 2 + p.y * (H / 2 - pad)];
+
+// *** THE LAB HALF IS A VIEWER AND NOTHING MORE. *** lab-galaxy.json already carries the component count, the
+// island list and the placements, and this page must NOT re-derive any of them: a second opinion about the
+// lab's shape is the second-declaration defect, and the artefact is the one that was gated. The page only
+// FILTERS by kind, and then routes with the SAME imported shortestPath the seeded galaxy uses -- so a route is
+// graded by proven code whichever galaxy is on screen.
+let lab = null, labErr = null, mode = "seeded";
+const kindOn = () => ["substrate", "coupling", "room"].filter((k) => $("k_" + k).checked);
+
+// *** LAYER 2 IS A SEPARATE FETCH, A SEPARATE ARTEFACT AND A SEPARATE CHANNEL. *** It is never merged into the
+// static layer's radius or ring: a star bright because its gate ran and a star bright because its VALUE DRIFTED
+// are opposite news, and one brightness carrying both is this tree's most-named defect.
+let act = null, actErr = null, layer = "static";
+// A SESSION IS A DOCUMENT THE VISITOR OWNS, not a log this page keeps about them: it lives in memory until they
+// export it, it goes out as a FILE, and nothing is sent anywhere. That is what dissolved this layer's privacy
+// weight -- a remote user is just a user.
+let tour = null, recording = false, imported = null, replayed = null, stepAt = -1;
+const nowStamp = () => new Date().toISOString();          // the LOG LINE's time, never a record's
+function neighboursNow() {
+  const m = new Map(G.systems.map((s) => [s.name || ("SYS-" + s.id), new Set()]));
+  for (const [a, b] of G.links) { const A = G.systems[a], B = G.systems[b]; if (A && B) m.get(A.name || ("SYS-" + A.id)).add(B.name || ("SYS-" + B.id)); }
+  return m;
+}
+function shortestNow(a, b) {
+  const i = G.systems.findIndex((s) => s.name === a), j = G.systems.findIndex((s) => s.name === b);
+  if (i < 0 || j < 0) return null;
+  const p = shortestPath(adj, i, j);
+  return p && p.length ? p.length - 1 : null;
+}
+async function loadAct() {
+  if (act || actErr) return;
+  try {
+    const r = await fetch("./gate-activity.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    act = await r.json();
+  } catch (e) {
+    actErr = "gate-activity.json is not here yet (" + (e.message || e) + "). Emitted by "
+           + "`node tools/roundhouse/gateActivity.mjs --write`, dry run by default.";
+  }
+}
+let actBy = new Map();
+const ACT_COLOUR = { "timed": "#9fe6c0", "partly": "#ffcc66", "never-timed": "#5566aa", "no-gate": "#e8736a" };
+
+async function loadLab() {
+  if (lab || labErr) return;
+  try {
+    const r = await fetch("./lab-galaxy.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    lab = await r.json();
+  } catch (e) {
+    // NAMED, NOT BLANK. The artefact is dry-run by default, so "absent" is the ordinary state on a fresh tree
+    // and is a different fact from "the page is broken" -- v3047's rule, that a blank canvas is not a report.
+    labErr = "lab-galaxy.json is not here yet (" + (e.message || e) + "). It is emitted by "
+           + "`node tools/roundhouse/labGalaxy.mjs --write`, which is DRY RUN by default so an accidental run "
+           + "cannot leave a stale map behind.";
+  }
+}
+
+function buildLab() {
+  const on = new Set(kindOn());
+  const use = lab.edges.filter((e) => e.kinds.some((k) => on.has(k)));
+  const idx = new Map(lab.nodes.map((n, i) => [n.id, i]));
+  const links = [];
+  for (const e of use) { const a = idx.get(e.a), b = idx.get(e.b); if (a != null && b != null) { links.push([a, b]); links.push([b, a]); } }
+  const place = new Map(lab.placed.map((p) => [p.id, p]));
+  G = {
+    systems: lab.nodes.map((n, i) => ({ id: i, name: n.id, x: (place.get(n.id) || {}).x || 0, y: (place.get(n.id) || {}).y || 0,
+                                        interrogated: n.interrogated, observables: n.observables, section: n.section })),
+    links,
+  };
+  adj = buildAdj(G.systems.length, links);
+  actBy = new Map(((act && act.nodes) || []).map((n) => [n.id, n]));
+  from = to = -1; path = null;
+}
+
+function build() {
+  if (mode === "lab" && lab) { buildLab(); draw(); status(); return; }
+  G = makeGalaxy(seed, 60, 3); adj = buildAdj(G.systems.length, G.links); from = to = -1; path = null;
+  draw(); status();
+}
+const nameOf = (i) => (mode === "lab" ? (G.systems[i] || {}).name : "SYS-" + i);
+
+function status() {
+  if (mode === "lab" && labErr) { $("read").innerHTML = "<b style='color:var(--red)'>" + labErr + "</b>"; return; }
+  const comp = components(G.systems.length, adj), oneWay = asymmetricLinks(G.links);
+  const singles = comp.sizes ? comp.sizes.filter((n) => n === 1).length : null;
+  let msg = "<span class='g'>" + comp.count + "</span> connected component" + (comp.count === 1 ? " (all " + G.systems.length + " systems reachable)" : "s")
+          + " &middot; <span class='g'>" + oneWay + "</span> one-way links &middot; " + (G.links.length / 2) + " jump links";
+  if (mode === "lab") {
+    // *** THE SEEDED GALAXY'S HEADLINE PROMISE IS FALSE HERE AND THE PAGE SAYS SO RATHER THAN REPEATING IT. ***
+    msg += " across <span class='g'>" + G.systems.length + "</span> devices"
+        + " &middot; kinds: " + (kindOn().join(", ") || "<b style='color:var(--red)'>none &mdash; every device is an island</b>")
+        + ".<br><b>This galaxy is NOT fully connected, and that is the measurement.</b> "
+        + (lab.islands.length ? "<span class='g'>" + lab.islands.length + "</span> islands at full link set: devices with no front door of their own and no measured coupling. " : "")
+        + "Routing to one REFUSES rather than inventing a hop.";
+  } else msg += ".";
+  if (mode === "lab" && layer === "runner") {
+    if (actErr) { $("read").innerHTML = "<b style='color:var(--red)'>" + actErr + "</b>"; return; }
+    const c = act.counts;
+    // *** THE AGE IS PRINTED BESIDE THE NUMBERS, NEVER UNDER THEM. *** Layer 1 has no clock and can never go
+    // stale; this one is a recorded run, and a figure shown without its age is v3070's remembered result
+    // presented as a current measurement.
+    msg += "<br><b>GATE RUNNER</b> (layer 2, its own channel &mdash; never mixed into the static one): timings captured at <b>"
+        + act.age.capturedAt + "</b> against a tree at <b>" + act.age.now + "</b>, so <b style='color:var(--red)'>"
+        + act.age.versions + " versions stale</b> &mdash; and that age is a <b>version distance, not a clock</b>, because "
+        + "gate-timings.json carries no timestamp at all.<br>"
+        + "<span style='color:" + ACT_COLOUR.timed + "'>&#9679; " + c.timed + " fully timed</span> &middot; "
+        + "<span style='color:" + ACT_COLOUR.partly + "'>&#9679; " + c.partly + " partly</span> &middot; "
+        + "<span style='color:" + ACT_COLOUR["never-timed"] + "'>&#9679; " + c["never-timed"] + " never-timed</span> &middot; "
+        + "<span style='color:" + ACT_COLOUR["no-gate"] + "'>&#9679; " + c["no-gate"] + " no gate of their own</span>. "
+        + "<b>NEVER-TIMED IS NOT FAST</b> &mdash; it is unmeasured, so it gets a colour rather than a smaller star. "
+        + act.gates.neverTimed + " of " + act.gates.total + " gates have never been in a measured suite run.";
+  }
+  if (mode === "lab" && recording && tour) {
+    $("t_rec").textContent = "Stop (" + tour.entries.length + ")";
+    msg += "<br><b>TOUR</b> (layer 3): recording &mdash; " + tour.entries.length + " entr" + (tour.entries.length === 1 ? "y" : "ies")
+        + ". <b>This is a document you own</b>: it lives in this tab until you export it, it goes out as a FILE, and nothing is sent anywhere.";
+  }
+  if (mode === "lab" && imported && replayed) {
+    const sum = summarise(imported, replayed, galaxyFingerprint(lab));
+    msg += "<br><b>IMPORTED TOUR</b>: " + sum.entries + " entries"
+        + (sum.span ? " from " + sum.span.first.slice(0, 16).replace("T", " ") + " to " + sum.span.last.slice(0, 16).replace("T", " ") : "")
+        + " &middot; recorded against <b>" + sum.recordedAgainst + "</b>, this map is <b>" + sum.currentFingerprint + "</b> &mdash; "
+        + (sum.sameGalaxy ? "<span class='g'>the same galaxy</span>."
+                          : "<b style='color:var(--red)'>A DIFFERENT GALAXY. The lab has moved since this was recorded; the routes below are replayed against the map as it is NOW.</b>")
+        + "<br>routes: <span class='g'>" + sum.byState.intact + " intact</span> &middot; "
+        + "<b style='color:#ffcc66'>" + sum.byState.longer + " longer</b> &middot; "
+        + "<b style='color:var(--red)'>" + sum.byState.broken + " broken</b>. "
+        + "<b>LONGER means the route still walks and is no longer the fewest jumps</b> &mdash; every hop still validates, "
+        + "and the sentence attached to it has expired. A valid/invalid reader would call that intact. "
+        + "Press <b>Step</b> to walk the recorded routes.";
+    if (stepAt >= 0) {
+      const routes = replayed.filter((r) => r.kind === "route");
+      const r = routes[stepAt];
+      if (r) msg += "<br>step " + (stepAt + 1) + " of " + routes.length + ": <b>" + r.from + " &rarr; " + r.to + "</b> &mdash; recorded at <b>"
+                 + r.wasJumps + "</b> jumps, now <b>" + (r.nowJumps === null ? "no route" : r.nowJumps) + "</b> ("
+                 + (r.state === "broken" ? "<b style='color:var(--red)'>broken at " + r.brokenAt.join(" &rarr; ") + "</b>" : r.state) + ").";
+    }
+  }
+  if (path) { const d = bfsDistances(adj, from)[to];
+    msg += " &nbsp; Route <b>" + nameOf(from) + " &rarr; " + nameOf(to) + "</b>: <b>" + (path.length - 1) + "</b> jumps (shortest; matches BFS " + (path.length - 1 === d) + ", valid " + isValidPath(adj, path) + ")";
+    if (mode === "lab") {
+      const on = new Set(kindOn());
+      const hops = [];
+      for (let i = 0; i + 1 < path.length; i++) {
+        const a = G.systems[path[i]].name, b = G.systems[path[i + 1]].name;
+        const e = lab.edges.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a));
+        hops.push(e ? e.kinds.filter((k) => on.has(k)).join("+") : "?");
+      }
+      // A ROUTE THAT MIXES KINDS IS STILL A REAL ROUTE, but "fewest jumps" is then counting hops of different
+      // kinds as equal -- so the composition is printed rather than hidden behind the number.
+      msg += " via <b>" + hops.join(" &rarr; ") + "</b>";
+    }
+    msg += ".";
+  } else if (from >= 0 && to >= 0) {
+    msg += " &nbsp; <b style='color:var(--red)'>" + nameOf(from) + " and " + nameOf(to) + " are in different components &mdash; there is no route, and none is invented.</b>";
+  } else msg += " &nbsp; Click two systems to plot the shortest route.";
+  $("read").innerHTML = msg;
+}
+function draw() {
+  g.clearRect(0, 0, W, H);
+  // links
+  g.strokeStyle = "rgba(51,110,140,0.35)"; g.lineWidth = 0.6;
+  for (const [a, b] of G.links) if (a < b) { const p = sc(G.systems[a]), q = sc(G.systems[b]); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
+  // route
+  if (path && path.length > 1) {
+    g.strokeStyle = "#ffcc66"; g.lineWidth = 2.2; g.beginPath();
+    path.forEach((id, i) => { const p = sc(G.systems[id]); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.stroke();
+  }
+  // systems
+  for (const s of G.systems) { const p = sc(s); const sel = s.id === from || s.id === to; const onPath = path && path.includes(s.id);
+    // *** TWO STATIC LAYERS, DELIBERATELY ON DIFFERENT CHANNELS. *** Radius = how many observables the device's
+    // baseline row carries; the RING = whether it declares a planted error. Merging them into one "brightness"
+    // would be two things wearing one label, and this map has three more layers coming (the gate runner's
+    // timings, then the session tour) that must each keep their own channel for the same reason.
+    // A device with NO baseline row is drawn at the minimum radius AND marked hollow -- unknown is not zero.
+    let r = sel ? 5 : 3;
+    if (mode === "lab") { const o = s.observables; r = (o === null || o === undefined) ? 2 : Math.min(6, 2 + Math.sqrt(o) / 1.6); if (sel) r += 2; }
+    let fill = sel ? "#ffcc66" : onPath ? "#9fe6c0" : "#5a9fc0";
+    if (mode === "lab" && layer === "runner" && act && !sel && !onPath) {
+      // *** THE RUNNER LAYER COLOURS BY STATE AND NEVER BY SIZE. *** A never-timed gate drawn as a SMALL dot
+      // would read as a fast one, and unmeasured is not quick -- so the state gets a hue of its own and the
+      // radius keeps meaning what it means in the static layer.
+      const a = actBy.get(s.name);
+      fill = a ? (ACT_COLOUR[a.state] || "#5a9fc0") : "#333c4a";
+    }
+    g.fillStyle = fill; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill();
+    if (mode === "lab" && layer === "static" && s.interrogated) { g.strokeStyle = "#ffcc66"; g.lineWidth = 1; g.beginPath(); g.arc(p[0], p[1], r + 2.5, 0, 7); g.stroke(); }
+    if (mode === "lab" && layer === "static" && (s.observables === null || s.observables === undefined)) { g.strokeStyle = "#e8736a"; g.lineWidth = 1; g.beginPath(); g.arc(p[0], p[1], r + 1.5, 0, 7); g.stroke(); }
+  }
+}
+cv.onclick = (e) => {
+  const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
+  let best = -1, bd = 1e9; for (const s of G.systems) { const p = sc(s), d = (p[0] - mx) ** 2 + (p[1] - my) ** 2; if (d < bd) { bd = d; best = s.id; } }
+  if (from === -1 || path) { from = best; to = -1; path = null; }
+  else if (best !== from) { to = best; path = shortestPath(adj, from, to); }
+  if (recording && tour && mode === "lab") {
+    const nm = (i) => (G.systems[i] || {}).name;
+    if (path) {
+      const on = new Set(kindOn());
+      const hops = [];
+      for (let i = 0; i + 1 < path.length; i++) {
+        const a = nm(path[i]), b = nm(path[i + 1]);
+        const e = lab.edges.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a));
+        hops.push(e ? e.kinds.filter((k) => on.has(k)).join("+") : "?");
+      }
+      addRoute(tour, nowStamp(), nm(from), nm(to), path.map(nm), hops);
+    } else if (from >= 0) addVisit(tour, nowStamp(), nm(from));
+  }
+  draw(); status();
+};
+$("reseed").onclick = () => { seed = (seed * 1664525 + 1013904223) >>> 0 % 99999 || 7; build(); };
+$("clear").onclick = () => { from = to = -1; path = null; draw(); status(); };
+$("mode").onclick = async () => {
+  if (mode === "seeded") {
+    await loadLab();
+    mode = "lab"; $("mode").textContent = "Show the seeded galaxy"; $("kinds").style.display = ""; $("layers").style.display = ""; $("tourbar").style.display = "";
+    $("reseed").style.display = "none";
+    if (labErr) { $("read").innerHTML = "<b style='color:var(--red)'>" + labErr + "</b>"; return; }
+  } else {
+    mode = "seeded"; $("mode").textContent = "Show THE LAB"; $("kinds").style.display = "none"; $("layers").style.display = "none"; $("tourbar").style.display = "none";
+    $("reseed").style.display = "";
+  }
+  build();
+};
+for (const k of ["substrate", "coupling", "room"]) $("k_" + k).onchange = () => { if (mode === "lab" && lab) build(); };
+$("t_rec").onclick = () => {
+  if (!lab) return;
+  if (!recording) { tour = newTour(lab, (window.ENGINE_VERSION || null)); recording = true; $("t_rec").textContent = "Stop (0)"; }
+  else { recording = false; $("t_rec").textContent = "Record"; }
+  status();
+};
+$("t_exp").onclick = () => {
+  if (!tour || !tour.entries.length) { $("read").innerHTML = "<b style='color:var(--red)'>Nothing recorded yet &mdash; press Record, then click some systems.</b>"; return; }
+  // A FILE, NOT HUB STORAGE. It works offline, needs no account, and travels with whoever made it.
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(tour, null, 1)], { type: "application/json" }));
+  a.download = "swek-lab-tour-" + (tour.galaxy.fingerprint || "unknown") + ".json";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
+$("t_imp").onchange = async (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  let j = null;
+  try { j = JSON.parse(await f.text()); } catch (e) { $("read").innerHTML = "<b style='color:var(--red)'>that file is not JSON: " + (e.message || e) + "</b>"; return; }
+  const v = validate(j);
+  if (!v.ok) { $("read").innerHTML = "<b style='color:var(--red)'>not a tour: " + v.problems.join("; ") + "</b>"; return; }
+  imported = j; stepAt = -1;
+  replayed = replay(j, neighboursNow(), shortestNow);
+  status();
+  ev.target.value = "";
+};
+$("t_step").onclick = () => {
+  if (!imported) return;
+  const routes = imported.entries.map((e, i) => [e, i]).filter(([e]) => e.kind === "route");
+  if (!routes.length) return;
+  stepAt = (stepAt + 1) % routes.length;
+  const [e] = routes[stepAt];
+  const i = (n) => G.systems.findIndex((s) => s.name === n);
+  from = i(e.from); to = i(e.to);
+  // THE RECORDED PATH IS DRAWN, NOT A FRESHLY COMPUTED ONE -- walking the tour means seeing what they saw.
+  path = e.path.map(i).every((x) => x >= 0) ? e.path.map(i) : null;
+  draw(); status();
+};
+$("l_static").onchange = () => { layer = "static"; draw(); status(); };
+$("l_runner").onchange = async () => { layer = "runner"; await loadAct(); if (mode === "lab" && lab) build(); else { draw(); status(); } };
+build();
+</script>
+</body>
+</html>

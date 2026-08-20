@@ -1,0 +1,18 @@
+# obj.gbnf — v1989: GBNF grammar for llama-server that constrains generation to
+# syntactically valid Wavefront OBJ, at the DECODER level. The model literally
+# cannot emit markdown fences, prose, negative face indices, or malformed lines —
+# every token must extend a valid "v x y z" or "f i j k [l]" line.
+#
+# Used by OllamaClient.generateOBJ() when a llama-server URL is configured
+# (voxelengine.llamaServerUrl). Attacks FailedOBJStore rejects at the source.
+# NOTE: grammar guarantees FORMAT, not geometry quality — the QC gate still runs.
+#
+# llama-server usage: POST /completion { prompt, grammar: <this file's text>, ... }
+
+root   ::= vline vline vline vline+ fline fline+
+vline  ::= "v " num " " num " " num "\n"
+fline  ::= "f " idx " " idx " " idx (" " idx)? "\n"
+num    ::= "-"? int frac?
+int    ::= [0-9] | [1-9] [0-9] | [1-9] [0-9] [0-9]
+frac   ::= "." [0-9] [0-9]? [0-9]? [0-9]?
+idx    ::= [1-9] [0-9]? [0-9]?

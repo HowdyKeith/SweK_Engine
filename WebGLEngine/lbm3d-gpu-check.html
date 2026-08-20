@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="GPU adjudicator">
+<meta name="demo:desc" content="The D3Q19 compute kernel was written on a machine with no GPU and no browser, so unlike everything else in this engine's fluid work it could not be checked against an exact answer before it shipped. This page is the check, and it runs on your hardware, not mine. It puts the GPU kernel and the verified CPU solver on the identical problem from the identical state, steps both, and compares them cell by cell -- then asks the GPU, alone, to reproduce Hagen-Poiseuille's paraboloid, which the CPU earned to half a percent. There is a sabotage button. It corrupts one weight in the kernel so you can watch the adjudicator go red, because a check you have never seen fail is a check you should not trust.">
+<meta name="demo:category" content="simulation">
+<meta name="demo:needs" content="webgpu">
+<title>GPU adjudicator</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#04060e; color:#9fb2d4; font:13px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:900px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { color:#f6a623; letter-spacing:.15em; text-transform:uppercase; font-size:15px; margin:0 0 4px; }
+  .sub { color:#7fb2d4; max-width:76ch; margin-bottom:20px; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th { text-align:left; color:#5f7aa0; font-size:10px; letter-spacing:.13em; text-transform:uppercase; padding:0 10px 8px 0; border-bottom:1px solid #1c2740; }
+  td { padding:9px 10px 9px 0; border-bottom:1px solid #101827; }
+  .nm { color:#cfe0f6; } .ex { color:#6f86ab; font-size:11px; }
+  .ok { color:#7fe3c4; font-weight:700; } .bad { color:#ff8a8a; font-weight:700; } .run { color:#f6a623; }
+  #verdict { margin:22px 0 8px; font-size:15px; }
+  .note { color:#6f86ab; font-size:11.5px; max-width:80ch; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:16px; padding:8px 14px; font:600 11px ui-monospace,monospace; cursor:pointer; margin-right:8px; }
+  button.sab { color:#ff9a9a; border-color:#5a2a2a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; GPU adjudicator &mdash; D3Q19</h1>
+  <div class="sub">This kernel was written where there was no GPU to run it on. Everything else in this engine's fluid work was measured against an exact answer before it was claimed; this could not be. So it is checked here, on <b>your</b> hardware, against the CPU solver that earned Hagen&ndash;Poiseuille to half a percent &mdash; and then asked to earn it again by itself.</div>
+  <div><button id="run">run the check</button><button id="sab" class="sab">sabotage the kernel</button></div>
+  <table><thead><tr><th style="width:50%">test</th><th style="width:26%">result</th><th style="width:14%">verdict</th></tr></thead><tbody id="rows"></tbody></table>
+  <div id="verdict"></div>
+  <div class="note" id="note"></div>
+</div>
+<script type="module">
+import { makeLBM3D } from "./simulation/lbm/lbm3d.js";
+// v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
+// AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
+// not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { LBM3D_WGSL } from "./simulation/lbm/lbm3dShader.js";
+import { W3, Q3 } from "./simulation/lbm/lbm3d.js";
+
+const NX = 20, NY = 20, NZ = 24, R = 5.0, TAU = 0.8, FZ = 2e-6;
+const cx = (NX-1)/2, cy = (NY-1)/2;
+const solidAt = (x, y) => Math.hypot(x - cx, y - cy) > R;      // the same pipe the CPU earned its paraboloid in
+let sabotage = false;
+const rowsEl = document.getElementById("rows");
+function row(name, exact) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = '<td><div class="nm">' + name + '</div><div class="ex">' + exact + "</div></td>" +
+                 '<td class="run">running&hellip;</td><td></td>';
+  rowsEl.appendChild(tr); return tr;
+}
+function settle(tr, text, ok) {
+  tr.children[1].className = ""; tr.children[1].textContent = text;
+  tr.children[2].innerHTML = '<span class="' + (ok ? "ok" : "bad") + '">' + (ok ? "AGREES" : "DISAGREES") + "</span>";
+  return ok;
+}
+async function gpuRun(steps) {
+  const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!_p.available) throw new Error(_p.message);
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error("no WebGPU adapter");
+  const dev = await adapter.requestDevice();
+  const n = NX * NY * NZ;
+  let src = LBM3D_WGSL;
+  // The sabotage: one weight, slightly wrong. This is what a mistyped constant would look like, and the whole point
+  // of the page is that you get to see whether the check notices.
+  if (sabotage) src = src.replace(W3[1].toFixed(10), (W3[1] * 1.02).toFixed(10));
+  const mod = dev.createShaderModule({ code: src });
+  const info = await mod.getCompilationInfo?.();
+  if (info) for (const m of info.messages) if (m.type === "error") throw new Error("WGSL: " + m.message);
+  const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const fBytes = n * Q3 * 4;
+  const mk = (sz, extra = 0) => dev.createBuffer({ size: sz, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | extra });
+  const fA = mk(fBytes), fB = mk(fBytes), sol = mk(n * 4), mom = mk(n * 16);
+  const init = new Float32Array(n * Q3);
+  for (let k = 0; k < n; k++) for (let i = 0; i < Q3; i++) init[k * Q3 + i] = W3[i];   // rest equilibrium: identical to the CPU
+  dev.queue.writeBuffer(fA, 0, init);
+  const sArr = new Uint32Array(n);
+  for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) sArr[(z*NY + y)*NX + x] = solidAt(x, y) ? 1 : 0;
+  dev.queue.writeBuffer(sol, 0, sArr);
+  const par = dev.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  dev.queue.writeBuffer(par, 0, new Uint32Array([NX, NY, NZ, 0]));
+  dev.queue.writeBuffer(par, 16, new Float32Array([0, 0, FZ, TAU]));
+  const bg = (a, b) => dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: a } }, { binding: 1, resource: { buffer: b } },
+    { binding: 2, resource: { buffer: sol } }, { binding: 3, resource: { buffer: mom } }, { binding: 4, resource: { buffer: par } }] });
+  const bgAB = bg(fA, fB), bgBA = bg(fB, fA);
+  const wg = [Math.ceil(NX/4), Math.ceil(NY/4), Math.ceil(NZ/4)];
+  for (let s = 0; s < steps; s++) {
+    const enc = dev.createCommandEncoder(); const p = enc.beginComputePass();
+    p.setPipeline(pipe); p.setBindGroup(0, s % 2 === 0 ? bgAB : bgBA);
+    p.dispatchWorkgroups(wg[0], wg[1], wg[2]); p.end();
+    dev.queue.submit([enc.finish()]);
+  }
+  const read = dev.createBuffer({ size: n * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const enc = dev.createCommandEncoder(); enc.copyBufferToBuffer(mom, 0, read, 0, n * 16);
+  dev.queue.submit([enc.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const out = new Float32Array(read.getMappedRange().slice(0));
+  read.unmap();
+  return out;   // rho, ux, uy, uz per cell
+}
+function cpuRun(steps) {
+  const m = makeLBM3D({ nx: NX, ny: NY, nz: NZ, tau: TAU, force: [0, 0, FZ], solidAt });
+  for (let s = 0; s < steps; s++) m.step();
+  return m;
+}
+document.getElementById("sab").onclick = (e) => {
+  sabotage = !sabotage;
+  e.target.textContent = sabotage ? "sabotage: ON (one weight is wrong)" : "sabotage the kernel";
+  e.target.style.color = sabotage ? "#ff6a6a" : "";
+};
+document.getElementById("run").onclick = async () => {
+  rowsEl.innerHTML = ""; document.getElementById("verdict").innerHTML = ""; document.getElementById("note").innerHTML = "";
+  const STEPS = 400;
+  let allOk = true;
+  const r1 = row("the GPU and the CPU are the same fluid", "same problem, same start, " + STEPS + " steps, compared cell by cell");
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const [gpu, cpu] = [await gpuRun(STEPS), cpuRun(STEPS)];
+    let maxU = 0, ref = 0;
+    for (let z = 0; z < NZ; z++) for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+      const k = (z*NY + y)*NX + x; if (cpu.solid[k]) continue;
+      maxU = Math.max(maxU, Math.abs(gpu[k*4+3] - cpu.uz[k]));
+      ref = Math.max(ref, Math.abs(cpu.uz[k]));
+    }
+    const rel = maxU / ref;
+    // f32 on the GPU against f64 on the CPU: they cannot agree bitwise, and pretending otherwise would be dishonest.
+    // 1% after 400 steps is loose enough for single precision and far too tight for a wrong weight.
+    allOk = settle(r1, "worst disagreement " + (rel*100).toFixed(4) + "% of peak speed", rel < 0.01) && allOk;
+    const r2 = row("the GPU earns Hagen-Poiseuille on its own", "u = A(R^2 - r^2), A must equal F/4nu");
+    await new Promise(r => setTimeout(r, 30));
+    const g2 = await gpuRun(3000);
+    let n=0, sx=0, sy=0, sxx=0, sxy=0;
+    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+      if (solidAt(x, y)) continue;
+      const k = (12*NY + y)*NX + x, r2v = (x-cx)**2 + (y-cy)**2, u = g2[k*4+3];
+      n++; sx += r2v; sy += u; sxx += r2v*r2v; sxy += r2v*u;
+    }
+    const A = -((n*sxy - sx*sy) / (n*sxx - sx*sx)), want = FZ / (4 * (TAU - 0.5) / 3);
+    const err = Math.abs(A - want) / want;
+    allOk = settle(r2, A.toExponential(3) + " vs " + want.toExponential(3) + " (" + (err*100).toFixed(1) + "%)", err < 0.08) && allOk;
+    document.getElementById("verdict").innerHTML = allOk
+      ? '<span class="ok">The GPU is running the same fluid.</span>'
+      : '<span class="bad">The GPU is NOT running the same fluid.</span>';
+    document.getElementById("note").innerHTML = sabotage
+      ? "Sabotage is ON &mdash; one weight in the kernel is 2% wrong. If the rows above are red, the check works. That is the only reason this button exists."
+      : (allOk ? "Single precision on the GPU against double on the CPU cannot agree bitwise, so the tolerance is 1% of peak speed &mdash; loose enough for f32, far too tight for a wrong constant. Press <b>sabotage</b> and run again to watch it fail."
+               : "Something real is wrong. Run with sabotage OFF to be sure it is not the deliberate corruption.");
+  } catch (e) {
+    settle(r1, e.message, false);
+    document.getElementById("verdict").innerHTML = '<span class="bad">Could not run: ' + e.message + "</span>";
+    document.getElementById("note").innerHTML = "WebGPU is needed here (Chrome or Edge). The CPU solver is unaffected and still runs everywhere.";
+  }
+};
+</script>
+</body>
+</html>

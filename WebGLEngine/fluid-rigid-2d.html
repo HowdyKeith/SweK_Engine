@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Fluid + Rigid (one-way coupling)</title>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; color:#dfe7f2; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; margin:auto; background:#04070f; display:block; cursor:crosshair; box-shadow:0 0 40px #0a1c28 inset; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:12px; align-items:center; flex-wrap:wrap; max-width:calc(100% - 28px); background:rgba(6,10,22,.66); border:1px solid #1a2440; border-radius:10px; padding:8px 13px; backdrop-filter:blur(6px); }
+  b.t { color:#5fe6d0; }
+  button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#0e1b1a; color:#8fe6d6; border:1px solid #245047; }
+  button:hover { background:#123028; } button.on { background:#1b3a33; color:#bff5e8; }
+  #stat { color:#7f93ab; }
+  #note { position:fixed; left:12px; bottom:10px; z-index:5; color:#5c7088; font-size:11px; background:rgba(6,10,22,.6); border:1px solid #16203a; border-radius:8px; padding:6px 10px; max-width:min(660px,92vw); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span><b class="t">SweK</b> &middot; fluid + rigid (one-way)</span>
+  <button id="box">drop box</button>
+  <button id="ball">drop ball</button>
+  <button id="reset">reset pool</button>
+  <button id="pause">pause</button>
+  <span id="stat"></span>
+</div>
+<div id="note"><b>Click anywhere</b> to drop a rigid body into the pool. Each body becomes a moving SOLID in the FLIP grid: the fluid's pressure solve enforces no-penetration, so the body splashes and displaces the water and the water flows around it. This is the verified 2D CPU foundation (<b>fluid/flip2d.mjs</b>, unit-tested: mass conserved, no particle trapped, surface displaced) for box3d rigid-fluid coupling. TWO-WAY is now live: the fluid pushes back, so light bodies (teal) float and heavy ones (amber) sink -- the float/sink threshold is at water density.</div>
+<script type="module">
+import { Flip2D, FLUID, SOLID } from "./fluid/flip2d.mjs";
+const NX = 64, NY = 64, CELL = 9;
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+cvs.width = NX * CELL; cvs.height = NY * CELL;
+const statEl = document.getElementById("stat");
+let paused = false, dropKind = "box";
+
+let sim;
+function reset() {
+  sim = new Flip2D(NX, NY, { iters: 50, flipRatio: 0.92, gravity: -22 });
+  let s = 7; const rng = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  sim.fillBlock(2, 2, NX - 2, NY * 0.42, 2, rng);   // resting pool, lower ~40%
+}
+reset();
+
+function drop(gx, gy) {
+  const density = 0.3 + Math.random() * 1.8;   // 0.3 (floats high) .. 2.1 (sinks); water density = 1
+  if (dropKind === "box") { const hw = 3.2 + Math.random() * 1.6, hh = 3.2 + Math.random() * 1.6; const b = sim.addBox(gx, gy, hw, hh, { angle: Math.random() * 0.8 - 0.4, omega: (Math.random() - 0.5) * 3 }); b.mass = density * 4 * hw * hh; b.density = density; }
+  else { const r = 3 + Math.random() * 2; const b = sim.addCircle(gx, gy, r, {}); b.mass = density * Math.PI * r * r; b.density = density; }
+  if (sim.bodies.length > 12) sim.bodies.shift();   // cap
+}
+
+// world (grid units) -> canvas pixels. grid y is up; canvas y is down.
+const px = gx => gx * CELL, py = gy => (NY - gy) * CELL;
+
+function render() {
+  ctx.fillStyle = "#04070f"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  // particles, colored teal->gold->white by speed
+  for (let k = 0; k < sim.count(); k++) {
+    const sp = Math.min(1, Math.hypot(sim.pvx[k], sim.pvy[k]) / 14);
+    let r, g, b;
+    if (sp < 0.5) { const t = sp * 2; r = 40 + t * 200; g = 150 + t * 50; b = 190 - t * 20; }
+    else { const t = (sp - 0.5) * 2; r = 240 + t * 15; g = 200 + t * 55; b = 90 + t * 165; }
+    ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`;
+    ctx.fillRect(px(sim.px[k]) - 1.5, py(sim.py[k]) - 1.5, 3, 3);
+  }
+  // rigid bodies, tinted by density: light (floats) teal, heavy (sinks) amber-red
+  for (const bd of sim.bodies) {
+    ctx.save(); ctx.translate(px(bd.x), py(bd.y));
+    const d = bd.density != null ? bd.density : 1;
+    const t = Math.max(0, Math.min(1, (d - 0.3) / 1.8));   // 0 light .. 1 heavy
+    const r = (90 + t * 150) | 0, g = (220 - t * 130) | 0, b = (205 - t * 150) | 0;
+    ctx.strokeStyle = `rgb(${r},${g},${b})`; ctx.fillStyle = `rgba(${r},${g},${b},0.18)`; ctx.lineWidth = 1.5;
+    if (bd.type === "circle") { ctx.beginPath(); ctx.arc(0, 0, bd.r * CELL, 0, 7); ctx.fill(); ctx.stroke(); }
+    else { ctx.rotate(-bd.angle); ctx.fillRect(-bd.hw * CELL, -bd.hh * CELL, bd.hw * 2 * CELL, bd.hh * 2 * CELL); ctx.strokeRect(-bd.hw * CELL, -bd.hh * CELL, bd.hw * 2 * CELL, bd.hh * 2 * CELL); }
+    ctx.restore();
+  }
+  statEl.textContent = sim.count().toLocaleString() + " particles \u00b7 " + sim.bodies.length + " bodies \u00b7 " + NX + "\u00d7" + NY;
+}
+
+function frame() {
+  if (!paused) { sim.step(1 / 60); sim.step(1 / 60); }   // 2 substeps for snappier interaction
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+cvs.addEventListener("pointerdown", e => {
+  const r = cvs.getBoundingClientRect();
+  const gx = (e.clientX - r.left) / CELL, gy = NY - (e.clientY - r.top) / CELL;
+  drop(Math.max(6, Math.min(NX - 6, gx)), Math.max(6, Math.min(NY - 2, gy)));
+});
+document.getElementById("box").onclick = () => { dropKind = "box"; };
+document.getElementById("ball").onclick = () => { dropKind = "ball"; };
+document.getElementById("reset").onclick = () => reset();
+const pb = document.getElementById("pause"); pb.onclick = () => { paused = !paused; pb.textContent = paused ? "play" : "pause"; pb.className = paused ? "on" : ""; };
+</script>
+</body>
+</html>

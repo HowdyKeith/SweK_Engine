@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Cameras</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.4 ui-rounded,system-ui,sans-serif; overflow:hidden; }
+  #bar { display:flex; align-items:center; gap:10px; padding:9px 13px; }
+  #clock { font-size:18px; font-weight:700; }
+  .badge { font-size:11px; padding:3px 9px; border-radius:7px; border:1px solid var(--line); color:var(--dim); }
+  .badge.live { color:var(--grn); border-color:#224a36; } .badge.off { color:var(--red); border-color:#5a2222; }
+  #bar .sp { flex:1; }
+  #bar select, #bar button { background:#0f161b; color:var(--dim); border:1px solid var(--line); border-radius:9px; padding:7px 10px; font:inherit; cursor:pointer; }
+  #grid { display:grid; gap:8px; padding:0 13px 14px; height:calc(100% - 50px); overflow:auto; align-content:start; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+  .cam { position:relative; background:#0b1012; border:1px solid var(--line); border-radius:12px; overflow:hidden; aspect-ratio:16/9; cursor:pointer; }
+  .cam iframe, .cam img { width:100%; height:100%; border:0; display:block; object-fit:cover; background:#000; }
+  .cam .nm { position:absolute; left:0; bottom:0; right:0; padding:5px 9px; font-size:12px; font-weight:600; background:linear-gradient(transparent,#000a); pointer-events:none; }
+  #msg { color:var(--dim); padding:24px 13px; font-size:14px; }
+  #msg a { color:var(--grn); }
+  /* expanded single */
+  #big { position:fixed; inset:0; background:#000e; display:none; z-index:60; }
+  #big.on { display:block; }
+  #big .wrap { position:absolute; inset:14px; border-radius:12px; overflow:hidden; }
+  #big iframe, #big img { width:100%; height:100%; border:0; background:#000; object-fit:contain; }
+  #big .x { position:absolute; top:22px; right:24px; z-index:61; background:#0f161bcc; color:#fff; border:1px solid var(--line); border-radius:9px; padding:8px 13px; font:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <span id="clock">--:--</span>
+    <span id="live" class="badge">…</span>
+    <span class="sp"></span>
+    <select id="mode" title="stream mode">
+      <option value="webrtc">Live (WebRTC)</option>
+      <option value="mse">MSE</option>
+      <option value="mjpeg">MJPEG</option>
+      <option value="snapshot">Snapshots</option>
+    </select>
+    <button id="full">⛶</button>
+    <button id="diag" title="Diagnose camera errors: reachability + the RTSP URL to test in VLC" style="font:inherit;background:#14241a;color:#9fe;border:1px solid #2a5a3a;border-radius:6px;padding:3px 10px;cursor:pointer;">🩺 Diagnose</button>
+  </div>
+  <div id="diagPanel" style="display:none;margin:6px 0;padding:10px 12px;border:1px solid #2a5a3a;background:#0c1712;border-radius:9px;font-size:12.5px;"></div>
+  <div id="msg" style="display:none;"></div>
+  <div id="ffbanner" style="display:none;margin:6px 0;padding:7px 10px;border:1px solid #6a5320;background:#241f10;color:#e8cf8a;border-radius:7px;font-size:12px;"></div>
+  <div id="shareBox" style="display:none;margin:6px 0;padding:8px 10px;border:1px solid #2a4060;background:#0e1620;border-radius:7px;font-size:12px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;"><b style="color:#9ed5ff;">Remote sharing</b> <span style="color:#7c93a8;font-size:11px;">which cameras through-tunnel visitors may view</span></div>
+    <div id="shareList" style="display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+  <div id="grid"></div>
+
+  <div id="big"><button class="x" id="bigX">✕ Close</button><div class="wrap" id="bigWrap"></div></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const G2 = location.protocol + "//" + location.hostname + ":1984";
+  let MODE = localStorage.getItem("swek.cams.mode") || "webrtc";
+  let cur = [], snapTimer = null;
+  // v1918 — are we a REMOTE (through-tunnel) viewer? go2rtc's :1984 isn't exposed through the tunnel, so
+  // remotes must use the same-origin /cam/* proxy on 8787, and only MJPEG/snapshot are proxyable (not
+  // WebRTC/MSE). We detect via /self/whoami and, if remote, force a proxyable mode + proxy URLs.
+  let IS_REMOTE = false;
+  fetch("/self/whoami",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+    if (j && j.remote) { IS_REMOTE = true; if (MODE!=="mjpeg" && MODE!=="snapshot") { MODE="mjpeg"; } try{ load(); }catch(e){} }
+    else { try{ loadShares(); }catch(e){} }   // host sees the sharing panel
+  }).catch(function(){});
+
+  // v1918 — host-only remote-sharing controls
+  function loadShares(){
+    fetch("/cam/shares",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.ok||!j.cameras||!j.cameras.length) return;
+      var box=document.getElementById("shareBox"), list=document.getElementById("shareList"); if(!box||!list) return;
+      box.style.display="block";
+      list.innerHTML=j.cameras.map(function(c){
+        var tag = c.internal ? " <span style='font-size:9px;padding:0 4px;border-radius:3px;background:#3a2410;color:#ffc078;border:1px solid #6a4a20'>internal/laptop cam</span>" : "";
+        return "<label style='display:flex;align-items:center;gap:7px;cursor:pointer'>"+
+          "<input type='checkbox' data-share='"+esc(c.name)+"' data-internal='"+(c.internal?"1":"")+"' "+(c.shared?"checked":"")+">"+
+          "<span style='color:#cfe'>"+esc(c.name)+"</span>"+tag+"</label>";
+      }).join("");
+      list.querySelectorAll("input[data-share]").forEach(function(cb){
+        cb.onchange=function(){
+          var name=cb.getAttribute("data-share"), on=cb.checked, internal=cb.getAttribute("data-internal")==="1";
+          function doShare(confirm){
+            fetch("/cam/share",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,on:on,confirm:confirm})}).then(function(r){return r.json();}).then(function(res){
+              if(res&&res.needConfirm){
+                if(window.confirm(res.message)) doShare(true); else { cb.checked=false; }
+              } else if(!(res&&res.ok)){ cb.checked=!on; alert((res&&res.error)||"failed"); }
+            }).catch(function(){ cb.checked=!on; });
+          }
+          doShare(false);
+        };
+      });
+    }).catch(function(){});
+  }
+
+  function playerHTML(name, big){
+    const enc = encodeURIComponent(name);
+    if (IS_REMOTE) {
+      // proxied through 8787 (works through the tunnel). Only image modes are available remotely.
+      if (MODE === "snapshot") return '<img data-snap="' + esc(name) + '" src="/cam/snapshot?src=' + enc + '&t=' + Date.now() + '" />';
+      return '<img src="/cam/mjpeg?src=' + enc + '" />';
+    }
+    if (MODE === "snapshot") return '<img data-snap="' + esc(name) + '" src="' + G2 + '/api/frame.jpeg?src=' + enc + '&t=' + Date.now() + '" />';
+    if (MODE === "mjpeg") return '<img src="' + G2 + '/api/stream.mjpeg?src=' + enc + '" />';
+    return '<iframe allow="autoplay" src="' + G2 + '/stream.html?src=' + enc + '&mode=' + MODE + (big?'':'&controls=0') + '"></iframe>';
+  }
+
+  function render(){
+    if (snapTimer) { clearInterval(snapTimer); snapTimer = null; }
+    if (!cur.length) { $("grid").innerHTML = ""; return; }
+    $("grid").innerHTML = cur.map(n => '<div class="cam" data-cam="' + esc(n) + '">' + playerHTML(n, false) + '<div class="nm">' + esc(n) + '</div></div>').join("");
+    $("grid").querySelectorAll(".cam").forEach(c => c.onclick = () => openBig(c.getAttribute("data-cam")));
+    if (MODE === "snapshot") snapTimer = setInterval(() => { document.querySelectorAll('#grid img[data-snap]').forEach(im => { const n = im.getAttribute("data-snap"); im.src = (IS_REMOTE ? "/cam/snapshot?src=" : (G2 + "/api/frame.jpeg?src=")) + encodeURIComponent(n) + "&t=" + Date.now(); }); }, 2000);
+  }
+
+  let bigSnap = null;
+  function openBig(name){
+    $("bigWrap").innerHTML = playerHTML(name, true);
+    $("big").classList.add("on");
+    if (MODE === "snapshot") { if (bigSnap) clearInterval(bigSnap); bigSnap = setInterval(() => { const im = $("bigWrap").querySelector("img[data-snap]"); if (im) im.src = G2 + "/api/frame.jpeg?src=" + encodeURIComponent(name) + "&t=" + Date.now(); }, 1000); }
+  }
+  $("bigX").onclick = () => { $("big").classList.remove("on"); $("bigWrap").innerHTML = ""; if (bigSnap) { clearInterval(bigSnap); bigSnap = null; } };
+
+  // v1960 — camera diagnostics: read the go2rtc config (has each camera's rtsp:// URL), TCP-probe each
+  // to split "network/IP timeout" from "auth/path (DESCRIBE)" errors, and surface the exact URL to VLC-test.
+  function parseStreams(yaml){
+    const out = []; if (!yaml) return out;
+    let inStreams = false;
+    yaml.split(/\r?\n/).forEach(line => {
+      if (/^streams:/.test(line)) { inStreams = true; return; }
+      if (inStreams) {
+        if (/^\S/.test(line)) inStreams = false;
+        else { const m = line.match(/^\s+([A-Za-z0-9_-]+):\s*(.+)$/); if (m && !m[2].startsWith("#")) out.push({ name: m[1], url: m[2].trim() }); }
+      }
+    });
+    return out;
+  }
+  document.getElementById("diag").onclick = async function(){
+    const panel = document.getElementById("diagPanel");
+    panel.style.display = "block"; panel.innerHTML = "reading go2rtc config…";
+    let cfg = null; try { cfg = await (await fetch("/go2rtc/config", { cache:"no-store" })).json(); } catch {}
+    const cams = parseStreams(cfg && cfg.yaml);
+    if (!cams.length) { panel.innerHTML = 'No cameras in the go2rtc config. Add them in <a href="/cloudedge.html">camera setup</a>.'; return; }
+    panel.innerHTML = '<div style="margin-bottom:7px"><b>🩺 Camera diagnostics</b> · <button id="g2r" style="font:inherit;font-size:11.5px;background:#241f10;color:#e8cf8a;border:1px solid #6a5320;border-radius:5px;padding:2px 8px;cursor:pointer">restart go2rtc</button></div>';
+    document.getElementById("g2r").onclick = function(){ this.textContent="restarting\u2026"; fetch("/go2rtc/restart",{method:"POST"}).then(()=>setTimeout(load,2500)); };
+    for (const c of cams) {
+      const row = document.createElement("div");
+      row.style.cssText = "margin:7px 0;padding:7px 9px;border:1px solid #1d3a2b;border-radius:7px;";
+      const safeUrl = c.url.replace(/\/\/([^:]+):([^@]+)@/, "//$1:****@");
+      row.innerHTML = '<b style="color:#cfe">'+c.name+'</b> <span class="pv" style="color:#8ab89e;font-size:11px">probing\u2026</span>'+
+        '<div style="font:11px ui-monospace,monospace;color:#9fd6ff;margin-top:3px;word-break:break-all">'+safeUrl+' <button data-copy="'+encodeURIComponent(c.url)+'" style="font:inherit;font-size:10px;background:#0c1712;color:#8effc4;border:1px solid #2a5a3a;border-radius:4px;padding:1px 6px;cursor:pointer">copy for VLC</button></div>';
+      panel.appendChild(row);
+      try {
+        const r = await (await fetch("/go2rtc/probe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:c.url})})).json();
+        const ok = r && r.reachable;
+        row.querySelector(".pv").outerHTML = '<span style="font-size:11px;color:'+(ok?"#8fefc0":"#ff9b8a")+'">'+(ok?"\u25cf reachable ("+r.ms+"ms)":"\u25cf unreachable")+'</span>'+
+          '<div style="font-size:11.5px;color:'+(ok?"#8fb89e":"#e8b48a")+';margin-top:3px">'+(r&&r.verdict||"")+'</div>';
+      } catch(e){ const pv=row.querySelector(".pv"); if(pv) pv.textContent = "probe failed"; }
+    }
+    panel.addEventListener("click", function(e){ const b=e.target.closest("button[data-copy]"); if(!b) return; try{ navigator.clipboard.writeText(decodeURIComponent(b.getAttribute("data-copy"))); b.textContent="copied"; }catch(_){}});
+  };
+
+  async function load(){
+    let st = null; try { st = await (await fetch("/go2rtc/status", { cache:"no-store" })).json(); } catch {}
+    let s = null; try { s = await (await fetch("/go2rtc/streams", { cache:"no-store" })).json(); } catch {}
+    const b = $("live");
+    if (!st || !st.running) { b.textContent = "go2rtc offline"; b.className = "badge off"; }
+    else { const n = (s && s.streams || []).length; b.textContent = n + " stream" + (n===1?"":"s"); b.className = "badge live"; }
+
+    const names = (s && s.streams) || [];
+    if (!st || !st.running) { $("msg").style.display = "block"; $("msg").innerHTML = 'go2rtc isn\'t running. <button id="g2start" style="font:inherit;padding:2px 10px;background:#14241a;color:#9fe;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer">Start it now</button> &middot; or from <a href="/cloudedge.html">camera setup</a>.'; $("grid").innerHTML = ""; cur = [];
+      var _gs = document.getElementById("g2start"); if (_gs) _gs.onclick = function(){ _gs.textContent = "starting\u2026"; _gs.disabled = true;
+        // ensure = install (if Auto-Install on) + start; falls back to plain start if already installed
+        fetch("/go2rtc/ensure", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" }).then(function(r){return r.json();}).then(function(j){
+          if (j && (j.ok || j.installing || j.started)) { var tries=0; var iv=setInterval(function(){ tries++; load(); if (tries>15) clearInterval(iv); }, 1500); }
+          else { _gs.disabled=false; _gs.textContent="Start it now"; $("msg").innerHTML += '<div style="color:#f88;margin-top:5px">'+((j&&j.error)||"couldn\'t start")+'</div>'; }
+        }).catch(function(e){ _gs.disabled=false; _gs.textContent="Start it now"; }); };
+      return; }
+    if (!names.length) { $("msg").style.display = "block"; $("msg").innerHTML = 'No streams yet. Add cameras in <a href="/cloudedge.html">camera setup</a> (CloudEdge/RTSP/ONVIF) — they\'ll appear here.'; $("grid").innerHTML = ""; cur = []; return; }
+    $("msg").style.display = "none";
+    ffmpegCheck();   // v1900 — some streams need ffmpeg (ffmpeg: sources); ensure it's present
+    // only rebuild if the set changed (avoid tearing down live players)
+    if (names.join("|") !== cur.join("|")) { cur = names; render(); }
+  }
+
+  // v1900 — ffmpeg self-heal for the wall. A stream that uses an ffmpeg: source (transcode) fails
+  // with "exec ffmpeg: not found" when ffmpeg is missing. Detect that here and either auto-install
+  // (when Auto-Install is on) or offer a one-click install button. Runs once per page unless missing.
+  var _ffOk = false, _ffBusy = false;
+  function ffDone(ban){
+    // ffmpeg just became available. go2rtc only sees it on a fresh start (PATH is read at launch), so
+    // restart go2rtc, then reload the wall so the ffmpeg-backed cameras retry.
+    if (ban) { ban.style.display = "block"; ban.style.borderColor = "#2a5a3a"; ban.style.background = "#122016"; ban.style.color = "#9fe8b8"; ban.textContent = "\u2713 ffmpeg ready \u2014 restarting go2rtc + reloading cameras\u2026"; }
+    cur = [];   // force render() to rebuild the players
+    fetch("/go2rtc/restart", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" }).then(function(r){return r.json();}).catch(function(){}).then(function(){
+      // give go2rtc a moment to bind again, then reload + clear
+      setTimeout(function(){ load(); if (ban) setTimeout(function(){ ban.style.display = "none"; }, 2500); }, 2500);
+    });
+  }
+  function ffFail(ban, msg){
+    _ffOk = false; _ffBusy = false;
+    if (!ban) return;
+    ban.style.display = "block"; ban.style.borderColor = "#6a3020"; ban.style.background = "#241410"; ban.style.color = "#f0b090";
+    ban.innerHTML = "\u26a0 ffmpeg install didn't complete: " + String(msg || "unknown").replace(/[<>&]/g,"") +
+      ' <button id="ffretry" style="font:inherit;padding:2px 10px;background:#2a2410;color:#ffd98a;border:1px solid #6a5320;border-radius:5px;cursor:pointer;margin-left:6px">Retry</button>' +
+      '<div style="margin-top:5px;color:#c99;font-size:11px">Or install it yourself in Terminal: <code>brew install ffmpeg</code> then reload this page.</div>';
+    var rb = document.getElementById("ffretry"); if (rb) rb.onclick = function(){ ban.style.display="none"; fetch("/ffmpeg/ensure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({force:true})}).then(function(){ setTimeout(ffmpegCheck, 1200); }); };
+  }
+  async function ffmpegCheck(){
+    if (_ffOk || _ffBusy) return;
+    var ban = document.getElementById("ffbanner"); if (!ban) return;
+    let f = null; try { f = await (await fetch("/ffmpeg/status", { cache:"no-store" })).json(); } catch {}
+    if (f && f.installed) { _ffOk = true; ffDone(ban); return; }
+    // install reported an error (e.g. timed out, or Homebrew not found) -> stop looping, show it + a retry
+    if (f && f.state && !f.state.installing && f.state.lastErr) { ffFail(ban, f.state.lastErr); return; }
+    if (f && f.state && f.state.installing) { ban.style.display = "block"; ban.textContent = "Installing ffmpeg\u2026 (needed for some camera streams) \u2014 can take several minutes (longer on older Macs that build from source)."; _ffBusy = true; setTimeout(function(){ _ffBusy=false; ffmpegCheck(); }, 6000); return; }
+    // missing + not installing -> ask the bridge to ensure (auto-installs if Auto-Install is on)
+    _ffBusy = true;
+    let e = null; try { e = await (await fetch("/ffmpeg/ensure", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{}" })).json(); } catch {}
+    _ffBusy = false;
+    if (e && e.installed) { _ffOk = true; ffDone(ban); return; }
+    if (e && e.installing) { ban.style.display = "block"; ban.textContent = "Installing ffmpeg\u2026 (needed for some camera streams) \u2014 can take several minutes (longer on older Macs that build from source)."; _ffBusy = true; setTimeout(function(){ _ffBusy=false; ffmpegCheck(); }, 6000); return; }
+    // Auto-Install is off -> one-click button
+    ban.style.display = "block";
+    ban.innerHTML = '\u26a0 Some cameras need <b>ffmpeg</b> to transcode, and it isn\'t installed. <button id="ffinstall" style="font:inherit;padding:2px 10px;background:#2a2410;color:#ffd98a;border:1px solid #6a5320;border-radius:5px;cursor:pointer">Install ffmpeg</button>';
+    var bi = document.getElementById("ffinstall"); if (bi) bi.onclick = function(){ bi.textContent = "installing\u2026"; bi.disabled = true;
+      fetch("/ffmpeg/ensure", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ force:true }) }).then(function(r){return r.json();}).then(function(j){
+        if (j && (j.installed || j.installing)) { ban.textContent = "Installing ffmpeg\u2026 (this can take a minute) \u2014 the affected cameras will start once it finishes."; var t=0; var iv=setInterval(function(){ t++; fetch("/ffmpeg/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(s){ if (s&&s.installed){ clearInterval(iv); _ffOk=true; ffDone(ban); } else if (t>40){ clearInterval(iv); ban.textContent="ffmpeg still installing or failed \u2014 check Auto-Install in Settings."; } }); }, 3000); }
+        else { bi.disabled=false; bi.textContent="Install ffmpeg"; ban.innerHTML += '<div style="color:#f88;margin-top:5px">'+((j&&j.error)||"install failed")+'</div>'; }
+      }).catch(function(e){ bi.disabled=false; bi.textContent="Install ffmpeg"; });
+    };
+  }
+
+  $("mode").value = MODE;
+  $("mode").onchange = () => { MODE = $("mode").value; localStorage.setItem("swek.cams.mode", MODE); render(); };
+  $("full").onclick = () => { try { (document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen).call(document.documentElement); } catch {} };
+  function tick(){ $("clock").textContent = new Date().toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }); } tick(); setInterval(tick, 10000);
+  let wl=null; async function wake(){ try { if ("wakeLock" in navigator) wl = await navigator.wakeLock.request("screen"); } catch {} }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState==="visible") wake(); }); document.addEventListener("click", () => { if (!wl) wake(); }); wake();
+
+  load(); setInterval(load, 15000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Endless Sky</title>
+<style>
+  :root { --bg:#080b12; --panel:#0d1220; --line:#1e2a44; --ink:#d8e4f5; --dim:#7d8fa8;
+          --go:#7cc6ff; --cy:#5ad6ff; --warn:#ffc04e; --err:#ff5a5a; --ok:#4ade80; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:15px; margin:0; color:var(--go); letter-spacing:.4px; }
+  header h1 small { color:var(--dim); font-weight:normal; letter-spacing:0; }
+  main { padding:16px; max-width:1000px; }
+  section { border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:12px 14px; margin-bottom:14px; }
+  h2 { font-size:12px; margin:0 0 8px; color:var(--cy); letter-spacing:.4px; text-transform:uppercase; }
+  p { margin:6px 0; }
+  .dim { color:var(--dim); }
+  a.btn, button { font:11px ui-monospace,monospace; padding:4px 11px; border-radius:5px; cursor:pointer;
+                  background:#152136; color:#b9d4ff; border:1px solid #2f486c; text-decoration:none; display:inline-block; }
+  a.btn.go, button.go { background:#10261c; color:#9fe6c0; border-color:#2a6a4a; }
+  button:disabled { opacity:.5; cursor:default; }
+  input[type=text] { background:#070c15; border:1px solid var(--line); border-radius:5px; color:var(--ink);
+                     font:11px ui-monospace,monospace; padding:5px 8px; min-width:340px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  table { border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  td, th { padding:3px 12px 3px 0; text-align:left; }
+  th { color:var(--dim); font-weight:normal; }
+  b.num { color:#9fe6c0; font-weight:normal; }
+  pre { background:#050810; border:1px solid var(--line); border-radius:6px; padding:8px 10px;
+        font-size:10.5px; max-height:280px; overflow:auto; white-space:pre; margin:8px 0 0; }
+  .warn { color:var(--warn); } .err { color:var(--err); } .ok { color:var(--ok); }
+  .pill { font-size:10px; padding:1px 7px; border-radius:9px; border:1px solid var(--line); color:var(--dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#128640; Endless Sky <small>&mdash; flown by SweK's clean-room EV engine</small></h1>
+</header>
+
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p>
+    Endless Sky's data, loaded through the same engine that flies Escape Velocity. The adapter parses ES's
+    text data and emits the <em>identical</em> <code>uni</code> graph that <code>evData.js</code> produces, so
+    <code>galaxyMap.js</code>, <code>systemView.js</code>, <code>flightView.js</code> and <code>combat.js</code>
+    fly it with no engine changes.
+  </p>
+  <p class="dim">
+    Endless Sky is GPLv3 and its data and art are freely redistributable. <b>These modules ship no game content</b>
+    &mdash; they transform files you supply. Ship art loads from the ES repo's raw images by default; set
+    <code>window.ES_IMAGES_BASE</code> to run fully offline.
+  </p>
+  <div class="row" style="margin-top:10px">
+    <a class="btn go" href="/ev.html">Fly it in Stellar Atlas &#8599;</a>
+    <a class="btn" href="/README-endless-sky.md" download>README-endless-sky.md</a>
+    <a class="btn" id="dlUniverse" href="/es-universe.json" download>es-universe.json</a>
+    <span class="pill" id="uniSize">&mdash;</span>
+  </div>
+  <p class="dim" style="margin-top:8px">
+    Drop <code>es-universe.json</code> on <code>ev.html</code> for an instant galaxy, or drop the raw ES
+    <code>data/</code> <code>.txt</code> files and let the adapter parse them live. Either works &mdash; and either
+    works from inside a <code>.zip</code>.
+  </p>
+</section>
+
+<section>
+  <h2>The baked galaxy</h2>
+  <div id="statusBox" class="dim">checking&hellip;</div>
+  <table id="countsTbl" style="display:none"><tbody></tbody></table>
+</section>
+
+<section>
+  <h2>Build the universe (node baker)</h2>
+  <p class="dim">
+    Runs <code>node es-build.mjs &lt;data dir&gt; es-universe.json</code> on the SweK server. Point it at a clone of
+    <code>endless-sky/data</code>. The bake writes to a temp file and only swaps in on success, so a failed build
+    never destroys a working galaxy.
+  </p>
+  <div class="row" style="margin-bottom:8px">
+    <button id="installBtn">&#11015; Install Endless Sky data</button>
+    <input type="text" id="esRef" value="master" title="git branch or tag" style="min-width:90px;width:110px">
+    <span id="installStat" class="dim"></span>
+  </div>
+  <div id="installNote" class="dim" style="font-size:10.5px;margin-bottom:8px">
+    Streams the ES source tarball from GitHub and extracts only <code>data/**.txt</code> (~10&nbsp;MB of text out of a
+    ~350&nbsp;MB download &mdash; GitHub offers no smaller listing-free archive). No token needed. Endless Sky is GPLv3
+    and its data is freely redistributable; <b>nothing ships with SweK</b>. On success the path below is filled in for you.
+  </div>
+  <div class="row">
+    <input type="text" id="dataDir" placeholder="/path/to/endless-sky/data  (or C:\endless-sky\data)">
+    <button class="go" id="buildBtn">Build universe</button>
+    <span id="buildStat" class="dim"></span>
+  </div>
+  <div id="buildErr" class="err" style="margin-top:6px"></div>
+  <pre id="buildLog" style="display:none"></pre>
+</section>
+
+<section>
+  <h2>Plugins</h2>
+  <p class="dim">
+    There are hundreds of Endless Sky plugins &mdash; ships, visual packs, and full story overhauls. SweK doesn't
+    try to be a plugin browser. <b>Find them at the community's own indexes</b>, then paste the GitHub repo here:
+  </p>
+  <div class="row" style="margin:8px 0">
+    <a class="btn" href="https://endless-sky.github.io/plugins.html" target="_blank" rel="noopener">Official plugin list &#8599;</a>
+    <a class="btn" href="https://github.com/EndlessSkyCommunity/awesome-endless-sky" target="_blank" rel="noopener">awesome-endless-sky &#8599;</a>
+  </div>
+  <div class="row">
+    <input type="text" id="pluginRepo" placeholder="owner/name  or  https://github.com/zuckung/endless-sky-plugins">
+    <input type="text" id="pluginRef" value="main" style="min-width:80px;width:90px" title="branch (falls back to master)">
+    <button id="pluginBtn">Install plugin repo</button>
+    <span id="pluginStat" class="dim"></span>
+  </div>
+  <div class="dim" style="font-size:10.5px;margin-top:6px">
+    Extracts only <code>*/data/**.txt</code> &mdash; plugin art is <b>not downloaded</b> (a plugin repo tarball runs to
+    hundreds of MB and is almost all images). Instead, plugin ships <b>stream their sprites straight from the plugin's
+    GitHub repo</b>, exactly as base-game art already does. A plugin marked <code>art</code> below gets its image root
+    registered ahead of the base game, so its ships render. Plugins marked <code>no art</code> are data-only.
+  </div>
+  <div id="pluginList" style="margin-top:10px"></div>
+</section>
+
+<section>
+  <h2>Coverage &mdash; what the adapter ignores</h2>
+  <p class="dim">
+    The adapter consumes a fixed set of ES root node types and drops the rest silently. This is the measured
+    inventory, baked into the universe by <code>ev/esCoverage.js</code>. An ignored type is only a problem if you
+    wanted it &mdash; but you should get to know.
+  </p>
+  <div id="covBox" class="dim">checking&hellip;</div>
+  <pre id="covOut" style="display:none"></pre>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n) { return (n == null) ? "—" : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); };
+
+  function noServer(where) {
+    where.className = "warn";
+    where.textContent = "the SweK server (port 8787) isn't serving /es/* — open this page from the bridge, "
+                      + "or run the baker from a terminal: node es-build.mjs <data dir> es-universe.json";
+  }
+
+  function renderStatus(s) {
+    var box = $("statusBox");
+    if (!s.present) { box.className = "warn"; box.textContent = "no es-universe.json yet — build one below."; return; }
+    box.className = "";
+    box.innerHTML = '<span class="ok">present</span> · ' + fmt(Math.round(s.bytes / 1024)) + ' KB'
+      + (s.source ? ' · source <b class="num">' + s.source + '</b>' : '');
+    $("uniSize").textContent = fmt(Math.round(s.bytes / 1024)) + " KB";
+    if (s.counts) {
+      var tb = $("countsTbl").querySelector("tbody");
+      tb.innerHTML = "";
+      Object.keys(s.counts).forEach(function (k) {
+        var tr = document.createElement("tr");
+        tr.innerHTML = '<th>' + k + '</th><td><b class="num">' + fmt(s.counts[k]) + '</b></td>';
+        tb.appendChild(tr);
+      });
+      $("countsTbl").style.display = "";
+    }
+  }
+
+  function renderCoverage(c) {
+    var box = $("covBox"), out = $("covOut");
+    if (!c.ok) { box.className = "warn"; box.textContent = c.error || "no universe to measure — build one."; return; }
+    if (!c.measured) {
+      box.className = "warn";
+      box.textContent = c.note || "this universe was baked before the coverage reporter existed — rebake to measure.";
+      return;
+    }
+    var r = c.coverage;
+    box.className = "";
+    box.innerHTML = '<b class="num">' + r.handledTotal + '</b>/' + r.total + ' root nodes consumed ('
+                  + r.pctHandled.toFixed(1) + '%) — <b class="num">' + r.unknownTotal + '</b> ignored';
+    var L = [];
+    L.push("consumed        count");
+    r.handled.forEach(function (h) { L.push(pad(h.type, 16) + String(h.count).padStart(5)); });
+    if (r.unknown.length) {
+      L.push("");
+      L.push("IGNORED root types — present in the data, never loaded:");
+      r.unknown.forEach(function (u) { L.push(pad(u.type, 16) + String(u.count).padStart(5)); });
+    } else { L.push(""); L.push("no ignored root types in this data set."); }
+    if (r.missionChildUnknown && r.missionChildUnknown.length) {
+      L.push("");
+      L.push("ignored keys INSIDE mission blocks:");
+      r.missionChildUnknown.forEach(function (m) { L.push(pad(m.type, 16) + String(m.count).padStart(5)); });
+    }
+    out.textContent = L.join("\n"); out.style.display = "block";
+  }
+  function pad(s, n) { s = String(s); while (s.length < n) s += " "; return s; }
+
+  function refresh() {
+    fetch("/es/status", { cache: "no-store" }).then(function (r) { return r.json(); })
+      .then(renderStatus).catch(function () { noServer($("statusBox")); });
+    fetch("/es/coverage", { cache: "no-store" }).then(function (r) { return r.json(); })
+      .then(renderCoverage).catch(function () { noServer($("covBox")); });
+  }
+  refresh();
+
+  $("installBtn").onclick = function () {
+    var btn = $("installBtn"), stat = $("installStat");
+    var ref = ($("esRef").value || "master").trim();
+    btn.disabled = true;
+    var t0 = Date.now();
+    var tick = setInterval(function () { stat.textContent = "downloading… " + Math.round((Date.now() - t0) / 1000) + "s"; }, 500);
+    // A ~350MB tarball on a slow link can take minutes; do not abort from the client.
+    fetch("/es/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ref: ref }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { stat.innerHTML = '<span class="err">✕ ' + (d.error || "install failed") + '</span>'; return; }
+        $("dataDir").value = d.dataDir;                       // hand the path straight to Build
+        stat.innerHTML = '<span class="ok">installed ' + fmt(d.files) + ' files (' + fmt(d.kb) + ' KB) in '
+                       + (d.ms / 1000).toFixed(1) + 's</span> — now click <b>Build universe</b>';
+      })
+      .catch(function (e) { stat.innerHTML = '<span class="err">✕ can\'t reach /es/install — ' + ((e && e.message) || e) + '</span>'; })
+      .then(function () { clearInterval(tick); btn.disabled = false; });
+  };
+
+  function renderPlugins(list) {
+    var box = $("pluginList");
+    if (!list.length) { box.innerHTML = '<span class="dim">no plugins installed yet.</span>'; return; }
+    box.innerHTML = '<div class="dim" style="font-size:10.5px;margin-bottom:4px">tick the plugins to layer into the next build (they load AFTER the base, so their definitions win):</div>'
+      + list.map(function (p) {
+          return '<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0;font-size:11px">'
+               + '<input type="checkbox" class="plugPick" value="' + p.name + '">'
+               + '<span>' + p.name + ' <span class="dim">(' + p.files + ' files' + (p.hasImages ? ', art' : ', no art') + ')</span></span></label>';
+        }).join("");
+  }
+  function refreshPlugins() {
+    fetch("/es/plugins", { cache: "no-store" }).then(function (r) { return r.json(); })
+      .then(function (d) { renderPlugins((d && d.plugins) || []); })
+      .catch(function () { $("pluginList").innerHTML = '<span class="warn">/es/plugins unreachable</span>'; });
+  }
+  refreshPlugins();
+
+  $("pluginBtn").onclick = function () {
+    var btn = $("pluginBtn"), stat = $("pluginStat");
+    var repo = ($("pluginRepo").value || "").trim();
+    var ref = ($("pluginRef").value || "main").trim();
+    if (!repo) { stat.innerHTML = '<span class="err">paste a GitHub repo</span>'; return; }
+    btn.disabled = true;
+    var t0 = Date.now();
+    var tick = setInterval(function () { stat.textContent = "downloading\u2026 " + Math.round((Date.now() - t0) / 1000) + "s"; }, 500);
+    fetch("/es/plugins/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repo: repo, ref: ref }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { stat.innerHTML = '<span class="err">\u2715 ' + (d.error || "install failed") + '</span>'; return; }
+        stat.innerHTML = '<span class="ok">' + d.plugins.length + ' plugin(s) from ' + d.repo + '@' + d.ref
+                       + ' in ' + (d.ms / 1000).toFixed(1) + 's</span> <span class="dim">(' + fmt(d.downloadKb) + ' KB downloaded, data only)</span>';
+        refreshPlugins();
+      })
+      .catch(function (e) { stat.innerHTML = '<span class="err">\u2715 ' + ((e && e.message) || e) + '</span>'; })
+      .then(function () { clearInterval(tick); btn.disabled = false; });
+  };
+
+  $("buildBtn").onclick = function () {
+    var dir = ($("dataDir").value || "").trim();
+    var btn = $("buildBtn"), stat = $("buildStat"), err = $("buildErr"), log = $("buildLog");
+    err.textContent = ""; log.style.display = "none"; log.textContent = "";
+    if (!dir) { err.textContent = "enter the path to the Endless Sky data folder"; return; }
+    btn.disabled = true;
+    var t0 = Date.now();
+    var tick = setInterval(function () { stat.textContent = "baking… " + Math.round((Date.now() - t0) / 1000) + "s"; }, 500);
+    // a full ES bake is minutes; do not abort it from the client.
+    fetch("/es/build", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dataDir: dir, plugins: Array.prototype.map.call(document.querySelectorAll(".plugPick:checked"), function (c) { return c.value; }) }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          err.textContent = "✕ " + (d.error || "build failed");
+          if (d.log) { log.textContent = d.log; log.style.display = "block"; }
+          stat.textContent = "";
+          return;
+        }
+        stat.innerHTML = '<span class="ok">built in ' + (d.ms / 1000).toFixed(1) + 's</span> · '
+                       + fmt(d.txtFiles) + ' .txt files → ' + fmt(d.kb) + ' KB';
+        if (d.log) { log.textContent = d.log; log.style.display = "block"; }
+        refresh();
+      })
+      .catch(function (e) { err.textContent = "✕ can't reach /es/build — " + ((e && e.message) || e); stat.textContent = ""; })
+      .then(function () { clearInterval(tick); btn.disabled = false; });
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "swek-gate-plan",
+  "producedBy": "cli/planSnapshot",
+  "producedAt": "2026-08-01T18:52:45.540Z",
+  "inputs": {
+    "timings": "/home/claude/e3/SweK_Engine_v3285/WebGLEngine/tools/ship/gate-timings.json"
+  },
+  "observations": [
+    {
+      "budgetSeconds": 20,
+      "selected": 32,
+      "total": 651,
+      "spentMs": 19999,
+      "reachable": 66,
+      "directlyTests": 6,
+      "missedReachable": 40,
+      "guessedCost": 2,
+      "firstTen": [
+        "physics/proposers-selfcheck.mjs",
+        "tools/roundhouse/isingGpu-selfcheck.mjs",
+        "physics/statmech/tempering-selfcheck.mjs",
+        "physics/statmech/wolff-selfcheck.mjs",
+        "physics/statmech/ising-selfcheck.mjs",
+        "tools/fingerprint/observableCompare-selfcheck.mjs",
+        "tools/roundhouse/kerrIscoKey-selfcheck.mjs",
+        "tools/roundhouse/inspiral-selfcheck.mjs",
+        "tools/roundhouse/blobKelvinBind-selfcheck.mjs",
+        "tools/roundhouse/assumptions-selfcheck.mjs"
+      ],
+      "missedReachableNames": [
+        "ai-bridge/fingerprintBridge-selfcheck.mjs",
+        "physics/consistency-selfcheck.mjs",
+        "physics/statmech/binderBudget-selfcheck.mjs",
+        "tools/caseStudy-selfcheck.mjs",
+        "tools/fingerprint/peerReport-selfcheck.mjs",
+        "tools/roundhouse/airyRefined-selfcheck.mjs",
+        "tools/roundhouse/airySlitAdoption-selfcheck.mjs",
+        "tools/roundhouse/corroborate-selfcheck.mjs"
+      ]
+    },
+    {
+      "budgetSeconds": 60,
+      "selected": 57,
+      "total": 651,
+      "spentMs": 59963,
+      "reachable": 66,
+      "directlyTests": 6,
+      "missedReachable": 16,
+      "guessedCost": 19,
+      "firstTen": [
+        "physics/proposers-selfcheck.mjs",
+        "tools/roundhouse/isingGpu-selfcheck.mjs",
+        "physics/statmech/tempering-selfcheck.mjs",
+        "physics/statmech/wolff-selfcheck.mjs",
+        "physics/statmech/ising-selfcheck.mjs",
+        "physics/statmech/binderBudget-selfcheck.mjs",
+        "tools/fingerprint/observableCompare-selfcheck.mjs",
+        "tools/roundhouse/kerrIscoKey-selfcheck.mjs",
+        "tools/roundhouse/inspiral-selfcheck.mjs",
+        "tools/roundhouse/blobKelvinBind-selfcheck.mjs"
+      ],
+      "missedReachableNames": [
+        "ai-bridge/fingerprintBridge-selfcheck.mjs",
+        "physics/consistency-selfcheck.mjs",
+        "tools/fingerprint/peerReport-selfcheck.mjs",
+        "tools/roundhouse/airyRefined-selfcheck.mjs",
+        "tools/roundhouse/airySlitAdoption-selfcheck.mjs",
+        "tools/roundhouse/corroborate-selfcheck.mjs",
+        "tools/roundhouse/errorPairAudit-selfcheck.mjs",
+        "tools/roundhouse/escapeBudget-selfcheck.mjs"
+      ]
+    },
+    {
+      "budgetSeconds": 180,
+      "selected": 229,
+      "total": 651,
+      "spentMs": 179921,
+      "reachable": 66,
+      "directlyTests": 6,
+      "missedReachable": 5,
+      "guessedCost": 19,
+      "firstTen": [
+        "physics/proposers-selfcheck.mjs",
+        "tools/roundhouse/isingGpu-selfcheck.mjs",
+        "physics/statmech/tempering-selfcheck.mjs",
+        "physics/statmech/wolff-selfcheck.mjs",
+        "physics/statmech/ising-selfcheck.mjs",
+        "physics/statmech/binderBudget-selfcheck.mjs",
+        "tools/fingerprint/observableCompare-selfcheck.mjs",
+        "tools/roundhouse/kerrIscoKey-selfcheck.mjs",
+        "tools/roundhouse/inspiral-selfcheck.mjs",
+        "tools/roundhouse/blobKelvinBind-selfcheck.mjs"
+      ],
+      "missedReachableNames": [
+        "tools/roundhouse/airyRefined-selfcheck.mjs",
+        "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+        "tools/roundhouse/pipeFlowKey-selfcheck.mjs",
+        "tools/roundhouse/thermalScaling-selfcheck.mjs",
+        "tools/ship/labDevices-selfcheck.mjs"
+      ]
+    },
+    {
+      "budgetSeconds": 600,
+      "selected": 591,
+      "total": 651,
+      "spentMs": 597719,
+      "reachable": 66,
+      "directlyTests": 6,
+      "missedReachable": 3,
+      "guessedCost": 67,
+      "firstTen": [
+        "physics/proposers-selfcheck.mjs",
+        "tools/roundhouse/isingGpu-selfcheck.mjs",
+        "physics/statmech/tempering-selfcheck.mjs",
+        "physics/statmech/wolff-selfcheck.mjs",
+        "physics/statmech/ising-selfcheck.mjs",
+        "physics/statmech/binderBudget-selfcheck.mjs",
+        "tools/fingerprint/observableCompare-selfcheck.mjs",
+        "tools/roundhouse/kerrIscoKey-selfcheck.mjs",
+        "tools/roundhouse/inspiral-selfcheck.mjs",
+        "tools/roundhouse/blobKelvinBind-selfcheck.mjs"
+      ],
+      "missedReachableNames": [
+        "tools/roundhouse/khGrowthKey-selfcheck.mjs",
+        "tools/roundhouse/pipeFlowKey-selfcheck.mjs",
+        "tools/ship/labDevices-selfcheck.mjs"
+      ]
+    }
+  ],
+  "changed": [
+    "physics/statmech/ising.js"
+  ]
+}

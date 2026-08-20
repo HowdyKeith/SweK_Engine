@@ -1,0 +1,105 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Triangles - where the argument finally does not run (v3637)</title>
+<meta name="demo:desc" content="On a square the offset from cell centre to furthest evaluation point is exactly half the lever the gradient was built on. On a triangle it is sqrt(5/2) = 1.5811 - above one - so the escape is forced by geometry rather than by the limiter, and only the centroid conserves.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:180px}
+</style></head><body><div id="w">
+<h1>Triangles &mdash; where the argument finally does not run</h1>
+<div class="sub">Two rounds proved a limiter monotone and each ended by naming the same untested case, in as many
+words: <i>on triangles the vertex offsets are not &frac12; and the argument does not run.</i> Both proofs rested on
+one geometric fact &mdash; the offset from the cell centre to the furthest evaluation point is exactly <b>half</b>
+the lever the gradient was measured on. <b>That is a property of the square, not of the limiter.</b></div>
+<div class="law">So measure the number first. Centroid to furthest vertex, over centroid to nearest neighbouring
+centroid: on a square, <b>0.5</b>. On the regular right-triangle mesh, <b>&radic;(5/2) = 1.5811</b> &mdash; from
+centroid <code>(2h/3, h/3)</code>, far vertex at <code>h&radic;5/3</code>, sibling centroid at
+<code>h&radic;2/3</code>. <b>Above one, and 3.16&times; the Cartesian value.</b> A gradient bounded by the neighbour
+difference is then applied over a lever <i>longer</i> than the one it was measured on. The escape is forced by
+geometry.</div>
+<h2>1. The mesh, and where the reconstruction leaves its neighbourhood</h2>
+<div class="panel">
+  <div class="row"><label>shear <input id="skew" type="range" min="0" max="0.4" step="0.05" value="0"></label>
+    <span id="sv" class="dim"></span>
+    <label><input id="lim" type="checkbox"> Barth&ndash;Jespersen</label>
+    <button id="go" class="good">reconstruct</button></div>
+  <canvas id="cv" width="620" height="620" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>The same instrument read zero twice on Cartesian meshes and reads 1288 here</b>, which is what
+makes it a finding rather than a new detector finding what it was built to find. Barth&ndash;Jespersen restores the
+zero &mdash; and the residue is <b>one ulp</b>, the same "bound attained, zero margin" signature minmod showed in
+2D, arrived at by a completely different construction.</div>
+<h2>2. Which centre conserves</h2>
+<div class="panel"><button id="cons" class="good">expand about three different centres</button><table id="t2"></table></div>
+<div class="law"><b>Only the centroid.</b> The integral of <code>(x &minus; x<sub>centroid</sub>)</code> over a
+triangle is exactly zero, so the gradient term cancels for <i>any</i> gradient. Expand about the bounding-box middle
+or a vertex and conservation is gone by fourteen orders. <b>"Centre" is a word a triangle answers at least four ways
+and only one of them conserves</b> &mdash; and it is a different fact from the Cartesian rounds, where conservation
+came from symmetric subcell offsets. Same conclusion, unrelated reasons, and only this one survives a triangle.</div>
+<div class="law">Graded by <code>physics/mesh/triReconstruct-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Not claimed:</b> that anything here reconstructs on
+triangles &mdash; <code>physics/mesh/</code> holds marching cubes, dual contouring and manifoldCensus and none of
+them carries a cell-average field. This is the number you would want <i>before</i> putting a finite-volume solver on
+an unstructured mesh. Related: <a href="/remap-2d.html" style="color:#9ab6e8">limiting in 2D</a> and
+<a href="/limiter-seam.html" style="color:#9ab6e8">the limiter seam</a>, where the guarantee held.</div>
+<script type="module">
+import { makeTriMesh, analyticCells, offsetRatios, gradientLS, limitBJ, vertexEscapes, conservationDrift, accuracy } from "/physics/mesh/triReconstruct.mjs";
+const $=(i)=>document.getElementById(i);
+const F=(x,y)=>Math.exp(-((x-10)**2+(y-10)**2)/18);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+$("skew").oninput=()=>{$("sv").textContent=(+$("skew").value).toFixed(2);};$("skew").oninput();
+$("go").onclick=()=>{
+  const skew=+$("skew").value, N=24;
+  const m=makeTriMesh({nx:N,ny:N,h:20/N,skew});
+  const u=analyticCells(F,m), g0=gradientLS(u,m);
+  const g=$("lim").checked?limitBJ(u,m,g0):g0;
+  const e=vertexEscapes(u,m,g), r=offsetRatios(m);
+  const cv=$("cv"),c=cv.getContext("2d"),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.fillStyle="#080a0f";c.fillRect(0,0,W,H);
+  let xlo=Infinity,xhi=-Infinity;for(const v of m.vx){xlo=Math.min(xlo,v);xhi=Math.max(xhi,v);}
+  const X=(x)=>10+(x-xlo)/(xhi-xlo)*(W-20), Y=(y)=>H-10-(y-xlo)/(xhi-xlo)*(H-20);
+  for(let t=0;t<m.tri.length;t++){
+    let lo=u[t],hi=u[t];for(const q of m.nbr[t]){lo=Math.min(lo,u[q]);hi=Math.max(hi,u[q]);}
+    let over=0;
+    for(const v of m.tri[t]){const val=u[t]+g.gx[t]*(m.vx[v]-m.cx[t])+g.gy[t]*(m.vy[v]-m.cy[t]);
+      over=Math.max(over,val>hi?val-hi:(val<lo?lo-val:0));}
+    const span=Math.max(hi-lo,1e-12);
+    const [a,b,cc]=m.tri[t];
+    c.beginPath();c.moveTo(X(m.vx[a]),Y(m.vy[a]));c.lineTo(X(m.vx[b]),Y(m.vy[b]));c.lineTo(X(m.vx[cc]),Y(m.vy[cc]));c.closePath();
+    const tone=Math.min(1,u[t]/0.6);
+    if(over>1e-12){const s=Math.min(1,over/span*4);c.fillStyle="rgba("+Math.round(180+75*s)+",60,70,"+(0.35+0.6*s)+")";}
+    else c.fillStyle="rgba("+Math.round(40+120*tone)+","+Math.round(60+130*tone)+","+Math.round(90+120*tone)+",0.85)";
+    c.fill();c.strokeStyle="#1a2130";c.stroke();}
+  c.fillStyle="#f0a8a0";c.fillText("red = the reconstruction left its own neighbourhood",14,18);
+  rows($("t"),["quantity","value","note"],[
+    ["offset ratio (worst / mean)",r.worst.toFixed(6)+" / "+r.mean.toFixed(6),
+      "<span class='bad'>square is 0.5; regular mesh is &radic;(5/2) = "+Math.sqrt(2.5).toFixed(6)+"</span>"],
+    ["vertex escapes","<span class='"+(e.count&&e.relative>1e-12?"bad":"ok")+"'>"+e.count+"</span>",
+      e.relative>1e-12?"<span class='bad'>worst "+(100*e.relative).toFixed(2)+"% of local span</span>"
+        :"<span class='ok'>worst "+e.worst.toExponential(2)+" &mdash; one ulp, the bound is attained</span>"],
+    ["reconstruction order","see the gate","<span class='dim'>unlimited ~2.0, Barth&ndash;Jespersen ~1.0</span>"]]);
+};
+$("cons").onclick=()=>{
+  const m=makeTriMesh({nx:24,ny:24,h:20/24,skew:0.25});
+  const u=analyticCells(F,m), g=gradientLS(u,m);
+  rows($("t2"),["expanded about","worst |reconstructed average &minus; cell average|","verdict"],
+    [["the centroid","<span class='ok'>"+conservationDrift(u,m,g,"centroid").toExponential(3)+"</span>","exact &mdash; first moment vanishes"],
+     ["the bounding-box middle","<span class='bad'>"+conservationDrift(u,m,g,"bbox").toExponential(3)+"</span>","conservation gone"],
+     ["a vertex","<span class='bad'>"+conservationDrift(u,m,g,"vertex").toExponential(3)+"</span>","conservation gone"]]);
+  void accuracy;
+};
+</script>
+</div></body></html>

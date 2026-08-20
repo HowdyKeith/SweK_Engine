@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Box3D Contacts &mdash; the overlay, and what it may claim</title>
+<!--
+  v3586 -- CONTACTS, ROUND 3. The shim declared three rounds at v3037: exports, gate, overlay. v3569 built the
+  exports, v3580 drove them and refuted the closure they were declared for, and this is the overlay.
+
+  *** IT DRAWS WHAT v3580 ESTABLISHED IS SOUND AND LABELS WHAT IS NOT. *** Contact POSITION and NORMAL are
+  straightforwardly the solver's own geometry. The IMPULSE is not a momentum budget outside the static case:
+  reported/needed measured 1.742 at the impact step, 14 to 30 while settling, and exactly 2 once at rest. A
+  renderer scaling arrow length by it would be drawing a number that MEANS SOMETHING DIFFERENT MID-IMPACT THAN
+  AT REST, and the reader would have no way to tell which they were looking at.
+
+  So the arrows are NORMALISED WITHIN THE FRAME -- relative, never absolute -- and the panel shows the static
+  closure sum/2 divided by m*g*dt live, which sits near 1.00 when the stack is at rest and wanders when it is
+  not. THE READER CAN SEE FOR THEMSELVES WHICH REGIME THEY ARE IN rather than being asked to remember.
+
+  If the WASM is missing its contact exports, the page SAYS SO instead of drawing an untroubled scene: an
+  artifact built before v3037 has no contact functions at all, and an empty overlay looks exactly like a world
+  with nothing touching.
+-->
+<style>
+  :root { --bg:#0b0f0c; --fg:#cfe9d8; --dim:#7f9c8c; --go:#6fe39b; --line:#1e3a2a; --warn:#ffcc66; --hot:#ff8a5c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-monospace,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--go); }
+  .sub { color:var(--dim); font-size:11px; max-width:86ch; }
+  .wrap { display:flex; gap:14px; padding:14px 16px; align-items:flex-start; flex-wrap:wrap; }
+  canvas { background:#07100b; border:1px solid var(--line); border-radius:6px; }
+  .panel { min-width:290px; font-size:12px; }
+  .row { display:flex; justify-content:space-between; gap:10px; padding:2px 0; border-bottom:1px solid #14251b; }
+  .row b { color:var(--go); font-weight:normal; }
+  .note { color:var(--warn); border:1px solid #3a3320; background:#14120a; padding:8px 10px;
+          border-radius:5px; margin-top:10px; font-size:11px; }
+  .err { color:#ff9a9a; }
+  button { background:#12211a; color:var(--fg); border:1px solid var(--line); border-radius:5px;
+           padding:5px 10px; cursor:pointer; font:inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9679; Box3D contacts &mdash; the overlay</h1>
+  <div class="sub">Contact <b>points</b> and <b>normals</b> from <code>swk_contacts</code>, drawn on a settling stack.
+    Arrow length is <b>normalised within the frame</b>: the impulse is a solver diagnostic, not a force, and
+    <b>not a momentum budget outside the static case</b>. The closure readout says which regime you are in.</div>
+</header>
+<div class="wrap">
+  <canvas id="c" width="540" height="380"></canvas>
+  <div class="panel">
+    <div class="row"><span>world</span><b id="mode">starting&hellip;</b></div>
+    <div class="row"><span>bodies</span><b id="bodies">-</b></div>
+    <div class="row"><span>contact points</span><b id="pts">-</b></div>
+    <div class="row"><span>&Sigma; totalNormalImpulse</span><b id="sum">-</b></div>
+    <div class="row"><span>m&middot;g&middot;dt (one body)</span><b id="need">-</b></div>
+    <div class="row" title="At rest this sits near 1.00, because box3d runs a solve pass AND a relax pass and both accumulate. Away from rest it wanders -- that is the point."><span>closure &nbsp;(&Sigma;/2) &divide; m&middot;g&middot;dt</span><b id="closure">-</b></div>
+    <div class="row"><span>settled</span><b id="settled">-</b></div>
+    <div style="margin-top:10px;"><button id="drop">drop a box</button> <button id="reset">reset</button></div>
+    <div class="note" id="claim">
+      <b>What this overlay may claim.</b> Position and normal are the solver's own geometry. The impulse is
+      <b>not</b> a momentum budget away from rest: measured 1.742 at impact, 14&ndash;30 while settling, 2.000 at
+      rest. Arrows are relative within the frame for that reason.
+    </div>
+    <div class="note err" id="unsupported" style="display:none;">
+      This WASM has no contact exports. It predates the v3037 contacts block, or was built from an older shim.
+      <b>Nothing is drawn because nothing can be read</b> &mdash; an empty overlay would look like a world with
+      nothing touching.
+    </div>
+  </div>
+</div>
+<script type="module">
+// *** THE API WAS READ, NOT GUESSED. *** The first draft of this script invented
+// M.init() returning a world, addBox(type,x,y,z,...) positionally, and a w.isFallback flag. NONE OF THOSE
+// EXIST: the loader exports a Box3DLoader class with createWorld({gravity}), and addBox takes an OPTIONS
+// OBJECT. A page written against a remembered API renders a blank canvas and looks like a physics bug.
+import { box3d } from "/physics/box3d/box3dLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("c"), ctx = cv.getContext("2d");
+const DT = 1 / 240, SUB = 4, G = 9.8, HALF = 0.5;
+let w = null;
+
+// A FIXED window so the eye can compare frames. Auto-fit would make a settling stack appear to move when only
+// the camera changed, which is the one thing this overlay must not do.
+const SX = 90, X0 = cv.width / 2, Y0 = cv.height - 40;
+const px = (x) => X0 + x * SX, py = (y) => Y0 - y * SX;
+
+// A FRESH WORLD each time rather than a reset method the loader does not have. createWorld() destroys and
+// remakes the underlying world, so "reset" is "build the scene again" and there is no second concept.
+function scene() {
+    w = box3d.createWorld({ gravity: [0, -G, 0] });
+    w.addBox({ type: "static", pos: [0, -0.5, 0], half: [20, 0.5, 20] });
+    for (let i = 0; i < 3; i++) w.addBox({ pos: [0, HALF + i * 1.02, 0], half: [HALF, HALF, HALF] });
+}
+
+function drawBox(x, y, q, half, fill) {
+    const a = 2 * Math.atan2(q[2], q[3]);          // planar scene: yaw about z is the whole rotation
+    ctx.save(); ctx.translate(px(x), py(y)); ctx.rotate(-a);
+    ctx.fillStyle = fill; ctx.strokeStyle = "#2f5f42";
+    ctx.fillRect(-half * SX, -half * SX, half * 2 * SX, half * 2 * SX);
+    ctx.strokeRect(-half * SX, -half * SX, half * 2 * SX, half * 2 * SX);
+    ctx.restore();
+}
+
+function frame() {
+    if (!w) return;
+    for (let i = 0; i < 4; i++) w.step(DT, SUB);
+    const xf = w.readTransforms();
+    const n = xf.length / 7;
+
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = "#0e1a13"; ctx.fillRect(0, py(0), cv.width, cv.height - py(0));
+    for (let i = 1; i < n; i++)
+        drawBox(xf[i * 7], xf[i * 7 + 1], [xf[i * 7 + 3], xf[i * 7 + 4], xf[i * 7 + 5], xf[i * 7 + 6]], HALF, "#16321f");
+
+    const cs = w.readContacts();
+    if (cs === null) { $("unsupported").style.display = ""; $("pts").textContent = "unavailable"; return; }
+
+    // *** NORMALISED WITHIN THE FRAME. *** An absolute scale would make the same arrow mean a different thing
+    // during an impact than at rest, which is exactly the confusion v3580 measured.
+    const maxImp = Math.max(1e-12, ...cs.map((c) => c.totalImpulse));
+    for (const c of cs) {
+        const x = px(c.point[0]), y = py(c.point[1]);
+        const L = 8 + 26 * (c.totalImpulse / maxImp);
+        ctx.strokeStyle = "#ff8a5c"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + c.normal[0] * L, y - c.normal[1] * L); ctx.stroke();
+        ctx.fillStyle = "#ffd08a";
+        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 6.2832); ctx.fill();
+    }
+
+    const mine = cs.filter((c) => c.body === 1);
+    const sum = mine.reduce((a, c) => a + c.totalImpulse, 0);
+    const need = 8 * HALF * HALF * HALF * G * DT;
+    const v = w.readVelocities();
+    const settled = Math.abs(v[4]) < 1e-3;
+    $("bodies").textContent = n;
+    $("pts").textContent = cs.length + " (" + mine.length + " on body 1)";
+    $("sum").textContent = sum.toFixed(6);
+    $("need").textContent = need.toFixed(6);
+    $("closure").textContent = mine.length ? ((sum / 2) / need).toFixed(4) : "no contact";
+    $("settled").textContent = settled ? "yes" : "no  (closure is meaningless here)";
+    requestAnimationFrame(frame);
+}
+
+(async () => {
+    const st = await box3d.init();
+    if (!st.ready) {
+        // ABSENT IS NOT EMPTY: an unbuilt WASM must say so rather than leave a black canvas that reads as a
+        // rendering fault. The loader already writes the rebuild instructions; they are shown, not swallowed.
+        $("mode").textContent = "WASM not available";
+        $("claim").innerHTML = "<b>No physics.</b> " + st.reason;
+        return;
+    }
+    $("mode").textContent = "box3d WASM";
+    scene(); frame();
+    $("drop").onclick = () => w.addBox({ pos: [(Math.random() - 0.5) * 0.4, 4, 0], half: [HALF, HALF, HALF] });
+    $("reset").onclick = () => scene();
+})();
+</script>
+</body>
+</html>

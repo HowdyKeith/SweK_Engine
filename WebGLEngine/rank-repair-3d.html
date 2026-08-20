@@ -1,0 +1,104 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The verdict carries, the trade does not (v3643)</title>
+<meta name="demo:desc" content="The same three repairs in three dimensions: the verdicts carry exactly, but a false zero-Neumann now reads 1.134 against the refusal's 1.000 - worse than doing nothing, where in 2D it looked better. And the vertex widening is 14.8x the rows against 2D's 3.9x, yet cheaper per defect fixed.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+</style></head><body><div id="w">
+<h1>The verdict carries, the trade does not</h1>
+<div class="sub">The previous round measured three repairs for an undetermined gradient in 2D and predicted that
+the <b>verdicts</b> would carry to three dimensions &mdash; the key is dimension-free &mdash; while the
+<b>trade</b> would not, because 6n deficient cells against a widened stencil on every cell is a different sum from
+two cells against the same widening. Both halves hold.</div>
+<div class="law"><b>And one result is sharper in 3D than it was in 2D.</b> A false zero-Neumann condition reads
+<b>1.134</b> here against the refusal's <b>1.000</b> &mdash; <i>worse than doing nothing</i>. In 2D it read 0.547
+against 1.000 and <i>looked better</i> than doing nothing. The 2D number was flattering by accident of dimension,
+and a reader who had only seen it would have drawn a milder conclusion than the truth. That is the argument for
+running the second dimension rather than asserting the verdict carries.</div>
+<h2>1. The three repairs in 3D</h2>
+<div class="panel"><button id="go" class="good">measure all three</button><table id="t"></table></div>
+<div class="law"><b>Rank is not correctness</b>, in either dimension: the Neumann row closes the deficiency, the
+matrix is invertible, and the answer is wrong. Supplied with the honest normal derivative the same machinery is
+exact &mdash; same rank, same rows, only the right-hand side differs. <b>The mechanism is sound; the assertion is
+what is false.</b></div>
+<h2>2. Where the dimensions part company</h2>
+<div class="panel"><button id="trade" class="good">compare the trade</button><table id="t2"></table></div>
+<div class="law"><b>The widening is ~4&times; more expensive in 3D</b> &mdash; 14.8&times; the rows against 2D's
+3.9&times; &mdash; because a tet has four vertices and each is shared by many more cells, so the neighbourhood
+doesn't gain a dimension, it multiplies.</div>
+<div class="law"><b>But per repaired cell it is <i>cheaper</i> in 3D, which is the opposite of the obvious
+reading.</b> The deficient set grew 24&times; while the stencil grew 4&times;. Two true numbers answering different
+questions: the <b>total</b> extra work is 16&times; higher in 3D, and the cost <b>per defect fixed</b> is
+1.5&times; lower. Which matters depends on whether the budget is the solver's total or the engineer's patience
+&mdash; and quoting one as "the cost" is the shape this arc keeps finding.</div>
+<div class="law"><b>Dirichlet meanwhile costs almost nothing in either dimension</b> and is exact. So where the
+data exists the choice is not close &mdash; and the vertex stencil's whole appeal is that it works where the data
+does not. Graded by <code>physics/mesh/rankRepair3-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/rank-repair.html" style="color:#9ab6e8">rank repair (2D)</a>,
+<a href="/tet-rank.html" style="color:#9ab6e8">tet rank</a>.</div>
+<script type="module">
+import { makeTetMesh, analyticCells3, gradientLS3 } from "/physics/mesh/tetReconstruct.mjs";
+import { repairError3, vertexNeighbours3 } from "/physics/mesh/rankRepair3.mjs";
+import { makeTriMesh, analyticCells, gradientLS } from "/physics/mesh/triReconstruct.mjs";
+import { repairError, vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+const $ = (i) => document.getElementById(i);
+const M = makeTetMesh({ nx: 8, ny: 8, nz: 8, h: 1, skew: 0.25 });
+const U = analyticCells3((x, y, z) => 0.3 + 0.7 * x - 0.4 * y + 0.55 * z, M);
+const G0 = gradientLS3(U, M);
+const MASK = new Uint8Array(M.tet.length);
+let NDEF = 0; for (let t = 0; t < M.tet.length; t++) if (G0.rank[t] < 3) { MASK[t] = 1; NDEF++; }
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const cell = (v) => "<span class='" + (v < 1e-12 ? "ok" : (v > 0.1 ? "bad" : "warn")) + "'>" + v.toExponential(3) + "</span>";
+$("go").onclick = () => {
+    const out = [["no repair", { mode: "none" }], ["vertex stencil", { mode: "vertex" }],
+        ["Dirichlet", { mode: "dirichlet" }], ["Neumann = 0", { mode: "neumann" }],
+        ["Neumann = 0, targeted", { mode: "neumann", onlyWhereDeficient: MASK }],
+        ["Neumann, TRUE value", { mode: "neumann", onlyWhereDeficient: MASK, honestNeumann: true }]]
+        .map(([name, o]) => {
+            const r = repairError3(M, MASK, o);
+            return [name, cell(r.deficient), cell(r.healthy), r.stillLow, r.meanStencil.toFixed(2),
+                name === "no repair" ? "a refusal"
+                    : (r.deficient < 1e-12 ? "exact"
+                        : (r.deficient > 1 ? "<span class='bad'>worse than the refusal</span>"
+                            : "<span class='bad'>rank restored, answer wrong</span>"))];
+        });
+    rows($("t"), ["repair", "deficient (" + NDEF + " tets)", "healthy", "still rank&lt;3", "mean stencil", "verdict"], out);
+};
+$("trade").onclick = () => {
+    const vn3 = vertexNeighbours3(M);
+    let sf3 = 0, sv3 = 0; for (let t = 0; t < M.tet.length; t++) { sf3 += M.nbr[t].length; sv3 += vn3[t].length; }
+    const m2 = makeTriMesh({ nx: 24, ny: 24, h: 20 / 24, skew: 0.25 });
+    const u2 = analyticCells((x, y) => 0.3 + 0.7 * x - 0.4 * y, m2), g2 = gradientLS(u2, m2);
+    const mask2 = new Uint8Array(m2.tri.length);
+    let nd2 = 0; for (let t = 0; t < m2.tri.length; t++) if (g2.rank[t] < 2) { mask2[t] = 1; nd2++; }
+    const vn2 = vertexNeighbours(m2);
+    let sf2 = 0, sv2 = 0; for (let t = 0; t < m2.tri.length; t++) { sf2 += m2.nbr[t].length; sv2 += vn2[t].length; }
+    const e2 = sv2 - sf2, e3 = sv3 - sf3;
+    rows($("t2"), ["question", "2D", "3D", "note"], [
+        ["cells", m2.tri.length, M.tet.length, ""],
+        ["deficient", nd2, NDEF, "<span class='dim'>O(1) against O(n)</span>"],
+        ["mean stencil, face &rarr; vertex", (sf2 / m2.tri.length).toFixed(2) + " &rarr; " + (sv2 / m2.tri.length).toFixed(2),
+            (sf3 / M.tet.length).toFixed(2) + " &rarr; " + (sv3 / M.tet.length).toFixed(2), ""],
+        ["widening ratio", (sv2 / sf2).toFixed(2) + "x", "<span class='bad'>" + (sv3 / sf3).toFixed(2) + "x</span>",
+            "~4x more expensive in 3D"],
+        ["total extra rows", e2, "<span class='bad'>" + e3 + "</span>",
+            (e3 / e2).toFixed(1) + "x higher total"],
+        ["extra rows per defect fixed", (e2 / nd2).toFixed(0), "<span class='ok'>" + (e3 / NDEF).toFixed(0) + "</span>",
+            "<span class='ok'>" + ((e2 / nd2) / (e3 / NDEF)).toFixed(2) + "x lower &mdash; the opposite reading</span>"]]);
+};
+</script>
+</div></body></html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fog of War (line-of-sight + toroidal memory)</title>
+<meta name="demo:desc" content="FOG OF WAR on a toroidal explored-memory buffer (v3839). The current field of view is recomputed every frame by RECURSIVE SHADOWCASTING, so the pillars actually occlude -- what is behind a pillar is dark and vision does not leak diagonally through a corner. What has been seen is REMEMBERED (dim) in a persistent toroidal wearField buffer that follows the viewer, until it travels far enough that old ground scrolls out of the window and is forgotten -- which is why a fixed buffer that follows the viewer is the right structure, not an infinite map. Three states per cell: unseen (black), remembered (dim), visible (lit). The viewer wanders on its own. Answer-key gate: fogOfWar-selfcheck (origin sees itself, an open disc lit to its radius, walls occlude, no corner leak, tri-state memory monotone).">
+<style>
+  html,body{margin:0;height:100%;background:#05060a;color:#b9c6dd;font:13px ui-monospace,monospace;overflow:hidden}
+  #hud{position:fixed;left:10px;top:10px;z-index:5;display:flex;gap:6px;align-items:center}
+  #hud button{background:#141c2c;color:#b9c6dd;border:1px solid #2c3d5c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:3px 10px}
+  #hud button.on{background:#22314a;color:#cfe0ff}
+  #note{position:fixed;left:10px;bottom:8px;z-index:5;color:#6a7a96;font-size:11px;max-width:64ch}
+</style>
+</head>
+<body>
+<div id="hud">
+  <button id="pauseBtn" title="Pause the wanderer">&#10073;&#10073; Pause</button>
+  <button id="resetBtn" title="Forget everything explored">&#9632; Reset</button>
+  <span id="stat" style="color:#6a7a96"></span>
+</div>
+<div id="note">Line-of-sight fog of war &mdash; pillars cast real shadows, explored ground is remembered (dim) in a toroidal buffer that follows the wanderer and forgets what scrolls out of range.</div>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { computeFOV, markExplored, fogState } from "/render/fogOfWar.js";
+import { scrollClear } from "/render/wearField.js";
+
+const N = 96;                 // toroidal explored-memory resolution (cells)
+const W = 41;                 // odd window of cells shown, viewer centred
+const RADIUS = 9;
+let explored = new Float64Array(N * N);
+let vx = 0.5, vy = 0.5, heading = 0.7, paused = false;
+let lastCellX = 0, lastCellY = 0;
+
+// deterministic pillar world: ~11% of cells are opaque
+function hash(x, y) { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+const isWall = (x, y) => hash(x, y) < 0.11;
+
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05060a);
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10); cam.position.z = 5;
+
+const rgba = new Uint8Array(W * W * 4);
+const tex = new THREE.DataTexture(rgba, W, W, THREE.RGBAFormat);
+tex.minFilter = tex.magFilter = THREE.NearestFilter; tex.needsUpdate = true;
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex }));
+scene.add(quad);
+// a viewer dot, drawn as a tiny overlay quad at centre
+const dot = new THREE.Mesh(new THREE.CircleGeometry(1 / W, 16), new THREE.MeshBasicMaterial({ color: 0x9fe0ff }));
+dot.position.z = 1; scene.add(dot);
+
+function fit() {
+  const a = innerWidth / innerHeight;
+  if (a >= 1) { cam.left = -a; cam.right = a; cam.top = 1; cam.bottom = -1; } else { cam.left = -1; cam.right = 1; cam.top = 1 / a; cam.bottom = -1 / a; }
+  cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+}
+fit(); addEventListener("resize", fit);
+
+function paint(cvx, cvy, fov) {
+  const half = (W - 1) / 2;
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+    const wx = cvx - half + i, wy = cvy - half + j;
+    const st = fogState(explored, N, fov, wx, wy), wall = isWall(wx, wy);
+    const o = ((W - 1 - j) * W + i) * 4;   // flip v so +y is up
+    let r, g, b;
+    if (st === 0) { r = 6; g = 7; b = 12; }                                   // unseen
+    else if (st === 1) { r = wall ? 40 : 20; g = wall ? 46 : 26; b = wall ? 58 : 40; }  // remembered
+    else { r = wall ? 150 : 60; g = wall ? 150 : 92; b = wall ? 160 : 120; }  // visible
+    rgba[o] = r; rgba[o + 1] = g; rgba[o + 2] = b; rgba[o + 3] = 255;
+  }
+  tex.needsUpdate = true;
+}
+
+const stat = document.getElementById("stat");
+document.getElementById("pauseBtn").onclick = (e) => { paused = !paused; e.target.classList.toggle("on", paused); };
+document.getElementById("resetBtn").onclick = () => { explored = new Float64Array(N * N); };
+
+let frame = 0;
+function tick() {
+  if (!paused) {
+    heading += (hash(Math.floor(frame / 30), 7) - 0.5) * 0.25;
+    let nx = vx + Math.cos(heading) * 0.06, ny = vy + Math.sin(heading) * 0.06;
+    if (isWall(Math.floor(nx), Math.floor(ny))) { heading += 2.2; }           // turn off a wall
+    else { vx = nx; vy = ny; }
+    const cvx = Math.floor(vx), cvy = Math.floor(vy);
+    if (cvx !== lastCellX || cvy !== lastCellY) { scrollClear(explored, N, lastCellX, lastCellY, cvx, cvy, N); lastCellX = cvx; lastCellY = cvy; }
+    const fov = computeFOV(cvx, cvy, RADIUS, isWall);
+    markExplored(explored, N, fov);
+    paint(cvx, cvy, fov);
+    if ((frame & 15) === 0) stat.textContent = `${W}x${W} view / ${N}x${N} memory  pos(${cvx},${cvy})`;
+  }
+  renderer.render(scene, cam);
+  frame++;
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

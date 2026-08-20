@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="YouTube Export">
+<meta name="demo:desc" content="Record a narrated SweK Engine showcase and export it as a YouTube-ready mp4. The avatar narrates the engine in first person -- overview, the box3d/Jolt physics, Escape Velocity, the living box -- over a live scene of sprite-mesh ships flying an evade brain through a nebula. Everything (scene, avatar, title, captions) composites onto one canvas, records to webm, and the server transcodes to H.264 mp4 with a paste-ready description.">
+<meta name="demo:category" content="fx">
+<title>YouTube Export</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; }
+  html,body { margin:0; height:100%; background:#03040a; overflow:hidden; color:#cfe0ff; font:12px ui-monospace,Menlo,monospace; }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  #stage { position:relative; flex:1; min-height:0; }
+  #c { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #bar { flex:none; display:flex; gap:8px; align-items:center; padding:8px 12px; background:#080d16; border-top:1px solid #1c2942; flex-wrap:wrap; }
+  select,button,input { background:rgba(14,20,32,.9); color:var(--cyan); border:1px solid #22304a; border-radius:7px; padding:7px 12px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+  button.rec { color:#ff6a6a; } button.go { color:#9be15d; }
+  #msg { color:#7c93b8; font-size:11px; margin-left:auto; }
+  input[type=text] { cursor:text; min-width:180px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage"><canvas id="c"></canvas>
+    <div id="draft" style="display:none;position:absolute;right:12px;top:12px;width:320px;background:rgba(6,10,20,.93);border:1px solid #22304a;border-radius:10px;padding:11px;z-index:5;">
+      <div style="color:#f6a623;font-size:11px;letter-spacing:.1em;margin-bottom:7px;">&#9673; DRAFT &mdash; REVIEW BEFORE UPLOAD</div>
+      <video id="preview" controls style="width:100%;border-radius:6px;background:#000;display:block;"></video>
+      <textarea id="desc" placeholder="description (editable)" style="width:100%;height:64px;margin-top:7px;background:#0c1220;color:#cfe0ff;border:1px solid #22304a;border-radius:6px;font:11px ui-monospace,monospace;padding:6px;box-sizing:border-box;resize:vertical;"></textarea>
+      <div id="draftNote" style="color:#7c93b8;font-size:10px;margin-top:5px;">Play it back. Nothing is uploaded until you press Upload.</div>
+    </div>
+  </div>
+  <div id="bar">
+    <span style="color:var(--amber);letter-spacing:.12em;text-transform:uppercase;">&#9670; Export</span>
+    <select id="script"></select>
+    <input id="ttl" type="text" placeholder="video title" value="SweK Engine - box3d & Jolt physics">
+    <button id="play">&#9654; Preview narration</button>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <button id="exp" class="go" disabled>&#11015; Export mp4</button>
+    <select id="priv" title="YouTube privacy"><option value="unlisted">Unlisted</option><option value="private">Private</option><option value="public">Public</option></select>
+    <button id="yt" class="go" disabled title="Upload the exported mp4 to your YouTube channel">&#9654; Upload to YouTube</button>
+    <span id="msg"></span>
+  </div>
+</div>
+<script type="module">
+import { makeCast } from "./fx/avatar/narratorCast.js";
+import { planSpeech, ampAt, speak as blobSpeak } from "./fx/avatar/blobVoice.js";
+import { SKINS, shadeTri, skinForPersona } from "./fx/avatar/skins.js";
+import { makeHerd } from "./fx/avatar/herd.js";
+import { metaField } from "./fx/avatar/pet.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+import { spriteToMesh } from "./fx/spritemesh/spriteMesh.js";
+import { makeDebris, stepBlackHole, evadeSteer, stepShip } from "./fx/showcase/livingBox.js";
+import { nebulaColorAt } from "./fx/nebula/nebula.js";
+import { makeVortons, nebulaSwirlColorAt } from "./fx/vorton/vortonNebula.js";
+import { SCRIPTS, ORDER, scriptById, estimateNarrationPlan, fetchBrainScript } from "./ui/exportScripts.js";
+import { makeBloom } from "./fx/post/bloom.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), msg = document.getElementById("msg");
+const bloom = makeBloom({ threshold: 0.55, intensity: 0.85, blurPx: 6 });
+let W = 0, H = 0;
+function resize() { const r = cv.getBoundingClientRect(); W = cv.width = Math.max(640, r.width | 0); H = cv.height = Math.max(360, r.height | 0); buildNeb(); }
+addEventListener("resize", resize);
+
+// nebula backdrop rendered once
+let neb = null, V = makeVortons(7);
+function buildNeb() { const nw = 220, nh = Math.max(120, Math.round(nw * H / W)), buf = new Uint8ClampedArray(nw * nh * 4); for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) { const c = nebulaSwirlColorAt(x, y, nw, nh, { x: 0, y: 0 }, 2.0, V, 0.35, 40, nebulaColorAt); const i = (y * nw + x) * 4; buf[i] = c[0] * 95; buf[i + 1] = c[1] * 95; buf[i + 2] = c[2] * 120; buf[i + 3] = 255; } const t = document.createElement("canvas"); t.width = nw; t.height = nh; t.getContext("2d").putImageData(new ImageData(buf, nw, nh), 0, 0); neb = t; }
+
+function shipSprite(hue) { const S = 46, s = document.createElement("canvas"); s.width = S; s.height = S; const g = s.getContext("2d"); g.translate(S / 2, S / 2); g.fillStyle = hue; g.beginPath(); g.moveTo(0, -19); g.lineTo(7, 8); g.lineTo(15, 14); g.lineTo(4, 12); g.lineTo(0, 18); g.lineTo(-4, 12); g.lineTo(-15, 14); g.lineTo(-7, 8); g.closePath(); g.fill(); return s; }
+const shipMesh = spriteToMesh(shipSprite("#cfe0ff"), { segments: 26, depth: 0.5 });
+const R = 1.2, hole = { x: 0, y: 0, z: 0, mass: 0.32, soft: 0.03, swirl: 0.7, horizon: 0.1, danger: 0.55 };
+const debris = makeDebris(280, R, 9);
+const ships = [{ x: R * 0.7, y: 0.2, z: 0, vx: 0, vy: 0, vz: 0, heading: 0, hue: "#a9c4ff" }, { x: -R * 0.6, y: -0.3, z: 0.1, vx: 0, vy: 0, vz: 0, heading: 3, hue: "#ffcf8f" }, { x: 0.1, y: R * 0.6, z: -0.1, vx: 0, vy: 0, vz: 0, heading: 1.5, hue: "#9be1b0" }];
+let seed = 4242; const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+let cam = 0.3;
+
+function project(x, y, z) { const cy = Math.cos(cam), sy = Math.sin(cam); const X = x * cy + z * sy, Z = -x * sy + z * cy, pp = 3.0 / (3.0 - Z); return { sx: W / 2 + X * Math.min(W, H) * 0.32 * pp, sy: H / 2 + y * Math.min(W, H) * 0.32 * pp, z: Z, pp }; }
+
+// Avataro is the narrator now (fx/avatar/blobNarrator.js): a marched metaball head whose mouth is carved by a
+// negative metaball driven by narr.amp -- sealed when silent, a real opening when it speaks.
+let voiceMode = "blob", actx = null;      // the blob speaks for itself; "tts" borrows a human voice (ttsBridge/SAPI/piper) instead
+// v2969 -- the blob voice now runs through a shared bus that fans out to BOTH the speakers AND a
+// MediaStreamAudioDestinationNode, so the SAME synthesized burble that carves the mouth is also
+// captured into the recording. Before this, the recorder took only cv.captureStream() (video), so
+// every exported clip was silent even though you could hear the narration live. The bus is built
+// lazily on first speak so the AudioContext is created inside a user gesture (autoplay policy).
+let voiceBus = null, voiceStreamDest = null;
+function _ensureVoiceBus() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    try { if (actx.state === "suspended") actx.resume(); } catch (e) {}
+    if (!voiceBus) {
+        voiceBus = actx.createGain(); voiceBus.gain.value = 1;
+        try { voiceBus.connect(actx.destination); } catch (e) {}                 // speakers
+        try { voiceStreamDest = actx.createMediaStreamDestination(); voiceBus.connect(voiceStreamDest); } catch (e) {}   // recorder tap
+    }
+    return voiceBus;
+}
+const castRig = makeCast({ linesPerPersona: 3 });                 // Avataro + a pet co-host; persona shifts by section
+const NB = 22, NLO = -1.9, NHI = 3.9, nspan = NHI - NLO, ncell = nspan / (NB - 1);   // wide enough for the two-shot
+const extras = makeHerd({ n: 3, orbitR: R * 0.78, separation: 1.5 });   // background extras, drifting behind the ships
+const EB = 16, ELO = -R * 1.25, EHI = R * 1.25, espan = EHI - ELO, ecell = espan / (EB - 1);
+// narration state (drives the narrator's mouth + captions)
+let narr = { lines: [], i: -1, speaking: false, amp: 0, caption: "", title: "", subtitle: "", plan: null, t0: 0 };
+const synth = window.speechSynthesis || null;
+function loadScript(id) { const sc = scriptById(id); narr.lines = sc.lines.slice(); narr.title = sc.title; narr.subtitle = sc.subtitle; narr.i = -1; narr.caption = ""; }
+function speakNext() {
+  narr.i++; if (narr.i >= narr.lines.length) { narr.speaking = false; narr.caption = ""; if (narr._onEnd) narr._onEnd(); return; }
+  const line = narr.lines[narr.i]; narr.caption = line.text || ""; if (line.title) { narr.title = line.title; narr.subtitle = line.subtitle || ""; }
+  if (voiceMode === "blob") {
+    // ITS OWN VOICE. One plan drives the sound and the carved mouth -- the mouth opens because it is speaking.
+    narr.plan = planSpeech(line.text, { persona: castRig.personaFor(narr.i), rate: 1 });
+    narr.t0 = performance.now() / 1000; narr.speaking = true;
+    try { const bus = _ensureVoiceBus(); if (bus) blobSpeak(narr.plan, actx, { volume: 0.42, destination: bus }); } catch (e) {}
+    setTimeout(() => { narr.speaking = false; narr.plan = null; setTimeout(speakNext, line.gap || 380); }, narr.plan.dur * 1000 + 60);
+    return;
+  }
+  if (synth) { const u = new SpeechSynthesisUtterance(line.text); u.rate = 0.98; u.onstart = () => narr.speaking = true; u.onend = () => { narr.speaking = false; setTimeout(speakNext, line.gap || 400); }; u.onerror = () => { narr.speaking = false; setTimeout(speakNext, line.ms || 2600); }; synth.speak(u); }
+  else { narr.speaking = true; setTimeout(() => { narr.speaking = false; speakNext(); }, line.ms || 2600); }
+}
+// v2442 -- before the read begins, watch the brain for a few seconds and let it speak for itself. If it has nothing
+// true to say the section simply is not there; nothing is invented to fill the gap.
+async function withBrainSection(lines) {
+  try { const sec = await fetchBrainScript({ samples: 4, everyMs: 1200 });
+    if (sec) { narr.brainLive = true; return lines.concat(sec.lines.map(l => ({ ...l, title: sec.title, subtitle: sec.subtitle }))); } }
+  catch (e) {}
+  narr.brainLive = false; return lines;
+}
+function startNarration(onEnd) { if (synth) synth.cancel(); narr._onEnd = onEnd; narr.i = -1; speakNext(); }
+
+function drawAvatar(t) {
+  // the mouth is carved by the SAME envelope the speaker is playing -- same number, same instant
+  const target = (voiceMode === "blob" && narr.plan) ? ampAt(narr.plan, performance.now() / 1000 - narr.t0) : (narr.speaking ? 1 : 0);
+  narr.amp += (target - narr.amp) * (voiceMode === "blob" ? 0.55 : 0.15);
+  const cx = 126, cy = H - 74, bw = 196, bh = 106, sc = bw / 5.4;
+  const cast = castRig.step(1 / 60, { amp: narr.amp, lineIndex: narr.i });
+  const balls = cast.narrator.concat(cast.cohost);
+  ctx.save();
+  // the frame the two of them sit in
+  ctx.fillStyle = "rgba(6,10,20,0.58)"; ctx.strokeStyle = "rgba(89,209,255,0.28)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 12) : ctx.rect(cx - bw / 2, cy - bh / 2, bw, bh); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.rect(cx - bw / 2 + 1, cy - bh / 2 + 1, bw - 2, bh - 2); ctx.clip();
+  const px = (x, y) => [cx + (x - 1.05) * sc, cy - y * sc];
+  // rings behind Avataro only -- the co-host is a guest, not the signal source
+  const na = px(0, 0);
+  for (let r = 0; r < 3; r++) { ctx.strokeStyle = "rgba(89,209,255," + (0.34 - r * 0.09) + ")"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(na[0], na[1], 30 + r * 7 + Math.sin(t * 2 + r) * 2, 0, 6.28); ctx.stroke(); }
+  // one field, two creatures: Avataro's carved mouth speaks, the pet reacts beside it
+  const NF = new Float32Array(NB * NB * NB);
+  for (let z = 0; z < NB; z++) { const wz = NLO + nspan * z / (NB - 1); for (let y = 0; y < NB; y++) { const wy = NLO + nspan * y / (NB - 1); const row = (z * NB + y) * NB;
+    for (let x = 0; x < NB; x++) NF[row + x] = metaField(balls, NLO + nspan * x / (NB - 1), wy, wz); } }
+  const hm = marchScalarField(NF, NB, NB, NB, 1.0, { origin: [NLO, NLO, NLO], cellSize: ncell });
+  const HP = hm.positions, tint = cast.tint, NL = [0.35, 0.6, 0.72], htris = [];
+  for (let i = 0; i + 8 < HP.length; i += 9) {
+    const A = px(HP[i], HP[i + 1]), B = px(HP[i + 3], HP[i + 4]), C = px(HP[i + 6], HP[i + 7]);
+    let nx = (HP[i + 4] - HP[i + 1]) * (HP[i + 8] - HP[i + 2]) - (HP[i + 5] - HP[i + 2]) * (HP[i + 7] - HP[i + 1]);
+    let ny = (HP[i + 5] - HP[i + 2]) * (HP[i + 6] - HP[i]) - (HP[i + 3] - HP[i]) * (HP[i + 8] - HP[i + 2]);
+    let nz = (HP[i + 3] - HP[i]) * (HP[i + 7] - HP[i + 1]) - (HP[i + 4] - HP[i + 1]) * (HP[i + 6] - HP[i]);
+    const ml = Math.hypot(nx, ny, nz) || 1; const lit = Math.max(0.14, (nx * NL[0] + ny * NL[1] + nz * NL[2]) / ml);
+    const p3 = [(HP[i] + HP[i + 3] + HP[i + 6]) / 3, (HP[i + 1] + HP[i + 4] + HP[i + 7]) / 3, (HP[i + 2] + HP[i + 5] + HP[i + 8]) / 3];
+    htris.push({ z: p3[2], A, B, C, lit, n: [nx / ml, ny / ml, nz / ml], p3, th: Math.max(0, Math.min(1, 1 - Math.hypot(p3[0], p3[1], p3[2]) / 1.6)) });
+  }
+  htris.sort((a, b) => a.z - b.z);
+  const cskin = skinForPersona(cast.persona);   // the cast changes material as it changes subject
+  if (cskin !== "persona" && SKINS[cskin].blend === "additive") ctx.globalCompositeOperation = "lighter";
+  for (const tr of htris) {
+    if (cskin === "persona") { const g2 = 46 + tr.lit * 200; ctx.fillStyle = "rgb(" + Math.round(g2 * tint[0]) + "," + Math.round(g2 * tint[1]) + "," + Math.round(g2 * tint[2]) + ")"; }
+    else { const c = shadeTri(cskin, { lit: tr.lit, normal: tr.n, thickness: tr.th, pos: tr.p3, t: t });
+      ctx.fillStyle = "rgba(" + Math.round(c[0] * 255) + "," + Math.round(c[1] * 255) + "," + Math.round(c[2] * 255) + "," + c[3].toFixed(3) + ")"; }
+    ctx.beginPath(); ctx.moveTo(tr.A[0], tr.A[1]); ctx.lineTo(tr.B[0], tr.B[1]); ctx.lineTo(tr.C[0], tr.C[1]); ctx.closePath(); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.restore();
+  ctx.fillStyle = "rgba(95,122,160,0.85)"; ctx.font = "9px ui-monospace,monospace"; ctx.textAlign = "left";
+  ctx.fillText((cast.persona === "both" ? "AVATARO / AVATARINA" : cast.persona.toUpperCase()) + " \u00b7 " + skinForPersona(cast.persona), cx - bw / 2 + 6, cy + bh / 2 - 5);
+}
+function drawLowerThird() {
+  if (!narr.title) return; const bx = 150, by = H - 116, bw = Math.min(W - 170, 520);
+  ctx.fillStyle = "rgba(6,10,20,0.72)"; ctx.fillRect(bx, by, bw, 54); ctx.fillStyle = "#f6a623"; ctx.fillRect(bx, by, 4, 54);
+  ctx.textAlign = "left"; ctx.fillStyle = "#f6a623"; ctx.font = "800 18px ui-monospace,monospace"; ctx.fillText(narr.title, bx + 14, by + 22);
+  ctx.fillStyle = "#8fb4d8"; ctx.font = "12px ui-monospace,monospace"; ctx.fillText(narr.subtitle || "", bx + 14, by + 42);
+}
+function drawCaption() {
+  if (!narr.caption) return; ctx.textAlign = "center"; ctx.font = "600 16px ui-monospace,monospace";
+  const w = ctx.measureText(narr.caption).width; ctx.fillStyle = "rgba(3,5,12,0.7)"; ctx.fillRect(W / 2 - w / 2 - 12, H - 44, w + 24, 26);
+  ctx.fillStyle = "#eaf2ff"; ctx.fillText(narr.caption, W / 2, H - 26);
+}
+
+let last = performance.now();
+function stepScene(dt) { cam += dt * 0.08; extras.step(dt, [0, 0, 0]); stepBlackHole(debris, hole, R, dt, rng); for (const sh of ships) stepShip(sh, evadeSteer(sh, hole, debris, R), dt, { accel: 2.6, maxV: 1.3 }); }
+function paintFrame(t) {
+  if (neb) ctx.drawImage(neb, 0, 0, W, H); else { ctx.fillStyle = "#03040a"; ctx.fillRect(0, 0, W, H); }
+  ctx.fillStyle = "rgba(3,4,10,0.28)"; ctx.fillRect(0, 0, W, H);
+  const draws = [];
+  for (const p of debris) { const pr = project(p.x, p.y, p.z), d = Math.hypot(p.x, p.y, p.z), heat = Math.max(0, 1 - d / 0.5); draws.push({ z: pr.z, t: "d", sx: pr.sx, sy: pr.sy, s: (1.2 + heat * 2) * pr.pp, heat }); }
+  for (const sh of ships) { const c = Math.cos(sh.heading), s = Math.sin(sh.heading); const sp = shipMesh.positions.map(v => { const lx = v[0] * c - v[1] * s, ly = v[0] * s + v[1] * c; return project(sh.x + lx * 0.13, sh.y + ly * 0.13, sh.z + v[2] * 0.13); }); draws.push({ z: project(sh.x, sh.y, sh.z).z + 0.002, t: "ship", sp, hue: sh.hue }); }
+  // background extras: the herd drifts through the scene behind the ships -- marched cheaply, no faces, just presence
+  const eb = extras.allBalls();
+  if (eb.length) {
+    const EF = new Float32Array(EB * EB * EB);
+    for (let z = 0; z < EB; z++) { const wz = ELO + espan * z / (EB - 1); for (let y = 0; y < EB; y++) { const wy = ELO + espan * y / (EB - 1); const row = (z * EB + y) * EB;
+      for (let x = 0; x < EB; x++) EF[row + x] = metaField(eb, ELO + espan * x / (EB - 1), wy, wz); } }
+    const em = marchScalarField(EF, EB, EB, EB, 1.0, { origin: [ELO, ELO, ELO], cellSize: ecell });
+    const EP = em.positions;
+    for (let i = 0; i + 8 < EP.length; i += 9) {
+      const a = project(EP[i], EP[i + 1], EP[i + 2]), b = project(EP[i + 3], EP[i + 4], EP[i + 5]), c2 = project(EP[i + 6], EP[i + 7], EP[i + 8]);
+      let nx = (EP[i + 4] - EP[i + 1]) * (EP[i + 8] - EP[i + 2]) - (EP[i + 5] - EP[i + 2]) * (EP[i + 7] - EP[i + 1]);
+      let ny = (EP[i + 5] - EP[i + 2]) * (EP[i + 6] - EP[i]) - (EP[i + 3] - EP[i]) * (EP[i + 8] - EP[i + 2]);
+      let nz = (EP[i + 3] - EP[i]) * (EP[i + 7] - EP[i + 1]) - (EP[i + 4] - EP[i + 1]) * (EP[i + 6] - EP[i]);
+      const ml = Math.hypot(nx, ny, nz) || 1; const lit = Math.max(0.12, (nx * 0.4 + ny * 0.7 + nz * 0.5) / ml);
+      draws.push({ z: (a.z + b.z + c2.z) / 3, t: "blob", a, b, c: c2, lit });
+    }
+  }
+  draws.sort((a, b) => a.z - b.z);
+  for (const o of draws) {
+    if (o.t === "blob") { const g = Math.round(40 + o.lit * 120); ctx.globalAlpha = 0.55; ctx.fillStyle = "rgb(" + Math.round(g * 0.62) + "," + Math.round(g * 0.5) + "," + Math.round(g * 0.86) + ")"; ctx.beginPath(); ctx.moveTo(o.a.sx, o.a.sy); ctx.lineTo(o.b.sx, o.b.sy); ctx.lineTo(o.c.sx, o.c.sy); ctx.closePath(); ctx.fill(); }
+    else if (o.t === "d") { ctx.globalAlpha = 0.5 + o.heat * 0.5; ctx.fillStyle = o.heat > 0.5 ? "#ffd0b0" : "#7fb0ff"; ctx.fillRect(o.sx - o.s / 2, o.sy - o.s / 2, o.s, o.s); }
+    else { ctx.globalAlpha = 1; for (const cc of shipMesh.cells) { const a = o.sp[cc[0]], b = o.sp[cc[1]], d = o.sp[cc[2]]; ctx.fillStyle = o.hue; ctx.strokeStyle = "rgba(89,209,255,0.4)"; ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.lineTo(d.sx, d.sy); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  }
+  ctx.globalAlpha = 1;
+  bloom(cv, ctx, W, H);
+  drawLowerThird(); drawAvatar(t); drawCaption();
+}
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  stepScene(dt); paintFrame(now / 1000);
+  requestAnimationFrame(frame);
+}
+
+// UI
+const sel = document.getElementById("script");
+for (const id of ORDER) { const o = document.createElement("option"); o.value = id; o.textContent = SCRIPTS[id].title; sel.appendChild(o); }
+sel.value = "physics"; loadScript("physics");
+sel.onchange = () => loadScript(sel.value);
+document.getElementById("play").onclick = () => startNarration();
+
+// record via MediaRecorder on the canvas stream -> webm blob -> POST to /export/mp4
+let rec = null, chunks = [], blob = null;
+document.getElementById("rec").onclick = function () {
+  if (rec && rec.state === "recording") { rec.stop(); return; }
+  chunks = []; blob = null; document.getElementById("exp").disabled = true;
+  const vstream = cv.captureStream(30); let mime = "video/webm;codecs=vp9"; if (!MediaRecorder.isTypeSupported(mime)) mime = "video/webm";
+  // v2969 -- mux the blob's captured voice track in with the canvas video so the export isn't silent.
+  // Build the bus now (this click is a user gesture, so the AudioContext is allowed to start). In "tts"
+  // voice mode the audio is system SpeechSynthesis, which WebAudio can't tap, so that path stays silent
+  // and we say so rather than pretend.
+  const tracks = vstream.getVideoTracks();
+  let audioNote = "";
+  if (voiceMode === "blob") { try { _ensureVoiceBus(); if (voiceStreamDest) for (const at of voiceStreamDest.stream.getAudioTracks()) tracks.push(at); } catch (e) {} }
+  else { audioNote = " (tts voice can't be captured in-browser -- switch to blob voice for sound)"; }
+  const stream = new MediaStream(tracks);
+  rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6 });
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => { blob = new Blob(chunks, { type: "video/webm" }); document.getElementById("exp").disabled = false;
+    try { const pv = document.getElementById("preview"); if (pv._u) URL.revokeObjectURL(pv._u); pv._u = URL.createObjectURL(blob); pv.src = pv._u; document.getElementById("draft").style.display = "block"; const de = document.getElementById("desc"); if (!de.value) de.value = (narr.title ? narr.title + " \u2014 " : "") + (narr.subtitle || "") + ". Rendered live with SweK Engine."; } catch (e) {}
+    msg.textContent = "recorded " + (blob.size / 1e6).toFixed(1) + " MB \u00b7 review the draft, then export/upload"; this.textContent = "\u25CF Record"; this.classList.add("rec"); };
+  rec.start(); this.textContent = "\u25A0 Stop"; msg.textContent = "recording\u2026 narration playing" + audioNote;
+  loadScript(sel.value); startNarration(() => { setTimeout(() => { if (rec && rec.state === "recording") rec.stop(); }, 800); });
+};
+document.getElementById("exp").onclick = async function () {
+  if (!blob) return; this.disabled = true; msg.textContent = "transcoding to mp4\u2026";
+  try {
+    const title = encodeURIComponent(document.getElementById("ttl").value || "SweK Engine");
+    const desc = encodeURIComponent((document.getElementById("desc").value) || ((narr.title ? narr.title + " \u2014 " : "") + (narr.subtitle || "") + ". Rendered live with SweK Engine."));
+    const r = await fetch("/export/mp4?title=" + title + "&desc=" + desc + "&tags=swek,gamedev,webgl,physics", { method: "POST", headers: { "content-type": "application/octet-stream" }, body: blob });
+    const j = await r.json();
+    if (j.ok) { window.__lastMp4 = j.mp4; document.getElementById("yt").disabled = false; } msg.textContent = j.ok ? ("\u2713 saved " + j.mp4 + " (" + (j.bytes / 1e6).toFixed(1) + " MB) + description .txt \u2014 ready to upload") : ("export failed: " + j.error);
+  } catch (e) { msg.textContent = "export error: " + e.message; } this.disabled = false;
+};
+
+document.getElementById("yt").onclick = async function () {
+  if (!window.__lastMp4) return; this.disabled = true; msg.textContent = "uploading to YouTube\u2026 (first time asks Google to authorize)";
+  try {
+    const meta = { mp4: window.__lastMp4, title: document.getElementById("ttl").value || "SweK Engine", description: (document.getElementById("desc").value) || ((narr.title ? narr.title + " \u2014 " : "") + (narr.subtitle || "") + ". Rendered live with SweK Engine."), tags: ["swek", "gamedev", "webgl", "physics"], privacyStatus: document.getElementById("priv").value };
+    const r = await fetch("/export/youtube", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(meta) });
+    const j = await r.json();
+    if (j.ok) { msg.innerHTML = "\u2713 uploaded: <a href='" + j.watch + "' target='_blank' style='color:#9be15d'>" + j.watch + "</a> (" + j.privacyStatus + ")"; }
+    else { msg.textContent = "upload failed: " + j.error + (j.hint ? " \u2014 " + j.hint : ""); this.disabled = false; }
+  } catch (e) { msg.textContent = "upload error: " + e.message; this.disabled = false; }
+};
+
+// headless capture hook (RIG): Playwright seeks this deterministic timeline frame-by-frame; no live speech.
+(function () {
+  const qs = new URLSearchParams(location.search); if (qs.get("headless") !== "1") return;
+  const scr = qs.get("script") || "physics"; loadScript(scr); const plan = estimateNarrationPlan(scriptById(scr));
+  let lastMs = 0; window.__headless = true;
+  window.__swekExport = {
+    ready: true,
+    plan: () => plan,
+    seek: (ms) => {
+      const dt = Math.max(0, Math.min(0.1, (ms - lastMs) / 1000)); lastMs = ms; stepScene(dt);
+      let acc = 0, active = -1, spk = 0;
+      for (let i = 0; i < plan.lines.length; i++) { const L = plan.lines[i]; if (ms >= acc && ms < acc + L.durMs) { active = i; spk = 1; break; } acc += L.durMs; if (ms >= acc && ms < acc + L.gap) { active = i; spk = 0; break; } acc += L.gap; }
+      narr.title = plan.title; narr.subtitle = plan.subtitle; narr.caption = active >= 0 ? plan.lines[active].text : ""; narr.speaking = spk > 0;
+      paintFrame(ms / 1000);
+    }
+  };
+})();
+resize(); if (!window.__headless) frame();
+</script>
+  <script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

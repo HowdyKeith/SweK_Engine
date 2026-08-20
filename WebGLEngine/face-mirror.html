@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Face Mirror — MediaPipe demo</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Face Mirror">
+<meta name="demo:desc"   content="MediaPipe face tracking → live mirror.">
+<meta name="demo:cats"   content="ai,face">
+<meta name="demo:swatch" content="M">
+
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --panel: #131927;
+    --panel-edge: #2a3550;
+    --text: #cfe6ff;
+    --text-dim: #6b7f9c;
+    --accent: #6cf;
+    --accent-warm: #fc8;
+    --warn: #f96;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, monospace;
+    height: 100%;
+    overflow: hidden;
+  }
+  .wrap {
+    display: flex; flex-direction: column;
+    height: 100vh;
+    padding: 12px;
+    gap: 12px;
+  }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 8px;
+  }
+  .header h1 {
+    margin: 0; font-size: 14px; font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .header .sub {
+    color: var(--text-dim); font-size: 11px;
+  }
+  .controls button {
+    background: var(--panel);
+    color: var(--accent-warm);
+    border: 1px solid var(--panel-edge);
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit; font-size: 12px;
+    margin-left: 6px;
+  }
+  .controls button:hover { background: #1c2538; }
+  .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .panels {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .panel h2 {
+    margin: 0 0 8px 0;
+    font-size: 11px; font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .panel-body {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #webcam-canvas {
+    max-width: 100%; max-height: 100%;
+    image-rendering: -webkit-optimize-contrast;
+    background: #000;
+    border-radius: 4px;
+  }
+  #mirror-svg {
+    max-width: 100%; max-height: 100%;
+  }
+  .metrics {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px 18px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .metric .label {
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .metric .val {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 2px;
+  }
+  .metric .val.hot   { color: var(--accent); }
+  .metric .val.warn  { color: var(--warn); }
+  .status {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 8px;
+  }
+  .status .err { color: var(--warn); }
+  .status .ok  { color: #9f6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div>
+      <h1>FACE MIRROR — MEDIAPIPE FACELANDMARKER</h1>
+      <div class="sub">Webcam → 478 landmarks → stylized SVG face. Demo for the engine's face-tracking pipeline.</div>
+    </div>
+    <div class="controls">
+      <button id="btn-start">Start camera</button>
+      <button id="btn-stop" disabled>Stop</button>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Webcam · raw landmarks</h2>
+      <div class="panel-body">
+        <canvas id="webcam-canvas" width="640" height="480"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>SweK robot · driven by blendshapes</h2>
+      <div class="panel-body">
+        <!-- v3115 -- THE FRONT DOOR. v3114 shipped ui/faceExpression.js and NOTHING CALLED IT, which by this
+             project's own rule makes it unfinished: a module with no page is a tool nobody can reach. This is
+             also the only way to answer the two questions v3114 left open, because both need a real face --
+             whether jawOpen 0.35 is the right threshold, and whether dimmed eyes read as "cannot see you"
+             rather than "sleepy". -->
+        <div id="robot-host"></div>
+        <div id="face-state" style="font-size:11px;color:#8b97a8;margin-top:6px;min-height:14px;"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Mirror · driven by metrics</h2>
+      <div class="panel-body">
+        <!-- Stylized SVG face. Eyes/mouth/brows animated via JS. Whole
+             face rotates via transform on #mirror-group. -->
+        <svg id="mirror-svg" viewBox="-100 -100 200 200">
+          <defs>
+            <radialGradient id="head-grad" cx="0.5" cy="0.4" r="0.6">
+              <stop offset="0" stop-color="#3e5a8a" />
+              <stop offset="1" stop-color="#1c2640" />
+            </radialGradient>
+          </defs>
+
+          <g id="mirror-group">
+            <!-- Head outline -->
+            <ellipse cx="0" cy="0" rx="70" ry="85" fill="url(#head-grad)" stroke="#6cf" stroke-width="1.5" />
+
+            <!-- Eyebrows (ry pivots around top, y-offset animated) -->
+            <g id="brow-left"  transform="translate(-30, -30)">
+              <rect x="-15" y="-3" width="30" height="5" rx="2" fill="#cfe6ff" />
+            </g>
+            <g id="brow-right" transform="translate(30, -30)">
+              <rect x="-15" y="-3" width="30" height="5" rx="2" fill="#cfe6ff" />
+            </g>
+
+            <!-- Eyes (ellipse ry animated by openness) -->
+            <g id="eye-left" transform="translate(-30, -15)">
+              <ellipse cx="0" cy="0" rx="12" ry="9" fill="#fff" />
+              <circle  cx="0" cy="0" r="5" fill="#1a2a4a" />
+              <circle  cx="-1.5" cy="-1.5" r="1.5" fill="#fff" />
+            </g>
+            <g id="eye-right" transform="translate(30, -15)">
+              <ellipse cx="0" cy="0" rx="12" ry="9" fill="#fff" />
+              <circle  cx="0" cy="0" r="5" fill="#1a2a4a" />
+              <circle  cx="-1.5" cy="-1.5" r="1.5" fill="#fff" />
+            </g>
+
+            <!-- Mouth (ellipse rx/ry animated by mouthWide/mouthOpen) -->
+            <ellipse id="mouth" cx="0" cy="35" rx="18" ry="4" fill="#1a1015" stroke="#fc8" stroke-width="1" />
+
+            <!-- Nose for reference -->
+            <path d="M0,-5 L-5,12 L5,12 Z" fill="rgba(255,255,255,0.15)" stroke="#6cf" stroke-width="0.5" opacity="0.5" />
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics" id="metrics">
+    <div class="metric"><div class="label">mouth open</div><div class="val" id="m-open">—</div></div>
+    <div class="metric"><div class="label">mouth wide</div><div class="val" id="m-wide">—</div></div>
+    <div class="metric"><div class="label">eye L · R</div><div class="val" id="m-eye">— · —</div></div>
+    <div class="metric"><div class="label">brow L · R</div><div class="val" id="m-brow">— · —</div></div>
+    <div class="metric"><div class="label">yaw · pitch</div><div class="val" id="m-rot">—° · —°</div></div>
+    <div class="metric"><div class="label">roll · fps</div><div class="val" id="m-roll">—° · —</div></div>
+  </div>
+
+  <div class="status" id="status">Click "Start camera" to begin. Camera permission is requested only after you click.</div>
+
+</div>
+
+<script type="module">
+import { MediaPipeFaceTracker } from "./face/MediaPipeFaceTracker.js";
+
+const btnStart = document.getElementById("btn-start");
+const btnStop  = document.getElementById("btn-stop");
+const statusEl = document.getElementById("status");
+const canvas   = document.getElementById("webcam-canvas");
+const ctx      = canvas.getContext("2d");
+
+// SVG elements driven by metrics
+const mirrorGroup = document.getElementById("mirror-group");
+const eyeLeft   = document.getElementById("eye-left");
+const eyeRight  = document.getElementById("eye-right");
+const browLeft  = document.getElementById("brow-left");
+const browRight = document.getElementById("brow-right");
+const mouth     = document.getElementById("mouth");
+
+// Metrics readouts
+const mOpen = document.getElementById("m-open");
+const mWide = document.getElementById("m-wide");
+const mEye  = document.getElementById("m-eye");
+const mBrow = document.getElementById("m-brow");
+const mRot  = document.getElementById("m-rot");
+const mRoll = document.getElementById("m-roll");
+
+let tracker = null;
+let faceFx = null, bot = null;
+const robotHost = document.getElementById("robot-host");
+const faceStateEl = document.getElementById("face-state");
+let frameCount = 0;
+let fpsT0 = performance.now();
+let fpsLatest = 0;
+
+btnStart.addEventListener("click", async () => {
+    btnStart.disabled = true;
+    statusEl.innerHTML = "<span class='ok'>Loading MediaPipe (~12 MB, first time only)…</span>";
+    try {
+        tracker = new MediaPipeFaceTracker();
+        await tracker.start();
+        // Subscribe — drive the mirror SVG + metric readouts
+        tracker.onUpdate((metrics, result) => onFrame(metrics, result));
+
+        // v3115 -- attach the robot to the SAME tracker. The wiring polls snapshot() at its own low rate
+        // rather than riding onUpdate, so a slow robot can never add work to the detect path -- which is the
+        // one thing this page must not do, given detectForVideo is still synchronous on this thread.
+        const [{ createSwekRobot }, { attachFaceExpression }] = await Promise.all([
+            import("./ui/swekRobot.js"),
+            import("./ui/faceExpression.js"),
+        ]);
+        if (!bot) { bot = createSwekRobot(); robotHost.appendChild(bot.el); }
+        faceFx = attachFaceExpression(bot, tracker, {
+            onState: (st) => {
+                // NAME THE STATE. "noface" and "unavailable" are different facts and the page says which --
+                // the whole point of v3114 was that a lost face must not look like a calm one.
+                faceStateEl.textContent = st === "live" ? "face: live"
+                    : st === "noface" ? "face: NOT DETECTED (tracker running, nobody in frame)"
+                    : "face: UNAVAILABLE (tracker not running)";
+                faceStateEl.style.color = st === "live" ? "#8b97a8" : "#fc6";
+            },
+        });
+        btnStop.disabled = false;
+        statusEl.innerHTML = "<span class='ok'>Tracking active. Try opening your mouth, blinking, raising eyebrows, turning your head.</span>";
+    } catch (e) {
+        statusEl.innerHTML = "<span class='err'>Failed: " + (e?.message ?? e) + "</span>";
+        btnStart.disabled = false;
+    }
+});
+
+btnStop.addEventListener("click", () => {
+    // v3115 -- STOP THE WIRING BEFORE THE TRACKER. The other order would leave one tick polling a tracker
+    // mid-teardown; faceExpression already reports "unavailable" on stop(), so the robot says so rather than
+    // freezing on whatever expression it happened to be wearing.
+    if (faceFx) { faceFx.stop(); faceFx = null; }
+    if (tracker) { tracker.stop(); tracker = null; }
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    statusEl.textContent = "Stopped.";
+});
+
+function onFrame(metrics, result) {
+    // FPS tracking
+    frameCount++;
+    const now = performance.now();
+    if (now - fpsT0 > 1000) {
+        fpsLatest = frameCount * 1000 / (now - fpsT0);
+        frameCount = 0;
+        fpsT0 = now;
+    }
+
+    drawWebcamWithLandmarks(result);
+    if (metrics) {
+        updateMirror(metrics);
+        updateReadouts(metrics);
+    }
+}
+
+function drawWebcamWithLandmarks(result) {
+    // Tracker's hidden video element is at /face-tracker-video — but
+    // we don't have direct ref. Instead, grab via the tracker.
+    const videoEl = tracker?._videoEl;
+    if (!videoEl) return;
+    const w = canvas.width, h = canvas.height;
+    // Draw webcam mirrored (natural feel)
+    ctx.save();
+    ctx.translate(w, 0); ctx.scale(-1, 1);
+    ctx.drawImage(videoEl, 0, 0, w, h);
+    ctx.restore();
+    // Landmarks on top
+    const lms = result?.faceLandmarks?.[0];
+    if (lms) {
+        ctx.fillStyle = "rgba(110, 220, 255, 0.85)";
+        for (const lm of lms) {
+            const x = (1 - lm.x) * w;
+            const y = lm.y * h;
+            ctx.fillRect(x - 1, y - 1, 2, 2);
+        }
+    }
+}
+
+function updateMirror(m) {
+    // Head rotation — invert yaw so it feels like a true mirror (turn
+    // right → mirror turns right from your POV).
+    const yawDeg   = -m.yaw   * 180 / Math.PI;
+    const pitchDeg = -m.pitch * 180 / Math.PI;
+    const rollDeg  = -m.roll  * 180 / Math.PI;
+    // Clamp to sane range
+    const yawC   = Math.max(-30, Math.min(30, yawDeg));
+    const pitchC = Math.max(-20, Math.min(20, pitchDeg));
+    const rollC  = Math.max(-25, Math.min(25, rollDeg));
+    mirrorGroup.setAttribute("transform",
+        `rotate(${rollC}) translate(${yawC * 0.3} ${pitchC * 0.4}) skewX(${yawC * 0.2})`
+    );
+
+    // Eye openness — baseline EAR ≈ 0.30, closed ≈ 0.08
+    // Map [0.08, 0.35] → [0.05, 1.2] for ry scale
+    const eyeL = Math.max(0.05, Math.min(1.2, (m.eyeLeft  - 0.08) / 0.22));
+    const eyeR = Math.max(0.05, Math.min(1.2, (m.eyeRight - 0.08) / 0.22));
+    eyeLeft.setAttribute("transform",  `translate(-30, -15) scale(1, ${eyeL.toFixed(3)})`);
+    eyeRight.setAttribute("transform", `translate(30, -15) scale(1, ${eyeR.toFixed(3)})`);
+
+    // Brow Y offset — baseline browY = ~0.05, raised = ~0.15
+    // Map to vertical translation: 0.05 → 0px, 0.15 → -8px
+    const browLY = -Math.max(0, Math.min(20, (m.browLeft  - 0.05) * 200));
+    const browRY = -Math.max(0, Math.min(20, (m.browRight - 0.05) * 200));
+    browLeft.setAttribute("transform",  `translate(-30, ${-30 + browLY})`);
+    browRight.setAttribute("transform", `translate(30, ${-30 + browRY})`);
+
+    // Mouth scale — baseline mouthOpen ≈ 0.02, open ≈ 0.20
+    // Map to ry: 0.02 → 4 (closed), 0.20 → 18 (open mouth)
+    const mouthRy = 4 + Math.max(0, Math.min(0.30, m.mouthOpen)) * 70;
+    // mouthWide baseline ≈ 0.20, smile ≈ 0.35
+    const mouthRx = 12 + Math.max(0, Math.min(0.50, m.mouthWide - 0.15)) * 30;
+    mouth.setAttribute("rx", mouthRx.toFixed(2));
+    mouth.setAttribute("ry", mouthRy.toFixed(2));
+}
+
+function updateReadouts(m) {
+    mOpen.textContent = m.mouthOpen.toFixed(3);
+    mOpen.className = "val" + (m.mouthOpen > 0.10 ? " hot" : "");
+    mWide.textContent = m.mouthWide.toFixed(3);
+    mEye.textContent  = `${m.eyeLeft.toFixed(2)} · ${m.eyeRight.toFixed(2)}`;
+    mEye.className = "val" + (Math.min(m.eyeLeft, m.eyeRight) < 0.12 ? " warn" : "");
+    mBrow.textContent = `${m.browLeft.toFixed(3)} · ${m.browRight.toFixed(3)}`;
+    const yawDeg = (m.yaw * 180 / Math.PI).toFixed(0);
+    const pitchDeg = (m.pitch * 180 / Math.PI).toFixed(0);
+    const rollDeg = (m.roll * 180 / Math.PI).toFixed(0);
+    mRot.textContent  = `${yawDeg}° · ${pitchDeg}°`;
+    mRoll.textContent = `${rollDeg}° · ${fpsLatest.toFixed(0)} fps`;
+}
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

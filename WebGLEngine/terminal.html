@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#06080c">
+<title>Terminal</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #06080c; color: #cde; font: 13px ui-monospace, monospace; overflow: hidden; }
+  #bar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #16202c; background: #080b10; }
+  #bar b { color: #6fe0c8; letter-spacing: .5px; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: #c44; box-shadow: 0 0 6px #c44; }
+  #dot.on { background: #5fd07a; box-shadow: 0 0 6px #5fd07a; }
+  #status { font-size: 11px; color: #8b97a8; }
+  #gpu { margin-left: auto; font-size: 10.5px; color: #566; }
+  #term { position: absolute; top: 39px; left: 0; right: 0; bottom: 0; padding: 6px 8px; }
+  #hint { display: none; padding: 14px; color: #ffcf6b; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <span id="dot"></span>
+    <b>TERMINAL</b>
+    <span id="status">loading&hellip;</span>
+    <span id="gpu"></span>
+  </div>
+  <div id="hint"></div>
+  <div id="term"></div>
+
+<script>
+// Prefer locally-vendored xterm (offline); fall back to the CDN.
+const CDN = "https://cdn.jsdelivr.net/npm/";
+const LOCAL = "/vendor/xterm/";
+function addCss(href) { const l = document.createElement("link"); l.rel = "stylesheet"; l.href = href; document.head.appendChild(l); }
+function addJs(src) { return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("load failed: " + src)); document.head.appendChild(s); }); }
+
+(async function boot() {
+  let local = false;
+  try { const r = await fetch(LOCAL + "xterm.min.js", { method: "HEAD" }); local = r.ok; } catch {}
+  try {
+    if (local) {
+      addCss(LOCAL + "xterm.min.css");
+      await addJs(LOCAL + "xterm.min.js"); await addJs(LOCAL + "addon-fit.min.js"); await addJs(LOCAL + "addon-webgl.min.js");
+    } else {
+      addCss(CDN + "@xterm/xterm@5.5.0/css/xterm.min.css");
+      await addJs(CDN + "@xterm/xterm@5.5.0/lib/xterm.min.js");
+      await addJs(CDN + "@xterm/addon-fit@0.10.0/lib/addon-fit.min.js");
+      await addJs(CDN + "@xterm/addon-webgl@0.18.0/lib/addon-webgl.min.js");
+    }
+  } catch (e) {
+    document.getElementById("term").style.display = "none";
+    const h = document.getElementById("hint"); h.style.display = "block";
+    h.innerHTML = "Couldn't load xterm.js" + (local ? " from the local copy." : " from the CDN \u2014 this needs internet, or click \u201cDownload for offline use\u201d in Settings \u2192 Diagnostics \u2192 Terminal.");
+    return;
+  }
+  initTerminal(local);
+})();
+
+function initTerminal(local) {
+  const $ = (id) => document.getElementById(id);
+  const term = new Terminal({
+    fontSize: 14, fontFamily: "ui-monospace, Menlo, Consolas, monospace",
+    cursorBlink: true, convertEol: true, scrollback: 4000,
+    theme: { background: "#06080c", foreground: "#cfe6e0", cursor: "#6fe0c8", selectionBackground: "#244" },
+  });
+  const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
+  term.open($("term"));
+  let gpu = false;
+  try { const w = new WebglAddon.WebglAddon(); w.onContextLoss(() => { try { w.dispose(); } catch {} }); term.loadAddon(w); gpu = true; } catch (e) {}
+  $("gpu").textContent = (gpu ? "GPU \u00b7 WebGL renderer" : "canvas renderer") + (local ? " \u00b7 offline" : "");
+  try { fit.fit(); } catch {}
+  addEventListener("resize", () => { try { fit.fit(); } catch {} });
+
+  const PROMPT = "\x1b[38;5;78m\u276f\x1b[0m ";
+  let line = "", ready = false;
+  const hist = []; let histIdx = 0;
+  const prompt = () => { term.write("\r\n" + PROMPT); line = ""; ready = true; };
+  const replaceLine = (s) => { term.write("\r\x1b[K" + PROMPT + s); line = s; };
+  const submit = () => { term.write("\r\n"); const cmd = line; if (cmd.trim()) hist.push(cmd); histIdx = hist.length; ready = false; ws.send(JSON.stringify({ type: "input", data: cmd })); line = ""; };
+
+  term.onData((d) => {
+    if (!ready) { if (d === "\x03") ws.send(JSON.stringify({ type: "signal", data: "SIGINT" })); return; }
+    if (d === "\x1b[A") { if (hist.length) { histIdx = Math.max(0, histIdx - 1); replaceLine(hist[histIdx] || ""); } return; }
+    if (d === "\x1b[B") { if (hist.length) { histIdx = Math.min(hist.length, histIdx + 1); replaceLine(histIdx < hist.length ? hist[histIdx] : ""); } return; }
+    if (d === "\x1b[C" || d === "\x1b[D") return;
+    for (const ch of d) {
+      if (ch === "\r") submit();
+      else if (ch === "\x7f") { if (line.length) { line = line.slice(0, -1); term.write("\b \b"); } }
+      else if (ch === "\x03") { term.write("^C"); ws.send(JSON.stringify({ type: "signal", data: "SIGINT" })); ready = false; }
+      else if (ch >= " ") { line += ch; term.write(ch); }
+    }
+  });
+
+  const wsUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/term";
+  const ws = new WebSocket(wsUrl);
+  ws.onopen = () => { $("dot").classList.add("on"); $("status").textContent = "connected"; };
+  ws.onclose = () => { $("dot").classList.remove("on"); $("status").textContent = "disconnected"; ready = false; };
+  ws.onerror = () => { $("status").textContent = "connection error"; };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.type === "output") term.write(m.data);
+    else if (m.type === "ready") prompt();
+    else if (m.type === "info") term.write("\x1b[38;5;245m" + m.data + "\x1b[0m");
+    else if (m.type === "error") { term.write("\r\n\x1b[31m" + m.data + "\x1b[0m\r\n"); $("status").textContent = "blocked"; }
+    else if (m.type === "exit") { term.write("\r\n\x1b[33m[shell exited \u2014 reload to restart]\x1b[0m\r\n"); ready = false; }
+  };
+  term.focus();
+}
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

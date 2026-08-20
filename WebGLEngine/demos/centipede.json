@@ -1,0 +1,6 @@
+{
+    "name": "Centipede Chain",
+    "description": "Spawn a 12-segment centipede with a top-down camera view.",
+    "camera": { "x": 0, "y": 90, "z": 40, "yaw": 0, "pitch": -0.9 },
+    "centipede": { "count": 12, "x": 0, "z": 0 }
+}

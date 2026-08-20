@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="PetFBI board">
+<meta name="demo:desc" content="Shared lost-pet posting board — claim a report, mark it posted, live status so admins don't double-post.">
+<meta name="demo:cats" content="tool">
+<title>PetFBI — posting board</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; --warn:#ffd27f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:9px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  #bar h1 { font-size:14px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { max-width:1000px; margin:0 auto; padding:14px; }
+  .note { font-size:11px; color:var(--dim); line-height:1.5; margin:0 0 12px; } .note b { color:var(--warn); }
+  input[type=text], textarea { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:7px 9px; font:12px ui-monospace,monospace; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:6px 11px; font:12px ui-monospace,monospace; cursor:pointer; white-space:nowrap; }
+  .btn:disabled { opacity:.4; cursor:default; } .btn.good { color:var(--good); border-color:#2f6f4a; } .btn.danger { color:var(--bad); border-color:#5a2330; }
+  .who { display:flex; align-items:center; gap:6px; }
+  .who input { width:120px; }
+  .addrow { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+  .addrow input { flex:1 1 130px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:10px; color:var(--dim); text-transform:uppercase; padding:6px 8px; border-bottom:1px solid var(--edge); }
+  td { padding:8px; border-bottom:1px solid #14304a; font-size:12px; vertical-align:top; }
+  tr.posted { opacity:.55; }
+  .badge { font-size:10px; padding:2px 7px; border-radius:10px; text-transform:uppercase; }
+  .badge.new { background:#173656; color:var(--blue); } .badge.claimed { background:#5a4410; color:var(--warn); } .badge.posted { background:#10401f; color:var(--good); }
+  .acts { display:flex; gap:5px; flex-wrap:wrap; }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:16px 0 6px; }
+  #scrapeOut { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:8px; margin-top:6px; max-height:32vh; overflow:auto; font-size:11px; white-space:pre-wrap; word-break:break-word; color:#bcd; display:none; }
+  a { color:var(--blue); }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>🐾 PetFBI board</h1>
+  <div class="who">you are <input type="text" id="who" placeholder="admin name"></div>
+  <label style="font-size:12px;color:var(--dim)"><input type="checkbox" id="mineOnly"> only my towns</label>
+  <span id="backing" style="font-size:11px;color:var(--dim)">backing: …</span>
+  <button class="btn" id="refresh">↻</button>
+  <span id="status">…</span>
+</div>
+<div class="wrap">
+  <p class="note">Shared board so admins coordinate. <b>Claim</b> a report before you work it; others see it's taken and don't double-post. Mark <b>posted</b> when done. <b>No auto-posting</b> — you still review and post by hand. (v1 lives on this bridge; Google Sheets backing for remote admins is next.)</p>
+
+  <div class="addrow" style="margin-bottom:6px">
+    <input type="text" id="acUrl" placeholder="⚡ paste a PetFBI report URL — one button: grab → assemble → route → email draft → board" style="flex:1 1 100%">
+    <button class="btn" id="acBtn" style="background:#10401f;color:#7fe0a0;border-color:#2f6f4a">⚡ Auto-chain</button>
+  </div>
+
+  <div class="addrow">
+    <input type="text" id="aTitle" placeholder="report title / pet name">
+    <input type="text" id="aPet" placeholder="type (dog/cat/…)" style="flex:0 1 130px">
+    <input type="text" id="aLink" placeholder="PetFBI link (optional)">
+    <button class="btn" id="addBtn">+ Add report</button>
+  </div>
+
+  <table>
+    <thead><tr><th>Report</th><th>Status</th><th>Who</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="ttl">🗺️ Map <button id="mapToggle" class="btn" style="font-size:11px;padding:2px 8px" onclick="_mapToggle()">show</button> <span id="mapStat" style="font-size:11px;color:var(--dim)"></span></div>
+  <div id="mapWrap" style="display:none;margin:6px 0">
+    <div id="pinMap" style="width:100%;height:420px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0a141f"></div>
+    <p class="note">Pins are geocoded report locations (red = new, orange = claimed, green = posted). Use <b>📍 Locate</b> on a report to add it. Drag to pan, scroll to zoom. Tiles &copy; OpenStreetMap.</p>
+  </div>
+
+  <div class="ttl">Scrape helper</div>
+  <p class="note">Pull the rendered source of a report's link via Camoufox (needs the scrape daemon — install at <a href="/camoufox.html">camoufox</a>). Builds toward the parse → assemble → assisted-post flow.</p>
+  <div id="scrapeOut"></div>
+
+  <div class="ttl">Backing (shared state for remote admins)</div>
+  <p class="note">Local = this bridge only. <b>Google Sheet</b> = all admins share one board (atomic claims). Paste the owner's web-app URL + secret. Setup: PetFBI/google-sheets/README.md (Google) or PetFBI/sharepoint/README.md (SharePoint via Power Automate). Stored in ~/.voxelbridge/ (never packaged).</p>
+  <div class="addrow">
+    <input type="text" id="sheetUrl" placeholder="Apps Script /exec URL" style="flex:2 1 260px">
+    <input type="text" id="sheetSecret" placeholder="shared secret" style="flex:1 1 120px">
+    <button class="btn good" id="useSheet">Use Google Sheet</button>
+    <button class="btn good" id="useSharePoint">Use SharePoint</button>
+    <button class="btn" id="useLocal">Use local</button>
+  </div>
+
+  <div class="ttl">Send email to admins</div>
+  <p class="note"><b>Draft</b> = open your mail app (mailto). <b>Gmail SMTP</b> = send directly (needs a Gmail <a href="https://myaccount.google.com/apppasswords" target="_blank">app password</a>, not your normal password). <b>Outlook</b> = send via the installed Outlook (no credentials — uses your configured profile). Stored in ~/.voxelbridge/ (never packaged).</p>
+  <div class="addrow">
+    <select id="mailMode" style="flex:0 1 150px"><option value="draft">Draft (mailto)</option><option value="smtp">Gmail SMTP</option><option value="outlook">Outlook</option></select>
+    <input type="text" id="mailUser" placeholder="your gmail address" style="flex:1 1 180px">
+    <input type="password" id="mailPass" placeholder="gmail app password" style="flex:1 1 160px">
+    <button class="btn good" id="saveMailer">Save mailer</button>
+    <span id="mailStat" style="font-size:11px;color:var(--dim)"></span>
+  </div>
+
+  <div class="ttl">Outlook</div>
+  <p class="note">Your installed Outlook via the same VBS bridge as the Transmitter (Windows only). Inbox unread count, and run one of your Outlook rules by name.</p>
+  <div class="addrow">
+    <button class="btn" id="olUnread">Check inbox unread</button>
+    <span id="olUnreadVal" style="font-size:12px;color:var(--dim)">—</span>
+    <label style="font-size:11px;color:var(--dim)"><input type="checkbox" id="olAuto"> auto-poll 60s</label>
+    <select id="olRules" style="flex:1 1 180px"><option value="">(load rules…)</option></select>
+    <button class="btn" id="olLoadRules">Load rules</button>
+    <button class="btn good" id="olRunRule">Run rule</button>
+    <span id="olStat" style="font-size:11px;color:var(--dim)"></span>
+  </div>
+</div>
+
+<script src="/slippyMap.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const who = () => ($("who").value.trim() || "anon");
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function api(op, body){ return fetch("/petfbi/"+op, body===undefined ? undefined : { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) }).then(r=>r.json()); }
+
+let TIMER = null;
+async function load(){
+  let j; try { j = await fetch("/petfbi/board").then(r=>r.json()); } catch { $("status").textContent="bridge offline"; return; }
+  const all = (j && j.reports) || [];
+  window._allReports = all;
+  const me = who();
+  const mineOnly = $("mineOnly") && $("mineOnly").checked;
+  const cov = mineOnly ? myCoverage(me) : null;
+  const reports = mineOnly ? all.filter(r => reportMine(r, cov, me)) : all;
+  $("status").textContent = mineOnly ? (reports.length + " of " + all.length + " (yours)") : (all.length + " reports");
+  const rows = $("rows"); rows.innerHTML = "";
+  if (!reports.length) { rows.innerHTML = '<tr><td colspan="4" style="color:var(--dim);padding:24px;text-align:center">' + (mineOnly ? "No reports for your towns." : "No reports yet. Add one above.") + '</td></tr>'; return; }
+  for (const r of reports) {
+    const tr = document.createElement("tr"); if (r.status==="posted") tr.className="posted";
+    const title = esc(r.title) + (r.petType?(' <span style="color:var(--dim)">· '+esc(r.petType)+'</span>'):'') + (r.link?(' · <a href="'+esc(r.link)+'" target="_blank">link</a>'):'') + (r.loc&&r.loc.lat!=null?(' <span title="'+esc((r.loc.address)||'')+'">📍</span>'):'');
+    const whoTxt = r.status==="posted" ? ("posted by "+esc(r.postedBy||"?")) : (r.claimedBy?("claimed by "+esc(r.claimedBy)):"—");
+    const acts = document.createElement("td"); acts.className="acts";
+    const mk = (label, cls, fn, dis) => { const b=document.createElement("button"); b.className="btn "+(cls||""); b.textContent=label; b.disabled=!!dis; b.onclick=fn; return b; };
+    if (r.status==="new") acts.append(mk("Claim","", async()=>{ const x=await api("claim",{id:r.id,who:me}); if(!x.ok) alert(x.error); load(); }));
+    if (r.status==="claimed") {
+      const mine = r.claimedBy===me;
+      acts.append(mk(mine?"Mark posted":"Claimed","good", async()=>{ const x=await api("posted",{id:r.id,who:me}); if(!x.ok) alert(x.error); load(); }, !mine));
+      acts.append(mk("Release","", async()=>{ await api("unclaim",{id:r.id,who:me}); load(); }, !mine));
+    }
+    if (r.link) { acts.append(mk("Grab source","", ()=>grab(r.link)));
+      acts.append(mk("Grab report","", ()=>runSkill("petfbi_grab", r.link)));
+      acts.append(mk("Grab map","", ()=>grabMap(r.id, r.link)));
+      acts.append(mk("Assemble","", ()=>assembleReport(r))); }
+    if (r.post || (r.groups && r.groups.length)) acts.append(mk("Post kit","", ()=>{ const k=document.getElementById("kit_"+r.id); if(k) k.style.display=(k.style.display==="none"?"":"none"); }));
+    acts.append(mk(r.loc&&r.loc.lat!=null?"📍 Re-locate":"📍 Locate","", async()=>{
+      const addr = prompt("Address or place to pin on the map:", (r.loc&&r.loc.address)||r.title||"");
+      if (addr==null || !addr.trim()) return;
+      const x = await api("locate",{id:r.id, address:addr.trim()});
+      if (!x.ok) alert(x.error || "geocode failed"); load();
+    }));
+    acts.append(mk("✕","danger", async()=>{ if(confirm("Delete this report?")){ await api("remove",{id:r.id}); load(); } }));
+    tr.innerHTML = '<td>'+title+(r.notes?('<div style="color:var(--dim);font-size:11px">'+esc(r.notes)+'</div>'):'')+'</td>'
+      + '<td><span class="badge '+r.status+'">'+r.status+'</span></td>'
+      + '<td style="color:var(--dim)">'+whoTxt+'</td>';
+    tr.appendChild(acts);
+    rows.appendChild(tr);
+    if (r.post || (r.groups && r.groups.length)) { const kr=document.createElement("tr"); kr.id="kit_"+r.id; kr.style.display="none"; const td=document.createElement("td"); td.colSpan=4; td.style.padding="0"; td.innerHTML=postKitHtml(r); kr.appendChild(td); rows.appendChild(kr); }
+  }
+  if (window._mapShown) renderMap();
+}
+// v1629 — pin map of geocoded report locations (bridge-proxied Static Maps; key stays server-side).
+window._mapShown = false;
+function _mapToggle(){ window._mapShown = !window._mapShown; $("mapWrap").style.display = window._mapShown?"":"none"; $("mapToggle").textContent = window._mapShown?"hide":"show"; if (window._mapShown) renderMap(); }
+async function renderMap(){
+  const located = (window._allReports||[]).filter(r=>r.loc && r.loc.lat!=null);
+  if (!located.length) { $("mapStat").textContent="no locations yet — use 📍 Locate on a report"; if (window._slippy) window._slippy.setMarkers([]); return; }
+  const markers = located.map((r,i)=>({ lat:r.loc.lat, lng:r.loc.lng, label:String.fromCharCode(65+(i%26)), address:(r.loc.address||r.title||""), color: r.status==="posted"?"green":(r.status==="claimed"?"orange":"red") }));
+  if (!window._slippy) window._slippy = makeSlippyMap($("pinMap"));
+  window._slippy.setMarkers(markers);
+  $("mapStat").textContent = located.length+" pinned";
+}
+async function grab(url){
+  const o = $("scrapeOut"); o.style.display="block"; o.textContent="▶ grabbing "+url+" via Camoufox …";
+  try { const r = await fetch("/scrape/content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})}).then(x=>x.json());
+    o.textContent = r.ok ? ((r.html||"").length.toLocaleString()+" chars from "+(r.url||url)+"\n\n"+(r.html||"").slice(0,6000)) : ("✕ "+(r.error||"failed (is the scrape daemon up?)")); }
+  catch { o.textContent="✕ bridge offline"; }
+}
+async function runSkill(name, url){
+  const o=$("scrapeOut"); o.style.display="block"; o.textContent="▶ running "+name+" on "+url+" (needs Camoufox) …";
+  try { const r=await fetch("/webwright/skills/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name, args:["--url", url]})}).then(x=>x.json());
+    o.textContent = (name+" → "+JSON.stringify(r.result!==undefined?r.result:r, null, 2)).slice(0, 8000); return r; }
+  catch { o.textContent="✕ bridge offline"; return {ok:false}; }
+}
+async function grabMap(id, url){
+  const r=await runSkill("petfbi_map_grab", url);
+  const m = r && r.result && r.result.mapUrl;
+  if (m && confirm("Save this map URL to the report?\n\n"+m)) { await api("update",{id, mapUrl:m}); load(); }
+}
+function copyText(t){ try{ navigator.clipboard.writeText(t); }catch{} }
+// v1989 — one-click "Post to Facebook" for volunteers. Fetches the kit (caption +
+// pet photo + map already downloaded server-side), copies the caption to the
+// clipboard, saves BOTH images as files to the volunteer's computer (ready to drag
+// into the FB composer), then opens the group composer(s). Turns a ~7-step manual
+// chore (copy text, hunt the photo, download it, screenshot the map, open FB, paste,
+// attach) into: click → paste (Ctrl+V) → drag the 2 saved images in → Post.
+async function fbPost(id){
+  const status=document.getElementById("scrapeOut"); if(status){ status.style.display="block"; status.textContent="\uD83D\uDCD8 building Facebook kit \u2026"; }
+  let k;
+  try{ k=await fetch("/petfbi/fbkit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}).then(r=>r.json()); }
+  catch(e){ if(status) status.textContent="\u2715 bridge offline"; return; }
+  if(!k||!k.ok){ if(status) status.textContent="\u2715 "+((k&&k.error)||"couldn't build kit"); return; }
+  // 1) caption to clipboard
+  let copied=false; try{ await navigator.clipboard.writeText(k.caption||""); copied=true; }catch{}
+  // 2) save the images as files (they download to the volunteer's Downloads)
+  let saved=0;
+  for(const img of (k.images||[])){
+    try{
+      const a=document.createElement("a"); a.href=img.dataUrl; a.download=img.name;
+      document.body.appendChild(a); a.click(); a.remove(); saved++;
+      await new Promise(r=>setTimeout(r,350));   // stagger so the browser doesn't block the 2nd download
+    }catch{}
+  }
+  // 3) open the first group composer (or the plain FB "create post" if no groups routed)
+  const groups=k.groups||[];
+  const openUrl = groups.length ? groups[0].url : "https://www.facebook.com/";
+  window.open(openUrl,"_blank");
+  // 4) tell the volunteer exactly what to do, and offer the remaining groups
+  const imgNames=(k.images||[]).map(i=>i.name).join(" + ")||"(no images found on the report)";
+  let msg="\u2713 Facebook kit ready:\n";
+  msg += (copied?"  \u2022 caption COPIED to clipboard \u2014 paste with Ctrl+V (\u2318V on Mac)\n":"  \u2022 caption copy blocked \u2014 use \u201CCopy text\u201D then paste\n");
+  msg += "  \u2022 "+saved+" image(s) saved to your Downloads: "+imgNames+"\n    drag them into the Facebook post box\n";
+  if(groups.length>1){ msg += "  \u2022 "+groups.length+" groups to post in \u2014 opened the first; the rest are listed below the post.\n"; }
+  msg += "\nAfter posting, click \u201CMark posted\u201D on this report.";
+  if(status){
+    status.textContent=msg;
+    if(groups.length>1){
+      const extra=document.createElement("div"); extra.style.cssText="margin-top:8px;font-size:12px";
+      extra.innerHTML="<b>Open the other groups:</b> "+groups.slice(1).map(g=>'<a href="'+esc(g.url)+'" target="_blank" style="margin-right:8px">'+esc(g.name)+'</a>').join(" ");
+      status.appendChild(extra);
+    }
+  }
+}
+async function markEmailed(id){ const x=await api("emailed",{id}); if(x&&x.ok) load(); }
+let ADMINS = [];
+async function loadAdmins(){ try{ const r=await fetch("/petfbi/admins").then(x=>x.json()); ADMINS=(r&&r.admins)||[]; }catch{} }
+function myCoverage(me){
+  const m=(me||"").toLowerCase();
+  const a=ADMINS.find(x => (x.email||"").toLowerCase()===m || (x.name||"").toLowerCase()===m || (x.email||"").toLowerCase().split("@")[0]===m);
+  if(!a) return null;
+  const towns=(a.towns||"").toLowerCase().split(",").map(t=>t.trim()).filter(Boolean);
+  return { email:(a.email||"").toLowerCase(), name:(a.name||"").toLowerCase(), state:(a.state||"").toLowerCase(), towns, all: !towns.length || towns.some(t=>["*","all","default"].includes(t)) };
+}
+function reportMine(r, cov, me){
+  const m=(me||"").toLowerCase();
+  if(Array.isArray(r.admins) && r.admins.some(a => (a.email||"").toLowerCase()===m || (a.name||"").toLowerCase()===m || (cov && (a.email||"").toLowerCase()===cov.email))) return true;
+  if(cov){
+    const rt=(((r.routing&&r.routing.town))||((r.fields&&r.fields.TOWN))||"").toLowerCase();
+    const rs=(((r.routing&&r.routing.state))||((r.fields&&r.fields.STATE))||"").toLowerCase();
+    const stateOk = !cov.state || cov.state==="*" || cov.state===rs;
+    const townOk = cov.all || (rt && cov.towns.includes(rt));
+    if(stateOk && townOk) return true;
+  }
+  return false;
+}
+let MAILER = { mode:"draft" };
+async function loadMailer(){
+  try{ const m=await fetch("/petfbi/mailer").then(r=>r.json()); MAILER=m||{mode:"draft"};
+    $("mailMode").value=MAILER.mode||"draft"; if(MAILER.smtpUser) $("mailUser").value=MAILER.smtpUser;
+    $("mailStat").textContent = MAILER.mode==="smtp" ? (MAILER.smtpReady?("Gmail SMTP ready \u00b7 "+MAILER.smtpUser):"Gmail SMTP \u2014 enter address + app password") : (MAILER.mode==="outlook"?"Outlook \u00b7 uses your profile":"Draft (mailto)");
+  }catch{}
+}
+async function sendNow(id){
+  if(!confirm("Send this report's email to its town admins now?")) return;
+  const x=await api("send",{id});
+  if(x&&x.ok){ alert("Sent to "+(x.sent||"?")+" recipient(s)."); load(); }
+  else alert("Send failed: "+((x&&x.error)||"?")+((x&&x.draft)?"\n\nUse Open email, or configure a mailer below.":""));
+}
+function postKitHtml(r){
+  const g=r.groups||[], rt=r.routing||{};
+  let h='<div style="padding:10px 14px;background:#0c1828;border-left:3px solid var(--blue)">';
+  if(r.post){ const pid="post_"+r.id;
+    h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap"><b style="color:var(--blue)">Ready post</b>'
+      +'<button class="btn good" style="font-weight:600" onclick="fbPost(\''+r.id+'\')" title="One click: copies the caption, downloads the pet photo + map as ready-to-attach files, and opens Facebook. Then just paste and drag the two images in.">\uD83D\uDCD8 Post to Facebook</button>'
+      +'<button class="btn" onclick="copyText(document.getElementById(\''+pid+'\').textContent)">Copy text</button></div>'
+      +'<pre id="'+pid+'" style="white-space:pre-wrap;background:#08111d;padding:8px;border-radius:4px;margin:0 0 8px;font-size:12px">'+esc(r.post)+'</pre>'; }
+  const links=[]; if(r.imageUrl) links.push('<a href="'+esc(r.imageUrl)+'" target="_blank">pet photo</a>'); if(r.mapUrl) links.push('<a href="'+esc(r.mapUrl)+'" target="_blank">map</a>');
+  if(links.length) h+='<div style="font-size:12px;margin-bottom:8px">'+links.join(' · ')+'</div>';
+  if(g.length){
+    h+='<b style="color:var(--blue)">Groups for '+esc(rt.town||'')+', '+esc(rt.state||'')+' ('+g.length+')</b>';
+    h+='<ul style="margin:4px 0 8px;padding-left:18px;font-size:12px">';
+    for(const x of g) h+='<li><span style="color:var(--dim)">['+esc(x.kind)+']</span> <a href="'+esc(x.url)+'" target="_blank">'+esc(x.name)+'</a></li>';
+    h+='</ul><div style="font-size:11px;color:var(--dim);line-height:1.5"><div><b>Admin:</b> '+esc(rt.adminShare||'')+'</div><div><b>Editor:</b> '+esc(rt.editorSteps||'')+'</div></div>';
+  } else if(r.groupsNote) h+='<div style="font-size:11px;color:var(--dim)">'+esc(r.groupsNote)+'</div>';
+  if(r.email && (r.email.to||[]).length){
+    const eid="em_"+r.id, to=(r.email.to||[]).join(", ");
+    const mailto="mailto:?bcc="+encodeURIComponent((r.email.to||[]).join(","))+"&subject="+encodeURIComponent(r.email.subject||"")+"&body="+encodeURIComponent(r.email.body||"");
+    h+='<div style="margin-top:8px;border-top:1px solid #1c3a5a;padding-top:8px"><b style="color:var(--blue)">Email kit</b>'
+      +'<span style="color:var(--dim);font-size:11px"> '+(r.emailedCount?("· emailed "+r.emailedCount+"×"):"· not emailed yet")+'</span>'
+      +'<div style="font-size:12px;margin:4px 0"><b>To:</b> '+esc(to)+'</div>'
+      +'<div style="font-size:12px;margin:2px 0"><b>Subj:</b> '+esc(r.email.subject||"")+'</div>'
+      +'<a class="btn" href="'+mailto+'">Open email</a> '
+      +((MAILER && MAILER.mode!=="draft") ? '<button class="btn good" onclick="sendNow(\''+r.id+'\')">Send now</button> ' : '')
+      +'<button class="btn" onclick="copyText(document.getElementById(\''+eid+'\').textContent)">Copy body</button> '
+      +'<button class="btn good" onclick="markEmailed(\''+r.id+'\')">Mark emailed</button>'
+      +'<pre id="'+eid+'" style="display:none">'+esc(r.email.body||"")+'</pre></div>';
+  } else if(r.adminsNote) h+='<div style="font-size:11px;color:var(--dim)">'+esc(r.adminsNote)+'</div>';
+  return h+'</div>';
+}
+async function assembleReport(r){
+  const o=$("scrapeOut"); o.style.display="block"; o.textContent="▶ grabbing + assembling "+r.link+" …";
+  const gr=await runSkill("petfbi_grab", r.link);
+  const res=gr&&gr.result, text=res&&res.text;
+  if(!text){ o.textContent="✕ grab returned no text (is Camoufox up?)"; return; }
+  try{
+    const a=await fetch("/petfbi/assemble",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text, meta:(res.meta||{}), url:r.link})}).then(x=>x.json());
+    if(!a.ok){ o.textContent="✕ assemble: "+(a.error||"failed"); return; }
+    const p=a.packet; o.textContent="Assembled: "+p.status+" "+p.type+" - "+p.name+" @ "+p.town+", "+p.state+"  ("+((p.groups||[]).length)+" groups)\n\n"+p.post;
+    if(confirm("Save this assembled post + "+((p.groups||[]).length)+" groups to the report?")){
+      await api("update",{id:r.id, post:p.post, notes:p.post, mapUrl:p.mapUrl, imageUrl:p.imageUrl, fields:p.fields, groups:p.groups, routing:p.routing, admins:p.admins, email:p.email, petType:p.type}); load(); }
+  }catch{ o.textContent="✕ bridge offline"; }
+}
+$("acBtn").onclick = async () => {
+  const url=$("acUrl").value.trim();
+  if(!/^https?:\/\//i.test(url)){ alert("paste a full http(s) report URL"); return; }
+  const o=$("scrapeOut"); o.style.display="block"; o.textContent="⚡ auto-chain: grabbing + assembling "+url+" … (needs Camoufox)";
+  $("acBtn").disabled=true;
+  try{
+    const r=await api("autochain",{url});
+    if(!r.ok){ o.textContent="✕ "+(r.step?("["+r.step+"] "):"")+(r.error||"failed"); $("acBtn").disabled=false; return; }
+    const p=r.packet||{};
+    const lines=[
+      "✓ "+(p.status||"")+" "+(p.type||"")+" — "+(p.name||"")+" @ "+(p.town||"")+", "+(p.state||""),
+      ((p.groups||[]).length)+" group(s) · "+((p.admins||[]).length)+" admin(s)"+(p.email&&p.email.to?(" · email → "+p.email.to):""),
+      "", "── POST ──", p.post||""
+    ];
+    if(p.email&&p.email.subject){ lines.push("","── EMAIL DRAFT ──","To: "+(p.email.to||""),"Subject: "+(p.email.subject||""),"",(p.email.body||"")); }
+    o.textContent=lines.join("\n");
+    $("acUrl").value="";
+    await load();
+  }catch(e){ o.textContent="✕ "+e.message; }
+  $("acBtn").disabled=false;
+};
+$("addBtn").onclick = async () => { const title=$("aTitle").value.trim(); const link=$("aLink").value.trim(); if(!title && !link) return; const r=await api("add",{title: title||("(intake) "+link.slice(-28)), petType:$("aPet").value.trim(), link}); if(r.ok){ $("aTitle").value="";$("aPet").value="";$("aLink").value=""; await load(); if(link && !title){ const rep=r.report; if(rep) assembleReport(rep); } } else alert(r.error); };
+$("refresh").onclick = load;
+$("mineOnly").onchange = load;
+let _lastUnread = null, _olTimer = null;
+async function pollUnread(announce){
+  try{
+    const r=await fetch("/outlook/unread").then(x=>x.json());
+    if(r.ok){
+      const n=r.unread;
+      $("olUnreadVal").textContent = n+" unread";
+      if(announce && _lastUnread!=null && n>_lastUnread){
+        document.title = "("+n+") PetFBI — new mail";
+        $("olUnreadVal").style.color = "#7fe0a0";
+        setTimeout(()=>{ $("olUnreadVal").style.color="var(--dim)"; document.title="PetFBI board"; }, 5000);
+      }
+      _lastUnread = n;
+    } else { $("olUnreadVal").textContent = "✕ "+(r.error||"no Outlook"); }
+  }catch{ $("olUnreadVal").textContent="✕ bridge offline"; }
+}
+$("olUnread").onclick = ()=>{ $("olUnreadVal").textContent="…"; pollUnread(false); };
+$("olAuto").onchange = e=>{ clearInterval(_olTimer); if(e.target.checked){ pollUnread(true); _olTimer=setInterval(()=>pollUnread(true), 60000); } };
+$("olLoadRules").onclick = async ()=>{ $("olStat").textContent="loading…"; try{ const r=await fetch("/outlook/rules").then(x=>x.json()); const sel=$("olRules"); sel.innerHTML=""; if(r.ok && r.rules && r.rules.length){ for(const x of r.rules){ const o=document.createElement("option"); o.value=x.name; o.textContent=x.name+(x.enabled?"":" (off)"); sel.appendChild(o);} $("olStat").textContent=r.rules.length+" rules"; } else { sel.innerHTML='<option value="">(none)</option>'; $("olStat").textContent="✕ "+(r.error||"no rules"); } }catch{ $("olStat").textContent="✕ bridge offline"; } };
+$("olRunRule").onclick = async ()=>{ const name=$("olRules").value; if(!name){ $("olStat").textContent="pick a rule"; return; } $("olStat").textContent="running "+name+"…"; try{ const r=await fetch("/outlook/rule",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name})}).then(x=>x.json()); $("olStat").textContent = r.ok ? ("✓ ran "+name) : ("✕ "+(r.error||"failed")); }catch{ $("olStat").textContent="✕ bridge offline"; } };
+$("who").value = localStorage.getItem("petfbi.admin") || "";
+$("who").onchange = () => { localStorage.setItem("petfbi.admin", $("who").value.trim()); load(); };
+async function loadConfig(){
+  try { const c = await fetch("/petfbi/config").then(r=>r.json());
+    $("backing").textContent = "backing: " + (c.mode==="sheet" ? ("Google Sheet "+(c.sheetUrl||"")) : c.mode==="sharepoint" ? ("SharePoint "+(c.sheetUrl||"")) : "local");
+    $("backing").style.color = (c.mode==="sheet"||c.mode==="sharepoint") ? "var(--good)" : "var(--dim)"; } catch {}
+}
+$("useSheet").onclick = async () => { const url=$("sheetUrl").value.trim(); if(!url){ alert("paste the web-app URL"); return; } const r=await fetch("/petfbi/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetUrl:url, secret:$("sheetSecret").value, mode:"sheet"})}).then(x=>x.json()); $("sheetSecret").value=""; loadConfig(); load(); };
+$("useSharePoint").onclick = async () => { const url=$("sheetUrl").value.trim(); if(!url){ alert("paste the Power Automate flow URL"); return; } await fetch("/petfbi/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sheetUrl:url, secret:$("sheetSecret").value, mode:"sharepoint"})}).then(x=>x.json()); $("sheetSecret").value=""; loadConfig(); load(); };
+$("useLocal").onclick = async () => { await fetch("/petfbi/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"local"})}); loadConfig(); load(); };
+$("saveMailer").onclick = async () => {
+  const mode=$("mailMode").value, body={mode};
+  if(mode==="smtp"){ body.user=$("mailUser").value.trim(); body.from=$("mailUser").value.trim(); if($("mailPass").value) body.pass=$("mailPass").value; }
+  await fetch("/petfbi/mailer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json());
+  $("mailPass").value=""; loadMailer(); load();
+};
+loadConfig();
+loadMailer();
+loadAdmins();
+load();
+TIMER = setInterval(load, 3000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

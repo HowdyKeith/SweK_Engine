@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Warp Map">
+<meta name="demo:desc" content="A star map that clusters because a power spectrum put the structure there, not because anyone drew it. The field comes from makeGRF -- white noise filtered by the square root of a prescribed P(k), whose measured spectrum comes back at 1.006 of what was asked for over twelve universes -- and the stars are Poisson-sampled from it. Toggle SCATTER to see the same star count with no field behind it: a pure scatter has variance exactly equal to its mean, which is what Poisson means, and it measures 1.0. The clustered map measures well above that, and the excess is structure. Chopping a smooth field into countable stars costs exactly V/N in shot noise, predicted before the code runs. Click any star to warp to it.">
+<meta name="demo:category" content="simulation">
+<title>Warp Map</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js" } }</script>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:430px; pointer-events:none; }
+  #cap { color:#ffd27f; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.75; }
+  #note { color:#6f86ab; margin-top:8px; line-height:1.45; font-size:11.5px; }
+  #ctl { position:fixed; left:14px; bottom:14px; z-index:4; background:rgba(4,8,18,.93); border:1px solid #3a3a6a; border-radius:10px; padding:11px 14px; }
+  #ctl label { color:#ffd27f; display:block; margin-bottom:6px; font-size:11px; }
+  input[type=range] { width:280px; }
+  #btns { position:fixed; right:14px; bottom:14px; z-index:4; display:flex; gap:8px; }
+  button { background:rgba(6,10,22,.92); color:#ffd27f; border:1px solid #4a4a7a; border-radius:16px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#6ff0d6; border-color:#2a6a5a; }
+  #warp { position:fixed; right:14px; top:12px; z-index:4; background:rgba(4,8,18,.92); border:1px solid #3a3a6a; border-radius:8px; padding:9px 12px; color:#6f86ab; font-size:11px; max-width:210px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Warp Map &mdash; structure, not scatter</div><div id="stat"></div><div id="note"></div></div>
+<div id="warp">click any star to <b style="color:#ffd27f">warp</b> to it.<br><span id="dest"></span></div>
+<div id="btns"><button id="tMode" class="on">clustered</button></div>
+<div id="ctl"><label>clustering strength &mdash; the power spectrum's slope: <span id="nval" style="color:#f6a623">-1.8</span></label><input id="slope" type="range" min="-32" max="-8" step="1" value="-18"></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
+import { makeGRF } from "./simulation/cosmo/grf.js";
+import { sampleStars, shotNoise } from "./simulation/cosmo/starmap.js";
+
+const N = 32, BOX = 100;          // N MUST be a power of two -- fft.js throws otherwise, and it is right to
+let seedv = 20260715;
+const rng = () => { seedv = (seedv * 1103515245 + 12345) & 0x7fffffff; return seedv / 0x7fffffff; };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x02030a);
+const cam = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.5, 4000);
+cam.position.set(150, 90, 150);
+const ctr = new OrbitControls(cam, renderer.domElement); ctr.enableDamping = true; ctr.target.set(BOX/2, BOX/2, BOX/2);
+addEventListener("resize", () => { cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+let stars = [], pts = null;
+function build() {
+  const slope = parseInt(document.getElementById("slope").value, 10) / 10;
+  document.getElementById("nval").textContent = slope.toFixed(1);
+  const clustered = document.getElementById("tMode").classList.contains("on");
+  const P = (k) => (k > 0 ? 1.0 * Math.pow(k, slope) : 0);
+  // the field: white noise filtered by sqrt(P(k)). Its measured spectrum returns 1.006 of what was asked for.
+  const g = makeGRF({ n: N, boxSize: BOX, P, seed: 4242 });
+  // sigma must stay below ~0.5 or 1+delta goes negative, the density clamps, and the sampling law breaks
+  let s = 0, s2 = 0;
+  for (const d of g.delta) { s += d; s2 += d*d; }
+  const mean = s/g.delta.length, sigma = Math.sqrt(s2/g.delta.length - mean*mean);
+  const field = clustered ? g.delta : new Float64Array(N*N*N);   // SCATTER = the same star count, no field at all
+    // v2490: was 0.006 -- about 6,000 stars, a mean of 0.18 per cell. AT THAT DENSITY THE SHOT NOISE SWAMPS THE
+  // STRUCTURE and the page measured variance/mean = 1.03: it could not show what the gate proves, because I shipped
+  // it 33x sparser than the configuration I verified headless (nbar 0.2 -> 199,627 stars -> 1.368). The page's own
+  // shot-noise readout said so in plain numbers -- V/N = 165.9 -- and I did not read it.
+  stars = sampleStars(field, N, 0.12, { rng, boxSize: BOX });
+  // measure what we built -- a pure scatter MUST land at variance/mean = 1, that is what Poisson means
+  const cs = BOX/N, c = new Int32Array(N*N*N);
+  for (const [x,y,z] of stars) c[(Math.floor(z/cs)*N + Math.floor(y/cs))*N + Math.floor(x/cs)]++;
+  const m = stars.length/(N*N*N);
+  let v = 0; for (const q of c) v += (q-m)**2;
+  const vom = (v/c.length)/m;
+  if (pts) { scene.remove(pts); pts.geometry.dispose(); }
+  const pos = new Float32Array(stars.length*3), col = new Float32Array(stars.length*3);
+  stars.forEach((p, i) => {
+    pos[i*3] = p[0]; pos[i*3+1] = p[1]; pos[i*3+2] = p[2];
+    const t = 0.5 + 0.5*rng();
+    col[i*3] = 0.75 + 0.25*t; col[i*3+1] = 0.72 + 0.2*t; col[i*3+2] = 0.5 + 0.5*t;
+  });
+  const g2 = new THREE.BufferGeometry();
+  g2.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g2.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  pts = new THREE.Points(g2, new THREE.PointsMaterial({ size: 0.9, vertexColors: true, sizeAttenuation: true }));
+  scene.add(pts);
+  document.getElementById("stat").innerHTML =
+    "<b style='color:#ffd27f'>" + stars.length.toLocaleString() + "</b> stars &middot; P(k) &prop; k<sup>" + slope.toFixed(1) + "</sup> &middot; &sigma;(&delta;) = " + sigma.toFixed(3) + (sigma > 0.5 ? " <b style='color:#f6a623'>(saturated &mdash; the sampling law breaks above ~0.5)</b>" : "") +
+    "<br>variance/mean = <b style='color:#7fe3c4'>" + vom.toFixed(3) + "</b> &mdash; " + (clustered ? "structure. A pure scatter cannot exceed 1." : "<b>1.0 is exactly what Poisson means.</b> No field behind it.") +
+    "<br>shot noise from making them countable: <b>" + shotNoise(stars.length, BOX).toFixed(3) + "</b> = V/N, predicted before anything ran";
+}
+document.getElementById("note").innerHTML =
+  "Nobody drew this. The field is <b>white noise filtered by &radic;P(k)</b> &mdash; ask for a spectrum and get one back at 1.006 of what you asked, over twelve universes. The stars are Poisson-sampled from it. " +
+  "Hit <b>scatter</b> for the same star count with <i>no field behind it</i>: variance/mean falls to 1.0, because that is what Poisson <i>is</i>. The gap is the galaxy.";
+document.getElementById("tMode").onclick = (e) => {
+  e.target.classList.toggle("on");
+  e.target.textContent = e.target.classList.contains("on") ? "clustered" : "scatter";
+  build();
+};
+document.getElementById("slope").oninput = build;
+
+// --- the warp: click a star, fly to it
+const ray = new THREE.Raycaster(); ray.params.Points.threshold = 1.6;
+let warpTo = null, warpFrom = null, warpT = 1;
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  const m = new THREE.Vector2((e.clientX/innerWidth)*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(m, cam);
+  const hit = ray.intersectObject(pts)[0];
+  if (!hit) return;
+  const p = stars[hit.index];
+  warpFrom = { pos: cam.position.clone(), tgt: ctr.target.clone() };
+  warpTo = new THREE.Vector3(p[0], p[1], p[2]);
+  warpT = 0;
+  // how crowded is this star's neighbourhood? a real answer, not flavour text
+  let near = 0;
+  for (const q of stars) if ((q[0]-p[0])**2 + (q[1]-p[1])**2 + (q[2]-p[2])**2 < 36) near++;
+  document.getElementById("dest").innerHTML =
+    "&#10148; warping to (" + p[0].toFixed(1) + ", " + p[1].toFixed(1) + ", " + p[2].toFixed(1) + ")<br>" +
+    "<b style='color:#7fe3c4'>" + (near-1) + "</b> stars within 6 units &mdash; " +
+    (near > 14 ? "deep in a cluster" : near > 5 ? "a modest neighbourhood" : "out in a void");
+});
+build();
+(function loop() {
+  if (warpT < 1) {
+    warpT = Math.min(1, warpT + 0.018);
+    const e = warpT < 0.5 ? 4*warpT**3 : 1 - Math.pow(-2*warpT + 2, 3)/2;
+    ctr.target.lerpVectors(warpFrom.tgt, warpTo, e);
+    const want = warpTo.clone().add(new THREE.Vector3(9, 5, 9));
+    cam.position.lerpVectors(warpFrom.pos, want, e);
+  }
+  ctr.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

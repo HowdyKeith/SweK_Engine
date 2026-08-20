@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Doc skills — xlsx/docx/pptx/pdf">
+<meta name="demo:desc" content="Create and read Office docs from a JSON spec. xlsx-first: build task fixtures with formulas, then read an output back to check formulas + values. Runs on the bridge.">
+<meta name="demo:cats" content="tool">
+<title>Doc skills</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:880px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 12px; }
+  .lead code { color:var(--amber); }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:14px 0 6px; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 14px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .btn.sm { padding:6px 10px; font-size:11px; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  input,select,textarea { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px; font:12px ui-monospace,monospace; }
+  textarea { width:100%; min-height:150px; resize:vertical; }
+  .tabs { display:flex; gap:6px; margin:6px 0 4px; }
+  .tab { padding:7px 14px; border:1px solid var(--edge); border-radius:6px 6px 0 0; cursor:pointer; color:var(--dim); font-size:12px; }
+  .tab.on { background:var(--panel); color:var(--blue); border-bottom-color:var(--panel); }
+  .pane { display:none; } .pane.on { display:block; }
+  .note { font-size:11px; color:var(--dim); }
+  table { border-collapse:collapse; width:100%; font-size:11px; margin-top:6px; }
+  th,td { border:1px solid #14304a; padding:4px 7px; text-align:left; vertical-align:top; word-break:break-word; }
+  th { color:var(--dim); background:#0a1422; }
+  td .f { color:var(--amber); } td .c { color:var(--good); }
+  #cout,#dl { margin-top:8px; }
+  #dl a { color:var(--good); font-size:13px; }
+  #rout { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:10px; font-size:11px; max-height:420px; overflow:auto; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="bar"><h1>📄 Doc skills</h1><span id="status">…</span></div>
+<div class="wrap">
+  <p class="lead">Create and read <b>xlsx / docx / pptx / pdf</b> on the bridge PC from a JSON spec. Built for the Excel eval work — build a fixture with formulas, then read an output back to check the formulas and cached values. <code>openpyxl · python-docx · python-pptx · fpdf2 · pypdf</code></p>
+  <div class="row"><button class="btn sm" id="detect">Detect libs</button><button class="btn sm" id="install">Install libs</button><span id="dstate" class="note"></span></div>
+
+  <div class="tabs"><div class="tab on" data-pane="create">Create</div><div class="tab" data-pane="read">Read</div></div>
+
+  <div class="pane on" id="pane-create">
+    <div class="row">
+      <select id="ckind"><option>xlsx</option><option>docx</option><option>pptx</option><option>pdf</option></select>
+      <button class="btn sm" id="example">Load example</button>
+      <button class="btn go" id="create">Create</button>
+    </div>
+    <textarea id="spec" spellcheck="false"></textarea>
+    <div id="cout" class="note"></div>
+    <div id="dl"></div>
+  </div>
+
+  <div class="pane" id="pane-read">
+    <div class="row">
+      <select id="rkind"><option>xlsx</option><option>docx</option><option>pptx</option><option>pdf</option></select>
+      <input id="path" placeholder="file path on the bridge PC, e.g. C:\\work\\output.xlsx" style="flex:1 1 300px">
+      <button class="btn go" id="read">Read path</button>
+    </div>
+    <div class="row">
+      <span class="note">or upload a file (read here, nothing stored):</span>
+      <input type="file" id="rfile" accept=".xlsx,.xlsm,.docx,.pptx,.pdf">
+    </div>
+    <div id="rout" class="note">Read result appears here.</div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function getJSON(u){ return fetch(u).then(r=>r.json()); }
+async function postJSON(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(r=>r.json()); }
+
+const EX = {
+  xlsx: {sheets:[{name:"Eval",header:true,widths:{A:16},rows:[["Item","Score","Weight","Weighted"],["Formula",8,0.5,"=B2*C2"],["Format",6,0.5,"=B3*C3"],["Total","","","=SUM(D2:D3)"]]}]},
+  docx: {title:"Eval Report",blocks:[{type:"heading",level:1,text:"Summary"},{type:"para",text:"The submitted workbook computes totals correctly.",bold:true},{type:"table",rows:[["Check","Result"],["Formulas","Pass"],["Formatting","Minor issues"]]}]},
+  pptx: {slides:[{title:"Task Review"},{title:"Findings",bullets:["Formulas correct","Number format off","Score: 8/10"]}]},
+  pdf:  {title:"Task Brief",blocks:[{type:"heading",text:"Instructions"},{type:"para",text:"Build a pivot from the Data sheet and compute regional totals with SUMIFS."}]}
+};
+function loadExample(){ $("spec").value = JSON.stringify(EX[$("ckind").value], null, 2); }
+$("example").onclick = loadExample; $("ckind").onchange = loadExample; loadExample();
+
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  document.querySelectorAll(".pane").forEach(p=>p.classList.remove("on")); $("pane-"+t.dataset.pane).classList.add("on");
+});
+
+async function detect(){
+  $("dstate").textContent="detecting…";
+  try{ const d=await getJSON("/doc/detect"); $("dstate").textContent = d.ready ? ("ready · "+d.python) : ("missing: "+(d.missing||[]).join(", ")); $("status").textContent = d.ready?"ready":"needs install"; }
+  catch{ $("status").textContent="bridge offline"; $("dstate").textContent=""; }
+}
+$("detect").onclick=detect;
+$("install").onclick=async e=>{ e.target.disabled=true; $("dstate").textContent="installing libs…"; try{ const r=await postJSON("/doc/install",{step:"pkg"}); $("dstate").textContent=r.ok?"installed ✓":("✕ "+(r.stderr||r.error||"").slice(-140)); }catch(x){ $("dstate").textContent="✕ "+x.message; } e.target.disabled=false; detect(); };
+
+$("create").onclick=async ()=>{
+  let spec; try{ spec=JSON.parse($("spec").value); }catch(e){ $("cout").textContent="✕ invalid JSON: "+e.message; return; }
+  $("create").disabled=true; $("cout").textContent="creating…"; $("dl").innerHTML="";
+  try{ const r=await postJSON("/doc/create",{kind:$("ckind").value,spec});
+    if(r.ok){ $("cout").textContent="✓ "+r.kind+" · "+r.bytes+" bytes"; const a=document.createElement("a"); a.href=r.url; a.download=r.filename; a.textContent="⬇ download "+r.filename; $("dl").appendChild(a); }
+    else $("cout").textContent="✕ "+(r.error||"failed");
+  }catch(e){ $("cout").textContent="✕ "+e.message; }
+  $("create").disabled=false;
+};
+
+function esc(v){ return String(v==null?"":v).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function renderRead(r){
+  if(!r.ok) return '<span style="color:var(--bad)">✕ '+esc(r.error||"failed")+'</span>';
+  if(r.kind==="xlsx"){
+    let h="";
+    for(const s of r.sheets){
+      h+='<div class="ttl">'+esc(s.name)+' — '+s.maxRow+'×'+s.maxCol+' ('+s.cellCount+' cells)</div>';
+      h+='<table><tr><th>cell</th><th>value / formula</th><th>cached</th></tr>';
+      for(const c of s.cells){ h+='<tr><td>'+esc(c.ref)+'</td><td>'+(c.formula?'<span class="f">'+esc(c.formula)+'</span>':esc(c.value))+'</td><td>'+(c.cached!=null?'<span class="c">'+esc(c.cached)+'</span>':'')+'</td></tr>'; }
+      h+='</table>';
+    }
+    if(r.note) h+='<div class="note" style="margin-top:6px">'+esc(r.note)+'</div>';
+    return h;
+  }
+  if(r.kind==="docx"){
+    let h='<div class="ttl">Paragraphs</div>'; for(const p of r.paragraphs) h+='<div>['+esc(p.style)+'] '+esc(p.text)+'</div>';
+    for(const t of (r.tables||[])){ h+='<div class="ttl">Table</div><table>'; for(const row of t){ h+='<tr>'+row.map(c=>'<td>'+esc(c)+'</td>').join("")+'</tr>'; } h+='</table>'; }
+    return h;
+  }
+  if(r.kind==="pptx"){ let h=""; for(const s of r.slides){ h+='<div class="ttl">Slide '+s.slide+'</div>'; for(const t of s.texts) h+='<div>'+esc(t).replace(/\n/g,"<br>")+'</div>'; } return h; }
+  if(r.kind==="pdf"){ let h='<div class="ttl">'+r.pageCount+' page(s)</div>'; for(const p of r.pages) h+='<div class="ttl">Page '+p.page+'</div><div style="white-space:pre-wrap">'+esc(p.text||p.error||"")+'</div>'; return h; }
+  return esc(JSON.stringify(r,null,2));
+}
+$("read").onclick=async ()=>{
+  const p=$("path").value.trim(); if(!p){ $("rout").textContent="enter a file path"; return; }
+  $("read").disabled=true; $("rout").textContent="reading…";
+  try{ const r=await postJSON("/doc/read",{kind:$("rkind").value,path:p,max:300}); $("rout").innerHTML=renderRead(r); }
+  catch(e){ $("rout").textContent="✕ "+e.message; }
+  $("read").disabled=false;
+};
+$("rfile").onchange = async () => {
+  const f = $("rfile").files && $("rfile").files[0]; if(!f) return;
+  $("rout").textContent="reading "+f.name+" …";
+  try{
+    const dataBase64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>rej(new Error("read failed")); r.readAsDataURL(f); });
+    const r = await postJSON("/doc/read-upload", { filename: f.name, dataBase64 });
+    $("rout").innerHTML = renderRead(r);
+  }catch(e){ $("rout").textContent="✕ "+e.message; }
+  $("rfile").value="";
+};
+detect();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

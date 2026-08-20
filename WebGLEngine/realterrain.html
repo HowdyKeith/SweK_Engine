@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK Engine — REAL TERRAIN</title>
+<style>
+  :root { --bg:#070b12; --panel:#0e1420; --line:#223247; --ink:#dce8f8; --dim:#7d8aa0; --accent:#5fb0ff; --good:#7fe0a0; --warn:#ffcf8b; --bad:#ff9b9b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(1200px 600px at 50% -10%, #14233b 0%, var(--bg) 60%); color:var(--ink);
+         font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; min-height:100vh; }
+  header { padding:16px 22px 6px; }
+  h1 { margin:0; font-size:22px; letter-spacing:.5px; font-weight:700;
+       background:linear-gradient(90deg,#9bd6ff,#5fb0ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--dim); font-size:13px; margin-top:2px; }
+  .wrap { display:flex; gap:18px; padding:14px 22px 28px; flex-wrap:wrap; align-items:flex-start; }
+  .controls { flex:0 0 300px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .row { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+  .row label { font-size:11px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .row .hint { font-size:11px; color:var(--dim); }
+  input[type=text], input[type=number], select { background:#0a1018; color:var(--ink); border:1px solid var(--line);
+        border-radius:8px; padding:7px 9px; font-size:13px; width:100%; font-family:ui-monospace,Menlo,Consolas,monospace; }
+  input[type=range] { width:100%; }
+  .latlon { display:flex; gap:8px; }
+  .latlon > div { flex:1; }
+  button { background:#1a2740; color:#cde; border:1px solid var(--line); border-radius:8px; padding:8px 14px;
+        cursor:pointer; font-size:12px; font-weight:600; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:linear-gradient(90deg,#1d3a63,#23507f); border-color:#2f6ba0; color:#eaf4ff; width:100%; padding:10px; }
+  .toggles { display:flex; gap:14px; align-items:center; font-size:12px; color:var(--dim); margin-bottom:12px; flex-wrap:wrap; }
+  .toggles label { display:flex; gap:5px; align-items:center; cursor:pointer; }
+  .stage { flex:1 1 520px; min-width:320px; }
+  .canvasbox { position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  canvas { width:100%; height:auto; display:block; border-radius:8px; image-rendering:auto; background:#05080d; }
+  .readout { display:flex; gap:18px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--dim); }
+  .readout b { color:var(--ink); font-weight:600; }
+  .log { margin-top:10px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; color:var(--dim);
+         background:#0a1018; border:1px solid var(--line); border-radius:8px; padding:8px 10px; max-height:120px; overflow:auto; white-space:pre-wrap; }
+  .log .ok { color:var(--good); } .log .er { color:var(--bad); } .log .wn { color:var(--warn); }
+  .note { font-size:11px; color:var(--dim); margin-top:10px; line-height:1.45; }
+  .legend { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); }
+  .ramp { width:120px; height:10px; border-radius:3px;
+          background:linear-gradient(90deg,#1b4a6e,#2e7d5b,#7aa24a,#caa64e,#b08b6a,#e9e9ee); border:1px solid var(--line); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>REAL TERRAIN</h1>
+    <div class="sub">Pulls live elevation (Open-Meteo) + streets (OpenStreetMap / Overpass) for a spot on Earth — no API keys. Stage 1: 2D preview before we voxelize it.</div>
+  </header>
+
+  <div class="wrap">
+    <div class="controls">
+      <div class="row">
+        <label>Center (your house = epicenter)</label>
+        <div class="latlon">
+          <div><span class="hint">lat</span><input id="lat" type="text" value="41.7001" /></div>
+          <div><span class="hint">lon</span><input id="lon" type="text" value="-71.4162" /></div>
+        </div>
+      </div>
+      <div class="row">
+        <button id="locBtn">📍 Use my location</button>
+      </div>
+      <div class="row">
+        <label>Area size — <span id="sizeLbl">2.0 km</span></label>
+        <input id="size" type="range" min="500" max="6000" step="250" value="2000" />
+        <span class="hint">Square box centered on the point.</span>
+      </div>
+      <div class="row">
+        <label>Elevation grid</label>
+        <select id="grid">
+          <option value="24">24 × 24 (fast)</option>
+          <option value="32" selected>32 × 32</option>
+          <option value="48">48 × 48 (slower, sharper)</option>
+        </select>
+        <span class="hint">More points = sharper heightmap, more requests.</span>
+      </div>
+      <div class="row">
+        <label>Elevation source</label>
+        <select id="source">
+          <option value="open-meteo" selected>Open-Meteo (global, no key)</option>
+          <option value="usgs">USGS 3DEP (US, no key)</option>
+          <option value="mapbox">Mapbox Terrain-RGB (token)</option>
+        </select>
+        <span class="hint">USGS is sharpest for US spots; Mapbox needs a token.</span>
+      </div>
+      <div class="row" id="mapboxRow" style="display:none;">
+        <label>Mapbox token</label>
+        <input id="mapboxToken" type="text" placeholder="pk...." />
+      </div>
+      <button id="go" class="primary">Fetch terrain + streets</button>
+      <button id="send" style="width:100%; margin-top:8px;">Send to engine &#128228;</button>
+      <div class="toggles" style="margin-top:12px;">
+        <label><input type="checkbox" id="tStreets" checked /> Streets</label>
+        <label><input type="checkbox" id="tShade" checked /> Hillshade</label>
+        <label><input type="checkbox" id="tMark" checked /> Epicenter</label>
+      </div>
+      <div class="note">Tip: Warwick RI is pre-filled. Hit “Use my location” to center on where you are right now (asks permission once).</div>
+    </div>
+
+    <div class="stage">
+      <div class="canvasbox">
+        <canvas id="cv" width="560" height="560"></canvas>
+      </div>
+      <div class="readout">
+        <div class="legend"><span>low</span><span class="ramp"></span><span>high</span></div>
+        <div>elev: <b id="rElev">—</b></div>
+        <div>roads: <b id="rRoads">—</b></div>
+        <div>box: <b id="rBox">—</b></div>
+      </div>
+      <div class="log" id="log">Ready. Set a point and fetch.</div>
+      <div class="note" id="stage2note"></div>
+    </div>
+  </div>
+
+<script type="module">
+import { fetchElevationGrid, fetchStreets } from "./world/realTerrainData.js";
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d");
+  const logEl = $("log");
+  let DATA = null;   // { heights, grid, min, max, bbox, roads, lat, lon, sizeM }
+
+  function log(msg, cls) {
+    const t = new Date().toLocaleTimeString();
+    const span = cls ? `<span class="${cls}">${msg}</span>` : msg;
+    logEl.innerHTML += `\n${t}  ${span}`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ── Geometry ────────────────────────────────────────────────────────────
+  const M_PER_DEG_LAT = 111320;
+  function bboxFromCenter(lat, lon, sizeM) {
+    const half = sizeM / 2;
+    const dLat = half / M_PER_DEG_LAT;
+    const dLon = half / (M_PER_DEG_LAT * Math.cos(lat * Math.PI / 180));
+    return { south: lat - dLat, west: lon - dLon, north: lat + dLat, east: lon + dLon };
+  }
+
+  // ── Open-Meteo elevation (batched ≤100 points/request) ──────────────────
+  // Elevation now comes from the shared module (Open-Meteo / USGS / Mapbox).
+  async function fetchElevation(lat, lon, sizeM, grid, source, mapboxToken) {
+    log("elevation via " + source + "...");
+    return fetchElevationGrid({ lat, lon, sizeM, grid, source, mapboxToken });
+  }
+
+  // ── Overpass streets (highway ways with inline geometry) ────────────────
+// streets fetched via the shared module (imported fetchStreets)
+
+  // ── Rendering ───────────────────────────────────────────────────────────
+  // Elevation → color ramp stops (low water-blue → green → tan → rock → snow).
+  const STOPS = [
+    [0.00, [27, 74, 110]], [0.18, [46, 125, 91]], [0.42, [122, 162, 74]],
+    [0.66, [202, 166, 78]], [0.85, [176, 139, 106]], [1.00, [233, 233, 238]],
+  ];
+  function ramp(t) {
+    t = Math.max(0, Math.min(1, t));
+    for (let i = 1; i < STOPS.length; i++) {
+      if (t <= STOPS[i][0]) {
+        const a = STOPS[i - 1], b = STOPS[i];
+        const f = (t - a[0]) / (b[0] - a[0] || 1);
+        return [0, 1, 2].map((k) => Math.round(a[1][k] + (b[1][k] - a[1][k]) * f));
+      }
+    }
+    return STOPS[STOPS.length - 1][1];
+  }
+
+  function render() {
+    if (!DATA) return;
+    const { heights, grid, min, max, bbox } = DATA;
+    const span = (max - min) || 1;
+    const shade = $("tShade").checked;
+    const W = cv.width, H = cv.height;
+
+    // Paint the heightmap into a small offscreen grid, then scale up.
+    const off = document.createElement("canvas");
+    off.width = grid; off.height = grid;
+    const octx = off.getContext("2d");
+    const img = octx.createImageData(grid, grid);
+    const hAt = (c, r) => heights[Math.max(0, Math.min(grid - 1, r)) * grid + Math.max(0, Math.min(grid - 1, c))];
+    for (let r = 0; r < grid; r++) {
+      for (let c = 0; c < grid; c++) {
+        const h = heights[r * grid + c];
+        const t = (h - min) / span;
+        let col = ramp(t);
+        if (shade) {
+          // Slope from neighbors, light from NW.
+          const dzdx = (hAt(c + 1, r) - hAt(c - 1, r));
+          const dzdy = (hAt(c, r + 1) - hAt(c, r - 1));
+          let s = 0.5 + (-(dzdx) - (dzdy)) * 0.06;
+          s = Math.max(0.45, Math.min(1.35, s));
+          col = col.map((v) => Math.max(0, Math.min(255, Math.round(v * s))));
+        }
+        const o = (r * grid + c) * 4;
+        img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(off, 0, 0, grid, grid, 0, 0, W, H);
+
+    // Streets overlay: project lat/lon → canvas via bbox.
+    if ($("tStreets").checked && DATA.roads && DATA.roads.length) {
+      const projX = (lon) => (lon - bbox.west) / ((bbox.east - bbox.west) || 1) * W;
+      const projY = (lat) => (bbox.north - lat) / ((bbox.north - bbox.south) || 1) * H;
+      const widthFor = (cls) => /motorway|trunk|primary/.test(cls) ? 3.2 : /secondary|tertiary/.test(cls) ? 2.2 : 1.2;
+      for (const road of DATA.roads) {
+        if (road.pts.length < 2) continue;
+        ctx.beginPath();
+        for (let i = 0; i < road.pts.length; i++) {
+          const x = projX(road.pts[i][1]), y = projY(road.pts[i][0]);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = "rgba(8,12,20,0.55)"; ctx.lineWidth = widthFor(road.cls) + 1.6; ctx.lineCap = "round"; ctx.stroke();
+        ctx.strokeStyle = "rgba(220,235,255,0.92)"; ctx.lineWidth = widthFor(road.cls); ctx.stroke();
+      }
+    }
+
+    // Epicenter crosshair (center of the box = the house).
+    if ($("tMark").checked) {
+      const cx = W / 2, cy = H / 2;
+      ctx.strokeStyle = "#ff5d6c"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - 15, cy); ctx.lineTo(cx + 15, cy);
+      ctx.moveTo(cx, cy - 15); ctx.lineTo(cx, cy + 15); ctx.stroke();
+    }
+  }
+
+  // ── Fetch flow ──────────────────────────────────────────────────────────
+  async function run() {
+    const lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
+    const sizeM = parseInt($("size").value, 10), grid = parseInt($("grid").value, 10);
+    const source = ($("source") && $("source").value) || "open-meteo";
+    const mapboxToken = ($("mapboxToken") && $("mapboxToken").value || "").trim();
+    if (!isFinite(lat) || !isFinite(lon)) { log("Enter a valid lat/lon.", "er"); return; }
+    $("go").disabled = true;
+    log(`Fetching ${grid}×${grid} elevation + streets around ${lat.toFixed(4)}, ${lon.toFixed(4)} (${(sizeM/1000).toFixed(2)} km box)…`);
+    try {
+      const el = await fetchElevation(lat, lon, sizeM, grid, source, mapboxToken);
+      let streets = { roads: [] };
+      try { streets = await fetchStreets(el.bbox); log(`streets: ${streets.roads.length} roads`, "ok"); }
+      catch (e) { log("streets failed: " + e.message + " (terrain still loaded)", "wn"); }
+      DATA = Object.assign({ lat, lon, sizeM }, el, streets);
+      window.__realTerrain = DATA;   // Stage 2 / console can read this
+      $("rElev").textContent = `${el.min.toFixed(0)}–${el.max.toFixed(0)} m (Δ${(el.max - el.min).toFixed(0)})`;
+      $("rRoads").textContent = String(streets.roads.length);
+      $("rBox").textContent = `${(sizeM/1000).toFixed(2)} km`;
+      render();
+      log("done — window.__realTerrain holds the data for Stage 2.", "ok");
+    } catch (e) {
+      log("FAILED: " + e.message, "er");
+    } finally { $("go").disabled = false; }
+  }
+
+  // ── Wiring ──────────────────────────────────────────────────────────────
+  $("size").addEventListener("input", () => { $("sizeLbl").textContent = ($("size").value / 1000).toFixed(2) + " km"; });
+  $("go").addEventListener("click", run);
+  $("source").addEventListener("change", () => { $("mapboxRow").style.display = ($("source").value === "mapbox") ? "" : "none"; });
+  $("send").addEventListener("click", () => {
+    const lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
+    if (!isFinite(lat) || !isFinite(lon)) { log("Enter a valid lat/lon first.", "er"); return; }
+    const payload = { lat, lon, sizeM: parseInt($("size").value, 10), grid: parseInt($("grid").value, 10), source: $("source").value };
+    try { localStorage.setItem("voxelengine.realTerrainPending", JSON.stringify(payload)); log("Sent. In the Real Terrain demo, hit \"Load from preview\" (Terrain Settings).", "ok"); }
+    catch (e) { log("Send failed: " + e.message, "er"); }
+  });
+  ["tStreets", "tShade", "tMark"].forEach((id) => $(id).addEventListener("change", render));
+  $("locBtn").addEventListener("click", () => {
+    if (!navigator.geolocation) { log("Geolocation not available.", "er"); return; }
+    log("Asking for your location…");
+    navigator.geolocation.getCurrentPosition(
+      (p) => { $("lat").value = p.coords.latitude.toFixed(5); $("lon").value = p.coords.longitude.toFixed(5); log("Got your location.", "ok"); },
+      (e) => log("Location denied/failed: " + e.message, "wn"),
+      { timeout: 8000, maximumAge: 600000 }
+    );
+  });
+
+  $("stage2note").innerHTML = "Stage 2 (next): turn <b>window.__realTerrain</b> into a voxel heightmap in the engine — your real streets painted onto the ground — and drop the Kaiju demo's epicenter on the center tile (your house).";
+})();
+</script>
+</body>
+</html>

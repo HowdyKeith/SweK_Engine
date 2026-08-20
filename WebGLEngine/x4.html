@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="X4 — telemetry">
+<meta name="demo:desc" content="Live X4: Foundations telemetry (pilot, credits, ship hull/shield, sector, logbook) via a community mod feed. Push (game POSTs to the bridge) or poll (mycumycu External App). Runs on the PC bridge.">
+<title>🛰️ X4 — SweK Engine</title>
+<style>
+  :root { --bg:#04090d; --panel:#0a151c; --edge:#13343b; --teal:#5ff0e6; --cyan:#8ff7ff; --orange:#ffae5c; --txt:#d7ecef; --dim:#6f9099; --good:#79ffc6; --bad:#ff7b7b; --shield:#5fb8ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; }
+  body { background:radial-gradient(ellipse at 50% -10%, #07212a 0%, #04090d 60%, #02060a 100%); color:var(--txt); font:14px/1.45 "Inter",system-ui,Segoe UI,Roboto,sans-serif; min-height:100vh; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.45;
+    background-image:radial-gradient(1px 1px at 22% 28%, #cffcff, transparent), radial-gradient(1px 1px at 72% 62%, #aef, transparent), radial-gradient(1px 1px at 42% 82%, #7df, transparent), radial-gradient(1px 1px at 88% 22%, #fff, transparent), radial-gradient(1px 1px at 12% 72%, #9ef, transparent); background-repeat:repeat; }
+  #bar, .wrap { position:relative; z-index:1; }
+  #bar { display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--edge); position:sticky; top:0; background:linear-gradient(180deg,#06141b,#04090d); }
+  #bar h1 { font-size:18px; margin:0; letter-spacing:3px; text-transform:uppercase; font-weight:600; }
+  #bar h1 small { color:var(--orange); font-size:11px; letter-spacing:2px; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { padding:16px 18px 60px; max-width:920px; margin:0 auto; }
+  h2 { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:var(--orange); margin:22px 0 10px; border-bottom:1px solid var(--edge); padding-bottom:5px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px 15px; flex:1; min-width:140px; box-shadow:inset 0 1px 0 rgba(95,240,230,.06); }
+  .lbl { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; }
+  .big { font-size:30px; font-weight:700; margin-top:3px; color:var(--cyan); }
+  .med { font-size:18px; font-weight:600; margin-top:4px; color:var(--teal); }
+  .bar { height:20px; border:1px solid var(--edge); border-radius:4px; background:#04121a; position:relative; overflow:hidden; margin-top:7px; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#1f6e64,var(--teal)); box-shadow:0 0 10px rgba(95,240,230,.5); transition:width .4s ease; }
+  .bar > b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
+  .bar.shield > i { background:linear-gradient(90deg,#1f5e9e,var(--shield)); box-shadow:0 0 10px rgba(95,184,255,.5); }
+  .mono { font-family:ui-monospace,Consolas,monospace; }
+  #log { width:100%; min-height:120px; background:#04121a; color:#bdeef0; border:1px solid var(--edge); border-radius:8px; padding:10px; font:12px/1.5 ui-monospace,Consolas,monospace; white-space:pre-wrap; overflow:auto; }
+  #offline { text-align:center; padding:60px 20px; color:var(--dim); }
+  .btn { padding:8px 14px; background:#0e2730; color:var(--teal); border:1px solid var(--edge); border-radius:8px; cursor:pointer; font-size:12px; }
+  .btn:hover { background:#13343b; }
+</style>
+</head>
+<body>
+<div id="bar"><h1>X4 <small>FOUNDATIONS LINK</small></h1><span id="status">connecting…</span><button class="btn" id="refresh">REFRESH</button></div>
+<div class="wrap">
+  <div id="offline">No link to X4.<br><span class="lbl" style="text-transform:none;letter-spacing:0;">In X4: Settings → Extensions → turn OFF <b>Protected UI Mode</b>, then enable the X4 connector. Push mode: install the SweK telemetry extension. Poll mode: run mycumycu's X4 External App and point the connector at its data URL.</span></div>
+  <div id="content" style="display:none;">
+    <div class="row">
+      <div class="card"><div class="lbl">Pilot</div><div class="med" id="pilot">—</div></div>
+      <div class="card"><div class="lbl">Credits</div><div class="big" id="money">—</div></div>
+    </div>
+    <h2>Ship</h2>
+    <div class="row">
+      <div class="card"><div class="lbl">Vessel</div><div class="med" id="ship">—</div></div>
+      <div class="card"><div class="lbl">Sector</div><div class="med" id="sector">—</div></div>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <div class="card"><div class="lbl">Hull</div><div class="bar"><i id="hullfill" style="width:0%"></i><b id="hulltxt">—</b></div></div>
+      <div class="card"><div class="lbl">Shield</div><div class="bar shield"><i id="shieldfill" style="width:0%"></i><b id="shieldtxt">—</b></div></div>
+    </div>
+    <h2>Logbook</h2>
+    <div id="log" class="mono">› waiting for entries…</div>
+  </div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : null;
+  const fmt = n => (n == null ? "—" : n.toLocaleString());
+  function pct(v) { v = num(v); return v == null ? null : Math.max(0, Math.min(100, v <= 1 ? v * 100 : v)); }
+  function render(s) {
+    if (!s || !s.connected || !s.ready || !s.data) {
+      $("offline").style.display = "block"; $("content").style.display = "none";
+      $("status").textContent = s && s.error ? ("(" + s.error + ")") : "no link";
+      return;
+    }
+    const d = s.data;
+    $("status").textContent = "● LINKED · " + (s.mode || "?") + (s.ageMs != null ? " · " + Math.round(s.ageMs / 1000) + "s ago" : "");
+    $("offline").style.display = "none"; $("content").style.display = "block";
+    $("pilot").textContent  = d.player || "—";
+    $("money").textContent  = d.money != null ? fmt(d.money) + " Cr" : "—";
+    $("ship").textContent   = d.ship || "—";
+    $("sector").textContent = d.sector || "—";
+    const h = pct(d.shipHull);   $("hullfill").style.width   = (h != null ? h : 0) + "%"; $("hulltxt").textContent   = h != null ? Math.round(h) + "%" : "—";
+    const sh = pct(d.shipShield);$("shieldfill").style.width = (sh != null ? sh : 0) + "%"; $("shieldtxt").textContent = sh != null ? Math.round(sh) + "%" : "—";
+    const entries = Array.isArray(d.logbook) ? d.logbook : null;
+    if (entries && entries.length) {
+      $("log").textContent = entries.map(e => "› " + (typeof e === "string" ? e : (e.title || e.text || JSON.stringify(e)))).join("\n");
+    } else {
+      $("log").textContent = "› (no logbook entries in feed)";
+    }
+  }
+  async function load() { try { const r = await fetch("/x4/state", { cache: "no-store" }); render(await r.json()); } catch (e) { $("status").textContent = "bridge unreachable"; } }
+  $("refresh").onclick = load;
+  load(); setInterval(load, 2000);
+</script>
+<script src="kiosk.js"></script>
+</body>
+</html>

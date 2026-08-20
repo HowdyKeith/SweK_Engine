@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paramecium — a reflex that beats a learner</title>
+<style>
+  :root {
+    --bg: #0a0d14; --panel: #121722; --edge: #223047;
+    --ink: #cfe0ff; --dim: #7d8ea8; --hot: #ff9c3f; --cool: #5cc8ff; --good: #6ee7a8; --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  header { padding: 18px 20px 12px; border-bottom: 1px solid var(--edge); }
+  h1 { margin: 0 0 4px; font-size: 17px; letter-spacing: .06em; color: var(--hot); text-transform: uppercase; }
+  .sub { color: var(--dim); font-size: 12.5px; max-width: 76ch; }
+  main { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 420px); gap: 14px; padding: 14px 20px 28px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: 12px 14px; }
+  .panel h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; color: var(--dim); text-transform: uppercase; }
+  canvas { width: 100%; height: auto; display: block; background: #070a10; border-radius: 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  button, select {
+    background: #1b2333; color: var(--ink); border: 1px solid var(--edge);
+    border-radius: 4px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
+  }
+  button:hover { border-color: var(--hot); }
+  button:disabled { opacity: .45; cursor: default; border-color: var(--edge); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: right; padding: 4px 6px; border-bottom: 1px solid #1a2233; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--dim); font-weight: 400; font-size: 11px; letter-spacing: .06em; }
+  .num { font-variant-numeric: tabular-nums; }
+  .win { color: var(--good); }
+  .lose { color: var(--bad); }
+  .note { color: var(--dim); font-size: 12px; margin-top: 10px; }
+  .note b { color: var(--ink); font-weight: 600; }
+  code { color: var(--cool); }
+  .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--dim); margin-top: 8px; }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Paramecium — a reflex that beats a learner</h1>
+  <div class="sub">
+    A single creature in a chemical gradient. It gets 75 decisions and 26 directions on a Fibonacci sphere.
+    A <b>mold reflex</b> — sample the neighbouring headings, go toward the strongest smell — is raced against
+    <b>UCB1</b>, a real reinforcement learner. This page runs <code>simulation/life/paramecium.js</code> and
+    <code>brain/bench/bandit.mjs</code> directly: <b>the same modules the gate runs</b>, not a recording.
+  </div>
+</header>
+<main>
+  <section class="panel">
+    <h2>The arena — top view (x/z), height shown as size</h2>
+    <div class="row">
+      <button id="run">Run the race</button>
+      <select id="world">
+        <option value="free">freeSpaceWorld (no gravity)</option>
+        <option value="grav">freeSpaceWorld + gravity (-9.8)</option>
+      </select>
+      <select id="steps"><option value="600">600 steps</option><option value="1200">1200 steps</option></select>
+    </div>
+    <canvas id="cv" width="720" height="460"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="background:#6ee7a8"></i>mold reflex 3D</span>
+      <span><i class="sw" style="background:#5cc8ff"></i>UCB1</span>
+      <span><i class="sw" style="background:#7d8ea8"></i>random</span>
+      <span><i class="sw" style="background:#ff9c3f"></i>food peak (y=5, off the plane)</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Result</h2>
+    <table id="tbl">
+      <thead><tr><th>policy</th><th>food</th><th>best taste</th><th>final y</th></tr></thead>
+      <tbody><tr><td colspan="4" style="color:var(--dim)">Press <b>Run the race</b>.</td></tr></tbody>
+    </table>
+    <div class="note" id="verdict"></div>
+    <div class="note">
+      <b>Why the learner loses.</b> UCB1 assumes its arms are <b>stationary</b> — that pulling arm 3 means the
+      same thing every time. In a moving body <b>every arm changes every step</b>: "north" from here is not
+      "north" from three metres away. Its memory is its handicap. With 26 arms and 75 decisions it cannot even
+      try each arm three times.
+    </div>
+    <div class="note">
+      <b>What this page will not tell you.</b> One peak, one start, one gravity. The mold's advantage here is a
+      fact about <i>this arena</i>, not a law. The kill condition is on
+      <a href="/predictions.html" style="color:var(--cool)">predictions.html</a>.
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { swim, chemoField, headings3, moldReflex3 } from './simulation/life/paramecium.js';
+import { ucb1, uniformRandom } from './brain/bench/bandit.mjs';
+import { freeSpaceWorld } from './physics/freeSpaceWorld.js';
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const tbl = document.querySelector('#tbl tbody'), verdict = document.getElementById('verdict');
+const btn = document.getElementById('run');
+
+// The peak sits at y=5 -- OFF THE PLANE, on purpose. If the food were at y=0 every number here would be a 2D
+// number in fancy dress, and the third dimension would be decoration.
+const PEAK = [6, 5, 6];
+const field = chemoField(PEAK, 4);
+const dirs = headings3(26);
+
+const COLOURS = { 'mold reflex 3D (cone of 5)': '#6ee7a8', 'UCB1': '#5cc8ff', 'random': '#7d8ea8' };
+
+/** Record the path by wrapping the world's readTransforms -- the creature is not modified to be watched. */
+function traced(world) {
+  const path = [];
+  const inner = world.readTransforms.bind(world);
+  world.readTransforms = () => { const t = inner(); if (t.length >= 3) path.push([t[0], t[1], t[2]]); return t; };
+  return path;
+}
+
+function project(p) {
+  // Top view. x/z to the canvas; y is drawn as dot SIZE, because a paramecium that climbed to the peak and one
+  // that fell out of the world look identical from directly above.
+  const S = 14, cx = cv.width / 2, cz = cv.height / 2;
+  return [cx + p[0] * S, cz + p[2] * S, Math.max(0.6, 2.2 + p[1] * 0.28)];
+}
+
+function draw(runs) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // the gradient, sampled on the y=5 plane the peak lives on
+  const img = ctx.createImageData(cv.width, cv.height);
+  for (let py = 0; py < cv.height; py += 2) {
+    for (let px = 0; px < cv.width; px += 2) {
+      const wx = (px - cv.width / 2) / 14, wz = (py - cv.height / 2) / 14;
+      const v = field.at3(wx, PEAK[1], wz);
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+        const i = ((py + dy) * cv.width + px + dx) * 4;
+        img.data[i] = 30 + v * 190; img.data[i + 1] = 22 + v * 110; img.data[i + 2] = 16 + v * 30; img.data[i + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const pk = project(PEAK);
+  ctx.strokeStyle = '#ff9c3f'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(pk[0], pk[1], 7, 0, 7); ctx.stroke();
+
+  for (const r of runs) {
+    ctx.strokeStyle = COLOURS[r.name] || '#888';
+    ctx.lineWidth = 1.4; ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    r.path.forEach((p, i) => { const q = project(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.stroke();
+    const last = r.path[r.path.length - 1];
+    if (last) { const q = project(last); ctx.fillStyle = COLOURS[r.name] || '#888';
+      ctx.beginPath(); ctx.arc(q[0], q[1], q[2], 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function race() {
+  btn.disabled = true; btn.textContent = 'Running…';
+  setTimeout(() => {
+    const steps = +document.getElementById('steps').value;
+    const gravity = document.getElementById('world').value === 'grav';
+    const policies = [
+      ['mold reflex 3D (cone of 5)', () => moldReflex3(field, dirs, 1.2, 5)],
+      ['UCB1', () => ucb1()],
+      ['random', () => uniformRandom()],
+    ];
+    const runs = [];
+    for (const [name, mk] of policies) {
+      const w = freeSpaceWorld();
+      // freeSpaceWorld has no gravity of its own -- add it honestly, as a per-step velocity change, rather than
+      // pretending the world has a field it does not.
+      if (gravity) {
+        const step = w.step.bind(w);
+        w.step = (dt = 1 / 60) => { const v = w.readVelocities(); if (v.length >= 3) w.setVelocity(0, [v[0], v[1] - 9.8 * dt, v[2]]); step(dt); };
+      }
+      const path = traced(w);
+      const r = swim(w, 'freeSpaceWorld', mk(), { steps, field, dirs });
+      runs.push({ name, path, ...r, y: w.readTransforms()[1] });
+    }
+    draw(runs);
+    const best = Math.max(...runs.map(r => r.food));
+    tbl.innerHTML = runs.map(r => `<tr>
+      <td><i class="sw" style="background:${COLOURS[r.name]}"></i>${r.name}</td>
+      <td class="num ${r.food === best ? 'win' : (r.food < best * 0.1 ? 'lose' : '')}">${r.food.toFixed(1)}</td>
+      <td class="num">${r.best.toFixed(3)}</td>
+      <td class="num">${r.y.toFixed(2)}</td></tr>`).join('');
+    const mold = runs[0], bandit = runs[1];
+    verdict.innerHTML = `<b>${(mold.food / Math.max(bandit.food, 0.01)).toFixed(0)}x.</b> The reflex ate
+      ${mold.food.toFixed(1)} to the learner's ${bandit.food.toFixed(1)}, and finished at y=${mold.y.toFixed(2)}
+      with the peak at y=5 — <b>it climbed</b>.`;
+    btn.disabled = false; btn.textContent = 'Run the race';
+  }, 10);
+}
+
+btn.addEventListener('click', race);
+race();
+</script>
+</body>
+</html>

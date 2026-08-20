@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Sinogram GPU">
+<meta name="demo:desc" content="The whole scan as one texture. A sinogram is an image -- detector across, angle down -- and every pixel is one ray that depends on no other ray, so a fragment shader computing one texture IS the entire scan. This is the Neo Geo trick: Doom ran on a machine with no framebuffer because a raycast column is a vertically scaled sprite, and someone noticed the data already had the shape the hardware wanted. This page adjudicates rather than asserts: it runs the same arithmetic on the GPU and on the CPU and prints the worst disagreement between them, because the arithmetic is proven headless but a GPU executing it faithfully is not. Casting is the real cost -- about ten times the reconstruction -- and it is the embarrassingly parallel half.">
+<meta name="demo:category" content="simulation">
+<title>Sinogram GPU</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060e; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { display:flex; height:100%; align-items:center; justify-content:center; gap:26px; flex-wrap:wrap; }
+  .panel { text-align:center; }
+  .panel h3 { color:#6ff0d6; font-size:11px; letter-spacing:.14em; text-transform:uppercase; margin:0 0 7px; font-weight:600; }
+  canvas.out { border:1px solid #2a4a5a; border-radius:6px; image-rendering:pixelated; background:#000; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; max-width:430px; }
+  #cap { color:#6ff0d6; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; margin-top:5px; line-height:1.8; }
+  #note { color:#6f86ab; margin-top:8px; line-height:1.45; font-size:11.5px; }
+  #verdict { position:fixed; right:14px; top:12px; z-index:4; background:rgba(6,12,20,.94); border:1px solid #2a5a6a; border-radius:8px; padding:10px 13px; max-width:250px; line-height:1.6; font-size:11px; }
+  #ctl { position:fixed; left:14px; bottom:14px; z-index:4; background:rgba(6,12,20,.93); border:1px solid #24525a; border-radius:10px; padding:11px 14px; }
+  #ctl label { color:#6ff0d6; display:block; margin-bottom:6px; font-size:11px; }
+  input[type=range] { width:290px; }
+</style>
+</head>
+<body>
+<div id="hud"><div id="cap">&#9670; Sinogram GPU &mdash; the frame IS the scan</div><div id="stat"></div><div id="note"></div></div>
+<div id="verdict">running&hellip;</div>
+<div id="wrap">
+  <div class="panel"><h3>the scan, in one draw call</h3><canvas id="sino" class="out" width="256" height="180" style="width:340px;height:240px"></canvas></div>
+  <div class="panel"><h3>rebuilt from it</h3><canvas id="rec" class="out" width="128" height="128" style="width:240px;height:240px"></canvas></div>
+</div>
+<div id="ctl"><label>blobs: <span id="bval" style="color:#f6a623">40</span></label><input id="nb" type="range" min="4" max="400" step="4" value="40"></div>
+<script type="module">
+import { SINOGRAM_FS, sinogramCPU, packBlobs, packTrig } from "./simulation/tomo/sinogramGPU.js";
+import { makeBlobs, blobRadonAt } from "./simulation/tomo/blobPhantom.js";
+import { reconstruct } from "./simulation/tomo/fbp.js";
+
+const NDET = 256, NANG = 180, GN = 128;
+const cv = document.createElement("canvas"); cv.width = NDET; cv.height = NANG;
+const gl = cv.getContext("webgl2", { antialias: false });
+const $ = (id) => document.getElementById(id);
+
+if (!gl) { $("verdict").innerHTML = "<b style='color:#ff6a6a'>no WebGL2</b> &mdash; this page needs it."; }
+else if (!gl.getExtension("EXT_color_buffer_float")) {
+  // Say so plainly instead of rendering zeros and calling them a scan.
+  $("verdict").innerHTML = "<b style='color:#ff6a6a'>no EXT_color_buffer_float</b> &mdash; this GPU cannot render to a float target, so the sinogram would come back quantised to 8 bits. Refusing to pretend.";
+} else {
+  const VS = `#version 300 es
+  void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+  const mk = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, mk(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, mk(gl.FRAGMENT_SHADER, SINOGRAM_FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  const vao = gl.createVertexArray();
+
+  // the render target IS the sinogram
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, NDET, NANG);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+
+  const mkTex = (unit, data, n) => {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, n, 1, 0, gl.RGBA, gl.FLOAT, data);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    return t;
+  };
+
+  function run() {
+    const nb = parseInt($("nb").value, 10);
+    $("bval").textContent = nb;
+    const blobs = makeBlobs(nb, 1234);
+    const { xyra, zs, n } = packBlobs(blobs);
+
+    // ---- THE GPU: one draw call, one texture, the entire scan
+    const tA = performance.now();
+    mkTex(0, xyra, n); mkTex(1, zs, n); mkTex(2, packTrig(NANG), NANG);
+    gl.useProgram(prog);
+    gl.uniform1i(gl.getUniformLocation(prog, "uBlobs"), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, "uBlobZ"), 1);
+    gl.uniform1i(gl.getUniformLocation(prog, "uTrig"), 2);   // v2490: cos/sin from the CPU, not from a function GLSL does not constrain
+    gl.uniform1i(gl.getUniformLocation(prog, "uBlobCount"), n);
+    gl.uniform1i(gl.getUniformLocation(prog, "uNDet"), NDET);
+    gl.uniform1i(gl.getUniformLocation(prog, "uNAngles"), NANG);
+    gl.uniform1f(gl.getUniformLocation(prog, "uZ"), 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, NDET, NANG);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const px = new Float32Array(NDET * NANG * 4);
+    gl.readPixels(0, 0, NDET, NANG, gl.RGBA, gl.FLOAT, px);   // the readback forces the GPU to finish, so this time is real
+    const tGPU = performance.now() - tA;
+    const gpu = new Float32Array(NDET * NANG);
+    for (let i = 0; i < NDET*NANG; i++) gpu[i] = px[i*4];
+
+    // ---- THE CPU TWIN: the same arithmetic, verified headless against the analytic shadow
+    const tB = performance.now();
+    const cpu = sinogramCPU(blobs, NDET, NANG, 0);
+    const tCPU = performance.now() - tB;
+
+    // ---- ADJUDICATE. This is the point of the page: not "it works", but "here is the disagreement".
+    let worst = 0, peak = 0, worstAt = null;
+    for (let ai = 0; ai < NANG; ai++) for (let di = 0; di < NDET; di++) {
+      const k = ai*NDET + di, d = Math.abs(gpu[k] - cpu[k]);
+      if (d > worst) { worst = d; worstAt = [di, ai]; }
+      peak = Math.max(peak, Math.abs(cpu[k]));
+    }
+    // and against the ANALYTIC truth, not just against each other -- two wrongs agreeing is not a right
+    let vsTruth = 0;
+    for (let ai = 0; ai < NANG; ai += 7) { const th = Math.PI*ai/NANG;
+      for (let di = 0; di < NDET; di += 5) {
+        const s = -1 + (di+0.5)*2/NDET;
+        vsTruth = Math.max(vsTruth, Math.abs(gpu[ai*NDET+di] - blobRadonAt(s, th, 0, blobs)));
+      } }
+
+    // draw the sinogram -- this texture is literally what the GPU computed
+    const sg = $("sino").getContext("2d");
+    const img = sg.createImageData(NDET, NANG);
+    for (let i = 0; i < NDET*NANG; i++) {
+      const t = Math.min(1, gpu[i]/Math.max(peak, 1e-9));
+      img.data[i*4] = 255*t; img.data[i*4+1] = 200*t; img.data[i*4+2] = 110*t; img.data[i*4+3] = 255;
+    }
+    sg.putImageData(img, 0, 0);
+
+    // and rebuild from the GPU's own scan -- if the texture is a real sinogram, this is a real picture
+    const angles = new Float64Array(NANG);
+    for (let a = 0; a < NANG; a++) angles[a] = Math.PI*a/NANG;
+    const rc = reconstruct({ data: Float64Array.from(gpu), angles, nAngles: NANG, nDet: NDET, ds: 2/NDET }, GN);
+    let mx = 0; for (const v of rc) if (v > mx) mx = v;
+    const rg = $("rec").getContext("2d");
+    const ri = rg.createImageData(GN, GN);
+    for (let i = 0; i < GN*GN; i++) {
+      const t = Math.max(0, Math.min(1, rc[i]/Math.max(mx, 1e-9)));
+      ri.data[i*4] = 190*t; ri.data[i*4+1] = 235*t; ri.data[i*4+2] = 255*t; ri.data[i*4+3] = 255;
+    }
+    rg.putImageData(ri, 0, 0);
+
+    const rel = worst/Math.max(peak, 1e-9);
+    $("stat").innerHTML =
+      "<b style='color:#f6a623'>" + n + "</b> blobs &middot; " + NDET + "&times;" + NANG + " = <b>" + (NDET*NANG).toLocaleString() + " rays</b>, one draw call" +
+      "<br>GPU <b style='color:#6ff0d6'>" + tGPU.toFixed(2) + " ms</b> (including readback) &middot; CPU twin <b>" + tCPU.toFixed(1) + " ms</b> &middot; <b style='color:#ffd27f'>" + (tCPU/tGPU).toFixed(1) + "&times;</b>" +
+      "<br>the whole scan on the wire: <b>" + (NDET*NANG*4/1024).toFixed(0) + " KB</b> &mdash; never the bottleneck";
+    $("verdict").innerHTML =
+      "<b style='color:#6ff0d6'>ADJUDICATED</b><br>" +
+      "GPU vs the verified CPU twin:<br>worst <b style='color:" + (rel < 1e-3 ? "#7fe3c4" : "#ff6a6a") + "'>" + worst.toExponential(2) + "</b> abs, " + rel.toExponential(2) + " rel" +
+      (worstAt ? "<br><span style='color:#6f86ab'>worst at detector " + worstAt[0] + ", angle " + worstAt[1] + "</span>" : "") +
+      "<br><br>GPU vs the <i>analytic</i> shadow:<br>worst <b style='color:" + (vsTruth/peak < 1e-3 ? "#7fe3c4" : "#ff6a6a") + "'>" + vsTruth.toExponential(2) + "</b>" +
+      "<br><span style='color:#6f86ab'>two wrongs agreeing is not a right, so it is checked against the closed form too.</span>" +
+      "<br><br><span style='color:#6f86ab'>v2489 measured 6.5e-4 here on a 1070. The cause was the shader computing its own sin/cos &mdash; a function GLSL ES does not constrain at all. It is handed them now. <b style='color:#ffd27f'>This number should be ~1e-7.</b> If it is not, that explanation was wrong.</span>";
+  }
+  $("nb").oninput = run;
+  $("note").innerHTML =
+    "<b>A sinogram is an image.</b> Detector across, angle down &mdash; and every pixel is one ray that depends on no other ray. So a fragment shader computing one texture <i>is</i> the entire scan. " +
+    "That is the Neo Geo move: Doom ran on a machine with no framebuffer because a raycast column <b>is</b> a scaled sprite, and the data already had the shape the hardware wanted. " +
+    "The arithmetic is proven headless; that a GPU runs it faithfully is not &mdash; so this page <b>adjudicates</b> instead of asserting.";
+  run();
+}
+</script>
+</body>
+</html>

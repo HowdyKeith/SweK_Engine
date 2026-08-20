@@ -1,0 +1,23 @@
+{
+  "_comment": "Copy to drive.json. Pull *.swekupdate.json from one Drive folder (read-only). Use EITHER service-account OR oauth.",
+  "_mode_A_service_account": [
+    "Headless. Make a service account in GCP, download its JSON key, set keyFile (or paste it into key).",
+    "Then SHARE your updates folder with the service account's client_email (Viewer)."
+  ],
+  "_mode_B_oauth_personal_drive": [
+    "Updates live in your own Drive. Make a Desktop-app OAuth client (clientId + clientSecret), put them in oauth below,",
+    "then run: node tools/drive-oauth-login.mjs   (opens a browser once; saves oauth.refreshToken here)."
+  ],
+  "folderId": "PASTE_DRIVE_FOLDER_ID_HERE",
+  "pollMs": 300000,
+  "enabled": false,
+
+  "keyFile": "/absolute/path/to/swek-updater-service-account.json",
+  "key": null,
+
+  "oauth": {
+    "clientId": "",
+    "clientSecret": "",
+    "refreshToken": ""
+  }
+}

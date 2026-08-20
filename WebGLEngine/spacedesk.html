@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — spacedesk auto-launch</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:600px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; background:var(--panel); }
+  label { display:block; color:var(--dim); font-size:12px; margin:10px 0 4px; }
+  input { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .ck { display:flex; align-items:center; gap:8px; margin-top:4px; cursor:pointer; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > div { flex:1; min-width:140px; }
+  .inline { display:flex; gap:8px; align-items:flex-end; }
+  .inline button { white-space:nowrap; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:8px 14px; font:inherit; cursor:pointer; }
+  button.scan, button.test { background:#10151d; color:var(--dim); border-color:var(--line); }
+  #msg { color:var(--dim); font-size:12px; margin-top:10px; }
+  .badge { font-size:11px; padding:2px 7px; border-radius:6px; }
+  .badge.up { color:var(--ok); background:#10231a; border:1px solid #224a36; } .badge.down { color:var(--dim); background:#10151d; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🖥️</span> spacedesk auto-launch</span> <span id="state" class="badge down">server: ?</span></header>
+  <main>
+    <div class="note">
+      When the <b>spacedesk server</b> starts on this PC, the bridge opens the <b>spacedesk viewer</b> on the Android TV Device so it joins as a second monitor automatically. It watches for the server's Windows process — hit <b>Scan</b> with spacedesk running to find its exact name (often <b>spacedeskService.exe</b>).
+    </div>
+    <div class="card">
+      <label class="ck"><input id="watch" type="checkbox" /> Watch for the spacedesk server and auto-open the viewer on the Android TV Device</label>
+
+      <label>Server process name (on this PC)</label>
+      <div class="inline">
+        <input id="processName" list="procs" placeholder="spacedeskService.exe" />
+        <button class="scan" id="scan">Scan</button>
+      </div>
+      <datalist id="procs"></datalist>
+
+      <div class="row" style="margin-top:6px;">
+        <div><label>Android TV Device IP</label><input id="shieldIp" placeholder="192.168.x.x" /></div>
+        <div><label>Poll every (sec)</label><input id="pollSec" type="number" min="3" max="120" placeholder="10" /></div>
+      </div>
+      <label>Viewer package (on the Android TV Device)</label>
+      <input id="viewerPkg" placeholder="ph.spacedesk.beta" />
+
+      <div class="actions">
+        <button id="save">Save</button>
+        <button class="test" id="test">🖥️ Open viewer on the Android TV Device now</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script type="module">
+  // v3846 -- CONVERTED TO ui/roundTrip.js, the THIRD call site after arrival.html (v3455) and doorbell.html
+  // (v3670). This page had the defect in BOTH places the ratchet warns about: the load did
+  // `c.viewerPkg || "ph.spacedesk.beta"` and `c.pollSec || 10`, and the markup carried
+  // value="192.168.10.114" on the device IP and value="10" on the poll interval -- so a FAILED FETCH left
+  // browser defaults in the form and the next Save (or the Test button, which also POSTs) wrote them back as
+  // though somebody had chosen them. applyLoaded puts each control into its own spelling of "not loaded";
+  // collectIfKnown OMITS a control that never learned a value, so a save cannot overwrite a good one.
+  import { applyLoaded, collectIfKnown } from "/ui/roundTrip.js";
+  const $ = (id) => document.getElementById(id);
+  function setState(running){ const b = $("state"); b.textContent = "server: " + (running ? "up" : "down"); b.className = "badge " + (running ? "up" : "down"); }
+
+  fetch("/spacedesk/config", { cache:"no-store" }).then(r => r.json()).then(c => {
+    if (!c) return;
+    for (const k of ["watch", "processName", "shieldIp", "pollSec", "viewerPkg"]) applyLoaded($(k), c[k]);
+    setState(c.running);
+  }).catch(() => {});
+
+  $("scan").onclick = () => {
+    $("msg").textContent = "scanning processes…";
+    fetch("/spacedesk/processes", { cache:"no-store" }).then(r => r.json()).then(j => {
+      const list = (j && j.processes) || [];
+      $("procs").innerHTML = list.map(p => '<option value="' + p.replace(/"/g,"&quot;") + '"></option>').join("");
+      const hit = list.find(p => /spacedesk/i.test(p));
+      if (hit) { $("processName").value = hit; $("msg").textContent = "found: " + hit; }
+      else $("msg").textContent = list.length ? (list.length + " processes — type to filter the list") : "no processes (not on Windows?)";
+    }).catch(e => $("msg").textContent = "✗ " + e);
+  };
+
+  function body(){ const b = {}; for (const k of ["watch", "processName", "shieldIp", "viewerPkg", "pollSec"]) collectIfKnown(b, k, $(k)); return b; }
+  $("save").onclick = () => { $("msg").textContent = "saving…"; fetch("/spacedesk/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(r => r.json()).then(c => { setState(c.running); $("msg").textContent = "✓ saved" + (c.watch ? " — watching" : ""); }).catch(e => $("msg").textContent = "✗ " + e); };
+  $("test").onclick = () => { $("msg").textContent = "launching viewer on the Android TV Device…"; fetch("/spacedesk/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(() => fetch("/spacedesk/test", { method:"POST" })).then(r => r.json()).then(j => $("msg").textContent = j && j.ok ? "✓ viewer launch sent" : "✗ launch failed (check IP/adb)").catch(e => $("msg").textContent = "✗ " + e); };
+</script>
+</body>
+</html>

@@ -1,0 +1,4902 @@
+{
+ "note": "v3186 -- FROZEN LAB RESULTS. Every gate in the lab checks a RELATIONSHIP (error < tol, ratio ~ 2, converges) and NOTHING CHECKED THE VALUES, so a number could drift on a refactor, a dependency bump or a float change and every gate would still pass. 26 of 27 devices are DETERMINISTIC (measured, replay-exact); lbm has no defaults() and its ABSENCE IS FROZEN so the day it grows one the gate says so. Comparison is EXACT: a difference is a FINDING, and a tolerance would hide the day a device stops being deterministic. Re-freeze DELIBERATELY after an intended change: SWEK_FREEZE_LAB_RESULTS=1 node tools/roundhouse/labResults-selfcheck.mjs  RE-FROZEN v3336: the previous capture was stamped v3186 -- 150 versions and 17 devices stale, and verify.mjs does not run this gate. IT WAS NOT RE-FROZEN BLIND: all 52 devices were compared against the v3186 values first and NOTHING HAD MOVED (moved 0, vanished 0, appeared 0), so this absorbs 17 NEW devices and no drift. A blanket re-freeze without that comparison would have been a record of whatever happened to be there.  v3340: ONE DEVICE ADDED (fieldnav) BY DELTA, NOT BY BLANKET RE-FREEZE. All 52 existing devices were compared first and NONE had moved (moved 0, vanished 0, appeared 0) despite the v3339 patches touching probeBind and instruments -- so their v3336 values stand untouched rather than being rewritten from a run they did not need. Rewriting them would have discarded the ratchet to add one row.  v3366: added by DELTA again -- only the devices absent from the baseline were captured; every existing row keeps its frozen value, so the ratchet is extended rather than discarded.  v3379: reaction added BY DELTA -- only the new device was captured; every existing row keeps its frozen value.  v3380: beam added BY DELTA -- only the new device captured.  v3381: pulsar added BY DELTA.  v3382: galaxy and geostats added, AND THE FIRST FULL RE-RUN OF EVERY FROZEN ROW SINCE v3336 -- five rounds had extended this baseline BY DELTA, which never re-runs the rows it protects. All 57 existing devices were captured in two chunks (twof 100s and kh 22s in one, the other 55 in the other) and compared BEFORE anything was written: MOVED 0, VANISHED 0, APPEARED 1. The one appearance is twof.dragOverLift, null at freeze time and 0.1262 now, WITH EVERY OTHER twof VALUE BIT-IDENTICAL -- so the physics did not move. THE CAUSE IS v3341, which fixed dominantFrequency(...).freq being read as an object: every frequency in twoFExperiment.mjs had been NaN since v2862, so the ratio was absent for a reason that no longer holds. liftSustained is STILL false, so the run remains DISQUALIFIED and the 2f question remains open -- what changed is that the negative is now a number from a bad run rather than no number at all. Absorbed DELIBERATELY with that reason, and the stale lbm-two-frequency instrument key was corrected in the same commit.  v3391: FULL RE-RUN AGAIN, second in a row -- v3382 argued a delta never re-runs the rows it protects, so this build re-ran all 59 existing devices in two chunks before writing. MOVED 0, VANISHED 0, APPEARED 1. The appearance is clocks.crossoverErrOrder = 0, added THIS round as the order statistic for the clocks planted error, and it reads zero because the baseline run plants nothing. Four new devices absorbed from the v3390 patch (nuclear, seismic, acoustics, em).  v3392: FULL RE-RUN, third in a row. All 63 devices captured in two chunks and compared BEFORE writing: MOVED 0, VANISHED 0, APPEARED 2 -- inspiral.ratePower and inspiral.a0Exponent, both added THIS round for the wrong-power-law plant, and the unplanted run reports 3 and 4 exactly as Peters does. kerr gained `planted` (boolean, so runRecord drops it) and its horizon values are UNCHANGED, which is the evidence that the plant is opt-in rather than always on. AND THE CAPTURE SCRIPT ITSELF FAILED SILENTLY FIRST: it still pointed at the previous rounds path, exited 1, and the comparison ran against STALE JSON and reported a comfortable moved 0. A COMPARISON IS ONLY AS GOOD AS THE FRESHNESS OF BOTH SIDES.  v3393: FULL RE-RUN, fourth in a row, and THE CAPTURE SCRIPT WAS REPOINTED AT THE CURRENT DIRECTORY FIRST -- v3392 ran it against a renamed path, got exit 1, and compared stale JSON to the baseline while reporting a comfortable moved 0. MOVED 0, VANISHED 0, APPEARED 0: pipe3d gained only `planted`, which is a boolean and dropped by runRecord, so the reader plant leaves every frozen number untouched -- which is the evidence that it is opt-in.",
+ "captured": "v3446",
+ "deviceCount": 75,
+ "observables": 638,
+ "devices": {
+  "friction": {
+   "mode": "critical",
+   "outputs": {
+    "criticalSlope": 0.5000217281490547,
+    "criticalKey": 0.5,
+    "criticalErrAbs": 0.000021728149054656143,
+    "criticalErrFrac": 0.000043456298109312286,
+    "travelBelow": -1,
+    "travelAbove": -1,
+    "sticksBelow": -1,
+    "slidesAbove": -1,
+    "travelZeroMu": -1,
+    "travelHalfMu": -1,
+    "zeroMuRatio": -1,
+    "monotoneViolations": -1,
+    "mu": 0.5
+   }
+  },
+  "plastic": {
+   "mode": "yield",
+   "outputs": {
+    "yieldKey": 0.1,
+    "yieldTension": 0.1000000000000002,
+    "yieldCompression": -0.10000000000000014,
+    "yieldWorstErrAbs": 2.7755575615628914e-16,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": 1,
+    "creepKey": -1,
+    "creepRegressed": -1,
+    "creepErrAbs": -1,
+    "creepPoints": -1,
+    "capKey": -1,
+    "capAttained": -1,
+    "capErrAbs": -1,
+    "capRatchets": -1,
+    "creepFreeSpread": -1,
+    "creepFreeWorstBudgetUsed": -1,
+    "creepFreeFallsWithCreep": -1,
+    "creepFreeSamples": -1
+   }
+  },
+  "vibrations": {
+   "mode": "moments",
+   "outputs": {
+    "sumW2": 24,
+    "sumW2Key": 24,
+    "sumW2ErrRel": 0,
+    "sumW4": 70,
+    "sumW4Key": 70,
+    "sumW4ErrRel": 0
+   }
+  },
+  "md": {
+   "mode": "madelung",
+   "outputs": {
+    "madelung": 1.747565146127009,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": 3.1559749531205103e-7,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "zeta": {
+   "mode": "even",
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 2,
+    "value": 1.6449340668482288,
+    "closedForm": 1.6449340668482264,
+    "errAbs": 2.4424906541753444e-15,
+    "errFrac": 1.4848562646983628e-15,
+    "piRecovered": 3.1415926535897953,
+    "piErrAbs": 2.220446049250313e-15,
+    "hasClosedForm": 1,
+    "errNoCorrection": -1,
+    "errWithCorrection": -1,
+    "correctionGain": -1,
+    "worstHigherErr": -1
+   }
+  },
+  "gyroscope": {
+   "mode": "precess",
+   "outputs": {
+    "omega": 40,
+    "torque": 12,
+    "steps": 3000,
+    "rateMeasured": -0.2986946333258104,
+    "rateTimesL": 11.947785333032417,
+    "rateErrFrac": 0.0043512222472985584,
+    "orderRatio": -1,
+    "orderRatioExpected": -1,
+    "orderErrFrac": -1,
+    "tiltDrift": 0.007666909072193362,
+    "spinDrift": 0.3524089421896477,
+    "precessed": 1,
+    "spunUp": 0,
+    "axisFrozen": 0
+   }
+  },
+  "figureeight": {
+   "mode": "period",
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.000005305096075403748,
+    "thirdDist": -1,
+    "energyDriftFrac": -1,
+    "angMomDrift": -1,
+    "nudge": 0,
+    "returnRatio": -1,
+    "linearityErrFrac": -1,
+    "closes": 1
+   }
+  },
+  "heidler": {
+   "mode": "peak",
+   "outputs": {
+    "i0": 30,
+    "t1": 19,
+    "t2": 485,
+    "etaStandard": 0.755850539963127,
+    "etaTrue": 0.806256630935786,
+    "etaRatio": 1.0666879076055407,
+    "setName": "first",
+    "peakOverI0First": 1.0666879076055407,
+    "peakOverI0Subsequent": 1.0397220144145967,
+    "peakOverI0Fast": 1.0504911078652872,
+    "peakMeasured": 32.00063722816622,
+    "peakOverI0": 1.0666879076055407,
+    "peakErrFrac": 0.06668790760554066,
+    "tPeak": 68.77750284742575,
+    "atZero": -1,
+    "atFar": -1,
+    "maxima": -1,
+    "tPeakInRange": -1
+   }
+  },
+  "spacefill": {
+   "mode": "stroke",
+   "outputs": {
+    "order": 6,
+    "cells": 4096,
+    "steps": 4096,
+    "distinct": 4096,
+    "revisits": 0,
+    "breaks": 0,
+    "worstJump": 1,
+    "coverageErrFrac": 0,
+    "breaksExpected": 0,
+    "breakErrAbs": 0,
+    "worstJumpExpected": 1,
+    "continuous": 1,
+    "bijectionMismatches": 0,
+    "orderRatio": -1,
+    "rasterTracksN": -1
+   }
+  },
+  "blackhole": {
+   "mode": "orbit",
+   "outputs": {
+    "kind": "orbit",
+    "r0": 9,
+    "captured": false,
+    "rMin": 8.91614149466843,
+    "rMax": 9,
+    "orbits": 19,
+    "precessionPerOrbit": 3.3535475732817894,
+    "energyDriftFrac": 3.410225004143458e-10
+   }
+  },
+  "xpbd": {
+   "mode": "hooke",
+   "outputs": {
+    "stretch": 0.01000005915876212,
+    "exactStretch": 0.01,
+    "stretchErrFrac": 0.00000591587621199402,
+    "amplitude": 0.00006201366943414666,
+    "meanLength": 1.0100000591587621,
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false
+   }
+  },
+  "em": {
+   "mode": "vacuum",
+   "outputs": {
+    "cComputed": 299792458.0000065,
+    "cDefined": 299792458,
+    "cErrFrac": 2.1671346650480375e-14,
+    "z0": 376.73031366686166,
+    "index": 1.5,
+    "impedance": 251.15354244457444,
+    "phaseSpeed": 199861638.666671,
+    "planted": false,
+    "indexSpeedProduct": 299792458.0000065,
+    "indexSpeedConsistent": true
+   }
+  },
+  "acoustics": {
+   "mode": "propagate",
+   "outputs": {
+    "courantNumber": 1,
+    "propagationError": 5.258482549637418e-21,
+    "exactAtMagicStep": true,
+    "planted": false
+   }
+  },
+  "seismic": {
+   "mode": "rays",
+   "outputs": {
+    "closedDistance": 10.392304845413264,
+    "integratedDistance": 10.392304845425388,
+    "arcDistance": 10.392304845413264,
+    "worstRouteDiff": 1.212363542890671e-11,
+    "turningDepth": 6,
+    "arcRadius": 12,
+    "planted": false
+   }
+  },
+  "nuclear": {
+   "mode": "chain",
+   "outputs": {
+    "chainWorstDiff": 4.468647674116255e-15,
+    "conservationResidual": 0,
+    "nA": 0.24659696394160643,
+    "nB": 0.07133219721404896,
+    "nC": 0.6820708388443446,
+    "planted": false
+   }
+  },
+  "astroparticle": {
+   "mode": "oscillation",
+   "outputs": {
+    "unitarityErr": 0,
+    "amplitudeErr": 3.6469636310876297e-8,
+    "phaseErr": 0.00012157543776348669,
+    "coeffErr": 5.359712271279635e-7,
+    "unitary": true,
+    "amplitudeFromAngle": true,
+    "phaseFromConstant": true,
+    "constantDerived": true,
+    "planted": false
+   }
+  },
+  "csg": {
+   "mode": "tree",
+   "outputs": {
+    "cornerErr": 2.220446049250313e-16,
+    "eikonalErr": 1.1102230246251565e-16,
+    "crossingErr": 1.1634027075047015e-12,
+    "idempotenceErr": 0,
+    "boxExactAtCorner": true,
+    "unitGradient": true,
+    "crossingOnSurface": true,
+    "idempotent": true,
+    "unionMembership": true,
+    "planted": false
+   }
+  },
+  "bonefield": {
+   "mode": "capsule",
+   "outputs": {
+    "segmentErr": 1.1920928910669204e-8,
+    "capErr": 1.1920928910669204e-8,
+    "unionErr": 4.768371586472142e-8,
+    "segmentExact": true,
+    "capClamped": true,
+    "unionIsMin": true,
+    "deterministic": true,
+    "planted": false
+   }
+  },
+  "clocks": {
+   "mode": "rates",
+   "outputs": {
+    "staticRate": 0.9128709291752769,
+    "orbitingRate": 0.8660254037844386,
+    "orbitingSlower": true,
+    "crossoverRatio": 1.5,
+    "crossoverResidual": 0,
+    "planted": false,
+    "crossoverErrOrder": 0,
+    "clockEffect": 7.539822368615546,
+    "clockEffectExact": 7.5398223686155035,
+    "clockEffectErrFrac": 5.654319433712919e-15,
+    "periodPro": 264.95701963403513,
+    "periodRetro": 257.4171972654196,
+    "r": 12,
+    "a": 0.6
+   }
+  },
+  "reaction": {
+   "mode": "selection",
+   "outputs": {
+    "winningMode": 7,
+    "k": 1.3744467859455345,
+    "amp": 2.614721972181186,
+    "criticalK": 1.0298835719535588,
+    "criticalB": 4.246320343559643,
+    "hopfB": 10,
+    "aboveThreshold": true,
+    "dkFromCritical": 0.34456321399197565
+   }
+  },
+  "beam": {
+   "mode": "exponent",
+   "outputs": {
+    "exponent": 3,
+    "points": 7,
+    "exponentError": 0,
+    "closedFormAtUnitL": 0.3333333333333333
+   }
+  },
+  "whitedwarf": {
+   "mode": "exponent",
+   "outputs": {
+    "planted": false,
+    "slopeMeasured": -0.3336203667084108,
+    "slopeTheory": -0.3333333333333333,
+    "slopeErrAbs": 0.0002870333750774612,
+    "r2": 0.9999998895626707,
+    "window": 0.01,
+    "converging": true
+   }
+  },
+  "centrifuge": {
+   "mode": "rate",
+   "outputs": {
+    "planted": false,
+    "sedCoefficient": 4.444444444444443e-8,
+    "rateContinuous": 0.39999999999999986,
+    "rateDiscreteExact": 0.3999200213268913,
+    "rateRecovered": 0.39992002132695803,
+    "logFitR2": 1,
+    "recoveredVsDiscrete": 1.6684436942813606e-13,
+    "recoveredVsContinuous": 0.0001999466826045627
+   }
+  },
+  "freerotation": {
+   "mode": "stability",
+   "outputs": {
+    "I0": 4.333333333333333,
+    "I1": 3.333333333333333,
+    "I2": 1.6666666666666665,
+    "midAxis": 1,
+    "sigmaPredicted": 0.4803844614152614,
+    "sigmaMeasured": 0.4803777959207057,
+    "sigmaRelErr": 0.0000138753333863241,
+    "sigmaR2": 0.9999999993279604,
+    "factorMid": 0,
+    "factorMax": 0,
+    "factorMin": 0,
+    "driftE": 0,
+    "driftL": 0,
+    "driftWorldL": 0,
+    "flips": 0,
+    "attitudeOrder": 0
+   }
+  },
+  "invariants": {
+   "mode": "invariance",
+   "outputs": {
+    "planted": false,
+    "sRest": 4.970187175537795,
+    "framesChecked": 5,
+    "sDriftWorst": 7.14804805800112e-15,
+    "shellDriftWorst": 1.1349983409757608e-14
+   }
+  },
+  "poisson": {
+   "mode": "canonical",
+   "outputs": {
+    "planted": false,
+    "qp": 0.999999999996449,
+    "qq": 0,
+    "pp": 0,
+    "antisymmetry": 0,
+    "canonicalErr": 3.551048344263563e-12
+   }
+  },
+  "refscan": {
+   "mode": "furnace",
+   "outputs": {
+    "planted": false,
+    "worstAlbedoErrFrac": 2.4671622769447924e-16,
+    "albedosTested": 4,
+    "furnaceSpread": 0,
+    "furnaceMean": 0.17999999999999985,
+    "furnaceGradeable": true
+   }
+  },
+  "sdfmarch": {
+   "mode": "sphere",
+   "outputs": {
+    "planted": false,
+    "worstAgainstClosedForm": 9.48399181410764e-8,
+    "raysTraced": 24,
+    "worstSteps": 10,
+    "normalErr": 2.220446049250313e-16
+   }
+  },
+  "compose": {
+   "mode": "compare",
+   "outputs": {
+    "valueA": 299792458.0000065,
+    "valueB": 299792458,
+    "absDiff": 0.000006496906280517578,
+    "relDiff": 2.1671346650479905e-14,
+    "dimensionsComparable": true,
+    "dimA": "m/s",
+    "dimB": "m/s",
+    "judgedByError": false,
+    "verdict": "unjudged",
+    "reason": "at least one measurement has no error bar -- cannot judge agreement"
+   }
+  },
+  "galaxy": {
+   "mode": "traces",
+   "outputs": {
+    "trA": 0,
+    "trA2": 228,
+    "trA3": 276,
+    "linkCount": 228,
+    "triangles": 46,
+    "reciprocalGap": 0,
+    "triangleErr": 0,
+    "selfLoops": 0
+   }
+  },
+  "geostats": {
+   "mode": "bridge",
+   "outputs": {
+    "worstValueErr": 2.6645352591003757e-15,
+    "worstOuterWeight": 5.093148125467906e-16,
+    "varianceRatio": 1.9999999999999996,
+    "varianceRatioSpread": 8.881784197001252e-16,
+    "rows": [
+     {
+      "x0": 0.5,
+      "kriged": 0.4999999999999997,
+      "linear": 0.5,
+      "valueErr": 2.7755575615628914e-16,
+      "outer": 9.251858538542972e-17,
+      "variance": 0.5,
+      "bridge": 0.25,
+      "varianceRatio": 2
+     },
+     {
+      "x0": 2,
+      "kriged": 1.7499999999999996,
+      "linear": 1.75,
+      "valueErr": 4.440892098500626e-16,
+      "outer": 1.4062824978585316e-16,
+      "variance": 1,
+      "bridge": 0.5,
+      "varianceRatio": 2
+     },
+     {
+      "x0": 4.75,
+      "kriged": 2.0208333333333326,
+      "linear": 2.0208333333333335,
+      "valueErr": 8.881784197001252e-16,
+      "outer": 1.5728159515523064e-16,
+      "variance": 1.4583333333333326,
+      "bridge": 0.7291666666666666,
+      "varianceRatio": 1.9999999999999991
+     },
+     {
+      "x0": 8.3,
+      "kriged": 4.131249999999999,
+      "linear": 4.131250000000001,
+      "valueErr": 2.6645352591003757e-15,
+      "outer": 5.093148125467906e-16,
+      "variance": 1.9549999999999994,
+      "bridge": 0.9774999999999999,
+      "varianceRatio": 1.9999999999999996
+     },
+     {
+      "x0": 12.5,
+      "kriged": 2,
+      "linear": 2,
+      "valueErr": 0,
+      "outer": 0,
+      "variance": 2.5,
+      "bridge": 1.25,
+      "varianceRatio": 2
+     }
+    ]
+   }
+  },
+  "pulsar": {
+   "mode": "residualCurvature",
+   "outputs": {
+    "curvature": 3.336300303680453e-7,
+    "predicted": 3.333333333333333e-7,
+    "ratio": 1.000890091104136,
+    "error": 0.0008900911041360704,
+    "recoveredFdot": -0.000001000890091104136,
+    "trueFdot": -0.000001,
+    "peakToPeak": 0.5940908634124753,
+    "span": 2668.3734055439336
+   }
+  },
+  "fieldnav": {
+   "mode": "policy",
+   "outputs": {
+    "optimalCost": 378.8467102050781,
+    "walkedCost": 395.3924283981323,
+    "excessFrac": 0.043673912818452676,
+    "arrived": true,
+    "looped": false,
+    "steps": 88,
+    "reachableCells": 2304,
+    "cells": 2304,
+    "amp": 1.5
+   }
+  },
+  "optics": {
+   "mode": "airy",
+   "outputs": {
+    "rayleighFactor": 1.2196950472018169,
+    "rayleighFactorExact": 1.2196698912665045,
+    "airyRingErrFrac": 0.000020625199894260012
+   }
+  },
+  "kerr": {
+   "mode": "spin",
+   "outputs": {
+    "outerHorizon": 1.8,
+    "ergoEquator": 2,
+    "ergoThickness": 0.19999999999999996,
+    "photonPrograde": 2.1889140197636334,
+    "photonRetrograde": 3.629849697131921,
+    "iscoPrograde": 3.829069418813151,
+    "iscoRetrograde": 7.850686185306578,
+    "iscoNumericPrograde": 3.829069292356184,
+    "iscoNumericRetrograde": 7.85068599281732,
+    "iscoErrFrac": 3.302550903219177e-8,
+    "shadowAsymmetry": 0.2439551662799225,
+    "omegaHorizon": 0.16666666666666666,
+    "horizonProductErr": 5.551115123125783e-17,
+    "horizonSumErr": 0,
+    "planted": false,
+    "dragAt5": 0.009410288582183186,
+    "dragFalloffRatio": 62.797365119196996
+   }
+  },
+  "ct": {
+   "mode": "parallel",
+   "outputs": {
+    "nAngles": 120,
+    "fbpCorr": 0.9920681537548257,
+    "bpCorr": 0.908728748024742,
+    "rampGain": 0.0833394057300837
+   }
+  },
+  "interferometer": {
+   "mode": "recover",
+   "outputs": {
+    "rmsResidual": 9.253371780321849e-17,
+    "maxResidual": 6.661338147750939e-16,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 5.811257081639297e-17,
+    "unwrapped": true,
+    "lambda": 0.55,
+    "unwrapGain": 5276657305622333
+   }
+  },
+  "windtunnel": {
+   "mode": "balance",
+   "outputs": {
+    "balanceErr": 0.2813276177045468,
+    "massDrift": 3.0527021240063563e-13,
+    "steps": 3500
+   }
+  },
+  "thermal": {
+   "mode": "diffuse",
+   "outputs": {
+    "alphaMeasured": 0.09999824574116206,
+    "alphaTheory": 0.1,
+    "alphaErrFrac": 0.000017542588379437785,
+    "tempRange": 0.1812385051653826,
+    "steps": 360
+   }
+  },
+  "pipe3d": {
+   "mode": "profile",
+   "outputs": {
+    "centrelineMeasured": 0.0029435814791555093,
+    "centrelineTheory": 0.0030250000000000003,
+    "centrelineErrFrac": 0.02691521350231107,
+    "profileRms": 0.045381680839589614,
+    "nuTheory": 0.1,
+    "nuImplied": 0.10276596796864781,
+    "massDrift": 3.000045874362744e-11,
+    "radius": 11,
+    "steps": 3000,
+    "flowMeasured": 0.5463232485613234,
+    "flowTheory": 0.5749507255151022,
+    "profileCells": 377,
+    "planted": false,
+    "flowErrFrac": 0.04979118328467403,
+    "nuErrFrac": 0.02765967968647809
+   }
+  },
+  "geometry": {
+   "mode": "sphere",
+   "outputs": {
+    "surfaceDeviation": 0.00860350085337347,
+    "watertight": true,
+    "boundaryEdges": 0,
+    "volumeMeasured": 4.153100617154511,
+    "volumeTheory": 4.1887902047863905,
+    "volumeErrFrac": 0.008520261432787534,
+    "triangles": 9888,
+    "vertices": 4946,
+    "resolution": 28,
+    "hasVolumeTruth": true
+   }
+  },
+  "kh": {
+   "mode": "sweep",
+   "outputs": {
+    "peakKD": 0.39269908169872414,
+    "peakSigmaNorm": 0.10590929424463459,
+    "michalkePeakKD": 0.4446,
+    "michalkePeakSigma": 0.1897,
+    "peakKDErrFrac": 0.11673620850489397,
+    "peakSigmaErrFrac": 0.4417011373503712,
+    "neutralRespected": true,
+    "unstableCount": 4,
+    "stableCount": 1,
+    "points": 5
+   }
+  },
+  "born": {
+   "mode": "validity",
+   "outputs": {
+    "tolerance": 0.05,
+    "phaseLimitMeasured": 0.31275895750000005,
+    "phaseLimitTheory": 0.31622776601683794,
+    "phaseLimitErrFrac": 0.010969335680198287,
+    "k": 6.283185307179586,
+    "d": 1
+   }
+  },
+  "ising": {
+   "mode": "order",
+   "outputs": {
+    "temperature": 2,
+    "magnetisation": 0.9127256944444454,
+    "yangExact": 0.911319377877496,
+    "magnetisationErrFrac": 0.001543165438032082,
+    "energy": -1.7430208333333335,
+    "susceptibility": 0.31649921874969067,
+    "specificHeat": 0.7960762152776439,
+    "onsagerTc": 2.269185314213022
+   }
+  },
+  "kepler": {
+   "mode": "conserve",
+   "outputs": {
+    "energyErrFirstHalf": 0.0006710005060555077,
+    "energyErrSecondHalf": 0.0006710005121761672,
+    "energyGrowthRatio": 1.0000000091216914,
+    "energyErrFinal": 0.0006663584689514665,
+    "energySeries": [
+     -0.4999987820276641,
+     -0.4996648142722542,
+     -0.4996687006440324,
+     -0.49967046153170713,
+     -0.4996708226872066,
+     -0.4996705716713685,
+     -0.4996691691372291,
+     -0.49966459462315516,
+     -0.49992120663033957,
+     -0.4996696414446551,
+     -0.49966794595185754,
+     -0.4996702800153581,
+     -0.4996708036288705,
+     -0.4996706761033456,
+     -0.4996696274195474,
+     -0.4996655588003247,
+     -0.4997777672328092,
+     -0.49969022483424785,
+     -0.49966697894935275,
+     -0.49967003745304656,
+     -0.49967076207894845,
+     -0.4996707492625413,
+     -0.4996699720332661,
+     -0.49966673029819075,
+     -0.4996994925711591,
+     -0.4997535754073823,
+     -0.4996658279947212,
+     -0.49966971446665714,
+     -0.49967069523146135,
+     -0.49967079624751554,
+     -0.4996702309247061,
+     -0.4996677456806452,
+     -0.49967227739696884,
+     -0.4998865563370598,
+     -0.499664751448622,
+     -0.499669284840318,
+     -0.4996705984592553,
+     -0.4996708202465715,
+     -0.49967042489506747,
+     -0.4996685466921538,
+     -0.4996652692357325,
+     -0.4999982275833237,
+     -0.49966478376147605,
+     -0.4996687145942483,
+     -0.4996704648418169,
+     -0.4996708228602261,
+     -0.4996705690591682,
+     -0.49966915790127775,
+     -0.4996645831417946,
+     -0.49992434640020766,
+     -0.4996694353204838,
+     -0.49966796415760195,
+     -0.49967028445570405,
+     -0.49967080426159716,
+     -0.4996706742286392,
+     -0.499669618964059,
+     -0.4996655338175865,
+     -0.49978024708815627,
+     -0.4996894721000682,
+     -0.49966700175476036,
+     -0.49967004337266646,
+     -0.4996707632136747,
+     -0.4996707479926804,
+     -0.49966996567805744
+    ],
+    "energyGrowthShared": 1.0000343560540406,
+    "energyVerdictBounded": 1,
+    "energySamples": 64,
+    "growthGapFrac": 0.00003434693203585864,
+    "angularMomentumErr": 2.6921477609369897e-14,
+    "semiMajorDrift": 0.0006668027986429514,
+    "integrator": "verlet",
+    "orbits": 200,
+    "eccentricity": 0.5
+   }
+  },
+  "twobody": {
+   "mode": "orbit",
+   "outputs": {
+    "ratioMeasured": 0.3333333333332323,
+    "ratioExact": 0.3333333333333333,
+    "ratioErrFrac": 3.0309088572266774e-13,
+    "periodMeasured": 99.36549039795929,
+    "periodExact": 99.345882657961,
+    "periodErrFrac": 0.00019736842105274027,
+    "barycentreDriftFrac": 9.515860049723625e-14,
+    "netMomentum": 4.14702110332227e-15,
+    "m1": 3,
+    "m2": 1,
+    "massRatio": 0.3333333333333333,
+    "periods": 38,
+    "planted": false
+   }
+  },
+  "inspiral": {
+   "mode": "merger",
+   "outputs": {
+    "mergerMeasured": 16.276041562401232,
+    "mergerExact": 16.276041666666668,
+    "mergerErrFrac": 6.40606835077051e-9,
+    "worstBulkErrFrac": 1.5333479624030186e-7,
+    "m1": 3,
+    "m2": 1,
+    "a0": 10,
+    "steps": 452,
+    "finalA": 0.09923144609918072,
+    "planted": false,
+    "ratePower": 3,
+    "a0Exponent": 4
+   }
+  },
+  "eccentric": {
+   "mode": "invariant",
+   "outputs": {
+    "worstInvariantDev": 3.631767989685781e-9,
+    "worstAtE": 0.22759966457696176,
+    "c0": 5.972009477896604,
+    "eFinal": 0.00999992990948581,
+    "aFinal": 0.3258446870025939,
+    "circularised": true,
+    "eccentricityEverRose": false,
+    "circularLimitErrFrac": 0,
+    "steps": 34234,
+    "m1": 3,
+    "m2": 1,
+    "a0": 10,
+    "e0": 0.7
+   }
+  },
+  "kuramoto": {
+   "mode": "curve",
+   "outputs": {
+    "superErrMean": 0.0053976801702385335,
+    "superErrWorst": 0.0070456575048616354,
+    "subcriticalRMean": 0.03060622848609197,
+    "finiteSizeFloor": 0.015625,
+    "criticalK": 1,
+    "gamma": 0.5,
+    "N": 4096,
+    "points": 6
+   }
+  },
+  "hmc": {
+   "mode": "moments",
+   "outputs": {
+    "meanErr": 0.015354807460400632,
+    "covErr": 0.03092974294525508,
+    "acceptRate": 0.9966666666666667,
+    "meanAbsDH": 0.004949560630843196,
+    "samples": 4000
+   }
+  },
+  "landauzener": {
+   "mode": "curve",
+   "outputs": {
+    "errMean": 0.0020618880558386675,
+    "errWorst": 0.0035075352802009796,
+    "relWorst": 0.006174329348549953,
+    "points": 5,
+    "v": 4,
+    "graded": true
+   }
+  },
+  "inference": {
+   "mode": "posterior",
+   "outputs": {
+    "muErr": 0.006479592234777232,
+    "sigmaErr": 0.0007470448384179762,
+    "acceptRate": 0.9936363636363637,
+    "samples": 3000,
+    "repeats": 0
+   }
+  },
+  "langevin": {
+   "mode": "jarzynski",
+   "outputs": {
+    "dFerr": 0.002898644947859741,
+    "dFjarzynski": 0.6902485356120855,
+    "dFexact": 0.6931471805599453,
+    "meanW": 1.2041187496387742,
+    "secondLawHolds": true,
+    "nTraj": 30000
+   }
+  },
+  "rmt": {
+   "mode": "repulsion",
+   "outputs": {
+    "rGoe": 0.534221449151825,
+    "rGoeErr": 0.0016769357104206017,
+    "rPoisson": 0.402572033724096,
+    "rPoissonErr": 0.01627767260420543,
+    "smallGap": 0.05303030303030303,
+    "n": 200,
+    "reps": 4
+   }
+  },
+  "percolation": {
+   "mode": "crossing",
+   "outputs": {
+    "prob": 0.50675,
+    "dev": 0.006750000000000034,
+    "sigmaOff": 0.8538149682454668,
+    "se": 0.007905694150420948,
+    "reps": 4000,
+    "L": 32
+   }
+  },
+  "diffusion": {
+   "mode": "pair",
+   "outputs": {
+    "einsteinD": 0.8393425394453097,
+    "greenKuboD": 0.86032895007266,
+    "disagreeFrac": 0.024694666889190548,
+    "meanD": 0.8498357447589848,
+    "steps": 6000,
+    "dt": 0.004,
+    "N": 64
+   }
+  },
+  "hydrostatic": {
+   "mode": "matched",
+   "outputs": {
+    "retained": 0.6324450444893971,
+    "collapsed": true,
+    "expanded": false,
+    "finite": true,
+    "restDensity": 144,
+    "packedDensity": 144.33852379429118,
+    "densityMismatch": 0.0023453461029824276,
+    "startHeight": 0.65,
+    "endHeight": 0.4110892789181081
+   }
+  },
+  "wolff": {
+   "mode": "magnetisation",
+   "outputs": {
+    "absM": 0.9108697916666667,
+    "yangExact": 0.911319377877496,
+    "magErr": 0.00044958621082924477,
+    "U4": 0.6655136513485975,
+    "T": 2,
+    "L": 32,
+    "flipsPerSpin": 2786.6533203125
+   }
+  },
+  "spatial": {
+   "mode": "agreement",
+   "outputs": {
+    "n": 400,
+    "r": 1.2,
+    "spherePairs": 462,
+    "boxPairs": 912,
+    "cornerPairs": 450,
+    "pointFamilyAgrees": true,
+    "boxFamilyAgrees": true,
+    "sphereSubsetOfBox": true,
+    "pointMismatches": [],
+    "boxMismatches": []
+   }
+  },
+  "twof": {
+   "mode": "inlet",
+   "outputs": {
+    "inletDriftFrac": 0.0014518856955491617,
+    "driftImprovementVsFeedback": 82.65113456787049,
+    "liftAmplitude": 0.022713677627373835,
+    "liftSustained": false,
+    "dragOverLift": 0.12620285392396335,
+    "healthy": true,
+    "reNominal": 64.79999999999995,
+    "blockageFrac": 0.14814814814814814,
+    "recordedDrift": 0.00145,
+    "recordedLift": 0.0227
+   }
+  },
+  "fdtd": {
+   "mode": "dispersion",
+   "outputs": {
+    "S": 0.9,
+    "pointsPerWavelength": 12,
+    "vpPredicted": 0.9977818819115514,
+    "vpMeasured": 0.9977659457136329,
+    "vpErrAbs": 0.000015936197918509087,
+    "steps": 2600
+   }
+  },
+  "tempering": {
+   "mode": "marginals",
+   "outputs": {
+    "temps": [
+     1.8,
+     2,
+     2.2,
+     2.4,
+     2.7
+    ],
+    "absM": [
+     0.9541614583333333,
+     0.908421875,
+     0.8016979166666667,
+     0.5129140625,
+     0.25521614583333335
+    ],
+    "yang": [
+     0.9568570172474183,
+     0.911319377877496,
+     0.7847551313839214,
+     0,
+     0
+    ],
+    "worstMagErrBelowTc": 0.016942785282745287,
+    "swapRate": [
+     0.36764705882352944,
+     0.29705882352941176,
+     0.18823529411764706,
+     0.18529411764705883
+    ],
+    "meanSwapRate": 0.2595588235294118,
+    "spreadAcrossLadder": 0.6989453125,
+    "occupancyMin": 0.07,
+    "L": 16,
+    "sweeps": 3000
+   }
+  },
+  "pbc": {
+   "mode": "agreement",
+   "outputs": {
+    "worstForceDiff": 2.3314683517128287e-15,
+    "maxForceMagnitude": 0.9933918518353809,
+    "plantedForceDiff": 1.0488665217844995,
+    "virialPBC": -87.83814054457136,
+    "virialImages": -87.83814054457133,
+    "momentumDrift": 7.216449660063518e-15,
+    "N": 64,
+    "L": 8,
+    "cutoff": 2.5
+   }
+  },
+  "blobbodies": {
+   "mode": "roundtrip",
+   "outputs": {
+    "peakKept": 0.5789179092783062,
+    "massKept": 0.9999011395246645,
+    "peak0": 4.260002136230469,
+    "peak": 2.466191530227661,
+    "trips": 4,
+    "gridN": 64,
+    "voxels": 262144,
+    "bodyCount": 7
+   }
+  },
+  "quantum": {
+   "mode": "well",
+   "outputs": {
+    "levelErrWorst": 0.00003204703923395548,
+    "ratio21": 3.999984617290552,
+    "ratio31": 8.999907703814177,
+    "gapWidens": true,
+    "gridN": 800
+   }
+  },
+  "chaos": {
+   "mode": "fixed",
+   "outputs": {
+    "r": 2.5,
+    "settled": 0.6,
+    "fixedPointExact": 0.6,
+    "fixedPointErr": 0,
+    "period": 1
+   }
+  },
+  "splat": {
+   "mode": "integral",
+   "outputs": {
+    "integralRatio": 0.9999999999999251,
+    "integralErrFrac": 7.494005416219807e-14,
+    "gridN": 256,
+    "isoRollDeviation": 1.1102230246251565e-14,
+    "axisRatio": 1
+   }
+  },
+  "discovery": {
+   "mode": "kepler",
+   "outputs": {
+    "exponent": 1.4999999999999982,
+    "exponentExact": 1.5,
+    "exponentErr": 1.7763568394002505e-15,
+    "verdict": "law",
+    "r2Val": 1,
+    "foundLaw": true
+   }
+  },
+  "probe": {
+   "mode": "precession",
+   "outputs": {
+    "precessionMeasured": 0.009856260938135186,
+    "precessionExact": 0.009817477042468103,
+    "precessionErrFrac": 0.003950495172976964,
+    "orbits": 18
+   }
+  },
+  "lens": {
+   "mode": "shadow",
+   "outputs": {
+    "rObs": 20,
+    "shadowAngleRad": 0.2490415079291834,
+    "shadowAngleExact": 0.2490415079291829,
+    "shadowErrFrac": 2.0060927402647517e-15,
+    "shadowFillsSky": false
+   }
+  },
+  "tidal": {
+   "mode": "deviation",
+   "outputs": {
+    "kind": "deviation",
+    "separationExact": 0.00906765751855998,
+    "separationLinear": 0.009075715616040198,
+    "deviationErrFrac": 0.0008878746118902933,
+    "stretchFactor": 9.06765751855998,
+    "rFinal": 3.158508425967305,
+    "properTime": 390.0009999976896
+   }
+  },
+  "box3d": {
+   "mode": "drop",
+   "outputs": {
+    "kind": "drop",
+    "fallDistance": 4.839765548706055,
+    "fallIdeal": 4.9,
+    "fallErrFrac": 0.012292745162029727
+   }
+  },
+  "blobthermal": {
+   "mode": "einstein",
+   "outputs": {
+    "kind": "einstein",
+    "dInput": 0.01141,
+    "dMeasured": 0.011329675900149917,
+    "dErrFrac": 0.007039798409297348,
+    "msd": 0.0679780554008995,
+    "walkers": 2000
+   }
+  },
+  "blobkelvin": {
+   "mode": "convert",
+   "outputs": {
+    "kind": "convert",
+    "scenario": "bacterium",
+    "kelvinAtD": 212.88207478908424,
+    "warmthAtT": 0.015712180104003336,
+    "roundTripErrFrac": 0
+   }
+  },
+  "lbm": {
+   "mode": null,
+   "unavailable": "device has no defaults(), so a mode must be given explicitly"
+  }
+ },
+ "pairs": {
+  "friction/critical": {
+   "outputs": {
+    "criticalSlope": 0.5000217281490547,
+    "criticalKey": 0.5,
+    "criticalErrAbs": 0.000021728149054656143,
+    "criticalErrFrac": 0.000043456298109312286,
+    "travelBelow": -1,
+    "travelAbove": -1,
+    "sticksBelow": -1,
+    "slidesAbove": -1,
+    "travelZeroMu": -1,
+    "travelHalfMu": -1,
+    "zeroMuRatio": -1,
+    "monotoneViolations": -1,
+    "mu": 0.5
+   }
+  },
+  "friction/stickSlide": {
+   "outputs": {
+    "criticalSlope": -1,
+    "criticalKey": -1,
+    "criticalErrAbs": -1,
+    "criticalErrFrac": -1,
+    "travelBelow": 6.345130535746554e-19,
+    "travelAbove": 2.2543282898433734,
+    "sticksBelow": 1,
+    "slidesAbove": 1,
+    "travelZeroMu": -1,
+    "travelHalfMu": -1,
+    "zeroMuRatio": -1,
+    "monotoneViolations": -1,
+    "mu": 0.5
+   }
+  },
+  "friction/zeroMu": {
+   "outputs": {
+    "criticalSlope": -1,
+    "criticalKey": -1,
+    "criticalErrAbs": -1,
+    "criticalErrFrac": -1,
+    "travelBelow": -1,
+    "travelAbove": -1,
+    "sticksBelow": -1,
+    "slidesAbove": -1,
+    "travelZeroMu": 36.3848865327356,
+    "travelHalfMu": 3.0665868333667484e-19,
+    "zeroMuRatio": 163862961430745820,
+    "monotoneViolations": -1,
+    "mu": 0
+   }
+  },
+  "friction/monotone": {
+   "outputs": {
+    "criticalSlope": -1,
+    "criticalKey": -1,
+    "criticalErrAbs": -1,
+    "criticalErrFrac": -1,
+    "travelBelow": -1,
+    "travelAbove": -1,
+    "sticksBelow": -1,
+    "slidesAbove": -1,
+    "travelZeroMu": 36.3848865327356,
+    "travelHalfMu": 7.2769773065465735,
+    "zeroMuRatio": -1,
+    "monotoneViolations": 0,
+    "mu": 0.5
+   }
+  },
+  "plastic/yield": {
+   "outputs": {
+    "yieldKey": 0.1,
+    "yieldTension": 0.1000000000000002,
+    "yieldCompression": -0.10000000000000014,
+    "yieldWorstErrAbs": 2.7755575615628914e-16,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": 1,
+    "creepKey": -1,
+    "creepRegressed": -1,
+    "creepErrAbs": -1,
+    "creepPoints": -1,
+    "capKey": -1,
+    "capAttained": -1,
+    "capErrAbs": -1,
+    "capRatchets": -1,
+    "creepFreeSpread": -1,
+    "creepFreeWorstBudgetUsed": -1,
+    "creepFreeFallsWithCreep": -1,
+    "creepFreeSamples": -1
+   }
+  },
+  "plastic/creep": {
+   "outputs": {
+    "yieldKey": -1,
+    "yieldTension": -1,
+    "yieldCompression": -1,
+    "yieldWorstErrAbs": -1,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": -1,
+    "creepKey": 0.5,
+    "creepRegressed": 0.5,
+    "creepErrAbs": 0,
+    "creepPoints": 6,
+    "capKey": -1,
+    "capAttained": -1,
+    "capErrAbs": -1,
+    "capRatchets": -1,
+    "creepFreeSpread": -1,
+    "creepFreeWorstBudgetUsed": -1,
+    "creepFreeFallsWithCreep": -1,
+    "creepFreeSamples": -1
+   }
+  },
+  "plastic/cap": {
+   "outputs": {
+    "yieldKey": -1,
+    "yieldTension": -1,
+    "yieldCompression": -1,
+    "yieldWorstErrAbs": -1,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": -1,
+    "creepKey": -1,
+    "creepRegressed": -1,
+    "creepErrAbs": -1,
+    "creepPoints": -1,
+    "capKey": 0.5,
+    "capAttained": 0.5,
+    "capErrAbs": 0,
+    "capRatchets": 0,
+    "creepFreeSpread": -1,
+    "creepFreeWorstBudgetUsed": -1,
+    "creepFreeFallsWithCreep": -1,
+    "creepFreeSamples": -1
+   }
+  },
+  "plastic/creepFree": {
+   "outputs": {
+    "yieldKey": 0.1,
+    "yieldTension": 0.1000000000000002,
+    "yieldCompression": -1,
+    "yieldWorstErrAbs": -1,
+    "yieldWorstBudgetUsed": -1,
+    "belowYieldExactlyZero": -1,
+    "creepKey": -1,
+    "creepRegressed": -1,
+    "creepErrAbs": -1,
+    "creepPoints": -1,
+    "capKey": -1,
+    "capAttained": -1,
+    "capErrAbs": -1,
+    "capRatchets": -1,
+    "creepFreeSpread": 2.220446049250313e-15,
+    "creepFreeWorstBudgetUsed": 0.9143518518518517,
+    "creepFreeFallsWithCreep": 1,
+    "creepFreeSamples": 5
+   }
+  },
+  "vibrations/moments": {
+   "outputs": {
+    "sumW2": 24,
+    "sumW2Key": 24,
+    "sumW2ErrRel": 0,
+    "sumW4": 70,
+    "sumW4Key": 70,
+    "sumW4ErrRel": 0
+   }
+  },
+  "vibrations/trace": {
+   "outputs": {
+    "sumW2": 24,
+    "sumW2Key": 24,
+    "sumW2ErrRel": 0,
+    "sumW4": 70,
+    "sumW4Key": 70,
+    "sumW4ErrRel": 0,
+    "traceProbed": 23.999999999982503,
+    "traceProbedErrRel": 7.290464528371862e-13
+   }
+  },
+  "vibrations/ring": {
+   "outputs": {
+    "sumW2": 64,
+    "sumW2Key": 64,
+    "sumW2ErrRel": 0,
+    "sumW4": 189.99999999999997,
+    "sumW4Key": 190,
+    "sumW4ErrRel": 1.495879443705474e-16,
+    "ringSumW2": 64,
+    "ringSumW4": 192,
+    "ringSecondMomentGap": 2.0000000000000284,
+    "ringFirstMomentGap": 0,
+    "ringRelativeGap": 0.010526315789473835
+   }
+  },
+  "vibrations/dispersion": {
+   "outputs": {
+    "sumW2": 31.999999999999993,
+    "sumW2Key": 32,
+    "sumW2ErrRel": 2.220446049250313e-16,
+    "sumW4": 93.99999999999999,
+    "sumW4Key": 94,
+    "sumW4ErrRel": 1.5117930548087238e-16,
+    "dispersionRatios": [
+     3.7661969417237446,
+     3.8791624532456144,
+     3.938555209866641,
+     3.969015654998146
+    ],
+    "dispersionExponent": 1.9887812527745432
+   }
+  },
+  "md/madelung": {
+   "outputs": {
+    "madelung": 1.747565146127009,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": 3.1559749531205103e-7,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/alphaFree": {
+   "outputs": {
+    "madelung": 1.747565146127009,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": 3.1559749531205103e-7,
+    "alphaSpread": 0.0000436251404392074,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/bond": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": 14.142156421059925,
+    "omegaTheory": 14.142135623730951,
+    "omegaErrFrac": 0.000001470593234783039,
+    "reducedMassCheck": 1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/coulomb": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": 4,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": 0,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/torsion": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": 0.008881784197001252,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/angles": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": 0.000008201973256992266,
+    "angleStiffPoints": 7,
+    "angleStiffAt104": 37.492394024089926,
+    "angleStiffWorstAtDeg": 179,
+    "angleStiffHOrderRatio": 4.000223108341473,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/angleFreq": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": 0.9999304596547038,
+    "angleOmegaOrderRatio": 3.9985009675264456,
+    "angleOmegaDtSpread": 4.919965947980387e-7,
+    "angleArmDrift": 0.011922544042400451,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/angleLinear": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": 3.999994646323282,
+    "angleGenericVExponent": 2.000828251573622,
+    "angleLinearFExponent": 2.9999892925183844,
+    "angleGenericFExponent": 1.0005358777990287,
+    "angleLinearStiffKey": 0,
+    "integratorOrderRatio": -1,
+    "integratorSecularRatio": -1,
+    "integratorErrAtRefDt": -1
+   }
+  },
+  "md/integrator": {
+   "outputs": {
+    "madelung": -1,
+    "madelungKey": 1.7475645946,
+    "madelungErrFrac": -1,
+    "alphaSpread": -1,
+    "omegaMeasured": -1,
+    "omegaTheory": -1,
+    "omegaErrFrac": -1,
+    "reducedMassCheck": -1,
+    "coulombRatio": -1,
+    "coulombRatioKey": 4,
+    "coulombErrFrac": -1,
+    "torsionFdErrFrac": -1,
+    "angleStiffWorstErrFrac": -1,
+    "angleStiffPoints": -1,
+    "angleStiffAt104": -1,
+    "angleStiffWorstAtDeg": -1,
+    "angleStiffHOrderRatio": -1,
+    "angleOmegaRatio": -1,
+    "angleOmegaOrderRatio": -1,
+    "angleOmegaDtSpread": -1,
+    "angleArmDrift": -1,
+    "angleLinearVExponent": -1,
+    "angleGenericVExponent": -1,
+    "angleLinearFExponent": -1,
+    "angleGenericFExponent": -1,
+    "angleLinearStiffKey": -1,
+    "integratorOrderRatio": 3.9999570983435646,
+    "integratorSecularRatio": 1,
+    "integratorErrAtRefDt": 0.00004005175633250023
+   }
+  },
+  "zeta/even": {
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 2,
+    "value": 1.6449340668482288,
+    "closedForm": 1.6449340668482264,
+    "errAbs": 2.4424906541753444e-15,
+    "errFrac": 1.4848562646983628e-15,
+    "piRecovered": 3.1415926535897953,
+    "piErrAbs": 2.220446049250313e-15,
+    "hasClosedForm": 1,
+    "errNoCorrection": -1,
+    "errWithCorrection": -1,
+    "correctionGain": -1,
+    "worstHigherErr": -1
+   }
+  },
+  "zeta/apery": {
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 3,
+    "value": 1.2020569031595953,
+    "closedForm": 1.2020569031595942,
+    "errAbs": 1.1102230246251565e-15,
+    "errFrac": 9.2360271939452e-16,
+    "piRecovered": -1,
+    "piErrAbs": -1,
+    "hasClosedForm": 0,
+    "errNoCorrection": -1,
+    "errWithCorrection": -1,
+    "correctionGain": -1,
+    "worstHigherErr": -1
+   }
+  },
+  "zeta/higher": {
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 4,
+    "value": 1.0823232337111386,
+    "closedForm": 1.082323233711138,
+    "errAbs": 6.661338147750939e-16,
+    "errFrac": 6.154666129553668e-16,
+    "piRecovered": -1,
+    "piErrAbs": -1,
+    "hasClosedForm": 1,
+    "errNoCorrection": -1,
+    "errWithCorrection": -1,
+    "correctionGain": -1,
+    "worstHigherErr": 6.661338147750939e-16
+   }
+  },
+  "zeta/corrections": {
+   "outputs": {
+    "M": 12,
+    "K": 5,
+    "s": 2,
+    "value": 1.6449340668482288,
+    "closedForm": 1.6449340668482264,
+    "errAbs": 2.4424906541753444e-15,
+    "errFrac": 1.4848562646983628e-15,
+    "piRecovered": -1,
+    "piErrAbs": -1,
+    "hasClosedForm": 1,
+    "errNoCorrection": 0.0000963173162127351,
+    "errWithCorrection": 2.4424906541753444e-15,
+    "correctionGain": 39434057218.63636,
+    "worstHigherErr": -1
+   }
+  },
+  "gyroscope/precess": {
+   "outputs": {
+    "omega": 40,
+    "torque": 12,
+    "steps": 3000,
+    "rateMeasured": -0.2986946333258104,
+    "rateTimesL": 11.947785333032417,
+    "rateErrFrac": 0.0043512222472985584,
+    "orderRatio": -1,
+    "orderRatioExpected": -1,
+    "orderErrFrac": -1,
+    "tiltDrift": 0.007666909072193362,
+    "spinDrift": 0.3524089421896477,
+    "precessed": 1,
+    "spunUp": 0,
+    "axisFrozen": 0
+   }
+  },
+  "gyroscope/order": {
+   "outputs": {
+    "omega": 40,
+    "torque": 12,
+    "steps": 3000,
+    "rateMeasured": -1,
+    "rateTimesL": -1,
+    "rateErrFrac": 0.00026931978231973613,
+    "orderRatioSeq": [
+     4.115156089433383,
+     4.031109608309496,
+     4.007914096239861,
+     4.001986919961522
+    ],
+    "orderRatioFirst": 4.115156089433383,
+    "orderRatioLast": 4.001986919961522,
+    "orderRatio": 4.001986919961522,
+    "orderRatioExpected": 4,
+    "orderErrFrac": 0.0004967299903804179,
+    "tiltDrift": -1,
+    "spinDrift": -1,
+    "precessed": -1,
+    "spunUp": -1,
+    "axisFrozen": -1
+   }
+  },
+  "gyroscope/sabotage": {
+   "outputs": {
+    "omega": 40,
+    "torque": 12,
+    "steps": 3000,
+    "rateMeasured": 0,
+    "rateTimesL": 0,
+    "rateErrFrac": -1,
+    "orderRatio": -1,
+    "orderRatioExpected": -1,
+    "orderErrFrac": -1,
+    "tiltDrift": 2.2426505097428162e-14,
+    "spinDrift": 600.0000000000131,
+    "precessed": 0,
+    "spunUp": 1,
+    "axisFrozen": 1
+   }
+  },
+  "gyroscope/hold": {
+   "outputs": {
+    "omega": 40,
+    "torque": 12,
+    "steps": 3000,
+    "rateMeasured": -0.2986946333258104,
+    "rateTimesL": -11.947785333032417,
+    "rateErrFrac": -1,
+    "orderRatio": -1,
+    "orderRatioExpected": -1,
+    "orderErrFrac": -1,
+    "tiltDrift": 0.007666909072193362,
+    "spinDrift": 0.3524089421896477,
+    "precessed": 1,
+    "spunUp": 0,
+    "axisFrozen": 0
+   }
+  },
+  "figureeight/period": {
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.000005305096075403748,
+    "thirdDist": -1,
+    "energyDriftFrac": -1,
+    "angMomDrift": -1,
+    "nudge": 0,
+    "returnRatio": -1,
+    "linearityErrFrac": -1,
+    "closes": 1
+   }
+  },
+  "figureeight/choreography": {
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.000005305096075403748,
+    "thirdDist": 0.00013249106491378224,
+    "energyDriftFrac": -1,
+    "angMomDrift": -1,
+    "nudge": 0,
+    "returnRatio": -1,
+    "linearityErrFrac": -1,
+    "closes": 1
+   }
+  },
+  "figureeight/perturbed": {
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.0012389949494576486,
+    "thirdDist": -1,
+    "energyDriftFrac": -1,
+    "angMomDrift": -1,
+    "nudge": 0.0001,
+    "returnRatio": 233.5480699778569,
+    "linearityErrFrac": 0.0018875435417276877,
+    "closes": 0
+   }
+  },
+  "figureeight/conserve": {
+   "outputs": {
+    "steps": 20000,
+    "period": 6.32591,
+    "returnDist": 0.000005305096075403748,
+    "thirdDist": -1,
+    "energyDriftFrac": 8.625489897207176e-16,
+    "angMomDrift": 1.2664718042733683e-15,
+    "nudge": 0,
+    "returnRatio": -1,
+    "linearityErrFrac": -1,
+    "closes": 1
+   }
+  },
+  "heidler/peak": {
+   "outputs": {
+    "i0": 30,
+    "t1": 19,
+    "t2": 485,
+    "etaStandard": 0.755850539963127,
+    "etaTrue": 0.806256630935786,
+    "etaRatio": 1.0666879076055407,
+    "setName": "first",
+    "peakOverI0First": 1.0666879076055407,
+    "peakOverI0Subsequent": 1.0397220144145967,
+    "peakOverI0Fast": 1.0504911078652872,
+    "peakMeasured": 32.00063722816622,
+    "peakOverI0": 1.0666879076055407,
+    "peakErrFrac": 0.06668790760554066,
+    "tPeak": 68.77750284742575,
+    "atZero": -1,
+    "atFar": -1,
+    "maxima": -1,
+    "tPeakInRange": -1
+   }
+  },
+  "heidler/exact": {
+   "outputs": {
+    "i0": 30,
+    "t1": 19,
+    "t2": 485,
+    "etaStandard": 0.755850539963127,
+    "etaTrue": 0.806256630935786,
+    "etaRatio": 1.0666879076055407,
+    "peakMeasured": 30,
+    "peakOverI0": 1,
+    "peakErrFrac": 0,
+    "tPeak": 68.77750284742575,
+    "atZero": -1,
+    "atFar": -1,
+    "maxima": -1,
+    "tPeakInRange": -1
+   }
+  },
+  "heidler/limits": {
+   "outputs": {
+    "i0": 30,
+    "t1": 19,
+    "t2": 485,
+    "etaStandard": 0.755850539963127,
+    "etaTrue": 0.806256630935786,
+    "etaRatio": 1.0666879076055407,
+    "peakMeasured": -1,
+    "peakOverI0": -1,
+    "peakErrFrac": -1,
+    "tPeak": 68.77750284742575,
+    "atZero": 0,
+    "atFar": 4.248350180325027e-18,
+    "maxima": 1,
+    "tPeakInRange": 1
+   }
+  },
+  "spacefill/stroke": {
+   "outputs": {
+    "order": 6,
+    "cells": 4096,
+    "steps": 4096,
+    "distinct": 4096,
+    "revisits": 0,
+    "breaks": 0,
+    "worstJump": 1,
+    "coverageErrFrac": 0,
+    "breaksExpected": 0,
+    "breakErrAbs": 0,
+    "worstJumpExpected": 1,
+    "continuous": 1,
+    "bijectionMismatches": 0,
+    "orderRatio": -1,
+    "rasterTracksN": -1
+   }
+  },
+  "spacefill/raster": {
+   "outputs": {
+    "order": 6,
+    "cells": 4096,
+    "steps": 4096,
+    "distinct": 4096,
+    "revisits": 0,
+    "breaks": 63,
+    "worstJump": 64,
+    "coverageErrFrac": 0,
+    "breaksExpected": 63,
+    "breakErrAbs": 0,
+    "worstJumpExpected": 64,
+    "continuous": 0,
+    "bijectionMismatches": -1,
+    "orderRatio": -1,
+    "rasterTracksN": -1
+   }
+  },
+  "spacefill/order": {
+   "outputs": {
+    "order": 6,
+    "cells": 4096,
+    "steps": 4096,
+    "distinct": 4096,
+    "revisits": 0,
+    "breaks": 0,
+    "worstJump": 1,
+    "coverageErrFrac": 0,
+    "breaksExpected": 0,
+    "breakErrAbs": 0,
+    "worstJumpExpected": 1,
+    "continuous": 1,
+    "bijectionMismatches": 0,
+    "orderRatio": 0,
+    "rasterTracksN": 0
+   }
+  },
+  "blackhole/orbit": {
+   "outputs": {
+    "kind": "orbit",
+    "r0": 9,
+    "captured": false,
+    "rMin": 8.91614149466843,
+    "rMax": 9,
+    "orbits": 19,
+    "precessionPerOrbit": 3.3535475732817894,
+    "energyDriftFrac": 3.410225004143458e-10
+   }
+  },
+  "blackhole/onset": {
+   "outputs": {
+    "kind": "onset",
+    "captureOnsetR": 6.0357421874999995,
+    "captureOnsetRBracket": [
+     6.028124999999999,
+     6.043359375
+    ],
+    "iscoTheory": 6
+   }
+  },
+  "blackhole/escape": {
+   "outputs": {
+    "kind": "escape",
+    "r0": 9,
+    "escapeV": 0.5321571957341932,
+    "escapeVBracket": [
+     0.5321278335372057,
+     0.5321865579311806
+    ],
+    "escapeTheory": 0.5345224838248488,
+    "escapeErrFrac": 0.004425048828125007
+   }
+  },
+  "blackhole/neutronstar": {
+   "outputs": {
+    "nsMass": 1.4,
+    "nsRadiusKm": 11,
+    "rsKm": 4.13448,
+    "compactness": 0.1879309090909091,
+    "iscoKm": 12.40344,
+    "photonSphereKm": 6.20172,
+    "iscoOutside": true,
+    "photonSphereOutside": false,
+    "escapeFrac": 0.6130757034672131
+   }
+  },
+  "xpbd/hooke": {
+   "outputs": {
+    "stretch": 0.01000005915876212,
+    "exactStretch": 0.01,
+    "stretchErrFrac": 0.00000591587621199402,
+    "amplitude": 0.00006201366943414666,
+    "meanLength": 1.0100000591587621,
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false
+   }
+  },
+  "xpbd/iteration": {
+   "outputs": {
+    "exactStretch": 0.01,
+    "iterSpread": 0,
+    "iterWorstErrFrac": 0.00000591587621199402,
+    "halvesWithIterations": false,
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false
+   }
+  },
+  "xpbd/substep": {
+   "outputs": {
+    "exactStretch": 0.01,
+    "substepSpread": 0.0009530392323098269,
+    "amplitudeGrows": true,
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false
+   }
+  },
+  "xpbd/volume": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "meshVolume": 4.091600620085997,
+    "meshVolumeErrFrac": 0.023202304233174032,
+    "convergenceRatio": 3.817904831077315,
+    "secondOrder": true,
+    "baseFaces": 8,
+    "baseIsOctahedron": true
+   }
+  },
+  "xpbd/pressure": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "volumeRatio": 1.4999999999999998,
+    "targetErrFrac": 1.4802973661668753e-16
+   }
+  },
+  "xpbd/damping": {
+   "outputs": {
+    "exactStretch": 0.01,
+    "stretchErrFrac": 1.0826721654616511e-7,
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "amplitudeReduction": 6.01230634036021,
+    "amplitudeMonotoneDown": true,
+    "equilibriumSpread": 5.005698078264231e-8,
+    "dampedLimitRelDiff": 0
+   }
+  },
+  "xpbd/friction": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "criticalAngleDeg": 26.588032841682434,
+    "coulombExactDeg": 26.56505117707799,
+    "criticalErrFrac": 0.0020315130627833896,
+    "offsetIsConstant": true,
+    "offsetSecondOrder": true
+   }
+  },
+  "xpbd/kernel": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "kernelIntegral": 1.0000000000000153,
+    "kernelIntegralErr": 1.532107773982716e-14,
+    "restDensity": 185.76967340822029
+   }
+  },
+  "xpbd/density": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "restDensity": 185.76967340822029,
+    "densityReduction": 9.219052925092535,
+    "densityRmsAfter": 0.07098371219998736
+   }
+  },
+  "xpbd/muscle": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "muscleVolumeHeld": 1.7985612998927536e-14,
+    "muscleVolumeLostWithout": 0.4799168224226934,
+    "muscleBulge": 0.36707725785575707,
+    "muscleBulgeAmplification": 3.332087370834713,
+    "muscleGirthVsEllipsoid": 0.09768667110829297
+   }
+  },
+  "xpbd/weave": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "anisotropyRatio": 14.027346008104345,
+    "swapReverses": true,
+    "isotropicResidual": 0,
+    "softStretch": 0.07547157774435886
+   }
+  },
+  "xpbd/tear": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "tearStart": 180,
+    "tearEnd": 170,
+    "tearMonotoneDown": true
+   }
+  },
+  "xpbd/modulate": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "zeroFieldErr": 0,
+    "compoundErr": 0,
+    "orderErr": 0,
+    "swell": 0.029999999999999805,
+    "swells": true
+   }
+  },
+  "xpbd/sampled": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "affineErr": 2.6645352591003757e-15,
+    "nodeErr": 0,
+    "clampErr": 0,
+    "nnAffineErr": 0.8147157030248624,
+    "affineExact": true,
+    "beatsNearest": true
+   }
+  },
+  "xpbd/fluid": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "momentumErr": 5.0009760763387015e-18,
+    "splitErr": 2.220446049250313e-16,
+    "plantMomentumErr": 0.02600753900894814,
+    "momentumConserved": true,
+    "splitByInverseMass": true,
+    "heavierMovesLess": true,
+    "contactsFire": true,
+    "plantBreaksIt": true
+   }
+  },
+  "xpbd/attach": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "orderErr": 0,
+    "snapErr": 0,
+    "springErr": 1.6653345369377348e-16,
+    "plantSpringErr": 1,
+    "snapsAtZero": true,
+    "orderFree": true,
+    "softSpring": true,
+    "plantSnapsWrongly": true
+   }
+  },
+  "xpbd/clothloop": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "freeFallErr": 0,
+    "equivErr": 0,
+    "freeFallDrop": 0.00256,
+    "freeFallExact": true,
+    "equivalent": true,
+    "clothMoves": true
+   }
+  },
+  "xpbd/grains": {
+   "outputs": {
+    "compliance": 0.001,
+    "iterations": 1,
+    "substeps": 800,
+    "planted": false,
+    "coneErr": 1.3877787807814457e-17,
+    "stickErr": 0,
+    "comErr": 6.938893903907228e-18,
+    "coneHolds": true,
+    "sticks": true,
+    "twoWay": true,
+    "deterministic": true
+   }
+  },
+  "em/vacuum": {
+   "outputs": {
+    "cComputed": 299792458.0000065,
+    "cDefined": 299792458,
+    "cErrFrac": 2.1671346650480375e-14,
+    "z0": 376.73031366686166,
+    "index": 1.5,
+    "impedance": 251.15354244457444,
+    "phaseSpeed": 199861638.666671,
+    "planted": false,
+    "indexSpeedProduct": 299792458.0000065,
+    "indexSpeedConsistent": true
+   }
+  },
+  "em/interface": {
+   "outputs": {
+    "index": 1.5,
+    "fresnel": -0.2,
+    "seismicEquivalent": -0.2,
+    "matchesSeismic": true,
+    "planted": false
+   }
+  },
+  "em/snell": {
+   "outputs": {
+    "index": 1.5,
+    "refractAngle": 0.2816217418445665,
+    "criticalAngleDeg": 41.810314895778596,
+    "totalInternal": true,
+    "planted": false
+   }
+  },
+  "em/fdtd": {
+   "outputs": {
+    "peakAtLimit": 0.5000000000000006,
+    "peakOverLimit": 6.896462344973452e+64,
+    "cflCliff": true,
+    "cfl1D": 1,
+    "cfl2D": 0.7071067811865475,
+    "cfl3D": 0.5773502691896258,
+    "planted": false
+   }
+  },
+  "em/waveguide": {
+   "outputs": {
+    "planted": false,
+    "te10": 1.569675101523213,
+    "te10Exact": 1.5707963267948966,
+    "te10RelErr": 0.0007137941772319019,
+    "degenerateGap": 6.081610511311247e-14,
+    "tmHasTe10": false,
+    "tmLowest": 3.5051136285747497,
+    "neumannZero": -7.95807864053508e-13
+   }
+  },
+  "em/hall": {
+   "outputs": {
+    "planted": false,
+    "rhoXX": 0.03608227648680886,
+    "rhoXXNaive": 0.03635876112797018,
+    "naiveGapRel": 0.007662616333600724,
+    "wcTau": 0.08794100053860816,
+    "gapOverWcTauSq": 0.9908188861068924,
+    "rhoXYTauSpread": 0.001287892837203748
+   }
+  },
+  "em/cherenkov": {
+   "outputs": {
+    "planted": false,
+    "nUsed": 1.5,
+    "betaThreshold": 0.6666666666666666,
+    "betaThresholdRecovered": 0.6666666666666665,
+    "thresholdRelErr": 1.6653345369377348e-16,
+    "betaFromPhaseSpeed": 0.6666666666666667,
+    "twoRouteGap": 3.330669073875469e-16,
+    "cosThetaAtThreshold": 1,
+    "cosThetaMax": 0.6666666666666666,
+    "cosThetaMaxExact": 0.6666666666666666,
+    "monotone": true,
+    "machCosAtThreshold": 0,
+    "machTriggersAtSameBeta": true
+   }
+  },
+  "acoustics/propagate": {
+   "outputs": {
+    "courantNumber": 1,
+    "propagationError": 5.258482549637418e-21,
+    "exactAtMagicStep": true,
+    "planted": false
+   }
+  },
+  "acoustics/stability": {
+   "outputs": {
+    "peakAtLimit": 0.9996737275461997,
+    "peakOverLimit": 16132421666883412000,
+    "cflIsCliff": true,
+    "planted": false
+   }
+  },
+  "acoustics/doppler": {
+   "outputs": {
+    "shiftSource": 1.8867924528301885,
+    "shiftObserver": 1.47,
+    "dopplerAsymmetry": 0.283532280836863,
+    "asymmetryVanishesAtZero": true,
+    "planted": false
+   }
+  },
+  "acoustics/modes": {
+   "outputs": {
+    "modesOpenOpen": [
+     171.5,
+     343,
+     514.5
+    ],
+    "modesOpenClosed": [
+     85.75,
+     257.25,
+     428.75
+    ],
+    "oddHarmonicsOnly": true,
+    "nonDispersive": true,
+    "planted": false
+   }
+  },
+  "acoustics/speed": {
+   "outputs": {
+    "planted": false,
+    "cAir": 343.2349805813274,
+    "cWater": 1483.2396974191327,
+    "cGranite": 5879.447357921313,
+    "cNewton": 290.0865042099686,
+    "laplaceRatio": 1.1832159566199234,
+    "matchesSeismic": true,
+    "airErrFrac": 0.00010192477076757441
+   }
+  },
+  "seismic/rays": {
+   "outputs": {
+    "closedDistance": 10.392304845413264,
+    "integratedDistance": 10.392304845425388,
+    "arcDistance": 10.392304845413264,
+    "worstRouteDiff": 1.212363542890671e-11,
+    "turningDepth": 6,
+    "arcRadius": 12,
+    "planted": false
+   }
+  },
+  "seismic/moduli": {
+   "outputs": {
+    "vpvs": 1.7320508075688772,
+    "vpvsExact": 1.7320508075688772,
+    "poissonRoundTrip": 5.551115123125783e-17,
+    "vsFluid": 0,
+    "vpFluid": 938.083151964686,
+    "planted": false
+   }
+  },
+  "seismic/interface": {
+   "outputs": {
+    "energyResidual": 0,
+    "reflection": 0.375,
+    "planted": false
+   }
+  },
+  "nuclear/chain": {
+   "outputs": {
+    "chainWorstDiff": 4.468647674116255e-15,
+    "conservationResidual": 0,
+    "nA": 0.24659696394160643,
+    "nB": 0.07133219721404896,
+    "nC": 0.6820708388443446,
+    "planted": false
+   }
+  },
+  "nuclear/equilib": {
+   "outputs": {
+    "activityRatio": 1.000020000400008,
+    "equilibDeparture": 0.00002000040000793568,
+    "equilibFirstOrder": true,
+    "planted": false
+   }
+  },
+  "nuclear/binding": {
+   "outputs": {
+    "peakA": 58,
+    "peakPerNucleon": 8.864767087219551,
+    "predictedZ": [
+     2,
+     8,
+     26,
+     92
+    ],
+    "predictedZCorrect": true,
+    "fissionQ": -22.649646420885915,
+    "planted": false
+   }
+  },
+  "astroparticle/oscillation": {
+   "outputs": {
+    "unitarityErr": 0,
+    "amplitudeErr": 3.6469636310876297e-8,
+    "phaseErr": 0.00012157543776348669,
+    "coeffErr": 5.359712271279635e-7,
+    "unitary": true,
+    "amplitudeFromAngle": true,
+    "phaseFromConstant": true,
+    "constantDerived": true,
+    "planted": false
+   }
+  },
+  "astroparticle/friedmann": {
+   "outputs": {
+    "closureErr": 0,
+    "matterExponentErr": 4.683481047429439e-9,
+    "radiationExponentErr": 1.927402681900503e-12,
+    "matterAgeErr": 1.745515398887676e-9,
+    "radiationAgeErr": 4.99933427988708e-13,
+    "closes": true,
+    "matterRegime": true,
+    "radiationRegime": true,
+    "ageNotBlind": true,
+    "planted": false
+   }
+  },
+  "astroparticle/lensing": {
+   "outputs": {
+    "invariantErr": 2.220446049250313e-16,
+    "totalErr": 4.440892098500626e-16,
+    "radiusErr": 0,
+    "invariant": true,
+    "totalConsistent": true,
+    "radiusDerived": true,
+    "peakMovesUnderPlant": false,
+    "planted": false
+   }
+  },
+  "astroparticle/jeans": {
+   "outputs": {
+    "thresholdErr": 1.7763568394002505e-15,
+    "noGravityMinOmega2": 0.1369,
+    "marginalAtJeansK": true,
+    "noGravityStable": true,
+    "collapsesWithGravity": true,
+    "planted": false
+   }
+  },
+  "astroparticle/halo": {
+   "outputs": {
+    "flatErr": 0,
+    "integratorErr": 2.3415598876953124e-13,
+    "keplerErr": 1.7335246004304446e-16,
+    "discrepancyFactor": 4.652502139089577,
+    "flatIsIsothermal": true,
+    "integratorMatches": true,
+    "keplerFalloff": true,
+    "discrepancyMeasured": true,
+    "planted": false
+   }
+  },
+  "astroparticle/desitter": {
+   "outputs": {
+    "closureErr": 0,
+    "closes": true,
+    "hubbleConstantErr": 0,
+    "efoldErr": 9.325873406851315e-15,
+    "hubbleConstant": true,
+    "notPowerLaw": true,
+    "planted": false
+   }
+  },
+  "csg/tree": {
+   "outputs": {
+    "cornerErr": 2.220446049250313e-16,
+    "eikonalErr": 1.1102230246251565e-16,
+    "crossingErr": 1.1634027075047015e-12,
+    "idempotenceErr": 0,
+    "boxExactAtCorner": true,
+    "unitGradient": true,
+    "crossingOnSurface": true,
+    "idempotent": true,
+    "unionMembership": true,
+    "planted": false
+   }
+  },
+  "bonefield/capsule": {
+   "outputs": {
+    "segmentErr": 1.1920928910669204e-8,
+    "capErr": 1.1920928910669204e-8,
+    "unionErr": 4.768371586472142e-8,
+    "segmentExact": true,
+    "capClamped": true,
+    "unionIsMin": true,
+    "deterministic": true,
+    "planted": false
+   }
+  },
+  "clocks/rates": {
+   "outputs": {
+    "staticRate": 0.9128709291752769,
+    "orbitingRate": 0.8660254037844386,
+    "orbitingSlower": true,
+    "crossoverRatio": 1.5,
+    "crossoverResidual": 0,
+    "planted": false,
+    "crossoverErrOrder": 0,
+    "clockEffect": 7.539822368615546,
+    "clockEffectExact": 7.5398223686155035,
+    "clockEffectErrFrac": 5.654319433712919e-15,
+    "periodPro": 264.95701963403513,
+    "periodRetro": 257.4171972654196,
+    "r": 12,
+    "a": 0.6
+   }
+  },
+  "clocks/spin": {
+   "outputs": {
+    "clockEffect": 7.539822368615489,
+    "clockEffectExact": 7.5398223686155035,
+    "clockEffectErrFrac": 3.1758427486020893e-12,
+    "clockEffectRadiusIndependent": true,
+    "a": 0.6
+   }
+  },
+  "clocks/signal": {
+   "outputs": {
+    "r": 50,
+    "lightTime": 54.74240202181578,
+    "shapiroDelay": 7.742402021815778,
+    "shapiroPositive": true,
+    "zStatic": 0.732050807568877,
+    "orbitingMoreRedshifted": true
+   }
+  },
+  "clocks/epicyclic": {
+   "outputs": {
+    "r": 12,
+    "kappa": 0.017010345435994296,
+    "omega": 0.024056261216234408,
+    "radialPeriod": 369.37435108661674,
+    "iscoTiming": 6,
+    "iscoAgrees": true
+   }
+  },
+  "reaction/selection": {
+   "outputs": {
+    "winningMode": 7,
+    "k": 1.3744467859455345,
+    "amp": 2.614721972181186,
+    "criticalK": 1.0298835719535588,
+    "criticalB": 4.246320343559643,
+    "hopfB": 10,
+    "aboveThreshold": true,
+    "dkFromCritical": 0.34456321399197565
+   }
+  },
+  "reaction/approach": {
+   "outputs": {
+    "criticalK": 1.0298835719535588,
+    "criticalB": 4.246320343559643,
+    "rows": [
+     {
+      "B": 12,
+      "mode": 7,
+      "k": 1.3744467859455345,
+      "dk": 0.34456321399197565
+     },
+     {
+      "B": 9,
+      "mode": 7,
+      "k": 1.3744467859455345,
+      "dk": 0.34456321399197565
+     },
+     {
+      "B": 6,
+      "mode": 6,
+      "k": 1.1780972450961724,
+      "dk": 0.14821367314261358
+     },
+     {
+      "B": 5,
+      "mode": 6,
+      "k": 1.1780972450961724,
+      "dk": 0.14821367314261358
+     },
+     {
+      "B": 4.6,
+      "mode": 5,
+      "k": 0.9817477042468103,
+      "dk": 0.04813586770674849
+     }
+    ],
+    "monotone": true,
+    "nearest": 0.04813586770674849,
+    "firstDk": 0.34456321399197565
+   }
+  },
+  "reaction/swapped": {
+   "outputs": {
+    "normalAmp": 2.614721972181186,
+    "swappedAmp": 9.897884846270294e-10,
+    "ratio": 2641697708.946838,
+    "normalMode": 7,
+    "swappedMode": 1
+   }
+  },
+  "reaction/thresholds": {
+   "outputs": {
+    "criticalB": 4.246320343559643,
+    "hopfB": 10,
+    "criticalK": 1.0298835719535588,
+    "turingFirst": true,
+    "gap": 5.753679656440357,
+    "continuousModeIndex": 5.24515396113749
+   }
+  },
+  "beam/exponent": {
+   "outputs": {
+    "exponent": 3,
+    "points": 7,
+    "exponentError": 0,
+    "closedFormAtUnitL": 0.3333333333333333
+   }
+  },
+  "beam/superposition": {
+   "outputs": {
+    "worstResidual": 1.1641532182693481e-10,
+    "relative": 1.5288435614408045e-16,
+    "nodes": 120
+   }
+  },
+  "beam/reciprocity": {
+   "outputs": {
+    "dij": 89379.99999872211,
+    "dji": 89379.99999883123,
+    "relGap": 1.2209086182473706e-12,
+    "nodes": 120
+   }
+  },
+  "beam/conditioning": {
+   "outputs": {
+    "rows": [
+     {
+      "eps": 0.01,
+      "tipDriftFrac": 0.793053396954456,
+      "relGap": 0.09340025991724724
+     },
+     {
+      "eps": 0.001,
+      "tipDriftFrac": 0.7953623346451875,
+      "relGap": 0.09067719836022779
+     },
+     {
+      "eps": 0.0001,
+      "tipDriftFrac": 0.8192133462574372,
+      "relGap": 0.07020817718341345
+     },
+     {
+      "eps": 0.00001,
+      "tipDriftFrac": 1.1700975916068246,
+      "relGap": 0.021553768594176265
+     },
+     {
+      "eps": 0.000001,
+      "tipDriftFrac": 0.35639098403557967,
+      "relGap": 0.0027179966823943644
+     }
+    ],
+    "reciprocityIsFiner": false
+   }
+  },
+  "beam/buckling": {
+   "outputs": {
+    "pcr": 2.46738128799358,
+    "pcrExact": 2.4674011002723395,
+    "pcrRelErr": 0.000008029614138199943,
+    "closedFormPcr": 2.4674011002723395,
+    "oddSquare2": 8.999421699276564,
+    "oddSquare3": 24.99518116522394,
+    "refineRatio": 4.001055954663423,
+    "buckleNodes": 160
+   }
+  },
+  "whitedwarf/exponent": {
+   "outputs": {
+    "planted": false,
+    "slopeMeasured": -0.3336203667084108,
+    "slopeTheory": -0.3333333333333333,
+    "slopeErrAbs": 0.0002870333750774612,
+    "r2": 0.9999998895626707,
+    "window": 0.01,
+    "converging": true
+   }
+  },
+  "whitedwarf/limitOrder": {
+   "outputs": {
+    "planted": false,
+    "limitSlope": 0.500000716241753,
+    "limitSlopeTheory": 0.5,
+    "limitSlopeErrAbs": 7.162417530182097e-7,
+    "limitR2": 0.9999999999998189,
+    "eps": 0.00001,
+    "chandrasekhar": 1.4565,
+    "naiveEverCollapses": false,
+    "naiveRatioLow": 1.0143604070406265,
+    "naiveRatioHigh": 273.8615069720028
+   }
+  },
+  "whitedwarf/muScaling": {
+   "outputs": {
+    "planted": false,
+    "muSlope": -2.0000000000000004,
+    "muSlopeTheory": -2,
+    "muSlopeErrAbs": 4.440892098500626e-16,
+    "shapeInvariantSpread": 1.758789901987678e-16,
+    "chandrasekhar": 1.4565
+   }
+  },
+  "whitedwarf/accretion": {
+   "outputs": {
+    "planted": false,
+    "steps": 257,
+    "crossedAt": 1.4569999999999717,
+    "detonated": true,
+    "stepsPredicted": 257,
+    "radiusAtStart": 3966.8233211416887,
+    "chandrasekhar": 1.4565
+   }
+  },
+  "centrifuge/rate": {
+   "outputs": {
+    "planted": false,
+    "sedCoefficient": 4.444444444444443e-8,
+    "rateContinuous": 0.39999999999999986,
+    "rateDiscreteExact": 0.3999200213268913,
+    "rateRecovered": 0.39992002132695803,
+    "logFitR2": 1,
+    "recoveredVsDiscrete": 1.6684436942813606e-13,
+    "recoveredVsContinuous": 0.0001999466826045627
+   }
+  },
+  "centrifuge/order": {
+   "outputs": {
+    "planted": false,
+    "orderMeasured": 0.9994234025983855,
+    "orderTheory": 1,
+    "errRatios": [
+     3.987262819330343,
+     3.996803942622421
+    ],
+    "dtCoarse": 0.016,
+    "rateContinuous": 0.39999999999999986
+   }
+  },
+  "centrifuge/doubling": {
+   "outputs": {
+    "planted": false,
+    "doublingTimes": [
+     1.734,
+     1.734,
+     1.734
+    ],
+    "doublingSpread": 0,
+    "doublingTheory": 1.732867951399864,
+    "rateContinuous": 0.39999999999999986
+   }
+  },
+  "centrifuge/neutral": {
+   "outputs": {
+    "planted": false,
+    "neutralDensityRecovered": 1,
+    "neutralDensityConfigured": 1,
+    "neutralRelErr": 0,
+    "driftAtNeutral": 0
+   }
+  },
+  "centrifuge/bands": {
+   "outputs": {
+    "planted": false,
+    "bands": [
+     5.957265738188179,
+     0.022251849653420627,
+     0.010512704393427472
+    ],
+    "bandOrderCorrect": true
+   }
+  },
+  "freerotation/stability": {
+   "outputs": {
+    "I0": 4.333333333333333,
+    "I1": 3.333333333333333,
+    "I2": 1.6666666666666665,
+    "midAxis": 1,
+    "sigmaPredicted": 0.4803844614152614,
+    "sigmaMeasured": 0.4803777959207057,
+    "sigmaRelErr": 0.0000138753333863241,
+    "sigmaR2": 0.9999999993279604,
+    "factorMid": 0,
+    "factorMax": 0,
+    "factorMin": 0,
+    "driftE": 0,
+    "driftL": 0,
+    "driftWorldL": 0,
+    "flips": 0,
+    "attitudeOrder": 0
+   }
+  },
+  "freerotation/conserve": {
+   "outputs": {
+    "I0": 4.333333333333333,
+    "I1": 3.333333333333333,
+    "I2": 1.6666666666666665,
+    "midAxis": 1,
+    "sigmaPredicted": 0,
+    "sigmaMeasured": 0,
+    "sigmaRelErr": 0,
+    "sigmaR2": 0,
+    "factorMid": 0,
+    "factorMax": 0,
+    "factorMin": 0,
+    "driftE": 1.155076034820013e-13,
+    "driftL": 5.768718835952314e-14,
+    "driftWorldL": 0.00024020828465800938,
+    "flips": 1,
+    "attitudeOrder": 0
+   }
+  },
+  "freerotation/flip": {
+   "outputs": {
+    "I0": 4.333333333333333,
+    "I1": 3.333333333333333,
+    "I2": 1.6666666666666665,
+    "midAxis": 1,
+    "sigmaPredicted": 0,
+    "sigmaMeasured": 0,
+    "sigmaRelErr": 0,
+    "sigmaR2": 0,
+    "factorMid": 110238372.87450363,
+    "factorMax": 0.9999999999975874,
+    "factorMin": 0.9999999993196067,
+    "driftE": 0,
+    "driftL": 0,
+    "driftWorldL": 0,
+    "flips": 1,
+    "attitudeOrder": 0
+   }
+  },
+  "freerotation/attitude": {
+   "outputs": {
+    "I0": 4.333333333333333,
+    "I1": 3.333333333333333,
+    "I2": 1.6666666666666665,
+    "midAxis": 1,
+    "sigmaPredicted": 0,
+    "sigmaMeasured": 0,
+    "sigmaRelErr": 0,
+    "sigmaR2": 0,
+    "factorMid": 0,
+    "factorMax": 0,
+    "factorMin": 0,
+    "driftE": 0,
+    "driftL": 0,
+    "driftWorldL": 0.00024020828465800938,
+    "flips": 0,
+    "attitudeOrder": 1.0000964586005865
+   }
+  },
+  "invariants/invariance": {
+   "outputs": {
+    "planted": false,
+    "sRest": 4.970187175537795,
+    "framesChecked": 5,
+    "sDriftWorst": 7.14804805800112e-15,
+    "shellDriftWorst": 1.1349983409757608e-14
+   }
+  },
+  "invariants/composition": {
+   "outputs": {
+    "planted": false,
+    "composed": 0.9154929577464788,
+    "composeGapWorst": 8.048759242212588e-15,
+    "composeStaysSubluminal": true
+   }
+  },
+  "invariants/naive": {
+   "outputs": {
+    "planted": false,
+    "naiveOverRootS": 2.294157338705619,
+    "gammaAt": 2.294157338705618,
+    "naiveRatioGapWorst": 5.2576854357665685e-14,
+    "naiveExactAtRest": 1
+   }
+  },
+  "invariants/precision": {
+   "outputs": {
+    "planted": false,
+    "ratios": [
+     157480314960629.9,
+     1574803149606299100,
+     1.574803149606299e+21,
+     1.574803149606299e+23
+    ],
+    "sSumSquare": 0,
+    "sExpanded": 0.254,
+    "sMassCarry": 1.134354345984,
+    "sumSquareCollapsed": true,
+    "routesAgreeAtParity": true
+   }
+  },
+  "invariants/gzk": {
+   "outputs": {
+    "planted": false,
+    "thresholdClosed": 106893334652.36227,
+    "thresholdBisected": 106893334652.36224,
+    "thresholdRelErr": 2.854956132133874e-16,
+    "thresholdEeV": 106.89333465236227,
+    "sAtThreshold": 1.1518634160010002,
+    "targetSq": 1.1518634160010002
+   }
+  },
+  "poisson/canonical": {
+   "outputs": {
+    "planted": false,
+    "qp": 0.999999999996449,
+    "qq": 0,
+    "pp": 0,
+    "antisymmetry": 0,
+    "canonicalErr": 3.551048344263563e-12
+   }
+  },
+  "poisson/jacobi": {
+   "outputs": {
+    "planted": false,
+    "jacobiSum": 0.000004199999986131964,
+    "jacobiEps": 0.001
+   }
+  },
+  "poisson/evolution": {
+   "outputs": {
+    "planted": false,
+    "bracketRate": -1.119999999994191,
+    "numericRate": -1.1199999999933485,
+    "evolutionRelErr": 7.521760991880106e-13
+   }
+  },
+  "poisson/preservation": {
+   "outputs": {
+    "planted": false,
+    "dtUsed": 0.1,
+    "verletDefect": 3.612554699827797e-11,
+    "rk4Defect": 1.3838176604608066e-8,
+    "eulerOverDtSq": 1.000000000257528,
+    "steppersSymplectic": [
+     "semiEuler",
+     "verlet"
+    ]
+   }
+  },
+  "poisson/floor": {
+   "outputs": {
+    "planted": false,
+    "rk4AtCoarse": 1.3838176604608066e-8,
+    "rk4AtFine": 1.9753088054130785e-11,
+    "floorEstimate": 1.1374012842679804e-11,
+    "rk4FallsBelowFloor": true,
+    "dtUsed": 0.1
+   }
+  },
+  "refscan/furnace": {
+   "outputs": {
+    "planted": false,
+    "worstAlbedoErrFrac": 2.4671622769447924e-16,
+    "albedosTested": 4,
+    "furnaceSpread": 0,
+    "furnaceMean": 0.17999999999999985,
+    "furnaceGradeable": true
+   }
+  },
+  "refscan/crop": {
+   "outputs": {
+    "planted": false,
+    "worstCropDiff": 0,
+    "cropRegions": 5,
+    "cropSky": 1.4
+   }
+  },
+  "refscan/sign": {
+   "outputs": {
+    "planted": false,
+    "brightBias": 0.005400000000000016,
+    "darkBias": -0.005400000000000016,
+    "signMeanGap": 0
+   }
+  },
+  "refscan/decision": {
+   "outputs": {
+    "planted": false,
+    "gradedGradeable": true,
+    "indicatorGradeable": false,
+    "gradedVerdictNull": true,
+    "indicatorVerdictSet": true,
+    "arbitrarySceneGradeable": true,
+    "indicatorResidual": 0.07190716465847886,
+    "mayConclude": false
+   }
+  },
+  "refscan/roulette": {
+   "outputs": {
+    "planted": false,
+    "meanNoRR": 0.17999999999999985,
+    "meanRR": 0.18046874999999996,
+    "spreadNoRR": 0,
+    "spreadRR": 0.12857142857142856,
+    "meanShiftFrac": 0.00260416666666723
+   }
+  },
+  "sdfmarch/sphere": {
+   "outputs": {
+    "planted": false,
+    "worstAgainstClosedForm": 9.48399181410764e-8,
+    "raysTraced": 24,
+    "worstSteps": 10,
+    "normalErr": 2.220446049250313e-16
+   }
+  },
+  "sdfmarch/ball": {
+   "outputs": {
+    "planted": false,
+    "ballAnalyticT": 2.8410292933684076,
+    "ballMeasuredT": 2.8437853920024145,
+    "ballOvershoot": 0.0027560986340069427,
+    "overshootWithinStep": true
+   }
+  },
+  "sdfmarch/surface": {
+   "outputs": {
+    "planted": false,
+    "hitsOnBlob": 60,
+    "meshCells": 48,
+    "meshWorst": 0.002880206439311197,
+    "meshMeanOverH": 0.015244455991522658
+   }
+  },
+  "sdfmarch/deadzone": {
+   "outputs": {
+    "planted": false,
+    "deadzoneReason": "stalled-no-gradient",
+    "deadzoneSteps": 0,
+    "entryStepsSaved": 14.25,
+    "entryAgreement": 2.056586012599837e-10
+   }
+  },
+  "sdfmarch/clamp": {
+   "outputs": {
+    "planted": false,
+    "clampWorstOvershoot": 0.3089707056315918,
+    "clampAllLate": true,
+    "clampStepRatio": 39
+   }
+  },
+  "compose/compare": {
+   "outputs": {
+    "valueA": 299792458.0000065,
+    "valueB": 299792458,
+    "absDiff": 0.000006496906280517578,
+    "relDiff": 2.1671346650479905e-14,
+    "dimensionsComparable": true,
+    "dimA": "m/s",
+    "dimB": "m/s",
+    "judgedByError": false,
+    "verdict": "unjudged",
+    "reason": "at least one measurement has no error bar -- cannot judge agreement"
+   }
+  },
+  "galaxy/traces": {
+   "outputs": {
+    "trA": 0,
+    "trA2": 228,
+    "trA3": 276,
+    "linkCount": 228,
+    "triangles": 46,
+    "reciprocalGap": 0,
+    "triangleErr": 0,
+    "selfLoops": 0
+   }
+  },
+  "galaxy/spectrum": {
+   "outputs": {
+    "zeroMultiplicity": 1,
+    "componentCount": 1,
+    "spectralAgrees": true,
+    "fiedler": 0.05643235032202051,
+    "connected": true,
+    "smallestEigenvalue": -6.506506903239508e-15,
+    "largestEigenvalue": 7.662934885485659
+   }
+  },
+  "galaxy/walks": {
+   "outputs": {
+    "pairs": 3600,
+    "mismatches": 0,
+    "eccentricity": 12,
+    "agreementFrac": 1
+   }
+  },
+  "galaxy/island": {
+   "outputs": {
+    "multiplicityBefore": 1,
+    "multiplicityAfter": 2,
+    "fiedlerBefore": 0.05643235032202051,
+    "fiedlerAfter": 0,
+    "bfsBefore": 1,
+    "bfsAfter": 2,
+    "bothNoticed": true
+   }
+  },
+  "galaxy/oneway": {
+   "outputs": {
+    "gapClean": 0,
+    "gapBroken": 1,
+    "setCountClean": 0,
+    "setCountBroken": 1,
+    "traceMatchesSet": true,
+    "linksClean": 228,
+    "linksBroken": 227
+   }
+  },
+  "geostats/bridge": {
+   "outputs": {
+    "worstValueErr": 2.6645352591003757e-15,
+    "worstOuterWeight": 5.093148125467906e-16,
+    "varianceRatio": 1.9999999999999996,
+    "varianceRatioSpread": 8.881784197001252e-16,
+    "rows": [
+     {
+      "x0": 0.5,
+      "kriged": 0.4999999999999997,
+      "linear": 0.5,
+      "valueErr": 2.7755575615628914e-16,
+      "outer": 9.251858538542972e-17,
+      "variance": 0.5,
+      "bridge": 0.25,
+      "varianceRatio": 2
+     },
+     {
+      "x0": 2,
+      "kriged": 1.7499999999999996,
+      "linear": 1.75,
+      "valueErr": 4.440892098500626e-16,
+      "outer": 1.4062824978585316e-16,
+      "variance": 1,
+      "bridge": 0.5,
+      "varianceRatio": 2
+     },
+     {
+      "x0": 4.75,
+      "kriged": 2.0208333333333326,
+      "linear": 2.0208333333333335,
+      "valueErr": 8.881784197001252e-16,
+      "outer": 1.5728159515523064e-16,
+      "variance": 1.4583333333333326,
+      "bridge": 0.7291666666666666,
+      "varianceRatio": 1.9999999999999991
+     },
+     {
+      "x0": 8.3,
+      "kriged": 4.131249999999999,
+      "linear": 4.131250000000001,
+      "valueErr": 2.6645352591003757e-15,
+      "outer": 5.093148125467906e-16,
+      "variance": 1.9549999999999994,
+      "bridge": 0.9774999999999999,
+      "varianceRatio": 1.9999999999999996
+     },
+     {
+      "x0": 12.5,
+      "kriged": 2,
+      "linear": 2,
+      "valueErr": 0,
+      "outer": 0,
+      "variance": 2.5,
+      "bridge": 1.25,
+      "varianceRatio": 2
+     }
+    ]
+   }
+  },
+  "geostats/screen": {
+   "outputs": {
+    "markovOuter": 1.5728159515523064e-16,
+    "worstOffMarkov": 0.0610305278580171,
+    "openingIsMonotone": true,
+    "slopeMean": 0.12115112804541966,
+    "slopeSpread": 0.0014175152407930741
+   }
+  },
+  "geostats/nugget": {
+   "outputs": {
+    "value": 1.625,
+    "mean": 1.625,
+    "valueErr": 0,
+    "worstWeightErr": 5.551115123125783e-17,
+    "variance": 1.1666666666666667,
+    "predictedVariance": 1.1666666666666667,
+    "varianceErr": 0
+   }
+  },
+  "geostats/scale": {
+   "outputs": {
+    "worstWeightDelta": 3.344736968365582e-16,
+    "valueDelta": 2.6645352591003757e-15,
+    "varianceRatio": 7.300000000000004,
+    "scale": 7.3,
+    "varianceRatioErr": 4.440892098500626e-15,
+    "selfConsistent": true
+   }
+  },
+  "pulsar/residualCurvature": {
+   "outputs": {
+    "curvature": 3.336300303680453e-7,
+    "predicted": 3.333333333333333e-7,
+    "ratio": 1.000890091104136,
+    "error": 0.0008900911041360704,
+    "recoveredFdot": -0.000001000890091104136,
+    "trueFdot": -0.000001,
+    "peakToPeak": 0.5940908634124753,
+    "span": 2668.3734055439336
+   }
+  },
+  "pulsar/spindownAge": {
+   "outputs": {
+    "characteristicAge": 750000,
+    "fromResiduals": 749333.0253401095,
+    "P0": 0.6666666666666666,
+    "recoveredFdot": -0.000001000890091104136,
+    "trueFdot": -0.000001,
+    "agreement": 0.0008892995465207276
+   }
+  },
+  "pulsar/linearIsWrong": {
+   "outputs": {
+    "spinningDownPeakToPeak": 0.5940908634124753,
+    "steadyPeakToPeak": 1.1825613910332322e-10,
+    "steadyCurvature": -8.577589941513407e-21,
+    "ratio": 5023763399.660831
+   }
+  },
+  "fieldnav/policy": {
+   "outputs": {
+    "optimalCost": 378.8467102050781,
+    "walkedCost": 395.3924283981323,
+    "excessFrac": 0.043673912818452676,
+    "arrived": true,
+    "looped": false,
+    "steps": 88,
+    "reachableCells": 2304,
+    "cells": 2304,
+    "amp": 1.5
+   }
+  },
+  "fieldnav/roughness": {
+   "outputs": {
+    "arrived": true,
+    "looped": false,
+    "steps": 800,
+    "reachableCells": 2304,
+    "cells": 2304,
+    "worstExcess": 5.177006536252296,
+    "bestExcess": 0.0018112540138655042,
+    "allArrived": true,
+    "degradesWithRoughness": true
+   }
+  },
+  "fieldnav/complete": {
+   "outputs": {
+    "arrived": true,
+    "looped": false,
+    "steps": 800,
+    "reachableCells": 2304,
+    "cells": 2304,
+    "worstExcess": 5.177006536252296,
+    "bestExcess": 0.0018112540138655042,
+    "allArrived": true,
+    "degradesWithRoughness": true
+   }
+  },
+  "optics/airy": {
+   "outputs": {
+    "rayleighFactor": 1.2196950472018169,
+    "rayleighFactorExact": 1.2196698912665045,
+    "airyRingErrFrac": 0.000020625199894260012
+   }
+  },
+  "optics/slit": {
+   "outputs": {
+    "slitRms": 0.0000012751498558664929,
+    "slitFirstMinFactor": 1.0000161973123858,
+    "slitFirstMinErrFrac": 0.000016197312385779483
+   }
+  },
+  "optics/edge": {
+   "outputs": {
+    "edgeShadowIntensity": 0.25,
+    "edgeFirstFringe": 1.370442919704022,
+    "edgeFirstFringeV": 1.217199999999999,
+    "edgeFirstFringeExact": 1.3704429197121788,
+    "edgeFirstFringeErrFrac": 5.951950602681156e-12
+   }
+  },
+  "kerr/spin": {
+   "outputs": {
+    "outerHorizon": 1.8,
+    "ergoEquator": 2,
+    "ergoThickness": 0.19999999999999996,
+    "photonPrograde": 2.1889140197636334,
+    "photonRetrograde": 3.629849697131921,
+    "iscoPrograde": 3.829069418813151,
+    "iscoRetrograde": 7.850686185306578,
+    "iscoNumericPrograde": 3.829069292356184,
+    "iscoNumericRetrograde": 7.85068599281732,
+    "iscoErrFrac": 3.302550903219177e-8,
+    "shadowAsymmetry": 0.2439551662799225,
+    "omegaHorizon": 0.16666666666666666,
+    "horizonProductErr": 5.551115123125783e-17,
+    "horizonSumErr": 0,
+    "planted": false,
+    "dragAt5": 0.009410288582183186,
+    "dragFalloffRatio": 62.797365119196996
+   }
+  },
+  "kerr/limit": {
+   "outputs": {
+    "outerHorizon": 2,
+    "ergoEquator": 2,
+    "ergoThickness": 0,
+    "photonPrograde": 3,
+    "photonRetrograde": 3,
+    "iscoPrograde": 6,
+    "iscoRetrograde": 6,
+    "iscoNumericPrograde": 5.999999857394702,
+    "iscoNumericRetrograde": 5.999999857394702,
+    "iscoErrFrac": 2.3767549706121827e-8,
+    "shadowAsymmetry": 0,
+    "omegaHorizon": 0,
+    "horizonProductErr": 0,
+    "horizonSumErr": 0,
+    "planted": false,
+    "dragAt5": 0,
+    "dragFalloffRatio": 0,
+    "schwarzHorizonErr": 0,
+    "schwarzPhotonErr": 0,
+    "schwarzShadowErr": 0
+   }
+  },
+  "kerr/extremal": {
+   "outputs": {
+    "outerHorizon": 1,
+    "ergoEquator": 2,
+    "ergoThickness": 1,
+    "photonPrograde": 1.0000000000000004,
+    "photonRetrograde": 4,
+    "iscoPrograde": 1,
+    "iscoRetrograde": 9,
+    "iscoNumericPrograde": 1.0001000480709608,
+    "iscoNumericRetrograde": 8.999999644026314,
+    "iscoErrFrac": 0.00010004807096075652,
+    "shadowAsymmetry": 0.5555555555555555,
+    "omegaHorizon": 0.5,
+    "horizonProductErr": 0,
+    "horizonSumErr": 0,
+    "planted": false,
+    "dragAt5": 0.015151515151515152,
+    "dragFalloffRatio": 60.77272727272727
+   }
+  },
+  "ct/parallel": {
+   "outputs": {
+    "nAngles": 120,
+    "fbpCorr": 0.9920681537548257,
+    "bpCorr": 0.908728748024742,
+    "rampGain": 0.0833394057300837
+   }
+  },
+  "ct/fan": {
+   "outputs": {
+    "nAngles": 120,
+    "rebinDivergence": 0.029535287831508047,
+    "fanCorr": 0.9838318261659443,
+    "fanNoRebinCorr": 0.6983346385362436,
+    "rebinGain": 0.2854971876297008,
+    "sourceDistance": 200,
+    "halfFanDeg": 14.595893500201464
+   }
+  },
+  "interferometer/recover": {
+   "outputs": {
+    "rmsResidual": 9.253371780321849e-17,
+    "maxResidual": 6.661338147750939e-16,
+    "peakToValley": 1.5923184347768635,
+    "relativeRms": 5.811257081639297e-17,
+    "unwrapped": true,
+    "lambda": 0.55,
+    "unwrapGain": 5276657305622333
+   }
+  },
+  "windtunnel/balance": {
+   "outputs": {
+    "balanceErr": 0.2813276177045468,
+    "massDrift": 3.0527021240063563e-13,
+    "steps": 3500
+   }
+  },
+  "windtunnel/drag": {
+   "outputs": {
+    "balanceErr": 0.030242283246406588,
+    "massDrift": 0.0000019828642796380325,
+    "steps": 3500,
+    "uMeasured": 0.03921382799347091,
+    "reMeasured": 8.234903878628893,
+    "cd": 5.477301579418315,
+    "cl": -0.08093270643878146,
+    "liftToDragRatio": 0.014776017947030123
+   }
+  },
+  "thermal/diffuse": {
+   "outputs": {
+    "alphaMeasured": 0.09999824574116206,
+    "alphaTheory": 0.1,
+    "alphaErrFrac": 0.000017542588379437785,
+    "tempRange": 0.1812385051653826,
+    "steps": 360
+   }
+  },
+  "thermal/convect": {
+   "outputs": {
+    "peakSpeed": 8.32667268468867e-17,
+    "kineticEnergy": 6.679801171477112e-33,
+    "convecting": false,
+    "convectingIsThreshold": true,
+    "massDrift": 0,
+    "steps": 360
+   }
+  },
+  "thermal/rayleigh": {
+   "outputs": {
+    "raCritMeasured": 39285.26670317607,
+    "raCritExact": 1707.762,
+    "raCritErrFrac": 22.003947097532368,
+    "raSweep": [
+     62294,
+     70600,
+     78905,
+     87211
+    ],
+    "onsetAmplitudes": [
+     0.007916934681476948,
+     0.009045622683964116,
+     0.010192034682119593,
+     0.01135633172792427
+    ],
+    "steps": 360
+   }
+  },
+  "pipe3d/profile": {
+   "outputs": {
+    "centrelineMeasured": 0.0029435814791555093,
+    "centrelineTheory": 0.0030250000000000003,
+    "centrelineErrFrac": 0.02691521350231107,
+    "profileRms": 0.045381680839589614,
+    "nuTheory": 0.1,
+    "nuImplied": 0.10276596796864781,
+    "massDrift": 3.000045874362744e-11,
+    "radius": 11,
+    "steps": 3000,
+    "flowMeasured": 0.5463232485613234,
+    "flowTheory": 0.5749507255151022,
+    "profileCells": 377,
+    "planted": false,
+    "flowErrFrac": 0.04979118328467403,
+    "nuErrFrac": 0.02765967968647809
+   }
+  },
+  "pipe3d/noslip": {
+   "outputs": {
+    "centrelineMeasured": 0.0029435814791555093,
+    "centrelineTheory": 0.0030250000000000003,
+    "centrelineErrFrac": 0.02691521350231107,
+    "profileRms": 0.045381680839589614,
+    "nuTheory": 0.1,
+    "nuImplied": 0.10276596796864781,
+    "massDrift": 3.000045874362744e-11,
+    "radius": 11,
+    "steps": 3000,
+    "flowMeasured": 0.5463232485613234,
+    "flowTheory": 0.5749507255151022,
+    "profileCells": 377,
+    "planted": false,
+    "flowErrFrac": 0.04979118328467403,
+    "nuErrFrac": 0.02765967968647809,
+    "wallSpeed": 0
+   }
+  },
+  "geometry/sphere": {
+   "outputs": {
+    "surfaceDeviation": 0.00860350085337347,
+    "watertight": true,
+    "boundaryEdges": 0,
+    "volumeMeasured": 4.153100617154511,
+    "volumeTheory": 4.1887902047863905,
+    "volumeErrFrac": 0.008520261432787534,
+    "triangles": 9888,
+    "vertices": 4946,
+    "resolution": 28,
+    "hasVolumeTruth": true
+   }
+  },
+  "geometry/blob": {
+   "outputs": {
+    "surfaceDeviation": 0.023383630527718635,
+    "watertight": true,
+    "boundaryEdges": 0,
+    "triangles": 2732,
+    "vertices": 1368,
+    "resolution": 28,
+    "hasVolumeTruth": false
+   }
+  },
+  "geometry/converge": {
+   "outputs": {
+    "volumeErrCoarse": 0.020892385972471318,
+    "volumeErrFine": 0.0066229429977987045,
+    "converged": true,
+    "volumeTheory": 4.1887902047863905,
+    "watertight": true,
+    "boundaryEdges": 0,
+    "surfaceDeviation": 0.020775623268698196,
+    "hasVolumeTruth": true
+   }
+  },
+  "kh/sweep": {
+   "outputs": {
+    "peakKD": 0.39269908169872414,
+    "peakSigmaNorm": 0.10590929424463459,
+    "michalkePeakKD": 0.4446,
+    "michalkePeakSigma": 0.1897,
+    "peakKDErrFrac": 0.11673620850489397,
+    "peakSigmaErrFrac": 0.4417011373503712,
+    "neutralRespected": true,
+    "unstableCount": 4,
+    "stableCount": 1,
+    "points": 5
+   }
+  },
+  "kh/single": {
+   "outputs": {
+    "kd": 0.5890486225480862,
+    "sigmaNorm": 0.07604328048404718,
+    "grew": true,
+    "michalkePeakKD": 0.4446,
+    "michalkePeakSigma": 0.1897
+   }
+  },
+  "kh/neutral": {
+   "outputs": {
+    "kd": 0.4581489286485115,
+    "sigmaNorm": 0.09988675168980152,
+    "grew": true,
+    "neutralRespected": true,
+    "unstableCount": 1,
+    "stableCount": 1,
+    "michalkePeakKD": 0.4446,
+    "points": 2
+   }
+  },
+  "born/validity": {
+   "outputs": {
+    "tolerance": 0.05,
+    "phaseLimitMeasured": 0.31275895750000005,
+    "phaseLimitTheory": 0.31622776601683794,
+    "phaseLimitErrFrac": 0.010969335680198287,
+    "k": 6.283185307179586,
+    "d": 1
+   }
+  },
+  "born/error": {
+   "outputs": {
+    "phase": 0.06252079667084208,
+    "errFrac": 0.001985204760803849,
+    "delta": 0.02,
+    "k": 6.283185307179586,
+    "d": 1
+   }
+  },
+  "born/scaling": {
+   "outputs": {
+    "errorScalingExponent": 2.0002159761824947,
+    "k": 6.283185307179586,
+    "d": 1
+   }
+  },
+  "ising/order": {
+   "outputs": {
+    "temperature": 2,
+    "magnetisation": 0.9127256944444454,
+    "yangExact": 0.911319377877496,
+    "magnetisationErrFrac": 0.001543165438032082,
+    "energy": -1.7430208333333335,
+    "susceptibility": 0.31649921874969067,
+    "specificHeat": 0.7960762152776439,
+    "onsagerTc": 2.269185314213022
+   }
+  },
+  "ising/ground": {
+   "outputs": {
+    "temperature": 0.8,
+    "magnetisation": 0.9999305555555554,
+    "energy": -1.9997222222222222,
+    "onsagerTc": 2.269185314213022,
+    "ordered": true
+   }
+  },
+  "ising/exponent": {
+   "outputs": {
+    "exponentMeasured": 1.7342414004170343,
+    "exponentTheory": 1.75,
+    "exponentErrFrac": 0.00900491404740895,
+    "chiMaxSmall": 2.305082446808508,
+    "chiMaxLarge": 25.515484896573152,
+    "peakT": 2.1999999999999997,
+    "onsagerTc": 2.269185314213022
+   }
+  },
+  "ising/transition": {
+   "outputs": {
+    "mBelow": 0.9127256944444454,
+    "mAbove": 0.2295225694444445,
+    "orderRatio": 3.9766272077455502,
+    "onsagerTc": 2.269185314213022
+   }
+  },
+  "kepler/conserve": {
+   "outputs": {
+    "energyErrFirstHalf": 0.0006710005060555077,
+    "energyErrSecondHalf": 0.0006710005121761672,
+    "energyGrowthRatio": 1.0000000091216914,
+    "energyErrFinal": 0.0006663584689514665,
+    "energySeries": [
+     -0.4999987820276641,
+     -0.4996648142722542,
+     -0.4996687006440324,
+     -0.49967046153170713,
+     -0.4996708226872066,
+     -0.4996705716713685,
+     -0.4996691691372291,
+     -0.49966459462315516,
+     -0.49992120663033957,
+     -0.4996696414446551,
+     -0.49966794595185754,
+     -0.4996702800153581,
+     -0.4996708036288705,
+     -0.4996706761033456,
+     -0.4996696274195474,
+     -0.4996655588003247,
+     -0.4997777672328092,
+     -0.49969022483424785,
+     -0.49966697894935275,
+     -0.49967003745304656,
+     -0.49967076207894845,
+     -0.4996707492625413,
+     -0.4996699720332661,
+     -0.49966673029819075,
+     -0.4996994925711591,
+     -0.4997535754073823,
+     -0.4996658279947212,
+     -0.49966971446665714,
+     -0.49967069523146135,
+     -0.49967079624751554,
+     -0.4996702309247061,
+     -0.4996677456806452,
+     -0.49967227739696884,
+     -0.4998865563370598,
+     -0.499664751448622,
+     -0.499669284840318,
+     -0.4996705984592553,
+     -0.4996708202465715,
+     -0.49967042489506747,
+     -0.4996685466921538,
+     -0.4996652692357325,
+     -0.4999982275833237,
+     -0.49966478376147605,
+     -0.4996687145942483,
+     -0.4996704648418169,
+     -0.4996708228602261,
+     -0.4996705690591682,
+     -0.49966915790127775,
+     -0.4996645831417946,
+     -0.49992434640020766,
+     -0.4996694353204838,
+     -0.49966796415760195,
+     -0.49967028445570405,
+     -0.49967080426159716,
+     -0.4996706742286392,
+     -0.499669618964059,
+     -0.4996655338175865,
+     -0.49978024708815627,
+     -0.4996894721000682,
+     -0.49966700175476036,
+     -0.49967004337266646,
+     -0.4996707632136747,
+     -0.4996707479926804,
+     -0.49966996567805744
+    ],
+    "energyGrowthShared": 1.0000343560540406,
+    "energyVerdictBounded": 1,
+    "energySamples": 64,
+    "growthGapFrac": 0.00003434693203585864,
+    "angularMomentumErr": 2.6921477609369897e-14,
+    "semiMajorDrift": 0.0006668027986429514,
+    "integrator": "verlet",
+    "orbits": 200,
+    "eccentricity": 0.5
+   }
+  },
+  "kepler/kepler3": {
+   "outputs": {
+    "slopeMeasured": 1.500000000000014,
+    "slopeTheory": 1.5,
+    "slopeErrFrac": 9.325873406851315e-15,
+    "periodErrFrac": 0.00003884733972182381,
+    "integrator": "verlet",
+    "specificEnergy": -0.5000000000000002,
+    "angMomentum": 0.8660254037844386,
+    "energyDimensionless": -0.5000000000000002,
+    "angMomDimensionless": 1
+   }
+  },
+  "kepler/closure": {
+   "outputs": {
+    "precessionPerOrbit": 0.00027997056649185407,
+    "integrator": "verlet",
+    "eccentricity": 0.5
+   }
+  },
+  "kepler/compare": {
+   "outputs": {
+    "verletGrowth": 1.0000000091216914,
+    "rk4Growth": 1.9810878937306704,
+    "verletFinalErr": 0.0006663584689514665,
+    "rk4FinalErr": 0.000005798077989727088,
+    "driftRatio": 1.9810878756597983,
+    "orbits": 200,
+    "eccentricity": 0.5
+   }
+  },
+  "kepler/solar": {
+   "outputs": {
+    "bodies": 8,
+    "periodRatio4to1": 8,
+    "periodRatioExact": 8,
+    "worstEnergyRelErr": 4.440892098500626e-16,
+    "worstAngMomRelErr": 2.0297180930734832e-16
+   }
+  },
+  "twobody/orbit": {
+   "outputs": {
+    "ratioMeasured": 0.3333333333332323,
+    "ratioExact": 0.3333333333333333,
+    "ratioErrFrac": 3.0309088572266774e-13,
+    "periodMeasured": 99.36549039795929,
+    "periodExact": 99.345882657961,
+    "periodErrFrac": 0.00019736842105274027,
+    "barycentreDriftFrac": 9.515860049723625e-14,
+    "netMomentum": 4.14702110332227e-15,
+    "m1": 3,
+    "m2": 1,
+    "massRatio": 0.3333333333333333,
+    "periods": 38,
+    "planted": false
+   }
+  },
+  "twobody/conserve": {
+   "outputs": {
+    "barycentreDriftFrac": 9.515860049723625e-14,
+    "netMomentum": 4.14702110332227e-15,
+    "periodErrFrac": 0.00019736842105274027,
+    "m1": 3,
+    "m2": 1,
+    "periods": 38,
+    "planted": false
+   }
+  },
+  "twobody/ratio": {
+   "outputs": {
+    "ratioMeasured": 0.3333333333332323,
+    "ratioExact": 0.3333333333333333,
+    "ratioErrFrac": 3.0309088572266774e-13,
+    "m1": 3,
+    "m2": 1,
+    "massRatio": 0.3333333333333333,
+    "periods": 38,
+    "planted": false
+   }
+  },
+  "inspiral/merger": {
+   "outputs": {
+    "mergerMeasured": 16.276041562401232,
+    "mergerExact": 16.276041666666668,
+    "mergerErrFrac": 6.40606835077051e-9,
+    "worstBulkErrFrac": 1.5333479624030186e-7,
+    "m1": 3,
+    "m2": 1,
+    "a0": 10,
+    "steps": 452,
+    "finalA": 0.09923144609918072,
+    "planted": false,
+    "ratePower": 3,
+    "a0Exponent": 4
+   }
+  },
+  "inspiral/track": {
+   "outputs": {
+    "worstBulkErrFrac": 1.5333479624030186e-7,
+    "worstBulkAt": 0.9896633846887263,
+    "worstTrajErrFrac": 0.11909677282330586,
+    "m1": 3,
+    "m2": 1,
+    "a0": 10,
+    "steps": 452,
+    "planted": false,
+    "ratePower": 3,
+    "a0Exponent": 4
+   }
+  },
+  "eccentric/invariant": {
+   "outputs": {
+    "worstInvariantDev": 3.631767989685781e-9,
+    "worstAtE": 0.22759966457696176,
+    "c0": 5.972009477896604,
+    "eFinal": 0.00999992990948581,
+    "aFinal": 0.3258446870025939,
+    "circularised": true,
+    "eccentricityEverRose": false,
+    "circularLimitErrFrac": 0,
+    "steps": 34234,
+    "m1": 3,
+    "m2": 1,
+    "a0": 10,
+    "e0": 0.7
+   }
+  },
+  "eccentric/circularise": {
+   "outputs": {
+    "eFinal": 0.00999992990948581,
+    "e0": 0.7,
+    "circularised": true,
+    "eccentricityEverRose": false,
+    "aFinal": 0.3258446870025939,
+    "steps": 34234,
+    "m1": 3,
+    "m2": 1
+   }
+  },
+  "eccentric/limit": {
+   "outputs": {
+    "circularLimitErrFrac": 0,
+    "a0": 10,
+    "m1": 3,
+    "m2": 1,
+    "steps": 34234
+   }
+  },
+  "kuramoto/curve": {
+   "outputs": {
+    "superErrMean": 0.0053976801702385335,
+    "superErrWorst": 0.0070456575048616354,
+    "subcriticalRMean": 0.03060622848609197,
+    "finiteSizeFloor": 0.015625,
+    "criticalK": 1,
+    "gamma": 0.5,
+    "N": 4096,
+    "points": 6
+   }
+  },
+  "kuramoto/onset": {
+   "outputs": {
+    "criticalK": 1,
+    "gamma": 0.5,
+    "N": 4096,
+    "subcriticalRMean": 0.03060622848609197,
+    "finiteSizeFloor": 0.015625,
+    "onsetDetected": true,
+    "points": 6
+   }
+  },
+  "kuramoto/pendulum": {
+   "outputs": {
+    "pendulums": 15,
+    "cycleSteps": 3600,
+    "spreadStart": 0,
+    "spreadMid": 0.6000000000000536,
+    "spreadAtCycle": 1.04638520070921e-13,
+    "resyncRatio": 5734026050764.009,
+    "couplingUsed": 0
+   }
+  },
+  "hmc/moments": {
+   "outputs": {
+    "meanErr": 0.015354807460400632,
+    "covErr": 0.03092974294525508,
+    "acceptRate": 0.9966666666666667,
+    "meanAbsDH": 0.004949560630843196,
+    "samples": 4000
+   }
+  },
+  "hmc/symplectic": {
+   "outputs": {
+    "jacobianDet": 0.9999999999768472,
+    "jacobianErr": 2.315281300013794e-11,
+    "reversibilityResidual": 5.551115123125783e-17,
+    "samples": 0
+   }
+  },
+  "landauzener/curve": {
+   "outputs": {
+    "errMean": 0.0020618880558386675,
+    "errWorst": 0.0035075352802009796,
+    "relWorst": 0.006174329348549953,
+    "points": 5,
+    "v": 4,
+    "graded": true
+   }
+  },
+  "landauzener/corner": {
+   "outputs": {
+    "points": 1,
+    "v": 4,
+    "cornerP": 0.028220135970243698,
+    "cornerExact": 0.029179416423313856,
+    "cornerOrderOk": true,
+    "graded": false
+   }
+  },
+  "inference/posterior": {
+   "outputs": {
+    "muErr": 0.006479592234777232,
+    "sigmaErr": 0.0007470448384179762,
+    "acceptRate": 0.9936363636363637,
+    "samples": 3000,
+    "repeats": 0
+   }
+  },
+  "inference/calibration": {
+   "outputs": {
+    "samples": 0,
+    "coverage": 0.8333333333333334,
+    "meanWidth": 0.052210078890903025,
+    "coverageUnderstated": 0.36666666666666664,
+    "widthUnderstated": 0.015683851625014858,
+    "repeats": 30
+   }
+  },
+  "langevin/jarzynski": {
+   "outputs": {
+    "dFerr": 0.002898644947859741,
+    "dFjarzynski": 0.6902485356120855,
+    "dFexact": 0.6931471805599453,
+    "meanW": 1.2041187496387742,
+    "secondLawHolds": true,
+    "nTraj": 30000
+   }
+  },
+  "langevin/fluctuation": {
+   "outputs": {
+    "nTraj": 0,
+    "equipartitionErr": 0.014703951593356468,
+    "x2": 0.49264802420332177,
+    "msdErr": 0.006057319085271118,
+    "msd": 39.757707236589155
+   }
+  },
+  "rmt/repulsion": {
+   "outputs": {
+    "rGoe": 0.534221449151825,
+    "rGoeErr": 0.0016769357104206017,
+    "rPoisson": 0.402572033724096,
+    "rPoissonErr": 0.01627767260420543,
+    "smallGap": 0.05303030303030303,
+    "n": 200,
+    "reps": 4
+   }
+  },
+  "rmt/semicircle": {
+   "outputs": {
+    "smallGap": 0.05303030303030303,
+    "semicircleMeasured": 28.468095226006714,
+    "semicirclePredicted": 28.284271247461902,
+    "semicircleErr": 0.006499159088686339,
+    "n": 200,
+    "reps": 4
+   }
+  },
+  "percolation/crossing": {
+   "outputs": {
+    "prob": 0.50675,
+    "dev": 0.006750000000000034,
+    "sigmaOff": 0.8538149682454668,
+    "se": 0.007905694150420948,
+    "reps": 4000,
+    "L": 32
+   }
+  },
+  "percolation/exponent": {
+   "outputs": {
+    "reps": 1500,
+    "widthSmall": 0.06875000000000014,
+    "widthLarge": 0.0402343750000001,
+    "widthRatio": 0.5852272727272729,
+    "widthRatioExact": 0.5946035575013605,
+    "nuErr": 0.01576896850985647
+   }
+  },
+  "diffusion/pair": {
+   "outputs": {
+    "einsteinD": 0.8393425394453097,
+    "greenKuboD": 0.86032895007266,
+    "disagreeFrac": 0.024694666889190548,
+    "meanD": 0.8498357447589848,
+    "steps": 6000,
+    "dt": 0.004,
+    "N": 64
+   }
+  },
+  "hydrostatic/matched": {
+   "outputs": {
+    "retained": 0.6324450444893971,
+    "collapsed": true,
+    "expanded": false,
+    "finite": true,
+    "restDensity": 144,
+    "packedDensity": 144.33852379429118,
+    "densityMismatch": 0.0023453461029824276,
+    "startHeight": 0.65,
+    "endHeight": 0.4110892789181081
+   }
+  },
+  "hydrostatic/tait": {
+   "outputs": {
+    "retained": 1.8418072201343816,
+    "collapsed": false,
+    "expanded": true,
+    "finite": true,
+    "restDensity": 144,
+    "packedDensity": 144.33852379429118,
+    "densityMismatch": 0.0023453461029824276,
+    "startHeight": 0.65,
+    "endHeight": 1.1971746930873481
+   }
+  },
+  "hydrostatic/mismatched": {
+   "outputs": {
+    "retained": 0.0900971373403633,
+    "collapsed": true,
+    "expanded": false,
+    "finite": true,
+    "restDensity": 400,
+    "packedDensity": 144.33852379429118,
+    "densityMismatch": 1.7712629274917155,
+    "startHeight": 0.65,
+    "endHeight": 0.058563139271236145
+   }
+  },
+  "wolff/magnetisation": {
+   "outputs": {
+    "absM": 0.9108697916666667,
+    "yangExact": 0.911319377877496,
+    "magErr": 0.00044958621082924477,
+    "U4": 0.6655136513485975,
+    "T": 2,
+    "L": 32,
+    "flipsPerSpin": 2786.6533203125
+   }
+  },
+  "wolff/efficiency": {
+   "outputs": {
+    "T": 2.269185314213022,
+    "L": 32,
+    "essPerWorkWolff": 0.34489475306002404,
+    "essPerWorkMetropolis": 0.005045256419830587,
+    "speedup": 68.36020300264643,
+    "flipsPerSpin": 1531.537109375
+   }
+  },
+  "spatial/agreement": {
+   "outputs": {
+    "n": 400,
+    "r": 1.2,
+    "spherePairs": 462,
+    "boxPairs": 912,
+    "cornerPairs": 450,
+    "pointFamilyAgrees": true,
+    "boxFamilyAgrees": true,
+    "sphereSubsetOfBox": true,
+    "pointMismatches": [],
+    "boxMismatches": []
+   }
+  },
+  "twof/inlet": {
+   "outputs": {
+    "inletDriftFrac": 0.0014518856955491617,
+    "driftImprovementVsFeedback": 82.65113456787049,
+    "liftAmplitude": 0.022713677627373835,
+    "liftSustained": false,
+    "dragOverLift": 0.12620285392396335,
+    "healthy": true,
+    "reNominal": 64.79999999999995,
+    "blockageFrac": 0.14814814814814814,
+    "recordedDrift": 0.00145,
+    "recordedLift": 0.0227
+   }
+  },
+  "twof/envelope": {
+   "outputs": {
+    "liftSustained": false,
+    "healthy": false,
+    "reNominal": 120,
+    "blockageFrac": 0.099
+   }
+  },
+  "fdtd/dispersion": {
+   "outputs": {
+    "S": 0.9,
+    "pointsPerWavelength": 12,
+    "vpPredicted": 0.9977818819115514,
+    "vpMeasured": 0.9977659457136329,
+    "vpErrAbs": 0.000015936197918509087,
+    "steps": 2600
+   }
+  },
+  "fdtd/magic": {
+   "outputs": {
+    "S": 1,
+    "pointsPerWavelength": 12,
+    "magicErr": 0,
+    "offMagicErr": 0.008738348756023306,
+    "errorGrowsAsStepShrinks": true,
+    "steps": 2600
+   }
+  },
+  "fdtd/lightspeed": {
+   "outputs": {
+    "cMeasured": 299792458,
+    "cExact": 299792458,
+    "cErrFrac": 0,
+    "S": 1,
+    "steps": 840
+   }
+  },
+  "tempering/marginals": {
+   "outputs": {
+    "temps": [
+     1.8,
+     2,
+     2.2,
+     2.4,
+     2.7
+    ],
+    "absM": [
+     0.9541614583333333,
+     0.908421875,
+     0.8016979166666667,
+     0.5129140625,
+     0.25521614583333335
+    ],
+    "yang": [
+     0.9568570172474183,
+     0.911319377877496,
+     0.7847551313839214,
+     0,
+     0
+    ],
+    "worstMagErrBelowTc": 0.016942785282745287,
+    "swapRate": [
+     0.36764705882352944,
+     0.29705882352941176,
+     0.18823529411764706,
+     0.18529411764705883
+    ],
+    "meanSwapRate": 0.2595588235294118,
+    "spreadAcrossLadder": 0.6989453125,
+    "occupancyMin": 0.07,
+    "L": 16,
+    "sweeps": 3000
+   }
+  },
+  "pbc/agreement": {
+   "outputs": {
+    "worstForceDiff": 2.3314683517128287e-15,
+    "maxForceMagnitude": 0.9933918518353809,
+    "plantedForceDiff": 1.0488665217844995,
+    "virialPBC": -87.83814054457136,
+    "virialImages": -87.83814054457133,
+    "momentumDrift": 7.216449660063518e-15,
+    "N": 64,
+    "L": 8,
+    "cutoff": 2.5
+   }
+  },
+  "blobbodies/roundtrip": {
+   "outputs": {
+    "peakKept": 0.5789179092783062,
+    "massKept": 0.9999011395246645,
+    "peak0": 4.260002136230469,
+    "peak": 2.466191530227661,
+    "trips": 4,
+    "gridN": 64,
+    "voxels": 262144,
+    "bodyCount": 7
+   }
+  },
+  "blobbodies/bodies": {
+   "outputs": {
+    "peak0": 4.194782199169161,
+    "peak": 4.194782199169162,
+    "trips": 4,
+    "bodyPeakKept": 1.0000000000000002,
+    "bodyDrift": 8.881784197001252e-16,
+    "bodyCount": 7
+   }
+  },
+  "quantum/well": {
+   "outputs": {
+    "levelErrWorst": 0.00003204703923395548,
+    "ratio21": 3.999984617290552,
+    "ratio31": 8.999907703814177,
+    "gapWidens": true,
+    "gridN": 800
+   }
+  },
+  "quantum/osc": {
+   "outputs": {
+    "levelErrWorst": 0.00008698625509219305,
+    "gapSpread": 0.0001145735868971487,
+    "gapMean": 0.9999045271164366,
+    "groundState": 0.49999045338633874,
+    "gridN": 800
+   }
+  },
+  "quantum/tunnel": {
+   "outputs": {
+    "transmission": 0.4199743416140261,
+    "energyOverBarrier": 0.5,
+    "barrierWidth": 1
+   }
+  },
+  "quantum/norm": {
+   "outputs": {
+    "norm": 1.0000000000002334,
+    "normDrift": 2.333688797762079e-13,
+    "steps": 400,
+    "gridN": 600
+   }
+  },
+  "quantum/bands": {
+   "outputs": {
+    "bandCount": 4,
+    "gapCount": 3,
+    "widestGap": 5.587939453767092,
+    "edgeRhsWorst": 1.5543122344752192e-15,
+    "insideGapWorst": 1.0749109237668668,
+    "insideBandWorst": 0.20431870578295985,
+    "groundState": 2.0400457574856183
+   }
+  },
+  "chaos/fixed": {
+   "outputs": {
+    "r": 2.5,
+    "settled": 0.6,
+    "fixedPointExact": 0.6,
+    "fixedPointErr": 0,
+    "period": 1
+   }
+  },
+  "chaos/doubling": {
+   "outputs": {
+    "firstDoubling": 3.000050419201317,
+    "firstDoublingErr": 0.00005041920131709787,
+    "secondDoubling": 3.449408166448074,
+    "secondDoublingErr": 0.0000815763351038612
+   }
+  },
+  "chaos/feigenbaum": {
+   "outputs": {
+    "deltaBest": 4.677208080595588,
+    "deltaErrFrac": 0.0017147410120369486,
+    "deltaSpread": 0.11029542230337963,
+    "cascadePoints": 5
+   }
+  },
+  "chaos/lyapunov": {
+   "outputs": {
+    "r": 2.5,
+    "lyapunovValue": -0.6931471805600862,
+    "chaotic": false,
+    "period": 1
+   }
+  },
+  "splat/integral": {
+   "outputs": {
+    "integralRatio": 0.9999999999999251,
+    "integralErrFrac": 7.494005416219807e-14,
+    "gridN": 256,
+    "isoRollDeviation": 1.1102230246251565e-14,
+    "axisRatio": 1
+   }
+  },
+  "splat/compose": {
+   "outputs": {
+    "alphaMeasured": 0.9176457,
+    "alphaExact": 0.9176457,
+    "alphaErr": 0,
+    "sameColourOrderDelta": 0,
+    "diffColourOrderDelta": 0.25,
+    "alphaOrderDelta": 0,
+    "orderDependenceCorrect": true
+   }
+  },
+  "splat/perspective": {
+   "outputs": {
+    "areaSlope": -2,
+    "areaSlopeErr": 0,
+    "areaIntercept": 8.764053269347762,
+    "areaAtUnitDepth": 6399.9999999999945
+   }
+  },
+  "splat/precision": {
+   "outputs": {
+    "freePairs16": 2,
+    "freePairs32": 0,
+    "precisionSharper": true,
+    "mandatoryPairs": 13,
+    "violations": 0,
+    "wrongSortCaught": true,
+    "radialVsZAgreement": 0.3333333333333333,
+    "metricsDiffer": true
+   }
+  },
+  "splat/shear": {
+   "outputs": {
+    "onAxisShearDelta": 0,
+    "offAxisShearDelta": 0.010005420663719955,
+    "shearGrows": true
+   }
+  },
+  "discovery/kepler": {
+   "outputs": {
+    "exponent": 1.4999999999999982,
+    "exponentExact": 1.5,
+    "exponentErr": 1.7763568394002505e-15,
+    "verdict": "law",
+    "r2Val": 1,
+    "foundLaw": true
+   }
+  },
+  "discovery/fragile": {
+   "outputs": {
+    "rollingVerdict": "fragile",
+    "lawFraction": 0.2,
+    "originsChecked": 5,
+    "foundLaw": false
+   }
+  },
+  "discovery/logistic": {
+   "outputs": {
+    "r": 4,
+    "coeffX": 4.000000000000007,
+    "coeffX2": -4.000000000000017,
+    "coeffErr": 1.687538997430238e-14,
+    "verdict": "law",
+    "r2Val": 1,
+    "nTerms": 2,
+    "foundLaw": true
+   }
+  },
+  "discovery/nolaw": {
+   "outputs": {
+    "verdict": "no-law",
+    "refusedCorrectly": true,
+    "foundLaw": false,
+    "r2Val": -0.10536219313323136
+   }
+  },
+  "discovery/rolling": {
+   "outputs": {
+    "rollingVerdict": "law",
+    "lawFraction": 1,
+    "originsChecked": 5,
+    "exponentSd": 1.4113375874265713e-15,
+    "exponent": 1.5000000000000002,
+    "exponentExact": 1.5,
+    "exponentErr": 2.220446049250313e-16,
+    "foundLaw": true
+   }
+  },
+  "discovery/splat": {
+   "outputs": {
+    "exponent": -1.9999999999999842,
+    "exponentExact": -2,
+    "exponentErr": 1.5765166949677223e-14,
+    "verdict": "law",
+    "r2Val": 1,
+    "foundLaw": true
+   }
+  },
+  "discovery/visviva": {
+   "outputs": {
+    "coeffInvR": 1.9999999999999951,
+    "coeffInvA": -0.9999999999999939,
+    "visVivaErr": 6.106226635438361e-15,
+    "verdict": "law",
+    "r2Val": 1,
+    "nTerms": 2,
+    "foundLaw": true,
+    "poorLibraryRefused": true
+   }
+  },
+  "probe/precession": {
+   "outputs": {
+    "precessionMeasured": 0.009856260938135186,
+    "precessionExact": 0.009817477042468103,
+    "precessionErrFrac": 0.003950495172976964,
+    "orbits": 18
+   }
+  },
+  "probe/isco": {
+   "outputs": {
+    "iscoR": 6,
+    "iscoL": 3.4641016151377544,
+    "iscoLIndependent": 3.4641016151377544,
+    "iscoAgrees": true,
+    "redshiftAtHorizonInfinite": true
+   }
+  },
+  "probe/closure": {
+   "outputs": {
+    "closureResidual": 1.0106493419925755e-10,
+    "closes": true,
+    "orbits": 19
+   }
+  },
+  "probe/firstorder": {
+   "outputs": {
+    "ratio1": 2.0046130214944817,
+    "ratio2": 2.002248603485653,
+    "firstOrderHolds": true
+   }
+  },
+  "probe/capture": {
+   "outputs": {
+    "captured": true,
+    "plunges": true,
+    "properTime": 99.345882657961,
+    "iscoL": 3.4641016151377544
+   }
+  },
+  "probe/findisco": {
+   "outputs": {
+    "iscoFoundR": 5.960687453046558,
+    "iscoExactR": 6,
+    "iscoDeficitFrac": 0.0065520911589070545,
+    "iscoTrials": 35
+   }
+  },
+  "probe/mission": {
+   "outputs": {
+    "achieved": 2,
+    "refuted": 1,
+    "impossible": 1,
+    "malformed": 1,
+    "notAllAchieved": true,
+    "missionVerdict": "5 proposals: {\"achieved\":2,\"refuted\":1,\"impossible\":1,\"malformed\":1}"
+   }
+  },
+  "probe/steer": {
+   "outputs": {
+    "steerVerdict": "circularised",
+    "steerL": 3.779644730091307,
+    "steerExactL": 3.779644730092272,
+    "steerErr": 9.65005853004186e-13,
+    "steerTrials": 43,
+    "steerEcc": 8.94129215112915e-13,
+    "steerStable": true
+   }
+  },
+  "probe/steerisco": {
+   "outputs": {
+    "steerVerdict": "circularised",
+    "steerL": 3.4641016151379356,
+    "steerExactL": 3.4641016151377544,
+    "steerErr": 1.8118839761882555e-13,
+    "steerTrials": 43,
+    "steerEcc": 7.64980671395035e-12,
+    "steerStable": true
+   }
+  },
+  "probe/pilot": {
+   "outputs": {
+    "pilotPlunged": true,
+    "pilotEcc": 1,
+    "pilotSide": -1,
+    "pilotL": 3,
+    "pilotExactL": 3.779644730092272,
+    "pilotLErrFrac": 0.2062746066806228,
+    "pilotTargetR": 10,
+    "pilotTurns": 0.695220622414076
+   }
+  },
+  "probe/tour": {
+   "outputs": {
+    "tourStations": 3,
+    "tourArrived": 3,
+    "tourRefused": 0,
+    "tourWorstErr": 1.0862422072932532e-12,
+    "tourIterations": 130,
+    "tourOrderIndependent": true
+   }
+  },
+  "probe/place": {
+   "outputs": {
+    "tourStations": 4,
+    "tourArrived": 4,
+    "tourRefused": 0,
+    "tourWorstErr": 0,
+    "tourIterations": 0,
+    "tourPeriods": [
+     142.17225402106772,
+     198.691765315922,
+     329.1333740390919,
+     561.9851784832581
+    ]
+   }
+  },
+  "probe/transfer": {
+   "outputs": {
+    "transferL": 4.170288281141494,
+    "transferE": 0.9690874237046979,
+    "transferEcc": 0.3333333333333333,
+    "apoErr": 7.935341272968799e-10,
+    "periErr": 0,
+    "deltaLDepart": 0.3906435510492221,
+    "deltaLArrive": 0.6804242195851655,
+    "routeLegs": 0,
+    "routeInfeasible": 0,
+    "routeWorstApoErr": 7.935341272968799e-10
+   }
+  },
+  "probe/route": {
+   "outputs": {
+    "routeDeltaL": 1.2730037367269964,
+    "routeLegs": 2,
+    "routeInfeasible": 0,
+    "routeWorstApoErr": 4.6484238680477574e-10,
+    "routeOrderMatters": true
+   }
+  },
+  "probe/emit": {
+   "outputs": {
+    "emitR": 20,
+    "emitConeRad": 0.2490415079291829,
+    "emitConeDeg": 14.269027327916007,
+    "emitEscapedSky": 0.9845745556671337,
+    "emitInsidePhotonSphere": false
+   }
+  },
+  "lens/shadow": {
+   "outputs": {
+    "rObs": 20,
+    "shadowAngleRad": 0.2490415079291834,
+    "shadowAngleExact": 0.2490415079291829,
+    "shadowErrFrac": 2.0060927402647517e-15,
+    "shadowFillsSky": false
+   }
+  },
+  "lens/pixels": {
+   "outputs": {
+    "rObs": 20,
+    "resolution": 512,
+    "fovDeg": 60,
+    "pixelDiameter": 225.5345739005172,
+    "pixelDiameterExact": 225.5345739005167,
+    "pixelErrFrac": 2.1423281227382634e-15,
+    "shadowAngleExact": 0.2490415079291829
+   }
+  },
+  "lens/images": {
+   "outputs": {
+    "sourceU": 0.3,
+    "imagePlus": 1.1611874208078343,
+    "imageMinus": -0.8611874208078343,
+    "imagePlusExact": 1.161187420807834,
+    "imageMinusExact": -0.8611874208078342,
+    "imageErrFrac": 1.9122202061968225e-16
+   }
+  },
+  "lens/pointmag": {
+   "outputs": {
+    "sourceU": 0.3,
+    "magTotal": 3.4447949623474874,
+    "magTotalExact": 3.4447949624912364,
+    "magErrFrac": 4.1729337814999744e-11
+   }
+  },
+  "lens/finite": {
+   "outputs": {
+    "sourceRho": 0.1,
+    "magFinite": 20.024984286256288,
+    "magFiniteExact": 20.024984394500784,
+    "magFiniteErrFrac": 5.405472179190309e-9,
+    "pointDivergence": 10000.0000375,
+    "sizeInferred": 0.1000000005418986,
+    "sizeTrue": 0.1,
+    "sizeErrFrac": 5.418985954408484e-9
+   }
+  },
+  "lens/map": {
+   "outputs": {
+    "mapN": 21,
+    "mapSpan": 0.6,
+    "sourceRho": 0.1,
+    "mapCells": 441,
+    "mapPeak": 20.024981687576595,
+    "mapPeakExact": 20.024984394500784,
+    "mapPeakErrFrac": 1.3517734323645215e-7
+   }
+  },
+  "lens/structure": {
+   "outputs": {
+    "sourceRho": 0.1,
+    "sepU": 0.2,
+    "magSingle": 20.024984150798122,
+    "magDouble": 12.688716508158578,
+    "structureResolved": true,
+    "magErrFrac": 0.3663557277945285
+   }
+  },
+  "lens/bcrit": {
+   "outputs": {
+    "bCritMeasured": 5.1961524227090194,
+    "bCritExact": 5.196152422706632,
+    "bCritErrFrac": 4.594598845332462e-13
+   }
+  },
+  "lens/deflect": {
+   "outputs": {
+    "impactParameter": 10,
+    "bCrit": 5.196152422706632,
+    "deflectionMeasured": 0.5903957876053885,
+    "deflectionWeak": 0.4,
+    "deflectionRegime": "mid",
+    "relWeak": 0.4759894690134711,
+    "rMin": 8.788850662596367,
+    "rMinOverB": 0.8788850662596367
+   }
+  },
+  "lens/deflectSweep": {
+   "outputs": {
+    "impactParameter": 60,
+    "sweepDphiCount": 4,
+    "deflectionErrFracCoarse": 0.05226212549087707,
+    "deflectionErrFracMid": 0.05226212465023618,
+    "deflectionErrFracFine": 0.05226212475960869,
+    "deflectionErrFracFinest": 0.052262124941942836,
+    "deflectionErrFracSpreadAfterFirst": 2.917066588281614e-10
+   }
+  },
+  "lens/shot": {
+   "outputs": {
+    "shotB": 10.540925533894596,
+    "shotCaptured": false,
+    "impactParameter": 10.540925533894596,
+    "bCritExact": 5.196152422706632,
+    "deflectionMeasured": 0.5452280703646171
+   }
+  },
+  "tidal/deviation": {
+   "outputs": {
+    "kind": "deviation",
+    "separationExact": 0.00906765751855998,
+    "separationLinear": 0.009075715616040198,
+    "deviationErrFrac": 0.0008878746118902933,
+    "stretchFactor": 9.06765751855998,
+    "rFinal": 3.158508425967305,
+    "properTime": 390.0009999976896
+   }
+  },
+  "tidal/validity": {
+   "outputs": {
+    "kind": "validity",
+    "validitySeparation": 0.014073748835532807,
+    "validityFrac": 0.00028147497671065613,
+    "validityTol": 0.01,
+    "deviationErrFrac": 0.0105580862437101,
+    "separationExact": 0.12638076467330395,
+    "separationLinear": 0.1277293420828672
+   }
+  },
+  "tidal/roche": {
+   "outputs": {
+    "kind": "roche",
+    "rocheMeasured": 62.74668231489607,
+    "rocheExact": 62.99605249474366,
+    "rocheErrFrac": 0.0039585048581956064
+   }
+  },
+  "box3d/drop": {
+   "outputs": {
+    "kind": "drop",
+    "fallDistance": 4.839765548706055,
+    "fallIdeal": 4.9,
+    "fallErrFrac": 0.012292745162029727
+   }
+  },
+  "box3d/toss": {
+   "outputs": {
+    "kind": "toss",
+    "apexHeight": 2.4272096157073975,
+    "apexIdeal": 2.5,
+    "apexErrFrac": 0.029116153717041016
+   }
+  },
+  "box3d/impulse": {
+   "outputs": {
+    "kind": "impulse",
+    "speedAfter": 5,
+    "speedIdeal": 5,
+    "momentumErrFrac": 0,
+    "massImplied": 1
+   }
+  },
+  "box3d/hash": {
+   "outputs": {
+    "kind": "hash",
+    "stateHash": "adb0305e",
+    "stateHashRepeat": "adb0305e",
+    "deterministic": true
+   }
+  },
+  "blobthermal/einstein": {
+   "outputs": {
+    "kind": "einstein",
+    "dInput": 0.01141,
+    "dMeasured": 0.011329675900149917,
+    "dErrFrac": 0.007039798409297348,
+    "msd": 0.0679780554008995,
+    "walkers": 2000
+   }
+  },
+  "blobthermal/scheme": {
+   "outputs": {
+    "kind": "scheme",
+    "schemeD": 0.018718501923719277,
+    "dConsistencyFrac": 0.00048339340569248805,
+    "horizons": [
+     {
+      "t": 0.5,
+      "D": 0.018727550324113645
+     },
+     {
+      "t": 1,
+      "D": 0.018718501923719277
+     }
+    ]
+   }
+  },
+  "blobthermal/floor": {
+   "outputs": {
+    "kind": "floor",
+    "fieldPeak": 1,
+    "peakFloorValue": 1,
+    "peakAboveFloor": true
+   }
+  },
+  "blobthermal/dispersion": {
+   "outputs": {
+    "kind": "dispersion",
+    "dmCentral": 0.9142857142851804,
+    "dmCentralExact": 0.9142857142857143,
+    "dmErrFrac": 5.839599637180726e-13,
+    "dmProfileExponent": 3.4999999999999845,
+    "dmProfileExponentExact": 3.5,
+    "dmProfileErrFrac": 4.440892098500626e-15,
+    "delayExponent": -3.9870166388897794,
+    "delayExponentExact": -2,
+    "delayExponentErrFrac": 0.9935083194448897,
+    "delayRatioExact": 4,
+    "dmSimUnits": 0.9142857142851804,
+    "scaleCommitted": false
+   }
+  },
+  "blobthermal/plasmalens": {
+   "outputs": {
+    "kind": "plasmalens",
+    "bendMeasured": -6.393634422114784,
+    "bendExact": 5.173544656577344,
+    "bendErrFrac": 0.23583246043624811,
+    "bendOutward": false,
+    "lensSign": "converging",
+    "focalLength": 0.06256222573759455,
+    "diverging": false
+   }
+  },
+  "blobkelvin/convert": {
+   "outputs": {
+    "kind": "convert",
+    "scenario": "bacterium",
+    "kelvinAtD": 212.88207478908424,
+    "warmthAtT": 0.015712180104003336,
+    "roundTripErrFrac": 0
+   }
+  },
+  "blobkelvin/calibration": {
+   "outputs": {
+    "kind": "calibration",
+    "boilingKelvin": 373.14999963029663,
+    "roomTravelFrac": 0.7856090052001669,
+    "stylisedKelvinAtMax": 109396.17649967935
+   }
+  }
+ },
+ "pairCount": 283,
+ "pairObservables": 2339
+}

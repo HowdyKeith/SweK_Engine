@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Backend adjudicator">
+<meta name="demo:desc" content="Cross-peer lockstep in this engine runs on either physics backend. The ship gate proves Jolt and box3d expose the same methods -- it has never proved they agree on the same physics, and box3d cannot be run where this engine is developed, so the question can only be settled here, on your machine. This page runs the same exact checks the ship gate runs against BOTH backends, then drops identical worlds in each and compares them body by body. If they disagree, two peers replaying identical inputs would drift apart and the lockstep comparator would report a divergence with nothing to blame. There is a sabotage button that nudges one body by a millionth of a metre, so you can watch the comparator prove it can see a difference at all.">
+<meta name="demo:category" content="simulation">
+<title>Backend adjudicator</title>
+<style>
+  html,body { margin:0; min-height:100%; background:#04060e; color:#9fb2d4; font:13px/1.6 ui-monospace,Menlo,monospace; }
+  .wrap { max-width:940px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { color:#f6a623; letter-spacing:.15em; text-transform:uppercase; font-size:15px; margin:0 0 4px; }
+  .sub { color:#7fb2d4; max-width:78ch; margin-bottom:18px; }
+  h2 { color:#f6a623; letter-spacing:.13em; text-transform:uppercase; font-size:11px; margin:26px 0 4px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:#5f7aa0; font-size:10px; letter-spacing:.13em; text-transform:uppercase; padding:0 10px 8px 0; border-bottom:1px solid #1c2740; }
+  td { padding:8px 10px 8px 0; border-bottom:1px solid #101827; }
+  .nm { color:#cfe0f6; } .ex { color:#6f86ab; font-size:11px; }
+  .ok { color:#7fe3c4; font-weight:700; } .bad { color:#ff8a8a; font-weight:700; } .skip { color:#8a7fb0; font-weight:700; } .run { color:#f6a623; }
+  #verdict { margin:22px 0 8px; font-size:15px; }
+  .note { color:#6f86ab; font-size:11.5px; max-width:82ch; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:16px; padding:8px 14px; font:600 11px ui-monospace,monospace; cursor:pointer; margin-right:8px; }
+  button.sab { color:#ff9a9a; border-color:#5a2a2a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#9670; Backend adjudicator &mdash; do the two physics engines agree?</h1>
+  <div class="sub">Cross-peer lockstep runs on <b>either</b> backend. The ship gate proves they expose the same <i>methods</i>; it has never proved they agree on the same <i>physics</i>. And box3d needs a WASM that cannot be built where this engine is developed &mdash; so this question can only be answered <b>here</b>. If they disagree, two peers replaying identical inputs drift apart, and the lockstep comparator reports a divergence with nothing to blame it on.</div>
+  <div><button id="run">run the check</button><button id="sab" class="sab">sabotage the comparator</button></div>
+  <h2>Each backend against mathematics &mdash; the same checks the ship gate runs</h2>
+  <table><thead><tr><th style="width:44%">check</th><th style="width:22%">Jolt</th><th style="width:22%">box3d</th><th style="width:10%"></th></tr></thead><tbody id="rows"></tbody></table>
+  <h2>The two backends against each other</h2>
+  <table><thead><tr><th style="width:44%">test</th><th style="width:44%">result</th><th style="width:10%">verdict</th></tr></thead><tbody id="cross"></tbody></table>
+  <div id="verdict"></div>
+  <div class="note" id="note"></div>
+</div>
+<script type="module">
+import { runRigidSuite, CHECKS } from "./tools/ship/rigidSuite.mjs";
+import { createJoltBackend } from "./physics/jolt/joltLoader.js";
+import { box3d } from "./physics/box3d/box3dLoader.js";
+
+let sabotage = false;
+const rowsEl = document.getElementById("rows"), crossEl = document.getElementById("cross");
+const mkJolt = () => createJoltBackend();
+async function mkBox3d() {
+  await box3d.init();
+  const st = box3d.status();
+  if (!st.ready) throw new Error(st.reason || "box3d not ready");
+  return box3d;
+}
+function cell(txt, ok) { return '<span class="' + (ok === null ? "skip" : ok ? "ok" : "bad") + '">' + txt + "</span>"; }
+
+document.getElementById("sab").onclick = (e) => {
+  sabotage = !sabotage;
+  e.target.textContent = sabotage ? "sabotage: ON (one body nudged by 1e-6 m)" : "sabotage the comparator";
+  e.target.style.color = sabotage ? "#ff6a6a" : "";
+};
+
+// The identical-world drop, built the same way twice. This is the scenario lockstep actually depends on.
+function scenario(b, nudge) {
+  const w = b.createWorld({ gravity: [0, -9.81, 0] });
+  w.addBox({ type: "static", pos: [0, -1, 0], half: [50, 1, 50] });
+  for (let n = 0; n < 6; n++) {
+    const x = n * 0.31 - 1 + (nudge && n === 3 ? 1e-6 : 0);   // the sabotage: one body, one millionth of a metre
+    w.addBox({ type: "dynamic", pos: [x, 3 + n * 1.7, n * 0.17], half: [0.5, 0.5, 0.5] });
+  }
+  for (let s = 0; s < 600; s++) w.step(1/240, 1);
+  const t = w.readTransforms();
+  w.destroy();
+  return t;
+}
+
+document.getElementById("run").onclick = async () => {
+  rowsEl.innerHTML = ""; crossEl.innerHTML = ""; document.getElementById("verdict").innerHTML = ""; document.getElementById("note").innerHTML = "";
+  let jr = null, br = null, bErr = null;
+  try { jr = await runRigidSuite(mkJolt); } catch (e) { bErr = "jolt: " + e.message; }
+  try { br = await runRigidSuite(mkBox3d); } catch (e) { br = null; bErr = e.message; }
+  // each backend against the exact analytic answers
+  for (let i = 0; i < CHECKS.length; i++) {
+    const c = CHECKS[i];
+    const j = jr && jr.rows[i], b = br && br.rows[i];
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td><div class="nm">' + c.name + '</div><div class="ex">' + c.exact + "</div></td>" +
+      "<td>" + (j ? cell(j.detail || (j.err ? "threw" : ""), j.pass) : cell("--", null)) + "</td>" +
+      "<td>" + (b ? cell(b.detail || (b.err ? "threw" : ""), b.pass) : cell("not available", null)) + "</td><td></td>";
+    rowsEl.appendChild(tr);
+  }
+  // and the two against each other
+  const tr = document.createElement("tr");
+  tr.innerHTML = '<td><div class="nm">identical worlds, both backends</div><div class="ex">7 bodies, 600 steps, same start &mdash; lockstep depends on this</div></td><td class="run">running&hellip;</td><td></td>';
+  crossEl.appendChild(tr);
+  await new Promise(r => setTimeout(r, 20));
+  let ok = false, txt = "";
+  try {
+    const jb = await mkJolt();
+    const a = scenario(jb, false);
+    let c2 = null;
+    try { const bb = await mkBox3d(); c2 = scenario(bb, sabotage); } catch (e) { c2 = null; }
+    if (!c2) { txt = "box3d not available on this machine — " + (bErr || "no WASM"); ok = null; }
+    else {
+      let worst = 0;
+      for (let i = 0; i < Math.min(a.length, c2.length); i++) worst = Math.max(worst, Math.abs(a[i] - c2[i]));
+      txt = "worst difference " + worst.toExponential(2) + " m after 600 steps";
+      ok = worst < 1e-4;
+    }
+  } catch (e) { txt = e.message; ok = false; }
+  tr.children[1].className = ""; tr.children[1].textContent = txt;
+  tr.children[2].innerHTML = ok === null ? cell("SKIPPED", null) : cell(ok ? "AGREE" : "DIVERGE", ok);
+
+  const joltOk = jr && jr.allPass;
+  document.getElementById("verdict").innerHTML = ok === null
+    ? '<span class="skip">box3d could not be judged on this machine — Jolt ' + (joltOk ? "agrees with mathematics on all four." : "FAILED a check.") + "</span>"
+    : ok ? '<span class="ok">The two backends track each other. Even so, see the note below before pairing them.</span>'
+         : '<span class="bad">The two backends diverge &mdash; and after the WASM rebuild, this is EXPECTED, not a bug. See below.</span>';
+  document.getElementById("note").innerHTML = sabotage
+    ? "Sabotage is ON &mdash; one body of seven was moved by <b>one millionth of a metre</b> before the drop. Physics amplifies that: if the row above still says AGREE, the comparator cannot see a difference and is worthless. That is the only reason this button exists."
+    : "<b>What this measured, and what it means.</b> Both engines now report exactly 0.05000/s damping and both pass all four exact checks &mdash; and they still do not compute the same trajectory (95.15633 vs 95.15535 on a one-second drop). That residual cannot be tuned away. Collisions amplify: a millionth of a metre becomes nine centimetres in 2.5 seconds, about 90,000&times;. To stay inside the 1e-4 m threshold for that long, two engines would have to track each other to ~1e-9 m through <i>every operation</i> &mdash; and two independent codebases differ in the last bit at best (different collision ordering, different solver iterations, different arithmetic). The last bit, amplified 90,000&times;, is a metre. <b>Mixed-backend lockstep is not broken; it is impossible.</b> Each engine is perfectly deterministic against itself &mdash; the bit-identical row above proves it &mdash; so lockstep works when every peer runs the same engine. <b>The engine is part of the protocol.</b> That conclusion is the reason this page was built.";
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Code Graph (Graphify)</title>
+<meta name="demo:title"  content="Code Graph (Graphify)">
+<meta name="demo:desc"   content="Render a Graphify GraphML knowledge graph of the codebase as a navigable 3D force-directed constellation. Nodes by community, hubs sized by degree.">
+<meta name="demo:cats"   content="viewer,graph,code">
+<meta name="demo:swatch" content="🕸">
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#05060a;color:#bcd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:7px;padding:9px 12px;background:rgba(12,16,30,0.92);border-bottom:1px solid rgba(150,120,220,0.25);align-items:center;flex-wrap:wrap}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#dcf;flex:1;min-width:120px}
+  #topbar button,#topbar label.btn{padding:6px 10px;border-radius:6px;border:1px solid rgba(150,120,220,0.4);background:rgba(14,12,28,0.85);color:#dcf;font-size:12px;cursor:pointer}
+  #topbar input[type=text]{background:rgba(8,8,18,0.9);color:#cde;border:1px solid rgba(150,120,220,0.3);border-radius:5px;padding:5px 8px;font-size:11px;min-width:150px;flex:1}
+  #host{flex:1;position:relative;overflow:hidden}
+  #c{position:absolute;inset:0;display:block}
+  #labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .lbl{position:absolute;transform:translate(-50%,-140%);font-size:10px;color:#cde;background:rgba(6,8,16,0.5);padding:1px 4px;border-radius:3px;white-space:nowrap}
+  #hud{position:absolute;left:10px;top:10px;font-size:11px;color:#9ab;background:rgba(6,8,16,0.6);padding:7px 10px;border-radius:6px;max-width:42%;line-height:1.5}
+  #info{position:absolute;right:10px;top:10px;font-size:11px;color:#cde;background:rgba(6,8,16,0.72);padding:8px 11px;border-radius:6px;max-width:44%;display:none;line-height:1.55}
+  #legend{position:absolute;left:10px;bottom:10px;font-size:10px;color:#9ab;background:rgba(6,8,16,0.55);padding:6px 9px;border-radius:6px;max-width:60%}
+  #legend .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  #msg{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:11px;color:#9ab;background:rgba(6,8,16,0.6);padding:5px 10px;border-radius:6px}
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🕸 Code Graph <span style="color:#869;font-weight:400;">· Graphify</span></h1>
+    <label class="btn">📂 GraphML<input id="file" type="file" accept=".graphml,.xml" style="display:none"></label>
+    <input id="url" type="text" placeholder="…or a .graphml URL" autocomplete="off">
+    <button id="btnUrl">⬇ Load</button>
+    <button id="btnSample">📊 Sample</button>
+    <button id="btnLabels" title="Toggle hub labels">🏷 Labels</button>
+    <button id="btnRestart" title="Re-run layout">⟲ Relayout</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host">
+    <canvas id="c"></canvas>
+    <div id="labels"></div>
+    <div id="hud">drag: orbit · wheel: zoom · click a node to inspect</div>
+    <div id="info"></div>
+    <div id="legend"></div>
+    <div id="msg"></div>
+  </div>
+</div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+
+const $ = (id) => document.getElementById(id);
+const msg = (t) => { $("msg").textContent = t || ""; };
+$("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const canvas = $("c");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060a);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
+camera.position.set(0, 0, 600);
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.1;
+scene.add(new THREE.HemisphereLight(0xddeeff, 0x202028, 1.2));
+const dl = new THREE.DirectionalLight(0xffffff, 1.0); dl.position.set(1, 1, 1); scene.add(dl);
+
+function resize() {
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+  const h = canvas.clientHeight || canvas.parentElement.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe($("host")); resize();
+
+// ---- graph state ----
+let nodes = [], edges = [], inst = null, lines = null, hiLines = null;
+let pos = null, vel = null, cooling = 1, iters = 0, maxIters = 400;
+let showLabels = true, selected = -1;
+const sphereGeo = new THREE.SphereGeometry(1, 12, 10);
+const tmpMat = new THREE.Matrix4(), tmpColor = new THREE.Color();
+const COMMUNITY_COLORS = {};
+let huePtr = 0;
+function communityColor(c) {
+  const key = String(c == null ? "?" : c);
+  if (!COMMUNITY_COLORS[key]) { COMMUNITY_COLORS[key] = new THREE.Color().setHSL((huePtr * 0.61803) % 1, 0.62, 0.6); huePtr++; }
+  return COMMUNITY_COLORS[key];
+}
+
+// ---- GraphML parse (tolerant of attribute naming) ----
+function parseGraphML(text) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if (doc.querySelector("parsererror")) throw new Error("invalid XML");
+  const keys = {};
+  doc.querySelectorAll("key").forEach(k => { keys[k.getAttribute("id")] = (k.getAttribute("attr.name") || k.getAttribute("id")); });
+  const dataOf = (el) => {
+    const o = {};
+    el.querySelectorAll(":scope > data").forEach(d => { o[(keys[d.getAttribute("key")] || d.getAttribute("key") || "").toLowerCase()] = (d.textContent || "").trim(); });
+    return o;
+  };
+  const N = [], idx = {};
+  doc.querySelectorAll("node").forEach(n => {
+    const id = n.getAttribute("id"); if (id == null) return;
+    const d = dataOf(n);
+    const label = d.label || d.name || d.title || id;
+    const type = d.type || d.kind || d.category || guessType(id, label);
+    const community = d.community ?? d.cluster ?? d.group ?? d.module ?? d.partition ?? type;
+    idx[id] = N.length;
+    N.push({ id, label, type, community: String(community), path: d.path || d.file || "", deg: 0 });
+  });
+  const E = [];
+  doc.querySelectorAll("edge").forEach(e => {
+    const s = e.getAttribute("source"), t = e.getAttribute("target");
+    if (idx[s] == null || idx[t] == null) return;
+    const d = dataOf(e);
+    const conf = (d.confidence || d.kind2 || "").toUpperCase();
+    const etype = d.type || d.relationship || d.label || "";
+    E.push({ s: idx[s], t: idx[t], conf, etype });
+    N[idx[s]].deg++; N[idx[t]].deg++;
+  });
+  return { N, E };
+}
+function guessType(id, label) {
+  const s = (label || id).toLowerCase();
+  if (s.endsWith(".html")) return "page";
+  if (s.includes("(") || s.includes("()")) return "function";
+  if (/^[A-Z]/.test(label) && /\.js$/.test(label)) return "class";
+  return "module";
+}
+
+function clearGraph() {
+  for (const o of [inst, lines, hiLines]) { if (o) { scene.remove(o); o.geometry?.dispose?.(); o.material?.dispose?.(); } }
+  inst = lines = hiLines = null; selected = -1; $("info").style.display = "none";
+  $("labels").innerHTML = "";
+}
+
+function buildGraph(parsed) {
+  clearGraph();
+  nodes = parsed.N; edges = parsed.E;
+  const n = nodes.length;
+  if (!n) { msg("no nodes found in this GraphML"); return; }
+  // init positions on a sphere
+  pos = new Float32Array(n * 3); vel = new Float32Array(n * 3);
+  const R = Math.cbrt(n) * 26 + 40;
+  for (let i = 0; i < n; i++) {
+    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, r = R * Math.cbrt(Math.random());
+    const s = Math.sqrt(1 - u * u);
+    pos[i*3] = r*s*Math.cos(th); pos[i*3+1] = r*s*Math.sin(th); pos[i*3+2] = r*u;
+  }
+  // node instances
+  const maxDeg = Math.max(1, ...nodes.map(d => d.deg));
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.1 });
+  inst = new THREE.InstancedMesh(sphereGeo, mat, n);
+  for (let i = 0; i < n; i++) {
+    nodes[i].size = 3 + 7 * Math.sqrt(nodes[i].deg / maxDeg);
+    inst.setColorAt(i, communityColor(nodes[i].community));
+  }
+  inst.instanceColor.needsUpdate = true;
+  scene.add(inst);
+  // edges
+  const eg = new THREE.BufferGeometry();
+  eg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(edges.length * 6), 3));
+  eg.setAttribute("color", new THREE.BufferAttribute(new Float32Array(edges.length * 6), 3));
+  const ecol = eg.getAttribute("color");
+  const confColor = (c) => c === "EXPLICIT" ? [0.55,0.75,1.0] : c === "INFERRED" ? [0.5,0.45,0.7] : [0.45,0.35,0.4];
+  for (let i = 0; i < edges.length; i++) { const c = confColor(edges[i].conf); ecol.setXYZ(i*2, ...c); ecol.setXYZ(i*2+1, ...c); }
+  ecol.needsUpdate = true;
+  lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45 }));
+  scene.add(lines);
+  // highlight overlay (selected node's edges)
+  hiLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.95 }));
+  scene.add(hiLines);
+
+  cooling = 1; iters = 0; maxIters = n > 600 ? 250 : 400;
+  buildLegend();
+  $("hud").innerHTML = `${n} nodes · ${edges.length} edges · ${Object.keys(COMMUNITY_COLORS).length} communities<br>drag: orbit · wheel: zoom · click a node`;
+  msg(n > 1200 ? "large graph — layout may take a moment" : "laying out…");
+  frameCamera();
+}
+
+function buildLegend() {
+  const items = Object.entries(COMMUNITY_COLORS).slice(0, 14);
+  $("legend").innerHTML = "communities: " + items.map(([k, c]) =>
+    `<span class="sw" style="background:#${c.getHexString()}"></span>${k}`).join("  ");
+}
+
+function frameCamera() {
+  let cx=0,cy=0,cz=0; const n=nodes.length;
+  for (let i=0;i<n;i++){ cx+=pos[i*3]; cy+=pos[i*3+1]; cz+=pos[i*3+2]; }
+  cx/=n; cy/=n; cz/=n;
+  let r=1; for (let i=0;i<n;i++){ const dx=pos[i*3]-cx,dy=pos[i*3+1]-cy,dz=pos[i*3+2]-cz; r=Math.max(r,Math.hypot(dx,dy,dz)); }
+  controls.target.set(cx,cy,cz);
+  camera.position.set(cx, cy, cz + r*2.4 + 60);
+  camera.updateProjectionMatrix(); controls.update();
+}
+
+// ---- force-directed step (O(n^2) repulsion; fine to ~1.5k nodes) ----
+function stepLayout() {
+  const n = nodes.length; if (!n) return;
+  const kRep = 2200, kSpr = 0.02, rest = 42, grav = 0.012, damp = 0.86;
+  for (let i = 0; i < n; i++) {
+    let fx=0,fy=0,fz=0; const ix=pos[i*3],iy=pos[i*3+1],iz=pos[i*3+2];
+    for (let j = 0; j < n; j++) {
+      if (i===j) continue;
+      let dx=ix-pos[j*3], dy=iy-pos[j*3+1], dz=iz-pos[j*3+2];
+      let d2=dx*dx+dy*dy+dz*dz; if (d2<1) d2=1; const inv=1/d2; const f=kRep*inv;
+      const d=Math.sqrt(d2); fx+=dx/d*f; fy+=dy/d*f; fz+=dz/d*f;
+    }
+    fx-=ix*grav; fy-=iy*grav; fz-=iz*grav;
+    vel[i*3]=(vel[i*3]+fx*0.001*cooling)*damp; vel[i*3+1]=(vel[i*3+1]+fy*0.001*cooling)*damp; vel[i*3+2]=(vel[i*3+2]+fz*0.001*cooling)*damp;
+  }
+  for (let e = 0; e < edges.length; e++) {
+    const a=edges[e].s, b=edges[e].t;
+    let dx=pos[b*3]-pos[a*3], dy=pos[b*3+1]-pos[a*3+1], dz=pos[b*3+2]-pos[a*3+2];
+    const d=Math.hypot(dx,dy,dz)||1; const f=kSpr*(d-rest)*cooling;
+    dx/=d; dy/=d; dz/=d;
+    vel[a*3]+=dx*f; vel[a*3+1]+=dy*f; vel[a*3+2]+=dz*f;
+    vel[b*3]-=dx*f; vel[b*3+1]-=dy*f; vel[b*3+2]-=dz*f;
+  }
+  for (let i = 0; i < n*3; i++) pos[i]+=vel[i];
+  iters++; cooling = Math.max(0.05, 1 - iters/maxIters);
+}
+
+function syncMeshes() {
+  const n = nodes.length; if (!inst) return;
+  for (let i = 0; i < n; i++) {
+    const s = nodes[i].size;
+    tmpMat.makeScale(s,s,s); tmpMat.setPosition(pos[i*3], pos[i*3+1], pos[i*3+2]);
+    inst.setMatrixAt(i, tmpMat);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  const lp = lines.geometry.getAttribute("position");
+  for (let e = 0; e < edges.length; e++) {
+    const a=edges[e].s, b=edges[e].t;
+    lp.setXYZ(e*2, pos[a*3],pos[a*3+1],pos[a*3+2]); lp.setXYZ(e*2+1, pos[b*3],pos[b*3+1],pos[b*3+2]);
+  }
+  lp.needsUpdate = true;
+}
+
+// ---- labels (top-degree hubs + selected) ----
+function updateLabels() {
+  const layer = $("labels");
+  if (!showLabels || !nodes.length) { layer.innerHTML = ""; return; }
+  const top = nodes.map((d,i)=>({i,deg:d.deg})).sort((a,b)=>b.deg-a.deg).slice(0,12).map(x=>x.i);
+  const set = new Set(top); if (selected>=0) set.add(selected);
+  const v = new THREE.Vector3(); const w = canvas.clientWidth, h = canvas.clientHeight;
+  let html = "";
+  set.forEach(i => {
+    v.set(pos[i*3],pos[i*3+1],pos[i*3+2]).project(camera);
+    if (v.z>1) return;
+    const x=(v.x*0.5+0.5)*w, y=(-v.y*0.5+0.5)*h;
+    html += `<div class="lbl" style="left:${x}px;top:${y}px;${i===selected?'color:#ffd060;':''}">${nodes[i].label}</div>`;
+  });
+  layer.innerHTML = html;
+}
+
+// ---- picking ----
+const ray = new THREE.Raycaster(); const ptr = new THREE.Vector2();
+canvas.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || !inst) return;
+  const r = canvas.getBoundingClientRect();
+  ptr.x = ((e.clientX-r.left)/r.width)*2-1; ptr.y = -((e.clientY-r.top)/r.height)*2+1;
+  ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObject(inst);
+  if (hit.length) selectNode(hit[0].instanceId);
+});
+function selectNode(i) {
+  selected = i; const nd = nodes[i];
+  const ins = edges.filter(e=>e.t===i), outs = edges.filter(e=>e.s===i);
+  const nameList = (arr, dir) => arr.slice(0,8).map(e => (dir==="out"?"→ ":"← ") + nodes[dir==="out"?e.t:e.s].label + (e.etype?(" ("+e.etype+")"):"")).join("<br>");
+  $("info").style.display = "block";
+  $("info").innerHTML = `<b style="color:#ffd060">${nd.label}</b><br>type: ${nd.type} · community: ${nd.community} · degree: ${nd.deg}`
+    + (nd.path?`<br><span style="color:#9ab">${nd.path}</span>`:"")
+    + (outs.length?`<br><br><b>calls/imports:</b><br>${nameList(outs,"out")}`:"")
+    + (ins.length?`<br><br><b>used by:</b><br>${nameList(ins,"in")}`:"");
+  // highlight edges
+  const rel = edges.filter(e=>e.s===i||e.t===i);
+  const hp = new Float32Array(rel.length*6);
+  rel.forEach((e,k)=>{ hp[k*6]=pos[e.s*3];hp[k*6+1]=pos[e.s*3+1];hp[k*6+2]=pos[e.s*3+2];hp[k*6+3]=pos[e.t*3];hp[k*6+4]=pos[e.t*3+1];hp[k*6+5]=pos[e.t*3+2]; });
+  hiLines.geometry.dispose();
+  hiLines.geometry = new THREE.BufferGeometry();
+  hiLines.geometry.setAttribute("position", new THREE.BufferAttribute(hp,3));
+  hiLines.userData.rel = rel;
+}
+
+// ---- loaders ----
+async function loadText(text, label) {
+  try { msg("parsing " + (label||"graph") + " …"); buildGraph(parseGraphML(text)); }
+  catch (e) { msg("parse failed: " + (e?.message||e)); console.error(e); }
+}
+async function loadUrl(u) { if(!u) return; try { const r=await fetch(u); if(!r.ok) throw new Error("HTTP "+r.status); await loadText(await r.text(), u.split("/").pop()); } catch(e){ msg("fetch failed: "+(e?.message||e)); } }
+
+// ---- loop ----
+function tick() {
+  requestAnimationFrame(tick);
+  if (nodes.length) {
+    if (iters < maxIters) { stepLayout(); if (iters>=maxIters) msg("layout settled — " + nodes.length + " nodes"); }
+    syncMeshes();
+    if (selected>=0 && hiLines) { // keep highlight following the sim
+      const rel = hiLines.userData.rel||[]; const hp=hiLines.geometry.getAttribute("position");
+      if (hp) { rel.forEach((e,k)=>{ hp.setXYZ(k*2,pos[e.s*3],pos[e.s*3+1],pos[e.s*3+2]); hp.setXYZ(k*2+1,pos[e.t*3],pos[e.t*3+1],pos[e.t*3+2]); }); hp.needsUpdate=true; }
+    }
+    updateLabels();
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+tick();
+
+// ---- controls ----
+$("file").addEventListener("change", async (e)=>{ const f=e.target.files?.[0]; if(!f) return; await loadText(await f.text(), f.name); });
+$("btnUrl").addEventListener("click", ()=>loadUrl($("url").value.trim()));
+$("btnSample").addEventListener("click", ()=>loadUrl("/graphify-sample.graphml"));
+$("btnLabels").addEventListener("click", ()=>{ showLabels=!showLabels; $("btnLabels").style.opacity=showLabels?"1":"0.55"; if(!showLabels) $("labels").innerHTML=""; });
+$("btnRestart").addEventListener("click", ()=>{ if(nodes.length){ const p=parseGraphML; iters=0; cooling=1; const n=nodes.length; const R=Math.cbrt(n)*26+40; for(let i=0;i<n;i++){const u=Math.random()*2-1,th=Math.random()*Math.PI*2,r=R*Math.cbrt(Math.random()),s=Math.sqrt(1-u*u);pos[i*3]=r*s*Math.cos(th);pos[i*3+1]=r*s*Math.sin(th);pos[i*3+2]=r*u;} msg("re-laying out…"); } });
+
+// ---- boot ----
+const q = new URLSearchParams(location.search);
+if (q.get("src")) { $("url").value=q.get("src"); loadUrl(q.get("src")); }
+else { msg("Load a Graphify .graphml (run graphify on the engine → graphify-out/), or tap 📊 Sample."); }
+</script>
+</body>
+</html>

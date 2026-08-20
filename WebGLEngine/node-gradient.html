@@ -1,0 +1,108 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The third declaration, and the fourth hiding inside it (v3639)</title>
+<meta name="demo:desc" content="Node-based Green-Gauss is supposed to be the linearity-preserving one - and it is, but only with a linearity-preserving node interpolation. With inverse-distance node values it is 15x better and still not exact, and at a boundary it reads 32% on a mesh with no shear at all.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:180px}
+ select{background:#0c1018;color:#d5dcea;border:1px solid #2e3c5a;padding:3px 6px;font:inherit}
+</style></head><body><div id="w">
+<h1>The third declaration &mdash; and the fourth hiding inside it</h1>
+<div class="sub">The previous round found cell-based Green&ndash;Gauss consistent but never exact on a skewed mesh.
+The standard answer is <b>node-based</b> Green&ndash;Gauss: read the face value from its two endpoint <b>nodes</b>,
+which lie <i>on</i> the face, instead of from two centroids which do not.</div>
+<div class="law"><b>But a node of a cell-average field has no value until somebody invents one</b>, and that is a
+fourth declaration nobody names. "Node-based Green&ndash;Gauss is linearity-preserving" turns out to be a claim
+about the <b>node interpolation</b> and not about Green&ndash;Gauss at all.</div>
+<h2>1. Four spellings of "the gradient"</h2>
+<div class="panel">
+  <div class="row">
+    <label>shear <input id="skew" type="range" min="0" max="0.4" step="0.05" value="0.25"></label>
+    <span id="sv" class="dim"></span>
+    <label>interior <select id="flt">
+      <option value="strict">strict &mdash; exclude cells touching a boundary NODE</option>
+      <option value="loose">loose &mdash; exclude cells with a boundary FACE</option></select></label>
+    <button id="go" class="good">check the exact key</button></div>
+  <table id="t"></table>
+</div>
+<div class="law"><b>With a least-squares node value it is exact at every skew.</b> With inverse-distance node
+values it is about <b>15&times; better than cell-based</b> and still five orders above exact &mdash; an
+inverse-distance mean reproduces a linear field only if the surrounding cells are <b>symmetric about the node</b>,
+which a regular mesh's interior is and a sheared one is not.</div>
+<h2>2. The filter itself was the finding</h2>
+<div class="panel"><button id="filt" class="good">compare the two interior filters</button><table id="t2"></table></div>
+<div class="law"><b>What counts as "interior" depends on what the scheme reads, not on what the cell has.</b> My
+first filter used the neighbour count &mdash; three faces, three neighbours, interior. But a node-based scheme reads
+its values from the <b>nodes</b>, so a cell with three interior faces can still be fed a value invented at a
+boundary vertex from a one-sided stencil. Under the loose filter, inverse-distance reads <b>32% on a mesh with no
+shear at all</b>; under the strict one, 1.57e-14. <b>Fourteen orders, entirely from which cells were called
+interior.</b></div>
+<div class="law">The cell-based schemes never notice, because they never look at a node &mdash; which is exactly why
+this could sit in the fixture through the previous round without anything going red. And the least-squares node
+value is <b>unaffected</b> by the filter: a one-sided stencil is a fine stencil for a plane fit and a terrible one
+for a distance-weighted mean. <b>The two node interpolations differ by thirteen orders at the boundary and are
+indistinguishable in the interior.</b></div>
+<div class="law">Graded by <code>physics/mesh/nodeGradient-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. On a smooth field all four are second order and spread
+by a third &mdash; second round running that <b>a convergence study cannot see the thing that matters</b>. Related:
+<a href="/gradient-join.html" style="color:#9ab6e8">two gradients</a>,
+<a href="/tri-limiter.html" style="color:#9ab6e8">triangle limiter</a>.</div>
+<script type="module">
+import { makeTriMesh, analyticCells, gradientLS, gradientGG, gradientGGNode,
+         linearityError, boundaryTouching, accuracy } from "/physics/mesh/triReconstruct.mjs";
+const $ = (i) => document.getElementById(i);
+const GGs = (u, m) => gradientGG(u, m, { weighting: "simple" });
+const GNi = (u, m) => gradientGGNode(u, m, { nodeMode: "idw" });
+const GNl = (u, m) => gradientGGNode(u, m, { nodeMode: "ls" });
+const F = (x, y) => Math.exp(-((x - 10) ** 2 + (y - 10) ** 2) / 18);
+const MESH = (s, n = 24) => makeTriMesh({ nx: n, ny: n, h: 20 / n, skew: s });
+const NAMED = [["least-squares", gradientLS], ["Green-Gauss, cell", GGs],
+               ["Green-Gauss, node / inverse-distance", GNi], ["Green-Gauss, node / least-squares", GNl]];
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const tone = (v) => v < 1e-12 ? "ok" : (v < 1e-2 ? "warn" : "bad");
+$("skew").oninput = () => { $("sv").textContent = (+$("skew").value).toFixed(2); };
+$("skew").oninput();
+$("go").onclick = () => {
+    const m = MESH(+$("skew").value), strict = $("flt").value === "strict";
+    rows($("t"), ["gradient", "relative error on a LINEAR field", "verdict"], NAMED.map(([name, G]) => {
+        const v = linearityError(m, { grad: G, strictInterior: strict });
+        return [name, "<span class='" + tone(v) + "'>" + v.toExponential(3) + "</span>",
+            v < 1e-12 ? "exact" : (v < 1e-2 ? "consistent, not exact" : "boundary contamination")];
+    }));
+};
+$("filt").onclick = () => {
+    const m = MESH(0), bt = boundaryTouching(m);
+    let touching = 0; for (const v of bt) touching += v;
+    const out = NAMED.map(([name, G]) => {
+        const loose = linearityError(m, { grad: G, strictInterior: false });
+        const strict = linearityError(m, { grad: G });
+        return [name, "<span class='" + tone(loose) + "'>" + loose.toExponential(3) + "</span>",
+            "<span class='" + tone(strict) + "'>" + strict.toExponential(3) + "</span>",
+            loose / Math.max(strict, 1e-300) > 100 ? "<span class='bad'>the filter decided the answer</span>"
+                : "<span class='ok'>unaffected</span>"];
+    });
+    const smooth = NAMED.map(([name, G]) => {
+        const errs = [12, 24, 48].map((n) => { const mm = MESH(0.25, n); const u = analyticCells(F, mm); return accuracy(F, mm, u, G(u, mm)); });
+        return [name + " &mdash; smooth field", errs.map((e) => e.toExponential(2)).join(" "),
+            "order " + Math.log2(errs[1] / errs[2]).toFixed(2), "<span class='dim'>indistinguishable</span>"];
+    });
+    out.push(["cells touching a boundary NODE", touching + " of " + m.tri.length, "&mdash;",
+        "<span class='dim'>cells with a boundary FACE are fewer</span>"]);
+    rows($("t2"), ["gradient (regular mesh, no shear)", "loose filter", "strict filter", "note"], out.concat(smooth));
+};
+</script>
+</div></body></html>

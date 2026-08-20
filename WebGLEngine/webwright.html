@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Webwright + scraper skills">
+<meta name="demo:desc" content="Install/detect Webwright; store and run re-runnable Camoufox scrapers as skills. PC bridge.">
+<meta name="demo:cats" content="tool">
+<title>Webwright — scraper authoring &amp; skills</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:9px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:14px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { max-width:920px; margin:0 auto; padding:14px; }
+  .note { font-size:11px; color:var(--dim); line-height:1.5; margin:0 0 12px; } .note a { color:var(--blue); } .note code { color:var(--amber); }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:18px 0 7px; }
+  input[type=text], textarea { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px 10px; font:12px ui-monospace,monospace; width:100%; }
+  textarea { resize:vertical; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:7px 12px; font:12px ui-monospace,monospace; cursor:pointer; white-space:nowrap; }
+  .btn:disabled { opacity:.45; cursor:default; } .btn.danger { color:var(--bad); border-color:#5a2330; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px; }
+  .card { background:var(--panel); border:1px solid #14304a; border-left-width:4px; border-radius:6px 6px 6px 14px; padding:9px 11px; }
+  .card.ok { border-left-color:var(--good); } .card.no { border-left-color:#5a2330; }
+  .card .k { font-size:10px; color:var(--dim); text-transform:uppercase; } .card .v { font-size:13px; margin-top:3px; word-break:break-all; }
+  .steps, .skills { display:flex; flex-direction:column; gap:8px; }
+  .step, .skill { display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid #14304a; border-radius:6px; padding:9px 11px; }
+  .step .t, .skill .t { flex:1; } .step .t b, .skill .t b { font-size:13px; } .step .t .d, .skill .t .d { font-size:11px; color:var(--dim); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  #out { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:10px; margin-top:8px; max-height:42vh; overflow:auto; }
+  #out pre { margin:0; white-space:pre-wrap; word-break:break-word; font-size:11px; color:#bcd; }
+  .gate { font-size:11px; color:var(--amber); }
+</style>
+</head>
+<body>
+<div id="bar"><h1>🛠 Webwright</h1><span id="status">…</span></div>
+<div class="wrap">
+  <p class="note">Webwright writes re-runnable Playwright scrapers for you, then you keep them here as <b>skills</b> and run them against Camoufox forever. Shares the Camoufox venv. <a href="/camoufox.html">Camoufox install →</a> · <a href="/scrape.html">scrape console →</a></p>
+
+  <div class="row"><button class="btn" id="redetect">↻ Detect</button></div>
+  <div class="ttl">Status</div>
+  <div class="cards" id="cards"></div>
+
+  <div class="ttl">Install (shares the Camoufox venv · idempotent)</div>
+  <div class="steps">
+    <div class="step"><div class="t"><b>1 · Clone Webwright</b><div class="d">git clone microsoft/Webwright</div></div><button class="btn" data-step="clone">Run</button></div>
+    <div class="step"><div class="t"><b>2 · Install deps</b><div class="d">pip install -e (into the venv)</div></div><button class="btn" data-step="deps">Run</button></div>
+    <div class="step"><div class="t"><b>3 · Install browser</b><div class="d">playwright install chromium (Webwright's default browser)</div></div><button class="btn" data-step="browser">Run</button></div>
+  </div>
+
+  <div class="ttl">Skill library</div>
+  <div class="skills" id="skills"></div>
+  <div class="row" style="margin-top:8px"><input type="text" id="runArgs" placeholder="run args, e.g.  --url https://example.com"><button class="btn" id="runBtn">Run selected ▸</button><span id="runName" class="gate"></span></div>
+  <div id="out"><pre>Select a skill and Run, or save one below.</pre></div>
+
+  <div class="ttl">Save a scraper as a skill</div>
+  <div class="row" style="margin-bottom:6px"><input type="text" id="saveName" placeholder="skill_name (A-Za-z0-9_-)"></div>
+  <textarea id="saveCode" rows="5" placeholder="# paste a Python Playwright/Camoufox scraper (print one final JSON line)"></textarea>
+  <div class="row" style="margin-top:6px"><button class="btn" id="saveBtn">Save skill</button></div>
+
+  <div class="ttl">Model backend key (stored on THIS machine only)</div>
+  <div class="row">
+    <select id="kProvider" style="background:#04070d;color:var(--text);border:1px solid var(--edge);border-radius:6px;padding:7px"><option value="openrouter">OpenRouter</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select>
+    <input type="text" id="kKey" placeholder="paste API key" style="flex:2">
+    <input type="text" id="kModel" placeholder="model (optional)" style="flex:1">
+    <button class="btn" id="kSave">Save key</button>
+  </div>
+  <p class="note">OpenRouter is the free-to-start path: openrouter.ai (no card), make a key, pick a <code>:free</code> model. Keys save to ~/.voxelbridge/ outside the project, so packaging the engine for other admins never leaks your key.</p>
+
+  <div class="ttl">Craft with Webwright (agentic — needs a model key)</div>
+  <div class="row" style="margin-bottom:6px"><input type="text" id="craftTask" placeholder="describe the scrape, e.g. 'get lost-pet rows from petfbi.org/found'"></div>
+  <div class="row"><input type="text" id="craftUrl" placeholder="start URL (optional)" style="flex:2"><input type="text" id="craftName" placeholder="skill name (optional)" style="flex:1"><button class="btn" id="craftBtn">Craft</button></div>
+  <p class="note" id="craftNote"></p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let SELECTED = null;
+function out(s) { $("out").innerHTML = "<pre></pre>"; $("out").firstChild.textContent = (typeof s === "string" ? s : JSON.stringify(s, null, 2)); }
+function busy(b) { document.querySelectorAll(".btn").forEach(x => x.disabled = b); }
+function card(k, ok, v) { return `<div class="card ${ok ? "ok" : "no"}"><div class="k">${k}</div><div class="v">${ok ? "🟢" : "🔴"} ${v}</div></div>`; }
+
+async function detect() {
+  $("status").textContent = "detecting…"; busy(true);
+  let d; try { d = await fetch("/webwright/detect", { cache: "no-store" }).then(r => r.json()); } catch { $("status").textContent = "bridge offline"; busy(false); return; }
+  const vv = d.venv || {}, ww = d.webwright || {}, bk = d.backend || {};
+  $("cards").innerHTML =
+    card("Camoufox venv", !!vv.exists, vv.exists ? "present" : "missing") +
+    card("Webwright", !!ww.installed, ww.installed ? ("v" + (ww.version || "?")) : (vv.exists ? (ww.error || "not installed") : "—")) +
+    card("Model backend", !!bk.configured, bk.configured ? bk.provider : "no key") +
+    card("Skills", true, (d.skillCount || 0) + " saved") +
+    card("Ready", !!d.ready, d.ready ? "yes" : "no");
+  $("status").textContent = d.ready ? "ready" : "incomplete";
+  $("craftNote").textContent = bk.configured ? "Craft runs Webwright with your model key; set WEBWRIGHT_CRAFT_CMD once you confirm its CLI. It writes final_script.py — save that as a skill." : "Set ANTHROPIC_API_KEY / OPENAI_API_KEY (or a .env in the Webwright dir) to enable Craft.";
+  busy(false); loadSkills();
+}
+async function loadSkills() {
+  let j; try { j = await fetch("/webwright/skills").then(r => r.json()); } catch { return; }
+  const box = $("skills"); box.innerHTML = "";
+  const skills = (j && j.skills) || [];
+  if (!skills.length) { box.innerHTML = '<div class="note">No skills yet. Save one below, or craft one.</div>'; return; }
+  for (const s of skills) {
+    const el = document.createElement("div"); el.className = "skill";
+    el.innerHTML = `<div class="t"><b>${s.name}</b><div class="d">${s.task || ""}${s.params && s.params.length ? " · args: " + s.params.map(p => p.name).join(" ") : ""}</div></div>`;
+    const sel = document.createElement("button"); sel.className = "btn"; sel.textContent = "Select"; sel.onclick = () => { SELECTED = s.name; $("runName").textContent = "▸ " + s.name; };
+    const view = document.createElement("button"); view.className = "btn"; view.textContent = "View"; view.onclick = async () => { const r = await fetch("/webwright/skills/get", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: s.name }) }).then(x => x.json()); out(r.code || r.error || ""); };
+    const del = document.createElement("button"); del.className = "btn danger"; del.textContent = "🗑"; del.onclick = async () => { if (!confirm("Delete skill '" + s.name + "'?")) return; await fetch("/webwright/skills/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: s.name }) }); if (SELECTED === s.name) { SELECTED = null; $("runName").textContent = ""; } loadSkills(); };
+    el.append(sel, view, del); box.appendChild(el);
+  }
+}
+async function post(op, body) { return fetch("/webwright/" + op, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }).then(r => r.json()); }
+
+document.querySelectorAll(".step .btn").forEach(b => b.onclick = async () => { busy(true); out("▶ " + b.closest(".step").querySelector("b").textContent + " …"); const r = await post("install", { step: b.dataset.step }).catch(e => ({ ok: false, error: String(e) })); out(r.skipped ? (r.stdout || "skipped") : (r.ok ? "✓ done\n" + (r.stdout || "").trim().split("\n").slice(-8).join("\n") : "✕ " + (r.error || ("exit " + r.code)) + "\n" + (r.stderr || "").trim().split("\n").slice(-10).join("\n"))); detect(); });
+$("redetect").onclick = detect;
+$("runBtn").onclick = async () => { if (!SELECTED) { out("Select a skill first."); return; } busy(true); const args = $("runArgs").value.trim() ? $("runArgs").value.trim().split(/\s+/) : []; out("▶ running " + SELECTED + " …"); const r = await post("skills/run", { name: SELECTED, args }).catch(e => ({ ok: false, error: String(e) })); out(r.result != null ? r.result : (r.ok ? (r.stdout || "(no output)") : ("✕ " + (r.error || ("exit " + r.exitCode)) + "\n" + (r.stderr || "")))); busy(false); };
+$("saveBtn").onclick = async () => { const name = $("saveName").value.trim(), code = $("saveCode").value; if (!name || !code.trim()) { out("Need a name and code."); return; } const r = await post("skills/save", { name, code, meta: { task: "saved from panel" } }); out(r.ok ? "✓ saved '" + r.name + "'" : "✕ " + r.error); if (r.ok) { $("saveName").value = ""; $("saveCode").value = ""; loadSkills(); } };
+$("craftBtn").onclick = async () => { const task = $("craftTask").value.trim(); if (!task) return; busy(true); out("▶ crafting with Webwright — this runs the agent and can take a few minutes …"); const r = await post("craft", { task, startUrl: $("craftUrl").value.trim() || undefined, name: $("craftName").value.trim() || undefined }).catch(e => ({ ok: false, error: String(e) })); out(r.ok ? ("✓ crafted + saved skill '" + r.savedSkill + "'\n" + (r.stdout || "").slice(-1500)) : ("✕ " + (r.error || "failed") + "\n" + (r.stderr || "").slice(-1500))); busy(false); loadSkills(); };
+
+$("kSave").onclick = async () => { const key=$("kKey").value.trim(); if(!key){ out("paste a key first"); return; } const r=await post("setkey",{provider:$("kProvider").value, key, model:$("kModel").value.trim()||undefined}); out(r.ok?("key saved for "+r.provider+" on this machine"):("error: "+r.error)); if(r.ok){ $("kKey").value=""; detect(); } };
+detect();
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSIM Compare &mdash; the local map, and what a whole-image number cannot say</title>
+<meta name="demo:desc" content="Two images side by side with the global SSIM, the windowed mean and the WORST WINDOW, plus the local SSIM map drawn as a heatmap with the worst window marked. Drop in two real renders, or use the built-in local-defect demonstration.">
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --go:#9fe6c0; --warn:#ffcc66; --bad:#ff8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0 0 4px; color:var(--go); }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:1100px; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; }
+  .card h2 { margin:0 0 8px; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.6; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  .pane { display:flex; flex-direction:column; gap:4px; }
+  .pane b { font-size:11px; color:var(--dim); font-weight:400; }
+  canvas { background:#070b10; border:1px solid var(--line); border-radius:6px; display:block; image-rendering:pixelated; }
+  button, select, input[type=file] { background:#132033; color:var(--ink); border:1px solid #2a3a52; border-radius:6px;
+           padding:4px 10px; font:inherit; font-size:11px; cursor:pointer; }
+  button:hover { border-color:#3d5a80; }
+  table { border-collapse:collapse; font-size:12px; }
+  td, th { border:1px solid var(--line); padding:4px 10px; text-align:left; }
+  th { color:var(--dim); font-weight:400; }
+  .big { font-size:15px; }
+  .ok { color:var(--go); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  code { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128200; SSIM Compare &mdash; the local map, and what a whole-image number cannot say</h1>
+  <div class="hint">
+    render/perceptual.mjs's <code>ssim()</code> is the <b>global</b> form: one window over the whole image.
+    render/ssimWindowed.mjs is SSIM as Wang et al. define it &mdash; an 11&times;11 Gaussian window slid across the
+    image, producing a <b>local map</b>. This page runs both on the same pair and draws the map.
+  </div>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Input</h2>
+    <div class="row">
+      <div class="pane">
+        <b>built-in demonstration &mdash; a local defect of the size you choose</b>
+        <div class="row">
+          <select id="size">
+            <option value="8">8&times;8 corner inverted (0.10% of pixels)</option>
+            <option value="16">16&times;16 (0.39%)</option>
+            <option value="32" selected>32&times;32 (1.56%)</option>
+            <option value="64">64&times;64 (6.25%)</option>
+          </select>
+          <button id="run">Run the demonstration</button>
+        </div>
+      </div>
+      <div class="pane">
+        <b>or two real renders &mdash; they must be the same size</b>
+        <div class="row">
+          <input type="file" id="fA" accept="image/*">
+          <input type="file" id="fB" accept="image/*">
+        </div>
+      </div>
+    </div>
+    <div class="hint" id="msg" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>The two images, and the map</h2>
+    <div class="row">
+      <div class="pane"><b>A &mdash; reference</b><canvas id="cA" width="256" height="256"></canvas></div>
+      <div class="pane"><b>B &mdash; candidate</b><canvas id="cB" width="256" height="256"></canvas></div>
+      <div class="pane">
+        <b>local SSIM map &mdash; dark is disagreement, the box is the worst window</b>
+        <canvas id="cM" width="256" height="256"></canvas>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:8px;">
+      <b>THE MAP IS THE POINT.</b> The two numbers above it are both whole-image statistics and neither can say
+      <i>where</i>. A metric that says where turns a red gate into a fixable bug report, which is the whole reason
+      the module returns the map and its minimum rather than just the mean.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What the three numbers say</h2>
+    <table id="nums"></table>
+    <div class="hint" style="margin-top:10px;">
+      <b>READ THE MEAN AND THE GLOBAL FIGURE AS THE SAME KIND OF THING.</b> That is the finding this page exists
+      to show: on a small local defect the windowed <i>mean</i> is nearly as blind as the global form, because
+      averaging a local map over an image is still an average over the image. Switching a gate from one to the
+      other would buy almost nothing. <b>The worst window is what sees it</b>, and it is the number that would
+      start failing renders that pass today &mdash; which is why no gate has been switched to it yet.
+      <br><br>
+      <b>NOT SHOWN HERE:</b> whether the worst window is the right threshold for <i>your</i> renders. A single bad
+      window can be a real defect or one legitimately noisy corner, and this page deliberately does not pick a
+      cutoff &mdash; it shows you the distribution and where the worst one is, and the decision stays yours.
+    </div>
+  </div>
+
+</main>
+<script type="module">
+import { ssim } from "/render/perceptual.mjs";
+import { ssimWindowed } from "/render/ssimWindowed.mjs";
+
+const $ = (id) => document.getElementById(id);
+const W = 256, H = 256;
+const base = (x, y) => 128 + 100 * Math.sin(x / 9) * Math.cos(y / 11);
+
+function synth(f) {
+  const d = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = f(x, y), i = (y * W + x) * 4;
+    d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+  }
+  return { data: d, width: W, height: H };
+}
+
+function paint(canvas, img) {
+  canvas.width = img.width; canvas.height = img.height;
+  canvas.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+}
+
+// The map is drawn on the SAME scale every time -- SSIM runs to 1 and can go NEGATIVE, so the ramp is fixed at
+// [-1, 1] rather than normalised to whatever this pair happened to produce. AUTO-SCALING WOULD MAKE A CLEAN
+// COMPARISON LOOK AS ALARMING AS A BROKEN ONE, which is the opposite of what a person reads a heatmap for.
+function paintMap(canvas, r) {
+  canvas.width = r.w; canvas.height = r.h;
+  const g = canvas.getContext("2d"), out = g.createImageData(r.w, r.h);
+  for (let i = 0; i < r.map.length; i++) {
+    const t = Math.max(0, Math.min(1, (r.map[i] + 1) / 2));   // -1..1 -> 0..1
+    const p = i * 4;
+    out.data[p] = Math.round(255 * (1 - t));          // red where it disagrees
+    out.data[p + 1] = Math.round(230 * t);
+    out.data[p + 2] = Math.round(160 * t);
+    out.data[p + 3] = 255;
+  }
+  g.putImageData(out, 0, 0);
+  g.strokeStyle = "#ffffff"; g.lineWidth = 1;
+  g.strokeRect(r.minAt.x - 6.5, r.minAt.y - 6.5, 13, 13);     // the 11x11 window, plus a pixel each side
+}
+
+function report(a, b) {
+  let r;
+  try { r = ssimWindowed(a, b); }
+  catch (e) { $("msg").innerHTML = "<span class='bad'>" + e.message + "</span>"; return; }
+  const gl = ssim(a, b);
+  paintMap($("cM"), r);
+  const cls = (v) => v > 0.99 ? "warn" : (v < 0.5 ? "bad" : "");
+  $("nums").innerHTML =
+    "<tr><th>measure</th><th>value</th><th>what it can and cannot see</th></tr>" +
+    "<tr><td>global ssim()</td><td class='big " + cls(gl) + "'>" + gl.toFixed(5) + "</td>" +
+      "<td>one window over the whole image &mdash; blind to anything small</td></tr>" +
+    "<tr><td>windowed MEAN</td><td class='big " + cls(r.mssim) + "'>" + r.mssim.toFixed(5) + "</td>" +
+      "<td>the paper's reported figure, and still an average over the image</td></tr>" +
+    "<tr><td>WORST WINDOW</td><td class='big " + (r.min < 0.5 ? "bad" : "ok") + "'>" + r.min.toFixed(4) + "</td>" +
+      "<td>at (" + r.minAt.x + ", " + r.minAt.y + ") &mdash; the only one of the three that says <b>where</b></td></tr>";
+}
+
+function runDemo() {
+  const s = Number($("size").value);
+  const A = synth(base);
+  const B = synth((x, y) => (x < s && y < s) ? 255 - base(x, y) : base(x, y));
+  paint($("cA"), A); paint($("cB"), B);
+  $("msg").textContent = "Built-in pair: a " + s + "\u00d7" + s + " corner of a 256\u00d7256 render, inverted (" +
+    ((s * s / (W * H)) * 100).toFixed(2) + "% of the pixels).";
+  report(A, B);
+}
+
+// A real render arrives as a file. THE SIZE CHECK IS THE MODULE'S, NOT A SECOND ONE HERE: ssimWindowed throws on
+// a mismatch and the message is shown as-is, so there is one rule about what is comparable.
+const loaded = {};
+async function fileToImg(file) {
+  const bmp = await createImageBitmap(file);
+  const c = document.createElement("canvas");
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext("2d").drawImage(bmp, 0, 0);
+  const d = c.getContext("2d").getImageData(0, 0, bmp.width, bmp.height);
+  return { data: d.data, width: bmp.width, height: bmp.height };
+}
+async function pick(which, input, canvas) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  try { loaded[which] = await fileToImg(f); } 
+  catch (e) { $("msg").innerHTML = "<span class='bad'>could not read that image: " + e.message + "</span>"; return; }
+  paint(canvas, loaded[which]);
+  if (loaded.A && loaded.B) { $("msg").textContent = "Comparing your two images."; report(loaded.A, loaded.B); }
+  else $("msg").textContent = "Loaded " + which + ". Pick the other one to compare.";
+}
+$("fA").onchange = () => pick("A", $("fA"), $("cA"));
+$("fB").onchange = () => pick("B", $("fB"), $("cB"));
+$("run").onclick = runDemo;
+$("size").onchange = runDemo;
+runDemo();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Splat Lab - Gaussian splatting, graded</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:960px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}
+  .sub{color:#6f8a7c;margin-bottom:16px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;margin-bottom:14px}
+  h2{font-size:14px;margin:0 0 6px;color:#9fe8c0}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22}
+  th{color:#6f8a7c;font-weight:normal}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:#7fe0a4}.warn{color:#e6c877}.hot{color:#f28b8b}.dim{color:#6f8a7c}
+  canvas{background:#070b09;border:1px solid #1a2a22;display:block}
+  /* v2872 -- the plot fills the page. This canvas is a DRAWING rather than a lattice, so it is scaled
+     by CSS with aspect-ratio held: the backing store keeps its own resolution and the lines stay in
+     proportion. (A field page would use pixelated here; a curve must not.) */
+  canvas { width: 100%; max-width: 520px; height: auto; display: block; }
+  label{margin-right:12px}
+  input[type=range]{vertical-align:middle}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Splat Lab</h1>
+  <div class="sub">3D Gaussian splatting graded against closed forms. This is not a viewer and loads no capture:
+    a splat cloud is <i>supposed</i> to differ from the surface it approximates, so the render is not gradeable &mdash;
+    but the projection and compositing arithmetic have exact answers, and those are what is measured here.</div>
+
+  <div class="card">
+    <h2>The projected splat</h2>
+    <div class="dim">A 3D Gaussian projected through the perspective Jacobian. Move it off-axis and watch the
+      <b>shear</b> tilt it &mdash; that term is exactly zero on the view axis, which is why an implementation that
+      omits it looks perfect until something leaves the middle of the screen.</div>
+    <div style="margin-top:8px">
+      <label>off-axis x <input id="ox" type="range" min="0" max="3" step="0.05" value="1.2"></label>
+      <label>depth z <input id="oz" type="range" min="2" max="12" step="0.1" value="5"></label>
+      <label><input id="shear" type="checkbox" checked> perspective shear</label>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px">
+      <canvas id="cv" width="320" height="320"></canvas>
+      <div style="flex:1;min-width:260px"><table id="projTbl"></table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Exact keys</h2>
+    <div class="dim">Each row is a closed form the code is never told. Computed live in your browser.</div>
+    <table id="keys"></table>
+  </div>
+
+  <div class="card">
+    <h2>Order dependence &mdash; the load-bearing negative</h2>
+    <div class="dim">Compositing is a product of transmittances for alpha and a weighted sum for colour. So the
+      accumulated alpha <b>cannot</b> care about order, and the colour <b>must</b>. A renderer whose depth sort
+      does nothing passes the first test and fails the second.</div>
+    <table id="order"></table>
+  </div>
+</div>
+
+<script type="module">
+import {
+  covarianceFromScaleRot, projectCovariance, eigen2, det2, gaussian2DIntegral, rasteriseIntegral,
+  compositeFrontToBack, accumulatedAlpha, areaDepthSlope, areaScale, rotZ, depthOrder
+} from "./physics/splat/gaussianSplat.js";
+
+const $ = (id) => document.getElementById(id);
+const I3 = [1,0,0,0,1,0,0,0,1];
+const f = 800;
+const AN = covarianceFromScaleRot([0.22,0.06,0.06], {x:0,y:0,z:Math.sin(0.35),w:Math.cos(0.35)});
+
+function drawEllipse(S2) {
+  const cv = $("cv"), g = cv.getContext("2d");
+  g.clearRect(0,0,cv.width,cv.height);
+  g.strokeStyle = "#1a2a22";
+  g.beginPath(); g.moveTo(cv.width/2,0); g.lineTo(cv.width/2,cv.height);
+  g.moveTo(0,cv.height/2); g.lineTo(cv.width,cv.height/2); g.stroke();
+  // draw the 1-sigma contour of the 2D Gaussian by walking the unit circle through the covariance's sqrt
+  const [l1,l2] = eigen2(S2);
+  // eigenvector of the largest eigenvalue
+  let vx = S2.xy, vy = l1 - S2.xx;
+  if (Math.abs(vx) < 1e-15 && Math.abs(vy) < 1e-15) { vx = 1; vy = 0; }
+  const n = Math.hypot(vx,vy); vx/=n; vy/=n;
+  const a = Math.sqrt(Math.max(l1,0)), b = Math.sqrt(Math.max(l2,0));
+  const scale = 2.2;
+  g.strokeStyle = "#7fe0a4"; g.lineWidth = 1.5; g.beginPath();
+  for (let i=0;i<=180;i++){
+    const t = i/180*2*Math.PI;
+    const ux = a*Math.cos(t), uy = b*Math.sin(t);
+    const x = ux*vx - uy*vy, y = ux*vy + uy*vx;
+    const px = cv.width/2 + x*scale, py = cv.height/2 - y*scale;
+    i ? g.lineTo(px,py) : g.moveTo(px,py);
+  }
+  g.closePath(); g.stroke();
+}
+
+function refresh() {
+  const x = parseFloat($("ox").value), z = parseFloat($("oz").value), shear = $("shear").checked;
+  const t = [x, 0, z];
+  const S2 = projectCovariance(AN, I3, t, f, { shear });
+  const full = projectCovariance(AN, I3, t, f, { shear: true });
+  drawEllipse(S2);
+  const [l1,l2] = eigen2(S2);
+  const drift = Math.abs(areaScale(S2)-areaScale(full))/areaScale(full);
+  $("projTbl").innerHTML =
+    row("off-axis x", x.toFixed(2)) + row("depth z", z.toFixed(1)) +
+    row("eigenvalues", l1.toPrecision(6)+" / "+l2.toPrecision(6)) +
+    row("axis ratio", (l1/l2).toFixed(3)) +
+    row("area scale", areaScale(S2).toPrecision(8)) +
+    row("integral 2&pi;&radic;det", gaussian2DIntegral(S2).toPrecision(8)) +
+    (shear ? '' : '<tr><td colspan="2" class="'+(drift<1e-12?'warn':'hot')+'">shear OFF: area differs by '
+      + (100*drift).toFixed(4) + '% ' + (drift<1e-12 ? '&mdash; on the axis the bug is INVISIBLE' : '&mdash; off-axis it shows') + '</td></tr>');
+}
+const row = (k,v) => '<tr><td class="dim">'+k+'</td><td class="num">'+v+'</td></tr>';
+
+function keys() {
+  const S2 = projectCovariance(covarianceFromScaleRot([0.1,0.1,0.1],{x:0,y:0,z:0,w:1}), I3, [0,0,5], f);
+  const exact = gaussian2DIntegral(S2), num = rasteriseIntegral(S2,{n:256,radius:8});
+  const slope = areaDepthSlope([2,3,5,8,13,21]);
+  const iso = covarianceFromScaleRot([0.1,0.1,0.1],{x:0,y:0,z:0,w:1});
+  const base = projectCovariance(iso,I3,[0,0,5],f);
+  let roll = 0;
+  for (const th of [0.3,1.1,2.7]) { const S = projectCovariance(iso,rotZ(th),[0,0,5],f);
+    roll = Math.max(roll, Math.abs(S.xx-base.xx), Math.abs(S.yy-base.yy), Math.abs(S.xy-base.xy)); }
+  const a=0.3,N=7, comp = compositeFrontToBack(Array.from({length:N},()=>({alpha:a,color:[1,1,1]})));
+  const rows = [
+    ["rasterised integral / 2&pi;&radic;det", (num/exact).toFixed(9), "1.000000000", Math.abs(num/exact-1)<1e-6],
+    ["log-area vs log-depth slope", slope.toPrecision(15), "-2 exactly", Math.abs(slope+2)<1e-12],
+    ["isotropic under camera roll", roll.toExponential(2), "0 exactly", roll<1e-12],
+    ["alpha of "+N+" splats at a="+a, comp.alpha.toPrecision(15), accumulatedAlpha(a,N).toPrecision(15), Math.abs(comp.alpha-accumulatedAlpha(a,N))<1e-14],
+  ];
+  $("keys").innerHTML = '<tr><th>quantity</th><th>measured</th><th>closed form</th><th></th></tr>' +
+    rows.map(r => '<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td><td class="num dim">'+r[2]+'</td><td class="'+(r[3]?'ok':'hot')+'">'+(r[3]?'match':'MISMATCH')+'</td></tr>').join("");
+}
+
+function orderTable() {
+  const same = Array.from({length:6},()=>({alpha:0.25,color:[0.4,0.6,0.8]}));
+  const sf = compositeFrontToBack(same), sb = compositeFrontToBack([...same].reverse());
+  const diff = [{alpha:0.5,color:[1,0,0]},{alpha:0.5,color:[0,0,1]}];
+  const df = compositeFrontToBack(diff), db = compositeFrontToBack([...diff].reverse());
+  const r = (label, a, b, mustDiffer) => {
+    const differs = Math.abs(a-b) > 1e-9;
+    const good = differs === mustDiffer;
+    return '<tr><td>'+label+'</td><td class="num">'+a.toFixed(6)+'</td><td class="num">'+b.toFixed(6)+
+      '</td><td class="'+(good?'ok':'hot')+'">'+(differs?'differs':'identical')+
+      ' &mdash; '+(mustDiffer?'must differ':'must not')+'</td></tr>';
+  };
+  $("order").innerHTML = '<tr><th>case</th><th>front-to-back</th><th>reversed</th><th>verdict</th></tr>' +
+    r("same colour &mdash; red channel", sf.color[0], sb.color[0], false) +
+    r("same colour &mdash; alpha", sf.alpha, sb.alpha, false) +
+    r("different colours &mdash; red channel", df.color[0], db.color[0], true) +
+    r("different colours &mdash; alpha", df.alpha, db.alpha, false);
+}
+
+for (const id of ["ox","oz","shear"]) $(id).addEventListener("input", refresh);
+refresh(); keys(); orderTable();
+</script>
+</body>
+</html>

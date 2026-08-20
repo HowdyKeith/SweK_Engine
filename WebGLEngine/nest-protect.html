@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Nest Protect</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:680px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .det { border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin:10px 0; background:var(--panel); }
+  .det h3 { margin:0 0 8px; font-size:14px; }
+  .badges { display:flex; gap:8px; flex-wrap:wrap; }
+  .b { padding:5px 10px; border-radius:7px; font-size:12px; border:1px solid; }
+  .b.clear { color:var(--ok); border-color:#224a36; background:#10231a; }
+  .b.bad { color:#160806; border-color:var(--bad); background:var(--bad); font-weight:bold; }
+  .b.dim { color:var(--dim); border-color:var(--line); }
+  #out { margin-top:6px; } #msg { color:var(--dim); font-size:12px; }
+  button { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:7px 12px; font:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🔥</span> Nest Protect <span style="color:var(--dim);font-weight:400;">· via Home Assistant</span></span></header>
+  <main>
+    <div class="note">
+      <b>Heads-up on Nest Protect + HA:</b> the official Home Assistant <b>Nest</b> integration uses Google's Device Access (SDM) API, which <b>does not expose Nest Protect</b> — only thermostats, cameras, doorbells and displays. So Protect smoke/CO status only shows here if some <b>other</b> integration is already feeding smoke/CO entities into HA. This panel reads whatever smoke / carbon-monoxide / battery entities your HA exposes and groups them per detector.
+    </div>
+    <div style="margin-bottom:10px;"><button id="refresh">↻ Refresh</button></div>
+    <div id="msg">loading…</div>
+    <div id="out"></div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  function load(){
+    $("msg").textContent = "reading Home Assistant…";
+    fetch("/ha/protect", { cache:"no-store" }).then(r => r.json()).then(j => {
+      const out = $("out"); out.innerHTML = "";
+      if (!j || j.ok === false) { $("msg").textContent = "✗ " + ((j && j.error) || "couldn't reach HA"); return; }
+      if (!j.detectors || !j.detectors.length) {
+        $("msg").innerHTML = "No smoke / CO detectors found in Home Assistant." + (j.configured === false ? " (HA isn't configured on the bridge yet.)" : " If you have Nest Protect, it needs a community integration — the official Nest integration won't surface it.");
+        return;
+      }
+      $("msg").textContent = j.count + " detector" + (j.count === 1 ? "" : "s") + (j.protectLikely ? " · looks like Nest Protect" : "") + ":";
+      j.detectors.forEach(d => {
+        const el = document.createElement("div"); el.className = "det";
+        const badges = [];
+        const mk = (label, val) => {
+          if (val == null) return '<span class="b dim">' + label + ' n/a</span>';
+          const bad = String(val).toUpperCase() === "DETECTED";
+          return '<span class="b ' + (bad ? "bad" : "clear") + '">' + label + ' ' + (bad ? "⚠ " : "✓ ") + val + '</span>';
+        };
+        badges.push(mk("smoke", d.smoke));
+        badges.push(mk("CO", d.co));
+        if (d.battery != null) badges.push('<span class="b dim">battery ' + d.battery + '</span>');
+        el.innerHTML = '<h3>' + (d.name || "detector") + '</h3><div class="badges">' + badges.join("") + '</div>';
+        out.appendChild(el);
+      });
+    }).catch(e => { $("msg").textContent = "✗ " + e; });
+  }
+  $("refresh").onclick = load;
+  load();
+  setInterval(load, 15000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

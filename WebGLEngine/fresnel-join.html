@@ -1,0 +1,127 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Four Fresnels, and what Schlick cannot do (v3629)</title>
+<meta name="demo:desc" content="Four declarations of Fresnel reflection in one engine plus a fifth thing wearing the name - joined here for the first time - and Schlick's approximation graded against the exact law, where Brewster's zero and total internal reflection are not approximated but absent.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ select{background:#0c1018;color:#d5dcea;border:1px solid #2e3c5a;padding:3px 6px;font:inherit}
+</style></head><body><div id="w">
+
+<h1>Four Fresnels &mdash; and a fifth wearing the name</h1>
+<div class="sub">This engine declares Fresnel reflection in <b>three</b> modules and Fresnel's <i>diffraction
+integrals</i> in a fourth. Until this page nothing had ever compared any of them. Two return <b>amplitude</b>, three
+return <b>power</b>, and one pair is a bit-for-bit duplicate.</div>
+
+<div class="law">Between <code>physics/em/maxwell.mjs</code> and <code>physics/render/fresnel.mjs</code> the
+difference is amplitude versus power &mdash; a square, so the two numbers differ by a factor of five at a glass
+interface (<code>&minus;0.2</code> and <code>0.04</code>) and <b>neither is wrong</b>. Between
+<code>physics/render</code> and <code>water/waterMath.js</code> it is a genuine duplicate. Between all of those and
+<code>physics/optics/fresnel.js</code> there is <b>no relationship at all</b> &mdash; those are the Fresnel integrals
+of near-field diffraction. Same man, different subject. Joining them because both say "fresnel" is exactly how a
+bad key gets built.</div>
+
+<h2>1. Five routes to one number</h2>
+<div class="panel"><button id="r1" class="good">join them at normal incidence</button>
+<span class="note">the raw column is what a naive comparison sees; the squared column is the join</span>
+<table id="t1"></table></div>
+<div class="law">The two amplitude routes also disagree in <b>sign</b>. At normal incidence there is no plane to tell
+s from p apart, so the sign is <b>pure convention</b> and the two files chose opposite ones. Comparing them directly
+would report a fault that does not exist.</div>
+
+<h2>2. Schlick against the exact law</h2>
+<div class="panel">
+  <div class="row"><label>interface <select id="pair">
+    <option value="1,1.5">air &rarr; glass (n 1 &rarr; 1.5)</option>
+    <option value="1,1.33">air &rarr; water (n 1 &rarr; 1.33)</option>
+    <option value="1.5,1">glass &rarr; air (n 1.5 &rarr; 1)</option>
+  </select></label><button id="r2" class="good">draw it</button></div>
+  <canvas id="cv" width="960" height="300"></canvas>
+  <div class="row note"><span style="color:#8fe0a8">&#9644; exact R (unpolarised)</span>
+  <span style="color:#e8c49a">&#9644; exact R<sub>p</sub></span>
+  <span style="color:#9ab6e8">&#9644; Schlick</span></div>
+  <table id="t2"></table>
+</div>
+<div class="law"><b>The honest statement is not "Schlick is 4% off."</b> At Brewster's angle the exact p reflectance
+is <b>exactly zero</b> and Schlick has no polarisation in it, so the zero is not inaccurate &mdash; it is
+<b>absent</b>, and the relative error there is infinite. Past the critical angle the exact reflectance is
+<b>1 over a whole range</b> and Schlick reads a few percent, a factor of 24 at the critical angle itself. Schlick
+approximates the unpolarised average in the external-reflection case; the two features that make Fresnel worth
+having are missing from it, not approximated by it.</div>
+
+<div class="law">Graded by <code>physics/em/fresnelJoin-selfcheck.mjs</code> (25 checks) from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Nothing in the four modules was edited</b> &mdash;
+the join reads them. The duplicate Schlick is <b>reported, not merged</b>: <code>water/waterMath.js</code> is
+CommonJS and mirrors GLSL in <code>water.html</code>, so sharing an import is a design call and it is Keith's.</div>
+
+<script type="module">
+import { DECLARATIONS, NOT_THIS_FRESNEL, normalIncidenceRoutes, schlickAudit, energyClosure } from "/physics/em/fresnelJoin.mjs";
+import { fresnel, rp, schlick, F0of, brewsterCos, criticalCos } from "/physics/render/fresnel.mjs";
+const $=(i)=>document.getElementById(i);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+
+$("r1").onclick=()=>{
+  const out=[];
+  for(const [n1,n2] of [[1,1.5],[1,1.33],[1.5,1]]){
+    const r=normalIncidenceRoutes(n1,n2,null);
+    for(const row of r.rows) out.push([n1+" &rarr; "+n2,row.name,
+      "<span class='"+(row.kind==="amplitude"?"warn":"dim")+"'>"+row.kind+"</span>",
+      row.raw.toFixed(6), row.asPower.toFixed(9)]);
+    out.push(["","<b>spread</b>","","<span class='bad'>raw "+r.rawSpread.toFixed(6)+"</span>",
+      "<span class='ok'>squared "+r.spread.toExponential(2)+"</span>"]);
+  }
+  out.push(["&mdash;","<i>"+NOT_THIS_FRESNEL.symbol+"</i>","<span class='bad'>NOT THIS FAMILY</span>",
+    NOT_THIS_FRESNEL.module,"the Fresnel integrals of diffraction"]);
+  rows($("t1"),["interface","declaration","kind","raw","as power"],out);
+  void DECLARATIONS;
+};
+
+$("r2").onclick=()=>{
+  const [n1,n2]=$("pair").value.split(",").map(Number);
+  const a=schlickAudit(n1,n2);
+  const cv=$("cv"),g=cv.getContext("2d"),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);g.fillStyle="#080a0f";g.fillRect(0,0,W,H);
+  const L=44,R=14,T=12,B=26;
+  const X=(d)=>L+d/90*(W-L-R), Y=(v)=>T+(1-v)*(H-T-B);
+  g.strokeStyle="#232b3d";g.fillStyle="#68748c";
+  for(const v of [0,0.25,0.5,0.75,1]){g.beginPath();g.moveTo(L,Y(v));g.lineTo(W-R,Y(v));g.stroke();g.fillText(v.toFixed(2),6,Y(v)+4);}
+  for(const d of [0,30,60,90]){g.fillText(d+"\u00b0",X(d)-8,H-10);}
+  const plot=(fn,col,dash)=>{g.strokeStyle=col;g.lineWidth=1.8;if(dash)g.setLineDash(dash);g.beginPath();
+    for(let i=0;i<=900;i++){const d=i/10,c=Math.cos(d*Math.PI/180),v=fn(c);
+      const px=X(d),py=Y(Math.max(0,Math.min(1,v)));if(i===0)g.moveTo(px,py);else g.lineTo(px,py);}
+    g.stroke();g.setLineDash([]);g.lineWidth=1;};
+  plot((c)=>fresnel(c,n1,n2).R,"#8fe0a8");
+  plot((c)=>fresnel(c,n1,n2).Rp,"#e8c49a");
+  plot((c)=>schlick(c,a.F0),"#9ab6e8",[5,4]);
+  const bd=a.brewster.angleDeg;
+  g.strokeStyle="#e8c49a";g.setLineDash([2,3]);g.beginPath();g.moveTo(X(bd),T);g.lineTo(X(bd),H-B);g.stroke();g.setLineDash([]);
+  g.fillStyle="#e8c49a";g.fillText("Brewster "+bd.toFixed(1)+"\u00b0",X(bd)+4,T+12);
+  if(a.criticalCos!==null){const cd=180/Math.PI*Math.acos(a.criticalCos);
+    g.strokeStyle="#f0a8a0";g.setLineDash([2,3]);g.beginPath();g.moveTo(X(cd),T);g.lineTo(X(cd),H-B);g.stroke();g.setLineDash([]);
+    g.fillStyle="#f0a8a0";g.fillText("critical "+cd.toFixed(1)+"\u00b0",X(cd)+4,T+26);}
+  const out=[["F0 (normal incidence)",a.F0.toFixed(6),"&mdash;","exact at this end"],
+    ["worst |Schlick &minus; exact R|",a.worstAbs.toFixed(6),"at cos = "+a.worstAt.toFixed(3),"<span class='warn'>bounded</span>"],
+    ["Brewster, exact R<sub>p</sub>",a.brewster.exactRp.toExponential(1),"Schlick "+a.brewster.schlick.toExponential(4),
+      "<span class='bad'>the zero is ABSENT, not inaccurate</span>"]];
+  if(a.tir) for(const t of a.tir) out.push(["past critical, cos = "+t.cosI.toFixed(4),t.exactR.toFixed(6),
+    "Schlick "+t.schlick.toFixed(6),"<span class='bad'>"+t.ratio.toFixed(1)+"x</span>"]);
+  else out.push(["total internal reflection","&mdash;","&mdash;","<span class='dim'>none going this way (n1 &lt; n2)</span>"]);
+  const e=energyClosure(n1,n2), bad=energyClosure(n1,n2,{opts:{noTransmissionFactor:true}});
+  out.push(["R + T &minus; 1 (exact law)","<span class='ok'>"+e.worst.toExponential(2)+"</span>",
+    "with v3491's plant: <span class='bad'>"+bad.worst.toFixed(6)+"</span>","an identity, no reference value"]);
+  rows($("t2"),["quantity","value","comparison","note"],out);
+  void rp; void F0of; void brewsterCos; void criticalCos;
+};
+</script>
+</div></body></html>

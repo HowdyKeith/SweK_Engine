@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wear Field (Toroidal Accumulation)</title>
+<meta name="demo:desc" content="A PERSISTENT TOROIDAL ACCUMULATION BUFFER following a ship (v3838) -- the snowflow deform buffer proper, the persistent half the stateless wave could not do. An N x N field is world-locked by wraparound addressing so it covers a size x size window that FOLLOWS the ship without ever being copied; the ship stamps wear/scorch into it every frame and it DECAYS, so a trail smears behind and heals over time. The subtle part, gated in wearField-selfcheck: the SCROLL-AND-CLEAR -- when the window recenters, only the newly-exposed texels (world the ship has just reached) are zeroed, while everything still in the window keeps accumulating; clearing everything would erase the trail, clearing nothing would ghost the world you left and returned to. The buffer runs on the CPU here; the GPU ping-pong-texture version is the optimisation. Pause/Reset/Heal. Answer-key gate: wearField-selfcheck (toroidal addressing, accumulation, persistence across scroll, re-entry clearing, decay).">
+<style>
+  html,body{margin:0;height:100%;background:#0a0c10;color:#d8c8b0;font:13px ui-monospace,monospace;overflow:hidden}
+  #hud{position:fixed;left:10px;top:10px;z-index:5;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  #hud button{background:#241d15;color:#e8c89a;border:1px solid #5a4526;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:3px 10px}
+  #hud button.on{background:#3a2a12;color:#ffd79a}
+  #note{position:fixed;left:10px;bottom:8px;z-index:5;color:#8a7a60;font-size:11px;max-width:66ch}
+</style>
+</head>
+<body>
+<div id="hud">
+  <button id="pauseBtn" title="Pause the ship">&#10073;&#10073; Pause</button>
+  <button id="healBtn" class="on" title="Wear decays over time (scorch cools)">&#9832; Heal</button>
+  <button id="resetBtn" title="Clear the field">&#9632; Reset</button>
+  <span id="stat" style="color:#8a7a60"></span>
+</div>
+<div id="note">A persistent wear buffer that follows the ship &mdash; scorch accumulates behind it and heals; as the ship travels, only the newly-reached strip is cleared, so the trail is world-locked, not copied.</div>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "/vendor/three/three.module.js";
+import { splatWorld, scrollClear, decay, wrapIndex } from "/render/wearField.js";
+
+const N = 128, SIZE = 48;          // 128x128 buffer over a 48-unit window (0.375 u/texel)
+let buf = new Float64Array(N * N);
+let sx = 0, sz = 0, heading = 0, turn = 0.012, speed = 6.0, paused = false, healing = true;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0c10);
+const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+cam.position.set(0, 30, 16); cam.lookAt(0, 0, 0);
+
+// ground plane textured by the wear buffer, wrapped so it world-locks under the centred ship
+const rgba = new Uint8Array(N * N * 4);
+const tex = new THREE.DataTexture(rgba, N, N, THREE.RGBAFormat);
+tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.minFilter = tex.magFilter = THREE.LinearFilter; tex.needsUpdate = true;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(28, 28, 1, 1), new THREE.MeshBasicMaterial({ map: tex }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+// the ship marker, always at centre, pointing along heading
+const ship = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.2, 12), new THREE.MeshBasicMaterial({ color: 0x9fd8ff }));
+ship.rotation.x = Math.PI / 2; ship.position.y = 0.4; scene.add(ship);
+const shipHolder = new THREE.Group(); shipHolder.add(ship); scene.add(shipHolder);
+
+function paint() {
+  for (let i = 0; i < N * N; i++) {
+    const v = Math.min(1, buf[i]);
+    const o = i * 4;
+    // dark ground -> orange scorch -> pale ash
+    rgba[o]     = 18 + 210 * Math.min(1, v * 1.3);
+    rgba[o + 1] = 20 + 120 * v * v;
+    rgba[o + 2] = 24 + 40 * v * v * v;
+    rgba[o + 3] = 255;
+  }
+  tex.needsUpdate = true;
+}
+
+const stat = document.getElementById("stat");
+document.getElementById("pauseBtn").onclick = (e) => { paused = !paused; e.target.classList.toggle("on", paused); };
+document.getElementById("healBtn").onclick = (e) => { healing = !healing; e.target.classList.toggle("on", healing); };
+document.getElementById("resetBtn").onclick = () => { buf = new Float64Array(N * N); };
+
+let frame = 0;
+function tick() {
+  if (!paused) {
+    const px = sx, pz = sz;
+    heading += turn * (Math.sin(frame * 0.013) * 1.4);       // a wandering path
+    sx += Math.cos(heading) * speed * (1 / 60);
+    sz += Math.sin(heading) * speed * (1 / 60);
+    scrollClear(buf, N, px, pz, sx, sz, SIZE);               // zero only the newly-reached strip
+    splatWorld(buf, N, sx, sz, SIZE, 5, 0.18, 1.2);          // stamp wear under the ship
+    if (healing) decay(buf, 0.004);                          // scorch cools
+    paint();
+    tex.offset.set((sx / SIZE) % 1, (sz / SIZE) % 1);        // world-lock the texture under the centred ship
+    shipHolder.rotation.y = -heading;
+  }
+  renderer.render(scene, cam);
+  if ((frame & 15) === 0) stat.textContent = `${N}x${N} buffer / ${SIZE}u window  pos(${sx.toFixed(0)},${sz.toFixed(0)})`;
+  frame++;
+  requestAnimationFrame(tick);
+}
+addEventListener("resize", () => { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+tick();
+</script>
+</body>
+</html>

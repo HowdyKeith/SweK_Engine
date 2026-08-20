@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="The Herd">
+<meta name="demo:desc" content="Avataro and a herd of blobs, each with its own mind -- the same driver that runs the avatar runs every one of them, so they roam, keep their distance, and each picks its own moves on its own schedule. Because metaballs merge by summing, they bond with each other as well as with the host, and the count in the corner is the honest one: how many creatures you SEE is the number of connected components of the merge graph, not how many exist. Two bond, you see one. They part, you see two. Drag to orbit, pinch to zoom.">
+<meta name="demo:category" content="fx">
+<title>The Herd</title>
+<style>
+  html,body { margin:0; height:100%; background:#05060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:14px; }
+  #count { color:#7fe3c4; font-size:13px; margin-top:4px; } #sub { color:#5f7aa0; font-size:11px; margin-top:3px; max-width:250px; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; gap:8px; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:20px; padding:9px 14px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; The Herd</div><div id="count"></div><div id="sub">each one has its own mind &middot; they bond and part on their own</div></div>
+<div id="ctl"><button id="fewer">&minus;</button><button id="more">+</button><button id="shatter" style="color:#ff8a5c;border-color:#6a3a2a">&#9889; shatter</button><button id="skin" style="color:#ffd08a;border-color:#6a5a2a">persona</button></div>
+<script type="module">
+import { makeAvatar } from "./fx/avatar/blobAvatar.js";
+import { makeAvatarDriver } from "./fx/avatar/avatarBrain.js";
+import { makeHerd } from "./fx/avatar/herd.js";
+import { metaField } from "./fx/avatar/pet.js";
+import { SKIN_NAMES, SKINS, shadeTri } from "./fx/avatar/skins.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+import { makeOrbitControls, attachOrbit } from "./ui/touchCamera.js";
+import { makeFleetReactor } from "./fx/avatar/fleetReactions.js";
+import { makeSites, fractureMesh, _bounds } from "./fx/fracture/cellFracture.js";
+import { selectBackend } from "./physics/backend.js";
+import { makePhysicsDebris, addGround, readDebris, applyXf } from "./fx/fracture/debrisPhysics.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), countEl = document.getElementById("count"), subEl = document.getElementById("sub");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+const av = makeAvatar({ persona: "both" });
+const avDriver = makeAvatarDriver(av, { mood: 0.6 });
+const orbit = makeOrbitControls({ az: 0.5, el: 0.28, dist: 5.4, minDist: 3, maxDist: 11 }); attachOrbit(cv, orbit);
+let herdN = 5, herd = makeHerd({ n: herdN, orbitR: 3.1, separation: 1.35 });
+document.getElementById("more").onclick = () => { herdN = Math.min(9, herdN + 1); herd = makeHerd({ n: herdN, orbitR: 3.1, separation: 1.35 }); };
+document.getElementById("fewer").onclick = () => { herdN = Math.max(1, herdN - 1); herd = makeHerd({ n: herdN, orbitR: 3.1, separation: 1.35 }); };
+
+// The REAL fleet: when one of your machines sails in, Avataro waves and the herd perks up. Rides the dashboard's
+// own FleetTracker, so it greets each peer once, ignores LAN blinks, and never greets itself. Offline: simply silent.
+const fleet = makeFleetReactor(av, { herd: { get members() { return herd.members; } }, onEvent: (e) => {
+  subEl.textContent = e.verb === "in" ? ("\u2691 " + e.name + " sailed in \u2014 Avataro waves") : ("\u2691 " + e.name + " left \u2014 a nod goodbye"); } });
+try { fleet.start(5000); } catch (e) {}
+
+// Shatter the WHOLE herd -- real solver when one loads (Jolt, then box3d), toy integrator never needed here.
+let physics = null, pWorld = null, pBodies = null, shatterT = 0, lastMesh = null, physName = "cpu";
+selectBackend({ prefer: "jolt" }).then(be => { physics = be; physName = be.name; }).catch(() => {});
+function shatterHerd() {
+  if (!lastMesh || !lastMesh.positions.length || !physics) return;
+  const impact = [0, 0.4, 0];
+  const frags = fractureMesh(lastMesh, makeSites(_bounds(lastMesh.positions), 22, { impact, bias: 0.5 }));
+  try { if (pWorld) pWorld.destroy(); } catch (e) {}
+  pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -2.2, extent: 12 });
+  pBodies = makePhysicsDebris(pWorld, frags, impact, { force: 3.0 }); shatterT = 0;
+  subEl.textContent = "the whole herd shattered \u2014 " + frags.length + " fragments (" + physName + ") \u00b7 they will all re-form";
+}
+document.getElementById("shatter").onclick = shatterHerd;
+const SKIN_CYCLE = ["persona"].concat(SKIN_NAMES); let skinIdx = 0;
+const skinBtn = document.getElementById("skin");
+skinBtn.onclick = () => { skinIdx = (skinIdx + 1) % SKIN_CYCLE.length; skinBtn.textContent = SKIN_CYCLE[skinIdx]; };
+
+const N = 32, LO = -4.4, HI = 4.4, span = HI - LO, cell = span / (N - 1);
+function buildField(balls) {
+  const f = new Float32Array(N * N * N);
+  for (let z = 0; z < N; z++) { const wz = LO + span * z / (N - 1); for (let y = 0; y < N; y++) { const wy = LO + span * y / (N - 1); const row = (z * N + y) * N;
+    for (let x = 0; x < N; x++) { f[row + x] = metaField(balls, LO + span * x / (N - 1), wy, wz); } } }
+  return f;
+}
+let last = performance.now(), clusterT = 0, visible = herdN + 1;
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now;
+  orbit.autospin(dt, 0.1);
+  const chose = avDriver.step(dt);
+  const body = av.step(dt);
+  const info = herd.step(dt, [body[0].p[0], body[0].p[1], body[0].p[2]]);
+  const all = body.concat(herd.allBalls());
+  clusterT += dt;
+  if (clusterT > 0.35) { clusterT = 0; visible = herd.clusters(body, 1.0).visible; }   // what the eye actually sees
+  countEl.textContent = (herd.n + 1) + " creatures \u00b7 you see " + visible;
+  if (chose) subEl.textContent = "Avataro: " + chose;
+  else { const acting = info.find(i => i.state === "merged"); if (acting) subEl.textContent = "one of them bonded in"; }
+
+  const mesh = marchScalarField(buildField(all), N, N, N, 1.0, { origin: [LO, LO, LO], cellSize: cell });
+  lastMesh = mesh;
+  const P = mesh.positions, W = cv.width, H = cv.height, S = Math.min(W, H) * 0.30;
+  const az = orbit.st.az, el = orbit.st.el, d = orbit.st.dist, ca = Math.cos(az), sa = Math.sin(az), ce = Math.cos(el), se = Math.sin(el);
+  const proj = (x, y, z) => { let X = x * ca + z * sa, Z = -x * sa + z * ca, Y = y * ce - Z * se, Zc = y * se + Z * ce; const persp = 5.4 / (d - Zc); return [W / 2 + X * S * persp, H / 2 - Y * S * persp, Zc]; };
+  const tint = av.personaTint(), L = [0.4, 0.75, 0.5], tris = [], src = [];
+  if (pBodies && pWorld) { pWorld.step(Math.min(dt, 1 / 30), 1); shatterT += dt;
+    for (const d of readDebris(pWorld, pBodies)) { const F = d.frag.positions;
+      for (let i = 0; i + 8 < F.length; i += 9) src.push([applyXf(d, [F[i], F[i + 1], F[i + 2]]), applyXf(d, [F[i + 3], F[i + 4], F[i + 5]]), applyXf(d, [F[i + 6], F[i + 7], F[i + 8]])]); }
+    if (shatterT > 3.6) { try { pWorld.destroy(); } catch (e) {} pWorld = null; pBodies = null; subEl.textContent = "all re-formed \u2014 nothing was lost"; }
+  } else { for (let i = 0; i + 8 < P.length; i += 9) src.push([[P[i], P[i + 1], P[i + 2]], [P[i + 3], P[i + 4], P[i + 5]], [P[i + 6], P[i + 7], P[i + 8]]]); }
+  for (const t3 of src) { const A = t3[0], B = t3[1], C = t3[2];
+    const pa = proj(A[0], A[1], A[2]), pb = proj(B[0], B[1], B[2]), pc = proj(C[0], C[1], C[2]);
+    let nx = (B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]);
+    let ny = (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]);
+    let nz = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+    const ml = Math.hypot(nx, ny, nz) || 1; const lit = Math.max(0.15, (nx * L[0] + ny * L[1] + nz * L[2]) / ml);
+    const cx3 = (A[0] + B[0] + C[0]) / 3, cy3 = (A[1] + B[1] + C[1]) / 3, cz3 = (A[2] + B[2] + C[2]) / 3;
+    tris.push({ z: (pa[2] + pb[2] + pc[2]) / 3, pa, pb, pc, lit, n: [nx / ml, ny / ml, nz / ml], pos: [cx3, cy3, cz3], thickness: Math.max(0, Math.min(1, 1 - Math.hypot(cx3, cy3, cz3) / 4.0)) });
+  }
+  tris.sort((a, b) => a.z - b.z);
+  ctx.clearRect(0, 0, W, H);
+  const skin = SKIN_CYCLE[skinIdx], nowT = performance.now() / 1000;
+  if (skin !== "persona" && SKINS[skin].blend === "additive") ctx.globalCompositeOperation = "lighter";
+  for (const t of tris) {
+    if (skin === "persona") { const g = 40 + t.lit * 200; ctx.fillStyle = "rgb(" + Math.round(g * tint[0]) + "," + Math.round(g * tint[1]) + "," + Math.round(g * tint[2]) + ")"; }
+    else { const c = shadeTri(skin, { lit: t.lit, normal: t.n, thickness: t.thickness, pos: t.pos, t: nowT });
+      ctx.fillStyle = "rgba(" + Math.round(c[0] * 255) + "," + Math.round(c[1] * 255) + "," + Math.round(c[2] * 255) + "," + c[3].toFixed(3) + ")"; }
+    ctx.beginPath(); ctx.moveTo(t.pa[0], t.pa[1]); ctx.lineTo(t.pb[0], t.pb[1]); ctx.lineTo(t.pc[0], t.pc[1]); ctx.closePath(); ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

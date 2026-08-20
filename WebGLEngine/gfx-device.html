@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Unified Device (WebGL2 / WebGPU)">
+<meta name="demo:desc" content="SweK's unified graphics device (the MUGL idea, in-house): one WebGPU-shaped API that both WebGL2 and WebGPU implement. This page writes its render ONCE and runs it on whichever backend the browser has -- WebGPU preferred, WebGL2 fallback. The backend it chose is shown live; the toggle forces the other. The selection + the unified op stream are verified headless via a null recorder backend; the real draws are the browser's.">
+<meta name="demo:category" content="fx">
+<title>Unified Device</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; }
+  #be { color:#59d1ff; font-size:14px; margin-top:4px; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:2px; }
+  button { position:fixed; right:14px; top:12px; z-index:3; background:rgba(14,20,32,.9); color:#59d1ff; border:1px solid #22304a; border-radius:7px; padding:7px 12px; font:600 12px ui-monospace,monospace; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; Unified Device</div><div id="be"></div><div id="sub"></div></div>
+<button id="toggle">force other backend</button>
+<script type="module">
+import { requestDevice, detectBackends } from "./gfx/device.js";
+
+const cv = document.getElementById("c"), be = document.getElementById("be"), sub = document.getElementById("sub");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+addEventListener("resize", resize); resize();
+
+// ONE triangle, ONE render path. Shaders are the only backend-specific bit: WGSL for WebGPU, GLSL for WebGL2.
+const triangle = new Float32Array([0.0, 0.6, -0.52, -0.3, 0.52, -0.3]);
+const GLSL = {
+  vertex: "#version 300 es\nin vec2 pos;\nout vec3 vc;\nvoid main(){ gl_Position = vec4(pos, 0.0, 1.0); vc = vec3(pos * 0.8 + 0.5, 0.9); }",
+  fragment: "#version 300 es\nprecision highp float;\nin vec3 vc;\nout vec4 o;\nvoid main(){ o = vec4(vc, 1.0); }"
+};
+const WGSL = "struct VO { @builtin(position) p: vec4f, @location(0) c: vec3f };\n@vertex fn vs(@location(0) pos: vec2f) -> VO { var o: VO; o.p = vec4f(pos, 0.0, 1.0); o.c = vec3f(pos * 0.8 + 0.5, 0.9); return o; }\n@fragment fn fs(i: VO) -> @location(0) vec4f { return vec4f(i.c, 1.0); }";
+
+let device = null, pipe = null, buf = null, raf = 0, prefer = "webgpu";
+async function boot(pref) {
+  if (device) { cancelAnimationFrame(raf); try { device.destroy(); } catch (e) {} }
+  device = await requestDevice(cv, { prefer: pref });
+  buf = device.buffer({ data: triangle, count: 3, components: 2 });
+  pipe = device.pipeline({ shaders: { wgsl: WGSL, glsl: GLSL }, attributes: [{ name: "pos", size: 2, offset: 0, wgpuFormat: "float32x2" }], stride: 8 });
+  const av = detectBackends();
+  be.textContent = "backend: " + device.backend.toUpperCase();
+  sub.textContent = "available: " + (av.webgpu ? "WebGPU " : "") + (av.webgl2 ? "WebGL2" : "") + (device.backend === "null" ? " (headless recorder \u2014 no GPU context)" : "") + " \u00b7 same render code, either runtime";
+  let t0 = performance.now(), frames = 0, fps = 0;
+  function frame() {
+    const t = performance.now() / 1000;
+    const bg = [0.02 + 0.02 * Math.sin(t), 0.03, 0.06 + 0.03 * Math.cos(t * 0.7), 1];
+    device.frame(({ pass }) => { pass.clear(bg); pass.use(pipe); pass.vertices(buf); pass.draw(3); });
+    frames++; const now = performance.now(); if (now - t0 > 500) { fps = Math.round(frames * 1000 / (now - t0)); frames = 0; t0 = now; be.textContent = "backend: " + device.backend.toUpperCase() + "  \u00b7  " + fps + " fps"; }
+    raf = requestAnimationFrame(frame);
+  }
+  frame();
+}
+document.getElementById("toggle").onclick = () => { prefer = (prefer === "webgpu") ? "webgl2" : "webgpu"; boot(prefer); };
+boot(prefer);
+</script>
+</body>
+</html>

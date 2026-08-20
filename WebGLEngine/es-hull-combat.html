@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="EV Hull Combat (box3d)">
+<meta name="demo:desc" content="Endless Sky ships fight with real hull physics: rams deal damage from impact momentum, destroyed ships burst into tumbling wreckage, and asteroid fields are hazards. Deterministic under lockstep for co-op. box3d on a rig; JS fallback here.">
+<meta name="demo:category" content="physics">
+<title>EV Hull Combat</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --red:#ff5d6c; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; overflow:hidden; }
+  #hud { position:fixed; top:12px; left:14px; z-index:5; }
+  h1 { font-size:15px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:6px 12px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  .stat { color:var(--dim); font-size:12px; }
+  .stat b { color:#dbe7ff; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>&#9670; EV Hull Combat</h1>
+  <div class="row"><button onclick="reset()">New battle</button><button onclick="toggle()" id="pauseBtn">Pause</button><button onclick="toggleJolt()" id="physBtn">Physics: Fallback</button><span class="stat" id="engine"></span></div>
+  <div class="stat" id="score">Blue <b id="blue">0</b> &middot; Red <b id="red">0</b> &middot; debris <b id="deb">0</b> &middot; rams <b id="rams">0</b></div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { createHullCombat } from "./physics/esHullCombat.js";
+import { decide, DEFAULT_W } from "./ev/esTactics.js";
+import { createJoltBackend } from "./physics/jolt/joltLoader.js";
+
+let joltBackend = null, useJolt = false;   // Jolt loaded on demand; falls back to the JS world on any error
+
+// ---- JS fallback world: planar integrator + circle separation, mimicking box3d so the demo runs without WASM ----
+// (On a rig with box3d built, swap this for the real world handle -- the combat layer is identical either way.)
+function fallbackWorld() {
+  const bs = [];
+  return {
+    addShip({ x, z, half }) { bs.push({ half: half || 30, pos: [x, 0, z], vel: [0, 0, 0], spin: 0, ang: 0 }); return bs.length - 1; },
+    setVelocity(i, v) { bs[i].vel = v.slice(); },
+    angularImpulse(i, v) { bs[i].spin += v[1]; },
+    readTransforms() { const a = new Float32Array(bs.length * 7); for (let i = 0; i < bs.length; i++) { const o = i * 7; a[o] = bs[i].pos[0]; a[o + 1] = bs[i].pos[1]; a[o + 2] = bs[i].pos[2]; a[o + 6] = 1; } return a; },
+    readVelocities() { const a = new Float32Array(bs.length * 3); for (let i = 0; i < bs.length; i++) { const o = i * 3; a[o] = bs[i].vel[0]; a[o + 2] = bs[i].vel[2]; } return a; },
+    step(dt) {
+      for (const b of bs) { b.pos[0] += b.vel[0] * dt; b.pos[2] += b.vel[2] * dt; b.ang += b.spin * dt; }
+      // simple pairwise separation (box3d-like no-overlap) + velocity reflection
+      for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+        const a = bs[i], b = bs[j]; const dx = b.pos[0] - a.pos[0], dz = b.pos[2] - a.pos[2]; let d = Math.hypot(dx, dz); const rr = a.half + b.half;
+        if (d > 0 && d < rr) { const nx = dx / d, nz = dz / d, ov = (rr - d) * 0.5; a.pos[0] -= nx * ov; a.pos[2] -= nz * ov; b.pos[0] += nx * ov; b.pos[2] += nz * ov;
+          const rel = (b.vel[0] - a.vel[0]) * nx + (b.vel[2] - a.vel[2]) * nz; if (rel < 0) { a.vel[0] += nx * rel * 0.5; a.vel[2] += nz * rel * 0.5; b.vel[0] -= nx * rel * 0.5; b.vel[2] -= nz * rel * 0.5; } }
+      }
+    },
+    ang(i) { return bs[i] ? bs[i].ang : 0; },
+    stateHash() { let h = 0; for (const b of bs) h = (h * 31 + Math.round(b.pos[0]) + Math.round(b.pos[2])) | 0; return h; },
+  };
+}
+
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+function resize() { cvs.width = innerWidth; cvs.height = innerHeight; } addEventListener("resize", resize); resize();
+document.getElementById("engine").textContent = "JS fallback \u00b7 toggle Jolt/box3d on a rig";
+
+const STATS = { turn: 200, accel: 320, speed: 320, mass: 900 };
+let combat, world, teams, paused = false, ramCount = 0, seed = 1;
+
+function makeWorld() {
+  if (useJolt && joltBackend) { try { return joltBackend.createWorld({ gravity: [0, 0, 0] }); } catch (e) { useJolt = false; } }
+  return fallbackWorld();
+}
+async function toggleJolt() {
+  const btn = document.getElementById("physBtn");
+  if (!useJolt) {
+    btn.textContent = "Physics: loading Jolt\u2026";
+    try { if (!joltBackend) joltBackend = await createJoltBackend(); useJolt = true; btn.textContent = "Physics: Jolt"; }
+    catch (e) { useJolt = false; btn.textContent = "Physics: Fallback (Jolt failed)"; }
+  } else { useJolt = false; btn.textContent = "Physics: Fallback"; }
+  reset();
+}
+window.toggleJolt = toggleJolt;
+
+function reset() {
+  seed = (Date.now() & 0xffff) || 7; ramCount = 0;
+  world = makeWorld(); combat = createHullCombat(world, { seed, shipHalf: 26, debrisCount: 6, debrisTtl: 500 });
+  teams = new Map();
+  const cx = 0, cy = 0;
+  for (let k = 0; k < 5; k++) { const r = combat.addShip({ x: -700 + (k % 2) * -60, y: -260 + k * 120, half: 26, heading: 0, vx: 0, vy: 0, team: "blue" }, STATS, 100); teams.set(r, "blue"); }
+  for (let k = 0; k < 5; k++) { const r = combat.addShip({ x: 700 + (k % 2) * 60, y: -260 + k * 120, half: 26, heading: 180, vx: 0, vy: 0, team: "red" }, STATS, 100); teams.set(r, "red"); }
+  for (let k = 0; k < 7; k++) combat.addAsteroid((Math.sin(k * 2.1) * 380), (Math.cos(k * 1.7) * 300), 40 + (k % 3) * 22);
+}
+function toggle() { paused = !paused; document.getElementById("pauseBtn").textContent = paused ? "Resume" : "Pause"; }
+
+// esTactics picks the target (reachability-gated, flees when hurt); the ship steers to it and fires in range.
+const WEAP_RANGE = 620, FIRE_CD = 22;
+function cand(r) { return { x: r.ship.x, y: r.ship.y, armor: r.hp, maxArmor: r.maxHp, dps: 10, team: r.team, id: r._id, dead: r.dead }; }
+function inputFor(ship, rec) {
+  let me = null; for (const r of combat._recs) if (r.ship === ship) { me = r; break; }
+  if (!me) return { turn: 0, thrust: 0 };
+  const self = cand(me), enemies = combat._recs.filter(r => !r.dead && r.team !== me.team).map(cand);
+  const d = decide(self, enemies, DEFAULT_W, { range: 1400 });
+  if (!d.target) return { turn: 0, thrust: 0.3 };
+  const dx = d.target.x - ship.x, dy = d.target.y - ship.y, dist = Math.hypot(dx, dy);
+  // flight model uses a compass heading (0 = up); steer toward that, but fire a world-direction shot
+  const steer = ((Math.atan2(dx, -dy) * 180 / Math.PI) % 360 + 360) % 360;
+  let diff = ((steer - (ship.heading || 0) + 540) % 360) - 180;
+  if (d.engaging && !d.fleeing && dist < WEAP_RANGE && Math.abs(diff) < 11 && me.cool <= 0) { combat.fire(me, Math.atan2(dy, dx), { dmg: 9, speed: 640 }); me.cool = FIRE_CD; }
+  const thrust = d.fleeing ? 1 : (dist > WEAP_RANGE * 0.7 ? 1 : 0.25);
+  return { turn: Math.max(-1, Math.min(1, diff / 30)), thrust };
+}
+
+let cam = 1;
+function draw() {
+  ctx.fillStyle = "#04060d"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  ctx.save(); ctx.translate(cvs.width / 2, cvs.height / 2); const sc = Math.min(cvs.width, cvs.height) / 1900; ctx.scale(sc, sc);
+  // asteroids
+  for (const a of combat.asteroids()) { ctx.fillStyle = "#22303f"; ctx.strokeStyle = "#3a4d63"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, 7); ctx.fill(); ctx.stroke(); }
+  // debris (tumbling squares)
+  const wref = world; let di = 0;
+  for (const d of combat.debris()) { ctx.save(); ctx.translate(d.x, d.y); ctx.rotate((d.spin || 0) * (performance.now() / 600)); ctx.fillStyle = "#6b7c93"; ctx.fillRect(-d.r * 0.6, -d.r * 0.6, d.r * 1.2, d.r * 1.2); ctx.restore(); }
+  // weapon fire (tracers)
+  for (const p of combat.shots()) { const col = p.team === "blue" ? "#8fe3ff" : "#ffb0b8"; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02); ctx.stroke(); }
+  // ships
+  for (const r of combat._recs) { if (r.dead) continue; const s = r.ship, team = teams.get(r); const col = team === "blue" ? "#59d1ff" : "#ff5d6c";
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(((s.heading || 0) - 90) * Math.PI / 180);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(30, 0); ctx.lineTo(-20, 16); ctx.lineTo(-10, 0); ctx.lineTo(-20, -16); ctx.closePath(); ctx.fill(); ctx.restore();
+    // hp bar
+    const hpf = Math.max(0, r.hp / r.maxHp); ctx.fillStyle = "#0a1120"; ctx.fillRect(s.x - 26, s.y - 40, 52, 7); ctx.fillStyle = hpf > 0.5 ? "#5fe08a" : hpf > 0.25 ? "#f6a623" : "#ff5d6c"; ctx.fillRect(s.x - 26, s.y - 40, 52 * hpf, 7);
+  }
+  ctx.restore();
+}
+
+function tick() {
+  if (!paused && combat) { const ev = combat.step(inputFor, 1 / 30); ramCount += ev.filter(e => e.type === "ram").length;
+    const blue = combat._recs.filter(r => !r.dead && teams.get(r) === "blue").length, red = combat._recs.filter(r => !r.dead && teams.get(r) === "red").length;
+    document.getElementById("blue").textContent = blue; document.getElementById("red").textContent = red;
+    document.getElementById("deb").textContent = combat.debris().length; document.getElementById("rams").textContent = ramCount;
+    if (blue === 0 || red === 0) setTimeout(reset, 1500);
+  }
+  draw(); requestAnimationFrame(tick);
+}
+reset(); tick();
+</script>
+</body>
+</html>

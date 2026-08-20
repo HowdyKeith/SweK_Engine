@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Tools</title>
+<!--
+     v3220 -- THE HALF THE FRONT-DOOR LAW ACTUALLY ASKS FOR.
+
+     v3219 found EIGHT analysis tools that printed nothing and exited 0, gave five of them a main block, and said
+     out loud that a terminal is not a front door. This is the button.
+
+     *** THE REFUSALS ARE ON THE PAGE, NOT JUST THE OFFERS. *** Three tools deliberately have no main block --
+     each takes its corpus or its registry from the caller, and a main block would have to invent one. A page
+     listing only what it can run makes three decisions look like three gaps, and the next person writes the code
+     three earlier rounds decided against.
+-->
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 11px 13px; margin-bottom: 12px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 4px 11px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .tool { border-bottom: 1px solid #16241d; padding: 8px 0; }
+  .tool:last-child { border-bottom: 0; }
+  .label { color: #b6f0cf; }
+  .rel { color: #6f8a7c; }
+  .blurb { color: #8fb3a0; margin: 3px 0 6px; }
+  .why { color: #e0c58a; }
+  pre { white-space: pre-wrap; color: #8fb3a0; margin: 6px 0 0; max-height: 420px; overflow: auto; background: #0a1210; padding: 8px; border: 1px solid #1a2a22; }
+  .dim { color: #6f8a7c; } .fail { color: #e0a0a0; } .slow { color: #e0c58a; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Tools</h1>
+  <div class="sub">The analysis tools, run from here instead of a terminal.
+    <span class="dim">Each one walks the tree and prints a report; none of them changes anything.</span></div>
+
+  <div class="card" id="listCard"><div id="msg" class="dim">loading&hellip;</div><div id="list"></div></div>
+
+  <div class="card" id="artCard" style="display:none">
+    <div class="dim">Tools that produce a FILE rather than a report. The run writes it; the link opens it.
+      Five megabytes rendered into this page would hang the tab, and a truncated render would be worse &mdash;
+      <b>a corpus you cannot tell is truncated is the failure the tool exists to prevent.</b></div>
+    <div id="artefacts"></div>
+  </div>
+
+  <!--
+       v3331 -- KEITH ASKED "what page do i run to check gateQuality" AND THE ANSWER WAS ALREADY YES.
+       v3327 recorded NO, then tried to add gates to the REPORTING registry above, and the front-door gate
+       refused it for a correct but DIFFERENT reason (a report prints and exits zero; a gate that fails exits
+       nonzero) -- and that correct refusal MASKED the real error, which is that gates.html has run any named
+       gate by filter since it was built, shows pass / fail / timeout apart, carries each gate's own output,
+       and is linked from server.html and listed in pageSections. THIRD INSTANCE of nearly rebuilding a front
+       door that exists (v3044 render-QA, v3233 corpus.mjs). The fix is not a second door; it is this pointer,
+       which HONOURS the refusal instead of routing around it.
+  -->
+  <div class="card">
+    <div class="dim">Not here on purpose &mdash; <b>gates are VERDICTS, not reports.</b>
+      Everything above prints and exits zero; a gate that fails exits nonzero, so listing one here would
+      show a red check as a green row.
+      To run <b>gateQuality</b>, the deletion harness, or any other gate:
+      <a href="/gates.html" style="color:#b6f0cf">gates.html</a> &mdash; type its name in the filter box and
+      press <i>Run filtered</i>. It reports failures and timeouts separately and will show you the gate's
+      own output.</div>
+  </div>
+
+  <div class="card" id="noDoorCard" style="display:none">
+    <div class="dim">Deliberately WITHOUT a front door &mdash; with the reason each was refused, not a guess:</div>
+    <div id="noDoor"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// THE BRIDGE BEING ABSENT IS AN ORDINARY STATE AND IT IS NAMED. An empty list on a server with no toolsBridge
+// would read as "no tools", which is a different claim from "this server cannot offer them".
+async function ask(url, opts) {
+  let r;
+  try { r = await fetch(url, opts); }
+  catch (e) { return { ok: false, error: "unreachable", message: "could not reach this server: " + e.message }; }
+  if (r.status === 404) return { ok: false, error: "no-bridge",
+    message: "this server has no /tools route -- toolsBridge is not dispatched here. That is not the same as having no tools." };
+  try { return await r.json(); } catch (e) { return { ok: false, error: "bad-json", message: "the route answered with something that is not JSON" }; }
+}
+
+async function load() {
+  const j = await ask("/tools/list");
+  if (!j || j.ok === false) { $("msg").innerHTML = '<span class="fail">' + esc(j && (j.message || j.error) || "no answer") + "</span>"; return; }
+  $("msg").textContent = "";
+  $("list").innerHTML = j.tools.map((t, i) => (
+    '<div class="tool"><div><span class="label">' + esc(t.label) + '</span> <span class="rel">' + esc(t.rel) + "</span></div>" +
+    '<div class="blurb">' + esc(t.blurb) + "</div>" +
+    '<button data-run="' + esc(t.rel) + '">Run</button> <span class="dim" id="s' + i + '"></span>' +
+    '<pre id="o' + i + '" style="display:none"></pre></div>'
+  )).join("");
+
+  j.tools.forEach((t, i) => {
+    $("list").querySelector('[data-run="' + t.rel.replace(/"/g, '\\"') + '"]').onclick = async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true; $("s" + i).textContent = "running\u2026";
+      const r = await ask("/tools/run?name=" + encodeURIComponent(t.rel));
+      btn.disabled = false;
+      if (!r || r.ok === false) { $("s" + i).innerHTML = '<span class="fail">' + esc(r && (r.message || r.error) || "no answer") + "</span>"; return; }
+      // A TIMEOUT IS NOT A FAILURE (v3076), and the budget travels with it so a near miss can be told from a
+      // tool that never had a chance. Both come straight off gatesBridge's runner rather than being re-derived.
+      $("s" + i).innerHTML = r.timedOut
+        ? '<span class="slow">TIMED OUT</span> <span class="dim">after ' + esc(r.ms) + "ms of a " + esc(r.budgetMs) + "ms budget</span>"
+        : '<span class="dim">' + esc(r.ms) + "ms, exit " + esc(r.exitCode) + "</span>";
+      const pre = $("o" + i);
+      // A TOOL THAT RAN AND SAID NOTHING IS THE EXACT DEFECT v3219 FIXED, so an empty answer is labelled rather
+      // than rendered as a blank box that looks like a page bug.
+      pre.textContent = String(r.output || "").trim() || "(the tool produced no output -- that is the defect v3219 was about, and it should not happen here)";
+      pre.style.display = "";
+    };
+  });
+
+  if (j.artefacts && j.artefacts.length) {
+    $("artCard").style.display = "";
+    $("artefacts").innerHTML = j.artefacts.map((t, i) => (
+      '<div class="tool"><div><span class="label">' + esc(t.label) + '</span> <span class="rel">' + esc(t.rel) + "</span></div>" +
+      '<div class="blurb">' + esc(t.blurb) + "</div>" +
+      '<button data-art="' + esc(t.rel) + '">Build it</button> <span class="dim" id="as' + i + '"></span></div>'
+    )).join("");
+    j.artefacts.forEach((t, i) => {
+      $("artefacts").querySelector('[data-art="' + t.rel.replace(/"/g, '\\"') + '"]').onclick = async (ev) => {
+        const btn = ev.currentTarget;
+        btn.disabled = true; $("as" + i).textContent = "building\u2026";
+        const r = await ask("/tools/run?name=" + encodeURIComponent(t.rel));
+        btn.disabled = false;
+        if (!r || r.ok === false) { $("as" + i).innerHTML = '<span class="fail">' + esc(r && (r.message || r.error) || "no answer") + "</span>"; return; }
+        // THE LINK IS ONLY OFFERED AFTER A RUN THAT SUCCEEDED. A permanent link to /corpus.txt would happily
+        // serve LAST WEEK'S FILE after a failed build, which is the stale-artefact trap this tree keeps finding.
+        const where = r.artefact || t.artefact;
+        $("as" + i).innerHTML = r.timedOut
+          ? '<span class="slow">TIMED OUT</span> <span class="dim">after ' + esc(r.ms) + "ms</span>"
+          : '<span class="dim">' + esc(r.ms) + "ms, exit " + esc(r.exitCode) + "</span> " +
+            (r.exitCode === 0 && where ? ' <a href="' + esc(where) + '" target="_blank" rel="noopener" style="color:#b6f0cf;">open ' + esc(where) + "</a>" : "");
+      };
+    });
+  }
+
+  if (j.noFrontDoor && j.noFrontDoor.length) {
+    $("noDoorCard").style.display = "";
+    $("noDoor").innerHTML = j.noFrontDoor.map((n) =>
+      '<div class="tool"><div class="rel">' + esc(n.rel) + '</div><div class="why">' + esc(n.why) + "</div></div>").join("");
+  }
+}
+load();
+</script>
+</body>
+</html>

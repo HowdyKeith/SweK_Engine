@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Kuramoto synchronization</title>
+<meta name="demo:desc" content="A thousand oscillators, each with its own natural frequency, each nudged toward the crowd's average phase. Below K_c = 2*gamma the crowd never organizes; above it the order parameter must climb the exact closed-form branch r(K) = sqrt(1 - Kc/K) — a whole curve the update rule never contains. Fireflies, pacemaker cells, power grids. Sabotage swaps in a plausible K*r^2 coupling that cannot bootstrap from noise.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { display:flex; gap:14px; padding:16px; flex-wrap:wrap; }
+  canvas { border:1px solid #22304a; border-radius:6px; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:5px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; } button.on { outline:2px solid #f6a623; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <canvas id="ring" width="360" height="360"></canvas>
+    <div style="margin-top:8px;">
+      <label>K <input id="kS" type="range" min="0.2" max="3.0" step="0.05" value="0.6" style="width:180px;vertical-align:middle;"></label>
+      <span id="kV">0.60</span>
+      <button id="sab" class="sab" title="K*r^2 — a plausible mean-field slip that cannot bootstrap coherence from noise">Sabotage coupling</button>
+    </div>
+    <div id="hud" style="margin-top:6px;line-height:1.6;">…</div>
+  </div>
+  <div style="flex:1;min-width:360px;">
+    <div class="dim" style="margin-bottom:6px;">measured r at each K you visit (dots) against the exact branch r(K) = &radic;(1 − K_c/K), K_c = 2&gamma; = 1.0 (orange). The update rule contains neither number. Gate: physics/sync/kuramoto-selfcheck.mjs.</div>
+    <canvas id="plot" width="520" height="330" style="width:100%;max-width:640px;"></canvas>
+  </div>
+</div>
+<script type="module">
+import { makeKuramoto, orderParameter, step, couplingMeanField, couplingWRONG, exactR } from "./physics/sync/kuramoto.js";
+
+const N = 1024, gamma = 0.5;
+let K = 0.6, coupling = couplingMeanField;
+let sys = makeKuramoto({ N, gamma, seed: (Date.now() & 0xffff) | 1 });
+let rSmooth = 0; const visited = new Map();   // K -> smoothed r
+
+const ring = document.getElementById("ring"), rctx = ring.getContext("2d");
+const plot = document.getElementById("plot"), pctx = plot.getContext("2d");
+const hud = document.getElementById("hud");
+document.getElementById("kS").oninput = (e) => { K = parseFloat(e.target.value); document.getElementById("kV").textContent = K.toFixed(2); };
+document.getElementById("sab").onclick = function () {
+  const on = coupling === couplingMeanField;
+  coupling = on ? couplingWRONG : couplingMeanField;
+  this.classList.toggle("on", on); visited.clear();
+  sys = makeKuramoto({ N, gamma, seed: (Date.now() & 0xffff) | 1 });
+};
+
+function drawRing() {
+  rctx.fillStyle = "#05070d"; rctx.fillRect(0, 0, 360, 360);
+  const cx = 180, cy = 180, R = 140;
+  rctx.strokeStyle = "#22304a"; rctx.beginPath(); rctx.arc(cx, cy, R, 0, 6.3); rctx.stroke();
+  for (let i = 0; i < N; i += 2) {
+    const a = sys.theta[i];
+    rctx.fillStyle = "rgba(89,209,255,0.5)";
+    rctx.fillRect(cx + R * Math.cos(a) - 1.5, cy + R * Math.sin(a) - 1.5, 3, 3);
+  }
+  const o = orderParameter(sys.theta, N);
+  rctx.strokeStyle = "#f6a623"; rctx.lineWidth = 3; rctx.beginPath();
+  rctx.moveTo(cx, cy); rctx.lineTo(cx + R * o.r * Math.cos(o.psi), cy + R * o.r * Math.sin(o.psi)); rctx.stroke(); rctx.lineWidth = 1;
+  return o.r;
+}
+function drawPlot() {
+  pctx.fillStyle = "#05070d"; pctx.fillRect(0, 0, 520, 330);
+  const tx = (k) => 40 + (k - 0.2) / 2.8 * 460, ty = (r) => 300 - r * 270;
+  pctx.strokeStyle = "#22304a"; pctx.strokeRect(40, 30, 460, 270);
+  pctx.strokeStyle = "rgba(246,166,35,0.85)"; pctx.beginPath();
+  for (let k = 0.2; k <= 3.0; k += 0.01) { const X = tx(k), Y = ty(exactR(k, gamma)); k <= 0.21 ? pctx.moveTo(X, Y) : pctx.lineTo(X, Y); }
+  pctx.stroke();
+  pctx.fillStyle = "#f6a623"; pctx.fillText("K_c = 1.0", tx(1.0) - 20, 44);
+  for (const [k, r] of visited) { pctx.fillStyle = "rgba(155,225,93,0.9)"; pctx.beginPath(); pctx.arc(tx(k), ty(r), 4, 0, 6.3); pctx.fill(); }
+  pctx.fillStyle = "#7f96b8"; pctx.fillText("K", 500, 316); pctx.fillText("r", 26, 40);
+}
+function tick() {
+  let r = 0;
+  for (let i = 0; i < 4; i++) r = step(sys, K, 0.05, coupling);
+  rSmooth = 0.98 * rSmooth + 0.02 * r;
+  visited.set(Math.round(K * 20) / 20, rSmooth);
+  drawRing(); drawPlot();
+  const ex = exactR(K, gamma), on = Math.abs(rSmooth - ex) < 0.08;
+  hud.innerHTML = "r = <b>" + rSmooth.toFixed(3) + "</b> · exact branch " + ex.toFixed(3) +
+    " <b class='" + (on ? "good" : "bad") + "'>" + (on ? "ON CURVE" : "OFF") + "</b>" +
+    (coupling === couplingWRONG ? " <span class='bad'>· sabotage live: K·r² cannot bootstrap from noise</span>" : "");
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

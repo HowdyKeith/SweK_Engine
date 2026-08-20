@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Ragdoll &mdash; a rig is a joint graph</title>
+<style>
+  :root { --bg:#04070d; --ink:#cfe3ff; --dim:#5b7699; --hot:#ff8a6a; --ok:#7fe3c4; --warn:#ffd27f; --line:#16304d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; padding:22px 18px 60px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  h1 { font-size:17px; letter-spacing:.08em; text-transform:uppercase; color:var(--warn); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 18px; }
+  .panel { border:1px solid var(--line); border-radius:11px; padding:16px; margin-bottom:14px; background:rgba(10,20,34,.5); }
+  .panel h2 { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:0 0 10px; font-weight:600; }
+  button { padding:6px 13px; background:#17324d; color:#cfe3ff; border:1px solid #2c5a85; border-radius:5px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:disabled { opacity:.35; cursor:default; }
+  canvas { width:100%; height:420px; display:block; background:#020509; border:1px solid var(--line); border-radius:8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .hot { color:var(--hot); } .dim { color:var(--dim); }
+  code { color:var(--ink); }
+  p { color:var(--dim); margin:0 0 8px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  th { text-align:left; color:var(--dim); font-weight:600; padding:4px 7px; border-bottom:1px solid var(--line); font-size:9px; letter-spacing:.06em; text-transform:uppercase; }
+  td { padding:4px 7px; border-bottom:1px solid rgba(22,48,77,.35); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ragdoll</h1>
+  <p class="sub">A rig is a joint graph. Shoulders and hips are spherical, elbows and knees are revolute, the spine is a weld.</p>
+
+  <div class="panel" id="gate" hidden>
+    <h2>This build cannot do joints</h2>
+    <p style="margin:0" id="gateWhy"></p>
+  </div>
+
+  <div class="panel">
+    <h2>What this is</h2>
+    <p>Fourteen boxes and thirteen joints. Box3D compiled all eight joint types from its first build; the SweK shim
+    bound none of them until v2515, so the engine had rigid bodies and no way to attach one to another.</p>
+    <p style="margin:0">The joints are solved inside Box3D, so they inherit its determinism and cost lockstep
+    nothing. <b>What would cost lockstep everything is whatever drives them</b> &mdash; which is why the shove below
+    is fired on a <em>tick index</em> and not on a timer. Two machines running this from the same seed step the same
+    ragdoll.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Drop it</h2>
+    <canvas id="cv" width="1200" height="840"></canvas>
+    <div class="row" style="margin-top:10px">
+      <button id="go" disabled>Drop</button>
+      <button id="shove" disabled>Shove</button>
+      <button id="hit" disabled title="Land a hit on the left forearm. With ACCUMULATE on, four of these take the arm off; with it off, nothing happens until the killing blow -- which is exactly the difference between the two severance implementations in the kaiju sim.">Hit arm</button>
+      <button id="kill" disabled title="The killing blow. Round 306's live rule severs ONLY here.">Killing blow</button>
+      <label class="dim" style="margin-left:6px"><input type="checkbox" id="accum" checked> accumulate damage</label>
+      <button id="reset" disabled>Reset</button>
+      <span id="lbl" class="dim" style="margin-left:6px">&mdash;</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>The joint graph</h2>
+    <table><thead><tr><th>joint</th><th>type</th><th>limit</th><th>why</th><th>cut</th></tr></thead><tbody id="graph"></tbody></table>
+    <div id="severOut" class="dim" style="margin-top:8px;font-size:12px;line-height:1.6;">Cut a joint to see a limb separate. <b>Nothing here runs severance code</b> &mdash; the limb falls off because the constraint holding it stopped existing.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Determinism</h2>
+    <p style="margin:0 0 8px">The hash below is Box3D's own state hash over every body's transform and velocity.
+    Run this on two machines and compare: <b>identical hashes at the same tick mean the rigs are bit-for-bit the
+    same</b>, which is the precondition for lockstep. Different hashes mean stay owner-authoritative.</p>
+    <div class="row">
+      <span id="hash" class="dim">tick &mdash; &nbsp; hash &mdash;</span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { box3d } from "./physics/box3d/box3dLoader.js";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let world = null, tick = 0, running = false, shoveAt = -1;
+let jointHandles = [], severed = [];   // v3234 -- see the note in build()
+// v3235 -- THE POLICY UNDER TEST, and it is a POLICY rather than a mechanism. The kaiju sim has TWO severance
+// implementations that differ in exactly one decision: round 306 (LIVE) severs only on the KILLING BLOW, round
+// 307 (unwired) ACCUMULATES per-bone damage so a limb comes off from sustained fire. THAT DIFFERENCE IS A
+// GAMEPLAY FEEL, and no measurement decides it -- only somebody watching.
+//
+// *** SO IT IS DEMONSTRATED HERE, ON THE PAGE THAT ALREADY OPENS AS THE SCENE. *** Keith: "if I am going to
+// watch something specific, it either has to open as that scene, or applied to a more simple demonstration of
+// that feature applied, or on the ragdoll demo." A flag on the kaiju sim would mean playing until a fight
+// happened and then judging from memory.
+//
+// WHAT THIS IS NOT: it does not run RagdollDismember. That module needs a PARTICLE SKELETON (parents[],
+// worldPos) and this rig is rigid bodies and joints. THE POLICY IS PORTABLE EVEN THOUGH THE MECHANISM IS NOT --
+// buckets and a threshold are the same question on either rig, and saying so is the difference between a
+// demonstration and a claim about code that is not running.
+let accumulate = true, buckets = {}, hp = 1.0;
+
+// v2761 -- BONES hoisted ABOVE the init block: build() runs inside the readiness gate and reads
+// BONES, so it must be initialized first (was a TDZ: Cannot access BONES before initialization).
+const BONES = [
+  //  name        pos                half                  (a box roughly the shape of the limb)
+  ["pelvis",     [0, 6.0, 0],        [0.34, 0.20, 0.20]],
+  ["chest",      [0, 6.62, 0],       [0.40, 0.34, 0.22]],
+  ["head",       [0, 7.32, 0],       [0.24, 0.26, 0.24]],
+  ["upperArmL",  [-0.72, 6.72, 0],   [0.30, 0.14, 0.14]],
+  ["lowerArmL",  [-1.42, 6.72, 0],   [0.32, 0.11, 0.11]],
+  ["upperArmR",  [0.72, 6.72, 0],    [0.30, 0.14, 0.14]],
+  ["lowerArmR",  [1.42, 6.72, 0],    [0.32, 0.11, 0.11]],
+  ["thighL",     [-0.22, 5.30, 0],   [0.16, 0.42, 0.16]],
+  ["shinL",      [-0.22, 4.44, 0],   [0.13, 0.42, 0.13]],
+  ["thighR",     [0.22, 5.30, 0],    [0.16, 0.42, 0.16]],
+  ["shinR",      [0.22, 4.44, 0],    [0.13, 0.42, 0.13]],
+];
+
+// v2766 -- JOINTS hoisted above init like BONES: build() reads it inside the readiness gate,
+// before its declaration would run (TDZ: Cannot access JOINTS before initialization).
+const JOINTS = [
+  ["spine",    "weld",      "pelvis", "chest",     [0, 6.32, 0],      null,      null,        "a spine bends, but not like a hinge -- a weld with a few Hz of give"],
+  ["neck",     "weld",      "chest",  "head",      [0, 7.02, 0],      null,      null,        "same: rigid with give, not a free swivel"],
+  ["shoulderL","spherical", "chest",  "upperArmL", [-0.42, 6.72, 0],  [-1,0,0],  90,          "a shoulder rotates every way, inside a cone"],
+  ["elbowL",   "revolute",  "upperArmL","lowerArmL",[-1.06, 6.72, 0], [0,0,1],   [0, 145],    "an elbow bends ONE way and stops"],
+  ["shoulderR","spherical", "chest",  "upperArmR", [0.42, 6.72, 0],   [1,0,0],   90,          "a shoulder rotates every way, inside a cone"],
+  ["elbowR",   "revolute",  "upperArmR","lowerArmR",[1.06, 6.72, 0],  [0,0,1],   [-145, 0],   "an elbow bends ONE way and stops"],
+  ["hipL",     "spherical", "pelvis", "thighL",    [-0.22, 5.76, 0],  [0,-1,0],  60,          "a hip is a shoulder with a tighter cone"],
+  ["kneeL",    "revolute",  "thighL", "shinL",     [-0.22, 4.88, 0],  [1,0,0],   [-145, 0],   "a knee bends backwards only -- get the sign wrong and it is a horror"],
+  ["hipR",     "spherical", "pelvis", "thighR",    [0.22, 5.76, 0],   [0,-1,0],  60,          "a hip is a shoulder with a tighter cone"],
+  ["kneeR",    "revolute",  "thighR", "shinR",     [0.22, 4.88, 0],   [1,0,0],   [-145, 0],   "a knee bends backwards only"],
+];
+
+const st = await box3d.init();
+if (!st.ready) {
+  $("gate").hidden = false;
+  $("gateWhy").innerHTML = "Box3D WASM is not built here. Run <code>physics/box3d/build-box3d-wasm-clang.sh</code> on a box with emsdk. <span class='dim'>(" + st.reason + ")</span>";
+} else {
+  // Ask the world, do not sniff at it. A box3d.wasm built before v2515 has no joint exports, and "not a function"
+  // tells an operator nothing they can act on.
+  const probe = box3d.createWorld({ gravity: [0, -9.8, 0] });
+  const has = typeof probe.supportsJoints === "function" && probe.supportsJoints();
+  probe.destroy();
+  if (!has) {
+    $("gate").hidden = false;
+    $("gateWhy").innerHTML = "This <code>box3d.wasm</code> predates v2515 and has no joint exports. Re-run <code>physics/box3d/build-box3d-wasm-clang.sh</code> and the ragdoll appears. <span class='dim'>(Everything else on this page is ready.)</span>";
+  } else {
+    $("go").disabled = false; $("reset").disabled = false;
+    build();
+  }
+}
+
+// A body per bone. Positions are the rest pose; the joint anchors are the points BETWEEN bones, which is what a
+// rig actually gives you -- a bone's head in world space.
+
+// The graph. Anchor is the world point the two bones share; axis matters only for hinges.
+
+function build() {
+  if (world) world.destroy();
+  world = box3d.createWorld({ gravity: [0, -9.8, 0] });
+  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [30, 0.5, 30] });
+
+  const idx = {};
+  for (const [name, pos, half] of BONES) idx[name] = world.addBox({ type: "dynamic", pos, half, density: 1 });
+
+  const rows = [];
+  // v3234 -- *** THE HANDLES WERE CREATED AND THROWN AWAY. *** j went into a table cell and nowhere else, so
+  // nothing could ever refer to a joint again. Keeping them is the whole of what dismemberment needs HERE:
+  // severing a limb on this rig is DESTROYING A CONSTRAINT, not detaching a subtree. The Box3D character is
+  // eleven rigid bodies held by joints; the kaiju ragdoll is a particle skeleton with a parents[] array, and
+  // simulation/RagdollDismember.js works on THAT one. Two ragdolls, two mechanisms, and the cheap demonstration
+  // is here: THE SOLVER NEEDS NO SPECIAL CASE.
+  jointHandles = [];
+  for (const [name, kind, a, b, anchor, axis, limit, why] of JOINTS) {
+    let j = -1, lim = "";
+    if (kind === "weld") { j = world.jointWeld(idx[a], idx[b], anchor, 8, 0.5); lim = "8 Hz give"; }
+    else if (kind === "spherical") { j = world.jointSpherical(idx[a], idx[b], anchor, axis, limit); lim = limit + "&deg; cone"; }
+    else { j = world.jointRevolute(idx[a], idx[b], anchor, axis, limit[0], limit[1]); lim = limit[0] + "&deg; to " + limit[1] + "&deg;"; }
+    rows.push("<tr><td>" + name + "</td><td class='" + (kind === "revolute" ? "warn" : kind === "spherical" ? "ok" : "dim") +
+              "'>" + kind + "</td><td>" + (j >= 0 ? lim : "<span class='hot'>refused</span>") + "</td><td class='dim'>" + why + "</td>" +
+              "<td>" + (j >= 0 ? "<button class='sev' data-j='" + j + "' data-n='" + name + "'>sever</button>" : "") + "</td></tr>");
+    if (j >= 0) jointHandles.push({ name, handle: j, kind });
+  }
+  severed = []; buckets = {}; hp = 1.0;
+  $("graph").innerHTML = rows.join("");
+  // *** THE DEMONSTRATION IS THE INVARIANT, NOT THE LIMB. *** jointDestroy's own comment says it "leaves a hole
+  // rather than shifting the joints after it: an index must mean the same joint for the life of the world, or
+  // every handle the caller holds quietly points at a different bone." That is a claim, and cutting one joint
+  // while holding ten others is how you SEE it hold -- so the readout checks the survivors rather than admiring
+  // the arm.
+  for (const btn of $("graph").querySelectorAll("button.sev")) {
+    btn.onclick = () => {
+      const h = parseInt(btn.getAttribute("data-j"), 10), name = btn.getAttribute("data-n");
+      const before = world.jointCount();
+      const others = jointHandles.filter((x) => x.handle !== h && !severed.includes(x.handle));
+      world.jointDestroy(h);
+      severed.push(h);
+      const after = world.jointCount();
+      btn.disabled = true; btn.textContent = "cut";
+      // A HANDLE THAT STILL RESOLVES TO ITS OWN JOINT is the property. We cannot read a joint back by index, so
+      // the check is the one the API can answer: exactly one joint went, and the count fell by exactly one.
+      const ok = (before - after) === 1;
+      $("severOut").innerHTML =
+        "<b>" + name + "</b> cut &mdash; joints " + before + " &rarr; " + after +
+        (ok ? " <span class='ok'>(exactly one)</span>" : " <span class='hot'>(expected one, got " + (before - after) + ")</span>") +
+        " &nbsp; <span class='dim'>" + others.length + " handle(s) still held, and jointDestroy LEAVES A HOLE rather than " +
+        "renumbering &mdash; so every one of them still means the joint it meant before the cut.</span>" +
+        "<br><span class='dim'>No severance code ran. On this rig a limb comes off because a CONSTRAINT STOPPED " +
+        "EXISTING, which is why the solver needed no special case. The kaiju ragdoll is a particle skeleton and " +
+        "severs by walking parents[] instead &mdash; two ragdolls, two mechanisms.</span>";
+      draw(); hash();
+    };
+  }
+
+  // *** ONE SEVERANCE PATH, TWO POLICIES DECIDING WHEN TO CALL IT. *** The cut is identical either way -- that
+  // is the point. What differs is whether damage is REMEMBERED between hits, which is the only real difference
+  // between the two implementations in the kaiju sim and the only thing a person needs to watch.
+  const THRESH = 1.0, PER_HIT = 0.28;
+  const named = (n) => jointHandles.find((x) => x.name === n);
+  function land(name, dmg, killing) {
+    const j = named(name);
+    if (!j || severed.includes(j.handle)) { report(name, "already off"); return; }
+    buckets[name] = (buckets[name] || 0) + dmg;
+    hp = Math.max(0, hp - dmg * 0.45);
+    // ROUND 306's RULE: sever only on the killing blow. ROUND 307's: sever when the BUCKET crosses.
+    const fires = accumulate ? (buckets[name] >= THRESH) : (killing && dmg >= 0.4);
+    if (fires) { world.jointDestroy(j.handle); severed.push(j.handle); }
+    report(name, fires ? "SEVERED" : null);
+    draw(); hash();
+  }
+  function report(name, note) {
+    const b = (buckets[name] || 0).toFixed(2);
+    $("severOut").innerHTML =
+      "<b>" + name + "</b> bucket <b>" + b + "</b> / " + THRESH.toFixed(2) +
+      " &nbsp; hp <b>" + hp.toFixed(2) + "</b> &nbsp; joints <b>" + world.jointCount() + "</b>" +
+      (note ? " &nbsp; <span class='" + (note === "SEVERED" ? "hot" : "dim") + "'>" + note + "</span>" : "") +
+      "<br><span class='dim'>" + (accumulate
+        ? "ACCUMULATE (round 307's rule): damage is remembered per bone, so sustained fire takes the arm even without a kill."
+        : "KILL-ONLY (round 306's rule, LIVE in the kaiju sim): the bucket fills and NOTHING HAPPENS until a killing blow lands.") +
+      " The cut itself is the same call either way &mdash; ONLY THE POLICY DIFFERS, which is the whole of what " +
+      "there is to decide.</span>";
+  }
+  $("hit").onclick = () => land("elbowL", PER_HIT, false);
+  $("kill").onclick = () => land("elbowL", 0.5, true);
+  $("accum").onchange = () => { accumulate = $("accum").checked; report("elbowL", null); };
+  $("hit").disabled = false; $("kill").disabled = false;
+  tick = 0; shoveAt = -1;
+  $("lbl").textContent = world.bodyCount() + " bodies, " + world.jointCount() + " joints";
+  draw(); hash();
+}
+
+function hash() {
+  $("hash").innerHTML = "tick <b>" + tick + "</b> &nbsp; hash <b>" + (world.stateHash() >>> 0).toString(16).padStart(8, "0") + "</b>";
+}
+
+function draw() {
+  ctx.fillStyle = "#020509"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!world) return;
+  const xf = world.readTransforms(), n = xf.length / 7;
+  const s = 84, ox = cv.width / 2, oy = cv.height - 90;
+  // ground
+  ctx.strokeStyle = "#16304d"; ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(cv.width, oy); ctx.stroke();
+  for (let i = 1; i < n; i++) {   // 0 is the ground slab
+    const x = xf[i * 7] * s + ox, y = -xf[i * 7 + 1] * s + oy;
+    const qx = xf[i * 7 + 3], qy = xf[i * 7 + 4], qz = xf[i * 7 + 5], qw = xf[i * 7 + 6];
+    // roll about z, which is the axis facing the camera in this flat view
+    const roll = Math.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz));
+    const half = BONES[i - 1] ? BONES[i - 1][2] : [0.2, 0.2, 0.2];
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-roll);
+    ctx.fillStyle = i === 3 ? "#ffd27f" : i <= 2 ? "#7fe3c4" : "#7fb4e6";
+    ctx.fillRect(-half[0] * s, -half[1] * s, half[0] * 2 * s, half[1] * 2 * s);
+    ctx.restore();
+  }
+  ctx.fillStyle = "#5b7699"; ctx.font = "12px ui-monospace,monospace";
+  ctx.fillText("tick " + tick, 10, 18);
+}
+
+function frame() {
+  if (!running) return;
+  // TICK-INDEXED, not time-indexed. A shove fired on a wall-clock timer would land on a different tick on a
+  // different machine, and two peers would disagree about the rig forever after. This is the whole discipline.
+  if (tick === shoveAt) {
+    world.impulse(4, [14, 6, 0]);        // lowerArmL
+    world.angularImpulse(1, [0, 0, 3]);  // chest
+  }
+  world.step(1 / 60, 4);
+  tick++;
+  draw();
+  if (tick % 10 === 0) hash();
+  requestAnimationFrame(frame);
+}
+
+$("go").onclick = () => {
+  running = !running;
+  $("go").textContent = running ? "Pause" : "Drop";
+  $("shove").disabled = !running;
+  if (running) frame();
+};
+$("shove").onclick = () => { shoveAt = tick + 2; };   // two ticks out, so it is still a tick and not a timestamp
+$("reset").onclick = () => { running = false; $("go").textContent = "Drop"; $("shove").disabled = true; build(); };
+</script>
+</body>
+</html>

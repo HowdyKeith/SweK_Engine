@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="TradingAgents — congress trades">
+<meta name="demo:desc" content="Browse politician stock disclosures: member list with trade counts, click for a per-member breakdown. Education/sim only. Free senate-watcher data, or FMP for current.">
+<meta name="demo:cats" content="tool">
+<title>TradingAgents — congress trades</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; --buy:#7fe0a0; --sell:#ff9b6b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #status { margin-left:auto; font-size:12px; color:var(--dim); }
+  .wrap { max-width:920px; margin:0 auto; padding:16px; }
+  .banner { font-size:11px; color:var(--amber); background:#1a1407; border:1px solid #5a4410; border-radius:6px; padding:8px 10px; margin-bottom:12px; line-height:1.5; }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:14px 0 6px; }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:8px 14px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  .btn.sm { padding:6px 10px; font-size:11px; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  input,select { background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:6px; padding:8px; font:12px ui-monospace,monospace; }
+  table { border-collapse:collapse; width:100%; font-size:12px; margin-top:6px; }
+  th,td { border:1px solid #14304a; padding:5px 8px; text-align:left; }
+  th { color:var(--dim); background:#0a1422; cursor:pointer; user-select:none; }
+  tr.member:hover { background:#0e1d30; cursor:pointer; }
+  td.num { text-align:right; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin:6px 0; }
+  .card { background:var(--panel); border:1px solid #14304a; border-left:4px solid var(--edge); border-radius:6px 6px 6px 12px; padding:8px 10px; }
+  .card .k { font-size:10px; color:var(--dim); text-transform:uppercase; } .card .v { font-size:16px; margin-top:2px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+  .chip { background:#10243b; border:1px solid var(--edge); border-radius:12px; padding:2px 9px; font-size:11px; color:var(--blue); }
+  .buy { color:var(--buy); } .sell { color:var(--sell); }
+  #analysis { display:none; border-top:1px solid var(--edge); margin-top:16px; padding-top:10px; }
+  .note { font-size:11px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div id="bar"><h1>📈 TradingAgents</h1><span id="status">…</span></div>
+<div class="wrap">
+  <div class="banner">⚖️ Education / simulation only — not investment advice. Disclosures are public STOCK Act filings and lag the actual trade by 30–45 days; amounts are reported ranges.</div>
+
+  <div class="ttl">Data source</div>
+  <div class="row">
+    <select id="source"><option value="senate">senate-watcher (free, historical)</option><option value="fmp">FMP (current, needs key)</option><option value="finnhub">finnhub (by ticker, key)</option></select>
+    <input id="apiKey" placeholder="API key (FMP / finnhub)" style="flex:1 1 220px">
+    <button class="btn sm" id="saveCfg">Save</button>
+    <span id="cfgState" class="note"></span>
+  </div>
+
+  <div class="ttl">Members</div>
+  <div class="row">
+    <label class="note">show top <input id="limit" type="number" value="40" min="0" max="500" style="width:64px"></label>
+    <select id="sort"><option value="trades">by trade count</option><option value="name">by name</option></select>
+    <button class="btn go" id="loadMembers">Load members</button>
+    <span id="memState" class="note"></span>
+  </div>
+  <div id="membersWrap"></div>
+
+  <div id="analysis">
+    <div class="ttl" id="aName">—</div>
+    <div class="cards" id="aCards"></div>
+    <div class="ttl">Top tickers</div><div class="chips" id="aTop"></div>
+    <div class="ttl">Recent disclosed trades</div><div id="aRecent"></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+async function getJSON(u){ return fetch(u).then(r=>r.json()); }
+async function postJSON(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(r=>r.json()); }
+function esc(v){ return String(v==null?"":v).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+async function loadCfg(){
+  try{ const r=await getJSON("/trader/config"); const c=r.config||{}; $("source").value=c.source||"senate"; $("cfgState").textContent="source: "+(c.source||"senate")+(c.apiKey==="set"?" · key ✓":""); $("status").textContent="ready"; }
+  catch{ $("status").textContent="bridge offline"; }
+}
+$("saveCfg").onclick=async ()=>{ const body={source:$("source").value}; const k=$("apiKey").value.trim(); if(k)body.apiKey=k; const r=await postJSON("/trader/config",body); const c=r.config||{}; $("cfgState").textContent="saved · source: "+(c.source||"")+(c.apiKey==="set"?" · key ✓":""); $("apiKey").value=""; };
+
+let MEMBERS=[], curSort="trades", asc=false;
+function renderMembers(){
+  const rows = MEMBERS.slice();
+  const wrap=$("membersWrap");
+  let h='<table><tr><th data-s="rank">#</th><th data-s="name">Member</th><th data-s="trades">Trades</th><th data-s="tickers">Tickers</th><th data-s="lastTrade">Last</th></tr>';
+  rows.forEach((m,i)=>{ h+='<tr class="member" data-name="'+esc(m.name)+'"><td class="num">'+(i+1)+'</td><td>'+esc(m.name)+'</td><td class="num">'+m.trades+'</td><td class="num">'+m.tickers+'</td><td>'+esc(m.lastTrade||"")+'</td></tr>'; });
+  h+='</table>';
+  wrap.innerHTML=h;
+  wrap.querySelectorAll("tr.member").forEach(tr=>tr.onclick=()=>analyze(tr.dataset.name));
+}
+$("loadMembers").onclick=async ()=>{
+  $("loadMembers").disabled=true; $("memState").textContent="loading…"; $("analysis").style.display="none";
+  try{ const r=await getJSON("/trader/members?limit="+(+$("limit").value||0)+"&sort="+$("sort").value);
+    if(r.ok){ MEMBERS=r.members||[]; $("memState").textContent=r.count+" of "+(r.members?r.members.length:0)+" shown · "+(r.source||""); renderMembers(); }
+    else $("memState").textContent="✕ "+(r.error||"failed");
+  }catch(e){ $("memState").textContent="✕ "+e.message; }
+  $("loadMembers").disabled=false;
+};
+
+async function analyze(name){
+  $("analysis").style.display="block"; $("aName").textContent="loading "+name+"…"; window.scrollTo(0,document.body.scrollHeight);
+  try{
+    const r=await getJSON("/trader/member-analysis?name="+encodeURIComponent(name)+"&limit=20");
+    if(!r.ok){ $("aName").textContent="✕ "+(r.error||"failed"); return; }
+    $("aName").textContent=r.member;
+    const s=r.summary||{};
+    $("aCards").innerHTML=[["Trades",s.totalTrades],["Buys",s.buys,"buy"],["Sells",s.sells,"sell"],["Tickers",s.uniqueTickers],["First",s.firstTrade],["Last",s.lastTrade]]
+      .map(([k,v,cls])=>'<div class="card"><div class="k">'+k+'</div><div class="v '+(cls||"")+'">'+esc(v)+'</div></div>').join("");
+    $("aTop").innerHTML=(r.topTickers||[]).map(t=>'<span class="chip">'+esc(t.ticker)+' · '+t.trades+'</span>').join("");
+    let h='<table><tr><th>Date</th><th>Ticker</th><th>Type</th><th>Amount</th></tr>';
+    for(const t of (r.recent||[])){ const cls=/purchase|buy/i.test(t.type)?"buy":(/sale|sell/i.test(t.type)?"sell":""); h+='<tr><td>'+esc(t.date)+'</td><td>'+esc(t.ticker)+'</td><td class="'+cls+'">'+esc(t.type)+'</td><td>'+esc(t.amount)+'</td></tr>'; }
+    h+='</table>'; $("aRecent").innerHTML=h;
+  }catch(e){ $("aName").textContent="✕ "+e.message; }
+}
+loadCfg();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>
