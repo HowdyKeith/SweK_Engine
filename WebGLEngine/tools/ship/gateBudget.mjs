@@ -34,7 +34,22 @@
 // "47.7s" reads as, and gateBudget-selfcheck went red comparing it against the 47729 actually recorded. A
 // ROUNDED MEASUREMENT IS A DIFFERENT NUMBER FROM THE MEASUREMENT, and the gate caught it on its first honest
 // run -- which is the entire argument for checking a derivation against an independent record.
-export const SLOWEST_GENERAL = { gate: "tools/roundhouse/assumptionMap-selfcheck.mjs", ms: 47729 };
+// *** v3913 -- RE-PINNED, BECAUSE THE GATE THIS NAMED HAD OUTGROWN THE BUDGET IT DEFINES. ***
+// assumptionMap-selfcheck was measured at 47729ms in the v3211 run and stopwatch-measured at 284000ms now --
+// SIX TIMES ITS RECORDED VALUE, and TWICE the 143s default derived from it. The constant that sets everyone
+// else's budget named a gate that could no longer pass that budget, which is why four gates read as TIMEOUT on
+// the rig while three of them were simply being killed.
+//
+// The re-pin is DERIVED, not chosen: every gate that had crept past the old line moved into the tail below
+// (their measurements were already sitting in gate-timings.json), and this now names the slowest gate that is
+// genuinely still in the general population. 1019 gates remain under it. THE DEFAULT BARELY MOVES -- 143.2s to
+// 139.9s -- which is the point: the general population was never slow, it had eighteen tail gates hiding in it.
+//
+// The alternative was pinning to the observed worst, observableUnits at 131.9s, which would have made the
+// default 396s for all 1019. This file's own header refuses that in advance: raising everything "turns a
+// genuinely hung gate into a five-minute stall". TWO POPULATIONS, TWO BUDGETS -- so the fix is to put the tail
+// gates in the tail, not to widen the budget for gates that never needed it.
+export const SLOWEST_GENERAL = { gate: "tools/roundhouse/flip3dBind-selfcheck.mjs", ms: 46639 };
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
@@ -63,6 +78,43 @@ export const MEASURED = {
     "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    250473,
     "tools/ship/labDevices-selfcheck.mjs":           253635,
     "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
+    // *** v3913 -- THE EIGHTEEN THAT HAD CREPT PAST THE GENERAL LINE, PLUS TWO MEASURED THIS ROUND. ***
+    // Not one number here is invented: the seventeen below came straight out of gate-timings.json, which is the
+    // record of what they ACTUALLY took in a full suite, and the three after them were stopwatch-timed on an
+    // otherwise idle box this round. gateBudget-selfcheck had been red for exactly this -- "no gate in the
+    // general population has crept past a third of the default" -- and the red was right for four hundred
+    // versions while nobody moved the gates it was pointing at.
+    "tools/roundhouse/observableUnits-selfcheck.mjs":     131866,
+    "physics/thermal/stefan-selfcheck.mjs":               115861,
+    "physics/sph/poolFixture-selfcheck.mjs":              103128,
+    "tools/roundhouse/detectionMap-selfcheck.mjs":         90448,
+    "tools/roundhouse/compose-selfcheck.mjs":              88058,
+    "simulation/lbm/settleCurve-selfcheck.mjs":            82639,
+    "tools/roundhouse/hydrostatic-selfcheck.mjs":          76003,
+    "tools/ship/doorKinds-selfcheck.mjs":                  73762,
+    "physics/astroparticle/jeans-selfcheck.mjs":           67863,
+    "tools/render-qa/terminatorOracle-selfcheck.mjs":      63310,
+    "tools/roundhouse/zeroRangeSweep-selfcheck.mjs":       62594,
+    "tools/roundhouse/stabilityBind-selfcheck.mjs":        61987,
+    "tools/ship/ddaPrecisionReport-selfcheck.mjs":         60804,
+    "physics/sph/tiltPower-selfcheck.mjs":                 59456,
+    "physics/sph/wideTilt-selfcheck.mjs":                  57318,
+    "physics/mesh/weightScaling-selfcheck.mjs":            50562,
+    "tools/ship/loopSearch-selfcheck.mjs":                 49899,
+    // MEASURED AT v3913, stopwatch-timed, each run alone:
+    // assumptionMap PASSES at 284s. It was the SLOWEST_GENERAL pin at 47729ms and had grown 6x underneath it.
+    "tools/roundhouse/assumptionMap-selfcheck.mjs":  284000,
+    // *** census FAILS at 717s, AND THAT IS THE FINDING. *** It was reported as TIMEOUT, and a timeout is not a
+    // failure -- but it is not a pass either, and here it was hiding a REAL RED for as long as the budget killed
+    // it. A gate that cannot finish cannot tell you it is broken. The failure is not fixed here; it is now
+    // VISIBLE, which is the prerequisite.
+    "tools/roundhouse/census-selfcheck.mjs":         717000,
+    // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
+    // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
+    // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
+    // the larger of the two readings is used -- a budget derived from the faster of two measurements is a budget
+    // that fails on the slower one.
+    "tools/roundhouse/configContract-selfcheck.mjs":  78000,
     // *** MEASURED AT v3904 BECAUSE A NEW CHECK TIMED OUT AND THE GATE TURNED OUT TO HAVE BEEN DYING ALL ALONG.
     // 1058s stopwatch-timed on an otherwise idle box, and IT PASSES -- all checks. A contended run earlier the
     // same hour gave 1085s; the SMALLER, cleaner number is recorded here and the larger one is written down
@@ -127,6 +179,29 @@ export const TAIL_HEADROOM = 2;
  * threshold being loosened in this tree.
  */
 export const UNRESOLVED = {
+    // *** v3913 -- claimTrace DID NOT COMPLETE IN THIRTY MINUTES, so there is no measurement to record. ***
+    // A LOWER BOUND IS NOT A MEASUREMENT. Every entry in MEASURED above is a real completion; putting a guess
+    // beside them would poison the one property that table has. This is the table for "we tried and it did not
+    // finish", and it is why the table exists empty rather than not existing.
+    //
+    // What is known: >= 1800000ms with no output, run alone on an idle box, rc 124 from timeout(1). What is NOT
+    // known is whether it would ever finish -- an 1800s bound cannot distinguish a very slow gate from a hung
+    // one, and saying which would be a confident answer about unfinished work.
+    //
+    // THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER. Three of the four gates that read as
+    // TIMEOUT on the rig turned out to be fine once allowed to run; this is the one that is genuinely unresolved,
+    // and calling it out separately is the whole point of keeping the two tables apart.
+    // *** AND THE GATE CAUGHT ME SMUGGLING A NUMBER IN HERE. *** I first wrote this as
+    // { atLeastMs: 1800000, measured: false, note: ... } and gateBudget-selfcheck refused it: the values in this
+    // table must be STRINGS. That is not a formatting rule, it is the table's whole point -- a machine-readable
+    // atLeastMs is a number something downstream can consume as a budget, which is exactly the fabrication this
+    // table exists to refuse. THE BOUND BELONGS IN PROSE, WHERE NOTHING CAN MISTAKE IT FOR A MEASUREMENT.
+    "tools/roundhouse/claimTrace-selfcheck.mjs":
+        "v3913: did not complete in 1800s, run alone on an idle box, no output at all (rc 124 from timeout(1)). " +
+        "That is a LOWER BOUND AND NOT A MEASUREMENT -- it cannot distinguish a very slow gate from a hung one, " +
+        "and saying which would be a confident answer about unfinished work. Three of the four gates that read " +
+        "as TIMEOUT on the rig turned out to be fine once allowed to run; this is the one that is genuinely " +
+        "unresolved. THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER.",
 };
 
 /**
