@@ -9,7 +9,7 @@
 // AND THE THREE CLASSIC ERRORS ARE TOLD APART BY THEIR RATIO, NOT BY A THRESHOLD, because each predicts a
 // different exact multiple: 1/(2 pi), 2, and 4/pi. A tolerance would lump them; a ratio names which one.
 "use strict";
-import { furnace, EXPECTED, uniformSampleHemisphere, uniformThetaHemisphere, createCoordinateSystem, rng,
+import { furnace, EXPECTED, EXPECTED_COSINE, uniformSampleHemisphere, uniformThetaHemisphere, createCoordinateSystem, rng,
          cosinePdf, cosineSampleHemisphere, toWorld } from "./furnace.mjs";
 
 let fails = 0;
@@ -201,9 +201,14 @@ const RHO = 0.18;   // the albedo the lesson uses, and the one every renderer is
     ok("!! *** SABOTAGE: A CONSTANT-WRONG PDF IS PURE BIAS -- EXACTLY 2x, WITH THE VARIANCE STILL AT ZERO ***",
        Math.abs(constWrong.mean - 2) < 1e-9 && constWrong.sd < 1e-14,
        "the integrand stays constant, so the estimator remains exact -- about the wrong number. NO AMOUNT OF SAMPLING FINDS THIS, and a convergence check would report a perfectly converged renderer.");
-    ok("!! ...while a SHAPE-wrong pdf lands on 4/3 AND brings the variance back",
-       Math.abs(bad.mean - 4 / 3) < 5e-3 && bad.sd > 1e-3,
-       `mean ${bad.mean.toFixed(6)} against the module's predicted ${(4 / 3).toFixed(6)}, sd ${bad.sd.toExponential(2)} against the clean ${cos.sd.toExponential(2)}. TWO FAULTS SEPARATED BY A NUMBER THE MEAN DOES NOT CONTAIN: sample the NDF and divide by the cosine pdf and you get both a bias and your variance back; scale the pdf and you get only the bias.`);
+    // *** v3905 -- THIS LINE SAID `4 / 3` AND THE MODULE ALREADY DECLARES IT AS EXPECTED_COSINE.wrongPdf. ***
+    // v3904 named EXPECTED_COSINE in a comment and re-typed its value in the assertion, which is a SECOND
+    // DECLARATION of a prediction -- and it was the ONLY comment-only definition in a census of 1824. The
+    // prediction is now READ FROM THE MODULE, so a change there fails here instead of silently disagreeing.
+    ok("!! ...while a SHAPE-wrong pdf lands on the module's own predicted 4/3 AND brings the variance back",
+       Math.abs(bad.mean - EXPECTED_COSINE.wrongPdf) < 5e-3 && bad.sd > 1e-3 &&
+       Math.abs(cos.mean - EXPECTED_COSINE.clean) < 1e-9,
+       `mean ${bad.mean.toFixed(6)} against the module's predicted ${EXPECTED_COSINE.wrongPdf.toFixed(6)}, sd ${bad.sd.toExponential(2)} against the clean ${cos.sd.toExponential(2)}. TWO FAULTS SEPARATED BY A NUMBER THE MEAN DOES NOT CONTAIN: sample the NDF and divide by the cosine pdf and you get both a bias and your variance back; scale the pdf and you get only the bias.`);
 }
 
 console.log(fails ? "\nfurnace-selfcheck: " + fails + " FAILED" : "\nfurnace-selfcheck: all checks pass");
