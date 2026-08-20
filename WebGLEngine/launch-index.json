@@ -1,0 +1,4030 @@
+{
+ "generatedFrom": "tools/ship/launchIndex.mjs",
+ "kinds": {
+  "PAGE": {
+   "id": "page",
+   "verb": "opens",
+   "survives": true,
+   "note": "a file on disk: openable, bookmarkable, and visible to render-QA"
+  },
+  "DEMO": {
+   "id": "demo",
+   "verb": "launches",
+   "survives": false,
+   "note": "a demos_code script the engine boots into via ?go=; exists only while the engine is up"
+  },
+  "BUILTIN": {
+   "id": "builtin",
+   "verb": "enters",
+   "survives": false,
+   "note": "an inline DEMO_MODE of main.js; a state of the engine, not a file"
+  }
+ },
+ "counts": {
+  "page": 397,
+  "demo": 49,
+  "builtin": 54
+ },
+ "entries": [
+  {
+   "kind": "page",
+   "id": "AudioLab.html",
+   "display": "AudioLab",
+   "href": "/AudioLab.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "RobotExpressive.html",
+   "display": "RobotExpressive",
+   "href": "/RobotExpressive.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ac.html",
+   "display": "Ac",
+   "href": "/ac.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "agenda.html",
+   "display": "Agenda",
+   "href": "/agenda.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "agent-arena.html",
+   "display": "Agent Arena",
+   "href": "/agent-arena.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "aibrain.html",
+   "display": "Aibrain",
+   "href": "/aibrain.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "air-quality.html",
+   "display": "Air Quality",
+   "href": "/air-quality.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "alexa.html",
+   "display": "Alexa",
+   "href": "/alexa.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "amplified-diff.html",
+   "display": "Amplified Diff",
+   "href": "/amplified-diff.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "android-invite.html",
+   "display": "Android Invite",
+   "href": "/android-invite.html",
+   "section": "NearShare",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "android-peer.html",
+   "display": "Android Peer",
+   "href": "/android-peer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "angle-of-repose.html",
+   "display": "Angle Of Repose",
+   "href": "/angle-of-repose.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "anime4k.html",
+   "display": "Anime4k",
+   "href": "/anime4k.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "arch-diagram.html",
+   "display": "Arch Diagram",
+   "href": "/arch-diagram.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "arrival.html",
+   "display": "Arrival",
+   "href": "/arrival.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ascii-object.html",
+   "display": "Ascii Object",
+   "href": "/ascii-object.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ascii-video.html",
+   "display": "Ascii Video",
+   "href": "/ascii-video.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "asset-library.html",
+   "display": "Asset Library",
+   "href": "/asset-library.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "asset-studio.html",
+   "display": "Asset Studio",
+   "href": "/asset-studio.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "asset2voxels.html",
+   "display": "Asset2voxels",
+   "href": "/asset2voxels.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "assets-ingest.html",
+   "display": "Assets Ingest",
+   "href": "/assets-ingest.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "asteroids.html",
+   "display": "Asteroids",
+   "href": "/asteroids.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "avatar-push.html",
+   "display": "Avatar Push",
+   "href": "/avatar-push.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "avatar-server.html",
+   "display": "Avatar Server",
+   "href": "/avatar-server.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "avatarpreview.html",
+   "display": "Avatarpreview",
+   "href": "/avatarpreview.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "avatarstage.html",
+   "display": "Avatarstage",
+   "href": "/avatarstage.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "backend-dom.html",
+   "display": "Backend Dom",
+   "href": "/backend-dom.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "backend-physics-check.html",
+   "display": "Backend Physics Check",
+   "href": "/backend-physics-check.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ball-alerts.html",
+   "display": "Ball Alerts",
+   "href": "/ball-alerts.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bands.html",
+   "display": "Bands",
+   "href": "/bands.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "battleship3d.html",
+   "display": "Battleship3d",
+   "href": "/battleship3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bayes-fit.html",
+   "display": "Bayes Fit",
+   "href": "/bayes-fit.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "beam.html",
+   "display": "Beam",
+   "href": "/beam.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "benchmark.html",
+   "display": "Benchmark",
+   "href": "/benchmark.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "benchmarks.html",
+   "display": "Benchmarks",
+   "href": "/benchmarks.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "binder-budget.html",
+   "display": "Binder Budget",
+   "href": "/binder-budget.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "biome-map-demo.html",
+   "display": "Biome Map Demo",
+   "href": "/biome-map-demo.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blackhole.html",
+   "display": "Blackhole",
+   "href": "/blackhole.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-avatar.html",
+   "display": "Blob Avatar",
+   "href": "/blob-avatar.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-gravity.html",
+   "display": "Blob Gravity",
+   "href": "/blob-gravity.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-herd.html",
+   "display": "Blob Herd",
+   "href": "/blob-herd.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-selfie.html",
+   "display": "Blob Selfie",
+   "href": "/blob-selfie.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-shock.html",
+   "display": "Blob Shock",
+   "href": "/blob-shock.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-stage.html",
+   "display": "Blob Stage",
+   "href": "/blob-stage.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blob-studio.html",
+   "display": "Blob Studio",
+   "href": "/blob-studio.html",
+   "section": "Blobs",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blobarium.html",
+   "display": "Blobarium",
+   "href": "/blobarium.html",
+   "section": "Blobs",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blobulator-gpu.html",
+   "display": "Blobulator Gpu",
+   "href": "/blobulator-gpu.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blobulator.html",
+   "display": "Blobulator",
+   "href": "/blobulator.html",
+   "section": "Blobs",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "blueprint.html",
+   "display": "Blueprint",
+   "href": "/blueprint.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "board.html",
+   "display": "Board",
+   "href": "/board.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "boids.html",
+   "display": "Boids",
+   "href": "/boids.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "boot-sidecar.html",
+   "display": "Boot Sidecar",
+   "href": "/boot-sidecar.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "boundary-rank.html",
+   "display": "Boundary Rank",
+   "href": "/boundary-rank.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-blobs.html",
+   "display": "Box3d Blobs",
+   "href": "/box3d-blobs.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-contacts.html",
+   "display": "Box3d Contacts",
+   "href": "/box3d-contacts.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-demo.html",
+   "display": "Box3d Demo",
+   "href": "/box3d-demo.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-info.html",
+   "display": "Box3d Info",
+   "href": "/box3d-info.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-replay.html",
+   "display": "Box3d Replay",
+   "href": "/box3d-replay.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d-vs-jolt.html",
+   "display": "Box3d Vs Jolt",
+   "href": "/box3d-vs-jolt.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "box3d.html",
+   "display": "Box3d",
+   "href": "/box3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-3d.html",
+   "display": "Brain 3d",
+   "href": "/brain-3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-bench.html",
+   "display": "Brain Bench",
+   "href": "/brain-bench.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-fleet.html",
+   "display": "Brain Fleet",
+   "href": "/brain-fleet.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-lab.html",
+   "display": "Brain Lab",
+   "href": "/brain-lab.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-maze.html",
+   "display": "Brain Maze",
+   "href": "/brain-maze.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-quadrants.html",
+   "display": "Brain Quadrants",
+   "href": "/brain-quadrants.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-replay.html",
+   "display": "Brain Replay",
+   "href": "/brain-replay.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "brain-room.html",
+   "display": "Brain Room",
+   "href": "/brain-room.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bridge.html",
+   "display": "Bridge",
+   "href": "/bridge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bzflag-info.html",
+   "display": "Bzflag Info",
+   "href": "/bzflag-info.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bzflag-test.html",
+   "display": "Bzflag Test",
+   "href": "/bzflag-test.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bzflag.html",
+   "display": "Bzflag",
+   "href": "/bzflag.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "camoufox.html",
+   "display": "Camoufox",
+   "href": "/camoufox.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cams.html",
+   "display": "Cams",
+   "href": "/cams.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "case-study.html",
+   "display": "Case Study",
+   "href": "/case-study.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "catalog.html",
+   "display": "Catalog",
+   "href": "/catalog.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "celltrack-splat.html",
+   "display": "Celltrack Splat",
+   "href": "/celltrack-splat.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "celltrack-viewer-gpu.html",
+   "display": "Celltrack Viewer Gpu",
+   "href": "/celltrack-viewer-gpu.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "celltrack-viewer.html",
+   "display": "Celltrack Viewer",
+   "href": "/celltrack-viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "celltrack.html",
+   "display": "Celltrack",
+   "href": "/celltrack.html",
+   "section": "Cell Tracking",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cellular-automata.html",
+   "display": "Cellular Automata",
+   "href": "/cellular-automata.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "changelog.html",
+   "display": "Changelog",
+   "href": "/changelog.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "clients.html",
+   "display": "Clients",
+   "href": "/clients.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cloudedge.html",
+   "display": "Cloudedge",
+   "href": "/cloudedge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cockpit.html",
+   "display": "Cockpit",
+   "href": "/cockpit.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "codemap.html",
+   "display": "Codemap",
+   "href": "/codemap.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-parallax.html",
+   "display": "Comic Parallax",
+   "href": "/comic-parallax.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-translate.html",
+   "display": "Comic Translate",
+   "href": "/comic-translate.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-voxel-blob.html",
+   "display": "Comic Voxel Blob",
+   "href": "/comic-voxel-blob.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-voxel-fire.html",
+   "display": "Comic Voxel Fire",
+   "href": "/comic-voxel-fire.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-voxel-physics.html",
+   "display": "Comic Voxel Physics",
+   "href": "/comic-voxel-physics.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comic-voxel-water.html",
+   "display": "Comic Voxel Water",
+   "href": "/comic-voxel-water.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "comics.html",
+   "display": "Comics",
+   "href": "/comics.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "composer.html",
+   "display": "Composer",
+   "href": "/composer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "connect.html",
+   "display": "Connect",
+   "href": "/connect.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "consistency-fleet.html",
+   "display": "Consistency Fleet",
+   "href": "/consistency-fleet.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "consistency.html",
+   "display": "Consistency",
+   "href": "/consistency.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "control.html",
+   "display": "Control",
+   "href": "/control.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cosmic-map.html",
+   "display": "Cosmic Map",
+   "href": "/cosmic-map.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cosmic-web.html",
+   "display": "Cosmic Web",
+   "href": "/cosmic-web.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "counter-strike.html",
+   "display": "Counter Strike",
+   "href": "/counter-strike.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "couple.html",
+   "display": "Couple",
+   "href": "/couple.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "credits.html",
+   "display": "Credits",
+   "href": "/credits.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "csg.html",
+   "display": "Csg",
+   "href": "/csg.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ct.html",
+   "display": "Ct",
+   "href": "/ct.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "cube.html",
+   "display": "Cube",
+   "href": "/cube.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "current-loop.html",
+   "display": "Current Loop",
+   "href": "/current-loop.html",
+   "section": "Electromagnetism",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "curriculum.html",
+   "display": "Curriculum",
+   "href": "/curriculum.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "curved-wall.html",
+   "display": "Curved Wall",
+   "href": "/curved-wall.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "debug.html",
+   "display": "Debug",
+   "href": "/debug.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "device.html",
+   "display": "Device",
+   "href": "/device.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "devtools.html",
+   "display": "Devtools",
+   "href": "/devtools.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "dictation.html",
+   "display": "Dictation",
+   "href": "/dictation.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "diffraction.html",
+   "display": "Diffraction",
+   "href": "/diffraction.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "diffusion.html",
+   "display": "Diffusion",
+   "href": "/diffusion.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "diorama-composer.html",
+   "display": "Diorama Composer",
+   "href": "/diorama-composer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "discontinuity.html",
+   "display": "Discontinuity",
+   "href": "/discontinuity.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "discovery-lab.html",
+   "display": "Discovery Lab",
+   "href": "/discovery-lab.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "doc.html",
+   "display": "Doc",
+   "href": "/doc.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "dock-brain.html",
+   "display": "Dock Brain",
+   "href": "/dock-brain.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "dock-hazards.html",
+   "display": "Dock Hazards",
+   "href": "/dock-hazards.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "doctor.html",
+   "display": "Doctor",
+   "href": "/doctor.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "doorbell.html",
+   "display": "Doorbell",
+   "href": "/doorbell.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "echo-show.html",
+   "display": "Echo Show",
+   "href": "/echo-show.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "economy.html",
+   "display": "Economy",
+   "href": "/economy.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "elliptic.html",
+   "display": "Elliptic",
+   "href": "/elliptic.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "endless-sky.html",
+   "display": "Endless Sky",
+   "href": "/endless-sky.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-away-mission.html",
+   "display": "Es Away Mission",
+   "href": "/es-away-mission.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-box3d-3d.html",
+   "display": "Es Box3d 3d",
+   "href": "/es-box3d-3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-box3d-fly3d.html",
+   "display": "Es Box3d Fly3d",
+   "href": "/es-box3d-fly3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-box3d.html",
+   "display": "Es Box3d",
+   "href": "/es-box3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-hull-combat.html",
+   "display": "Es Hull Combat",
+   "href": "/es-hull-combat.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "euler-blast.html",
+   "display": "Euler Blast",
+   "href": "/euler-blast.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "euler-gpu-check.html",
+   "display": "Euler Gpu Check",
+   "href": "/euler-gpu-check.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ev-admin.html",
+   "display": "Ev Admin",
+   "href": "/ev-admin.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ev-loader.html",
+   "display": "Ev Loader",
+   "href": "/ev-loader.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ev-mission-creator.html",
+   "display": "Ev Mission Creator",
+   "href": "/ev-mission-creator.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ev-sprites.html",
+   "display": "Ev Sprites",
+   "href": "/ev-sprites.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ev.html",
+   "display": "Ev",
+   "href": "/ev.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "eve.html",
+   "display": "Eve",
+   "href": "/eve.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "external-linalg.html",
+   "display": "External Linalg",
+   "href": "/external-linalg.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fabric.html",
+   "display": "Fabric",
+   "href": "/fabric.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "face-mirror.html",
+   "display": "Face Mirror",
+   "href": "/face-mirror.html",
+   "section": "Face & Population",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "face.html",
+   "display": "Face",
+   "href": "/face.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fallout.html",
+   "display": "Fallout",
+   "href": "/fallout.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fanbeam.html",
+   "display": "Fanbeam",
+   "href": "/fanbeam.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fdtd.html",
+   "display": "Fdtd",
+   "href": "/fdtd.html",
+   "section": "Electromagnetism",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fingerprint.html",
+   "display": "Fingerprint",
+   "href": "/fingerprint.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fire-demo.html",
+   "display": "Fire Demo",
+   "href": "/fire-demo.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fleet-arena.html",
+   "display": "Fleet Arena",
+   "href": "/fleet-arena.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fleet-bench.html",
+   "display": "Fleet Bench",
+   "href": "/fleet-bench.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "flesh.html",
+   "display": "Flesh",
+   "href": "/flesh.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "flight-coop.html",
+   "display": "Flight Coop",
+   "href": "/flight-coop.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "flight-gpu.html",
+   "display": "Flight Gpu",
+   "href": "/flight-gpu.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "flight.html",
+   "display": "Flight",
+   "href": "/flight.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "floor-atlas.html",
+   "display": "Floor Atlas",
+   "href": "/floor-atlas.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fluid-box3d.html",
+   "display": "Fluid Box3d",
+   "href": "/fluid-box3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fluid-rigid-2d.html",
+   "display": "Fluid Rigid 2d",
+   "href": "/fluid-rigid-2d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fluid-selfie.html",
+   "display": "Fluid Selfie",
+   "href": "/fluid-selfie.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fluid-webgpu-3d.html",
+   "display": "Fluid Webgpu 3d",
+   "href": "/fluid-webgpu-3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fluid-webgpu.html",
+   "display": "Fluid Webgpu",
+   "href": "/fluid-webgpu.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fog-of-war.html",
+   "display": "Fog Of War",
+   "href": "/fog-of-war.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fpscontrol.html",
+   "display": "Fpscontrol",
+   "href": "/fpscontrol.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fpsmirror.html",
+   "display": "Fpsmirror",
+   "href": "/fpsmirror.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fresnel-join.html",
+   "display": "Fresnel Join",
+   "href": "/fresnel-join.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fresnel.html",
+   "display": "Fresnel",
+   "href": "/fresnel.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "frugon.html",
+   "display": "Frugon",
+   "href": "/frugon.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gallery.html",
+   "display": "Gallery",
+   "href": "/gallery.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gate-plan.html",
+   "display": "Gate Plan",
+   "href": "/gate-plan.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gates.html",
+   "display": "Gates",
+   "href": "/gates.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gauges-spacetime.html",
+   "display": "Gauges Spacetime",
+   "href": "/gauges-spacetime.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gauges3000.html",
+   "display": "Gauges3000",
+   "href": "/gauges3000.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "geodesic.html",
+   "display": "Geodesic",
+   "href": "/geodesic.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gfx-device.html",
+   "display": "Gfx Device",
+   "href": "/gfx-device.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "glb_viewer.html",
+   "display": "Glb Viewer",
+   "href": "/glb_viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "govee.html",
+   "display": "Govee",
+   "href": "/govee.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gradient-join.html",
+   "display": "Gradient Join",
+   "href": "/gradient-join.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "grammar.html",
+   "display": "Grammar",
+   "href": "/grammar.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "graph_viewer.html",
+   "display": "Graph Viewer",
+   "href": "/graph_viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gravity-waves.html",
+   "display": "Gravity Waves",
+   "href": "/gravity-waves.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gray-scott.html",
+   "display": "Gray Scott",
+   "href": "/gray-scott.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "grid-refinement.html",
+   "display": "Grid Refinement",
+   "href": "/grid-refinement.html",
+   "section": "Electromagnetism",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ha-capabilities.html",
+   "display": "Ha Capabilities",
+   "href": "/ha-capabilities.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ha-diagram.html",
+   "display": "Ha Diagram",
+   "href": "/ha-diagram.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ha-switches.html",
+   "display": "Ha Switches",
+   "href": "/ha-switches.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "health.html",
+   "display": "Health",
+   "href": "/health.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "heightfield-vs-volume.html",
+   "display": "Heightfield Vs Volume",
+   "href": "/heightfield-vs-volume.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "hmc-bench.html",
+   "display": "Hmc Bench",
+   "href": "/hmc-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "hmc.html",
+   "display": "Hmc",
+   "href": "/hmc.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "home.html",
+   "display": "Home",
+   "href": "/home.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "hosting.html",
+   "display": "Hosting",
+   "href": "/hosting.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "hub.html",
+   "display": "Hub",
+   "href": "/hub.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "huly.html",
+   "display": "Huly",
+   "href": "/huly.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "immich.html",
+   "display": "Immich",
+   "href": "/immich.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "index.html",
+   "display": "Index",
+   "href": "/index.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "indexPlus.html",
+   "display": "IndexPlus",
+   "href": "/indexPlus.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "instrument-bench.html",
+   "display": "Instrument Bench",
+   "href": "/instrument-bench.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "instruments.html",
+   "display": "Instruments",
+   "href": "/instruments.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "interferometer.html",
+   "display": "Interferometer",
+   "href": "/interferometer.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ios-peer.html",
+   "display": "Ios Peer",
+   "href": "/ios-peer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ising-bench.html",
+   "display": "Ising Bench",
+   "href": "/ising-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ising.html",
+   "display": "Ising",
+   "href": "/ising.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "join.html",
+   "display": "Join",
+   "href": "/join.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "jolt-arena.html",
+   "display": "Jolt Arena",
+   "href": "/jolt-arena.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kaggle-config.html",
+   "display": "Kaggle Config",
+   "href": "/kaggle-config.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kepler.html",
+   "display": "Kepler",
+   "href": "/kepler.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kerr.html",
+   "display": "Kerr",
+   "href": "/kerr.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kinematic.html",
+   "display": "Kinematic",
+   "href": "/kinematic.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "krbn-compare.html",
+   "display": "Krbn Compare",
+   "href": "/krbn-compare.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "krbn.html",
+   "display": "Krbn",
+   "href": "/krbn.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kriging.html",
+   "display": "Kriging",
+   "href": "/kriging.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "kuramoto.html",
+   "display": "Kuramoto",
+   "href": "/kuramoto.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lab-census.html",
+   "display": "Lab Census",
+   "href": "/lab-census.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lab-export.html",
+   "display": "Lab Export",
+   "href": "/lab-export.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lan.html",
+   "display": "Lan",
+   "href": "/lan.html",
+   "section": "NearShare",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "landau-zener.html",
+   "display": "Landau Zener",
+   "href": "/landau-zener.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "langevin.html",
+   "display": "Langevin",
+   "href": "/langevin.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lbm-fluid.html",
+   "display": "Lbm Fluid",
+   "href": "/lbm-fluid.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lbm3d-flow.html",
+   "display": "Lbm3d Flow",
+   "href": "/lbm3d-flow.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lbm3d-gpu-check.html",
+   "display": "Lbm3d Gpu Check",
+   "href": "/lbm3d-gpu-check.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lbm3d-gpu.html",
+   "display": "Lbm3d Gpu",
+   "href": "/lbm3d-gpu.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "librechat.html",
+   "display": "Librechat",
+   "href": "/librechat.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "limiter-seam.html",
+   "display": "Limiter Seam",
+   "href": "/limiter-seam.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lineage.html",
+   "display": "Lineage",
+   "href": "/lineage.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "live-panel.html",
+   "display": "Live Panel",
+   "href": "/live-panel.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "living-box.html",
+   "display": "Living Box",
+   "href": "/living-box.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "login.html",
+   "display": "Login",
+   "href": "/login.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "logistic.html",
+   "display": "Logistic",
+   "href": "/logistic.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "macrodroid.html",
+   "display": "Macrodroid",
+   "href": "/macrodroid.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "magmap-android.html",
+   "display": "Magmap Android",
+   "href": "/magmap-android.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "magmap-bench.html",
+   "display": "Magmap Bench",
+   "href": "/magmap-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "maigret.html",
+   "display": "Maigret",
+   "href": "/maigret.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "markdown-tools.html",
+   "display": "Markdown Tools",
+   "href": "/markdown-tools.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mc-flesh.html",
+   "display": "Mc Flesh",
+   "href": "/mc-flesh.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "md-demo.html",
+   "display": "Md Demo",
+   "href": "/md-demo.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "meijer-g.html",
+   "display": "Meijer G",
+   "href": "/meijer-g.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "method-lab.html",
+   "display": "Method Lab",
+   "href": "/method-lab.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "models.html",
+   "display": "Models",
+   "href": "/models.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mods-library.html",
+   "display": "Mods Library",
+   "href": "/mods-library.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "module-history.html",
+   "display": "Module History",
+   "href": "/module-history.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm-gpu-check.html",
+   "display": "Mpm Gpu Check",
+   "href": "/mpm-gpu-check.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm-gpu.html",
+   "display": "Mpm Gpu",
+   "href": "/mpm-gpu.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm.html",
+   "display": "Mpm",
+   "href": "/mpm.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm3d.html",
+   "display": "Mpm3d",
+   "href": "/mpm3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "multigrid.html",
+   "display": "Multigrid",
+   "href": "/multigrid.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "muster.html",
+   "display": "Muster",
+   "href": "/muster.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "nebula-device.html",
+   "display": "Nebula Device",
+   "href": "/nebula-device.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "nebula-live.html",
+   "display": "Nebula Live",
+   "href": "/nebula-live.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "nebula.html",
+   "display": "Nebula",
+   "href": "/nebula.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "nest-protect.html",
+   "display": "Nest Protect",
+   "href": "/nest-protect.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "netcheck.html",
+   "display": "Netcheck",
+   "href": "/netcheck.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "node-gradient.html",
+   "display": "Node Gradient",
+   "href": "/node-gradient.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "normal-modes.html",
+   "display": "Normal Modes",
+   "href": "/normal-modes.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "office-floor.html",
+   "display": "Office Floor",
+   "href": "/office-floor.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "opengen.html",
+   "display": "Opengen",
+   "href": "/opengen.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "orbs.html",
+   "display": "Orbs",
+   "href": "/orbs.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "outlook-rules.html",
+   "display": "Outlook Rules",
+   "href": "/outlook-rules.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "pachinko.html",
+   "display": "Pachinko",
+   "href": "/pachinko.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "page-index.html",
+   "display": "Page Index",
+   "href": "/page-index.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "panel-brain.html",
+   "display": "Panel Brain",
+   "href": "/panel-brain.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "panel-gauge.html",
+   "display": "Panel Gauge",
+   "href": "/panel-gauge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "panels.html",
+   "display": "Panels",
+   "href": "/panels.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "paramecium.html",
+   "display": "Paramecium",
+   "href": "/paramecium.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "path-tracer.html",
+   "display": "Path Tracer",
+   "href": "/path-tracer.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "percolation.html",
+   "display": "Percolation",
+   "href": "/percolation.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "petfbi-board.html",
+   "display": "Petfbi Board",
+   "href": "/petfbi-board.html",
+   "section": "PetFBI",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "petfbi-setup.html",
+   "display": "Petfbi Setup",
+   "href": "/petfbi-setup.html",
+   "section": "PetFBI",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "petfbi.html",
+   "display": "Petfbi",
+   "href": "/petfbi.html",
+   "section": "PetFBI",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "phase-change.html",
+   "display": "Phase Change",
+   "href": "/phase-change.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "physics-bench.html",
+   "display": "Physics Bench",
+   "href": "/physics-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "physics-lab.html",
+   "display": "Physics Lab",
+   "href": "/physics-lab.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "physics-showcase.html",
+   "display": "Physics Showcase",
+   "href": "/physics-showcase.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "physics-verified.html",
+   "display": "Physics Verified",
+   "href": "/physics-verified.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "pipboy-models.html",
+   "display": "Pipboy Models",
+   "href": "/pipboy-models.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "play.html",
+   "display": "Play",
+   "href": "/play.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "policy-mass.html",
+   "display": "Policy Mass",
+   "href": "/policy-mass.html",
+   "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "pom-demo.html",
+   "display": "Pom Demo",
+   "href": "/pom-demo.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "population.html",
+   "display": "Population",
+   "href": "/population.html",
+   "section": "Face & Population",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "predict.html",
+   "display": "Predict",
+   "href": "/predict.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "predictions.html",
+   "display": "Predictions",
+   "href": "/predictions.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "presence.html",
+   "display": "Presence",
+   "href": "/presence.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "probe-lab.html",
+   "display": "Probe Lab",
+   "href": "/probe-lab.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "pulsar.html",
+   "display": "Pulsar",
+   "href": "/pulsar.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "push2run.html",
+   "display": "Push2run",
+   "href": "/push2run.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "quadratic-recon.html",
+   "display": "Quadratic Recon",
+   "href": "/quadratic-recon.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "quadratic-wall.html",
+   "display": "Quadratic Wall",
+   "href": "/quadratic-wall.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ragdoll.html",
+   "display": "Ragdoll",
+   "href": "/ragdoll.html",
+   "section": "Box3D & Cross-Arch",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rank-repair-3d.html",
+   "display": "Rank Repair 3d",
+   "href": "/rank-repair-3d.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rank-repair.html",
+   "display": "Rank Repair",
+   "href": "/rank-repair.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ray-march-demo.html",
+   "display": "Ray March Demo",
+   "href": "/ray-march-demo.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "raycast.html",
+   "display": "Raycast",
+   "href": "/raycast.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "raymarch-gl-demo.html",
+   "display": "Raymarch Gl Demo",
+   "href": "/raymarch-gl-demo.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "raymarch-live.html",
+   "display": "Raymarch Live",
+   "href": "/raymarch-live.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "raymarch-options.html",
+   "display": "Raymarch Options",
+   "href": "/raymarch-options.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "realterrain.html",
+   "display": "Realterrain",
+   "href": "/realterrain.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "regrid-cost.html",
+   "display": "Regrid Cost",
+   "href": "/regrid-cost.html",
+   "section": "Electromagnetism",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "remap-2d.html",
+   "display": "Remap 2d",
+   "href": "/remap-2d.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "remap-order.html",
+   "display": "Remap Order",
+   "href": "/remap-order.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "remote-desktop.html",
+   "display": "Remote Desktop",
+   "href": "/remote-desktop.html",
+   "section": "NearShare",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "render-review.html",
+   "display": "Render Review",
+   "href": "/render-review.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "report.html",
+   "display": "Report",
+   "href": "/report.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rig.html",
+   "display": "Rig",
+   "href": "/rig.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rle-mesh-demo.html",
+   "display": "Rle Mesh Demo",
+   "href": "/rle-mesh-demo.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rmt.html",
+   "display": "Rmt",
+   "href": "/rmt.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rocket-league.html",
+   "display": "Rocket League",
+   "href": "/rocket-league.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "roundhouse.html",
+   "display": "Roundhouse",
+   "href": "/roundhouse.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "row-weight.html",
+   "display": "Row Weight",
+   "href": "/row-weight.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rps.html",
+   "display": "Rps",
+   "href": "/rps.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "run-inspector.html",
+   "display": "Run Inspector",
+   "href": "/run-inspector.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "runtimes.html",
+   "display": "Runtimes",
+   "href": "/runtimes.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "samplers.html",
+   "display": "Samplers",
+   "href": "/samplers.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "schrodinger.html",
+   "display": "Schrodinger",
+   "href": "/schrodinger.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "scrape.html",
+   "display": "Scrape",
+   "href": "/scrape.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "scrapling.html",
+   "display": "Scrapling",
+   "href": "/scrapling.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "server.html",
+   "display": "Server",
+   "href": "/server.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "servicesdash.html",
+   "display": "Servicesdash",
+   "href": "/servicesdash.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "settings.html",
+   "display": "Settings",
+   "href": "/settings.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "shield-apps.html",
+   "display": "Shield Apps",
+   "href": "/shield-apps.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "shield-display.html",
+   "display": "Shield Display",
+   "href": "/shield-display.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ship.html",
+   "display": "Ship",
+   "href": "/ship.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "shipavatar.html",
+   "display": "Shipavatar",
+   "href": "/shipavatar.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "showcase.html",
+   "display": "Showcase",
+   "href": "/showcase.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "sinogram-gpu.html",
+   "display": "Sinogram Gpu",
+   "href": "/sinogram-gpu.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "skillbook.html",
+   "display": "Skillbook",
+   "href": "/skillbook.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "skin-depth.html",
+   "display": "Skin Depth",
+   "href": "/skin-depth.html",
+   "section": "Electromagnetism",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "skyrim.html",
+   "display": "Skyrim",
+   "href": "/skyrim.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slime-mold.html",
+   "display": "Slime Mold",
+   "href": "/slime-mold.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slotmachine.html",
+   "display": "Slotmachine",
+   "href": "/slotmachine.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slug-text.html",
+   "display": "Slug Text",
+   "href": "/slug-text.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "social.html",
+   "display": "Social",
+   "href": "/social.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "solar.html",
+   "display": "Solar",
+   "href": "/solar.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "spacedesk.html",
+   "display": "Spacedesk",
+   "href": "/spacedesk.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "spatial-agreement.html",
+   "display": "Spatial Agreement",
+   "href": "/spatial-agreement.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "spectator.html",
+   "display": "Spectator",
+   "href": "/spectator.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "sphere-impostor.html",
+   "display": "Sphere Impostor",
+   "href": "/sphere-impostor.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "splat-lab.html",
+   "display": "Splat Lab",
+   "href": "/splat-lab.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "splat_viewer.html",
+   "display": "Splat Viewer",
+   "href": "/splat_viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "sprite-raycast.html",
+   "display": "Sprite Raycast",
+   "href": "/sprite-raycast.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "spritemesh.html",
+   "display": "Spritemesh",
+   "href": "/spritemesh.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ssao-compare.html",
+   "display": "Ssao Compare",
+   "href": "/ssao-compare.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ssim-compare.html",
+   "display": "Ssim Compare",
+   "href": "/ssim-compare.html",
+   "section": "Sampling & Methods",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "star_gas.html",
+   "display": "Star Gas",
+   "href": "/star_gas.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "starfield.html",
+   "display": "Starfield",
+   "href": "/starfield.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "statistical-mechanics.html",
+   "display": "Statistical Mechanics",
+   "href": "/statistical-mechanics.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "svg-forge.html",
+   "display": "Svg Forge",
+   "href": "/svg-forge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "sync-probe.html",
+   "display": "Sync Probe",
+   "href": "/sync-probe.html",
+   "section": "NearShare",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tactical-scan.html",
+   "display": "Tactical Scan",
+   "href": "/tactical-scan.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "terminal.html",
+   "display": "Terminal",
+   "href": "/terminal.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tet-rank.html",
+   "display": "Tet Rank",
+   "href": "/tet-rank.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "thead.html",
+   "display": "Thead",
+   "href": "/thead.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "thermal-flow.html",
+   "display": "Thermal Flow",
+   "href": "/thermal-flow.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "thermal3d-cells.html",
+   "display": "Thermal3d Cells",
+   "href": "/thermal3d-cells.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tomography.html",
+   "display": "Tomography",
+   "href": "/tomography.html",
+   "section": "Optics & Imaging",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tools.html",
+   "display": "Tools",
+   "href": "/tools.html",
+   "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "toroidal-wave.html",
+   "display": "Toroidal Wave",
+   "href": "/toroidal-wave.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "torrents.html",
+   "display": "Torrents",
+   "href": "/torrents.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "torsion-modes.html",
+   "display": "Torsion Modes",
+   "href": "/torsion-modes.html",
+   "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "trace-truth.html",
+   "display": "Trace Truth",
+   "href": "/trace-truth.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "trader.html",
+   "display": "Trader",
+   "href": "/trader.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "trading.html",
+   "display": "Trading",
+   "href": "/trading.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tradingfloor.html",
+   "display": "Tradingfloor",
+   "href": "/tradingfloor.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tri-limiter.html",
+   "display": "Tri Limiter",
+   "href": "/tri-limiter.html",
+   "section": "Discretisation & Meshes",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "tts.html",
+   "display": "Tts",
+   "href": "/tts.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "turing.html",
+   "display": "Turing",
+   "href": "/turing.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "uitars.html",
+   "display": "Uitars",
+   "href": "/uitars.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "universal-viewer.html",
+   "display": "Universal Viewer",
+   "href": "/universal-viewer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "uvtt.html",
+   "display": "Uvtt",
+   "href": "/uvtt.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "verify.html",
+   "display": "Verify",
+   "href": "/verify.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "view.html",
+   "display": "View",
+   "href": "/view.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "volume-cache.html",
+   "display": "Volume Cache",
+   "href": "/volume-cache.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "voxearth.html",
+   "display": "Voxearth",
+   "href": "/voxearth.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "voxel-mesh.html",
+   "display": "Voxel Mesh",
+   "href": "/voxel-mesh.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "voxel-photo-cube.html",
+   "display": "Voxel Photo Cube",
+   "href": "/voxel-photo-cube.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "voxel-viewer.html",
+   "display": "Voxel Viewer",
+   "href": "/voxel-viewer.html",
+   "section": "Voxel & Render",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wadmap.html",
+   "display": "Wadmap",
+   "href": "/wadmap.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wall-condition.html",
+   "display": "Wall Condition",
+   "href": "/wall-condition.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wall.html",
+   "display": "Wall",
+   "href": "/wall.html",
+   "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wallpaper.html",
+   "display": "Wallpaper",
+   "href": "/wallpaper.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "warp-map.html",
+   "display": "Warp Map",
+   "href": "/warp-map.html",
+   "section": "Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wasm-bench.html",
+   "display": "Wasm Bench",
+   "href": "/wasm-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wasm-demo.html",
+   "display": "Wasm Demo",
+   "href": "/wasm-demo.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wasm-sandbox.html",
+   "display": "Wasm Sandbox",
+   "href": "/wasm-sandbox.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "water.html",
+   "display": "Water",
+   "href": "/water.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "waveguide.html",
+   "display": "Waveguide",
+   "href": "/waveguide.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wear-field.html",
+   "display": "Wear Field",
+   "href": "/wear-field.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "weather.html",
+   "display": "Weather",
+   "href": "/weather.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "webgpu-bench.html",
+   "display": "Webgpu Bench",
+   "href": "/webgpu-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "webtorrent.html",
+   "display": "Webtorrent",
+   "href": "/webtorrent.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "webwright.html",
+   "display": "Webwright",
+   "href": "/webwright.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "weight-scaling.html",
+   "display": "Weight Scaling",
+   "href": "/weight-scaling.html",
+   "section": "Boundaries & Reconstruction",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wind-tunnel.html",
+   "display": "Wind Tunnel",
+   "href": "/wind-tunnel.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wormhole-jump.html",
+   "display": "Wormhole Jump",
+   "href": "/wormhole-jump.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wormhole.html",
+   "display": "Wormhole",
+   "href": "/wormhole.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "writeup.html",
+   "display": "Writeup",
+   "href": "/writeup.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "x4.html",
+   "display": "X4",
+   "href": "/x4.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "xbox.html",
+   "display": "Xbox",
+   "href": "/xbox.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "youtube-export.html",
+   "display": "Youtube Export",
+   "href": "/youtube-export.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "ai_chain",
+   "display": "Ai Chain",
+   "href": "/?go=ai_chain",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "ai_pipeline_bench",
+   "display": "Ai Pipeline Bench",
+   "href": "/?go=ai_pipeline_bench",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "alert_wave",
+   "display": "Alert Wave",
+   "href": "/?go=alert_wave",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "alien_patrol",
+   "display": "Alien Patrol",
+   "href": "/?go=alien_patrol",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "alien_swarm",
+   "display": "Alien Swarm",
+   "href": "/?go=alien_swarm",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "ant_colony",
+   "display": "Ant Colony",
+   "href": "/?go=ant_colony",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "aquarium",
+   "display": "Aquarium",
+   "href": "/?go=aquarium",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "aquariumEcosystem",
+   "display": "AquariumEcosystem",
+   "href": "/?go=aquariumEcosystem",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "asset_pipeline",
+   "display": "Asset Pipeline",
+   "href": "/?go=asset_pipeline",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "bitcoin_miner",
+   "display": "Bitcoin Miner",
+   "href": "/?go=bitcoin_miner",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "bot_voice_lineup",
+   "display": "Bot Voice Lineup",
+   "href": "/?go=bot_voice_lineup",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "chess",
+   "display": "Chess",
+   "href": "/?go=chess",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "chess3d",
+   "display": "Chess3d",
+   "href": "/?go=chess3d",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "city_builder",
+   "display": "City Builder",
+   "href": "/?go=city_builder",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "compound_ai",
+   "display": "Compound Ai",
+   "href": "/?go=compound_ai",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "cube_d3d11",
+   "display": "Cube D3d11",
+   "href": "/?go=cube_d3d11",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "dejarik",
+   "display": "Dejarik",
+   "href": "/?go=dejarik",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "demoFishObj",
+   "display": "DemoFishObj",
+   "href": "/?go=demoFishObj",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "dungeon_draw",
+   "display": "Dungeon Draw",
+   "href": "/?go=dungeon_draw",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "ecosystem_enemies",
+   "display": "Ecosystem Enemies",
+   "href": "/?go=ecosystem_enemies",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "face_test",
+   "display": "Face Test",
+   "href": "/?go=face_test",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "fitzhugh_nagumo",
+   "display": "Fitzhugh Nagumo",
+   "href": "/?go=fitzhugh_nagumo",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "freeglut_shapes",
+   "display": "Freeglut Shapes",
+   "href": "/?go=freeglut_shapes",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "hand_tracking",
+   "display": "Hand Tracking",
+   "href": "/?go=hand_tracking",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "home_assistant_control",
+   "display": "Home Assistant Control",
+   "href": "/?go=home_assistant_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "home_assistant_solar",
+   "display": "Home Assistant Solar",
+   "href": "/?go=home_assistant_solar",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "kaiju_attacks_city",
+   "display": "Kaiju Attacks City",
+   "href": "/?go=kaiju_attacks_city",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "kaiju_roster",
+   "display": "Kaiju Roster",
+   "href": "/?go=kaiju_roster",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "lip_sync_dialog",
+   "display": "Lip Sync Dialog",
+   "href": "/?go=lip_sync_dialog",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "multiplayer_ogre",
+   "display": "Multiplayer Ogre",
+   "href": "/?go=multiplayer_ogre",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "neural_enemies",
+   "display": "Neural Enemies",
+   "href": "/?go=neural_enemies",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "ocean_ecosystem",
+   "display": "Ocean Ecosystem",
+   "href": "/?go=ocean_ecosystem",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "parallax_studio",
+   "display": "Parallax Studio",
+   "href": "/?go=parallax_studio",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "pheromone_hunt",
+   "display": "Pheromone Hunt",
+   "href": "/?go=pheromone_hunt",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "pinball",
+   "display": "Pinball",
+   "href": "/?go=pinball",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "rgb_control",
+   "display": "Rgb Control",
+   "href": "/?go=rgb_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "rigged_showcase",
+   "display": "Rigged Showcase",
+   "href": "/?go=rigged_showcase",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "rock_paper_scissors",
+   "display": "Rock Paper Scissors",
+   "href": "/?go=rock_paper_scissors",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "sandbox",
+   "display": "Sandbox",
+   "href": "/?go=sandbox",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "satellite_strike_showcase",
+   "display": "Satellite Strike Showcase",
+   "href": "/?go=satellite_strike_showcase",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "skybox_gen",
+   "display": "Skybox Gen",
+   "href": "/?go=skybox_gen",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "spawn_grid",
+   "display": "Spawn Grid",
+   "href": "/?go=spawn_grid",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "testfire_skirmish",
+   "display": "Testfire Skirmish",
+   "href": "/?go=testfire_skirmish",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "texture_studio",
+   "display": "Texture Studio",
+   "href": "/?go=texture_studio",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "threechess",
+   "display": "Threechess",
+   "href": "/?go=threechess",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "tridchess",
+   "display": "Tridchess",
+   "href": "/?go=tridchess",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "wadModePicker",
+   "display": "WadModePicker",
+   "href": "/?go=wadModePicker",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "wadModes",
+   "display": "WadModes",
+   "href": "/?go=wadModes",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "demo",
+   "id": "wad_arena",
+   "display": "Wad Arena",
+   "href": "/?go=wad_arena",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "kaiju",
+   "display": "KAIJU + TERRAIN",
+   "href": "/?go=kaiju",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "sky",
+   "display": "Sky",
+   "href": "/?go=sky",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "space",
+   "display": "Space",
+   "href": "/?go=space",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "hell",
+   "display": "Hell",
+   "href": "/?go=hell",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "tech",
+   "display": "Tech",
+   "href": "/?go=tech",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "people",
+   "display": "People",
+   "href": "/?go=people",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "trees",
+   "display": "Trees",
+   "href": "/?go=trees",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "defenders",
+   "display": "Defenders",
+   "href": "/?go=defenders",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "ogre",
+   "display": "Defenders 2",
+   "href": "/?go=ogre",
+   "section": null,
+   "collision": true
+  },
+  {
+   "kind": "builtin",
+   "id": "gather",
+   "display": "Gather",
+   "href": "/?go=gather",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "more",
+   "display": "More",
+   "href": "/?go=more",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "reset",
+   "display": "Reset",
+   "href": "/?go=reset",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "maze",
+   "display": "New Maze",
+   "href": "/?go=maze",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "dungeon",
+   "display": "DUNGEON — Explorer & Treasure",
+   "href": "/?go=dungeon",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "walk",
+   "display": "Enter",
+   "href": "/?go=walk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "attack",
+   "display": "Attack",
+   "href": "/?go=attack",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "throw",
+   "display": "Throw",
+   "href": "/?go=throw",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "swap",
+   "display": "Swap",
+   "href": "/?go=swap",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "arrow",
+   "display": "Arrow",
+   "href": "/?go=arrow",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "grenade",
+   "display": "Grenade",
+   "href": "/?go=grenade",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "block",
+   "display": "Block",
+   "href": "/?go=block",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "auto",
+   "display": "Auto",
+   "href": "/?go=auto",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "exit",
+   "display": "Exit",
+   "href": "/?go=exit",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "dungeonwalk",
+   "display": "DUNGEON — Walk It Yourself (First Person)",
+   "href": "/?go=dungeonwalk",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "wildlife",
+   "display": "WILDLIFE — Ambient Critters",
+   "href": "/?go=wildlife",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "opensea",
+   "display": "Dive In",
+   "href": "/?go=opensea",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "life",
+   "display": "Step",
+   "href": "/?go=life",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "random",
+   "display": "Randomize",
+   "href": "/?go=random",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "clear",
+   "display": "Clear",
+   "href": "/?go=clear",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "pause",
+   "display": "Pause / Run",
+   "href": "/?go=pause",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "lander",
+   "display": "LUNAR LANDER",
+   "href": "/?go=lander",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "props",
+   "display": "Props",
+   "href": "/?go=props",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "car",
+   "display": "Car",
+   "href": "/?go=car",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "horse",
+   "display": "Horse",
+   "href": "/?go=horse",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "demon",
+   "display": "Demon",
+   "href": "/?go=demon",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "restart",
+   "display": "Restart",
+   "href": "/?go=restart",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "lorenz",
+   "display": "Reset 2",
+   "href": "/?go=lorenz",
+   "section": null,
+   "collision": true
+  },
+  {
+   "kind": "builtin",
+   "id": "spawn",
+   "display": "Spawn",
+   "href": "/?go=spawn",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "wander",
+   "display": "Wander",
+   "href": "/?go=wander",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "robot",
+   "display": "ROBOT (Animated GLB)",
+   "href": "/?go=robot",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "engine_saga",
+   "display": "⭐ ENGINE: A SAGA (Auto Rotating Feature Crawl)",
+   "href": "/?go=engine_saga",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "resume_fx",
+   "display": "📄 RESUME FX (Portfolio Piece)",
+   "href": "/?go=resume_fx",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "nrc",
+   "display": "NEURAL RADIANCE CACHE",
+   "href": "/?go=nrc",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "flow",
+   "display": "FLOW MATCHING SAMPLER",
+   "href": "/?go=flow",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "ovm",
+   "display": "O VOXEL · AO · PCF SHADOWS (.Ovm)",
+   "href": "/?go=ovm",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "p3d",
+   "display": "PIXAL3D MESH (.P3d)",
+   "href": "/?go=p3d",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "mol",
+   "display": "MOLECULAR FIELD (.Mol / .Pdb)",
+   "href": "/?go=mol",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "mto",
+   "display": "MEDICAL TOMOGRAPHY (.Mto)",
+   "href": "/?go=mto",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "wnd",
+   "display": "FLUID FIELD (.Wnd)",
+   "href": "/?go=wnd",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "battleship",
+   "display": "BATTLESHIP 3D 2",
+   "href": "/?go=battleship",
+   "section": null,
+   "collision": true
+  },
+  {
+   "kind": "builtin",
+   "id": "slots",
+   "display": "SLOTS",
+   "href": "/?go=slots",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "snake",
+   "display": "SNAKE — Centipede Extension",
+   "href": "/?go=snake",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "tron",
+   "display": "TRON — Light Cycles",
+   "href": "/?go=tron",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "spectator_cast_toggle",
+   "display": "Cast",
+   "href": "/?go=spectator_cast_toggle",
+   "section": null,
+   "collision": false
+  }
+ ]
+}

@@ -63,6 +63,19 @@ export const MEASURED = {
     "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    250473,
     "tools/ship/labDevices-selfcheck.mjs":           253635,
     "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
+    // *** MEASURED AT v3904 BECAUSE A NEW CHECK TIMED OUT AND THE GATE TURNED OUT TO HAVE BEEN DYING ALL ALONG.
+    // 1058s stopwatch-timed on an otherwise idle box, and IT PASSES -- all checks. A contended run earlier the
+    // same hour gave 1085s; the SMALLER, cleaner number is recorded here and the larger one is written down
+    // rather than averaged in. This gate was never in this table, so it ran against the 143s default, so it was
+    // being KILLED IN EVERY FULL SUITE at a seventh of the time it needs. *** A TIMEOUT IS NOT A FAILURE AND IT
+    // IS NOT A PASS EITHER -- IT IS THE GATE NEVER HAVING RUN, and gate-timings.json proves this one never has:
+    // 1049 timed entries in the shipped record and levelClaim-selfcheck is in NONE of them. Not slow in the
+    // record -- ABSENT FROM IT, which is what being killed looks like from the outside and is why no amount of
+    // reading the timings would ever have surfaced it. I found it by adding a check and blaming the check, then
+    // did the honest thing and ran the PRISTINE file: 1085s, before any edit of mine. The reportLines check
+    // added at v3904 costs nothing measurable against an 18-minute fixture -- which is exactly why its live arm
+    // is not driven, and why the two numbers here differ by 27s of contention rather than by anything I wrote.
+    "physics/sph/levelClaim-selfcheck.mjs":         1058000,
     // *** MEASURED AT v3213 AND MOVED HERE FROM UNRESOLVED, WHICH IS WHAT THAT TABLE SAID SHOULD HAPPEN. ***
     // 573s on an idle box, and it PASSES. Its own header said ~90s. The antidote fired on its own round: the
     // line below in UNRESOLVED was DELETED, not edited in place.
