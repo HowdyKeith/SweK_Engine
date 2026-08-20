@@ -102,5 +102,74 @@ const fresh = () => makeBlobs(7, 20260715).map((b) => ({ ...b }));
     })(), "every message points at the round that shipped that bug. AN ALARM THAT DOES NOT TELL YOU WHAT IT HAS SEEN BEFORE IS JUST A NOISE.");
 }
 
+{
+    // =============================================================================================================
+    // v3906 -- THE EXTERNAL ANSWER KEY. The four deaths above are excellent and they are all RELATIVE: dismantled
+    // means closestPair CHANGED from a baseline, dissolved means peak fell below floor. Not one of them knows what
+    // closestPair or fieldPeak SHOULD return for a given blob set. gradedCoverage's GRADE door asked for a key,
+    // and both gauges have one sitting in plain algebra.
+    // =============================================================================================================
+    const report = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
+
+    // KEY 1 -- closestPair is a geometric primitive, and O(n^2) brute force is its definition.
+    {
+        const rnd = ((s) => () => ((s = (s * 16807) % 2147483647) / 2147483647))(11);
+        const B = Array.from({ length: 9 }, () => ({ x: rnd()*2-1, y: rnd()*2-1, z: rnd()*2-1, r: 0.5, a: 2 }));
+        let best = Infinity, pair = null;
+        for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+            const d = Math.hypot(B[i].x-B[j].x, B[i].y-B[j].y, B[i].z-B[j].z);
+            if (d < best) { best = d; pair = [i, j]; }
+        }
+        ok("*** closestPair agrees with an independent O(n^2) sweep written here ***",
+           Math.abs(closestPair(B) - best) < 1e-12,
+           `${closestPair(B).toPrecision(12)} against brute force ${best.toPrecision(12)}, between blobs ${pair}`);
+        report("THE BRUTE FORCE IS THE DEFINITION, NOT A FASTER IMPLEMENTATION", "nine blobs is 36 pairs -- small " +
+               "enough that the naive sweep is OBVIOUSLY right, which is the only property a key needs. If the two " +
+               "ever disagree the sweep is the one to believe");
+    }
+
+    // KEY 2 -- fieldPeak has an exact answer for a single blob: the field maxes at the centre, at exactly `a`.
+    // *** AND IT DOES NOT RETURN IT, WHICH IS THE FINDING. *** fieldPeak is a 15^3 SCAN over [-2, 2]; it returns
+    // the largest SAMPLE, not the peak. Put the blob on a grid node and it is exact; put it anywhere else and it
+    // under-reads by however much the field falls off between the centre and the nearest node.
+    {
+        const n = 15, ext = 2, node = (i) => (i / n) * 2 * ext - ext;
+        const AMPS = [1.5, 3, 7.25];
+        const on  = AMPS.map((a) => [a, fieldPeak([{ x: node(5), y: node(7), z: node(9), r: 1, a }])]);
+        const off = AMPS.map((a) => [a, fieldPeak([{ x: 0.1, y: -0.2, z: 0.3, r: 1, a }])]);
+        ok("*** a blob centred ON a grid node reads its amplitude EXACTLY -- bit-exact, at three amplitudes ***",
+           on.every(([a, got]) => got === a),
+           on.map(([a, got]) => `a=${a} -> ${got}`).join(", ") + "  (=== , not a tolerance)");
+        const ratios = off.map(([a, got]) => got / a);
+        // *** I WROTE THIS AS "the SAME double three times" AND THE CHECK REFUSED IT. *** I had read bit-identity
+        // off a toPrecision(15) print, which is exactly the mistake of believing a rounded display. Measured: two
+        // of the three ARE bit-identical and the third is HALF AN ULP away -- dividing by 7.25 costs one rounding
+        // step that dividing by 1.5 and 3 does not. The honest claim is invariance to floating-point resolution,
+        // and it is the stronger one: it holds as tightly as division allows, which is what "purely geometric"
+        // predicts. A TOLERANCE CHOSEN AFTER LOOKING WOULD HAVE HIDDEN THAT THE SPREAD IS ONE ROUNDING AND NOT A
+        // TREND, so the bound here is ulps of the ratio, not a percentage of it.
+        const spread = (Math.max(...ratios) - Math.min(...ratios)) / ratios[0];
+        ok("*** and OFF the node it under-reads by a ratio invariant in amplitude, to within half an ulp ***",
+           spread <= 2 * Number.EPSILON && ratios[0] < 0.96,
+           "peak/a = " + ratios[0].toPrecision(17) + " at a = " + AMPS.join(", ") +
+           "; spread " + spread.toExponential(3) + " = " + (spread / Number.EPSILON).toFixed(2) + " ulp");
+        // The ratio is (1 - d^2/r^2)^3 for the centre-to-nearest-node distance d. Recovering d proves the
+        // under-read is PURELY GEOMETRIC: it must not exceed the grid's half-diagonal.
+        const d = Math.sqrt(1 - Math.cbrt(ratios[0]));
+        const halfDiag = Math.sqrt(3) * (2 * ext / n) / 2;
+        ok("...and the implied offset is a real grid offset -- inside the cell's half-diagonal",
+           d > 0 && d < halfDiag,
+           `implied d = ${d.toPrecision(9)} against half-diagonal ${halfDiag.toPrecision(9)} (spacing ${(2*ext/n).toPrecision(6)})`);
+        report("*** THIS IS A LIMIT OF THE GAUGE, NOT A BUG, AND THE DIFFERENCE MATTERS ***",
+               "the amplitude-invariant ratio is the proof: a bug in the FIELD would scale with a, and this does " +
+               "not -- it is the sampling offset and nothing else. But it means fieldPeak reads up to ~5% LOW on " +
+               "an arbitrarily-placed blob, and 'dissolved' is judged by peak against floor. A death threshold " +
+               "tuned on on-node fixtures would fire early on off-node ones");
+        report("WHAT WOULD FIX IT, AND WHY IT IS NOT DONE HERE", "one Newton step uphill from the best sample, or " +
+               "simply sampling each blob's own centre -- both cheap. CHANGING THE GAUGE IS A DIFFERENT ROUND " +
+               "FROM KEYING IT, and a key written after the fix could not have found this");
+    }
+}
+
 console.log(fails ? "\nblobVitals-selfcheck: " + fails + " FAILED" : "\nblobVitals-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
