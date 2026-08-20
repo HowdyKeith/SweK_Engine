@@ -200,5 +200,36 @@ console.log("\n8. THE RELEASE BUTTON IS REACHABLE FROM THE OPS PAGE, AND IT IS T
            "and the only evidence is one console line nobody is looking at.");
 }
 
+console.log("\n9. THE MESSAGE THAT NAMES WHAT YOU LACK ALSO OFFERS WHERE TO GET IT");
+{
+    const ENGROOT2 = path.join(HERE, "..");
+    const gp = fs.readFileSync(path.join(ENGROOT2, "ui", "githubPanel.js"), "utf8");
+    ok("the token URL is ONE constant, read by both the Account tab and the error affordance",
+       /const TOKEN_URL = "https:\/\/github\.com\/settings\/tokens"/.test(gp) &&
+       /tokLink\.href = TOKEN_URL/.test(gp) && /a\.href = TOKEN_URL/.test(gp),
+       "the Account tab had it hardcoded since v1847; a second copy would be the one that goes stale");
+    ok("*** the link is attached at say(), not at the eight call sites that can raise a token error ***",
+       /const say = \(m, ok\) => \{[\s\S]{0,900}TOKEN_ERR\.test\(m\)/.test(gp),
+       "a token error from a route nobody has written yet still arrives with its remedy, and there is no list of messages to keep in step with the bridge");
+    ok("...and it is built as a NODE rather than injected as innerHTML",
+       /out\.textContent = m;/.test(gp) && /createElement\("a"\)[\s\S]{0,200}TOKEN_URL/.test(gp),
+       "the message is server text, and this panel renders repo names and error bodies straight from GitHub");
+    // The matcher has to cover what the bridge ACTUALLY says, which is checked against the bridge rather than
+    // against a list written here -- a list would be a second declaration of the thing being tested.
+    const m = gp.match(/const TOKEN_ERR = (\/.*\/i);/);
+    const re = m ? new RegExp(m[1].slice(1, -2), "i") : null;
+    const msgs = [...new Set([...ghSrc.matchAll(/error:\s*"([^"]*[Tt]oken[^"]*)"/g)].map((x) => x[1]))];
+    ok("*** and it matches every token-required string githubBridge actually produces ***",
+       !!re && msgs.length > 0 && msgs.every((x) => re.test(x)),
+       msgs.length + " distinct messages, all matched: " + msgs.map((x) => JSON.stringify(x.slice(0, 34))).join(", "));
+    ok("...and it does NOT fire on an error that has nothing to do with a token",
+       !!re && !re.test("the latest release (v1) has no .zip asset") && !re.test("no engineRepo set"),
+       "A CONTROL THAT CANNOT FAIL IS NOT A CHECK -- driven in the browser too: a non-token error rendered zero links");
+    report("DRIVEN, NOT INFERRED", "the release button was clicked in Chromium against a stubbed bridge returning " +
+           "the real publish error: the link renders, is visible, points at settings/tokens, and carries the " +
+           "pointer to the Account tab. Repeated with the terse 'token required' spelling (link appears) and with " +
+           "a non-token error (no link).");
+}
+
 console.log(fails ? `\nengineUpdateSource-selfcheck: ${fails} FAILED` : "\nengineUpdateSource-selfcheck: all checks pass");
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(fails ? 1 : 0);

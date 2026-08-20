@@ -27,7 +27,38 @@ export function mountGithubPanel() {
     root.append(tabsRow, body);
 
     const out = E("div", "margin-top:8px;font:11px ui-monospace,monospace;color:#bcd;white-space:pre-wrap;max-height:230px;overflow:auto;background:#0b0e13;border:1px solid #1a222e;border-radius:6px;padding:7px 9px;display:none;");
-    const say = (m, ok) => { out.style.display = "block"; out.style.color = ok === false ? "#f88" : (ok ? "#9fe88f" : "#bcd"); if (typeof m === "string") out.textContent = m; else { out.innerHTML = ""; out.appendChild(m); } };
+    // v3910 -- ONE DEFINITION OF WHERE A TOKEN COMES FROM. The Account tab already had this URL hardcoded in
+    // its "Where do I get a token?" note (v1847); it is a constant now and BOTH readers use it, so the day it
+    // changes it changes once.
+    const TOKEN_URL = "https://github.com/settings/tokens";
+    // Every token-gated call in githubBridge answers with some spelling of "token required" -- publish, upload,
+    // createRepo, issues, delete, eight of them. Keith hit the publish one and asked, reasonably, why the
+    // message that names the thing you are missing does not offer the place to get it.
+    // *** THE LINK IS ATTACHED HERE, AT say(), AND NOT AT THE EIGHT CALL SITES. *** Wrapping the one chokepoint
+    // means a token error raised by a route nobody has written yet still arrives with its remedy, and there is
+    // no list of messages to keep in step with the bridge -- which is the kind of list that goes stale silently.
+    const TOKEN_ERR = /token[^.]{0,40}\brequired\b|\brequired\b[^.]{0,40}token/i;
+    const say = (m, ok) => {
+        out.style.display = "block";
+        out.style.color = ok === false ? "#f88" : (ok ? "#9fe88f" : "#bcd");
+        if (typeof m !== "string") { out.innerHTML = ""; out.appendChild(m); return; }
+        out.textContent = m;
+        if (ok === false && TOKEN_ERR.test(m)) {
+            // A NODE, NOT innerHTML: the message is server text and this panel renders repo names, issue titles
+            // and error bodies from GitHub. Building the link as an element keeps the message itself text.
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;";
+            const a = document.createElement("a");
+            a.href = TOKEN_URL; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = "\u2192 Get a token on GitHub";
+            a.style.cssText = "color:#7fd1ff;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #2a4a6a;padding:3px 8px;border-radius:4px;";
+            const hint = document.createElement("span");
+            hint.style.cssText = "color:#8fa3bb;font-size:10px;";
+            hint.textContent = "then paste it in the Account tab \u2014 it explains the two kinds and the scopes";
+            wrap.append(a, hint);
+            out.appendChild(wrap);
+        }
+    };
     const repo = () => repoSel.value.trim();
 
     // ---- sections ----
@@ -99,7 +130,7 @@ export function mountGithubPanel() {
             const sum = E("summary", "cursor:pointer;color:#9ed5ff;font-size:10px;", "Where do I get a token?");
             help.appendChild(sum);
             const tokLink = E("a", "color:#7fd1ff;font-size:11px;font-weight:bold;word-break:break-all;", "\u2192 github.com/settings/tokens");
-            tokLink.href = "https://github.com/settings/tokens"; tokLink.target = "_blank"; tokLink.rel = "noopener";
+            tokLink.href = TOKEN_URL; tokLink.target = "_blank"; tokLink.rel = "noopener";   // v3910 -- the shared constant, not a second copy
             const body = E("div", "margin-top:5px;line-height:1.55;");
             body.innerHTML =
                 "GitHub has no permanent \u201cAPI key\u201d \u2014 you generate a <b>Personal Access Token (PAT)</b> yourself. Either kind works to create + push to your own repo:"
