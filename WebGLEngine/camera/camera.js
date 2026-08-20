@@ -14,6 +14,11 @@
 import { buildViewProj } from "./buildViewProj.js";
 
 export class Camera {
+    // The keys the _move* methods consult in EVERY mode that moves. KeyE is deliberately absent: it is
+    // kaiju-drive only, and consumesKey() adds it there. Cross-checked against the keys.has() literals in this
+    // file by tools/ship/cameraKeys-selfcheck.mjs, so this cannot quietly fall behind the code it describes.
+    static MOVEMENT_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft"]);
+
 
     constructor(canvas) {
 
@@ -592,6 +597,26 @@ export class Camera {
         // Since we're above the target looking down, pitch is negative.
         const horiz = Math.hypot(fwdX, fwdZ);
         this.pitch = -Math.atan2(-fwdY, horiz);     // sign so down → negative
+    }
+
+    // v3911 -- *** WHO OWNS A KEY, ASKED RATHER THAN GUESSED. ***
+    // Keith: pressing W on index.html moved the camera forward AND tipped it toward the sky. Both were happening:
+    // this class consumes KeyW in _moveObserver/_moveFP/_moveKaijuDrive, while main.js's navPad ALSO bound KeyW
+    // to "rotUp". The pad tried to stand aside -- but its guard read `mode === "fp" || mode === "kaiju_drive"`,
+    // and it named TWO of the THREE modes that move on WASD. IT MISSED "observer", WHICH IS THE DEFAULT
+    // (constructor, this.mode = "observer"), so the collision was live in the mode everyone starts in and in no
+    // other. A HAND-LISTED SET OF MODES IS A SECOND DECLARATION OF THE DISPATCH ABOVE, and it drifted the moment
+    // a third mover existed.
+    //
+    // So the pad no longer decides. It asks, and the answer lives beside the dispatch it has to agree with.
+    // PER-MODE, because a blanket set would be wrong in the other direction: KeyE is read ONLY by
+    // _moveKaijuDrive, and blocking it in observer would take the pad's rotRight away for no reason.
+    consumesKey(code) {
+        // these two return before any _move* runs -- see the dispatch in update(): missile_cam returns outright,
+        // ogre_orbit goes to _moveOrbit, which reads no keys at all.
+        if (this.mode === "missile_cam" || this.mode === "ogre_orbit") return false;
+        if (Camera.MOVEMENT_KEYS.has(code)) return true;
+        return code === "KeyE" && this.mode === "kaiju_drive";
     }
 
     _moveObserver(dt) {
