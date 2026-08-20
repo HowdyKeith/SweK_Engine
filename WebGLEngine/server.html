@@ -216,6 +216,26 @@ window.addEventListener("load", function () {
     .bigbtns button { min-height:46px; padding:4px 10px; font-size:13px; max-width:none; flex:1 1 44%; }
     #erRow > div, #netRow > div { flex:1 1 100%; min-width:0; }
   }
+
+  /* v3909 -- EVERY LINK IN A DRAWER IS A BOX, AND IT IS CSS RATHER THAN 113 INLINE STYLES.
+     The boxing was applied BY HAND, per anchor, in the Arriving markup -- so 23 of 113 simply never got it and
+     read as bare underlined text next to boxed siblings. Measured, not eyeballed: 90 boxed, 23 not, and the two
+     properties are independent (lab-export HAD an icon and no box).
+     *** CSS AND NOT A JS PASS, BECAUSE OF THE RACE. *** placements() appends links ASYNCHRONOUSLY from a bridge
+     fetch, long after any load-time styling pass would have finished. A rule applies to a node the moment it
+     lands, whoever adds it and whenever. The existing inline styles still win where they exist -- same box, same
+     radius -- so nothing already right is changed; this only reaches what was missed. */
+  .gpanel [data-panel-pages] > a,
+  .gpanel .placedPages > a {
+    display: inline-flex; align-items: center; gap: 4px;
+    text-decoration: none; border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 3px; font-size: 11px;
+  }
+  /* A page with no icon of its own gets a neutral mark, so the row reads as one kind of thing rather than as
+     "the important ones have pictures". Set from JS as an ATTRIBUTE and drawn here: CSS cannot ask whether text
+     begins with an emoji, and putting the glyph in the DOM would make it part of the link's own text. */
+  .gpanel [data-panel-pages] > a[data-noicon]::before,
+  .gpanel .placedPages > a[data-noicon]::before { content: "\25C6"; opacity: .45; font-size: 8px; }
 </style>
 <script src="/engine/favicon-inject.js"></script>
 <script src="/engine/visitor-chat.js"></script>
@@ -4128,7 +4148,17 @@ A password fetches a token from the list server; an unregistered callsign needs 
         Object.keys(pages).forEach(function(f){
           (pages[f].topics || []).forEach(function(t){
             var panel = document.querySelector('.gpanel[data-panel="' + t + '"]');
-            if (!panel || panel.querySelector('[data-place-page="' + f + '"]')) return;
+            if (!panel) return;
+            // v3909 -- *** THIS IS WHERE THE DUPLICATES CAME FROM. *** The guard checked only for THIS block's
+            // own marker, never for a link the drawer already had. pageSections' mover puts a properly labelled
+            // anchor -- icon and title -- into [data-panel-pages]; if the same page also carries a topics entry
+            // in page-placements.json, this loop then appended a SECOND link to the same href rendered as a bare
+            // slug. Physics Lab showed all twelve of its pages twice: "Physics Lab" and "physics-lab".
+            // Reproduced in a browser by stubbing /pages/placements before believing it, since the route 404s
+            // offline and the panel looks clean without a bridge. THE ADDS-AND-NEVER-REMOVES PROPERTY IS INTACT:
+            // this refuses to add a duplicate, it does not delete anything anyone else placed.
+            if (panel.querySelector('[data-place-page="' + f + '"]')) return;
+            if (panel.querySelector('a[href="/' + f + '"]')) return;
             var host = panel.querySelector(".placedPages") || (function(){
               var d = document.createElement("div");
               d.className = "placedPages";
@@ -4142,6 +4172,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
             a.title = "placed here from the Page Index";
             a.style.cssText = "color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;";
             host.appendChild(a);
+            if (window.swekMarkPanelLinks) window.swekMarkPanelLinks();
           });
         });
 
@@ -7603,6 +7634,41 @@ if (missing.length && arrivingRow) {
 }
 console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.length + " panels" +
             (missing.length ? ", " + missing.length + " unmatched: " + missing.join(", ") : ""));
+
+// v3909 -- MARK THE LINKS THAT HAVE NO ICON OF THEIR OWN, so the CSS above can give them a neutral one.
+// Exposed on window because the OTHER place links arrive -- placements(), which appends asynchronously from a
+// bridge fetch in a classic script far above -- has to be able to re-run it, and a module's names are not
+// reachable from there. THE TWO CALL SITES ARE THE ONLY TWO WAYS A LINK ENTERS A DRAWER, which is what makes
+// this complete rather than merely likely: the mover below, and the placements append.
+const ICON_START = /^[\p{Extended_Pictographic}\u25C6\u25C9\u25CF\u25B6\u2699\u2295\u269B\u2697\u222B\u25D6]/u;
+window.swekMarkPanelLinks = function () {
+  // *** THE GUARD IN placements() IS NOT ENOUGH ON ITS OWN, AND THE BROWSER IS WHAT SAID SO. *** I added a check
+  // there for "does this drawer already link to this page", verified the boxing, AND THE TWELVE DUPLICATES WERE
+  // STILL THERE. The reason is order: placements() resolves its bridge fetch BEFORE this module moves the
+  // anchors in, so at the moment it checks, the drawer is genuinely empty and it is right to append. The guard
+  // stays -- it covers the other ordering -- and this pass covers this one. TWO ORDERINGS, TWO DEFENCES.
+  let removed = 0;
+  for (const panel of document.querySelectorAll('.gpanel')) {
+    const owned = new Set([...panel.querySelectorAll('[data-panel-pages] > a[href]')].map((a) => a.getAttribute("href")));
+    if (!owned.size) continue;
+    // ONLY a placements-added anchor is ever removed, and only when the drawer already owns that exact href.
+    // The mover's anchors are authoritative -- they carry the icon and the title -- and nothing here can touch
+    // them. This does not weaken placements' "adds and never removes": it declines a duplicate of a link that
+    // is already present, which is the same decision its own guard makes when the ordering lets it.
+    for (const a of panel.querySelectorAll('.placedPages > a[data-place-page]')) {
+      if (owned.has(a.getAttribute("href"))) { a.remove(); removed++; }
+    }
+  }
+  let marked = 0;
+  for (const a of document.querySelectorAll('.gpanel [data-panel-pages] > a, .gpanel .placedPages > a')) {
+    const has = ICON_START.test((a.textContent || "").trim());
+    if (has) a.removeAttribute("data-noicon");
+    else if (!a.hasAttribute("data-noicon")) { a.setAttribute("data-noicon", ""); marked++; }
+  }
+  if (removed) console.log("[pageSections] removed " + removed + " duplicate placement link(s) the drawer already owned");
+  return marked;
+};
+console.log("[pageSections] " + window.swekMarkPanelLinks() + " panel links carry no icon of their own and get the neutral mark");
 </script>
 
 <!-- v3247 -- INSTALL AND RUN HISTORY, from the side that can see it. -->
