@@ -10,6 +10,59 @@
 // ceremony the guard exists to force. An entry cannot be added without writing the sentence.
 
 export const EXACT_OK = {
+    // *** v3915 -- THE REMAINING TWENTY, EACH MEASURED, EACH WITH THE CONTROL THAT PROVES IT IS NOT VACUOUS. ***
+    // v3914 did the two clusters and named these twenty rather than registering them, because a sentence
+    // written without the measurement is what empties this register of meaning. Every entry below carries a
+    // number I took, and for every one there is a case where THE SAME EXPRESSION IS NOT ZERO -- a sibling
+    // observable, another mode, a plant, or a perturbed input. That pairing is the whole standard here.
+
+    // FREEROTATION -- the control is the `stability` mode, where the SAME observable reads 1.3875e-5.
+    "freerotation.conserve.sigmaRelErr": "the conserve fixture integrates a torque-free body whose sigma is constant by construction, so the spread over the run is bit-zero; the stability mode reads 1.3875e-5 from the same expression, which is the control that it can move",
+    "freerotation.flip.sigmaRelErr": "as conserve -- the flip fixture changes WHICH axis the body tumbles about, not whether sigma is conserved, so the residual stays exactly zero while stability shows the same key going non-zero",
+    "freerotation.attitude.sigmaRelErr": "as conserve; attitude grades orientation rather than the invariant, and leaves sigma exactly conserved",
+
+    // CLOCKS -- an exact GR identity, verified at four independent (M, r) pairs.
+    "clocks.rates.crossoverResidual": "|orbitingDilation(M,r) - staticDilation(M, r/1.5)| is the identity sqrt(1-3M/r) = sqrt(1-2M/(2r/3)), algebraically exact; measured bit-zero at (M,r) = (1,12), (0.3,7.7), (2,50) and (0.05,4), while the sibling clockEffectErrFrac reads 5.65e-15 so the arithmetic is genuinely floating point",
+    "clocks.rates.crossoverErrOrder": "the ORDER of the naive composition's error, which its own comment states reads 2.000000000000 under the planted error and 0 without it -- this is the honest arm of a declared plant, not an unexamined zero",
+
+    // GEOSTATS -- the control is the plant mode.
+    "geostats.nugget.valueErr": "kriging with a nugget reproduces the observation at a data location exactly -- the estimator is an exact interpolator there; the noconstraint plant mode reads 3.25e-1 on the same key",
+    "geostats.nugget.varianceErr": "the kriging variance at a data location is exactly zero for the same reason; the plant mode reads 3.33e-2, so the comparison is live",
+
+    // FDTD -- the magic time step, and the controls are computed in the same mode.
+    "fdtd.magic.magicErr": "|1 - vp/c| at Courant number S = 1.0, the magic time step at which the Yee scheme is exactly non-dispersive; the same at() function is evaluated at S = 0.9 and S = 0.5 IN THE SAME MODE and returns non-zero, which is the point the mode exists to make -- a smaller step is worse, not better",
+    "fdtd.lightspeed.cErrFrac": "cMeasured equals cExact to the bit at the magic step, the same exactness as magicErr seen through the recovered speed rather than the dispersion",
+
+    // PROBE
+    "probe.place.tourWorstErr": "the place fixture puts the probe at the tour waypoints rather than integrating to them, so the worst waypoint error is zero by construction; the tour mode integrates and reads 1.0862e-12",
+    "probe.transfer.periErr": "the transfer's PERIHELION is the departure radius, which the fixture sets, so it is exact by construction; its sibling apoErr in the same mode is 7.9353e-10 because the APHELION is integrated to -- one exact end and one measured end, side by side",
+
+    // XPBD -- a symmetry identity whose own gate asserts === 0.
+    "xpbd.weave.isotropicResidual": "iso and isoOther are stretchAlong(stiff, stiff, axis) at axis 0 and axis 2 -- equal compliances, so the cloth is isotropic and the two axes agree to the bit; the same function returns anisotropyRatio 14.03 when the compliances differ, so the machinery is direction-sensitive and the zero is the symmetry",
+
+    // SEISMIC -- an algebraic identity that is NOT always bit-exact, which is what makes it a real subtraction.
+    "seismic.interface.energyResidual": "R^2 + (Z1/Z2) T^2 = 1 is energy conservation at a plane interface, algebraically exact; it is bit-zero at the fixture's impedances but reads 1.11e-16 at Z1=1.5 Z2=7.3, and scaling R by one percent moves it to 8.73e-3 -- so this is exact arithmetic at these values, not an identity the code cannot fail",
+
+    // NUCLEAR
+    "nuclear.chain.conservationResidual": "A + B + C = N0 for the closed Bateman chain, exact by construction since the three populations partition a fixed nucleon count; bit-zero at the fixture's rates and 1.1369e-13 at l1=1e-4 l2=7 t=0.2, so the sum is genuinely recomputed rather than asserted",
+
+    // BEAM -- the most interesting of the twenty: a REAL error that the observable is deliberately blind to.
+    "beam.exponent.exponentError": "the recovered log-log slope is exactly 3 even though measureTipDeflection is a real finite-difference solve carrying genuine discretisation error -- 5.21e-7 at L=0.5 rising to 2.67e-4 at L=4. THE RATIO numeric/closed IS IDENTICAL AT EVERY L (1.0000125031215), so a constant relative error moves the INTERCEPT of the fit and never its SLOPE. The zero is not the absence of error; it is an exponent being immune to the error that is present, which is what a scaling check should be",
+
+    // CENTRIFUGE -- a bisection that lands exactly only because the target is the exact bracket midpoint.
+    "centrifuge.neutral.neutralRelErr": "the neutral density is recovered by BISECTION on the drift sign, and at rhoF = 1 it converges on 1 exactly; at rhoF = 1.3 it lands 1.71e-16 off and at 0.7777 1.43e-16 off, so the search is a real numerical one and the exactness belongs to the value, not to the method",
+
+    // GALAXY -- the control is the plant.
+    "galaxy.traces.triangleErr": "the trace identity over the adjacency triple is integer-exact on this fixture; the unorderedtri plant mode reads 1.38e+3 on the same key",
+
+    // MPMSTRESS -- the blind partner, named by its own mode.
+    "mpmstress.blindfixtures.dilationPlantDelta": "blindfixtures is the mode of fixtures BLIND to the plant, and the dilation fixture is the blind one -- the transposed plant leaves it untouched by design; its sighted partner shearPlantDelta sits beside it in the same mode at 1.5385e+1",
+
+    // HANDS -- an equivalence between two spellings of the same operation.
+    "hands.mirror.mirrorMaxDelta": "computeHandMetrics with mirror:true must agree with the same pose flipped by x -> 1-x and mirror:false; the max is taken over five quantities across four poses and every one agrees to the bit, which is the equivalence the mode exists to assert rather than a check with nothing in it",
+
+    // KERRLADDER
+    "kerrladder.photon.photonErr": "at spin 0 the photon sphere sits at exactly 3M, a small integer landed on exactly; the sibling photonWorstErr over ten spin rows reads 1.2434e-14, so the non-zero spins in the same mode are what show the comparison working",
     // *** v3914 -- TWELVE OF THE THIRTY-TWO CENSUS HAD BEEN UNABLE TO REPORT. *** census-selfcheck was timing
     // out at 180s, so its exact-zero ledger went unenforced and the fresh list grew to 32 across 16 devices. It
     // completes at 717s now (v3913 gave it a budget), and these twelve are the two clusters, EXAMINED rather
