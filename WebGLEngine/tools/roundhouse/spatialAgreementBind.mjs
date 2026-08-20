@@ -33,7 +33,7 @@ import {
     POINT_FAMILY, BOX_FAMILY,
 } from "../../physics/spatial/agreement.mjs";
 
-// *** v3854 -- THE DEVICE FEARED A SUPERSET AND REPORTED ONLY A BOOLEAN ABOUT IT. ***
+// *** v3902 -- THE DEVICE FEARED A SUPERSET AND REPORTED ONLY A BOOLEAN ABOUT IT. ***
 //
 // The header above ends on the reason this device exists: "A structure that returned a superset -- reporting
 // pairs that are not neighbours -- would pass every isolated brute-force gate that only checked for MISSED
@@ -100,7 +100,7 @@ function buildSpatial({ mode = "agreement", config = {} } = {}) {
 export const spatialAgreementDevice = {
     modes: ["agreement", "supersetbox"],
     name: "spatial-five-way-agreement", observables: SPATIAL_OBSERVABLES, build: buildSpatial,
-    // *** v3854 -- IT REFUSES AN UNDECLARED MODE NOW, AND IT USED TO HAND THE NAME STRAIGHT BACK. ***
+    // *** v3902 -- IT REFUSES AN UNDECLARED MODE NOW, AND IT USED TO HAND THE NAME STRAIGHT BACK. ***
     // The old line was `mode: mode || "agreement"`, which returns ANY truthy name as though the device offered
     // it -- deviceModes-selfcheck's `checkMode(d, "zzz_not_a_mode_zzz")` saw acceptance, and `spatial` sat on
     // that gate's UNGUARDED_BASELINE. Guarding it was the PLANT'S PRECONDITION and not a side errand: v3806's
@@ -108,7 +108,7 @@ export const spatialAgreementDevice = {
     // an identical number, so the plant appears to fire and changes nothing.
     // *** AND I WALKED INTO EXACTLY THAT ON splatBind THIS SAME ROUND *** -- a second copy of the mode list
     // inside its defaults() coerced the new plant mode to the primary and the two arms came back bit-identical.
-    // The lesson was written down at v3806 and cost a debugging round anyway at v3854.
+    // The lesson was written down at v3806 and cost a debugging round anyway at v3902.
     // NULL, NOT A COERCION: beamBind returns null for an undeclared mode and that is the behaviour the gate
     // calls correct -- coercing to the primary passes the same check while still answering a question nobody
     // asked.

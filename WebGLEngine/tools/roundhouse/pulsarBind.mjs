@@ -18,7 +18,7 @@
 // PARAMETER RATHER THAN A SMALL NUMBER IS AN ALGEBRA ERROR ANNOUNCING ITSELF, and this tree has seen it before
 // -- the CT units sabotage at v3073, where the shape was exactly right and the scale was not.
 //
-// *** v3854 -- THE PLANT IS THAT SAME ALGEBRA ERROR, AND IT IS NOW A MODE RATHER THAN AN ANECDOTE. ***
+// *** v3902 -- THE PLANT IS THAT SAME ALGEBRA ERROR, AND IT IS NOW A MODE RATHER THAN AN ANECDOTE. ***
 //
 // The paragraph above records a mistake and its measurement, and then the mistake left the tree -- the file
 // kept the CORRECT line and the story about the wrong one. A STORY ABOUT A CAUGHT ERROR IS NOT A CAUGHT ERROR:

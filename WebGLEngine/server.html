@@ -290,7 +290,7 @@ window.addEventListener("load", function () {
 </head>
 <body>
   <header>
-    <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button><span id="instHist" title="Install-to-ready: how long from this build being written to the server answering. Measured by the SERVER, because the page loses the process during a restart and is not open at all while somebody unzips by hand. New-build and plain-restart averages are kept apart." style="margin-left:8px;font-size:10px;color:var(--dim);vertical-align:middle;"></span> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span></span>
+    <span class="title">⚙️ <a href="/self/zip" download title="Download this SweK Engine build (.zip from your Downloads)" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor;">SweK Engine</a><span id="hdrEngineVer" style="color:var(--go);font-weight:600;"></span><button id="verBtn" title="ONE update control. Idle: check every source -- each LAN peer, the Downloads folder and Google Drive. When a newer build is found this becomes the install button and names the version. While it installs it reports the stage rather than a spinner." style="margin-left:8px;font-size:11px;padding:2px 9px;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;border-radius:5px;cursor:pointer;vertical-align:middle;">Version Check</button> · <span id="hdrPeerName"></span>Server Mode<span id="hdrRuntime"></span></span>
 <a id="androidPeerBtn" href="/android-peer.html" title="SweK Android Peer - install guide, expectations, and the verdict front door for the phone's ballot" style="font-size:11px;padding:2px 10px;margin-left:6px;background:#143020;color:#8fe0ae;border:1px solid #2c6a45;border-radius:5px;cursor:pointer;text-decoration:none;">&#129302; Android Peer</a><!-- v2922 android-peer (install) -->
 <a id="iosPeerBtn" href="/ios-peer.html" title="SweK iOS Peer - iPhone/iPad: portable physics subset in-page, plus the Apple GPU as a first-class magmap vendor" style="font-size:11px;padding:2px 10px;margin-left:4px;background:#141f30;color:#9ec9ff;border:1px solid #2c4a6a;border-radius:5px;cursor:pointer;text-decoration:none;">&#127823; iOS Peer</a><!-- v2925 ios-peer (install) -->
     <!-- v3245 -- checkPeersVer and updateNowBtn MERGED INTO #verBtn beside the version number. THREE CONTROLS
@@ -319,6 +319,12 @@ window.addEventListener("load", function () {
   <main>
     <div id="remoteBanner" style="display:none;padding:7px 12px;margin:0 0 8px;border:1px solid;border-radius:6px;font-size:12px;font-weight:600;"></div>
     <div id="peerVerOut" style="font-size:11px;color:var(--dim);padding:0 2px;"></div>
+    <!-- v3850 -- MOVED OFF THE TITLE LINE. install-to-ready sat between the version and the update button,
+         where it is neither: the title line is IDENTITY (which build am I, is there a newer one) and this is a
+         MEASUREMENT ABOUT THE LAST BOOT. Keith: "this should not appear (and stay) on the top line ... it
+         would be better if it shows up on the status lines". It is a sibling of #peerVerOut rather than a
+         child, because that container is emptied on every version check and this fact outlives one. -->
+    <div id="instHistLine" style="font-size:11px;color:var(--dim);padding:0 2px;"><span id="instHist" title="Install-to-ready: how long from this build being written to the server answering. Measured by the SERVER, because the page loses the process during a restart and is not open at all while somebody unzips by hand. New-build and plain-restart averages are kept apart." style="margin-left:8px;font-size:10px;color:var(--dim);vertical-align:middle;"></span></div>
     <div id="gaugeBtnRow" style="display:flex;align-items:flex-start;gap:28px;padding:0 2px 12px;border-bottom:1px solid var(--line);margin-bottom:8px;flex-wrap:wrap;">
       <div id="gaugeAvatarCol" style="display:flex;flex-direction:column;gap:6px;flex:1 1 460px;min-width:0;">
         <div id="dbgTicker" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#0a120e;overflow:hidden;">
@@ -547,6 +553,7 @@ window.addEventListener("load", function () {
             <!-- v3841 merge -- SVG->3D forge + office-floor front doors. Reachable anchors. -->
             <a href="/svg-forge.html" target="_blank" rel="noopener" title="SVG -> 3D forge: paste an SVG and bevel-extrude its paths into a metal medal/badge/insignia -- holes and inner points preserved. Thickness/bevel/metal controls.">SVG forge</a>
             <a href="/office-floor.html" target="_blank" rel="noopener" title="Office floor: the physics-lab AI roster and job queue -- what runs next, on whom, and when a human is woken. SVG, no sprites.">Office Floor</a>
+      <a href="/lab-census.html" target="_blank" rel="noopener" title="The physics lab's coverage in one read: graded modules, declared plants, corroboration eligibility, instrument reach, and whether the job dispatcher is ticking. Every figure imported from the tool that owns it.">Lab census</a>
             <!-- v3825 -- Long Silence Round A: a Three.js 3D render pass for the box3d ES fight. An <a> so it is reachable (not an orphan); it also links from es-box3d.html itself. -->
             <a href="/es-box3d-3d.html" target="_blank" rel="noopener" title="Endless Sky on Box3D, in 3D -- real hull meshes following box3d's (x,0,z)+heading under a free OrbitControls camera, the sim unchanged and still planar (Long Silence Round A).">ES Box3D 3D</a>
             <!-- v3826 -- Long Silence Round B: the box3d ES fight flying in 3D (pitch/altitude). Reachable anchor; also links from the Round A page. -->
@@ -1253,7 +1260,7 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="smarthome" hidden>
           <div class="gpanelHdr">&#127968; Smart Home</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Home Assistant, the Shield, announcements and the house sensors. New at v3670 on Keith's ask. Membership is DERIVED: a page is here because it CALLS a house endpoint (/ha, /doorbell, /arrival, /presence, /alexa, /shield, /nest, /solar), not because its name looks like one -- a string test for &quot;home assistant&quot; also took the credits page, which only links to one. Dashboards that read a sensor while being about something else (control, hub, board, index) are deliberately not here.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Home Assistant, the Android TV Device, announcements and the house sensors. New at v3670 on Keith's ask. Membership is DERIVED: a page is here because it CALLS a house endpoint (/ha, /doorbell, /arrival, /presence, /alexa, /shield, /nest, /solar), not because its name looks like one -- a string test for &quot;home assistant&quot; also took the credits page, which only links to one. Dashboards that read a sensor while being about something else (control, hub, board, index) are deliberately not here.</div>
           <div data-panel-pages="smarthome" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="boundaries" hidden>
@@ -1368,7 +1375,7 @@ window.addEventListener("load", function () {
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
             <label style="font-size:11px;color:var(--dim);">host</label>
-            <input id="brainHost" type="text" placeholder="http://192.168.50.195:8787"
+            <input id="brainHost" type="text" placeholder="http://192.168.10.195:8787"
                    style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:4px 7px;width:220px;">
             <button id="brainGo" style="font-size:11px;padding:2px 10px;background:#1a2438;color:#b0c4ff;border:1px solid #3a4a6a;border-radius:5px;cursor:pointer;">Use</button>
             <a id="brainOpen" href="/ai/brain/mind" target="_blank" rel="noopener"
@@ -7617,7 +7624,9 @@ console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.len
     // THE AVERAGES ARE REAL MEASUREMENTS EVEN WHEN THE LAST RUN IS NOT, so they still earn the space.
     if(j.avgNewBuildMs!=null) bits.push("avg new "+s(j.avgNewBuildMs));
     if(j.avgRestartMs!=null) bits.push("avg restart "+s(j.avgRestartMs));
-    el.textContent = bits.length ? (" \u00b7 "+bits.join(" \u00b7 ")) : "";
+    // v3850 -- NO LEADING SEPARATOR ANY MORE. The " \u00b7 " existed to join this onto the title line it used to
+    // trail; on its own status line it rendered as a stray dot with nothing before it.
+    el.textContent = bits.length ? bits.join(" \u00b7 ") : "";
     el.title = j.note + "  Last " + j.runs.length + " runs recorded." + (note ? ("  " + note) : "");
   }).catch(function(){ /* a history that will not load must not be reported as a fast install */ });
 })();

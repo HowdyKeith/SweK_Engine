@@ -41,7 +41,7 @@ export const SPLAT_OBSERVABLES = [
 const I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const DEF = { z: 5, f: 800, sigma: 0.1, gridN: 256, alpha: 0.3, count: 7, offAxis: 2.0 };
 
-// *** v3854 -- THE MODE LIST LIVED IN TWO PLACES AND THE COPY IN splatDefaults SILENTLY REWROTE UNKNOWN NAMES
+// *** v3902 -- THE MODE LIST LIVED IN TWO PLACES AND THE COPY IN splatDefaults SILENTLY REWROTE UNKNOWN NAMES
 // TO "integral". *** Adding a plant mode produced two arms that were BIT-IDENTICAL, because the new name was
 // not in the whitelist below and was quietly coerced to the primary -- the plant appeared to fire and changed
 // nothing. THE FAILURE MODE IS THE DANGEROUS ONE: a typo'd or new mode name did not raise, it answered the
@@ -153,7 +153,7 @@ export async function buildSplat(hyp, base = {}) {
     // "integral" -- the default and the sharpest single number. "detnotsqrt" is its plant and shares this
     // whole block, so the arms differ in ONE thing: the closed form the rasteriser is graded against.
     //
-    // *** v3854 -- THE PLANT IS det WHERE sqrt(det) BELONGS, WHICH IS THE STANDARD 2D-GAUSSIAN SLIP. ***
+    // *** v3902 -- THE PLANT IS det WHERE sqrt(det) BELONGS, WHICH IS THE STANDARD 2D-GAUSSIAN SLIP. ***
     // The normalisation of a 2D Gaussian carries sqrt(det Sigma), not det Sigma -- the determinant of a 2x2
     // covariance has units of length^4 and the integral has units of length^2. THE RASTERISER IS NEVER TOUCHED
     // (`num` is bit-identical in both arms), so this is a `method` plant: the picture is right, the sum over

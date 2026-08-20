@@ -70,7 +70,7 @@ export function vibrationsDefaults(cfg = {}) {
 export const firstMomentKey = (N, k, m) => 2 * N * (k / m);
 export const secondMomentKey = (N, k, m) => (6 * N - 2) * (k / m) * (k / m);
 
-// *** v3854 -- THE TRIG ROUTE'S ANSWER, KEPT RUNNABLE. *** The header records deriving the second moment twice
+// *** v3902 -- THE TRIG ROUTE'S ANSWER, KEPT RUNNABLE. *** The header records deriving the second moment twice
 // and getting 6N-2 from the matrix trace and 6N+6 from expanding sin^4 -- and the measurement settling it at
 // 6N-2 exactly, at seven values of N. The correct key shipped and the wrong one became a sentence. THIS IS
 // THAT SENTENCE AS A MODE, so the sweep re-derives the disagreement instead of remembering it.
@@ -190,7 +190,7 @@ export const vibrationsDevice = {
     observables: VIBRATIONS_OBSERVABLES,
     build: buildVibrations,
     defaults: vibrationsDefaults,
-    // *** v3854 -- `sumW4ErrRel` GOES FROM EXACTLY ZERO TO 0.10256410, AND THE ZERO IS THE POINT. ***
+    // *** v3902 -- `sumW4ErrRel` GOES FROM EXACTLY ZERO TO 0.10256410, AND THE ZERO IS THE POINT. ***
     // The honest key reproduces the measured fourth moment to the bit at N=12: s4 = 70, key = 70, error
     // EXACTLY 0. Under the trig route the key is 78 and the relative error is 8/78 = 0.10256410256410256.
     //

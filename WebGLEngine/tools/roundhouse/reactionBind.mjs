@@ -33,7 +33,7 @@
 // the inhibitor must diffuse FASTER than the activator. SWAP Du AND Dv and nothing forms at any B: amplitude
 // 9.9e-10 against 2.6 unswapped, nine orders. No threshold was tuned to make that happen.
 //
-// *** v3854 -- THE PLANT SMUGGLES THE ANSWER INTO THE INITIAL CONDITION, AND IT IS THE ONE DEFECT THIS DEVICE
+// *** v3902 -- THE PLANT SMUGGLES THE ANSWER INTO THE INITIAL CONDITION, AND IT IS THE ONE DEFECT THIS DEVICE
 // WAS BUILT TO BE IMMUNE TO. *** The header above says what makes this device worth having: "THIS SEEDS EVERY
 // MODE WITH NOISE AND ASKS WHICH ONE WINS -- and consults no formula at all while running." So the plant is to
 // stop doing that. `seeded` puts the amplitude on ONE mode -- Math.round(k_c L / 2pi) = 5, the nearest integer

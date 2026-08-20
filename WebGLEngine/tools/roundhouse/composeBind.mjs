@@ -104,7 +104,7 @@ async function buildCompose({ mode = "compare", config = {} } = {}) {
     };
 }
 
-// *** v3854 -- A PLANT WAS ATTEMPTED HERE AND REFUSED, AND THE REFUSAL IS MEASURED RATHER THAN ASSERTED. ***
+// *** v3902 -- A PLANT WAS ATTEMPTED HERE AND REFUSED, AND THE REFUSAL IS MEASURED RATHER THAN ASSERTED. ***
 //
 // The curriculum proposes this device for a plant. It should not, and the reason is a property of what this
 // device CONTRIBUTES rather than of how hard it is to sabotage.

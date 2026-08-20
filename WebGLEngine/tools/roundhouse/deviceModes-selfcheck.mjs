@@ -74,7 +74,11 @@ for (const name of D.DEVICE_NAMES) {
     // plant and both arms read an identical number. So guarding the mode was not a side errand, it was the
     // plant's precondition, and this gate went red the moment the guards landed. TWO ENTRIES DELETED, NOT
     // COMMENTED OUT, the same way "em" left at v3424.
-    // *** v3854 -- "spatial" CAME OFF THIS LIST, AND THE STALENESS HALF SAID SO ON THE SAME RUN ITS PLANT
+    // *** v3902 -- "fieldnav" AND "inference" CAME OFF WITH IT, for the same reason and on the same run: each
+    // took a plant this round, and each had a defaults() of the form `mode: mode || <primary>` that hands ANY
+    // truthy name straight back. All three now return NULL for a mode they do not declare. THREE ENTRIES
+    // DELETED, NOT COMMENTED OUT.
+    // *** v3902 -- "spatial" CAME OFF THIS LIST, AND THE STALENESS HALF SAID SO ON THE SAME RUN ITS PLANT
     // LANDED. *** Its defaults() was `mode: mode || "agreement"`, handing ANY truthy name straight back as
     // though the device offered it; it now returns NULL for a mode it does not declare, which is beamBind's
     // behaviour and the one this check calls correct. The guard was the plant's precondition, exactly as it
@@ -82,8 +86,8 @@ for (const name of D.DEVICE_NAMES) {
     // same round, on splatBind, where a SECOND COPY of the mode list inside defaults() coerced a new plant
     // mode to the primary and made both arms read bit-identical numbers.
     const UNGUARDED_BASELINE = [
-        "acoustics", "seismic", "nuclear", "clocks", "fieldnav", "kuramoto", "hmc", "landauzener",
-        "inference", "langevin", "rmt", "percolation", "diffusion", "wolff",
+        "acoustics", "seismic", "nuclear", "clocks", "kuramoto", "hmc", "landauzener",
+        "langevin", "rmt", "percolation", "diffusion", "wolff",
         "twof", "tempering", "blobbodies",
         // v3501 -- xpbd and compose were ALREADY unguarded on the pristine v3500 extract (this gate was red there,
         // it is not carried by verify). They are recorded here to bring the baseline current, not to excuse them:

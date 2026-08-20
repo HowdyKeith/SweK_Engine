@@ -113,7 +113,7 @@ export const spacefillDevice = {
     observables: SPACEFILL_OBSERVABLES,
     build: buildSpacefill,
     defaults: spacefillDefaults,
-    // *** v3854 -- NO CODE CHANGED HERE. THE PLANT WAS BUILT AT v3188 AND NEVER DECLARED. ***
+    // *** v3902 -- NO CODE CHANGED HERE. THE PLANT WAS BUILT AT v3188 AND NEVER DECLARED. ***
     // The header above already calls `raster` the load-bearing negative and already states the consequence
     // if it ever stopped firing: "If this mode ever reports zero breaks, the checker is measuring nothing,
     // because a raster scan cannot be a continuous stroke." That is a plant, written down and run, and the

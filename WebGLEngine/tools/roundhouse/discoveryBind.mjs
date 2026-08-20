@@ -134,7 +134,7 @@ export const discoveryDevice = {
     // device reported as having NO DISCOVERABLE MODES. Derived from this file's own default plus every
     // mode its own build() branches on, each verified to produce a DISTINCT answer first.
     modes: ["kepler", "fragile", "logistic", "nolaw", "rolling", "splat", "visviva"], name: "symbolic-equation-discovery", observables: DISCOVERY_OBSERVABLES, build: buildDiscovery, defaults: discoveryDefaults,
-    // *** v3854 -- NO CODE CHANGED. `nolaw` HAS BEEN THE PLANT SINCE v2867 AND WAS NEVER DECLARED. ***
+    // *** v3902 -- NO CODE CHANGED. `nolaw` HAS BEEN THE PLANT SINCE v2867 AND WAS NEVER DECLARED. ***
     // The header calls it "THE LOAD-BEARING ONE" and says why: "A regressor that always finds an equation is
     // decoration, and this is the mode that can catch it."
     //

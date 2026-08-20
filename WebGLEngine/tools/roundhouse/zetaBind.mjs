@@ -86,7 +86,7 @@ export async function buildZeta(args = {}) {
                  worstHigherErr: -1 };
     }
 
-    // *** v3854 -- "even" AND ITS PLANT "nocorrection" SHARE THIS BLOCK, SO THE ARMS DIFFER IN ONE THING. ***
+    // *** v3902 -- "even" AND ITS PLANT "nocorrection" SHARE THIS BLOCK, SO THE ARMS DIFFER IN ONE THING. ***
     // The `corrections` mode above already MEASURES what dropping the Euler-Maclaurin tail costs -- 9.6e-5
     // against 2.4e-15, a gain of 3.9e10 -- and the census could not use a word of it, because `corrections`
     // reports that finding in observables (`errNoCorrection`, `correctionGain`) that are the -1 NOT-APPLICABLE
