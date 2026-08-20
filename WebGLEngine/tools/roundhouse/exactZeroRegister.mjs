@@ -10,6 +10,29 @@
 // ceremony the guard exists to force. An entry cannot be added without writing the sentence.
 
 export const EXACT_OK = {
+    // *** v3916 -- NINE OF THE TEN v3211 BACKLOG ENTRIES, EXAMINED AT LAST. *** That backlog was created by the
+    // first real run of census-selfcheck and eight of its ten said only "NOT EXAMINED". They have been debt for
+    // seven hundred versions because census could not finish to keep asking.
+    //
+    // SPACEFILL IS SEVEN OF THE NINE, AND EXAMINING THEM FOUND A MISTAKE OF MINE. coverageErrFrac and
+    // breakErrAbs are zero in ALL THREE modes because every path this device builds covers its grid exactly and
+    // hits its analytic break key exactly -- a Hilbert curve has 0 breaks and a raster has n-1, and both keys
+    // are DERIVED rather than observed. That is why breakErrAbs is zero even in `raster` where breaks reads 63:
+    // 63 IS the key at order 6. Which means the `raster` mode I declared a plant at v3902 is not one -- see
+    // spacefillBind's plantRefused, written this round.
+    "spacefill.stroke.coverageErrFrac": "the Hilbert path visits every one of the n*n cells exactly once, so distinct == cells to the bit; the bijectionMismatches observable beside it is the independent statement of the same fact and would move first if the curve stopped covering",
+    "spacefill.stroke.breakErrAbs": "a Hilbert curve is continuous by construction, so breaks == 0 and the analytic key is 0; the raster mode carries key n-1 = 63 and hits it exactly, which is what shows the key is DERIVED per mode rather than a constant zero",
+    "spacefill.raster.coverageErrFrac": "a raster covers every cell exactly once too -- coverage and continuity are separate observables here precisely because a raster has perfect coverage and no continuity",
+    "spacefill.raster.breakErrAbs": "the raster's key is n-1 breaks, one per row end, DERIVED not observed; at order 6 that is 63 and the path has exactly 63. THE DEVICE IS CORRECT IN THIS MODE, which is why this stayed zero while `breaks` moved 0 -> 63",
+    "spacefill.order.coverageErrFrac": "the order mode re-measures the Hilbert path at the base order, so coverage is exact for the same reason as stroke",
+    "spacefill.order.breakErrAbs": "as stroke -- continuity of the Hilbert curve at the base order",
+    "spacefill.order.orderRatio": "the SUM of Hilbert breaks across four orders spanning a sixteenfold size range. Zero across every order, not an average: one break at one size would be a broken curve, and its sibling rasterTracksN sums |rasterBreaks - (n-1)| over the same four orders as the paired positive statement",
+
+    // HEIDLER -- the v3211 note guessed this and never checked; the guess was right.
+    "heidler.exact.peakErrFrac": "the exact mode normalises the waveform by its own true peak, so the key is exactly 1 and the fraction exactly 0 -- dividing a function by its own maximum cannot give anything else, as the bind says in place. The controls are in the neighbouring modes: `peak` finds the peak by scan and reads 6.6688e-2, and the `noroot` plant reads 4.9575",
+
+    // MD -- the inverse square, read as a ratio so no constant is being graded.
+    "md.coulomb.coulombErrFrac": "two unit charges at separations 1 and 2 give a force ratio of exactly 4, bit-exact because both separations are exactly representable and the law is 1/d^2; measured 4 with |r-4| = 0. THE SAME EXPRESSION RETURNS 9 AT SEPARATIONS 1 AND 3, so it tracks the exponent rather than returning a constant -- an absolute magnitude would have graded the choice of constants instead of the inverse square",
     // *** v3915 -- THE REMAINING TWENTY, EACH MEASURED, EACH WITH THE CONTROL THAT PROVES IT IS NOT VACUOUS. ***
     // v3914 did the two clusters and named these twenty rather than registering them, because a sentence
     // written without the measurement is what empties this register of meaning. Every entry below carries a
@@ -306,13 +329,4 @@ export const GRADED_BY_COMMENT = {
  */
 export const EXACT_ZERO_BACKLOG = {
     "plastic.creep.creepErrAbs": "MINE, v3211. Exact at creep 0.4 and 0.5, 1.1e-16 at 0.125, 4.4e-16 at 0.3 -- a rounding cancellation rather than an exact construction, so it does NOT belong on the register above",
-    "md.coulomb.coulombErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "heidler.exact.peakErrFrac": "NOT EXAMINED -- the exact mode normalises by the true peak, which MAY make this zero by construction, but nobody has verified it",
-    "spacefill.stroke.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.stroke.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.raster.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.raster.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.orderRatio": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
 };

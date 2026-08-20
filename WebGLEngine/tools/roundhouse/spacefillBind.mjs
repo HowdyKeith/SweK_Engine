@@ -125,5 +125,29 @@ export const spacefillDevice = {
     //
     // `breaks` and not `continuous`: `continuous` is a boolean wearing a number, and a boolean declaration is
     // what the census reports as DECLARED BUT DEAD (v3849 cost a round to exactly that).
-    plantMode: "raster", plantFlips: "breaks", plantKind: "knob",
+    // *** v3916 -- THIS DECLARATION WAS WRONG AND MY OWN COMMENT ABOVE CONTAINS THE PROOF. ***
+    // I wrote "= n-1 at order 3, and the key is analytic, not remembered" and then declared the mode a PLANT.
+    // Those two statements cannot both stand. `raster` passes expectedBreaks = n-1 into measure(), so at order 6
+    // the path has 63 breaks and the key says 63, and breakErrAbs -- THE DEVICE'S OWN ERROR OBSERVABLE -- reads
+    // EXACTLY ZERO IN BOTH ARMS. The device is not wrong under this mode. It is measuring a different path and
+    // getting that path right.
+    //
+    // The mode's own comment says what it is: "THE LOAD-BEARING NEGATIVE". A raster has perfect coverage and no
+    // continuity, and it exists to show that the continuity observable can fail. A NEGATIVE CONTROL AND A PLANT
+    // ARE OPPOSITE THINGS -- one proves a check can fail, the other proves a check does fail on a broken device.
+    //
+    // *** AND THE MACHINERY COULD NOT TELL. *** probeModePlant asks whether the declared observable is a finite
+    // number in both arms and whether it MOVES: `breaks` reads 0 against 63, so it separates perfectly and the
+    // declaration passed every gate. THE PROBE CHECKS SEPARATION, NOT WRONGNESS, and a load-bearing negative
+    // separates exactly as well as a plant does. That is the hole this entry sat in for fourteen versions.
+    //
+    // Refused rather than replaced: a real plant for this device would have to make a HILBERT path wrong --
+    // break the curve's own continuity or bijection -- and that is a different round from noticing this.
+    plantRefused:
+        "v3916: the `raster` mode was declared a plant at v3902 and is not one. It is the device's LOAD-BEARING " +
+        "NEGATIVE, and breakErrAbs -- the error observable -- is exactly zero in BOTH arms, because the raster " +
+        "path has exactly the n-1 breaks its analytic key predicts. `breaks` moves 0 -> 63 and so satisfies " +
+        "probeModePlant, WHICH CHECKS SEPARATION AND NOT WRONGNESS; a negative control separates just as well " +
+        "as a plant. A real plant here must corrupt the HILBERT path's continuity or bijection, which is a " +
+        "different round. Expires when somebody writes that plant, or shows the raster mode does make it wrong.",
 };
