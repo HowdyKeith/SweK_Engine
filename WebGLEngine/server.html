@@ -989,6 +989,18 @@ window.addEventListener("load", function () {
       </section>
     
         <div class="gpanel" data-panel="github" hidden>
+          <!-- v3908 -- THE GITHUB MANAGER, WHICH LIVED ONLY ON THE ENGINE PAGE. main.js mounts ui/githubPanel.js
+               into the left-edge dock, so every GitHub action -- including "Release current engine", the one that
+               makes auto-update possible at all -- was reachable from index.html and NOT from the ops page. This
+               button opens THE SAME MODULE, not a copy of it: mountGithubPanel() has no imports and no globals and
+               says in its own header that the Dock merely provides the drawer, so the panel travels and only its
+               host changes. A SECOND GITHUB PANEL WRITTEN FOR THIS PAGE WOULD BE THE SECOND COPY THAT NEVER GETS
+               UPDATED -- all six tabs (Publish, Account, Repos, Releases, Issues, Code) arrive here for free and
+               stay in step forever. -->
+          <div style="border:1px solid #4a5a7a;background:#0e1522;border-radius:6px;margin-bottom:10px;padding:8px 10px;">
+            <button id="ghManagerBtn" style="padding:7px 12px;background:#3a2a5a;color:#cfe;border:1px solid #6a4a9a;border-radius:6px;cursor:pointer;font:12px system-ui;">&#128025; GitHub Manager &mdash; repos, releases, issues, files</button>
+            <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;">The same panel as the engine page's left-edge GitHub tab. <b>Releases &rarr; Release current engine</b> auto-tags from ENGINE_VERSION, builds the installable zip and uploads it as the release asset &mdash; which is what <code>fetchEngineBuild</code> reads, so auto-update stays dark until a release exists.</div>
+          </div>
           <div id="ghUpdates" style="display:none;border:1px solid #4a6a2a;background:#111f0a;border-radius:6px;margin-bottom:10px;padding:7px 10px;"></div>
           <div id="ghPeers" style="border:1px solid var(--line);border-radius:6px;margin-bottom:10px;padding:6px 10px;"></div>
         </div>
@@ -4375,6 +4387,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
     dlg.onclick=function(e){ if(e.target===dlg) dlg.remove(); };
     return { dlg: dlg, card: card };
   }
+  // v3908 -- EXPOSED, because it lives inside an IIFE and the GitHub Manager host at the foot of this file is a
+  // MODULE, which cannot see function-scoped names. I assumed a top-level `function` in a classic script was
+  // global, wired the button on that assumption, AND THE BROWSER SAID OTHERWISE: `typeof swekOverlay === "function"`
+  // came back FALSE and the button was inert -- it opened nothing and logged a warning nobody would read.
+  // *** THAT IS THE v3227 FAILURE AGAIN: WIRED, PLAUSIBLE, AND DEAD. *** The fix is to make the ONE overlay
+  // reachable rather than to write a second one for the new caller; a duplicate would drift the first time either
+  // grew a keyboard escape or a focus trap.
+  window.swekOverlay = swekOverlay;
 
   // *** v3692 -- THE GRAB PICKER, WHICH DID NOT EXIST. *** Keith: choosing a peer and asking to GET a file gave
   // no file selection at all. The old code fetched /peer/dl/remote, JOINED THE NAMES INTO A STRING AND PUT THEM
@@ -7751,6 +7771,28 @@ try {
     btn.title = "\u25b8 This looks like your device (" + d.why + ") \u2014 " + (btn.title || "");
   }
 } catch (e) { /* a detector that breaks the page would be worse than no detector */ }
+</script>
+<script type="module">
+// v3908 -- host the engine's GitHub panel on the ops page. IMPORTS THE SAME MODULE main.js does; the only thing
+// this page supplies is the drawer, which is exactly what ui/githubPanel.js's header says the Dock was providing.
+// swekOverlay() is reused rather than re-implemented -- it already handles the backdrop, click-outside-to-close
+// and a card that scrolls at 82vh, and a second overlay here would drift from it the first time either changed.
+import { mountGithubPanel } from "./ui/githubPanel.js";
+(function () {
+    var btn = document.getElementById("ghManagerBtn");
+    if (!btn) return;
+    var ghRoot = null;
+    btn.onclick = function () {
+        // mountGithubPanel() RETURNS UNDEFINED IF ALREADY MOUNTED (it guards on #ghPanelRoot) and it does not
+        // append its root anywhere -- the host does. So the root is kept here across opens rather than looked up
+        // in the DOM, where it would not be found once an overlay it lived in had been removed.
+        if (!ghRoot) { try { var m = mountGithubPanel(); ghRoot = m && m.root; } catch (e) { console.warn("github panel:", e); } }
+        if (!ghRoot) return;
+        if (typeof swekOverlay !== "function") { console.warn("swekOverlay missing -- cannot host the panel"); return; }
+        var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close");
+        o.card.appendChild(ghRoot);
+    };
+})();
 </script>
 </body>
 </html>

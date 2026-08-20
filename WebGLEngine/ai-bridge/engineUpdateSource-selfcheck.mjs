@@ -176,5 +176,29 @@ console.log("\n7. *** THE ARTIFACT THE PUBLISHER BUILDS MUST BE THE ONE THE INST
            "CLAIM, and this whole gate exists because that was true of the entire update source.");
 }
 
+console.log("\n8. THE RELEASE BUTTON IS REACHABLE FROM THE OPS PAGE, AND IT IS THE SAME PANEL");
+{
+    const ENGROOT = path.join(HERE, "..");
+    const server = fs.readFileSync(path.join(ENGROOT, "server.html"), "utf8");
+    const panel = fs.readFileSync(path.join(ENGROOT, "ui", "githubPanel.js"), "utf8");
+    ok("server.html imports the SAME module main.js does, rather than carrying its own copy",
+       /import \{ mountGithubPanel \} from "\.\/ui\/githubPanel\.js"/.test(server) &&
+       /import \{ mountGithubPanel \}/.test(fs.readFileSync(path.join(ENGROOT, "main.js"), "utf8")),
+       "one panel, two hosts -- all six tabs travel and cannot drift apart");
+    ok("...and there is a control to open it", /id="ghManagerBtn"/.test(server));
+    ok("*** and swekOverlay is EXPOSED, which is the whole reason the button was dead on the first try ***",
+       /window\.swekOverlay = swekOverlay/.test(server),
+       "it is defined inside an IIFE; a MODULE cannot see a function-scoped name, so the host got a warning and opened nothing");
+    ok("...and the panel still declares itself host-agnostic, which is what lets it travel",
+       /the Dock provides the minitab/.test(panel) && !/^import /m.test(panel),
+       "ui/githubPanel.js has NO imports and no globals -- only its drawer comes from the host");
+    report("*** DRIVEN IN A REAL BROWSER, NOT INFERRED FROM THE SOURCE ***", "server.html was served and loaded in " +
+           "Chromium, the GitHub tab clicked, the button clicked: the overlay opened, #ghPanelRoot was inside it, " +
+           "all six tabs rendered and the release button read back verbatim. THE FIRST RUN FAILED -- typeof " +
+           "swekOverlay was FALSE and the button did nothing -- which no amount of reading the diff would have " +
+           "shown. THAT IS THE v3227 FAILURE AGAIN: a page that looks perfectly wired while one module is inert, " +
+           "and the only evidence is one console line nobody is looking at.");
+}
+
 console.log(fails ? `\nengineUpdateSource-selfcheck: ${fails} FAILED` : "\nengineUpdateSource-selfcheck: all checks pass");
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(fails ? 1 : 0);
