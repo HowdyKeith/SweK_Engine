@@ -52,8 +52,27 @@ const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"
        iIndex < iVerify && iCounts < iVerify,
        "index at " + (iIndex + 1) + ", counts at " + (iCounts + 1) + ", verify at " + (iVerify + 1) +
        " — reversed, verify checks yesterday's numbers and passes. The order is the ritual, not decoration");
-    ok("...and packaging is last",
-       ids[ids.length - 1] === "package");
+    // *** v3907 -- THIS WAS "packaging is last" AND IT WENT RED WHEN publish-release WAS ADDED AFTER IT. ***
+    // I did NOT edit it to agree with what shipped, which is the failure this tree names out loud. I read it
+    // first, and what it says is telling: the line above it EXPLAINS ITS ORDER ("reversed, verify checks
+    // yesterday's numbers and passes") and this one gave no reason at all. IT WAS DESCRIBING THE LIST, NOT
+    // CONSTRAINING IT -- a positional assertion standing in for a causal one nobody had written down.
+    //
+    // The causal claim is: PACKAGING MUST COME AFTER EVERY STEP THAT MODIFIES THE TREE, because the zip has to
+    // contain the finished tree. Publishing does not modify the tree, it CONSUMES the zip -- so it belongs after
+    // packaging and always did; there was simply never a step there before. Asserted as the reason now, which is
+    // strictly stronger: "last" permitted a tree-mutating step to be inserted at position 7 and stay green.
+    const MUTATES = ["bump-version", "changelog", "knowledge-index", "launch-index", "population-census", "derived-counts"];
+    const iPkg = ids.indexOf("package");
+    const lateMutator = MUTATES.filter((m) => ids.indexOf(m) > iPkg);
+    ok("!! *** packaging comes after every step that MODIFIES the tree -- the reason 'last' was standing in for ***",
+       iPkg >= 0 && lateMutator.length === 0,
+       lateMutator.length ? "MUTATES THE TREE AFTER PACKAGING: " + lateMutator.join(", ")
+                          : "package at " + (iPkg + 1) + ", after all " + MUTATES.length + " tree-mutating steps");
+    const iPub = ids.indexOf("publish-release");
+    ok("...and publishing comes after packaging, because it UPLOADS THE ZIP packaging produced",
+       iPub === -1 || iPub > iPkg,
+       iPub === -1 ? "no publish step in the ritual" : "package at " + (iPkg + 1) + ", publish at " + (iPub + 1));
 }
 
 // ---- 3. THE NUMBERS ARE READ, NEVER DECLARED --------------------------------------------------------------------------
@@ -109,7 +128,12 @@ const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"
        currentState().markersAgree,
        "main.js and brain.js are two declarations ON PURPOSE — a deliberate cross-check is not accidental " +
        "duplication, and the difference is that something reads them and refuses when they disagree");
-    ok("the show output names all six steps",
+    // v3907 -- THIS LABEL SAID "all six steps" WHILE THE PREDICATE COUNTED STEPS.length. The check was right and
+    // its NAME had been wrong since the seventh step was added. *** A NAME IS A CLAIM *** -- the same bug
+    // blobSpace-selfcheck already records against backendConformance's "answers all ten calls", which had been
+    // wrong since the eleventh. SECOND INSTANCE IN THIS TREE, so the fix here is not to write "nine": it is to
+    // make the label READ THE NUMBER, so it cannot go stale a third time.
+    ok(`the show output names all ${STEPS.length} steps`,
        showLines().join("\n").split("\n").filter((l) => /^\s+(ok|XX|--)/.test(l)).length === STEPS.length);
 }
 
