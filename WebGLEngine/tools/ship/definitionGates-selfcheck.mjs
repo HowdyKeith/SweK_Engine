@@ -36,9 +36,61 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const report = (l) => console.log("  ----  " + l);   // v4059 -- the tree-wide census prints, it does not assert
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// *** v3905, LANDING AT v4535 -- THE CENSUS READS TWO SHAPES AND THERE ARE SIX. ***
+// v3904 reported, while using this file, that it reads `export const NAME = (` and `export function NAME` and
+// nothing else -- so an exported TABLE, a bare exported CONSTANT, a class, an async function and a
+// separately-declared `export { name }` were all outside its subject. A WRONG CONSTANT IS THE FOUNDING CASE OF
+// THIS WHOLE FILE ("a 1% error in r_s = 2M survived five gates"), so the instrument could not see the shape of
+// its own origin story.
+//
+// *** THE WIDENING IS A SECOND CENSUS, NOT AN EDIT TO THE FIRST, AND THAT IS THE WHOLE DESIGN. *** Both
+// ratchets below were frozen against populations the NARROW rule found. Widening in place would move the
+// denominator underneath a frozen number without moving the number -- the defect this file's siblings have
+// carried in three places. So `shapes` is a PARAMETER, it defaults to narrow, both existing ratchets keep
+// calling the narrow rule and stay comparable to v3323, v3903, v4060 and v4062, and the wider population gets
+// its own reporting and its own floor.
+//
+// SHAPES IS NOT SCOPE. v4059-v4060's `wide` is the sweep ROOT -- physics/ against the whole tree -- and this is
+// what counts as a definition once you are there. Two axes, two names, because one word for both is how a
+// number comes to mean less than it says.
+//
+// WHAT `shapes: "all"` COUNTS, AND THE TWO THINGS IT DELIBERATELY DOES NOT:
+//   counted:     export const/let/var NAME = <anything>   including tables, arrays and bare constants
+//                export const A = 1, B = 2                BOTH names -- a multi-declarator is two definitions
+//                export async function NAME / export class NAME
+//                export { NAME }                          ONLY when NAME is declared in this same file
+//   NOT counted: export { NAME } from "./other.mjs"       a re-export is not a definition
+//                export { NAME } where NAME was IMPORTED  ditto -- counting those would file another module's
+//                                                         definition against this one's gate
+export function exportedDefinitions(src, { shapes = "narrow" } = {}) {
+    const out = [], seen = new Set();
+    const add = (name, kind) => { if (/^\w+$/.test(name) && !seen.has(name)) { seen.add(name); out.push({ name, kind }); } };
+    for (const m of src.matchAll(/^export const (\w+) = \(/gm)) add(m[1], "arrow");
+    for (const m of src.matchAll(/^export function (\w+)/gm)) add(m[1], "function");
+    if (shapes !== "all") return out;
+    for (const m of src.matchAll(/^export async function (\w+)/gm)) add(m[1], "async fn");
+    for (const m of src.matchAll(/^export class (\w+)/gm)) add(m[1], "class");
+    for (const m of src.matchAll(/^export (?:const|let|var) (\w+) = (?!\()(.*)$/gm)) {
+        add(m[1], "value");
+        // `export const DT = 0.016, GRAVITY = [0, -10, 0];` is TWO definitions, and there are several.
+        for (const d of String(m[2]).matchAll(/,\s*(\w+)\s*=/g)) add(d[1], "value");
+    }
+    // `export { a, b }` with no `from`: a definition ONLY if this file declares the name. A re-export and an
+    // exported import are somebody else's definitions and belong to their own module's gate.
+    for (const m of src.matchAll(/^export\s*\{([^}]*)\}\s*(?!from)/gm)) {
+        for (const raw of m[1].split(",")) {
+            const name = raw.trim().split(/\s+as\s+/)[0].trim();
+            if (!/^\w+$/.test(name)) continue;
+            if (new RegExp("^\\s*(?:async\\s+)?(?:function|class|const|let|var)\\s+" + name + "\\b", "m").test(src))
+                add(name, "named export");
+        }
+    }
+    return out;
+}
+
 /** Exported one-line definitions, and whether the module's own gate names them. */
-export function definitionCoverage(root, sub = "physics") {
-    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0 };
+export function definitionCoverage(root, sub = "physics", { shapes = "narrow" } = {}) {
+    const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0, byKind: {} };
     const walk = (dir) => {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
@@ -61,11 +113,14 @@ export function definitionCoverage(root, sub = "physics") {
             // 67 definitions with 3 gaps. Extending it to `export function` finds 541 more, of which 40 are
             // never named by their own gate -- and planting errors in four of those showed all four passing
             // silently. The narrow pattern was not wrong, it was just narrow.
-            const decls = [...src.matchAll(/^export const (\w+) = \(/gm), ...src.matchAll(/^export function (\w+)/gm)];
+            // v4535: the shapes read are a PARAMETER now (see exportedDefinitions above). The default is the
+            // two forms this census has always read, so every frozen number below is unmoved.
+            const decls = exportedDefinitions(src, { shapes });
             for (const m of decls) {
                 out.total++;
-                const rel = path.relative(root, p).replace(/\\/g, "/") + ":" + m[1];
-                const re = new RegExp("\\b" + m[1] + "\\b");
+                out.byKind[m.kind] = (out.byKind[m.kind] || 0) + 1;
+                const rel = path.relative(root, p).replace(/\\/g, "/") + ":" + m.name;
+                const re = new RegExp("\\b" + m.name + "\\b");
                 if (!re.test(gsrc)) out.ungated.push(rel);
                 else if (!re.test(body)) out.importOnly.push(rel);
             }
@@ -164,6 +219,74 @@ const cov = definitionCoverage(ENG);
               "additionally covers the " + (wide.gatedModules - cov.gatedModules) + " gated modules outside " +
               "physics/ -- render/, rig/, ui/, world/ and the rest -- where a silently uncovered export would " +
               "previously have passed every gate in this file");
+
+    // *** v3905, LANDING AT v4535 -- AND BOTH RATCHETS ABOVE ARE COUNTING TWO OF SIX SHAPES. ***
+    // Everything above reads `export const NAME = (` and `export function NAME`. MEASURED with the same
+    // criterion and the wider shape rule (exportedDefinitions, `shapes: "all"`), on this tree, today:
+    //
+    //                  narrow                     all shapes                 outside the subject
+    //     physics/     1797 defs,  45 unmentioned  2228 defs, 139 unmentioned   431 defs,  94 unmentioned
+    //     tree-wide    3426 defs, 295 unmentioned  4823 defs, 582 unmentioned  1397 defs, 287 unmentioned
+    //
+    // Tree-wide by kind, all shapes: 2913 function, 1096 value, 513 arrow, 176 async fn, 109 named export,
+    // 16 class. *** THE 1,096 VALUES ARE THE POINT. *** A WRONG CONSTANT IS THE FOUNDING CASE OF THIS ENTIRE
+    // FILE -- "a 1% error in r_s = 2M survived five gates" -- and an exported constant is precisely the shape
+    // `export const NAME = (` cannot see. The instrument could not see the shape of its own origin story.
+    //
+    // ONE FLOOR, NOT TWO. tree-wide subsumes physics/ by the same argument v4060 makes one row up, so the
+    // wider population gets a single ratchet at today's honest count and the physics figure is REPORTED. It
+    // ratchets DOWN: existing debt stays visible and shrinkable, and a new ungated export of ANY shape cannot
+    // arrive quietly. It is deliberately not folded into BASELINE_WIDE -- that number was frozen against a
+    // population the narrow rule found, and moving the denominator under a frozen number without moving the
+    // number is the defect this file's siblings have carried in three places.
+    const BASELINE_SHAPES = 582;   // v4535: tree-wide, all six shapes -- ratchets down, never up
+    const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
+    const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
+    ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
+        shapesWide.ungated.length <= BASELINE_SHAPES && shapesWide.total > wide.total,
+        shapesWide.ungated.length > BASELINE_SHAPES
+            ? "GREW to " + shapesWide.ungated.length + ": " + shapesWide.ungated.slice(0, 6).join(", ") + " ..."
+            : `${shapesWide.ungated.length} unmentioned of ${shapesWide.total} definitions tree-wide against a ` +
+              `frozen ${BASELINE_SHAPES}, where the narrow rule sees ${wide.ungated.length} of ${wide.total}. ` +
+              `SO ${shapesWide.total - wide.total} DEFINITIONS AND ` +
+              `${shapesWide.ungated.length - wide.ungated.length} UNMENTIONED ONES SIT OUTSIDE THE TWO ROWS ` +
+              `ABOVE: ` + Object.entries(shapesWide.byKind).sort((a, b) => b[1] - a[1])
+                  .map(([k, v]) => k + " " + v).join(", ") + ".");
+    report(`under physics/ the same widening reads ${shapesPhys.ungated.length} unmentioned of ` +
+        `${shapesPhys.total}, against the narrow ${cov.ungated.length} of ${cov.total} -- ` +
+        `${shapesPhys.total - cov.total} definitions and ${shapesPhys.ungated.length - cov.ungated.length} ` +
+        "unmentioned ones that the physics ratchet cannot see. REPORTED rather than ratcheted, because one " +
+        "floor on the population that subsumes it is a floor somebody can act on and two are a number nobody " +
+        "re-derives.");
+    // *** THE NEGATIVE CONTROL, AND IT IS THE ROW THAT MAKES THE PARAMETER SAFE. *** If `shapes: "all"` ever
+    // leaks into the default, every frozen number above is silently re-baselined against a bigger denominator
+    // -- the exact failure the split was made to avoid. So the narrow rule is driven over a fixture carrying
+    // all six shapes and must still see EXACTLY the two it has always seen, by name.
+    {
+        const FIXTURE = [
+            "export const arrowOne = (a) => a;",
+            "export function fnTwo(x) { return x; }",
+            "export async function asyncThree() {}",
+            "export class ClassFour {}",
+            "export const VALUE_FIVE = 42, VALUE_SIX = [1, 2];",
+            "const localSeven = 7;",
+            "export { localSeven };",
+            "import { borrowed } from './elsewhere.mjs';",
+            "export { borrowed };",
+            "export { reExported } from './other.mjs';",
+        ].join("\n");
+        const narrow = exportedDefinitions(FIXTURE).map((d) => d.name).sort();
+        const all = exportedDefinitions(FIXTURE, { shapes: "all" }).map((d) => d.name).sort();
+        ok("!! CONTROL: the narrow rule still sees ONLY its two forms, and the wide one refuses a re-export",
+            narrow.join() === "arrowOne,fnTwo" &&
+            all.join() === "ClassFour,VALUE_FIVE,VALUE_SIX,arrowOne,asyncThree,fnTwo,localSeven" &&
+            !all.includes("borrowed") && !all.includes("reExported"),
+            `narrow [${narrow.join(", ")}] against all [${all.join(", ")}]. A multi-declarator is TWO ` +
+            "definitions (VALUE_FIVE and VALUE_SIX); `export { localSeven }` counts because this file DECLARES " +
+            "it; `export { borrowed }` does NOT, because it was imported, and `export { reExported } from` " +
+            "does not, because a re-export is somebody else's definition and belongs to their gate. IF THIS " +
+            "ROW EVER GOES RED ON THE FIRST CLAUSE, A WIDER DEFAULT HAS MOVED EVERY FROZEN NUMBER ABOVE.");
+    }
     // *** v4458 -- THIS LINE PRINTED TWO IMPOSSIBLE NUMBERS ON EVERY RUN FOR ~390 VERSIONS. ***
     //
     // The decomposition is only defined while the count EXCEEDS what constant-rate growth would have

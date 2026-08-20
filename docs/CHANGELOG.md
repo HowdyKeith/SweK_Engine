@@ -16954,6 +16954,100 @@ denominator every number in this file is quoted against, and that is its own rou
      Those three predate the v3941 split of this file out of README.md, so they were never migrated;
      root CHANGELOG-v*.md was retired at 867ba208 and is not revived here. -->
 
+## v3905 -- THE WIDENED REGEX, RUN BESIDE THE NARROW ONE RATHER THAN INSTEAD OF IT -- AND IT CAUGHT v3904
+
+Keith: "fixed: widening the regex." v3904 reported, while using it, that `definitionGates` reads
+`export const NAME = (` and `export function NAME` and nothing else -- so an exported TABLE, an exported
+CONSTANT, a class, an async function and a separately-declared `export { name }` were all outside its subject.
+
+*** THAT IS 316 DEFINITIONS IN physics/ ALONE, AND A WRONG CONSTANT IS THE FOUNDING CASE OF THE WHOLE FILE:
+"a 1% error in r_s = 2M survived five gates". THE INSTRUMENT COULD NOT SEE THE SHAPE OF ITS OWN ORIGIN STORY. ***
+
+    narrow rule   1508 definitions   110 unmentioned    (function 1195, arrow 313)
+    wide rule     1824 definitions   184 unmentioned    (+ value 245, named export 61, async fn 6, class 4)
+
+### THE WIDENING IS A PARAMETER, NOT AN EDIT, AND THAT IS THE WHOLE DESIGN
+
+Section 1's pin of 37 was set against 608 symbols found by the narrow rule. **Widening the rule in place would
+have moved the denominator underneath a frozen ratchet without moving the ratchet** -- the exact defect this
+file's siblings have written on them in three places (androidUpdateDoor asserting a spelling, caseStudy baking a
+live count). So `definitionCoverage(root, { wide })` takes a parameter, **section 1 still calls the narrow rule
+and still reads 110 against the frozen 37**, and the wide population gets its own reporting and its own floor.
+There is a negative control on exactly that: a fixture asserting the narrow rule still sees only its two forms,
+so a `wide` that leaked into the default would fail rather than silently re-baseline the tree.
+
+### WHAT THE WIDENING REVEALS, AND IT IS A MUCH DARKER CLASS
+
+74 definitions are unmentioned under the wide rule that the narrow rule could not see. **71 of the 74 are reached
+by NO gate anywhere** -- against the narrow rule's 110, where 34 were already driven by a subject-named gate. The
+difference is not an accident of which folder: v3904's cluster was *functions*, and a function tends to be called
+by somebody's gate even when its own is silent. **A constant is not called. It is read, and nothing reads it.**
+
+    the new dark, by cluster:  physics 15, xpbd 8, sph 7, thermal 6, predict 5, statmech 5, sync 5, hmc 4 ...
+
+### AND IT CAUGHT THE ROUND THAT SHIPPED AN HOUR AGO -- TWICE
+
+**(1) THE ONE COMMENT-ONLY DEFINITION IN 1824, AND v3904 WROTE IT.** The ungated test reads the RAW gate source,
+so a name in a comment counts as a mention. That is section 2's stated floor and it is fine as far as it goes --
+but the widening made the weakness measurable for the first time, and the answer across the whole census is a
+single entry: `physics/render/furnace.mjs:EXPECTED_COSINE`, which v3904 named in a comment while **re-typing its
+value as `4 / 3` in the assertion beside it**. A second declaration of a prediction, committed by the round that
+was closing that very cluster. It reads `EXPECTED_COSINE.wrongPdf` and `.clean` from the module now, and
+comment-only is a floor at 0. *** NOBODY CAN RUN A SENTENCE ABOUT A CONSTANT. ***
+
+**(2) v3904's CLUSTER FLOOR HAD A HOLE THE NARROW RULE COULD NOT SEE.** Sabotage: add
+`export const MESH_TOLERANCE_TABLE = {...}` to `physics/mesh/discontinuity.mjs` and leave it ungated.
+**Section 4's floor -- the one v3904 shipped -- PASSES. Section 5's wide floor catches it.** A floor set under a
+rule that cannot see tables was worth less than it looked, and the same registry now guards both populations, so
+a cluster cannot be closed under one rule and dark under the other.
+
+Both closed clusters survive the stricter instrument: physics/mesh and physics/render add **no** dark definition
+under the wide rule.
+
+### WHAT COUNTS, AND THE TWO THINGS THAT DELIBERATELY DO NOT
+
+    counted:      export const/let/var NAME = <anything>     tables, arrays, bare constants
+                  export const A = 1, B = 2                  BOTH names -- a multi-declarator is two definitions
+                  export async function NAME / export class NAME
+                  export { NAME }                            ONLY when NAME is declared in this same file
+
+    NOT counted:  export { NAME } from "./other.mjs"         a re-export is not a definition
+                  export { NAME } where NAME was IMPORTED    48 of these in physics/; counting them would move
+                                                             another module's debt onto this one
+
+Every form is driven by a fixture it must find, and both exclusions by one it must refuse -- because the way a
+widened regex goes wrong is silently: **a pattern that matches nothing costs nothing and proves nothing.** The
+multi-declarator case is real rather than hypothetical (`export const DT = 0.016, GRAVITY = [0, -10, 0];` appears
+five times), and counting only the first name is how a scanner reports a smaller, wronger number and looks like
+it improved.
+
+### ALSO IN THIS ROUND
+
+- The cross-gate reach classifier and the `CLOSED` cluster registry are **hoisted out of section 4** so section 5
+  uses the same ones. Two copies of "which gate reaches this definition" is the duplicated-table defect this tree
+  has paid for eight times.
+
+### HONEST NOTES AND LIMITS
+
+- **The multi-declarator split only handles statements that end on their line.** Every one in the tree does. A
+  multi-line declarator list would have its first name counted and the rest missed -- stated here rather than
+  discovered later.
+- **Comment stripping is line-wise `//` plus `/* */`,** the same rule the file already used for `importOnly`. A
+  name inside a template literal in a gate would read as code. Not seen; not guarded.
+- **`definitionGates` stays RED**, at 110 against the frozen 37, exactly as at v3904. The widening did not touch
+  the pinned population and the pin did not move.
+- **The population still stops at `physics/`** -- v3368's finding, unchanged and not addressed here. The same
+  scan over the whole tree finds more.
+- Runtime 9.3s, up from 5.2s: the wide scan walks the modules a second time and classifies 74 new entries
+  against 1100 gate files. `deadImportScan` is red for its pre-existing reason ("the deleted barrel left a
+  recovery archive behind"), verified against a pristine v3903 extraction.
+- The four physics gates from v3904 are green; `--affected` over the two changed files reports 1 of 2, and it is
+  the section-1 ratchet.
+
+<!-- Folded in from the root CHANGELOG-v3905.md when the v3904-v3906 rounds were rebased onto main.
+     Those three predate the v3941 split of this file out of README.md, so they were never migrated;
+     root CHANGELOG-v*.md was retired at 867ba208 and is not revived here. -->
+
 ## Since v854 — Audio system foundation (closes the audio queued item from the tamagotchi/wandering/audio plan): three pieces. (1) FIX SILENT NO-OP — discovery: AudioManager.setVolume(group, v) didn't exist, so the settingsHub volume sliders (volMaster/volSfx/volMusic) were silently no-oping via optional-chaining (a?.setVolume?.(group, v)). Real bug, not a new feature. Added generic setVolume(group, v) + currentVolume(group) dispatchers that route to setMasterVolume/setSFXVolume/setAmbientVolume, plus relay music to audioBus.setMusicVolume so the new music layer responds to the same slider. Tracks _masterVolume / _sfxVolume / _musicVolume internally for currentVolume() reads. (2) MUSIC / AMBIENT LOOP LAYER — new procedural music in audioBus.js. New _musicGain node parallel to master, new _ensureMusicGain() lazy init. Single procedural voice "ambient_pad": three sine oscillators tuned to a D minor triad (D3 / F3 / A3 = 146.83 / 174.61 / 220.00 Hz) with slow LFO detune (0.08-0.14 Hz, ±8 cents) for breathing pad sound. Per-osc gain decreasing for higher voices so the bass dominates. 1.5s fade-in on startMusic, 1s fade-out on stopMusic. No asset files needed — entirely synthesized. Added startMusic(name)/stopMusic()/setMusicVolume(v)/getMusicVolume()/isMusicPlaying() public methods. AudioManager.startMusic/stopMusic passthroughs let the same audioManager API drive both EngineAudio's ambient gain AND the new audioBus music pad through one call. (3) ENGINE EVENT AUDIO CUES — the v849 Twitch wiring dispatches engine:kaijuDefeated / engine:weatherChanged / engine:roundShipped / engine:bridge-up window events; v855 maps them to audio.play() voices via an ENGINE_EVENT_CUES table: kaijuDefeated→alert (siren burst), weatherChanged→ping (soft tonal), roundShipped→feed (ascending fanfare), bridge-up→happy (gentle chord). Cue voices are the existing 0.1-0.4s synth voices — short, non-intrusive. (4) MUSIC AUTO-START + TOGGLE — music starts on first user gesture (click/keydown/touchstart) since browsers require gesture to resume AudioContext. Preference persists to localStorage as voxelEngine.musicEnabled (default ON). New Music toggle in the settingsHub audio tab calls audio.startMusic/stopMusic + persists the pref. (5) WIRING SURFACE — settingsHub audio tab now has 4 controls: Master volume, SFX volume, Music volume, Music toggle. All hot-wired to a real audio path (no more silent no-ops). VERIFIED: 3 audio files syntax-clean, real ES module import of audioBus succeeds, 13/13 expected methods on AudioBus prototype (8 pre-existing + 5 new music methods), volume clamping works (0.5 stored as 0.5, 2.5 clamped to 1.0, -1 clamped to 0.0), startMusic without AudioContext returns {ok:false, error: "no audio context"}, unknown music voice returns error, isMusicPlaying() = false when not started. HONEST GAPS: (a) Music is ONE procedural pad — no track variety. Day/night/weather/biome-aware music selection is a future round. (b) Music gain is parallel to master (under master gain), so master slider correctly scales everything; music slider scales music below that. But the existing EngineAudio.ambientGain is a SEPARATE gain — setting "music" group volume now updates BOTH (via the new setMusicVolume relay) so EngineAudio's ambient sounds (rain, wind from the world system) also respond. This is intentional unification, but if user wants independent control of "wind/rain ambient" vs "background pad" it would need to split. (c) Engine event audio cues fire on the WINDOW events from v849, but the engine code that DISPATCHES those events (kaijuDefeated etc.) is still not wired — the receiving side (audio + Twitch broadcast) is ready but the firing side waits for engine code to call dispatchEvent at the relevant moments. (d) The music pad is a static minor triad; doesn't change in response to engine state. Future: rotate to a more tense voicing during super_busy AI activity, mellow during idle, etc. (e) Music auto-start uses ONE first-gesture hook; if the user has the page open but never clicks (e.g. a Shield as a passive display), music never starts. Could add a "always start at page load" mode for kiosk use. (f) No music asset-file support yet — only the one procedural voice. Adding file-based music tracks would need a load + register path similar to the existing buffer system. v855 doesn't yet provide that.
 
 ## Since v853 — Tamagotchi liveliness, rigged-avatar fidget + llama refinements (user redirect mid-round: "the rigged glb avatar is the real tamagotchi super alive avatar, llama is secondary/m2, llama stays 2D"): two pieces. (1) RIGGED AVATAR IDLE FIDGET — robotFaceAvatar.js gains an idle fidget controller. When the avatar has been in neutral idle for >4s and no head-lock (speech) is active, every 8-18s it triggers a brief weighted-random clip from a fidget pool (wave×3, happy×3, thumbsup×3, yes×2, no×2, play/jump×2, greet×1) and returns to neutral via the existing HOLD timer. Excludes PERSISTENT clips (would stick) + long HOLDS (run/death) + loud reactions (alert/attack — those read as engine events). Every non-fidget setEmotion call resets the cooldown so the character doesn't immediately fidget after a user-driven expression. Console API: window.kpopFidget.enable() / disable() / setEnabled() / setInterval(min, max) / trigger() / snapshot(). Default enabled. (2) LLAMA SIDE-TO-SIDE RUN — the super_busy state's body now translates -15px → +15px → flips scaleX(-1) → -15px (back-and-forth across the panel with proper direction flip at each turnaround) on a 4s ease-in-out loop. Inner animations (motion-blur legs, dust trail, panting head) unchanged. Visually reads as "the llama is sprinting back and forth because the AI is hammering". (3) LLAMA GRAZE IDLE — alongside the existing yawn, occasional grazing behavior during idle (head dips + tilts slightly as if eating grass; 1.6s animation, every 30-90s random). Both idle behaviors check state===idle && !isYawning && !isGrazing before firing, so they alternate naturally. Yawn first kicks at 8-12s after mount, graze at 15-30s, so the first interaction with the panel shows both behaviors quickly. (4) NOT IN THIS ROUND — lateral wandering of the rigged avatar in 3D space (would require Walking-clip locomotion + model offset + bound-clamping in the small render area), per the redirect: focus is on liveliness via idle fidget rather than spatial wandering. The rigged avatar stays at origin; the camera orbits it; fidget triggers make it feel super alive without movement. (5) USER CLARIFIED — llama stays 2D ("we don't need llama to be 3d and I like it not actual 3d"). Confirmed in code: HeartbeatAvatar is SVG-only; no 3D path added. (6) USER CLARIFIED — llama wandering is "currently not important" but the side-to-side run during super_busy was explicitly wanted ("It may run from one side of the screen to the other and back and forth quickly when legs are running") and that's what's shipped. VERIFIED: both files syntax-clean, 35 _fidget references in robotFaceAvatar.js, 9 hb-run-sideways/hb-graze/_doGraze/_scheduleGraze markers in HeartbeatAvatar.js. HeartbeatAvatar import succeeds with new _scheduleGraze + _doGraze on prototype. HONEST GAPS: (a) Fidget can pick a clip whose actual GLB doesn't have it — setClipFuzzy does a fuzzy lookup but a missing clip name silently degrades to whatever the fuzzy match returns. Edge case: if the loaded avatar has no Wave clip, the fidget tick "succeeds" but visually nothing happens. Snapshot can show currentEmotion="wave" but the rig didn't change. (b) Fidget is per-instance of robotface.html. The PC PipAvatar iframe runs one instance; the phone iframe runs another. They fidget independently (no synchronization). For users with both visible, expressions won't match. (c) The lateral-wandering item from the original v854 spec was descoped here. If the user wants the rigged avatar to actually move around its viewport, that's a follow-up round needing Walking clip + root-joint translation + camera-follow tuning. (d) Llama side-to-side run has fixed -15px..+15px range tuned for the 100px SVG viewBox. If the panel is rendered at a different scale, the run amplitude might feel cramped. (e) Graze + yawn aren't audibly cued — no sleep sigh, no munch sound. v855 audio round can wire them.
