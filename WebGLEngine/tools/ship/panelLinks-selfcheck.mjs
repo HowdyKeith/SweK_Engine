@@ -77,5 +77,33 @@ report("THREE FIXTURES, BECAUSE THE BUG WAS AN ORDERING", "placements resolving 
        "(4s delay), and not at all (404, the offline case). All three: 24 links in Physics Lab, 0 unboxed, 0 " +
        "dupes. THE OFFLINE CASE IS THE ONE THAT HID THIS FOR SO LONG -- it looks correct and always did.");
 
+console.log("\n4. THE PREVIEW PANE BESIDE THE DRAWER IS ONE ROW WITH IT");
+{
+    const gi = fs.readFileSync(path.join(ENG, "ui", "gaugeInfoPanel.js"), "utf8");
+    ok("*** the stage stretches, so the info column matches the drawer's height ***",
+       /id="panelStage"[^>]*align-items:stretch/.test(s),
+       "it was flex-start: the preview box ended wherever its content ended, leaving a ragged gap down the right of every panel");
+    ok("*** and the dials row top-justifies rather than centring ***",
+       /id="dialsRow"[^>]*align-items:stretch/.test(s),
+       "align-items:center is why the box floated 26px below the drawer top instead of aligning with it");
+    ok("...and the column between them passes the height down",
+       /id="stageInfo"[^>]*display:flex;flex-direction:column/.test(s),
+       "a stretched parent gives nothing to a child that is not a flex container");
+    // The height lock is the part that needed care rather than deletion.
+    ok("*** the px height lock is still there for callers that do not stretch ***",
+       /host\.style\.height = _lockH \+ "px"/.test(gi),
+       "v3778 set it BECAUSE a long info body pushed the page down -- dropping it would revert that");
+    ok("...and stretchToRow is OPT-IN, stated by the caller",
+       /stretchToRow = false/.test(gi) && /stretchToRow: true/.test(s),
+       "the module mounts on other pages and must not infer this one's layout");
+    ok("!! ...and content still cannot grow the pane in stretch mode",
+       /if \(stretchToRow\) \{[\s\S]{0,400}overflow = "hidden"/.test(gi),
+       "THE ROW DECIDES THE HEIGHT, THE CONTENT NEVER DOES -- which is the property v3778 actually asked for");
+    report("MEASURED IN CHROMIUM AT 1400x900", "before: drawer y=86 h=430, preview y=112 h=189 -- 26px low and " +
+           "241px short. After: preview y=86 h=437, filling the row. AND THE TAB SWAP NOW MOVES NOTHING AT ALL: " +
+           "stage 437, next element top 536, dials row 437, IDENTICAL across gauges -> info -> gauges. That is " +
+           "stronger than the measured lock v3659 wrote, because the height now comes from something neither tab can move.");
+}
+
 console.log(fails ? `\npanelLinks-selfcheck: ${fails} FAILED` : "\npanelLinks-selfcheck: all checks pass");
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(fails ? 1 : 0);

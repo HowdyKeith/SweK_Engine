@@ -367,7 +367,10 @@ window.addEventListener("load", function () {
              hides the MAIN dials and avatar; v3821 also hides the info panel's OWN dock (its second robot and
              vertical gauge stack) via gi.setDock(false), so a staged panel carries the info TEXT alone and no
              gauges or avatar at all. Empty and display:none until something is presented. -->
-        <div id="panelStage" style="display:none;gap:12px;align-items:flex-start;margin-bottom:8px;">
+        <!-- v3912 -- align-items was flex-start, so the info column NEVER matched the drawer beside it: the preview
+             box ended wherever its own content ended, leaving a ragged gap down the right of every panel.
+             stretch makes the two columns one row. -->
+        <div id="panelStage" style="display:none;gap:12px;align-items:stretch;margin-bottom:8px;">
           <!-- v3823 -- THE ROLES FLIP: THE INFO COLUMN IS THE HARD-SET ONE AND THE LINKS PANEL FILLS THE LEFT.
                Keith, on the rig: "the text info panel needs to be hard set to 4 times wider and always set to
                that, and the links panel on the left needs to fill that space ... so all link panels are set to
@@ -380,7 +383,7 @@ window.addEventListener("load", function () {
                -- only now it is the info that never restructures, and the panel is as wide as the space allows.
                (The staged panels were authored at 460; ~half a page minus a 360 info leaves them near that.) -->
           <div id="stageBody" style="flex:1 1 auto;min-width:0;"></div>
-          <div id="stageInfo" style="flex:0 0 360px;max-width:360px;min-width:360px;"></div>
+          <div id="stageInfo" style="flex:0 0 360px;max-width:360px;min-width:360px;display:flex;flex-direction:column;"></div><!-- v3912 -- a column, so the height stretch above has something to hand down -->
         </div>
         <div id="stageBar" style="display:none;align-items:center;gap:8px;margin-bottom:6px;">
           <button id="stageBack" title="Send this panel back to the right column"
@@ -388,7 +391,10 @@ window.addEventListener("load", function () {
                          padding:3px 9px;font:11px ui-monospace,monospace;cursor:pointer;">&#8592; back to the right</button>
           <span id="stageWhat" style="color:var(--dim);font:11px ui-monospace,monospace;"></span>
         </div>
-        <div id="dialsRow" style="display:flex;align-items:center;justify-content:center;gap:20px;">
+        <!-- v3912 -- align-items was center, which is why the preview box floated 26px below the drawer top instead
+             of aligning with it. stretch top-justifies it AND lets it reach the bottom; flex:1 passes the
+             stretched height on rather than collapsing to content. -->
+        <div id="dialsRow" style="display:flex;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:0;">
           <div id="dials" title="Live SVG dials — same gauge settings as the 3D gauges. No avatar, no render." style="display:flex;gap:14px;align-items:flex-start;min-width:360px;min-height:230px;"></div>
           <span id="dialsRobot" style="display:inline-flex;align-items:flex-end;align-self:stretch;flex:none;overflow:visible;" title="SweK — turns red on errors"></span>
         </div>
@@ -3489,6 +3495,10 @@ A password fetches a token from the list server; an unregistered callsign needs 
       const { mountGaugeInfo } = await import("/ui/gaugeInfoPanel.js");
       const gi = mountGaugeInfo({
         dialsEl, host: dialsEl.parentElement,
+        // v3912 -- this page stages the panel BESIDE a links drawer, so its height belongs to that row
+        // rather than to whatever the gauges measured at mount. Stated by the caller because the module
+        // is meant to mount on other pages and must not infer this page's layout.
+        stretchToRow: true,
         // *** v3788 -- THIS READ `.lastStats`, WHICH svgGaugeSet HAS NEVER EXPOSED. Its returned API is
         // { root, start, stop, destroy, refresh, setGauges, values, setStats } -- NO lastStats -- so this
         // returned undefined on every call, `|| {}` turned that into an empty object, and the dock was handed
@@ -7676,7 +7686,13 @@ console.log("[pageSections] " + window.swekMarkPanelLinks() + " panel links carr
 (function(){
   var el=document.getElementById("instHist"); if(!el) return;
   fetch("/install/history",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){
-    if(!j||!j.ok||!j.runs||!j.runs.length){ el.textContent=""; return; }
+    // v3912 -- AN EMPTY LINE STILL TOOK UP A LINE. el.textContent = "" blanked the span and left the DIV around
+    // it holding its padding, so "nothing to report" rendered as a gap in the header forever. The container is
+    // hidden instead, and shown only when there is something to say.
+    var lineEl = document.getElementById("instHistLine");
+    var hide = function(){ el.textContent = ""; if (lineEl) lineEl.style.display = "none"; };
+    var show = function(){ if (lineEl) lineEl.style.display = ""; };
+    if(!j||!j.ok||!j.runs||!j.runs.length){ hide(); return; }
     var last=j.runs[0];
     var s=function(ms){ return ms==null?"--":(ms<1000?ms+"ms":(ms/1000).toFixed(1)+"s"); };
     // THE LAST RUN, THEN THE TWO AVERAGES. A single blended average would describe neither operation, and the
@@ -7699,7 +7715,22 @@ console.log("[pageSections] " + window.swekMarkPanelLinks() + " panel links carr
     // of one glance away forever.
     var note = "";
     var bits = [];
-    if (last.installToReadyMs == null) {
+    // v3912 -- THE THIRD CASE, AND IT IS THE ONE KEITH ACTUALLY HIT: a number that is real arithmetic and not an
+    // install. installToReadyMs is boot minus main.js's mtime, so a build DOWNLOADED AND STARTED LATER reports
+    // every minute it merely sat there -- 4180.6s, seventy minutes, parked in the header and never leaving.
+    // The ceiling comes from the bridge (j.plausibleMaxMs) rather than being chosen again here, so the headline
+    // and the averages cannot disagree about which runs count. Past it the run is NOT reported as a measurement,
+    // and it is NOT silently dropped either: it goes to the title and the console, exactly the treatment v3578
+    // gave the null case, because a non-measurement in a header is noise that trains you to stop reading it.
+    var ceiling = (typeof j.plausibleMaxMs === "number") ? j.plausibleMaxMs : 600000;
+    var implausible = last.installToReadyMs != null && last.installToReadyMs > ceiling;
+    if (implausible) {
+      note = "The most recent run (" + (last.newBuild ? "new build" : "restart") + ") measured " +
+             s(last.installToReadyMs) + " from build-write to ready, which is longer than an install takes -- " +
+             "the build most likely sat before it was started, so it is not shown as an install time.";
+      console.log("[installHistory] last run " + s(last.installToReadyMs) + " exceeds the " + s(ceiling) +
+                  " plausibility ceiling -- reported as sat-before-start, not as an install");
+    } else if (last.installToReadyMs == null) {
       note = "The most recent run (" + (last.newBuild ? "new build" : "restart") + ") recorded no " +
              "start-to-ready time, so there is nothing to show here for it.";
       console.log("[installHistory] last " + (last.newBuild ? "new build" : "restart") +
@@ -7712,8 +7743,10 @@ console.log("[pageSections] " + window.swekMarkPanelLinks() + " panel links carr
     if(j.avgRestartMs!=null) bits.push("avg restart "+s(j.avgRestartMs));
     // v3850 -- NO LEADING SEPARATOR ANY MORE. The " \u00b7 " existed to join this onto the title line it used to
     // trail; on its own status line it rendered as a stray dot with nothing before it.
-    el.textContent = bits.length ? bits.join(" \u00b7 ") : "";
-    el.title = j.note + "  Last " + j.runs.length + " runs recorded." + (note ? ("  " + note) : "");
+    if (bits.length) { show(); el.textContent = bits.join(" \u00b7 "); } else { hide(); }
+    el.title = j.note + "  Last " + j.runs.length + " runs recorded." +
+               (j.setAside ? ("  " + j.setAside + " run(s) set aside as longer than an install takes.") : "") +
+               (note ? ("  " + note) : "");
   }).catch(function(){ /* a history that will not load must not be reported as a fast install */ });
 })();
 </script>

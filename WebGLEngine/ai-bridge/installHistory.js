@@ -104,12 +104,34 @@ function save(engineRoot, h) {
 }
 
 /** The report a page can render: newest first, with the two averages kept apart. */
+// v3912 -- *** A BUILD THAT SAT BEFORE YOU STARTED IT IS NOT A SLOW INSTALL. ***
+// Keith saw "ready in 4180.6s (new build)" -- SEVENTY MINUTES -- sitting in server.html's header and not going
+// away. The number was honest arithmetic and a dishonest claim: installToReadyMs is bootAt minus main.js's
+// mtime, so it counts every minute the zip merely EXISTED before anyone launched it. Download a build at ten
+// and start it at eleven and this reports an hour-long install.
+//
+// The note below already conceded the mechanism -- "mtime says when the file was written, not when the work
+// began" -- but it assumed install and boot are one continuous action. THEY ARE FOR THE UPDATER AND NOT FOR A
+// HAND-DOWNLOADED BUILD, which is the case this readout was most likely to meet.
+//
+// So there is a ceiling, and past it the run is NOT AN INSTALL MEASUREMENT AT ALL. It is not silently dropped:
+// the count is reported so the page can say how many runs were set aside and why -- the distinction v3538 drew
+// between a missing measurement and a completed one, applied to a third case neither round had.
+// TEN MINUTES because the slowest thing here is a full-tree unzip plus a boot; the tree's own slowest single
+// gate is 573s and this covers that with room. A CEILING IS A JUDGEMENT AND IT IS WRITTEN DOWN AS ONE.
+const PLAUSIBLE_MAX_MS = 10 * 60 * 1000;
+const isPlausibleInstall = (ms) => ms != null && ms >= 0 && ms <= PLAUSIBLE_MAX_MS;
+
 function report(engineRoot) {
     const runs = load(engineRoot).runs.slice().reverse();
-    const ready = (f) => runs.filter(f).map((r) => r.installToReadyMs).filter((n) => n != null);
+    // ONE RULE, APPLIED TO THE AVERAGES HERE AND HANDED TO THE PAGE FOR THE HEADLINE, so the two cannot
+    // disagree about which runs count -- a headline excluded from its own average is how a readout starts
+    // contradicting itself.
+    const ready = (f) => runs.filter(f).map((r) => r.installToReadyMs).filter(isPlausibleInstall);
+    const setAside = runs.filter((r) => r.installToReadyMs != null && !isPlausibleInstall(r.installToReadyMs)).length;
     const avg = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
     return {
-        ok: true, runs,
+        ok: true, runs, plausibleMaxMs: PLAUSIBLE_MAX_MS, setAside,
         // KEPT APART ON PURPOSE: installing a new build and restarting the same one are different operations,
         // and one average over both would be a number that describes neither.
         avgNewBuildMs: avg(ready((r) => r.newBuild)),
@@ -120,4 +142,4 @@ function report(engineRoot) {
     };
 }
 
-module.exports = { recordBoot, touch, report, historyPath };
+module.exports = { recordBoot, touch, report, historyPath, PLAUSIBLE_MAX_MS, isPlausibleInstall };
