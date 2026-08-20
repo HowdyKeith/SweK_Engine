@@ -17048,6 +17048,121 @@ it improved.
      Those three predate the v3941 split of this file out of README.md, so they were never migrated;
      root CHANGELOG-v*.md was retired at 867ba208 and is not revived here. -->
 
+## v3906 -- THE FOUR STEPPERS IN poisson.mjs, AND THE MISSING NAMES AND THE MISSING CHECK WERE THE SAME HOLE
+
+`verletStep`, `eulerStep`, `semiEulerStep` and `rk4Step` are exported and **not one of the four names appeared in
+their own gate**. Every check reached them through the `STEPPERS` table, which is a real front door and is also
+the whole problem: *a registry hides which function is behind which key.*
+
+### MEASURED, NOT ARGUED: ALL SIX TRANSPOSITIONS OF THE TABLE, DRIVEN AGAINST v3430
+
+    verlet <-> euler       CAUGHT        semiEuler <-> euler    CAUGHT
+    verlet <-> rk4         CAUGHT        semiEuler <-> rk4      CAUGHT
+    euler  <-> rk4         CAUGHT        *** verlet <-> semiEuler   PASSES EVERY CHECK IN THE FILE ***
+
+**One of six is invisible, and it is invisible for a reason that names the missing check.** The two are
+indistinguishable on the SYMPLECTIC axis, which is the only axis the file measured. Section 5 says in prose
+*"ACCURACY AND SYMPLECTICITY ARE DIFFERENT AXES, and a fixture of verlet-versus-rk4 alone would let them be read
+as one"* — and then measures one of the two axes. **The claim and the gap are the same sentence.**
+
+### AND A SECOND PLANT SURVIVED v3430, THIS ONE INSIDE A STEPPER: A DETERMINANT IS NOT A MAP
+
+Flip the sign of explicit Euler's momentum kick — `[q + dt*p, p + dt*q]` — and **every check passes**. Its
+Jacobian is `[[1,dt],[dt,1]]` with determinant `1 - dt²`, so `symplecticDefect` reads `dt²`: *the same number as
+the correct map.* Section 5's "explicit Euler's defect is EXACTLY dt²" is satisfied by completely different
+dynamics. The new closed-form check catches it at 2.0e-1 rather than at a floor.
+
+### WHAT THE ROUND ADDS
+
+**Each stepper is the MATRIX it is supposed to be** — the strongest available statement about a stepper, and one
+the symplectic checks cannot make, because two different maps can share a determinant:
+
+    euler      [[1, dt], [-dt, 1]]                       semiEuler  [[1-dt^2, dt], [-dt, 1]]
+    verlet     [[1-dt^2/2, dt], [-dt+dt^3/4, 1-dt^2/2]]  rk4        [[a, b], [-b, a]]
+
+worst element **5.95e-11** across all sixteen entries of four matrices, against the central-difference floor —
+asserted through the named export *and* through `STEPPERS[k]`, so a crossed wire fails on the physics rather
+than only on an identity comparison.
+
+**THE ORDER AXIS, MEASURED BY REFINEMENT AND NOT TOLD TO THE LOOP: 1, 1, 2, 4.**
+
+    euler      5.11e-2 -> 2.53e-2 -> 1.26e-2 -> 6.27e-3 -> 3.13e-3    order 1.002
+    semiEuler  4.25e-2 -> 2.11e-2 -> 1.05e-2 -> 5.26e-3 -> 2.63e-3    order 1.001
+    verlet     8.99e-4 -> 2.25e-4 -> 5.61e-5 -> 1.40e-5 -> 3.51e-6    order 2.000
+    rk4        8.33e-7 -> 5.21e-8 -> 3.26e-9 -> 2.03e-10 -> 1.27e-11  order 4.000
+
+All four corners of the 2×2 are occupied — first-order-not-symplectic, first-order-symplectic,
+second-order-symplectic, fourth-order-not-symplectic — which is the only way to show the two axes are
+independent rather than correlated. It is also exactly the discriminator the invisible transposition needed:
+verlet and semiEuler are a whole order apart while their symplectic defects are 3.61e-11 and 8.11e-12, both at
+the floor.
+
+### RK4 CONTRACTS PHASE-SPACE VOLUME BY EXACTLY dt^6/72, WHICH IS SECTION 6'S FINDING WITH A NUMBER IN IT
+
+RK4 on this Hamiltonian advances by the truncated series of `exp(i·dt)`, so its determinant is `a² + b²` with
+`a = 1 - dt²/2 + dt⁴/24` and `b = dt - dt³/6`, and that expands **exactly**:
+
+    det = 1 - dt^6/72 + dt^8/576
+
+No truncation, no fitting — a polynomial identity. Measured across four step sizes, the ratio to `-dt⁶/72` is
+0.98000, 0.99500, 0.99875, 0.99969 and **the shortfall from 1 is `dt²/8` every time** (0.125000, 0.125000,
+0.125001, 0.125102) — which is the `dt⁸/576` term and nothing else. Section 6 says RK4's defect "vanishes into
+the noise"; **this says where**: it crosses Verlet's central-difference floor of ~1e-11 at dt ≈ 0.03, so a check
+at any smaller step certifies RK4 as symplectic. The reason is now a power law rather than an observation about
+one run.
+
+### THE CONSEQUENCE ELEVEN FILES ACTUALLY RELY ON, OVER 159 PERIODS
+
+None of the one-step checks is why anybody cares. 20,000 steps at dt = 0.05, and both determinants become
+predictions with no free parameter, because the Euler and RK4 maps are each a rotation times a scalar:
+
+    euler      H = 2.435543e+21   against H0 (1 + dt^2)^N     agreeing to 1.06e-12
+    rk4        H = 4.99997831e-1  against H0 det^N            agreeing to 1.11e-12
+    verlet     band [4.9969e-1, 5.0000e-1]                    0.06% of H0, not drifting
+    semiEuler  band [4.8780e-1, 5.1282e-1]                    5.00% of H0, not drifting
+
+*** RK4 DOES NOT MERELY FAIL TO PRESERVE ENERGY, IT REMOVES IT, MONOTONICALLY AND FOREVER. *** A fourth-order
+method that loses energy slower than a second-order one preserves it is the trade the eleven files saying
+"symplectic" are making, and this is the first place in the tree it is a number. And the two RK4 predictions
+separate here: the exact polynomial agrees to 1.1e-12 while the leading `dt⁶/72` term alone is **1.36e-9 out**,
+which is `N · dt⁸/576` — a leading-order prediction is not the same claim as an exact one.
+
+### A MISTAKE THIS ROUND MADE AND THE PLANT THAT CAUGHT IT
+
+The first version compared the four Jacobians against their closed forms **using the named exports only**, and
+then claimed in its own detail string that *"a swapped registry entry fails here"*. **It did not** — nothing in
+the comparison read the registry. Driving the six transpositions is what found it; the sentence was written from
+the armchair and the plant disagreed. The comparison now runs twice, once by name and once through the table,
+and the claim is true.
+
+### WHAT MOVED
+
+    definitionGates      110 unmentioned -> 106     (the four steppers)
+    reached by NO gate    76 -> 72 tree-wide
+    physics/mechanics     6 sibling-unmentioned -> 2 (rigidKeys' quatOf and posOf are all that is left)
+    assertions            poisson 13 -> 24
+
+Five arithmetic plants inside the steppers were driven against both gates: verlet's half-step becoming a full
+step, semi-implicit Euler falling back to explicit, the Euler sign flip, RK4's `k3` reading `k1`, and RK4's
+weights losing their 2s. The old gate caught four of five; the new one catches five of five and all six
+transpositions.
+
+### HONEST NOTES
+
+- **`poisson.mjs` is untouched** — byte-identical to v3903. This round changed one gate.
+- Runtime 0.11s (was 0.02s); `--affected` reports 1/1 pass; `poissonDevice-selfcheck` (which reads the same
+  registry through the bind) is green.
+- **The fixture is one degree of freedom on the unit harmonic oscillator**, which is what makes every matrix
+  exact by hand. A stepper correct here can still be wrong on a non-separable or non-linear Hamiltonian —
+  nothing in this round tests that, and the module's own header is honest that the oscillator is "the cheapest
+  fixture that can tell a symplectic map from a plausible one".
+- The order study measures the **global** error at T = 1, so it reads convergence order, not local truncation
+  order. They differ by one and the numbers quoted are the global ones.
+
+<!-- Folded in from the root CHANGELOG-v3906.md when the v3904-v3906 rounds were rebased onto main.
+     Those three predate the v3941 split of this file out of README.md, so they were never migrated;
+     root CHANGELOG-v*.md was retired at 867ba208 and is not revived here. -->
+
 ## Since v854 — Audio system foundation (closes the audio queued item from the tamagotchi/wandering/audio plan): three pieces. (1) FIX SILENT NO-OP — discovery: AudioManager.setVolume(group, v) didn't exist, so the settingsHub volume sliders (volMaster/volSfx/volMusic) were silently no-oping via optional-chaining (a?.setVolume?.(group, v)). Real bug, not a new feature. Added generic setVolume(group, v) + currentVolume(group) dispatchers that route to setMasterVolume/setSFXVolume/setAmbientVolume, plus relay music to audioBus.setMusicVolume so the new music layer responds to the same slider. Tracks _masterVolume / _sfxVolume / _musicVolume internally for currentVolume() reads. (2) MUSIC / AMBIENT LOOP LAYER — new procedural music in audioBus.js. New _musicGain node parallel to master, new _ensureMusicGain() lazy init. Single procedural voice "ambient_pad": three sine oscillators tuned to a D minor triad (D3 / F3 / A3 = 146.83 / 174.61 / 220.00 Hz) with slow LFO detune (0.08-0.14 Hz, ±8 cents) for breathing pad sound. Per-osc gain decreasing for higher voices so the bass dominates. 1.5s fade-in on startMusic, 1s fade-out on stopMusic. No asset files needed — entirely synthesized. Added startMusic(name)/stopMusic()/setMusicVolume(v)/getMusicVolume()/isMusicPlaying() public methods. AudioManager.startMusic/stopMusic passthroughs let the same audioManager API drive both EngineAudio's ambient gain AND the new audioBus music pad through one call. (3) ENGINE EVENT AUDIO CUES — the v849 Twitch wiring dispatches engine:kaijuDefeated / engine:weatherChanged / engine:roundShipped / engine:bridge-up window events; v855 maps them to audio.play() voices via an ENGINE_EVENT_CUES table: kaijuDefeated→alert (siren burst), weatherChanged→ping (soft tonal), roundShipped→feed (ascending fanfare), bridge-up→happy (gentle chord). Cue voices are the existing 0.1-0.4s synth voices — short, non-intrusive. (4) MUSIC AUTO-START + TOGGLE — music starts on first user gesture (click/keydown/touchstart) since browsers require gesture to resume AudioContext. Preference persists to localStorage as voxelEngine.musicEnabled (default ON). New Music toggle in the settingsHub audio tab calls audio.startMusic/stopMusic + persists the pref. (5) WIRING SURFACE — settingsHub audio tab now has 4 controls: Master volume, SFX volume, Music volume, Music toggle. All hot-wired to a real audio path (no more silent no-ops). VERIFIED: 3 audio files syntax-clean, real ES module import of audioBus succeeds, 13/13 expected methods on AudioBus prototype (8 pre-existing + 5 new music methods), volume clamping works (0.5 stored as 0.5, 2.5 clamped to 1.0, -1 clamped to 0.0), startMusic without AudioContext returns {ok:false, error: "no audio context"}, unknown music voice returns error, isMusicPlaying() = false when not started. HONEST GAPS: (a) Music is ONE procedural pad — no track variety. Day/night/weather/biome-aware music selection is a future round. (b) Music gain is parallel to master (under master gain), so master slider correctly scales everything; music slider scales music below that. But the existing EngineAudio.ambientGain is a SEPARATE gain — setting "music" group volume now updates BOTH (via the new setMusicVolume relay) so EngineAudio's ambient sounds (rain, wind from the world system) also respond. This is intentional unification, but if user wants independent control of "wind/rain ambient" vs "background pad" it would need to split. (c) Engine event audio cues fire on the WINDOW events from v849, but the engine code that DISPATCHES those events (kaijuDefeated etc.) is still not wired — the receiving side (audio + Twitch broadcast) is ready but the firing side waits for engine code to call dispatchEvent at the relevant moments. (d) The music pad is a static minor triad; doesn't change in response to engine state. Future: rotate to a more tense voicing during super_busy AI activity, mellow during idle, etc. (e) Music auto-start uses ONE first-gesture hook; if the user has the page open but never clicks (e.g. a Shield as a passive display), music never starts. Could add a "always start at page load" mode for kiosk use. (f) No music asset-file support yet — only the one procedural voice. Adding file-based music tracks would need a load + register path similar to the existing buffer system. v855 doesn't yet provide that.
 
 ## Since v853 — Tamagotchi liveliness, rigged-avatar fidget + llama refinements (user redirect mid-round: "the rigged glb avatar is the real tamagotchi super alive avatar, llama is secondary/m2, llama stays 2D"): two pieces. (1) RIGGED AVATAR IDLE FIDGET — robotFaceAvatar.js gains an idle fidget controller. When the avatar has been in neutral idle for >4s and no head-lock (speech) is active, every 8-18s it triggers a brief weighted-random clip from a fidget pool (wave×3, happy×3, thumbsup×3, yes×2, no×2, play/jump×2, greet×1) and returns to neutral via the existing HOLD timer. Excludes PERSISTENT clips (would stick) + long HOLDS (run/death) + loud reactions (alert/attack — those read as engine events). Every non-fidget setEmotion call resets the cooldown so the character doesn't immediately fidget after a user-driven expression. Console API: window.kpopFidget.enable() / disable() / setEnabled() / setInterval(min, max) / trigger() / snapshot(). Default enabled. (2) LLAMA SIDE-TO-SIDE RUN — the super_busy state's body now translates -15px → +15px → flips scaleX(-1) → -15px (back-and-forth across the panel with proper direction flip at each turnaround) on a 4s ease-in-out loop. Inner animations (motion-blur legs, dust trail, panting head) unchanged. Visually reads as "the llama is sprinting back and forth because the AI is hammering". (3) LLAMA GRAZE IDLE — alongside the existing yawn, occasional grazing behavior during idle (head dips + tilts slightly as if eating grass; 1.6s animation, every 30-90s random). Both idle behaviors check state===idle && !isYawning && !isGrazing before firing, so they alternate naturally. Yawn first kicks at 8-12s after mount, graze at 15-30s, so the first interaction with the panel shows both behaviors quickly. (4) NOT IN THIS ROUND — lateral wandering of the rigged avatar in 3D space (would require Walking-clip locomotion + model offset + bound-clamping in the small render area), per the redirect: focus is on liveliness via idle fidget rather than spatial wandering. The rigged avatar stays at origin; the camera orbits it; fidget triggers make it feel super alive without movement. (5) USER CLARIFIED — llama stays 2D ("we don't need llama to be 3d and I like it not actual 3d"). Confirmed in code: HeartbeatAvatar is SVG-only; no 3D path added. (6) USER CLARIFIED — llama wandering is "currently not important" but the side-to-side run during super_busy was explicitly wanted ("It may run from one side of the screen to the other and back and forth quickly when legs are running") and that's what's shipped. VERIFIED: both files syntax-clean, 35 _fidget references in robotFaceAvatar.js, 9 hb-run-sideways/hb-graze/_doGraze/_scheduleGraze markers in HeartbeatAvatar.js. HeartbeatAvatar import succeeds with new _scheduleGraze + _doGraze on prototype. HONEST GAPS: (a) Fidget can pick a clip whose actual GLB doesn't have it — setClipFuzzy does a fuzzy lookup but a missing clip name silently degrades to whatever the fuzzy match returns. Edge case: if the loaded avatar has no Wave clip, the fidget tick "succeeds" but visually nothing happens. Snapshot can show currentEmotion="wave" but the rig didn't change. (b) Fidget is per-instance of robotface.html. The PC PipAvatar iframe runs one instance; the phone iframe runs another. They fidget independently (no synchronization). For users with both visible, expressions won't match. (c) The lateral-wandering item from the original v854 spec was descoped here. If the user wants the rigged avatar to actually move around its viewport, that's a follow-up round needing Walking clip + root-joint translation + camera-follow tuning. (d) Llama side-to-side run has fixed -15px..+15px range tuned for the 100px SVG viewBox. If the panel is rendered at a different scale, the run amplitude might feel cramped. (e) Graze + yawn aren't audibly cued — no sleep sigh, no munch sound. v855 audio round can wire them.
