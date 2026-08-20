@@ -109,6 +109,8 @@ export const MEASURED = {
     // it. A gate that cannot finish cannot tell you it is broken. The failure is not fixed here; it is now
     // VISIBLE, which is the prerequisite.
     "tools/roundhouse/census-selfcheck.mjs":         717000,
+    // v3917 -- measured at 534s on the run that first made it pass: 66 declared mode plants, two builds each.
+    "tools/roundhouse/plantDirection-selfcheck.mjs": 534000,
     // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
     // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
     // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
