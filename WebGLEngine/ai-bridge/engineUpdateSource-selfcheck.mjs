@@ -138,5 +138,43 @@ console.log("\n6. THE POLLER REACHES IT, AND ONLY WHEN ASKED");
            "margin. A GitHub installer that extracted for itself would re-earn every one of those bugs alone");
 }
 
+console.log("\n7. *** THE ARTIFACT THE PUBLISHER BUILDS MUST BE THE ONE THE INSTALLER CAN SEE AND RUN ***");
+{
+    const pkgSrc = fs.readFileSync(path.join(HERE, "packagerBridge.js"), "utf8");
+    ok("publishEngineBuild builds the INSTALLABLE zip, not the Gmail-safe one",
+       /packager\.makeInstallable\(/.test(ghSrc) && !/packager\.makeGmailSafe\(/.test(ghSrc),
+       "the release asset comes from makeInstallable()");
+    // The distinction has to be REAL, not a rename of the same function. Gmail-safe renames blocked extensions;
+    // the installable build must not, and BLOCKED is why.
+    const blocked = (pkgSrc.match(/const BLOCKED = \[([^\]]*)\]/) || [])[1] || "";
+    ok("*** and the reason is that BLOCKED contains js AND mjs -- the Gmail build renames THE WHOLE ENGINE ***",
+       /"js"/.test(blocked) && /"mjs"/.test(blocked),
+       "BLOCKED = " + blocked.replace(/\s+/g, " ").trim().slice(0, 110) + " ... -- main.js would arrive as main.js.txt");
+    const inst = (pkgSrc.match(/async function makeInstallable[\s\S]*?\n\}/) || [""])[0];
+    const gmail = (pkgSrc.match(/async function makeGmailSafe\(opts[\s\S]*?\n\}/) || [""])[0];
+    ok("...so makeInstallable does NOT call _renameBlocked, and makeGmailSafe still does",
+       !!inst && !/_renameBlocked/.test(inst) && !!gmail && /_renameBlocked/.test(gmail),
+       "the two builds differ in the one way that matters, and the email build keeps its own behaviour");
+    ok("...and it keeps the secret skips, which matter MORE for a public release than for an email",
+       /SKIP_FILES/.test(pkgSrc) && /github\.json/.test(pkgSrc) && /_copyTree\(PROJECT_ROOT, dest\)/.test(inst),
+       "same _copyTree, so github.json / gmail.json / the token files stay out of the published asset");
+    // THE CROSS-FILE CLAIM: the name it emits must satisfy BOTH readers, in two other files.
+    const prefix = (inst.match(/opts\.prefix \|\| "([^"]+)"/) || [])[1];
+    const name = prefix ? `${prefix}_${gh.engineVersion()}.zip` : "";
+    const picker = /^(?:SweK_Engine|EngineProject)_v\d+\.zip$/i;
+    const scanner = /(?:EngineProject|SweK[ _]Engine)[ _]v(\d+)\.zip$/i;
+    ok("*** the filename it emits satisfies the ASSET PICKER and the DOWNLOADS SCANNER, in two other files ***",
+       !!name && picker.test(name) && scanner.test(name), `emits ${name || "(prefix unreadable)"}`);
+    const bad = "EngineProject_GmailSafe_" + gh.engineVersion() + ".zip";
+    ok("...and the Gmail-safe name would satisfy NEITHER, which is the bug this section exists for",
+       !picker.test(bad) && !scanner.test(bad), `${bad} -> picker ${picker.test(bad)}, scanner ${scanner.test(bad)}`);
+    report("*** THIS BUG WAS REACHABLE ONLY BY DOING THE THING FOR THE FIRST TIME ***", "publishEngineBuild has " +
+           "existed since v1129 and the repo has zero releases, so the one-click 'cut a version' flow had never " +
+           "once been run. It would have published an asset in which EVERY JavaScript file was renamed, under a " +
+           "filename the installer's scanner cannot match -- two independent failures, either one fatal, neither " +
+           "visible from reading the panel. A CAPABILITY NOBODY HAS EXERCISED IS NOT A FEATURE, IT IS AN UNTESTED " +
+           "CLAIM, and this whole gate exists because that was true of the entire update source.");
+}
+
 console.log(fails ? `\nengineUpdateSource-selfcheck: ${fails} FAILED` : "\nengineUpdateSource-selfcheck: all checks pass");
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(fails ? 1 : 0);

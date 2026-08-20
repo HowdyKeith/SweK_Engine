@@ -146,6 +146,42 @@ async function makeGmailSafe(opts = {}) {
 // conversion (strip secrets + rename blocked extensions), zip into "My Documents" (overridable),
 // then delete the extracted temp tree and the working copy. Lets you Gmail-safe an archived build
 // without it being the live engine.
+// v3907 -- THE INSTALLABLE BUILD, WHICH IS NOT THE GMAIL-SAFE ONE, AND publishEngineBuild WAS SHIPPING THE WRONG
+// ONE. makeGmailSafe exists to get an engine THROUGH EMAIL: it renames every extension in BLOCKED, and BLOCKED
+// contains "js" and "mjs" -- SO IT RENAMES EVERY JAVASCRIPT FILE IN THE TREE. That is correct for its own job and
+// catastrophic as a release asset: main.js arrives as main.js.txt and nothing runs. It also names the zip
+// EngineProject_GmailSafe_vNNNN.zip, which sysadminBridge's scanDownloads() CANNOT SEE -- its pattern needs the
+// version to follow the prefix directly -- so the installer would ignore the file even if it were runnable.
+//
+// Nobody noticed because the publish path had never once been run: the repo had zero releases. THE BUG WAS
+// REACHABLE ONLY BY DOING THE THING FOR THE FIRST TIME.
+//
+// This is the same copy, the same secret-skipping (SKIP_FILES holds github.json, gmail.json and the rest -- which
+// matters far more for a PUBLIC release asset than for an email), and NO RENAMING. The folder and the zip are
+// named <prefix>_vNNNN so the zip root, the asset picker and the Downloads scanner all agree.
+async function makeInstallable(opts = {}) {
+    const ver = engineVersion() || new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const prefix = (opts.prefix || "SweK_Engine").trim() || "SweK_Engine";
+    const folderName = prefix + "_" + ver;
+    const dest = path.join(os.tmpdir(), folderName);
+    _setProg("prepare");
+    try { fs.rmSync(dest, { recursive: true, force: true }); } catch {}
+    const copied = _copyTree(PROJECT_ROOT, dest);
+    let outDir = (opts.outDir || "").trim() || externalAssetsDir() || path.resolve(PROJECT_ROOT, "..");
+    if (path.resolve(outDir).startsWith(path.resolve(PROJECT_ROOT) + path.sep)) outDir = path.resolve(PROJECT_ROOT, "..");
+    try { fs.mkdirSync(outDir, { recursive: true }); } catch {}
+    const outZip = path.join(outDir, folderName + ".zip");
+    try { fs.rmSync(outZip, { force: true }); } catch {}
+    _setProg("zip");
+    const z = await _zip(dest, outZip);
+    let bytes = 0; try { bytes = fs.statSync(outZip).size; } catch {}
+    _setProg("clean");
+    try { fs.rmSync(dest, { recursive: true, force: true }); } catch {}
+    _setProg("done");
+    if (!z.ok) return { ok: false, error: "zip failed: " + z.error, copied };
+    return { ok: true, path: outZip, bytes, mb: +(bytes / 1048576).toFixed(1), copied, renamed: 0, version: ver, root: folderName };
+}
+
 async function makeGmailSafeFromZip(opts = {}) {
     const srcZip = String(opts.srcZip || "").trim();
     if (!srcZip) return { ok: false, error: "no source .zip selected" };
@@ -201,4 +237,4 @@ async function makeGmailSafeFromZip(opts = {}) {
     return { ok: true, path: outZip, bytes, mb: +(bytes / 1048576).toFixed(1), copied, renamed, version: ver, srcZip, outDir };
 }
 
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, progress, engineVersion, externalAssetsDir, PROJECT_ROOT };
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, progress, engineVersion, externalAssetsDir, PROJECT_ROOT };

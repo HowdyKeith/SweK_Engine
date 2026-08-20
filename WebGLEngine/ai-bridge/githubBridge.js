@@ -236,7 +236,11 @@ async function publishEngineBuild({ repo, notes, draft, prerelease } = {}) {
     const tag = engineVersion();
     if (!tag) return { ok: false, error: "couldn't read the engine version" };
     let assetPath = "";
-    try { const packager = require("./packagerBridge.js"); const z = await packager.makeGmailSafe({}); if (!z.ok) return { ok: false, error: "build zip failed: " + z.error }; assetPath = z.path; }
+    // v3907 -- WAS makeGmailSafe, WHICH RENAMES EVERY .js AND .mjs IN THE TREE AND NAMES THE ZIP
+    // EngineProject_GmailSafe_vNNNN.zip. That asset is unrunnable AND invisible to the Downloads scanner that
+    // feeds the installer. The release asset must be the INSTALLABLE build, whose root and filename are the
+    // <prefix>_vNNNN that fetchEngineBuild's picker and scanDownloads() both expect.
+    try { const packager = require("./packagerBridge.js"); const z = await packager.makeInstallable({}); if (!z.ok) return { ok: false, error: "build zip failed: " + z.error }; assetPath = z.path; }
     catch (e) { return { ok: false, error: "packager error: " + String(e && e.message || e) }; }
     const pub = await publishVersion({ repo, tag, name: tag, body: notes || ("Engine build " + tag), assetPath, draft, prerelease });
     return Object.assign({ tag, assetPath }, pub);
