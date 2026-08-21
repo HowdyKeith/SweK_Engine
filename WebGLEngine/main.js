@@ -4352,9 +4352,45 @@
 // Four causes, four distinguishable states, driven in one pass: transpose removed -> DISAGREES (3 rows), key
 // removed -> ABSENT, right-hand side quietly edited -> STALE, honest -> AGREES.
 //
-// NOT DONE: cholesky. The module names four things the lab rolls by hand and this key now grades three. cholesky
-// wants a symmetric positive-definite problem and dpotrf, and it is the one claim where symmetry is the POINT
-// rather than the blindness -- so it needs its own reason to be non-vacuous, not this one's.
+// =================================================================================================================
+// v3936 (fourth) -- CHOLESKY LANDS ON dpotrf, AND THE FIRST TIME THIS KEY EVER RAN IT FOUND A TYPED CONSTANT
+// DECIDING A PHYSICS VERDICT.
+//
+// cholesky does NOT inherit solve's argument and must not: symmetry is the POINT here, so this claim cannot see a
+// transpose and does not pretend to -- the plant confirms it still moves three rows, not four. Its own reason is
+// stronger. lyapunovStable decides whether a system is STABLE by whether cholesky(P) returns null, so "is this
+// matrix positive definite" is not a numerical curiosity, IT IS THE VERDICT A CONTROL ENGINEER ACTS ON. The
+// answer graded is therefore a DECISION first and a factor second, and the two sides reach it by GENUINELY
+// DIFFERENT RULES: this engine rejects a pivot with `s <= tol` for a TYPED tol of 1e-12, dpotrf rejects only a
+// pivot that is not positive. A BOOLEAN AGREEING ACROSS TWO UNRELATED DECISION RULES CANNOT BE AN ACCIDENT OF
+// TOLERANCE -- the same reason rank is worth more than det.
+//
+// THE REFUSAL IS HALF THE CLAIM AND IT IS THE HALF THAT IS EASY TO LEAVE OUT. A key that only grades successes
+// cannot tell a solver that always says yes from one that is right. The indefinite matrix is the lab's own -- the
+// one controlStateSpace-selfcheck uses verbatim to prove its Cholesky is doing the work rather than a sign test --
+// and a planted reference that NEVER REFUSES is caught on exactly that row and no other.
+//
+// *** AND THE TWO SIDES DO NOT AGREE EVERYWHERE. THE PLACE THEY PART IS A DEFECT ON THIS SIDE. ***
+//     hilbert(8)   smallest pivot  5.6600e-9    both say POSITIVE DEFINITE
+//     hilbert(12)  smallest pivot  9.2436e-14   WE REFUSE IT, dpotrf ACCEPTS IT
+//     hilbert(14)  smallest pivot -5.3074e-16   both REFUSE
+// A Hilbert matrix is positive definite for EVERY n as a matter of mathematics -- it is a Gram matrix of linearly
+// independent functions. At n = 12 the smallest pivot is still POSITIVE and dpotrf is right to accept it. This
+// engine throws it away because cholesky() tests `s <= tol` against a typed 1e-12. hilbert(14)'s pivot goes
+// genuinely NEGATIVE and there both refuse, WHICH IS HOW WE KNOW THE BOUNDARY IS OUR CUT-OFF AND NOT THE MATHS.
+//
+// THE CONSEQUENCE IS NOT NUMERICAL. lyapunovStable reports a system UNSTABLE whenever cholesky(P) returns null, so
+// any Lyapunov P whose smallest pivot lands in (0, 1e-12] IS CALLED UNSTABLE WHILE BEING STABLE. NOT FIXED HERE:
+// changing that tolerance moves a physics verdict, and this tree reserves that call -- v3901 left the twof default
+// alone for the same reason. It is ASSERTED rather than described, so that fixing the tolerance turns THAT check
+// red and sends whoever did it to this note. A gate that merely mentioned it would be a comment nobody re-derives.
+//
+// 250 versions of a key that never ran. The first run graded 18 problems, agreed on all of them, and the probe
+// beside them found this. That is the entire argument for an outside reference, and it is not a hypothetical any
+// more.
+//
+// ALSO: adding a third claim shape meant the gate's fixture builder had to learn it, which is the same trap the
+// solve round hit one section above. It goes through the single shape-aware builder, so it was one line.
 // =================================================================================================================
 // =================================================================================================================
 // v3935 -- SEVENTEEN OF NINETEEN. singleSource FLAGGED TWENTY-ONE FILES AND EXACTLY ONE WAS THE DEFECT.

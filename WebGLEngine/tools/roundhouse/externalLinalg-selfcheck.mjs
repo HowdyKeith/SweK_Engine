@@ -17,7 +17,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { grade, ours, problems, toleranceFor, EPS, writeProblemsText, ANSWER_FILE,
          solveIsDiscriminating } from "./externalLinalg.mjs";
-import { ctrbMatrix, rank } from "../../physics/control/controlStateSpace.mjs";
+import { ctrbMatrix, rank, cholesky } from "../../physics/control/controlStateSpace.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -28,8 +28,8 @@ const say = (l) => console.log("  ----  " + l);
 // fixture went GREEN FOR THE WRONG REASON -- it was asserting "disagrees" and getting it because every solve row
 // had lost its answer, not because the rank rows were missing. A fixture builder that has to be updated in three
 // places when a claim type is added will be updated in two.
-const asAnswer = (o) => o.claim === "solve"
-    ? { name: o.name, claim: o.claim, values: o.values }
+const asAnswer = (o) => o.claim === "solve" ? { name: o.name, claim: o.claim, values: o.values }
+    : o.claim === "chol" ? { name: o.name, claim: o.claim, definite: o.definite, values: o.values }
     : { name: o.name, claim: o.claim, value: o.value };
 
 const tmp = (obj) => {
@@ -128,6 +128,87 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
     ok("...and a solve answer sent as a SCALAR is refused rather than coerced",
         grade(scalar).state === "disagrees",
         "the two sides must agree about the SHAPE of an answer before its value means anything");
+}
+
+// ---- 3c. CHOLESKY: THE ANSWER IS A DECISION, AND THE DECISION IS A STABILITY VERDICT ----------------------------
+{
+    const truth = ours();
+    const chols = truth.filter((o) => o.claim === "chol");
+    ok("!! *** the set contains a claim whose answer is a DECISION, not a number ***", chols.length > 0,
+        "lyapunovStable decides whether a system is STABLE by whether cholesky(P) returns null. 'Is this matrix "
+        + "positive definite' is not a numerical curiosity here -- it is the verdict a control engineer acts on.");
+
+    // THE REFUSAL IS HALF THE CLAIM. A key that only grades successes cannot tell a solver that always says yes
+    // from one that is right, and the refusal is the half that is easy to leave out.
+    const refused = chols.find((o) => !o.definite);
+    ok("!! ...and one problem must be REFUSED by both sides, not merely solved by both",
+        !!refused, "the lab's own indefinite matrix, the one controlStateSpace-selfcheck uses verbatim to prove "
+        + "its Cholesky is doing the work rather than a sign test");
+
+    // *** THE TWO SIDES DECIDE BY DIFFERENT RULES, WHICH IS WHY AGREEING IS WORTH SOMETHING. *** This engine
+    // rejects a pivot with `s <= tol` for a TYPED tol of 1e-12; dpotrf rejects only a pivot that is not positive.
+    // A boolean agreeing across two unrelated decision rules cannot be an accident of tolerance.
+    const flipped = tmp({ answers: truth.map((o) => o === refused
+        ? { name: o.name, claim: "chol", definite: true, values: new Array(o.rows * o.cols).fill(0) }
+        : asAnswer(o)) });
+    ok("!! ...and a reference that ACCEPTS the indefinite matrix is a disagreement, with no tolerance to hide in",
+        grade(flipped).disagreements.some((d) => d.name === refused.name),
+        "the verdict is a boolean and gets NO tolerance, exactly like rank's integer -- a reference that never "
+        + "refuses anything would otherwise sail through on the two problems it can factor");
+
+    const pd = chols.find((o) => o.definite);
+    const wrongFactor = tmp({ answers: truth.map((o) => o === pd
+        ? { ...asAnswer(o), values: o.values.map((v, i) => i === 0 ? v + 1e-3 : v) } : asAnswer(o)) });
+    ok("...and a correct VERDICT with a wrong FACTOR is still a disagreement",
+        grade(wrongFactor).disagreements.some((d) => d.name === pd.name),
+        "agreeing that a matrix is positive definite while producing a different L is two solvers agreeing about "
+        + "the easy half; the factor is the corroboration and it is checked");
+
+    // ---- THE DIVERGENCE THIS KEY FOUND THE FIRST TIME IT EVER RAN, PINNED SO IT CANNOT BE LOST ----------------
+    // *** THE TWO SIDES DO NOT AGREE EVERYWHERE, AND THE PLACE THEY PART IS A DEFECT ON THIS SIDE. ***
+    // Measured at v3936 against reference LAPACK:
+    //     hilbert(8)   smallest pivot  5.6600e-9    both say POSITIVE DEFINITE
+    //     hilbert(12)  smallest pivot  9.2436e-14   WE REFUSE IT, dpotrf ACCEPTS IT
+    //     hilbert(14)  smallest pivot -5.3074e-16   both REFUSE
+    // A Hilbert matrix is positive definite for EVERY n as a matter of mathematics -- it is a Gram matrix of
+    // linearly independent functions. At n = 12 the smallest pivot is still POSITIVE, and dpotrf is right to
+    // accept it. This engine rejects it because cholesky() tests `s <= tol` against a TYPED tol of 1e-12, so a
+    // pivot that is small but genuinely positive is thrown away.
+    //
+    // THAT TYPED CONSTANT DECIDES A PHYSICS VERDICT. lyapunovStable calls a system UNSTABLE whenever cholesky(P)
+    // returns null, so any Lyapunov P whose smallest pivot lands in (0, 1e-12] is reported unstable while being
+    // stable. NOT FIXED HERE: changing that tolerance MOVES A STABILITY VERDICT, and this tree reserves that call.
+    // It is asserted rather than described so that fixing it fails THIS check and sends the reader to this note.
+    {
+        const H = (n) => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => 1 / (i + j + 1)));
+        const pivots = (M) => {
+            const n = M.length, L = Array.from({ length: n }, () => new Array(n).fill(0)), ps = [];
+            for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
+                let x = M[i][j];
+                for (let k = 0; k < j; k++) x -= L[i][k] * L[j][k];
+                if (i === j) { ps.push(x); if (x <= 0) return ps; L[i][j] = Math.sqrt(x); }
+                else L[i][j] = x / L[j][j];
+            }
+            return ps;
+        };
+        const p12 = Math.min(...pivots(H(12)));
+        ok("!! *** the typed 1e-12 in cholesky() REFUSES A MATRIX THAT IS POSITIVE DEFINITE *** (measured, not fixed)",
+            p12 > 0 && cholesky(H(12)) === null,
+            "hilbert(12): smallest pivot " + p12.toExponential(4) + " -- POSITIVE, so dpotrf accepts it and this "
+            + "engine does not. A Hilbert matrix is positive definite for every n. lyapunovStable calls a system "
+            + "UNSTABLE when cholesky(P) is null, so this typed constant decides a stability verdict. NOT FIXED: "
+            + "changing it moves a physics verdict, which is Keith's call. If this check ever goes red because the "
+            + "tolerance was fixed, that is the good outcome -- delete it and say so in the changelog.");
+        ok("...and the boundary really is a TOLERANCE and not a genuine indefiniteness",
+            Math.min(...pivots(H(14))) < 0 && cholesky(H(14)) === null,
+            "hilbert(14)'s smallest pivot goes genuinely NEGATIVE, and there both implementations refuse -- so "
+            + "the disagreement at 12 is this engine's typed cut-off, not a difference of opinion about the maths");
+    }
+
+    ok("...and BOTH REFUSING is an agreement rather than a missing answer",
+        grade(tmp({ answers: truth.map(asAnswer) })).rows.find((r) => r.name === refused.name).agrees,
+        "there is no factor to compare when both correctly refuse, and demanding one would fail the refusal case "
+        + "for having behaved properly");
 }
 
 // ---- 4. THE TOLERANCE IS DERIVED, AND IT IS NOT DOING THE WORK --------------------------------------------------

@@ -15,6 +15,9 @@
   {"name": "uncontrollable-2in.A", "claim": "det", "value": 6},
   {"name": "jordan.solve", "claim": "solve", "values": [1.375, -1.75, 1.5]},
   {"name": "companion.solve", "claim": "solve", "values": [-0.33333333333333331, 1, -2]},
+  {"name": "lyapunov-companion.chol", "claim": "chol", "definite": true, "values": [1.347837774610382, 0, 0, 0.85321840778088376, 1.1315262621597373, 0, 0.061827420853687219, 0.085943835043123307, 0.31164781498029914]},
+  {"name": "hilbert4.chol", "claim": "chol", "definite": true, "values": [1, 0, 0, 0, 0.5, 0.28867513459481287, 0, 0, 0.33333333333333331, 0.28867513459481292, 0.074535599249992951, 0, 0.25, 0.25980762113533162, 0.11180339887498915, 0.018898223650462669]},
+  {"name": "indefinite.chol", "claim": "chol", "definite": false, "values": []},
   {"name": "hilbert4.A", "claim": "det", "value": 1.6534391534393001e-07}
  ]
 }

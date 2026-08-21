@@ -23,7 +23,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { rank, det, solve, transpose, ctrbMatrix, obsvMatrix } from "../../physics/control/controlStateSpace.mjs";
+import { rank, det, solve, cholesky, transpose, ctrbMatrix, obsvMatrix, lyapunovStable }
+    from "../../physics/control/controlStateSpace.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ANSWER_FILE = path.join(HERE, "external-linalg-answers.json");
@@ -42,6 +43,7 @@ export function problems() {
     // b is an INPUT, not a reference value -- the answer being graded is x, and that comes from LAPACK. Typing b
     // is therefore not the thing v3520 forbids; typing x would be.
     const pushSolve = (name, A, b) => out.push({ name: name + ".solve", M: A, b, claim: "solve" });
+    const pushChol = (name, A) => out.push({ name: name + ".chol", M: A, claim: "chol" });
     const push = (name, A, B, C) => {
         if (B) out.push({ name: name + ".ctrb", M: ctrbMatrix(A, B), claim: "rank" });
         if (C) out.push({ name: name + ".obsv", M: obsvMatrix(A, C), claim: "rank" });
@@ -84,6 +86,25 @@ export function problems() {
     // form would otherwise silently retire the check.
     pushSolve("jordan", [[2, 1, 0], [0, 2, 1], [0, 0, 2]], [1, -2, 3]);            // det 8,  max|x-x_T| = 8.75e-1
     pushSolve("companion", [[0, 1, 0], [0, 0, 1], [-6, -11, -6]], [1, -2, 3]);     // det -6, max|x-x_T| = 3.50e+0
+
+    // *** v3936 -- CHOLESKY'S ANSWER IS A DECISION, AND THE DECISION IS A PHYSICS VERDICT. ***
+    // This claim does NOT inherit solve's argument, and it must not: symmetry is the POINT here, not the
+    // blindness, so it cannot see a transpose and does not pretend to. Its own reason is stronger. lyapunovStable
+    // decides whether a system is STABLE by whether cholesky(P) returns null -- so "is this matrix positive
+    // definite" is not a numerical curiosity here, it is the verdict a control engineer acts on. And the two sides
+    // decide it by GENUINELY DIFFERENT RULES: this engine rejects a pivot with `s <= tol` for a TYPED tol of
+    // 1e-12, while dpotrf rejects only a pivot that is not positive. A BOOLEAN AGREEING ACROSS TWO UNRELATED
+    // DECISION RULES CANNOT BE AN ACCIDENT OF TOLERANCE, which is the same reason rank is worth more than det.
+    //
+    // The P below is the matrix the engine's OWN stability verdict rests on, taken from lyapunovStable rather than
+    // invented -- the same rule the ctrb/obsv problems follow.
+    pushChol("lyapunov-companion", lyapunovStable([[0, 1, 0], [0, 0, 1], [-6, -11, -6]]).P);
+    pushChol("hilbert4", hilbert(4));
+    // AND THE REFUSAL, WHICH IS THE HALF THAT IS EASY TO FORGET. A key that only ever grades successes cannot tell
+    // a solver that always says yes from one that is right. This matrix is the lab's own indefinite example --
+    // controlStateSpace-selfcheck uses it verbatim to prove "the Cholesky is doing the work rather than a sign
+    // test" -- and BOTH implementations must refuse it.
+    pushChol("indefinite", [[1, 2], [2, 1]]);
     // A deliberately ill-conditioned symmetric matrix: the case where "agrees to 1e-12" is a claim about the
     // PROBLEM rather than about either solver, and where a fixed tolerance would be dishonest.
     push("hilbert4", hilbert(4), null, null);
@@ -101,6 +122,13 @@ export function ours() {
     return problems().map((p) => {
         const base = { name: p.name, claim: p.claim, rows: p.M.length, cols: p.M[0].length };
         if (p.claim === "solve") return { ...base, values: solve(p.M, p.b) };
+        if (p.claim === "chol") {
+            const L = cholesky(p.M);
+            // definite is the CLAIM; the factor is the corroboration. Kept apart so a caller cannot read one as
+            // the other -- an absent factor because the matrix was refused is not an absent factor because the
+            // reference failed to produce one.
+            return { ...base, definite: L !== null, values: L ? L.flat() : [] };
+        }
         return { ...base, value: p.claim === "rank" ? rank(p.M) : det(p.M) };
     });
 }
@@ -203,7 +231,19 @@ export function grade(answerFile = ANSWER_FILE) {
         if (!a) { rows.push({ ...o, external: null, agrees: false, missing: true }); continue; }
         const tol = toleranceFor(o);
         let agrees, external;
-        if (o.claim === "solve") {
+        if (o.claim === "chol") {
+            // THE BOOLEAN IS THE CLAIM AND IT GETS NO TOLERANCE, exactly like rank's integer: "is this matrix
+            // positive definite" is the stability verdict, and a verdict is either the same or it is not. The
+            // factor is corroboration on top -- compared only when both sides say definite, because there is no
+            // factor to compare when both correctly refuse, and demanding one would fail the refusal case for
+            // having behaved properly.
+            external = a.definite;
+            const verdictAgrees = a.definite === o.definite;
+            const factorAgrees = !o.definite
+                || (Array.isArray(a.values) && a.values.length === o.values.length
+                    && o.values.every((v, i) => Math.abs(a.values[i] - v) <= tol));
+            agrees = verdictAgrees && factorAgrees;
+        } else if (o.claim === "solve") {
             // EVERY COMPONENT MUST AGREE. A vector comparison that checked a norm, or the first entry, would pass
             // a reference that got one coordinate wrong -- and a transposed solve typically moves some components
             // far more than others, so the loose version would be blind exactly where this claim earns its keep.
@@ -229,8 +269,13 @@ export function reportLines() {
     L.push("  state: " + g.state + (g.why ? "   " + g.why : ""));
     for (const r of g.rows) {
         L.push("  " + (r.agrees ? "AGREE " : "DIFFER") + "  " + r.name.padEnd(26) + r.claim.padEnd(6) +
-               " ours=" + fmt(r.value !== undefined ? r.value : r.values) + (r.missing ? "   (no external answer)" :
-               "  lapack=" + fmt(r.external) + (r.exact ? "   EXACT INTEGER" : "   tol=" + r.tol.toExponential(2))));
+               (r.claim === "chol"
+                 ? " ours=" + (r.definite ? "DEFINITE" : "REFUSED") + (r.missing ? "   (no external answer)" :
+                   "  lapack=" + (r.external ? "DEFINITE" : "REFUSED") +
+                   (r.definite ? "   + factor, " + r.values.length + " entries, tol=" + r.tol.toExponential(2)
+                               : "   BOTH REFUSED -- no factor to compare, and that is the agreement"))
+                 : " ours=" + fmt(r.value !== undefined ? r.value : r.values) + (r.missing ? "   (no external answer)" :
+                   "  lapack=" + fmt(r.external) + (r.exact ? "   EXACT INTEGER" : "   tol=" + r.tol.toExponential(2)))));
     }
     if (g.state === "absent") L.push("  Run tools/roundhouse/external-linalg.c on a Mac to produce the answers. See its header.");
     return L;

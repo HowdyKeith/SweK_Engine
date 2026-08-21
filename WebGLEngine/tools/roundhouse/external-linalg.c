@@ -52,6 +52,7 @@ extern void dgetrf_(lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *l
                     lapack_int_t *ipiv, lapack_int_t *info);
 extern void dgesv_(lapack_int_t *n, lapack_int_t *nrhs, double *a, lapack_int_t *lda,
                    lapack_int_t *ipiv, double *b, lapack_int_t *ldb, lapack_int_t *info);
+extern void dpotrf_(char *uplo, lapack_int_t *n, double *a, lapack_int_t *lda, lapack_int_t *info);
 #define LINALG_SOURCE "reference LAPACK (Netlib) via external-linalg.c"
 #endif
 
@@ -94,6 +95,22 @@ static int solve_by_lu(const double *A, const double *b, int n, double *x) {
     return info == 0;
 }
 
+// v3936 -- CHOLESKY, WHOSE ANSWER IS A DECISION FIRST AND A FACTOR SECOND. dpotrf returns info > 0 when the
+// leading minor of that order is NOT positive definite, and it decides that from the pivot's SIGN. The engine
+// being graded rejects on `s <= tol` for a TYPED tol -- a different rule, which is exactly why the two agreeing
+// is worth something. Returns 1 for positive definite, 0 for a refusal; L is written to `out` row-major with the
+// strict upper triangle ZEROED, because dpotrf leaves the untouched half holding the original input.
+static int chol_by_potrf(const double *A, int n, double *out) {
+    double a[MAXN * MAXN];
+    char uplo = 'L';
+    lapack_int_t N = n, lda = n, info = 0;
+    memcpy(a, A, sizeof(double) * n * n);
+    dpotrf_(&uplo, &N, a, &lda, &info);
+    if (info != 0) return 0;
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) out[i * n + j] = (j <= i) ? a[j * n + i] : 0.0;
+    return 1;
+}
+
 static double det_by_lu(const double *A, int n) {
     double a[MAXN * MAXN];
     lapack_int_t N = n, lda = n, ipiv[MAXN], info = 0;
@@ -133,6 +150,16 @@ int main(int argc, char **argv) {
             if (!solve_by_lu(colmaj, rhs, n, x)) { fprintf(stderr, "dgesv failed on %s\n", name); return 2; }
             printf("  {\"name\": \"%s\", \"claim\": \"solve\", \"values\": [", name);
             for (int i = 0; i < n; i++) printf("%s%.17g", i ? ", " : "", x[i]);
+            printf("]}%s\n", (p + 1 < count) ? "," : "");
+            continue;
+        }
+        if (strcmp(claim, "chol") == 0) {
+            if (m != n) { fprintf(stderr, "chol needs a square matrix\n"); return 2; }
+            double L[MAXN * MAXN];
+            int definite = chol_by_potrf(colmaj, n, L);
+            printf("  {\"name\": \"%s\", \"claim\": \"chol\", \"definite\": %s, \"values\": [",
+                   name, definite ? "true" : "false");
+            if (definite) for (int i = 0; i < n * n; i++) printf("%s%.17g", i ? ", " : "", L[i]);
             printf("]}%s\n", (p + 1 < count) ? "," : "");
             continue;
         }
