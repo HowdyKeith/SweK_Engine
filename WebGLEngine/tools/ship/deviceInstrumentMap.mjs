@@ -172,7 +172,12 @@ export const NO_INSTRUMENT = {
     twobody: "the two-body solver underlies kepler; kepler IS its front door",
     inspiral: "gravitational-wave inspiral, graded against Peters (1964) in the roundhouse; its front door is probe-lab's family",
     eccentric: "stage 3 of the same inspiral family, sharing probe-lab's front door",
-    blobkelvin: "a blob-scene binding of Kelvin-Helmholtz, gated in the roundhouse and covered on the front door by the fluids instruments",
+    // v3933 -- blobkelvin's exemption REMOVED, not edited: registering diffusion-knob gave the device a real
+    // instrument, because physics/diffusionKnob.mjs imports blobKelvin.js at line 46 and reads it. The excuse
+    // said the device was "covered on the front door by the fluids instruments"; it is covered by one that
+    // names it now. AN EXCUSE FOR A DEVICE THAT NOW HAS AN INSTRUMENT ROTS SILENTLY -- this gate's own words --
+    // and it fired the moment the instrument landed, which is the ratchet working in the direction nobody has
+    // to remember.
 };
 
 /**
