@@ -165,16 +165,19 @@ function runOne(rel, cb) {
     // The budget now comes from the one table. The table is ESM and this runner is callback-style, so it is
     // loaded once and memoised; the SOURCE of the number travels with the result so the page can show where it
     // came from rather than asserting the wiring in a sentence.
-    loadBudgets().then((gb) => spawnOne(rel, file, gb, cb));
+    loadBudgets().then(({ gb, hs }) => spawnOne(rel, file, gb, hs, cb));
 }
 
 let BUDGETS = null;
 function loadBudgets() {
-    if (!BUDGETS) BUDGETS = import("../tools/ship/gateBudget.mjs").then((m) => m).catch(() => null);
+    if (!BUDGETS) BUDGETS = Promise.all([
+        import("../tools/ship/gateBudget.mjs").catch(() => null),
+        import("../tools/ship/hostScale.mjs").catch(() => null),
+    ]).then(([gb, hs]) => ({ gb, hs }));
     return BUDGETS;
 }
 
-function spawnOne(rel, file, gb, cb) {
+function spawnOne(rel, file, gb, hs, cb) {
     // A FAILED IMPORT MUST NOT SILENTLY REINVENT A NUMBER. If the table cannot be read the budget is reported as
     // coming from nowhere, which is a visible defect, rather than falling back to a constant that looks fine.
     let budgetMs = 180000, budgetSource = "fallback: gateBudget.mjs could not be loaded";
@@ -184,6 +187,16 @@ function spawnOne(rel, file, gb, cb) {
             budgetSource = typeof gb.budgetReason === "function" ? gb.budgetReason(rel) : "tools/ship/gateBudget.mjs";
         }
     } catch { /* keep the fallback and say so */ }
+    // v3923 -- and the table is ONE BOX'S STOPWATCH, so this box scales it by what it has actually done. The
+    // scale starts at 1 with no local runs and only ever GROWS a budget; see tools/ship/hostScale.mjs.
+    try {
+        if (hs && typeof hs.scaled === "function") {
+            const sc = hs.scaled(budgetMs);
+            if (sc.scale > 1) budgetSource += "  |  host x" + sc.scale.toFixed(2) + " (" + sc.why + ")";
+            else budgetSource += "  |  host x1.00 (" + sc.why + ")";
+            budgetMs = sc.ms;
+        }
+    } catch { /* an unreadable local file must never stop a gate running */ }
     let out = "";
     const t0 = Date.now();
     const p = spawn(process.execPath, [file], { cwd: ENGINE, env: { ...process.env } });
@@ -209,7 +222,12 @@ function spawnOne(rel, file, gb, cb) {
         //
         // ...but a killed process HAS no verdict, and `code === 0` being false is not evidence of anything. A
         // timed-out gate is reported as such, with the budget it exceeded, so the reader knows what to do next.
-        cb({ ok: code === 0, code, timedOut, timeoutMs: budgetMs, budgetSource, out, ms: Date.now() - t0 });
+        const took = Date.now() - t0;
+        // Record what this box actually did, so the next budget is measured rather than assumed. A killed run is
+        // recorded as a LOWER BOUND -- without it a badly-mismatched box that times out on everything would
+        // never produce a completed run to learn from, which is exactly the box that needs the scale.
+        try { if (hs && typeof hs.recordRun === "function") hs.recordRun(rel, took, code === 0 && !timedOut); } catch {}
+        cb({ ok: code === 0, code, timedOut, timeoutMs: budgetMs, budgetSource, out, ms: took });
     });
     p.on("error", (e) => { clearTimeout(kill); cb({ ok: false, code: -1, out: String(e && e.message) }); });
 }
