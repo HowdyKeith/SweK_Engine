@@ -88,8 +88,30 @@ console.log("\n3. `method` WAS 26 AND THE SPLIT THAT COULD BE JUSTIFIED WAS MADE
         "ship-ritual measures 'the steps of a ship, their order'; delivered-assets measures whether assets " +
         "resolve 'IN THE SHIPPED TREE'. *** A RELEASE CHECKLIST IS NOT A METHOD OF MEASUREMENT, which is a " +
         "category error rather than a crowding problem. ***");
+    // *** v3920 -- THE BAND WAS STILL A COUNT, AND IT WENT RED THE SAME WAY THE PIN DID. ***
+    //
+    // The note below records v1 pinning `=== 22` and going red the same round, and states the lesson in as many
+    // words: "A COUNT IS NOT A PROPERTY: adding a genuine method instrument is progress, and a check that fails
+    // on progress is the ratchet this session has now removed four times." THE FIX WAS A SECOND COUNT WITH TWO
+    // BOUNDS. `method` reached 40 and it is red again -- on growth, exactly as predicted, by the check whose own
+    // comment predicted it. And the check DIRECTLY BELOW says "THE SIZE IS REPORTED, NOT ENFORCED", so this file
+    // was enforcing a size two lines above the sentence refusing to.
+    //
+    // What the line actually claims is that THE STRUCTURAL DISCRIMINATOR FAILS -- that where a module lives does
+    // not predict what it is about -- and that is mechanical, so it is measured instead of guessed at with a
+    // range. gate-selection and coverage-triage are `method` and live under tools/ship; hmc-kernel and
+    // ising-kernel are `method` and live under tools/roundhouse. SPLITTING `method` BY DIRECTORY WOULD CUT
+    // BETWEEN INSTRUMENTS THAT BELONG TOGETHER, in both directions. That statement stays true at 40 instruments
+    // and at 400, which is what makes it a property.
+    const byDir = (id) => (INSTRUMENTS.find((i) => i.id === id) || {});
+    const shipSide = ["gate-selection", "coverage-triage"].map(byDir);
+    const houseSide = ["hmc-kernel", "ising-kernel"].map(byDir);
+    const discriminatorFails =
+        shipSide.length === 2 && houseSide.length === 2 &&
+        shipSide.every((i) => i.area === "method" && /^tools\/ship\//.test(i.gate || "")) &&
+        houseSide.every((i) => i.area === "method" && /^tools\/roundhouse\//.test(i.gate || ""));
     ok("!! ...and the rest did NOT, because there is no structural discriminator",
-        counts.get("method") > 15 && counts.get("method") < 30,
+        discriminatorFails,
         // *** THE FIRST VERSION PINNED `=== 22` AND WENT RED THE SAME ROUND, when v3583 added lockstep-dt to
         // `method`. A COUNT IS NOT A PROPERTY: adding a genuine method instrument is progress, and a check that
         // fails on progress is the ratchet this session has now removed four times (the stale-export count, the
