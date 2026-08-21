@@ -4216,6 +4216,51 @@
 // plant's blind partner, which is a property worth having and not a defect.
 // =================================================================================================================
 // =================================================================================================================
+// v3933 -- TWENTY-FOUR MODULES WERE WRITTEN TO BE READ AND HAD NO ENTRY IN THE REGISTRY, AND REGISTERING ONE OF
+// THEM MADE A STALE EXCUSE FIRE ON ITS OWN.
+//
+// registryOrphans has been red since before v3904 saying so, and nothing ran it -- the nineteenth and last of the
+// ordinary-work items v3924 found by timing the untimed. A reportLines() beside the gate is the mark of a module
+// written to be READ as well as checked, which is what an instrument IS, and its own message named
+// physics/info/entropy as one THIS SESSION CITED AS A LANDMARK FOUR TIMES while it sat outside the registry.
+//
+// *** EVERY KEY CAME FROM RUNNING THE MODULE, NOT FROM READING ITS HEADER. *** instruments-selfcheck requires a
+// key of at least 60 characters citing a number, an exact fact or a REFUSAL and never an adjective -- a bar no
+// invented sentence gets past, so each module's own reportLines() was called and the key written from what it
+// actually printed: diffusionKnob's 1.025346630 at every temperature in the sweep, corpusFilters' 169 filter
+// sites collapsing to 34 distinct admitted sets over 4496 files, doorKinds' work list of 8 resolving to 3.
+// Seven keys still failed the bar on the first pass BECAUSE I HAD WRITTEN THE NUMBERS AS WORDS -- "TWO REMAINING
+// INSTANCES", "a work list of EIGHT" -- and gradeable() wants a digit. The rule was right and my prose was not.
+//
+// All 22 bench-served entries were then re-run through the bench path to confirm they actually report: 22 of 22.
+//
+// *** TWO CARRY page: null, AND THAT IS A SHAPE RATHER THAN AN OMISSION. *** officeManager and composePropose
+// export reportLines(r), which FORMATS a result somebody else computed; called with nothing they throw. A bench
+// page over them would render an error where a reader expected a measurement -- exactly what benchBroken exists
+// to prevent, arriving through the other door. registryOrphans now tells the two apart FROM THE PARAMETER LIST,
+// derived rather than by naming two files: a reporter the bench can call takes no required argument.
+//
+// *** AND REGISTERING diffusion-knob MADE A STALE EXEMPTION FIRE BY ITSELF. *** deviceInstrumentMap excused
+// blobkelvin as "covered on the front door by the fluids instruments". physics/diffusionKnob.mjs imports
+// blobKelvin.js at line 46 and reads it, so the device now has an instrument that NAMES it. The exemption was
+// removed rather than edited: "an excuse for a device that now has an instrument would rot silently" is that
+// gate's own wording, and it caught this the moment the instrument landed -- the ratchet working in the
+// direction nobody has to remember. It is the same shape v3932 built into wiringClaims two rounds ago, found
+// here by a gate that already had it.
+//
+// *** A CONTAINER ROLLBACK ATE THIS ROUND ONCE, AND THE LOST TIME WENT INTO A FALSE DIAGNOSIS. *** Mid-round the
+// tree reverted to v3904 and the 24 entries vanished. I did not notice immediately, and spent four measurements
+// chasing why an overlap between diffusion-knob and blobkelvin had "disappeared" between two runs -- reading
+// claims(), uncovered and unexplained for a subtlety that was not there. THE ANSWER WAS THAT I WAS MEASURING A
+// TREE SIX VERSIONS OLD. Recovered from origin and redone; the same mistake as v3922's caseStudy pass, which was
+// also real and also about the wrong tree. THE HABIT THAT CATCHES IT IS CHECKING HEAD BEFORE BELIEVING A
+// SURPRISE, and the habit that limits it is committing the moment a block goes green.
+//
+// SIXTEEN OF THE NINETEEN ARE CLOSED, and the ordinary work is done. Three remain, all by decision rather than
+// by neglect: definitionGates and referenceKind are deliberately red until their debt is paid, and singleSource
+// is a refactor across dozens of files.
+// =================================================================================================================
+// =================================================================================================================
 // v3932 -- THREE HUNDRED WIRING CLAIMS WERE SIX CLAIMS AND ONE PARAGRAPH, AND ONE OF THE SIX WAS A FILE SAYING
 // NOTHING CALLS A MODULE IT IMPORTS TWENTY-NINE LINES LATER.
 //
