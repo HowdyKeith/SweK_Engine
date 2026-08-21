@@ -111,6 +111,22 @@ export const MEASURED = {
     "tools/roundhouse/census-selfcheck.mjs":         717000,
     // v3917 -- measured at 534s on the run that first made it pass: 66 declared mode plants, two builds each.
     "tools/roundhouse/plantDirection-selfcheck.mjs": 534000,
+    // v3924 -- twoFBind was NEVER TIMED AND NEVER BUDGETED, so it silently took the 139.9s general default while
+    // taking 249s. It passes when nothing is watching a clock and is killed by the ritual and the rig alike. It
+    // is absent from gate-timings.json for the reason that matters: A GATE THAT COULD NOT FINISH LEAVES NO ENTRY,
+    // so the record cannot contain the gates it most needs to describe.
+    "tools/roundhouse/twoFBind-selfcheck.mjs":       249000,
+    // v3924 -- measured to completion at 195s, and it PASSES. Another gate that was never timed, never budgeted,
+    // and silently killed at 139.9s by every runner.
+    "physics/sph/packingTransfer-selfcheck.mjs":     195000,
+    // *** v3924 -- AND THIS ONE IS WHY SLOWEST_GENERAL IS STILL 46.6s. *** Timing the never-timed 55 put
+    // materialKnobs at 131.9s into the GENERAL population, and gateBudget-selfcheck immediately said so: the
+    // recorded slowest general gate was no longer the slowest anybody had seen. The lever that check invites is
+    // to re-pin SLOWEST_GENERAL, which would take the default from 139.9s to 396s FOR EVERY GATE IN THE TREE --
+    // six minutes granted to gates that finish in forty milliseconds, and every future regression hidden under
+    // it. OF THE 24 NEWLY-TIMED GATES ONLY THIS ONE IS OVER 46.6s; THE NEXT IS 23s. It is the slow tail, not the
+    // population, and the tail is what MEASURED is for. Measured to completion, and it PASSES.
+    "physics/sph/materialKnobs-selfcheck.mjs":       131900,
     // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
     // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
     // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
@@ -181,6 +197,36 @@ export const TAIL_HEADROOM = 2;
  * threshold being loosened in this tree.
  */
 export const UNRESOLVED = {
+    // *** v3924 -- TEN GATES THAT EXCEEDED A 150s CAP AND HAVE NOT YET BEEN MEASURED TO COMPLETION. ***
+    //
+    // They were found by timing the 55 gates that had NEITHER a recorded time NOR a MEASURED budget -- a
+    // population that existed because gate-timings.json CANNOT CONTAIN A GATE THAT DID NOT FINISH. Asked which
+    // gates run over the default with no budget, the record answered ZERO, and that zero was a property of the
+    // file. twoFBind is 249s and appears nowhere in it.
+    //
+    // The cap was 150s, just above the 139.9s general default, because that is all it takes to answer "does it
+    // fit". IT IS NOT A RUNTIME. A LOWER BOUND IS NOT A MEASUREMENT -- the rule this table was created for --
+    // so none of these gets a number in MEASURED until it has been watched to the end. packingTransfer was, and
+    // moved out of this list to MEASURED at 195s on the same round, which is what that traffic should look like.
+    "physics/sph/stability-selfcheck.mjs":
+        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion, so no budget is claimed",
+    "tools/roundhouse/corroborationCensus-selfcheck.mjs":
+        "exceeded a 150s cap at v3924. A census over the device registry, so it grows with the lab -- the same shape as labResults, whose entry records that it will outrun any number written down",
+    "tools/roundhouse/libmSensitivity-selfcheck.mjs":
+        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
+    "tools/roundhouse/plantedCoverage-selfcheck.mjs":
+        "exceeded a 150s cap at v3924. It builds two arms of every declared plant across the whole registry, so its cost tracks the plant census rather than any fixture of its own",
+    "tools/roundhouse/responseCensus-selfcheck.mjs":
+        "exceeded a 150s cap at v3924. Another registry-wide census; cost grows with the device count",
+    "tools/roundhouse/sensitivity-selfcheck.mjs":
+        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
+    "tools/roundhouse/valueMatch-selfcheck.mjs":
+        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
+    "tools/ship/orphanTriage-selfcheck.mjs":
+        "exceeded a 150s cap at v3924. It walks the whole tree, so its cost is a file count rather than a physics fixture",
+    "tools/ship/shaderRefs-selfcheck.mjs":
+        "exceeded a 150s cap at v3924. It resolves every shader reference in the tree; cost is a file count",
+
     // *** v3913 -- claimTrace DID NOT COMPLETE IN THIRTY MINUTES, so there is no measurement to record. ***
     // A LOWER BOUND IS NOT A MEASUREMENT. Every entry in MEASURED above is a real completion; putting a guess
     // beside them would poison the one property that table has. This is the table for "we tried and it did not
