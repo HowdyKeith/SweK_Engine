@@ -4252,6 +4252,22 @@
 // catalogSnapshot was collateral from the same comparison and is green again untouched. The contract belongs to
 // readReport, so it is pinned ONCE in readReport's own gate; pinning it again in a consumer would be a second
 // definition of the same rule, which is the thing v3935 just finished removing.
+//
+// AND SHIPPING THE FIX FOUND THE SHIP RITUAL DOING THE SAME CLASS OF THING TO ITSELF. The v3936 ship refused at
+// step 6 with the words "selfchecks said NO:" AND NOTHING AFTER THE COLON. Nothing had said no. The ritual ran 923
+// seconds against its own 900-second cap, execFileSync killed the sweep with SIGTERM, and A KILLED CHILD'S
+// BUFFERED STDOUT NEVER FLUSHES -- so there was no text to quote and the error path quoted it anyway. THE
+// EMPTINESS WAS NOT INCIDENTAL: it is what a timeout ALWAYS produces there, so every timeout this ritual has ever
+// hit was reported as a verdict nobody could read, on the one step whose entire job is to say what is wrong.
+// A TIMEOUT IS NOT A FAILURE is this tree's own rule and I had applied it to my own sweep four rounds ago.
+//
+// The throw is CLASSIFIED now instead of assumed, into the three different events it was flattening into one, and
+// it CANNOT return an empty reason -- a refusal that names nothing is indistinguishable from a bug in the refusing
+// code, which is exactly how that ship read. All three driven end to end on the real ritual rather than argued:
+// a 1s cap reports DID NOT FINISH and says nothing is shown to be red; a planted bad marker still reports "the
+// gate said NO" and quotes the verify FAIL line; a step replaced with a bare nonzero exit reports that it printed
+// nothing readable and is a bug in the step. The cap is --step-timeout now, because a cap that cannot be raised on
+// a slower box is a cap that turns a slow machine into a red tree -- v3923's finding, which never reached here.
 // =================================================================================================================
 // =================================================================================================================
 // v3935 -- SEVENTEEN OF NINETEEN. singleSource FLAGGED TWENTY-ONE FILES AND EXACTLY ONE WAS THE DEFECT.
