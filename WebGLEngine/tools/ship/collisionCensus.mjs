@@ -66,6 +66,7 @@
 // ---------------------------------------------------------------------------------------------------------------
 "use strict";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { gateFiles } from "./staleness.mjs";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -80,12 +81,18 @@ export const HOOK = path.join(HERE, "collideCensusHook.mjs");
 
 /** Every gate in the tree that imports a cloth solver or the pass itself. DERIVED, never a typed list. */
 export function collisionGates() {
+    // *** v3935 -- THE GATE LIST COMES FROM staleness.gateFiles() NOW, NOT FROM A SECOND WALK. ***
+    // This function recursed the tree and selected `-selfcheck.mjs` itself, which is a SECOND DEFINITION of
+    // which files are gates -- singleSource has been red about it since before v3904. What is this census's own
+    // question is the IMPORT FILTER below; deriving the corpus was never part of it. The population is narrowed
+    // to physics/ and tools/ exactly as the old walk did, so the answer is unchanged: 7 gates, verified
+    // identical to the previous output before this line was committed.
     const out = [];
-    const walk = (dir) => {
-        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-            const p = path.join(dir, e.name);
-            if (e.isDirectory()) { if (!/node_modules|\.git/.test(e.name)) walk(p); continue; }
-            if (!/-selfcheck\.mjs$/.test(e.name)) continue;
+    for (const abs of gateFiles()) {
+        const rel = path.relative(ENGINE, abs).split(path.sep).join("/");
+        if (!/^(physics|tools)\//.test(rel)) continue;
+        const p = abs;
+        {
             const src = fs.readFileSync(p, "utf8");
             // A CONSUMER OF THIS CENSUS CANNOT BE A SUBJECT OF IT. Left in, this file's own gate matched the
             // import test (it imports selfCollide and solverParity), so the census SPAWNED ITSELF and hung --
@@ -93,11 +100,9 @@ export function collisionGates() {
             // Excluded by MECHANISM (does it import the census) rather than by name.
             if (/from\s+["'][^"']*collisionCensus\.mjs/.test(src)) continue;
             if (/from\s+["'][^"']*(clothStep|clothLoop|selfCollide|clothSoak|collisionKnobs|kktResidual|solverParity)/.test(src))
-                out.push(path.relative(ENGINE, p).split(path.sep).join("/"));
+                out.push(rel);
         }
-    };
-    walk(path.join(ENGINE, "physics"));
-    walk(path.join(ENGINE, "tools"));
+    }
     return out.sort();
 }
 

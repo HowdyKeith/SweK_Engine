@@ -29,6 +29,7 @@
 // from an accidental copy in general, and a checker that guessed would be switched off.
 
 import fs from "fs";
+import { codeOnly } from "./sourceScan.mjs";
 import path from "path";
 
 let fails = 0;
@@ -270,11 +271,44 @@ const files = walk(ROOT);
         // census depend on the gate walker to answer a question that is not about gates.
         ["registerResidue-selfcheck.mjs", "the pattern is in a SKIP -- excluding gates from an artefact-emitter walk, not deriving which files are gates"],
     ]);
-    const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+    // *** v3935 -- THE DETECTOR CAN TELL A WALK FROM A PREDICATE FOR THE MECHANICAL CASES, AND MEASURING SAID SO.
+    //
+    // The paragraph above concluded it CANNOT, and made every non-walker a human sentence. That was the right
+    // call for two exemptions. It flagged TWENTY-ONE files, of which exactly ONE was a genuine second walk
+    // (collisionCensus.mjs, converted this round) -- so the mechanism was asking for twenty hand-written
+    // excuses, AND AN EXCUSE WRITTEN CARELESSLY IS WORSE THAN NO EXCUSE. Reading all twenty-one showed the
+    // shapes are legible at the line:
+    //
+    //   TWO were the pattern QUOTED INSIDE A STRING -- checkerCensus-selfcheck showing what a copy looks like,
+    //     reportingTools in a blurb. codeOnly() strips strings as well as comments and both disappear. THE
+    //     KEYWORD PROBE, SIXTH TIME THIS SESSION.
+    //   SKIP: the test is negated or the line ends in `continue`, or it is a SKIP constant -- declining to look
+    //     at gates while walking for something else. shaderCensus and registerResidue's own sentences say this.
+    //   PREDICATE: `const isGate = (f) => /.../.test(f)` -- classifying a name already held, which is the
+    //     wiringClaims exemption's exact wording.
+    //   TRANSFORM: `.replace(/-selfcheck\.mjs$/, ".mjs")` -- turning a gate path into its module, not selecting.
+    //   ASSERTION: the pattern inside an ok(...) call -- a gate CHECKING somebody else's list.
+    //
+    // What is left is the pattern applied POSITIVELY to a directory entry, which is the only shape that derives
+    // which files are gates. HUMAN SENTENCES ARE KEPT for anything the classifier cannot place: the rule did not
+    // become a machine, it became a machine WITH A DOOR FOR THE AMBIGUOUS CASE, which is what the two existing
+    // exemptions always were.
+    const PATTERN = /selfcheck[^\n]*\\\.mjs\$\//;
+    const classify = (line) => {
+        if (/\.replace\s*\(/.test(line)) return "transform";
+        if (/\bok\s*\(/.test(line)) return "assertion";
+        if (/!\s*\/[^/]*selfcheck/.test(line) || /\bcontinue\s*;/.test(line) || /\bSKIP\b/.test(line)) return "skip";
+        if (/(const|let|export const)\s+\w+\s*=\s*\(?\w*\)?\s*=>/.test(line)) return "predicate";
+        if (/\.filter\s*\(|\.some\s*\(|\.every\s*\(/.test(line)) return "predicate";
+        return "walk";
+    };
     const rebuilders = files
         .filter((f) => /[\\/]tools[\\/]ship[\\/][^\\/]+\.mjs$/.test(f))
         .filter((f) => !LEGITIMATE.has(path.basename(f)))
-        .filter((f) => /selfcheck[^\n]*\\\.mjs\$\//.test(stripComments(fs.readFileSync(f, "utf8"))))
+        .filter((f) => {
+            let code; try { code = codeOnly(fs.readFileSync(f, "utf8")); } catch { return false; }
+            return code.split("\n").filter((l) => PATTERN.test(l)).some((l) => classify(l) === "walk");
+        })
         .map((f) => path.basename(f));
     ok("...and nothing else in tools/ship re-derives the gate-file pattern",
         rebuilders.length === 0,
