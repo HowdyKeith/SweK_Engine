@@ -129,6 +129,14 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          still reading 341, so it was one round from going stale again.
     //   345 -> v3426: plus beerLambert.js, oscillation.js, halo.js. Counted by diffing the population
     //          against the shipped tree rather than by raising the number until it passed.
+    //   418 -> pinned at some round between v3426 and v3904, history not recorded here
+    //   464 -> v3927. RED SINCE BEFORE v3904 AND NOBODY SAW IT, because this gate had never been timed and so
+    //          nothing in the ritual ran it (v3924 found nineteen in that state). Counted the way this comment
+    //          demands rather than raised until it passed: populationCensus.compare() reports GREW, 46 added,
+    //          0 REMOVED, reconciles:true, every one named -- physics +2, em +9, md +2, mechanics +2, mesh +8,
+    //          sph +1, statmech +1, thermal +7, fluid +1, mpm +13. A population that only grew, in areas that
+    //          are obviously live work, is the case this pin is designed to WAVE THROUGH ONCE COUNTED; a
+    //          removal or a failure to reconcile would have been the other kind and is what the check is for.
     ok("!! the default population is ACCOUNTED FOR -- it may grow, but not silently",
         p.roots.join(",") === "physics,simulation,fluid" && p.total === EXPECTED_POPULATION,
         "expected " + EXPECTED_POPULATION + " (from the recorded census) and found " + p.total + ". A tool that silently changed what it counts would make every " +

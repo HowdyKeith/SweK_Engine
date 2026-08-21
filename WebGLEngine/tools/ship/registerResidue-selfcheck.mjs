@@ -138,7 +138,10 @@ function emitters() {
 // So the number MAY ONLY SHRINK. A new page linked without being placed or excused FAILS on the day it lands,
 // and every one that gets a home lowers the bar. *** WHEN THIS REACHES ZERO THIS SECTION GOES RED AND SHOULD BE
 // REPLACED BY AN EQUALITY -- the residue IS the unplaced set -- NOT BY LOWERING THE NUMBER AGAIN. ***
-const RESIDUE_CEILING = 42;
+// v3927 -- 42 -> 41. Eleven pages got homes this round (eight GPU Brain, three lattice-Boltzmann) and the
+// residue fell 52 -> 41, so the bar comes down with it: "every one that gets a home lowers the bar". A ratchet
+// left above the real number is a ratchet holding nothing, which the check below this one exists to say.
+const RESIDUE_CEILING = 41;
 
 {
     const html = fs.readFileSync(path.join(ENG, "server.html"), "utf8");

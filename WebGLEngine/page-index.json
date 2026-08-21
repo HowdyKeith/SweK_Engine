@@ -42,7 +42,7 @@
    "f": "aibrain.html",
    "t": "AI Brain (VBA bridge)",
    "d": "VBA-bridge visualizer for engine AI state.",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
@@ -427,7 +427,7 @@
    "f": "brain-3d.html",
    "t": "GPU Brain 3D (the brain's actual mechanics, in 3D)",
    "d": "",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
@@ -441,28 +441,28 @@
    "f": "brain-fleet.html",
    "t": "GPU Brain Fleet &mdash; Training Pool",
    "d": "",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
    "f": "brain-lab.html",
    "t": "Brain Lab",
    "d": "Watch the GPU Brain learn, live: train a hunt policy, transfer it to intercept (warm start beats scratch), and clone a scripted behavior by imitation -- all running in idle time with a watchdog health gauge showing training / stalled / recovered.",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
    "f": "brain-maze.html",
    "t": "Brain Maze (the GPU Brain solves an obstacle room)",
    "d": "",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
    "f": "brain-quadrants.html",
    "t": "Brain Quadrants (one GPU pass, many regions)",
    "d": "",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
@@ -476,7 +476,7 @@
    "f": "brain-room.html",
    "t": "Brain Room &mdash; a clean 3D test world",
    "d": "",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
@@ -840,7 +840,7 @@
    "f": "dock-brain.html",
    "t": "GPU Brain: Learn to Dock",
    "d": "A thruster-controlled ship learns to dock with the GPU Brain: relative target + velocity in, turn + thrust out, trained by evolution strategy. No drag, so it must anticipate momentum and counter-thrust to arrive slow. Watch it go from drifting to docking.",
-   "g": "",
+   "g": "brain",
    "p": 0
   },
   {
@@ -1526,21 +1526,21 @@
    "f": "lbm-fluid.html",
    "t": "Lattice Boltzmann",
    "d": "Real fluid, from the equations up. D2Q9 lattice Boltzmann with BGK collision, Guo forcing and halfway bounce-back walls -- written from the physics rather than ported from anything. It is verified against the exact analytic solution of pressure-driven channel flow to within 0.07 percent, and its viscosity is never set: it emerges from the relaxation time exactly as theory demands. Put a cylinder in it and the von Karman vortex street arrives on its own -- steady below Reynolds 47, shedding above it. Nobody told it that number. The WebGPU compute path shares the same constants, interpolated rather than retyped.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
    "f": "lbm3d-flow.html",
    "t": "Duct",
    "d": "The lattice in three dimensions, which is where this engine actually lives -- every fluid before this one was flat. D3Q19 drives a duct past a sphere: nineteen velocities per cell, no viscosity ever set, and a wake that forms because the equations say it must. The shell is an isosurface of speed, marched fresh out of the live field; the sparks are tracers riding the actual velocity, not a scripted animation. A note on the colour: this lattice is isothermal by construction and has no temperature at all, so the blackbody ramp is reading SPEED here, not heat -- said plainly, because a ramp that looks like fire and means nothing would be a paint job. The same solver was verified against Hagen-Poiseuille to half a percent.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
    "f": "lbm3d-gpu-check.html",
    "t": "GPU adjudicator",
    "d": "The D3Q19 compute kernel was written on a machine with no GPU and no browser, so unlike everything else in this engine's fluid work it could not be checked against an exact answer before it shipped. This page is the check, and it runs on your hardware, not mine. It puts the GPU kernel and the verified CPU solver on the identical problem from the identical state, steps both, and compares them cell by cell -- then asks the GPU, alone, to reproduce Hagen-Poiseuille's paraboloid, which the CPU earned to half a percent. There is a sabotage button. It corrupts one weight in the kernel so you can watch the adjudicator go red, because a check you have never seen fail is a check you should not trust.",
-   "g": "",
+   "g": "fluidgpu",
    "p": 0
   },
   {
