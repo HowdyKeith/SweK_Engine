@@ -43,7 +43,11 @@ export function problems() {
     // b is an INPUT, not a reference value -- the answer being graded is x, and that comes from LAPACK. Typing b
     // is therefore not the thing v3520 forbids; typing x would be.
     const pushSolve = (name, A, b) => out.push({ name: name + ".solve", M: A, b, claim: "solve" });
-    const pushChol = (name, A) => out.push({ name: name + ".chol", M: A, claim: "chol" });
+    // factorWhy, when present, says the FACTOR is not a meaningful comparison for this problem and why. The
+    // VERDICT is still graded -- that is the claim. This is a declared, reasoned exemption carrying its own
+    // measurement, not a widened tolerance: loosening the global tolerance until a hard problem passed would have
+    // weakened every easy problem beside it, which is how a ratchet rots.
+    const pushChol = (name, A, factorWhy = null) => out.push({ name: name + ".chol", M: A, claim: "chol", factorWhy });
     const push = (name, A, B, C) => {
         if (B) out.push({ name: name + ".ctrb", M: ctrbMatrix(A, B), claim: "rank" });
         if (C) out.push({ name: name + ".obsv", M: obsvMatrix(A, C), claim: "rank" });
@@ -100,6 +104,16 @@ export function problems() {
     // invented -- the same rule the ctrb/obsv problems follow.
     pushChol("lyapunov-companion", lyapunovStable([[0, 1, 0], [0, 0, 1], [-6, -11, -6]]).P);
     pushChol("hilbert4", hilbert(4));
+    // v3936 -- THE PROBLEM THE TWO SIDES USED TO DISAGREE ABOUT, NOW GRADED RATHER THAN DESCRIBED. hilbert(12)'s
+    // smallest pivot is 9.2436e-14: positive, merely small. dpotrf always accepted it; this engine refused it on a
+    // typed absolute 1e-12 until that tolerance was made scale-invariant. It is in the graded set so the agreement
+    // is CORROBORATED BY LAPACK on every run, rather than asserted by a comment that nobody re-derives.
+    pushChol("hilbert12", hilbert(12),
+        "kappa ~ 1.7e16. Two independent factorisations of the same matrix agree to about kappa*EPS, and MEASURED "
+        + "here that is max|dL| 8.490e-10, 2.793e-3 relative -- far outside any tolerance built from size and EPS "
+        + "alone, and NOT evidence that either solver is wrong. Compare hilbert(4), kappa ~ 1.6e4, whose factors "
+        + "come back BIT-IDENTICAL. The VERDICT is still graded and still agrees; it is the factor that this "
+        + "problem cannot adjudicate.");
     // AND THE REFUSAL, WHICH IS THE HALF THAT IS EASY TO FORGET. A key that only ever grades successes cannot tell
     // a solver that always says yes from one that is right. This matrix is the lab's own indefinite example --
     // controlStateSpace-selfcheck uses it verbatim to prove "the Cholesky is doing the work rather than a sign
@@ -127,7 +141,7 @@ export function ours() {
             // definite is the CLAIM; the factor is the corroboration. Kept apart so a caller cannot read one as
             // the other -- an absent factor because the matrix was refused is not an absent factor because the
             // reference failed to produce one.
-            return { ...base, definite: L !== null, values: L ? L.flat() : [] };
+            return { ...base, definite: L !== null, values: L ? L.flat() : [], factorWhy: p.factorWhy };
         }
         return { ...base, value: p.claim === "rank" ? rank(p.M) : det(p.M) };
     });
@@ -239,7 +253,7 @@ export function grade(answerFile = ANSWER_FILE) {
             // having behaved properly.
             external = a.definite;
             const verdictAgrees = a.definite === o.definite;
-            const factorAgrees = !o.definite
+            const factorAgrees = !o.definite || !!o.factorWhy
                 || (Array.isArray(a.values) && a.values.length === o.values.length
                     && o.values.every((v, i) => Math.abs(a.values[i] - v) <= tol));
             agrees = verdictAgrees && factorAgrees;
@@ -272,8 +286,9 @@ export function reportLines() {
                (r.claim === "chol"
                  ? " ours=" + (r.definite ? "DEFINITE" : "REFUSED") + (r.missing ? "   (no external answer)" :
                    "  lapack=" + (r.external ? "DEFINITE" : "REFUSED") +
-                   (r.definite ? "   + factor, " + r.values.length + " entries, tol=" + r.tol.toExponential(2)
-                               : "   BOTH REFUSED -- no factor to compare, and that is the agreement"))
+                   (!r.definite ? "   BOTH REFUSED -- no factor to compare, and that is the agreement"
+                     : r.factorWhy ? "   VERDICT ONLY -- factor NOT adjudicated: " + r.factorWhy.slice(0, 96) + "..."
+                     : "   + factor, " + r.values.length + " entries, tol=" + r.tol.toExponential(2)))
                  : " ours=" + fmt(r.value !== undefined ? r.value : r.values) + (r.missing ? "   (no external answer)" :
                    "  lapack=" + fmt(r.external) + (r.exact ? "   EXACT INTEGER" : "   tol=" + r.tol.toExponential(2)))));
     }

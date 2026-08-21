@@ -4391,6 +4391,48 @@
 //
 // ALSO: adding a third claim shape meant the gate's fixture builder had to learn it, which is the same trap the
 // solve round hit one section above. It goes through the single shape-aware builder, so it was one line.
+//
+// =================================================================================================================
+// v3936 (fifth) -- THE CHOLESKY TOLERANCE, FIXED ON KEITH'S CALL. IT WAS WORSE THAN THE KEY FOUND.
+//
+// The section above measured hilbert(12) and left the tolerance alone because changing it moves a physics verdict.
+// Keith made that call. Looking properly before touching it turned up something sharper than the hilbert case:
+//
+// *** THE VERDICT DEPENDED ON THE UNITS. *** Positive definiteness is INVARIANT under scaling by any positive
+// factor. A typed ABSOLUTE cut-off is not. Measured before the fix:
+//     [[2,1],[1,2]] -- eigenvalues 1 and 3 -- was REFUSED once scaled by 1e-13. The same matrix.
+//     lyapunovStable on roots -1,-2,-3 -- stable in any units -- reported UNSTABLE for Q = 1e-12 I.
+// A STABLE SYSTEM WAS CALLED UNSTABLE FOR CHOOSING SMALL UNITS FOR Q. hilbert(12) was one visible symptom of that,
+// not the disease.
+//
+// The default is dpotrf's rule now -- reject a pivot that is not positive, nothing else -- which is scale-invariant
+// because the sign of a positive number survives multiplication by a positive one, and which means the two sides
+// decide this by THE SAME LAW rather than agreeing by luck. `s <= 0` and not `s < 0`: a zero pivot is a singular
+// matrix, positive SEMI-definite, with no factor having a positive diagonal. A caller can still demand a MARGIN,
+// and that margin is RELATIVE now, so asking for one does not reintroduce the bug.
+//
+// EVERY VERDICT THAT MOVED, AND NOTHING ELSE MOVED. Measured across every stability verdict the lab can reach:
+// companion(-1,-2,-3) and diag(-1,-2) at Q = 1e-12 and 1e-13 went false -> TRUE; hilbert(12) and hilbert(13) went
+// refused -> DEFINITE; [[2,1],[1,2]] scaled by 1e-13 went refused -> DEFINITE. Every one is a FALSE NEGATIVE being
+// corrected. The unstable systems stayed unstable, the double integrator stayed refused, the lab's indefinite
+// matrix stayed refused, and hilbert(14) -- whose smallest pivot is genuinely NEGATIVE -- stayed refused. NO FALSE
+// POSITIVE WAS INTRODUCED, and that is the half a tolerance change is most likely to get wrong.
+//
+// hilbert(12) is in the GRADED SET now rather than described in a comment, so LAPACK corroborates the agreement on
+// every run. Confirmed on the reference side too: dpotrf accepts 11, 12 and 13 and refuses 14, exactly matching.
+//
+// AND ITS FACTOR IS DECLARED UNCOMPARABLE, WITH THE MEASUREMENT THAT SAYS WHY. kappa ~ 1.7e16, so two independent
+// factorisations agree to about kappa*EPS -- measured at max|dL| 8.490e-10, 2.793e-3 relative. That is a statement
+// about the PROBLEM, not about either solver, and hilbert(4) proves the point from the other side: kappa ~ 1.6e4
+// and the two factors come back BIT-IDENTICAL. The VERDICT is still graded and still agrees. WIDENING THE GLOBAL
+// TOLERANCE UNTIL THE HARD PROBLEM PASSED WOULD HAVE WEAKENED EVERY EASY PROBLEM BESIDE IT, which is how a ratchet
+// rots; the exemption is per-problem, carries its reason, and the gate asserts BOTH that it states a measurement
+// AND that it has not become the general case -- an exemption that can spread is a suppression.
+//
+// The v3936 pin went red, which is what it was written to do: its own text said that fixing the tolerance was the
+// good outcome and to delete it and say so. Deleted, and said. What replaced it asserts the PROPERTY -- scale
+// invariance -- rather than the symptom, plus the control that the refusals still hold, because a tolerance change
+// that made everything definite would have passed a scale-invariance check and destroyed the claim.
 // =================================================================================================================
 // =================================================================================================================
 // v3935 -- SEVENTEEN OF NINETEEN. singleSource FLAGGED TWENTY-ONE FILES AND EXACTLY ONE WAS THE DEFECT.

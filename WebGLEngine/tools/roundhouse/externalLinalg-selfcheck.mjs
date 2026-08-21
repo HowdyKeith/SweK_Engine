@@ -164,45 +164,54 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
         "agreeing that a matrix is positive definite while producing a different L is two solvers agreeing about "
         + "the easy half; the factor is the corroboration and it is checked");
 
-    // ---- THE DIVERGENCE THIS KEY FOUND THE FIRST TIME IT EVER RAN, PINNED SO IT CANNOT BE LOST ----------------
-    // *** THE TWO SIDES DO NOT AGREE EVERYWHERE, AND THE PLACE THEY PART IS A DEFECT ON THIS SIDE. ***
-    // Measured at v3936 against reference LAPACK:
-    //     hilbert(8)   smallest pivot  5.6600e-9    both say POSITIVE DEFINITE
-    //     hilbert(12)  smallest pivot  9.2436e-14   WE REFUSE IT, dpotrf ACCEPTS IT
-    //     hilbert(14)  smallest pivot -5.3074e-16   both REFUSE
-    // A Hilbert matrix is positive definite for EVERY n as a matter of mathematics -- it is a Gram matrix of
-    // linearly independent functions. At n = 12 the smallest pivot is still POSITIVE, and dpotrf is right to
-    // accept it. This engine rejects it because cholesky() tests `s <= tol` against a TYPED tol of 1e-12, so a
-    // pivot that is small but genuinely positive is thrown away.
+    // ---- THE DIVERGENCE THIS KEY FOUND, AND THE FIX IT EARNED --------------------------------------------------
+    // v3936 pinned a divergence here and said: "if this check ever goes red because the tolerance was fixed, that
+    // is the good outcome -- delete it and say so." It went red, because the tolerance was fixed. This is the
+    // replacement, and it asserts the PROPERTY rather than the symptom.
     //
-    // THAT TYPED CONSTANT DECIDES A PHYSICS VERDICT. lyapunovStable calls a system UNSTABLE whenever cholesky(P)
-    // returns null, so any Lyapunov P whose smallest pivot lands in (0, 1e-12] is reported unstable while being
-    // stable. NOT FIXED HERE: changing that tolerance MOVES A STABILITY VERDICT, and this tree reserves that call.
-    // It is asserted rather than described so that fixing it fails THIS check and sends the reader to this note.
+    // What was wrong: cholesky() rejected a pivot with `s <= tol` for a TYPED ABSOLUTE tol of 1e-12. Positive
+    // definiteness is INVARIANT under scaling by any positive factor; an absolute cut-off is not. So the verdict
+    // depended on the units. Measured before the fix: [[2,1],[1,2]] scaled by 1e-13 was REFUSED, and
+    // lyapunovStable called a system with roots -1,-2,-3 UNSTABLE for Q = 1e-12 I. The default is dpotrf's rule
+    // now -- reject a pivot that is not positive -- and an explicitly requested margin is RELATIVE.
     {
         const H = (n) => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => 1 / (i + j + 1)));
-        const pivots = (M) => {
-            const n = M.length, L = Array.from({ length: n }, () => new Array(n).fill(0)), ps = [];
-            for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
-                let x = M[i][j];
-                for (let k = 0; k < j; k++) x -= L[i][k] * L[j][k];
-                if (i === j) { ps.push(x); if (x <= 0) return ps; L[i][j] = Math.sqrt(x); }
-                else L[i][j] = x / L[j][j];
-            }
-            return ps;
-        };
-        const p12 = Math.min(...pivots(H(12)));
-        ok("!! *** the typed 1e-12 in cholesky() REFUSES A MATRIX THAT IS POSITIVE DEFINITE *** (measured, not fixed)",
-            p12 > 0 && cholesky(H(12)) === null,
-            "hilbert(12): smallest pivot " + p12.toExponential(4) + " -- POSITIVE, so dpotrf accepts it and this "
-            + "engine does not. A Hilbert matrix is positive definite for every n. lyapunovStable calls a system "
-            + "UNSTABLE when cholesky(P) is null, so this typed constant decides a stability verdict. NOT FIXED: "
-            + "changing it moves a physics verdict, which is Keith's call. If this check ever goes red because the "
-            + "tolerance was fixed, that is the good outcome -- delete it and say so in the changelog.");
-        ok("...and the boundary really is a TOLERANCE and not a genuine indefiniteness",
-            Math.min(...pivots(H(14))) < 0 && cholesky(H(14)) === null,
-            "hilbert(14)'s smallest pivot goes genuinely NEGATIVE, and there both implementations refuse -- so "
-            + "the disagreement at 12 is this engine's typed cut-off, not a difference of opinion about the maths");
+        const spd = [[2, 1], [1, 2]];                       // eigenvalues 1 and 3, positive definite past argument
+        const scaled = (k) => spd.map((r) => r.map((x) => x * k));
+        ok("!! *** the verdict is SCALE-INVARIANT, which is the property the typed tolerance broke ***",
+            [1, 1e-6, 1e-13, 1e-20, 1e-30].every((k) => cholesky(scaled(k)) !== null),
+            "scaling a matrix by a positive factor CANNOT change whether it is positive definite. Before v3936 "
+            + "this matrix was REFUSED at 1e-13 -- the same matrix, in different units. That is not a numerical "
+            + "nicety: lyapunovStable decides STABILITY by this function, so a stable system was reported unstable "
+            + "for choosing small units for Q.");
+        ok("...and an explicitly requested margin is RELATIVE, so asking for one does not reintroduce the bug",
+            [1, 1e-13, 1e-30].every((k) => cholesky(scaled(k), 1e-12) !== null)
+            && cholesky(spd, 0.9) === null,
+            "a caller may still demand a pivot be a decent fraction of the matrix scale -- tol 0.9 refuses this "
+            + "one -- but the same demand applied to the same matrix in different units gives the same answer");
+        ok("!! ...and hilbert(12) is ACCEPTED now, which is what dpotrf said all along",
+            cholesky(H(12)) !== null,
+            "smallest pivot 9.2436e-14: POSITIVE, merely small. A Hilbert matrix is positive definite for every n.");
+        ok("!! ...and the REFUSALS still hold, so the fix did not buy agreement by never refusing anything",
+            cholesky(H(14)) === null && cholesky([[1, 2], [2, 1]]) === null,
+            "hilbert(14)'s smallest pivot is genuinely NEGATIVE (-5.3074e-16) and the lab's indefinite matrix is "
+            + "still refused. A tolerance change that made everything definite would have passed the check above "
+            + "and destroyed the claim -- this is the control that stops that.");
+    }
+
+    // AN EXEMPTION THAT CAN SPREAD IS A SUPPRESSION. hilbert12 declares that its FACTOR cannot be adjudicated
+    // because kappa ~ 1.7e16 swamps any tolerance built from size and EPS; that is a real statement about the
+    // PROBLEM. Two things keep it honest: it must carry its reason, and it must not become the general case.
+    {
+        const cs = ours().filter((o) => o.claim === "chol" && o.definite);
+        const exempt = cs.filter((o) => o.factorWhy);
+        ok("!! an exemption from the factor comparison must SAY WHY, in a sentence with a measurement in it",
+            exempt.every((o) => /\d/.test(o.factorWhy) && o.factorWhy.length > 80),
+            exempt.map((o) => o.name).join(", ") || "none claimed");
+        ok("!! ...and it must NOT be the general case -- some problem still has its factor graded",
+            cs.some((o) => !o.factorWhy),
+            "if every definite problem excused its own factor, this claim would quietly become verdict-only and "
+            + "nothing would say so. " + cs.filter((o) => !o.factorWhy).map((o) => o.name).join(", ") + " still compare.");
     }
 
     ok("...and BOTH REFUSING is an agreement rather than a missing answer",
