@@ -29,8 +29,17 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
 /* 1. THE FILES KEITH NAMED ARE IN ROOT, BY NAME ------------------------------------------------------------ */
+// *** v3928 -- THE NAMED LIST WAS MISSING TWO LAUNCHERS, WHICH IS THE HOLE THE NEXT CHECK'S OWN WARNING NAMES.
+// This file says "THE NAMES ARE THE CHECK, NOT THE COUNT: a tidy-up that left the right NUMBER of files while
+// moving the one he double-clicks would pass a count and fail him on the first use" -- and then protected six
+// names while TWO MORE DOUBLE-CLICK ENTRY POINTS SAT IN ROOT UNNAMED. A tidy-up could have moved either and
+// this gate would have gone green.
+//   "Check this Mac matches the fleet.command" -- its own SECOND LINE reads "DOUBLE-CLICK THIS ON THE MAC".
+//   START_SweK_LATEST.bat -- a launcher whose header explains why it exists beside START_NODE_Engine.bat.
+// Read, not guessed: both were opened before being added.
 const KEITHS = ["START_NODE_Engine.bat", "MAKE_GMAIL_SAFE.bat", "Start Mac SweK Engine.command",
-                "make_Mac_SweK_Runnable.sh", "make_gmail_safe.sh", "make Gmail safe zip run again.sh"];
+                "make_Mac_SweK_Runnable.sh", "make_gmail_safe.sh", "make Gmail safe zip run again.sh",
+                "Check this Mac matches the fleet.command", "START_SweK_LATEST.bat"];
 const missing = KEITHS.filter((f) => !fs.existsSync(path.join(ROOT, f)));
 ok("!! *** every launcher Keith actually uses is still in the ROOT, checked by name ***", missing.length === 0,
    missing.length ? "MISSING: " + missing.join(", ") : KEITHS.length + " named launchers present. THE NAMES ARE THE CHECK, NOT THE COUNT: a tidy-up that left the right NUMBER of files while moving the one he double-clicks would pass a count and fail him on the first use.");
@@ -90,8 +99,43 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
 /* 4. THE ROOT IS ACTUALLY TIDY, AND THE CEILING IS A NUMBER SOMEBODY CHOSE ---------------------------------- */
 {
     const loose = fs.readdirSync(ROOT, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
-    ok("!! the root holds a dozen files or fewer", loose.length <= 12,
-       loose.length + " files: " + loose.join(", ") + ". Was FORTY-ONE. The ceiling is deliberately a LITERAL rather than a re-measurement, so the next file dropped in root has to be argued for rather than absorbed.");
+
+    // *** v3928 -- THE CEILING WAS TWELVE AND THIS FILE'S OWN OTHER CHECKS REQUIRE TWELVE. ***
+    //
+    // It was red from before v3904 and nobody saw it, because this gate had never been timed and so nothing in
+    // the ritual ran it. Keith asked for the three CHANGELOG-*.md moved into docs/ and they were: 18 -> 15.
+    // STILL RED, and counting the remainder is what settles it rather than moving more:
+    //
+    //   8 launchers named above (six original, two that were missing)     _SETUP.bat, asserted in section 1
+    //   README.md, BACKLOG.md, TODO.md, asserted below                    STATUS.md, written by tools/ship/status.mjs
+    //   .gitignore, which "only works where it is"                        .gitattributes, for the same reason
+    //
+    // THAT IS FIFTEEN FILES THIS FILE INSISTS ON, AGAINST A CEILING OF TWELVE. The ceiling could not be met
+    // without moving something Keith double-clicks -- the exact failure section 1 warns about -- so it was never
+    // a tidy-up target, it was an arithmetic impossibility that read as untidiness.
+    //
+    // SO THE COUNT BECOMES THE PROPERTY: every file in root is JUSTIFIED BY NAME, and a stray one fails on
+    // arrival. That is STRICTLY STRONGER than `<= 12`, which would have accepted a stray file as long as a
+    // launcher had been moved out to make room. A count is not a property -- the fifth time this session, after
+    // areaHygiene's band, caseStudy's baked total, gateBudget's SLOWEST_GENERAL and moduleHistory's 0.70.
+    const RITUAL_WRITTEN = ["README.md", "BACKLOG.md", "TODO.md", "STATUS.md"];
+    const GIT_CONFIG = [".gitignore", ".gitattributes"];
+    const JUSTIFIED = new Set([...KEITHS, "_SETUP.bat", ...RITUAL_WRITTEN, ...GIT_CONFIG]);
+    const strays = loose.filter((f) => !JUSTIFIED.has(f));
+    ok("!! every file in the root is there for a NAMED reason -- a stray one fails on arrival", strays.length === 0,
+       strays.length ? "UNJUSTIFIED IN ROOT: " + strays.join(", ") + ". Move it, or add it to the list above " +
+                       "WITH THE REASON -- the list is what a tidy-up is checked against"
+                     : loose.length + " files, every one named: " + KEITHS.length + " launchers, _SETUP.bat, " +
+                       RITUAL_WRITTEN.length + " written by the ship ritual or opened first by a stranger, and " +
+                       GIT_CONFIG.length + " git files that only work where they are. THE THREE CHANGELOGS WENT " +
+                       "TO docs/ THIS ROUND at Keith's word; nothing else here can leave without breaking a " +
+                       "check in this same file");
+    ok("...and the old ceiling of twelve is recorded as UNMEETABLE rather than quietly dropped",
+       JUSTIFIED.size > 12,
+       JUSTIFIED.size + " files are required by name against a ceiling that was 12. A number that cannot be " +
+       "satisfied by any correct tree is not a strict check, it is a permanently red one -- and a gate that is " +
+       "always red teaches everybody to stop reading it, which is how this one went unread for hundreds of " +
+       "versions with a REAL finding inside it (two unprotected launchers)");
 
     ok("...and README, BACKLOG and TODO stayed, which is not an oversight",
        ["README.md", "BACKLOG.md", "TODO.md"].every((f) => loose.includes(f)),
