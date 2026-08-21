@@ -148,4 +148,6 @@ export const discoveryDevice = {
     //
     // NEGATIVE R-SQUARED IS THE HONEST SHAPE OF THE ANSWER: the best fit is WORSE than predicting the mean,
     // which is what "there is nothing here" looks like as a number rather than as a flag.
-    plantMode: "nolaw", plantFlips: "r2Val", plantKind: "knob" };
+    plantMode: "nolaw", plantFlips: "r2Val", plantKind: "knob",
+    plantIdeal: 1, plantIdealWhy:
+        "r2Val is a coefficient of determination, so a law that fits perfectly gives exactly 1 -- not 0. The nolaw arm gives -0.105, WORSE THAN PREDICTING THE MEAN, and the exponent stops being computable" };

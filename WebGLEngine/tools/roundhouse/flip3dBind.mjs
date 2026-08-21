@@ -262,6 +262,8 @@ export const flip3dDevice = {
     // returns mode "hydrostatic" and the front door still leads with it. ***
     modes: FLIP3D_MODES,
     plantMode: "flatdivergence", plantFlips: "worstRel", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "worstRel is the worst relative anisotropy across directions, and an isotropic solve gives 0 exactly; flatdivergence takes it 0 -> 0.347 with every directional component going nonzero together",
     name: "flip3d-hydrostatic",
     observables: FLIP3D_OBSERVABLES,
     build: buildFlip3D,

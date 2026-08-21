@@ -104,6 +104,8 @@ export const mpmTransferDevice = {
     modes: MPM_MODES,
     // "conserve" is FIRST so the mode-plant contract compares the plant against the mode that owns the keys.
     plantMode: "pic", plantFlips: "angularLostFrac", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "angularLostFrac is the fraction of angular momentum lost in the particle-to-grid transfer, ideally 0 for an APIC-style conserving transfer; PIC drops the affine term and loses 25.5 percent. NOTE: linearErr actually IMPROVES under the plant (1.65e-15 -> 9.55e-16) because PIC is more damped, which is why the side-channel is reported and never promoted to a verdict",
     name: "mpm-apic-transfer", observables: MPM_OBSERVABLES,
     build: buildMpmTransfer, defaults: mpmDefaults,
 };

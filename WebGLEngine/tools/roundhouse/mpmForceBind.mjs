@@ -91,6 +91,8 @@ export const mpmForceDevice = {
     modes: MPMFORCE_MODES,
     // "thirdlaw" is FIRST so the contract compares the plant against the mode that owns the identity.
     plantMode: "brokenstencil", plantFlips: "netForce", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "netForce is the sum of internal forces over a closed body, identically 0 by Newton's third law; a broken stencil takes it 7.94e-15 -> 5.02",
     name: "mpm-internal-forces", observables: MPMFORCE_OBSERVABLES,
     build: buildMpmForce, defaults: mpmForceDefaults,
 };

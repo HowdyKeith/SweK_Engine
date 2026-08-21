@@ -152,6 +152,8 @@ export const gyroscopeDevice = {
     plantKind: "mode",
     plantMode: "sabotage",
     plantFlips: "precessed",
+    plantIdeal: 1, plantIdealWhy:
+        "precessed is the claim itself as a 0/1: a gyroscope under torque MUST precess, so 1 is the ideal and the sabotage arm's 0 is the claim failing outright, with rateMeasured going -2.987e-1 -> 0 beside it",
     name: "gyroscopic-precession",
     modes: GYRO_MODES,
     observables: GYRO_OBSERVABLES,

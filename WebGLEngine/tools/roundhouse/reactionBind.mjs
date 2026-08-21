@@ -143,5 +143,7 @@ export const reactionDevice = {
     // `dkFromCritical` and NOT `monotone` or `nearest` -- both of those are blind to this plant, and the
     // header above says why. 0.34456 -> 0.048136, finite in both arms, which is what probeModePlant requires.
     plantMode: "seeded", plantFlips: "dkFromCritical", plantKind: "knob",
+    plantDirectionRefused:
+        "DIRECTION IS THE WRONG TEST FOR THIS PLANT, AND THAT IS THE POINT OF IT. The seeded arm takes dkFromCritical 0.34456 -> 0.048136, which is CLOSER to critical -- tidier, not worse -- because the plant smuggles the answer into the initial condition and the winner then sits on the quantisation floor at every B. A plant that produces the more attractive number cannot be read by |planted - ideal| > |honest - ideal| in either direction, and declaring an ideal here would be picking a number because it makes the wall pass. WHAT ACTUALLY CATCHES IT is the ratio clause this device's gate already pairs with the observable -- nearest < firstDk / 5, reading 0.048136 < 0.0096 and failing -- and the header above records that `monotone` and `nearest` alone are both blind to it. The plant is real and verified; the DIRECTION probe is not what verifies it",
 };
 export default reactionDevice;

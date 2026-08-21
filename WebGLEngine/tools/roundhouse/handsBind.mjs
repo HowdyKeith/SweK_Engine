@@ -328,6 +328,8 @@ export const handsDevice = {
     // DEAD -- which is what mpmrefine reads today and what v3845 had to reorder flip3d to avoid.
     modes: HANDS_MODES,
     plantMode: "flatdistance", plantFlips: "rigidDisagreements", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "rigidDisagreements counts poses where a rigid transform is not reproduced, ideally 0 across all 256 swept; flatdistance produces 20, and it is specifically the OUT-OF-PLANE ones that break (20) while inPlaneDisagreements stays 0 -- which is what a flattened distance would do",
     name: "hands-gesture-invariance",
     observables: HANDS_OBSERVABLES,
     build: buildHands,

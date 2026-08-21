@@ -138,6 +138,8 @@ export function buildVaporize(hyp, base = {}) {
 export const vaporizeDevice = {
     modes: VAPORIZE_MODES,
     plantMode: "celsius", plantFlips: "routeGap", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "routeGap is the fractional gap between two routes to the same vapour-pressure ratio, ideally 0 since both compute one physical quantity; feeding Celsius where Kelvin is required takes it 1.59e-2 -> 7.28e-1",
     name: "vaporize-gasification",
     observables: VAPORIZE_OBSERVABLES,
     build: buildVaporize,

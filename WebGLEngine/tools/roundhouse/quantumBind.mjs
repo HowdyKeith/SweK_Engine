@@ -178,4 +178,6 @@ export const quantumDevice = {
     // DISTINCT answer. *** A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE. ***
     modes: QUANTUM_MODES,
     plantMode: "stencil", plantFlips: "numericEdgeWorst", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "numericEdgeWorst is the residual of the numeric band edges against the analytic ones, ideally 0; the wrong stencil takes it 3.57e-3 -> 5.45e+4 while the analytic quantities beside it do not move at all",
     name: "schrodinger-1d", observables: QUANTUM_OBSERVABLES, build: buildQuantum, defaults: quantumDefaults };

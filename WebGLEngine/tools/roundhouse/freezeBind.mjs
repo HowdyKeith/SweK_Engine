@@ -157,6 +157,8 @@ export const freezeDevice = {
     // *** controlFieldMirror, and "control" is modes[0] so the contract has it in both arms. The FRONT-based
     // observables are BLIND to this plant and that is the point -- see the header. ***
     plantMode: "slowfreeze", plantFlips: "controlFieldMirror", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "controlFieldMirror is the disagreement between the freeze field and the mirrored melt field, ideally 0 because the Stefan problem is symmetric under the swap; slowfreeze takes it 3.13e-14 -> 6.35e-5",
     name: "freeze-solidification",
     observables: FREEZE_OBSERVABLES,
     build: buildFreeze,

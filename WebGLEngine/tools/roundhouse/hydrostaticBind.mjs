@@ -102,6 +102,8 @@ export const hydrostaticDevice = {
     // *** `densityMismatch` AND NOT `retained`: see the header. retained is an END STATE and swallows a 7x
     // error in the Tait coefficient. ONE PLANT TESTS ONE CLAIM, and it has to test one that can be seen.
     plantMode: "surfacedensity", plantFlips: "densityMismatch", plantKind: "reader",
+    plantIdeal: 0, plantIdealWhy:
+        "densityMismatch is a fractional disagreement between packed and rest density, ideally 0; reading surface density instead of the interior takes it 2.35e-3 -> 2.62e-2",
     name: "sph-hydrostatic-column", observables: HYDROSTATIC_OBSERVABLES, build: buildHydrostatic,
     defaults: ({ mode } = {}) => ({ mode: HYDROSTATIC_MODES.includes(mode) ? mode : "matched", config: { ...DEF } }),
 };

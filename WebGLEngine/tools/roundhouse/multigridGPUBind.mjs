@@ -257,6 +257,8 @@ export const multigridGPUDevice = {
     // those move together under a change of test vector and their AGREEMENT is the property, which is exactly
     // why `window` mode's pair could not be declared.
     plantMode: "narrowwindow", plantFlips: "adjointWorst", plantKind: "knob",
+    plantIdeal: 0, plantIdealWhy:
+        "adjointWorst is the worst restriction/prolongation adjoint defect over the level pairs, identically 0 for a matched pair; narrowing the window takes it 7.19e-16 -> 2.93e-1",
 };
 
 // ---- front door ------------------------------------------------------------------------------------------

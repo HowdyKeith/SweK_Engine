@@ -121,4 +121,6 @@ export const spatialAgreementDevice = {
     // because a superset misses nothing -- and a declaration pointed at an observable that does not move is
     // the dead declaration v3849 and v3852 each cost a round to.
     plantMode: "supersetbox", plantFlips: "boxExtraPairs", plantKind: "knob",
+    plantIdeal: 0, plantIdealWhy:
+        "boxExtraPairs counts pairs the box query returns that the accounted corner set does not explain, so an agreeing broadphase has exactly 0; supersetbox leaves 10168 unaccounted while boxMissingPairs stays 0 -- the plant adds false pairs rather than losing true ones",
 };

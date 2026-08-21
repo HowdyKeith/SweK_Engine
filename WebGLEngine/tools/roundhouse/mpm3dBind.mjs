@@ -92,6 +92,8 @@ export async function buildMpm3d(hyp, base = {}) {
 export const mpm3dDevice = {
     modes: MPM3D_MODES,
     plantMode: "pic", plantFlips: "angularWorstFrac", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "angularWorstFrac is the worst-axis angular momentum loss in 3D transfer, ideally 0 for the same reason as mpmtransfer; PIC loses 55.6 percent, and linearErr again improves under the plant",
     name: "mpm-3d-apic-transfer", observables: MPM3D_OBSERVABLES,
     build: buildMpm3d, defaults: mpm3dDefaults,
 };

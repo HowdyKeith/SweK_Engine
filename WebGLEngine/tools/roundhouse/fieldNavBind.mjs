@@ -102,4 +102,6 @@ export const fieldNavDevice = {
     // a walk that took six times the necessary route"). `arrived` and `looped` are booleans and are
     // bit-identical under this plant anyway: the walker does not know its score changed.
     plantMode: "crowflight", plantFlips: "excessFrac", plantKind: "method",
+    plantIdeal: 0, plantIdealWhy:
+        "excessFrac is the walked path's excess over the OPTIMAL cost, so a policy that matches the optimum has 0; crowflight substitutes a straight-line lower bound that ignores obstacles and the excess blows to 5.35 against a path that did not change",
 };

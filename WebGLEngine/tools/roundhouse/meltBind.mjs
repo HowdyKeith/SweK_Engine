@@ -126,6 +126,8 @@ export const meltDevice = {
     // *** moltenFraction, NOT frontRelErr: the naive arm has no front, so frontRelErr is null there and the
     // census would read this device DECLARED BUT DEAD. See the header. ***
     plantMode: "naive", plantFlips: "moltenFraction", plantKind: "mode",
+    plantNull: 1, plantNullWhy:
+        "naiveMoltenFraction is the device's OWN recorded value for the naive answer -- everything above the melting point counted as molten, which is 1 by construction -- and it reads 1 in BOTH arms. So 1 is the null this plant collapses onto, not an ideal it moves away from: the honest front-tracking arm sits at 0.3075 and the naive arm lands exactly on the device's own wrong reference, while frontRelErr goes null because the naive arm has no front to grade at all",
     name: "melt-stefan",
     observables: MELT_OBSERVABLES,
     build: buildMelt,

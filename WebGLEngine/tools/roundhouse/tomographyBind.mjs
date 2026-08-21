@@ -146,6 +146,8 @@ export const ctDevice = {
     // 74.55 across 30 / 60 / 120 / 240) where the honest run is flat to 1.68e-3.
     modes: ["parallel", "fan", "gain", "unweighted"], name: "ct-reconstruction-bench",
     plantMode: "unweighted", plantFlips: "absoluteGain", plantKind: "mode",
+    plantIdeal: 1, plantIdealWhy:
+        "absoluteGain is a RATIO of reconstructed to true attenuation, so correct absolute scaling is exactly 1 -- not 0. The unweighted arm drops the ramp filter and the gain runs to 37.2, and fbpCorr stops being computable at all",
     observables: CT_OBSERVABLES, build: buildCT, defaults: ctDefaults };
 
 /** Least-squares gain and offset of a reconstruction against the truth we own: recon ~ gain*truth + offset. */

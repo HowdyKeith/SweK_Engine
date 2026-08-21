@@ -84,6 +84,8 @@ export const entropyDevice = {
     modes: ENTROPY_MODES,
     // "coding" is FIRST so the mode-plant contract compares the plant against the mode that owns the band.
     plantMode: "mergelargest", plantFlips: "excessOverH", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "excessOverH is the code's expected length minus the source entropy; Huffman's bound is an excess below 1 bit and the ideal is 0, reached only by a dyadic source. Merging the LARGEST nodes instead of the smallest takes it 2.01e-2 -> 1.94, straight through the bound",
     name: "shannon-source-coding", observables: ENTROPY_OBSERVABLES,
     build: buildEntropy, defaults: entropyDefaults,
 };

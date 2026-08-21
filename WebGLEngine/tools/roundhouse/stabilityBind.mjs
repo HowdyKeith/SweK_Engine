@@ -84,6 +84,8 @@ export const stabilityDevice = {
     modes: STABILITY_MODES,
     // "response" is FIRST so the mode-plant contract compares the plant against the mode that owns the ladder.
     plantMode: "deafknob", plantFlips: "spanAcrossViscosity", plantKind: "mode",
+    plantNull: 1, plantNullWhy:
+        "spanAcrossViscosity is the RATIO of response across the swept viscosity, so a knob that does nothing gives exactly 1 -- the null, not an ideal. A responsive knob is merely FAR from 1 (7.90 here) with no particular target, which is why this declares the value the plant COLLAPSES ONTO rather than one it moves away from",
     name: "sph-energy-stability", observables: STABILITY_OBSERVABLES,
     build: buildStability, defaults: stabilityDefaults,
 };

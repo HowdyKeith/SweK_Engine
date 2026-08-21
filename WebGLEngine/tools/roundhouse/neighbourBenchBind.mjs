@@ -99,6 +99,8 @@ export async function buildNbench(hyp, base = {}) {
 export const neighbourBenchDevice = {
     modes: NBENCH_MODES,
     plantMode: "boxhits", plantFlips: "differingLists", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "differingLists counts neighbour lists on which two methods disagree, so agreement is exactly 0 of 2500; boxhits disagrees on ALL 2500, and identicalLists falls 2500 -> 0 as the paired positive statement",
     name: "sph-neighbour-bench", observables: NBENCH_OBSERVABLES,
     build: buildNbench, defaults: nbenchDefaults,
 };

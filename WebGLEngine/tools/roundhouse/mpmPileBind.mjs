@@ -78,6 +78,8 @@ export const pileDevice = {
     modes: PILE_MODES,
     // "friction" is FIRST so the contract compares the plant against the mode that owns the trend.
     plantMode: "deafangle", plantFlips: "spread", plantKind: "mode",
+    plantNull: 1, plantNullWhy:
+        "spread is the ratio of pile width at two friction angles, exactly 1 when the angle is ignored; the honest arm gives 1.31, and widthAtLow and widthAtHigh both become 21.362 under the plant",
     name: "mpm-pile-friction", observables: PILE_OBSERVABLES,
     build: buildPile, defaults: pileDefaults,
 };

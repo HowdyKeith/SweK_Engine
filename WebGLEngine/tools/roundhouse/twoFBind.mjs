@@ -75,6 +75,8 @@ export const twoFDevice = {
     // inletDriftFrac; the plant is a variant of inlet, so inlet is its correct baseline (v3762's lesson).
     modes: ["inlet", "envelope", "nofixedinlet"],
     plantMode: "nofixedinlet", plantFlips: "inletDriftFrac", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "inletDriftFrac is the fractional drift of the inlet condition the solver is supposed to hold fixed, ideally 0; releasing it takes the drift 1.45e-3 -> 1.02e-2 and kills vortex shedding, liftAmplitude 2.27e-2 -> 6.2e-12",
     name: "lbm-two-frequency-shedding", observables: TWOF_OBSERVABLES, build: buildTwoF,
     defaults: ({ mode } = {}) => ({ mode: mode || "inlet", config: { ...DEF } }),
 };
