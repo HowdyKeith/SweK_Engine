@@ -164,13 +164,34 @@ say("\n3. server.html IS WIRED THE WAY THE TWO MODULES EXPECT");
 {
     ok("!! the stage has an info column and no rail", /id="stageInfo"/.test(SRV) && !/id="stageRail"/.test(SRV),
         "the 232px scaled rail is gone: with the dials hidden there is nothing narrow to make room for");
-    ok("!! *** THE PANEL BOX IS A FIXED WIDTH, LEFT-JUSTIFIED ***",
-        /id="stageBody" style="flex:0 0 460px;max-width:460px/.test(SRV),
-        "flex:0 0 460px with a matching max-width. A basis alone still GROWS under flex-grow and a max-width " +
-        "alone still SHRINKS; Keith's complaint is that the view moves, so it must do neither");
-    ok("...and 460 is #rightStack's own basis rather than a number picked here",
+    // *** v3925 -- THIS ASSERTION WAS TESTING A DECISION THAT WAS DELIBERATELY REVERSED AT v3823, AND IT HAS
+    // BEEN RED EVER SINCE WITHOUT ANYBODY SEEING IT. *** It required #stageBody to be flex:0 0 460px. server.html
+    // quotes the reason it is not, in Keith's words on the rig: "the text info panel needs to be hard set to 4
+    // times wider and always set to that, and the links panel on the left needs to fill that space ... so all
+    // link panels are set to that width too." v3823 flipped the roles -- THE INFO COLUMN BECAME THE HARD-SET ONE
+    // and #stageBody grows into what is left.
+    //
+    // THE CONCERN DID NOT CHANGE, ONLY WHICH BOX CARRIES IT: the view must not move between drawers. A basis
+    // alone still GROWS under flex-grow and a max-width alone still SHRINKS, so the hard-set column needs both,
+    // and #stageInfo pins all three (basis, max, min). Because that column is fixed inside a fixed-width parent,
+    // every links panel still resolves to ONE width -- which is the property the old 460 was buying.
+    //
+    // A gate edited to agree with whatever shipped is this tree's named failure, so the evidence for moving it
+    // is stated rather than assumed: the page carries the request verbatim, the change is dated and reasoned in
+    // place, and the invariant asserted below is the SAME invariant, pinned to the box that now owns it.
+    ok("!! *** THE INFO COLUMN IS THE HARD-SET BOX, AND IT NEITHER GROWS NOR SHRINKS ***",
+        /id="stageInfo" style="flex:0 0 360px;max-width:360px;min-width:360px/.test(SRV),
+        "flex:0 0 360px with a matching max-width AND min-width. A basis alone still GROWS under flex-grow and " +
+        "a max-width alone still SHRINKS; Keith's complaint is that the view moves, so it must do neither -- " +
+        "and since v3823 the box that must not move is the INFO column, not the panel");
+    ok("...and the panel box fills whatever the fixed column leaves, rather than being pinned itself",
+        /id="stageBody" style="flex:1 1 auto;min-width:0;/.test(SRV),
+        "min-width:0 is not decoration: without it a flex child refuses to shrink below its content and the " +
+        "row silently stops responding -- the same rule canvasFill enforces on the lab pages");
+    ok("...and 460 is still #rightStack's own basis, which is where the panels were authored",
         /id="rightStack"[^>]*flex:1 1 460px/.test(SRV),
-        "the panels were authored inside that column, so on stage they are the width they were designed at");
+        "the panels were authored inside that column; on stage they now land near that width because a fixed " +
+        "360 info column leaves about that much, rather than because a second copy of 460 was typed here");
     ok("!! the stage is told to put the rail in the info column", /railHost:info/.test(SRV));
     ok("!! *** THE GAUGES ARE HIDDEN BY RAISING THE TAB, NOT BY REACHING FOR THEM ***",
         /gi\.pinInfo\(true\)/.test(SRV) && !/dialsRobot"\)\.style\.display/.test(SRV),

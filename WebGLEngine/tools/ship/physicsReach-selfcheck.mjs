@@ -134,7 +134,33 @@ console.log("\n3. A DOOR THAT NAMES A MODULE MUST NAME ONE THAT EXISTS");
     }
     // The sources are already comment-stripped, so a path quoted in prose -- including another project's --
     // cannot reach this scan. That was a real false positive: see the header on heidler.
-    const ghosts = [...named].filter((rel) => !fs.existsSync(path.join(ENG, rel)) && !/-selfcheck\./.test(rel)).sort();
+    //
+    // *** v3925 -- AND A SECOND FALSE POSITIVE, OF THE OPPOSITE KIND: A FIXTURE'S INVENTED NAME. ***
+    // roundhouseSrc concatenates EVERY .mjs under tools/roundhouse, selfchecks included, and
+    // officeDispatch-selfcheck builds a synthetic frontier out of "physics/alpha.mjs" and "physics/beta.mjs" --
+    // placeholders for testing a dispatcher, never meant to exist. They were reported as GHOSTS, which is the
+    // headline this section reserves for a device naming a module that is not there.
+    //
+    // The guard already in place excludes "-selfcheck" IN THE REFERENCED PATH; what was needed is the
+    // REFERENCING FILE. A name that appears ONLY inside a selfcheck is a fixture, not a door -- and the doors
+    // are what this section is about, as its own assertion says: "named by a device, a row or a page". So a
+    // ghost must be named by at least one file that is not a selfcheck. THE CHECK IS NOT WEAKENED: a real module
+    // path invented by a real device still has no selfcheck to hide behind, and section 4 drives exactly that.
+    const fixtureOnly = new Set();
+    {
+        const realRefs = new Set();
+        for (const f of walk(path.join(ENG, "tools/roundhouse")).filter((p) => p.endsWith(".mjs") && !/-selfcheck\.mjs$/.test(p))) {
+            for (const m of stripComments(rd(f)).matchAll(/physics\/[A-Za-z0-9_\/-]+\.(?:mjs|js)/g)) realRefs.add(m[0]);
+        }
+        for (const src of [instrumentsSrc, pagesSrc]) {
+            for (const m of src.matchAll(/physics\/[A-Za-z0-9_\/-]+\.(?:mjs|js)/g)) realRefs.add(m[0]);
+        }
+        for (const n of named) if (!realRefs.has(n)) fixtureOnly.add(n);
+    }
+    const ghosts = [...named].filter((rel) => !fs.existsSync(path.join(ENG, rel)) && !/-selfcheck\./.test(rel) && !fixtureOnly.has(rel)).sort();
+    const excused = [...named].filter((rel) => !fs.existsSync(path.join(ENG, rel)) && fixtureOnly.has(rel)).sort();
+    if (excused.length) say("named ONLY inside a selfcheck, so fixtures rather than doors: " + excused.join(", ") +
+        " -- officeDispatch-selfcheck invents a frontier to test a dispatcher against");
     ok("!! every physics module named by a device, a row or a page exists on disk", ghosts.length === 0,
         ghosts.length ? "GHOSTS: " + ghosts.join(", ") : named.size + " distinct module paths named across the three doors, all present");
 }
