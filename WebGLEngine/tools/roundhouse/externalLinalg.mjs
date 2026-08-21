@@ -23,7 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { rank, det, ctrbMatrix, obsvMatrix } from "../../physics/control/controlStateSpace.mjs";
+import { rank, det, solve, transpose, ctrbMatrix, obsvMatrix } from "../../physics/control/controlStateSpace.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ANSWER_FILE = path.join(HERE, "external-linalg-answers.json");
@@ -39,6 +39,9 @@ export const EPS = (() => { let e = 1; while (1 + e / 2 !== 1) e /= 2; return e;
  */
 export function problems() {
     const out = [];
+    // b is an INPUT, not a reference value -- the answer being graded is x, and that comes from LAPACK. Typing b
+    // is therefore not the thing v3520 forbids; typing x would be.
+    const pushSolve = (name, A, b) => out.push({ name: name + ".solve", M: A, b, claim: "solve" });
     const push = (name, A, B, C) => {
         if (B) out.push({ name: name + ".ctrb", M: ctrbMatrix(A, B), claim: "rank" });
         if (C) out.push({ name: name + ".obsv", M: obsvMatrix(A, C), claim: "rank" });
@@ -67,6 +70,20 @@ export function problems() {
     // is the one that matters -- not a matrix invented to trip a checker. THE ROW THAT DOES THE CATCHING IS
     // uncontrollable-2in.ctrb; its obsv is rectangular too and is blind, which is stated rather than implied.
     push("uncontrollable-2in", [[1, 0, 0], [0, 2, 0], [0, 0, 3]], [[1, 0], [0, 1], [0, 0]], [[1, 0, 0], [0, 1, 0]]);
+    // *** v3936 -- SOLVE IS THE ONLY CLAIM HERE THAT IS NOT TRANSPOSE-INVARIANT, AND THAT IS WHY IT EXISTS. ***
+    // rank and det cannot see a row/column-major mixup on a square matrix, because both are equal for A and its
+    // transpose; the whole set was blind to it until one rectangular rank-deficient problem was added above. Ax=b
+    // is different: transposing A changes x. So solve puts the reference's column-major handling under test on
+    // SQUARE problems, where the guard previously rested on a single rectangular row.
+    //
+    // *** BUT ONLY IF A IS NOT SYMMETRIC -- WHICH IS THE SAME BLINDNESS ONE LEVEL DOWN. *** For symmetric A the
+    // transpose IS A and solve returns the identical vector: measured at exactly 0.000e+0 difference for diag(1,2)
+    // and for hilbert4. Every other square matrix in this set is symmetric or singular, so a solve claim on any of
+    // them would have looked like coverage and tested nothing. Both matrices below are NON-SYMMETRIC on purpose and
+    // the gate ASSERTS that rather than trusting this comment -- a later round that "tidies" one into a symmetric
+    // form would otherwise silently retire the check.
+    pushSolve("jordan", [[2, 1, 0], [0, 2, 1], [0, 0, 2]], [1, -2, 3]);            // det 8,  max|x-x_T| = 8.75e-1
+    pushSolve("companion", [[0, 1, 0], [0, 0, 1], [-6, -11, -6]], [1, -2, 3]);     // det -6, max|x-x_T| = 3.50e+0
     // A deliberately ill-conditioned symmetric matrix: the case where "agrees to 1e-12" is a claim about the
     // PROBLEM rather than about either solver, and where a fixed tolerance would be dishonest.
     push("hilbert4", hilbert(4), null, null);
@@ -81,10 +98,16 @@ export function hilbert(n) {
 
 /** What this engine says, computed here, so the comparison has a left-hand side even with no Mac in the room. */
 export function ours() {
-    return problems().map((p) => ({
-        name: p.name, claim: p.claim, rows: p.M.length, cols: p.M[0].length,
-        value: p.claim === "rank" ? rank(p.M) : det(p.M),
-    }));
+    return problems().map((p) => {
+        const base = { name: p.name, claim: p.claim, rows: p.M.length, cols: p.M[0].length };
+        if (p.claim === "solve") return { ...base, values: solve(p.M, p.b) };
+        return { ...base, value: p.claim === "rank" ? rank(p.M) : det(p.M) };
+    });
+}
+
+/** True when a solve problem's matrix could actually detect a transposed reference. */
+export function solveIsDiscriminating(p) {
+    return p.claim === "solve" && JSON.stringify(p.M) !== JSON.stringify(transpose(p.M));
 }
 
 /**
@@ -101,6 +124,10 @@ export function problemsText() {
     for (const p of ps) {
         L.push(p.name + " " + p.claim + " " + p.M.length + " " + p.M[0].length);
         for (const row of p.M) L.push(row.map((x) => x.toPrecision(17)).join(" "));
+        // A solve block carries ONE EXTRA LINE: the right-hand side, rows long. The claim word already on the
+        // header line tells the C reader whether to expect it, so nothing has to be counted or guessed -- the
+        // format stays something printf writes and fscanf reads, which is the whole reason it is not JSON.
+        if (p.claim === "solve") L.push(p.b.map((x) => x.toPrecision(17)).join(" "));
     }
     return L.join("\n") + "\n";
 }
@@ -124,7 +151,12 @@ export function writeProblems(file = PROBLEM_FILE) {
  */
 export function toleranceFor(p) {
     const n = Math.max(p.rows || 0, p.cols || 0);
-    const scale = Math.max(1, Math.abs(p.value) || 1);
+    // A solve answer is a VECTOR, and its scale is its largest component -- not its first, and not one. Using the
+    // first component would make the tolerance depend on which corner of the answer happened to be small.
+    const magnitude = p.claim === "solve"
+        ? Math.max(...(p.values || [0]).map(Math.abs))
+        : Math.abs(p.value) || 1;
+    const scale = Math.max(1, magnitude || 1);
     return n * scale * EPS * 64;   // 64 = a generous conditioning allowance, and it is a FACTOR not a floor
 }
 
@@ -170,12 +202,26 @@ export function grade(answerFile = ANSWER_FILE) {
         const a = byName.get(o.name + "|" + o.claim);
         if (!a) { rows.push({ ...o, external: null, agrees: false, missing: true }); continue; }
         const tol = toleranceFor(o);
-        const agrees = o.claim === "rank" ? a.value === o.value : Math.abs(a.value - o.value) <= tol;
-        rows.push({ ...o, external: a.value, tol, agrees, missing: false, exact: o.claim === "rank" });
+        let agrees, external;
+        if (o.claim === "solve") {
+            // EVERY COMPONENT MUST AGREE. A vector comparison that checked a norm, or the first entry, would pass
+            // a reference that got one coordinate wrong -- and a transposed solve typically moves some components
+            // far more than others, so the loose version would be blind exactly where this claim earns its keep.
+            external = Array.isArray(a.values) ? a.values : null;
+            agrees = external !== null && Array.isArray(o.values) && external.length === o.values.length
+                     && o.values.every((v, i) => Math.abs(external[i] - v) <= tol);
+        } else {
+            external = a.value;
+            agrees = o.claim === "rank" ? a.value === o.value : Math.abs(a.value - o.value) <= tol;
+        }
+        rows.push({ ...o, external, tol, agrees, missing: false, exact: o.claim === "rank" });
     }
     const bad = rows.filter((r) => !r.agrees);
     return { state: bad.length ? "disagrees" : "agrees", file: answerFile, rows, disagreements: bad };
 }
+
+/** A vector answer has to print as a vector; String([1,2]) reads "1,2" and hides its own shape. */
+const fmt = (v) => Array.isArray(v) ? "[" + v.map((x) => Number(x.toPrecision(8))).join(", ") + "]" : String(v);
 
 export function reportLines() {
     const g = grade();
@@ -183,8 +229,8 @@ export function reportLines() {
     L.push("  state: " + g.state + (g.why ? "   " + g.why : ""));
     for (const r of g.rows) {
         L.push("  " + (r.agrees ? "AGREE " : "DIFFER") + "  " + r.name.padEnd(26) + r.claim.padEnd(6) +
-               " ours=" + r.value + (r.missing ? "   (no external answer)" :
-               "  lapack=" + r.external + (r.exact ? "   EXACT INTEGER" : "   tol=" + r.tol.toExponential(2))));
+               " ours=" + fmt(r.value !== undefined ? r.value : r.values) + (r.missing ? "   (no external answer)" :
+               "  lapack=" + fmt(r.external) + (r.exact ? "   EXACT INTEGER" : "   tol=" + r.tol.toExponential(2))));
     }
     if (g.state === "absent") L.push("  Run tools/roundhouse/external-linalg.c on a Mac to produce the answers. See its header.");
     return L;

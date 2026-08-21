@@ -50,6 +50,8 @@ extern void dgesvd_(char *jobu, char *jobvt, lapack_int_t *m, lapack_int_t *n, d
                     double *work, lapack_int_t *lwork, lapack_int_t *info);
 extern void dgetrf_(lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *lda,
                     lapack_int_t *ipiv, lapack_int_t *info);
+extern void dgesv_(lapack_int_t *n, lapack_int_t *nrhs, double *a, lapack_int_t *lda,
+                   lapack_int_t *ipiv, double *b, lapack_int_t *ldb, lapack_int_t *info);
 #define LINALG_SOURCE "reference LAPACK (Netlib) via external-linalg.c"
 #endif
 
@@ -80,6 +82,18 @@ static int rank_by_svd(const double *A, int m, int n, double *s1_out) {
     return r;
 }
 
+// v3936 -- Ax = b, AND IT IS THE ONLY CLAIM IN THIS FILE THAT CAN SEE A TRANSPOSE. rank and det are equal for A
+// and A-transpose, so on a square matrix they cannot tell whether to_col_major above did its job. This one can:
+// solving A-transpose x = b gives a different x. dgesv overwrites its right-hand side with the solution.
+static int solve_by_lu(const double *A, const double *b, int n, double *x) {
+    double a[MAXN * MAXN];
+    lapack_int_t N = n, nrhs = 1, lda = n, ldb = n, ipiv[MAXN], info = 0;
+    memcpy(a, A, sizeof(double) * n * n);
+    memcpy(x, b, sizeof(double) * n);
+    dgesv_(&N, &nrhs, a, &lda, ipiv, x, &ldb, &info);
+    return info == 0;
+}
+
 static double det_by_lu(const double *A, int n) {
     double a[MAXN * MAXN];
     lapack_int_t N = n, lda = n, ipiv[MAXN], info = 0;
@@ -107,9 +121,21 @@ int main(int argc, char **argv) {
         int m = 0, n = 0;
         if (fscanf(f, "%127s %31s %d %d", name, claim, &m, &n) != 4) { fprintf(stderr, "bad block %d\n", p); return 2; }
         if (m > MAXN || n > MAXN) { fprintf(stderr, "matrix too large\n"); return 2; }
-        double rowmaj[MAXN * MAXN], colmaj[MAXN * MAXN];
+        double rowmaj[MAXN * MAXN], colmaj[MAXN * MAXN], rhs[MAXN], x[MAXN];
         for (int i = 0; i < m * n; i++) if (fscanf(f, "%lf", &rowmaj[i]) != 1) { fprintf(stderr, "short matrix\n"); return 2; }
+        // A solve block carries one extra line: the right-hand side, m long. The claim word says so, so there is
+        // nothing to infer -- and reading it in the wrong order would desynchronise every block after this one.
+        if (strcmp(claim, "solve") == 0)
+            for (int i = 0; i < m; i++) if (fscanf(f, "%lf", &rhs[i]) != 1) { fprintf(stderr, "short rhs\n"); return 2; }
         to_col_major(rowmaj, colmaj, m, n);
+        if (strcmp(claim, "solve") == 0) {
+            if (m != n) { fprintf(stderr, "solve needs a square matrix\n"); return 2; }
+            if (!solve_by_lu(colmaj, rhs, n, x)) { fprintf(stderr, "dgesv failed on %s\n", name); return 2; }
+            printf("  {\"name\": \"%s\", \"claim\": \"solve\", \"values\": [", name);
+            for (int i = 0; i < n; i++) printf("%s%.17g", i ? ", " : "", x[i]);
+            printf("]}%s\n", (p + 1 < count) ? "," : "");
+            continue;
+        }
         double value = 0.0;
         if (strcmp(claim, "rank") == 0) { double s1; value = (double)rank_by_svd(colmaj, m, n, &s1); }
         else if (strcmp(claim, "det") == 0) { value = (m == n) ? det_by_lu(colmaj, n) : NAN; }

@@ -13,6 +13,8 @@
   {"name": "uncontrollable-2in.ctrb", "claim": "rank", "value": 2},
   {"name": "uncontrollable-2in.obsv", "claim": "rank", "value": 2},
   {"name": "uncontrollable-2in.A", "claim": "det", "value": 6},
+  {"name": "jordan.solve", "claim": "solve", "values": [1.375, -1.75, 1.5]},
+  {"name": "companion.solve", "claim": "solve", "values": [-0.33333333333333331, 1, -2]},
   {"name": "hilbert4.A", "claim": "det", "value": 1.6534391534393001e-07}
  ]
 }

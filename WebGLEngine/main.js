@@ -4316,9 +4316,45 @@
 // most. A NOTE THAT ASSERTS THE STATE OF THE WORLD WILL EVENTUALLY LIE ABOUT IT. It asks the grader now; all three
 // branches -- agrees, absent, stale -- driven.
 //
-// NOT DONE: cholesky and solve. The module's header names four things the lab rolls by hand and this key grades
-// two. solve is the one worth having next, because unlike rank and det IT IS NOT TRANSPOSE-INVARIANT and would
-// make to_col_major load-bearing on square problems too.
+// =================================================================================================================
+// v3936 (third) -- solve LANDS, AND to_col_major IS LOAD-BEARING ON SQUARE PROBLEMS AT LAST.
+//
+// The previous section closed by naming solve as the thing worth having next, for one reason: rank and det are
+// EQUAL for A and its transpose, so on a square matrix neither can tell whether the reference got row/column
+// major right. The guard rested entirely on ONE rectangular rank-deficient row. Ax=b is different -- transpose A
+// and x moves -- so the reference's column-major handling is now under test on square problems too. Measured on
+// the plant: removing to_col_major used to move ONE row, and moves THREE now, TWO OF THEM SQUARE.
+//
+// *** AND THE SAME BLINDNESS EXISTS ONE LEVEL DOWN, WHICH IS THE PART WORTH REMEMBERING. *** For SYMMETRIC A the
+// transpose IS A and solve returns the identical vector -- measured at EXACTLY 0.000e+0 for diag(1,2) and for
+// hilbert4. Every other square matrix already in the set is symmetric or singular, so a solve claim on any of
+// them would have looked like coverage and tested nothing, which is precisely the failure this whole version has
+// been about. The two matrices chosen are non-symmetric on purpose, jordan and a companion form, and THE GATE
+// ASSERTS THE NON-SYMMETRY rather than trusting the comment: a later round that tidied one into a symmetric form
+// would otherwise retire the check in silence.
+//
+// The exchange format grew by ONE LINE per solve block -- the right-hand side -- and the claim word already on
+// the header tells the C reader whether to expect it, so nothing is counted or guessed. It stays something printf
+// writes and fscanf reads, which was always the argument against JSON on that side. b is an INPUT rather than a
+// reference value, so typing it is not what v3520 forbids; typing x would be. The comparison is EVERY COMPONENT,
+// not a norm and not the first entry: a transposed solve moves some coordinates far more than others, so the
+// loose version would be blind exactly where this claim earns its keep. Wrong length and wrong shape are refused
+// rather than coerced.
+//
+// AND ADDING A CLAIM TYPE BROKE A FIXTURE, WHICH IS HOW IT WAS FOUND. The gate built its answer fixtures by hand
+// as { name, claim, value }, correct while every claim was a scalar. solve made that silently DROP the vectors.
+// One fixture went red and said so. THE OTHER WENT GREEN FOR THE WRONG REASON: the omits-the-hard-problems check
+// asserts "disagrees" and was getting it because every solve row had lost its answer, not because the rank rows
+// were missing. Both now go through one shape-aware builder, and the right-reason version is verified by reading
+// WHICH claims disagree -- all rank, none solve. A fixture builder that must be updated in three places when a
+// claim is added will be updated in two.
+//
+// Four causes, four distinguishable states, driven in one pass: transpose removed -> DISAGREES (3 rows), key
+// removed -> ABSENT, right-hand side quietly edited -> STALE, honest -> AGREES.
+//
+// NOT DONE: cholesky. The module names four things the lab rolls by hand and this key now grades three. cholesky
+// wants a symmetric positive-definite problem and dpotrf, and it is the one claim where symmetry is the POINT
+// rather than the blindness -- so it needs its own reason to be non-vacuous, not this one's.
 // =================================================================================================================
 // =================================================================================================================
 // v3935 -- SEVENTEEN OF NINETEEN. singleSource FLAGGED TWENTY-ONE FILES AND EXACTLY ONE WAS THE DEFECT.

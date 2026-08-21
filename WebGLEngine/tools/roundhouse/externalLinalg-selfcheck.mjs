@@ -15,12 +15,23 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { grade, ours, problems, toleranceFor, EPS, writeProblemsText, ANSWER_FILE } from "./externalLinalg.mjs";
+import { grade, ours, problems, toleranceFor, EPS, writeProblemsText, ANSWER_FILE,
+         solveIsDiscriminating } from "./externalLinalg.mjs";
 import { ctrbMatrix, rank } from "../../physics/control/controlStateSpace.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (l) => console.log("  ----  " + l);
+// v3936 -- ONE PLACE THAT KNOWS THE SHAPE OF AN ANSWER. The fixtures below used to write { name, claim, value }
+// by hand, which was right while every claim was a scalar. Adding solve made that silently DROP the vectors: the
+// honest-reference fixture went red (correctly, and that is how this was found) and the omits-the-hard-problems
+// fixture went GREEN FOR THE WRONG REASON -- it was asserting "disagrees" and getting it because every solve row
+// had lost its answer, not because the rank rows were missing. A fixture builder that has to be updated in three
+// places when a claim type is added will be updated in two.
+const asAnswer = (o) => o.claim === "solve"
+    ? { name: o.name, claim: o.claim, values: o.values }
+    : { name: o.name, claim: o.claim, value: o.value };
+
 const tmp = (obj) => {
     const f = path.join(os.tmpdir(), "exlin-" + Math.random().toString(36).slice(2) + ".json");
     fs.writeFileSync(f, JSON.stringify(obj)); return f;
@@ -58,12 +69,12 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
 // ---- 3. THE GRADER CATCHES A WRONG ANSWER, AND THE INTEGER CLAIM GETS NO TOLERANCE ------------------------------
 {
     const truth = ours();
-    const good = tmp({ answers: truth.map((o) => ({ name: o.name, claim: o.claim, value: o.value })) });
+    const good = tmp({ answers: truth.map(asAnswer) });
     ok("!! an honest reference agrees across every problem", grade(good).state === "agrees",
         "if this failed, the two implementations disagree about something and THAT is the finding");
 
     const rk = truth.find((o) => o.claim === "rank");
-    const bad = tmp({ answers: truth.map((o) => (o === rk ? { ...o, value: o.value + 1 } : { name: o.name, claim: o.claim, value: o.value })) });
+    const bad = tmp({ answers: truth.map((o) => (o === rk ? { ...asAnswer(o), value: o.value + 1 } : asAnswer(o))) });
     const gb = grade(bad);
     ok("!! *** a rank off by ONE is a disagreement, with no tolerance to hide in ***",
         gb.state === "disagrees" && gb.disagreements.some((d) => d.name === rk.name),
@@ -71,11 +82,52 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
         "an accident of tolerance, but an integer agreeing across ELIMINATION and the SINGULAR VALUE SPECTRUM " +
         "cannot. That is why this comparison is worth more than the determinant one beside it.");
 
-    const missing = tmp({ answers: truth.filter((o) => o.claim !== "rank").map((o) => ({ name: o.name, claim: o.claim, value: o.value })) });
+    const missing = tmp({ answers: truth.filter((o) => o.claim !== "rank").map(asAnswer) });
     ok("...and an answer file that simply OMITS the hard problems does not pass either",
         grade(missing).state === "disagrees",
         "a reference that skips what it found difficult is the same failure as one that gets it wrong, and it " +
         "is the easier of the two to ship by accident");
+}
+
+// ---- 3b. SOLVE: THE ONLY CLAIM THAT CAN SEE A TRANSPOSE, AND THE PROPERTY THAT LETS IT ---------------------------
+{
+    const solves = problems().filter((p) => p.claim === "solve");
+    ok("!! *** the set contains a claim that is NOT transpose-invariant ***", solves.length > 0,
+        "rank and det are EQUAL for A and its transpose, so on a square matrix neither can tell whether the "
+        + "reference got row/column major right. Ax=b can: transposing A changes x. Without a claim of this kind "
+        + "the reference's column-major handling rests entirely on rectangular problems.");
+
+    // *** THE GUARD ON THE GUARD. *** For SYMMETRIC A the transpose IS A, and solve returns the identical vector --
+    // measured at exactly 0.000e+0 for diag(1,2) and for hilbert4. A solve claim on a symmetric matrix looks like
+    // coverage and tests nothing, which is the same failure this whole round was about, one level down.
+    for (const p of solves)
+        ok("!! ...and " + p.name + "'s matrix is NON-SYMMETRIC, which is what makes it able to see one",
+            solveIsDiscriminating(p),
+            "a symmetric A would make this claim as blind as rank and det are. IF A LATER ROUND TIDIES THIS "
+            + "MATRIX INTO A SYMMETRIC FORM THE CHECK RETIRES ITSELF SILENTLY -- so it is asserted, not trusted.");
+
+    const truth = ours();
+    const sv = truth.find((o) => o.claim === "solve");
+    const perturb = (i, d) => tmp({ answers: truth.map((o) => o === sv
+        ? { ...asAnswer(o), values: o.values.map((v, k) => k === i ? v + d : v) } : asAnswer(o)) });
+
+    // EVERY COMPONENT, NOT A NORM AND NOT THE FIRST ONE. A transposed solve moves some coordinates far more than
+    // others, so a comparison that looked at one end of the vector would be blind exactly where this claim pays.
+    for (let i = 0; i < sv.values.length; i++)
+        ok("!! ...and a wrong answer in component " + i + " ALONE is caught",
+            grade(perturb(i, 1e-3)).disagreements.some((d) => d.name === sv.name),
+            "checking a norm, or the first entry, would pass a reference that got one coordinate wrong");
+
+    const truncated = tmp({ answers: [{ name: sv.name, claim: "solve", values: sv.values.slice(0, -1) }] });
+    ok("!! a solve answer of the WRONG LENGTH is a disagreement, not a crash and not a pass",
+        grade(truncated).state === "disagrees",
+        "a short vector is a reference that answered a different question; comparing what happens to line up "
+        + "would be the worst of the three available behaviours");
+
+    const scalar = tmp({ answers: [{ name: sv.name, claim: "solve", value: 1.375 }] });
+    ok("...and a solve answer sent as a SCALAR is refused rather than coerced",
+        grade(scalar).state === "disagrees",
+        "the two sides must agree about the SHAPE of an answer before its value means anything");
 }
 
 // ---- 4. THE TOLERANCE IS DERIVED, AND IT IS NOT DOING THE WORK --------------------------------------------------
@@ -112,8 +164,10 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
         const live = grade();
         if (live.state === "agrees")
             say("*** LAPACK HAS RUN, AND IT AGREES ON ALL " + live.rows.length + " PROBLEMS. *** The outside half "
-              + "of this key is EXERCISED: " + (live.rows.filter((r) => r.exact).length) + " of those are ranks, "
-              + "agreeing as EXACT INTEGERS across elimination here and the singular-value spectrum there. Source: "
+              + "of this key is EXERCISED: " + (live.rows.filter((r) => r.exact).length) + " ranks agreeing as "
+              + "EXACT INTEGERS across elimination here and the singular-value spectrum there, and "
+              + (live.rows.filter((r) => r.claim === "solve").length) + " solves -- the only claim that can see a "
+              + "TRANSPOSED reference on a square matrix. Source: "
               + (JSON.parse(fs.readFileSync(ANSWER_FILE, "utf8")).source || "unrecorded") + ".");
         else if (live.state === "absent")
             say("*** LAPACK HAS NOT RUN HERE. *** The grader above is tested against fixtures, but no reference "
