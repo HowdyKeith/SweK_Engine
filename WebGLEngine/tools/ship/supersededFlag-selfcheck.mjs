@@ -124,10 +124,27 @@ const server = rd(path.join(ROOT, "ai-bridge", "server.js"));
         "an ask aimed at a route nobody serves would fail every time and fall through to the reap FOREVER, " +
         "looking exactly like the old behaviour while claiming to be new");
 
-    ok("!! ...and the kill is still there for a server that cannot answer",
-        /swek_killengine\.ps1/.test(launcher),
-        "A HUNG SERVER CANNOT ACKNOWLEDGE ANYTHING. Removing the fallback would trade a broad kill for a " +
-        "launcher that cannot start at all, which is a worse failure and a harder one to see");
+    // *** v3929 -- THIS NAMED A FILE THAT STOPPED EXISTING AT v3658, AND HAS BEEN RED EVER SINCE. ***
+    //
+    // It looked for "swek_killengine.ps1" in the launcher. That name is gone from the tree: v3658 replaced the
+    // WRITE-TO-TEMP-RUN-DELETE sequence with a real file, ai-bridge/installers/kill-engine.ps1, BECAUSE AVAST
+    // QUARANTINED START_NODE_Engine.bat AS IDP.ALEXA.54 FOR THE DROPPER SHAPE -- drop, execute with policy
+    // bypass, remove the evidence. That header says the detection "WAS RIGHT ABOUT THE SHAPE AND WRONG ABOUT
+    // THE INTENT". So the fallback was not removed; it was made better, and this check went on reporting it
+    // missing for hundreds of versions because nothing ever ran this gate (v3924 found nineteen in that state).
+    //
+    // AND THE CHECK IS STRENGTHENED WHILE THE NAME IS CORRECTED, because a MENTION was all it ever required: a
+    // rename could leave the launcher invoking a script that is not there and this line would still pass, as
+    // long as the string matched. The file it points at must EXIST. That is the difference between a launcher
+    // that says it can kill a hung server and one that can.
+    const KILL_SCRIPT = "WebGLEngine/ai-bridge/installers/kill-engine.ps1";
+    const killRef = /installers[\\/]kill-engine\.ps1/.test(launcher);
+    const killThere = fs.existsSync(path.join(PROJ, KILL_SCRIPT));
+    ok("!! ...and the kill is still there for a server that cannot answer", killRef && killThere,
+        "launcher invokes it: " + killRef + ", script on disk: " + killThere + ". A HUNG SERVER CANNOT " +
+        "ACKNOWLEDGE ANYTHING. Removing the fallback would trade a broad kill for a launcher that cannot start " +
+        "at all, which is a worse failure and a harder one to see -- and a launcher CALLING A SCRIPT THAT IS " +
+        "NOT THERE is that same failure wearing a passing check");
 
     ok("!! *** the fallback is ANNOUNCED, so 'it needed killing' stops being routine ***",
         /did NOT exit on request/.test(ask) && /no processes were terminated/.test(ask),

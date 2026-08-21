@@ -143,6 +143,20 @@ export async function asyncStalenessRows() {
         why: "a floor ABOVE the live registry means devices vanished or the ratchet was raised past reality; a floor below it is headroom and is fine",
     });
 
+    // *** v3929 -- THE DEVICES TOOLTIP IN server.html, WHICH HAS NOW DRIFTED TWICE. ***
+    // lab-scene-run-selfcheck watches it, and its own header records the first drift: "IT READ 'Nineteen
+    // devices' AGAINST A REGISTRY OF 75 -- FIFTY-SIX BEHIND." It was corrected to 75 BY HAND, the registry is
+    // now 108, and it drifted again the moment devices were added. A HAND-MAINTAINED NUMBER DRIFTS AS OFTEN AS
+    // SOMEBODY FORGETS. It belongs with the other derived facts, in the file whose whole job is that -- and it
+    // goes in the ASYNC list because the live count needs devices.mjs, which is exactly why this list exists.
+    const tt = readOr("server.html").match(/title="Point a model at a physics instrument[^"]*?(\d+) devices/);
+    rows.push({
+        id: "server.html devices tooltip",
+        claimed: tt ? Number(tt[1]) : null, actual: live,
+        ok: !!tt && live !== null && Number(tt[1]) === live,
+        why: "a numeral in a tooltip is read as a fact about the lab; when it lags, the first thing a visitor learns about the registry is wrong",
+    });
+
     // 2. the cost model's device count -- it multiplies per-device, so a wrong count is a wrong answer
     const pcSrc = readOr("tools/roundhouse/promptCost.mjs");
     const pcM = pcSrc.match(/devices:\s*(\d+)/);
@@ -174,6 +188,16 @@ export async function asyncStalenessRows() {
 
 /** Convenience: are they all fresh? */
 export function isFresh() { return stalenessRows().every((r) => r.ok); }
+
+/**
+ * v3929 -- isFresh() reads the SYNC rows only, and it is exported and called elsewhere, so its meaning is left
+ * alone. But the CLI prints both lists and then printed a verdict from half of them: the run that added the
+ * devices tooltip showed "STALE server.html devices tooltip" and, three lines later, "all derived facts match".
+ * A SUMMARY THAT DISAGREES WITH THE ROWS ABOVE IT TEACHES PEOPLE TO SKIP THE SUMMARY. The CLI uses this instead.
+ */
+export async function isFreshAll() {
+    return isFresh() && (await asyncStalenessRows()).every((r) => r.ok);
+}
 
 /**
  * v3087 -- THE ONLY DERIVED NUMBER IN THE RITUAL THAT WAS STILL EDITED BY HAND.
@@ -214,11 +238,38 @@ export function fixDerived({ write = true } = {}) {
     return { applied, skipped, clean: applied.length === 0 && skipped.length === 0 };
 }
 
+/**
+ * v3929 -- the rows that need an IMPORT to know their actual value cannot be reached from the sync fixer, so
+ * they get their own. fixDerived keeps its signature and its contract exactly; this is additive, and the CLI
+ * runs both so `--fix` still means one command.
+ */
+export async function fixDerivedAsync({ write = true } = {}) {
+    const applied = [], skipped = [];
+    for (const r of await asyncStalenessRows()) {
+        if (r.ok) continue;
+        if (r.id === "server.html devices tooltip" && r.actual != null) {
+            const rel = "server.html", file = path.join(ENG, rel);
+            const before = readOr(rel);
+            const after = before.replace(/(title="Point a model at a physics instrument[^"]*?)\d+( devices)/,
+                                         "$1" + r.actual + "$2");
+            if (after === before) { skipped.push(r.id + " -- the marker was not found in " + rel); continue; }
+            if (write) fs.writeFileSync(file, after);
+            applied.push(r.id + ": " + r.claimed + " -> " + r.actual);
+        } else {
+            skipped.push(r.id + " -- not writable from here (" + r.claimed + " vs " + r.actual + ")");
+        }
+    }
+    return { applied, skipped, clean: applied.length === 0 && skipped.length === 0 };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const fix = process.argv.includes("--fix");
-    const r = fix ? fixDerived() : { applied: [], skipped: [], clean: isFresh() };
+    const rSync = fix ? fixDerived() : { applied: [], skipped: [], clean: await isFreshAll() };
+    const rAsync = fix ? await fixDerivedAsync() : { applied: [], skipped: [], clean: true };
+    const r = { applied: [...rSync.applied, ...rAsync.applied], skipped: [...rSync.skipped, ...rAsync.skipped],
+                clean: rSync.clean && rAsync.clean };
     if (!fix) {
-        for (const row of stalenessRows()) console.log((row.ok ? "  ok    " : "  STALE ") + row.id + ": claimed " + row.claimed + ", actual " + row.actual);
+        for (const row of [...stalenessRows(), ...await asyncStalenessRows()]) console.log((row.ok ? "  ok    " : "  STALE ") + row.id + ": claimed " + row.claimed + ", actual " + row.actual);
         console.log(r.clean ? "\n[staleness] all derived facts match. --fix would do nothing." : "\n[staleness] run with --fix to rewrite what can be derived.");
         process.exit(r.clean ? 0 : 1);
     }
