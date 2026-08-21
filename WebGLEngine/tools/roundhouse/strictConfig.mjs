@@ -27,6 +27,7 @@
 // is the opt-in that turns the report into an error, and it is what a measurement script should use.
 
 import { getDevice } from "./devices.mjs";
+import { codeOnly } from "../ship/sourceScan.mjs";
 
 /**
  * Keys a device accepts that its defaults() does not list. Registered rather than guessed, so adding one is a
@@ -104,7 +105,21 @@ export const ENABLING_FLAGS = {
 
 export function readButNotDeclared(bindSource, declaredKeys, extra = EXTRA_KEYS) {
     const read = new Set();
-    for (const m of bindSource.matchAll(/\b(?:cfg|config|c)\.([A-Za-z_$][\w$]*)/g)) read.add(m[1]);
+    // *** v3930 -- THIS SCANNED COMMENTS AND STRINGS AS THOUGH THEY WERE CODE, AND IT COST A ROUND TO SEE. ***
+    //
+    // xpbd was this audit's ONE offender out of 64 binds. The real cause was a local named `c` shadowing the
+    // config object -- a genuine naming defect, since `c.` means config everywhere else in that file -- and
+    // renaming it cleared five of the six reads. THE SIXTH WAS THE COMMENT EXPLAINING THE RENAME, which quotes
+    // `c.freeFallErr` to say what the old line looked like. A prose mention was being counted as a read.
+    //
+    // codeOnly() strips comments AND string literals, which is exactly right for the question this asks: does
+    // this bind READ a config key it does not declare. A key named in a sentence is not read, and a key inside
+    // a string literal is not read either. THE KEYWORD PROBE HAS NOW MISLED THIS PROJECT FIVE TIMES -- the
+    // plant census, the runner census, the canvas scan, physicsReach's ghosts, and this -- and every one was
+    // the same shape: a regex over raw source that cannot tell what a file DOES from what it SAYS.
+    let scanned = bindSource;
+    try { scanned = codeOnly(bindSource); } catch { /* an unparsable file is scanned raw rather than skipped */ }
+    for (const m of scanned.matchAll(/\b(?:cfg|config|c)\.([A-Za-z_$][\w$]*)/g)) read.add(m[1]);
     return [...read].filter((k) =>
         !declaredKeys.includes(k) && !extra[k] && !ENABLING_FLAGS[k] && k !== "mode" && k !== "length");
 }

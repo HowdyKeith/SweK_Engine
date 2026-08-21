@@ -124,9 +124,18 @@ function buildXpbd({ mode = "hooke", config = {} } = {}) {
     // the integrator not the constraint solve). Both are exact zeros on the register. The plant drops -aTilde*
     // lambda from the solve and is honest: byte-identical at compliance 0 (aTilde 0), divergent above it.
     if (mode === "clothloop") {
-        const c = clothLoopKeys();
-        return { ...blank, freeFallErr: c.freeFallErr, equivErr: c.equivErr, freeFallDrop: c.freeFallDrop,
-                 freeFallExact: c.freeFallExact, equivalent: c.equivalent, clothMoves: c.clothMoves };
+        // *** v3930 -- THIS LOCAL WAS CALLED `c` AND SHADOWED THE CONFIG. *** Line 55 of this file is
+        // `const c = { ...DEF, ...config }`, and every other mode reads c.tearStrain, c.h, c.mu, c.inflation --
+        // so in this file `c.` MEANS CONFIG. Here it meant the return of clothLoopKeys(), which is a bag of
+        // OBSERVABLES, and a reader arriving at `c.freeFallErr` would reasonably take it for a config key.
+        //
+        // strictConfig's lab-wide audit did exactly that: xpbd was its ONE offender out of 64 binds, reporting
+        // six "undeclared config reads" that are observables. THE SCANNER READ THE LINE THE WAY A HUMAN WOULD,
+        // which makes this a naming defect rather than a scanner artifact -- so the fix is the name, not a
+        // loosening of the audit. `keys` says what it is.
+        const keys = clothLoopKeys();
+        return { ...blank, freeFallErr: keys.freeFallErr, equivErr: keys.equivErr, freeFallDrop: keys.freeFallDrop,
+                 freeFallExact: keys.freeFallExact, equivalent: keys.equivalent, clothMoves: keys.clothMoves };
     }
     // v3533 -- GRAINS, lab reach for frictionalContact.js: the particle-particle Coulomb path (which the plane
     // "friction" mode never runs). The cone clamps a slide to mu*depth, a slow pair sticks, the split is two-way,
