@@ -994,8 +994,15 @@ function pullFrom(peerUrl){
                                 } else hashWhy = "peer served no manifest (pre-v3249 build)";
                             } catch (e) { hashWhy = "manifest unavailable: " + String((e && e.message) || e).slice(0, 60); }
 
-                            try { fs.renameSync(part, dest); }
-                            catch (e) { try { fs.unlinkSync(part); } catch {} return resolve({ ok: false, error: "could not place engine zip: " + String((e && e.message) || e) }); }
+                            // *** v3925 -- THE TRUST DECISION NOW HAPPENS WHILE THE FILE IS STILL .part. ***
+                            // It used to rename part -> dest HERE and decide afterwards, so a REFUSE deleted
+                            // `dest`. If a good zip of that version was already in Downloads, the rename had
+                            // overwritten it and the refusal then deleted it: AN UNTRUSTED PEER COULD DESTROY A
+                            // BUILD THE MACHINE ALREADY HAD, by offering a version it was going to reject.
+                            // updateIntegrity-selfcheck has been saying so since it was written -- "an error path
+                            // that deleted `dest` would now delete a GOOD PREVIOUS DOWNLOAD while leaving the
+                            // broken one behind" -- and it was red and unread because it had never been timed.
+                            // Nothing but an ACCEPTED transfer is ever named *.zip now.
 
                             // v3284 -- *** WHO IS ALLOWED TO HAND THIS MACHINE A BUILD. ***
                             // Until now, pairing a peer granted PERMANENT update-source trust: any paired peer
@@ -1015,7 +1022,7 @@ function pullFrom(peerUrl){
                             let trust = null;
                             try {
                                 const { decidePeerUpdate, peerUpdateLine } = await import("./peerTrust.mjs");
-                                const bytes = fs.readFileSync(dest);
+                                const bytes = fs.readFileSync(part);   // still .part: the decision precedes the placement
                                 trust = decidePeerUpdate({ peerUrl: base, offer: off, bytes, policy: _updatePolicy() });
                                 trust.line = peerUpdateLine(trust);
                                 lastNote = trust.line;
@@ -1028,9 +1035,11 @@ function pullFrom(peerUrl){
                                 lastNote = trust.line;
                             }
                             if (trust.action === "refuse") {
-                                try { fs.unlinkSync(dest); } catch {}
+                                try { fs.unlinkSync(part); } catch {}
                                 return resolve({ ok: false, error: trust.why, peer: base, trust });
                             }
+                            try { fs.renameSync(part, dest); }
+                            catch (e) { try { fs.unlinkSync(part); } catch {} return resolve({ ok: false, error: "could not place engine zip: " + String((e && e.message) || e) }); }
                             resolve({ ok: true, pulled: true, saved: dest, version: off.version, zipName, bytes: got,
                                       // NAMED so a caller can tell a CHECKED transfer from one that merely finished:
                                       // a peer that sends no content-length is not the same as one that sent it all.
