@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/deviceBridge-selfcheck.mjs -- v2813
 //
-// Run: node tools/ship/deviceBridge-selfcheck.mjs   (~20s -- it runs real device loops)
+// Run: node tools/ship/deviceBridge-selfcheck.mjs   (~3s -- it runs real device loops)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES ai-bridge/deviceBridge.js + device.html -- the front door for the roundhouse device registry.

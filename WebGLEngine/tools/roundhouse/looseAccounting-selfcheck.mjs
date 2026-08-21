@@ -1,6 +1,6 @@
 // tools/roundhouse/looseAccounting-selfcheck.mjs
 //
-// Run: node tools/roundhouse/looseAccounting-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/looseAccounting-selfcheck.mjs   (~0.3s)
 //
 // v3174 -- "ASK WHY THE ERROR IS LARGE" IS UNANSWERABLE FOR A DEVICE WITH ONE MODE.
 //

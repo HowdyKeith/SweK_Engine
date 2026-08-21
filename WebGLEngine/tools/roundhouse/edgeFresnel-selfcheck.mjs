@@ -1,6 +1,6 @@
 // tools/roundhouse/edgeFresnel-selfcheck.mjs
 //
-// Run: node tools/roundhouse/edgeFresnel-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/edgeFresnel-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2914 -- THE THIRD GRID ALIGNMENT IN OPTICS, AND THE ONE PLACE THE MODE ACTUALLY VERIFIES SOMETHING.

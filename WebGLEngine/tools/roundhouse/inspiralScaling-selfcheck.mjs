@@ -1,6 +1,6 @@
 // tools/roundhouse/inspiralScaling-selfcheck.mjs
 //
-// Run: node tools/roundhouse/inspiralScaling-selfcheck.mjs   (~25s)
+// Run: node tools/roundhouse/inspiralScaling-selfcheck.mjs   (~0.1s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3102 -- inspiral's TWO ERRORS GRADE THE SOLVER, NOT THE LAW.

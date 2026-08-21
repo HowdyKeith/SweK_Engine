@@ -1,6 +1,6 @@
 // WebGLEngine/physics/quantum/rmt-selfcheck.mjs — v3284
 //
-// Run: node physics/quantum/rmt-selfcheck.mjs   (~30s — MEASURED; the 250x250 diagonalizations dominate)
+// Run: node physics/quantum/rmt-selfcheck.mjs   (~0.3s — MEASURED; the 250x250 diagonalizations dominate)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // ORDER MATTERS HERE: the eigensolver is checked against spectra known in closed form BEFORE any statistical

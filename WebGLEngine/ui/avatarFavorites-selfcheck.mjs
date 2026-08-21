@@ -1,6 +1,6 @@
 // WebGLEngine/ui/avatarFavorites-selfcheck.mjs — v3557
 //
-// Run: node ui/avatarFavorites-selfcheck.mjs   (~4s — MEASURED individually)
+// Run: node ui/avatarFavorites-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A star under the mode switch on server.html's avatar panel: hover says "Set Favorite", click opens a picker

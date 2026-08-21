@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/externalLinalg-selfcheck.mjs -- v3687
 //
-// Run: node tools/roundhouse/externalLinalg-selfcheck.mjs   (~1s)
+// Run: node tools/roundhouse/externalLinalg-selfcheck.mjs   (~0.1s)
 //
 // *** THE DANGEROUS OBJECT IN THIS ROUND IS THE GRADER, NOT THE REFERENCE. *** A grader that returns "pass" when
 // the external answers are missing would certify whatever it is handed, forever, on every machine that is not a

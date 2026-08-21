@@ -1,6 +1,6 @@
 // tools/roundhouse/spacefill-selfcheck.mjs
 //
-// Run: node tools/roundhouse/spacefill-selfcheck.mjs   (~3s)
+// Run: node tools/roundhouse/spacefill-selfcheck.mjs   (~0.2s)
 //
 // v3188 -- THE FIRST DEVICE BUILT TO v3174's STANDARD RATHER THAN RETROFITTED TOWARD IT.
 //

@@ -1,6 +1,6 @@
 // tools/roundhouse/heidler-selfcheck.mjs
 //
-// Run: node tools/roundhouse/heidler-selfcheck.mjs   (~4s)
+// Run: node tools/roundhouse/heidler-selfcheck.mjs   (~0.2s)
 //
 // v3193 -- THE 5% BELONGS TO THE FORMULA, NOT TO ANY CODE, AND THE DEVICE PROVES IT.
 //

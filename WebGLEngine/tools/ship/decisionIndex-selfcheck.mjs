@@ -1,6 +1,6 @@
 // tools/ship/decisionIndex-selfcheck.mjs
 //
-// Run: node tools/ship/decisionIndex-selfcheck.mjs   (~3s)
+// Run: node tools/ship/decisionIndex-selfcheck.mjs   (~0.2s)
 //
 // v3172 -- THE TREE ALREADY DECIDED IT, AND THE DECISION WAS IN A COMMENT NOBODY GREPS.
 //

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/amplifiedDiff-selfcheck.mjs
 //
-// Run: node tools/ship/amplifiedDiff-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/amplifiedDiff-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3252 -- SHOW THE RESIDUAL, AMPLIFIED. TAKEN FROM netherite.

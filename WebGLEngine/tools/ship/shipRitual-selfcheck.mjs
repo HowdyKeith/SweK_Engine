@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shipRitual-selfcheck.mjs — v3528
 //
-// Run: node tools/ship/shipRitual-selfcheck.mjs   (~5s — MEASURED individually)
+// Run: node tools/ship/shipRitual-selfcheck.mjs   (~0.3s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THE RITUAL WAS WRITTEN TWICE AND THE SECOND COPY HAD GONE ENTIRELY WRONG. *** At v3527 the handoff's State

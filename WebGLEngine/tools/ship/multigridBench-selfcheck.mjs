@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/multigridBench-selfcheck.mjs
 //
-// Run: node tools/ship/multigridBench-selfcheck.mjs   (~20s -- MEASURED)
+// Run: node tools/ship/multigridBench-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3224 -- THE PAGE THAT TURNS "SHOULD WE WIRE THE GPU MULTIGRID" INTO A TABLE.

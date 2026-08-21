@@ -1,6 +1,6 @@
 // tools/roundhouse/corroborateFully-selfcheck.mjs
 //
-// Run: node tools/roundhouse/corroborateFully-selfcheck.mjs   (~60s)
+// Run: node tools/roundhouse/corroborateFully-selfcheck.mjs   (~22s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2908 -- THE LAB'S SECOND AND THIRD CORROBORATED QUANTITIES, AND A QUANTISED OBSERVABLE THAT TWO CRITERIA

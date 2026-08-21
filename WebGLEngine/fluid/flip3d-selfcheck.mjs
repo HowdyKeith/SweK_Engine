@@ -1,6 +1,6 @@
 // WebGLEngine/fluid/flip3d-selfcheck.mjs — v3427
 //
-// Run: node fluid/flip3d-selfcheck.mjs   (~70s — MEASURED individually)
+// Run: node fluid/flip3d-selfcheck.mjs   (~31s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE 3D EXTENSION OF THE SOLVER GATED AT v3410, and the last module the coverage triage called GATEABLE. Named

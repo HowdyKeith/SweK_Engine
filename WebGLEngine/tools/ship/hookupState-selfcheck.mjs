@@ -70,11 +70,31 @@ console.log("\n3. *** THE ATTRITION RATE, AND IT CORRECTS WHAT I SAID FROM MEMOR
         "labScenes marks a withdrawal as `refused` with `provenance: measured`; knobRegistry keeps " +
         "NOT_REGISTERED. *** BOTH EXISTED AND NOTHING READ EITHER, so the rate that governs any plan was a " +
         "number somebody would restate from memory -- which is what I did. ***");
-    ok("!! *** AND THE DERIVED RATE IS 29%, NOT THE 40% I GAVE LAST TURN ***",
-        a.rate < 0.35 && a.rate > 0.2,
-        "I had counted MUSCLE among the measured deaths. It was withdrawn on STRUCTURE -- it inherits balloon's " +
-        "volume constraint -- and never run. *** DRIVEN AND ARGUED ARE DIFFERENT EVIDENCE, and folding them " +
-        "together inflated the one number a plan actually depends on. *** The survey separates them now.");
+    // *** v3931 -- THIS PINNED THE RATE IN A BAND, AND THE RATE MOVES BY CONSTRUCTION. ***
+    //
+    // rate = measured withdrawals / (measured withdrawals + STILL-CANDIDATES). Every time a candidate is
+    // assessed it leaves the denominator -- shipping or dying -- so THE RATE RISES AS THE SURVEY DOES ITS JOB
+    // and falls when new candidates are proposed. It was 29% when this band was written and it is 43% now:
+    // 3 of 7 became 3 of 7-minus-resolved. NOTHING WENT WRONG; the number is not a property of the tree, it is
+    // a snapshot of how much of the pool is left.
+    //
+    // What the headline was ACTUALLY about survives, and it is checkable: I had counted MUSCLE among the
+    // measured deaths when it was withdrawn on STRUCTURE, and folding the two together inflated the one number
+    // a plan depends on. DRIVEN AND ARGUED ARE DIFFERENT EVIDENCE. So the check is that they are STILL NOT
+    // FOLDED -- the structural withdrawals appear in neither half of this fraction, which is exactly the
+    // mistake that produced 40%, and it stays false at any pool size.
+    const structural = SCENE_TRIAGE.filter((r) => r.eligible === "refused" && r.provenance === "assessed").length;
+    const stillCandidates = SCENE_TRIAGE.filter((r) => r.eligible === "candidate").length;
+    const measuredDeaths = a.withdrawnByMeasurement.length;
+    const honest = measuredDeaths / Math.max(1, measuredDeaths + stillCandidates);
+    const folded = (measuredDeaths + structural) / Math.max(1, measuredDeaths + structural + stillCandidates);
+    ok("!! *** the rate counts MEASURED deaths only -- structural withdrawals are in neither half ***",
+        Math.abs(a.rate - honest) < 1e-12 && structural > 0 && Math.abs(a.rate - folded) > 1e-12,
+        "reported " + (a.rate * 100).toFixed(0) + "%, measured-only " + (honest * 100).toFixed(0) + "%, and " +
+        (folded * 100).toFixed(0) + "% if the " + structural + " structural withdrawals were folded in. I had " +
+        "counted MUSCLE among the measured deaths -- it inherits balloon's volume constraint and was never run " +
+        "-- and reported 40% from memory against a derived 29%. THE VALUE MOVES WITH THE POOL AND THE " +
+        "SEPARATION DOES NOT, so the separation is what is asserted");
     ok("...and the structural withdrawals are still counted, in their own column",
         a.withdrawnOnStructure.length >= 4,
         "they are real refusals with reasons on record. Dropping them to make the measured rate look cleaner " +

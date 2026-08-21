@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/ragdollSever-selfcheck.mjs
 //
-// Run: node tools/ship/ragdollSever-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/ragdollSever-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3234 -- THE INTERIM DEMONSTRATION: A LIMB COMES OFF BECAUSE A CONSTRAINT STOPPED EXISTING.

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/joystickCore-selfcheck.mjs
 //
-// Run: node tools/ship/joystickCore-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/joystickCore-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3263 -- THE PHONE REMOTE'S STICK, AS ARITHMETIC RATHER THAN AS DOM.

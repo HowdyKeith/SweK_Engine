@@ -1,6 +1,6 @@
 // tools/roundhouse/fanKey-selfcheck.mjs
 //
-// Run: node tools/roundhouse/fanKey-selfcheck.mjs   (~20s)
+// Run: node tools/roundhouse/fanKey-selfcheck.mjs   (~0.3s)
 //
 // v3136 -- ct.fan's SECOND ANSWER KEY, AND THE OBVIOUS ONE IS WRONG.
 //

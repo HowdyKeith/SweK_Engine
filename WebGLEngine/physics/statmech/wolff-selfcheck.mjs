@@ -1,6 +1,6 @@
 // WebGLEngine/physics/statmech/wolff-selfcheck.mjs — v3284
 //
-// Run: node physics/statmech/wolff-selfcheck.mjs   (~50s — MEASURED; the L=48 Metropolis comparison dominates)
+// Run: node physics/statmech/wolff-selfcheck.mjs   (~2s — MEASURED; the L=48 Metropolis comparison dominates)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Two claims, and the ORDER IS THE POINT: first that Wolff samples the SAME distribution (Yang's exact

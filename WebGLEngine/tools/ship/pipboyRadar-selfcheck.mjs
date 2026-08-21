@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/pipboyRadar-selfcheck.mjs
 //
-// Run: node tools/ship/pipboyRadar-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/pipboyRadar-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3237 -- THE PIP-BOY DREW FROM A RADAR IT HAD JUST SWITCHED OFF.

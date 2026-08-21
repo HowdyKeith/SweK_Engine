@@ -1,6 +1,6 @@
 // tools/roundhouse/fdtd-selfcheck.mjs
 //
-// Run: node tools/roundhouse/fdtd-selfcheck.mjs   (~12s — MEASURED individually)
+// Run: node tools/roundhouse/fdtd-selfcheck.mjs   (~0.4s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE BEST ANSWER KEY IN THE LAB, AND IT IS NOT CLOSE. Every other device asks whether the simulation matches

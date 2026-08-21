@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/shaderCensus-selfcheck.mjs
 //
-// Run: node tools/ship/shaderCensus-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/shaderCensus-selfcheck.mjs   (~0.3s -- MEASURED)
 //
 // v3274 -- COUNT BEFORE BUILDING A COMPILER.
 //

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/sackurTetrode-selfcheck.mjs -- v3816
 //
-// Run: node physics/thermal/sackurTetrode-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/sackurTetrode-selfcheck.mjs   (~0.1s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE SACKUR-TETRODE ENTROPY, THE CLASSICAL IDEAL GAS bec.mjs AND fermi.mjs BOTH BECOME WHEN HOT AND THIN.

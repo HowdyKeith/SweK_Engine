@@ -1,6 +1,6 @@
 // tools/roundhouse/inspiral-selfcheck.mjs
 //
-// Run: node tools/roundhouse/inspiral-selfcheck.mjs   (~20s)
+// Run: node tools/roundhouse/inspiral-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2938 -- THE LAB'S FIRST RADIATIVE SCENE, AND THE TWO TRAPS IT WAS BUILT KNOWING ABOUT.

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/md/pbc-selfcheck.mjs — v3285
 //
-// Run: node physics/md/pbc-selfcheck.mjs   (~12s — MEASURED individually)
+// Run: node physics/md/pbc-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Periodic boundaries are the layer every transport measurement needs, and they are the layer where a sign

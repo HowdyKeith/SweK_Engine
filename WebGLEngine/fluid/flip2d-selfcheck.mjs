@@ -1,6 +1,6 @@
 // WebGLEngine/fluid/flip2d-selfcheck.mjs — v3410
 //
-// Run: node fluid/flip2d-selfcheck.mjs   (~50s — MEASURED individually)
+// Run: node fluid/flip2d-selfcheck.mjs   (~1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THIS SOLVER HAD NO GATE AT ALL, AND IT DESCRIBES ITSELF AS "a correct 2D FLIP/PIC fluid solver". ***

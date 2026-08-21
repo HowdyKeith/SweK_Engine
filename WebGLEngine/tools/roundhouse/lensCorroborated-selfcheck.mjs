@@ -1,6 +1,6 @@
 // tools/roundhouse/lensCorroborated-selfcheck.mjs
 //
-// Run: node tools/roundhouse/lensCorroborated-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/lensCorroborated-selfcheck.mjs   (~0.4s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3082 -- THE FIRST QUANTITY PUT THROUGH ALL FOUR SINCE THE BATTERY WAS BUILT, and it did not pass on the

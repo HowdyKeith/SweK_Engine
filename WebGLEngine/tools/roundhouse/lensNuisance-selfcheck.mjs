@@ -1,6 +1,6 @@
 // tools/roundhouse/lensNuisance-selfcheck.mjs
 //
-// Run: node tools/roundhouse/lensNuisance-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/lensNuisance-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3081 -- THE FIFTH ELIGIBLE DEVICE, AND TWO THINGS FOUND ON THE WAY TO IT.

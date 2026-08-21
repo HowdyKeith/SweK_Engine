@@ -1,6 +1,6 @@
 // tools/roundhouse/gradedCoverage-selfcheck.mjs
 //
-// Run: node tools/roundhouse/gradedCoverage-selfcheck.mjs   (~2s)
+// Run: node tools/roundhouse/gradedCoverage-selfcheck.mjs   (~0.1s)
 //
 // v3195 -- HOW MUCH OF THE PROVEN PHYSICS IS ACTUALLY GRADED? TWENTY-TWO OF NINETY-SIX.
 //

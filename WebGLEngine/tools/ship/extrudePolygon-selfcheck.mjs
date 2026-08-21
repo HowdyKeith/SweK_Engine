@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/extrudePolygon-selfcheck.mjs
 //
-// Run: node tools/ship/extrudePolygon-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/extrudePolygon-selfcheck.mjs   (~0.04s -- MEASURED)
 //
 // v3279 -- THE HALF OF SVG-TO-3D THAT HAS AN ANSWER KEY.
 //

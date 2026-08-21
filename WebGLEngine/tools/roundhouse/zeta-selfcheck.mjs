@@ -1,6 +1,6 @@
 // tools/roundhouse/zeta-selfcheck.mjs
 //
-// Run: node tools/roundhouse/zeta-selfcheck.mjs   (~3s)
+// Run: node tools/roundhouse/zeta-selfcheck.mjs   (~0.2s)
 //
 // v3198 -- THE PI-ZETA BRIDGE, AND ITS CONTROL IS A NUMBER WITH NO CLOSED FORM.
 //

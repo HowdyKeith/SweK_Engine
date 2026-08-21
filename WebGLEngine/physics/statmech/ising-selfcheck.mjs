@@ -1,6 +1,6 @@
 // WebGLEngine/physics/statmech/ising-selfcheck.mjs -- v2819
 //
-// Run: node physics/statmech/ising-selfcheck.mjs   (~15s -- it runs real Monte Carlo)
+// Run: node physics/statmech/ising-selfcheck.mjs   (~7s -- it runs real Monte Carlo)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES physics/statmech/ising.js -- the 2D Ising model, the lab's first statistical-mechanics instrument and

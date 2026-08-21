@@ -1,6 +1,6 @@
 // WebGLEngine/physics/quantum/kronigPenney-selfcheck.mjs — v3320
 //
-// Run: node physics/quantum/kronigPenney-selfcheck.mjs   (~40s — MEASURED individually)
+// Run: node physics/quantum/kronigPenney-selfcheck.mjs   (~3s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // BAND STRUCTURE, AND THE FORBIDDEN GAPS ARE THE FALSIFIER. An energy is allowed exactly when the

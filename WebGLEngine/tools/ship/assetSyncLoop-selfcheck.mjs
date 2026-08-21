@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/assetSyncLoop-selfcheck.mjs
 //
-// Run: node tools/ship/assetSyncLoop-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/assetSyncLoop-selfcheck.mjs   (~0.1s -- MEASURED)
 //
 // v3325 -- THE 201-SECOND BLOCK IS FIXED, AND THIS IS WHAT KEEPS IT FIXED.
 //

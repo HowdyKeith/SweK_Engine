@@ -1,6 +1,6 @@
 // tools/roundhouse/slitQuantisation-selfcheck.mjs
 //
-// Run: node tools/roundhouse/slitQuantisation-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/slitQuantisation-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2913 -- THE SAME DEFECT AS v2911, ONE MODE OVER, AND A ZERO THAT IS THE RIGHT ANSWER FOR THE WRONG REASON.

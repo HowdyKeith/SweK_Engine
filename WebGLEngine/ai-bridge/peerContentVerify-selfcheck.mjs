@@ -1,6 +1,6 @@
 // ai-bridge/peerContentVerify-selfcheck.mjs
 //
-// Run: node ai-bridge/peerContentVerify-selfcheck.mjs   (~3s)
+// Run: node ai-bridge/peerContentVerify-selfcheck.mjs   (~0.1s)
 //
 // v3147 -- THE OTHER END OF v3143. The peer Grab now verifies CONTENT, not just length.
 //

@@ -1,6 +1,6 @@
 // tools/roundhouse/physicsBaselineCoverage-selfcheck.mjs
 //
-// Run: node tools/roundhouse/physicsBaselineCoverage-selfcheck.mjs   (~60s)
+// Run: node tools/roundhouse/physicsBaselineCoverage-selfcheck.mjs   (~2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2916 -- THE REGRESSION TEST FOR "DID THE PHYSICS MOVE" COVERED FIVE NUMBERS.

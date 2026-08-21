@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/stratified-selfcheck.mjs -- v3498
 //
-// Run: node physics/render/stratified-selfcheck.mjs   (~30s)
+// Run: node physics/render/stratified-selfcheck.mjs   (~0.2s)
 //
 // *** THE OBSERVABLE IS THE CONVERGENCE EXPONENT, NOT AN ERROR. *** Independent uniform samples give a standard
 // error falling as N^-1/2 whatever you do; a better sampler shows up as a STEEPER SLOPE and not as a smaller

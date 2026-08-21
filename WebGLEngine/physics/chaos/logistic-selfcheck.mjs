@@ -1,6 +1,6 @@
 // WebGLEngine/physics/chaos/logistic-selfcheck.mjs -- v2823
 //
-// Run: node physics/chaos/logistic-selfcheck.mjs   (~5s)
+// Run: node physics/chaos/logistic-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES physics/chaos/logistic.js -- x -> r x (1 - x), one line of arithmetic containing a route to chaos whose

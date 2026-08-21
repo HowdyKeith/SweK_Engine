@@ -1,6 +1,6 @@
 // tools/ship/pageRequirements-selfcheck.mjs
 //
-// Run: node tools/ship/pageRequirements-selfcheck.mjs   (~2s)
+// Run: node tools/ship/pageRequirements-selfcheck.mjs   (~0.1s)
 //
 // v3170 -- TERASOLOGY'S module.txt IDEA: A COMPONENT STATES ITS OWN REQUIREMENTS.
 //

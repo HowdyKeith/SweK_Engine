@@ -1,6 +1,6 @@
 // WebGLEngine/physics/statmech/paramagnet-selfcheck.mjs -- v3818
 //
-// Run: node physics/statmech/paramagnet-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/statmech/paramagnet-selfcheck.mjs   (~0.05s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // LOCALISED SPINS -- the non-interacting neighbour of ising.js -- GRADED ON THEIR MAGNETISATION AND THEIR HEAT.

@@ -1,6 +1,6 @@
 // tools/roundhouse/deflectAdoption-selfcheck.mjs
 //
-// Run: node tools/roundhouse/deflectAdoption-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/deflectAdoption-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2933 -- THE FIFTH AND LAST DIAGNOSED FIX, AND THE ONE THAT CHANGED A FIELD'S MEANING.

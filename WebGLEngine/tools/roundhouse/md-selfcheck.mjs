@@ -1,6 +1,6 @@
 // tools/roundhouse/md-selfcheck.mjs
 //
-// Run: node tools/roundhouse/md-selfcheck.mjs   (~20s)
+// Run: node tools/roundhouse/md-selfcheck.mjs   (~0.7s)
 //
 // v3199 -- FOUR MODULES IN ONE ROUND, AND THE HONEST WAY TO DO IT.
 //

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/sheddingSpectrum-selfcheck.mjs -- v2797
 //
-// Run: node tools/ship/sheddingSpectrum-selfcheck.mjs   (~121s -- MEASURED; the last section runs a real LBM sim)
+// Run: node tools/ship/sheddingSpectrum-selfcheck.mjs   (~36s -- MEASURED; the last section runs a real LBM sim)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES simulation/lbm/sheddingSpectrum.mjs on two levels, both with real answer keys:

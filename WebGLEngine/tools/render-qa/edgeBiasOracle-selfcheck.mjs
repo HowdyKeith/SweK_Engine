@@ -1,6 +1,6 @@
 // WebGLEngine/tools/render-qa/edgeBiasOracle-selfcheck.mjs -- v3502
 //
-// Run: node tools/render-qa/edgeBiasOracle-selfcheck.mjs   (~40s)
+// Run: node tools/render-qa/edgeBiasOracle-selfcheck.mjs   (~5s)
 //
 // v3501 gave terminatorBow a right answer instead of a threshold. THIS IS THE SAME TREATMENT FOR THE OTHER
 // GEOMETRIC CHECK, edgeBiasProfile -- the one built at v3181 to find the 1/cos ray-march signature on

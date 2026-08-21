@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/directStrategy-selfcheck.mjs -- v3495
 //
-// Run: node physics/render/directStrategy-selfcheck.mjs   (~40s)
+// Run: node physics/render/directStrategy-selfcheck.mjs   (~4s)
 //
 // *** v3489 MEASURED MIS ON A DIFFUSE SURFACE AND CALLED IT A TRADE RATHER THAN A WIN -- 1.4x at one light size
 // and 300x WORSE at another -- AND WROTE "DO NOT RE-PROPOSE WITHOUT NEW EVIDENCE". THIS IS THE NEW EVIDENCE, AND

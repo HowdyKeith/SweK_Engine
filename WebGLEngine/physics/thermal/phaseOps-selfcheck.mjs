@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/phaseOps-selfcheck.mjs -- v3669
 //
-// Run: node physics/thermal/phaseOps-selfcheck.mjs   (~2s -- MEASURED with date +%s%N around the run)
+// Run: node physics/thermal/phaseOps-selfcheck.mjs   (~0.1s -- MEASURED with date +%s%N around the run)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THE PROPERTY IS REACHABILITY, AND IT IS PROVEN BY WALKING THE IMPORT GRAPH RATHER THAN BY READING ONE

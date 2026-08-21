@@ -1,6 +1,6 @@
 // WebGLEngine/physics/quantum/schrodinger1d-selfcheck.mjs -- v2822
 //
-// Run: node physics/quantum/schrodinger1d-selfcheck.mjs   (~10s)
+// Run: node physics/quantum/schrodinger1d-selfcheck.mjs   (~0.1s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES physics/quantum/schrodinger1d.js -- the lab's first quantum instrument.

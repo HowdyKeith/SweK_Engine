@@ -1,6 +1,6 @@
 // tools/roundhouse/friction-selfcheck.mjs
 //
-// Run: node tools/roundhouse/friction-selfcheck.mjs   (~25s)
+// Run: node tools/roundhouse/friction-selfcheck.mjs   (~0.2s)
 //
 // v3200 -- THE SEVENTEEN WERE NOT A BATCH, AND THAT IS THE FINDING.
 //

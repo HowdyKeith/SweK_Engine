@@ -1,6 +1,6 @@
 // tools/roundhouse/assumptions-selfcheck.mjs
 //
-// Run: node tools/roundhouse/assumptions-selfcheck.mjs   (~10s)
+// Run: node tools/roundhouse/assumptions-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3100 -- AN ASSUMPTION THAT LIVES IN A COMMENT DOES NOT TRAVEL WITH THE NUMBER.

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/hmc/tune-selfcheck.mjs — v3282
 //
-// Run: node physics/hmc/tune-selfcheck.mjs   (~6s — MEASURED)
+// Run: node physics/hmc/tune-selfcheck.mjs   (~0.1s — MEASURED)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The proposer-adjudicator handshake, gated: (1) the tuned config beats a deliberately bad baseline on

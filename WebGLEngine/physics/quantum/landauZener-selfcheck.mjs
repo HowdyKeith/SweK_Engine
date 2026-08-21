@@ -1,6 +1,6 @@
 // WebGLEngine/physics/quantum/landauZener-selfcheck.mjs — v3284
 //
-// Run: node physics/quantum/landauZener-selfcheck.mjs   (~25s — MEASURED; the v=60 sweeps dominate)
+// Run: node physics/quantum/landauZener-selfcheck.mjs   (~3s — MEASURED; the v=60 sweeps dominate)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The key is the closed form P = exp(-pi D^2 / 2v), which the integrator does not contain. It is checked ACROSS

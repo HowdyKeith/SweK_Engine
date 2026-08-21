@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/corroborationReach-selfcheck.mjs -- v3511
 //
-// Run: node tools/roundhouse/corroborationReach-selfcheck.mjs   (~20s)
+// Run: node tools/roundhouse/corroborationReach-selfcheck.mjs   (~0.2s)
 //
 // *** THE RATCHET GUARDS THE NUMERATOR AND NEVER THE RATE, AND THAT IS THE WHOLE DESIGN. ***
 //

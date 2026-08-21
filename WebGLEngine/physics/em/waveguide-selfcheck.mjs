@@ -1,6 +1,6 @@
 // WebGLEngine/physics/em/waveguide-selfcheck.mjs — v3408
 //
-// Run: node physics/em/waveguide-selfcheck.mjs   (~40s — MEASURED individually)
+// Run: node physics/em/waveguide-selfcheck.mjs   (~1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A hollow metal pipe carries NOTHING below its cutoff, and above it carries a discrete set of modes. Both come

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/consistencyFleet-selfcheck.mjs — v3285
 //
-// Run: node physics/consistencyFleet-selfcheck.mjs   (~40s — MEASURED; two routes are really executed)
+// Run: node physics/consistencyFleet-selfcheck.mjs   (~0.2s — MEASURED; two routes are really executed)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The board going fleet-wide brings one tempting mistake with it: run the SAME route on two machines, watch the

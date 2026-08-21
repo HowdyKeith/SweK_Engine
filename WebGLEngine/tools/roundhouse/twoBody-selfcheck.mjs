@@ -1,6 +1,6 @@
 // tools/roundhouse/twoBody-selfcheck.mjs
 //
-// Run: node tools/roundhouse/twoBody-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/twoBody-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2937 -- A NEW DEVICE, SO THE GATE MUST EARN IT. Three closed-form keys and a new conserved quantity, each

@@ -1,6 +1,6 @@
 // tools/roundhouse/plastic-selfcheck.mjs
 //
-// Run: node tools/roundhouse/plastic-selfcheck.mjs   (~2s)
+// Run: node tools/roundhouse/plastic-selfcheck.mjs   (~0.2s)
 //
 // v3211 -- PLASTICITY GRADED, AND BOTH OF ITS PARAMETERS RECOVERED FROM BEHAVIOUR.
 //

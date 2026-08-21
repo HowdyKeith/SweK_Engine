@@ -1,6 +1,6 @@
 // WebGLEngine/physics/em/hall-selfcheck.mjs — v3409
 //
-// Run: node physics/em/hall-selfcheck.mjs   (~55s — MEASURED individually)
+// Run: node physics/em/hall-selfcheck.mjs   (~1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THE FALSIFIER IS A QUANTITY THAT MUST NOT CHANGE. ***

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/bec-selfcheck.mjs -- v3814
 //
-// Run: node physics/thermal/bec-selfcheck.mjs   (~2s, MEASURED)
+// Run: node physics/thermal/bec-selfcheck.mjs   (~0.8s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // BOSE-EINSTEIN CONDENSATION, GRADED AT ITS TRANSITION AND ITS TWO EDGES.

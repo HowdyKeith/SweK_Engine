@@ -1,6 +1,6 @@
 // tools/roundhouse/lensDeflectReference-selfcheck.mjs
 //
-// Run: node tools/roundhouse/lensDeflectReference-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/lensDeflectReference-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2930 -- ITEM 6, AND IT WAS NOT A MISSING ESTIMATOR. IT WAS A WRONG REFERENCE.

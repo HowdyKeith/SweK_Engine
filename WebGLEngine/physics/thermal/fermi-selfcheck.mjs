@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/fermi-selfcheck.mjs -- v3815
 //
-// Run: node physics/thermal/fermi-selfcheck.mjs   (~2s, MEASURED)
+// Run: node physics/thermal/fermi-selfcheck.mjs   (~0.5s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE DEGENERATE FERMI GAS, THE MIRROR OF bec.mjs, GRADED AT T = 0, AT LOW T, AND AGAINST ITS STATISTICS.

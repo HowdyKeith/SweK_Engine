@@ -1,6 +1,6 @@
 // tools/roundhouse/magmapAndroid-selfcheck.mjs
 //
-// Run: node tools/roundhouse/magmapAndroid-selfcheck.mjs   (~30 s: import-graph walk + one emulated full run)
+// Run: node tools/roundhouse/magmapAndroid-selfcheck.mjs   (~0.4 s: import-graph walk + one emulated full run)
 //
 // v2921 -- THE EXPERIMENT IS GATED BEFORE THE PHONE OPENS IT. Four things can silently rot a browser experiment
 // between the desk and the device, and each gets a check:

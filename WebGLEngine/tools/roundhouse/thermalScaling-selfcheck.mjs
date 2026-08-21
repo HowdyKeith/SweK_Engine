@@ -1,6 +1,6 @@
 // tools/roundhouse/thermalScaling-selfcheck.mjs
 //
-// Run: node tools/roundhouse/thermalScaling-selfcheck.mjs   (~232s -- MEASURED, was a typed ~40s)
+// Run: node tools/roundhouse/thermalScaling-selfcheck.mjs   (~50s -- MEASURED, was a typed ~40s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3105 -- thermal's SECOND KEY IS THE SCALING, AND ITS CONVECTION CLAIM DOES NOT SURVIVE BEING MEASURED.

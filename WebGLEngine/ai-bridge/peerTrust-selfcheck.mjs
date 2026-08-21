@@ -1,6 +1,6 @@
 // WebGLEngine/ai-bridge/peerTrust-selfcheck.mjs — v3284
 //
-// Run: node ai-bridge/peerTrust-selfcheck.mjs   (~1s — MEASURED; real ed25519, no mocks)
+// Run: node ai-bridge/peerTrust-selfcheck.mjs   (~0.1s — MEASURED; real ed25519, no mocks)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The decision under test: LAN keeps trust-on-pair, external requires a signature verifying against the locally

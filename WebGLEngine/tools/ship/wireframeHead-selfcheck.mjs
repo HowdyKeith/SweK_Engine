@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/wireframeHead-selfcheck.mjs
 //
-// Run: node tools/ship/wireframeHead-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/wireframeHead-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3239 -- ONE DEFINITION OF THE WIREFRAME HEAD'S SHAPE.

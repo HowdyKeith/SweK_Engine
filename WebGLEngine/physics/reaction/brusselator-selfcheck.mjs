@@ -1,6 +1,6 @@
 // WebGLEngine/physics/reaction/brusselator-selfcheck.mjs — v3319
 //
-// Run: node physics/reaction/brusselator-selfcheck.mjs   (~25s — MEASURED individually)
+// Run: node physics/reaction/brusselator-selfcheck.mjs   (~0.4s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Turing's 1952 result: DIFFUSION, the process that smooths everything, can destabilise a uniform state and make

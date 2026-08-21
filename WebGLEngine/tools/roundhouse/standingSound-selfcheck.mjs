@@ -1,6 +1,6 @@
 // tools/roundhouse/standingSound-selfcheck.mjs
 //
-// Run: node tools/roundhouse/standingSound-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/standingSound-selfcheck.mjs   (~0.5s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3101 -- THE FOUR CRITERIA SAY THE NUMBER IS WELL BEHAVED. THEY DO NOT SAY IT IS MEANINGFUL.

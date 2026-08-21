@@ -1,6 +1,6 @@
 // WebGLEngine/physics/orbits/kepler-selfcheck.mjs -- v2820
 //
-// Run: node physics/orbits/kepler-selfcheck.mjs   (~10s)
+// Run: node physics/orbits/kepler-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES physics/orbits/kepler.js -- two-body orbits, and the sharpest demonstration in the lab that HOW YOU

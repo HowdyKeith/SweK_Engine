@@ -1,6 +1,6 @@
 // WebGLEngine/physics/tomography/reconQuality-selfcheck.mjs — v3340
 //
-// Run: node physics/tomography/reconQuality-selfcheck.mjs   (~45s — MEASURED individually)
+// Run: node physics/tomography/reconQuality-selfcheck.mjs   (~0.5s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE FIRST PLACE THE PERCEPTUAL METRICS MEET EXACT GROUND TRUTH. The phantom is CONSTRUCTED from ellipses

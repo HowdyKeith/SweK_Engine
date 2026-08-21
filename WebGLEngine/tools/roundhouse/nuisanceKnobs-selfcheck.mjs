@@ -1,6 +1,6 @@
 // tools/roundhouse/nuisanceKnobs-selfcheck.mjs
 //
-// Run: node tools/roundhouse/nuisanceKnobs-selfcheck.mjs   (~2 min)
+// Run: node tools/roundhouse/nuisanceKnobs-selfcheck.mjs   (~3 s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2906 -- THE FIRST TIME CRITERION 2 WAS ASKED, AND THE FIRST TIME IT FAILED.

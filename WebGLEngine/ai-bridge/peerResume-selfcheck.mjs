@@ -1,6 +1,6 @@
 // ai-bridge/peerResume-selfcheck.mjs
 //
-// Run: node ai-bridge/peerResume-selfcheck.mjs   (~2s)
+// Run: node ai-bridge/peerResume-selfcheck.mjs   (~0.1s)
 //
 // v3160 -- /peer/dl/get NOW HONOURS A RANGE, AND THERE IS A MANIFEST TO RESUME AGAINST.
 //

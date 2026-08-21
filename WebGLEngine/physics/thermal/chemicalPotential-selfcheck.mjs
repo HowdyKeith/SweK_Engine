@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/chemicalPotential-selfcheck.mjs -- v3817
 //
-// Run: node physics/thermal/chemicalPotential-selfcheck.mjs   (~3s, MEASURED)
+// Run: node physics/thermal/chemicalPotential-selfcheck.mjs   (~0.7s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE FINITE-T CHEMICAL POTENTIAL, THE THREAD THROUGH bec, fermi AND sackurTetrode. One density constraint

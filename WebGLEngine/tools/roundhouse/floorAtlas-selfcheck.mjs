@@ -1,6 +1,6 @@
 // tools/roundhouse/floorAtlas-selfcheck.mjs — v3284
 //
-// Run: node tools/roundhouse/floorAtlas-selfcheck.mjs   (~1s — MEASURED; pure folding, no physics)
+// Run: node tools/roundhouse/floorAtlas-selfcheck.mjs   (~0.1s — MEASURED; pure folding, no physics)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The atlas has one job that is easy to get subtly wrong: aggregating measurements that must NOT be aggregated.

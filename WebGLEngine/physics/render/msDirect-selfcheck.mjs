@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/msDirect-selfcheck.mjs -- v3499
 //
-// Run: node physics/render/msDirect-selfcheck.mjs   (~30s)
+// Run: node physics/render/msDirect-selfcheck.mjs   (~8s)
 //
 // *** v3495 REFUSED THIS COMBINATION RATHER THAN APPROXIMATING IT: an msTable with direct="nee" or "mis" THREW,
 // because next-event estimation evaluated the SINGLE-SCATTERING lobe only and the compensation lobe's share

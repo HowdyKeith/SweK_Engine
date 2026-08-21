@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/blackbody-selfcheck.mjs -- v3811
 //
-// Run: node physics/thermal/blackbody-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/blackbody-selfcheck.mjs   (~0.4s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // BLACKBODY RADIATION, GRADED AGAINST MATHEMATICAL CONSTANTS AND DEFINED SI VALUES -- NOT ONE TYPED REFERENCE.

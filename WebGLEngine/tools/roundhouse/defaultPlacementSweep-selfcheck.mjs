@@ -1,6 +1,6 @@
 // tools/roundhouse/defaultPlacementSweep-selfcheck.mjs
 //
-// Run: node tools/roundhouse/defaultPlacementSweep-selfcheck.mjs   (~4 min, scoped)
+// Run: node tools/roundhouse/defaultPlacementSweep-selfcheck.mjs   (~22 s, scoped)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2918 -- THE DETECTOR WORKED, FOUND TWO MORE REAL BASINS, AND PRODUCED ONE FALSE POSITIVE THAT WAS MORE

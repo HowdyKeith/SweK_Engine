@@ -1,6 +1,6 @@
 // WebGLEngine/physics/blackhole/kerrOrbit-selfcheck.mjs — v3299
 //
-// Run: node physics/blackhole/kerrOrbit-selfcheck.mjs   (~10s — MEASURED individually)
+// Run: node physics/blackhole/kerrOrbit-selfcheck.mjs   (~1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE ROUND errorPairAudit ASKED FOR. Its finding: kerr shipped with two error-pair keys and NEITHER was

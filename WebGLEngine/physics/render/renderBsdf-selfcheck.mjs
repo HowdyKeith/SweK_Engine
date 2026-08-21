@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/renderBsdf-selfcheck.mjs -- v3493
 //
-// Run: node physics/render/renderBsdf-selfcheck.mjs   (~20s)
+// Run: node physics/render/renderBsdf-selfcheck.mjs   (~6s)
 //
 // *** THREE MODULES WERE GRADED AND UNCALLED -- microfacet (v3490), fresnel (v3491), energyCompensation (v3492)
 // -- WHICH IS v3473's nee.mjs SHAPE THREE TIMES OVER. This is the round that gives them a consumer, and the

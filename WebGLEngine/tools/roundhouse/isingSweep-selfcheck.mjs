@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/isingSweep-selfcheck.mjs — v3311
 //
-// Run: node tools/roundhouse/isingSweep-selfcheck.mjs   (~40s — MEASURED individually)
+// Run: node tools/roundhouse/isingSweep-selfcheck.mjs   (~0.9s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE FIRST REAL QUESTION PUT TO sweepDevice, and the point is that NOTHING HERE IS ISING-SPECIFIC MACHINERY.

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/astroparticle/astroparticle-selfcheck.mjs — v3426
 //
-// Run: node physics/astroparticle/astroparticle-selfcheck.mjs   (~30s — MEASURED individually)
+// Run: node physics/astroparticle/astroparticle-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // TWO DEVICES, AND EACH ONE IS ABOUT WHAT A CHECK CANNOT SEE.

@@ -1,6 +1,6 @@
 // tools/roundhouse/androidVerdict-selfcheck.mjs
 //
-// Run: node tools/roundhouse/androidVerdict-selfcheck.mjs   (~30 s: synthetic grading + one real scoped run)
+// Run: node tools/roundhouse/androidVerdict-selfcheck.mjs   (~6 s: synthetic grading + one real scoped run)
 //
 // v2920 -- THE GRADER IS GRADED BEFORE ANY PHONE MEETS IT. Every rule the verdict claims to enforce is driven
 // here with synthetic transcripts where the right answer is known by construction:

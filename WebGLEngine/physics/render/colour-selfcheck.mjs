@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/colour-selfcheck.mjs -- v3497
 //
-// Run: node physics/render/colour-selfcheck.mjs   (~10s)
+// Run: node physics/render/colour-selfcheck.mjs   (~0.4s)
 //
 // *** RADIANCE WAS A SCALAR THROUGH THIS WHOLE ARC. The key everybody reaches for is that A GREY WORLD MUST
 // RETURN IDENTICAL VALUES PER CHANNEL -- and it is NECESSARY AND NOT SUFFICIENT, because a renderer that

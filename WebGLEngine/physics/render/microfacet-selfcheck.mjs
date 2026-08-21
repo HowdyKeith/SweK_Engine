@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/microfacet-selfcheck.mjs -- v3490
 //
-// Run: node physics/render/microfacet-selfcheck.mjs   (~5s)
+// Run: node physics/render/microfacet-selfcheck.mjs   (~2s)
 //
 // *** THE FURNACE TEST'S ACTUAL PURPOSE: DOES THIS MATERIAL MODEL CONSERVE ENERGY. *** v3467 built the furnace
 // for a Lambertian surface, where the answer is the albedo and the fault is a wrong sampler. That is not what

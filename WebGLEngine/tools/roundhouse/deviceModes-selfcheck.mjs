@@ -1,6 +1,6 @@
 // tools/roundhouse/deviceModes-selfcheck.mjs
 //
-// Run: node tools/roundhouse/deviceModes-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/deviceModes-selfcheck.mjs   (~0.2s)
 //
 // v3189 -- THE FRONT DOOR COULD NOT SAY HOW MANY MODES A DEVICE HAS, AND THREE DEVICES REFUSE NOTHING.
 //

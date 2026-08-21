@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/pageSections-selfcheck.mjs
 //
-// Run: node tools/ship/pageSections-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/pageSections-selfcheck.mjs   (~0.3s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3227 -- ARRIVING PAGES HELD 96 OF 315. NOW IT HOLDS EIGHT, AND THE OTHER 88 ARE IN DRAWERS.

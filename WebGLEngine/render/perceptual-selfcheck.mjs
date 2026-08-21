@@ -1,6 +1,6 @@
 // WebGLEngine/render/perceptual-selfcheck.mjs — v3337
 //
-// Run: node render/perceptual-selfcheck.mjs   (~15s — MEASURED individually)
+// Run: node render/perceptual-selfcheck.mjs   (~0.5s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A PIXEL DIFF IS THE WRONG QUESTION, in two directions at once. physics/backendVisualDiff.mjs counts pixels

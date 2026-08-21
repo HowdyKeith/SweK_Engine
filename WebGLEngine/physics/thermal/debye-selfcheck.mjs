@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/debye-selfcheck.mjs -- v3812
 //
-// Run: node physics/thermal/debye-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/debye-selfcheck.mjs   (~0.1s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE DEBYE HEAT CAPACITY, GRADED AT BOTH LIMITS AND AGAINST THE RADIATION INTEGRAL IT REDUCES TO.
