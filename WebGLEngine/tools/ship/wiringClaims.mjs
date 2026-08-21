@@ -137,6 +137,7 @@ export function auditClaims(root = ENG) {
             src.split(/\r?\n/).forEach((line, i) => {
                 if (!CLAIM_PATTERNS.some((re) => re.test(line))) return;
                 // The subject is any path-like token on the same line.
+                const rel = path.relative(ENG, p).replace(/\\/g, "/");
                 const subjects = [];
                 for (const m of line.matchAll(/([\w./-]+\.(?:js|mjs))\b/g)) {
                     const rel = m[1].replace(/^\.?\//, "");
@@ -158,13 +159,33 @@ export function auditClaims(root = ENG) {
                 // mega-comment: A LINE NAMING MORE MODULES THAN A CONTRAST CAN IS PROSE, NOT A RECORD. Such
                 // lines are RETURNED SEPARATELY rather than dropped -- an exclusion nobody can see is the next
                 // round's mystery, and main.js line 1967 already records this same line as a known hazard.
+                // *** v3934 -- THE CHANGELOG RECORDS CLAIMS; IT DOES NOT MAKE THEM. ***
+                //
+                // v3932 cut 300 hits to 6 by refusing lines that name more modules than a contrast can. Then
+                // v3932's OWN CHANGELOG BLOCK -- describing the officeDispatch fix, in main.js -- arrived as a
+                // fresh two-subject claim, because a changelog block is multi-line and each line names few
+                // modules. THE AUDITOR WAS READING THE RECORD OF ITS OWN FINDING AS A NEW FINDING.
+                //
+                // main.js is the engine's changelog. Every block in it is a DATED HISTORICAL RECORD, written in
+                // the past tense about a state that has usually been fixed -- that is what a changelog is for.
+                // Reading it as live prose means every round's write-up becomes next round's claim, forever.
+                // Excluded by NAME because there is exactly one such file and pretending otherwise would be a
+                // derived-sounding rule with one member; REPORTED alongside the prose blocks so the exclusion is
+                // visible rather than silent. main.js line 1967 already records this same file as a hazard for a
+                // different scanner.
+                if (rel === "main.js") {
+                    prose.push({ file: rel, line: i + 1, subjects: subjects.length,
+                                 why: "engine changelog: a dated record OF a claim, not a claim",
+                                 text: line.trim().slice(0, 120) });
+                    return;
+                }
                 if (subjects.length > MAX_SUBJECTS_PER_CLAIM) {
-                    prose.push({ file: path.relative(ENG, p).replace(/\\/g, "/"), line: i + 1,
-                                 subjects: subjects.length, text: line.trim().slice(0, 120) });
+                    prose.push({ file: rel, line: i + 1, subjects: subjects.length,
+                                 why: "names more modules than a contrast line can", text: line.trim().slice(0, 120) });
                     return;
                 }
                 for (const hit of subjects) {
-                    out.push({ file: path.relative(ENG, p).replace(/\\/g, "/"), line: i + 1, subject: hit, text: line.trim().slice(0, 150) });
+                    out.push({ file: rel, line: i + 1, subject: hit, text: line.trim().slice(0, 150) });
                 }
             });
         }

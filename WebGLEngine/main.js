@@ -4256,6 +4256,15 @@
 // also real and also about the wrong tree. THE HABIT THAT CATCHES IT IS CHECKING HEAD BEFORE BELIEVING A
 // SURPRISE, and the habit that limits it is committing the moment a block goes green.
 //
+// *** AND THE ROUND'S WRITE-UP BECAME THE NEXT ROUND'S CLAIM, WHICH IS THE THIRD TIME MY OWN PROSE HAS TRIPPED
+// A SCANNER I WAS FIXING. *** v3932 cut wiringClaims from 300 hits to 6; then v3932's OWN CHANGELOG BLOCK,
+// describing the officeDispatch fix, arrived as a fresh two-subject claim -- THE AUDITOR READING THE RECORD OF
+// ITS OWN FINDING AS A NEW FINDING. main.js is the engine's changelog and every block in it is a DATED RECORD
+// OF a claim, written in the past tense about a state usually already fixed. Read as live prose, every round's
+// write-up becomes next round's work, forever. Excluded BY NAME because there is exactly one such file and a
+// derived-sounding rule with one member is a fiction -- and REPORTED beside the prose blocks so the exclusion
+// is visible. DRIVEN: restoring officeDispatch's present tense still turns the gate red.
+//
 // SIXTEEN OF THE NINETEEN ARE CLOSED, and the ordinary work is done. Three remain, all by decision rather than
 // by neglect: definitionGates and referenceKind are deliberately red until their debt is paid, and singleSource
 // is a refactor across dozens of files.
