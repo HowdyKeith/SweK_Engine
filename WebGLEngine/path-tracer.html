@@ -28,7 +28,7 @@
   <p class="sub">Monte Carlo path tracing, in JavaScript, on the CPU &mdash; <a href="/server.html">&larr; back</a></p>
 
   <div class="wrap">
-    <div><canvas id="cv" width="128" height="128"></canvas>
+    <div><canvas id="cv" width="128" height="128" style="width:100%;max-width:160px;height:auto"></canvas>
       <div id="prog" class="sub" style="margin-top:6px">idle</div></div>
 
     <div class="panel">
@@ -87,7 +87,7 @@
     surface <code>marchingTets</code> extracts from the same field &mdash; two independent routes to one surface.
   </p>
   <div class="wrap">
-    <div><canvas id="mcv" width="160" height="160"></canvas>
+    <div><canvas id="mcv" width="160" height="160" style="width:100%;max-width:200px;height:auto"></canvas>
       <div id="mprog" class="sub" style="margin-top:6px">idle</div></div>
     <div class="panel">
       <label>Max step <span id="msv" class="sub"></span></label>
@@ -174,7 +174,7 @@
     is the output, read back as floats and compared against the CPU module.
   </p>
   <div class="wrap">
-    <div><canvas id="gcv" width="256" height="192" style="width:256px;image-rendering:pixelated"></canvas>
+    <div><canvas id="gcv" width="256" height="192" style="width:256px;image-rendering:pixelated;width:100%;max-width:320px;height:auto"></canvas>
       <div id="gprog" class="sub" style="margin-top:6px">idle</div></div>
     <div class="panel">
       <button id="ggo">Ask the GPU</button>
@@ -224,7 +224,7 @@
     was already built &mdash; ten rounds of graded scalar renderer, run three times.
   </p>
   <div class="wrap">
-    <div><canvas id="ccv" width="140" height="140" style="width:140px"></canvas>
+    <div><canvas id="ccv" width="140" height="140" style="width:140px;width:100%;max-width:180px;height:auto"></canvas>
       <div id="cprog" class="sub" style="margin-top:6px">idle</div></div>
     <div class="panel">
       <label>Scene</label>
@@ -275,7 +275,7 @@
     <b>Nothing in the renderer is told that curve.</b>
   </p>
   <div class="wrap">
-    <div><canvas id="tocv" width="160" height="160" style="width:160px"></canvas>
+    <div><canvas id="tocv" width="160" height="160" style="width:160px;width:100%;max-width:200px;height:auto"></canvas>
       <div id="toprog" class="sub" style="margin-top:6px">idle</div></div>
     <div class="panel">
       <button id="togo">Sweep the light angle</button>
@@ -292,7 +292,7 @@
     topmost covered row per column is <code>c<sub>y</sub> &minus; &radic;(R&sup2;&minus;dx&sup2;)</code>.
   </p>
   <div class="wrap">
-    <div><canvas id="ebcv" width="150" height="150" style="width:150px"></canvas>
+    <div><canvas id="ebcv" width="150" height="150" style="width:150px;width:100%;max-width:190px;height:auto"></canvas>
       <div id="ebprog" class="sub" style="margin-top:6px">idle</div></div>
     <div class="panel">
       <button id="ebgo">Measure the profile</button>
