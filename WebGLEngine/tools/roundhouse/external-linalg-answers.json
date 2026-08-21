@@ -1,0 +1,18 @@
+{
+ "source": "reference LAPACK (Netlib) via external-linalg.c",
+ "answers": [
+  {"name": "double-integrator.ctrb", "claim": "rank", "value": 2},
+  {"name": "double-integrator.obsv", "claim": "rank", "value": 2},
+  {"name": "double-integrator.A", "claim": "det", "value": 0},
+  {"name": "uncontrollable.ctrb", "claim": "rank", "value": 1},
+  {"name": "uncontrollable.obsv", "claim": "rank", "value": 1},
+  {"name": "uncontrollable.A", "claim": "det", "value": 2},
+  {"name": "jordan.ctrb", "claim": "rank", "value": 3},
+  {"name": "jordan.obsv", "claim": "rank", "value": 3},
+  {"name": "jordan.A", "claim": "det", "value": 8},
+  {"name": "uncontrollable-2in.ctrb", "claim": "rank", "value": 2},
+  {"name": "uncontrollable-2in.obsv", "claim": "rank", "value": 2},
+  {"name": "uncontrollable-2in.A", "claim": "det", "value": 6},
+  {"name": "hilbert4.A", "claim": "det", "value": 1.6534391534393001e-07}
+ ]
+}

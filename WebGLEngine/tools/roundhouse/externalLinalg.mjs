@@ -50,6 +50,23 @@ export function problems() {
     push("double-integrator", [[0, 1], [0, 0]], [[0], [1]], [[1, 0]]);
     push("uncontrollable", [[1, 0], [0, 2]], [[1], [0]], [[1, 0]]);
     push("jordan", [[2, 1, 0], [0, 2, 1], [0, 0, 2]], [[0], [0], [1]], [[1, 0, 0]]);
+    // *** v3936 -- THE PROBLEM THAT MAKES A GUARD LOAD-BEARING, AND IT TOOK TWO TRIES TO FIND IT. ***
+    // external-linalg.c transposes row-major into column-major explicitly, and its own comment says why: get it
+    // backwards and you have A-transpose, which has THE SAME RANK AND THE SAME DETERMINANT, so the mistake passes
+    // silently. That warning was written and never tested -- every other problem here is SQUARE, and deleting the
+    // transpose outright was MEASURED to leave all ten answers byte-identical. A guard nothing can fail is decor.
+    //
+    // FIRST GUESS WAS WRONG AND THE MEASUREMENT SAID SO. "Make it rectangular" is not enough: on a non-square
+    // matrix the mistake stops being a transpose and becomes a genuine reshuffle, but a reshuffle of a FULL-RANK
+    // matrix is still full rank, so a controllable multi-input system reads 3 either way and catches nothing. What
+    // discriminates is RANK DEFICIENCY plus rectangularity -- the reshuffle scatters a dependent column's entries
+    // across independent ones and the rank goes UP.
+    //
+    // So: diag(1,2,3) with the third mode unreachable. ctrb is 3x6 of rank 2, and the reshuffle reads 3. This is
+    // the multi-input twin of the "uncontrollable" pair already above, whose own note says the uncontrollable case
+    // is the one that matters -- not a matrix invented to trip a checker. THE ROW THAT DOES THE CATCHING IS
+    // uncontrollable-2in.ctrb; its obsv is rectangular too and is blind, which is stated rather than implied.
+    push("uncontrollable-2in", [[1, 0, 0], [0, 2, 0], [0, 0, 3]], [[1, 0], [0, 1], [0, 0]], [[1, 0, 0], [0, 1, 0]]);
     // A deliberately ill-conditioned symmetric matrix: the case where "agrees to 1e-12" is a claim about the
     // PROBLEM rather than about either solver, and where a fixed tolerance would be dishonest.
     push("hilbert4", hilbert(4), null, null);
@@ -78,14 +95,18 @@ export function ours() {
  * it natively. Each side does the job it cannot get wrong.
  * Format: one problem per block -- name claim rows cols, then rows*cols doubles, whitespace-separated.
  */
-export function writeProblemsText(file = PROBLEM_FILE.replace(/\.json$/, ".txt")) {
+export function problemsText() {
     const ps = problems();
     const L = [String(ps.length)];
     for (const p of ps) {
         L.push(p.name + " " + p.claim + " " + p.M.length + " " + p.M[0].length);
         for (const row of p.M) L.push(row.map((x) => x.toPrecision(17)).join(" "));
     }
-    fs.writeFileSync(file, L.join("\n") + "\n");
+    return L.join("\n") + "\n";
+}
+
+export function writeProblemsText(file = PROBLEM_FILE.replace(/\.json$/, ".txt")) {
+    fs.writeFileSync(file, problemsText());
     return file;
 }
 
@@ -113,12 +134,36 @@ export function toleranceFor(p) {
  */
 export function grade(answerFile = ANSWER_FILE) {
     if (!fs.existsSync(answerFile)) {
-        return { state: "absent", file: answerFile, rows: [],
+        return { state: "absent", file: answerFile, rows: [], disagreements: [],
                  why: "no external answers on disk. THIS IS NOT A PASS -- LAPACK has not run, so nothing has been corroborated." };
     }
     let ext;
     try { ext = JSON.parse(fs.readFileSync(answerFile, "utf8")); }
-    catch (e) { return { state: "unreadable", file: answerFile, rows: [], why: String(e && e.message || e) }; }
+    catch (e) { return { state: "unreadable", file: answerFile, rows: [], disagreements: [], why: String(e && e.message || e) }; }
+
+    // *** v3936 -- A KEY IS ONLY A KEY FOR THE QUESTIONS IT WAS ASKED. *** Once the answers are committed, the
+    // problems can be edited without them, and a stale key still LOOKS like corroboration. The loud version of
+    // that is harmless: add a problem and its answer is missing, which already fails below. THE QUIET VERSION IS
+    // THE DANGEROUS ONE -- change a matrix in a way that happens to preserve rank and det, and a key computed on
+    // the OLD matrix agrees with the engine's reading of the NEW one, certifying a comparison nobody made.
+    // So the problems as they stand NOW are re-derived and checked against the text that was actually fed to
+    // LAPACK. This is a content comparison, not a timestamp: touching a file is not editing it, and v3936 spent
+    // a round on a freshness check that could not tell those apart.
+    // TWO POPULATIONS, TWO TREATMENTS. This only applies to THE REAL KEY. A caller handing in an explicit fixture
+    // built from ours() is asking a different question -- "does the grader catch a wrong answer" -- and the
+    // problems file on disk has nothing to do with it. Folding the two made a corrupt problems file turn every
+    // fixture check stale, which is how this was found: the gate's own wrong-answer fixture stopped grading.
+    const textFile = PROBLEM_FILE.replace(/\.json$/, ".txt");
+    if (answerFile === ANSWER_FILE && fs.existsSync(textFile)) {
+        const onDisk = fs.readFileSync(textFile, "utf8");
+        const now = problemsText();
+        if (onDisk !== now) {
+            return { state: "stale", file: answerFile, rows: [], disagreements: [],
+                     why: "the problems have changed since this key was produced. LAPACK answered a DIFFERENT set of "
+                        + "questions, so these answers corroborate nothing about the current ones. Re-run the "
+                        + "reference: see external-linalg.c's header." };
+        }
+    }
     const byName = new Map((ext.answers || []).map((a) => [a.name + "|" + a.claim, a]));
     const rows = [];
     for (const o of ours()) {

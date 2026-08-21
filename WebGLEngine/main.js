@@ -4268,6 +4268,57 @@
 // gate said NO" and quotes the verify FAIL line; a step replaced with a bare nonzero exit reports that it printed
 // nothing readable and is a bug in the step. The cap is --step-timeout now, because a cap that cannot be raised on
 // a slower box is a cap that turns a slow machine into a red tree -- v3923's finding, which never reached here.
+//
+// =================================================================================================================
+// v3936 (second half) -- THE ANSWER KEY THAT COULD NOT BE PRODUCED WHERE THE GATES RUN, AND THE GUARD INSIDE IT
+// THAT NOTHING COULD FAIL.
+//
+// externalLinalg has reported "absent" -- NOT pass, ABSENT -- since v3687. Roughly 250 versions of a control that
+// was designed, built, argued for at length, and NEVER ONCE FIRED, because producing its key needed a Mac with
+// Accelerate and these gates run on Linux. The gate was scrupulously honest about it ("THIS IS NOT A PASS --
+// LAPACK has not run, so nothing has been corroborated"), which is why it never lied; it also never corroborated.
+//
+// dgesvd_ and dgetrf_ are the same Fortran symbols in reference LAPACK, so the port is an __APPLE__ conditional,
+// a typedef, and two hand-written extern declarations -- liblapack alone, no LAPACKE, no CBLAS. The Mac path is
+// byte-for-byte what it was. The answers file records WHICH LAPACK wrote it, because a key claiming Accelerate
+// that Netlib produced would be a lie in the one record whose entire value is knowing where its numbers came
+// from. THE INDEPENDENCE ARGUMENT IS UNTOUCHED: what matters is that nobody who wrote these routines has seen
+// this engine. 13 problems, all agreeing, 8 of them ranks agreeing as EXACT INTEGERS across elimination here and
+// the singular-value spectrum there.
+//
+// *** AND THE ROUND'S REAL FIND: to_col_major WAS DEAD CODE THAT LOOKED LIKE A GUARD. *** Its own comment says
+// why it exists -- get row/column major backwards and you have A-transpose, which has THE SAME RANK AND THE SAME
+// DETERMINANT, so the mistake passes silently. That was written at v3687 and never tested. EVERY PROBLEM IN THE
+// SET WAS SQUARE, and deleting the transpose outright was MEASURED to leave all ten answers BYTE-IDENTICAL. The
+// author saw the risk exactly, wrote the defence, and never built the case that could fail.
+//
+// MY FIRST FIX WAS WRONG AND ONE MEASUREMENT SAID SO. "Make it rectangular" does not do it: on a non-square
+// matrix the mistake stops being a transpose and becomes a genuine reshuffle, but A RESHUFFLE OF A FULL-RANK
+// MATRIX IS STILL FULL RANK -- a controllable 2-input system reads rank 3 either way and catches nothing. I added
+// exactly that, watched the plant stay silent, and had to go looking for what actually discriminates: RANK
+// DEFICIENCY plus rectangularity. diag(1,2,3) with the third mode unreachable gives ctrb 3x6 of rank 2, and the
+// reshuffle reads 3. Plant fires, and EXACTLY ONE ROW MOVES.
+//
+// A COMMITTED KEY CAN GO STALE, so the problems as they stand now are re-derived and compared against the text
+// actually fed to LAPACK. A CONTENT COMPARISON, NOT A TIMESTAMP -- touching a file is not editing it, which is
+// the same distinction the first half of this version spent a round on. Driven both ways: a quiet edit that
+// preserves rank and det still reports STALE, a touch still reports AGREES.
+//
+// AND THAT GUARD HAD A BUG I PUT IN IT, found by driving the branch rather than by reading it. The staleness
+// check fired for callers handing in an explicit FIXTURE, not just for the real key -- so a corrupt problems file
+// made the gate's own wrong-answer fixture stop grading and threw a TypeError instead. TWO POPULATIONS, TWO
+// TREATMENTS: a fixture asks "does the grader catch a wrong answer", the key asks "does LAPACK agree", and the
+// problems file on disk is irrelevant to the first. Every early return also carries disagreements: [] now, because
+// a caller reading that field should not have to know which state it got.
+//
+// LAST: the gate's closing line SAID "LAPACK HAS NOT RUN -- no Accelerate, no clang, no Apple hardware here". True
+// for 250 versions and false the hour the port landed, sitting in the closing position where a reader trusts it
+// most. A NOTE THAT ASSERTS THE STATE OF THE WORLD WILL EVENTUALLY LIE ABOUT IT. It asks the grader now; all three
+// branches -- agrees, absent, stale -- driven.
+//
+// NOT DONE: cholesky and solve. The module's header names four things the lab rolls by hand and this key grades
+// two. solve is the one worth having next, because unlike rank and det IT IS NOT TRANSPOSE-INVARIANT and would
+// make to_col_major load-bearing on square problems too.
 // =================================================================================================================
 // =================================================================================================================
 // v3935 -- SEVENTEEN OF NINETEEN. singleSource FLAGGED TWENTY-ONE FILES AND EXACTLY ONE WAS THE DEFECT.

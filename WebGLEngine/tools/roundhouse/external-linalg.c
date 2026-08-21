@@ -1,10 +1,16 @@
 // WebGLEngine/tools/roundhouse/external-linalg.c -- v3687
 // ---------------------------------------------------------------------------------------------------------------
-// THE OUTSIDE ANSWER KEY. Compile and run this ON A MAC; nothing in this tree can run it, which is the point.
+// THE OUTSIDE ANSWER KEY. It was Mac-only until v3936, and its gate had therefore reported "absent" -- not pass,
+// ABSENT -- for ~250 versions: a control designed, built, argued for, and never once fired, because producing the
+// key needed hardware the gates do not run on. Reference LAPACK is the same dgesvd/dgetrf and installs anywhere.
+// THE INDEPENDENCE ARGUMENT IS UNCHANGED: what matters is that nobody who wrote these routines has seen this
+// engine. Running BOTH is strictly better than running either, and that is now a thing Keith can do rather than
+// the only thing that works.
 //
 //   cd WebGLEngine
 //   node tools/roundhouse/externalLinalg.mjs --write-problems
-//   clang -O2 tools/roundhouse/external-linalg.c -framework Accelerate -o /tmp/exlinalg
+//   # on a Mac:            clang -O2 tools/roundhouse/external-linalg.c -framework Accelerate -o /tmp/exlinalg
+//   # where the gates run: cc    -O2 tools/roundhouse/external-linalg.c -llapack -lm      -o /tmp/exlinalg
 //   /tmp/exlinalg tools/roundhouse/external-linalg-problems.txt > tools/roundhouse/external-linalg-answers.json
 //   node tools/roundhouse/externalLinalg.mjs          # now it grades instead of skipping
 //
@@ -27,7 +33,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+// v3936 -- TWO LAPACKS, ONE PROGRAM. The Mac path is untouched; what is new is that this can also be built where
+// the gates actually run. dgesvd_ and dgetrf_ are the Fortran symbols BOTH libraries export, so the body below is
+// identical on either -- only the integer width and the header differ. Declaring the two symbols by hand on the
+// non-Apple side keeps the dependency down to liblapack alone: no LAPACKE, no CBLAS, no header hunt.
+#ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+typedef __CLPK_integer lapack_int_t;
+#define LINALG_SOURCE "Accelerate LAPACK (macOS) via external-linalg.c"
+#else
+// Reference LAPACK builds its Fortran INTEGER as 32-bit by default, which is what `int` is on every platform this
+// is likely to see. If anyone links an ILP64 build, THIS IS THE LINE THAT IS WRONG -- and it will not be subtle.
+typedef int lapack_int_t;
+extern void dgesvd_(char *jobu, char *jobvt, lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *lda,
+                    double *s, double *u, lapack_int_t *ldu, double *vt, lapack_int_t *ldvt,
+                    double *work, lapack_int_t *lwork, lapack_int_t *info);
+extern void dgetrf_(lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *lda,
+                    lapack_int_t *ipiv, lapack_int_t *info);
+#define LINALG_SOURCE "reference LAPACK (Netlib) via external-linalg.c"
+#endif
 
 #define MAXN 64
 
@@ -40,7 +64,7 @@ static void to_col_major(const double *rowmaj, double *colmaj, int m, int n) {
 
 static int rank_by_svd(const double *A, int m, int n, double *s1_out) {
     double a[MAXN * MAXN], s[MAXN], work[8 * MAXN * MAXN];
-    __CLPK_integer M = m, N = n, lda = m, lwork = 8 * MAXN * MAXN, info = 0, one = 1;
+    lapack_int_t M = m, N = n, lda = m, lwork = 8 * MAXN * MAXN, info = 0, one = 1;
     double u[1], vt[1];
     memcpy(a, A, sizeof(double) * m * n);
     char jobu = 'N', jobvt = 'N';
@@ -58,7 +82,7 @@ static int rank_by_svd(const double *A, int m, int n, double *s1_out) {
 
 static double det_by_lu(const double *A, int n) {
     double a[MAXN * MAXN];
-    __CLPK_integer N = n, lda = n, ipiv[MAXN], info = 0;
+    lapack_int_t N = n, lda = n, ipiv[MAXN], info = 0;
     memcpy(a, A, sizeof(double) * n * n);
     dgetrf_(&N, &N, a, &lda, ipiv, &info);
     if (info < 0) return NAN;
@@ -77,7 +101,7 @@ int main(int argc, char **argv) {
     if (!f) { fprintf(stderr, "cannot open %s\n", argv[1]); return 2; }
     int count = 0;
     if (fscanf(f, "%d", &count) != 1) { fprintf(stderr, "bad header\n"); return 2; }
-    printf("{\n \"source\": \"Accelerate LAPACK via external-linalg.c\",\n \"answers\": [\n");
+    printf("{\n \"source\": \"%s\",\n \"answers\": [\n", LINALG_SOURCE);
     for (int p = 0; p < count; p++) {
         char name[128], claim[32];
         int m = 0, n = 0;

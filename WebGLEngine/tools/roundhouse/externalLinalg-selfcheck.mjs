@@ -3,16 +3,19 @@
 // Run: node tools/roundhouse/externalLinalg-selfcheck.mjs   (~0.1s)
 //
 // *** THE DANGEROUS OBJECT IN THIS ROUND IS THE GRADER, NOT THE REFERENCE. *** A grader that returns "pass" when
-// the external answers are missing would certify whatever it is handed, forever, on every machine that is not a
-// Mac -- which is every machine this engine's gates run on. So the first thing checked is that ABSENT IS NOT
-// PASS, and the rest is checked against FIXTURE answer files written here, because LAPACK cannot run in this
-// sandbox and a check that needs it would skip in exactly the situation it exists to guard.
+// the external answers are missing would certify whatever it is handed, forever. So the first thing checked is
+// that ABSENT IS NOT PASS, and the rest is checked against FIXTURE answer files written here.
+//
+// v3936: the fixtures are still the right way to test the GRADER -- they let it be handed a wrong answer on
+// purpose, which a real reference will not do on request. What changed is the sentence that used to follow: this
+// file said LAPACK "cannot run in this sandbox", and since the reference gained a Linux build line that is no
+// longer true. The closing note ASKS the grader what state it is actually in rather than asserting one.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { grade, ours, problems, toleranceFor, EPS, writeProblemsText } from "./externalLinalg.mjs";
+import { grade, ours, problems, toleranceFor, EPS, writeProblemsText, ANSWER_FILE } from "./externalLinalg.mjs";
 import { ctrbMatrix, rank } from "../../physics/control/controlStateSpace.mjs";
 
 let fails = 0;
@@ -100,9 +103,27 @@ console.log("externalLinalg-selfcheck -- the grader, and whether it can be foole
         "problems go out as text because A JSON PARSER HAND-WRITTEN IN C WOULD BE THE LEAST TRUSTWORTHY LINK IN " +
         "A CHAIN WHOSE WHOLE PURPOSE IS TRUST -- a reference that mis-reads its input produces a disagreement " +
         "indistinguishable from a real one. Answers come back as JSON, which printf cannot get wrong.");
-    say("*** LAPACK HAS NOT RUN. *** No Accelerate, no clang, no Apple hardware here, so the outside half of " +
-        "this key is UNEXERCISED and the corroboration it promises DOES NOT YET EXIST. Everything above tests " +
-        "the grader against fixtures; only a Mac can test the reference. See external-linalg.c's header.");
+    // *** v3936 -- THIS LINE USED TO BE A TYPED SENTENCE AND IT WENT STALE THE HOUR THE PORT LANDED. *** It read
+    // "LAPACK HAS NOT RUN -- no Accelerate, no clang, no Apple hardware here", which was true for 250 versions and
+    // false the moment the reference could be built on Linux. A NOTE THAT ASSERTS THE STATE OF THE WORLD IS A NOTE
+    // THAT WILL EVENTUALLY LIE ABOUT IT, and this one sat in the closing position where a reader trusts it most.
+    // It ASKS now instead of claiming, so it cannot describe a world that has moved on.
+    {
+        const live = grade();
+        if (live.state === "agrees")
+            say("*** LAPACK HAS RUN, AND IT AGREES ON ALL " + live.rows.length + " PROBLEMS. *** The outside half "
+              + "of this key is EXERCISED: " + (live.rows.filter((r) => r.exact).length) + " of those are ranks, "
+              + "agreeing as EXACT INTEGERS across elimination here and the singular-value spectrum there. Source: "
+              + (JSON.parse(fs.readFileSync(ANSWER_FILE, "utf8")).source || "unrecorded") + ".");
+        else if (live.state === "absent")
+            say("*** LAPACK HAS NOT RUN HERE. *** The grader above is tested against fixtures, but no reference "
+              + "answers are on disk, so THE CORROBORATION THIS KEY PROMISES DOES NOT YET EXIST. Build the "
+              + "reference and re-run: see external-linalg.c's header, which now carries a Linux line as well as "
+              + "a Mac one.");
+        else
+            say("*** THE REFERENCE IS PRESENT BUT THE STATE IS " + live.state.toUpperCase() + ". *** " + (live.why || "")
+              + " This is NOT corroboration, and it is not absence either -- read it before trusting anything above.");
+    }
 }
 
 if (fails) { console.log("\nexternalLinalg-selfcheck: " + fails + " FAILURES"); process.exit(1); }
