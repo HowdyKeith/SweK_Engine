@@ -7,7 +7,8 @@
 // the RK4-under-the-floor finding. This one exists so the module can be graded at all, and so the instrument
 // row naming it has a link that RESOLVES -- the rule pulsar, heidler and whitedwarf each learned separately.
 "use strict";
-import { bracket, jacobi, symplecticDefect, jacobian, J, H, STEPPERS } from "./poisson.mjs";
+import { bracket, jacobi, symplecticDefect, jacobian, J, H, STEPPERS,
+         verletStep, eulerStep, semiEulerStep, rk4Step } from "./poisson.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -83,6 +84,96 @@ const Q = (w) => w[0], P = (w) => w[1];
     ok("!! *** RK4 IS NOT SYMPLECTIC AND A CHECK AT ONE SMALL dt CERTIFIES IT AS IF IT WERE ***",
        coarse > 1e-9 && fine <= floor * 10,
        `${coarse.toExponential(2)} at dt = 0.1 falls to ${fine.toExponential(2)} at dt/8, against verlet's floor of ${floor.toExponential(2)} -- INDISTINGUISHABLE. *** THE DISCRIMINATOR IS THE SCALING, NOT THE VALUE: Euler's defect is dt^2 and visible at every step size, RK4's vanishes into the noise. ***`);
+}
+
+// ---- 7. *** THE OTHER AXIS: ORDER, AND THE FIXTURE THAT CERTIFIES A FIRST-ORDER METHOD AS SECOND *** --------
+//
+// v3941 -- SECTIONS 5 AND 6 GRADE SYMPLECTICITY AND NOTHING GRADED ORDER, though the module's own header names
+// both for every stepper ("first order AND symplectic, so order and symplecticity come apart", "fourth order
+// and NOT symplectic"). Half of what this file says about its four steppers was checked by nothing. They are
+// reached above through the STEPPERS map, so each is EXERCISED and none is NAMED -- which is what
+// definitionGates counts, and it was right to: the property their names carry had no key.
+//
+// The reference is the exact flow of H = (q^2 + p^2)/2, q(t) = q0 cos t + p0 sin t, p(t) = p0 cos t - q0 sin t.
+// Global error at fixed T over halving dt, and the observed order is the log2 of successive ratios -- DERIVED
+// from the run, never typed.
+//
+// *** AND THE OBVIOUS FIXTURE IS THE WRONG ONE, WHICH IS THE FINDING. *** One whole period from z0 = [1, 0] --
+// the first thing anybody writes -- reads semi-implicit Euler at order 2.000 with an error BIT-FOR-BIT equal to
+// velocity Verlet's. That is not a near miss, it is the wrong answer to four digits, and it contradicts the
+// module's own header from a fixture that looks like the tidiest one available.
+//
+// The mechanism is exact and is asserted below rather than described. Verlet is kick-drift-kick,
+// K(dt/2) D(dt) K(dt/2); semi-implicit Euler is D(dt) K(dt). So VERLET IS SEMI-IMPLICIT EULER CONJUGATED BY A
+// HALF-KICK: Verlet^N = K(dt/2) . SE^N . K(-dt/2), an identity to float precision. The conjugation moves p by
+// (dt/2)q at each end and nothing in between, so on a closed orbit that returns to its starting configuration
+// the two end kicks very nearly cancel and the O(dt) term with them. A PARTIAL PERIOD DOES NOT LET THEM CANCEL
+// AND THE FIRST-ORDER TERM SURVIVES. Both fixtures are run here, because the one that resolves the methods is
+// only trustworthy if the one that hides them is on the page beside it.
+{
+    const exactFlow = (z0, t) => [z0[0] * Math.cos(t) + z0[1] * Math.sin(t), z0[1] * Math.cos(t) - z0[0] * Math.sin(t)];
+    const globalError = (mk, N, T, z0) => {
+        const step = mk(T / N);
+        let w = z0.slice();
+        for (let i = 0; i < N; i++) w = step(w);
+        const e = exactFlow(z0, T);
+        return Math.hypot(w[0] - e[0], w[1] - e[1]);
+    };
+    // The order is the log2 of the last error ratio under a halving, taken over four refinements.
+    const orderOf = (mk, T, z0, N0) => {
+        const Ns = [N0, 2 * N0, 4 * N0, 8 * N0], es = Ns.map((N) => globalError(mk, N, T, z0));
+        return { order: Math.log2(es[es.length - 2] / es[es.length - 1]), es };
+    };
+
+    // A GENERIC state and a PARTIAL period -- the same z0 the bracket sections use, so the fixture is not
+    // chosen per stepper. RK4 is refined from a coarser start because at 1600 steps its error is already at
+    // the rounding floor, where an order estimate measures the floor rather than the method.
+    const T = 1.0, ORD = {
+        eulerStep: orderOf(eulerStep, T, z, 200),
+        semiEulerStep: orderOf(semiEulerStep, T, z, 200),
+        verletStep: orderOf(verletStep, T, z, 200),
+        rk4Step: orderOf(rk4Step, T, z, 20),
+    };
+    const near = (name, want) => Math.abs(ORD[name].order - want) < 0.05;
+    ok("!! *** EACH STEPPER CONVERGES AT ITS OWN STATED ORDER, MEASURED RATHER THAN QUOTED ***",
+       near("eulerStep", 1) && near("semiEulerStep", 1) && near("verletStep", 2) && near("rk4Step", 4),
+       `eulerStep ${ORD.eulerStep.order.toFixed(3)}, semiEulerStep ${ORD.semiEulerStep.order.toFixed(3)}, ` +
+       `verletStep ${ORD.verletStep.order.toFixed(3)}, rk4Step ${ORD.rk4Step.order.toFixed(3)} -- against 1, 1, 2, 4. ` +
+       "Global error against the EXACT flow, halved four times, order read off the ratio. Section 5 says which " +
+       "of these preserve the form; this says how fast each converges, AND THE TWO ANSWERS DO NOT LINE UP -- " +
+       "semi-implicit Euler is symplectic and first order while RK4 is fourth order and is not.");
+
+    ok("!! ...and the two FIRST-ORDER methods are told apart by the other axis, not by this one",
+       near("eulerStep", 1) && near("semiEulerStep", 1) &&
+       symplecticDefect(semiEulerStep(0.1), z) < 1e-9 && symplecticDefect(eulerStep(0.1), z) > 1e-3,
+       "explicit and semi-implicit Euler converge at the SAME rate and differ completely in whether they " +
+       "preserve the form. A suite that graded only order would call them the same method.");
+
+    // *** THE TRAP, RUN RATHER THAN WARNED ABOUT. ***
+    const whole = 2 * Math.PI, z1 = [1, 0];
+    const trapSE = orderOf(semiEulerStep, whole, z1, 200), trapV = orderOf(verletStep, whole, z1, 200);
+    const tie = Math.abs(trapSE.es[3] - trapV.es[3]) / trapV.es[3];
+    ok("!! *** ONE WHOLE PERIOD FROM [1,0] READS semiEulerStep AT ORDER 2, MATCHING verletStep TO FOUR DIGITS ***",
+       Math.abs(trapSE.order - 2) < 0.05 && tie < 1e-3 && Math.abs(ORD.semiEulerStep.order - 1) < 0.05,
+       `whole period: semiEulerStep ${trapSE.order.toFixed(3)} and verletStep ${trapV.order.toFixed(3)}, final ` +
+       `errors ${trapSE.es[3].toExponential(3)} against ${trapV.es[3].toExponential(3)} -- agreeing to ` +
+       `${tie.toExponential(1)} relative. THE SAME METHOD READS 1.000 ON THE PARTIAL PERIOD ABOVE. A gate ` +
+       "written on the tidiest available fixture would have pinned a first-order method at second order and " +
+       "contradicted the module's own header, with every number in it correct.");
+
+    // The mechanism, as an identity rather than a story: kick-drift-kick against drift-kick.
+    const K = (s) => ([q0, p0]) => [q0, p0 - s * q0];
+    const dt = 0.1, N = 37;
+    let a = z.slice(); { const V = verletStep(dt); for (let i = 0; i < N; i++) a = V(a); }
+    let b = K(-dt / 2)(z); { const SE = semiEulerStep(dt); for (let i = 0; i < N; i++) b = SE(b); } b = K(dt / 2)(b);
+    const conj = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+    ok("!! ...and the reason is an EXACT CONJUGACY: Verlet^N = K(dt/2) . semiEuler^N . K(-dt/2)",
+       conj < 1e-12,
+       `worst component differs by ${conj.toExponential(3)} after ${N} steps -- ROUNDOFF, not agreement to a ` +
+       "tolerance. Verlet is K(dt/2) D(dt) K(dt/2) and semi-implicit Euler is D(dt) K(dt), so they are the same " +
+       "map seen from a half-kick away. The conjugation moves p by (dt/2)q at the two ENDS and nowhere else, " +
+       "which is why a closed orbit cancels it and a partial one does not. THE TRAP IS A PROPERTY OF THE PAIR, " +
+       "not an accident of a seed.");
 }
 
 console.log(fails ? "\npoisson-selfcheck: " + fails + " FAILED" : "\npoisson-selfcheck: all checks pass");
