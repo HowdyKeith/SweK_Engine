@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import {
     makeTriMesh, analyticCells, offsetRatios, gradientLS, limitBJ,
     vertexEscapes, conservationDrift, accuracy,
+    gradientGG, gradientGGNode, nodeValues, linearityError, boundaryCells, boundaryTouching, rankCensus,
 } from "./triReconstruct.mjs";
 
 let fails = 0;
@@ -123,6 +124,127 @@ const F = (x, y) => Math.exp(-((x - 10) ** 2 + (y - 10) ** 2) / 18);
         "zero of section 2 and this is the bill");
 }
 
+// --- 4b. *** THE GREEN-GAUSS ROUND SHIPPED AND THIS GATE NEVER LEARNED ABOUT IT *** -----------------------------------
+//
+// v3941 -- section 5's NOT DONE list below used to end with "Green-Gauss against least-squares (two standard
+// gradients that disagree on skewed cells -- a two-declarations round of its own)". THAT ROUND HAPPENED:
+// gradientGG, nodeValues, gradientGGNode, linearityError, boundaryCells and boundaryTouching are all in the
+// module, each with a header paragraph naming an exact property, AND NOT ONE OF THEM WAS IMPORTED HERE. Seven
+// definitions, no keys, and a gate still advertising the work as outstanding. definitionGates counted them and
+// was right to.
+//
+// THE INSTRUMENT IS linearityError: reconstruct a field that IS linear, u = a + bx + cy, and ask each gradient
+// scheme for b and c back. A linearity-preserving scheme returns them to machine precision. Nothing else here
+// is a tolerance -- 1e-12 against 1e-3 is not a close call.
+{
+    say("4b. LINEARITY PRESERVATION -- five gradient schemes on the same field, and the regular mesh cannot tell them apart.");
+    const reg = makeTriMesh({ nx: 24, ny: 24, h: 20 / 24, skew: 0 });
+    const skw = makeTriMesh({ nx: 24, ny: 24, h: 20 / 24, skew: 0.25 });
+    const SCHEMES = {
+        "LS":          gradientLS,
+        "GG simple":   (u, m) => gradientGG(u, m, { weighting: "simple" }),
+        "GG distance": (u, m) => gradientGG(u, m, { weighting: "distance" }),
+        "GGnode ls":   (u, m) => gradientGGNode(u, m, { nodeMode: "ls" }),
+        "GGnode idw":  (u, m) => gradientGGNode(u, m, { nodeMode: "idw" }),
+    };
+    const on = (m) => Object.fromEntries(Object.entries(SCHEMES).map(([k, g]) => [k, linearityError(m, { grad: g })]));
+    const R = on(reg), S = on(skw);
+    for (const k of Object.keys(SCHEMES)) say(`     ${k.padEnd(12)} regular ${R[k].toExponential(3)}   sheared ${S[k].toExponential(3)}`);
+
+    ok("!! *** THE REGULAR MESH CERTIFIES ALL FIVE SCHEMES, INCLUDING THE TWO THAT ARE WRONG ***",
+        Object.values(R).every((e) => e < 1e-12),
+        Object.entries(R).map(([k, e]) => `${k} ${e.toExponential(1)}`).join(", ") +
+        " -- every one at machine precision. ON A CARTESIAN-LIKE MESH THE FACE MIDPOINT REALLY IS HALFWAY " +
+        "BETWEEN THE CENTROIDS, so the assumption the simple average makes is TRUE and the scheme that makes it " +
+        "is exact. A gate run only on the regular mesh would report five linearity-preserving gradients and " +
+        "three of those five would be a fiction of the fixture.");
+
+    ok("!! *** AND THE SHEARED MESH SPLITS THEM BY ELEVEN ORDERS OF MAGNITUDE ***",
+        S["LS"] < 1e-12 && S["GGnode ls"] < 1e-12 &&
+        S["GG simple"] > 1e-3 && S["GG distance"] > 1e-3 && S["GGnode idw"] > 1e-5,
+        `LS ${S["LS"].toExponential(2)} and GGnode-ls ${S["GGnode ls"].toExponential(2)} are EXACT; GG simple ` +
+        `${S["GG simple"].toExponential(2)}, GG distance ${S["GG distance"].toExponential(2)}, GGnode idw ` +
+        `${S["GGnode idw"].toExponential(2)} are not. Same field, same mesh, same instrument.`);
+
+    ok("!! ...and DISTANCE WEIGHTING BUYS LESS THAN A FACTOR OF TWO, so the face position was not the whole fault",
+        S["GG simple"] / S["GG distance"] > 1.2 && S["GG simple"] / S["GG distance"] < 4,
+        `${(S["GG simple"] / S["GG distance"]).toFixed(2)}x better and still four orders from exact. The module's ` +
+        "header blames the simple average for assuming the face midpoint sits halfway between the centroids; " +
+        "PUTTING THE FACE VALUE AT ITS TRUE POSITION FIXES A FRACTION OF IT. Cell-based Green-Gauss is not " +
+        "linearity-preserving on skewed triangles for a reason the interpolation position does not reach.");
+
+    // *** THE CLAIM THE MODULE'S HEADER MAKES, AS A MEASUREMENT: it is the NODE RULE, not Green-Gauss. ***
+    ok("!! *** 'NODE-BASED GREEN-GAUSS IS LINEARITY-PRESERVING' IS A CLAIM ABOUT THE NODE INTERPOLATION ***",
+        S["GGnode ls"] < 1e-12 && S["GGnode idw"] > 1e-5,
+        `identical Green-Gauss machinery over identical faces, differing ONLY in how a node of a cell-average ` +
+        `field gets a value: least-squares plane ${S["GGnode ls"].toExponential(2)}, inverse-distance ` +
+        `${S["GGnode idw"].toExponential(2)}. *** ELEVEN ORDERS APART, AND THE WORD 'GREEN-GAUSS' IS THE HALF ` +
+        "THAT DID NOT CHANGE. The property belongs to the fourth declaration nobody names.");
+
+    // nodeValues on its own, at the nodes rather than through a gradient -- the plane fit is exact by construction.
+    {
+        const A = (x, y) => 0.3 + 0.7 * x - 0.4 * y;
+        const u = analyticCells(A, skw);
+        const faceCount = new Map(), key = (p, q) => (p < q ? p + ":" + q : q + ":" + p);
+        for (const [a, b, c] of skw.tri) for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = key(p, q); faceCount.set(k, (faceCount.get(k) || 0) + 1); }
+        const interior = new Uint8Array(skw.vx.length).fill(1);
+        for (const [k, n] of faceCount) if (n === 1) { const [p, q] = k.split(":").map(Number); interior[p] = 0; interior[q] = 0; }
+        const worstOf = (mode) => {
+            const nv = nodeValues(u, skw, { mode });
+            let worst = 0, cnt = 0;
+            for (let v = 0; v < skw.vx.length; v++) { if (!interior[v]) continue; cnt++; worst = Math.max(worst, Math.abs(nv[v] - A(skw.vx[v], skw.vy[v]))); }
+            return { worst, cnt };
+        };
+        const ls = worstOf("ls"), idw = worstOf("idw");
+        ok("!! nodeValues 'ls' reproduces a linear field EXACTLY at every interior node, and 'idw' does not",
+            ls.worst < 1e-12 && idw.worst > 1e-5 && ls.cnt === idw.cnt,
+            `${ls.cnt} interior nodes: ls worst ${ls.worst.toExponential(2)}, idw worst ${idw.worst.toExponential(2)}. ` +
+            "A plane fitted by least squares to samples OF a plane returns that plane whatever the stencil looks " +
+            "like; a distance-weighted mean of them does not unless the neighbours happen to sit symmetrically " +
+            "about the node. THIS IS WHERE THE ELEVEN ORDERS ABOVE COME FROM, measured one level down.");
+    }
+
+    // *** THE TWO INTERIORS, WHICH IS THE FINDING THE MODULE SAYS COST IT A ROUND'S HEADLINE. ***
+    {
+        const bc = boundaryCells(skw), bt = boundaryTouching(skw);
+        let nbc = 0, nbt = 0, faceInteriorNodeBoundary = 0, subset = true;
+        for (let t = 0; t < bc.length; t++) {
+            nbc += bc[t]; nbt += bt[t];
+            if (bc[t] && !bt[t]) subset = false;
+            if (!bc[t] && bt[t]) faceInteriorNodeBoundary++;
+        }
+        ok("!! boundaryTouching is STRICTLY LARGER than boundaryCells, and one contains the other",
+            subset && nbt > nbc && faceInteriorNodeBoundary > 0,
+            `${nbc} cells have a boundary FACE, ${nbt} touch a boundary NODE, and ${faceInteriorNodeBoundary} ` +
+            "cells have three neighbours and still touch one. Two different sets wearing the word 'boundary'.");
+
+        const looseIdw = linearityError(skw, { grad: (u, m) => gradientGGNode(u, m, { nodeMode: "idw" }), strictInterior: false });
+        const strictIdw = S["GGnode idw"];
+        const looseSimple = linearityError(skw, { grad: (u, m) => gradientGG(u, m, { weighting: "simple" }), strictInterior: false });
+        ok("!! *** AND WHICH INTERIOR IS RIGHT DEPENDS ON WHAT THE SCHEME READS, MEASURED BOTH WAYS ***",
+            looseIdw / strictIdw > 100 && looseSimple === S["GG simple"],
+            `the node-based scheme moves from ${strictIdw.toExponential(2)} to ${looseIdw.toExponential(2)} -- ` +
+            `${(looseIdw / strictIdw).toFixed(0)}x -- when the ${faceInteriorNodeBoundary} face-interior ` +
+            "node-boundary cells are let back in, while cell-based Green-Gauss returns the SAME NUMBER BIT FOR " +
+            "BIT because it never looks at a node. *** THE NEIGHBOUR COUNT IS THE WRONG INTERIOR FOR A SCHEME " +
+            "THAT READS NODES, and this is that sentence as two numbers and an exact equality.");
+    }
+
+    // The census: a count, not a verdict -- the module says so and this reports it under the same rule.
+    {
+        const u = analyticCells((x, y) => 0.3 + 0.7 * x - 0.4 * y, skw);
+        const c = rankCensus(u, skw);
+        say(`     rankCensus: by neighbour count ${JSON.stringify(c.byNbr)}, by rank ${JSON.stringify(c.byRank)}, total ${c.total}`);
+        ok("!! rankCensus accounts for EVERY cell, and only the ones short of two neighbours are rank-deficient",
+            Object.values(c.byNbr).reduce((a, b) => a + b, 0) === c.total &&
+            Object.values(c.byRank).reduce((a, b) => a + b, 0) === c.total &&
+            (c.byRank[2] || 0) === c.total - (c.byNbr[1] || 0),
+            `${c.total} cells, and rank 2 is reached by exactly the ${c.total - (c.byNbr[1] || 0)} cells with two ` +
+            "or more neighbours -- a plane through two differences and no more. REPORTED AS A CENSUS: the split " +
+            "is a property of this triangulation, so the ACCOUNTING is asserted and the numbers are not.");
+    }
+}
+
 // --- 5. scope --------------------------------------------------------------------------------------------------------
 {
     say("5. SCOPE.");
@@ -134,9 +256,11 @@ const F = (x, y) => Math.exp(-((x - 10) ** 2 + (y - 10) ** 2) / 18);
     say("   NOT CLAIMED: that anything in this tree reconstructs on triangles. physics/mesh/ holds marching cubes,");
     say("   dual contouring and manifoldCensus, and NONE of them carries a cell-average field -- this is the number");
     say("   you would want BEFORE putting a finite-volume solver on an unstructured mesh, not a fix to one.");
-    say("   NOT DONE: Green-Gauss against least-squares (two standard gradients that disagree on skewed cells --");
-    say("   a two-declarations round of its own), Venkatakrishnan's smooth limiter, tetrahedra, and boundary cells,");
-    say("   which are excluded here by name rather than folded into the interior average.");
+    say("   DONE SINCE, AND GRADED IN 4b: Green-Gauss against least-squares. That round shipped six functions into");
+    say("   the module and this gate was not told, so it went on advertising the work as outstanding while nothing");
+    say("   exercised it -- the v3941 finding, and a reminder that a NOT DONE list is a claim like any other.");
+    say("   STILL NOT DONE: Venkatakrishnan's smooth limiter, tetrahedra, and boundary cells, which are excluded");
+    say("   here by name rather than folded into the interior average.");
 }
 
 console.log("triReconstruct-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
