@@ -562,7 +562,7 @@ function newBattle() {
   shots = []; t = 0;
 }
 
-function syncScene() {
+function syncScene(dt) {   // v3845 -- dt is a PARAMETER: the debris step below needs it, and frame() owns the clock
   const live = new Set();
   for (const e of A.concat(B)) {
     if (e.dead) continue;
@@ -602,7 +602,7 @@ function frame() {
     esbx.step(dt); esbx.sync();
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
   }
-  syncScene(); controls.update();
+  syncScene(dt); controls.update();
   if (structures.visible) {   // v3843 -- rocks tumble on their own axes, the station turns on its spine
     for (const g of structures.children) if (g.userData.spin) g.rotation.y += g.userData.spin * dt;
     for (const { inst, rocks } of rockSpin) {

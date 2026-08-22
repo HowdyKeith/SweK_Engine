@@ -332,10 +332,16 @@ async function initGPU() {
     const ci = mod.getCompilationInfo ? await mod.getCompilationInfo() : null;
     if (ci) for (const m of ci.messages) if (m.type === "error") { fallback("WGSL (" + nm + ") error: " + m.message); return false; }
   }
+  // v3845 -- ONE EXPLICIT LAYOUT for the four scene pipelines. `layout: "auto"` gives every pipeline its own
+  // implicit BindGroupLayout, so the single camera bind group -- built from shipPipe's -- was illegal on the
+  // grid/shot/fx pipelines and every pass that set it died at finish(). All four declare the same
+  // @group(0) @binding(0) uniform, read in the vertex stage only, so one layout serves them all.
+  const sceneBGL = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: "uniform" } }] });
+  const scenePL = device.createPipelineLayout({ bindGroupLayouts: [sceneBGL] });
   const DS = { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" };
   try {
     shipPipe = device.createRenderPipeline({
-      layout: "auto", primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: DS,
+      layout: scenePL, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: DS,
       vertex: { module: modS, entryPoint: "vs", buffers: [
         { arrayStride: 12, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }] },
         { arrayStride: 32, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x4" }, { shaderLocation: 2, offset: 16, format: "float32x4" }] },
@@ -343,12 +349,12 @@ async function initGPU() {
       fragment: { module: modS, entryPoint: "fs", targets: [{ format }] },
     });
     gridPipe = device.createRenderPipeline({
-      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
       vertex: { module: modG, entryPoint: "vs" },
       fragment: { module: modG, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     shotPipe = device.createRenderPipeline({
-      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
       vertex: { module: modH, entryPoint: "vs", buffers: [
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
@@ -356,7 +362,7 @@ async function initGPU() {
       fragment: { module: modH, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
     fxPipe = device.createRenderPipeline({
-      layout: "auto", primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
+      layout: scenePL, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "less" },
       vertex: { module: modFX, entryPoint: "vs", buffers: [
         { arrayStride: 16, stepMode: "instance", attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }] },
         { arrayStride: 12, stepMode: "instance", attributes: [{ shaderLocation: 1, offset: 0, format: "float32x3" }] },
@@ -364,7 +370,7 @@ async function initGPU() {
       fragment: { module: modFX, entryPoint: "fs", targets: [{ format, blend: { color: { srcFactor: "src-alpha", dstFactor: "one" }, alpha: { srcFactor: "zero", dstFactor: "one" } } }] },
     });
   } catch (e) { fallback("pipeline failed: " + e.message); return false; }
-  bind = device.createBindGroup({ layout: shipPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uBuf } }] });
+  bind = device.createBindGroup({ layout: sceneBGL, entries: [{ binding: 0, resource: { buffer: uBuf } }] });
   bhUBO = device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
   const modBD = device.createShaderModule({ code: BACKDROP_WGSL });
