@@ -79,3 +79,16 @@ Root Utils/email-draft.md
 # v3923 -- per-host observed gate runtimes. gate-timings.json is the shipped REFERENCE; this is one
 # box's comparison against it and must never travel, or a fast machine would export its scale to a slow one.
 WebGLEngine/tools/ship/host-timings.local.json
+
+# v3936 -- SHIP-RUN DIAGNOSTICS, DELIBERATELY LOCAL.
+# refusal() writes a step's full output here when the ritual stops, because a 2h24m sweep that reports
+# "29 FAILED, 11 TIMED OUT" and prints eight names is unrepeatable otherwise. That log is for whoever ran the
+# ritual on THAT box: it is one machine's run, it is rewritten by the next one, and committing it would churn
+# on every ship while telling a reader of the repo nothing they can act on.
+#
+# THIS IS NOT THE tools/ship/deleted/ CASE, and the difference is worth stating because the two look alike.
+# A deletion receipt is a claim about the tree that must outlive the machine, which is exactly why v3936 moved
+# that record to a TRACKED file after finding the zips could never survive a clone. A refusal log is a claim
+# about one run. Durable record: tracked. Run artifact: ignored.
+WebGLEngine/tools/ship/last-refusal-*.log
+WebGLEngine/tools/ship/last-selfchecks-full.log
