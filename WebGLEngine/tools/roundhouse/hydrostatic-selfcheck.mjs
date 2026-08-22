@@ -25,11 +25,20 @@
 // progress has no settled height. Asserting any of those numbers would be pinning a constant onto a transient,
 // so what gets asserted is the direction, which is stable.
 
+// *** v3941 RUNTIME NOTE: THE STEP-COUNT SWEEP COSTS ABOUT 29s AND THE BUDGET TABLE HAS NOT BEEN TOLD. ***
+// Establishing that a row has settled means measuring it at more than one stopwatch position, so this gate now
+// runs the three Tait rows at 1200/1500/1800 instead of 1500 alone. Measured on the box that made this change:
+// ~105s against a previous ~76s. gateBudget.MEASURED still carries 76.0s for this gate, recorded on a DIFFERENT
+// box -- and that table is one machine's stopwatch by design, so this number is reported here rather than
+// written into it. IT NOW UNDERSTATES THE GATE BY ROUGHLY THE SWEEP, and the entry wants re-timing where the
+// table lives. Said out loud because a budget quietly too small is how a working gate starts reading as a hang.
+
 import { getDevice } from "./devices.mjs";
 import { MEASURED_V2881, makeColumn, settle } from "../../physics/sph/hydrostatic.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const say = (m) => console.log("  ----  " + m);
 const dev = await getDevice("hydrostatic");
 
 // ---- 1. THE RECORDED NUMBERS STILL HOLD --------------------------------------------------------------------------
@@ -42,12 +51,92 @@ const dev = await getDevice("hydrostatic");
         "apart, and the settled height has not moved -- which is the only claim a device can make about a " +
         "question that has already been answered");
 
-    const taits = [];
-    for (const cs of [8, 15, 25]) taits.push(await dev.build({ mode: "tait", config: { soundSpeed: cs } }));
+    // *** v3941 -- THIS FILE DIAGNOSED THIS EXACT DISEASE ONE ROW UP AND LEFT IT UNTREATED HERE. ***
+    //
+    // The header already refuses to pin the mis-stated-density row, in as many words: "The column is STILL
+    // FALLING at the measurement point -- 0.156 at 1200 steps, 0.090 at 1500, 0.038 at 1800. A collapse in
+    // progress has no settled height. Asserting any of those numbers would be pinning a constant onto a
+    // transient, so what gets asserted is the direction, which is stable."
+    //
+    // c=8 IS THAT SAME SENTENCE, ABOUT AN EXPANSION INSTEAD OF A COLLAPSE. settle()'s own `expanded` flag
+    // carries the comment "A column that GREW has not settled -- it is bouncing off the lid", and section 2
+    // below asserts that flag for Tait. So the file states these columns have NOT settled and then pins three
+    // of their heights to 2%.
+    //
+    // MEASURED HERE, at 1200 / 1500 / 1800 steps:
+    //     c=8    1.651  1.845  1.787     <- spread 11% of its own mean: still swinging
+    //     c=15   1.828  1.842  1.832     <- spread 0.8%: settled
+    //     c=25   1.846  1.844  1.846     <- spread 0.1%: settled
+    //
+    // *** AND THE PROOF IS THAT THIS LINE PASSES ON ONE MACHINE AND FAILS ON ANOTHER WITH NOTHING BETWEEN THEM. ***
+    // On this box c=8 lands on 1.845 -- the recorded value, to three places. On Keith's rig the same code, same
+    // seed, same 1500 steps reads 1.792 and the line goes red. Each box is bit-deterministic (three runs here,
+    // identical to twelve places). The two settled rows agree on BOTH boxes to three places. A floating-point
+    // difference that stays invisible on a settled observable is AMPLIFIED when the sample lands mid-swing, so
+    // this row is a PLATFORM LOTTERY: it can only be trusted where it happens to land right. A CROSS-PLATFORM
+    // DISAGREEMENT ON A TRANSIENT IS NOT A CROSS-PLATFORM BUG, and neither the record nor the engine is wrong.
+    //
+    // The 2% bar is an order of magnitude TIGHTER THAN c=8's OWN SENSITIVITY TO WHERE THE STOPWATCH STOPS, and
+    // that is the whole defect: a claim to 2% is only testable on a quantity that is stable to well inside 2%
+    // when the sample moves. So settledness is DERIVED FROM THE TOLERANCE ITSELF -- not from a ratio between
+    // rows, which would have thrown out c=15 at 0.8% for the crime of sitting beside c=25 at 0.1%.
+    const TOL = 0.02;                       // the claim each recorded height makes
+    const SETTLED_MAX = TOL / 2;            // ...and it is only testable if moving the stopwatch moves it less
+    const CS = [8, 15, 25], STEPS = [1200, 1500, 1800];
     const recTait = MEASURED_V2881.filter((m) => m.eos === "tait");
-    ok("...and so do all three Tait sound speeds",
-        taits.every((t, i) => Math.abs(t.retained - recTait[i].retained) / recTait[i].retained < 0.02),
-        taits.map((t, i) => `c=${[8, 15, 25][i]}: ${t.retained.toFixed(3)} vs ${recTait[i].retained.toFixed(3)}`).join("  "));
+    const sweep = [];
+    for (let i = 0; i < CS.length; i++) {
+        const runs = [];
+        for (const steps of STEPS) runs.push(await dev.build({ mode: "tait", config: { soundSpeed: CS[i], steps } }));
+        const vals = runs.map((r) => r.retained);
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        sweep.push({ cs: CS[i], vals, spread: (Math.max(...vals) - Math.min(...vals)) / mean,
+                     rec: recTait[i].retained, at1500: runs[STEPS.indexOf(1500)] });
+    }
+    for (const r of sweep) {
+        say(`c=${String(r.cs).padStart(2)}  ${r.vals.map((v) => v.toFixed(4)).join("  ")}  ` +
+            `(steps ${STEPS.join("/")})  spread ${(r.spread * 100).toFixed(1)}% of mean  |  recorded ${r.rec.toFixed(3)}`);
+    }
+    const settled = sweep.filter((r) => r.spread <= SETTLED_MAX);
+    const moving = sweep.filter((r) => r.spread > SETTLED_MAX);
+
+    // *** AND UNSETTLED IS NOT A PARDON. THE FIRST VERSION OF THIS SECTION MADE IT ONE, AND A PLANT WALKED OUT. ***
+    // Exempting a moving row from its recorded value means a physics change that makes rows LESS settled buys
+    // itself an exemption from the check: dropping the Tait exponent from 7 to 5 pushed c=8 and c=15 over the
+    // settledness bar and the whole gate went green on changed physics. A CHECK THAT GOES QUIET WHEN THINGS GET
+    // WORSE IS WORSE THAN NO CHECK.
+    //
+    // So every row keeps a claim; only its STRENGTH depends on settling. A settled row must reproduce its
+    // recorded height. A moving row must still SWING THROUGH it -- the recorded value has to lie inside the
+    // range the sweep covers, widened by the same tolerance, because a sample of a transient is a sample OF THAT
+    // SWING and must be somewhere in it. Under the gamma plant c=8 swings 1.754-1.796 and the record is 1.845:
+    // outside the swing entirely, which is the physics moving rather than the stopwatch.
+    const brackets = (r) => r.rec >= Math.min(...r.vals) * (1 - TOL) && r.rec <= Math.max(...r.vals) * (1 + TOL);
+
+    ok("!! ...and every Tait row that HAS settled reproduces its v2881 measurement",
+        settled.length > 0 && settled.every((r) => Math.abs(r.at1500.retained - r.rec) / r.rec < TOL),
+        settled.map((r) => `c=${r.cs}: ${r.at1500.retained.toFixed(3)} vs ${r.rec.toFixed(3)} ` +
+                           `(spread ${(r.spread * 100).toFixed(1)}%)`).join("  ") +
+        `. ${settled.length} of ${sweep.length} rows move by less than half the ${(TOL * 100).toFixed(0)}% ` +
+        "tolerance when the stopwatch moves 600 steps either way, and those are the only ones a recorded number " +
+        "can be a claim about.");
+
+    ok("!! *** AND A ROW THAT HAS NOT SETTLED IS NOT PINNED TO A HEIGHT -- BUT ITS SWING MUST STILL CONTAIN ONE ***",
+        moving.every((r) => r.at1500.expanded === true && r.at1500.retained > 1.5 && brackets(r)),
+        moving.length === 0
+          ? "every row settled on this run, so there is no transient to exempt -- REPORTED rather than assumed, " +
+            "because that may well have been true on the box that produced the v2881 record, and it is what put " +
+            "three numbers in the table"
+          : moving.map((r) => `c=${r.cs} spread ${(r.spread * 100).toFixed(1)}%`).join(", ") +
+            `, against a ${(SETTLED_MAX * 100).toFixed(0)}% bar derived from the tolerance. What is asserted is ` +
+            `the DIRECTION -- it expands, retained ${moving[0].at1500.retained.toFixed(3)} above its starting ` +
+            `height, at every step count -- AND THAT ITS SWING STILL CONTAINS THE RECORDED HEIGHT: ` +
+            moving.map((r) => `c=${r.cs} spans ${Math.min(...r.vals).toFixed(3)}-${Math.max(...r.vals).toFixed(3)} ` +
+                              `${brackets(r) ? "around" : "and MISSES"} ${r.rec.toFixed(3)}`).join(", ") +
+            ". *** THE EXACT HEIGHT IS NOT ASSERTED: pinning a constant onto a " +
+            "transient is the mistake this file's own header refuses for the row above, and the same refusal " +
+            "belongs here. On this box that row happens to land on the recorded value; on Keith's it does not, " +
+            "and the check was passing or failing on which machine ran it. ***");
 }
 
 // ---- 2. TAIT EXPANDS, IT DOES NOT SETTLE ----------------------------------------------------------------------------
