@@ -89,8 +89,20 @@ function refusal(what, e, pick) {
             + " its own to get a verdict, or raise the cap: --step-timeout <seconds>.");
     }
     const text = String((e && e.stdout) || "");
+    // *** v3936 -- WRITE THE WHOLE THING DOWN BEFORE THROWING ANY OF IT AWAY. *** A ship refused at step 6 with
+    // "29 FAILED, 11 TIMED OUT, of 1103 (8617.4s)" and then printed EIGHT names. The other thirty-two were
+    // discarded, so a TWO-AND-A-HALF-HOUR measurement was unrepeatable -- the only way to learn what else was red
+    // was to run the entire sweep again. A REPORT THAT EXPENSIVE MUST NOT BE TRUNCATED INTO UNREPEATABILITY.
+    // The summary is for the terminal; the file is the record. Same family as the timeout-as-verdict bug above:
+    // both made a costly gate report less than it already knew.
+    let logged = "";
+    if (text) {
+        const logPath = path.join(ENGINE, "tools", "ship", "last-refusal-" + what + ".log");
+        try { fs.writeFileSync(logPath, text); logged = "\n  FULL OUTPUT: " + path.relative(ENGINE, logPath); }
+        catch { /* the refusal matters more than the log; never mask a red with a write error */ }
+    }
     const picked = pick(text);
-    if (picked) return new Error(what + " said NO:\n" + picked);
+    if (picked) return new Error(what + " said NO:\n" + picked + logged);
     return new Error(what + " exited " + (e && e.status != null ? e.status : "non-zero")
         + " but printed nothing this ritual could read as a reason. That is a bug in the step, not a clean refusal"
         + " -- run it directly and read its output before believing anything about the tree.");
@@ -196,8 +208,12 @@ stage("every selfcheck in the tree (~100s)", () => {
     try {
         out = run(process.execPath, ["tools/ship/selfchecks.mjs"], { cwd: ENGINE });
     } catch (e) {
-        throw refusal("selfchecks", e, (text) => text.split("\n").filter((l) => /FAIL {2}|TIMED OUT/.test(l))
-                                                     .slice(0, 8).join("\n") || text.slice(-500).trim());
+        throw refusal("selfchecks", e, (text) => {
+            const f = text.split("\n").filter((l) => /FAIL {2}|TIMED OUT/.test(l));
+            // The count comes first. Eight names with no total reads like eight failures.
+            return f.length ? f.slice(0, 8).join("\n") + (f.length > 8 ? "\n    ... and " + (f.length - 8)
+                              + " more of " + f.length + " total" : "") : text.slice(-500).trim();
+        });
     }
     const m = out.match(/selfchecks: (\d+)\/(\d+) pass in ([\d.]+)s/);
     if (!m || m[1] !== m[2]) throw new Error("selfchecks exited 0 without a clean verdict:\n" + out.slice(-300));
