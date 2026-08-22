@@ -355,6 +355,36 @@ if (zipPath) {
     const nestedInZip = new RegExp(P + "_v\\d+\\/WebGLEngine\\/.*" + P + "_v\\d+\\/").test(list) ||
         (list.match(new RegExp(P + "_v\\d+\\/", "g")) ? new Set(list.match(new RegExp(P + "_v\\d+", "g"))).size > 1 : false);
     check("zip: single project root (no nested fork inside)", !nestedInZip);
+    // *** v3938 -- THIS GATE PASSED A ZIP THAT COULD NOT BE INSTALLED, AND THAT IS WHAT IT IS FOR. ***
+    // The nested-fork check above asks whether there is MORE THAN ONE project root. It never asked whether
+    // there was ONE -- so a FLAT archive (WebGLEngine/, BACKLOG.md, README.md at the top, which is what a plain
+    // `zip -r` of the tree produces) sailed through with "single project root", was declared ALL GREEN, and was
+    // handed over. The installer then extracts into the folder that holds every version and empties the build
+    // into its own parent. NOT HYPOTHETICAL: that archive was built, verified and delivered at v3937.
+    //
+    // ABSENCE AND EXCESS ARE DIFFERENT FAULTS and one check cannot report both -- the same shape this tree
+    // keeps finding (empty vs never-ran, unknown vs false, records vs orphans). So the root is asserted
+    // POSITIVELY: exactly one top-level entry, named <prefix>_v<the version being shipped>, containing
+    // WebGLEngine. The version is compared too, because a zip whose root says one build while its name says
+    // another is the collision the whole numbering discipline exists to prevent.
+    const tops = new Set();
+    for (const line of list.split("\n")) {
+        const m = line.match(/^\s*\d+\s+\S+\s+\S+\s+(.+)$/);
+        if (!m) continue;
+        const first = m[1].trim().replace(/\\/g, "/").replace(/^\.\//, "").split("/")[0];
+        if (first && first !== "-----" ) tops.add(first);
+    }
+    const wantRoot = new RegExp("^" + P + "_v" + String(version || "").replace(/^v/, "") + "$");
+    const roots = [...tops];
+    check("zip: ONE top-level folder, named for this build",
+        roots.length === 1 && wantRoot.test(roots[0]),
+        roots.length === 1
+            ? "root is \"" + roots[0] + "\"" + (wantRoot.test(roots[0]) ? "" : ", expected " + P + "_" + version)
+            : roots.length + " top-level entries (" + roots.slice(0, 6).join(", ") + ") -- a FLAT zip empties " +
+              "itself into the folder that holds every version, and the installer only finds out after extracting");
+    const rootHasEngine = roots.length === 1 && new RegExp(roots[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/WebGLEngine/").test(list);
+    check("zip: that folder contains WebGLEngine/", rootHasEngine,
+        rootHasEngine ? "" : "the launcher and the engine live under the root folder; without it the extract produces nothing to run");
     const sz = fs.statSync(zipPath).size;
     check("zip: size in sane band (1-40 MB)", sz > 1e6 && sz < 40e6, `${(sz / 1e6).toFixed(1)} MB`);
   } catch (e) {

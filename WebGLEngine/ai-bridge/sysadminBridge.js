@@ -493,6 +493,84 @@ async function prunePartials(opts){
     return { ok: true, removed, failed, kept: keep, bytes };
 }
 
+
+// ================================================================================================================
+// *** v3938 -- THE INSTALLER EXTRACTED FIRST AND ASKED WHETHER THE ZIP WAS INSTALLABLE AFTERWARDS. ***
+// ================================================================================================================
+//
+// A build zip must contain ONE top-level folder, <prefix>_vNNNN, holding WebGLEngine. The apply path assumed it:
+// it extracted into the parent directory and only then looked for a launcher. A FLAT zip -- WebGLEngine/,
+// BACKLOG.md, README.md at the root, which is what a plain `zip -r` of the tree produces -- therefore emptied
+// itself directly into the folder that holds every version, mixing a build into its own parent, and the only
+// symptom was "extract did not produce the launcher" AFTER the mess was made.
+//
+// *** THE CHECK IS CHEAP AND IT WAS ON THE WRONG SIDE OF THE EXPENSIVE, IRREVERSIBLE STEP. *** Listing an
+// archive costs milliseconds; extracting one costs 26 seconds and cannot be undone. So the shape is verified
+// BEFORE anything is written, and a bad archive is REFUSED BY NAME with what it actually contained.
+//
+// NOT A HASH AND NOT A SIGNATURE: this asks only whether the archive is SHAPED like a build for the version it
+// claims. A zip whose root says v3937 while its main.js says otherwise is a different question, answered after
+// extraction by the version stamp the launcher reads.
+// THE LISTER IS PURE NODE, and it is pure Node because the first version was not. It shelled out to `tar -tf`,
+// which reads zips on Windows (bsdtar) and NOT on Linux (GNU tar) -- so on the box this was written on it fell
+// straight through to the "cannot list" branch and ACCEPTED THE FLAT ARCHIVE IT WAS WRITTEN TO REFUSE. The
+// fail-open was correct in design and hid the check completely in practice, which is worse than no check
+// because it reads as one. A zip's central directory is forty lines of buffer arithmetic and needs no process.
+function _zipTopLevel(file){
+    const B = require("fs");
+    let buf; try { buf = B.readFileSync(file); } catch (e) { return { ok: false, why: "cannot read " + file + ": " + ((e && e.code) || e) }; }
+    // End of Central Directory: scan back for 0x06054b50. The comment field is <= 64 KiB, so the signature is
+    // within the last 64 KiB + 22 bytes unless the file is truncated.
+    let eocd = -1;
+    for (let i = buf.length - 22; i >= 0 && i >= buf.length - 66000; i--){
+        if (buf.readUInt32LE(i) === 0x06054b50){ eocd = i; break; }
+    }
+    if (eocd < 0) return { ok: false, why: "no zip end-of-central-directory record (truncated or not a zip)" };
+    const count = buf.readUInt16LE(eocd + 10);
+    let off = buf.readUInt32LE(eocd + 16);
+    const names = [];
+    for (let n = 0; n < count; n++){
+        if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) break;   // ZIP64 or damaged: stop and report what we have
+        const nameLen = buf.readUInt16LE(off + 28), extraLen = buf.readUInt16LE(off + 30), cmtLen = buf.readUInt16LE(off + 32);
+        names.push(buf.toString("utf8", off + 46, off + 46 + nameLen));
+        off += 46 + nameLen + extraLen + cmtLen;
+    }
+    if (!names.length) return { ok: false, why: "the central directory listed no entries" };
+    return { ok: true, names };
+}
+
+/**
+ * Is this archive shaped like a build of version `v`? Returns { ok } or { ok:false, why }.
+ * WANTED: exactly one top-level entry, matching <prefix>_v<v>, containing WebGLEngine.
+ */
+function zipShapeFor(file, v){
+    const listed = _zipTopLevel(file);
+    // *** FAIL-OPEN ONLY WHEN THE ARCHIVE CANNOT BE READ AT ALL, and say so. *** Refusing here would break the
+    // installer on any box where neither lister runs, which is a worse failure than the one being prevented --
+    // and the post-extract launcher check still catches a bad archive, just later and messier.
+    if (!listed.ok) return { ok: true, unverified: true, why: listed.why };
+    const tops = new Set();
+    for (const n of listed.names){
+        const first = String(n).replace(/\\/g, "/").replace(/^\.\//, "").split("/")[0];
+        if (first) tops.add(first);
+    }
+    if (tops.size === 0) return { ok: false, why: "the archive is empty" };
+    if (tops.size > 1){
+        const sample = [...tops].slice(0, 6).join(", ");
+        return { ok: false, why: "the archive has " + tops.size + " top-level entries (" + sample +
+            (tops.size > 6 ? ", ..." : "") + ") instead of one <prefix>_v" + v + " folder. A FLAT zip would " +
+            "empty itself into the folder that holds every version" };
+    }
+    const root = [...tops][0];
+    const m = root.match(/^(.*)[ _]v(\d+)$/i);
+    if (!m) return { ok: false, why: "the archive's root folder is \"" + root + "\", which is not <prefix>_vNNNN" };
+    if (parseInt(m[2], 10) !== v) return { ok: false, why: "the archive's root folder is \"" + root +
+        "\" but the zip is named v" + v + " -- the name and the contents disagree about which build this is" };
+    const hasEngine = listed.names.some((n) => String(n).replace(/\\/g, "/").startsWith(root + "/WebGLEngine/"));
+    if (!hasEngine) return { ok: false, why: "the archive's root \"" + root + "\" contains no WebGLEngine/" };
+    return { ok: true, root };
+}
+
 async function updateCheck(apply, opts){
     opts = opts || {}; const silent = !!opts.silent;   // v2229 — auto-applies pass silent:true (minimized relaunch + quiet flag); manual stays loud
     const u = cfg.update, cur = currentVersion();
@@ -558,6 +636,14 @@ async function updateCheck(apply, opts){
         lastNote = "launch of v" + found.v + " suppressed \u2014 a relaunch fired " + Math.round(launchGuard.lockAgeMs() / 1000) + "s ago (avoiding a port-8787 collision storm; retries after the cooldown)";
         log(lastNote);
         return { ok: true, skipped: true, suppressed: true, version: found.v, current: cur, note: lastNote };
+    }
+    // v3938 -- SHAPE CHECKED BEFORE ANYTHING IS WRITTEN. See zipShapeFor: listing costs milliseconds, the
+    // extract costs half a minute and cannot be undone, and a flat archive empties itself into the folder that
+    // holds every version. This is the last gate before the irreversible step.
+    const shape = zipShapeFor(found.file, found.v);
+    if (!shape.ok){
+        lastNote = "REFUSED v" + found.v + ": " + shape.why + ". Nothing was extracted. File: " + found.file;
+        return { ok: false, error: lastNote, refused: "bad-zip-shape", found: found.v, current: cur };
     }
     launchGuard.markLaunch(found.v);
     // APPLY: extract beside the current folder, then name the result <preferredPrefix>_vNNNN. The zip's own top
@@ -1192,7 +1278,7 @@ async function patchScan(dirArg){
     return { ok: true, dir, tree, rows };
 }
 
-module.exports = {
+module.exports = { zipShapeFor,
     start, stop, setLogger, getConfig, setConfig,
     firewallStatus, firewallAllow, firewallRemove,
     go2rtcFirewallStatus, go2rtcFirewallAllow,
