@@ -278,7 +278,7 @@ export function reportLines() {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     for (const l of reportLines()) console.log(l);
     process.exit(0);
 }

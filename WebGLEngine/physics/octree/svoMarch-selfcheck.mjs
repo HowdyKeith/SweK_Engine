@@ -20,6 +20,7 @@ import { buildSVO, svoAt } from "./svoGenerator.js";
 import { shaderConstants, render, compareRays, svoSampleGL, marchGL, marchDDA,
          CUBE_DIAGONAL, SHADER_PATH, MEASURED_V3561 } from "./svoMarch.mjs";
 import { notAllBlack, notUniform, colorPresent, stats, runCheck } from "../../tools/render-qa/checks.mjs";
+import { reportLines } from "./svoMarch.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -196,6 +197,22 @@ console.log("\n5. THE CONTROL: THE MIRROR IS A MIRROR, AND NOTHING WAS FIXED");
         "1.0/512.0 is a fraction of THE WHOLE CUBE and knows nothing of the tree's depth. At size 32 that is 16 " +
         "samples per voxel; past size 512 the step is wider than a voxel and the march tunnels. THE SAFETY IS " +
         "AN ACCIDENT OF THE FIXTURE SIZE.");
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    const L = reportLines();
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[svoMarch]"),
+       L.length + " lines, self-named");
 }
 
 console.log(fails ? `\nsvoMarch-selfcheck: ${fails} FAILED` : "\nsvoMarch-selfcheck: all checks pass");

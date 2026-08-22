@@ -87,12 +87,39 @@ export function det(M) {
 }
 
 /** Cholesky. Succeeds IFF the matrix is positive definite, which is the whole Lyapunov test. */
-export function cholesky(M, tol = 1e-12) {
+// *** v3936 -- THE DEFAULT TOLERANCE WAS A TYPED ABSOLUTE 1e-12, AND IT DECIDED A PHYSICS VERDICT IN UNITS. ***
+//
+// POSITIVE DEFINITENESS IS INVARIANT UNDER SCALING BY ANY POSITIVE FACTOR. A typed ABSOLUTE cut-off is not, so
+// the old rule made the answer depend on what the numbers were measured in. Measured before the fix:
+//
+//     [[2,1],[1,2]] -- eigenvalues 1 and 3, positive definite past argument -- was REFUSED once scaled by 1e-13.
+//     lyapunovStable on roots -1,-2,-3 -- stable in any units -- reported UNSTABLE for Q = 1e-12 I.
+//
+// That second line is the one that matters: this function's caller decides STABILITY by whether it returns null,
+// so a stable system was called unstable because someone chose small units for Q. The external LAPACK key found
+// the same defect from the other end -- dpotrf accepts hilbert(12), whose smallest pivot is 9.2436e-14, POSITIVE
+// and merely small; we refused it. hilbert(14)'s pivot is genuinely NEGATIVE and both refuse, which is how the
+// boundary was identified as ours rather than the mathematics'.
+//
+// THE DEFAULT IS NOW EXACTLY dpotrf'S RULE: reject a pivot that is not positive, and nothing else. That is
+// scale-invariant because the sign of a positive number survives multiplication by a positive one, and it is the
+// rule the outside reference uses, so the two now decide this by the same law rather than agreeing by luck.
+//
+// A caller who genuinely wants a MARGIN can still ask for one -- and it is RELATIVE now, so an explicit margin is
+// scale-invariant too. Scaling the whole matrix scales the pivots and the reference together and cannot flip the
+// verdict. For a symmetric positive-definite matrix the largest entry is on the diagonal, which is what makes the
+// diagonal the honest scale to measure against.
+export function cholesky(M, tol = 0) {
     const n = M.length, L = zeros(n);
+    let scale = 0;
+    for (let i = 0; i < n; i++) scale = Math.max(scale, Math.abs(M[i][i]));
+    const floor = tol > 0 ? tol * scale : 0;
     for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
         let s = M[i][j];
         for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
-        if (i === j) { if (s <= tol) return null; L[i][j] = Math.sqrt(s); }
+        // `s <= 0` at floor 0. NOT `s < 0`: a pivot of exactly zero is a singular matrix, which is positive
+        // SEMI-definite and has no Cholesky factor with a positive diagonal. dpotrf refuses it for the same reason.
+        if (i === j) { if (s <= floor) return null; L[i][j] = Math.sqrt(s); }
         else L[i][j] = s / L[j][j];
     }
     return L;

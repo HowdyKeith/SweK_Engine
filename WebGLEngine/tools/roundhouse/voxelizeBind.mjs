@@ -119,6 +119,8 @@ export const voxelizeDevice = {
     modes: VOXELIZE_MODES,
     // "order" is FIRST so the mode-plant contract compares the plant against the mode that owns the rate.
     plantMode: "oneaxis", plantFlips: "order", plantKind: "mode",
+    plantIdeal: 2, plantIdealWhy:
+        "order is the measured convergence order of the voxelised volume, and a correct three-axis sampling is SECOND order, so the ideal is 2 -- not 0. Sampling one axis takes it 1.97 -> 0.227",
     name: "mesh-volume-convergence", observables: VOXELIZE_OBSERVABLES,
     build: buildVoxelize, defaults: voxelizeDefaults,
 };

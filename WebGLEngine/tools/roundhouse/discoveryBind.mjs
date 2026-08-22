@@ -133,4 +133,21 @@ export const discoveryDevice = {
     // about a mode you already thought of, and these names were in nobody's candidate list, so this
     // device reported as having NO DISCOVERABLE MODES. Derived from this file's own default plus every
     // mode its own build() branches on, each verified to produce a DISTINCT answer first.
-    modes: ["kepler", "fragile", "logistic", "nolaw", "rolling", "splat", "visviva"], name: "symbolic-equation-discovery", observables: DISCOVERY_OBSERVABLES, build: buildDiscovery, defaults: discoveryDefaults };
+    modes: ["kepler", "fragile", "logistic", "nolaw", "rolling", "splat", "visviva"], name: "symbolic-equation-discovery", observables: DISCOVERY_OBSERVABLES, build: buildDiscovery, defaults: discoveryDefaults,
+    // *** v3902 -- NO CODE CHANGED. `nolaw` HAS BEEN THE PLANT SINCE v2867 AND WAS NEVER DECLARED. ***
+    // The header calls it "THE LOAD-BEARING ONE" and says why: "A regressor that always finds an equation is
+    // decoration, and this is the mode that can catch it."
+    //
+    // *** BUT IT DECLARES ITS OBSERVABLE AS A BOOLEAN -- "the observable is a BOOLEAN: did it correctly
+    // return nothing?" -- AND A BOOLEAN IS EXACTLY WHAT THE CENSUS CANNOT GRADE. *** probeModePlant requires
+    // the declared observable to be a FINITE NUMBER IN BOTH ARMS; `refusedCorrectly` would have been reported
+    // as DECLARED BUT DEAD, which is the defect v3849 spent a whole round removing from mpmrefine. So the
+    // declaration points at the number the same mode already returns beside it:
+    //
+    //     r2Val   1.0000000 (kepler, an exact law)  ->  -0.10536219 (chaos framed as x(n), no law)
+    //
+    // NEGATIVE R-SQUARED IS THE HONEST SHAPE OF THE ANSWER: the best fit is WORSE than predicting the mean,
+    // which is what "there is nothing here" looks like as a number rather than as a flag.
+    plantMode: "nolaw", plantFlips: "r2Val", plantKind: "knob",
+    plantIdeal: 1, plantIdealWhy:
+        "r2Val is a coefficient of determination, so a law that fits perfectly gives exactly 1 -- not 0. The nolaw arm gives -0.105, WORSE THAN PREDICTING THE MEAN, and the exponent stops being computable" };

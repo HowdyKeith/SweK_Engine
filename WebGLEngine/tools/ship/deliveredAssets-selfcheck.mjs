@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/deliveredAssets-selfcheck.mjs — v3554
 //
-// Run: node tools/ship/deliveredAssets-selfcheck.mjs   (~4s — MEASURED individually)
+// Run: node tools/ship/deliveredAssets-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** "SHIPS WITH" AND "EXPECTS YOU TO HAVE" WERE THE SAME SENTENCE, AND NOTHING COULD TELL THEM APART. ***

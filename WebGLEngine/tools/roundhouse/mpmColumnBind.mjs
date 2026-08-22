@@ -103,6 +103,8 @@ export const mpmColumnDevice = {
     modes: MPMCOL_MODES,
     // "energy" is FIRST so the contract compares the plant against the mode that owns the budget.
     plantMode: "noelastic", plantFlips: "worstRise", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "worstRise is the largest energy INCREASE seen in a settling column, and a dissipative system never gains energy, so 0 is the ideal and any positive value is unphysical; removing the elastic response takes it 6.85e-6 -> 3.49e-1",
     name: "mpm-column-energy", observables: MPMCOL_OBSERVABLES,
     build: buildMpmColumn, defaults: mpmColDefaults,
 };

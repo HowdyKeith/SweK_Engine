@@ -1,6 +1,6 @@
 // tools/roundhouse/khGrowthKey-selfcheck.mjs
 //
-// Run: node tools/roundhouse/khGrowthKey-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/khGrowthKey-selfcheck.mjs   (~389s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3092 -- THE SIXTH SECOND ANSWER KEY, AND IT WAS ALREADY IN THE OBJECT.

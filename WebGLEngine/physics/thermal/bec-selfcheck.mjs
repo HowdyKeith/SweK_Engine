@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/bec-selfcheck.mjs -- v3814
 //
-// Run: node physics/thermal/bec-selfcheck.mjs   (~2s, MEASURED)
+// Run: node physics/thermal/bec-selfcheck.mjs   (~0.8s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // BOSE-EINSTEIN CONDENSATION, GRADED AT ITS TRANSITION AND ITS TWO EDGES.
@@ -22,6 +22,7 @@ import path from "node:path";
 import {
     boseFunction, boseFunctionAtOne, criticalDensity, condensateFraction, cvPeak, cvBelowTc, cvAboveTc,
     classicalExcited, ceilingForDimension,
+    fugacityFor,
 } from "./bec.mjs";
 import { boseIntegral } from "./blackbody.mjs";
 import { gammaFn } from "../md/maxwellSpeed.mjs";
@@ -126,6 +127,45 @@ say("");
 say("NOT CLAIMED: real condensates. This is the IDEAL Bose gas -- no interactions, so the cusp is not yet the");
 say("lambda divergence of helium-4 and there is no depletion, no critical velocity, no vortices. It grades the");
 say("ideal-gas transition and its limits. k_B = 1, conserved N. NO DEVICE BIND, no lab-results change.");
+
+{
+    // v3904 -- fugacityFor IS AN INVERSION AND NOTHING HAD EVER PUT IT BACK THROUGH THE FUNCTION IT INVERTS.
+    // fugacityFor(v) returns the z with boseFunction(3/2, z) = v. THE ROUND TRIP IS THE ONLY HONEST TEST OF A
+    // SOLVER: a bisection that converged on the wrong bracket, or one that silently returned its own upper
+    // bound, both look like plausible numbers from the outside and neither survives being fed back in.
+    for (const v of [0.5, 1.0, 2.0, 2.5]) {
+        const z = fugacityFor(v);
+        ok("fugacityFor(" + v + ") inverts boseFunction(3/2, .) to 1e-14",
+           Math.abs(boseFunction(1.5, z) - v) / v < 1e-14,
+           "z = " + z.toPrecision(15) + " -> g(3/2,z) = " + boseFunction(1.5, z).toPrecision(17));
+    }
+    // *** AND THE CEILING IS THE PHYSICS. *** g(3/2, z) cannot exceed zeta(3/2) = 2.6123753486847501 for
+    // z <= 1, so ABOVE that value there is no fugacity to find -- that IS Bose-Einstein condensation, stated
+    // as the failure of an inversion rather than as a paragraph. What the solver must NOT do is keep climbing
+    // and return z > 1, which is unphysical and would make the condensate fraction negative downstream.
+    const zc = boseFunctionAtOne(1.5);
+    ok("the inversion SATURATES at z = 1 above zeta(3/2), rather than running past it",
+       [zc + 1e-9, 3.0, 5.0, 50.0].every((v) => fugacityFor(v) === 1),
+       "zeta(3/2) = " + zc.toPrecision(17) + "; fugacityFor returns exactly 1 for every demand above it");
+    // *** I WROTE THE OPPOSITE CHECK FIRST AND THE MEASUREMENT REFUTED IT. *** I asserted that a demand
+    // 1e-3 below the ceiling would still land strictly inside z < 1. It does not -- it returns exactly 1,
+    // and the reason is physics rather than a bug: g(3/2, z) has a SQUARE-ROOT SINGULARITY IN ITS DERIVATIVE
+    // at z = 1, g ~ zeta(3/2) - 2*sqrt(pi)*sqrt(-ln z), so dz goes like dv^2. The inversion is ILL-CONDITIONED
+    // AT EXACTLY THE POINT THE PHYSICS CARES ABOUT, and that is the property worth recording.
+    const law = (d) => (d / (2 * Math.sqrt(Math.PI))) ** 2;   // predicted 1 - z for a shortfall d in v
+    const probes = [0.1, 0.03].map((d) => ({ d, gap: 1 - fugacityFor(zc - d), pred: law(d) }));
+    ok("*** below the ceiling the inversion follows the SQUARE-ROOT law, so dz ~ dv^2 ***",
+       probes.every((p) => p.gap > 0 && Math.abs(p.gap / p.pred - 1) < 0.10),
+       probes.map((p) => "d=" + p.d + ": 1-z = " + p.gap.toExponential(3) + " against " + p.pred.toExponential(3)).join("; ") +
+       " -- a 0.1 shortfall in v is only 8e-4 in z, a 100x compression");
+    // WHAT IS NOT CLAIMED, MEASURED RATHER THAN GUESSED: the solver resolves 1 - z down to about 7e-5 and
+    // SATURATES EARLY below that -- fugacityFor(zeta(3/2) - 1e-2) already returns exactly 1, where the law
+    // predicts 1 - z = 8e-6. THAT IS A RESOLUTION LIMIT AND IT IS THE RIGHT WAY TO FAIL: pinning to 1 keeps
+    // condensateFraction non-negative downstream, where returning z > 1 or a noisy z < 1 would not.
+    ok("...and where it gives up it gives up ON THE SAFE SIDE, at a limit this line names",
+       fugacityFor(zc - 1e-2) === 1 && fugacityFor(zc - 0.03) < 1,
+       "resolves at d = 0.03 (1-z = 6.9e-5), saturates at d = 0.01 (law says 8.0e-6)");
+}
 
 console.log("bec-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

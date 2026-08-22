@@ -138,6 +138,8 @@ export const cflDevice = {
     // "sweep" owns the scaling key, so it is the plant's baseline -- but the mode-plant contract compares
     // against the FIRST OTHER mode, so `sweep` must precede `advectiveonly` in this list.
     plantMode: "advectiveonly", plantFlips: "ratioSpread", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "ratioSpread is how much the measured CFL ratio varies across the swept regimes, and a correct stability limit gives one ratio everywhere, so 0; dropping the acoustic term takes it 0.333 -> 44.1",
     name: "sph-cfl-boundary", observables: CFL_OBSERVABLES,
     build: buildCfl, defaults: cflDefaults,
 };

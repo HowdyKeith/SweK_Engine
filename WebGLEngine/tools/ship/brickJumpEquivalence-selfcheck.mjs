@@ -1,6 +1,6 @@
 // tools/ship/brickJumpEquivalence-selfcheck.mjs
 //
-// Run: node tools/ship/brickJumpEquivalence-selfcheck.mjs   (~15s)
+// Run: node tools/ship/brickJumpEquivalence-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3092 -- THE JUMPING TRAVERSAL WAS RIGHT TO BE KEPT OUT OF THE DEFAULT, FOR THE WRONG REASON.

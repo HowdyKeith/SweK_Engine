@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateSelection-selfcheck.mjs — v3285
 //
-// Run: node tools/ship/gateSelection-selfcheck.mjs   (~25s — MEASURED; builds the real import graph)
+// Run: node tools/ship/gateSelection-selfcheck.mjs   (~7s — MEASURED; builds the real import graph)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The third instrument on the proposer interface, and the one with the most tempting degenerate policy: a

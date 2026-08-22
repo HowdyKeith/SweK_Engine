@@ -19,6 +19,7 @@ import { codeOnly } from "../../tools/ship/sourceScan.mjs";
 import { energyBudget, energyRatio, viscosityThreshold, lidBudget, settledSurface,
          MEASURED_V3542, STILL_BLOCKED, TALL_LID } from "./stability.mjs";
 import { SHIPPED_LID, FREE_LID } from "./materialKnobs.mjs";
+import { reportLines } from "./stability.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "../..");
@@ -205,6 +206,25 @@ console.log("\n8. THE FRONT DOOR, AND ONE DECLARATION OF THE INSTRUMENT");
         "correcting the round that wrote the first one. ***");
     ok("...and STILL_BLOCKED records the new blocker where the next reader will look", STILL_BLOCKED.freeSurfaceScore.length > 200,
         "so the next round starts from the fixture size rather than re-deriving that the column now settles");
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    // WHAT IS NOT CLAIMED: the live arm. reportLines({ live: true }) drives the real solver, and levelClaim's
+    // measured at 51s SOLO -- the gate went to 280s against a 143s default budget, so the live arm is
+    // DELIBERATELY NOT DRIVEN HERE. A CHECK THAT TIMES OUT IS NOT A STRONGER CHECK, IT IS AN ABSENT ONE.
+    const L = reportLines({ live: false });
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[stability]"),
+       L.length + " lines, self-named");
 }
 
 console.log(`\nstability-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

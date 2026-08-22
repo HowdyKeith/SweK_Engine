@@ -57,17 +57,51 @@ function buildFieldNav({ mode = "policy", config = {} } = {}) {
         };
     }
 
+    // *** v3902 -- `crowflight` IS THE PLANT, AND IT CONTRADICTS THIS DEVICE'S PREMISE DIRECTLY. ***
+    // The header's first line is that the answer key here is AN EXHAUSTIVE SEARCH RATHER THAN A FORMULA,
+    // because no closed form for the cheapest path over terrain exists -- "Dijkstra's dist[] IS the true
+    // cost-to-go from every cell. Expensive, and correct." The plant replaces that key with the closed form
+    // somebody reaches for when the search looks too expensive: the STRAIGHT-LINE DISTANCE from start to goal.
+    //
+    // It is wrong for a reason the device is entirely about: crow-flight distance knows nothing about the
+    // ground. It counts cells, not cost, so it UNDERSTATES the true optimum on any terrain worth navigating,
+    // and the excess it reports is mostly the terrain the straight line refused to look at.
+    //
+    // A `method` plant: the walk is untouched (`walkedCost` and `steps` are bit-identical), the terrain is
+    // untouched, and Dijkstra still runs -- only the number the walk is GRADED AGAINST is replaced.
+    //
+    // *** THE REVERSED-DIRECTION SLIP WAS TRIED FIRST AND MEASURED TOO WEAK TO USE. *** Solving the field from
+    // the goal instead of the start is a real error and the cost field IS asymmetric (378.8467102 against
+    // 378.4454346, ratio 0.99894), but that is a 0.1% shift against an excessFrac of 4.4% -- it would have
+    // moved the observable without SEPARATING it, and a plant no key separates is not coverage.
     const r = navigateRun(c);
+    const dx = (r.goalX - r.startX), dz = (r.goalZ - r.startZ);
+    const crow = Math.hypot(dx, dz);
+    const optimalCost = mode === "crowflight" ? crow : r.optimalCost;
+    const excessFrac = optimalCost > 0 ? r.walkedCost / optimalCost - 1 : null;
     return {
-        optimalCost: r.optimalCost, walkedCost: r.walkedCost, excessFrac: r.excessFrac,
+        optimalCost, walkedCost: r.walkedCost, excessFrac,
         arrived: r.arrived, looped: r.looped, steps: r.steps,
         reachableCells: r.reachableCells, cells: r.cells, amp: r.amp,
         worstExcess: null, bestExcess: null, allArrived: null, degradesWithRoughness: null,
     };
 }
 
+export const FIELDNAV_MODES = ["policy", "roughness", "complete", "crowflight"];
+
 export const fieldNavDevice = {
-    modes: ["policy", "roughness", "complete"],
+    modes: FIELDNAV_MODES,
     name: "field-navigation-policy", observables: FIELDNAV_OBSERVABLES, build: buildFieldNav,
-    defaults: ({ mode } = {}) => ({ mode: mode || "policy", config: { ...DEF } }),
+    // v3902 -- REFUSES an undeclared mode rather than handing the name back, the way beamBind does. The old
+    // line was `mode: mode || "policy"`, which returns any truthy name as though the device offered it.
+    defaults: ({ mode } = {}) => {
+        const m = mode ?? "policy";
+        return FIELDNAV_MODES.includes(m) ? { mode: m, config: { ...DEF } } : null;
+    },
+    // `excessFrac` -- the quantity the header insists on ("EXCESS COST, not arrival -- arrival alone would pass
+    // a walk that took six times the necessary route"). `arrived` and `looped` are booleans and are
+    // bit-identical under this plant anyway: the walker does not know its score changed.
+    plantMode: "crowflight", plantFlips: "excessFrac", plantKind: "method",
+    plantIdeal: 0, plantIdealWhy:
+        "excessFrac is the walked path's excess over the OPTIMAL cost, so a policy that matches the optimum has 0; crowflight substitutes a straight-line lower bound that ignores obstacles and the excess blows to 5.35 against a path that did not change",
 };

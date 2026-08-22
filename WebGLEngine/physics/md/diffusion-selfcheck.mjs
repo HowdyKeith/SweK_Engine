@@ -1,6 +1,6 @@
 // WebGLEngine/physics/md/diffusion-selfcheck.mjs — v3286
 //
-// Run: node physics/md/diffusion-selfcheck.mjs   (~60s — MEASURED individually)
+// Run: node physics/md/diffusion-selfcheck.mjs   (~8s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A Lennard-Jones diffusion coefficient at one state point has NO closed form to check against, which is

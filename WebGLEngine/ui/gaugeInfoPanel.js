@@ -171,7 +171,7 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
                                  // strobe the panel, and lengthening it would make the panel feel sluggish to
                                  // summon while doing nothing about how long it stays. TWO DELAYS, TWO JOBS. ***
                                  raiseMs = 140, returnMs = 4000, hideWith = [], dockGauges = null,
-                                 fixedH = 0, dockMax = 0,
+                                 fixedH = 0, dockMax = 0, stretchToRow = false,
                                  dockScale = 0.8 } = {}) {
     if (!dialsEl || !host) return null;
     const sel = makeSelection();
@@ -230,7 +230,9 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
     // width here would be a number nobody could justify and would clip the moment the scale changed.
     const row = document.createElement("div");
     row.id = "giRow";
-    row.style.cssText = "display:none;gap:10px;align-items:stretch;";
+    // v3912 -- flex:1 so the row FILLS the stretched height its ancestors now hand down. align-items:stretch
+    // was already right and was doing nothing, because nothing above it had a height to stretch within.
+    row.style.cssText = "display:none;gap:10px;align-items:stretch;flex:1 1 auto;min-height:0;";
     const dock = document.createElement("div");
     dock.id = "giDock";
     dock.style.cssText = "flex:none;display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#0a120e;overflow:hidden;";
@@ -352,6 +354,25 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
                 if (tab !== "gauges") return;             // only the gauges pane defines the height
                 const h = host.getBoundingClientRect().height;
                 if (h > 40) _lockH = h;
+            }
+            // *** v3912 -- stretchToRow: THE HEIGHT COMES FROM THE ROW, WHICH IS STILL A FIXED HEIGHT. ***
+            // Keith: the info panel should top-align with the links drawer beside it and reach its bottom.
+            // The obvious move -- drop the px lock -- WOULD REVERT v3778, whose comment records him asking for
+            // a height precisely because minHeight alone let a long body push the page down. THAT ASK AND THIS
+            // ONE ARE NOT IN CONFLICT: what he objected to was the CONTENT deciding the height. Here the ROW
+            // decides it, the content still cannot, and overflow:hidden below is what keeps that true.
+            // A definite height that happens to come from a sibling is every bit as fixed as a measured one,
+            // and it is BETTER for the swap v3659 was defending: gauges and info now share a height set by
+            // something neither of them can move, so changing tab cannot shift the page at all.
+            if (stretchToRow) {
+                host.style.minHeight = "0";               // or the flex item refuses to shrink below its content
+                host.style.height = "";
+                host.style.maxHeight = "";
+                host.style.overflow = "hidden";           // content still SCROLLS ITS OWN PANE rather than growing it
+                host.style.width = "100%";
+                host.style.boxSizing = "border-box";
+                host.style.flex = "1 1 auto";             // fill the column the stage stretched, do not size to content
+                return;
             }
             if (_lockH > 40) {
                 host.style.minHeight = _lockH + "px";

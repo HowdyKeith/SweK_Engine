@@ -1,4 +1,3 @@
-import { pathToFileURL } from "node:url";
 // physics/sph/poolFixture.mjs
 //
 // v3543 -- *** THE 24% GAP WAS NEVER QUANTISATION, AND EIGHT TIMES THE DEPTH MOVES IT BY NOTHING. ***
@@ -86,6 +85,7 @@ import { pathToFileURL } from "node:url";
 import { createSphWorld } from "./sph.js";
 import { LATTICE, packedDensity } from "./materialKnobs.mjs";
 
+import { pathToFileURL } from "node:url";
 export const G = 9.81, TALL_LID = 6.0;
 export const SHIPPED_FLOOR = 0.6;
 
@@ -334,4 +334,4 @@ export function reportLines({ live = true } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

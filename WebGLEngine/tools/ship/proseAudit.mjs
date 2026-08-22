@@ -253,7 +253,7 @@ export function blindSpotSize({ files = null, limit = 400 } = {}) {
              gainedPct: before ? (after - before) / before : 0, filesGaining };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const a = auditAll({});
     console.log(`[proseAudit] ${a.rows.length} prose assertions across the suite`);
     for (const k of ["TRIVIAL", "INVISIBLE", "UNMATCHED", "MISDIRECTED", "UNPARSEABLE", "UNRESOLVED", "HTML-UNAUDITED", "ALTERNATIVE", "SOUND"]) {

@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/shuffleEffect-selfcheck.mjs -- v3507
 //
-// Run: node physics/render/shuffleEffect-selfcheck.mjs   (~50s)
+// Run: node physics/render/shuffleEffect-selfcheck.mjs   (~5s)
 //
 // *** v3500 SHIPPED THE PER-PIXEL STRATUM SHUFFLE AND SAID SO PLAINLY: "KEPT BECAUSE IT COSTS NO DRAWS AND
 // CANNOT HURT, NOT BECAUSE THE GATE PROVED IT WORKS", and named the missing piece -- a fixture with structure

@@ -1,6 +1,6 @@
 // tools/roundhouse/isingGpu-selfcheck.mjs — v3283
 //
-// Run: node tools/roundhouse/isingGpu-selfcheck.mjs   (~6s — MEASURED, dominated by the two physics runs)
+// Run: node tools/roundhouse/isingGpu-selfcheck.mjs   (~0.9s — MEASURED, dominated by the two physics runs)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Layered keys for the first ZERO-TOLERANCE kernel: (1) Philox4x32-10 reproduces the Random123 reference

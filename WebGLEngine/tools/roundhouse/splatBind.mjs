@@ -41,6 +41,19 @@ export const SPLAT_OBSERVABLES = [
 const I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const DEF = { z: 5, f: 800, sigma: 0.1, gridN: 256, alpha: 0.3, count: 7, offAxis: 2.0 };
 
+// *** v3902 -- THE MODE LIST LIVED IN TWO PLACES AND THE COPY IN splatDefaults SILENTLY REWROTE UNKNOWN NAMES
+// TO "integral". *** Adding a plant mode produced two arms that were BIT-IDENTICAL, because the new name was
+// not in the whitelist below and was quietly coerced to the primary -- the plant appeared to fire and changed
+// nothing. THE FAILURE MODE IS THE DANGEROUS ONE: a typo'd or new mode name did not raise, it answered the
+// DEFAULT MODE'S NUMBERS under the requested mode's label, which is a device reporting an answer to a question
+// it was not asked.
+//
+// ONE DECLARATION, READ BY BOTH splatDefaults AND splatDevice. That is the same defect this tree has found in
+// nine files (MODES), three (the gate-file walk) and four (a mesher's liveness), and the same fix: THE SECOND
+// COPY IS NEVER THE ONE THAT GETS UPDATED. The coercion behaviour is deliberately left as it was -- this round
+// is about the list having one home, not about changing what an unknown mode does.
+export const SPLAT_MODES = ["integral", "perspective", "compose", "shear", "precision", "detnotsqrt"];
+
 export function splatDefaults(hyp) {
     const h = { mode: "integral", ...(hyp || {}) };
     const c = { ...DEF, ...(h.config || {}) };
@@ -54,7 +67,7 @@ export function splatDefaults(hyp) {
     c.count = Math.min(200, Math.max(1, num(c.count, DEF.count) | 0));
     c.offAxis = Math.min(10, Math.max(0, num(c.offAxis, DEF.offAxis)));
     h.config = c;
-    if (!["integral", "perspective", "compose", "shear", "precision"].includes(h.mode)) h.mode = "integral";
+    if (!SPLAT_MODES.includes(h.mode)) h.mode = "integral";
     return h;
 }
 
@@ -137,9 +150,21 @@ export async function buildSplat(hyp, base = {}) {
         };
     }
 
-    // "integral" -- the default and the sharpest single number
+    // "integral" -- the default and the sharpest single number. "detnotsqrt" is its plant and shares this
+    // whole block, so the arms differ in ONE thing: the closed form the rasteriser is graded against.
+    //
+    // *** v3902 -- THE PLANT IS det WHERE sqrt(det) BELONGS, WHICH IS THE STANDARD 2D-GAUSSIAN SLIP. ***
+    // The normalisation of a 2D Gaussian carries sqrt(det Sigma), not det Sigma -- the determinant of a 2x2
+    // covariance has units of length^4 and the integral has units of length^2. THE RASTERISER IS NEVER TOUCHED
+    // (`num` is bit-identical in both arms), so this is a `method` plant: the picture is right, the sum over
+    // the grid is right, and the number they are compared against is wrong.
+    //
+    // DERIVED, NOT RE-IMPLEMENTED: since exact = 2 pi sqrt(det), the wrong form 2 pi det is exact^2 / (2 pi)
+    // exactly -- so the plant needs no second call into the module and cannot drift from what it is imitating.
+    // The default arm returns the module's own value untouched.
     const S2 = projectCovariance(iso, I3, [0, 0, c.z], c.f);
-    const exact = gaussian2DIntegral(S2);
+    const exact0 = gaussian2DIntegral(S2);
+    const exact = h.mode === "detnotsqrt" ? (exact0 * exact0) / (2 * Math.PI) : exact0;
     if (!(exact > 0)) return { error: "degenerate-projection" };
     const num = rasteriseIntegral(S2, { n: c.gridN, radius: 8 });
     const base2 = projectCovariance(iso, I3, [0, 0, c.z], c.f);
@@ -163,4 +188,11 @@ export const splatDevice = {
     // about a mode you already thought of, and these names were in nobody's candidate list, so this
     // device reported as having NO DISCOVERABLE MODES. Derived from this file's own default plus every
     // mode its own build() branches on, each verified to produce a DISTINCT answer first.
-    modes: ["integral", "compose", "perspective", "precision", "shear"], name: "gaussian-splat-projection", observables: SPLAT_OBSERVABLES, build: buildSplat, defaults: splatDefaults };
+    modes: SPLAT_MODES, name: "gaussian-splat-projection", observables: SPLAT_OBSERVABLES, build: buildSplat, defaults: splatDefaults,
+    // *** `shear` IS ALREADY "the sabotage as an observable" AND STILL COULD NOT BE DECLARED. *** This device's
+    // five modes report DISJOINT observable sets -- `integral` returns integralRatio/integralErrFrac/gridN and
+    // `shear` returns onAxisShearDelta/offAxisShearDelta/shearGrows, with NOT ONE number in common. The
+    // mode-plant contract compares an observable ACROSS two arms, so a self-contained sabotage that reports
+    // only its own numbers is invisible to it however load-bearing it is. That is why the plant is a new mode
+    // MIRRORING `integral` rather than the sabotage this device already had.
+    plantMode: "detnotsqrt", plantFlips: "integralErrFrac", plantKind: "method" };

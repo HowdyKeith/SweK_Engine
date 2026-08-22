@@ -23,7 +23,7 @@ sync stall and a few kilobytes.</div>
 </div>
 
 <table id="out"></table>
-<canvas id="grid" width="256" height="256"></canvas>
+<canvas id="grid" width="256" height="256" style="width:100%;max-width:320px;height:auto"></canvas>
 
 <!-- v3120 -- THE SHADERS HAD NOWHERE TO BE COMPILED. v3119 shipped populationGPU.js with real GLSL and the
      page was a pure planner that never made a GL context, so nothing in the project would ever have compiled
@@ -40,9 +40,9 @@ word for both would make every laptop look like a defect.</div>
        against stepReference on the same input. A full readback is what v3118 argued against PER FRAME; once,
        to settle this, it is exactly the right tool. -->
   <button id="verBtn">verify GPU against JS reference</button> <button id="drawBtn">draw the field</button></div>
-  <canvas id="popCanvas" width="512" height="512" style="display:block;margin-top:8px;border:1px solid #333;background:#0a0a0a"></canvas>
+  <canvas id="popCanvas" width="512" height="512" style="display:block;margin-top:8px;border:1px solid #333;background:#0a0a0a;width:100%;max-width:640px;height:auto"></canvas>
 <table id="gpuOut"></table>
-<canvas id="glcv" width="8" height="8" style="display:none"></canvas>
+<canvas id="glcv" width="8" height="8" style="display:none;width:100%;max-width:10px;height:auto"></canvas>
 <div class="note" id="limits"></div>
 
 <script type="module">

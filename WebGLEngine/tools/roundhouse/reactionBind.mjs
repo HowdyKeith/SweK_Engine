@@ -32,18 +32,52 @@
 // THE LOAD-BEARING NEGATIVE IS PHYSICS WITH NO FREE PARAMETER: Turing patterns need LONG-RANGE INHIBITION --
 // the inhibitor must diffuse FASTER than the activator. SWAP Du AND Dv and nothing forms at any B: amplitude
 // 9.9e-10 against 2.6 unswapped, nine orders. No threshold was tuned to make that happen.
+//
+// *** v3902 -- THE PLANT SMUGGLES THE ANSWER INTO THE INITIAL CONDITION, AND IT IS THE ONE DEFECT THIS DEVICE
+// WAS BUILT TO BE IMMUNE TO. *** The header above says what makes this device worth having: "THIS SEEDS EVERY
+// MODE WITH NOISE AND ASKS WHICH ONE WINS -- and consults no formula at all while running." So the plant is to
+// stop doing that. `seeded` puts the amplitude on ONE mode -- Math.round(k_c L / 2pi) = 5, the nearest integer
+// the formula points at -- and lets the same dynamics run:
+//
+//     winningMode      7          ->   5      (exactly the mode that was seeded, at EVERY B)
+//     k                1.3744     ->   0.9817
+//     dkFromCritical   0.34456    ->   0.048136        <- DECLARED
+//
+// *** AND THE DEFECT MAKES THE DEVICE AGREE WITH THE WRONG HYPOTHESIS THE HEADER ABOVE RECORDS HOLDING. ***
+// "I expected the winner to BE k_c. It is not." Under the plant it IS -- dk sits on the 0.048136 quantisation
+// floor at B=12, 9, 6, 5 and 4.6 alike, so the seeded run would have CONFIRMED the belief the real run
+// refuted. A plant that produces the tidier answer is the dangerous kind, and this one is only visible
+// because the true device measured something less tidy first.
+//
+// *** WHAT CATCHES IT IS NOT `monotone`. *** A CONSTANT SEQUENCE IS MONOTONE NON-INCREASING, so the pinned
+// 0.048136 at every B satisfies `dks.every(d <= prev)` and `monotone` stays TRUE under the plant. What fires
+// is the RATIO clause the device gate already pairs with it -- `nearest < firstDk / 5`, which reads
+// 0.048136 < 0.0096 and fails -- and `nearest` ALONE is blind too (0.048136 in both arms, because the true
+// B=4.6 row also lands on m=5). THE DECLARED OBSERVABLE IS `dkFromCritical` FOR EXACTLY THAT REASON: two of
+// this device's three approach observables cannot see the plant, and v3852 already cost a round to
+// discovering that a declaration pointed at a blind number is not coverage.
+//
+// KIND: `knob`. The physics input -- the initial condition -- is replaced upstream; the integrator, the mode
+// scan and the closed forms are all untouched.
 "use strict";
 import { makeField, step, criticalK, criticalB, hopfB } from "../../physics/reaction/brusselator.js";
 
 const DEF = { A: 3, Du: 1, Dv: 8, n: 128, L: 32, seed: 11, dt: 2e-3, noise: 1e-6 };
-export const MODES = ["selection", "approach", "swapped", "thresholds"];
+export const MODES = ["selection", "approach", "swapped", "thresholds", "seeded"];
 
 /** Seed EVERY mode with tiny noise, run, and report which spatial mode dominates. No formula is consulted. */
-export function compete({ A, B, Du, Dv, n, L, seed, dt, noise, T }) {
-    const F = makeField({ n, L, A, B, Du, Dv, mode: 1, amp: 0 });
-    let r = seed >>> 0;
-    const rnd = () => { r = (r * 1103515245 + 12345) % 2147483648; return r / 2147483648 - 0.5; };
-    for (let i = 0; i < F.n; i++) { F.u[i] += noise * rnd(); F.v[i] += noise * rnd(); }
+export function compete({ A, B, Du, Dv, n, L, seed, dt, noise, T, seedMode = 0 }) {
+    // seedMode > 0 IS THE PLANT AND NOTHING ELSE PASSES IT. The default arm is unchanged to the byte: a flat
+    // field (amp 0) plus noise on every cell, so every spatial mode starts with power and the dynamics pick.
+    // The plant arm puts that same amplitude on ONE cosine and adds no noise at all -- the answer, handed in.
+    const F = seedMode > 0
+        ? makeField({ n, L, A, B, Du, Dv, mode: seedMode, amp: noise })
+        : makeField({ n, L, A, B, Du, Dv, mode: 1, amp: 0 });
+    if (!(seedMode > 0)) {
+        let r = seed >>> 0;
+        const rnd = () => { r = (r * 1103515245 + 12345) % 2147483648; return r / 2147483648 - 0.5; };
+        for (let i = 0; i < F.n; i++) { F.u[i] += noise * rnd(); F.v[i] += noise * rnd(); }
+    }
     for (let s = 0; s < Math.round(T / dt); s++) step(F, dt);
     let best = 0, bestA = -1;
     for (let m = 1; m < F.n / 2; m++) {
@@ -87,7 +121,12 @@ export function build({ mode = "selection", config = {} } = {}) {
                  monotone: dks.every((d, i) => i === 0 || d <= dks[i - 1] + 1e-12),
                  nearest: dks[dks.length - 1], firstDk: dks[0] };
     }
-    const w = compete(c);
+    // "selection" and its plant "seeded" share this shape exactly, so the census compares like with like and
+    // the ONLY difference between the arms is where the initial power went. The seeded mode is DERIVED from
+    // k_c rather than typed: the nearest integer mode the grid can hold, which is the answer the formula
+    // points at -- 5 here, against the 7 the honest competition actually selects at B=9.
+    const seedMode = mode === "seeded" ? Math.round(kc * c.L / (2 * Math.PI)) : 0;
+    const w = compete({ ...c, seedMode });
     return { winningMode: w.mode, k: w.k, amp: w.amp, criticalK: kc, criticalB: Bc, hopfB: Bh,
              aboveThreshold: c.B > Bc, dkFromCritical: Math.abs(w.k - kc) };
 }
@@ -101,5 +140,10 @@ export const REACTION_OBSERVABLES = [
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */
 export const reactionDevice = {
     modes: MODES, name: "turing-selection", observables: REACTION_OBSERVABLES, build, defaults,
+    // `dkFromCritical` and NOT `monotone` or `nearest` -- both of those are blind to this plant, and the
+    // header above says why. 0.34456 -> 0.048136, finite in both arms, which is what probeModePlant requires.
+    plantMode: "seeded", plantFlips: "dkFromCritical", plantKind: "knob",
+    plantDirectionRefused:
+        "DIRECTION IS THE WRONG TEST FOR THIS PLANT, AND THAT IS THE POINT OF IT. The seeded arm takes dkFromCritical 0.34456 -> 0.048136, which is CLOSER to critical -- tidier, not worse -- because the plant smuggles the answer into the initial condition and the winner then sits on the quantisation floor at every B. A plant that produces the more attractive number cannot be read by |planted - ideal| > |honest - ideal| in either direction, and declaring an ideal here would be picking a number because it makes the wall pass. WHAT ACTUALLY CATCHES IT is the ratio clause this device's gate already pairs with the observable -- nearest < firstDk / 5, reading 0.048136 < 0.0096 and failing -- and the header above records that `monotone` and `nearest` alone are both blind to it. The plant is real and verified; the DIRECTION probe is not what verifies it",
 };
 export default reactionDevice;

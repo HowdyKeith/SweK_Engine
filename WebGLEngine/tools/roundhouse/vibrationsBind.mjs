@@ -53,7 +53,7 @@ export const VIBRATIONS_OBSERVABLES = [
     "dispersionRatios", "dispersionExponent",
 ];
 
-export const VIBRATIONS_MODES = ["moments", "trace", "ring", "dispersion"];
+export const VIBRATIONS_MODES = ["moments", "trace", "ring", "dispersion", "sixNplus6"];
 
 const DEF = { N: 12, k: 1, m: 1 };
 
@@ -69,6 +69,17 @@ export function vibrationsDefaults(cfg = {}) {
 /** The two closed-form keys, as functions of N. Nothing here reads a frequency. */
 export const firstMomentKey = (N, k, m) => 2 * N * (k / m);
 export const secondMomentKey = (N, k, m) => (6 * N - 2) * (k / m) * (k / m);
+
+// *** v3902 -- THE TRIG ROUTE'S ANSWER, KEPT RUNNABLE. *** The header records deriving the second moment twice
+// and getting 6N-2 from the matrix trace and 6N+6 from expanding sin^4 -- and the measurement settling it at
+// 6N-2 exactly, at seven values of N. The correct key shipped and the wrong one became a sentence. THIS IS
+// THAT SENTENCE AS A MODE, so the sweep re-derives the disagreement instead of remembering it.
+//
+// AND THE "+6" IS NOT A TYPO FOR "-2": the two routes differ by 8, which at N=12 is 78 against 70. That is
+// why it is worth keeping runnable -- an error of 8 in a trace is not a rounding story, it is a different
+// count of how many neighbours the end masses have, and this device exists because the second moment is the
+// one that KNOWS ABOUT THE ENDS.
+export const secondMomentKeyTrigRoute = (N, k, m) => (6 * N + 6) * (k / m) * (k / m);
 
 /** Both moments, taken from the module's own frequencies. */
 export function moments(state) {
@@ -125,7 +136,11 @@ export async function buildVibrations(args = {}) {
     const { N, k, m, mode } = cfg;
     const st = makeChain({ N, k, m });
     const { s2, s4 } = moments(st);
-    const key2 = firstMomentKey(N, k, m), key4 = secondMomentKey(N, k, m);
+    // THE WHOLE EXPRESSION BRANCHES; the default arm calls the same function it always did, so `sumW4Key` is
+    // bit-identical outside the plant. The CHAIN and the FREQUENCIES are untouched in both arms -- `sumW4`
+    // itself is bit-identical -- which is what makes this a `method` plant and not a `knob` one.
+    const key2 = firstMomentKey(N, k, m);
+    const key4 = mode === "sixNplus6" ? secondMomentKeyTrigRoute(N, k, m) : secondMomentKey(N, k, m);
 
     const out = {
         sumW2: s2, sumW2Key: key2, sumW2ErrRel: Math.abs(s2 - key2) / key2,
@@ -175,4 +190,13 @@ export const vibrationsDevice = {
     observables: VIBRATIONS_OBSERVABLES,
     build: buildVibrations,
     defaults: vibrationsDefaults,
+    // *** v3902 -- `sumW4ErrRel` GOES FROM EXACTLY ZERO TO 0.10256410, AND THE ZERO IS THE POINT. ***
+    // The honest key reproduces the measured fourth moment to the bit at N=12: s4 = 70, key = 70, error
+    // EXACTLY 0. Under the trig route the key is 78 and the relative error is 8/78 = 0.10256410256410256.
+    //
+    // `ring` AND `dispersion` MOVE sumW4 TOO AND ARE NOT PLANTS, which is why neither could be declared: they
+    // change N and the key follows (24->64->32 and 70->190->94), so the ERROR stays at zero and the device is
+    // still right. A mode that moves an observable is not a plant; a mode that moves the observable AWAY FROM
+    // ITS KEY is. That distinction is the whole reason the contract names the observable rather than the mode.
+    plantMode: "sixNplus6", plantFlips: "sumW4ErrRel", plantKind: "method",
 };

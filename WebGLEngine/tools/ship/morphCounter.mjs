@@ -69,4 +69,4 @@ export function reportLines(pairs = [[1, 2], [2, 3], [9, 0]]) {
     return L;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

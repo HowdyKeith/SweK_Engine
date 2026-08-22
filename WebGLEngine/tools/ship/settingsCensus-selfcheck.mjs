@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/settingsCensus-selfcheck.mjs
 //
-// Run: node tools/ship/settingsCensus-selfcheck.mjs   (~3s -- MEASURED)
+// Run: node tools/ship/settingsCensus-selfcheck.mjs   (~0.3s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3262 -- WHAT THE SETTINGS SCHEMA COVERS, AND WHO READS IT.

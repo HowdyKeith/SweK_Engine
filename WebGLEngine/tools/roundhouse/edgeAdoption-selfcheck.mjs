@@ -1,6 +1,6 @@
 // tools/roundhouse/edgeAdoption-selfcheck.mjs
 //
-// Run: node tools/roundhouse/edgeAdoption-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/edgeAdoption-selfcheck.mjs   (~0.3s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2931 -- THE FIRST OF THE DIAGNOSED FIXES ADOPTED, AND THE MERGE GAP THAT ADOPTING IT EXPOSED.

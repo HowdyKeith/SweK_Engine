@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/flip2dAsync-selfcheck.mjs
 //
-// Run: node tools/ship/flip2dAsync-selfcheck.mjs   (~5s -- MEASURED)
+// Run: node tools/ship/flip2dAsync-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3225 -- THE GPU PRESSURE SOLVE IS WIRED, OPT-IN, AND NOBODY PAYS FOR IT UNTIL THEY ASK.

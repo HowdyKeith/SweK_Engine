@@ -1,6 +1,6 @@
 // tools/roundhouse/rayleighOnset-selfcheck.mjs
 //
-// Run: node tools/roundhouse/rayleighOnset-selfcheck.mjs   (~280s -- MEASURED, was a typed ~60s)
+// Run: node tools/roundhouse/rayleighOnset-selfcheck.mjs   (~80s -- MEASURED, was a typed ~60s)
 //
 // v3145 -- THERMAL'S ACTUAL BIFURCATION, AND A SECOND EXTERNAL ANSWER KEY FOR THE WHOLE LAB.
 //

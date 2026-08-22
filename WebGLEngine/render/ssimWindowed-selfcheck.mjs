@@ -1,6 +1,6 @@
 // WebGLEngine/render/ssimWindowed-selfcheck.mjs — v3691
 //
-// Run: node render/ssimWindowed-selfcheck.mjs   (~2s)
+// Run: node render/ssimWindowed-selfcheck.mjs   (~0.2s)
 //
 // *** THE HEADLINE OF THIS GATE IS A RESULT I DID NOT EXPECT AND IT CHANGES WHAT THE METRIC SHOULD REPORT. ***
 // The round was built on a measurement: SweK's global ssim() reads 0.99872 when 0.10% of a 256x256 render is

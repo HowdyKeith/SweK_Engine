@@ -17,6 +17,7 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { reportLines } from "./scheduleKey.mjs";
 import { scene, runSchedule, constraintResidual, momentumResidual, maxDiff, scheduleGap,
          colourOrderGap, gapExponent, convergenceBoundary, divergenceBoundary, relaxationBracket,
          convergenceTrace, COMPLIANT, RIGID, MEASURED_V3600 } from "./scheduleKey.mjs";
@@ -153,6 +154,22 @@ section("7. WHAT IS NOT CLAIMED -- ASSERTED AS AN ABSENT MECHANISM, NOT AN ABSEN
     ok("no device, no baseline row", /No device, no baseline row/.test(MEASURED_V3600.whatThisIsNot));
     // ANTIDOTE (v3196): if a jacobi schedule is ever wired into clothLoop this line goes RED and must be
     // rewritten to assert the MOMENTUM residual of the shipped path -- not weakened, not deleted.
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    const L = reportLines();
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[scheduleKey]"),
+       L.length + " lines, self-named");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

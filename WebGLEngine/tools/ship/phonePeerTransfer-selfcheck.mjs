@@ -1,6 +1,6 @@
 // tools/ship/phonePeerTransfer-selfcheck.mjs
 //
-// Run: node tools/ship/phonePeerTransfer-selfcheck.mjs   (~2s)
+// Run: node tools/ship/phonePeerTransfer-selfcheck.mjs   (~0.1s)
 //
 // v3169 -- THE PHONE PEERS COULD NOT MOVE A FILE, and "registered" was not "working".
 //

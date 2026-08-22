@@ -398,4 +398,12 @@ REM v3088 -- was an INLINE copy of the three-way message. Extracted to swek_exit
 REM judgement has ONE definition; four copies is how the fifth gets it wrong.
 call "%~dp0WebGLEngine\tools\ship\swek_exit_report.bat" %NODE_RC%
 popd
+
+REM v3903 -- *** THE END-OF-SCRIPT MARKER, WHICH discovery-selfcheck HAS ASKED FOR AND NOT HAD. ***
+REM A launcher window that CLOSED and a launcher window that RAN TO THE END look identical after the fact,
+REM and this file's own v2609 note is Keith reporting exactly that confusion: "the only error is that the
+REM dos window did not exit without pressing a key". Every branch above that can leave prints WHY it left;
+REM the ordinary path printed nothing at all, so "it finished" was the one outcome with no evidence.
+REM The marker is the last line executed, so seeing it means every section above ran to completion.
+echo [SweK] listener script ENDED (rc=%NODE_RC%) -- this line is the proof the launcher reached its end.
 goto :eof

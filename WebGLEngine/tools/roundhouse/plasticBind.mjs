@@ -65,7 +65,7 @@ function resolutionBudget(yieldStrain, creep) {
 }
 
 const DEF = { yieldStrain: 0.1, creep: 0.5, maxStrain: 0.5 };
-export const PLASTIC_MODES = ["yield", "creep", "cap", "creepFree"];
+export const PLASTIC_MODES = ["yield", "creep", "cap", "creepFree", "tensiononly"];
 
 export function plasticDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
@@ -206,15 +206,26 @@ export async function buildPlastic(args = {}) {
     // "yield" -- THE BIFURCATION, RECOVERED IN BOTH DIRECTIONS ACROSS A SWEEP.
     // The module's own gate exercises TENSION only (one constraint stretched to strain 0.3). The compression
     // branch is a separate `sign` path in the same function and nothing had ever run it.
+    // *** v3902 -- `tensiononly` IS THE PLANT, AND IT IS THE BLIND SPOT THIS MODE WAS BUILT TO CLOSE. ***
+    // The comment directly above records it: the module's own gate stretches ONE constraint in tension, "the
+    // compression branch is a separate `sign` path in the same function and NOTHING HAD EVER RUN IT". The
+    // plant puts the lab back in that state -- it probes the compression onset with sign = +1, so the device
+    // measures tension twice and calls one of them compression.
+    //
+    // A `reader` plant: applyPlasticity is untouched, the bisection is untouched, and the material still
+    // yields at exactly the strain it should in both directions. WHAT IS CORRUPTED IS WHICH DIRECTION GETS
+    // LOOKED AT -- and the recovered compression onset comes back at +y instead of -y, so the sweep's worst
+    // |c + y| becomes 2y rather than ~1e-16.
     const sweep = [0.02, 0.05, 0.1, 0.2, 0.35];
+    const compressionSign = mode === "tensiononly" ? 1 : -1;
     let worst = 0, tension = 0, compression = 0;
     for (const y of sweep) {
         const opts = { ...base, yieldStrain: y };
-        const t = onsetStrain(opts, 1), c = onsetStrain(opts, -1);
+        const t = onsetStrain(opts, 1), c = onsetStrain(opts, compressionSign);
         worst = Math.max(worst, Math.abs(t - y), Math.abs(c + y));
         if (y === base.yieldStrain) { tension = t; compression = c; }
     }
-    if (!tension) { const o = { ...base }; tension = onsetStrain(o, 1); compression = onsetStrain(o, -1); }
+    if (!tension) { const o = { ...base }; tension = onsetStrain(o, 1); compression = onsetStrain(o, compressionSign); }
     // EXACTLY ZERO, right up to the boundary -- including one ULP short of it, where a leaky yield would show.
     let allZero = 1;
     for (const s of [0, 0.01, 0.05, 0.099, base.yieldStrain * (1 - Number.EPSILON)]) if (permanentSet(s, base) !== 0) allZero = 0;
@@ -228,4 +239,11 @@ export const plasticDevice = {
     observables: PLASTIC_OBSERVABLES,
     build: buildPlastic,
     defaults: plasticDefaults,
+    // `yieldWorstErrAbs` -- the only observable of this mode that is a finite number in BOTH arms and means the
+    // same thing in each. `yieldTension` is bit-identical under the plant (the tension path is untouched) and
+    // `belowYieldExactlyZero` is a boolean, which the census reports as DECLARED BUT DEAD.
+    // *** THE OTHER THREE MODES COULD NOT CARRY THIS. *** creep, cap and creepFree report their findings in
+    // observables that read -1 -- the NONE sentinel -- in every other mode, so a cross-mode comparison against
+    // them measures a sentinel turning into a number, which is not an observable getting worse.
+    plantMode: "tensiononly", plantFlips: "yieldWorstErrAbs", plantKind: "reader",
 };

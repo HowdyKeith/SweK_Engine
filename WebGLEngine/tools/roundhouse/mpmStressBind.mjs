@@ -91,6 +91,8 @@ export const mpmStressDevice = {
     modes: MPMSTRESS_MODES,
     // "symmetry" is FIRST so the contract compares the plant against the mode that owns the asymmetry key.
     plantMode: "transposed", plantFlips: "asymmetry", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "asymmetry is |sigma - sigma^T|, identically 0 for the Cauchy stress of a hyperelastic model by conservation of angular momentum; transposing one factor takes it 0 -> 72.6",
     name: "mpm-neohookean-stress", observables: MPMSTRESS_OBSERVABLES,
     build: buildMpmStress, defaults: mpmStressDefaults,
 };

@@ -119,6 +119,8 @@ export const figureEightDevice = {
     // "period" stays FIRST: it owns returnDist, and the contract compares the plant against modes[0].
     modes: FIG8_MODES,
     plantMode: "euler", plantFlips: "returnDist", plantKind: "knob",
+    plantIdeal: 0, plantIdealWhy:
+        "returnDist is how far the orbit misses its own starting point after one period, so a closed orbit returns exactly to it and 0 is the ideal; euler goes 5.31e-6 -> 5.54e-2 and `closes` drops 1 -> 0",
     observables: FIG8_OBSERVABLES,
     build: buildFigureEight,
     defaults: figureEightDefaults,

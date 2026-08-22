@@ -84,6 +84,8 @@ export const adjointDevice = {
     // v3768 -- the mode plant. "identity" is FIRST so the contract compares the plant against the mode that
     // owns controlDefect; the plant is a variant of identity, so identity is its correct baseline.
     plantMode: "rowmajor", plantFlips: "controlDefect", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "controlDefect is <Ax,y> - <x,A'y>, which is identically 0 for a true adjoint pair; rowmajor transposes the indexing and the defect goes 8.30e-14 -> 1.81e+3",
     name: "radon-adjoint-identity", observables: ADJOINT_OBSERVABLES,
     build: buildAdjoint, defaults: adjointDefaults,
 };

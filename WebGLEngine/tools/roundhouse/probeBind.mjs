@@ -24,6 +24,16 @@ import {
 import { steerToCircular, steerToISCO, NAV } from "../../physics/blackhole/navigate.js";
 import { runMission, adjudicate, findLowestStable, VERDICT } from "../../physics/blackhole/mission.js";
 
+// *** v3902 -- ONE declaration of the mode list, and this is the FIFTH DEVICE THIS ROUND FOUND CARRYING TWO. ***
+// splat, multigridgpu, geometry, induction and probe all kept a whitelist inside defaults() alongside the
+// device object's own `modes` array. On splatBind the second copy SILENTLY COERCED a new plant mode to the
+// primary, so both arms read bit-identical numbers and the plant appeared to fire while changing nothing --
+// and it did it again here, which is how this one was found. FIVE INSTANCES IS NOT A COINCIDENCE, IT IS THE
+// SHAPE: a device grows a mode, the author updates the list they are looking at, and the other one rots.
+// THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED.
+export const PROBE_MODES = ["precession", "firstorder", "closure", "isco", "capture", "steer", "steerisco",
+    "mission", "findisco", "pilot", "tour", "place", "transfer", "route", "emit", "halfadvance"];
+
 export const PROBE_OBSERVABLES = [
     "emitR", "emitConeRad", "emitConeDeg", "emitEscapedSky", "emitInsidePhotonSphere",
     "transferL", "transferE", "transferEcc", "apoErr", "periErr", "deltaLDepart", "deltaLArrive",
@@ -70,7 +80,7 @@ export function probeDefaults(hyp) {
     c.r0 = Math.max(2.01 * c.M, num(c.r0, DEF.r0));
     c.rTarget = Math.max(2.05 * c.M, num(c.rTarget, DEF.rTarget));
     h.config = c;
-    if (!["precession", "firstorder", "closure", "isco", "capture", "steer", "steerisco", "mission", "findisco", "pilot", "tour", "place", "transfer", "route", "emit"].includes(h.mode)) h.mode = "precession";
+    if (!PROBE_MODES.includes(h.mode)) h.mode = "precession";   // v3902 -- ONE declaration, read here and by the device
     return h;
 }
 
@@ -259,9 +269,26 @@ export async function buildProbe(hyp, base = {}) {
         };
     }
 
+    // *** v3902 -- `halfadvance` IS THE PLANT, AND IT IS THE MOST FAMOUS WRONG ANSWER IN THIS CORNER OF
+    // PHYSICS. *** The relativistic perihelion advance is 6 pi M / (a(1 - e^2)); a naive derivation gives
+    // EXACTLY HALF of it, and the factor of two is the whole reason the 1915 result settled Mercury -- the
+    // half-sized answer had been available for decades and did not fit. The plant restores that answer as the
+    // key while leaving the integrator alone.
+    //
+    // WHY IT IS WORTH HAVING RATHER THAN OBVIOUS: the orbit still precesses, in the right direction, at a rate
+    // that scales correctly with a and e -- every SHAPE-OF-THE-ANSWER check survives it, which is the same
+    // property the blackhole rs plant has and the same reason a wrong CONSTANT is more dangerous than a wrong
+    // LAW. It is caught only by a device that compares the measured advance to an independently computed
+    // number, which is what this mode does.
+    //
+    // A `method` plant: measuredPrecession is untouched and `precessionMeasured` is bit-identical across the
+    // arms. THE SABOTAGE IS IN THE BIND -- physics/blackhole/probe.js is imported unchanged, and the wrong key
+    // is formed here rather than by editing the module's exported constant.
     const m = measuredPrecession(M, c.a, c.e, { dphi: c.dphi });
     if (!m.ok) return { error: m.reason };
-    const ex = precessionExact(M, c.a, c.e);
+    const ex = h.mode === "halfadvance"
+        ? (3 * Math.PI * M) / (c.a * (1 - c.e * c.e))
+        : precessionExact(M, c.a, c.e);
     return {
         precessionMeasured: m.perOrbit, precessionExact: ex,
         precessionErrFrac: Math.abs(m.perOrbit / ex - 1), orbits: m.orbits,
@@ -273,4 +300,13 @@ export const probeDevice = {
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
     // DISTINCT answer. *** A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE. ***
-    modes: ["precession", "isco", "closure", "firstorder", "capture", "findisco", "mission", "steer", "steerisco", "pilot", "tour", "place", "transfer", "route", "emit"], name: "schwarzschild-probe", observables: PROBE_OBSERVABLES, build: buildProbe, defaults: probeDefaults };
+    modes: PROBE_MODES, name: "schwarzschild-probe", observables: PROBE_OBSERVABLES, build: buildProbe, defaults: probeDefaults,
+    // `precessionErrFrac` -- the ratio of measured to key, which lands on ~1 because the measured advance is
+    // twice the halved key. NOT `precessionMeasured`, which is bit-identical (the orbit does not know its key
+    // changed), and not `closureResidual`, which exists only in the `closure` mode.
+    // *** `closure` IS A CONTROL, NOT A PLANT, AND IT COULD NOT BE DECLARED AS EITHER. *** "Delete 3Mu^2 and
+    // the orbit must close EXACTLY" drives closureResidual to ~1e-10, its ideal -- but the control contract
+    // needs the observable to be finite in BOTH arms, and `precession` (the primary) does not report
+    // closureResidual at all. A self-contained control is invisible to the census for the same reason splat's
+    // self-contained sabotage was: the contract compares ACROSS modes.
+    plantMode: "halfadvance", plantFlips: "precessionErrFrac", plantKind: "method" };

@@ -105,4 +105,4 @@ export function triageLines(t) {
     return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) for (const l of triageLines(triage())) console.log(l);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) for (const l of triageLines(triage())) console.log(l);

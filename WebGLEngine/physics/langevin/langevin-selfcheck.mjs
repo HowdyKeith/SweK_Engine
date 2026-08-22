@@ -1,6 +1,6 @@
 // WebGLEngine/physics/langevin/langevin-selfcheck.mjs — v3282
 //
-// Run: node physics/langevin/langevin-selfcheck.mjs   (~4s — MEASURED, dominated by the Jarzynski ensembles)
+// Run: node physics/langevin/langevin-selfcheck.mjs   (~0.4s — MEASURED, dominated by the Jarzynski ensembles)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Three exact keys, none fed to the simulation: equipartition <x^2> = kT/k, Einstein MSD = 2Dt, and the

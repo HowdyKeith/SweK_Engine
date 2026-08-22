@@ -216,6 +216,26 @@ window.addEventListener("load", function () {
     .bigbtns button { min-height:46px; padding:4px 10px; font-size:13px; max-width:none; flex:1 1 44%; }
     #erRow > div, #netRow > div { flex:1 1 100%; min-width:0; }
   }
+
+  /* v3909 -- EVERY LINK IN A DRAWER IS A BOX, AND IT IS CSS RATHER THAN 113 INLINE STYLES.
+     The boxing was applied BY HAND, per anchor, in the Arriving markup -- so 23 of 113 simply never got it and
+     read as bare underlined text next to boxed siblings. Measured, not eyeballed: 90 boxed, 23 not, and the two
+     properties are independent (lab-export HAD an icon and no box).
+     *** CSS AND NOT A JS PASS, BECAUSE OF THE RACE. *** placements() appends links ASYNCHRONOUSLY from a bridge
+     fetch, long after any load-time styling pass would have finished. A rule applies to a node the moment it
+     lands, whoever adds it and whenever. The existing inline styles still win where they exist -- same box, same
+     radius -- so nothing already right is changed; this only reaches what was missed. */
+  .gpanel [data-panel-pages] > a,
+  .gpanel .placedPages > a {
+    display: inline-flex; align-items: center; gap: 4px;
+    text-decoration: none; border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 3px; font-size: 11px;
+  }
+  /* A page with no icon of its own gets a neutral mark, so the row reads as one kind of thing rather than as
+     "the important ones have pictures". Set from JS as an ATTRIBUTE and drawn here: CSS cannot ask whether text
+     begins with an emoji, and putting the glyph in the DOM would make it part of the link's own text. */
+  .gpanel [data-panel-pages] > a[data-noicon]::before,
+  .gpanel .placedPages > a[data-noicon]::before { content: "\25C6"; opacity: .45; font-size: 8px; }
 </style>
 <script src="/engine/favicon-inject.js"></script>
 <script src="/engine/visitor-chat.js"></script>
@@ -347,7 +367,10 @@ window.addEventListener("load", function () {
              hides the MAIN dials and avatar; v3821 also hides the info panel's OWN dock (its second robot and
              vertical gauge stack) via gi.setDock(false), so a staged panel carries the info TEXT alone and no
              gauges or avatar at all. Empty and display:none until something is presented. -->
-        <div id="panelStage" style="display:none;gap:12px;align-items:flex-start;margin-bottom:8px;">
+        <!-- v3912 -- align-items was flex-start, so the info column NEVER matched the drawer beside it: the preview
+             box ended wherever its own content ended, leaving a ragged gap down the right of every panel.
+             stretch makes the two columns one row. -->
+        <div id="panelStage" style="display:none;gap:12px;align-items:stretch;margin-bottom:8px;">
           <!-- v3823 -- THE ROLES FLIP: THE INFO COLUMN IS THE HARD-SET ONE AND THE LINKS PANEL FILLS THE LEFT.
                Keith, on the rig: "the text info panel needs to be hard set to 4 times wider and always set to
                that, and the links panel on the left needs to fill that space ... so all link panels are set to
@@ -360,7 +383,7 @@ window.addEventListener("load", function () {
                -- only now it is the info that never restructures, and the panel is as wide as the space allows.
                (The staged panels were authored at 460; ~half a page minus a 360 info leaves them near that.) -->
           <div id="stageBody" style="flex:1 1 auto;min-width:0;"></div>
-          <div id="stageInfo" style="flex:0 0 360px;max-width:360px;min-width:360px;"></div>
+          <div id="stageInfo" style="flex:0 0 360px;max-width:360px;min-width:360px;display:flex;flex-direction:column;"></div><!-- v3912 -- a column, so the height stretch above has something to hand down -->
         </div>
         <div id="stageBar" style="display:none;align-items:center;gap:8px;margin-bottom:6px;">
           <button id="stageBack" title="Send this panel back to the right column"
@@ -368,7 +391,10 @@ window.addEventListener("load", function () {
                          padding:3px 9px;font:11px ui-monospace,monospace;cursor:pointer;">&#8592; back to the right</button>
           <span id="stageWhat" style="color:var(--dim);font:11px ui-monospace,monospace;"></span>
         </div>
-        <div id="dialsRow" style="display:flex;align-items:center;justify-content:center;gap:20px;">
+        <!-- v3912 -- align-items was center, which is why the preview box floated 26px below the drawer top instead
+             of aligning with it. stretch top-justifies it AND lets it reach the bottom; flex:1 passes the
+             stretched height on rather than collapsing to content. -->
+        <div id="dialsRow" style="display:flex;align-items:stretch;justify-content:center;gap:20px;flex:1 1 auto;min-height:0;">
           <div id="dials" title="Live SVG dials — same gauge settings as the 3D gauges. No avatar, no render." style="display:flex;gap:14px;align-items:flex-start;min-width:360px;min-height:230px;"></div>
           <span id="dialsRobot" style="display:inline-flex;align-items:flex-end;align-self:stretch;flex:none;overflow:visible;" title="SweK — turns red on errors"></span>
         </div>
@@ -651,7 +677,7 @@ window.addEventListener("load", function () {
             <a href="/wind-tunnel.html" target="_blank" rel="noopener" title="Drag and lift on a body in a lattice-Boltzmann channel, with the momentum-balance identity as the answer key: force on all solids MUST equal the applied body force." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Wind tunnel</a>
             <a href="/roundhouse.html" target="_blank" rel="noopener" title="The agent loop: cheap model proposes, a REAL gate verifies, escalate only on failure. Watch a claim be refused by a measurement." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Roundhouse</a>
             <a href="/policy-mass.html" target="_blank" rel="noopener" title="Does the brain put its probability mass on the options that actually WORK? An aggregate hit rate cannot tell a policy that is learning from one that has learned to lose -- two brains at an identical 45.0% scored +1.000 and -1.000. Ranks mass against merit. The demos need no captured trace." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Mass vs merit</a>
-            <a href="/device.html" target="_blank" rel="noopener" title="Point a model at a physics instrument and let the simulation judge its claim. 75 devices, three tiers -- local Ollama, Gemini, Claude -- all judged by the same gate." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Devices</a>
+            <a href="/device.html" target="_blank" rel="noopener" title="Point a model at a physics instrument and let the simulation judge its claim. 108 devices, three tiers -- local Ollama, Gemini, Claude -- all judged by the same gate." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Devices</a>
             <a href="/models.html" target="_blank" rel="noopener" title="Compare models across your fleet on the same physics. Cheap-win rate, refused rate and malformed rate kept separate, because being wrong and being unparseable have opposite fixes." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Model bench</a>
             <a href="/skillbook.html" target="_blank" rel="noopener" title="Run a real two-arm skillbook trial and read every statistic behind the verdict. The proposer is a deterministic mock and the page says so." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Skillbook</a>
             <a href="/gates.html" target="_blank" rel="noopener" title="Run the whole selfcheck suite from the browser and read the failures." style="color:#8fb4e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#9673; Gates</a>
@@ -989,6 +1015,18 @@ window.addEventListener("load", function () {
       </section>
     
         <div class="gpanel" data-panel="github" hidden>
+          <!-- v3908 -- THE GITHUB MANAGER, WHICH LIVED ONLY ON THE ENGINE PAGE. main.js mounts ui/githubPanel.js
+               into the left-edge dock, so every GitHub action -- including "Release current engine", the one that
+               makes auto-update possible at all -- was reachable from index.html and NOT from the ops page. This
+               button opens THE SAME MODULE, not a copy of it: mountGithubPanel() has no imports and no globals and
+               says in its own header that the Dock merely provides the drawer, so the panel travels and only its
+               host changes. A SECOND GITHUB PANEL WRITTEN FOR THIS PAGE WOULD BE THE SECOND COPY THAT NEVER GETS
+               UPDATED -- all six tabs (Publish, Account, Repos, Releases, Issues, Code) arrive here for free and
+               stay in step forever. -->
+          <div style="border:1px solid #4a5a7a;background:#0e1522;border-radius:6px;margin-bottom:10px;padding:8px 10px;">
+            <button id="ghManagerBtn" style="padding:7px 12px;background:#3a2a5a;color:#cfe;border:1px solid #6a4a9a;border-radius:6px;cursor:pointer;font:12px system-ui;">&#128025; GitHub Manager &mdash; repos, releases, issues, files</button>
+            <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;">The same panel as the engine page's left-edge GitHub tab. <b>Releases &rarr; Release current engine</b> auto-tags from ENGINE_VERSION, builds the installable zip and uploads it as the release asset &mdash; which is what <code>fetchEngineBuild</code> reads, so auto-update stays dark until a release exists.</div>
+          </div>
           <div id="ghUpdates" style="display:none;border:1px solid #4a6a2a;background:#111f0a;border-radius:6px;margin-bottom:10px;padding:7px 10px;"></div>
           <div id="ghPeers" style="border:1px solid var(--line);border-radius:6px;margin-bottom:10px;padding:6px 10px;"></div>
         </div>
@@ -3457,6 +3495,10 @@ A password fetches a token from the list server; an unregistered callsign needs 
       const { mountGaugeInfo } = await import("/ui/gaugeInfoPanel.js");
       const gi = mountGaugeInfo({
         dialsEl, host: dialsEl.parentElement,
+        // v3912 -- this page stages the panel BESIDE a links drawer, so its height belongs to that row
+        // rather than to whatever the gauges measured at mount. Stated by the caller because the module
+        // is meant to mount on other pages and must not infer this page's layout.
+        stretchToRow: true,
         // *** v3788 -- THIS READ `.lastStats`, WHICH svgGaugeSet HAS NEVER EXPOSED. Its returned API is
         // { root, start, stop, destroy, refresh, setGauges, values, setStats } -- NO lastStats -- so this
         // returned undefined on every call, `|| {}` turned that into an empty object, and the dock was handed
@@ -4116,7 +4158,17 @@ A password fetches a token from the list server; an unregistered callsign needs 
         Object.keys(pages).forEach(function(f){
           (pages[f].topics || []).forEach(function(t){
             var panel = document.querySelector('.gpanel[data-panel="' + t + '"]');
-            if (!panel || panel.querySelector('[data-place-page="' + f + '"]')) return;
+            if (!panel) return;
+            // v3909 -- *** THIS IS WHERE THE DUPLICATES CAME FROM. *** The guard checked only for THIS block's
+            // own marker, never for a link the drawer already had. pageSections' mover puts a properly labelled
+            // anchor -- icon and title -- into [data-panel-pages]; if the same page also carries a topics entry
+            // in page-placements.json, this loop then appended a SECOND link to the same href rendered as a bare
+            // slug. Physics Lab showed all twelve of its pages twice: "Physics Lab" and "physics-lab".
+            // Reproduced in a browser by stubbing /pages/placements before believing it, since the route 404s
+            // offline and the panel looks clean without a bridge. THE ADDS-AND-NEVER-REMOVES PROPERTY IS INTACT:
+            // this refuses to add a duplicate, it does not delete anything anyone else placed.
+            if (panel.querySelector('[data-place-page="' + f + '"]')) return;
+            if (panel.querySelector('a[href="/' + f + '"]')) return;
             var host = panel.querySelector(".placedPages") || (function(){
               var d = document.createElement("div");
               d.className = "placedPages";
@@ -4130,6 +4182,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
             a.title = "placed here from the Page Index";
             a.style.cssText = "color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;";
             host.appendChild(a);
+            if (window.swekMarkPanelLinks) window.swekMarkPanelLinks();
           });
         });
 
@@ -4375,6 +4428,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
     dlg.onclick=function(e){ if(e.target===dlg) dlg.remove(); };
     return { dlg: dlg, card: card };
   }
+  // v3908 -- EXPOSED, because it lives inside an IIFE and the GitHub Manager host at the foot of this file is a
+  // MODULE, which cannot see function-scoped names. I assumed a top-level `function` in a classic script was
+  // global, wired the button on that assumption, AND THE BROWSER SAID OTHERWISE: `typeof swekOverlay === "function"`
+  // came back FALSE and the button was inert -- it opened nothing and logged a warning nobody would read.
+  // *** THAT IS THE v3227 FAILURE AGAIN: WIRED, PLAUSIBLE, AND DEAD. *** The fix is to make the ONE overlay
+  // reachable rather than to write a second one for the new caller; a duplicate would drift the first time either
+  // grew a keyboard escape or a focus trap.
+  window.swekOverlay = swekOverlay;
 
   // *** v3692 -- THE GRAB PICKER, WHICH DID NOT EXIST. *** Keith: choosing a peer and asking to GET a file gave
   // no file selection at all. The old code fetched /peer/dl/remote, JOINED THE NAMES INTO A STRING AND PUT THEM
@@ -7583,6 +7644,41 @@ if (missing.length && arrivingRow) {
 }
 console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.length + " panels" +
             (missing.length ? ", " + missing.length + " unmatched: " + missing.join(", ") : ""));
+
+// v3909 -- MARK THE LINKS THAT HAVE NO ICON OF THEIR OWN, so the CSS above can give them a neutral one.
+// Exposed on window because the OTHER place links arrive -- placements(), which appends asynchronously from a
+// bridge fetch in a classic script far above -- has to be able to re-run it, and a module's names are not
+// reachable from there. THE TWO CALL SITES ARE THE ONLY TWO WAYS A LINK ENTERS A DRAWER, which is what makes
+// this complete rather than merely likely: the mover below, and the placements append.
+const ICON_START = /^[\p{Extended_Pictographic}\u25C6\u25C9\u25CF\u25B6\u2699\u2295\u269B\u2697\u222B\u25D6]/u;
+window.swekMarkPanelLinks = function () {
+  // *** THE GUARD IN placements() IS NOT ENOUGH ON ITS OWN, AND THE BROWSER IS WHAT SAID SO. *** I added a check
+  // there for "does this drawer already link to this page", verified the boxing, AND THE TWELVE DUPLICATES WERE
+  // STILL THERE. The reason is order: placements() resolves its bridge fetch BEFORE this module moves the
+  // anchors in, so at the moment it checks, the drawer is genuinely empty and it is right to append. The guard
+  // stays -- it covers the other ordering -- and this pass covers this one. TWO ORDERINGS, TWO DEFENCES.
+  let removed = 0;
+  for (const panel of document.querySelectorAll('.gpanel')) {
+    const owned = new Set([...panel.querySelectorAll('[data-panel-pages] > a[href]')].map((a) => a.getAttribute("href")));
+    if (!owned.size) continue;
+    // ONLY a placements-added anchor is ever removed, and only when the drawer already owns that exact href.
+    // The mover's anchors are authoritative -- they carry the icon and the title -- and nothing here can touch
+    // them. This does not weaken placements' "adds and never removes": it declines a duplicate of a link that
+    // is already present, which is the same decision its own guard makes when the ordering lets it.
+    for (const a of panel.querySelectorAll('.placedPages > a[data-place-page]')) {
+      if (owned.has(a.getAttribute("href"))) { a.remove(); removed++; }
+    }
+  }
+  let marked = 0;
+  for (const a of document.querySelectorAll('.gpanel [data-panel-pages] > a, .gpanel .placedPages > a')) {
+    const has = ICON_START.test((a.textContent || "").trim());
+    if (has) a.removeAttribute("data-noicon");
+    else if (!a.hasAttribute("data-noicon")) { a.setAttribute("data-noicon", ""); marked++; }
+  }
+  if (removed) console.log("[pageSections] removed " + removed + " duplicate placement link(s) the drawer already owned");
+  return marked;
+};
+console.log("[pageSections] " + window.swekMarkPanelLinks() + " panel links carry no icon of their own and get the neutral mark");
 </script>
 
 <!-- v3247 -- INSTALL AND RUN HISTORY, from the side that can see it. -->
@@ -7590,7 +7686,13 @@ console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.len
 (function(){
   var el=document.getElementById("instHist"); if(!el) return;
   fetch("/install/history",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(j){
-    if(!j||!j.ok||!j.runs||!j.runs.length){ el.textContent=""; return; }
+    // v3912 -- AN EMPTY LINE STILL TOOK UP A LINE. el.textContent = "" blanked the span and left the DIV around
+    // it holding its padding, so "nothing to report" rendered as a gap in the header forever. The container is
+    // hidden instead, and shown only when there is something to say.
+    var lineEl = document.getElementById("instHistLine");
+    var hide = function(){ el.textContent = ""; if (lineEl) lineEl.style.display = "none"; };
+    var show = function(){ if (lineEl) lineEl.style.display = ""; };
+    if(!j||!j.ok||!j.runs||!j.runs.length){ hide(); return; }
     var last=j.runs[0];
     var s=function(ms){ return ms==null?"--":(ms<1000?ms+"ms":(ms/1000).toFixed(1)+"s"); };
     // THE LAST RUN, THEN THE TWO AVERAGES. A single blended average would describe neither operation, and the
@@ -7613,7 +7715,22 @@ console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.len
     // of one glance away forever.
     var note = "";
     var bits = [];
-    if (last.installToReadyMs == null) {
+    // v3912 -- THE THIRD CASE, AND IT IS THE ONE KEITH ACTUALLY HIT: a number that is real arithmetic and not an
+    // install. installToReadyMs is boot minus main.js's mtime, so a build DOWNLOADED AND STARTED LATER reports
+    // every minute it merely sat there -- 4180.6s, seventy minutes, parked in the header and never leaving.
+    // The ceiling comes from the bridge (j.plausibleMaxMs) rather than being chosen again here, so the headline
+    // and the averages cannot disagree about which runs count. Past it the run is NOT reported as a measurement,
+    // and it is NOT silently dropped either: it goes to the title and the console, exactly the treatment v3578
+    // gave the null case, because a non-measurement in a header is noise that trains you to stop reading it.
+    var ceiling = (typeof j.plausibleMaxMs === "number") ? j.plausibleMaxMs : 600000;
+    var implausible = last.installToReadyMs != null && last.installToReadyMs > ceiling;
+    if (implausible) {
+      note = "The most recent run (" + (last.newBuild ? "new build" : "restart") + ") measured " +
+             s(last.installToReadyMs) + " from build-write to ready, which is longer than an install takes -- " +
+             "the build most likely sat before it was started, so it is not shown as an install time.";
+      console.log("[installHistory] last run " + s(last.installToReadyMs) + " exceeds the " + s(ceiling) +
+                  " plausibility ceiling -- reported as sat-before-start, not as an install");
+    } else if (last.installToReadyMs == null) {
       note = "The most recent run (" + (last.newBuild ? "new build" : "restart") + ") recorded no " +
              "start-to-ready time, so there is nothing to show here for it.";
       console.log("[installHistory] last " + (last.newBuild ? "new build" : "restart") +
@@ -7626,8 +7743,10 @@ console.log("[pageSections] moved " + moved + " page links into " + SECTIONS.len
     if(j.avgRestartMs!=null) bits.push("avg restart "+s(j.avgRestartMs));
     // v3850 -- NO LEADING SEPARATOR ANY MORE. The " \u00b7 " existed to join this onto the title line it used to
     // trail; on its own status line it rendered as a stray dot with nothing before it.
-    el.textContent = bits.length ? bits.join(" \u00b7 ") : "";
-    el.title = j.note + "  Last " + j.runs.length + " runs recorded." + (note ? ("  " + note) : "");
+    if (bits.length) { show(); el.textContent = bits.join(" \u00b7 "); } else { hide(); }
+    el.title = j.note + "  Last " + j.runs.length + " runs recorded." +
+               (j.setAside ? ("  " + j.setAside + " run(s) set aside as longer than an install takes.") : "") +
+               (note ? ("  " + note) : "");
   }).catch(function(){ /* a history that will not load must not be reported as a fast install */ });
 })();
 </script>
@@ -7751,6 +7870,28 @@ try {
     btn.title = "\u25b8 This looks like your device (" + d.why + ") \u2014 " + (btn.title || "");
   }
 } catch (e) { /* a detector that breaks the page would be worse than no detector */ }
+</script>
+<script type="module">
+// v3908 -- host the engine's GitHub panel on the ops page. IMPORTS THE SAME MODULE main.js does; the only thing
+// this page supplies is the drawer, which is exactly what ui/githubPanel.js's header says the Dock was providing.
+// swekOverlay() is reused rather than re-implemented -- it already handles the backdrop, click-outside-to-close
+// and a card that scrolls at 82vh, and a second overlay here would drift from it the first time either changed.
+import { mountGithubPanel } from "./ui/githubPanel.js";
+(function () {
+    var btn = document.getElementById("ghManagerBtn");
+    if (!btn) return;
+    var ghRoot = null;
+    btn.onclick = function () {
+        // mountGithubPanel() RETURNS UNDEFINED IF ALREADY MOUNTED (it guards on #ghPanelRoot) and it does not
+        // append its root anywhere -- the host does. So the root is kept here across opens rather than looked up
+        // in the DOM, where it would not be found once an overlay it lived in had been removed.
+        if (!ghRoot) { try { var m = mountGithubPanel(); ghRoot = m && m.root; } catch (e) { console.warn("github panel:", e); } }
+        if (!ghRoot) return;
+        if (typeof swekOverlay !== "function") { console.warn("swekOverlay missing -- cannot host the panel"); return; }
+        var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close");
+        o.card.appendChild(ghRoot);
+    };
+})();
 </script>
 </body>
 </html>

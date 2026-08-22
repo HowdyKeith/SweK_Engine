@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/fermi-selfcheck.mjs -- v3815
 //
-// Run: node physics/thermal/fermi-selfcheck.mjs   (~2s, MEASURED)
+// Run: node physics/thermal/fermi-selfcheck.mjs   (~0.5s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE DEGENERATE FERMI GAS, THE MIRROR OF bec.mjs, GRADED AT T = 0, AT LOW T, AND AGAINST ITS STATISTICS.
@@ -21,6 +21,7 @@ import path from "node:path";
 import {
     fermiIntegral, fermiIntegralClosed, etaDirichlet, fermiEnergyCoefficient, groundEnergyPerParticle,
     degeneracyPressure, POLYTROPE_EXPONENT, sommerfeldCoefficient, fermiCv, classicalCv, occupation,
+    fermiFunction,
 } from "./fermi.mjs";
 import { gammaFn } from "../md/maxwellSpeed.mjs";
 import { zeta } from "../zeta.js";
@@ -133,6 +134,20 @@ say("");
 say("NOT CLAIMED: real metals or real white dwarfs. This is the IDEAL Fermi gas -- non-relativistic, no lattice,");
 say("no band structure, no electron-electron interaction, spin folded into E_F. It grades the ideal degenerate");
 say("thermodynamics and its exact join to whiteDwarf's polytrope. k_B = 1. NO DEVICE BIND, no lab-results change.");
+
+{
+    // v3904 -- THE COMPLETE FERMI-DIRAC INTEGRAL OF ORDER 1 HAS A CLOSED FORM AND NOTHING USED IT.
+    // F_1(0) = int_0^inf x/(e^x + 1) dx = pi^2/12. It is the Fermi cousin of the Bose pi^2/6, and the FACTOR
+    // OF TWO BETWEEN THEM IS THE STATISTICS -- eta(2) = (1 - 2^(1-2)) zeta(2). *** THIS IS THE ONE PLACE THE
+    // SIGN IN THE DENOMINATOR IS GRADED BY ITS CONSEQUENCE RATHER THAN BY READING THE SOURCE: flip e^x + 1
+    // to e^x - 1 and the answer moves to pi^2/6, which is a 2x miss no tolerance forgives.
+    const got = fermiFunction(2, 1), exact = Math.PI ** 2 / 12;
+    ok("fermiFunction(2,1) lands on pi^2/12", Math.abs(got - exact) / exact < 1e-11,
+       got.toPrecision(17) + " against " + exact.toPrecision(17) + ", rel " + (Math.abs(got - exact) / exact).toExponential(3));
+    ok("...and it is HALF the Bose answer, which is where the +1 shows up",
+       Math.abs(got / (Math.PI ** 2 / 6) - 0.5) < 1e-11,
+       "F/B = " + (got / (Math.PI ** 2 / 6)).toPrecision(12) + "; the Bose value pi^2/6 = " + (Math.PI ** 2 / 6).toPrecision(12));
+}
 
 console.log("fermi-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

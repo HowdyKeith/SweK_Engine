@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateBudget-selfcheck.mjs
 //
-// Run: node tools/ship/gateBudget-selfcheck.mjs   (~2s)
+// Run: node tools/ship/gateBudget-selfcheck.mjs   (~0.05s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3212 -- THE BUDGET WENT STALE FOR FOUR HUNDRED VERSIONS AND NOTHING COULD HAVE NOTICED.

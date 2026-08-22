@@ -104,8 +104,47 @@ async function buildCompose({ mode = "compare", config = {} } = {}) {
     };
 }
 
+// *** v3902 -- A PLANT WAS ATTEMPTED HERE AND REFUSED, AND THE REFUSAL IS MEASURED RATHER THAN ASSERTED. ***
+//
+// The curriculum proposes this device for a plant. It should not, and the reason is a property of what this
+// device CONTRIBUTES rather than of how hard it is to sabotage.
+//
+// MEASURED ON THE DEFAULT PAIR (em/vacuum/cComputed against fdtd/lightspeed/cMeasured):
+//     valueA 299792458.000   valueB 299792458.000   absDiff 6.4969e-6   relDiff 2.1671e-14
+//     sigmaApart null   judgedByError false   agree null   verdict "unjudged"
+//
+// EVERY NUMBER IN THAT LIST BELONGS TO THE TWO DEVICES BEING COMPARED, NOT TO THIS ONE. valueA, valueB,
+// absDiff and relDiff are pure functions of em and fdtd; corrupting any of them plants a defect in em or in
+// fdtd, which is where it would have to be declared. THIS DEVICE'S OWN CONTRIBUTION IS THE THREE FILTERS, AND
+// ALL THREE ARE CATEGORICAL -- `dimensionsComparable` and `judgedByError` are booleans, `verdict` and `reason`
+// are strings. probeModePlant requires a FINITE NUMBER IN BOTH ARMS, and this device does not produce one it
+// owns.
+//
+// *** THE TEMPTING FIX IS THE ONE TO REFUSE: inventing a numeric observable (a count of filters passed, a
+// verdict encoded as an integer) SOLELY so the census has something to grade. *** That is manufacturing
+// coverage -- the thing beamDevice's refusal names in the same words -- and it would report this device as
+// covered while nothing about the three filters had been shown to catch anything.
+//
+// WHAT WOULD OVERTURN IT: a pair where BOTH sides carry sample counts, so `sigmaApart` is a real number rather
+// than null. Then the classic uncertainty defect -- standardError -> standard deviation, dropping the
+// 1/sqrt(N) -- would inflate both error bars, drive sigmaApart DOWN, and turn a genuine disagreement into a
+// reported agreement. That is a clean numeric plant on this device's own arithmetic, and it needs a fixture
+// this device does not have today. NOT A PERMANENT OPINION: build that pair and this refusal expires.
+const PLANT_REFUSED =
+    "a plant was attempted and MEASURED to be unavailable: every finite number this device reports (valueA, " +
+    "valueB, absDiff, relDiff) belongs to the two devices being compared, and its OWN contribution -- the " +
+    "units, independence and uncertainty filters -- is entirely categorical (two booleans and two strings). " +
+    "On the default pair sigmaApart is null because neither side carries an error bar, so there is no number " +
+    "of this device's own to move. Inventing one to satisfy the census would MANUFACTURE coverage. EXPIRES " +
+    "IF a comparison pair with sample counts on both sides is added: then sigmaApart is real and dropping the " +
+    "1/sqrt(N) from standardError turns a genuine disagreement into a reported agreement, which is a clean " +
+    "numeric plant on this device's own arithmetic.";
+
 export const composeDevice = {
     modes: ["compare"],
     name: "cross-device-comparison", observables: COMPOSE_OBSERVABLES, build: buildCompose,
     defaults: ({ mode } = {}) => ({ mode: mode || "compare", config: { ...DEF } }),
+    // THE REFUSAL TRAVELS ON THE DEVICE, because the registry hands out devices and curriculum.refusedPlants()
+    // is the thing that needs to see it -- beamBind's reasoning, and it must be a STRING for that reader.
+    plantRefused: PLANT_REFUSED,
 };

@@ -74,6 +74,8 @@ export const mpmPlasticDevice = {
     modes: MPMPLASTIC_MODES,
     // "split" is FIRST so the contract compares the plant against the mode that owns the identity.
     plantMode: "nofp", plantFlips: "splitDrift", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "splitDrift measures whether F = Fe*Fp is preserved across the plastic split, ideally 0 to rounding; dropping the Fp update takes it 2.22e-16 -> 1.24e-1 and volume follows",
     name: "mpm-return-mapping", observables: MPMPLASTIC_OBSERVABLES,
     build: buildMpmPlastic, defaults: mpmPlasticDefaults,
 };

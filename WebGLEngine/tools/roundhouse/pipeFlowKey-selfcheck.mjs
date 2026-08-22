@@ -1,6 +1,6 @@
 // tools/roundhouse/pipeFlowKey-selfcheck.mjs
 //
-// Run: node tools/roundhouse/pipeFlowKey-selfcheck.mjs   (~250s -- MEASURED, was a typed ~20s)
+// Run: node tools/roundhouse/pipeFlowKey-selfcheck.mjs   (~54s -- MEASURED, was a typed ~20s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3091 -- THE FIFTH SECOND ANSWER KEY, AND THE FOURTH TO FIND SOMETHING REAL.

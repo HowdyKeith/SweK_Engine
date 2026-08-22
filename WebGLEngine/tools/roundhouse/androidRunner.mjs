@@ -33,6 +33,23 @@ import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ENGINE_ROOT = path.resolve(HERE, "..", "..");
+// *** v3919 -- THIS IS THE FOURTH GATE RUNNER AND THE SECOND FLAT 180000, AND THE NAME COLLIDES. ***
+//
+// tools/ship/gateBudget.mjs ALSO exports DEFAULT_BUDGET_MS, and it is 139917, derived as 3x the slowest general
+// gate. Two constants with one name and different values is this tree's most repeated defect wearing its most
+// convincing disguise: whichever one you are reading looks authoritative.
+//
+// THIS ONE IS DELIBERATELY NOT THE TABLE, and that is a claim about hardware rather than about gates. The host
+// table's numbers are MEASURED ON THIS MACHINE -- census 717s, levelClaim 1058s -- and an Android device is a
+// different machine class, so importing them would apply a limit to a thing it was never measured against,
+// which is the drift gateBudget itself was written about at v3212. What is wrong is not the number, it is that
+// nothing said the number was a separate decision. It says so now, and budgetIsOwn declares it so the runner
+// census can tell a REASONED exception from a runner nobody wired up.
+export const budgetIsOwn =
+    "an Android device is a different machine class from the host the MEASURED table was timed on, so this " +
+    "runner sets one flat per-device budget rather than importing host timings; the number is a hardware claim " +
+    "and is overridable from argv[3]. THIS IS THE DECISION rigRunner FAILED TO MAKE -- it carried the same flat " +
+    "180000 with no reason attached, and twenty gates could never pass on rig.html because of it.";
 export const DEFAULT_BUDGET_MS = 180000;   // one budget, both machines; defaultPlacementSweep (~4 min) excludes itself on both
 
 export function detectLibc() {

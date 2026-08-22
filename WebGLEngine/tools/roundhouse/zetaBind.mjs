@@ -33,7 +33,7 @@ export const ZETA_OBSERVABLES = [
 ];
 
 const DEF = { M: 12, K: 5 };
-export const ZETA_MODES = ["even", "apery", "higher", "corrections"];
+export const ZETA_MODES = ["even", "apery", "higher", "corrections", "nocorrection"];
 
 export function zetaDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
@@ -86,8 +86,22 @@ export async function buildZeta(args = {}) {
                  worstHigherErr: -1 };
     }
 
+    // *** v3902 -- "even" AND ITS PLANT "nocorrection" SHARE THIS BLOCK, SO THE ARMS DIFFER IN ONE THING. ***
+    // The `corrections` mode above already MEASURES what dropping the Euler-Maclaurin tail costs -- 9.6e-5
+    // against 2.4e-15, a gain of 3.9e10 -- and the census could not use a word of it, because `corrections`
+    // reports that finding in observables (`errNoCorrection`, `correctionGain`) that are the -1 NOT-APPLICABLE
+    // SENTINEL in every other mode. probeModePlant needs one observable that means THE SAME THING in both
+    // arms and gets WORSE; a sentinel turning into a number is neither. So the plant restates the same defect
+    // in the shape `even` already has, and `errAbs` -- which both arms compute against the same pi^2/6 -- is
+    // what carries it:
+    //
+    //     errAbs   2.4424907e-15  ->  9.6317316e-5      (3.9e10 x, the number `corrections` already knew)
+    //
+    // THE DEFECT IS REAL ARITHMETIC AND NOT A FLAG: K=0 is the bare tail, so the sum is genuinely computed
+    // without its correction terms. `knob` rather than `method` because what changes is the COMPUTATION, not
+    // the key it is graded against -- `closedForm` is bit-identical in both arms.
     const target = Math.PI ** 2 / 6;
-    const v = zeta(2, { M, K });
+    const v = mode === "nocorrection" ? zeta(2, { M, K: 0 }) : zeta(2, { M, K });
     const pi = piFromZeta();
     return { ...base, s: 2, value: v, closedForm: target, errAbs: Math.abs(v - target),
              errFrac: Math.abs(v - target) / target,
@@ -101,4 +115,8 @@ export const zetaDevice = {
     observables: ZETA_OBSERVABLES,
     build: buildZeta,
     defaults: zetaDefaults,
+    // The declaration points at `errAbs`, computed against the same pi^2/6 in both arms. NOT `correctionGain`
+    // and NOT `errNoCorrection`: those live only inside `corrections` and read -1 everywhere else, so either
+    // would have been a declaration on a sentinel -- a number that changes without meaning anything.
+    plantMode: "nocorrection", plantFlips: "errAbs", plantKind: "knob",
 };

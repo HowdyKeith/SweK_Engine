@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/labDevices-selfcheck.mjs -- v2814
 //
-// Run: node tools/ship/labDevices-selfcheck.mjs   (~254s -- MEASURED; it runs the real instruments)
+// Run: node tools/ship/labDevices-selfcheck.mjs   (~123s -- MEASURED; it runs the real instruments)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES the three lab instruments wired in as roundhouse devices: optics, kerr, ct.

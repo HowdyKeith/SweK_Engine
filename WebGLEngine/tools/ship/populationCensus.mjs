@@ -118,7 +118,7 @@ export function lines(c = compare()) {
     return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     if (process.argv.includes("--write")) {
         const p = writeCensus();
         console.log(`[census] recorded ${p.total} modules across ${Object.keys(p.areas).length} areas -> ${CENSUS_FILE}`);

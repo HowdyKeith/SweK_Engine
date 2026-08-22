@@ -23,8 +23,8 @@
 // starting scale measured from the device instead of guessed, which is a different and smaller claim.
 
 import { makeCodeSkill, codeBook } from "./skillCode.mjs";
-import { pathToFileURL } from "node:url";
 
+import { pathToFileURL } from "node:url";
 /** Order of magnitude of a finite non-zero number, or null. The small composable piece. */
 export const magnitude = makeCodeSkill({
     id: "magnitude",
@@ -70,7 +70,7 @@ export const LAB_SKILLS = Object.freeze([magnitude, tolFor]);
 export function labBook() { return codeBook(LAB_SKILLS); }
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const { runSkillAsync } = await import("./skillCode.mjs");
     const book = labBook();
     console.log("[labSkills] code skills that RUN THE DEVICE -- the thing a hint string cannot do\n");

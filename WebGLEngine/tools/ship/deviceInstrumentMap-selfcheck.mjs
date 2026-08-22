@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/deviceInstrumentMap-selfcheck.mjs — v3299
 //
-// Run: node tools/ship/deviceInstrumentMap-selfcheck.mjs   (~4s — MEASURED individually)
+// Run: node tools/ship/deviceInstrumentMap-selfcheck.mjs   (~0.3s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE DRIFT THIS EXISTS TO CATCH ALREADY HAPPENED. The v3298 patch bound twelve physics modules as roundhouse

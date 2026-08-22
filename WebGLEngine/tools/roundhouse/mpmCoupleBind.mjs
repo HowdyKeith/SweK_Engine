@@ -84,6 +84,8 @@ export const coupleDevice = {
     modes: COUPLE_MODES,
     // "contact" is FIRST so the contract compares the plant against the mode that owns separation.
     plantMode: "separategrids", plantFlips: "minGap", plantKind: "mode",
+    plantDirectionRefused:
+        "minGap IS ONE-SIDED, NOT A POINT IDEAL, so no plantIdeal is honest here. The contact solver's claim is gap >= 0 -- the bodies must not pass through each other -- and the ideal gap is whatever the physics gives, certainly not 0, which would mean exact contact everywhere. The plant's signature is a SIGN CHANGE: 0.5334 -> -1.4000, from a real gap to interpenetration. Declaring plantIdeal: 0 would make the wall pass (|-1.4| > |0.5334|) on a sentence that is false, and a number chosen because it makes the wall pass is exactly what the plantIdealWhy guard exists to prevent. A bound-crossing rule would read this correctly and there is one device for it today, so this is named and left rather than given machinery of its own",
     name: "mpm-two-material-contact", observables: COUPLE_OBSERVABLES,
     build: buildCouple, defaults: coupleDefaults,
 };

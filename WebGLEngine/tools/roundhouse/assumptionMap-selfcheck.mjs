@@ -37,9 +37,21 @@ const D = await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "devi
 const A = await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "assumptions.mjs")).href);
 
 /** DERIVED, never a typed list -- the classification follows the measurement and moves when the tree does. */
+// v3923 -- *** A KILLED RUN OF THIS GATE PRINTED "(no output)", WHICH IS THE LEAST USEFUL THING IT COULD SAY. ***
+// classify() builds every device before a single line is written, so Keith's 568s timeout reported nothing at
+// all: not how far it got, not which device was slow, not whether it was stuck or merely long. The tree's own
+// rule is that a timeout wants "either a longer budget or a smaller fixture" -- AND YOU CANNOT CHOOSE BETWEEN
+// THOSE FROM AN EMPTY REPORT. Progress is written as it goes, so a kill leaves a position instead of a blank.
 async function classify() {
     const rows = [];
+    let done = 0; const total = D.DEVICE_NAMES.length; const t0 = Date.now();
     for (const n of D.DEVICE_NAMES) {
+        if (done && done % 10 === 0) {
+            const s = (Date.now() - t0) / 1000;
+            console.log("  ----  classified " + String(done).padStart(3) + "/" + total + "  " +
+                        s.toFixed(0) + "s elapsed, ~" + (s / done * total).toFixed(0) + "s projected  (last: " + n + ")");
+        }
+        done++;
         let d; try { d = await D.getDevice(n); } catch { continue; }
         if (typeof d.defaults !== "function" || typeof d.build !== "function") continue;
         const def = d.defaults({});

@@ -110,8 +110,14 @@ const o = await dev.build({ mode: "inlet" });
     // count stays 45 and this device is invisible to it. Worth stating rather than quietly renumbering: the
     // census measures what it says it measures, and widening the SEARCH does not widen the CENSUS. The tree now
     // has a graded device the coverage number does not know about, which is a gap in the number, not the device.
+    // *** v3930 -- THE COUNT WAS PINNED AT TWO AND A THIRD MODE ARRIVED, WHICH IS PROGRESS. ***
+    // `nofixedinlet` is this device's PLANT -- it releases the inlet condition the solver must hold, taking
+    // inletDriftFrac 1.45e-3 -> 1.02e-2 and killing vortex shedding. Adding a plant to a device is the thing
+    // this lab spends rounds doing, and it turned this line red. THE NAMES ARE THE CHECK, NOT THE COUNT, which
+    // is rootLayout's rule two rounds ago and applies verbatim: pinning a total means the gate fires on
+    // enrichment, while a NAMED set still fails the day a mode disappears -- which is the loss worth catching.
     ok("twof declares its modes -- and the physics/ census does NOT count it, correctly",
-        m.source === "exported" && m.declared.length === 2,
+        m.source === "exported" && ["inlet", "envelope"].every((k) => m.declared.includes(k)),
         `source "${m.source}", modes ${JSON.stringify(m.declared)}. gradedCoverage still reads 45 of 113 because ` +
         "it scans physics/ and this lives in simulation/lbm/. Found only because the sweep widened past physics/ " +
         "-- the search space was the limit, not the tree, and the coverage number carries the same limit");

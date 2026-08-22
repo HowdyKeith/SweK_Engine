@@ -1,6 +1,6 @@
 // tools/roundhouse/refinementWindow-selfcheck.mjs
 //
-// Run: node tools/roundhouse/refinementWindow-selfcheck.mjs   (~10s)
+// Run: node tools/roundhouse/refinementWindow-selfcheck.mjs   (~0.2s)
 //
 // v3132 -- A REGISTER'S NOTE CONTRADICTED ITS OWN VALUE LIST, AND CRITERION 3 REWARDED THE ERROR.
 //

@@ -1,6 +1,6 @@
 // WebGLEngine/render/renderAccountability-selfcheck.mjs — v3339
 //
-// Run: node render/renderAccountability-selfcheck.mjs   (~10s — MEASURED individually)
+// Run: node render/renderAccountability-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // FOUR THINGS THE PERCEPTUAL PATCH MADE POSSIBLE, and one that it made possible to REFUSE honestly.

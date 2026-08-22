@@ -256,10 +256,7 @@ export async function plantedCoverage(engRoot, { DEVICE_NAMES, getDevice }) {
 // strong one. A REPORT MUST PRINT AND EXIT ZERO; this exits 0 on both paths, because a census is not a verdict.
 // ---------------------------------------------------------------------------------------------------------------
 async function main() {
-    // v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
-// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
-// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
-const engRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const engRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const verify = process.argv.includes("--verify");
     const D = await import("./devices.mjs");
     console.log("[plantedCoverage] which of the lab's binds can be asked what they would catch\n");
@@ -301,4 +298,161 @@ const engRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..",
 import { fileURLToPath } from "node:url";
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
     main().then((c) => process.exit(c)).catch((e) => { console.error("[plantedCoverage] COULD NOT RUN:", e && e.stack || e); process.exit(1); });
+}
+
+/**
+ * *** v3917 -- THE DISCRIMINATOR WAS WRITTEN DOWN AT v3688 AND NOTHING EVER RE-DERIVED IT. ***
+ *
+ * The comment above declaredControlMode states the rule in as many words: "THE DISCRIMINATOR IS DIRECTION AND IT
+ * IS MECHANICAL: a plant moves the claim's observable AWAY from its ideal; a control moves it TO the ideal."
+ * probeControlMode encodes half of that -- it requires the control to REACH controlIdeal. probeModePlant encodes
+ * none of it. It asks only `av !== bv`, WHICH IS SEPARATION, NOT WRONGNESS, and a load-bearing negative separates
+ * exactly as well as a plant does.
+ *
+ * v3916 paid for the gap. spacefill's `raster` mode was declared a plant at v3902 because `breaks` moves 0 -> 63,
+ * and probeModePlant passed it every run since. But 63 IS THE ANALYTIC KEY FOR A RASTER at order 6, breakErrAbs
+ * is exactly zero in BOTH arms, and spacefill-selfcheck had been calling that same mode "the NEGATIVE" since
+ * v3174. TWO PROSE CLAIMS ABOUT ONE DEVICE DISAGREED FOR FOURTEEN VERSIONS AND NOTHING COMPARED THEM.
+ *
+ * This applies the rule where it has meaning. When plantFlips names an ERROR-LIKE observable, "away from ideal"
+ * is decidable without knowing anything else about the device: the planted arm must report a LARGER magnitude.
+ * When plantFlips names something else -- `breaks`, `order`, `netForce`, `r2Val` -- there is no ideal in evidence
+ * and the direction cannot be read, so this reports UNREADABLE rather than inventing a verdict. Those two
+ * populations are the point and they are not merged: see plantDirection-selfcheck, which walls the first at zero
+ * failures and ratchets the second so it cannot grow.
+ */
+export const ERRORISH_FIELD = /err|error|residual|delta|deviation/i;
+
+/** Magnitudes of every finite numeric error-like field on an observable bag. */
+export function errorLikeFields(obs) {
+    const m = new Map();
+    for (const [k, v] of Object.entries(obs || {})) {
+        if (!ERRORISH_FIELD.test(k)) continue;
+        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+        m.set(k, Math.abs(v));
+    }
+    return m;
+}
+
+/**
+ * Build a declared mode plant's two arms and read the DIRECTION of its named observable.
+ *
+ * verdict is one of:
+ *   "worse"      -- plantFlips is error-like and grew. The declaration is confirmed mechanically.
+ *   "better"     -- plantFlips is error-like and SHRANK. That is a control wearing a plant's label.
+ *   "unmoved"    -- plantFlips is error-like and did not move at all. Not a plant either.
+ *   "unreadable" -- plantFlips is not error-like, so no ideal is in evidence. NOT a pass and NOT a failure.
+ */
+export async function probeModePlantDirection(device) {
+    const d = declaredPlantMode(device);
+    if (!d) return null;
+    const primary = (device.modes || []).find((m) => m !== d.mode);
+    if (!primary) return { verdict: "unreadable", why: "no other mode to compare against" };
+    let a, b;
+    try { a = await device.build({ mode: primary }); b = await device.build({ mode: d.mode }); }
+    catch (e) { return { verdict: "unreadable", why: "build threw: " + (e && e.message || e) }; }
+
+    const base = { mode: d.mode, flips: d.flips, primary };
+
+    // *** v3918 -- AN IDEAL DOES NOT HAVE TO BE ZERO, AND AN OBSERVABLE DOES NOT HAVE TO BE CALLED "err". ***
+    //
+    // v3917 could read direction on 33 of 66 plants and called the rest unreadable. Reading all 33 of the rest
+    // found that MOST OF THEM HAVE A PERFECTLY GOOD IDEAL -- it is just not zero and not in the name.
+    // ct's absoluteGain is ideally 1, voxelize's order is ideally 2, discovery's r2Val is ideally 1,
+    // gyroscope's precessed is ideally 1. And netForce, asymmetry, worstRise, differingLists and
+    // rigidDisagreements are all ideally zero while matching no spelling of "error".
+    //
+    // So a bind may DECLARE the ideal. plantIdeal makes the v3688 rule apply to any observable at all:
+    // |planted - ideal| must exceed |honest - ideal|. THIS MAKES A DECLARATION FALSIFIABLE RATHER THAN
+    // SELF-PROVING -- declare an ideal for a mode that actually improves and the wall fires on it.
+    //
+    // plantNull is the other shape, and it is a family rather than an exception: stability, mpmdrucker and
+    // mpmpile all plant a DEAF KNOB, and the observable is a responsiveness ratio whose null value is 1. There
+    // is no point-ideal to move away from -- a responsive knob is merely "far from 1" -- so what is declared is
+    // the null the plant COLLAPSES ONTO, and the rule inverts: the planted arm must land on it and the honest
+    // arm must not. The direction is the opposite of plantIdeal's for exactly the reason the meaning is.
+    const decl = declaredPlantIdeal(device);
+    if (decl && decl.kind === "both") {
+        return { ...base, verdict: "unreadable", why: "declares BOTH plantIdeal and plantNull -- they are opposite rules and a bind must say which one it means" };
+    }
+    if (decl && !decl.ok) {
+        return { ...base, verdict: "unreadable", missingWhy: decl.kind,
+                 why: "declares " + decl.kind + " with no " + decl.kind + "Why sentence -- a bare number is what gets edited to agree with whatever shipped" };
+    }
+    const ideal = decl && decl.kind === "plantIdeal" ? decl.value : null;
+    const nul = decl && decl.kind === "plantNull" ? decl.value : null;
+    if (ideal !== null || nul !== null) {
+        const av = a && a[d.flips], bv = b && b[d.flips];
+        if (typeof av !== "number" || typeof bv !== "number" || !Number.isFinite(av) || !Number.isFinite(bv)) {
+            return { ...base, verdict: "unreadable", declared: true,
+                     why: d.flips + " is not a finite number in both modes (" + av + " -> " + bv + ")" };
+        }
+        const target = ideal !== null ? ideal : nul;
+        const da = Math.abs(av - target), db = Math.abs(bv - target);
+        const verdict = ideal !== null
+            ? (db > da ? "worse" : db < da ? "better" : "unmoved")
+            : (db < da ? "worse" : db > da ? "better" : "unmoved");
+        return { ...base, verdict, from: av, to: bv, target, via: ideal !== null ? "plantIdeal" : "plantNull",
+                 why: verdict === "worse" ? "" : d.flips + " went " + av + " -> " + bv +
+                      " against " + (ideal !== null ? "ideal " : "null ") + target +
+                      (verdict === "better"
+                         ? (ideal !== null ? ", TOWARD its ideal -- that is a control's direction"
+                                           : ", AWAY from the null it is declared to collapse onto")
+                         : " (no movement relative to it)") };
+    }
+
+    if (!ERRORISH_FIELD.test(d.flips)) {
+        // The side channel is reported but NEVER promoted to a verdict: an unrelated error field getting worse
+        // does not show that THIS declaration is a plant, only that the two arms differ somewhere.
+        const ea = errorLikeFields(a), eb = errorLikeFields(b);
+        const shared = [...ea.keys()].filter((k) => eb.has(k));
+        const worse = shared.filter((k) => eb.get(k) > ea.get(k));
+        return { ...base, verdict: "unreadable", sideErrorFields: shared.length, sideWorse: worse,
+                 why: d.flips + " is not error-like and the bind declares no plantIdeal/plantNull, so 'away from ideal' has no reading here" };
+    }
+    const av = Math.abs(a && a[d.flips]), bv = Math.abs(b && b[d.flips]);
+    if (!Number.isFinite(av) || !Number.isFinite(bv)) {
+        return { ...base, verdict: "unreadable", why: d.flips + " is not a finite number in both modes" };
+    }
+    const verdict = bv > av ? "worse" : bv < av ? "better" : "unmoved";
+    return { ...base, verdict, from: av, to: bv,
+             why: verdict === "worse" ? "" : d.flips + " went " + av.toExponential(3) + " -> " + bv.toExponential(3) +
+                  (verdict === "better" ? ", TOWARD its ideal -- that is a control's direction" : " (no movement)") };
+}
+
+/** Sweep every declared mode plant in a device registry and split it by whether direction is readable. */
+export async function plantDirectionCensus(D) {
+    const readable = [], unreadable = [], wrongWay = [], undeclaredUnreadable = [];
+    for (const name of D.DEVICE_NAMES) {
+        let dev; try { dev = await D.getDevice(name); } catch { continue; }
+        const r = await probeModePlantDirection(dev);
+        if (!r) continue;
+        // "unreadable" was a silent bucket at v3917 and a silent bucket is where a spacefill hides. A plant whose
+        // direction cannot be read must SAY SO IN PROSE -- plantDirectionRefused, the same shape as plantRefused
+        // -- naming what does verify it instead. Refusing is a position somebody took; being unreadable is not.
+        const refused = typeof dev.plantDirectionRefused === "string" && dev.plantDirectionRefused.trim().length >= 40;
+        const row = { device: name, refused, ...r };
+        if (r.verdict === "unreadable") { unreadable.push(row); if (!refused) undeclaredUnreadable.push(row); }
+        else if (r.verdict === "worse") readable.push(row);
+        else { readable.push(row); wrongWay.push(row); }
+    }
+    return { readable, unreadable, wrongWay, undeclaredUnreadable,
+             total: readable.length + unreadable.length };
+}
+
+/**
+ * A declared ideal WITHOUT A SENTENCE is a number, and a number is what gets edited to agree with whatever
+ * shipped. The register of exact zeros learned this at v3211 and says so in its own header; the same rule
+ * applies here for the same reason. So the pair is the unit: plantIdeal REQUIRES plantIdealWhy, plantNull
+ * REQUIRES plantNullWhy, and a bind that declares the number alone is reported as UNDECLARED rather than
+ * quietly gaining a readable direction.
+ */
+export function declaredPlantIdeal(device) {
+    if (!device) return null;
+    const has = (k) => typeof device[k] === "number" && Number.isFinite(device[k]);
+    const why = (k) => typeof device[k] === "string" && device[k].trim().length >= 40;
+    if (has("plantIdeal") && has("plantNull")) return { kind: "both", ok: false };
+    if (has("plantIdeal")) return { kind: "plantIdeal", value: device.plantIdeal, ok: why("plantIdealWhy"), why: device.plantIdealWhy };
+    if (has("plantNull")) return { kind: "plantNull", value: device.plantNull, ok: why("plantNullWhy"), why: device.plantNullWhy };
+    return null;
 }

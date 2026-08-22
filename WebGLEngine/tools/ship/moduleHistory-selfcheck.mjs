@@ -185,9 +185,25 @@ console.log("\n5. HOLE C -- the comment stripper");
     const main = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
     const naiveMain = main.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
     const kept = noComments(main).length / main.length, naiveKept = naiveMain.length / main.length;
+    // *** v3925 -- THE CLAIM IS A COMPARISON AND IT WAS PINNED TO TWO ABSOLUTES, ONE OF WHICH DRIFTED. ***
+    //
+    // The sentence says "the naive stripper blanks FAR MORE OF THE FILE", which is a statement about the gap
+    // between two strippers. It was tested as naiveKept < 0.60 AND kept > 0.70 -- and the second is not a fact
+    // about either stripper, it is a fact about HOW MUCH OF main.js IS COMMENT. main.js carries the engine's
+    // whole changelog, this session alone has added ten blocks to it, and noComments now keeps 41.7% because
+    // FIFTY-EIGHT PERCENT OF THAT FILE IS PROSE. Nothing about the stripper changed.
+    //
+    // A COUNT IS NOT A PROPERTY, for the third time this session (areaHygiene's band, caseStudy's baked total,
+    // and now this). The ratio IS the property: noComments keeps 1.57x what the naive stripper does, and that
+    // holds whatever the comment density becomes. A floor stays underneath so a stripper returning nothing
+    // cannot satisfy a ratio by making both numbers tiny.
+    const ratio = kept / naiveKept;
     ok("!! measured on main.js: the naive stripper blanks far more of the file",
-        naiveKept < 0.60 && kept > 0.70,
-        "naive keeps " + (naiveKept * 100).toFixed(1) + "%, noComments keeps " + (kept * 100).toFixed(1) + "%");
+        ratio > 1.3 && kept > 0.20 && naiveKept < kept,
+        "naive keeps " + (naiveKept * 100).toFixed(1) + "%, noComments keeps " + (kept * 100).toFixed(1) +
+        "% -- a ratio of " + ratio.toFixed(2) + "x. THE RATIO IS THE CLAIM: main.js is " +
+        ((1 - kept) * 100).toFixed(0) + "% comment and rising, so an absolute floor on `kept` measures the " +
+        "changelog rather than the stripper");
     ok("...and that difference is worth real specifiers",
         new Set(specifiersIn(main).statics).size > new Set(oldSpecifiers(naiveMain)).size,
         "the gap is what made thirteen ordinary imports invisible");

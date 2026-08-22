@@ -1,6 +1,6 @@
 // WebGLEngine/physics/elasticity/beam-selfcheck.mjs — v3319
 //
-// Run: node physics/elasticity/beam-selfcheck.mjs   (~20s — MEASURED individually)
+// Run: node physics/elasticity/beam-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Continuum mechanics, which this lab had none of, and TWO EXACT KEYS FROM ONE DISCRETISATION that fail in

@@ -1,4 +1,3 @@
-import { pathToFileURL } from "node:url";
 // tools/roundhouse/skillCode.mjs
 //
 // Run: node tools/roundhouse/skillCode.mjs            (front door: skillbook.html, "Executable skills")
@@ -27,6 +26,7 @@ import { pathToFileURL } from "node:url";
 //   *** WHEN A LINE HERE GOES RED because somebody wanted runSkill to return a verdict, the correct response
 //   is to route that judgement through skillbook's trial -- NEVER to widen this file's return states. ***
 
+import { pathToFileURL } from "node:url";
 /** The refusal, declared as DATA so a checker can read it -- not as prose a mention test would find. */
 export const SKILL_GENERATION_REFUSED = Object.freeze({
     refused: true,
@@ -163,7 +163,7 @@ export function certificationBelongsTo() {
 // ---- front door ------------------------------------------------------------------------------------------
 // A MODULE WITH NO CALLER IS UNFINISHED. skillbook.html renders this; running the file directly prints the
 // same three things without a browser.
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const demo = [
         makeCodeSkill({ id: "clamp01", trigger: "malformed", run: (x) => Math.min(1, Math.max(0, Number(x) || 0)) }),
         makeCodeSkill({ id: "percent", trigger: "malformed", uses: ["clamp01"], run: (x, ctx) => `${(ctx.call("clamp01", x) * 100).toFixed(1)}%` }),

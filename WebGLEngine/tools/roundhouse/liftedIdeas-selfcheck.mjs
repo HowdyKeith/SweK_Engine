@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/liftedIdeas-selfcheck.mjs — v3527
 //
-// Run: node tools/roundhouse/liftedIdeas-selfcheck.mjs   (~8s — MEASURED individually)
+// Run: node tools/roundhouse/liftedIdeas-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // TWO IDEAS TAKEN FROM PUBLISHED WORK, WITH NO CODE LIFTED FROM EITHER, and both adapted rather than adopted.

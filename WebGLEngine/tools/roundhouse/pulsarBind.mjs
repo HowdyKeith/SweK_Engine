@@ -17,11 +17,39 @@
 // with tau = N/f0, so THE CURVATURE IS -fdot/(2 f0). One f0, not two. A RATIO THAT COMES BACK AS A CLEAN
 // PARAMETER RATHER THAN A SMALL NUMBER IS AN ALGEBRA ERROR ANNOUNCING ITSELF, and this tree has seen it before
 // -- the CT units sabotage at v3073, where the shape was exactly right and the scale was not.
+//
+// *** v3902 -- THE PLANT IS THAT SAME ALGEBRA ERROR, AND IT IS NOW A MODE RATHER THAN AN ANECDOTE. ***
+//
+// The paragraph above records a mistake and its measurement, and then the mistake left the tree -- the file
+// kept the CORRECT line and the story about the wrong one. A STORY ABOUT A CAUGHT ERROR IS NOT A CAUGHT ERROR:
+// nothing re-derives it, so nothing would notice if the fix were ever undone. `twof0` puts the wrong
+// denominator back behind a mode, and the census runs it:
+//
+//     predicted   3.3333333e-7 (right, -fdot/2f0)   ->   2.2222222e-7 (wrong, -fdot/2f0^2)
+//     ratio       1.000890091                       ->   1.501335137
+//     error       8.9009e-4                         ->   5.0134e-1        (563x, and `error` is what is declared)
+//
+// *** AND THE PLANTED ratio COMES BACK AS 1.501335137, WHICH IS THE NUMBER THE PARAGRAPH ABOVE RECORDS
+// MEASURING, TO SEVEN DIGITS. *** The header said "measured a ratio of 1.501335 against it". That is the
+// original wrong run reproduced exactly -- so the anecdote is now a live arm the sweep re-derives every time,
+// and the reason it is 1.5 rather than a small number is still the whole point: A RATIO THAT COMES BACK AS A
+// CLEAN PARAMETER RATHER THAN A SMALL NUMBER IS AN ALGEBRA ERROR ANNOUNCING ITSELF.
+//
+// KIND: `method`. The pulse train is untouched (same f0, same fdot, same arrival times) and the fit is
+// untouched -- `curvature` and `recoveredFdot` are BIT-IDENTICAL across the two arms, checked -- so what is
+// corrupted is only THE KEY THE FIT IS GRADED AGAINST. That is the third species this lab separates.
+//
+// AND SAYING WHICH GATE WOULD HAVE CAUGHT IT NEEDS CARE, because I first wrote that pulsar-selfcheck "still
+// passes under the plant, because every check is internal" -- WHICH IS TRUE FOR THE WRONG REASON AND SO IS
+// NOT A MEASUREMENT. pulsar-selfcheck imports ONLY physics/pulsar/pulsar.js; it never loads this bind, so it
+// cannot see this plant or any other, by construction rather than by blindness. The correct statement is
+// narrower and worth more: THE KEY LIVES HERE AND ONLY pulsarDevice-selfcheck GRADES IT, so until now the
+// one line in this device that had already been got wrong once was the one line no plant covered.
 "use strict";
 import { pulseArrivalTimes, periodAt, phaseAt } from "../../physics/pulsar/pulsar.js";
 
 const DEF = { f0: 1.5, fdot: -1e-6, nPulses: 4000 };
-export const MODES = ["residualCurvature", "spindownAge", "linearIsWrong"];
+export const MODES = ["residualCurvature", "spindownAge", "linearIsWrong", "twof0"];
 
 /** Least-squares line through (index, arrivalTime), then a quadratic through what is left. */
 export function residualFit(times) {
@@ -55,8 +83,12 @@ export function build({ mode = "residualCurvature", config = {} } = {}) {
     const t = pulseArrivalTimes(c.f0, c.fdot, c.nPulses);
     const fit = residualFit(t);
 
-    if (mode === "residualCurvature") {
-        const predicted = -c.fdot / (2 * c.f0);            // ONE f0. My first version had two.
+    if (mode === "residualCurvature" || mode === "twof0") {
+        // ONE f0. My first version had two -- and `twof0` is that version, kept runnable so the sweep can
+        // show it firing. THE WHOLE EXPRESSION BRANCHES rather than sharing a factored sub-expression: a
+        // plant that reassociates the default's arithmetic moves the default in the last ulp, which this
+        // tree has caught itself doing (v3845, flip3d).
+        const predicted = mode === "twof0" ? -c.fdot / (2 * c.f0 * c.f0) : -c.fdot / (2 * c.f0);
         return { curvature: fit.curvature, predicted, ratio: fit.curvature / predicted,
                  error: Math.abs(fit.curvature / predicted - 1),
                  recoveredFdot: -2 * c.f0 * fit.curvature, trueFdot: c.fdot,
@@ -79,5 +111,12 @@ export function build({ mode = "residualCurvature", config = {} } = {}) {
 export const PULSAR_OBSERVABLES = ["curvature", "predicted", "ratio", "error", "recoveredFdot", "trueFdot",
     "peakToPeak", "span", "characteristicAge", "fromResiduals", "P0", "agreement",
     "spinningDownPeakToPeak", "steadyPeakToPeak", "steadyCurvature"];
-export const pulsarDevice = { modes: MODES, name: "pulsar-timing-residuals", observables: PULSAR_OBSERVABLES, build, defaults };
+export const pulsarDevice = {
+    modes: MODES, name: "pulsar-timing-residuals", observables: PULSAR_OBSERVABLES, build, defaults,
+    // *** THE DECLARATION, AND IT NAMES WHAT MOVES. *** `error` is finite in BOTH arms (8.9009e-4 against
+    // 5.0134e-1) which is what probeModePlant requires -- `predicted` and `ratio` move too, but `error` is the
+    // one the device already treats as its verdict. `curvature` and `recoveredFdot` are BIT-IDENTICAL across
+    // the plant and would have been a dead declaration: the fit never sees the key.
+    plantMode: "twof0", plantFlips: "error", plantKind: "method",
+};
 export default pulsarDevice;

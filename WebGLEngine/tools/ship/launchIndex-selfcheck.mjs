@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/launchIndex-selfcheck.mjs — v3544
 //
-// Run: node tools/ship/launchIndex-selfcheck.mjs   (~6s — MEASURED individually)
+// Run: node tools/ship/launchIndex-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THREE PILLS LISTED THREE DIFFERENT KINDS OF THING AND CALLED THEM ALL DEMOS. *** 56 demos_code scripts

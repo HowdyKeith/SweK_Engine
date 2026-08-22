@@ -1,6 +1,6 @@
 // WebGLEngine/ui/gaugeInfoPanel-selfcheck.mjs — v3553
 //
-// Run: node ui/gaugeInfoPanel-selfcheck.mjs   (~3s — MEASURED individually)
+// Run: node ui/gaugeInfoPanel-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** HOVER AND SELECT MUST NOT MEAN THE SAME THING, AND THAT IS THE WHOLE CHECK. ***

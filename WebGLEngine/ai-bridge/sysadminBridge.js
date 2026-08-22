@@ -257,11 +257,56 @@ function _prefixOf(nameOrZip){ const m = String(nameOrZip).replace(/\.zip$/i, ""
 function preferredPrefix(){ return ((cfg.update.versionPrefix || "").trim() || _prefixOf(_runningVersionFolder()) || "SweK_Engine"); }
 // match a version zip/folder: the built-in names + the user's configured prefix (escaped), so a stray zip in
 // Downloads is never mistaken for a build.
+// *** v3921 -- THE BROWSER RENAMES THE SECOND DOWNLOAD AND THE SCANNER STOPPED SEEING IT. ***
+//
+// Keith: "when I had tried to autoupdate the new version in downloads, it wasn't reported as update so I
+// extracted it and ran swek." The zip was ROOTED CORRECTLY and NAMED CORRECTLY -- and every browser on every
+// platform appends a disambiguator when a file of that name is already there. MEASURED against this regex:
+//
+//     SweK_Engine_v3918.zip            MATCH
+//     SweK_Engine_v3918 (1).zip        MISS      <- Chrome, Edge, Firefox on a second download
+//     SweK_Engine_v3918(1).zip         MISS
+//     SweK_Engine_v3918-1.zip          MISS
+//     SweK_Engine_v3918 copy.zip       MISS      <- macOS Finder duplicate
+//     9e6077e1-SweK_Engine_v3918.zip   MATCH     (the pattern is unanchored, so a prefix was always fine)
+//
+// A SUFFIX BREAKS IT AND A PREFIX DOES NOT, because the version group is followed immediately by \.zip$. The
+// asymmetry is the whole bug: nobody prefixes a download and every browser suffixes one.
+//
+// COPY_SUFFIX is deliberately NARROW. The partial-download extensions live in PARTIAL_SUFFIXES and are scanned
+// SEPARATELY on purpose -- "nothing downstream may ever hand a partial file to the installer" -- so this must
+// never grow to admit them. It matches only what a file manager adds to disambiguate a COMPLETED file.
+// THERE WERE FOUR COPIES OF THIS PATTERN AND ONLY ONE OF THEM WAS THE BUILDER. _zipForVersionInDownloads (the
+// prune safety net), _scanEngineParentZips and patchScan's isBuild each spelled it out inline with the same
+// \.zip$ glued to the version, so widening the builder alone would have fixed the scanner and left three
+// siblings blind -- which is v3919's "there is one table" arriving again in a different file, one round later.
+// All four now come from _versionRe. The prune path keeps its START ANCHOR on purpose: it authorises a
+// DELETION, and a stricter match there fails toward not deleting.
+const COPY_SUFFIX = "(?:\\s*\\(\\d+\\)|\\s*-\\s*\\d+|\\s+copy(?:\\s*\\d+)?)?";
 function _versionRe(anchorStart, suffix){
     const names = ["EngineProject", "SweK[ _]Engine"];
     const p = (cfg.update.versionPrefix || "").trim();
     if (p && !/^(EngineProject|SweK)$/i.test(p) && !/^SweK[ _]Engine$/i.test(p)) names.push(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    return new RegExp((anchorStart ? "^" : "") + "(?:" + names.join("|") + ")[ _]v(\\d+)" + (suffix || ""), "i");
+    return new RegExp((anchorStart ? "^" : "") + "(?:" + names.join("|") + ")[ _]v(\\d+)" + (suffix ? COPY_SUFFIX + suffix : ""), "i");
+}
+
+// *** AND A SILENT "no update" IS THE THING THAT MADE THIS TAKE A ROUND TO FIND. *** The status said nothing
+// except that there was nothing, which is indistinguishable from an empty folder, a wrong folder, a partial
+// download and a name the pattern cannot read. Every zip in the scanned directory that this scanner DECLINED is
+// now reported with the reason, so the next miss is answerable from the status instead of from the source.
+function scanDownloadsRejects(){
+    const out = []; const dir = downloadsDir(); const re = _versionRe(false, "\\.zip$");
+    try {
+        for (const f of fs.readdirSync(dir)){
+            if (re.test(f)) continue;
+            if (!/\.zip(\.\w+)?$/i.test(f)) continue;
+            let why = "no <prefix>_vNNNN before the extension";
+            if (/\.zip\.\w+$/i.test(f)) why = "still downloading (partial suffix) -- reported separately, never installed";
+            else if (/v\d+/i.test(f)) why = "has a version but the name around it does not match the prefix pattern";
+            out.push({ file: f, why });
+        }
+    } catch { /* unreadable directory is reported by downloadsDir itself */ }
+    return out.slice(0, 20);
 }
 
 // where a new version should land: the PARENT of the running <prefix>_vNNNN folder (so it extracts beside the
@@ -321,7 +366,7 @@ function downloadsDir(){ return cfg.update.downloadsDir || path.join(os.homedir(
 // Anything failing a check is reported, not removed.
 let _lastPrune = null;
 function _zipForVersionInDownloads(v){
-    try { const dir = downloadsDir(); for (const f of fs.readdirSync(dir)){ const m = f.match(/^(?:EngineProject|SweK[ _]Engine)[ _]v(\d+)\.zip$/i); if (m && parseInt(m[1], 10) === v) return path.join(dir, f); } } catch {}
+    try { const dir = downloadsDir(); for (const f of fs.readdirSync(dir)){ const m = f.match(_versionRe(true, "\\.zip$")); if (m && parseInt(m[1], 10) === v) return path.join(dir, f); } } catch {}
     return null;
 }
 function _oldVersionFolders(){
@@ -629,7 +674,7 @@ async function updateCheck(apply, opts){
 // lastFound is KEPT and still returned, because "the newest we have ever seen" is a genuinely different and
 // useful fact -- it is simply not the answer to "is there an update sitting in Downloads". The two are now
 // separate fields instead of one field wearing both meanings, and updateAvailable follows the CURRENT scan.
-function updateStatus(){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(); if (f) lastFound = f.v; const _p = scanDownloadsPartial(); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
+function updateStatus(){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(); if (f) lastFound = f.v; const _p = scanDownloadsPartial(); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const rejected = f ? [] : scanDownloadsRejects(); const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, rejected, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
 
 // ───────────────────────── one-terminal flag (v3739) ───────────────────────
 // Keith: Avast dislikes the single-terminal construction, so START_NODE_Engine.bat's self-relaunch into a
@@ -835,7 +880,7 @@ function stop(){ if (awakeProc){ try { awakeProc.kill(); } catch {} awakeProc = 
 // newest zip found in either place.
 function _scanEngineParentZips(){
     let best = null; const dir = engineParentDir();
-    try { for (const f of fs.readdirSync(dir)){ const m = f.match(/(?:EngineProject|SweK[ _]Engine)[ _]v(\d+)\.zip$/i); if (m){ const v = parseInt(m[1], 10); if (!best || v > best.v) best = { v, file: path.join(dir, f) }; } } } catch {}
+    try { for (const f of fs.readdirSync(dir)){ const m = f.match(_versionRe(false, "\\.zip$")); if (m){ const v = parseInt(m[1], 10); if (!best || v > best.v) best = { v, file: path.join(dir, f) }; } } } catch {}
     return best;
 }
 function _bestOfferZip(){
@@ -949,8 +994,15 @@ function pullFrom(peerUrl){
                                 } else hashWhy = "peer served no manifest (pre-v3249 build)";
                             } catch (e) { hashWhy = "manifest unavailable: " + String((e && e.message) || e).slice(0, 60); }
 
-                            try { fs.renameSync(part, dest); }
-                            catch (e) { try { fs.unlinkSync(part); } catch {} return resolve({ ok: false, error: "could not place engine zip: " + String((e && e.message) || e) }); }
+                            // *** v3925 -- THE TRUST DECISION NOW HAPPENS WHILE THE FILE IS STILL .part. ***
+                            // It used to rename part -> dest HERE and decide afterwards, so a REFUSE deleted
+                            // `dest`. If a good zip of that version was already in Downloads, the rename had
+                            // overwritten it and the refusal then deleted it: AN UNTRUSTED PEER COULD DESTROY A
+                            // BUILD THE MACHINE ALREADY HAD, by offering a version it was going to reject.
+                            // updateIntegrity-selfcheck has been saying so since it was written -- "an error path
+                            // that deleted `dest` would now delete a GOOD PREVIOUS DOWNLOAD while leaving the
+                            // broken one behind" -- and it was red and unread because it had never been timed.
+                            // Nothing but an ACCEPTED transfer is ever named *.zip now.
 
                             // v3284 -- *** WHO IS ALLOWED TO HAND THIS MACHINE A BUILD. ***
                             // Until now, pairing a peer granted PERMANENT update-source trust: any paired peer
@@ -970,7 +1022,7 @@ function pullFrom(peerUrl){
                             let trust = null;
                             try {
                                 const { decidePeerUpdate, peerUpdateLine } = await import("./peerTrust.mjs");
-                                const bytes = fs.readFileSync(dest);
+                                const bytes = fs.readFileSync(part);   // still .part: the decision precedes the placement
                                 trust = decidePeerUpdate({ peerUrl: base, offer: off, bytes, policy: _updatePolicy() });
                                 trust.line = peerUpdateLine(trust);
                                 lastNote = trust.line;
@@ -983,9 +1035,11 @@ function pullFrom(peerUrl){
                                 lastNote = trust.line;
                             }
                             if (trust.action === "refuse") {
-                                try { fs.unlinkSync(dest); } catch {}
+                                try { fs.unlinkSync(part); } catch {}
                                 return resolve({ ok: false, error: trust.why, peer: base, trust });
                             }
+                            try { fs.renameSync(part, dest); }
+                            catch (e) { try { fs.unlinkSync(part); } catch {} return resolve({ ok: false, error: "could not place engine zip: " + String((e && e.message) || e) }); }
                             resolve({ ok: true, pulled: true, saved: dest, version: off.version, zipName, bytes: got,
                                       // NAMED so a caller can tell a CHECKED transfer from one that merely finished:
                                       // a peer that sends no content-length is not the same as one that sent it all.
@@ -1069,7 +1123,7 @@ async function pullNewestPeer(peers, opts){
 async function patchScan(){
     const dir = downloadsDir();
     let names = []; try { names = fs.readdirSync(dir); } catch (e) { return { ok: false, dir, why: "cannot read " + dir + ": " + e.code, rows: [] }; }
-    const isBuild = /^(?:EngineProject|SweK[ _]Engine)[ _]v\d+\.zip$/i;
+    const isBuild = _versionRe(true, "\\.zip$");
     const cand = names.filter((n) => /\.zip$/i.test(n) && !isBuild.test(n));
     if (!cand.length) return { ok: true, dir, rows: [], note: "no patch-shaped zip in " + dir + " (full builds are excluded by name and are the update panel's business)" };
     let mod; try { mod = await import("../tools/ship/patchBase.mjs"); }

@@ -1,5 +1,3 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 // WebGLEngine/tools/ship/threeImportmap-selfcheck.mjs — v3833
 //
 // The regression Keith hit: es-box3d-3d.html imported OrbitControls, OrbitControls does `from 'three'`, and the
@@ -15,10 +13,7 @@ import { readdirSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 
 // engine root is two levels up from tools/ship/
-// v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
-// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
-// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = new URL("../../", import.meta.url).pathname;
 
 function htmlFiles(dir, acc = []) {
     for (const name of readdirSync(dir)) {

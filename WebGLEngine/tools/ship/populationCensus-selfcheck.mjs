@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/populationCensus-selfcheck.mjs — v3553
 //
-// Run: node tools/ship/populationCensus-selfcheck.mjs   (~10s — MEASURED individually)
+// Run: node tools/ship/populationCensus-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THE HAND-TYPED PIN WENT RED TWICE AND NOBODY NOTICED EITHER TIME. ***

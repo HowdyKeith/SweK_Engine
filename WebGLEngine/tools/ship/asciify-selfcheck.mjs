@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/asciify-selfcheck.mjs
 //
-// Run: node tools/ship/asciify-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/asciify-selfcheck.mjs   (~0.1s -- MEASURED)
 //
 // v3322 -- ASCII RENDERING, TAKEN AS A TECHNIQUE RATHER THAN AS A DEPENDENCY.
 //

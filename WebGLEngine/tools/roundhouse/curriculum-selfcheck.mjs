@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/curriculum-selfcheck.mjs -- v3698
 //
-// Run: node tools/roundhouse/curriculum-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/curriculum-selfcheck.mjs   (~0.3s)
 //
 // *** THE THING BEING CHECKED IS NOT WHETHER THE ADVICE IS GOOD. *** It is whether a file that generates work
 // can also mark that work done, because THAT is the failure a curriculum invites and it is the reason this one

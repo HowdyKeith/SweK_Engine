@@ -1,6 +1,6 @@
 // tools/roundhouse/khMichalke-selfcheck.mjs
 //
-// Run: node tools/roundhouse/khMichalke-selfcheck.mjs   (~90s)
+// Run: node tools/roundhouse/khMichalke-selfcheck.mjs   (~328s)
 //
 // v3164 -- kh's DISAGREEMENT WITH MICHALKE IS NOT A CONVERGENCE MEASURE, AND REFINING THE BOX DOES NOT FIX IT.
 //

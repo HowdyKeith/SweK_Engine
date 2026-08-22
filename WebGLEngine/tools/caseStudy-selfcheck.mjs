@@ -36,8 +36,22 @@ const html = fs.readFileSync(path.join(dir, "..", "case-study.html"), "utf8");
     const gateCount = countGateFiles();
     const subOk = html.includes(">" + subsystems.length + "<");
     const gateOk = html.includes(">" + gateCount + "<");
+    // v3922 -- *** WHEN THIS FAILS IT MUST NAME THE ONE COMMAND THAT FIXES IT. *** These numbers are plain text
+    // in the markup ON PURPOSE (v3531) and `staleness --fix` re-derives them; v3087 decided just as deliberately
+    // that --fix NEVER RUNS DURING A CHECK, so a ritual that auto-fixed before asserting would be a gate that
+    // agrees with whatever shipped. That leaves one human step -- and the failure never said what it was. Keith's
+    // rig reported "the page shows 50 subsystems and 1108 gates" as a FAILURE, which reads like the page is
+    // wrong about the engine rather than three gates behind, and names nothing to do about it. It was stale by
+    // exactly the three gates added since the last re-bake, and one command closed it.
     ok("!! the baked subsystem and gate counts match reality", subOk && gateOk,
-       "the page shows " + subsystems.length + " subsystems and " + gateCount + " gates, matching the live engine -- the numbers a reader sees are the numbers that are true.");
+       (subOk && gateOk
+         ? "the page shows " + subsystems.length + " subsystems and " + gateCount + " gates, matching the live engine -- the numbers a reader sees are the numbers that are true."
+         : "the page is STALE: the engine has " + subsystems.length + " subsystems and " + gateCount + " gates" +
+           (gateOk ? "" : ", and the markup does not carry >" + gateCount + "<") +
+           (subOk ? "" : ", and the markup does not carry >" + subsystems.length + "<") +
+           ". THE FIX IS ONE COMMAND: node tools/ship/staleness.mjs --fix -- it re-derives these from the tree " +
+           "and writes them into the page. Adding a gate makes this red every time, by design: the number is " +
+           "plain text so a reader can trust it without running anything."));
 }
 
 // ---- 3. REAL LINKS: the page links to the working console and lab ----------------------------------------

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/voxelFixture-selfcheck.mjs
 //
-// Run: node tools/ship/voxelFixture-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/voxelFixture-selfcheck.mjs   (~0.1s -- MEASURED)
 //
 // v3321 -- THE MESHER COMPARISON GETS A FIXTURE, BECAUSE A MEASUREMENT WITHOUT A FRONT DOOR DOES NOT GET TAKEN.
 //

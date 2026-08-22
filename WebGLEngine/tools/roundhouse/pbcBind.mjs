@@ -111,6 +111,8 @@ export const pbcDevice = {
     // "agreement" stays FIRST so the mode-plant contract compares the plant against the mode that owns the key.
     modes: PBC_MODES,
     plantMode: "wrapwrong", plantFlips: "worstForceDiff", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "worstForceDiff compares minimum-image forces against an explicit image sum, identically 0 for correct wrapping; wrapwrong takes it 2.33e-15 -> 1.049, landing on plantedForceDiff 1.049 which the device records independently",
     name: "periodic-minimum-image", observables: PBC_OBSERVABLES, build: buildPbc,
     defaults: ({ mode } = {}) => ({ mode: PBC_MODES.includes(mode) ? mode : "agreement", config: { ...DEF } }),
 };

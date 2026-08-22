@@ -116,9 +116,16 @@ export function importedModules(root = ENG) {
 }
 
 /** A claim sentence, the module it names, and whether that module is actually reachable. */
+/** A contrast line names TWO modules ("A is unwired while B is live"); anything past that is prose. */
+export const MAX_SUBJECTS_PER_CLAIM = 2;
+
+/** Lines that matched a claim pattern but name too many modules to be a record. Filled by auditClaims(). */
+export const proseBlocks = [];
+
 export function auditClaims(root = ENG) {
     const reached = importedModules(root);
     const out = [];
+    const prose = proseBlocks; prose.length = 0;
     const walk = (d) => {
         let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
@@ -130,10 +137,55 @@ export function auditClaims(root = ENG) {
             src.split(/\r?\n/).forEach((line, i) => {
                 if (!CLAIM_PATTERNS.some((re) => re.test(line))) return;
                 // The subject is any path-like token on the same line.
+                const rel = path.relative(ENG, p).replace(/\\/g, "/");
+                const subjects = [];
                 for (const m of line.matchAll(/([\w./-]+\.(?:js|mjs))\b/g)) {
                     const rel = m[1].replace(/^\.?\//, "");
                     const hit = [...reached].find((r) => r === rel || r.endsWith("/" + rel));
-                    if (hit) out.push({ file: path.relative(ENG, p).replace(/\\/g, "/"), line: i + 1, subject: hit, text: line.trim().slice(0, 150) });
+                    if (hit) subjects.push(hit);
+                }
+                // *** v3932 -- ONE LINE WAS PRODUCING 294 OF THE 300 CLAIMS. ***
+                //
+                // This walks LINES, and the design assumption is that a line making a wiring claim names the
+                // module it is about -- one path token -- and a CONTRAST line -- "A is unwired
+                // while B is live" -- names two, which is why the selfcheck adjudicates those by name. (No real
+                // module path is quoted in this comment: naming one HERE would create a claim, which is how the
+                // v3930 strictConfig fix put its own explanation into the audit it was repairing.) main.js
+                // holds the engine's whole changelog as the TRAILING COMMENT OF A SINGLE LINE, so that one line
+                // matched a claim pattern and handed back every module path in the history: 294 subjects, all
+                // from main.js:4977. THE COUNT WAS NOT 300 CLAIMS, IT WAS SIX CLAIMS AND ONE PARAGRAPH.
+                //
+                // The discriminator is derived rather than a filename exclusion, so it holds for any future
+                // mega-comment: A LINE NAMING MORE MODULES THAN A CONTRAST CAN IS PROSE, NOT A RECORD. Such
+                // lines are RETURNED SEPARATELY rather than dropped -- an exclusion nobody can see is the next
+                // round's mystery, and main.js line 1967 already records this same line as a known hazard.
+                // *** v3934 -- THE CHANGELOG RECORDS CLAIMS; IT DOES NOT MAKE THEM. ***
+                //
+                // v3932 cut 300 hits to 6 by refusing lines that name more modules than a contrast can. Then
+                // v3932's OWN CHANGELOG BLOCK -- describing the officeDispatch fix, in main.js -- arrived as a
+                // fresh two-subject claim, because a changelog block is multi-line and each line names few
+                // modules. THE AUDITOR WAS READING THE RECORD OF ITS OWN FINDING AS A NEW FINDING.
+                //
+                // main.js is the engine's changelog. Every block in it is a DATED HISTORICAL RECORD, written in
+                // the past tense about a state that has usually been fixed -- that is what a changelog is for.
+                // Reading it as live prose means every round's write-up becomes next round's claim, forever.
+                // Excluded by NAME because there is exactly one such file and pretending otherwise would be a
+                // derived-sounding rule with one member; REPORTED alongside the prose blocks so the exclusion is
+                // visible rather than silent. main.js line 1967 already records this same file as a hazard for a
+                // different scanner.
+                if (rel === "main.js") {
+                    prose.push({ file: rel, line: i + 1, subjects: subjects.length,
+                                 why: "engine changelog: a dated record OF a claim, not a claim",
+                                 text: line.trim().slice(0, 120) });
+                    return;
+                }
+                if (subjects.length > MAX_SUBJECTS_PER_CLAIM) {
+                    prose.push({ file: rel, line: i + 1, subjects: subjects.length,
+                                 why: "names more modules than a contrast line can", text: line.trim().slice(0, 120) });
+                    return;
+                }
+                for (const hit of subjects) {
+                    out.push({ file: rel, line: i + 1, subject: hit, text: line.trim().slice(0, 150) });
                 }
             });
         }

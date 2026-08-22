@@ -75,23 +75,34 @@ console.log("\n2. THE FOUR FACTS ARE INDEPENDENT, AND A PAGE CAN BE IN SEVERAL T
 // ---------------------------------------------------------------------------
 console.log("\n3. *** `auto` STORES A DECISION TO FOLLOW THE SUGGESTER, NOT THE SUGGESTION ***");
 {
+    // *** v3927 -- THE FIXTURE USED A REAL PAGE THAT WAS NOT IN ANY SECTION, AND THEN ONE WAS. ***
+    // This section needs a page the base register does NOT place, so that `auto` with a refusing suggester lands
+    // on auto-unreached instead of inheriting a section list. It named brain-3d.html -- a real page that
+    // happened to be unplaced -- and v3927 gave it a home in the GPU Brain panel, which turned this red. THE
+    // TEST WAS COUPLED TO THE REGISTER'S CONTENTS, so closing registerResidue's debt broke it, and progress
+    // breaking a test is the ratchet shape this tree keeps removing.
+    //
+    // A SYNTHETIC NAME CANNOT BE PLACED BY ANYBODY. physicsReach learned the same lesson from the other side
+    // this same round: officeDispatch's invented physics/alpha.mjs was reported as a missing module because a
+    // scanner could not tell a fixture from a door. A fixture should be UNMISTAKABLE as one.
+    const UNPLACEABLE = "__fixture-never-in-a-section.html";
     const f = tmp();
-    write({ pages: { "brain-3d.html": { auto: true } } }, f);
-    const withS = resolve(f, { suggest: (file) => (file === "brain-3d.html" ? { suggestion: "brain" } : null) });
+    write({ pages: { [UNPLACEABLE]: { auto: true } } }, f);
+    const withS = resolve(f, { suggest: (file) => (file === UNPLACEABLE ? { suggestion: "brain" } : null) });
     const withoutS = resolve(f, { suggest: (file) => ({ suggestion: null }) });
 
     ok("!! ticking auto resolves through the suggester at READ time",
-        withS.get("brain-3d.html").topics.join() === "brain" && withS.get("brain-3d.html").from === "auto",
+        withS.get(UNPLACEABLE).topics.join() === "brain" && withS.get(UNPLACEABLE).from === "auto",
         "*** THE ANSWER TRACKS THE SUGGESTER AS THE TREE CHANGES INSTEAD OF FREEZING WHATEVER IT SAID THE DAY " +
         "THE BOX WAS TICKED. *** Storing the suggested topic would have been simpler and would have been the " +
         "ratchet this lab keeps removing, in a new place.");
     ok("!! ...and auto with no suggestion says auto-unreached rather than falling back to a guess",
-        withoutS.get("brain-3d.html").from === "auto-unreached" && withoutS.get("brain-3d.html").topics.length === 0,
+        withoutS.get(UNPLACEABLE).from === "auto-unreached" && withoutS.get(UNPLACEABLE).topics.length === 0,
         "the suggester refuses 160 of 228 pages ON PURPOSE. *** IF `auto` QUIETLY PICKED THE NEAREST PANEL WHEN " +
         "THE SUGGESTER DECLINED, IT WOULD REINTRODUCE NEAREST-ANYTHING THROUGH THE BACK DOOR *** -- the exact " +
         "thing v3576 built the score floor to prevent.");
     ok("...and 'nobody decided' is a different state from 'decided to let the tool decide'",
-        !resolve(f).get("physics-lab.html").auto && resolve(f).get("brain-3d.html").auto,
+        !resolve(f).get("physics-lab.html").auto && resolve(f).get(UNPLACEABLE).auto,
         "pageSections' UNPLACED doctrine: an unplaced page and a page nobody has got to must not look identical");
     fs.rmSync(path.dirname(f), { recursive: true, force: true });
 }

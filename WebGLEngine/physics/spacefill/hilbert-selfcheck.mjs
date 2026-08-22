@@ -1,6 +1,6 @@
 // physics/spacefill/hilbert-selfcheck.mjs
 //
-// Run: node physics/spacefill/hilbert-selfcheck.mjs   (~2s)
+// Run: node physics/spacefill/hilbert-selfcheck.mjs   (~0.1s)
 //
 // v3187 -- SLDgen's IDEA, IN THE ONE FORM THIS TREE CAN ACTUALLY TEST.
 //

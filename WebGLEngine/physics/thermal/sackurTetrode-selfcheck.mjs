@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/sackurTetrode-selfcheck.mjs -- v3816
 //
-// Run: node physics/thermal/sackurTetrode-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/sackurTetrode-selfcheck.mjs   (~0.1s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE SACKUR-TETRODE ENTROPY, THE CLASSICAL IDEAL GAS bec.mjs AND fermi.mjs BOTH BECOME WHEN HOT AND THIN.
@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
     sackurTetrode, NEG_ENTROPY_THRESHOLD, quantumEOS, EXCHANGE_DENOM, entropyExtensive, entropyDistinguishable,
+    quantumConcentration,
 } from "./sackurTetrode.mjs";
 import { boseFunction, criticalDensity } from "./bec.mjs";   // the Bose sibling: polylog + condensation threshold
 
@@ -116,6 +117,23 @@ say("");
 say("NOT CLAIMED: real gases. This is the monatomic ideal gas -- no internal structure, no interactions beyond the");
 say("exchange correction's leading term, no condensation of its own. It grades the classical limit and its exact");
 say("first-order bridge to bec.mjs and fermi.mjs. k_B = 1. NO DEVICE BIND, no lab-results change.");
+
+{
+    // v3904 -- quantumConcentration IS AN INVERSE CUBE AND ITS ROUND TRIP WAS NEVER CLOSED.
+    // n_Q = 1/lambda^3, so n_Q(lambda) * lambda^3 must return 1 -- across the whole range of thermal
+    // wavelengths this file cares about, from a cold atom (1e-7 m) to a hot electron (1e-11 m).
+    // *** WHAT IS CLAIMED IS "TO WITHIN ONE ULP", NOT "EXACTLY 1". *** I checked before writing it: the
+    // product is 0.99999999999999989 at 1e-11 and 1.0000000000000002 at 1e-7. A cube and a reciprocal do not
+    // compose bit-exactly, and asserting === 1 here would be a check that passes on this machine's rounding.
+    const rt = [1e-11, 1e-9, 3.3e-9, 1e-8, 1e-7].map((l) => quantumConcentration(l) * l * l * l);
+    ok("quantumConcentration round-trips its own cube to within an ulp",
+       rt.every((v) => Math.abs(v - 1) <= 4 * Number.EPSILON),
+       "worst |n_Q*lambda^3 - 1| = " + Math.max(...rt.map((v) => Math.abs(v - 1))).toExponential(3) +
+       " over four decades of lambda, against eps = " + Number.EPSILON.toExponential(3));
+    ok("...and it is a strictly DECREASING function of lambda, as an inverse cube must be",
+       quantumConcentration(1e-11) > quantumConcentration(1e-9) && quantumConcentration(1e-9) > quantumConcentration(1e-7),
+       "n_Q falls by 1e18 as lambda rises by 1e4 -- the cube, read off the ratio");
+}
 
 console.log("sackurTetrode-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

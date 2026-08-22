@@ -19,8 +19,8 @@
 <body>
 <div id="wrap">
   <div class="dim" style="margin-bottom:8px;">Each run draws a FRESH noisy dataset from y = A cos(&omega;t) + noise with a known truth (A=2, &omega;=1.3), samples the posterior with HMC, and marks whether the 90% interval for &omega; covered the truth. Left: the data and the posterior-mean fit. Right: the posterior cloud in (A, &omega;) with the truth crosshair. The coverage counter is the frequentist key: ~90% is calibrated; the overconfidence sabotage makes every single posterior look BETTER while the counter collapses.</div>
-  <canvas id="fit" width="470" height="300"></canvas>
-  <canvas id="post" width="470" height="300" style="margin-left:8px;"></canvas>
+  <canvas id="fit" width="470" height="300" style="width:100%;max-width:590px;height:auto"></canvas>
+  <canvas id="post" width="470" height="300" style="margin-left:8px;width:100%;max-width:590px;height:auto"></canvas>
   <div id="bar">
     <button id="run">Run one dataset</button>
     <button id="run10">Run 10</button>

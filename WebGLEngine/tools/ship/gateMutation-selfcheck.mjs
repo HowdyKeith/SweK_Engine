@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateMutation-selfcheck.mjs — v3312
 //
-// Run: node tools/ship/gateMutation-selfcheck.mjs   (~35s — MEASURED; it runs other gates twice)
+// Run: node tools/ship/gateMutation-selfcheck.mjs   (~2s — MEASURED; it runs other gates twice)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // DOES A GATE FAIL WHEN SOMETHING FAILS? The only question that matters about a suite, and this tree had 674

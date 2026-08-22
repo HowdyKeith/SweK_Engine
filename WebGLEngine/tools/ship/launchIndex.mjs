@@ -182,7 +182,7 @@ export function lines(ix = buildIndex()) {
     ];
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     if (process.argv.includes("--write")) console.log("[launchIndex]", JSON.stringify(writeIndex()));
     for (const l of lines()) console.log(l);
 }

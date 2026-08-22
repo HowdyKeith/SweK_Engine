@@ -1,6 +1,6 @@
 // WebGLEngine/physics/elasticity/buckling-selfcheck.mjs — v3407
 //
-// Run: node physics/elasticity/buckling-selfcheck.mjs   (~35s — MEASURED individually)
+// Run: node physics/elasticity/buckling-selfcheck.mjs   (~0.3s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // A THIRD EXACT KEY ON THE SAME DISCRETISATION. beam.js already answers two questions with one fourth-difference

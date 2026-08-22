@@ -41,7 +41,12 @@
 import { shadowSolve } from "../../fluid/multigridGPU.js";
 import { shadowProlong, shadowRestrict } from "../../fluid/mgGpuKernels.js";
 import { PoissonMG, FLUID, SOLID, AIR } from "../../fluid/multigrid.mjs";
+
 import { pathToFileURL } from "node:url";
+// v3902 -- ONE declaration of the mode list. It lived in mggpuDefaults' whitelist AND in the device object,
+// and on splatBind this same round the second copy SILENTLY COERCED a new plant mode to the primary and made
+// both arms read bit-identical numbers. THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED.
+export const MGGPU_MODES = ["adjoint", "window", "reference", "solve", "narrowwindow"];
 
 export const MGGPU_OBSERVABLES = [
     "n", "cells", "levels", "pairs", "adjointWorst", "innerFine", "innerCoarse",
@@ -60,7 +65,7 @@ export function mggpuDefaults(hyp) {
     c.n = 1 << Math.round(Math.log2(n));
     c.seed = Math.max(1, num(c.seed, DEF.seed) | 0);
     h.config = c;
-    if (!["adjoint", "window", "reference", "solve"].includes(h.mode)) h.mode = "adjoint";
+    if (!MGGPU_MODES.includes(h.mode)) h.mode = "adjoint";   // v3902 -- ONE declaration, read here and by the device
     if (!h.claim || !h.claim.observable) h.claim = { observable: "adjointWorst", max: 1e-12 };
     return h;
 }
@@ -92,14 +97,29 @@ const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] 
 const relGap = (a, b) => Math.abs(a - b) / Math.max(1e-30, Math.abs(a) + Math.abs(b));
 
 /** <P x, y>_fine against <x, P^T y>_coarse on one level pair, through the shipped gather kernels. */
-function adjointOnPair(F, C, seed) {
+// *** v3902 -- `narrow` IS THE PLANT: THE GATHER WINDOW THAT IS NOT THE TRANSPOSE. ***
+// P^T is not a choice, it is P's transpose, and this file's `window` mode ALREADY MEASURES what the naive
+// window costs -- at(0,1), "just the two fine cells under the coarse one", against the shipped at(-1,2). The
+// header states the separation: "the adjoint gap is 1e-15 against 1e-1, fourteen orders". THAT MEASUREMENT WAS
+// UNREACHABLE BY THE CENSUS, because `window` reports it as narrowRel/widerRel -- observables that do not
+// exist in the `adjoint` mode -- and the mode-plant contract needs ONE observable that means the same thing in
+// both arms. So the plant re-states the same defect in `adjoint`'s own shape, on `adjointWorst`.
+// THE PLANTED RESTRICTION IS BUILT FROM P'S OWN COLUMNS (restrictAtWindow), not from a second copy of the
+// weight arithmetic -- the same reasoning pColumn's docstring gives for why the bracket is honest.
+function adjointOnPair(F, C, seed, narrow = false) {
     const rnd = rand(seed);
     const x = fluidNoise(C, rnd), y = fluidNoise(F, rnd);
     const Px = new Float64Array(F.nx * F.ny);
     shadowProlong(x, C.type, F.type, Px, F.nx, F.ny, C.nx, C.ny);
-    const PTy = new Float64Array(C.nx * C.ny);
-    shadowRestrict(y, F.type, C.type, PTy, F.nx, F.ny, C.nx, C.ny);
-    const innerFine = dot(Px, y), innerCoarse = dot(x, PTy);
+    let innerCoarse;
+    if (narrow) {
+        innerCoarse = dot(x, restrictAtWindow(y, F, C, 0, 1));
+    } else {
+        const PTy = new Float64Array(C.nx * C.ny);
+        shadowRestrict(y, F.type, C.type, PTy, F.nx, F.ny, C.nx, C.ny);
+        innerCoarse = dot(x, PTy);
+    }
+    const innerFine = dot(Px, y);
     return { innerFine, innerCoarse, rel: relGap(innerFine, innerCoarse) };
 }
 
@@ -217,8 +237,9 @@ export function buildMGGPU(hyp, base = {}) {
     }
 
     let adjointWorst = 0, innerFine = 0, innerCoarse = 0;
+    const narrow = h.mode === "narrowwindow";
     for (let l = 0; l < levels - 1; l++) {
-        const r = adjointOnPair(mg.levels[l], mg.levels[l + 1], seed + 7 * l + n);
+        const r = adjointOnPair(mg.levels[l], mg.levels[l + 1], seed + 7 * l + n, narrow);
         if (r.rel >= adjointWorst) { adjointWorst = r.rel; innerFine = r.innerFine; innerCoarse = r.innerCoarse; }
     }
     // wgslGraded is 0 ON PURPOSE and is an observable rather than a comment: the compute shaders are not
@@ -227,15 +248,22 @@ export function buildMGGPU(hyp, base = {}) {
 }
 
 export const multigridGPUDevice = {
-    modes: ["adjoint", "window", "reference", "solve"],
+    modes: MGGPU_MODES,
     name: "multigridgpu-transfer-adjoint",
     observables: MGGPU_OBSERVABLES,
     build: buildMGGPU,
     defaults: mggpuDefaults,
+    // `adjointWorst` -- the device's own claim observable (its default claim is adjointWorst <= 1e-12), so the
+    // plant is measured against the number this device already stakes itself on. NOT innerFine/innerCoarse:
+    // those move together under a change of test vector and their AGREEMENT is the property, which is exactly
+    // why `window` mode's pair could not be declared.
+    plantMode: "narrowwindow", plantFlips: "adjointWorst", plantKind: "knob",
+    plantIdeal: 0, plantIdealWhy:
+        "adjointWorst is the worst restriction/prolongation adjoint defect over the level pairs, identically 0 for a matched pair; narrowing the window takes it 7.19e-16 -> 2.93e-1",
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     console.log("[multigridgpu] the property the gather rewrite had to keep and is never told: RESTRICT IS THE");
     console.log("               EXACT TRANSPOSE OF PROLONG.\n");
     for (const n of [16, 32, 64]) {

@@ -20,6 +20,7 @@ import { warmthOfKelvin, kelvinOfWarmth } from "./blobKelvin.js";
 import { SCENE_TRIAGE, refused as refusedRows } from "./labScenes.mjs";
 import { listProposers, resetRegistry } from "./proposers.mjs";
 import { registerAll } from "./knobRegistry.mjs";
+import { reportLines } from "./diffusionKnob.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c, note = "") => { if (c) { pass++; console.log("  ok   " + n + (note ? "  -- " + note : "")); }
@@ -83,6 +84,22 @@ section("4. THE REFUSAL IS WIRED, AND NOTHING WAS REGISTERED ON IT");
        !listProposers().some((p) => /diffus/i.test(p.id) || /diffus/i.test(String(p.instrument))));
     ok("the antidote names what would make it askable", /thermostat|fluctuation-dissipation|trap/i
        .test(REFUSED.whatWouldMakeItAskable));
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    const L = reportLines();
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[diffusionKnob]"),
+       L.length + " lines, self-named");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

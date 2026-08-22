@@ -1,6 +1,6 @@
 // tools/roundhouse/soundness-selfcheck.mjs
 //
-// Run: node tools/roundhouse/soundness-selfcheck.mjs   (~5s)
+// Run: node tools/roundhouse/soundness-selfcheck.mjs   (~0.2s)
 //
 // v3130 -- NOW THAT THE AGENT CAN MOVE THE OPERATING POINT, SOMETHING HAS TO TELL IT WHEN IT HAS MOVED
 // SOMEWHERE THE INSTRUMENT DOES NOT WORK.

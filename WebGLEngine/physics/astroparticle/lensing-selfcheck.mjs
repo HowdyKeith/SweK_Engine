@@ -1,6 +1,6 @@
 // WebGLEngine/physics/astroparticle/lensing-selfcheck.mjs — v3428
 //
-// Run: node physics/astroparticle/lensing-selfcheck.mjs   (~10s — MEASURED individually)
+// Run: node physics/astroparticle/lensing-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** A SECOND, INDEPENDENT INSTANCE OF THE PATTERN THE OSCILLATION DEVICE FOUND. ***

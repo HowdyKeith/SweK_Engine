@@ -149,15 +149,30 @@ const ALL = FIELD.concat(PLOT);
         const h = fs.readFileSync(p, "utf8");
         const tags = [...h.matchAll(/<canvas[^>]*>/gi)];
         if (!tags.length) continue;
-        const sized = tags.some((t) => /width="\d+"/.test(t[0]) && /height="\d+"/.test(t[0]));
-        if (!sized) continue;
-          // KNOWN BLIND SPOT, v3002: this reads CSS RULES and JS assignments, not INLINE style attributes. A
-          // canvas carrying style="width:100%" inline is genuinely responsive and would still be reported as a
-          // postage stamp. Stated here rather than loosened to a bare file-wide search, which would accept
-          // "width:100%" appearing anywhere at all -- including in a comment about canvases.
-        const responsive = /canvas[^{]*\{[^}]*width:\s*100%/.test(h) || /#[\w-]+[^{]*\{[^}]*width:\s*100%/.test(h) || /\.style\.width\s*=\s*["\'`]100%/.test(h);
+        const sized = tags.filter((t) => /width="\d+"/.test(t[0]) && /height="\d+"/.test(t[0]));
+        if (!sized.length) continue;
+          // v3922 -- *** THE BLIND SPOT v3002 NAMED IS CLOSED, AND CLOSING IT IS NOT THE LOOSENING IT REFUSED. ***
+          // The note here said this reads CSS RULES and JS assignments but not INLINE style attributes, so a
+          // canvas carrying style="width:100%" was reported as a postage stamp anyway -- and it declined to fix
+          // that rather than fall back to "a bare file-wide search, which would accept width:100% appearing
+          // anywhere at all -- including in a comment about canvases". THAT REASONING WAS RIGHT ABOUT THE WRONG
+          // FIX. Reading the style attribute OF THE CANVAS TAG ITSELF is not a file-wide search: it is the most
+          // precise reading available, narrower than the CSS-rule regexes already here, and it is the exact
+          // property that makes a canvas responsive.
+          //
+          // The blind spot was load-bearing: kuramoto, landau-zener and percolation each had ONE canvas fixed
+          // and ONE already carrying the inline style, and the page was reported whole. So the check is now
+          // PER CANVAS and names the element, because "kuramoto.html" sends you to a page that is half right
+          // and tells you nothing about which half.
+        const inlineResponsive = (t) => /style="[^"]*width:\s*100%/i.test(t);
+        const cssResponsive = /canvas[^{]*\{[^}]*width:\s*100%/.test(h) || /#[\w-]+[^{]*\{[^}]*width:\s*100%/.test(h) || /\.style\.width\s*=\s*["\'`]100%/.test(h);
         const jsResize = /addEventListener\(["\'`]resize/.test(h) || /innerWidth/.test(h) || /clientWidth/.test(h) || /ResizeObserver/.test(h);
-        if (!responsive && !jsResize) offenders.push(path.relative(ENG, p));
+        if (cssResponsive || jsResize) continue;
+        const stuck = sized.filter((t) => !inlineResponsive(t[0]));
+        for (const t of stuck) {
+            const id = (t[0].match(/id="([^"]+)"/) || [, "(no id)"])[1];
+            offenders.push(path.relative(ENG, p) + "#" + id);
+        }
     }
     ok("!! NO PAGE IN THE TREE SHIPS A FIXED, UNGROWABLE CANVAS", offenders.length === 0,
        offenders.length ? "POSTAGE STAMPS: " + offenders.slice(0, 8).join(", ") + (offenders.length > 8 ? " (+" + (offenders.length - 8) + ")" : "")

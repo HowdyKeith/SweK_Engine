@@ -1,6 +1,6 @@
 // tools/ship/corpusText-selfcheck.mjs
 //
-// Run: node tools/ship/corpusText-selfcheck.mjs   (~5s)
+// Run: node tools/ship/corpusText-selfcheck.mjs   (~0.6s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3099 -- A RESEARCH AGENT NEEDS TEXT, AND THE DASHBOARD IS NOT TEXT.

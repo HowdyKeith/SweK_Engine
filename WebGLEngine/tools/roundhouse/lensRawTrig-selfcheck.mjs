@@ -1,6 +1,6 @@
 // tools/roundhouse/lensRawTrig-selfcheck.mjs
 //
-// Run: node tools/roundhouse/lensRawTrig-selfcheck.mjs   (~30s)
+// Run: node tools/roundhouse/lensRawTrig-selfcheck.mjs   (~0.5s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2929 -- ITEM 5, RESOLVED BY MEASUREMENT: DO NOT CONVERT shadow/aim TO STRICT TRIG AS STATED.

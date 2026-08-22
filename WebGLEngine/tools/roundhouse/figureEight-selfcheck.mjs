@@ -1,6 +1,6 @@
 // tools/roundhouse/figureEight-selfcheck.mjs
 //
-// Run: node tools/roundhouse/figureEight-selfcheck.mjs   (~10s)
+// Run: node tools/roundhouse/figureEight-selfcheck.mjs   (~0.2s)
 //
 // v3196 -- THE FIGURE-EIGHT IS GRADED, AND ITS NEGATIVE FAILS BY A PREDICTED AMOUNT.
 //

@@ -21,8 +21,8 @@
 import { render, coverage } from "../../physics/render/pathTracer.mjs";
 import { buildTable } from "../../physics/render/energyCompensation.mjs";
 import { asciify, RAMP } from "./asciify.mjs";
-import { pathToFileURL } from "node:url";
 
+import { pathToFileURL } from "node:url";
 export const CAM = { w: 120, h: 120, spp: 64, seed: 5, eye: [0, 0, 4], look: [0, 0, 0], fovDeg: 40, maxDepth: 8 };
 
 /**
@@ -96,7 +96,7 @@ export function reportLines(opts = {}) {
     return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     console.log("[traceAscii] converged path traces, printed as characters");
     for (const l of reportLines()) console.log(l);
 }

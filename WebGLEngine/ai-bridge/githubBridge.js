@@ -17,7 +17,14 @@ const SEED_REPOS = [
     "HowdyKeith/swek-blobulator",       // marching-cubes metaballs, 9 checks tied to README claims
     "HowdyKeith/sph-no-tension",        // the SPH tensile fix
 ];
-const DEFAULTS = { owner: "HowdyKeith", token: "", defaultRepo: "", engineRepo: "", showAsPeer: true, monitorRepos: SEED_REPOS.slice() };
+// v3907 -- engineRepo WAS "" WHILE owner WAS ALREADY "HowdyKeith", and that asymmetry made the whole GitHub
+// update source a silent no-op: versionCheck() returned "no repo to check (set engineRepo)" and
+// fetchEngineBuild() returned "no engineRepo set", so cfg.update.autoFetch could be ON and the poller would
+// call githubPull() every interval forever without ever looking at anything. A DEFAULT THAT DISABLES THE
+// FEATURE IS NOT A SAFE DEFAULT, IT IS AN INVISIBLE ONE. Setting it turns on no network traffic by itself:
+// cfg.update.autoFetch and cfg.update.enabled both default to false, so this only makes the manual check
+// and the opt-in poller able to reach the repo they were always meant to reach.
+const DEFAULTS = { owner: "HowdyKeith", token: "", defaultRepo: "", engineRepo: "HowdyKeith/SweK_Engine", showAsPeer: true, monitorRepos: SEED_REPOS.slice() };
 
 function loadCfg() { try { if (fs.existsSync(CFG)) return Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(CFG, "utf8"))); } catch {} return { ...DEFAULTS }; }
 function saveCfg(c) { try { fs.mkdirSync(path.dirname(CFG), { recursive: true }); fs.writeFileSync(CFG, JSON.stringify(c, null, 2), { mode: 0o600 }); } catch {} }
@@ -52,6 +59,41 @@ function pagesUrl(full) {
     if (!owner || !repo) return null;
     return "https://" + owner.toLowerCase() + ".github.io/" + repo + "/";
 }
+
+// ================================================================================================================
+// *** v3937 -- "owner/repo" WENT INTO A SLOT THAT ONLY EVER HELD "repo", AND EVERY GITHUB ACTION 404'd. ***
+// ================================================================================================================
+//
+// Keith pressed "Release current engine" and got a bare "Not Found". The credentials were fine. TWENTY-TWO CALL
+// SITES built their URL as `_repoPath(repo)`, which is correct ONLY when `repo` is a bare name --
+// and the panel's own input placeholder says "owner/repo or repo", the repo list renders "HowdyKeith/SweK_Engine",
+// and engineRepo is set from that same list. So the release path built:
+//
+//     /repos/HowdyKeith/HowdyKeith%2FSweK_Engine/releases     ->  404 Not Found
+//
+// createRelease ran the value through encodeURIComponent, which turns the separator into %2F -- so the slash could
+// not even accidentally resolve, and GitHub's 404 (which it also returns for "no permission", to avoid leaking
+// whether a repo exists) reads exactly like a credentials problem. THE ERROR NAMED THE WRONG SUSPECT.
+//
+// *** THE UI OFFERED A FORM THE BACKEND COULD NOT PARSE, WHICH IS THE SAME SHAPE v3908 ALREADY FIXED ONE LAYER UP:
+// there the guard "refused the very path its own message recommended". Here the placeholder documents a syntax
+// nothing implements. AN INPUT'S PLACEHOLDER IS A CLAIM TOO. ***
+//
+// This file already knew about the two-part form in exactly one place -- pagesUrl(), whose own comment is about a
+// 404 -- so the knowledge was present and unshared. One resolver now, used by every call site.
+/** "owner/repo", a github URL, or a bare "repo" -> {owner, repo}. Falls back to the configured owner. */
+function _split(repo) {
+    const s = String(repo == null ? "" : repo).trim()
+        .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+        .replace(/\.git$/i, "")
+        .replace(/^\/+|\/+$/g, "");
+    const parts = s.split("/").filter(Boolean);
+    if (parts.length >= 2) return { owner: parts[0], repo: parts[1] };
+    let owner = ""; try { owner = (loadCfg().owner || "").trim(); } catch {}
+    return { owner, repo: parts[0] || "" };
+}
+/** The "/repos/<owner>/<repo>" prefix for either form. Each segment encoded ON ITS OWN so the separator survives. */
+function _repoPath(repo) { const x = _split(repo); return "/repos/" + encodeURIComponent(x.owner) + "/" + encodeURIComponent(x.repo); }
 
 const _pagesCache = new Map();   // full -> { live, url, at }
 const PAGES_TTL = 10 * 60 * 1000;
@@ -132,7 +174,7 @@ async function repoPreview(repo) {
 
 async function latestRelease(repo) {
     const c = loadCfg(); const owner = c.owner; if (!owner || !repo) return { ok: false, error: "owner/repo required" };
-    const r = await _api("GET", "/repos/" + owner + "/" + encodeURIComponent(repo) + "/releases/latest");
+    const r = await _api("GET", _repoPath(repo) + "/releases/latest");
     if (r.ok) return { ok: true, repo, tag: r.data.tag_name, name: r.data.name, publishedAt: r.data.published_at, url: r.data.html_url, assets: (r.data.assets || []).map(a => ({ name: a.name, size: a.size, downloads: a.download_count, id: a.id, apiUrl: a.url, downloadUrl: a.browser_download_url })) };
     if (r.status === 404) return { ok: true, repo, tag: null, none: true };
     return r;
@@ -189,7 +231,7 @@ async function createRelease({ repo, tag, name, body, draft, prerelease, target 
     const c = loadCfg(); const owner = c.owner;
     if (!effTok()) return { ok: false, error: "a personal access token (repo scope) is required to publish" };
     if (!owner || !repo || !tag) return { ok: false, error: "owner, repo, and tag (version) are required" };
-    const r = await _api("POST", "/repos/" + owner + "/" + encodeURIComponent(repo) + "/releases", { tag_name: tag, name: name || tag, body: body || "", draft: !!draft, prerelease: !!prerelease, target_commitish: target || undefined });
+    const r = await _api("POST", _repoPath(repo) + "/releases", { tag_name: tag, name: name || tag, body: body || "", draft: !!draft, prerelease: !!prerelease, target_commitish: target || undefined });
     if (!r.ok) return r;
     return { ok: true, id: r.data.id, tag: r.data.tag_name, url: r.data.html_url, uploadUrl: r.data.upload_url };
 }
@@ -199,7 +241,7 @@ async function uploadAsset({ repo, releaseId, filePath, uploadUrl } = {}) {
     if (!effTok()) return { ok: false, error: "token required to upload" };
     if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: "asset file not found: " + filePath };
     let base = uploadUrl ? uploadUrl.replace(/\{.*\}$/, "") : null;
-    if (!base) { if (!releaseId) return { ok: false, error: "releaseId or uploadUrl required" }; base = "https://uploads.github.com/repos/" + owner + "/" + encodeURIComponent(repo) + "/releases/" + releaseId + "/assets"; }
+    if (!base) { if (!releaseId) return { ok: false, error: "releaseId or uploadUrl required" }; base = "https://uploads.github.com" + _repoPath(repo) + "/releases/" + releaseId + "/assets"; }
     const fname = path.basename(filePath);
     const data = fs.readFileSync(filePath);
     try {
@@ -229,7 +271,11 @@ async function publishEngineBuild({ repo, notes, draft, prerelease } = {}) {
     const tag = engineVersion();
     if (!tag) return { ok: false, error: "couldn't read the engine version" };
     let assetPath = "";
-    try { const packager = require("./packagerBridge.js"); const z = await packager.makeGmailSafe({}); if (!z.ok) return { ok: false, error: "build zip failed: " + z.error }; assetPath = z.path; }
+    // v3907 -- WAS makeGmailSafe, WHICH RENAMES EVERY .js AND .mjs IN THE TREE AND NAMES THE ZIP
+    // EngineProject_GmailSafe_vNNNN.zip. That asset is unrunnable AND invisible to the Downloads scanner that
+    // feeds the installer. The release asset must be the INSTALLABLE build, whose root and filename are the
+    // <prefix>_vNNNN that fetchEngineBuild's picker and scanDownloads() both expect.
+    try { const packager = require("./packagerBridge.js"); const z = await packager.makeInstallable({}); if (!z.ok) return { ok: false, error: "build zip failed: " + z.error }; assetPath = z.path; }
     catch (e) { return { ok: false, error: "packager error: " + String(e && e.message || e) }; }
     const pub = await publishVersion({ repo, tag, name: tag, body: notes || ("Engine build " + tag), assetPath, draft, prerelease });
     return Object.assign({ tag, assetPath }, pub);
@@ -243,17 +289,17 @@ function _verLt(a, b) { const x = _num(a), y = _num(b); for (let i = 0; i < Math
 async function whoami() { const r = await _api("GET", "/user"); if (!r.ok) return r; return { ok: true, login: r.data.login, name: r.data.name, publicRepos: r.data.public_repos, privateRepos: r.data.total_private_repos, url: r.data.html_url }; }
 async function rateLimit() { const r = await _api("GET", "/rate_limit"); if (!r.ok) return r; const c = (r.data.resources && r.data.resources.core) || {}; return { ok: true, limit: c.limit, remaining: c.remaining, reset: c.reset }; }
 async function createRepo({ name, description, priv, autoInit } = {}) { if (!effTok()) return { ok: false, error: "token required" }; if (!name) return { ok: false, error: "repo name required" }; const r = await _api("POST", "/user/repos", { name, description: description || "", private: !!priv, auto_init: autoInit !== false }); if (!r.ok) return r; return { ok: true, name: r.data.name, url: r.data.html_url }; }
-async function updateRepo({ repo, description, homepage, priv, topics } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo) return { ok: false, error: "repo required" }; const body = {}; if (description != null) body.description = description; if (homepage != null) body.homepage = homepage; if (priv != null) body.private = !!priv; const r = await _api("PATCH", "/repos/" + c.owner + "/" + repo, body); if (!r.ok) return r; let tr = null; if (Array.isArray(topics)) tr = await _api("PUT", "/repos/" + c.owner + "/" + repo + "/topics", { names: topics.map(s => String(s).toLowerCase().trim()).filter(Boolean) }); return { ok: true, url: r.data.html_url, topics: tr && tr.ok ? tr.data.names : undefined }; }
-async function deleteRepo({ repo, confirm } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo) return { ok: false, error: "repo required" }; if (confirm !== repo) return { ok: false, error: "type the repo name to confirm deletion" }; const r = await _api("DELETE", "/repos/" + c.owner + "/" + repo); if (!r.ok) return r; return { ok: true, deleted: repo }; }
-async function listReleases({ repo } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", "/repos/" + c.owner + "/" + repo + "/releases?per_page=30"); if (!r.ok) return r; return { ok: true, releases: (r.data || []).map(x => ({ id: x.id, tag: x.tag_name, name: x.name, draft: x.draft, prerelease: x.prerelease, publishedAt: x.published_at, url: x.html_url, assets: (x.assets || []).length })) }; }
-async function deleteRelease({ repo, id } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !id) return { ok: false, error: "repo and id required" }; const r = await _api("DELETE", "/repos/" + c.owner + "/" + repo + "/releases/" + id); if (!r.ok) return r; return { ok: true, deleted: id }; }
-async function listIssues({ repo, state } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", "/repos/" + c.owner + "/" + repo + "/issues?state=" + (state || "open") + "&per_page=30"); if (!r.ok) return r; return { ok: true, issues: (r.data || []).filter(x => !x.pull_request).map(x => ({ number: x.number, title: x.title, state: x.state, url: x.html_url, comments: x.comments })) }; }
-async function createIssue({ repo, title, body } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !title) return { ok: false, error: "repo and title required" }; const r = await _api("POST", "/repos/" + c.owner + "/" + repo + "/issues", { title, body: body || "" }); if (!r.ok) return r; return { ok: true, number: r.data.number, url: r.data.html_url }; }
-async function closeIssue({ repo, number } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !number) return { ok: false, error: "repo and number required" }; const r = await _api("PATCH", "/repos/" + c.owner + "/" + repo + "/issues/" + number, { state: "closed" }); if (!r.ok) return r; return { ok: true, closed: number }; }
-async function listCommits({ repo, branch } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", "/repos/" + c.owner + "/" + repo + "/commits?per_page=15" + (branch ? "&sha=" + encodeURIComponent(branch) : "")); if (!r.ok) return r; return { ok: true, commits: (r.data || []).map(x => ({ sha: x.sha.slice(0, 7), msg: ((x.commit && x.commit.message) || "").split("\n")[0].slice(0, 64), author: x.commit && x.commit.author && x.commit.author.name, date: x.commit && x.commit.author && x.commit.author.date })) }; }
-async function listBranches({ repo } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", "/repos/" + c.owner + "/" + repo + "/branches?per_page=50"); if (!r.ok) return r; return { ok: true, branches: (r.data || []).map(x => ({ name: x.name, protected: x.protected })) }; }
-async function getFile({ repo, path: fp, ref } = {}) { const c = loadCfg(); if (!repo || !fp) return { ok: false, error: "repo and path required" }; const r = await _api("GET", "/repos/" + c.owner + "/" + repo + "/contents/" + fp.split("/").map(encodeURIComponent).join("/") + (ref ? "?ref=" + encodeURIComponent(ref) : "")); if (!r.ok) return r; let content = ""; try { content = Buffer.from(r.data.content || "", "base64").toString("utf8"); } catch {} return { ok: true, path: fp, sha: r.data.sha, size: r.data.size, content }; }
-async function putFile({ repo, path: fp, content, message, sha, branch } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !fp) return { ok: false, error: "repo and path required" }; const body = { message: message || ("update " + fp), content: Buffer.from(content || "", "utf8").toString("base64") }; if (sha) body.sha = sha; if (branch) body.branch = branch; const r = await _api("PUT", "/repos/" + c.owner + "/" + repo + "/contents/" + fp.split("/").map(encodeURIComponent).join("/"), body); if (!r.ok) return r; return { ok: true, path: fp, commit: r.data.commit && r.data.commit.sha, url: r.data.content && r.data.content.html_url }; }
+async function updateRepo({ repo, description, homepage, priv, topics } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo) return { ok: false, error: "repo required" }; const body = {}; if (description != null) body.description = description; if (homepage != null) body.homepage = homepage; if (priv != null) body.private = !!priv; const r = await _api("PATCH", _repoPath(repo), body); if (!r.ok) return r; let tr = null; if (Array.isArray(topics)) tr = await _api("PUT", _repoPath(repo) + "/topics", { names: topics.map(s => String(s).toLowerCase().trim()).filter(Boolean) }); return { ok: true, url: r.data.html_url, topics: tr && tr.ok ? tr.data.names : undefined }; }
+async function deleteRepo({ repo, confirm } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo) return { ok: false, error: "repo required" }; if (confirm !== repo) return { ok: false, error: "type the repo name to confirm deletion" }; const r = await _api("DELETE", _repoPath(repo)); if (!r.ok) return r; return { ok: true, deleted: repo }; }
+async function listReleases({ repo } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/releases?per_page=30"); if (!r.ok) return r; return { ok: true, releases: (r.data || []).map(x => ({ id: x.id, tag: x.tag_name, name: x.name, draft: x.draft, prerelease: x.prerelease, publishedAt: x.published_at, url: x.html_url, assets: (x.assets || []).length })) }; }
+async function deleteRelease({ repo, id } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !id) return { ok: false, error: "repo and id required" }; const r = await _api("DELETE", _repoPath(repo) + "/releases/" + id); if (!r.ok) return r; return { ok: true, deleted: id }; }
+async function listIssues({ repo, state } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/issues?state=" + (state || "open") + "&per_page=30"); if (!r.ok) return r; return { ok: true, issues: (r.data || []).filter(x => !x.pull_request).map(x => ({ number: x.number, title: x.title, state: x.state, url: x.html_url, comments: x.comments })) }; }
+async function createIssue({ repo, title, body } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !title) return { ok: false, error: "repo and title required" }; const r = await _api("POST", _repoPath(repo) + "/issues", { title, body: body || "" }); if (!r.ok) return r; return { ok: true, number: r.data.number, url: r.data.html_url }; }
+async function closeIssue({ repo, number } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !number) return { ok: false, error: "repo and number required" }; const r = await _api("PATCH", _repoPath(repo) + "/issues/" + number, { state: "closed" }); if (!r.ok) return r; return { ok: true, closed: number }; }
+async function listCommits({ repo, branch } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/commits?per_page=15" + (branch ? "&sha=" + encodeURIComponent(branch) : "")); if (!r.ok) return r; return { ok: true, commits: (r.data || []).map(x => ({ sha: x.sha.slice(0, 7), msg: ((x.commit && x.commit.message) || "").split("\n")[0].slice(0, 64), author: x.commit && x.commit.author && x.commit.author.name, date: x.commit && x.commit.author && x.commit.author.date })) }; }
+async function listBranches({ repo } = {}) { const c = loadCfg(); if (!repo) return { ok: false, error: "repo required" }; const r = await _api("GET", _repoPath(repo) + "/branches?per_page=50"); if (!r.ok) return r; return { ok: true, branches: (r.data || []).map(x => ({ name: x.name, protected: x.protected })) }; }
+async function getFile({ repo, path: fp, ref } = {}) { const c = loadCfg(); if (!repo || !fp) return { ok: false, error: "repo and path required" }; const r = await _api("GET", _repoPath(repo) + "/contents/" + fp.split("/").map(encodeURIComponent).join("/") + (ref ? "?ref=" + encodeURIComponent(ref) : "")); if (!r.ok) return r; let content = ""; try { content = Buffer.from(r.data.content || "", "base64").toString("utf8"); } catch {} return { ok: true, path: fp, sha: r.data.sha, size: r.data.size, content }; }
+async function putFile({ repo, path: fp, content, message, sha, branch } = {}) { const c = loadCfg(); if (!effTok()) return { ok: false, error: "token required" }; if (!repo || !fp) return { ok: false, error: "repo and path required" }; const body = { message: message || ("update " + fp), content: Buffer.from(content || "", "utf8").toString("base64") }; if (sha) body.sha = sha; if (branch) body.branch = branch; const r = await _api("PUT", _repoPath(repo) + "/contents/" + fp.split("/").map(encodeURIComponent).join("/"), body); if (!r.ok) return r; return { ok: true, path: fp, commit: r.data.commit && r.data.commit.sha, url: r.data.content && r.data.content.html_url }; }
 
 // v1502 — DOWNLOAD half of the GitHub flow (the "installer"). Follows redirects (release
 // assets 302 to a signed CDN URL) and drops the auth header on the cross-host hop so the
@@ -568,16 +614,16 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
 
     // 1. the repo, made if absent. auto_init gives us a base commit to build on.
     let created = false;
-    let r = await _api("GET", "/repos/" + c.owner + "/" + repo);
+    let r = await _api("GET", _repoPath(repo));
     if (!r.ok) {
         const mk = await createRepo({ name: repo, description, priv: !!priv, autoInit: true });
         if (!mk.ok) return mk;
         created = true;
         await new Promise((res) => setTimeout(res, 1500));       // GitHub needs a beat before the ref exists
-        r = await _api("GET", "/repos/" + c.owner + "/" + repo);
+        r = await _api("GET", _repoPath(repo));
         if (!r.ok) return r;
     } else if (description) {
-        await _api("PATCH", "/repos/" + c.owner + "/" + repo, { description });
+        await _api("PATCH", _repoPath(repo), { description });
     }
     const base = r.data.default_branch || br;
 
@@ -585,28 +631,28 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
     const tree = [];
     for (const f of pv.files.length === pv.count ? walkDir(dir) : walkDir(dir)) {
         const buf = fs.readFileSync(path.join(dir, f.path));
-        const b = await _api("POST", "/repos/" + c.owner + "/" + repo + "/git/blobs",
+        const b = await _api("POST", _repoPath(repo) + "/git/blobs",
             { content: buf.toString("base64"), encoding: "base64" });
         if (!b.ok) return { ok: false, error: "blob failed for " + f.path + ": " + b.error };
         tree.push({ path: f.path, mode: "100644", type: "blob", sha: b.data.sha });
     }
 
     // 3. one tree, one commit, then move the branch. This is what git push does.
-    const headRef = await _api("GET", "/repos/" + c.owner + "/" + repo + "/git/ref/heads/" + base);
+    const headRef = await _api("GET", _repoPath(repo) + "/git/ref/heads/" + base);
     const parent = headRef.ok ? headRef.data.object.sha : null;
-    const t = await _api("POST", "/repos/" + c.owner + "/" + repo + "/git/trees", { tree });
+    const t = await _api("POST", _repoPath(repo) + "/git/trees", { tree });
     if (!t.ok) return { ok: false, error: "tree failed: " + t.error };
-    const cm = await _api("POST", "/repos/" + c.owner + "/" + repo + "/git/commits",
+    const cm = await _api("POST", _repoPath(repo) + "/git/commits",
         { message: message || "Publish " + pv.count + " files", tree: t.data.sha, parents: parent ? [parent] : [] });
     if (!cm.ok) return { ok: false, error: "commit failed: " + cm.error };
-    const up = await _api("PATCH", "/repos/" + c.owner + "/" + repo + "/git/refs/heads/" + base,
+    const up = await _api("PATCH", _repoPath(repo) + "/git/refs/heads/" + base,
         { sha: cm.data.sha, force: true });
     if (!up.ok) return { ok: false, error: "ref update failed: " + up.error };
 
     // 4. topics, if asked. A separate endpoint; failing here must not fail the publish.
     let topicsSet = null;
     if (Array.isArray(topics) && topics.length) {
-        const tp = await _api("PUT", "/repos/" + c.owner + "/" + repo + "/topics", { names: topics.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 20) });
+        const tp = await _api("PUT", _repoPath(repo) + "/topics", { names: topics.map((x) => String(x).toLowerCase().trim()).filter(Boolean).slice(0, 20) });
         topicsSet = tp.ok;
     }
     return { ok: true, repo, created, files: pv.count, bytes: pv.bytes, branch: base,

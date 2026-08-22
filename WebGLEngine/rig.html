@@ -142,9 +142,15 @@
         // returned a verdict; calling that a failure is a confident wrong answer about unfinished work, and it
         // sits beside real failures with nothing to distinguish them.
         c._st.textContent = (r.ok ? "pass"
-            : r.timedOut ? "TIMEOUT (" + Math.round((r.timeoutMs || 180000) / 1000) + "s budget)"
+            // v3919 -- the `|| 180000` here was the page's OWN COPY of a number the server owns, and it would
+            // have gone on printing "180s budget" after the server started sending 568s. A budget the page
+            // cannot read is reported as unknown; inventing one is how the two copies stayed agreeing.
+            : r.timedOut ? "TIMEOUT (" + (r.timeoutMs ? Math.round(r.timeoutMs / 1000) + "s budget" : "budget unknown -- server sent none") + ")"
             : "FAIL " + r.code) + (r.ms ? " " + (r.ms / 1000).toFixed(1) + "s" : "");
-        c._out.textContent = r.out || "(no output)";
+        // Where the number came from travels with it, so the wiring is VISIBLE rather than asserted in a
+        // comment. v3212's "there is one table" was true of the button and the ship and false of this runner
+        // for seven hundred versions, because nothing printed the source.
+        c._out.textContent = (r.timedOut && r.budgetSource ? "budget: " + r.budgetSource + "\n\n" : "") + (r.out || "(no output)");
         c._out.style.display = r.ok ? "none" : "block";
         c._btn.disabled = false;
         c._ok = r.ok; c._timedOut = !!r.timedOut;

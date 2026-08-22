@@ -14,6 +14,7 @@ import {
     sirt, sirtDescent, stepFor, residual, methodGain, seedExperiment, PHANTOM, MEASURED_V3613, MEASURED_V3846, reportLines,
 } from "./sirt.mjs";
 import { radon, backProject, filteredBackProjection, scoreRecon, phantomField, angleSet } from "./ct.js";
+import { stepForMatched, stepForUnmatched } from "./sirt.mjs";
 import { matchedBackProject } from "./reconOps.mjs";
 import { binaryPair, PAIR, LATTICE_ANGLES, PLUS_DIAGONALS } from "./ambiguity.mjs";
 
@@ -208,6 +209,40 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
        "adding an observable moves lab-results, which is Keith's call; this ships as a bench module with a page row");
     const rep = reportLines();
     ok("the report renders and names the fixed points", rep.length > 15 && rep.join("\n").includes("FIXED POINTS"), rep.length + " lines");
+}
+
+// ---- v3903: THE TWO STEP CONSTANTS, WHICH THIS GATE HAD NEVER NAMED --------------------------------------------
+// definitionGates-selfcheck found stepForMatched and stepForUnmatched unmentioned here. They are one line each
+// and they are the arithmetic the v3846 split rests on -- "THE TWO HALVES MOVE TOGETHER OR NEITHER MOVES" is
+// stated in sirt.mjs's own comment and was, until now, checked by nothing.
+{
+    const N = 24, nDet = 24, angles = angleSet(24);
+    const m = stepForMatched(N, angles, nDet, {});
+    const u = stepForUnmatched(N, angles, nDet, {});
+
+    // LANDWEBER CONVERGES IFF 0 < step < 2 / lambda_max. Both land on exactly HALF that ceiling -- not
+    // approximately, and not by a tolerance: the ratio is 0.500000000000 for each.
+    const ceilM = 2 / m.lambdaMax, ceilU = 2 / u.lambdaMax;
+    ok("!! both steps sit at EXACTLY half the Landweber ceiling 2/lambda_max",
+        Math.abs(m.step / ceilM - 0.5) < 1e-12 && Math.abs(u.step / ceilU - 0.5) < 1e-12,
+        "matched " + (m.step / ceilM).toPrecision(12) + " and unmatched " + (u.step / ceilU).toPrecision(12) +
+        " of their own ceilings. Half is a CHOICE and the bound is a THEOREM -- this pins the choice so a " +
+        "later edit toward the ceiling cannot happen silently");
+
+    // *** AND THE TWO OPERATORS DO NOT SHARE A CEILING, WHICH IS WHY THE STEPS ARE TWO FUNCTIONS. ***
+    ok("!! the matched operator's spectral radius is 7.73x the unmatched one's, so the steps CANNOT be shared",
+        m.lambdaMax / u.lambdaMax > 7 && m.step < u.step,
+        "lambda_max " + m.lambdaMax.toPrecision(9) + " against " + u.lambdaMax.toPrecision(9) +
+        "; step " + m.step.toPrecision(9) + " against " + u.step.toPrecision(9));
+
+    // THE ONE THAT MAKES THE SPLIT NECESSARY RATHER THAN TIDY: keeping the OLD step while moving to the NEW
+    // operator puts the iteration OUTSIDE the bound. Not slower -- divergent.
+    ok("!! *** the unmatched step is 3.86x OUTSIDE the matched operator's ceiling -- pairing them DIVERGES ***",
+        u.step > ceilM && u.step / ceilM > 3,
+        "unmatched step " + u.step.toPrecision(9) + " against a matched ceiling of " + ceilM.toPrecision(9) +
+        " = " + (u.step / ceilM).toPrecision(8) + "x. THIS IS WHAT sirt.mjs MEANS BY \"the two halves move " +
+        "together or neither moves\", and until this check the sentence was prose in a comment while the two " +
+        "constants it governs were named by nothing");
 }
 
 console.log(fails ? "\nsirt-selfcheck: " + fails + " FAILED" : "\nsirt-selfcheck: all checks pass");

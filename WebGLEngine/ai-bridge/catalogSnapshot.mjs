@@ -95,7 +95,7 @@ export function readForBoot({ snapshotPath = SNAPSHOT_PATH, catalogPath = CATALO
 }
 
 // ---- CLI: a producer a scheduled task or a shell can invoke -----------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = write({ producedBy: "cli/catalogSnapshot" });
     console.log("[catalogSnapshot] wrote " + r.observations + " observations to " + r.path);
     const back = readForBoot({});

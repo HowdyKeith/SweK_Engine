@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/modelBench-selfcheck.mjs -- v2827
 //
-// Run: node tools/ship/modelBench-selfcheck.mjs   (~20s, runs real device loops)
+// Run: node tools/ship/modelBench-selfcheck.mjs   (~4s, runs real device loops)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES tools/roundhouse/modelBench.mjs + /device/bench/*.

@@ -31,6 +31,12 @@
 
 import { sphereField, wyvill, wyvillGrad, marchingTets, meshVolume, watertight, maxSurfaceDeviation } from "../../physics/mesh/marchingCubes.js";
 
+// v3902 -- ONE declaration of the mode list. It lived in geomDefaults' whitelist AND in the device object --
+// the THIRD device this round found carrying that duplicate (splat and multigridgpu were the others), and on
+// splatBind the second copy SILENTLY COERCED a new plant mode to the primary, so both arms read bit-identical
+// numbers and the plant looked like it had fired. THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED.
+export const GEOM_MODES = ["sphere", "blob", "converge", "midpoint"];
+
 export const GEOM_OBSERVABLES = [
     "surfaceDeviation", "watertight", "boundaryEdges", "volumeMeasured", "volumeTheory", "volumeErrFrac",
     "triangles", "vertices", "resolution", "volumeErrCoarse", "volumeErrFine", "converged", "hasVolumeTruth",
@@ -48,13 +54,29 @@ export function geomDefaults(hyp) {
     c.Nfine = Math.min(56, Math.max(c.Ncoarse + 4, num(c.Nfine, DEF.Nfine) | 0));
     c.R = Math.min(1.3, Math.max(0.2, num(c.R, DEF.R)));
     h.config = c;
-    if (!["sphere", "converge", "blob"].includes(h.mode)) h.mode = "sphere";
+    if (!GEOM_MODES.includes(h.mode)) h.mode = "sphere";   // v3902 -- ONE declaration, read here and by the device
     return h;
 }
 
-function runSphere(c, N) {
+// *** v3902 -- `midpoint` IS THE PLANT, AND IT IS THE DEFECT THIS DEVICE'S HEADER ALREADY NAMES. ***
+// "An extractor that interpolates edges wrongly fails here while still producing a closed, plausible-looking
+// blob." The classic wrong interpolation is placing each vertex at the MIDPOINT of its crossing edge instead
+// of at the linearly interpolated zero -- and that is produced here WITHOUT TOUCHING THE MODULE, by handing
+// the extractor sign(f) instead of f. Linear interpolation between -1 and +1 lands at the midpoint every time,
+// and sign(f) changes sign exactly where f does, so THE TOPOLOGY IS UNTOUCHED: identical triangle count,
+// identical watertightness. Only the vertices move. The grading still uses the TRUE f.
+//
+// *** AND THE VOLUME KEY GETS BETTER UNDER IT, WHICH IS THE REASON surfaceDeviation IS WHAT GETS DECLARED. ***
+// Measured AT THIS DEVICE'S OWN RESOLUTION (I first quoted numbers from a scratch run at N=24 and they were
+// not this device's -- corrected): volumeErrFrac 8.5203e-3 -> 2.9779e-3, so a device graded on enclosed volume
+// alone would report the BROKEN extractor as NEARLY THREE TIMES MORE ACCURATE. surfaceDeviation meanwhile goes
+// 8.6035e-3 -> 1.7953e-1, twenty-one times worse. THREE KEYS THAT DO NOT AGREE ABOUT WHICH MESH IS BETTER --
+// which is exactly why this device carries three, and why the volume key alone would have been worse than
+// nothing here: it does not merely miss the defect, it endorses it.
+function runSphere(c, N, midpoint = false) {
     const fld = sphereField(c.R);
-    const m = marchingTets(fld.f, fld.g, { N, lo: c.lo, hi: c.hi, iso: 0 });
+    const field = midpoint ? ((x, y, z) => Math.sign(fld.f(x, y, z))) : fld.f;
+    const m = marchingTets(field, fld.g, { N, lo: c.lo, hi: c.hi, iso: 0 });
     const vol = meshVolume(m.verts, m.tris);
     return {
         dev: maxSurfaceDeviation(m.verts, fld.f, 0),
@@ -101,7 +123,7 @@ export async function buildGeometry(hyp, base = {}) {
         };
     }
 
-    const r = runSphere(c, c.N);
+    const r = runSphere(c, c.N, h.mode === "midpoint");
     return {
         surfaceDeviation: r.dev,
         watertight: r.tight.watertight,
@@ -119,4 +141,8 @@ export const geometryDevice = {
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
     // DISTINCT answer. *** A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE. ***
-    modes: ["sphere", "blob", "converge"], name: "marching-tets-geometry", observables: GEOM_OBSERVABLES, build: buildGeometry, defaults: geomDefaults };
+    modes: GEOM_MODES, name: "marching-tets-geometry", observables: GEOM_OBSERVABLES, build: buildGeometry, defaults: geomDefaults,
+    // `surfaceDeviation` (8.6035e-3 -> 1.7953e-1) and emphatically NOT `volumeErrFrac`, which IMPROVES under
+    // this plant (8.5203e-3 -> 2.9779e-3), nor `watertight`/`triangles`/`vertices`, which are bit-identical
+    // because the topology never moves -- only the vertex positions along the crossing edges do.
+    plantMode: "midpoint", plantFlips: "surfaceDeviation", plantKind: "knob" };

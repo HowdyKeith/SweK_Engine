@@ -1,6 +1,6 @@
 // WebGLEngine/physics/knobRegistry-selfcheck.mjs — v3286
 //
-// Run: node physics/knobRegistry-selfcheck.mjs   (~35s — MEASURED individually)
+// Run: node physics/knobRegistry-selfcheck.mjs   (~5s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // THE PROPERTY UNDER TEST IS NOT "the knobs are registered". It is that EVERY REGISTERED ADJUDICATOR CAN SAY

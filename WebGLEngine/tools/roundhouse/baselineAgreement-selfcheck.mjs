@@ -69,8 +69,33 @@ console.log("\n3. THE RECEIPT IS STILL THERE");
 {
     let zips = [];
     try { zips = fs.readdirSync(DELETED).filter((f) => /\.zip$/.test(f)); } catch {}
+    // *** v3920 -- THE RED IS REAL AND ITS CAUSE IS NOT WHAT IT LOOKS LIKE, SO THE MESSAGE NOW SAYS WHICH. ***
+    //
+    // This gate asserts a .zip exists. The repo's .gitignore excludes *.zip and its own comment names these
+    // files specifically: "The tools/ship/deleted/deleted_*.zip tombstones stay out." *** SO THE RECEIPT CANNOT
+    // TRAVEL, BY DESIGN, AND THIS CHECK IS UNSATISFIABLE IN ANY CLONE OR ANY UNZIPPED DELIVERY. *** It can only
+    // pass on the machine where the archive was made, and only until that machine is reimaged.
+    //
+    // THE CHECK IS NOT WEAKENED, because the two causes are not the same thing and neither is harmless: an empty
+    // directory in a clone is the ship policy showing through, and an empty directory in the authoring tree is a
+    // lost receipt -- the 43-version failure this gate exists for. A gate that reported one number for both would
+    // send the reader to the wrong place. The retired files predate this repo carrying the full engine, so their
+    // hashes are not recoverable from history and NO MANIFEST IS SYNTHESISED HERE: inventing a receipt for a
+    // deletion nobody can verify is worse than reporting that the receipt is missing.
+    let ignored = false;
+    try {
+        const gi = fs.readFileSync(path.join(HERE, "..", "..", "..", ".gitignore"), "utf8");
+        ignored = /^\*\.zip\s*$/m.test(gi);
+    } catch { /* no .gitignore reachable: leave the plain reading */ }
+    const dirExists = fs.existsSync(DELETED);
     ok("!! the deletion archive exists and holds the retired files", zips.length > 0,
-        zips.length + " archives in tools/ship/deleted/ -- ARCHIVED, NOT rm. A deletion without an archive " +
+        zips.length + " archives in tools/ship/deleted/" +
+        (zips.length ? "" : " -- directory " + (dirExists ? "EXISTS BUT IS EMPTY" : "IS ABSENT") +
+            (ignored ? ", and .gitignore excludes *.zip, so IN A CLONE OR AN UNZIPPED DELIVERY THIS CANNOT PASS " +
+                       "and the red says nothing about the authoring tree. CHECK THE AUTHORING TREE: if it is " +
+                       "empty THERE, the receipt is genuinely lost and that is the 43-version failure."
+                     : ". Nothing excludes zips here, so this is the authoring tree and the receipt is GONE.")) +
+        " -- ARCHIVED, NOT rm. A deletion without an archive " +
         "once cost 43 versions of not noticing, two zip diffs and a 203-archive sweep across two drives.");
     ok("...and this gate asserts the receipt rather than trusting it", true,
         "a later cleanup that binned the archive would leave the retirement unverifiable, which is the same " +

@@ -1,6 +1,6 @@
 // tools/roundhouse/errorPairAudit-selfcheck.mjs
 //
-// Run: node tools/roundhouse/errorPairAudit-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/errorPairAudit-selfcheck.mjs   (~7s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3094 -- WHEN A DEVICE REPORTS TWO ERROR FRACTIONS, AUDIT BOTH BEFORE TRUSTING EITHER.

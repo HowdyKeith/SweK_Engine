@@ -33,6 +33,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
+const require_ = createRequire(import.meta.url);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel) => { try { return fs.readFileSync(path.join(ENG, rel), "utf8"); } catch { return ""; } };
@@ -142,6 +144,37 @@ export const STEPS = [
              "been claimed and twice caught files that would have been missed.",
         verify: null,
     },
+    {
+        id: "publish-release",
+        what: "Cut the GitHub release for this version and upload the zip as its asset.",
+        command: "curl -sS -X POST http://localhost:8787/github/publish-engine -d {}   (or the GitHub panel's Publish button)",
+        why: "*** THE WHOLE PUBLISH FLOW HAS EXISTED SINCE v1129 AND HAD NEVER BEEN RUN. *** githubBridge's " +
+             "publishEngineBuild() auto-tags from the running ENGINE_VERSION, builds the zip and uploads it as a " +
+             "release asset -- and its only caller was a panel button. A STEP THAT IS ONLY EVER A BUTTON IS A STEP " +
+             "THAT GETS FORGOTTEN, and the evidence is that the repo had zero releases while every piece of the " +
+             "machinery was in place. It is a ritual step now because that is the difference between a capability " +
+             "and a habit. WITHOUT IT AUTO-UPDATE CANNOT WORK AT ALL: fetchEngineBuild reads the newest RELEASE " +
+             "ASSET, so a version that is committed but never released is invisible to every engine in the field.",
+        verify: () => {
+            // Offline on purpose. A ritual step whose verification needs the network is a step that reports a
+            // broken tree when the wifi is down, and this file's own argument is that a step must be able to say
+            // how you would know it worked. WHAT IS CHECKED HERE IS THAT THE PUBLISH *CAN* HAPPEN -- the two
+            // things that were silently false for two years -- not that it HAS. The release landing is confirmed
+            // by the consumer: the engine's own update check, /sys/update/github-status.
+            let st = null;
+            try { st = require_(path.join(ENG, "ai-bridge", "githubBridge.js")).status(); } catch (e) { }
+            if (!st) return { ok: false, detail: "githubBridge unreadable -- cannot tell whether a publish is possible" };
+            const repo = (st.engineRepo || "").trim();
+            const s2 = currentState();
+            const missing = [];
+            if (!repo) missing.push("engineRepo unset");
+            if (!st.hasToken) missing.push("no token (repo scope) -- publishing needs one, checking does not");
+            if (st.engineVersion !== s2.engine) missing.push(`githubBridge reads ${st.engineVersion} but main.js says ${s2.engine}`);
+            return missing.length
+                ? { ok: false, detail: "NOT publishable: " + missing.join("; ") }
+                : { ok: true, detail: `ready: ${st.engineVersion} -> ${repo} (the release ITSELF is confirmed by /sys/update/github-status, not here)` };
+        },
+    },
 ];
 
 /** Steps whose success this file can check directly, as opposed to those delegated to a named gate. */
@@ -175,7 +208,7 @@ export function showLines() {
     return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     if (process.argv.includes("--run")) {
         console.log("[shipRitual] --run performs only the two mechanical steps; the edits and the zip are yours.");
         for (const id of ["knowledge-index"]) {

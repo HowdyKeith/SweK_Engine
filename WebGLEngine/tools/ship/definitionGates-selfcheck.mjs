@@ -83,6 +83,28 @@ const cov = definitionCoverage(ENG);
     // gate on day one and a switched-off gate on day two, so the count is FROZEN and the assertion is that it
     // must not GROW. Existing debt stays visible and shrinkable; a new untested export cannot arrive quietly.
     const BASELINE = 37;   // v3323: iscoKm and photonSphereKm closed -- the number RATCHETS DOWN, never up
+    // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
+    // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
+    // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
+    // set against: 37 of 608 exported symbols.
+    //
+    //     at v3323   37 of  608  =  6.09%
+    //     at v3903  121 of 1508  =  8.02%          corpus 2.48x, unmentioned 3.27x
+    //
+    // CONSTANT-RATE EXPECTATION IS ~92, SO ~29 ARE A REAL REGRESSION AND THE REST IS GROWTH. That matters
+    // because the two have different fixes: growth is closed by gating as modules land, regression is closed by
+    // going back. Quoting only the count hides the first; quoting only the rate excuses the second. The tree's
+    // own rule from the instruments battery -- QUOTE THE RATE, NEVER THE COUNT, AND DERIVE BOTH TERMS -- is
+    // half of what this needs; the count is still the thing that must fall.
+    //
+    // *** THE PIN STAYS AT 37 BECAUSE RAISING IT IS THE ONE MOVE THAT CANNOT BE UNDONE. *** A baseline lifted to
+    // meet the tree is a gate edited to agree with whatever shipped, and this file's siblings have that written
+    // on them in three places. It stays red, and it stays red honestly, until the count comes back to it.
+    // v3903 closed FIVE by giving them real keys rather than a mention: ct.js's ramLakKernel (h[0]=1/4,
+    // -1/(pi^2 n^2) on odds, DC response halving as 1/len), filterSino, backProject (EXACTLY pi for an all-ones
+    // sinogram at every angle count), and sirt.mjs's stepForMatched / stepForUnmatched (each at exactly half its
+    // own Landweber ceiling, and the unmatched step 3.86x OUTSIDE the matched one's -- the divergence the v3846
+    // split exists to prevent, checked by nothing until now). 126 -> 121.
     ok("!! no NEW exported symbol has appeared without its gate naming it",
         cov.ungated.length <= BASELINE,
         cov.ungated.length > BASELINE
@@ -92,6 +114,14 @@ const cov = definitionCoverage(ENG);
               "three gaps there were load-bearing and were closed. The remaining debt is exported FUNCTIONS, and " +
               "planting errors in four of them showed all four passing silently, so it is real debt rather than " +
               "a scan artefact");
+    // REPORTED, NOT ASSERTED -- a census is not debt, and this one says which KIND of debt the count above is.
+    const rateNow = cov.ungated.length / cov.total, rateThen = 37 / 608;
+    console.log("  ----  the count against its own denominator   " +
+        `${cov.ungated.length} of ${cov.total} = ${(100 * rateNow).toFixed(2)}% now, against 37 of 608 = ` +
+        `${(100 * rateThen).toFixed(2)}% when the pin was set. Corpus ${(cov.total / 608).toFixed(2)}x, ` +
+        `unmentioned ${(cov.ungated.length / 37).toFixed(2)}x -- so ~${Math.round(rateThen * cov.total)} is GROWTH ` +
+        `and ~${cov.ungated.length - Math.round(rateThen * cov.total)} is REGRESSION. Different fixes: growth is ` +
+        "closed by gating as modules land, regression by going back for the ones that slipped");
 }
 
 // ---- 2. MENTIONING IS NOT TESTING, AND THIS GATE SAYS SO ---------------------------------------------------------

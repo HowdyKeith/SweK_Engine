@@ -1,6 +1,6 @@
 // WebGLEngine/physics/statmech/paramagnet-selfcheck.mjs -- v3818
 //
-// Run: node physics/statmech/paramagnet-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/statmech/paramagnet-selfcheck.mjs   (~0.05s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // LOCALISED SPINS -- the non-interacting neighbour of ising.js -- GRADED ON THEIR MAGNETISATION AND THEIR HEAT.
@@ -20,6 +20,7 @@ import path from "node:path";
 import {
     brillouin, langevinFunction, curieConstant, susceptibilityCurie, schottkyC, twoLevelEntropy,
     schottkyPeakNewton, schottkyPeakMaximise, schottkyResidual,
+    twoLevelEnergy,
 } from "./paramagnet.mjs";
 import { sackurTetrode } from "../thermal/sackurTetrode.mjs";   // the classical gas that VIOLATES the third law
 
@@ -97,6 +98,26 @@ say("");
 say("NOT CLAIMED: interactions or ordering. These spins are independent -- no exchange, no phase transition (that is");
 say("ising.js), no crystal field beyond a single gap. It grades the Brillouin magnetisation, the Curie law, and the");
 say("Schottky heat capacity of a two-level system. k_B = 1. NO DEVICE BIND, no lab-results change.");
+
+{
+    // v3904 -- THE TWO-LEVEL OCCUPATION HAS TWO EXACT PROPERTIES AND NEITHER WAS GRADED.
+    // (1) At zero field (or infinite temperature) the two levels are equally likely, so the mean energy in
+    // units of the splitting is EXACTLY 1/2. Not approximately: 1/(1 + e^0) = 1/2 is representable, so this
+    // is graded bit-exactly and a tolerance would be hiding something.
+    ok("twoLevelEnergy(0) is EXACTLY one half", twoLevelEnergy(0) === 0.5,
+       "1/(1 + e^0) = 0.5, asserted bit-exactly because it is representable");
+    // (2) The Fermi-function symmetry f(x) + f(-x) = 1, which says the two levels' occupations are
+    // complementary. *** THIS IS THE PROPERTY THAT CATCHES A SIGN ERROR IN THE EXPONENT, and a sign error in
+    // the exponent is invisible to any single-point check because it maps a plausible number onto another
+    // plausible number -- it swaps which level is the ground state and nothing else looks wrong.
+    const xs = [1e-6, 0.3, 1.0, 2.5, 12.0, 40.0];
+    const worst = Math.max(...xs.map((x) => Math.abs(twoLevelEnergy(x) + twoLevelEnergy(-x) - 1)));
+    ok("f(x) + f(-x) = 1 across six decades of argument", worst < 1e-15,
+       "worst departure " + worst.toExponential(3) + " over x = " + xs.join(", "));
+    ok("...and the function actually MOVES over that range, so the symmetry is not a constant in disguise",
+       twoLevelEnergy(40) < 1e-15 && twoLevelEnergy(-40) > 1 - 1e-15,
+       "f(40) = " + twoLevelEnergy(40).toExponential(3) + ", f(-40) = " + twoLevelEnergy(-40).toPrecision(17));
+}
 
 console.log("paramagnet-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

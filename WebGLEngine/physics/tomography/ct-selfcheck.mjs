@@ -13,6 +13,7 @@
 // bounds, and that bound is checked too.
 import { analyticRadon, analyticRadonEllipse } from "./ct.js";
 import { phantomField, radon, filteredBackProjection, scoreRecon, angleSet, straightRayValidPhase } from "./ct.js";
+import { ramLakKernel, filterSino, backProject } from "./ct.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -117,6 +118,56 @@ const recon = (nA, filter = true) => { const ang = angleSet(nA); return scoreRec
         for (let i = 0; i < ang.length; i++) for (let d = 0; d < nDet; d++) { pk = Math.max(pk, ana[i][d]); const e = num[i][d] - unscaled[i][d]; s3 += e * e; c3++; }
         return Math.sqrt(s3 / c3) > 0.1 * pk;
     })(), "which is why the units note is in the source rather than in someone's head");
+}
+
+// ---- v3903: THREE DEFINITIONS THIS GATE IMPORTED THROUGH filteredBackProjection AND NEVER NAMED ---------------
+// definitionGates-selfcheck found ramLakKernel, filterSino and backProject unmentioned by this file. They were
+// reachable -- filteredBackProjection calls all three -- but reachable is not named, and the whole reason that
+// gate exists is that horizon(M) was reachable through six other functions when a 1% error in it passed five
+// gates. A DEFECT IN A COMPOSITE IS ATTRIBUTED TO THE COMPOSITE; these give the three parts their own keys.
+{
+    // RAM-LAK IS A CLOSED FORM, NOT A DESIGN CHOICE: h[0] = 1/4, h[odd n] = -1/(pi^2 n^2), h[even n] = 0.
+    const h = ramLakKernel(32);
+    ok("ramLakKernel is the exact spatial ramp: 1/4 at the centre, -1/(pi^2 n^2) on odds, 0 on evens",
+        h.length === 65 && h[32] === 0.25 &&
+        Math.abs(h[33] - (-1 / (Math.PI * Math.PI))) < 1e-15 &&
+        Math.abs(h[35] - (-1 / (9 * Math.PI * Math.PI))) < 1e-15 && h[34] === 0,
+        "h[0]=" + h[32] + ", h[1]=" + h[33].toPrecision(10) + ", h[2]=" + h[34] + ", h[3]=" + h[35].toPrecision(10));
+
+    // *** AND THE KERNEL SUMS TO ZERO IN THE LIMIT, WHICH IS THE WHOLE POINT OF A RAMP. *** sum h = 1/4 - 2/pi^2 *
+    // sum_{odd} 1/n^2 = 1/4 - 2/pi^2 * pi^2/8 = 0 exactly. A filter with nonzero DC response would let the
+    // back-projection keep the blur it exists to remove. Finite truncation leaves O(1/len), and it HALVES as len
+    // DOUBLES -- measured, not asserted from the algebra.
+    const sums = [16, 32, 64, 128, 256].map((L) => { let s2 = 0; for (const v of ramLakKernel(L)) s2 += v; return s2; });
+    const halves = sums.slice(1).every((v, i) => Math.abs(v / sums[i] - 0.5) < 0.01);
+    ok("...and its DC response vanishes as 1/len -- the ramp kills the constant it is there to kill",
+        sums.every((v) => v > 0) && halves && sums[sums.length - 1] < 5e-4,
+        sums.map((v) => v.toExponential(3)).join(" -> ") + " across len 16..256, each half the last");
+
+    // filterSino IS the convolution, so a CONSTANT projection must come back near zero everywhere except the
+    // truncation edge -- the same DC fact, now measured through the function that applies it.
+    const nDet = 64, flat = [Float64Array.from({ length: nDet }, () => 1)];
+    const filtered = filterSino(flat, nDet)[0];
+    const mid = filtered.slice(nDet / 4, 3 * nDet / 4);
+    ok("filterSino applies that kernel, so a FLAT projection filters to ~0 away from the edges",
+        Math.max(...mid.map(Math.abs)) < 0.05,
+        "worst |filtered| in the middle half = " + Math.max(...mid.map(Math.abs)).toExponential(3) +
+        " for an input that is 1 everywhere -- the edges are truncation, not filter error");
+
+    // *** backProject's NORMALISATION IS pi/nAngles, AND THE CONSEQUENCE IS ANGLE-COUNT INDEPENDENT. *** An
+    // all-ones sinogram deposits pi at every pixel every ray reaches, whether that is 4 rays or 32. A wrong
+    // constant here rescales every reconstruction while leaving every SHAPE check passing.
+    const N = 16;
+    const maxima = [4, 8, 16, 32].map((K) => {
+        const angles = Array.from({ length: K }, (_, i) => (i * Math.PI) / K);
+        const img = backProject(angles.map(() => Float64Array.from({ length: N }, () => 1)), N, angles, N);
+        return Math.max(...img);
+    });
+    ok("!! backProject deposits EXACTLY pi for an all-ones sinogram, at every angle count",
+        maxima.every((m) => m === Math.PI),
+        "K = 4, 8, 16, 32 all give " + maxima[0].toPrecision(12) + " and Math.PI is " + Math.PI.toPrecision(12) +
+        " -- BIT-EQUAL, not within a tolerance. The pi/nAngles normalisation is what makes the answer independent " +
+        "of how finely the scan was sampled, and nothing else in this gate would notice if that constant moved");
 }
 
 console.log(fails ? "\nct-selfcheck: " + fails + " FAILED" : "\nct-selfcheck: all checks pass");

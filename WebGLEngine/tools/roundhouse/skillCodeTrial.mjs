@@ -33,8 +33,8 @@
 
 import { proofStrength, deriveState, evidenceIsSound, MIN_IMPROVEMENT, Z_MIN, requiredN } from "./skillbook.mjs";
 import { runSkillAsync } from "./skillCode.mjs";
-import { pathToFileURL } from "node:url";
 
+import { pathToFileURL } from "node:url";
 /** The complete set of verdicts this file can return. MIRROR is the one skillbook has no equivalent of. */
 export const TRIAL_STATES = Object.freeze(["MIRROR", "PROVEN", "UNDERPOWERED", "RETIRED", "PROPOSED"]);
 
@@ -121,7 +121,7 @@ export async function codeTrial({ book, skill, questions, attempt, match }) {
 }
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const { LAB_SKILLS, labBook } = await import("./labSkills.mjs");
     const book = labBook();
     console.log("[skillCodeTrial] certifying a code skill -- and refusing to, when the producer cannot vary\n");

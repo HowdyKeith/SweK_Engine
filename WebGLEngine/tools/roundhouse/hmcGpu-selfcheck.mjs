@@ -1,6 +1,6 @@
 // tools/roundhouse/hmcGpu-selfcheck.mjs — v3282
 //
-// Run: node tools/roundhouse/hmcGpu-selfcheck.mjs   (~2s — MEASURED)
+// Run: node tools/roundhouse/hmcGpu-selfcheck.mjs   (~0.1s — MEASURED)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // What can be gated WITHOUT a GPU, gated: (1) the f64 flat mirror is BIT-IDENTICAL to the shipping leapfrog in

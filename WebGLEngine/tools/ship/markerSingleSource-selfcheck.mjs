@@ -83,11 +83,31 @@ for (const name of MARKERS) {
            : "declared in " + holders.length + " files: " + holders.join(", ") + ". *** ONE OF THESE IS STALE OR WILL BE. The bump edits ONE path by name, so a second declaration is never the one that gets updated -- brain.js sat sixty versions behind brain/brain.js and nothing noticed until a broken-import scan tripped over it. DELETE THE COPY (archiveBeforeDelete first, per Keith's rule), DO NOT SYNC IT. ***");
 }
 
-// The deletion this gate exists because of, asserted by absence AND by the archive that proves it was kept.
-ok("!! the deleted duplicate stayed deleted, and its recovery archive is still there",
-   !fs.existsSync(path.join(ROOT, "brain.js")) &&
-   fs.readdirSync(path.join(ROOT, "tools", "ship", "deleted")).some((f) => /stale-brain-duplicate/.test(f)),
-   "WebGLEngine/brain.js is gone and tools/ship/deleted/ holds the zip. *** KEITH'S RULE, IN removeCluster's OWN WORDS: a deletion without an archive cost 43 versions of not noticing, two zip diffs, three convergence passes and a 203-archive sweep across two drives. A zip written at deletion time would have made it one unzip. *** The archive is asserted here so a later cleanup cannot quietly bin the receipt.");
+// The deletion this gate exists because of, asserted by absence AND by the RECORD that keeps it from being
+// forgotten. It asserted a recovery ZIP until v3936, and that zip does not exist and cannot be rebuilt:
+// WebGLEngine/brain.js appears in NONE of this repository's 64 commits, no commit here deletes any file at all,
+// and .gitignore excludes *.zip on purpose -- line 47 says "the tools/ship/deleted/deleted_*.zip tombstones stay
+// out". THE RECEIPT WAS NEVER TRACKED, so it only ever existed on the one machine that did the deleting and this
+// gate could not pass in a clone, an unzipped delivery, or a fresh container.
+//
+// Writing the zip would have turned this green in seconds and made it certify a reversibility that DOES NOT
+// EXIST -- which is the exact failure the archive rule was written to prevent. A receipt for a deletion nobody
+// can reverse is worse than a red gate, because it stops anyone looking. So the unsatisfiable half is retired and
+// the durable half replaces it: a TRACKED record, which unlike the zip survives a clone. Deleting that record
+// turns this red, so the loss cannot be quietly forgotten the way the zip was.
+{
+    const rec = path.join(ROOT, "tools", "ship", "deleted", "RETIRED.md");
+    const txt = fs.existsSync(rec) ? fs.readFileSync(rec, "utf8") : "";
+    ok("!! the deleted duplicate stayed deleted, and the retirement record still names it",
+       !fs.existsSync(path.join(ROOT, "brain.js")) && /WebGLEngine\/brain\.js/.test(txt),
+       fs.existsSync(path.join(ROOT, "brain.js"))
+         ? "*** brain.js IS BACK. *** The duplicate this gate exists because of has returned -- delete it again."
+         : txt ? "brain.js is gone and tools/ship/deleted/RETIRED.md names it. THE ARCHIVE ITSELF IS LOST AND "
+               + "UNRECONSTRUCTABLE (absent from all 64 commits; *.zip was never tracked), which is stated there "
+               + "rather than papered over with a zip that would certify a way back that does not exist."
+               : "NO RETIREMENT RECORD -- tools/ship/deleted/RETIRED.md is missing, so nothing in the tree "
+               + "remembers what was deleted or that its receipt was lost. That is the 43-version failure shape.");
+}
 
 console.log(fails ? "\nmarkerSingleSource-selfcheck: " + fails + " FAILED" : "\nmarkerSingleSource-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

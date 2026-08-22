@@ -93,5 +93,40 @@ const ok = (name, cond, detail) => {
        "a report that will not say WHICH world it judged is the substitution problem wearing a rosette");
 }
 
+{
+    // =============================================================================================================
+    // v3906 -- gradedCoverage's GRADE door PROPOSED THIS MODULE FOR AN ANSWER KEY, AND THE ANSWER IS NO. This is a
+    // MEASURED REFUSAL in the same sense as beam's and compose's plant refusals: the work was attempted, the
+    // reason it cannot be done was found, and the reason is written here so the door's proposal does not get
+    // re-attempted every time somebody reads the list.
+    //
+    // blobSpace and blobVitals -- the other two modules the same door proposed on the same run -- BOTH HAD KEYS
+    // SITTING IN ALGEBRA. blobSpace's field is the Wyvill polynomial, so its iso-surface is r*sqrt(1 - a^(-1/3))
+    // and its normal is exactly radial. blobVitals' closestPair is defined by an O(n^2) sweep and fieldPeak's true
+    // value for one blob is exactly its amplitude. Both were keyed at v3906 and both keys FOUND SOMETHING.
+    //
+    // *** THIS MODULE HAS NO SUCH QUANTITY, BECAUSE ITS CONTENT IS A CONVENTION AND NOT A MEASUREMENT. *** CONTRACT
+    // is thirteen method NAMES. There is no closed form for "the interface has thirteen calls" -- it has thirteen
+    // because thirteen were chosen. An "answer key" for that would be a second list of thirteen names, compared
+    // against the first, and THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED: adding a fourteenth call would
+    // break a check that exists only to restate what the module already says.
+    //
+    // THE ONE GENUINELY EXTERNAL NUMBER HERE IS ALREADY KEYED, and it is worth naming as the boundary of the
+    // refusal: FLOATS_PER_BODY is 7 because a rigid pose in 3D is 3 translations plus a 4-component quaternion.
+    // THAT is forced by SE(3) rather than chosen, which is exactly why guessing 3 was a bug and not a preference,
+    // and the check above already grades it against the decomposition rather than against the literal.
+    // =============================================================================================================
+    const report = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
+    report("*** GRADE DOOR: REFUSED, WITH THE REASON MEASURED RATHER THAN ASSUMED ***",
+           "a conformance contract is a convention; keying it means writing it twice. The two sibling modules the " +
+           "same door proposed WERE keyed at v3906 and both keys found something -- so this refusal is a finding " +
+           "about THIS module, not a general objection to the door");
+    report("WHAT WOULD OVERTURN THIS", "if a backend ever had to satisfy a PHYSICAL claim -- energy conserved to a " +
+           "tolerance, a joint holding to a residual, a pose round-tripping through readTransforms -- that would be " +
+           "keyable, and it would belong here. The thirteen calls would still not be");
+    ok("FLOATS_PER_BODY is externally forced, not chosen: 3 translations + 4 quaternion components",
+       FLOATS_PER_BODY === 3 + 4, `${FLOATS_PER_BODY} = 3 + 4, the dimension of a rigid pose with a unit quaternion`);
+}
+
 console.log(fails ? "\nbackendConformance-selfcheck: " + fails + " FAILED" : "\nbackendConformance-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

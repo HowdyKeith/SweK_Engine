@@ -102,6 +102,8 @@ export const druckerDevice = {
     modes: DP_MODES,
     // "angle" is FIRST so the contract compares the plant against the mode that owns the spread.
     plantMode: "deafangle", plantFlips: "shearSpread", plantKind: "mode",
+    plantNull: 1, plantNullWhy:
+        "shearSpread is the ratio of shear strength at two friction angles, so an angle-deaf model gives exactly 1; the honest arm gives 2.12, and shearAt20 and shearAt40 become the SAME number (7.04e-2) under the plant, which is the collapse stated directly",
     name: "mpm-drucker-prager", observables: DP_OBSERVABLES,
     build: buildDrucker, defaults: dpDefaults,
 };

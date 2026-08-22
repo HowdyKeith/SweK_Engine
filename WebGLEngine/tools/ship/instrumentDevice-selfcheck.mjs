@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/instrumentDevice-selfcheck.mjs
 //
-// Run: node tools/ship/instrumentDevice-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/instrumentDevice-selfcheck.mjs   (~0.2s -- MEASURED)
 //
 // v3330 -- EVERY INSTRUMENT THAT NAMES A DEVICE MUST NAME ONE THAT EXISTS.
 //

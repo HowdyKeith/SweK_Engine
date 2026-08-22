@@ -1,6 +1,6 @@
 // WebGLEngine/physics/render/pathStrat-selfcheck.mjs -- v3500
 //
-// Run: node physics/render/pathStrat-selfcheck.mjs   (~40s)
+// Run: node physics/render/pathStrat-selfcheck.mjs   (~1s)
 //
 // *** v3498 ENDED ON THE CENTRE PIXEL: 30x the edge pixel's noise, ALL OF IT PATH VARIANCE, untouched by
 // stratifying the pixel domain. THIS ROUND STRATIFIES THE FIRST BOUNCE'S DIRECTION -- AND THE RESULT IS THE

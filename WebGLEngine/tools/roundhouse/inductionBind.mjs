@@ -43,7 +43,13 @@
 // GRADE, and the three plants below were run against the shipped file and REVERTED.
 
 import { inducedE, coulombE, divergence, K_COULOMB } from "../../physics/blobInduction.js";
+
 import { pathToFileURL } from "node:url";
+// v3902 -- ONE declaration of the mode list; it lived in the defaults whitelist AND in the device object.
+// The FOURTH device this round carrying that duplicate (splat, multigridgpu, geometry were the others), and on
+// splatBind the second copy silently coerced a new plant mode to the primary so both arms read bit-identical
+// numbers. THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED.
+export const INDUCTION_MODES = ["faraday", "gauss", "separation", "radialdot"];
 
 export const INDUCTION_OBSERVABLES = [
     "circulation", "circulationExact", "circulationErr", "circulationWorstErr", "loops",
@@ -64,7 +70,7 @@ export function inductionDefaults(hyp) {
     c.nTheta = Math.min(800, Math.max(40, num(c.nTheta, DEF.nTheta) | 0));
     c.nPhi = Math.min(1600, Math.max(80, num(c.nPhi, DEF.nPhi) | 0));
     h.config = c;
-    if (!["faraday", "gauss", "separation"].includes(h.mode)) h.mode = "faraday";
+    if (!INDUCTION_MODES.includes(h.mode)) h.mode = "faraday";   // v3902 -- ONE declaration, read here and by the device
     if (!h.claim || !h.claim.observable) {
         h.claim = h.mode === "faraday" ? { observable: "circulationWorstErr", max: 1e-10 }
             : h.mode === "gauss" ? { observable: "fluxSpread", max: 1e-9 }
@@ -78,13 +84,18 @@ export function inductionDefaults(hyp) {
  * the same quadrature rather than a second spelling of it. Midpoint rule on a closed smooth curve, which is
  * SPECTRALLY accurate -- that is why the Faraday bar can be 1e-10 while the surface integral's cannot.
  */
-export function circulationAround(F, cx, cy, a, n) {
+export function circulationAround(F, cx, cy, a, n, radial = false) {
     let s = 0;
     const dt = (2 * Math.PI) / n;
     for (let i = 0; i < n; i++) {
         const t = dt * (i + 0.5), ct = Math.cos(t), st = Math.sin(t);
         const [ex, ey] = F(cx + a * ct, cy + a * st);
-        s += (-ex * st + ey * ct) * a * dt;
+        // *** v3902 -- `radial` IS THE PLANT: DOT WITH rhat INSTEAD OF phihat. *** A line integral is E.dl and
+        // dl points ALONG the curve; rhat is the one unit vector at every point that is perpendicular to it.
+        // The slip is a single sign-and-swap away from the correct expression and produces a number, not an
+        // error. THE WHOLE EXPRESSION BRANCHES rather than sharing a factored sub-expression, so the default
+        // arm is bit-identical.
+        s += radial ? (ex * ct + ey * st) * a * dt : (-ex * st + ey * ct) * a * dt;
     }
     return s;
 }
@@ -115,9 +126,10 @@ export async function buildInduction(hyp, base = {}) {
     const Eind3 = (x, y) => { const [a, b] = inducedE(x, y, c.dBdt); return [a, b, 0]; };
     const Ecoul = (x, y, z) => coulombE(x, y, z, c.charge);
 
-    if (h.mode === "faraday") {
+    if (h.mode === "faraday" || h.mode === "radialdot") {
+        const radial = h.mode === "radialdot";
         const rows = LOOPS.map(([cx, cy, a]) => {
-            const got = circulationAround(Eind2, cx, cy, a, c.nLoop);
+            const got = circulationAround(Eind2, cx, cy, a, c.nLoop, radial);
             const exact = -c.dBdt * Math.PI * a * a;         // -dPhi/dt: THE AREA, and nothing about where
             return { cx, cy, a, got, exact, err: Math.abs(got - exact) / Math.abs(exact) };
         });
@@ -169,14 +181,22 @@ export async function buildInduction(hyp, base = {}) {
 }
 
 export const inductionDevice = {
-    modes: ["faraday", "gauss", "separation"],
+    // *** THE INDUCED FIELD IS PURELY AZIMUTHAL, SO DOTTING WITH rhat DOES NOT DEGRADE THE ANSWER -- IT
+    // ANNIHILATES IT. *** MEASURED: circulation -1.162389e+1 -> -7.871036e-19, which is zero to the width of
+    // the quadrature, against an exact -11.623892818 that does not move. circulationWorstErr therefore goes
+    // 1.677432e-13 -> 1.0000000000000044: the relative error SATURATING AT UNITY, which is what "the answer is
+    // gone" looks like as a ratio rather than "the answer is wrong". The 2x2 table in the header is the same
+    // fact from the other side: each field is annihilated by the OTHER's integral, and this plant simply
+    // applies the wrong one of the two to the induced field.
+    plantMode: "radialdot", plantFlips: "circulationWorstErr", plantKind: "reader",
+    modes: INDUCTION_MODES,
     name: "induction-integral-forms",
     observables: INDUCTION_OBSERVABLES,
     build: buildInduction,
     defaults: inductionDefaults,
 };
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const f = await buildInduction({ mode: "faraday" });
     const g = await buildInduction({ mode: "gauss" });
     const s = await buildInduction({ mode: "separation" });

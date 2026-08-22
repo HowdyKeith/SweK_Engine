@@ -79,16 +79,35 @@ export function lensDefaults(hyp) {
     c.sepU = Math.min(2, Math.max(1e-4, num(c.sepU, DEF.sepU)));
     c.mapN = Math.min(64, Math.max(5, num(c.mapN, DEF.mapN) | 0));
     c.mapSpan = Math.min(4, Math.max(0.05, num(c.mapSpan, DEF.mapSpan)));
-    if (!["shadow", "pixels", "bcrit", "deflect", "deflectSweep", "shot", "aim", "images", "pointmag", "finite", "structure", "map"].includes(h.mode)) h.mode = "shadow";
+    if (!LENS_MODES.includes(h.mode)) h.mode = "shadow";   // v3902 -- ONE declaration, read here and by the device
     h.config = c;
     if (!h.claim || !h.claim.observable) h.claim = { observable: "shadowErrFrac", max: 1e-9 };
     return h;
 }
 
 /** Exact angular radius of the shadow for a STATIC observer at r_obs (radians). */
-export function shadowAngle(M, rObs) {
+// *** v3902 -- ONE declaration of the mode list, and this is the SIXTH DEVICE THIS ROUND FOUND CARRYING TWO. ***
+// splat, multigridgpu, geometry, induction, probe and lens all kept a whitelist inside defaults() beside the
+// device object's own `modes`. Two of them (splat, probe) silently coerced a NEW PLANT MODE to the primary, so
+// both arms read bit-identical numbers and the plant appeared to fire while changing nothing. SIX INSTANCES IS
+// THE SHAPE, NOT A COINCIDENCE, and the failure is the quiet kind: an unknown mode does not raise, it answers
+// the DEFAULT MODE'S NUMBERS UNDER THE REQUESTED MODE'S LABEL.
+export const LENS_MODES = ["shadow", "pixels", "bcrit", "deflect", "deflectSweep", "shot", "aim", "images",
+    "pointmag", "finite", "structure", "map", "flatshadow"];
+
+/**
+ * *** v3902 -- `flat` IS THE PLANT: THE ASYMPTOTIC SHADOW USED AT FINITE RADIUS. ***
+ * The exact angular radius carries the metric factor (1 - 2M/r_obs). This file's own header states the limit it
+ * reduces to -- "As r_obs -> infinity the disc shrinks to b_crit/r_obs" -- AND THAT LIMIT IS THE PLANT: dropping
+ * the factor is using the far-field answer where the observer actually is. It is tempting precisely because it
+ * is CORRECT SOMEWHERE, which is the hardest kind of wrong to see: the shadow still shrinks with distance, still
+ * scales with M, still fills the sky close in. Only the size is wrong, and only at finite r.
+ */
+export function shadowAngle(M, rObs, flat = false) {
     const bc = criticalImpact(M);
-    const s2 = (bc * bc / (rObs * rObs)) * (1 - 2 * M / rObs);
+    // THE WHOLE EXPRESSION BRANCHES rather than sharing a factored sub-expression -- the default arm is
+    // bit-identical, which is the discipline a reassociation cost this tree once already (v3845, flip3d).
+    const s2 = flat ? (bc * bc / (rObs * rObs)) : (bc * bc / (rObs * rObs)) * (1 - 2 * M / rObs);
     if (s2 >= 1) return Math.PI / 2 + Math.acos(Math.min(1, 2 - Math.sqrt(s2)));   // inside 3M: more than half the sky
     return Math.asin(Math.sqrt(s2));
 }
@@ -227,8 +246,10 @@ export function buildLens(hyp, base = {}) {
     const h = lensDefaults({ ...hyp, config: { ...(base || {}), ...(hyp && hyp.config) } });
     const c = h.config, M = c.M;
 
-    if (h.mode === "shadow") {
-        const exact = shadowAngle(M, c.rObs);
+    if (h.mode === "shadow" || h.mode === "flatshadow") {
+        // The RAY MEASUREMENT is untouched in both arms -- `shadowAngleRad` is bit-identical -- so only the
+        // closed form the rays are graded against moves. That is what makes this a `method` plant.
+        const exact = shadowAngle(M, c.rObs, h.mode === "flatshadow");
         const rays = measureShadowByRays(M, c.rObs);
         return {
             rObs: c.rObs,
@@ -485,7 +506,11 @@ export const lensDevice = {
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
     // DISTINCT answer. *** A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE. ***
-    modes: ["shadow", "pixels", "images", "pointmag", "finite", "map", "structure", "bcrit", "deflect", "deflectSweep", "shot"],
+    modes: LENS_MODES,
+    // `shadowErrFrac` -- the ray-traced shadow edge against its closed form. `shadowAngleRad` is bit-identical
+    // (the rays never learn their key changed) and `shadowFillsSky` is a boolean, which the census reports as
+    // DECLARED BUT DEAD.
+    plantMode: "flatshadow", plantFlips: "shadowErrFrac", plantKind: "method",
     name: "schwarzschild-lens",
     observables: LENS_OBSERVABLES,
     build: buildLens,

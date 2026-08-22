@@ -58,9 +58,9 @@
 // a physics judgement and it is KEITH'S.
 "use strict";
 import { createSphWorld } from "./sph.js";
-import { pathToFileURL } from "node:url";
 import { LATTICE, packedDensity } from "./materialKnobs.mjs";
 
+import { pathToFileURL } from "node:url";
 export const G = 9.81;
 /** A lid high enough that the first contact is a MEASUREMENT rather than a wall. See lidBudget(). */
 export const TALL_LID = 6.0;
@@ -271,4 +271,4 @@ export function reportLines({ live = true } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

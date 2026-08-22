@@ -1,6 +1,6 @@
 // tools/roundhouse/gyroscope-selfcheck.mjs
 //
-// Run: node tools/roundhouse/gyroscope-selfcheck.mjs   (~15s)
+// Run: node tools/roundhouse/gyroscope-selfcheck.mjs   (~0.2s)
 //
 // v3197 -- THE GYROSCOPE IS GRADED, AND ITS KEY IS AN ORDER RATHER THAN A VALUE.
 //

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "kind": "swek-catalog-snapshot",
   "producedBy": "cli/catalogSnapshot",
-  "producedAt": "2026-08-01T18:44:30.824Z",
+  "producedAt": "2026-08-22T00:40:48.888Z",
   "inputs": {
-    "catalog": "/home/claude/e3/SweK_Engine_v3285/WebGLEngine/ai-bridge/install_catalog.json"
+    "catalog": "/home/user/SweK_Engine/WebGLEngine/ai-bridge/install_catalog.json"
   },
   "observations": [
     {
@@ -702,6 +702,27 @@
     },
     {
       "id": "jellyfin",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "turbo-fieldfare",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "ntfy-server",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "ardy",
       "name": null,
       "kind": null,
       "hasInstall": false,

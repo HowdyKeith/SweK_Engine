@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/escTolKnob-selfcheck.mjs -- v3514
 //
-// Run: node tools/roundhouse/escTolKnob-selfcheck.mjs   (~2 min)
+// Run: node tools/roundhouse/escTolKnob-selfcheck.mjs   (~8 s)
 //
 // *** THE FIRST PROMOTION SINCE corroborationReach STARTED COUNTING, AND IT CAME OUT OF A SUSPICION THAT WAS
 // WRONG. *** v3512 flagged blackhole's registered nuisance knob as a SUSPECT pass -- escapeV bit-identical

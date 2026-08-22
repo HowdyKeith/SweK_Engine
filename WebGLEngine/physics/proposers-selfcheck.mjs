@@ -1,6 +1,6 @@
 // WebGLEngine/physics/proposers-selfcheck.mjs — v3284
 //
-// Run: node physics/proposers-selfcheck.mjs   (~20s — MEASURED)
+// Run: node physics/proposers-selfcheck.mjs   (~0.5s — MEASURED)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Two independent things are on trial here.

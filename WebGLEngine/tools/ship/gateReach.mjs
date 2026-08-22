@@ -80,7 +80,7 @@ export function reachLines(r) {
     return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = reach();
     for (const l of reachLines(r)) console.log(l);
     console.log("\n  first twenty with no gate at all:");

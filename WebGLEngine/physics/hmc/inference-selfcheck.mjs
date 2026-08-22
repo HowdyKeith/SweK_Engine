@@ -1,6 +1,6 @@
 // WebGLEngine/physics/hmc/inference-selfcheck.mjs — v3282
 //
-// Run: node physics/hmc/inference-selfcheck.mjs   (~10s — MEASURED, dominated by the 40-repeat calibrations)
+// Run: node physics/hmc/inference-selfcheck.mjs   (~3s — MEASURED, dominated by the 40-repeat calibrations)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Two keys of different KINDS, on purpose. The conjugate posterior is ALGEBRA — HMC's recovered moments are

@@ -1,4 +1,3 @@
-import path from "node:path";
 // WebGLEngine/tools/ship/gateSelection.mjs — v3285
 // ---------------------------------------------------------------------------------------------------------------
 // WHICH GATES TO RUN WHEN THERE IS NOT TIME FOR ALL OF THEM — the measurement-budget handshake pointed at the
@@ -37,7 +36,7 @@ import path from "node:path";
 import { affectedGates, buildGraph, importsOf, resolveSpec } from "./affected.mjs";
 import { gateFiles } from "./staleness.mjs";
 import { MEASURED } from "./gateBudget.mjs";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
 import fs from "node:fs";
 
 // The general population is overwhelmingly sub-second: 473 of 556 timed gates in the v3211 run came in under 1s,
@@ -55,10 +54,7 @@ export const ASSUMED_CHEAP_MS = 1000;
 // missed is impossible to read as success.
 //
 // Everything is normalised to engine-relative here, once, at the boundary.
-// v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
-// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
-// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
-const ENG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ENG_ROOT = new URL("../../", import.meta.url).pathname.replace(/\/$/, "");
 const rel = (p) => {
     let x = String(p).replace(/\\/g, "/").replace(/^\.\//, "");
     if (x.startsWith(ENG_ROOT + "/")) x = x.slice(ENG_ROOT.length + 1);

@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------------------------------------------
 "use strict";
 import { pathToFileURL } from "node:url";
+import { reportLines } from "./stabilityMeter.mjs";
 import { KINDS, shmRun, predictedAmplification, verdict, reciprocity, stabilityBoundary,
          EXPLODE_FACTOR, DAMP_FACTOR, MEASURED_V3599 } from "./stabilityMeter.mjs";
 
@@ -92,6 +93,22 @@ section("5. WHAT IS NOT CLAIMED");
     ok("no claim is made about anybody else's code", /NOT a claim about EA's code/.test(MEASURED_V3599.whatThisIsNot));
     ok("and it is pointed at THIS tree's integrators first",
        /centrifuge|SPH column/.test(MEASURED_V3599.whatThisIsNot));
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    const L = reportLines();
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[stabilityMeter]"),
+       L.length + " lines, self-named");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

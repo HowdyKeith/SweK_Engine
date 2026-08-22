@@ -66,7 +66,47 @@ function stage(name, fn) {
 }
 
 // execFileSync THROWS on a non-zero exit, which is exactly what we want and exactly what a pipe would have hidden.
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", timeout: 900000, ...opts });
+//
+// v3936 -- THE CAP IS THIS BOX'S STOPWATCH AND IT USED TO BE ANONYMOUS. A v3936 ship refused at step 6 with the
+// words "selfchecks said NO:" and NOTHING AFTER THE COLON. Nothing had said no. The ritual ran 923 seconds against
+// this 900-second cap, execFileSync killed the sweep with SIGTERM, and A KILLED CHILD'S BUFFERED STDOUT NEVER
+// FLUSHES -- so there was no text to quote and the error path quoted it anyway. The emptiness was not incidental;
+// it is what a timeout ALWAYS produces here, which means every timeout this ritual has ever hit was reported as a
+// verdict nobody could read. A TIMEOUT IS NOT A FAILURE is this tree's own rule, and the step whose entire job is
+// to say what is wrong was the place it was broken. Overridable now, because a cap that cannot be raised on a
+// slower box is a cap that turns a slow machine into a red tree.
+const RUN_TIMEOUT_MS = Number(arg("--step-timeout", "900")) * 1000;
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: "utf8", timeout: RUN_TIMEOUT_MS, ...opts });
+
+// Classify what actually happened, because "it threw" covers three different events that deserve three different
+// sentences. NEVER RETURNS AN EMPTY REASON: a refusal that names nothing is indistinguishable from a bug in the
+// refusing code, which is precisely how the v3936 ship read.
+function refusal(what, e, pick) {
+    if (e && e.signal) {
+        return new Error(what + " DID NOT FINISH. It was killed by this ritual's own " + (RUN_TIMEOUT_MS / 1000)
+            + "s cap (" + e.signal + ") -- THIS IS NOT THE SAME AS IT SAYING NO, and nothing here has been shown to"
+            + " be red. A killed child's buffered output never flushes, so there is no tail to quote. Re-run it on"
+            + " its own to get a verdict, or raise the cap: --step-timeout <seconds>.");
+    }
+    const text = String((e && e.stdout) || "");
+    // *** v3936 -- WRITE THE WHOLE THING DOWN BEFORE THROWING ANY OF IT AWAY. *** A ship refused at step 6 with
+    // "29 FAILED, 11 TIMED OUT, of 1103 (8617.4s)" and then printed EIGHT names. The other thirty-two were
+    // discarded, so a TWO-AND-A-HALF-HOUR measurement was unrepeatable -- the only way to learn what else was red
+    // was to run the entire sweep again. A REPORT THAT EXPENSIVE MUST NOT BE TRUNCATED INTO UNREPEATABILITY.
+    // The summary is for the terminal; the file is the record. Same family as the timeout-as-verdict bug above:
+    // both made a costly gate report less than it already knew.
+    let logged = "";
+    if (text) {
+        const logPath = path.join(ENGINE, "tools", "ship", "last-refusal-" + what + ".log");
+        try { fs.writeFileSync(logPath, text); logged = "\n  FULL OUTPUT: " + path.relative(ENGINE, logPath); }
+        catch { /* the refusal matters more than the log; never mask a red with a write error */ }
+    }
+    const picked = pick(text);
+    if (picked) return new Error(what + " said NO:\n" + picked + logged);
+    return new Error(what + " exited " + (e && e.status != null ? e.status : "non-zero")
+        + " but printed nothing this ritual could read as a reason. That is a bug in the step, not a clean refusal"
+        + " -- run it directly and read its output before believing anything about the tree.");
+}
 
 console.log("\nSweK ship ritual -- " + version + (dryRun ? "   (dry run: no zip, no outputs)" : ""));
 console.log("");
@@ -128,9 +168,8 @@ stage("verify.mjs (the actual gate)", () => {
     try {
         out = run(process.execPath, ["tools/ship/verify.mjs", "--version", version, ...(markers ? ["--markers", markers] : [])], { cwd: ENGINE });
     } catch (e) {
-        const text = String((e && e.stdout) || "");
-        const fails = text.split("\n").filter((l) => /\[verify\] FAIL/.test(l));
-        throw new Error("the gate said NO:\n" + (fails.join("\n") || text.slice(-600)));
+        throw refusal("the gate", e, (text) => text.split("\n").filter((l) => /\[verify\] FAIL/.test(l)).join("\n")
+                                                || text.slice(-600).trim());
     }
     const m = out.match(/\[verify\] ALL GREEN/);
     // Belt and braces: exit 0 AND the words. If verify.mjs ever exits 0 without printing its verdict, that is a bug
@@ -169,9 +208,12 @@ stage("every selfcheck in the tree (~100s)", () => {
     try {
         out = run(process.execPath, ["tools/ship/selfchecks.mjs"], { cwd: ENGINE });
     } catch (e) {
-        const text = String((e && e.stdout) || "");
-        const fails = text.split("\n").filter((l) => /FAIL {2}|TIMED OUT/.test(l));
-        throw new Error("selfchecks said NO:\n" + (fails.slice(0, 8).join("\n") || text.slice(-500)));
+        throw refusal("selfchecks", e, (text) => {
+            const f = text.split("\n").filter((l) => /FAIL {2}|TIMED OUT/.test(l));
+            // The count comes first. Eight names with no total reads like eight failures.
+            return f.length ? f.slice(0, 8).join("\n") + (f.length > 8 ? "\n    ... and " + (f.length - 8)
+                              + " more of " + f.length + " total" : "") : text.slice(-500).trim();
+        });
     }
     const m = out.match(/selfchecks: (\d+)\/(\d+) pass in ([\d.]+)s/);
     if (!m || m[1] !== m[2]) throw new Error("selfchecks exited 0 without a clean verdict:\n" + out.slice(-300));

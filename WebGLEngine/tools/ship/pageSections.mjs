@@ -226,13 +226,30 @@ export const SECTIONS = [
     // both mean the same thing.
     { id: "brain", tab: "brain", label: "GPU Brain", note: "appended to the existing panel",
       pages: ["panel-brain.html", "brain-bench.html", "brain-replay.html", "agent-arena.html", "fleet-arena.html",
-              "policy-mass.html"] },
+              "policy-mass.html",
+              // *** v3927 -- EIGHT BRAIN PAGES WERE LINKED FROM server.html AND FILED NOWHERE. ***
+              // registerResidue has been red since before v3904, saying 52 pages are linked but appear in
+              // neither a section nor UNPLACED -- and nobody saw it, because that gate had never been timed and
+              // so nothing ran it. UNPLACED's own rule is that "an unplaced page and a page nobody has got to
+              // look identical, and the second one gets placed by a guess", so these were CHECKED BY TITLE
+              // rather than by filename: "AI Brain (VBA bridge)", "GPU Brain 3D", "GPU Brain Fleet - Training
+              // Pool", "Brain Lab", "Brain Maze (the GPU Brain solves an obstacle room)", "Brain Quadrants (one
+              // GPU pass, many regions)", "Brain Room - a clean 3D test world", "GPU Brain: Learn to Dock".
+              // Every one is the GPU Brain doing something; none needed a guess. Six plus eight is fourteen,
+              // inside MAX_PER_PANEL.
+              "aibrain.html", "brain-3d.html", "brain-fleet.html", "brain-lab.html", "brain-maze.html",
+              "brain-quadrants.html", "brain-room.html", "dock-brain.html"] },
     // v3434 -- "Policy Mass" was one page and RL policy work IS brain work; it joins GPU Brain at six.
     // Keith: "celltrack is a big button item, it is it's own very large science project." NOTHING ELSE IN HERE.
     { id: "celltrack", tab: "celltrack", label: "Cell Tracking", note: "appended -- its own project, on purpose",
       pages: ["celltrack.html"] },
     { id: "fluidgpu", tab: "fluidgpu", label: "Fluid", note: "appended",
-      pages: ["lbm3d-gpu.html", "euler-gpu-check.html", "fluid-selfie.html", "wind-tunnel.html",
+      // v3927 -- three more lattice-Boltzmann pages join, same round and same reason as the brain eight:
+      // "Lattice Boltzmann", "Duct" and "GPU adjudicator". lbm3d-gpu.html was ALREADY here and
+      // lbm3d-gpu-check.html is the *-gpu-check pattern this drawer already holds twice (euler, mpm), so the
+      // subject is not in doubt. Nine plus three is twelve, inside MAX_PER_PANEL.
+      pages: ["lbm-fluid.html", "lbm3d-flow.html", "lbm3d-gpu-check.html",
+              "lbm3d-gpu.html", "euler-gpu-check.html", "fluid-selfie.html", "wind-tunnel.html",
               "multigrid.html", "couple.html",
               // v3795 -- mpm.html JOINS. Filed with the other solvers rather than in a physics-lab drawer
               // because it is A SOLVER RUNNING, not an instrument reporting: it draws the same loop

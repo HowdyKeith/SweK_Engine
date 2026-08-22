@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/mesostructure-selfcheck.mjs
 //
-// Run: node tools/ship/mesostructure-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/mesostructure-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3253 -- WHAT A HEIGHTFIELD CANNOT SAY, PROVED RATHER THAN ASSERTED.

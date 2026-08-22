@@ -59,7 +59,7 @@ export function write({ changed = [], snapshotPath = SNAPSHOT_PATH, producedBy }
     return { ok: true, path: snapshotPath, budgets: rep.observations.length };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const changed = process.argv.slice(2).filter((a) => !a.startsWith("--"));
     const r = write({ changed, producedBy: "cli/planSnapshot" });
     console.log("[planSnapshot] wrote " + r.budgets + " budgets to " + r.path +

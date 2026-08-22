@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 384,
+  "page": 397,
   "demo": 49,
   "builtin": 54
  },
@@ -159,7 +159,7 @@
    "id": "ascii-video.html",
    "display": "Ascii Video",
    "href": "/ascii-video.html",
-   "section": "System Tools",
+   "section": null,
    "collision": false
   },
   {
@@ -1052,6 +1052,22 @@
   },
   {
    "kind": "page",
+   "id": "es-box3d-3d.html",
+   "display": "Es Box3d 3d",
+   "href": "/es-box3d-3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "es-box3d-fly3d.html",
+   "display": "Es Box3d Fly3d",
+   "href": "/es-box3d-fly3d.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "es-box3d.html",
    "display": "Es Box3d",
    "href": "/es-box3d.html",
@@ -1295,6 +1311,14 @@
    "id": "fluid-webgpu.html",
    "display": "Fluid Webgpu",
    "href": "/fluid-webgpu.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fog-of-war.html",
+   "display": "Fog Of War",
+   "href": "/fog-of-war.html",
    "section": null,
    "collision": false
   },
@@ -1700,6 +1724,14 @@
   },
   {
    "kind": "page",
+   "id": "lab-census.html",
+   "display": "Lab Census",
+   "href": "/lab-census.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "lab-export.html",
    "display": "Lab Export",
    "href": "/lab-export.html",
@@ -1916,10 +1948,34 @@
   },
   {
    "kind": "page",
+   "id": "mpm-gpu-check.html",
+   "display": "Mpm Gpu Check",
+   "href": "/mpm-gpu-check.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm-gpu.html",
+   "display": "Mpm Gpu",
+   "href": "/mpm-gpu.html",
+   "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "mpm.html",
    "display": "Mpm",
    "href": "/mpm.html",
    "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "mpm3d.html",
+   "display": "Mpm3d",
+   "href": "/mpm3d.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1992,6 +2048,14 @@
    "display": "Normal Modes",
    "href": "/normal-modes.html",
    "section": "Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "office-floor.html",
+   "display": "Office Floor",
+   "href": "/office-floor.html",
+   "section": null,
    "collision": false
   },
   {
@@ -2287,7 +2351,7 @@
    "id": "raycast.html",
    "display": "Raycast",
    "href": "/raycast.html",
-   "section": "System Tools",
+   "section": null,
    "collision": false
   },
   {
@@ -2495,7 +2559,7 @@
    "id": "settings.html",
    "display": "Settings",
    "href": "/settings.html",
-   "section": null,
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -2583,6 +2647,14 @@
    "id": "slotmachine.html",
    "display": "Slotmachine",
    "href": "/slotmachine.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "slug-text.html",
+   "display": "Slug Text",
+   "href": "/slug-text.html",
    "section": null,
    "collision": false
   },
@@ -2700,6 +2772,22 @@
   },
   {
    "kind": "page",
+   "id": "statistical-mechanics.html",
+   "display": "Statistical Mechanics",
+   "href": "/statistical-mechanics.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "svg-forge.html",
+   "display": "Svg Forge",
+   "href": "/svg-forge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "sync-probe.html",
    "display": "Sync Probe",
    "href": "/sync-probe.html",
@@ -2768,6 +2856,14 @@
    "display": "Tools",
    "href": "/tools.html",
    "section": "System Tools",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "toroidal-wave.html",
+   "display": "Toroidal Wave",
+   "href": "/toroidal-wave.html",
+   "section": null,
    "collision": false
   },
   {
@@ -2999,6 +3095,14 @@
    "id": "waveguide.html",
    "display": "Waveguide",
    "href": "/waveguide.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "wear-field.html",
+   "display": "Wear Field",
+   "href": "/wear-field.html",
    "section": null,
    "collision": false
   },

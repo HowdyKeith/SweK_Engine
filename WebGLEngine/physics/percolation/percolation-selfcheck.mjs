@@ -1,6 +1,6 @@
 // WebGLEngine/physics/percolation/percolation-selfcheck.mjs — v3283
 //
-// Run: node physics/percolation/percolation-selfcheck.mjs   (~10s — MEASURED, dominated by the width bisections)
+// Run: node physics/percolation/percolation-selfcheck.mjs   (~3s — MEASURED, dominated by the width bisections)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Two exact keys, neither in the code: Kesten's p_c = 1/2 via the finite-size duality statement (horizontal

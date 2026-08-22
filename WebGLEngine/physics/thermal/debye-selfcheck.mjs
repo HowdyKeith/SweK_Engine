@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/debye-selfcheck.mjs -- v3812
 //
-// Run: node physics/thermal/debye-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/debye-selfcheck.mjs   (~0.1s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // THE DEBYE HEAT CAPACITY, GRADED AT BOTH LIMITS AND AGAINST THE RADIATION INTEGRAL IT REDUCES TO.
@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import {
     debyeCv, debyeCvIntegral, debyeEnergyPerTheta, einsteinCv, DULONG_PETIT, LOWT_COEFF,
+    debyeD3, debyeEnergyIntegral,
 } from "./debye.mjs";
 import { boseIntegral } from "./blackbody.mjs";
 
@@ -104,6 +105,27 @@ say("");
 say("NOT CLAIMED: real solids. This is the pure Debye model -- a linear phonon dispersion to a single cutoff, no");
 say("anharmonicity, no electronic heat capacity, no optical branches. It grades the model's own limits and its");
 say("identity with the radiation integral, not any particular crystal. k_B = 1. NO DEVICE BIND, no lab-results change.");
+
+{
+    // v3904 -- TWO CLOSED FORMS THE DEBYE MODEL IS BUILT ON, NEITHER OF WHICH WAS EVER COMPARED TO.
+    // (1) The full phonon energy integral: as the upper limit runs to infinity, int_0^inf x^3/(e^x - 1) dx
+    // converges to pi^4/15 -- the SAME integral Stefan-Boltzmann is built from, which is why blackbody and
+    // debye are siblings in this tree at all. Graded as a RELATIVE error against Math.PI**4/15 computed here,
+    // never against a typed decimal: A TYPED CONSTANT GRADES THE TYPIST, NOT THE QUADRATURE.
+    const I = debyeEnergyIntegral(60), exact = Math.PI ** 4 / 15;
+    ok("debyeEnergyIntegral(60) converges on pi^4/15", Math.abs(I - exact) / exact < 1e-11,
+       I.toPrecision(17) + " against " + exact.toPrecision(17) + ", rel " + (Math.abs(I - exact) / exact).toExponential(3));
+    // (2) The HIGH-TEMPERATURE limit. debyeD3(x) -> 1 as x -> 0, which is Dulong-Petit. But "-> 1" is a weak
+    // claim any decaying bug also satisfies, so what is graded is the FIRST CORRECTION: 1 - D3(x) -> 3x/8.
+    // *** A LIMIT IS CHEAP AND ITS APPROACH RATE IS NOT -- the coefficient is what distinguishes the real
+    // series from a function that merely happens to be near 1 in the region tested.
+    const slope = (x) => (1 - debyeD3(x)) / x;
+    const s = [1e-4, 1e-3, 1e-2].map(slope);
+    ok("debyeD3 approaches Dulong-Petit at the series rate 3/8", s.every((v) => Math.abs(v - 0.375) < 5e-3),
+       "(1-D3)/x = " + s.map((v) => v.toPrecision(7)).join(", ") + " -> 3/8 = 0.375");
+    ok("...and it approaches from BELOW, monotonically", debyeD3(1e-4) > debyeD3(1e-3) && debyeD3(1e-3) > debyeD3(1e-2) &&
+       debyeD3(1e-4) < 1, "D3 < 1 everywhere and rising as x falls");
+}
 
 console.log("debye-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

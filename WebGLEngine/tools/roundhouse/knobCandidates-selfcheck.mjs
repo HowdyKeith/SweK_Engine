@@ -1,6 +1,6 @@
 // tools/roundhouse/knobCandidates-selfcheck.mjs
 //
-// Run: node tools/roundhouse/knobCandidates-selfcheck.mjs   (~3 min: blackhole escape is 600k steps per point)
+// Run: node tools/roundhouse/knobCandidates-selfcheck.mjs   (~6 s: blackhole escape is 600k steps per point)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2917 -- THREE KNOBS EXAMINED, THREE REJECTED, AND THE ONE THAT MATTERED.

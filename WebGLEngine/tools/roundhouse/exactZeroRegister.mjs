@@ -10,6 +10,118 @@
 // ceremony the guard exists to force. An entry cannot be added without writing the sentence.
 
 export const EXACT_OK = {
+    // *** v3916 -- NINE OF THE TEN v3211 BACKLOG ENTRIES, EXAMINED AT LAST. *** That backlog was created by the
+    // first real run of census-selfcheck and eight of its ten said only "NOT EXAMINED". They have been debt for
+    // seven hundred versions because census could not finish to keep asking.
+    //
+    // SPACEFILL IS SEVEN OF THE NINE, AND EXAMINING THEM FOUND A MISTAKE OF MINE. coverageErrFrac and
+    // breakErrAbs are zero in ALL THREE modes because every path this device builds covers its grid exactly and
+    // hits its analytic break key exactly -- a Hilbert curve has 0 breaks and a raster has n-1, and both keys
+    // are DERIVED rather than observed. That is why breakErrAbs is zero even in `raster` where breaks reads 63:
+    // 63 IS the key at order 6. Which means the `raster` mode I declared a plant at v3902 is not one -- see
+    // spacefillBind's plantRefused, written this round.
+    "spacefill.stroke.coverageErrFrac": "the Hilbert path visits every one of the n*n cells exactly once, so distinct == cells to the bit; the bijectionMismatches observable beside it is the independent statement of the same fact and would move first if the curve stopped covering",
+    "spacefill.stroke.breakErrAbs": "a Hilbert curve is continuous by construction, so breaks == 0 and the analytic key is 0; the raster mode carries key n-1 = 63 and hits it exactly, which is what shows the key is DERIVED per mode rather than a constant zero",
+    "spacefill.raster.coverageErrFrac": "a raster covers every cell exactly once too -- coverage and continuity are separate observables here precisely because a raster has perfect coverage and no continuity",
+    "spacefill.raster.breakErrAbs": "the raster's key is n-1 breaks, one per row end, DERIVED not observed; at order 6 that is 63 and the path has exactly 63. THE DEVICE IS CORRECT IN THIS MODE, which is why this stayed zero while `breaks` moved 0 -> 63",
+    "spacefill.order.coverageErrFrac": "the order mode re-measures the Hilbert path at the base order, so coverage is exact for the same reason as stroke",
+    "spacefill.order.breakErrAbs": "as stroke -- continuity of the Hilbert curve at the base order",
+    "spacefill.order.orderRatio": "the SUM of Hilbert breaks across four orders spanning a sixteenfold size range. Zero across every order, not an average: one break at one size would be a broken curve, and its sibling rasterTracksN sums |rasterBreaks - (n-1)| over the same four orders as the paired positive statement",
+
+    // HEIDLER -- the v3211 note guessed this and never checked; the guess was right.
+    "heidler.exact.peakErrFrac": "the exact mode normalises the waveform by its own true peak, so the key is exactly 1 and the fraction exactly 0 -- dividing a function by its own maximum cannot give anything else, as the bind says in place. The controls are in the neighbouring modes: `peak` finds the peak by scan and reads 6.6688e-2, and the `noroot` plant reads 4.9575",
+
+    // MD -- the inverse square, read as a ratio so no constant is being graded.
+    "md.coulomb.coulombErrFrac": "two unit charges at separations 1 and 2 give a force ratio of exactly 4, bit-exact because both separations are exactly representable and the law is 1/d^2; measured 4 with |r-4| = 0. THE SAME EXPRESSION RETURNS 9 AT SEPARATIONS 1 AND 3, so it tracks the exponent rather than returning a constant -- an absolute magnitude would have graded the choice of constants instead of the inverse square",
+    // *** v3915 -- THE REMAINING TWENTY, EACH MEASURED, EACH WITH THE CONTROL THAT PROVES IT IS NOT VACUOUS. ***
+    // v3914 did the two clusters and named these twenty rather than registering them, because a sentence
+    // written without the measurement is what empties this register of meaning. Every entry below carries a
+    // number I took, and for every one there is a case where THE SAME EXPRESSION IS NOT ZERO -- a sibling
+    // observable, another mode, a plant, or a perturbed input. That pairing is the whole standard here.
+
+    // FREEROTATION -- the control is the `stability` mode, where the SAME observable reads 1.3875e-5.
+    "freerotation.conserve.sigmaRelErr": "the conserve fixture integrates a torque-free body whose sigma is constant by construction, so the spread over the run is bit-zero; the stability mode reads 1.3875e-5 from the same expression, which is the control that it can move",
+    "freerotation.flip.sigmaRelErr": "as conserve -- the flip fixture changes WHICH axis the body tumbles about, not whether sigma is conserved, so the residual stays exactly zero while stability shows the same key going non-zero",
+    "freerotation.attitude.sigmaRelErr": "as conserve; attitude grades orientation rather than the invariant, and leaves sigma exactly conserved",
+
+    // CLOCKS -- an exact GR identity, verified at four independent (M, r) pairs.
+    "clocks.rates.crossoverResidual": "|orbitingDilation(M,r) - staticDilation(M, r/1.5)| is the identity sqrt(1-3M/r) = sqrt(1-2M/(2r/3)), algebraically exact; measured bit-zero at (M,r) = (1,12), (0.3,7.7), (2,50) and (0.05,4), while the sibling clockEffectErrFrac reads 5.65e-15 so the arithmetic is genuinely floating point",
+    "clocks.rates.crossoverErrOrder": "the ORDER of the naive composition's error, which its own comment states reads 2.000000000000 under the planted error and 0 without it -- this is the honest arm of a declared plant, not an unexamined zero",
+
+    // GEOSTATS -- the control is the plant mode.
+    "geostats.nugget.valueErr": "kriging with a nugget reproduces the observation at a data location exactly -- the estimator is an exact interpolator there; the noconstraint plant mode reads 3.25e-1 on the same key",
+    "geostats.nugget.varianceErr": "the kriging variance at a data location is exactly zero for the same reason; the plant mode reads 3.33e-2, so the comparison is live",
+
+    // FDTD -- the magic time step, and the controls are computed in the same mode.
+    "fdtd.magic.magicErr": "|1 - vp/c| at Courant number S = 1.0, the magic time step at which the Yee scheme is exactly non-dispersive; the same at() function is evaluated at S = 0.9 and S = 0.5 IN THE SAME MODE and returns non-zero, which is the point the mode exists to make -- a smaller step is worse, not better",
+    "fdtd.lightspeed.cErrFrac": "cMeasured equals cExact to the bit at the magic step, the same exactness as magicErr seen through the recovered speed rather than the dispersion",
+
+    // PROBE
+    "probe.place.tourWorstErr": "the place fixture puts the probe at the tour waypoints rather than integrating to them, so the worst waypoint error is zero by construction; the tour mode integrates and reads 1.0862e-12",
+    "probe.transfer.periErr": "the transfer's PERIHELION is the departure radius, which the fixture sets, so it is exact by construction; its sibling apoErr in the same mode is 7.9353e-10 because the APHELION is integrated to -- one exact end and one measured end, side by side",
+
+    // XPBD -- a symmetry identity whose own gate asserts === 0.
+    "xpbd.weave.isotropicResidual": "iso and isoOther are stretchAlong(stiff, stiff, axis) at axis 0 and axis 2 -- equal compliances, so the cloth is isotropic and the two axes agree to the bit; the same function returns anisotropyRatio 14.03 when the compliances differ, so the machinery is direction-sensitive and the zero is the symmetry",
+
+    // SEISMIC -- an algebraic identity that is NOT always bit-exact, which is what makes it a real subtraction.
+    "seismic.interface.energyResidual": "R^2 + (Z1/Z2) T^2 = 1 is energy conservation at a plane interface, algebraically exact; it is bit-zero at the fixture's impedances but reads 1.11e-16 at Z1=1.5 Z2=7.3, and scaling R by one percent moves it to 8.73e-3 -- so this is exact arithmetic at these values, not an identity the code cannot fail",
+
+    // NUCLEAR
+    "nuclear.chain.conservationResidual": "A + B + C = N0 for the closed Bateman chain, exact by construction since the three populations partition a fixed nucleon count; bit-zero at the fixture's rates and 1.1369e-13 at l1=1e-4 l2=7 t=0.2, so the sum is genuinely recomputed rather than asserted",
+
+    // BEAM -- the most interesting of the twenty: a REAL error that the observable is deliberately blind to.
+    "beam.exponent.exponentError": "the recovered log-log slope is exactly 3 even though measureTipDeflection is a real finite-difference solve carrying genuine discretisation error -- 5.21e-7 at L=0.5 rising to 2.67e-4 at L=4. THE RATIO numeric/closed IS IDENTICAL AT EVERY L (1.0000125031215), so a constant relative error moves the INTERCEPT of the fit and never its SLOPE. The zero is not the absence of error; it is an exponent being immune to the error that is present, which is what a scaling check should be",
+
+    // CENTRIFUGE -- a bisection that lands exactly only because the target is the exact bracket midpoint.
+    "centrifuge.neutral.neutralRelErr": "the neutral density is recovered by BISECTION on the drift sign, and at rhoF = 1 it converges on 1 exactly; at rhoF = 1.3 it lands 1.71e-16 off and at 0.7777 1.43e-16 off, so the search is a real numerical one and the exactness belongs to the value, not to the method",
+
+    // GALAXY -- the control is the plant.
+    "galaxy.traces.triangleErr": "the trace identity over the adjacency triple is integer-exact on this fixture; the unorderedtri plant mode reads 1.38e+3 on the same key",
+
+    // MPMSTRESS -- the blind partner, named by its own mode.
+    "mpmstress.blindfixtures.dilationPlantDelta": "blindfixtures is the mode of fixtures BLIND to the plant, and the dilation fixture is the blind one -- the transposed plant leaves it untouched by design; its sighted partner shearPlantDelta sits beside it in the same mode at 1.5385e+1",
+
+    // HANDS -- an equivalence between two spellings of the same operation.
+    "hands.mirror.mirrorMaxDelta": "computeHandMetrics with mirror:true must agree with the same pose flipped by x -> 1-x and mirror:false; the max is taken over five quantities across four poses and every one agrees to the bit, which is the equivalence the mode exists to assert rather than a check with nothing in it",
+
+    // KERRLADDER
+    "kerrladder.photon.photonErr": "at spin 0 the photon sphere sits at exactly 3M, a small integer landed on exactly; the sibling photonWorstErr over ten spin rows reads 1.2434e-14, so the non-zero spins in the same mode are what show the comparison working",
+    // *** v3914 -- TWELVE OF THE THIRTY-TWO CENSUS HAD BEEN UNABLE TO REPORT. *** census-selfcheck was timing
+    // out at 180s, so its exact-zero ledger went unenforced and the fresh list grew to 32 across 16 devices. It
+    // completes at 717s now (v3913 gave it a budget), and these twelve are the two clusters, EXAMINED rather
+    // than waved through -- MOVING AN ENTRY HERE MEANS SOMEBODY LOOKED, and both clusters have a control that
+    // proves the comparison is live rather than vacuous.
+    //
+    // THE VIBRATIONS SUM RULES. sumW2ErrRel and sumW4ErrRel compare the moments of the eigenvalues lambda = w^2,
+    // summed over the module's own frequencies, against closed forms in N: sum(lambda) = 2N(k/m) and
+    // sum(lambda^2) = (6N-2)(k/m)^2. The naming is offset by one on purpose -- "first moment" is the moment of
+    // LAMBDA, so it lands on sumW2 -- and I checked that before assuming a bug, because key4 being computed by
+    // a function called secondMomentKey reads exactly like one.
+    // *** AT N=12 THE TWO SUMS ARE 24 AND 70 -- SMALL INTEGERS, EXACTLY REPRESENTABLE -- so the summation lands
+    // bit-exactly on the closed form. THE CONTROL IS ring AT N=32: there sum(lambda^2) comes out
+    // 189.99999999999997 against 190, a residual of -2.84e-14, WHICH IS WHY ring.sumW4ErrRel IS NOT ON THIS LIST.
+    // The same expression produces a non-zero when the arithmetic stops being exact, so the zeros at N=12 are a
+    // property of the numbers and not of a dead check.
+    "vibrations.moments.sumW2ErrRel": "sum(lambda) over the chain's own frequencies lands bit-exactly on 2N(k/m) = 24 at N=12, a small integer; ring at N=32 shows the same comparison going non-zero, so this is exact arithmetic and not a dead check",
+    "vibrations.moments.sumW4ErrRel": "sum(lambda^2) lands bit-exactly on (6N-2)(k/m)^2 = 70 at N=12; the ring mode's 2.84e-14 residual at N=32 is the control that the expression can miss",
+    "vibrations.trace.sumW2ErrRel": "same chain and same sum rule as moments -- the trace mode probes a different route to the second moment and leaves these two untouched, so the exactness carries across unchanged",
+    "vibrations.trace.sumW4ErrRel": "same as moments.sumW4ErrRel: 70 at N=12 is exactly representable and the sum reaches it to the bit",
+    "vibrations.ring.sumW2ErrRel": "sum(lambda) = 64 at N=32 is exactly representable and the sum lands on it; ITS SIBLING sumW4ErrRel IS NOT ZERO at the same N, which is what makes this a fact about the number rather than about the check",
+    "vibrations.sixNplus6.sumW2ErrRel": "the sixNplus6 plant replaces the FOURTH moment's key only (6N-2 -> 6N+6), so the second-moment comparison is bit-identical to the honest arm and stays exactly zero -- it is the plant's blind partner",
+    //
+    // THE FFT ABSOLUTE KEYS, WHICH ARE EXACT BY CONSTRUCTION AND WHOSE OWN GATE SAYS SO. A constant c gives
+    // |X[0]| = c*N and a sinusoid c*sin gives |X[k]| = c*N/2, both exactly; fftBind-selfcheck asserts
+    // `honest.sinusoidErrFrac === 0` and states "NOT TOLERANCED -- EXACTLY ZERO" in the same breath. Nothing in
+    // fft.js is told either number.
+    // *** THE CONTROL IS THE halfscale PLANT: the same two observables read 0.875 there. *** A check that could
+    // only ever return zero would read zero in that mode too, so these are exact AND demonstrably live -- which
+    // is the pair of properties this register exists to record, and the reason they are not merely tolerated.
+    "fft.absolute.sinusoidErrFrac": "a sinusoid c*sin gives |X[k]| = c*N/2 exactly and fft.js is never told the number; fftBind-selfcheck asserts === 0 deliberately, and the halfscale plant moves it to 0.875",
+    "fft.absolute.mixedToneErrFrac": "same absolute key over two summed tones, exact for the same reason; halfscale moves it to 0.875, so the zero is live rather than unreachable",
+    "fft.parseval.sinusoidErrFrac": "the parseval mode changes WHICH identity is graded, not the absolute keys, so this stays exactly zero alongside its own energy residual",
+    "fft.parseval.mixedToneErrFrac": "as above -- the mixed-tone absolute key is untouched by the parseval route and remains exact",
+    "fft.roundtrip.sinusoidErrFrac": "the roundtrip mode grades inverse-then-forward; the absolute key is computed on the forward pass and is unaffected, so it stays bit-zero",
+    "fft.roundtrip.mixedToneErrFrac": "as above -- roundtrip leaves the absolute keys alone, and halfscale is where these two are shown to move",
     // v3533 -- THE GRAINS STICK ZERO. Below the Coulomb cone (tangential motion < mu*depth) a contact STICKS: the
     // solve resists the entire tangential motion since the previous step, so the applied correction equals that
     // motion exactly and the residual is zero to the bit. It is the sticking half of the friction law (the coneErr
@@ -217,13 +329,4 @@ export const GRADED_BY_COMMENT = {
  */
 export const EXACT_ZERO_BACKLOG = {
     "plastic.creep.creepErrAbs": "MINE, v3211. Exact at creep 0.4 and 0.5, 1.1e-16 at 0.125, 4.4e-16 at 0.3 -- a rounding cancellation rather than an exact construction, so it does NOT belong on the register above",
-    "md.coulomb.coulombErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "heidler.exact.peakErrFrac": "NOT EXAMINED -- the exact mode normalises by the true peak, which MAY make this zero by construction, but nobody has verified it",
-    "spacefill.stroke.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.stroke.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.raster.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.raster.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.coverageErrFrac": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.breakErrAbs": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
-    "spacefill.order.orderRatio": "NOT EXAMINED -- surfaced by the first real run of census-selfcheck at v3211",
 };

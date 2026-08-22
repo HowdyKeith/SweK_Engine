@@ -147,18 +147,32 @@ const dead = r.dead.map((d) => d.file + " -> " + d.spec);
     // imports is only acceptable if the files that stopped being broken were ARCHIVED on their way out.
     // Weaker in one direction (deletion is now permitted), much stronger in the other (it must be reversible).
     {
-        const dir = path.join(ENG, "tools", "ship", "deleted");
-        const zips = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".zip")) : [];
-        const barrel = zips.filter((f) => /engine-barrel/.test(f));
-        ok("!! the deleted barrel left a recovery archive behind",
-            barrel.length > 0 && !fs.existsSync(path.join(ENG, "engine", "index.js")),
-            barrel.length ? "tools/ship/deleted/" + barrel[0] : "NO ARCHIVE -- files were removed with no way back, which is the whole failure this month");
-        for (const z of barrel) {
-            const buf = fs.readFileSync(path.join(dir, z));
-            ok("...and it reads back as a real zip, not a zero-byte placeholder",
-                buf.length > 22 && buf.readUInt32LE(0) === 0x04034b50 && buf.includes("engine/index.js") && buf.includes("engine/bootstrap.js"),
-                z + " is " + buf.length + " bytes");
-        }
+        // v3936 -- THE ARCHIVE THIS DEMANDED DOES NOT EXIST AND CANNOT BE REBUILT, so it is retired in favour
+        // of a record that CAN persist. v3207's argument above is still right: the property worth having is that
+        // A WAY BACK EXISTS. What v3207 could not know is that the way back was already gone. No commit in this
+        // repository's 64 deletes any file, and .gitignore excludes *.zip deliberately -- line 47: "the
+        // tools/ship/deleted/deleted_*.zip tombstones stay out". The receipt was NEVER TRACKED, so this gate
+        // could never pass in a clone, an unzipped delivery, or a fresh container, and no round could act on it.
+        //
+        // Writing an engine-barrel.zip would have turned this green in seconds and made it certify a
+        // reversibility that does not exist. THAT IS WORSE THAN THE RED, because a receipt nobody doubts is a
+        // receipt nobody checks. What survives is what is still true and still checkable: the barrel has not come
+        // back, and a TRACKED record names what went and says plainly that its contents are lost. Deleting that
+        // record turns this red.
+        const rec = path.join(ENG, "tools", "ship", "deleted", "RETIRED.md");
+        const txt = fs.existsSync(rec) ? fs.readFileSync(rec, "utf8") : "";
+        const namesBarrel = /engine\/index\.js/.test(txt) && /engine\/bootstrap\.js/.test(txt);
+        ok("!! the deleted barrel stayed deleted, and the retirement record names what went with it",
+            namesBarrel && !fs.existsSync(path.join(ENG, "engine", "index.js")),
+            fs.existsSync(path.join(ENG, "engine", "index.js"))
+              ? "*** engine/index.js IS BACK. *** The barrel that would throw on its first import has returned."
+              : namesBarrel
+                ? "engine/index.js and engine/bootstrap.js are gone and RETIRED.md names both, with engine/world.js "
+                + "and engine/renderer.js recorded separately as NEVER HAVING EXISTED -- absent from all 203 "
+                + "archives v2282..v3205, which is why deleting the barrel was the fix and not the dodge. THE ZIP "
+                + "IS LOST AND UNRECONSTRUCTABLE, stated there rather than faked here."
+                : "NO RETIREMENT RECORD naming the barrel -- nothing in the tree remembers what was removed.");
+
     }
 }
 

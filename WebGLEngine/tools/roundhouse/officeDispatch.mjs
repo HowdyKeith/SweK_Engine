@@ -2,7 +2,10 @@
 // ---------------------------------------------------------------------------------------------------------------
 // THE BODY officeManager NEVER HAD.
 //
-// *** officeManager.mjs (v3824) DECIDES WHAT RUNS NEXT AND NOTHING CALLS IT. *** Its own patch README said so
+// *** WHEN THIS FILE WAS WRITTEN, officeManager.mjs (v3824) DECIDED WHAT RUNS NEXT AND NOTHING CALLED IT. ***
+// (v3932: past tense on purpose. THIS FILE IMPORTS IT AT LINE 34 -- the sentence describing the gap became
+// false the moment the fix landed, and wiringClaims caught it reading as a live claim: "a wiring claim is a
+// fact about the import graph written down in prose, where nothing re-derives it".) Its own patch README said so
 // outright -- "the honest consumer is a hub loop calling this on a tick and posting to jobQueue" -- and then the
 // only consumer built was office-floor.html, a page that renders the decision for a human to look at. An
 // arbitrator whose output is a drawing arbitrates nothing. This file is the missing half: it turns

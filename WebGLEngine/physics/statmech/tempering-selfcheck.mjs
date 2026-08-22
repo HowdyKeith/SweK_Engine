@@ -1,6 +1,6 @@
 // WebGLEngine/physics/statmech/tempering-selfcheck.mjs — v3284
 //
-// Run: node physics/statmech/tempering-selfcheck.mjs   (~40s — MEASURED; five replicas plus five control runs)
+// Run: node physics/statmech/tempering-selfcheck.mjs   (~2s — MEASURED; five replicas plus five control runs)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The claim tempering has to earn is NOT that it explores better -- it is that it changes nothing it should not.

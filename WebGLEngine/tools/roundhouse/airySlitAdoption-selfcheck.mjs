@@ -1,6 +1,6 @@
 // tools/roundhouse/airySlitAdoption-selfcheck.mjs
 //
-// Run: node tools/roundhouse/airySlitAdoption-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/airySlitAdoption-selfcheck.mjs   (~6s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2932 -- THE TWO PURE-IMPROVEMENT FIXES ADOPTED, AND THE PIN CHANGE MADE VISIBLE.

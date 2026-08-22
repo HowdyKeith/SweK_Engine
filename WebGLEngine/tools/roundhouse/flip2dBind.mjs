@@ -45,8 +45,8 @@
 // could redden configurations nobody in this sandbox can run. IT IS NAMED AS DEBT INSTEAD. ***
 
 import { Flip2D, FLUID } from "../../fluid/flip2d.mjs";
-import { pathToFileURL } from "node:url";
 
+import { pathToFileURL } from "node:url";
 export const FLIP2D_MODES = ["hydrostatic", "forceslate"];
 
 export const FLIP2D_OBSERVABLES = [
@@ -134,7 +134,7 @@ export const flip2dDevice = {
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = await buildFlip2D({ mode: "hydrostatic" });
     console.log("[flip2d] the FLIP/PIC solver's HYDROSTATIC limit, graded against p = rho g d\n");
     if (r.error) { console.log("  REFUSED:", r.error); }

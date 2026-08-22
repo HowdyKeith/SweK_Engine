@@ -177,6 +177,8 @@ export const refineDevice = {
     // finite quantity MOVE; true -> false is not something it can measure, and this device was the census's
     // only DECLARED BUT DEAD entry for that reason alone.
     plantMode: "cellfloor", plantFlips: "floorDriftFrac", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "floorDriftFrac is the fractional drift of the refinement floor across a refine step, ideally 0 because refinement must not move the coarse solution; the cellfloor arm takes it 0 -> 0.5 while massDriftFrac stays 2.96e-15",
     name: "mpm-self-convergence", observables: REFINE_OBSERVABLES,
     build: buildRefine, defaults: refineDefaults,
 };

@@ -1,6 +1,6 @@
 // WebGLEngine/ui/avatarSwitch-selfcheck.mjs — v3555
 //
-// Run: node ui/avatarSwitch-selfcheck.mjs   (~4s — MEASURED individually)
+// Run: node ui/avatarSwitch-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Three avatar surfaces in one box on server.html, rotated by a corner button: the SVG robot, RobotExpressive

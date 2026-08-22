@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/pageIndex-selfcheck.mjs
 //
-// Run: node tools/ship/pageIndex-selfcheck.mjs   (~4s -- MEASURED)
+// Run: node tools/ship/pageIndex-selfcheck.mjs   (~0.1s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3228 -- TWO COUNTS OF ONE THING, IN ONE TREE, NEVER COMPARED.

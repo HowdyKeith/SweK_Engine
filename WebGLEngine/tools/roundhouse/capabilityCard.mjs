@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 // WebGLEngine/tools/roundhouse/capabilityCard.mjs -- v3395
 //
 // *** WHAT THIS LAB CAN BE ASKED, PUBLISHED AS DATA -- AND, JUST AS IMPORTANTLY, WHAT IT REFUSES TO CLAIM. ***
@@ -37,6 +36,7 @@ import path from "node:path";
 import { INSTRUMENTS } from "../../physics/instruments.mjs";
 import { parseRegistry, readsPlantedKnob, declaredPlantMode } from "./plantedCoverage.mjs";
 
+import { fileURLToPath } from "node:url";
 /** The absences, first-class. A caller that reads only the positive fields would over-trust the card. */
 export const NOT_CLAIMED = [
     { field: "detectionFloor", why: "only clocks has one measured, and it is a RADIUS (invisible beyond ~1007M at a 1e-6 tolerance) rather than an epsilon. One numeric column would force every other device to look like it had a floor of zero." },
@@ -137,10 +137,7 @@ export function readVersion(engRoot) {
 
 // ---- main block: this is a REPORTING tool -- it prints and exits zero, and changes nothing ----------------
 if (process.argv[1] && process.argv[1].endsWith("capabilityCard.mjs")) {
-    // v3901 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
-// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT. Keith's
-// rig hit exactly this: detectionMap died with 'C:\\C:\\Intel\\SweK_Engine_v3849\\...'.
-const here = path.dirname(fileURLToPath(import.meta.url));
+    const here = path.dirname(fileURLToPath(import.meta.url));
     const eng = path.join(here, "..", "..");
     const D = await import("./devices.mjs");
     const card = await capabilityCard(eng, D);

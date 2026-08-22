@@ -1,6 +1,6 @@
 // WebGLEngine/tools/render-qa/traceAscii-selfcheck.mjs -- v3509
 //
-// Run: node tools/render-qa/traceAscii-selfcheck.mjs   (~90s)
+// Run: node tools/render-qa/traceAscii-selfcheck.mjs   (~2s)
 //
 // *** THE ASSERTIONS ARE MADE ON THE TEXT, NOT ON THE EYE. *** The register exists so a failing gate can be
 // READ rather than only counted, and this file is what stops the picture becoming decoration: every claim its

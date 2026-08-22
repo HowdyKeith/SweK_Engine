@@ -1,6 +1,6 @@
 // tools/roundhouse/escapeBudget-selfcheck.mjs
 //
-// Run: node tools/roundhouse/escapeBudget-selfcheck.mjs   (~5 min: every point integrates up to 4.8M steps)
+// Run: node tools/roundhouse/escapeBudget-selfcheck.mjs   (~5 s: every point integrates up to 4.8M steps)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2919 -- THREE BASINS, ONE CONSTRAINT, AND A NUMBER THAT LOOKS BETTER FOR NOT HAVING CONVERGED.

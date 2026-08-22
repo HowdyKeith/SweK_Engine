@@ -1,6 +1,6 @@
 // WebGLEngine/physics/optics/beerLambert-selfcheck.mjs — v3411
 //
-// Run: node physics/optics/beerLambert-selfcheck.mjs   (~8s — MEASURED individually)
+// Run: node physics/optics/beerLambert-selfcheck.mjs   (~0.04s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // *** THIS LAW WAS ASSUMED EVERYWHERE IN THE TREE AND TESTED NOWHERE. *** radon() in ct.js computes the line

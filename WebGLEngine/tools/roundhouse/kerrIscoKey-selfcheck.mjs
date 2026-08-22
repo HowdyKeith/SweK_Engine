@@ -1,6 +1,6 @@
 // tools/roundhouse/kerrIscoKey-selfcheck.mjs
 //
-// Run: node tools/roundhouse/kerrIscoKey-selfcheck.mjs   (~20s)
+// Run: node tools/roundhouse/kerrIscoKey-selfcheck.mjs   (~0.2s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3095 -- kerr's FIRST GRADED QUANTITY AT GENERAL SPIN.

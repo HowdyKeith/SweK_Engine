@@ -27,7 +27,7 @@ export const HEIDLER_OBSERVABLES = [
 ];
 
 const DEF = { set: "first" };
-export const HEIDLER_MODES = ["peak", "exact", "limits"];
+export const HEIDLER_MODES = ["peak", "exact", "limits", "noroot"];
 
 export function heidlerDefaults(cfg = {}) {
     const want = cfg && cfg.mode;
@@ -84,8 +84,21 @@ export async function buildHeidler(args = {}) {
                  atZero, atFar, maxima, tPeakInRange: (tp.tPeak > t1 && tp.tPeak < t2) ? 1 : 0 };
     }
 
-    // "peak" -- the claim, graded against its own stated purpose.
-    const p = peakOf(i0, t1, t2, null);
+    // "peak" -- the claim, graded against its own stated purpose. "noroot" is its plant and shares this whole
+    // block, so the two arms differ in ONE thing: which eta the current is normalised by.
+    //
+    // *** v3902 -- THE PLANT IS THE n-TH ROOT, DROPPED. *** The published normalisation is
+    // eta = exp(-(t1/t2) (n t2/t1)^(1/n)), and this module ships the n=2 case as
+    // exp(-(t1/t2) sqrt(2 t2/t1)). Transcribing it without the ^(1/n) is the standard slip -- the exponent is
+    // easy to read as belonging to the bracket rather than to the whole factor -- and it PRODUCES A NUMBER,
+    // not an error: 0.7558505400 becomes 0.1353352832, a factor 0.179.
+    //
+    // THE SABOTAGE IS IN THE BIND AND NEVER IN THE MODULE BEING GRADED: physics/discharge/heidler.mjs is
+    // imported unchanged, and peakOf already takes the eta to normalise by as an argument -- the same
+    // mechanism the `exact` control uses to hand it the TRUE peak. One entry point, two uses, opposite
+    // directions: the control drives peakErrFrac to 0, the plant drives it away.
+    const etaNoRoot = Math.exp(-(t1 / t2) * ((2 * t2) / t1));
+    const p = peakOf(i0, t1, t2, mode === "noroot" ? etaNoRoot : null);
     // v3221 -- *** THE DEVICE EMITS ALL THREE PARAMETER SETS, BECAUSE THE CLAIM IS ABOUT ALL THREE. ***
     // This gate's header cites "1.0667, 1.0397, 1.0505 across the three standard parameter sets" as the evidence
     // that the published eta does not make the peak equal i0. The device ran ONE set, so claimTrace could not
@@ -120,6 +133,11 @@ export const heidlerDevice = {
     controlIdeal: 0,
     name: "heidler-return-stroke",
     modes: HEIDLER_MODES,
+    // *** THIS DEVICE NOW CARRIES BOTH HALVES, WHICH IS THE POINT OF SEPARATING THEM. *** `exact` is the
+    // CONTROL -- it drives peakErrFrac to its ideal and catches nothing -- and `noroot` is the PLANT, which
+    // drives the same observable away from it. The census counts them apart, and until now this device had
+    // only the half that proves the apparatus.
+    plantMode: "noroot", plantFlips: "peakErrFrac", plantKind: "knob",
     observables: HEIDLER_OBSERVABLES,
     build: buildHeidler,
     defaults: heidlerDefaults,

@@ -19,6 +19,7 @@ import { adjudicate, score, propose, recoverFreq, CHAIN_N, DT, EXCITED_FLOOR, AM
     from "./vibrationKnob.mjs";
 import { registerAll } from "./knobRegistry.mjs";
 import { resetRegistry, listProposers, getProposer, runProposer } from "./proposers.mjs";
+import { reportLines } from "./vibrationKnob.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c, note = "") => { if (c) { pass++; console.log("  ok   " + n + (note ? "  -- " + note : "")); }
@@ -146,6 +147,22 @@ section("5. THE LOOP, AND THE SCENE IS REGISTERED");
     ok("the accepted mode is a real one", r.accepted >= 1 && r.accepted <= CHAIN_N);
     ok("it stopped early rather than sweeping", r.adjudicated < r.tried,
        r.adjudicated + " adjudications of " + r.tried + " candidates");
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    const L = reportLines();
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[vibrationKnob]"),
+       L.length + " lines, self-named");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

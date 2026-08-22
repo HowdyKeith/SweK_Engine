@@ -21,6 +21,7 @@ import { planePool, transferRatio, phaseSwing, transferByWidth, worstError, colu
          xProfile, tiltedProfile, MEASURED_V3545, EXPLAINS_V3544 } from "./tiltPower.mjs";
 import { surfaceHeights, surfaceSlope } from "./levelClaim.mjs";
 import { SHIPPED_FLOOR } from "./poolFixture.mjs";
+import { reportLines } from "./tiltPower.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -154,6 +155,25 @@ console.log("\n6. WHAT IS NOT CLAIMED, AND THE REGISTER SAYS SO IN ITS OWN WORDS
     ok("the front door prints and the numbers in it are derived from the same functions the gate drives",
         typeof transferRatio === "function" && typeof phaseSwing === "function" && typeof columnLeverage === "function",
         "no reference value in this gate is typed -- every comparison drives planePool or the live pool");
+}
+
+{
+    // v3904 -- reportLines IS THIS MODULE'S OWN REPORT, AND NOTHING HAD EVER CALLED IT.
+    // I nearly skipped this on the belief that toolFrontDoor already covered it. IT DOES NOT, AND I CHECKED
+    // RATHER THAN ASSERTED: section 1 SPAWNS the file and demands non-empty stdout matching /[basename]/ --
+    // that is what the MAIN BLOCK prints, which is a different function. A reportLines() returning [] would
+    // leave the front door perfectly green, because the main block writes its own header either way.
+    // *** A REPORTER NOBODY CALLS IS A REPORTER THAT CAN GO SILENT IN PRIVATE. *** The shape graded here is
+    // the weakest one worth having -- an array, of strings, longer than a header, carrying its own name --
+    // and it is the shape that distinguishes "the report is built" from "the function still returns".
+    // WHAT IS NOT CLAIMED: the live arm. reportLines({ live: true }) drives the real solver, and levelClaim's
+    // measured at 51s SOLO -- the gate went to 280s against a 143s default budget, so the live arm is
+    // DELIBERATELY NOT DRIVEN HERE. A CHECK THAT TIMES OUT IS NOT A STRONGER CHECK, IT IS AN ABSENT ONE.
+    const L = reportLines({ live: false });
+    ok("reportLines returns a real report and names itself",
+       Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
+       L.join("\n").includes("[tiltPower]"),
+       L.length + " lines, self-named");
 }
 
 console.log(fails ? `\ntiltPower-selfcheck: ${fails} FAILED` : "\ntiltPower-selfcheck: all checks pass");

@@ -86,13 +86,33 @@ fs.writeFileSync(path.join(tmp, "sub", "b.js"), "export const b = 2;\n");
         "wrapping it in a catch would restore exactly the behaviour this replaces: a way back that is optional in practice");
 }
 
-// ---- 4. the real archive this round produced -------------------------------------------------------------
+// ---- 4. the retirement this round recorded ------------------------------------------------------------------
+// *** v3936 -- THE THIRD GATE TO DEMAND THIS ZIP, AND THE ZIP HAS NEVER BEEN REACHABLE FROM HERE. ***
+// markerSingleSource and deadImportScan wanted the same receipt and were retired the same way in the same
+// version. The evidence is not a judgement call: WebGLEngine/brain.js appears in NONE of this repository's 64
+// commits, no commit here deletes any file at all, and .gitignore excludes *.zip on purpose -- line 47 says "the
+// tools/ship/deleted/deleted_*.zip tombstones stay out". THE RECEIPTS WERE NEVER TRACKED, so all three gates
+// were unsatisfiable in a clone, an unzipped delivery, or a fresh container, and no round could ever have acted
+// on them.
+//
+// Writing engine-barrel.zip would have turned this green in ten seconds and made it certify a way back that does
+// not exist -- the precise failure the archive rule was written to prevent. What is asserted instead is what is
+// still true and still checkable, against a TRACKED record that unlike a zip survives a clone.
 {
-    const dir = path.join(ENG, "tools", "ship", "deleted");
-    const zips = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".zip")) : [];
-    ok("the engine/ barrel deletion left its archive in the tree",
-        zips.some((z) => /engine-barrel/.test(z)),
-        zips.join(", ") || "none -- v3207 deleted engine/index.js and engine/bootstrap.js and MUST have kept a copy");
+    const rec = path.join(ENG, "tools", "ship", "deleted", "RETIRED.md");
+    const txt = fs.existsSync(rec) ? fs.readFileSync(rec, "utf8") : "";
+    const named = /engine\/index\.js/.test(txt) && /engine\/bootstrap\.js/.test(txt);
+    ok("the engine/ barrel deletion is recorded, and the record names what went with it",
+        named && !fs.existsSync(path.join(ENG, "engine", "index.js")),
+        fs.existsSync(path.join(ENG, "engine", "index.js"))
+          ? "*** engine/index.js IS BACK. *** The barrel that would throw on its first import has returned."
+          : named
+            ? "tools/ship/deleted/RETIRED.md names engine/index.js and engine/bootstrap.js as LOST, and "
+            + "engine/world.js and engine/renderer.js as NEVER HAVING EXISTED -- absent from all 203 archives "
+            + "v2282..v3205, which is why deleting the barrel was the fix and not the dodge. THE ZIP IS "
+            + "UNRECONSTRUCTABLE and that is stated there rather than faked here."
+            : "NO RETIREMENT RECORD naming the barrel -- nothing in the tree remembers what was removed, which "
+            + "is the 43-version failure shape this gate exists for.");
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/seedSpread-selfcheck.mjs -- v3513
 //
-// Run: node tools/roundhouse/seedSpread-selfcheck.mjs   (~90s)
+// Run: node tools/roundhouse/seedSpread-selfcheck.mjs   (~5s)
 //
 // *** A SEALED PRE-REGISTRATION HAD BEEN SITTING IN nuisanceKnobs.mjs UNMEASURED, SAYING SO IN ITS OWN WORDS:
 // "What follows has not been measured." IT PREDICTED THAT ising's MAGNETISATION SEED SPREAD AT T = 2.27 WOULD

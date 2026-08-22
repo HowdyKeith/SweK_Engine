@@ -60,9 +60,26 @@ function buildInference({ mode = "posterior", config = {} } = {}) {
         };
     }
 
+    // *** v3902 -- `overconfident` IS THE PLANT, AND THE HEADER ABOVE ALREADY WROTE IT DOWN AS A SENTENCE. ***
+    // "UNDERSTATING THE NOISE produces beautiful, tight, plausible posteriors whose coverage collapses" -- and
+    // the `calibration` mode MEASURES that already, coverage 83.3% falling to 36.7% while the interval width
+    // also falls. THE CENSUS COULD NOT SEE ANY OF IT: those findings live in `coverage`/`coverageUnderstated`,
+    // which are NULL in `posterior`, and the mode-plant contract needs one observable that is a finite number
+    // in both arms. So the same defect is restated in `posterior`'s own shape.
+    //
+    // THE CHAIN IS SAMPLED AT AN UNDERSTATED SIGMA AND GRADED AGAINST THE EXACT POSTERIOR AT THE TRUE ONE --
+    // the key never moves, which is what makes this a `knob` and not a moved goalpost. The same 0.3 factor
+    // `calibration` uses, so the two modes are describing ONE defect at one strength.
+    //
+    // *** AND THE FILE ALREADY RECORDS THAT THE MODULE'S OWN PLANT DOES NOT EXIST: *** "sigmaWRONG is exported
+    // for exactly that measurement" appears in the module's header, but sigmaWRONG "APPEARS ONLY IN TWO
+    // COMMENTS -- it is never defined and never exported". The overconfidence case is reachable only by passing
+    // an explicit sigmaLik. That is what this plant does, so the device now HAS the planted error the module
+    // only claimed to export.
     const { ts, ys } = makeData(c);
+    const sigLik = mode === "overconfident" ? c.sigma * 0.3 : c.sigma;
     const ex = linearPosteriorExact(ts, ys, c.sigma, c.tau);
-    const ch = posteriorChain(linearTarget(ts, ys, c.sigma, c.tau), ex.mu.slice(), { n: c.n, seed: c.seed });
+    const ch = posteriorChain(linearTarget(ts, ys, sigLik, c.tau), ex.mu.slice(), { n: c.n, seed: c.seed });
     const m = momentsOf(ch.samples);
     const muErr = Math.max(...m.mean.map((v, i) => Math.abs(v - ex.mu[i])));
     const sigmaErr = Math.max(
@@ -74,8 +91,24 @@ function buildInference({ mode = "posterior", config = {} } = {}) {
     };
 }
 
+export const INFERENCE_MODES = ["posterior", "calibration", "overconfident"];
+
 export const inferenceDevice = {
-    modes: ["posterior", "calibration"],
+    modes: INFERENCE_MODES,
     name: "bayesian-inference", observables: INFERENCE_OBSERVABLES, build: buildInference,
-    defaults: ({ mode } = {}) => ({ mode: mode || "posterior", config: { ...DEF } }),
+    // v3902 -- REFUSES an undeclared mode instead of handing the name back. The old line was
+    // `mode: mode || "posterior"`, which returns ANY truthy name as though the device offered it -- the same
+    // shape that kept `spatial` on deviceModes-selfcheck's UNGUARDED_BASELINE. NULL is beamBind's behaviour
+    // and the one that gate calls correct.
+    defaults: ({ mode } = {}) => {
+        const m = mode ?? "posterior";
+        return INFERENCE_MODES.includes(m) ? { mode: m, config: { ...DEF } } : null;
+    },
+    // `sigmaErr` 7.4704e-4 -> 6.3739e-2, the posterior WIDTH being what understating the noise corrupts.
+    // *** AND `muErr` GETS BETTER UNDER THE PLANT: 6.4796e-3 -> 1.6527e-3, nearly four times closer. *** A
+    // device graded on the recovered MEAN would report the overconfident sampler as the more accurate one --
+    // which is the header's "confidently wrong" in one number, and the second device this round (geometry's
+    // volume key was the other) whose obvious observable ENDORSES the defect rather than missing it.
+    // `coverage` is NULL in `posterior`, so it cannot carry the declaration however well it describes this.
+    plantMode: "overconfident", plantFlips: "sigmaErr", plantKind: "knob",
 };

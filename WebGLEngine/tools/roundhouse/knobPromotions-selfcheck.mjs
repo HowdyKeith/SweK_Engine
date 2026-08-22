@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/knobPromotions-selfcheck.mjs -- v3512
 //
-// Run: node tools/roundhouse/knobPromotions-selfcheck.mjs   (~2 min)
+// Run: node tools/roundhouse/knobPromotions-selfcheck.mjs   (~3 s)
 //
 // *** corroborationReach NAMES THREE DEVICES AS "ONE KNOB SHORT" AND CALLS THEM THE CHEAPEST PROMOTIONS IN THE
 // LAB. THAT IS A STATEMENT ABOUT THE REGISTERS, NOT ABOUT THE PHYSICS. All three were examined; ALL THREE WERE

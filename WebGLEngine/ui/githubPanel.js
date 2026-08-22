@@ -27,7 +27,38 @@ export function mountGithubPanel() {
     root.append(tabsRow, body);
 
     const out = E("div", "margin-top:8px;font:11px ui-monospace,monospace;color:#bcd;white-space:pre-wrap;max-height:230px;overflow:auto;background:#0b0e13;border:1px solid #1a222e;border-radius:6px;padding:7px 9px;display:none;");
-    const say = (m, ok) => { out.style.display = "block"; out.style.color = ok === false ? "#f88" : (ok ? "#9fe88f" : "#bcd"); if (typeof m === "string") out.textContent = m; else { out.innerHTML = ""; out.appendChild(m); } };
+    // v3910 -- ONE DEFINITION OF WHERE A TOKEN COMES FROM. The Account tab already had this URL hardcoded in
+    // its "Where do I get a token?" note (v1847); it is a constant now and BOTH readers use it, so the day it
+    // changes it changes once.
+    const TOKEN_URL = "https://github.com/settings/tokens";
+    // Every token-gated call in githubBridge answers with some spelling of "token required" -- publish, upload,
+    // createRepo, issues, delete, eight of them. Keith hit the publish one and asked, reasonably, why the
+    // message that names the thing you are missing does not offer the place to get it.
+    // *** THE LINK IS ATTACHED HERE, AT say(), AND NOT AT THE EIGHT CALL SITES. *** Wrapping the one chokepoint
+    // means a token error raised by a route nobody has written yet still arrives with its remedy, and there is
+    // no list of messages to keep in step with the bridge -- which is the kind of list that goes stale silently.
+    const TOKEN_ERR = /token[^.]{0,40}\brequired\b|\brequired\b[^.]{0,40}token/i;
+    const say = (m, ok) => {
+        out.style.display = "block";
+        out.style.color = ok === false ? "#f88" : (ok ? "#9fe88f" : "#bcd");
+        if (typeof m !== "string") { out.innerHTML = ""; out.appendChild(m); return; }
+        out.textContent = m;
+        if (ok === false && TOKEN_ERR.test(m)) {
+            // A NODE, NOT innerHTML: the message is server text and this panel renders repo names, issue titles
+            // and error bodies from GitHub. Building the link as an element keeps the message itself text.
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;";
+            const a = document.createElement("a");
+            a.href = TOKEN_URL; a.target = "_blank"; a.rel = "noopener";
+            a.textContent = "\u2192 Get a token on GitHub";
+            a.style.cssText = "color:#7fd1ff;font-size:11px;font-weight:bold;text-decoration:none;border:1px solid #2a4a6a;padding:3px 8px;border-radius:4px;";
+            const hint = document.createElement("span");
+            hint.style.cssText = "color:#8fa3bb;font-size:10px;";
+            hint.textContent = "then paste it in the Account tab \u2014 it explains the two kinds and the scopes";
+            wrap.append(a, hint);
+            out.appendChild(wrap);
+        }
+    };
     const repo = () => repoSel.value.trim();
 
     // ---- sections ----
@@ -99,7 +130,7 @@ export function mountGithubPanel() {
             const sum = E("summary", "cursor:pointer;color:#9ed5ff;font-size:10px;", "Where do I get a token?");
             help.appendChild(sum);
             const tokLink = E("a", "color:#7fd1ff;font-size:11px;font-weight:bold;word-break:break-all;", "\u2192 github.com/settings/tokens");
-            tokLink.href = "https://github.com/settings/tokens"; tokLink.target = "_blank"; tokLink.rel = "noopener";
+            tokLink.href = TOKEN_URL; tokLink.target = "_blank"; tokLink.rel = "noopener";   // v3910 -- the shared constant, not a second copy
             const body = E("div", "margin-top:5px;line-height:1.55;");
             body.innerHTML =
                 "GitHub has no permanent \u201cAPI key\u201d \u2014 you generate a <b>Personal Access Token (PAT)</b> yourself. Either kind works to create + push to your own repo:"
@@ -206,7 +237,14 @@ export function mountGithubPanel() {
             listB.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("releases?repo=" + encodeURIComponent(repo())); if (!j.ok) return say("\u2717 " + j.error, false); if (!j.releases.length) return say("(no releases)", true); const box = E("div"); j.releases.forEach(rl => { const row = E("div", "display:flex;gap:6px;align-items:center;padding:2px 0;"); row.append(E("span", "color:#9fd;flex:1;", `${rl.tag}${rl.draft ? " (draft)" : ""}${rl.prerelease ? " (pre)" : ""} \u00B7 ${rl.assets} asset(s)`)); const d = E("span", "cursor:pointer;color:#f88;", "\u2715"); d.title = "delete release"; d.onclick = async () => { const x = await api("release/delete", { repo: repo(), id: rl.id }); if (x.ok) row.remove(); }; row.append(d); box.append(row); }); say(box, true); };
             vc.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("versioncheck?repo=" + encodeURIComponent(repo())); say(j.ok ? (j.none ? "no releases yet" : (j.behind ? "\u26A0 newer: " + j.latest + " (engine " + j.current + ")" : "\u2713 up to date (" + j.current + ")")) : "\u2717 " + j.error, j.ok && !j.behind); };
             pub.onclick = async () => { if (!repo() || !tag.value.trim()) return say("need repo + tag", false); pub.disabled = true; say("publishing\u2026"); const j = await api("publish", { repo: repo(), tag: tag.value.trim(), name: name.value.trim(), body: notes.value, assetPath: asset.value.trim(), draft: dr.checked, prerelease: pr.checked }); pub.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + rel.tag + (j.asset ? (j.asset.ok ? " + asset" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };
-            eng.onclick = async () => { if (!repo()) return say("pick a repo (or set engineRepo in Account)", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: repo(), body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };
+            // v3908 -- THE GUARD REFUSED THE VERY PATH ITS OWN MESSAGE RECOMMENDED. It said "pick a repo (or set
+            // engineRepo in Account)" and then returned before anything could ever consult engineRepo, so setting
+            // it did nothing and the button read as broken. publishEngineBuild() ALREADY falls back to
+            // engineRepo || defaultRepo on the server -- the UI was stricter than the backend it calls, and the
+            // error text described a remedy the code did not allow. AN ERROR MESSAGE IS A CLAIM TOO.
+            eng.onclick = async () => { let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) return say("pick a repo, or set engineRepo in Account", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };
             return w;
         },
         Issues() {

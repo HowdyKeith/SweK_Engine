@@ -94,7 +94,22 @@ export function readReport(reportPath, { inputs = {}, maxAgeMs = null, now = Dat
     const ageMs = now - producedMs;
     const staleBecause = [];
     for (const [name, p] of Object.entries(inputs)) {
-        try { const st = fs.statSync(p); if (st.mtimeMs > producedMs) staleBecause.push(name + " changed after the report was made"); }
+        // *** v3936 -- THE TWO SIDES OF THIS COMPARISON DO NOT CARRY THE SAME RESOLUTION. ***
+        //
+        // producedAt is an ISO-8601 STRING, so Date.parse gives WHOLE MILLISECONDS. st.mtimeMs is a float and
+        // carries a FRACTION. An input touched in the SAME millisecond as the report therefore reads as newer
+        // than it -- 1787344621891.7 > 1787344621891 -- and a report produced a moment ago comes back
+        // "STALE (0s old): catalog changed after the report was made". Keith's rig hit it on bootSidecar AND
+        // catalogSnapshot in the same run; this box does not, because the fixture timings happen not to tie.
+        // A ZERO-SECOND-OLD REPORT REPORTED AS STALE IS THE TELL, and it is a real race rather than a fixture
+        // artefact: any producer whose inputs are touched in its own millisecond hits it in production too.
+        //
+        // Compared at the resolution producedAt ACTUALLY HAS. The floor is not a tolerance and not a fudge: it
+        // is the precision the other side of the comparison was written with. What it costs is stated rather
+        // than hidden -- an input genuinely changed within the SAME MILLISECOND as the report is read as fresh,
+        // which is the resolution limit of an ISO timestamp and cannot be recovered by comparing more finely
+        // against a number that does not have the digits.
+        try { const st = fs.statSync(p); if (Math.floor(st.mtimeMs) > producedMs) staleBecause.push(name + " changed after the report was made"); }
         catch { staleBecause.push(name + " could not be checked -- assuming stale"); }
     }
     if (maxAgeMs != null && ageMs > maxAgeMs) staleBecause.push("older than the permitted age (" + Math.round(ageMs / 1000) + "s)");

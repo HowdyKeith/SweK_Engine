@@ -1,6 +1,6 @@
 // WebGLEngine/ai-bridge/catalogSnapshot-selfcheck.mjs — v3285
 //
-// Run: node ai-bridge/catalogSnapshot-selfcheck.mjs   (~1s — MEASURED individually, not from a batch loop)
+// Run: node ai-bridge/catalogSnapshot-selfcheck.mjs   (~0.1s — MEASURED individually, not from a batch loop)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The boot sidecar's first real producer and reader. Two things are on trial: that the contract works end to end

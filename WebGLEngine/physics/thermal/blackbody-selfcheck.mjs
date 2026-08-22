@@ -1,6 +1,6 @@
 // WebGLEngine/physics/thermal/blackbody-selfcheck.mjs -- v3811
 //
-// Run: node physics/thermal/blackbody-selfcheck.mjs   (~1s, MEASURED)
+// Run: node physics/thermal/blackbody-selfcheck.mjs   (~0.4s, MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered by filename).
 //
 // BLACKBODY RADIATION, GRADED AGAINST MATHEMATICAL CONSTANTS AND DEFINED SI VALUES -- NOT ONE TYPED REFERENCE.
@@ -30,6 +30,7 @@ import {
     planckShape, wienRootNewton, wienPeakMaximise, wienResidual,
     boseIntegral, boseClosed, stefanBoltzmannSigma, wienConstant, exitance,
     H_PLANCK, K_BOLTZ, C_LIGHT,
+    planckNuShape, planckLambdaShape, peakWavelength,
 } from "./blackbody.mjs";
 import { zeta } from "../zeta.js";
 import { gammaFn } from "../md/maxwellSpeed.mjs";
@@ -164,6 +165,34 @@ say("NOT CLAIMED: real spectra. This is the ideal blackbody -- emissivity is 1 a
 say("here does radiative transfer, absorption, or a grey body. NOT CLAIMED: that any renderer consumes this yet;");
 say("it ships as a bench module + gate (v3613's pattern), no device bind and no lab-results change. FOUND: the");
 say("zeta.js real-s gap (section 6): driven here in v3811, FIXED in v3812 via the existing tools/ strict-libm -- now corroborated.");
+
+{
+    // v3904 -- THE TWO WIEN ROOTS ARE CLOSED FORMS THIS FILE SOLVES FOR AND NEVER GRADED AGAINST.
+    // wienRootNewton(n) solves x = n(1 - e^-x). The two PHYSICAL cases are n=3 (spectrum per unit FREQUENCY)
+    // and n=5 (per unit WAVELENGTH), and their roots are the two constants the textbooks print.
+    // *** THE PAIR IS THE POINT, NOT EITHER ROOT. *** A peak in nu and a peak in lambda ARE NOT THE SAME PEAK
+    // -- nu_max/c is NOT 1/lambda_max -- and the ratio 0.568252661 is the entire content of that sentence.
+    // Checking only one root would pass with the other spelling substituted, and substituting one for the
+    // other is the single commonest error in this corner of physics.
+    const r3 = wienRootNewton(3), r5 = wienRootNewton(5);
+    ok("wienRootNewton(3) hits the FREQUENCY-peak Wien root", Math.abs(r3 - 2.8214393721220787) < 1e-12,
+       r3.toPrecision(17) + " against 2.8214393721220787");
+    ok("wienRootNewton(5) hits the WAVELENGTH-peak Wien root", Math.abs(r5 - 4.9651142317442769) < 1e-12,
+       r5.toPrecision(17) + " against 4.9651142317442769");
+    ok("*** and the two peaks DISAGREE, by the ratio that says they are different questions ***",
+       Math.abs(r3 / r5 - 0.56825266054974299) < 1e-12 && Math.abs(r3 - r5) > 2,
+       "r3/r5 = " + (r3 / r5).toPrecision(12) + ", apart by " + (r5 - r3).toPrecision(6));
+    // Wien's DISPLACEMENT law is the claim that lambda_max * T is a constant. peakWavelength divides by T, so
+    // the product is constant BY CONSTRUCTION -- which is exactly why it can be graded BIT-EXACTLY rather
+    // than to a tolerance. A tolerance here would hide a T-dependence that has no business existing at all.
+    const prods = new Set([1, 2.7255, 100, 300, 1000, 5772, 1e5].map((T) => peakWavelength(T) * T));
+    ok("peakWavelength(T)*T is BIT-IDENTICAL across five decades of T", prods.size === 1,
+       "one distinct double over 7 temperatures: " + [...prods][0].toPrecision(17) + " m*K");
+    ok("...and the shape functions the roots came from are the ones exported",
+       typeof planckNuShape === "function" && typeof planckLambdaShape === "function" &&
+       planckNuShape(r3) > 0 && planckLambdaShape(r5) > 0,
+       "both shapes evaluate positive AT their own root");
+}
 
 console.log("blackbody-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

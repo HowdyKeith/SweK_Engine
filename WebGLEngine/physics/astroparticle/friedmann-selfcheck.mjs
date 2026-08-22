@@ -1,6 +1,6 @@
 // WebGLEngine/physics/astroparticle/friedmann-selfcheck.mjs — v3428
 //
-// Run: node physics/astroparticle/friedmann-selfcheck.mjs   (~45s — MEASURED individually)
+// Run: node physics/astroparticle/friedmann-selfcheck.mjs   (~0.1s — MEASURED individually)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // ONE INTEGRATOR, THREE EXACT REGIMES, AND A THIRD INSTANCE OF THE BLINDNESS PATTERN.

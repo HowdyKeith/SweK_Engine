@@ -18,6 +18,7 @@ import { fresnelNormal, criticalAngle as opticalCriticalAngle } from "./maxwell.
 import { criticalAngle as frictionCriticalAngle } from "../xpbd/frictionKey.mjs";
 // Importing contactKeys is safe; CALLING it needs box3d WASM. Section 6 makes that call for real and catches.
 import { criticalAngle as contactCriticalAngle } from "../mechanics/contactKeys.mjs";
+import { initNode } from "../box3d/box3dNode.mjs";
 
 const require = createRequire(import.meta.url);
 const water = require("../../water/waterMath.js");
@@ -132,24 +133,74 @@ const ROOT = new URL("../../", import.meta.url);
     // calling it here throws "box3dNode: call initNode() first", so THE COMPARISON NEEDS THE RIG. Two
     // implementations of one physical quantity, in different units, in different shapes, one of them requiring a
     // WASM backend, and nothing has ever put them side by side. ***
+    // *** v3903 -- THE COMPARISON THIS SECTION CALLED "OWED" IS NOW RUN, AND THE RIG IS INITIALISED HERE. ***
+    // The previous version asserted that contactKeys.criticalAngle THROWS -- a check that passes only while the
+    // capability is ABSENT, and which therefore had to go red the moment anybody supplied the rig. It also read
+    // two regexes out of contactKeys.mjs to establish the return shape, AND THAT FILE NO LONGER HOLDS THE
+    // IMPLEMENTATION: v3617 moved slopeSpeed/criticalAngle into reposeOps.mjs (contactKeys re-exports them so
+    // the two are the SAME FUNCTION OBJECT). So the regexes were reading a file the code had left, which is why
+    // this gate was red -- not because the collision changed, but because the CHECK was looking in the old place.
+    // A STRUCTURAL CLAIM READ OUT OF A SOURCE FILE ROTS WHEN THE CODE MOVES; a claim established by CALLING does
+    // not, and this tree's own rule is to ask the thing that runs.
+    const MUS = [0.3, 0.5, 0.8];
     const fk = frictionCriticalAngle(0.5);
-    const ckSrc = readFileSync(new URL("physics/mechanics/contactKeys.mjs", ROOT), "utf8");
     ok("physics/xpbd/frictionKey.mjs returns DEGREES as a bare number, and it is right", Number.isFinite(fk) &&
         rel(Math.tan(fk * Math.PI / 180), 0.5) < 0.02,
         "mu = 0.5 -> " + fk.toFixed(4) + " deg, against the exact atan(0.5) = " + (180 / Math.PI * Math.atan(0.5)).toFixed(4) + " deg");
-    ok("physics/mechanics/contactKeys.mjs returns RADIANS inside an OBJECT, and needs box3d", (() => {
-        const shape = /return \{ theta, tan: Math\.tan\(theta\), exact: Math\.atan\(mu\)/.test(ckSrc);
-        const backed = /slopeSpeed\(mid, mu, opts\)/.test(ckSrc);
-        // THE REAL CALL, NOT A STUB. A helper that throws by construction would be a check that cannot fail --
-        // this tree's own named anti-pattern -- so contactKeys.criticalAngle is actually invoked here.
-        let threw = null;
-        try { contactCriticalAngle(0.5); } catch (e) { threw = e.message; }
-        if (threw) say("     contactKeys.criticalAngle(0.5) threw: " + threw.slice(0, 70));
-        else say("     contactKeys.criticalAngle(0.5) RETURNED -- box3d is available here, so run the comparison");
-        return shape && backed && threw !== null;
-    })(), "different units, different return shape, and a WASM dependency -- so no accidental comparison was ever possible");
-    say("   THE COMPARISON IS OWED AND IT NEEDS THE RIG: initialise box3d, call both at the same mu, and grade");
-    say("   BOTH against atan(mu), which is the external key neither of them is told. That is Keith's to run.");
+
+    const rig = await initNode();
+    if (!rig.ready) {
+        // NOT A FAILURE. The wasm is a build artefact and a machine without it is not a machine with a defect --
+        // but the absence is REPORTED BY NAME so a green run cannot be mistaken for a run that did the work.
+        say("     BOX3D NOT AVAILABLE HERE (" + String(rig.reason).slice(0, 90) + ")");
+        say("     THE CROSS-SOLVER COMPARISON WAS NOT RUN. This is reported, not passed: an unavailable rig and");
+        say("     an agreement are different findings, and only one of them is evidence.");
+    } else {
+        // *** TWO INDEPENDENT SOLVERS, ONE PHYSICAL QUANTITY, GRADED AGAINST A KEY NEITHER IS TOLD. ***
+        // frictionKey bisects an XPBD contact; contactKeys tilts gravity on a box3d WASM rigid body. They share
+        // no code, no units and no return shape -- and atan(mu) is the answer both must land on.
+        const rows = MUS.map((mu) => {
+            const c = contactCriticalAngle(mu);              // OBJECT, theta in RADIANS
+            const f = frictionCriticalAngle(mu);             // BARE NUMBER, in DEGREES
+            const exact = Math.atan(mu);
+            return { mu, box3d: c.theta, xpbd: f * Math.PI / 180, exact,
+                     eBox: Math.abs(c.theta - exact) / exact, eXpbd: Math.abs(f * Math.PI / 180 - exact) / exact,
+                     shapeIsObject: c && typeof c === "object" && typeof c.theta === "number",
+                     numberIsBare: typeof f === "number" };
+        });
+        for (const r of rows) {
+            say("     mu=" + r.mu + "  box3d " + r.box3d.toFixed(7) + " rad (relErr " + r.eBox.toFixed(5) + ")" +
+                "   xpbd " + r.xpbd.toFixed(7) + " rad (relErr " + r.eXpbd.toFixed(5) + ")   exact " + r.exact.toFixed(7));
+        }
+        ok("!! *** BOTH criticalAngle IMPLEMENTATIONS LAND ON atan(mu), AND NEITHER IS TOLD IT ***",
+            rows.every((r) => r.eBox < 0.05 && r.eXpbd < 0.01),
+            "the comparison this section has called OWED since it was written. Two solvers sharing no code -- an " +
+            "XPBD bisection and a box3d WASM rigid body on a tilted gravity vector -- against the closed form " +
+            "neither receives. Worst measured: box3d " + Math.max(...rows.map((r) => r.eBox)).toFixed(5) +
+            ", xpbd " + Math.max(...rows.map((r) => r.eXpbd)).toFixed(5));
+        ok("...and BOTH ERR HIGH, which is the direction a discrete solver must err",
+            rows.every((r) => r.box3d > r.exact && r.xpbd > r.exact),
+            "a block holds slightly PAST the ideal cone before it slips, because the contact resolves in finite " +
+            "steps -- so an implementation reading BELOW atan(mu) would be reporting slip that the friction law " +
+            "does not permit. THE SIGN OF THE ERROR IS A CHECK THE MAGNITUDE ALONE DOES NOT MAKE.");
+        ok("...and both converge as mu grows, so the gap is discretisation and not a wrong law",
+            rows[0].eBox > rows[rows.length - 1].eBox && rows[0].eXpbd > rows[rows.length - 1].eXpbd,
+            "box3d " + rows.map((r) => r.eBox.toFixed(5)).join(" -> ") + " and xpbd " +
+            rows.map((r) => r.eXpbd.toFixed(5)).join(" -> ") + " across mu = " + MUS.join(", ") +
+            ". A WRONG LAW WOULD NOT IMPROVE WITH mu; a finite step size does, because the slip angle grows " +
+            "while the step does not.");
+        ok("...and the interface collision is REAL, established by calling rather than by reading the source",
+            rows.every((r) => r.shapeIsObject && r.numberIsBare),
+            "contactKeys returns an OBJECT with theta in RADIANS; frictionKey returns a BARE NUMBER in DEGREES. " +
+            "Same quantity, different units, different shape -- so no accidental comparison was ever possible, " +
+            "which is why nothing had made this one until now. THE OLD CHECK ASSERTED THIS BY REGEX AGAINST " +
+            "contactKeys.mjs AND WENT RED WHEN v3617 MOVED THE CODE TO reposeOps.mjs.");
+        ok("...and box3d is the LESS accurate of the two, which is worth knowing before either is trusted",
+            rows.every((r) => r.eBox > r.eXpbd),
+            "at every mu measured, by a factor of " + (rows[1].eBox / rows[1].eXpbd).toFixed(1) + " at mu=0.5. " +
+            "NOT A DEFECT IN EITHER: they are different integrators at different step sizes. It is a statement " +
+            "about which number to quote, and it could not be made while the two had never met.");
+    }
     say("   NOT MERGED AND NOT RENAMED. A name collision across UNRELATED domains is not a defect -- physics reuses");
     say("   `critical` for every threshold it has. What would be a defect is a CHECK that joined them, and this");
     say("   section exists so that the next reader meets the collision before writing one.");

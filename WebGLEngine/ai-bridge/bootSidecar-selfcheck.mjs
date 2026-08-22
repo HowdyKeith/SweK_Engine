@@ -1,6 +1,6 @@
-// WebGLEngine/ai-bridge/bootSidecar-selfcheck.mjs — v3285
+// WebGLEngine/ai-bridge/bootSidecar-selfcheck.mjs — v3936 (was v3285)
 //
-// Run: node ai-bridge/bootSidecar-selfcheck.mjs   (~1s — MEASURED; real temp files, no mocks)
+// Run: node ai-bridge/bootSidecar-selfcheck.mjs   (~0.1s — MEASURED; real temp files, no mocks)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // Three rules under test: the three states are never collapsed into two, a sidecar may not grade, and anything
@@ -57,6 +57,44 @@ const write = (o) => fs.writeFileSync(REPORT, JSON.stringify(o, null, 2));
     const r2 = readReport(REPORT, { inputs: { gone: path.join(dir, "does-not-exist") } });
     ok("!! an input that cannot be checked is assumed STALE (a check that cannot run must not report success)",
        r2.state === STATE_STALE && /assuming stale/.test(r2.why));
+
+    // ---- v3936: THE TIE, CONSTRUCTED RATHER THAN HOPED FOR --------------------------------------------------------
+    // Section 2 above wrote the input and stamped the report from Date.now() back to back, and whether those two
+    // landed in the SAME MILLISECOND was left to luck. On Keith's box they tied and section 2 went red with
+    // "STALE (0s old) -- catalog changed after the report was made"; on the authoring box they did not, so the gate
+    // was green here while the bug was live in the field. A FIXTURE THAT ONLY SOMETIMES REACHES THE CASE IS NOT A
+    // TEST OF THAT CASE -- it reports the timing of the box it ran on. So the tie is now BUILT: the input's mtime is
+    // set to the report's own whole millisecond plus a fraction, which is exactly what a producer racing its own
+    // inputs produces. producedAt is an ISO string and carries WHOLE ms; mtimeMs is a float and carries a fraction.
+    {
+        const tieMs = Date.now();
+        fs.writeFileSync(REPORT, JSON.stringify({ schemaVersion: SCHEMA_VERSION, kind: "swek-discovery-snapshot",
+            producedBy: "tie-fixture", producedAt: new Date(tieMs).toISOString(), observations: [] }, null, 2));
+        fs.writeFileSync(INPUT, "{}");
+        fs.utimesSync(INPUT, (tieMs + 0.7) / 1000, (tieMs + 0.7) / 1000);
+        const tied = fs.statSync(INPUT).mtimeMs;
+        // The precondition is ASSERTED, not assumed: utimesSync takes SECONDS, so the mtime you get is not always
+        // the mtime you asked for. A fixture that failed to land would otherwise pass as a result.
+        ok("   [precondition] the fixture really did construct a same-millisecond tie",
+           Math.floor(tied) === tieMs && tied > tieMs, tied + " vs producedMs " + tieMs);
+        ok("!! an input touched in the report's OWN MILLISECOND reads FRESH, not stale",
+           readReport(REPORT, { inputs: { catalog: INPUT } }).state === STATE_FRESH,
+           "the two sides carry different resolution -- comparing a float mtime against a whole-ms ISO stamp made a "
+           + "zero-second-old report report itself stale, which is the tell");
+
+        // ...and the floor that fixes it must be a RESOLUTION MATCH, never a tolerance. One whole millisecond later
+        // is a real change and must still read STALE, or the fix has bought section 2 by breaking this section.
+        let bumped = 0;
+        for (let b = 1; b <= 3 && Math.floor(bumped) !== tieMs + 1; b += 0.25) {
+            fs.utimesSync(INPUT, (tieMs + b) / 1000, (tieMs + b) / 1000);
+            bumped = fs.statSync(INPUT).mtimeMs;
+        }
+        ok("   [precondition] the fixture really did land on the NEXT whole millisecond",
+           Math.floor(bumped) === tieMs + 1, bumped + " floors to " + Math.floor(bumped));
+        ok("!! ...and ONE WHOLE MILLISECOND later is still STALE -- the floor is a resolution match, not a tolerance",
+           readReport(REPORT, { inputs: { catalog: INPUT } }).state === STATE_STALE,
+           "a floor that swallowed a real change would hide staleness everywhere rather than in a tie");
+    }
     // plain age expiry
     // age alone, with a report genuinely made ten minutes ago (the first attempt used a report a millisecond
     // old against a 1ms limit, which is a race rather than a test)

@@ -1,10 +1,16 @@
 // WebGLEngine/tools/roundhouse/external-linalg.c -- v3687
 // ---------------------------------------------------------------------------------------------------------------
-// THE OUTSIDE ANSWER KEY. Compile and run this ON A MAC; nothing in this tree can run it, which is the point.
+// THE OUTSIDE ANSWER KEY. It was Mac-only until v3936, and its gate had therefore reported "absent" -- not pass,
+// ABSENT -- for ~250 versions: a control designed, built, argued for, and never once fired, because producing the
+// key needed hardware the gates do not run on. Reference LAPACK is the same dgesvd/dgetrf and installs anywhere.
+// THE INDEPENDENCE ARGUMENT IS UNCHANGED: what matters is that nobody who wrote these routines has seen this
+// engine. Running BOTH is strictly better than running either, and that is now a thing Keith can do rather than
+// the only thing that works.
 //
 //   cd WebGLEngine
 //   node tools/roundhouse/externalLinalg.mjs --write-problems
-//   clang -O2 tools/roundhouse/external-linalg.c -framework Accelerate -o /tmp/exlinalg
+//   # on a Mac:            clang -O2 tools/roundhouse/external-linalg.c -framework Accelerate -o /tmp/exlinalg
+//   # where the gates run: cc    -O2 tools/roundhouse/external-linalg.c -llapack -lm      -o /tmp/exlinalg
 //   /tmp/exlinalg tools/roundhouse/external-linalg-problems.txt > tools/roundhouse/external-linalg-answers.json
 //   node tools/roundhouse/externalLinalg.mjs          # now it grades instead of skipping
 //
@@ -27,7 +33,28 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+// v3936 -- TWO LAPACKS, ONE PROGRAM. The Mac path is untouched; what is new is that this can also be built where
+// the gates actually run. dgesvd_ and dgetrf_ are the Fortran symbols BOTH libraries export, so the body below is
+// identical on either -- only the integer width and the header differ. Declaring the two symbols by hand on the
+// non-Apple side keeps the dependency down to liblapack alone: no LAPACKE, no CBLAS, no header hunt.
+#ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+typedef __CLPK_integer lapack_int_t;
+#define LINALG_SOURCE "Accelerate LAPACK (macOS) via external-linalg.c"
+#else
+// Reference LAPACK builds its Fortran INTEGER as 32-bit by default, which is what `int` is on every platform this
+// is likely to see. If anyone links an ILP64 build, THIS IS THE LINE THAT IS WRONG -- and it will not be subtle.
+typedef int lapack_int_t;
+extern void dgesvd_(char *jobu, char *jobvt, lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *lda,
+                    double *s, double *u, lapack_int_t *ldu, double *vt, lapack_int_t *ldvt,
+                    double *work, lapack_int_t *lwork, lapack_int_t *info);
+extern void dgetrf_(lapack_int_t *m, lapack_int_t *n, double *a, lapack_int_t *lda,
+                    lapack_int_t *ipiv, lapack_int_t *info);
+extern void dgesv_(lapack_int_t *n, lapack_int_t *nrhs, double *a, lapack_int_t *lda,
+                   lapack_int_t *ipiv, double *b, lapack_int_t *ldb, lapack_int_t *info);
+extern void dpotrf_(char *uplo, lapack_int_t *n, double *a, lapack_int_t *lda, lapack_int_t *info);
+#define LINALG_SOURCE "reference LAPACK (Netlib) via external-linalg.c"
+#endif
 
 #define MAXN 64
 
@@ -40,7 +67,7 @@ static void to_col_major(const double *rowmaj, double *colmaj, int m, int n) {
 
 static int rank_by_svd(const double *A, int m, int n, double *s1_out) {
     double a[MAXN * MAXN], s[MAXN], work[8 * MAXN * MAXN];
-    __CLPK_integer M = m, N = n, lda = m, lwork = 8 * MAXN * MAXN, info = 0, one = 1;
+    lapack_int_t M = m, N = n, lda = m, lwork = 8 * MAXN * MAXN, info = 0, one = 1;
     double u[1], vt[1];
     memcpy(a, A, sizeof(double) * m * n);
     char jobu = 'N', jobvt = 'N';
@@ -56,9 +83,37 @@ static int rank_by_svd(const double *A, int m, int n, double *s1_out) {
     return r;
 }
 
+// v3936 -- Ax = b, AND IT IS THE ONLY CLAIM IN THIS FILE THAT CAN SEE A TRANSPOSE. rank and det are equal for A
+// and A-transpose, so on a square matrix they cannot tell whether to_col_major above did its job. This one can:
+// solving A-transpose x = b gives a different x. dgesv overwrites its right-hand side with the solution.
+static int solve_by_lu(const double *A, const double *b, int n, double *x) {
+    double a[MAXN * MAXN];
+    lapack_int_t N = n, nrhs = 1, lda = n, ldb = n, ipiv[MAXN], info = 0;
+    memcpy(a, A, sizeof(double) * n * n);
+    memcpy(x, b, sizeof(double) * n);
+    dgesv_(&N, &nrhs, a, &lda, ipiv, x, &ldb, &info);
+    return info == 0;
+}
+
+// v3936 -- CHOLESKY, WHOSE ANSWER IS A DECISION FIRST AND A FACTOR SECOND. dpotrf returns info > 0 when the
+// leading minor of that order is NOT positive definite, and it decides that from the pivot's SIGN. The engine
+// being graded rejects on `s <= tol` for a TYPED tol -- a different rule, which is exactly why the two agreeing
+// is worth something. Returns 1 for positive definite, 0 for a refusal; L is written to `out` row-major with the
+// strict upper triangle ZEROED, because dpotrf leaves the untouched half holding the original input.
+static int chol_by_potrf(const double *A, int n, double *out) {
+    double a[MAXN * MAXN];
+    char uplo = 'L';
+    lapack_int_t N = n, lda = n, info = 0;
+    memcpy(a, A, sizeof(double) * n * n);
+    dpotrf_(&uplo, &N, a, &lda, &info);
+    if (info != 0) return 0;
+    for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) out[i * n + j] = (j <= i) ? a[j * n + i] : 0.0;
+    return 1;
+}
+
 static double det_by_lu(const double *A, int n) {
     double a[MAXN * MAXN];
-    __CLPK_integer N = n, lda = n, ipiv[MAXN], info = 0;
+    lapack_int_t N = n, lda = n, ipiv[MAXN], info = 0;
     memcpy(a, A, sizeof(double) * n * n);
     dgetrf_(&N, &N, a, &lda, ipiv, &info);
     if (info < 0) return NAN;
@@ -77,15 +132,37 @@ int main(int argc, char **argv) {
     if (!f) { fprintf(stderr, "cannot open %s\n", argv[1]); return 2; }
     int count = 0;
     if (fscanf(f, "%d", &count) != 1) { fprintf(stderr, "bad header\n"); return 2; }
-    printf("{\n \"source\": \"Accelerate LAPACK via external-linalg.c\",\n \"answers\": [\n");
+    printf("{\n \"source\": \"%s\",\n \"answers\": [\n", LINALG_SOURCE);
     for (int p = 0; p < count; p++) {
         char name[128], claim[32];
         int m = 0, n = 0;
         if (fscanf(f, "%127s %31s %d %d", name, claim, &m, &n) != 4) { fprintf(stderr, "bad block %d\n", p); return 2; }
         if (m > MAXN || n > MAXN) { fprintf(stderr, "matrix too large\n"); return 2; }
-        double rowmaj[MAXN * MAXN], colmaj[MAXN * MAXN];
+        double rowmaj[MAXN * MAXN], colmaj[MAXN * MAXN], rhs[MAXN], x[MAXN];
         for (int i = 0; i < m * n; i++) if (fscanf(f, "%lf", &rowmaj[i]) != 1) { fprintf(stderr, "short matrix\n"); return 2; }
+        // A solve block carries one extra line: the right-hand side, m long. The claim word says so, so there is
+        // nothing to infer -- and reading it in the wrong order would desynchronise every block after this one.
+        if (strcmp(claim, "solve") == 0)
+            for (int i = 0; i < m; i++) if (fscanf(f, "%lf", &rhs[i]) != 1) { fprintf(stderr, "short rhs\n"); return 2; }
         to_col_major(rowmaj, colmaj, m, n);
+        if (strcmp(claim, "solve") == 0) {
+            if (m != n) { fprintf(stderr, "solve needs a square matrix\n"); return 2; }
+            if (!solve_by_lu(colmaj, rhs, n, x)) { fprintf(stderr, "dgesv failed on %s\n", name); return 2; }
+            printf("  {\"name\": \"%s\", \"claim\": \"solve\", \"values\": [", name);
+            for (int i = 0; i < n; i++) printf("%s%.17g", i ? ", " : "", x[i]);
+            printf("]}%s\n", (p + 1 < count) ? "," : "");
+            continue;
+        }
+        if (strcmp(claim, "chol") == 0) {
+            if (m != n) { fprintf(stderr, "chol needs a square matrix\n"); return 2; }
+            double L[MAXN * MAXN];
+            int definite = chol_by_potrf(colmaj, n, L);
+            printf("  {\"name\": \"%s\", \"claim\": \"chol\", \"definite\": %s, \"values\": [",
+                   name, definite ? "true" : "false");
+            if (definite) for (int i = 0; i < n * n; i++) printf("%s%.17g", i ? ", " : "", L[i]);
+            printf("]}%s\n", (p + 1 < count) ? "," : "");
+            continue;
+        }
         double value = 0.0;
         if (strcmp(claim, "rank") == 0) { double s1; value = (double)rank_by_svd(colmaj, m, n, &s1); }
         else if (strcmp(claim, "det") == 0) { value = (m == n) ? det_by_lu(colmaj, n) : NAN; }

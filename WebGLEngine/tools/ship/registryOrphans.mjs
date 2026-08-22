@@ -37,6 +37,26 @@ const hasSplit = (mod) => {
     try { return /export\s+(async\s+)?function\s+reportLines/.test(fs.readFileSync(path.join(ENG, mod), "utf8")); }
     catch { return false; }
 };
+// *** v3933 -- A reportLines THAT REQUIRES A RESULT IS A FORMATTER, NOT A READABLE MODULE. ***
+//
+// hasSplit asks only whether reportLines is EXPORTED, which is right for "does this module follow the v3327
+// split". It is NOT enough for "can the bench serve this one": officeManager and composePropose both export
+// `reportLines(r)`, which FORMATS a result somebody else computed. Called with nothing they throw -- and a bench
+// page pointing at them would render an error where a reader expected a measurement, which is exactly what
+// benchBroken exists to prevent, arriving through the other door.
+//
+// The distinction is in the PARAMETER LIST and is derived rather than a list of two names: a reporter the bench
+// can call takes no required argument. A default value still counts as callable, because it is.
+const benchServable = (mod) => {
+    try {
+        const m = fs.readFileSync(path.join(ENG, mod), "utf8")
+            .match(/export\s+(?:async\s+)?function\s+reportLines\s*\(([^)]*)\)/);
+        if (!m) return false;
+        const params = m[1].trim();
+        return params === "" || /=/.test(params);        // no parameter, or one with a default
+    } catch { return false; }
+};
+
 export const moduleFor = (gate) => gate.replace(/-selfcheck\.mjs$/, ".mjs");
 
 export function scan() {
@@ -62,7 +82,7 @@ export function scan() {
         if (!i.gate) continue;
         const mod = moduleFor(i.gate);
         const canReport = fs.existsSync(path.join(ENG, mod)) && hasSplit(mod);
-        if (canReport && !i.page) benchEligible.push({ id: i.id, module: mod });
+        if (canReport && benchServable(mod) && !i.page) benchEligible.push({ id: i.id, module: mod });
         // and the reverse: a bench page whose module cannot report would render an error where a reader
         // expected a measurement
         if (i.page === "instrument-bench.html" && !canReport) benchBroken.push({ id: i.id, module: mod });

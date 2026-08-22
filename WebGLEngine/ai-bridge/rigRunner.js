@@ -150,6 +150,53 @@ function runOne(rel, cb) {
     if (!rel.endsWith("-selfcheck.mjs") || !fs.existsSync(file) || rel.includes("..")) {
         return cb({ ok: false, code: -1, out: "no such selfcheck: " + rel });
     }
+    // *** v3919 -- THIS RUNNER HAD ITS OWN BUDGET, AND gatesBridge's OWN COMMENT SAYS THAT CANNOT HAPPEN. ***
+    //
+    // v3212 wrote, in gatesBridge.js: "THE BUDGET IS NOT THE PAGE'S BUSINESS. It comes from
+    // tools/ship/gateBudget.mjs -- the same table selfchecks.mjs uses -- so a gate cannot be given one budget by
+    // the button and another by the ship. TWO DECLARATIONS ABOUT ONE THING IS THIS TREE'S MOST REPEATED DEFECT;
+    // there is one table." IT FIXED THE BUTTON AND THE SHIP. THIS IS A THIRD RUNNER AND NOBODY NOTICED IT.
+    //
+    // The flat 180000 below was ABOVE the general default (139.9s), so ordinary gates were fine and nothing
+    // looked wrong -- but it is BELOW twenty of the thirty-five MEASURED budgets, so those twenty COULD NEVER
+    // PASS ON rig.html no matter what they did. levelClaim is budgeted 2116s and was killed at 180.
+    // assumptionMap reads "TIMEOUT (180s budget)" while the table beside it says 568s.
+    //
+    // The budget now comes from the one table. The table is ESM and this runner is callback-style, so it is
+    // loaded once and memoised; the SOURCE of the number travels with the result so the page can show where it
+    // came from rather than asserting the wiring in a sentence.
+    loadBudgets().then(({ gb, hs }) => spawnOne(rel, file, gb, hs, cb));
+}
+
+let BUDGETS = null;
+function loadBudgets() {
+    if (!BUDGETS) BUDGETS = Promise.all([
+        import("../tools/ship/gateBudget.mjs").catch(() => null),
+        import("../tools/ship/hostScale.mjs").catch(() => null),
+    ]).then(([gb, hs]) => ({ gb, hs }));
+    return BUDGETS;
+}
+
+function spawnOne(rel, file, gb, hs, cb) {
+    // A FAILED IMPORT MUST NOT SILENTLY REINVENT A NUMBER. If the table cannot be read the budget is reported as
+    // coming from nowhere, which is a visible defect, rather than falling back to a constant that looks fine.
+    let budgetMs = 180000, budgetSource = "fallback: gateBudget.mjs could not be loaded";
+    try {
+        if (gb && typeof gb.budgetFor === "function") {
+            budgetMs = gb.budgetFor(rel);
+            budgetSource = typeof gb.budgetReason === "function" ? gb.budgetReason(rel) : "tools/ship/gateBudget.mjs";
+        }
+    } catch { /* keep the fallback and say so */ }
+    // v3923 -- and the table is ONE BOX'S STOPWATCH, so this box scales it by what it has actually done. The
+    // scale starts at 1 with no local runs and only ever GROWS a budget; see tools/ship/hostScale.mjs.
+    try {
+        if (hs && typeof hs.scaled === "function") {
+            const sc = hs.scaled(budgetMs);
+            if (sc.scale > 1) budgetSource += "  |  host x" + sc.scale.toFixed(2) + " (" + sc.why + ")";
+            else budgetSource += "  |  host x1.00 (" + sc.why + ")";
+            budgetMs = sc.ms;
+        }
+    } catch { /* an unreadable local file must never stop a gate running */ }
     let out = "";
     const t0 = Date.now();
     const p = spawn(process.execPath, [file], { cwd: ENGINE, env: { ...process.env } });
@@ -166,9 +213,8 @@ function runOne(rel, cb) {
     // The distinction matters in both directions: a real failure needs fixing, a timeout needs either a longer
     // budget or a smaller fixture, and treating the second as the first sends you looking for a bug that is not
     // there. gatesBridge already carried a timedOut flag; this runner threw the information away.
-    const TIMEOUT_MS = 180000;
     let timedOut = false;
-    const kill = setTimeout(() => { timedOut = true; try { p.kill("SIGKILL"); } catch {} }, TIMEOUT_MS);
+    const kill = setTimeout(() => { timedOut = true; try { p.kill("SIGKILL"); } catch {} }, budgetMs);
     p.on("close", (code) => {
         clearTimeout(kill);
         // THE EXIT CODE IS THE VERDICT. Not a regex over stdout. v2544 shipped past a gate because a pipe ate the
@@ -176,7 +222,12 @@ function runOne(rel, cb) {
         //
         // ...but a killed process HAS no verdict, and `code === 0` being false is not evidence of anything. A
         // timed-out gate is reported as such, with the budget it exceeded, so the reader knows what to do next.
-        cb({ ok: code === 0, code, timedOut, timeoutMs: TIMEOUT_MS, out, ms: Date.now() - t0 });
+        const took = Date.now() - t0;
+        // Record what this box actually did, so the next budget is measured rather than assumed. A killed run is
+        // recorded as a LOWER BOUND -- without it a badly-mismatched box that times out on everything would
+        // never produce a completed run to learn from, which is exactly the box that needs the scale.
+        try { if (hs && typeof hs.recordRun === "function") hs.recordRun(rel, took, code === 0 && !timedOut); } catch {}
+        cb({ ok: code === 0, code, timedOut, timeoutMs: budgetMs, budgetSource, out, ms: took });
     });
     p.on("error", (e) => { clearTimeout(kill); cb({ ok: false, code: -1, out: String(e && e.message) }); });
 }
