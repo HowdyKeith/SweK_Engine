@@ -12,10 +12,11 @@ import { emptyQueue, claim, complete, validateSpec } from "./jobQueue.mjs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { fileURLToPath } from "node:url";
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (n, d) => console.log("  ----  " + n + "   " + d);
-const HERE = path.dirname(new URL(import.meta.url).pathname), ENG = path.resolve(HERE, "..", "..");
+const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 
 const FRONTIER = [
     { kind: "plant", subject: "physics/alpha.mjs", grader: "tools/roundhouse/alphaBind.mjs" },

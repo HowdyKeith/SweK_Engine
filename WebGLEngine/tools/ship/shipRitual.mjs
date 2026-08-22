@@ -32,7 +32,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 const require_ = createRequire(import.meta.url);
 
@@ -208,7 +208,7 @@ export function showLines() {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     if (process.argv.includes("--run")) {
         console.log("[shipRitual] --run performs only the two mechanical steps; the edits and the zip are yours.");
         for (const id of ["knowledge-index"]) {

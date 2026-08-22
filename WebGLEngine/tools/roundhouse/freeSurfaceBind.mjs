@@ -103,6 +103,7 @@
 import { surfaceCells, levelness, volumeHeight, occupancy } from "../../fluid/freeSurface.mjs";
 import { Flip2D } from "../../fluid/flip2d.mjs";
 
+import { pathToFileURL } from "node:url";
 export const FREESURFACE_MODES = ["vessels", "depth", "mincell"];
 
 export const FREESURFACE_OBSERVABLES = [
@@ -254,7 +255,7 @@ export const freeSurfaceDevice = {
 // ---- front door ------------------------------------------------------------------------------------------
 // device.html lists every name in DEVICE_NAMES from /device/list and runs it, so registering is the door; this
 // block is the one that works without a server.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = await buildFreeSurface({ mode: "vessels" });
     console.log("[freesurface] COMMUNICATING VESSELS -- two unequal columns over one floor must find one level\n");
     if (r.error) { console.log("  REFUSED:", r.error); }

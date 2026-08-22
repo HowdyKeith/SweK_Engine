@@ -37,7 +37,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { makeReport, readReport, reportLine, STATE_FRESH, STATE_STALE } from "./bootSidecar.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -95,7 +95,7 @@ export function readForBoot({ snapshotPath = SNAPSHOT_PATH, catalogPath = CATALO
 }
 
 // ---- CLI: a producer a scheduled task or a shell can invoke -----------------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = write({ producedBy: "cli/catalogSnapshot" });
     console.log("[catalogSnapshot] wrote " + r.observations + " observations to " + r.path);
     const back = readForBoot({});

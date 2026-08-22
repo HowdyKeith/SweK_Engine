@@ -44,6 +44,7 @@
 
 import { inducedE, coulombE, divergence, K_COULOMB } from "../../physics/blobInduction.js";
 
+import { pathToFileURL } from "node:url";
 // v3902 -- ONE declaration of the mode list; it lived in the defaults whitelist AND in the device object.
 // The FOURTH device this round carrying that duplicate (splat, multigridgpu, geometry were the others), and on
 // splatBind the second copy silently coerced a new plant mode to the primary so both arms read bit-identical
@@ -195,7 +196,7 @@ export const inductionDevice = {
     defaults: inductionDefaults,
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const f = await buildInduction({ mode: "faraday" });
     const g = await buildInduction({ mode: "gauss" });
     const s = await buildInduction({ mode: "separation" });

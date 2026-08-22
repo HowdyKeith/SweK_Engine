@@ -40,7 +40,7 @@
 // MISLED THIS PROJECT THREE TIMES, so the name scan is reported apart from the two facts that are derived.
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { codeOnly, noComments } from "../ship/sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -176,4 +176,4 @@ export function reportLines() {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

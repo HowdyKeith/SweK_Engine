@@ -26,7 +26,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { reach } from "./gateReach.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -105,4 +105,4 @@ export function triageLines(t) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) for (const l of triageLines(triage())) console.log(l);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) for (const l of triageLines(triage())) console.log(l);

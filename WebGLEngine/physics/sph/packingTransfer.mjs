@@ -61,6 +61,7 @@
 import { settlePool, poolSurface, settledDensity, perCellFullDeclared, perCellFullLattice,
          SHIPPED_FLOOR } from "./poolFixture.mjs";
 
+import { pathToFileURL } from "node:url";
 /**
  * *** THE MARGIN IS A PARAMETER HERE AND WAS A CONSTANT IN v3543. *** interiorNumberDensity fixes the slab at
  * one smoothing length in from every wall and from the free surface; that is a choice, and a choice nobody
@@ -189,4 +190,4 @@ export function reportLines({ live = false } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

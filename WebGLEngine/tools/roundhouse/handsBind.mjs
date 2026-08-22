@@ -96,6 +96,7 @@
 
 import { computeHandMetrics } from "../../face/MediaPipeHandTracker.js";
 
+import { pathToFileURL } from "node:url";
 export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance"];
 
 export const HANDS_OBSERVABLES = [
@@ -337,7 +338,7 @@ export const handsDevice = {
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const rigid = await buildHands({ mode: "rigid" });
     const flat = await buildHands({ mode: "flatdistance" });
     const scale = await buildHands({ mode: "scale" });

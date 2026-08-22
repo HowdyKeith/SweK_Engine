@@ -24,6 +24,7 @@ import { makeLBM } from "../../simulation/lbm/lbm2d.js";
 import { makeThermal } from "../../simulation/lbm/thermal2d.js";
 import { makeLBM3D } from "../../simulation/lbm/lbm3d.js";
 
+import { pathToFileURL } from "node:url";
 /**
  * The Poiseuille channel, with EVERY physics knob exposed. Compare against physicsSuite's version, which is the
  * same measurement with the same numbers welded shut.
@@ -413,7 +414,7 @@ export async function reportLines() {
     return L;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     for (const l of await reportLines()) console.log(l);
     process.exit(0);
 }

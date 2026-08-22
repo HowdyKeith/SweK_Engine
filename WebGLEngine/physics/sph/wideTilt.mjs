@@ -45,6 +45,7 @@ import { settlePool } from "./poolFixture.mjs";
 import { surfaceHeights, surfaceSlope } from "./levelClaim.mjs";
 import { columnLeverage, xProfile, transferByWidth, worstError, tiltedProfile } from "./tiltPower.mjs";
 
+import { pathToFileURL } from "node:url";
 export const WIDE_W = 2.4;
 export const WIDE_TARGET_N = 19044;
 
@@ -144,4 +145,4 @@ export function reportLines() {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

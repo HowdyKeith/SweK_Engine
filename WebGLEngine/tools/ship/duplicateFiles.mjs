@@ -30,8 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
-
+import { fileURLToPath, pathToFileURL } from "node:url";
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SKIP = new Set([".git", "node_modules", "__pycache__", ".DS_Store"]);
 // Text-ish and code-ish only. A duplicated BINARY ASSET (an icon, a wasm blob, a font) is normal and carries no
@@ -104,7 +103,7 @@ export function reportLines(root = ROOT) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     // *** THE NAME GOES IN BRACKETS BECAUSE toolFrontDoor DEMANDS IT IN THAT FORM, and it is right to: a report
     // with no name on it is unattributable the moment two of them share a terminal. My first version printed a
     // bare title and the front-door gate FAILED IT CORRECTLY -- the check was read rather than guessed at.

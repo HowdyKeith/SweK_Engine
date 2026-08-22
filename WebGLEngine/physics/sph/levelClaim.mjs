@@ -68,6 +68,7 @@
 "use strict";
 import { settlePool, cellIndex, perCellFullDeclared, SHIPPED_FLOOR } from "./poolFixture.mjs";
 
+import { pathToFileURL } from "node:url";
 /**
  * The free surface as a CONTINUOUS height per column: the top qualifying cell, plus how far the cell above it
  * is filled. Returns [columnKey, height] so a caller can fit against position as well as take a spread.
@@ -220,4 +221,4 @@ export function reportLines({ live = true } = {}) {
 }
 
 // A REPORTING TOOL MUST PRINT AND EXIT ZERO; the gate beside it is what exits nonzero.
-if (import.meta.url === `file://${process.argv[1]}`) { for (const l of reportLines()) console.log(l); process.exit(0); }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { for (const l of reportLines()) console.log(l); process.exit(0); }

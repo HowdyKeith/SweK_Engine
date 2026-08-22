@@ -23,7 +23,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildGraph } from "./affected.mjs";
 import { gateFiles } from "./staleness.mjs";
 
@@ -80,7 +80,7 @@ export function reachLines(r) {
     return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = reach();
     for (const l of reachLines(r)) console.log(l);
     console.log("\n  first twenty with no gate at all:");

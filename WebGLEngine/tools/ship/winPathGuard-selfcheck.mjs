@@ -18,7 +18,12 @@ import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BAD_PATHNAME = "new URL(import.meta.url).pathname";
-const BAD_GUARD = "`file://${process.argv[1]}`";
+// The OFFENCE is the comparison, not the fragment. Every sentence about this bug contains the fragment.
+const BAD_GUARD_RE = /import\.meta\.url\s*===\s*`file:\/\/\$\{process\.argv\[1\]\}`/;
+// Line-wise, like v3126's stripper: a non-greedy /* */ span once ate 965,179 characters of server.js.
+const stripComments = (src) => src.split("\n")
+    .filter((L) => { const t = L.trim(); return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")); })
+    .join("\n");
 const SKIP = new Set(["node_modules", ".git", "vendor", "rt", "__pycache__"]);
 
 function walk(dir, hits) {
@@ -28,9 +33,21 @@ function walk(dir, hits) {
         if (st.isDirectory()) walk(p, hits);
         else if (name === "winPathGuard-selfcheck.mjs") continue;   // this file holds the patterns as search literals
         else if (/\.(mjs|js)$/.test(name)) {
-            const s = readFileSync(p, "utf8"), rel = path.relative(ROOT, p);
+            const raw = readFileSync(p, "utf8"), rel = path.relative(ROOT, p);
+            // *** v3936 -- THE SENTENCE DESCRIBING THE BUG IS NOT THE BUG. *** This read raw source with
+            // includes(), so every COMMENT teaching the rule and every STRING quoting it counted as an offence:
+            // main.js's own note about main-module detection, and orphanTriage's two paragraphs about the
+            // commonest spelling, were all reported as Windows-fragile code. That is the keyword-probe trap --
+            // a regex over raw source cannot tell what a file DOES from what it SAYS -- and it makes the honest
+            // response to a red gate "delete the explanation", which is exactly backwards.
+            //
+            // Comments are stripped, and the guard is matched as THE COMPARISON rather than as a fragment.
+            // Prose quotes the fragment; only code writes `import.meta.url === ...`. Measured when this changed:
+            // 40 real guards, 0 prose, and the four surviving prose hits went to zero without a word being
+            // reworded. The pathname form is a complete expression already, so stripping comments is enough.
+            const s = stripComments(raw);
             if (s.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
-            if (s.includes(BAD_GUARD)) hits.push(rel + "  [file://${process.argv[1]} guard]");
+            if (BAD_GUARD_RE.test(s)) hits.push(rel + "  [file://${process.argv[1]} guard]");
         }
     }
 }

@@ -42,6 +42,7 @@ import { shadowSolve } from "../../fluid/multigridGPU.js";
 import { shadowProlong, shadowRestrict } from "../../fluid/mgGpuKernels.js";
 import { PoissonMG, FLUID, SOLID, AIR } from "../../fluid/multigrid.mjs";
 
+import { pathToFileURL } from "node:url";
 // v3902 -- ONE declaration of the mode list. It lived in mggpuDefaults' whitelist AND in the device object,
 // and on splatBind this same round the second copy SILENTLY COERCED a new plant mode to the primary and made
 // both arms read bit-identical numbers. THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED.
@@ -262,7 +263,7 @@ export const multigridGPUDevice = {
 };
 
 // ---- front door ------------------------------------------------------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     console.log("[multigridgpu] the property the gather rewrite had to keep and is never told: RESTRICT IS THE");
     console.log("               EXACT TRANSPOSE OF PROLONG.\n");
     for (const n of [16, 32, 64]) {

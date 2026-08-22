@@ -36,6 +36,7 @@ import path from "node:path";
 import { INSTRUMENTS } from "../../physics/instruments.mjs";
 import { parseRegistry, readsPlantedKnob, declaredPlantMode } from "./plantedCoverage.mjs";
 
+import { fileURLToPath } from "node:url";
 /** The absences, first-class. A caller that reads only the positive fields would over-trust the card. */
 export const NOT_CLAIMED = [
     { field: "detectionFloor", why: "only clocks has one measured, and it is a RADIUS (invisible beyond ~1007M at a 1e-6 tolerance) rather than an epsilon. One numeric column would force every other device to look like it had a floor of zero." },
@@ -136,7 +137,7 @@ export function readVersion(engRoot) {
 
 // ---- main block: this is a REPORTING tool -- it prints and exits zero, and changes nothing ----------------
 if (process.argv[1] && process.argv[1].endsWith("capabilityCard.mjs")) {
-    const here = path.dirname(new URL(import.meta.url).pathname);
+    const here = path.dirname(fileURLToPath(import.meta.url));
     const eng = path.join(here, "..", "..");
     const D = await import("./devices.mjs");
     const card = await capabilityCard(eng, D);

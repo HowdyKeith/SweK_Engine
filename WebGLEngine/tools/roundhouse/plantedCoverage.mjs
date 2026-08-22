@@ -256,7 +256,7 @@ export async function plantedCoverage(engRoot, { DEVICE_NAMES, getDevice }) {
 // strong one. A REPORT MUST PRINT AND EXIT ZERO; this exits 0 on both paths, because a census is not a verdict.
 // ---------------------------------------------------------------------------------------------------------------
 async function main() {
-    const engRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+    const engRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
     const verify = process.argv.includes("--verify");
     const D = await import("./devices.mjs");
     console.log("[plantedCoverage] which of the lab's binds can be asked what they would catch\n");

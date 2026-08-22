@@ -18,6 +18,7 @@ import path from "node:path";
 import { hostScale, scaled, recordRun, SCALE_FLOOR, SCALE_CEILING } from "./hostScale.mjs";
 import { MEASURED, budgetFor } from "./gateBudget.mjs";
 
+import { fileURLToPath } from "node:url";
 let failed = 0;
 const say = (m) => console.log("  ----  " + m);
 const ok = (l, c, n) => { console.log("  " + (c ? "PASS" : "FAIL") + "  " + l + (n ? "   " + n : "")); if (!c) failed++; };
@@ -79,7 +80,7 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
 
 // ---- 6. *** THE DENOMINATOR, WHICH THE FIRST VERSION GOT WRONG *** -------------------------------------------
 {
-    const raw = JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "gate-timings.json"), "utf8"));
+    const raw = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "gate-timings.json"), "utf8"));
     const truncated = raw.timings[GATE];
     ok("!! *** the scale divides by MEASURED, not by gate-timings.json, and here is why ***",
        typeof truncated === "number" && truncated < REF / 2,
@@ -97,7 +98,7 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
 
 // ---- 7. AND THE LOCAL FILE MUST NEVER TRAVEL -----------------------------------------------------------------
 {
-    const gi = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..", ".gitignore"), "utf8");
+    const gi = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".gitignore"), "utf8");
     ok("!! the per-host record is gitignored -- a fast machine must not export its scale to a slow one",
        /host-timings\.local\.json/.test(gi),
        "gate-timings.json is the shipped REFERENCE and this is one box's comparison against it. Shipping the " +
