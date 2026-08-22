@@ -1,0 +1,1 @@
+{"version":3,"file":"intersect2d.d.ts","sourceRoot":"","sources":["../../src/curve/intersect2d.ts"],"names":[],"mappings":"AAMA,OAAO,KAAK,EAAE,IAAI,EAAE,MAAM,kBAAkB,CAAC;AAC7C,OAAO,KAAK,EAAE,OAAO,EAAe,MAAM,YAAY,CAAC;AAmFvD,oEAAoE;AACpE,wBAAgB,iBAAiB,CAAC,CAAC,EAAE,OAAO,EAAE,CAAC,EAAE,OAAO,GAAG,IAAI,EAAE,CAchE"}

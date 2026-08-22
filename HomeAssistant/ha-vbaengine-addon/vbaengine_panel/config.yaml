@@ -1,0 +1,27 @@
+name: VBA Engine Panel
+version: "0.1.0"
+slug: vbaengine_panel
+description: Slimmed WebGL engine served as a Home Assistant sidebar panel (ingress).
+url: "https://github.com/YOURNAME/ha-vbaengine-addon"
+arch:
+  - amd64
+  - aarch64
+init: false
+
+# --- Ingress: HA serves this add-on's web UI as a sidebar panel and handles
+#     auth + TLS. The container just listens on ingress_port. ---
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:cube-outline
+panel_title: SweK Engine
+panel_admin: false
+
+# Optional knobs the panel can read (passed in as /data/options.json by the
+# supervisor). bridge_url lets the panel talk to your Node bridge if you want
+# it to pull live engine state directly instead of (or as well as) HA entities.
+options:
+  bridge_url: ""
+  title: "SweK Engine"
+schema:
+  bridge_url: "str?"
+  title: "str?"

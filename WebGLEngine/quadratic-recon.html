@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The fix I proposed was wrong (v3647)</title>
+<meta name="demo:desc" content="The previous round proposed a higher-order boundary row to recover what curvature costs. It is wrong three ways: the row is already exact at its quadrature point, a constant gradient cannot satisfy it, and a second row makes it worse. A quadratic reconstruction with no boundary row converges at second order.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>The fix I proposed was wrong</h1>
+<div class="sub">The previous round ended by naming the repair: <i>"a higher-order boundary row &mdash; two rows
+per face, or one per quadrature point &mdash; is what would recover the exactness curvature costs."</i> Three
+measurements say the boundary row was never the limiting factor, and a fourth says what is.</div>
+<h2>1. The row is already exact at its own quadrature point</h2>
+<div class="panel"><button id="n" class="good">compare each face normal to the exact wall normal</button><table id="t0"></table></div>
+<div class="law">A chord's outward normal <b>is</b> the radial direction at the arc midpoint, by symmetry &mdash;
+4.0e-16 rising only to 7.2e-15 over a sixteenfold refinement. That is round-off, not geometry, and it does not
+fall with h because <b>there is nothing there to converge</b>. <i>(My first version of this check compared against
++r̂ and read exactly 2.000 &mdash; two unit vectors pointing opposite ways. On the inner wall of an annulus
+"outward from the cell" means toward the hole. A worst case of exactly 2.000 between unit vectors is a sign, not
+an error.)</i></div>
+<h2>2. A constant gradient cannot satisfy the row</h2>
+<div class="panel"><button id="r" class="good">measure what the row asks for</button><table id="t1"></table></div>
+<div class="law">The exact gradient at the <i>centroid</i>, dotted with the face normal, is <b>O(h)</b> &mdash;
+orders 0.96 / 0.98 / 0.99 once the mesh resolves the circle. <b>The row asks a constant gradient for something a
+constant gradient does not have</b>, and the first-order convergence measured last round is exactly this residual
+vanishing.</div>
+<h2>3. The proposed fix, measured</h2>
+<div class="panel"><button id="two" class="good">one row against two</button><table id="t2"></table></div>
+<div class="law"><b>Two rows per face is worse at every mesh size and converges no faster</b>, because it adds
+another equation the constant gradient cannot satisfy either. <b>More quadrature points state a true condition
+more carefully to a model that cannot hear it.</b></div>
+<h2>4. What actually moves the category</h2>
+<div class="panel">
+  <button id="q" class="good">quadratic reconstruction, no boundary row</button>
+  <canvas id="cv" width="620" height="360" style="max-width:100%"></canvas>
+  <table id="t3"></table>
+</div>
+<div class="law"><b>Order 1.88 against the linear-plus-row's 0.93, and 27&times; more accurate at the finest mesh
+&mdash; with no boundary row at all.</b> The category moves, but not by the route I proposed. The higher order
+costs the wider stencil: five unknowns need at least five rows, which a vertex neighbourhood has and a face
+neighbourhood does not &mdash; the same widening trade measured two rounds ago, arriving from a different
+direction.</div>
+<div class="law"><b>Not claimed:</b> that a quadratic is the right choice for a solver. It is ~4&times; the rows on
+every cell and has no limiter, so on a discontinuous field it would be the widening under trial again, and worse.
+What is claimed is narrow: <b>the boundary row was not the limiting factor on a curved wall, and the fix proposed
+last round makes it worse rather than better.</b> Graded by
+<code>physics/mesh/quadraticRecon-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/curved-wall.html" style="color:#9ab6e8">curved wall</a>.</div>
+<script type="module">
+import { makeAnnulus, potentialFlow, cellValues, annulusFaces, gradientWall, wallSideError } from "/physics/mesh/curvedWall.mjs";
+import { vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+import { quadraticGradient, rowResidual, normalExactness } from "/physics/mesh/quadraticRecon.mjs";
+const $ = (i) => document.getElementById(i);
+const { phi, grad } = potentialFlow({});
+const NT = [24, 48, 96, 192, 384];
+const build = (nt) => {
+    const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / 8)), nt, a: 1, b: 3 });
+    return { nt, m, u: cellValues(m, phi), F: annulusFaces(m), vn: vertexNeighbours(m) };
+};
+const S = NT.map(build);
+const ord = (v) => v.slice(1).map((e, i) => Math.log2(v[i] / e));
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const oneRow = (s) => wallSideError(s.m, s.F, grad, gradientWall(s.u, s.m, { wall: "inner", faces: s.F }), "inner");
+const twoRow = (s) => {
+    const { m, u, F } = s;
+    const gx = new Float64Array(u.length), gy = new Float64Array(u.length);
+    for (let t = 0; t < u.length; t++) {
+        const rws = [];
+        for (const q of m.nbr[t]) { const dx = m.cx[q] - m.cx[t], dy = m.cy[q] - m.cy[t]; rws.push([dx, dy, u[q] - u[t], 1 / (dx * dx + dy * dy)]); }
+        if (F[t].some((f) => f.kind === "inner")) {
+            const [p, q, z] = m.tri[t];
+            for (const [x, y] of [[p, q], [q, z], [z, p]]) {
+                const rx = Math.hypot(m.vx[x], m.vy[x]), ry = Math.hypot(m.vx[y], m.vy[y]);
+                if (Math.abs(rx - m.a) > 1e-9 || Math.abs(ry - m.a) > 1e-9) continue;
+                rws.push([-m.vx[x] / rx, -m.vy[x] / rx, 0, 1]); rws.push([-m.vx[y] / ry, -m.vy[y] / ry, 0, 1]);
+            }
+        }
+        let sxx = 0, sxy = 0, syy = 0, sxu = 0, syu = 0;
+        for (const [dx, dy, du, w] of rws) { sxx += w * dx * dx; sxy += w * dx * dy; syy += w * dy * dy; sxu += w * dx * du; syu += w * dy * du; }
+        const det = sxx * syy - sxy * sxy, tr = sxx + syy;
+        if (Math.abs(det) > 1e-10 * Math.max(tr * tr, 1e-300)) { gx[t] = (syy * sxu - sxy * syu) / det; gy[t] = (sxx * syu - sxy * sxu) / det; }
+    }
+    return wallSideError(m, F, grad, { gx, gy }, "inner");
+};
+$("n").onclick = () => rows($("t0"), ["nt", "|face normal &minus; exact wall normal|", "reading"],
+    S.map((s) => [s.nt, "<span class='ok'>" + normalExactness(s.m, s.F, "inner").toExponential(3) + "</span>",
+        "round-off &mdash; and it does not fall with h"]));
+$("r").onclick = () => {
+    const v = S.map((s) => rowResidual(s.m, s.F, grad, "inner").relative);
+    rows($("t1"), ["nt", "|grad(centroid)&middot;n| / scale", "order", "reading"],
+        S.map((s, i) => [s.nt, "<span class='bad'>" + v[i].toExponential(3) + "</span>",
+            i ? ord(v)[i - 1].toFixed(2) : "&mdash;",
+            i === 1 ? "<span class='dim'>coarsest step is pre-asymptotic</span>" : (i ? "O(h)" : "")]));
+};
+$("two").onclick = () => {
+    const e1 = S.map(oneRow), e2 = S.map(twoRow);
+    rows($("t2"), ["nt", "one row", "two rows", "ratio", "reading"],
+        S.map((s, i) => [s.nt, e1[i].toExponential(3), "<span class='bad'>" + e2[i].toExponential(3) + "</span>",
+            (e2[i] / e1[i]).toFixed(3), e2[i] > e1[i] ? "<span class='bad'>worse</span>" : "better"])
+        .concat([["orders", ord(e1).map((o) => o.toFixed(2)).join(", "), ord(e2).map((o) => o.toFixed(2)).join(", "),
+            "&mdash;", "<span class='dim'>no faster</span>"]]));
+};
+$("q").onclick = () => {
+    const e1 = S.map(oneRow);
+    const eq = S.map((s) => wallSideError(s.m, s.F, grad, quadraticGradient(s.u, s.m, s.vn), "inner"));
+    rows($("t3"), ["nt", "linear + row", "quadratic, no row", "ratio", "reading"],
+        S.map((s, i) => [s.nt, e1[i].toExponential(3), "<span class='ok'>" + eq[i].toExponential(3) + "</span>",
+            (e1[i] / eq[i]).toFixed(1) + "x", ""])
+        .concat([["orders", "<span class='warn'>" + ord(e1).map((o) => o.toFixed(2)).join(", ") + "</span>",
+            "<span class='ok'>" + ord(eq).map((o) => o.toFixed(2)).join(", ") + "</span>", "&mdash;",
+            "<span class='ok'>first order against second</span>"]]));
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    const L = 48, B = 32, T = 14, R = 14, lo = -3.5, hi = 0;
+    const X = (i) => L + i / (S.length - 1) * (W - L - R);
+    const Y = (v) => T + (1 - (Math.log10(Math.max(v, 1e-5)) - lo) / (hi - lo)) * (H - T - B);
+    ctx.strokeStyle = "#232b3d"; ctx.fillStyle = "#68748c";
+    for (let e = -3; e <= 0; e++) { ctx.beginPath(); ctx.moveTo(L, Y(Math.pow(10, e))); ctx.lineTo(W - R, Y(Math.pow(10, e))); ctx.stroke(); ctx.fillText("1e" + e, 6, Y(Math.pow(10, e)) + 4); }
+    const line = (v, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath();
+        v.forEach((x, i) => { const px = X(i), py = Y(x); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }); ctx.stroke(); ctx.lineWidth = 1; };
+    line(e1, "#e8c49a"); line(eq, "#8fe0a8"); line(S.map(twoRow), "#f0a8a0");
+    S.forEach((s, i) => { ctx.fillStyle = "#68748c"; ctx.fillText(String(s.nt), X(i) - 8, H - 12); });
+    ctx.fillStyle = "#e8c49a"; ctx.fillText("linear + one row (order 0.93)", L + 8, T + 14);
+    ctx.fillStyle = "#f0a8a0"; ctx.fillText("linear + two rows (the proposed fix)", L + 8, T + 30);
+    ctx.fillStyle = "#8fe0a8"; ctx.fillText("quadratic, no row (order 1.88)", L + 8, T + 46);
+};
+</script>
+</div></body></html>

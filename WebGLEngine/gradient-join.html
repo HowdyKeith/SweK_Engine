@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Two gradients, one exact key (v3638)</title>
+<meta name="demo:desc" content="Least-squares and Green-Gauss are both called the gradient. On a linear field the answer is known exactly with nothing to converge - least-squares is exact at every skew, Green-Gauss is not, and a convergence study on a smooth field cannot tell them apart at all.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:180px}
+</style></head><body><div id="w">
+<h1>Two gradients, one exact key</h1>
+<div class="sub">Least-squares and Green&ndash;Gauss are <b>both</b> called "the gradient", both ship in real
+solvers, and nothing here had ever compared them. The key needs no tolerance and no reference run: <b>any gradient
+worth the name reproduces a linear field exactly.</b> Feed <code>u = a + bx + cy</code> and the answer is
+<code>(b, c)</code> &mdash; on every mesh, at every skew, with nothing to converge.</div>
+<div class="law"><b>The control comes first.</b> On the regular mesh all three must be exact, because there is
+nothing to be skewed by. My first Green&ndash;Gauss divided by <code>2A</code> instead of <code>A</code> and this
+line read <b>exactly 0.5000 on every mesh including that one</b>. An error that is exactly one half at zero skew is
+a normalisation, not a finding &mdash; and the round would otherwise have reported a factor of two as a defect in a
+standard method.</div>
+<h2>1. Shear the mesh; the field is still linear</h2>
+<div class="panel">
+  <div class="row"><label>shear <input id="skew" type="range" min="0" max="0.4" step="0.05" value="0.25"></label>
+    <span id="sv" class="dim"></span>
+    <button id="go" class="good">check the exact key</button></div>
+  <canvas id="cv" width="620" height="620" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>Least-squares is exact at every skew</b> &mdash; it solves for the plane through the neighbours,
+and when the data lie on a plane the residual is zero by construction. <b>Green&ndash;Gauss is not.</b> Its face
+value is the simple average of two cell values, which silently assumes <b>the face midpoint lies halfway between the
+two centroids</b> &mdash; true on a uniform Cartesian grid, false on a triangle, and further from true the more the
+mesh is sheared. The "improved" distance weighting is about 40% better and still five orders above least-squares.</div>
+<h2>2. Two instruments, and only one can answer</h2>
+<div class="panel"><button id="sweep" class="good">refine, and then test on a smooth field</button><table id="t2"></table></div>
+<div class="law"><b>It converges at second order, so Green&ndash;Gauss is <i>consistent</i> &mdash; just never
+<i>exact</i>.</b> It is not broken; it gets a linear field wrong by O(h&sup2;) at every finite resolution while
+least-squares gets it right at all of them.</div>
+<div class="law"><b>And on a smooth field the two are indistinguishable</b> &mdash; same order, within a quarter in
+magnitude. <b>A convergence study would call them equivalent and ship either.</b> The exact key separates them by
+five orders. Both instruments are honest; only one of them can answer this question.</div>
+<div class="law">Graded by <code>physics/mesh/gradientJoin-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Not claimed:</b> that Green&ndash;Gauss is wrong to
+use &mdash; it is consistent, cheaper, and exact on a regular mesh. What is claimed is narrower: it is not exact on
+a skewed one, an order study cannot tell, and if a solver needs a linear field reproduced exactly then the choice is
+not a matter of taste. Related: <a href="/tri-limiter.html" style="color:#9ab6e8">triangle limiter</a>.</div>
+<script type="module">
+import { makeTriMesh, analyticCells, gradientLS, gradientGG, linearityError, accuracy } from "/physics/mesh/triReconstruct.mjs";
+const $=(i)=>document.getElementById(i);
+const GGs=(u,m)=>gradientGG(u,m,{weighting:"simple"}), GGd=(u,m)=>gradientGG(u,m,{weighting:"distance"});
+const F=(x,y)=>Math.exp(-((x-10)**2+(y-10)**2)/18);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+$("skew").oninput=()=>{$("sv").textContent=(+$("skew").value).toFixed(2);};$("skew").oninput();
+$("go").onclick=()=>{
+  const skew=+$("skew").value, N=24, m=makeTriMesh({nx:N,ny:N,h:20/N,skew});
+  const B=0.7,C=-0.4;
+  const u=analyticCells((x,y)=>0.3+B*x+C*y,m);
+  const gl=gradientLS(u,m), gg=GGs(u,m);
+  const cv=$("cv"),c=cv.getContext("2d"),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.fillStyle="#080a0f";c.fillRect(0,0,W,H);
+  let xlo=Infinity,xhi=-Infinity;for(const v of m.vx){xlo=Math.min(xlo,v);xhi=Math.max(xhi,v);}
+  const X=(x)=>10+(x-xlo)/(xhi-xlo)*(W-20), Y=(y)=>H-10-(y-xlo)/(xhi-xlo)*(H-20);
+  const norm=Math.hypot(B,C);
+  let worst=0;for(let t=0;t<u.length;t++) if(m.nbr[t].length>=3) worst=Math.max(worst,Math.hypot(gg.gx[t]-B,gg.gy[t]-C)/norm);
+  for(let t=0;t<m.tri.length;t++){
+    const err=m.nbr[t].length>=3?Math.hypot(gg.gx[t]-B,gg.gy[t]-C)/norm:0;
+    const s=worst>0?Math.min(1,err/worst):0;
+    const [a,b,cc]=m.tri[t];
+    c.beginPath();c.moveTo(X(m.vx[a]),Y(m.vy[a]));c.lineTo(X(m.vx[b]),Y(m.vy[b]));c.lineTo(X(m.vx[cc]),Y(m.vy[cc]));c.closePath();
+    c.fillStyle="rgba("+Math.round(40+215*s)+","+Math.round(70-30*s)+","+Math.round(95-25*s)+",0.9)";
+    c.fill();c.strokeStyle="#1a2130";c.stroke();}
+  c.fillStyle="#f0a8a0";c.fillText("red = Green-Gauss error on a LINEAR field (least-squares is black everywhere)",14,18);
+  rows($("t"),["gradient","relative error on a linear field","verdict"],[
+    ["least-squares","<span class='ok'>"+linearityError(m,{grad:gradientLS}).toExponential(3)+"</span>","exact &mdash; solves for the plane"],
+    ["Green-Gauss, simple average","<span class='"+(skew>0?"bad":"ok")+"'>"+linearityError(m,{grad:GGs}).toExponential(3)+"</span>",
+      skew>0?"assumes the face midpoint is halfway between centroids":"exact on the regular mesh"],
+    ["Green-Gauss, distance weighted","<span class='"+(skew>0?"warn":"ok")+"'>"+linearityError(m,{grad:GGd}).toExponential(3)+"</span>",
+      skew>0?"~40% better, still not exact":"exact on the regular mesh"]]);
+};
+$("sweep").onclick=()=>{
+  const out=[];
+  const errs=[12,24,48,96].map(n=>linearityError(makeTriMesh({nx:n,ny:n,h:20/n,skew:0.25}),{grad:GGs}));
+  errs.forEach((e,i)=>out.push(["Green-Gauss on a LINEAR field, n="+[12,24,48,96][i],e.toExponential(3),
+    i?"order "+Math.log2(errs[i-1]/e).toFixed(3):"&mdash;",
+    i?"<span class='warn'>consistent, never exact</span>":"<span class='dim'>baseline</span>"]));
+  for(const [name,G] of [["least-squares",gradientLS],["Green-Gauss simple",GGs]]){
+    const e=[12,24,48].map(n=>{const m=makeTriMesh({nx:n,ny:n,h:20/n,skew:0.25});const u=analyticCells(F,m);return accuracy(F,m,u,G(u,m));});
+    out.push([name+" on a SMOOTH field",e.map(x=>x.toExponential(2)).join(" "),
+      "order "+Math.log2(e[1]/e[2]).toFixed(2),"<span class='bad'>a convergence study cannot tell them apart</span>"]);}
+  rows($("t2"),["measurement","values","derived","verdict"],out);
+};
+</script>
+</div></body></html>

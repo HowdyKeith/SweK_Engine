@@ -1,0 +1,127 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A third category: true, and badly written down (v3646)</title>
+<meta name="demo:desc" content="On a curved zero-flux wall the condition holds pointwise but one row per face asserts a single number for something that varies. The error converges at first order where a false assertion stays flat at 0.5 forever - a discretisation error converges and a false assertion does not.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>A third category: true, and badly written down</h1>
+<div class="sub">Four rounds had two kinds of boundary assertion: one that is <b>true</b> (exact, free,
+rank-restoring) and one that is <b>false</b> (worse than the refusal). This is a third &mdash;
+<code>grad&middot;n = 0</code> holds <b>pointwise</b> on a curved wall, and a single row per face asserts one
+number for a condition that varies across it.</div>
+<div class="law"><b>And the discriminator needs no tolerance: a discretisation error converges under refinement
+and a false assertion does not.</b> Both cases sit on the same mesh, in the same field &mdash; potential flow past
+a cylinder, <code>&phi; = U(r + a&sup2;/r)cos&theta;</code>, whose radial derivative is <b>exactly zero</b> at
+<code>r = a</code> at every angle and nonzero at <code>r = b</code>.</div>
+<h2>1. The fixture, checked first</h2>
+<div class="panel"><button id="fix" class="good">verify both walls are what they claim</button><table id="t0"></table></div>
+<div class="law">The false wall is <b>not uniformly false</b>: <code>grad&middot;n</code> vanishes at
+<code>&theta; = &pi;/2</code> and <code>3&pi;/2</code>, the top and bottom of the circle. My first check asserted
+the minimum was large and went red &mdash; the check was wrong, not the physics. It now measures the typical
+magnitude with the two zeros named.</div>
+<h2>2. The discriminator</h2>
+<div class="panel">
+  <button id="go" class="good">refine sixteenfold</button>
+  <canvas id="cv" width="620" height="380" style="max-width:100%"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>On the true curved wall the error converges, approaching first order</b> &mdash; the row is a
+one-number statement of a condition that varies across the face, the variation is O(h), and the damage vanishes.
+<b>On the false wall it is flat at ~0.5 across a sixteenfold refinement.</b> The same cells with <i>no</i> row
+converge perfectly well, so the flatness is the row and not the corner. <b>0.93 against &minus;0.02.</b></div>
+<h2>3. What the row actually buys on a curve</h2>
+<div class="panel"><button id="buy" class="good">with and without, on the true wall</button><table id="t2"></table></div>
+<div class="law"><b>Neutral to marginally negative.</b> The same condition on a <i>flat</i> wall measured
+1.8e-15 &mdash; exact, free and rank-restoring. <b>Curvature destroys the exactness and leaves the cost.</b> So the
+three categories are not points on one scale: the first is about <b>algebra</b>, the second about
+<b>resolution</b>, the third about the <b>problem</b>. Graded by
+<code>physics/mesh/curvedWall-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/wall-condition.html" style="color:#9ab6e8">wall condition</a> (the flat case).</div>
+<script type="module">
+import { makeAnnulus, potentialFlow, cellValues, annulusFaces, normalTurn, gradientWall, wallSideError } from "/physics/mesh/curvedWall.mjs";
+const $ = (i) => document.getElementById(i);
+const { phi, grad } = potentialFlow({});
+const run = (nt) => {
+    const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / 8)), nt, a: 1, b: 3 });
+    const u = cellValues(m, phi), F = annulusFaces(m);
+    return { nt, m, F, turn: normalTurn(m, F),
+        innerNone: wallSideError(m, F, grad, gradientWall(u, m, { wall: "none", faces: F }), "inner"),
+        innerNeu: wallSideError(m, F, grad, gradientWall(u, m, { wall: "inner", faces: F }), "inner"),
+        outerNone: wallSideError(m, F, grad, gradientWall(u, m, { wall: "none", faces: F }), "outer"),
+        outerNeu: wallSideError(m, F, grad, gradientWall(u, m, { wall: "outer", faces: F }), "outer") };
+};
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+$("fix").onclick = () => {
+    let wIn = 0, sum = 0, least = Infinity, leastAt = 0;
+    for (let i = 0; i < 360; i++) {
+        const th = 2 * Math.PI * i / 360;
+        const [ax, ay] = grad(Math.cos(th), Math.sin(th));
+        wIn = Math.max(wIn, Math.abs(ax * Math.cos(th) + ay * Math.sin(th)));
+        const x = 3 * Math.cos(th), y = 3 * Math.sin(th), [bx, by] = grad(x, y);
+        const d = Math.abs((bx * x + by * y) / 3); sum += d;
+        if (d < least) { least = d; leastAt = th; }
+    }
+    rows($("t0"), ["wall", "|grad&middot;n| over 360 angles", "reading"], [
+        ["inner, r = a", "<span class='ok'>worst " + wIn.toExponential(3) + "</span>",
+            "<span class='ok'>a genuine zero-flux wall, pointwise</span>"],
+        ["outer, r = b", "<span class='bad'>mean " + (sum / 360).toFixed(6) + "</span>",
+            "<span class='bad'>O(1) wrong over most of it</span>"],
+        ["outer, least", least.toExponential(2) + " at &theta; = " + leastAt.toFixed(4),
+            "<span class='warn'>true at exactly two points (&pi;/2, 3&pi;/2)</span>"]]);
+};
+$("go").onclick = () => {
+    const s = [24, 48, 96, 192, 384].map(run);
+    const ord = (k) => s.slice(1).map((r, i) => Math.log2(s[i][k] / r[k]));
+    const oi = ord("innerNeu"), oo = ord("outerNeu"), on = ord("outerNone");
+    rows($("t"), ["nt", "normal turn", "inner, no row", "inner + row", "outer, no row", "outer + row"],
+        s.map((r, i) => [r.nt, r.turn.toFixed(5), r.innerNone.toExponential(2),
+            "<span class='ok'>" + r.innerNeu.toExponential(2) + "</span>", r.outerNone.toExponential(2),
+            "<span class='bad'>" + r.outerNeu.toExponential(2) + "</span>"])
+        .concat([["orders", "&mdash;", ord("innerNone").map((x) => x.toFixed(2)).join(", "),
+            "<span class='ok'>" + oi.map((x) => x.toFixed(2)).join(", ") + "</span>",
+            on.map((x) => x.toFixed(2)).join(", "),
+            "<span class='bad'>" + oo.map((x) => x.toFixed(2)).join(", ") + "</span>"]]));
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    const L = 46, B = 34, T = 14, R = 14;
+    const X = (i) => L + i / (s.length - 1) * (W - L - R);
+    const lo = -3, hi = 0.2;
+    const Y = (v) => T + (1 - (Math.log10(Math.max(v, 1e-4)) - lo) / (hi - lo)) * (H - T - B);
+    ctx.strokeStyle = "#232b3d"; ctx.fillStyle = "#68748c";
+    for (let e = -3; e <= 0; e++) { ctx.beginPath(); ctx.moveTo(L, Y(Math.pow(10, e))); ctx.lineTo(W - R, Y(Math.pow(10, e))); ctx.stroke();
+        ctx.fillText("1e" + e, 6, Y(Math.pow(10, e)) + 4); }
+    const line = (k, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath();
+        s.forEach((r, i) => { const px = X(i), py = Y(r[k]); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+        ctx.stroke(); ctx.lineWidth = 1; };
+    line("innerNeu", "#8fe0a8"); line("outerNeu", "#f0a8a0"); line("outerNone", "#4a5670");
+    s.forEach((r, i) => { ctx.fillStyle = "#68748c"; ctx.fillText(String(r.nt), X(i) - 8, H - 14); });
+    ctx.fillStyle = "#8fe0a8"; ctx.fillText("true curved wall + row: converges", L + 8, T + 14);
+    ctx.fillStyle = "#f0a8a0"; ctx.fillText("false wall + row: flat forever", L + 8, T + 30);
+    ctx.fillStyle = "#4a5670"; ctx.fillText("false wall, no row: converges", L + 8, T + 46);
+};
+$("buy").onclick = () => {
+    const s = [24, 48, 96, 192, 384].map(run);
+    rows($("t2"), ["nt", "inner without the row", "inner with it", "ratio", "reading"],
+        s.map((r) => [r.nt, r.innerNone.toExponential(3), r.innerNeu.toExponential(3),
+            (r.innerNeu / r.innerNone).toFixed(4),
+            r.innerNeu > r.innerNone ? "<span class='warn'>a hair worse</span>" : "<span class='ok'>a hair better</span>"])
+        .concat([["flat wall (v3645)", "1.000 (refusal)", "<span class='ok'>1.805e-15</span>", "&mdash;",
+            "<span class='ok'>exact &mdash; curvature is what costs it</span>"]]));
+};
+</script>
+</div></body></html>

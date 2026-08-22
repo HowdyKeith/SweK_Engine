@@ -1,0 +1,19 @@
+{
+  "name": "VoxelEngine Control",
+  "short_name": "VoxelControl",
+  "description": "Phone/tablet controller for the VoxelEngine — buttons, camera, demos, spawning.",
+  "start_url": "/control.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a0e16",
+  "theme_color": "#173656",
+  "icons": [
+    {
+      "src": "/textures/sprites/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

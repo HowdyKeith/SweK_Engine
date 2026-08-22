@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Fingerprint -- Fleet Reproducibility</title>
+<style>
+:root{ --bg:#000; --panel:#070b10; --edge:#12202e; --cyan:#6ee7ff; --amber:#ffb454; --good:#8aff9e; --bad:#ff7a8a; --dim:#5a7286; --text:#cfe6f5; }
+*{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Antonio',ui-monospace,'Segoe UI',monospace}
+body{padding:16px;max-width:960px;margin:0 auto}
+h1{font-size:24px;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase;margin:0 0 4px}
+p.sub{color:var(--dim);margin:0 0 16px;letter-spacing:.04em;font-size:13px;line-height:1.5}
+.card{border:1px solid var(--edge);border-left:4px solid var(--cyan);border-radius:0 10px 10px 0;background:var(--panel);padding:12px 14px;margin-bottom:14px}
+label{display:block;color:var(--amber);letter-spacing:.1em;font-size:12px;text-transform:uppercase;margin-bottom:6px}
+textarea{width:100%;height:88px;background:#04080c;color:var(--text);border:1px solid var(--edge);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical}
+button{font-family:inherit;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:12px;color:#04080c;background:var(--cyan);border:0;border-radius:10px;padding:9px 14px;cursor:pointer;margin-top:8px}
+button.ghost{background:var(--edge);color:var(--cyan)}
+.verdict{font-size:22px;letter-spacing:.14em;padding:10px 0;text-transform:uppercase}
+.verdict.agree{color:var(--good)} .verdict.diverge{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--edge);font-variant-numeric:tabular-nums}
+th{color:var(--dim);letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+.mono{font-family:ui-monospace,monospace;color:var(--dim)}
+.hit{color:var(--bad);font-weight:700} .okrow{color:var(--good)}
+.note{color:var(--dim);font-size:12px;letter-spacing:.05em;margin-top:6px}
+</style>
+</head>
+<body>
+  <h1>Fleet Fingerprint</h1>
+<div style="font-size:.85em;opacity:.75;margin:.3em 0 1em"><a href="/report.html">&#128202; ledger reports (human-eyes view)</a></div>
+  <p class="sub">Ask every peer for its cross-architecture fingerprint and see who agrees. A matching master across
+    machines means the whole engine -- strict-libm, MD, collision, Ewald, Prime Transport, A* -- is bit-identical.
+    A mismatch names the exact science and the exact machine that diverged.</p>
+
+  <div class="card">
+    <label>Peer URLs (one per line -- their tunnel or LAN address; this box is always included)</label>
+    <textarea id="urls" placeholder="https://peer-galaxina.trycloudflare.com&#10;http://192.168.11.42:8080"></textarea>
+    <button id="run">Fingerprint the fleet</button>
+    <button class="ghost" id="self">This box only</button>
+    <div class="note" id="status"></div>
+  </div>
+
+  <div class="card" id="out" style="display:none">
+    <div class="verdict" id="verdict"></div>
+    <table id="peers"><thead><tr><th>peer</th><th>arch</th><th>master</th></tr></thead><tbody></tbody></table>
+    <div id="div"></div>
+    <h2 style="margin-top:1.4em">Measured physics across the fleet</h2>
+    <div id="obs"></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function render(payload) {
+  const { results, comparison } = payload;
+  $("out").style.display = "block";
+  const v = $("verdict");
+  v.textContent = comparison.masterAgree ? "Fleet agrees -- bit-identical" : "Divergence detected";
+  v.className = "verdict " + (comparison.masterAgree ? "agree" : "diverge");
+  const tb = $("peers").querySelector("tbody"); tb.innerHTML = "";
+  for (const r of results) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + (r.url || "?") + "</td><td>" + (r.ok ? (r.arch || "?") : "<span class='hit'>unreachable</span>") +
+      "</td><td class='mono'>" + (r.ok ? (r.master || "").slice(0, 20) + "..." : (r.error || "")) + "</td>";
+    tb.appendChild(tr);
+  }
+  const d = $("div");
+  if (comparison.divergences && comparison.divergences.length) {
+    let h = "<table><thead><tr><th>diverging subsystem</th><th>on peer</th><th>its hash</th></tr></thead><tbody>";
+    for (const x of comparison.divergences) h += "<tr class='hit'><td>" + x.subsystem + "</td><td>" + x.url + "</td><td class='mono'>" + (x.hash || "").slice(0, 20) + "...</td></tr>";
+    d.innerHTML = h + "</tbody></table><div class='note'>Each row is one science that computed different bits on one machine -- start your bisect there.</div>";
+  } else {
+    d.innerHTML = "<div class='note okrow'>Every subsystem agrees across every reachable peer.</div>";
+  }
+
+  // v2927 -- ITEM 4. Below the hashes, the MEASURED physics. The 50 subsystems answer "does the fleet compute
+  // the same bits"; these answer "does the fleet agree on the physics it measures", which the hashes never
+  // covered. A break here is louder than a hash divergence: it means an observable the fleet was TOLD is
+  // portable disagreed across machines -- a broken prediction, not just a difference.
+  const obs = comparison.observables || [];
+  const od = $("obs");
+  if (od) {
+    if (!obs.length) {
+      od.innerHTML = "<div class='note'>No physics observables compared -- peers on this build carry them, older peers do not. Need at least two observable-bearing peers.</div>";
+    } else {
+      const breaks = comparison.observableBreaks || [];
+      let h = "";
+      if (breaks.length) {
+        h += "<div class='verdict diverge'>" + breaks.length + " BROKEN PREDICTION" + (breaks.length > 1 ? "S" : "") +
+             " -- an observable predicted portable diverged across the fleet</div>";
+      } else {
+        h += "<div class='note okrow'>Every physics observable agreed with its cross-machine prediction.</div>";
+      }
+      h += "<table><thead><tr><th>observable</th><th>kind</th><th>predicted</th><th>fleet</th></tr></thead><tbody>";
+      for (const o of obs) {
+        const broken = o.verdict === "DIVERGED-BROKEN-PREDICTION";
+        const cls = broken ? "hit" : "";
+        const pred = o.predictedPortable ? "portable" : "may vary";
+        const fleet = o.verdict === "agree-as-predicted" ? "agrees"
+          : o.verdict === "agree-unexpectedly" ? "agrees (better than predicted)"
+          : o.verdict === "diverged-as-predicted" ? "varies (as predicted)"
+          : broken ? "DIVERGED" : o.verdict;
+        h += "<tr class='" + cls + "'><td class='mono'>" + o.id + "</td><td>" + (o.kind || "") + "</td><td>" + pred + "</td><td>" + fleet + "</td></tr>";
+      }
+      od.innerHTML = h + "</tbody></table><div class='note'>Predicted portable = the libm-tripwire said this number should reproduce across machines (v2905). A DIVERGED row is where that promise broke.</div>";
+    }
+  }
+}
+async function collect(urls) {
+  $("status").textContent = "asking " + (urls.length + 1) + " machines...";
+  try {
+    const res = await fetch("/fingerprint/collect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ urls }) });
+    const payload = await res.json();
+    $("status").textContent = "reachable: " + payload.comparison.reachableCount + " / " + (urls.length + 1);
+    render(payload);
+  } catch (e) { $("status").textContent = "error: " + e.message; }
+}
+$("run").onclick = () => collect($("urls").value.split(/\s+/).map((s) => s.trim()).filter(Boolean));
+$("self").onclick = () => collect([]);
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Heightfield vs Volume</title>
+<!--
+     v3254 -- THE TWO SHADED SIDE BY SIDE, WITH THE DIFF UNDER THEM.
+     
+     v3253 proved in DATA that a heightfield cannot represent an overhang. This renders both and subtracts them,
+     so the loss is a picture with a pixel count under it rather than a sentence.
+
+     *** IN PLAIN JAVASCRIPT AT SMALL RESOLUTION, DELIBERATELY. *** A WebGL version would look better and could
+     not be checked in the suite at all -- and the property under test is GEOMETRIC, not shaded. Everything here
+     is verified headlessly by tools/ship/mesostructure-selfcheck.mjs, including the control below.
+-->
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1000px;margin:0 auto;padding:16px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#6f8a7c;margin-bottom:14px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}.row>div{flex:1 1 280px}
+  canvas{width:100%;image-rendering:pixelated;background:#04140b;border:1px solid #1a2a22}
+  .lab{color:#b6f0cf;margin-bottom:4px}.dim{color:#6f8a7c}.warn{color:#e0c58a}
+  .receipt{color:#b6f0cf;font-size:14px;margin-top:8px}
+  label{color:#6f8a7c}input[type=range]{width:160px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Heightfield vs Volume</h1>
+  <div class="sub">Same volume, same camera, same ray, same shading. <b>One line differs</b> &mdash; the occupancy test.
+    <span class="dim">If anything else differed, the diff would be measuring the setup.</span></div>
+
+  <div class="card row">
+    <div><div class="lab">Volume march &mdash; overhangs are ordinary</div><canvas id="cvV"></canvas></div>
+    <div><div class="lab">Heightfield &mdash; one height per texel</div><canvas id="cvH"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="lab">Difference, amplified</div>
+    <label>gain <input id="gain" type="range" min="1" max="200" value="80"> <b id="gainN">80</b>&times;</label>
+    <canvas id="cvD"></canvas>
+    <div class="receipt" id="receipt"></div>
+    <div class="dim" style="margin-top:6px">
+      The lit region is the <b>space beneath the overhang</b>. The heightfield does not lose the roof &mdash; the roof
+      <i>is</i> the top of its column. It <b>fills in the air underneath</b>, because a column must have exactly one
+      surface. <b>You never see geometry go missing; you see solid where there should be a gap.</b>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lab">Control &mdash; a flat volume</div>
+    <div class="dim">The same two tracers over a volume with no overhang. <b>They must agree exactly.</b>
+      A comparison that cannot come out identical is measuring its own setup, and this is the only line that
+      proves the one above is about the projection.</div>
+    <div class="receipt" id="ctrl"></div>
+  </div>
+</div>
+
+<script type="module">
+import { overhangVolume, traceVolume, traceHeightfield, mesoReceipt } from "./tools/render-qa/mesostructure.mjs";
+import { amplifiedDiff, diffReceipt } from "./tools/render-qa/amplifiedDiff.mjs";
+
+const W = 96, H = 64;
+const put = (id, buf) => { const c = document.getElementById(id); c.width = W; c.height = H;
+                           c.getContext("2d").putImageData(new ImageData(buf, W, H), 0, 0); };
+
+const vol = overhangVolume();
+const vImg = traceVolume(vol, { W, H }), hImg = traceHeightfield(vol, { W, H });
+put("cvV", vImg); put("cvH", hImg);
+
+function redraw() {
+  const gain = parseInt(document.getElementById("gain").value, 10);
+  document.getElementById("gainN").textContent = gain;
+  const { out, stats } = amplifiedDiff(vImg, hImg, { gain });
+  put("cvD", out);
+  document.getElementById("receipt").textContent = diffReceipt(stats) + "  \u00b7  " + mesoReceipt(vol);
+}
+document.getElementById("gain").oninput = redraw;
+redraw();
+
+// THE CONTROL RUNS ON THE PAGE, NOT JUST IN THE GATE. Somebody looking at a 31% difference should be able to
+// see, on the same screen, that these two tracers CAN agree -- otherwise the number is unfalsifiable from here.
+const flat = overhangVolume({ w: 24, h: 16 });
+for (let x = 0; x < flat.w; x++) for (let y = 0; y < flat.h; y++) flat.solid[flat.at(x, y)] = y < 5 ? 1 : 0;
+const fd = amplifiedDiff(traceVolume(flat, { W, H }), traceHeightfield(flat, { W, H }), { gain: 80 });
+document.getElementById("ctrl").innerHTML = fd.stats.differing === 0
+  ? "identical &mdash; " + fd.stats.pixels.toLocaleString() + " pixels, zero differ. The tracers agree when the volume has nothing to lose."
+  : '<span class="warn">' + fd.stats.differing + " pixels differ on a FLAT volume &mdash; the comparison is measuring its own setup, not the projection.</span>";
+</script>
+</body>
+</html>

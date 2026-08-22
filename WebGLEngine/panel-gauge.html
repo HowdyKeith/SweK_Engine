@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gauge -- single-metric panel</title>
+<style>
+  :root { --bg:#06140c; --dim:#6a8a78; }
+  html, body { margin:0; height:100%; background:var(--bg); color:#cfe8d8; font:12px ui-monospace,"SF Mono",Menlo,monospace; }
+  body { display:flex; align-items:center; justify-content:center; }
+  #g { transform:scale(1.1); }
+  #err { color:var(--dim); font-size:11px; }
+</style>
+</head>
+<body>
+<div id="g"></div>
+<script type="module">
+import { mountSvgGaugeSet } from "./ui/svgGaugeSet.js";
+// which metric to show: ?metric=cpu|ram|gpu|battery|peers|remotes  (default cpu)
+const metric = (new URLSearchParams(location.search).get("metric") || "cpu").toLowerCase();
+const color = { cpu: "amber", ram: "green", gpu: "cyan", battery: "green", peers: "cyan", remotes: "amber" }[metric] || "cyan";
+try {
+  mountSvgGaugeSet(document.getElementById("g"), { gauges: [{ source: metric, color, showPct: true }], scale: 1.6 });
+} catch (e) {
+  document.getElementById("g").innerHTML = "<span id='err'>gauge offline</span>";
+}
+</script>
+</body>
+</html>

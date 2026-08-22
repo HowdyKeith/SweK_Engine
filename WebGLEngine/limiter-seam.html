@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The limiter at a refinement seam (v3636)</title>
+<meta name="demo:desc" content="Does a slope limiter survive non-uniform spacing? Monotonicity does, for both spellings, with a factor-of-two margin independent of the widths - what breaks is accuracy, only at the seam, only for the spelling almost everyone writes, and it is bit-identical on a uniform grid.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ select{background:#0c1018;color:#d5dcea;border:1px solid #2e3c5a;padding:3px 6px;font:inherit}
+</style></head><body><div id="w">
+<h1>The limiter at a refinement seam</h1>
+<div class="sub">A refinement interface <i>is</i> non-uniform spacing, and this engine already had one. The previous
+round proved a limiter monotone on a Cartesian cell and named the untested case in as many words: with non-uniform
+spacing the offsets are not &frac12; and the argument does not run. So this should break.</div>
+<div class="law"><b>It does not break &mdash; and the measurement also showed which guarantee I had been
+watching.</b> Monotonicity survives, for <i>both</i> spellings, at every refinement ratio. The reason is one line:
+minmod already bounds its output by the <b>smaller</b> of the two differences, and half of the smaller difference
+cannot leave a neighbourhood whose half-span is at least that difference. <b>A factor of two of margin, independent
+of the widths.</b></div>
+<h2>1. Two spellings of the same limiter</h2>
+<div class="panel">
+  <div class="row"><label>refinement ratio <select id="rat"><option>1</option><option>2</option>
+    <option selected>4</option><option>8</option></select></label>
+    <button id="go" class="good">reconstruct across the seam</button></div>
+  <canvas id="cv" width="960" height="240"></canvas>
+  <table id="t"></table>
+</div>
+<div class="law"><b>What breaks is accuracy, and only at the seam.</b> The interiors are <b>bit-identical</b> for
+both spellings at every ratio &mdash; so a whole-domain error number would have called this fine. At the seam the
+naive spelling degrades by <b>2.7&times;, 3.9&times;, 4.4&times;</b> the interior at ratios 2, 4, 8, while the
+correct one sits <i>below</i> the interior, because the seam cells are finer and a correct reconstruction gets that
+for free.</div>
+<div class="law"><b>And on a uniform grid the two are identical to the last bit</b>, which is why the defect is
+invisible until it isn't: a difference <i>is</i> the slope times the spacing when the spacing is one number. The fix
+is a <b>unit</b>, not a tolerance &mdash; divide by the centre-to-centre distance
+<code>(h<sub>i</sub>+h<sub>i&plusmn;1</sub>)/2</code>, which across a seam is neither width, and apply the slope over
+<code>h<sub>i</sub>/2</code>.</div>
+<h2>2. The numbers</h2>
+<div class="panel"><button id="sweep" class="good">sweep the ratio</button><table id="t2"></table></div>
+<div class="law"><b>The penalty saturates.</b> 4.91e-3 at ratio 4 against 5.66e-3 at ratio 8 &mdash; the first step
+away from uniform costs almost all of it, and refining harder costs almost nothing more. <b>Not claimed:</b> that
+this shape is present anywhere in this tree; no file here is accused of it. <b>Not tested:</b> triangles, which is
+still the case the previous round's scope note names and which this round does <i>not</i> close.</div>
+<div class="law">Graded by <code>physics/em/limiterNonUniform-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Related:
+<a href="/grid-refinement.html" style="color:#9ab6e8">grid refinement</a> (what the seam costs) and
+<a href="/remap-2d.html" style="color:#9ab6e8">limiting in 2D</a> (where the guarantee held).</div>
+<script type="module">
+import { interfaceWidths, centres, analyticCells, halfExcess, escapes, excessFactor, accuracyByRegion } from "/physics/em/limiterNonUniform.mjs";
+const $=(i)=>document.getElementById(i);
+const F=(x)=>Math.exp(-Math.pow((x-45)/14,2));
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+$("go").onclick=()=>{
+  const ratio=+$("rat").value;
+  const {h,splitAt}=interfaceWidths({nCoarse:60,nFine:60*ratio,ratio});
+  const u=analyticCells(F,h), x=centres(h);
+  const en=halfExcess(u,h,"naive"), es=halfExcess(u,h,"slope");
+  const cv=$("cv"),c=cv.getContext("2d"),W=cv.width,H=cv.height;
+  c.clearRect(0,0,W,H);c.fillStyle="#080a0f";c.fillRect(0,0,W,H);
+  const xmax=x[x.length-1];
+  const X=(v)=>12+v/xmax*(W-24), Y=(v)=>H-24-v*(H-46);
+  c.strokeStyle="#e8c49a";c.setLineDash([4,4]);
+  c.beginPath();c.moveTo(X(x[splitAt]),10);c.lineTo(X(x[splitAt]),H-14);c.stroke();c.setLineDash([]);
+  c.fillStyle="#e8c49a";c.fillText("seam ("+ratio+"x)",X(x[splitAt])+6,20);
+  c.strokeStyle="#3a4560";c.lineWidth=1.4;c.beginPath();
+  for(let i=0;i<u.length;i++){const px=X(x[i]),py=Y(u[i]);if(i===0)c.moveTo(px,py);else c.lineTo(px,py);}c.stroke();
+  const bars=(e,col,dy)=>{c.strokeStyle=col;c.lineWidth=1.2;
+    for(let i=1;i<u.length-1;i++){const px=X(x[i]);
+      c.beginPath();c.moveTo(px,Y(u[i]+e[i])+dy);c.lineTo(px,Y(u[i]-e[i])+dy);c.stroke();}};
+  bars(en,"#f0a8a0",0); bars(es,"#8fe0a8",0);
+  c.lineWidth=1;c.fillStyle="#f0a8a0";c.fillText("naive",14,20);
+  c.fillStyle="#8fe0a8";c.fillText("slope-form",70,20);
+  c.fillStyle="#68748c";c.fillText("vertical bars = the reconstruction's reach at each cell's faces",14,H-4);
+  const n=accuracyByRegion(F,h,splitAt,2,"naive"), s=accuracyByRegion(F,h,splitAt,2,"slope");
+  const esc=escapes(u,h,"naive"), esc2=escapes(u,h,"slope");
+  rows($("t"),["spelling","escapes (monotonicity)","interior error","seam error","seam / interior"],[
+    ["naive (bare differences)","<span class='ok'>"+esc.count+"</span>",n.interior.toExponential(3),
+      "<span class='"+(n.ratioSeamToInterior>2?"bad":"ok")+"'>"+n.seam.toExponential(3)+"</span>",
+      "<span class='"+(n.ratioSeamToInterior>2?"bad":"ok")+"'>"+n.ratioSeamToInterior.toFixed(2)+"x</span>"],
+    ["slope form (true slopes)","<span class='ok'>"+esc2.count+"</span>",s.interior.toExponential(3),
+      "<span class='ok'>"+s.seam.toExponential(3)+"</span>","<span class='ok'>"+s.ratioSeamToInterior.toFixed(2)+"x</span>"]]);
+};
+$("sweep").onclick=()=>{
+  const out=[];
+  for(const ratio of [1,2,4,8]){
+    const {h,splitAt}=interfaceWidths({nCoarse:60,nFine:60*ratio,ratio});
+    const n=accuracyByRegion(F,h,splitAt,2,"naive"), s=accuracyByRegion(F,h,splitAt,2,"slope");
+    out.push([ratio,"<span class='"+(n.interior===s.interior?"ok":"bad")+"'>"+
+      (n.interior===s.interior?"identical "+n.interior.toExponential(2):"differ")+"</span>",
+      "<span class='"+(n.ratioSeamToInterior>2?"bad":"ok")+"'>"+n.seam.toExponential(2)+" ("+n.ratioSeamToInterior.toFixed(1)+"x)</span>",
+      "<span class='ok'>"+s.seam.toExponential(2)+" ("+s.ratioSeamToInterior.toFixed(1)+"x)</span>",
+      "naive excess factor "+excessFactor(1,1/ratio,"naive").toFixed(4)+", slope "+excessFactor(1,1/ratio).toFixed(4)]);}
+  rows($("t2"),["ratio","interior (both spellings)","naive at the seam","slope form at the seam","face excess, as a fraction of the difference"],out);
+};
+</script>
+</div></body></html>

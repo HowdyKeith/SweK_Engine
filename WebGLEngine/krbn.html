@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Krbn Hologram &mdash; SweK</title>
+<!--
+  krbn.html -- v2608
+
+  THE HOLOGRAM, LIVE. Krbn imported straight into the page, rendering the blobulator to pencil SVG on every
+  frame. NO SERVER. NO CLI. NO .ts FILE.
+
+  ---- WHY THERE IS NO INSTALL BUTTON HERE ---------------------------------------------------------------------
+
+  Keith asked for "a Krbn button that installs it and a page for me to drop that file into", after this went
+  wrong on his Windows box:
+
+      C:\box3d>bun run render blob.krbn.ts
+      error: Script not found "render"
+      C:\box3d>curl -fsSL https://bun.sh/install | bash
+      Windows Subsystem for Linux has no installed distributions.
+
+  BOTH WERE MY FAULT AND BOTH WERE ONE LINE. `bun run render` is a PACKAGE SCRIPT -- it only exists inside the
+  package, and he was in C:\box3d while Krbn cloned into C:\box3d\Krbn. And `curl | bash` IS A BASH SCRIPT ON A
+  MACHINE WITH NO BASH; Bun's Windows installer is powershell -c "irm bun.sh/install.ps1|iex". I handed a
+  Windows user a Unix line and watched WSL choke on it.
+
+  But he asked the better question underneath: "is a .ts file that i would want to export, or import, or is it
+  just a test that you export? if this is the last time I will see a .ts file, then we can just fix my Krbn
+  installer."
+
+  IT WAS THE LAST TIME. THREE THINGS I CHECKED INSTEAD OF ASSUMING:
+
+    1. Krbn's package.json says   "import": "./dist/index.js"   -- IT SHIPS COMPILED JS. The .ts is the CLI's
+       format, NOT the library's interface. API.md said so all along: "A Drawing is just { toSvg(): string }, so
+       you can also call it directly (scene.toSVG(cam)), embed the string, or ship it however you like."
+
+    2. ONLY dist/cli/render.js IMPORTS node:fs / node:path / node:url. Walking the import graph from
+       dist/index.js reaches 52 FILES AND NOT ONE NODE BUILT-IN. THE BROWSER CAN IMPORT THE WHOLE LIBRARY.
+
+    3. AND BUN WAS INSTALLED IN MY SANDBOX THE ENTIRE TIME. I told Keith I could not run Krbn and never looked.
+       /home/claude/.npm-global/bin/bun. THE NINTH EXPIRED BLOCKER -- a "cannot" that had quietly become a habit.
+       THE PREFLIGHT I WROTE TO HELP HIM IS WHAT CAUGHT ME.
+
+  So the button he asked for is not needed and the drop target is not needed. There is no file to drop. Krbn is
+  vendored at /vendor/krbn (MIT, LICENSE beside it -- it is Valeriu's work and it travels with his name on it)
+  and this page imports it like any other module.
+
+  ---- WHAT IS REAL HERE, AND WHAT IS NOT ------------------------------------------------------------------------
+
+  Measured in a real headless browser before this page existed: 131 exports, a 142,500-byte SVG, 496 stroke
+  paths, 708 ms. Fast enough to be interactive, NOT fast enough to be sixty frames a second -- SO THIS PAGE
+  RENDERS ON RELEASE, NOT ON DRAG. A slider that fires a 700 ms render on every pixel of travel is a slider that
+  fights you.
+
+  THE SKIN IS BLOCKY AND IT IS MEANT TO BE. We have no marching cubes that emits { positions, triangles }, so
+  the mesh comes from SweK's own gated greedy mesher sampling the field. I am not calling it smooth because I
+  would like it to be.
+-->
+<style>
+  :root { --ink: #cfe3ff; --dim: #5d7fa8; --bg: #0b0f14; --panel: #121a24; --edge: #24384f; --hot: #ffb454; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 13px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+  #hud { padding: 10px 14px; border-bottom: 1px solid var(--edge); background: var(--panel); }
+  #cap { color: var(--hot); letter-spacing: 0.12em; font-size: 12px; }
+  #stat { color: var(--dim); margin-top: 4px; font-size: 12px; }
+  .warn { color: #ff6b6b; }
+  #wrap { display: flex; gap: 14px; padding: 14px; flex-wrap: wrap; }
+  #stage { border: 1px solid var(--edge); background: #000; min-width: 640px; min-height: 480px; }
+  #stage svg { display: block; }
+  #ctl { display: flex; flex-direction: column; gap: 12px; min-width: 240px; }
+  label { display: block; color: var(--dim); font-size: 11px; letter-spacing: 0.08em; }
+  input[type=range] { width: 100%; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid var(--edge);
+           padding: 7px 12px; cursor: pointer; font: inherit; }
+  button:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .note { color: var(--dim); font-size: 11px; border-left: 2px solid var(--edge); padding-left: 8px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cap">&#9673; KRBN HOLOGRAM &mdash; seven ghosted lumps inside the skin</div>
+  <div id="stat">booting...</div>
+</div>
+<div id="wrap">
+  <div id="stage"></div>
+  <div id="ctl">
+    <div>
+      <label for="orbit">ORBIT <span id="oval">0&deg;</span></label>
+      <input type="range" id="orbit" min="0" max="359" value="30" />
+    </div>
+    <div>
+      <label for="temp">WARMTH (D) <span id="tval">0.000</span></label>
+      <input type="range" id="temp" min="0" max="100" value="0" />
+    </div>
+    <div>
+      <label for="ink">PAPER / INK <span id="cval" style="color:var(--dim)"></span></label>
+      <select id="ink" style="width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--edge);padding:6px;font:inherit">
+        <option value="paper">graphite on paper (6.55:1)</option>
+        <option value="dark">light ink on dark (9.18:1)</option>
+        <option value="blueprint">white on blueprint (4.98:1)</option>
+      </select>
+    </div>
+    <div>
+      <label for="bones">BONES</label>
+      <select id="bones" style="width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--edge);padding:6px;font:inherit">
+        <option value="ghost">ghosted (x-ray)</option>
+        <option value="drop">hidden (opaque)</option>
+        <option value="off">skin only</option>
+      </select>
+    </div>
+    <button id="draw">RENDER</button>
+    <button id="spin">SPIN 360</button>
+    <button id="save">SAVE SVG</button>
+    <div>
+      <label for="gifn">GIF FRAMES <span id="gval">12</span> <span id="gest" style="color:var(--dim)"></span></label>
+      <input type="range" id="gifn" min="4" max="36" step="4" value="12" />
+    </div>
+    <button id="gif">SAVE GIF</button>
+    <div class="note">
+      Renders on RELEASE, not on drag. Measured 708 ms per frame in a real browser -- fast enough to be
+      interactive, not fast enough for sixty a second. A slider that fires a 700 ms render on every pixel of
+      travel is a slider that fights you.
+    </div>
+    <div class="note">
+      Krbn by Valeriu Palos, MIT, vendored at /vendor/krbn with his LICENSE beside it.
+      The skin is a VOXEL mesh from SweK's own greedy mesher -- blocky on purpose, because we have no marching
+      cubes that emits { positions, triangles }.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { makeBlobs } from "./simulation/tomo/blobPhantom.js";
+  import { blobMeshInput } from "./tools/krbnEmit.mjs";
+  import { jitterCentres, lcg, peakFloor } from "./physics/blobThermal.js";
+  import { vitals, diagnose, closestPair as vitalsClosestPair } from "./physics/blobVitals.js";
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---- INK ----------------------------------------------------------------------------------------------------
+  //
+  // Keith, looking at the spin GIF: "I wonder if we can adjust the contrast maybe."
+  //
+  // HE WAS BEING POLITE ABOUT A BUG. MEASURED:
+  //
+  //     default on LCARS dark   ink #1a1a1a   vs #0b0f14   contrast 1.42:1
+  //     light ink on dark       ink #e8eef7   vs #0b0f14   contrast 9.18:1
+  //     default on paper        ink #1a1a1a   vs #f4f1ea   contrast 6.55:1
+  //
+  // WCAG's floor for a thing being VISIBLE AT ALL is 3:1. I SHIPPED 1.42:1 TWICE AND CALLED IT A HOLOGRAM.
+  //
+  // The cause is in vendor/krbn/pipeline/style.js: `visible: { weight: 1.5, color: "#1a1a1a", opacity: 1 }`.
+  // KRBN IS A PENCIL-PLOTTER LIBRARY. ITS DEFAULT INK IS GRAPHITE BECAUSE IT EXPECTS PAPER. I put it on my
+  // LCARS background and never checked what colour it draws with. And the ghosted bones are that same graphite
+  // at `opacity: 0.32` -- so the x-ray, the entire point of the picture, was 0.45:1 against the background.
+  //
+  // THE GIF PROVED IT INDEPENDENTLY: its palette came out with EIGHT entries whose luminance ran 0.0 .. 22.1
+  // OF 255. NOT ONE PIXEL BRIGHTER THAN 22. The quantiser was not broken -- IT WAS FAITHFULLY REPRODUCING A
+  // BLACK PICTURE.
+  //
+  // Default is PAPER, because that is what a pencil drawing IS, and because Krbn's own gallery is graphite on
+  // white. The dark modes are here because this engine is LCARS -- BUT THEY CARRY THEIR OWN MEASURED NUMBER.
+  const INKS = {
+    paper:     { bg: "#f4f1ea", ink: "#1a1a1a", ratio: "6.55:1" },
+    dark:      { bg: "#0b0f14", ink: "#e8eef7", ratio: "9.18:1" },
+    blueprint: { bg: "#0d2b45", ink: "#eaf4ff", ratio: "4.98:1" },   // I WROTE 8.29 HERE FROM NOWHERE. THE GATE CAUGHT IT.
+  };
+  const inkNow = () => INKS[$("ink").value] || INKS.paper;
+  const stat = $("stat"), stage = $("stage");
+  const SEED = 20260715;
+
+  let K = null;                       // the Krbn module, once it loads
+  // v2612 -- IF THE BLOBARIUM SENT HIM, DRAW *HIM*, not a fresh one from the seed.
+  // ?lumps=x,y,z,r,a;x,y,z,r,a;...  -- the tank's live state, packed by its HOLOGRAM button.
+  // PARSED DEFENSIVELY: a malformed URL falls back to the seed AND SAYS SO, rather than drawing a
+  // half-eaten creature and letting you think that is what is in the tank.
+  function lumpsFromUrl() {
+    const raw = new URLSearchParams(location.search).get("lumps");
+    if (!raw) return null;
+    const out = [];
+    for (const part of raw.split(";")) {
+      const n = part.split(",").map(Number);
+      if (n.length !== 5 || !n.every(Number.isFinite)) return null;
+      out.push({ x: n[0], y: n[1], z: n[2], r: n[3], a: n[4] });
+    }
+    return out.length ? out : null;
+  }
+  const sent = lumpsFromUrl();
+  let blobs = sent || makeBlobs(7, SEED);
+  let basePair = vitalsClosestPair(blobs);
+  let rnd = lcg(SEED);
+  let lastSvg = "";
+  let busy = false;
+
+  // ---- FRAMING ------------------------------------------------------------------------------------------------
+  //
+  // Keith: "the gif you sent me looks like a white square with a grid."
+  //
+  // HE WAS RIGHT AND I HAD NEVER LOOKED AT IT. I verified GIF89a, palette entries, luminance range, loop block --
+  // EVERY STRUCTURAL PROPERTY EXCEPT WHAT THE PICTURE SHOWS.
+  //
+  // Krbn's own types say it: `scale: number  /** world units per pixel (ortho) **/`, and camera.js does
+  // `const inv = 1 / cam.scale; // pixels per world unit`. I NEVER READ EITHER. I saw the SVG at 640x480 using
+  // 0.009, halved the viewport for the GIF, and HALVED THE SCALE TOO -- assuming they were proportional.
+  //
+  //     640 x 0.009  = 5.76 world units across the frame
+  //     320 x 0.0045 = 1.44 world units across the frame
+  //
+  // THE BLOB IS 1.845 UNITS ACROSS. I MEASURED THAT MYSELF ONE ROUND EARLIER. It does not fit in 1.44, so the
+  // frame showed the INSIDE of the creature, WHICH IS CROSS-HATCH. "A white square with a grid" IS LITERALLY
+  // WHAT THAT IS. Fewer pixels for the same world means MORE units per pixel: I HALVED IT WHEN I SHOULD HAVE
+  // DOUBLED IT.
+  //
+  // THE FIX IS v2611's SENTENCE APPLIED TO THE CAMERA: THE BLOB TELLS YOU ITS OWN FRAMING. Measured, worst case
+  // over a full 360 orbit -- because what fits at 0 degrees must fit at 45:
+  //
+  //     horizontal: 2.064 units      vertical: 2.170 units
+  //
+  // Not the 3D diagonal (3.230): I tried that first and HE FILLED ONLY 42% OF THE FRAME, because the camera sees
+  // a 2D PROJECTION and the diagonal is the worst case of a box he never presents. Rasterised and counted at the
+  // projected bound: 63% wide, 78% tall, 7.96% ink. THAT IS A CREATURE.
+  const frame = (W, H) => {
+    const lo = [0, 1, 2].map((k) => Math.min(...blobs.map((b) => [b.x, b.y, b.z][k] - b.r)));
+    const hi = [0, 1, 2].map((k) => Math.max(...blobs.map((b) => [b.x, b.y, b.z][k] + b.r)));
+    const c = [0, 1, 2].map((k) => (lo[k] + hi[k]) / 2);
+    // worst-case screen extent over the whole spin, from the lumps themselves
+    let u = 0, v = 0;
+    for (let d = 0; d < 360; d += 15) {
+      const a = d * Math.PI / 180;
+      const eye = [c[0] + 5 * Math.sin(a), c[1] - 5 * Math.cos(a), c[2] + 2.2];
+      const fwd = [c[0] - eye[0], c[1] - eye[1], c[2] - eye[2]];
+      const fl = Math.hypot(...fwd); const F = fwd.map((x) => x / fl);
+      const r0 = [F[1] * 1 - F[2] * 0, F[2] * 0 - F[0] * 1, F[0] * 0 - F[1] * 0];
+      const rl = Math.hypot(...r0); const R = r0.map((x) => x / rl);
+      const U = [R[1] * F[2] - R[2] * F[1], R[2] * F[0] - R[0] * F[2], R[0] * F[1] - R[1] * F[0]];
+      for (const b of blobs) {
+        const rel = [b.x - c[0], b.y - c[1], b.z - c[2]];
+        u = Math.max(u, Math.abs(rel[0] * R[0] + rel[1] * R[1] + rel[2] * R[2]) + b.r);
+        v = Math.max(v, Math.abs(rel[0] * U[0] + rel[1] * U[1] + rel[2] * U[2]) + b.r);
+      }
+    }
+    return { c, scale: Math.max((u * 2 * 1.12) / W, (v * 2 * 1.12) / H) };
+  };
+
+  const cam = (deg, W = 640, H = 480) => {
+    const a = (deg * Math.PI) / 180;
+    const f = frame(W, H);
+    return {
+      eye: [f.c[0] + 5 * Math.sin(a), f.c[1] - 5 * Math.cos(a), f.c[2] + 2.2],
+      target: f.c, up: [0, 0, 1],
+      projection: "orthographic", scale: f.scale,
+      viewport: { width: W, height: H },
+    };
+  };
+
+  function build(deg) {
+    const mesh = blobMeshInput(blobs);
+    const pal = inkNow();
+    const scene = new K.Scene({
+      svg: { background: pal.bg },
+      light: { direction: [-0.4, -0.5, -0.7] },
+      style: { wobble: 0.45 },
+    });
+    // THE SKIN -- subject. Hatched along the surface's own curved iso-parameter field.
+    scene.add(new K.Mesh(mesh))
+      .setImportance(1, { role: "subject" })
+      .style({ weight: 1.3, color: pal.ink, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
+
+    // THE BONES. API.md annotates hidden: "ghost" as "(x-ray)" IN THEIR OWN WORDS -- this page did not invent
+    // the x-ray, Krbn already had it.
+    const mode = $("bones").value;
+    if (mode !== "off") {
+      for (const b of blobs) {
+        scene.add(K.sphere([b.x, b.y, b.z], b.r))
+          .setImportance(0.3, { role: "context" })
+          .style({ hidden: mode, color: pal.ink, wobble: 0.5, weight: 0.8 });
+      }
+    }
+    return { svg: scene.toSVG(cam(deg)), mesh };
+  }
+
+  async function draw() {
+    if (!K || busy) return;
+    busy = true;
+    $("draw").disabled = true;
+    const deg = Number($("orbit").value);
+    await new Promise((r) => requestAnimationFrame(r));   // let the disabled state paint before we block
+    const t0 = performance.now();
+    let out;
+    try {
+      out = build(deg);
+    } catch (e) {
+      stat.innerHTML = '<span class="warn">render failed: ' + e.message + "</span>";
+      busy = false; $("draw").disabled = false;
+      return;
+    }
+    lastSvg = out.svg;
+    stage.style.background = inkNow().bg;
+    stage.innerHTML = out.svg;
+    const ms = Math.round(performance.now() - t0);
+
+    // THE VITALS RIDE ALONG. v2605: four gauges, each one a death I actually shipped.
+    const v = vitals(blobs, basePair);
+    const d = diagnose(v);
+    const D = (Number($("temp").value) / 100) * 0.02;
+    if (d === "well") {
+      stat.textContent = deg + "\u00b0 \u2014 well \u2014 " + out.mesh.positions.length + " verts, " +
+        out.mesh.triangles.length + " tris \u2014 " + (out.svg.match(/<(path|polyline)/g) || []).length +
+        " strokes \u2014 " + (out.svg.length / 1024).toFixed(1) + " KB \u2014 " + ms + " ms \u2014 D " + D.toFixed(5);
+    } else {
+      stat.innerHTML = '<span class="warn">' + deg + "\u00b0 \u2014 " + d + "</span>";
+    }
+    busy = false;
+    $("draw").disabled = false;
+  }
+
+  // RENDER ON RELEASE, NOT ON INPUT. 708 ms per frame means a drag-driven render fights the user.
+  $("orbit").addEventListener("input", () => { $("oval").textContent = $("orbit").value + "\u00b0"; });
+  $("orbit").addEventListener("change", draw);
+  $("temp").addEventListener("input", () => { $("tval").textContent = ((Number($("temp").value) / 100) * 0.02).toFixed(3); });
+  $("temp").addEventListener("change", () => {
+    const D = (Number($("temp").value) / 100) * 0.02;
+    if (D > 0) jitterCentres(blobs, { D, dt: 1 / 60, rnd });    // warmth moves the CENTRES -- v2596's whole argument
+    draw();
+  });
+  $("bones").addEventListener("change", draw);
+  $("ink").addEventListener("change", () => { $("cval").textContent = inkNow().ratio; draw(); });
+  $("draw").addEventListener("click", draw);
+
+  $("spin").addEventListener("click", async () => {
+    if (busy) return;
+    for (let deg = 0; deg < 360; deg += 30) {
+      $("orbit").value = String(deg);
+      $("oval").textContent = deg + "\u00b0";
+      await draw();
+    }
+  });
+
+  // ---- THE GIF ----------------------------------------------------------------------------------------------
+  //
+  // MEASURED IN A REAL BROWSER BEFORE THIS BUTTON EXISTED: 8 frames at 240x180 -> render 4501 ms, ENCODE 66 ms.
+  // THE ENCODER IS FREE. KRBN IS THE COST, at ~563 ms a frame. So 12 frames is about SEVEN SECONDS and 36 is
+  // about TWENTY. A BUTTON THAT LOOKS FROZEN FOR TWENTY SECONDS IS A BROKEN BUTTON -- so it says the number
+  // BEFORE you press it, and counts frames WHILE it works.
+  //
+  // The mesh is built ONCE and the camera orbits around it. THE BLOB DOES NOT CHANGE WHILE YOU WALK AROUND HIM
+  // -- v2606's whole point, and it saves a marching pass per frame.
+  const gifEst = () => { const n = Number($("gifn").value); $("gval").textContent = n;
+    $("gest").textContent = "~" + Math.round(n * 0.57) + "s"; };
+  $("gifn").addEventListener("input", gifEst);
+  gifEst();
+
+  $("gif").addEventListener("click", async () => {
+    if (!K || busy) return;
+    busy = true;
+    const btn = $("gif");
+    const N = Number($("gifn").value);
+    const W = 320, H = 240;                 // small ON PURPOSE: a GIF is 256 colours per frame, MAXIMUM, and
+    let bytes;                              // this is a pencil drawing -- which is the one thing that survives it
+    try {
+      const { encodeGif } = await import("./render/gifRecorder.js");
+      const mesh = blobMeshInput(blobs);    // ONCE. The camera moves, he does not.
+      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+      const g = cv.getContext("2d", { willReadFrequently: true });
+      const frames = [];
+      for (let f = 0; f < N; f++) {
+        btn.textContent = "RENDERING " + (f + 1) + "/" + N;
+        await new Promise((r) => requestAnimationFrame(r));   // let that paint before we block the thread
+        const a = (f / N) * Math.PI * 2;
+        // THE GIF HAS ITS OWN CAMERA. This is where 0.0045 lived -- 2.25x too far in, showing 1.08 units of a
+        // 2.17-unit creature. IT USES THE MEASURED FRAMING NOW, same as the page.
+        const cf = frame(W, H);
+        const cam = { eye: [cf.c[0]+5*Math.sin(a), cf.c[1]-5*Math.cos(a), cf.c[2]+2.2], target: cf.c, up: [0,0,1],
+          projection: "orthographic", scale: cf.scale, viewport: { width: W, height: H } };
+        // THE GIF BUILDS ITS OWN SCENE -- so it needs the ink too, or SAVE GIF QUIETLY SHIPS THE BLACK PICTURE
+        // WHILE THE PAGE SHOWS THE FIXED ONE. Two code paths, one bug, and only one of them on screen.
+        const pal = inkNow();
+        const scene = new K.Scene({ svg: { background: pal.bg }, light: { direction: [-0.4,-0.5,-0.7] }, style: { wobble: 0.45 } });
+        scene.add(new K.Mesh(mesh)).setImportance(1, { role: "subject" })
+          .style({ weight: 1.1, color: pal.ink, hatch: { mode: "cross", angle: 20, spacingPx: 7, field: true } });
+        const mode = $("bones").value;
+        if (mode !== "off") for (const b of blobs)
+          scene.add(K.sphere([b.x, b.y, b.z], b.r)).setImportance(0.3, { role: "context" }).style({ hidden: mode, color: pal.ink, weight: 0.7 });
+        const svg = scene.toSVG(cam);
+        // SVG -> raster. THE ONE BRIDGE KRBN DOES NOT BUILD FOR US, because a Drawing is { toSvg(): string }
+        // and a string is not pixels. An Image with an object URL is the browser's own SVG rasteriser.
+        const img = new Image();
+        const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+        try {
+          await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("the SVG did not decode")); img.src = url; });
+          g.fillStyle = pal.bg; g.fillRect(0, 0, W, H);
+          g.drawImage(img, 0, 0, W, H);
+        } finally { URL.revokeObjectURL(url); }
+        frames.push(g.getImageData(0, 0, W, H).data);
+      }
+      btn.textContent = "ENCODING...";
+      await new Promise((r) => requestAnimationFrame(r));
+      bytes = encodeGif(frames, W, H, { delay: 90, colors: 64 });
+    } catch (e) {
+      stat.innerHTML = '<span class="warn">gif failed: ' + e.message + "</span>";
+      btn.textContent = "SAVE GIF"; busy = false;
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([bytes], { type: "image/gif" }));
+    a.download = "blob-hologram-spin.gif";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    stat.textContent = N + " frames \u2014 " + (bytes.length / 1024).toFixed(1) + " KB \u2014 GIF89a";
+    btn.textContent = "SAVE GIF";
+    busy = false;
+  });
+
+  $("save").addEventListener("click", () => {
+    if (!lastSvg) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lastSvg], { type: "image/svg+xml" }));
+    a.download = "blob-hologram-" + $("orbit").value + ".svg";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  (async function boot() {
+    try {
+      K = await import("/vendor/krbn/index.js");
+    } catch (e) {
+      // NO FALLBACK. v2597's rule: a page that quietly draws something else when its subject is missing is
+      // lying about what it is showing.
+      stat.innerHTML = '<span class="warn">Krbn is not vendored: ' + e.message +
+        " &mdash; expected /vendor/krbn/index.js. Clone https://github.com/vpalos/Krbn, run <b>bun install &amp;&amp; bun run build</b> once, and copy dist/ to vendor/krbn/.</span>";
+      for (const id of ["draw", "spin", "save"]) $(id).disabled = true;
+      return;
+    }
+    $("cval").textContent = inkNow().ratio;
+    stat.textContent = "Krbn loaded (" + Object.keys(K).length + " exports) \u2014 press RENDER";
+    draw();
+  })();
+</script>
+</body>
+</html>

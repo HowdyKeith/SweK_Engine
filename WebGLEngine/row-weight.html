@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The knob nobody asked about (v3649)</title>
+<meta name="demo:desc" content="Moving the boundary row onto the wall makes the constraint exactly satisfiable and the answer 3.5% worse. Looking for that 3.5% found the row's weight - a hardcoded 1 for six rounds - worth 1.7x, larger than every effect being measured around it.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>The knob nobody asked about</h1>
+<div class="sub">The previous round named the obvious next step: <b>move the row's evaluation point onto the
+wall</b>. The offset is a closed form, so the correction is one line. It is done here &mdash; and it is worth
+<b>3.5% in the wrong direction</b>.</div>
+<div class="law"><b>And looking for that 3.5% found something worth 1.7&times;: the row's weight</b>, a hardcoded
+<code>1</code> through six rounds that nobody &mdash; including me &mdash; ever asked about. A knob with no key,
+sitting in the middle of every measurement in this thread. <b>The unexamined constant was larger than every effect
+being measured around it.</b></div>
+<h2>1. The projection does exactly what it was supposed to</h2>
+<div class="panel"><button id="g1" class="good">check satisfiability</button><table id="t1"></table></div>
+<div class="law">The constraint becomes <b>exactly satisfiable</b> &mdash; thirteen orders, 1.7e-2 down to 5.6e-16.
+It is now true at the point it is written at.</div>
+<h2>2. And the answer gets worse</h2>
+<div class="panel"><button id="g2" class="good">with the point moved</button><table id="t2"></table></div>
+<div class="law"><b>A constraint being exactly true is not the same as a fit being better.</b> A least-squares fit
+doesn't <i>solve</i> the row &mdash; it <i>trades</i> it against the data rows, and moving the point moves the
+lever arms in that trade. The order is untouched either way.</div>
+<h2>3. The knob</h2>
+<div class="panel">
+  <button id="g3" class="good">sweep the row weight</button>
+  <canvas id="cv" width="620" height="340" style="max-width:100%"></canvas>
+  <table id="t3"></table>
+</div>
+<div class="law"><b>There is an interior optimum and the default is not it</b> &mdash; weight 0.25 reads 6.72e-4
+against the default's 1.14e-3, a factor of <b>1.70</b>, bracketed on both sides. And an <b>over-weighted true
+constraint destroys almost all of its own benefit</b>: at weight 64 it is barely better than having no row at all.
+<b>Forcing a true condition crowds out the data that would have told you the rest of the answer.</b></div>
+<div class="law">The projection's 3.5% is itself <b>a function of the weight</b> and vanishes at the good one
+&mdash; so the thing I went looking for only exists at the weight I hadn't examined. <b>The default is left at 1
+deliberately</b>, so every earlier number in this thread reproduces. <b>Not claimed:</b> that 0.25 is right &mdash;
+it is the minimum for one field on one mesh at one refinement, and a weight fitted to a fixture is a knob with a
+story rather than a key. What is claimed is that the default was never chosen, and that it is now visible. Graded
+by <code>physics/mesh/rowWeight-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>.</div>
+<script type="module">
+import { makeAnnulus, potentialFlow, cellValues, annulusFaces, wallSideError } from "/physics/mesh/curvedWall.mjs";
+import { vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+import { quadraticGradient, quadraticGradientWithWall, projectFacesToWall, faceMidpointOffset } from "/physics/mesh/quadraticRecon.mjs";
+const $ = (i) => document.getElementById(i);
+const { phi, grad } = potentialFlow({});
+const S = [24, 48, 96, 192, 384].map((nt) => {
+    const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / 8)), nt, a: 1, b: 3 });
+    const F = annulusFaces(m);
+    return { nt, m, u: cellValues(m, phi), F, P: projectFacesToWall(m, F, "inner"), vn: vertexNeighbours(m) };
+});
+const ord = (v) => v.slice(1).map((e, i) => Math.log2(v[i] / e));
+const err = (s, faces, w) => wallSideError(s.m, s.F, grad, quadraticGradientWithWall(s.u, s.m, s.vn, faces, { rowWeight: w }), "inner");
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const res = (s, faces) => { let w = 0;
+    for (let t = 0; t < s.m.tri.length; t++) for (const f of faces[t]) { if (f.kind !== "inner") continue;
+        const [gx, gy] = grad(f.mx, f.my); w = Math.max(w, Math.abs(gx * f.nx + gy * f.ny)); } return w; };
+$("g1").onclick = () => rows($("t1"), ["nt", "|grad&middot;n| at the chord midpoint", "at the projected point", "offset removed"],
+    S.map((s) => [s.nt, "<span class='warn'>" + res(s, s.F).toExponential(3) + "</span>",
+        "<span class='ok'>" + res(s, s.P).toExponential(3) + "</span>",
+        faceMidpointOffset(s.m, s.F, "inner").worst.toExponential(3)]));
+$("g2").onclick = () => {
+    const ec = S.map((s) => err(s, s.F, 1)), ep = S.map((s) => err(s, s.P, 1));
+    rows($("t2"), ["nt", "chord point", "projected point", "projected / chord"],
+        S.map((s, i) => [s.nt, ec[i].toExponential(3), "<span class='bad'>" + ep[i].toExponential(3) + "</span>",
+            "<span class='bad'>" + (ep[i] / ec[i]).toFixed(4) + "</span>"])
+        .concat([["orders", ord(ec).map((o) => o.toFixed(2)).join(", "), ord(ep).map((o) => o.toFixed(2)).join(", "),
+            "<span class='dim'>untouched</span>"]]));
+};
+$("g3").onclick = () => {
+    const s = S[3];
+    const noRow = wallSideError(s.m, s.F, grad, quadraticGradient(s.u, s.m, s.vn), "inner");
+    const W = [0.0625, 0.25, 1, 4, 16, 64];
+    const r = W.map((w) => ({ w, c: err(s, s.F, w), p: err(s, s.P, w) }));
+    const best = r.reduce((a, b) => (b.c < a.c ? b : a));
+    rows($("t3"), ["row weight", "chord", "projected", "proj / chord", "vs no row (" + noRow.toExponential(2) + ")"],
+        r.map((x) => [x.w === 1 ? "<b>1 (the default)</b>" : x.w,
+            (x.w === best.w ? "<span class='ok'>" : "<span class='" + (x.c > noRow * 0.9 ? "bad" : "warn") + "'>") + x.c.toExponential(3) + "</span>",
+            x.p.toExponential(3), (x.p / x.c).toFixed(4),
+            (noRow / x.c).toFixed(2) + "x " + (x.c < noRow ? "better" : "worse")]));
+    const cv = $("cv"), ctx = cv.getContext("2d"), W2 = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W2, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W2, H);
+    const L = 52, B = 30, T = 14, R = 14, lo = -3.4, hi = -2.5;
+    const X = (i) => L + i / (W.length - 1) * (W2 - L - R);
+    const Y = (v) => T + (1 - (Math.log10(v) - lo) / (hi - lo)) * (H - T - B);
+    ctx.strokeStyle = "#232b3d"; ctx.fillStyle = "#68748c";
+    for (const e of [-3.4, -3.2, -3.0, -2.8, -2.6]) { ctx.beginPath(); ctx.moveTo(L, Y(Math.pow(10, e))); ctx.lineTo(W2 - R, Y(Math.pow(10, e))); ctx.stroke();
+        ctx.fillText(Math.pow(10, e).toExponential(1), 4, Y(Math.pow(10, e)) + 4); }
+    ctx.strokeStyle = "#4a5670"; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(noRow)); ctx.lineTo(W2 - R, Y(noRow)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#4a5670"; ctx.fillText("no row at all", W2 - 100, Y(noRow) - 5);
+    ctx.strokeStyle = "#8fe0a8"; ctx.lineWidth = 1.8; ctx.beginPath();
+    r.forEach((x, i) => { const px = X(i), py = Y(x.c); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.stroke(); ctx.lineWidth = 1;
+    r.forEach((x, i) => { ctx.fillStyle = x.w === 1 ? "#e8c49a" : (x.w === best.w ? "#8fe0a8" : "#68748c");
+        ctx.beginPath(); ctx.arc(X(i), Y(x.c), 4, 0, 7); ctx.fill();
+        ctx.fillText(String(x.w), X(i) - 10, H - 12); });
+    ctx.fillStyle = "#e8c49a"; ctx.fillText("the default", X(2) - 22, Y(r[2].c) - 10);
+    ctx.fillStyle = "#8fe0a8"; ctx.fillText("optimum", X(1) - 18, Y(r[1].c) + 18);
+};
+</script>
+</div></body></html>

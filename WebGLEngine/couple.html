@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!--
+  couple.html -- multi-physics coupling authoring bench. RIG-ONLY (runs from the engine root so its ES imports of
+  ./physics/xpbd/* resolve; will not preview in a standalone sandbox, like server.html / fingerprint.html / ev.html).
+
+  This page holds NO physics. It imports the verified twins and the gated coupling registry, builds its picker and
+  sliders straight from that registry, and drives the same modulatedSubstep / plasticSubstep the gates exercise. Pick
+  a coupling, paint its field onto the mesh with the pointer, and watch the deterministic solver respond. Because the
+  math is the gated code, what you author here is what the fingerprint proves bit-identical across machines.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK -- Coupling Bench</title>
+<style>
+  :root { --lcars-bg:#000; --lcars-amber:#ff9f00; --lcars-orange:#ff7700; --lcars-blue:#7788ff; --lcars-cyan:#33ccff; --lcars-red:#ee3322; --lcars-panel:#1a1206; --lcars-text:#ffcc66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--lcars-bg); color:var(--lcars-text); font-family:"Antonio","Arial Narrow",sans-serif; letter-spacing:.04em; }
+  #wrap { display:flex; gap:14px; padding:14px; min-height:100vh; }
+  #stageCol { flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
+  #panel { flex:0 0 320px; display:flex; flex-direction:column; gap:10px; }
+  .bar { background:var(--lcars-amber); color:#000; border-radius:0 22px 0 0; padding:8px 16px; font-size:20px; font-weight:700; text-transform:uppercase; }
+  .block { background:var(--lcars-panel); border-left:6px solid var(--lcars-orange); border-radius:0 0 0 18px; padding:12px 14px; }
+  .block h3 { margin:0 0 8px; font-size:13px; letter-spacing:.14em; color:var(--lcars-amber); text-transform:uppercase; }
+  canvas { background:#05070d; border:2px solid var(--lcars-orange); border-radius:14px; width:100%; display:block; }
+  select, button { font-family:inherit; font-size:14px; background:#241a08; color:var(--lcars-text); border:1px solid var(--lcars-orange); border-radius:8px; padding:7px 10px; cursor:pointer; }
+  button.lcars { background:var(--lcars-orange); color:#000; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+  button.lcars.on { background:var(--lcars-cyan); }
+  button:hover { filter:brightness(1.15); }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; margin:7px 0; text-transform:uppercase; letter-spacing:.08em; }
+  input[type=range] { width:150px; accent-color:var(--lcars-orange); }
+  .val { color:var(--lcars-cyan); min-width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .hint { font-size:11px; color:#b8935a; line-height:1.5; text-transform:none; letter-spacing:normal; }
+  .tag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:8px; background:var(--lcars-blue); color:#000; text-transform:uppercase; letter-spacing:.1em; }
+  .tag.perm { background:var(--lcars-red); color:#fff; } .tag.sel { background:var(--lcars-cyan); } .tag.temp { background:var(--lcars-amber); }
+  #status { font-size:12px; color:var(--lcars-cyan); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageCol">
+    <div class="bar">SweK &middot; Multi-Physics Coupling Bench</div>
+    <canvas id="stage" width="900" height="620"></canvas>
+    <div class="block">
+      <div id="status">initialising&hellip;</div>
+      <div class="hint" id="paintHint"></div>
+    </div>
+  </div>
+  <div id="panel">
+    <div class="bar" style="border-radius:22px 0 0 0">Controls</div>
+    <div class="block">
+      <h3>Coupling</h3>
+      <select id="couplingSel" style="width:100%"></select>
+      <div style="margin-top:8px"><span id="kindTag" class="tag temp">temporary</span> <span id="driverTag" class="tag">field</span></div>
+      <div class="hint" id="couplingHint" style="margin-top:8px"></div>
+    </div>
+    <div class="block" id="paramsBlock"><h3>Parameters</h3><div id="params"></div></div>
+    <div class="block" id="brushBlock">
+      <h3>Paint Brush</h3>
+      <label class="row">Radius <input type="range" id="brushR" min="10" max="120" value="45" /><span class="val" id="brushRv">45</span></label>
+      <label class="row">Intensity <input type="range" id="brushI" min="0" max="100" value="100" /><span class="val" id="brushIv">1.00</span></label>
+      <div class="btns"><button id="eraseBtn">Erase mode</button><button id="clearFieldBtn">Clear field</button></div>
+      <div class="hint" style="margin-top:8px">Drag on the mesh to paint. Colour shows the field: warm = high, dark = zero.</div>
+    </div>
+    <div class="block">
+      <h3>Simulation</h3>
+      <div class="btns">
+        <button class="lcars" id="playBtn">Play</button>
+        <button id="stepBtn">Step</button>
+        <button id="resetBtn">Reset mesh</button>
+      </div>
+      <label class="row" style="margin-top:10px">Gravity <input type="range" id="grav" min="0" max="40" value="10" /><span class="val" id="gravv">10</span></label>
+      <label class="row">Iterations <input type="range" id="iters" min="1" max="16" value="8" /><span class="val" id="itersv">8</span></label>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { buildClothConstraints } from "./physics/xpbd/clothMesh.js";
+import { colorConstraints } from "./physics/xpbd/xpbd.js";
+import { markRowFibers } from "./physics/xpbd/muscle.js";
+import { fluidMeshSubstep } from "./physics/xpbd/fluid.js";
+import { COUPLINGS, couplingById } from "./physics/xpbd/couplingRegistry.js";
+
+const W = 26, H = 18, SP = 0.28;      // mesh grid
+const cvs = document.getElementById("stage"), ctx = cvs.getContext("2d");
+let cons, batches, state, field, N, fluid = null;
+let coupling = COUPLINGS[0];
+let params = {};                       // live parameter values
+let playing = false, erase = false;
+let brushR = 45, brushI = 1.0;
+
+function spawnFluid(nSide, cx, cy) {
+    const nF = nSide * nSide; const pos = new Float64Array(3 * nF), vel = new Float64Array(3 * nF), invMass = new Float64Array(nF).fill(1);
+    let k = 0; for (let a = 0; a < nSide; a++) for (let b = 0; b < nSide; b++) { pos[3 * k] = cx + a * 0.13; pos[3 * k + 1] = cy + b * 0.13; pos[3 * k + 2] = 0; k++; }
+    return { pos, vel, invMass, nF };
+}
+
+function buildMesh() {
+    fluid = null;
+    if (coupling.driver === "body") {
+        // a catenary rope (single row) pinned at both ends, with a fluid blob to pour in -- all in the x-y plane
+        const RW = 22; const built = buildClothConstraints(RW, 1, SP, { structural: 0.0006, shear: 0, bending: 0.02 });
+        cons = built.cons; batches = colorConstraints(cons); N = RW;
+        const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N);
+        for (let x = 0; x < RW; x++) { pos[3 * x] = x * SP; pos[3 * x + 1] = 0; pos[3 * x + 2] = 0; invMass[x] = (x === 0 || x === RW - 1) ? 0 : 1; }
+        state = { pos, vel, invMass };
+        field = new Float64Array(N);
+        fluid = spawnFluid(6, RW * SP * 0.42, 1.6);
+        return;
+    }
+    const built = buildClothConstraints(W, H, SP, { structural: 0.001, shear: 0.002, bending: 0.01 });
+    cons = built.cons;
+    if (coupling.id === "muscle") { markRowFibers(cons, W, Math.floor(H / 2)); markRowFibers(cons, W, Math.floor(H / 2) - 1); }
+    batches = colorConstraints(cons);
+    N = W * H;
+    const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; pos[3 * i] = x * SP; pos[3 * i + 1] = -y * SP; pos[3 * i + 2] = 0; invMass[i] = (y === 0) ? 0 : 1; }  // top row pinned
+    state = { pos, vel, invMass };
+    field = new Float64Array(N);
+}
+
+// world <-> screen (fit the scene with margin, y up)
+function fit() {
+    const pad = 40;
+    let gx0 = 0, gx1 = (W - 1) * SP, gy0 = -(H - 1) * SP, gy1 = 0;
+    if (coupling.driver === "body") { gx0 = 0; gx1 = (N - 1) * SP; gy0 = -1.4; gy1 = 1.9; }
+    const gw = gx1 - gx0, gh = gy1 - gy0;
+    const s = Math.min((cvs.width - 2 * pad) / gw, (cvs.height - 2 * pad) / gh);
+    const ox = pad + (cvs.width - 2 * pad - gw * s) / 2 - gx0 * s, oy = pad + gy1 * s;
+    return { s, ox, oy };
+}
+const toScreen = (wx, wy, f) => [f.ox + wx * f.s, f.oy - wy * f.s];
+
+function fieldColor(v) {
+    if (coupling.id === "muscle") { const t = Math.max(0, Math.min(1, v)); return `rgb(${40 + 40 * t},${120 + 135 * t},${180 + 75 * t})`; }
+    const t = Math.max(0, Math.min(1, v)); return `rgb(${40 + 215 * t},${40 + 120 * t * (1 - t) * 2},${60 - 60 * t})`;   // dark -> amber/red
+}
+
+function render() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    const f = fit(), p = state.pos;
+    ctx.lineWidth = coupling.driver === "body" ? 2 : 1;
+    for (const c of cons) {
+        const [ax, ay] = toScreen(p[3 * c.i], p[3 * c.i + 1], f), [bx, by] = toScreen(p[3 * c.j], p[3 * c.j + 1], f);
+        ctx.strokeStyle = c.muscle ? "rgba(120,220,255,.7)" : (c.kind === "bending" ? "rgba(255,150,40,.18)" : "rgba(255,150,40,.5)");
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    }
+    for (let i = 0; i < N; i++) {
+        const [sx, sy] = toScreen(p[3 * i], p[3 * i + 1], f);
+        ctx.fillStyle = state.invMass[i] === 0 ? "#ff3322" : fieldColor(field[i]);
+        ctx.beginPath(); ctx.arc(sx, sy, state.invMass[i] === 0 ? 4 : 3, 0, 7); ctx.fill();
+    }
+    if (fluid) {                                          // fluid particles (two-body coupling)
+        for (let i = 0; i < fluid.nF; i++) {
+            const [sx, sy] = toScreen(fluid.pos[3 * i], fluid.pos[3 * i + 1], f);
+            ctx.fillStyle = "rgba(80,180,255,.9)"; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, 7); ctx.fill();
+        }
+    }
+}
+
+// ---- coupling options come straight from the registry ----
+const sel = document.getElementById("couplingSel");
+for (const c of COUPLINGS) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); }
+function selectCoupling(id) {
+    coupling = couplingById(id);
+    params = {}; for (const pr of coupling.params) params[pr.name] = pr.default;
+    // params UI
+    const box = document.getElementById("params"); box.innerHTML = "";
+    for (const pr of coupling.params) {
+        const row = document.createElement("label"); row.className = "row";
+        const val = document.createElement("span"); val.className = "val"; val.textContent = pr.default.toFixed(2);
+        const inp = document.createElement("input"); inp.type = "range"; inp.min = pr.min; inp.max = pr.max; inp.step = pr.step; inp.value = pr.default;
+        inp.oninput = () => { params[pr.name] = parseFloat(inp.value); val.textContent = params[pr.name].toFixed(2); };
+        row.append(pr.label + " ", inp, val); box.appendChild(row);
+    }
+    const kt = document.getElementById("kindTag"); kt.textContent = coupling.kind; kt.className = "tag " + (coupling.kind === "permanent" ? "perm" : coupling.kind === "selective" ? "sel" : "temp");
+    const dt = document.getElementById("driverTag"); dt.textContent = coupling.driver === "field" ? "paint: " + coupling.fieldName : (coupling.driver === "body" ? "two-body fluid" : "auto (stress)");
+    document.getElementById("brushBlock").style.display = coupling.driver === "field" ? "" : "none";
+    document.getElementById("couplingHint").textContent = coupling.driver === "field"
+        ? "Paint the " + coupling.fieldName + " field onto the mesh, then Play."
+        : coupling.driver === "body" ? "A fluid blob sits above a hammock. Press Play -- its weight caves the mesh, the mesh holds it up, both move (two-way)."
+        : "Plasticity reads stress from the motion -- just raise gravity and Play to dent it. No painting.";
+    document.getElementById("paintHint").textContent = coupling.driver === "field" ? "" : (coupling.driver === "body" ? "Two coupled bodies -- fluid (blue) and mesh (amber). Reset to re-drop the fluid." : "This coupling has no paint field; deformation is driven by load.");
+    buildMesh(); render();
+}
+sel.onchange = () => selectCoupling(sel.value);
+
+// ---- painting ----
+let painting = false;
+function paintAt(mx, my) {
+    if (coupling.driver !== "field") return;
+    const f = fit(), r2 = brushR * brushR;
+    for (let i = 0; i < N; i++) {
+        const [sx, sy] = toScreen(state.pos[3 * i], state.pos[3 * i + 1], f);
+        const d2 = (sx - mx) * (sx - mx) + (sy - my) * (sy - my);
+        if (d2 < r2) { const w = 1 - Math.sqrt(d2) / brushR; field[i] = erase ? Math.max(0, field[i] - brushI * w) : Math.min(1, field[i] + brushI * w * 0.5); }
+    }
+    render();
+}
+function evPos(e) { const rc = cvs.getBoundingClientRect(); return [(e.clientX - rc.left) * cvs.width / rc.width, (e.clientY - rc.top) * cvs.height / rc.height]; }
+cvs.addEventListener("pointerdown", (e) => { painting = true; const [x, y] = evPos(e); paintAt(x, y); });
+cvs.addEventListener("pointermove", (e) => { if (painting) { const [x, y] = evPos(e); paintAt(x, y); } });
+window.addEventListener("pointerup", () => { painting = false; });
+
+// ---- controls ----
+const grav = document.getElementById("grav"), iters = document.getElementById("iters");
+grav.oninput = () => document.getElementById("gravv").textContent = grav.value;
+iters.oninput = () => document.getElementById("itersv").textContent = iters.value;
+document.getElementById("brushR").oninput = (e) => { brushR = +e.target.value; document.getElementById("brushRv").textContent = brushR; };
+document.getElementById("brushI").oninput = (e) => { brushI = e.target.value / 100; document.getElementById("brushIv").textContent = brushI.toFixed(2); };
+document.getElementById("eraseBtn").onclick = (e) => { erase = !erase; e.target.classList.toggle("on", erase); e.target.textContent = erase ? "Erase: ON" : "Erase mode"; };
+document.getElementById("clearFieldBtn").onclick = () => { field.fill(0); render(); };
+document.getElementById("resetBtn").onclick = () => { buildMesh(); render(); };
+document.getElementById("stepBtn").onclick = () => { stepSim(); render(); };
+const playBtn = document.getElementById("playBtn");
+playBtn.onclick = () => { playing = !playing; playBtn.classList.toggle("on", playing); playBtn.textContent = playing ? "Pause" : "Play"; };
+
+let frame = 0;
+function stepSim() {
+    const opts = { dt: 0.016, iterations: parseInt(iters.value), gravity: [0, -parseFloat(grav.value), 0], ...params };
+    if (coupling.driver === "body") {
+        coupling.substep(fluid, state, cons, batches, opts);   // two-body: fluid + mesh both advance
+    } else {
+        coupling.substep(state, cons, batches, field, opts);   // the gated substep -- registry delegates to the verified module
+    }
+    frame++;
+    let extra = "";
+    if (coupling.id === "plastic") { let y = 0; for (const c of cons) if (c.restOrig !== undefined && Math.abs(c.rest0 - c.restOrig) > 1e-9) y++; extra = `  |  yielded ${y}`; }
+    if (coupling.driver === "body") extra = `  |  fluid ${fluid.nF}`;
+    document.getElementById("status").textContent = `coupling: ${coupling.id}  |  frame ${frame}  |  nodes ${N}  |  constraints ${cons.length}` + extra;
+}
+function loop() { if (playing) { stepSim(); render(); } requestAnimationFrame(loop); }
+
+selectCoupling(COUPLINGS[0].id);
+loop();
+</script>
+</body>
+</html>

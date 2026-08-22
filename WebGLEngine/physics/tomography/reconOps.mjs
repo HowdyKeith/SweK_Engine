@@ -75,12 +75,28 @@ export function powerStep(adjoint, N, angles, nDet, { iters = 14, seed = 12345 }
 }
 
 /**
- * x <- x + step * B (b - A x). B DEFAULTS TO backProject, which is what sirt.mjs shipped at v3613 and what its
- * hash-pinned checks still hold -- and v3616 measured that THIS PAIR TURNS ROUND past ~1000 iterations, so the
- * default must be stopped early. Pass matchedBackProject for the operator that descends instead.
+ * x <- x + step * B (b - A x).
+ *
+ * *** v3847 -- B NOW DEFAULTS TO matchedBackProject. THE DEFAULT MOVED, AND THE SPARSE-ANGLE REGRESSION IS
+ * ACCEPTED RATHER THAN WORKED AROUND. *** v3846 measured the crossover and split the entry points by question;
+ * Keith read the numbers and chose ONE default. The reasoning is that a fixed-point iteration that WALKS AWAY
+ * FROM THE DATA is not a defensible default whatever it scores on one phantom -- v3616's finding stands, and a
+ * method that is not a descent method should not be the thing this tree hands out by name.
+ *
+ * WHAT IT COSTS, AND IT IS A REAL COST PAID ON PURPOSE (see sirt.mjs's header for the full table):
+ *     12 views   correlation 0.970618 -> 0.952483     30 views   0.987556 -> 0.979565
+ *    120 views   correlation 0.996503 -> 0.996897 (the matched operator wins here)
+ * FINDING 1's headline gain falls +0.0957 -> +0.0776 at twelve views, and its ORDERING and every assertion
+ * built on it still hold -- the sparse end is still where a method choice buys most, by 7.86x rather than 10.1x.
+ *
+ * WHAT IT BUYS: the residual actually descends, monotonically, for as long as you run it. The budget stops
+ * being load-bearing -- 300 iterations is now merely a budget rather than an accidental regulariser.
+ *
+ * Pass `adjoint: (r) => backProject(r, N, angles, nDet)` for the old operator; the gates do exactly that to
+ * hold the turn-round on the record.
  */
 export function landweber(sino, N, angles, nDet, { iters = 300, step = null, x0 = null, every = 50, adjoint = null } = {}) {
-    const B = adjoint || ((r) => backProject(r, N, angles, nDet));
+    const B = adjoint || ((r) => matchedBackProject(r, N, angles, nDet));   // v3847 -- was backProject
     const lam = step === null ? powerStep(B, N, angles, nDet).step : step;
     const x = x0 ? Float64Array.from(x0) : new Float64Array(N * N);
     const history = [];
@@ -129,6 +145,14 @@ export function landweber(sino, N, angles, nDet, { iters = 300, step = null, x0 
  * from 4.345 to 7.556 by 4000, while the matched operator falls monotonically to 0.2945 and is still falling.
  * THE CLAIM WAS TRUE ONLY INSIDE A BUDGET THAT HID THE DEFECT, which is the same shape as a tolerance chosen
  * by looking at where the measurement landed. ***
+ */
+/**
+ * *** v3847 -- THIS IS NOW THE SAME OPERATOR AS THE DEFAULT, AND IT IS KEPT ANYWAY. *** v3846 split the entry
+ * points by question; v3847 moved the default to the matched operator, so `landweberDescent` and `landweber`
+ * now agree. It is RETAINED rather than deleted for two reasons: v3846's callers and gates keep working
+ * against ONE declaration (the rule reconOps.mjs was created to enforce), and the NAME still carries the
+ * claim -- code that means "I am minimising a residual" says so, and stays correct if a future round ever
+ * reopens the default. IT IS AN ALIAS, NOT A SECOND IMPLEMENTATION; there is no way for the two to drift.
  */
 export function landweberDescent(sino, N, angles, nDet, opts = {}) {
     const adjoint = opts.adjoint || ((r) => matchedBackProject(r, N, angles, nDet));

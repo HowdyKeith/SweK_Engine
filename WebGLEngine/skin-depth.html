@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Skin depth, and a bisected threshold against a predicted one (v3628)</title>
+<meta name="demo:desc" content="Skin depth exact vs the famous good-conductor limit (55% wrong at loss tangent 1), measured on a lossy 1D FDTD - and the stability meter's bisected threshold graded against FDTD's exactly predictable Courant limit for the first time.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ input[type=range]{vertical-align:middle;width:200px}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+</style></head><body><div id="w">
+
+<h1>How far a wave gets into a conductor</h1>
+<div class="sub">In a medium with permittivity <code>&epsilon;</code>, permeability <code>&mu;</code> and
+conductivity <code>&sigma;</code>, the <b>loss tangent</b> <code>p = &sigma;/(&omega;&epsilon;)</code> decides
+everything: <code>&alpha; = &omega;&radic;(&mu;&epsilon;/2 &middot; (&radic;(1+p&sup2;) &minus; 1))</code> and the
+skin depth is <code>&delta; = 1/&alpha;</code>, exactly.</div>
+
+<div class="law"><b>The formula everybody quotes is a limit, and it never says so.</b>
+<code>&delta; = &radic;(2/&omega;&mu;&sigma;)</code> is the <code>p &rarr; &infin;</code> case. It is exact to
+eighteen digits for copper and <b>55.4% wrong at p = 1</b>. The miss is a function of <code>p</code> alone &mdash;
+not of the material, not of the frequency, not of anything appearing in either formula.</div>
+
+<h2>1. The two formulas, and the number between them</h2>
+<div class="panel"><button id="r1" class="good">sweep the loss tangent</button><table id="t1"></table></div>
+
+<h2>2. The closed form grading a lossy FDTD</h2>
+<div class="panel">
+  <div class="row"><label>&sigma; <input id="sig" type="range" min="0.02" max="0.3" step="0.01" value="0.1"></label>
+  <span id="sigv" class="dim"></span><button id="r2" class="good">launch a wave into it</button></div>
+  <canvas id="cv" width="960" height="240"></canvas>
+  <table id="t2"></table>
+</div>
+<div class="law">The window for the fit is <b>derived from the predicted &delta;</b> &mdash; half a depth in, one
+decade wide &mdash; not chosen by eye. A deeper window always reads a <i>smaller</i> &alpha;, by up to 30&times;.
+Domain length is ruled out (35 &rarr; 118 depths moves nothing) and so is the Courant number.
+<b>That residue is not explained here</b>, and the number quoted is a bound on this fixture rather than on FDTD.</div>
+
+<h2>3. A bisected threshold against a predicted one</h2>
+<div class="panel"><button id="r3" class="good">bisect at six budgets</button>
+<span class="note">FDTD's limit is <code>S &le; 1/&radic;d</code> &mdash; exact. The meter's method is to bisect.</span>
+<table id="t3"></table></div>
+<div class="law"><b>The bisected boundary is a function of the step budget and the predicted one is not.</b> It
+falls toward 1 as the budget grows and never reaches it &mdash; and it is always <i>above</i> the true limit, so a
+solver tuned to a bisected threshold is tuned just past its own cliff. Nobody could have known that before,
+because everywhere else the meter has been used there was no right answer to check the bisection against.</div>
+
+<h2>4. The edges &mdash; and the verdict on section 3's floor</h2>
+<div class="panel"><button id="r4" class="good">measure both boundaries</button>
+<span class="note">a hard source is an assignment; a soft source is an accumulation</span>
+<table id="t4"></table></div>
+<div class="law"><b>An assignment is a mirror.</b> <code>E[i] = f(t)</code> overwrites the cell every step, so
+whatever arrives is annihilated and replaced &mdash; reflection coefficient <b>exactly 1</b>, not 0.99.
+<code>E[i] += f(t)</code> leaves the ordinary update in place and is <b>exactly transparent</b>. And Mur's
+first-order boundary is <b>exact at the magic Courant number</b> <code>S = 1</code>: its coefficient
+<code>(c&Delta;t&minus;&Delta;x)/(c&Delta;t+&Delta;x)</code> vanishes and the update collapses to
+<code>E<sub>0</sub> &larr; E<sub>1</sub></code>, which is precisely what the scheme does there. That is the same
+fact the magic time step already rests on, arriving at the boundary.</div>
+<div class="law"><b>Verdict on the unexplained floor above: partial, and named.</b> That fixture drove its edge with
+an assignment, so the driven cell was a perfect mirror. One word changed: at &sigma; = 0.01 measured/predicted falls
+from <b>1.97e+4 to 1.18</b> and the closed form now holds where it could not be checked before. But a residual floor
+near <b>1e-9</b> survives at &sigma; = 0.02 and 0.05 &mdash; roughly <b>five orders lower</b>, and still open. Not
+retracted, no longer the same size, and no cause claimed for what is left.</div>
+
+<div class="law">Graded by <code>physics/em/skinDepth-selfcheck.mjs</code> (22 checks) from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. Two doors were closed in
+<code>physics/stabilityMeter.mjs</code> this round: <code>verdict()</code> used to answer for any name it had never
+heard of by silently treating it as symplectic, and <code>classifyEnvelope</code> compares an energy ratio to 1,
+which is right for a conservative system and wrong for a conductor &mdash; there is now a second question that takes
+the predicted ratio. The original is untouched and still hash-pinned.</div>
+
+<script type="module">
+import { propagation, skinDepthExact, skinDepthGood, goodConductorRatio, lossTangent,
+         lossyFdtd1d, measuredAlpha, EPS0, MU0 } from "/physics/em/skinDepth.mjs";
+import { classifyEnvelope } from "/physics/stabilityMeter.mjs";
+import { cflLimit } from "/physics/em/maxwell.mjs";
+import { reflectionOf, sourceTransparency } from "/physics/em/absorbing.mjs";
+const $=(i)=>document.getElementById(i);
+const rel=(a,b)=>Math.abs(a-b)/Math.max(Math.abs(b),1e-300);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+
+$("r1").onclick=()=>{
+  const out=[];
+  for(const p of [0.1,0.3,1,3,10,100,1e4]){
+    const miss=1/goodConductorRatio(p)-1;
+    out.push([p.toExponential(0), goodConductorRatio(p).toFixed(9),
+      "<span class='"+(miss>0.05?"bad":miss>0.005?"warn":"ok")+"'>"+(100*miss).toFixed(4)+"%</span>",
+      p<1?"poor conductor":p>1e3?"good conductor":"neither"]);
+  }
+  const om=2*Math.PI*1e6,sg=5.96e7;
+  out.push(["copper @ 1 MHz","&delta; = "+(1e6*skinDepthExact({omega:om,sigma:sg})).toFixed(3)+" &micro;m",
+    "<span class='ok'>"+rel(skinDepthExact({omega:om,sigma:sg}),skinDepthGood({omega:om,sigma:sg})).toExponential(2)+"</span>",
+    "p = "+lossTangent(om,EPS0,sg).toExponential(2)]);
+  rows($("t1"),["loss tangent p","&delta;<sub>good</sub>/&delta;<sub>exact</sub>","the limit is out by","regime"],out);
+};
+
+const showSig=()=>{$("sigv").textContent="\u03c3 = "+(+$("sig").value).toFixed(2)+" (normalised units)";};
+$("sig").oninput=showSig; showSig();
+$("r2").onclick=()=>{
+  const sigma=+$("sig").value;
+  const r=lossyFdtd1d({N:900,dx:1,S:0.99,eps:1,mu:1,sigma,freqCells:24,steps:6000});
+  const pr=propagation({omega:r.omega,eps:1,mu:1,sigma});
+  const m=measuredAlpha(r,pr.delta,{skipDeltas:0.5,decades:1});
+  const cv=$("cv"),g=cv.getContext("2d"),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);g.fillStyle="#080a0f";g.fillRect(0,0,W,H);
+  const L=44,R=12,T=10,B=22;
+  const Y=(v)=>T+(1-(Math.log10(Math.max(v,1e-8))+8)/8)*(H-T-B);
+  const X=(i)=>L+i/r.N*(W-L-R);
+  g.strokeStyle="#232b3d";for(let e=-8;e<=0;e+=2){g.beginPath();g.moveTo(L,Y(Math.pow(10,e)));g.lineTo(W-R,Y(Math.pow(10,e)));g.stroke();
+    g.fillStyle="#68748c";g.fillText("1e"+e,6,Y(Math.pow(10,e))+4);}
+  g.strokeStyle="#e8c49a";g.beginPath();g.moveTo(X(r.i0),T);g.lineTo(X(r.i0),H-B);g.stroke();
+  g.fillStyle="#e8c49a";g.fillText("conductor \u2192",X(r.i0)+6,T+12);
+  g.strokeStyle="#9ab6e8";g.lineWidth=1.6;g.beginPath();
+  for(let i=0;i<r.N;i++){const y=Y(r.envelope[i]);if(i===0)g.moveTo(X(i),y);else g.lineTo(X(i),y);}g.stroke();
+  g.strokeStyle="#8fe0a8";g.setLineDash([5,4]);g.beginPath();
+  const a0=r.envelope[r.i0+2]||1;
+  for(let i=r.i0;i<r.N;i++){const y=Y(a0*Math.exp(-pr.alpha*(i-r.i0-2)*r.dx));if(i===r.i0)g.moveTo(X(i),y);else g.lineTo(X(i),y);}
+  g.stroke();g.setLineDash([]);g.lineWidth=1;
+  g.fillStyle="#8fe0a8";g.fillText("predicted exp(-\u03b1z)",W-190,T+12);
+  rows($("t2"),["quantity","predicted","measured","relative"],[
+    ["loss tangent p",pr.p.toFixed(4),"&mdash;","&mdash;"],
+    ["skin depth &delta;",pr.delta.toFixed(3)+" cells","&mdash;","&mdash;"],
+    ["attenuation &alpha;",pr.alpha.toExponential(5),m.alpha.toExponential(5),
+      "<span class='ok'>"+rel(m.alpha,pr.alpha).toExponential(3)+"</span>"],
+    ["good-conductor &delta;",skinDepthGood({omega:r.omega,mu:1,sigma}).toFixed(3)+" cells","&mdash;",
+      "<span class='bad'>"+(100*(1/goodConductorRatio(pr.p)-1)).toFixed(1)+"% out</span>"]]);
+};
+
+$("r3").onclick=()=>{
+  const blows=(S,steps)=>{const r=lossyFdtd1d({N:300,dx:1,S,eps:1,mu:1,sigma:0,freqCells:20,steps,source:"pulse"});
+    return classifyEnvelope(r.energyRatio,r.blewUp)==="EXPLODES";};
+  const out=[];
+  for(const steps of [100,200,400,800,1600,3200]){
+    let a=0.5,b=1.6;
+    for(let i=0;i<40;i++){const m=0.5*(a+b);if(blows(m,steps))b=m;else a=m;}
+    const S=0.5*(a+b);
+    out.push([steps,S.toFixed(6),cflLimit(1).toFixed(6),
+      "<span class='"+(S-1>1e-3?"bad":"warn")+"'>+"+(100*(S-1)).toFixed(3)+"%</span>"]);
+  }
+  rows($("t3"),["step budget","bisected boundary S","predicted 1/&radic;d","high by"],out);
+};
+$("r4").onclick=()=>{
+  const out=[];
+  for(const m of ["none","soft","hard"]){const t=sourceTransparency({mode:m});
+    out.push(["source: "+m,t.r.toFixed(9),"&mdash;",
+      "<span class='"+(t.r===0?"ok":"bad")+"'>"+(t.r===0?"exactly transparent":"a PERFECT MIRROR")+"</span>"]);}
+  const pec=reflectionOf({left:"pec",right:"pec"});
+  out.push(["boundary: PEC wall",pec.coefficient.toFixed(6),"&mdash;",
+    "<span class='bad'>the edge an unfinished sim has</span>"]);
+  for(const S of [1,0.99,0.9,0.7,0.5]){
+    const r=reflectionOf({left:"mur",right:"mur",S,steps:Math.round(600/S)});
+    out.push(["boundary: Mur, S = "+S.toFixed(2),r.coefficient.toExponential(3),"coef "+r.murCoef.toFixed(6),
+      "<span class='"+(r.coefficient===0?"ok":"warn")+"'>"+(r.coefficient===0?"EXACT at the magic step":"dispersive residual")+"</span>"]);
+  }
+  rows($("t4"),["what","|r|","mur coefficient","verdict"],out);
+};
+void MU0;
+</script>
+</div></body></html>

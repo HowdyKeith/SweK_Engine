@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="P2P Share — WebTorrent">
+<meta name="demo:desc" content="Seed SweK output folders (cell-tracking runs, exports) as torrents and fetch them from peers. Native WebRTC/TCP P2P — no central server; magnets broadcast on the peer bus.">
+<meta name="demo:category" content="network">
+<title>SweK P2P Share</title>
+<style>
+  :root { --bg:#05070f; --panel:#0b1120; --edge:#1c2942; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; --text:#dbe7ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(1200px 700px at 70% -10%, #0a1428, var(--bg)); color:var(--text); font:14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; padding:22px; }
+  h1 { font-size:20px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 20px; font-size:12px; }
+  .panel { background:linear-gradient(180deg, var(--panel), #080d18); border:1px solid var(--edge); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .panel h2 { font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); margin:0 0 12px; }
+  label { display:block; color:var(--dim); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 5px; }
+  input[type=text] { width:100%; background:#060b16; border:1px solid var(--edge); border-radius:9px; color:var(--text); padding:9px 11px; font:13px ui-monospace, monospace; margin-bottom:10px; }
+  input[type=text]:focus { outline:none; border-color:var(--cyan); }
+  button { background:var(--amber); color:#0a0d16; border:0; border-radius:9px; padding:9px 16px; font:600 12px ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+  button:hover { filter:brightness(1.12); }
+  button.ghost { background:transparent; color:var(--cyan); border:1px solid var(--edge); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .t { border:1px solid var(--edge); border-radius:11px; padding:12px 14px; margin-bottom:10px; background:#070c17; }
+  .t .name { color:var(--text); font-weight:600; }
+  .t .meta { color:var(--dim); font-size:12px; margin-top:3px; }
+  .bar { height:7px; background:#0f1930; border-radius:4px; overflow:hidden; margin-top:9px; }
+  .bar > i { display:block; height:100%; background:linear-gradient(90deg, var(--cyan), var(--green)); width:0%; transition:width .4s; }
+  .tag { display:inline-block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border-radius:20px; margin-right:6px; }
+  .tag.seed { background:rgba(95,224,138,.14); color:var(--green); border:1px solid rgba(95,224,138,.3); }
+  .tag.leech { background:rgba(89,209,255,.14); color:var(--cyan); border:1px solid rgba(89,209,255,.3); }
+  .mag { font-size:11px; color:var(--dim); word-break:break-all; background:#060b16; border:1px solid var(--edge); border-radius:8px; padding:7px 9px; margin-top:8px; }
+  .empty { color:var(--dim); font-style:italic; }
+  #toasts { position:fixed; right:18px; bottom:18px; display:flex; flex-direction:column; gap:8px; z-index:50; }
+  .toast { background:#0c1526; border:1px solid var(--cyan); border-radius:10px; padding:11px 14px; max-width:320px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  .toast .th { color:var(--cyan); font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:4px; }
+  .warn { color:var(--amber); font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+  <h1>&#9776; P2P Share</h1>
+  <p class="sub">Seed a SweK output folder as a torrent and fetch peers' offers. WebRTC/TCP peer-to-peer &mdash; no central server. Magnets you create are broadcast on the peer bus so LAN peers can auto-fetch.</p>
+
+  <div class="panel">
+    <h2>Seed a folder</h2>
+    <label>Absolute path (a cell-tracking run, render export, asset pack&hellip;)</label>
+    <input type="text" id="seedPath" placeholder="/home/you/celltrack/runs/run_2026_07_13">
+    <div class="row"><button onclick="doSeed()">Seed &amp; broadcast</button><span id="seedMsg" class="sub" style="margin:0"></span></div>
+    <div id="seedMag"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Fetch a magnet</h2>
+    <label>Magnet URI from a peer</label>
+    <input type="text" id="addMag" placeholder="magnet:?xt=urn:btih:&hellip;">
+    <div class="row"><button class="ghost" onclick="doAdd()">Fetch to SweK-torrents</button><span id="addMsg" class="sub" style="margin:0"></span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Active transfers</h2>
+    <div id="list"><span class="empty">Nothing seeding or downloading yet.</span></div>
+    <div id="avail" class="warn"></div>
+    <div id="installBox" style="display:none;margin-top:10px">
+      <div class="warn">WebTorrent isn't installed on this host yet.</div>
+      <div class="row" style="margin-top:8px"><button onclick="doInstall()" id="installBtn">Install WebTorrent (one-click)</button><span id="installMsg" class="sub" style="margin:0"></span></div>
+      <pre id="installLog" style="display:none;margin-top:8px;max-height:150px;overflow:auto;background:#060b16;border:1px solid var(--edge);border-radius:8px;padding:8px;font-size:11px;color:var(--dim);white-space:pre-wrap"></pre>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+<script>
+const fmt = (b) => b > 1e9 ? (b/1e9).toFixed(2)+" GB" : b > 1e6 ? (b/1e6).toFixed(1)+" MB" : b > 1e3 ? (b/1e3).toFixed(0)+" KB" : b+" B";
+const fmtSpd = (b) => b > 1e6 ? (b/1e6).toFixed(1)+" MB/s" : b > 1e3 ? (b/1e3).toFixed(0)+" KB/s" : b+" B/s";
+
+async function post(url, body) { const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{}) }); return r.json(); }
+
+async function doSeed() {
+  const path = document.getElementById("seedPath").value.trim(); const msg = document.getElementById("seedMsg");
+  if (!path) { msg.textContent = "enter a path"; return; }
+  msg.textContent = "hashing + seeding\u2026"; document.getElementById("seedMag").innerHTML = "";
+  const r = await post("/webtorrent/seed", { path });
+  if (!r.ok) { msg.textContent = "\u2717 " + (r.error || "failed"); return; }
+  msg.textContent = "\u2713 seeding \u201c" + r.name + "\u201d (" + fmt(r.size) + ", " + r.files + " files) \u2014 broadcast to peers";
+  document.getElementById("seedMag").innerHTML = '<div class="mag" id="mg">' + r.magnet + '</div><div class="row" style="margin-top:8px"><button class="ghost" onclick="copyMag()">Copy magnet</button></div>';
+  refresh();
+}
+function copyMag() { const t = document.getElementById("mg").textContent; navigator.clipboard && navigator.clipboard.writeText(t); }
+
+async function doAdd(magnet) {
+  const mag = magnet || document.getElementById("addMag").value.trim(); const msg = document.getElementById("addMsg");
+  if (!mag) { msg.textContent = "paste a magnet"; return; }
+  msg.textContent = "connecting to peers\u2026";
+  const r = await post("/webtorrent/add", { magnet: mag });
+  msg.textContent = r.ok ? ("\u2713 fetching \u201c" + (r.name||"") + "\u201d " + (r.pending?"(finding peers\u2026)":"") ) : ("\u2717 " + (r.error||"failed"));
+  refresh();
+}
+
+async function doRemove(hash) { await post("/webtorrent/remove", { infoHash: hash }); refresh(); }
+
+let installing = false;
+async function doInstall() {
+  installing = true; document.getElementById("installBtn").disabled = true;
+  document.getElementById("installMsg").textContent = "installing (~20s, downloads packages)\u2026";
+  document.getElementById("installLog").style.display = "block";
+  const r = await post("/webtorrent/install", {});
+  if (r && !r.ok && r.error) document.getElementById("installMsg").textContent = "\u2717 " + r.error;
+  refresh();
+}
+
+async function refresh() {
+  let j; try { j = await fetch("/webtorrent/status").then(r => r.json()); } catch { return; }
+  const el = document.getElementById("list");
+  const notReady = j.installed === false && !j.available;
+  document.getElementById("installBox").style.display = notReady || j.installing ? "block" : "none";
+  document.getElementById("avail").textContent = "";
+  if (j.installing) { document.getElementById("installMsg").textContent = "installing WebTorrent\u2026"; const lg = document.getElementById("installLog"); lg.style.display = "block"; lg.textContent = (j.installLog || []).join("\n"); lg.scrollTop = lg.scrollHeight; }
+  else if (installing && j.installed) { installing = false; document.getElementById("installMsg").textContent = "\u2713 installed \u2014 ready to seed"; }
+  if (!j.torrents || !j.torrents.length) { el.innerHTML = '<span class="empty">Nothing seeding or downloading yet.</span>'; return; }
+  el.innerHTML = j.torrents.map(t => {
+    const tag = t.seeding ? '<span class="tag seed">seeding</span>' : '<span class="tag leech">fetching</span>';
+    return '<div class="t">' + tag + '<span class="name">' + (t.name||"(pending)") + '</span>' +
+      '<div class="meta">' + fmt(t.size||0) + ' &middot; ' + t.peers + ' peers &middot; \u2193 ' + fmtSpd(t.down) + '  \u2191 ' + fmtSpd(t.up) + '</div>' +
+      '<div class="bar"><i style="width:' + (t.done?100:t.progress) + '%"></i></div>' +
+      '<div class="row" style="margin-top:9px"><button class="ghost" onclick="doRemove(\'' + t.infoHash + '\')">Remove</button></div></div>';
+  }).join("");
+}
+
+function toast(title, html) {
+  const w = document.getElementById("toasts"); const d = document.createElement("div"); d.className = "toast";
+  d.innerHTML = '<div class="th">' + title + '</div>' + html; w.appendChild(d); setTimeout(() => d.remove(), 22000);
+}
+
+// listen on the peer bus for magnets other peers broadcast, and offer a one-tap fetch
+try {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } if (m && m.type === "webtorrent:offer" && m.magnet) {
+    const id = "o" + Date.now();
+    toast("Peer is sharing", '\u201c' + (m.name||"data") + '\u201d (' + fmt(m.size||0) + ')<div class="row" style="margin-top:9px"><button onclick="doAdd(\'' + m.magnet.replace(/'/g,"") + '\');this.closest(\'.toast\').remove()">Fetch</button></div>');
+  } };
+} catch {}
+
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>

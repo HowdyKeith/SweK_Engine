@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — the gate planner</title>
+<meta name="demo:desc" content="The serial suite runs about twenty six minutes, so in practice a change is defended by whatever its author remembered to run. The planner picks which gates to spend a budget on: gates that DIRECTLY import a changed file first, then transitively reachable ones, then the rest, cheapest first inside each band. This page reads a snapshot rather than computing one, using the boot sidecar contract, so it can say plainly whether the plan it is showing is fresh, stale, or absent.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:940px; margin:0 auto; padding:18px; line-height:1.65; }
+  table { border-collapse:collapse; width:100%; margin-top:10px; } td,th { border:1px solid #22304a; padding:5px 9px; }
+  th { color:#7f96b8; font-weight:normal; text-align:left; } .num { text-align:right; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; } .warn { color:#f6a623; }
+  .bar { display:inline-block; height:9px; background:#2b6ea8; border-radius:2px; vertical-align:middle; }
+  code { color:#9fb4d8; }
+  pre { background:#0a0e18; border:1px solid #17202f; border-radius:6px; padding:9px; overflow:auto; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">The gate planner</h2>
+  <div class="dim">A 3-minute subset that reliably contains the gates a change can reach is worth more than a 26-minute one that gets skipped. Ordering is a dependency fact, not a filename guess: gates whose <b>direct</b> imports include a changed file go first, then everything the change reaches transitively, then the rest — cheapest first inside each band, so a run cut short still covers as much as it could. Costs come from <code>gate-timings.json</code>, observed on real suite runs. Gate: <code>tools/ship/gateSelection-selfcheck.mjs</code>.</div>
+  <div id="state" style="margin-top:12px;"></div>
+  <div id="out"></div>
+  <div class="dim" style="margin-top:14px;">
+    Regenerate this snapshot: <code>node tools/ship/planSnapshot.mjs &lt;changed files…&gt;</code><br>
+    Run a plan for real: <code>node tools/ship/selfchecks.mjs --budget 60 --affected &lt;changed files…&gt;</code><br>
+    <b>Unrun gates are not a claim that they pass.</b> And a plan is not a ship: <code>verify.mjs</code> is not decomposable this way and still catches what these cannot.
+  </div>
+</div>
+<script>
+(async () => {
+  const stateEl = document.getElementById("state"), out = document.getElementById("out");
+  let rep = null, snapMs = null;
+  try {
+    const r = await fetch("./tools/ship/gate-plan-snapshot.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    rep = await r.json();
+    snapMs = Date.parse(rep.producedAt);
+  } catch (e) {
+    stateEl.innerHTML = "<b class='bad'>NO SNAPSHOT</b> — the work has not been done, which is not the same as there being nothing to show. " +
+      "<span class='dim'>Run <code>node tools/ship/planSnapshot.mjs</code>.</span>";
+    return;
+  }
+  // staleness against the timings file the plan was derived from — the same rule the sidecar contract uses
+  let stale = null;
+  try {
+    const h = await fetch("./tools/ship/gate-timings.json", { method: "HEAD", cache: "no-store" });
+    const lm = h.headers.get("last-modified");
+    if (lm && Date.parse(lm) > snapMs) stale = "gate-timings.json changed after this plan was made";
+  } catch { stale = "could not check the timings file — assuming stale"; }
+  const ageS = Math.max(0, Math.round((Date.now() - snapMs) / 1000));
+  stateEl.innerHTML = stale
+    ? "<b class='warn'>STALE</b> <span class='dim'>(" + ageS + "s old, by " + rep.producedBy + ") — " + stale + ". Shown anyway: a plan from a moment ago beats no plan, and pretending it is current would be the lie.</span>"
+    : "<b class='good'>FRESH</b> <span class='dim'>(" + ageS + "s old, by " + rep.producedBy + ")</span>";
+
+  const changed = (rep.changed && rep.changed.length) ? rep.changed.join(", ") : null;
+  let html = "<div class='dim' style='margin-top:8px;'>plan for: <b>" + (changed || "no change set — cheapest-first over the whole suite") + "</b></div>";
+  html += "<table><tr><th>budget</th><th class='num'>gates</th><th></th><th class='num'>time</th><th class='num'>direct</th><th class='num'>reachable missed</th><th class='num'>cost guessed</th></tr>";
+  const maxSel = Math.max(...rep.observations.map((o) => o.selected));
+  for (const o of rep.observations) {
+    const w = Math.round(120 * o.selected / maxSel);
+    html += "<tr><td>" + o.budgetSeconds + "s</td><td class='num'>" + o.selected + " / " + o.total +
+      "</td><td><span class='bar' style='width:" + w + "px'></span></td><td class='num'>" + (o.spentMs / 1000).toFixed(1) + "s</td>" +
+      "<td class='num'>" + o.directlyTests + "</td><td class='num'><b class='" + (o.missedReachable ? "warn" : "good") + "'>" +
+      o.missedReachable + "</b></td><td class='num'>" + o.guessedCost + "</td></tr>";
+  }
+  html += "</table>";
+  const worst = rep.observations[0];
+  if (worst.missedReachableNames && worst.missedReachableNames.length) {
+    html += "<div class='dim' style='margin-top:8px;'>at " + worst.budgetSeconds + "s these reachable gates do not fit — <b class='warn'>a green run at this budget is not a green run on the change</b>:</div><pre>" +
+      worst.missedReachableNames.join("\n") + "</pre>";
+  }
+  html += "<div class='dim'>first ten at " + worst.budgetSeconds + "s:</div><pre>" + worst.firstTen.join("\n") + "</pre>";
+  out.innerHTML = html;
+})();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

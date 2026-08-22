@@ -1,0 +1,28 @@
+{
+ "eligible": [
+  "chaos",
+  "kepler",
+  "lens",
+  "optics",
+  "quantum",
+  "splat"
+ ],
+ "refinement": [
+  "blackhole",
+  "chaos",
+  "kepler",
+  "lens",
+  "optics",
+  "quantum",
+  "splat"
+ ],
+ "nuisance": [
+  "chaos",
+  "ising",
+  "kepler",
+  "lens",
+  "optics",
+  "quantum",
+  "splat"
+ ]
+}

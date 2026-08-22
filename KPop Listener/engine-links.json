@@ -1,0 +1,115 @@
+{
+  "_comment": "Tray right-click 'Open Engine' menu links. KPopupTrayIcon.psm1 reads this. Each link is either {label, path} (path is appended to base) or {label, url} (absolute), or {sep:true} for a separator. Edit Discord/Twitter URLs to your server/profile. Delete this file to fall back to built-in defaults.",
+  "base": "http://localhost:8787/",
+  "links": [
+    {
+      "label": "Main Engine",
+      "path": ""
+    },
+    {
+      "label": "Control",
+      "path": "control.html"
+    },
+    {
+      "label": "Settings",
+      "path": "settings.html"
+    },
+    {
+      "sep": true
+    },
+    {
+      "label": "Pip-Boy (Fallout)",
+      "path": "fallout.html"
+    },
+    {
+      "label": "Starfield",
+      "path": "starfield.html"
+    },
+    {
+      "label": "Solar",
+      "path": "solar.html"
+    },
+    {
+      "label": "Trading Floor",
+      "path": "tradingfloor.html"
+    },
+    {
+      "label": "Agenda",
+      "path": "agenda.html"
+    },
+    {
+      "label": "Weather",
+      "path": "weather.html"
+    },
+    {
+      "label": "Real Terrain",
+      "path": "realterrain.html"
+    },
+    {
+      "label": "Health",
+      "path": "health.html"
+    },
+    {
+      "label": "Spectator",
+      "path": "spectator.html"
+    },
+    {
+      "label": "AI Brain",
+      "path": "aibrain.html"
+    },
+    {
+      "label": "PetFBI",
+      "path": "petfbi.html"
+    },
+    {
+      "label": "Doc Skills",
+      "path": "doc.html"
+    },
+    {
+      "label": "Maigret (install)",
+      "path": "maigret.html"
+    },
+    {
+      "label": "Scrapling (install)",
+      "path": "scrapling.html"
+    },
+    {
+      "label": "Hosting / LAN",
+      "path": "hosting.html"
+    },
+    {
+      "sep": true
+    },
+    {
+      "label": "Architecture diagram",
+      "path": "architecture.svg"
+    },
+    {
+      "label": "Slots (demo)",
+      "path": "slotmachine.html"
+    },
+    {
+      "label": "Pachinko (demo)",
+      "path": "pachinko.html"
+    },
+    {
+      "label": "Pip-Boy Models",
+      "path": "pipboy-models.html"
+    },
+    {
+      "label": "End Credits",
+      "path": "credits.html"
+    },
+    {
+      "sep": true
+    },
+    {
+      "label": "Discord",
+      "url": "https://discord.com/channels/@me"
+    },
+    {
+      "label": "Twitter / X",
+      "url": "https://x.com"
+    }
+  ]
+}

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Room &mdash; a clean 3D test world</title>
+<style>
+  :root { --bg:#070b0d; --ink:#dfe9ee; --dim:#7f97a4; --line:#183042; --go:#5ce6a4; --acc:#8ab4ff; --pur:#e0b0ff; --bad:#f4808c; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  #cv { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  .panel { position:fixed; top:12px; left:12px; z-index:5; background:rgba(8,14,17,.82); border:1px solid var(--line); border-radius:10px; padding:10px 12px; backdrop-filter:blur(4px); max-width:300px; }
+  h1 { font-size:15px; margin:0 0 6px; }
+  h1 small { color:var(--dim); font-weight:400; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  button, select { font:12px ui-sans-serif,system-ui; padding:4px 10px; border-radius:6px; cursor:pointer; border:1px solid var(--line); background:#12202c; color:var(--acc); }
+  button.go { background:#0e2a1e; color:var(--go); border-color:#215c3f; }
+  select { color:var(--ink); background:#0c1410; }
+  .kv { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:1px 0; }
+  .kv b { color:var(--ink); font-weight:600; } .kv span { color:var(--dim); }
+  code { background:#06101a; border:1px solid var(--line); border-radius:4px; padding:0 4px; font:11px ui-monospace,monospace; color:#bfe0ff; }
+  .hint { color:var(--dim); font-size:11px; margin-top:6px; line-height:1.5; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="panel">
+  <h1>&#129504; Brain Room <small>&mdash; clean 3D test world</small></h1>
+  <div class="row">
+    <button id="btnNew" class="go">New world</button>
+    <button id="btnReset">Reset agent</button>
+    <button id="btnPause">Pause</button>
+  </div>
+  <div class="row">
+    <label style="color:var(--dim);font-size:11px;">field
+      <select id="src"><option value="local">local solve</option><option value="brain">live brain</option></select>
+    </label>
+    <label style="color:var(--dim);font-size:11px;">world
+      <select id="modeSel"><option value="terrain">ramps &amp; hills</option><option value="flat">walls only</option></select>
+    </label>
+    <label style="color:var(--dim);font-size:11px;"><input type="checkbox" id="arrows"> flow arrows</label>
+  </div>
+  <div class="kv"><span>agent</span><b id="kStat">&mdash;</b></div>
+  <div class="kv"><span>field source</span><b id="kSrc">local</b></div>
+  <div class="kv"><span>seed</span><b id="kSeed">&mdash;</b></div>
+  <div class="kv"><span>grid / obstacles</span><b id="kGrid">&mdash;</b></div>
+  <div class="hint">Drag to orbit &middot; wheel to zoom &middot; <b>click the floor</b> to move the goal.
+    The agent follows the flow field from the same solver the GPU brain runs. <a href="/server.html">&larr; panel</a></div>
+</div>
+
+<script type="module">
+import { RoomWorld, IMPASS_DH, WALL_H } from "/brain/room/roomSim.js";
+import { FlowFieldSolverCPU } from "/brain/flowfieldCpu.js";
+
+// ---------- tiny column-major mat4 -----------------------------------------------------------
+const M4 = {
+  ident: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  mul(a,b){ const o=new Float32Array(16); for(let c=0;c<4;c++)for(let r=0;r<4;r++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+r]*b[c*4+k];o[c*4+r]=s;} return o; },
+  persp(fovy,asp,n,f){ const t=1/Math.tan(fovy/2),o=new Float32Array(16); o[0]=t/asp;o[5]=t;o[10]=(f+n)/(n-f);o[11]=-1;o[14]=(2*f*n)/(n-f); return o; },
+  lookAt(e,c,u){ const z=norm(sub(e,c)),x=norm(cross(u,z)),y=cross(z,x),o=new Float32Array(16);
+    o[0]=x[0];o[1]=y[0];o[2]=z[0]; o[4]=x[1];o[5]=y[1];o[6]=z[1]; o[8]=x[2];o[9]=y[2];o[10]=z[2];
+    o[12]=-dot(x,e);o[13]=-dot(y,e);o[14]=-dot(z,e);o[15]=1; return o; },
+  trs(tx,ty,tz,sx,sy,sz){ const o=M4.ident(); o[0]=sx;o[5]=sy;o[10]=sz; o[12]=tx;o[13]=ty;o[14]=tz; return o; },
+  invert(m){ // general 4x4 inverse (for picking)
+    const inv=new Float32Array(16), a=m;
+    inv[0]=a[5]*a[10]*a[15]-a[5]*a[11]*a[14]-a[9]*a[6]*a[15]+a[9]*a[7]*a[14]+a[13]*a[6]*a[11]-a[13]*a[7]*a[10];
+    inv[4]=-a[4]*a[10]*a[15]+a[4]*a[11]*a[14]+a[8]*a[6]*a[15]-a[8]*a[7]*a[14]-a[12]*a[6]*a[11]+a[12]*a[7]*a[10];
+    inv[8]=a[4]*a[9]*a[15]-a[4]*a[11]*a[13]-a[8]*a[5]*a[15]+a[8]*a[7]*a[13]+a[12]*a[5]*a[11]-a[12]*a[7]*a[9];
+    inv[12]=-a[4]*a[9]*a[14]+a[4]*a[10]*a[13]+a[8]*a[5]*a[14]-a[8]*a[6]*a[13]-a[12]*a[5]*a[10]+a[12]*a[6]*a[9];
+    inv[1]=-a[1]*a[10]*a[15]+a[1]*a[11]*a[14]+a[9]*a[2]*a[15]-a[9]*a[3]*a[14]-a[13]*a[2]*a[11]+a[13]*a[3]*a[10];
+    inv[5]=a[0]*a[10]*a[15]-a[0]*a[11]*a[14]-a[8]*a[2]*a[15]+a[8]*a[3]*a[14]+a[12]*a[2]*a[11]-a[12]*a[3]*a[10];
+    inv[9]=-a[0]*a[9]*a[15]+a[0]*a[11]*a[13]+a[8]*a[1]*a[15]-a[8]*a[3]*a[13]-a[12]*a[1]*a[11]+a[12]*a[3]*a[9];
+    inv[13]=a[0]*a[9]*a[14]-a[0]*a[10]*a[13]-a[8]*a[1]*a[14]+a[8]*a[2]*a[13]+a[12]*a[1]*a[10]-a[12]*a[2]*a[9];
+    inv[2]=a[1]*a[6]*a[15]-a[1]*a[7]*a[14]-a[5]*a[2]*a[15]+a[5]*a[3]*a[14]+a[13]*a[2]*a[7]-a[13]*a[3]*a[6];
+    inv[6]=-a[0]*a[6]*a[15]+a[0]*a[7]*a[14]+a[4]*a[2]*a[15]-a[4]*a[3]*a[14]-a[12]*a[2]*a[7]+a[12]*a[3]*a[6];
+    inv[10]=a[0]*a[5]*a[15]-a[0]*a[7]*a[13]-a[4]*a[1]*a[15]+a[4]*a[3]*a[13]+a[12]*a[1]*a[7]-a[12]*a[3]*a[5];
+    inv[14]=-a[0]*a[5]*a[14]+a[0]*a[6]*a[13]+a[4]*a[1]*a[14]-a[4]*a[2]*a[13]-a[12]*a[1]*a[6]+a[12]*a[2]*a[5];
+    inv[3]=-a[1]*a[6]*a[11]+a[1]*a[7]*a[10]+a[5]*a[2]*a[11]-a[5]*a[3]*a[10]-a[9]*a[2]*a[7]+a[9]*a[3]*a[6];
+    inv[7]=a[0]*a[6]*a[11]-a[0]*a[7]*a[10]-a[4]*a[2]*a[11]+a[4]*a[3]*a[10]+a[8]*a[2]*a[7]-a[8]*a[3]*a[6];
+    inv[11]=-a[0]*a[5]*a[11]+a[0]*a[7]*a[9]+a[4]*a[1]*a[11]-a[4]*a[3]*a[9]-a[8]*a[1]*a[7]+a[8]*a[3]*a[5];
+    inv[15]=a[0]*a[5]*a[10]-a[0]*a[6]*a[9]-a[4]*a[1]*a[10]+a[4]*a[2]*a[9]+a[8]*a[1]*a[6]-a[8]*a[2]*a[5];
+    let det=a[0]*inv[0]+a[1]*inv[4]+a[2]*inv[8]+a[3]*inv[12]; if(!det) return M4.ident(); det=1/det;
+    for(let i=0;i<16;i++) inv[i]*=det; return inv;
+  },
+};
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm=a=>{const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l];};
+
+// ---------- GL setup -------------------------------------------------------------------------
+const cv = document.getElementById("cv");
+const gl = cv.getContext("webgl2", { antialias: true });
+if (!gl) { document.body.insertAdjacentHTML("beforeend", "<div style='position:fixed;inset:0;display:grid;place-items:center;color:#f4808c'>WebGL2 not available in this browser.</div>"); throw new Error("no webgl2"); }
+
+function sh(type, src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+function prog(vs,fs){ const p=gl.createProgram(); gl.attachShader(p,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); return p; }
+
+// lit solid program (boxes) -- position + normal, model + viewProj + color + light
+const solid = prog(
+  `#version 300 es
+   layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNrm;
+   uniform mat4 uModel, uVP; out vec3 vN; out vec3 vW;
+   void main(){ vec4 w=uModel*vec4(aPos,1.0); vW=w.xyz; vN=mat3(uModel)*aNrm; gl_Position=uVP*w; }`,
+  `#version 300 es
+   precision highp float; in vec3 vN; in vec3 vW; out vec4 o;
+   uniform vec3 uColor; uniform vec3 uLight;
+   void main(){ float d=max(dot(normalize(vN), normalize(uLight)),0.0); float amb=0.35; o=vec4(uColor*(amb+0.75*d),1.0); }`);
+const uModel=gl.getUniformLocation(solid,"uModel"), uVP=gl.getUniformLocation(solid,"uVP"), uColor=gl.getUniformLocation(solid,"uColor"), uLight=gl.getUniformLocation(solid,"uLight");
+
+// ground program -- a big quad with a procedural grid in world xz
+const ground = prog(
+  `#version 300 es
+   layout(location=0) in vec2 aXZ; uniform mat4 uVP; uniform float uSpan; uniform vec2 uCenter; out vec2 vXZ;
+   void main(){ vec2 p=aXZ*uSpan+uCenter; vXZ=p; gl_Position=uVP*vec4(p.x,0.0,p.y,1.0); }`,
+  `#version 300 es
+   precision highp float; in vec2 vXZ; out vec4 o; uniform float uCell;
+   void main(){ vec2 g=abs(fract(vXZ/uCell-0.5)-0.5)/fwidth(vXZ/uCell); float line=1.0-min(min(g.x,g.y),1.0);
+     vec3 base=vec3(0.055,0.085,0.10); vec3 grid=vec3(0.12,0.30,0.24); o=vec4(mix(base,grid,line*0.8),1.0); }`);
+const gVP=gl.getUniformLocation(ground,"uVP"), gSpan=gl.getUniformLocation(ground,"uSpan"), gCell=gl.getUniformLocation(ground,"uCell"), gCenter=gl.getUniformLocation(ground,"uCenter");
+
+// lines program -- flow arrows
+const lines = prog(
+  `#version 300 es
+   layout(location=0) in vec3 aPos; uniform mat4 uVP; void main(){ gl_Position=uVP*vec4(aPos,1.0); }`,
+  `#version 300 es
+   precision highp float; out vec4 o; uniform vec3 uColor; void main(){ o=vec4(uColor,1.0); }`);
+const lVP=gl.getUniformLocation(lines,"uVP"), lColor=gl.getUniformLocation(lines,"uColor");
+
+// ---------- geometry -------------------------------------------------------------------------
+// unit cube, base at y=0, spanning x,z in [-0.5,0.5], y in [0,1]. pos+normal interleaved.
+function cubeMesh(){
+  const F=[ // face verts (x,y,z) + normal
+    // +x
+    [.5,0,-.5],[.5,1,-.5],[.5,1,.5],[.5,0,-.5],[.5,1,.5],[.5,0,.5],[1,0,0],
+    // -x
+    [-.5,0,.5],[-.5,1,.5],[-.5,1,-.5],[-.5,0,.5],[-.5,1,-.5],[-.5,0,-.5],[-1,0,0],
+    // +y
+    [-.5,1,-.5],[.5,1,-.5],[.5,1,.5],[-.5,1,-.5],[.5,1,.5],[-.5,1,.5],[0,1,0],
+    // -y
+    [-.5,0,.5],[.5,0,.5],[.5,0,-.5],[-.5,0,.5],[.5,0,-.5],[-.5,0,-.5],[0,-1,0],
+    // +z
+    [.5,0,.5],[.5,1,.5],[-.5,1,.5],[.5,0,.5],[-.5,1,.5],[-.5,0,.5],[0,0,1],
+    // -z
+    [-.5,0,-.5],[-.5,1,-.5],[.5,1,-.5],[-.5,0,-.5],[.5,1,-.5],[.5,0,-.5],[0,0,-1],
+  ];
+  const data=[];
+  for(let f=0; f<F.length; f+=7){ const n=F[f+6]; for(let v=0; v<6; v++){ const p=F[f+v]; data.push(p[0],p[1],p[2], n[0],n[1],n[2]); } }
+  return new Float32Array(data);
+}
+const cubeData=cubeMesh();
+const cubeVAO=gl.createVertexArray(); gl.bindVertexArray(cubeVAO);
+const cubeVBO=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,cubeVBO); gl.bufferData(gl.ARRAY_BUFFER,cubeData,gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+const CUBE_VERTS=cubeData.length/6;
+
+const quadVAO=gl.createVertexArray(); gl.bindVertexArray(quadVAO);
+const quadVBO=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,quadVBO);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+const lineVAO=gl.createVertexArray(); const lineVBO=gl.createBuffer(); let lineCount=0;
+function buildArrows(){
+  gl.bindVertexArray(lineVAO); gl.bindBuffer(gl.ARRAY_BUFFER,lineVBO);
+  const pts=[]; const c=world.CELL;
+  if (field && field.fx) for(let y=0;y<world.H;y++)for(let x=0;x<world.W;x++){
+    const i=y*world.W+x; if(world.heights[i]>1) continue;
+    const fx=field.fx[i], fz=field.fz[i]; const l=Math.hypot(fx,fz); if(l<1e-3) continue;
+    const cx=x*c, cz=y*c, len=c*0.42, ay=world.heightAt(cx,cz)/WALL_H*(c*2.2)+0.4;
+    pts.push(cx,ay,cz, cx+fx/l*len,ay,cz+fz/l*len);
+  }
+  lineCount=pts.length/3;
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pts),gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+}
+
+// ---------- world + field --------------------------------------------------------------------
+let seed=1;
+function modeVal(){ const el=document.getElementById("modeSel"); return el && el.value==="flat" ? "flat" : "terrain"; }
+let world=new RoomWorld({ seed, W:40, H:40, CELL:4, nBoxes:16, mode:modeVal() });
+let agent=world.spawnAgent();
+let field=null, status="...", paused=false, useArrows=false, source="local";
+
+async function solveLocal(){
+  const s=new FlowFieldSolverCPU(null, world.W, world.H, { cell: world.CELL, impassDh: IMPASS_DH });
+  field=await s.solve(world.solveHeights(), world.solveGoals(), { wantFlow:true, wantDist:true });
+  field.w=world.W; field.h=world.H; if(useArrows) buildArrows();
+}
+async function postSnapshot(){ try{ await fetch("/ai/brain/snapshot",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(world.snapshotBody())}); }catch(e){} }
+async function pollBrain(){
+  try{ const j=await fetch("/ai/brain/flowfield",{cache:"no-store"}).then(r=>r.json());
+    const f=j&&j.field; if(f&&f.fx&&f.w===world.W&&f.h===world.H){ field={fx:f.fx,fz:f.fz,dist:f.dist,w:f.w,h:f.h}; if(useArrows) buildArrows(); } }catch(e){}
+}
+async function refieldForSource(){
+  if(source==="brain"){ await postSnapshot(); status="waiting for brain..."; setTimeout(pollBrain,400); }
+  else { await solveLocal(); }
+}
+
+async function newWorld(){ seed++; world=new RoomWorld({ seed, W:40, H:40, CELL:4, nBoxes:16, mode:modeVal() }); agent=world.spawnAgent(); document.getElementById("kSeed").textContent=seed; document.getElementById("kGrid").textContent=world.W+"x"+world.H+" / "+world.boxes.length; await refieldForSource(); }
+function resetAgent(){ agent=world.spawnAgent(); }
+
+// ---------- camera ---------------------------------------------------------------------------
+const cam={ yaw:0.7, pitch:0.9, dist:180 };
+function camPos(){ const cx=world.W*world.CELL/2, cz=world.H*world.CELL/2;
+  const cp=Math.cos(cam.pitch), sp=Math.sin(cam.pitch), cy=Math.cos(cam.yaw), sy=Math.sin(cam.yaw);
+  return { eye:[cx+cam.dist*cp*sy, cam.dist*sp, cz+cam.dist*cp*cy], center:[cx,0,cz] }; }
+function viewProj(){ const {eye,center}=camPos(); const asp=cv.width/cv.height||1;
+  return M4.mul(M4.persp(50*Math.PI/180, asp, 1, 4000), M4.lookAt(eye,center,[0,1,0])); }
+
+// drag to orbit, wheel to zoom
+let drag=null;
+cv.addEventListener("pointerdown",e=>{ drag={x:e.clientX,y:e.clientY,moved:false}; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove",e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+  cam.yaw-=dx*0.008; cam.pitch=Math.max(0.15,Math.min(1.5,cam.pitch+dy*0.006)); drag.x=e.clientX; drag.y=e.clientY; });
+cv.addEventListener("pointerup",e=>{ if(drag&&!drag.moved) pick(e.clientX,e.clientY); drag=null; });
+cv.addEventListener("wheel",e=>{ e.preventDefault(); cam.dist=Math.max(40,Math.min(600,cam.dist*(1+Math.sign(e.deltaY)*0.1))); },{passive:false});
+
+// click -> ray/ground intersection -> set goal
+function pick(px,py){
+  const rect=cv.getBoundingClientRect();
+  const ndcX=((px-rect.left)/rect.width)*2-1, ndcY=1-((py-rect.top)/rect.height)*2;
+  const inv=M4.invert(viewProj());
+  const un=(z)=>{ const v=[ndcX,ndcY,z,1], o=[0,0,0,0]; for(let r=0;r<4;r++){let s=0;for(let k=0;k<4;k++)s+=inv[k*4+r]*v[k];o[r]=s;} return [o[0]/o[3],o[1]/o[3],o[2]/o[3]]; };
+  const a=un(-1), b=un(1); const dir=sub(b,a); if(Math.abs(dir[1])<1e-6) return;
+  const t=-a[1]/dir[1]; if(t<0) return;
+  const wx=a[0]+dir[0]*t, wz=a[2]+dir[2]*t;
+  const c=world.cellAt(wx,wz);
+  if(world.setGoal(c.gx,c.gy)) refieldForSource();
+}
+
+// ---------- render ---------------------------------------------------------------------------
+function resize(){ const dpr=Math.min(devicePixelRatio||1,2); cv.width=innerWidth*dpr|0; cv.height=innerHeight*dpr|0; }
+addEventListener("resize",resize); resize();
+
+function drawCube(vp, x,y,z, sx,sy,sz, color){ gl.uniformMatrix4fv(uModel,false,M4.trs(x,y,z,sx,sy,sz)); gl.uniform3fv(uColor,color); gl.drawArrays(gl.TRIANGLES,0,CUBE_VERTS); }
+
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(field && !paused){ world.advance(); status=world.stepAgent(agent,field,dt,18); document.getElementById("kStat").textContent=status; }
+
+  gl.viewport(0,0,cv.width,cv.height); gl.clearColor(0.027,0.043,0.051,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  const vp=viewProj();
+
+  // ground
+  gl.useProgram(ground); gl.bindVertexArray(quadVAO);
+  gl.uniformMatrix4fv(gVP,false,vp); gl.uniform1f(gSpan, Math.max(world.W,world.H)*world.CELL*0.75); gl.uniform1f(gCell, world.CELL);
+  gl.uniform2f(gCenter, world.W*world.CELL/2, world.H*world.CELL/2);
+  gl.disable(gl.DEPTH_TEST); gl.drawArrays(gl.TRIANGLES,0,6); gl.enable(gl.DEPTH_TEST);
+
+  // solids
+  gl.useProgram(solid); gl.bindVertexArray(cubeVAO);
+  gl.uniformMatrix4fv(uVP,false,vp); gl.uniform3fv(uLight,[0.5,1.0,0.35]);
+  // terrain: draw every raised cell as a column at its real height. Walls (>= IMPASS_DH) are grey
+  // and tall; climbable ramps/hills are green and shade lighter as they rise. This is what turns the
+  // "up and over" into a picture -- the pass is a green hump through a grey ridge.
+  const c=world.CELL;
+  const HY = (h) => h / WALL_H * (c * 2.2);         // solver-height -> world Y (WALL_H == a c*2.2 tall wall)
+  for(let gy=0; gy<world.H; gy++) for(let gx=0; gx<world.W; gx++){
+    const h = world.heights[world.idx(gx,gy)];
+    if(h <= 1) continue;
+    const cx = gx*c, cz = gy*c;
+    let col;
+    if(h >= IMPASS_DH) col = [0.42,0.47,0.52];      // impassable wall
+    else { const t = h/IMPASS_DH; col = [0.28+0.30*t, 0.52+0.16*t, 0.34+0.08*t]; }   // ramp/hill, lighter as it climbs
+    drawCube(vp, cx, 0, cz, c, HY(h), c, col);
+  }
+  // goal (green pillar) sitting ON the terrain
+  { const g=world.cellCenter(world.goal.gx,world.goal.gy); const gy0=HY(world.heightAt(g.x,g.z)); drawCube(vp, g.x, gy0, g.z, c*0.5, c*3, c*0.5, [0.36,0.90,0.55]); }
+  // agent (cyan cube)
+  drawCube(vp, agent.x, HY(world.heightAt(agent.x, agent.z)), agent.z, c*0.6, c*0.9, c*0.6, [0.42,0.72,1.0]);
+
+  // flow arrows
+  if(useArrows && lineCount){ gl.useProgram(lines); gl.bindVertexArray(lineVAO); gl.uniformMatrix4fv(lVP,false,vp); gl.uniform3fv(lColor,[0.5,0.75,0.5]); gl.drawArrays(gl.LINES,0,lineCount); }
+
+  requestAnimationFrame(frame);
+}
+
+// ---------- wiring ---------------------------------------------------------------------------
+document.getElementById("btnNew").onclick=newWorld;
+document.getElementById("btnReset").onclick=resetAgent;
+document.getElementById("btnPause").onclick=e=>{ paused=!paused; e.target.textContent=paused?"Resume":"Pause"; };
+document.getElementById("src").onchange=e=>{ source=e.target.value; document.getElementById("kSrc").textContent=source==="brain"?"live brain":"local"; refieldForSource(); };
+document.getElementById("arrows").onchange=e=>{ useArrows=e.target.checked; if(useArrows&&field) buildArrows(); };
+document.getElementById("modeSel").onchange=()=>{ newWorld(); };
+document.getElementById("kSeed").textContent=seed;
+document.getElementById("kGrid").textContent=world.W+"x"+world.H+" / "+world.boxes.length;
+
+// when using the live brain, keep pulling its field
+setInterval(()=>{ if(source==="brain") pollBrain(); }, 700);
+
+await refieldForSource();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

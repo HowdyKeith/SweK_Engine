@@ -1,0 +1,29 @@
+{
+    "type": "megastructure",
+    "civStyle": "tower",
+    "name": "Crystal Spire",
+    "megaType": "crystal_spire",
+    "voxels": [
+        {"dx": 0, "dy": 0,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 1,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 2,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 3,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 4,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 5,  "dz": 0, "mat": 1},
+        {"dx": 0, "dy": 6,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 7,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 8,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 9,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 10, "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 11, "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 12, "dz": 0, "mat": 30},
+        {"dx": 1, "dy": 6,  "dz": 0, "mat": 30},
+        {"dx": -1,"dy": 6,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 6,  "dz": 1, "mat": 30},
+        {"dx": 0, "dy": 6,  "dz": -1,"mat": 30},
+        {"dx": 1, "dy": 9,  "dz": 0, "mat": 30},
+        {"dx": -1,"dy": 9,  "dz": 0, "mat": 30},
+        {"dx": 0, "dy": 9,  "dz": 1, "mat": 30},
+        {"dx": 0, "dy": 9,  "dz": -1,"mat": 30}
+    ]
+}

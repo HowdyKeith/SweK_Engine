@@ -1,0 +1,247 @@
+// FILE: gpu/assetVariants.js
+//
+// Round 90 — asset variant catalog. Each "base kind" (tree_oak, civ_plaza,
+// kaiju_tech, etc.) gets N variant names with distinct descriptions so the
+// Ollama OBJ pipeline produces visually different models for what would
+// otherwise be 60 copies of the same mesh.
+//
+// CONTRACT
+//   pickVariant(baseKind, seed) -> "tree_oak_2" | base name if no variants
+//   registerAllDescriptions(loader) -> void   (call once at startup)
+//   variantNames(baseKind) -> string[]        (debug)
+//
+// WHY A SEPARATE MODULE
+//   - Variant descriptions live next to the variant names so adding a new
+//     one is a single edit (add to array + array of descriptions).
+//   - The asset loader's _ollamaDescriptions map gets pre-populated at
+//     startup, so the FIRST encounter of any variant name has a real
+//     descriptive prompt (instead of the generic _defaultDescription
+//     fallback like "tree_oak_2 (generic): an angular geometric form").
+//   - Random-but-deterministic variant selection is centralized — every
+//     spawner uses the same pickVariant() so the same seed produces the
+//     same layout (helpful for testing).
+
+// ============================================================
+// VARIANT TABLES
+// ============================================================
+// Each entry maps a base kind name to an array of [variant_suffix, description].
+// The base name itself is also a valid choice (no suffix); spawners can
+// always fall back to it if pickVariant is called with no variant config.
+
+const VARIANTS = {
+    // ---- Trees ----
+    tree_oak: [
+        ["1", "a gnarled old oak with twisted branches and a wide canopy"],
+        ["2", "a young oak with full round canopy and slim trunk"],
+        ["3", "a weathered oak with sparse leaves and exposed roots"],
+        ["4", "an oak split by lightning, blackened at the crown but still alive"],
+    ],
+    tree_pine: [
+        ["1", "a tall conifer with dense layered branches narrowing to a point"],
+        ["2", "a young pine with sparse short branches and a thin trunk"],
+        ["3", "a dead pine, branches bare, silhouette like a skeleton"],
+        ["4", "a snow-laden pine with branches drooping under weight"],
+    ],
+    tree_palm: [
+        ["1", "a tall coconut palm with curving trunk and seven fronds"],
+        ["2", "a short fan palm with a dense crown of broad leaves"],
+        ["3", "a sun-bleached palm leaning sharply to one side, almost windswept"],
+    ],
+
+    // ---- Civ structures ----
+    civ_ring_wall: [
+        ["a", "a circular stone ring wall with crenellations every 4 units, weathered grey"],
+        ["b", "a hexagonal angular fortified wall in tan sandstone with corner towers"],
+        ["c", "a rough volcanic-rock ring wall, low and brutal, no decoration"],
+    ],
+    civ_plaza: [
+        ["a", "a symmetrical marble plaza with a central fountain and four obelisks"],
+        ["b", "a tiered stone plaza with steps descending on all sides toward a sunken floor"],
+        ["c", "an asymmetric pavilion with scattered columns, half overgrown with vines"],
+    ],
+    civ_spire_field: [
+        ["a", "a cluster of seven tapering needle-thin obsidian spires of varying heights"],
+        ["b", "a forest of crystalline spires with refracting facets, blue-white"],
+        ["c", "stone monoliths in a loose grid, weathered, eroded at the bases"],
+    ],
+    civ_tower: [
+        ["a", "a circular keep tower in light stone with arrow slits and a flat top"],
+        ["b", "a hexagonal mage tower with a steep conical roof and external balcony"],
+        ["c", "a stout watchtower in dark basalt with a beacon brazier on top"],
+    ],
+
+    // ---- Kaiju kinds ----
+    kaiju_tech: [
+        ["alpha",   "an angular mech with treads, plated armor, and a dome turret"],
+        ["beta",    "a tech walker with sensor antennae and exposed pistons"],
+        ["gamma",   "a tracked siege engine with double cannons and reactive armor"],
+    ],
+    kaiju_space: [
+        ["alpha",   "a sleek extraterrestrial creature with elongated limbs and antennae"],
+        ["beta",    "a bulbous gas-bag space beast with hanging tentacles"],
+        ["gamma",   "an angular obsidian space-creature with a single glowing eye"],
+    ],
+    kaiju_hell: [
+        ["alpha",   "a horned demon-beast with cracked obsidian skin and glowing veins"],
+        ["beta",    "a hunched skeletal hell-creature with smoldering bones"],
+        ["gamma",   "a four-armed magma giant, fissures of lava across its torso"],
+    ],
+    kaiju_sky: [
+        ["alpha",   "a winged drake with a long serpentine neck and feathered wings"],
+        ["beta",    "a cloud-shaped sky leviathan with trailing wisps of vapor"],
+    ],
+    kaiju_ice: [
+        ["alpha",   "a frost golem of jagged ice shards, glacier-blue, with horns"],
+        ["beta",    "a slow yeti-like creature, white fur, hunched shoulders"],
+    ],
+
+    // Round 93 — meta-loop: an avatar generated by Ollama+C3D to act as
+    // the Ollama heartbeat indicator. Hand-authored baseline so the
+    // pipeline has something concrete to ask C3D for on first run; the
+    // VariantExpander can also produce more at runtime via the UI.
+    heartbeat_mascot: [
+        ["v1",      "a small round friendly mascot creature, like a low-poly tamagotchi pet, single body with two stub legs, two eyes, no arms, smooth surfaces"],
+        ["v2",      "a compact owl-shaped messenger spirit, big eyes, small wings folded, perched, low-poly stylized"],
+    ],
+    // Round 101 — M2 character avatar for the PalChat M1↔M2 dialogue.
+    // M2 is the dog persona — voiced with a male System.Speech voice
+    // (David typically), barks/sniffs/wags/chases as a small enthusiastic
+    // companion. The 3D mesh appears in the PalChatAvatar's right slot;
+    // SVG dog stays as the fallback render until the OBJ arrives from
+    // Ollama via C3D.
+    palchat_dog: [
+        ["v1",      "a small low-poly cartoon dog, compact body, big floppy ears, short snout with visible nose, four stubby legs, curled tail, friendly expression, blocky stylized voxel-art feel"],
+        ["v2",      "a small low-poly puppy mascot, oversized head with large eyes, button nose, small triangular ears perked up, short body, three-quarter-view friendly pose"],
+    ],
+};
+
+// ============================================================
+// PUBLIC API
+// ============================================================
+
+/**
+ * Returns one of the variant names for `baseKind`, deterministic per seed.
+ * If `baseKind` has no variants registered, returns `baseKind` unchanged
+ * (so existing callers that don't know about variants still work).
+ *
+ * @param {string} baseKind  e.g. "tree_oak"
+ * @param {number|string} seed  any value; same seed → same variant
+ * @returns {string} variant name, e.g. "tree_oak_2"
+ */
+export function pickVariant(baseKind, seed = 0) {
+    const variants = VARIANTS[baseKind];
+    if (!variants || variants.length === 0) return baseKind;
+    const idx = _hashSeed(seed) % variants.length;
+    return `${baseKind}_${variants[idx][0]}`;
+}
+
+/**
+ * Returns ALL valid asset names for a base kind: the base name itself
+ * plus all variant names. Useful for diagnostics.
+ */
+export function variantNames(baseKind) {
+    const variants = VARIANTS[baseKind];
+    if (!variants) return [baseKind];
+    return [baseKind, ...variants.map(([s]) => `${baseKind}_${s}`)];
+}
+
+/**
+ * Round 91 — runtime variant injection. Adds a new variant to the catalog
+ * at runtime, so VariantExpander (and its LLM-generated entries) can grow
+ * the table without re-editing this file. Persists nothing on its own —
+ * callers should also POST to /variants/save if they want disk persistence.
+ *
+ * @param {string} baseKind     e.g. "tree_oak"
+ * @param {string} suffix       e.g. "stormwracked"
+ * @param {string} description  LLM-friendly description string
+ * @returns {string|null}       the full variant name, or null on rejection
+ */
+export function addRuntimeVariant(baseKind, suffix, description) {
+    if (!baseKind || !suffix || !description) return null;
+    if (!VARIANTS[baseKind]) VARIANTS[baseKind] = [];
+    // Reject if this exact suffix already exists
+    if (VARIANTS[baseKind].some(([s]) => s === suffix)) return null;
+    VARIANTS[baseKind].push([suffix, description]);
+    return `${baseKind}_${suffix}`;
+}
+
+/**
+ * Round 91 — overwrite an existing variant's description. Used by the
+ * "regenerate failed" flow when the LLM rewrites a description that the
+ * OBJ generator choked on. Matches by full name (base + suffix).
+ *
+ * @returns {boolean} true if found and updated, false otherwise
+ */
+export function updateVariantDescription(fullName, newDescription) {
+    for (const [base, variants] of Object.entries(VARIANTS)) {
+        for (const entry of variants) {
+            const fullN = `${base}_${entry[0]}`;
+            if (fullN === fullName) {
+                entry[1] = newDescription;
+                return true;
+            }
+        }
+        // Also handle the case where the failed name IS the base name
+        if (base === fullName && variants[0]) {
+            variants[0][1] = newDescription;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns the description currently registered for a variant name, or
+ * null if not found. Used by regenerate-failed to feed the previous
+ * description into the rewrite prompt.
+ */
+export function getVariantDescription(fullName) {
+    for (const [base, variants] of Object.entries(VARIANTS)) {
+        for (const [suffix, desc] of variants) {
+            if (`${base}_${suffix}` === fullName) return desc;
+        }
+        if (base === fullName && variants[0]) return variants[0][1];
+    }
+    return null;
+}
+
+/**
+ * Walk every variant and register its description with the asset loader.
+ * Call this ONCE at engine startup, right after the loader is constructed.
+ * The loader will then have an exact description ready the first time it
+ * encounters each variant name, instead of falling back to a generic
+ * description from kindOrStyle/archetype.
+ *
+ * @param {object} loader GPUAssetLoader instance
+ */
+export function registerAllDescriptions(loader) {
+    if (!loader?.registerDescription) return 0;
+    let n = 0;
+    for (const [base, variants] of Object.entries(VARIANTS)) {
+        for (const [suffix, desc] of variants) {
+            loader.registerDescription(`${base}_${suffix}`, desc);
+            n++;
+        }
+        // Also register a generic description for the BASE name (without
+        // suffix), so callers that don't use variants still get a real
+        // description rather than the loader's _defaultDescription fallback.
+        if (variants.length > 0) {
+            loader.registerDescription(base, variants[0][1]);
+        }
+    }
+    return n;
+}
+
+// ============================================================
+// INTERNAL
+// ============================================================
+// Tiny hash → integer. Cheap, deterministic, good enough for variant
+// selection. Not cryptographic — don't use elsewhere.
+function _hashSeed(seed) {
+    let h = 0;
+    const s = String(seed);
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h);
+}

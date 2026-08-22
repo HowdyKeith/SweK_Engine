@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Nebula (the look of space)">
+<meta name="demo:desc" content="A parallax volumetric nebula for the EV flight view: domain-warped colored gas, a starfield, and depth from a drifting camera -- with ships flying through it so combat happens INSIDE the cloud. WebGPU, WebGL2 fallback, Canvas2D fallback. Drag to steer the camera.">
+<meta name="demo:category" content="fx">
+<title>Nebula</title>
+<style>
+  :root { --amber:#f6a623; --cyan:#59d1ff; --dim:#7c93b8; }
+  html, body { margin:0; height:100%; background:#04060d; overflow:hidden; color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #neb, #ships { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #ships { z-index:2; touch-action:none; }
+  #cap { position:fixed; left:14px; top:12px; z-index:3; color:var(--amber); letter-spacing:.15em; text-transform:uppercase; font-size:13px; }
+  #eng { position:fixed; right:14px; top:12px; z-index:3; color:var(--dim); font-size:11px; }
+  #hint { position:fixed; left:14px; bottom:12px; z-index:3; color:var(--dim); font-size:11px; }
+</style>
+</head>
+<body>
+<canvas id="neb"></canvas>
+<canvas id="ships"></canvas>
+<div id="cap">&#9670; Nebula</div>
+<div id="eng">initializing&hellip;</div>
+<div id="hint">drag to fly the camera &middot; ships drift through the cloud</div>
+<script type="module">
+import { NEBULA_WGSL, NEBULA_GLSL_VS, NEBULA_GLSL_FS } from "./fx/nebula/nebulaShaders.js";
+import { renderNebulaCPU } from "./fx/nebula/nebula.js";
+
+const neb = document.getElementById("neb"), shipCv = document.getElementById("ships"), sctx = shipCv.getContext("2d");
+let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);
+function resize() { W = innerWidth; H = innerHeight; for (const c of [neb, shipCv]) { c.width = Math.floor(W * DPR); c.height = Math.floor(H * DPR); c.style.width = W + "px"; c.style.height = H + "px"; } sctx.setTransform(DPR, 0, 0, DPR, 0, 0); if (mode === "gpu") configureGPU(); }
+addEventListener("resize", () => resize());
+
+// camera (parallax): auto-drifts, drag to steer
+let cam = { x: 0, y: 0, vx: 8, vy: 3 }, dragging = false, lastX = 0, lastY = 0;
+shipCv.addEventListener("pointerdown", (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; cam.vx = 0; cam.vy = 0; });
+addEventListener("pointerup", () => dragging = false);
+addEventListener("pointermove", (e) => { if (!dragging) return; cam.x -= (e.clientX - lastX) * 2; cam.y += (e.clientY - lastY) * 2; lastX = e.clientX; lastY = e.clientY; });
+
+// ---- rendering backends: WebGPU -> WebGL2 -> Canvas2D ----
+let mode = "cpu", device, gpuCtx, pipeline, ubuf, bind, fmt = "bgra8unorm";
+let gl, prog, uRes, uCam, uTime;
+async function initGPU() {
+  if (!navigator.gpu) return false;
+  try { const ad = await navigator.gpu.requestAdapter(); device = await ad.requestDevice(); gpuCtx = neb.getContext("webgpu"); fmt = navigator.gpu.getPreferredCanvasFormat();
+    const m = device.createShaderModule({ code: NEBULA_WGSL });
+    pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module: m, entryPoint: "vs" }, fragment: { module: m, entryPoint: "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
+    ubuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }] });
+    configureGPU(); return true;
+  } catch (e) { return false; }
+}
+function configureGPU() { if (device && gpuCtx) gpuCtx.configure({ device, format: fmt, alphaMode: "opaque" }); }
+function initGL() {
+  gl = neb.getContext("webgl2"); if (!gl) return false;
+  const c = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+  try { prog = gl.createProgram(); gl.attachShader(prog, c(gl.VERTEX_SHADER, NEBULA_GLSL_VS)); gl.attachShader(prog, c(gl.FRAGMENT_SHADER, NEBULA_GLSL_FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    uRes = gl.getUniformLocation(prog, "uRes"); uCam = gl.getUniformLocation(prog, "uCam"); uTime = gl.getUniformLocation(prog, "uTime"); return true;
+  } catch (e) { return false; }
+}
+function renderGPU(t) { device.queue.writeBuffer(ubuf, 0, new Float32Array([neb.width, neb.height, cam.x, cam.y, t, 0, 0, 0]));
+  const enc = device.createCommandEncoder(); const pass = enc.beginRenderPass({ colorAttachments: [{ view: gpuCtx.getCurrentTexture().createView(), clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end(); device.queue.submit([enc.finish()]); }
+function renderGL(t) { gl.viewport(0, 0, neb.width, neb.height); gl.useProgram(prog); gl.uniform2f(uRes, neb.width, neb.height); gl.uniform2f(uCam, cam.x, cam.y); gl.uniform1f(uTime, t); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+let cpuCtx = null, cpuT = 0;
+function renderCPU(t) { if (!cpuCtx) cpuCtx = neb.getContext("2d"); if (t - cpuT < 0.06) return; cpuT = t; const buf = renderNebulaCPU(neb.width, neb.height, cam, t, 6); cpuCtx.putImageData(new ImageData(buf, neb.width, neb.height), 0, 0); }
+
+// ---- ships drifting through the cloud (shows gameplay sits IN the nebula) ----
+const ships = []; for (let i = 0; i < 6; i++) ships.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, a: Math.random() * 6.28, sp: 30 + Math.random() * 50, col: i % 2 ? "#59d1ff" : "#f6a623", cd: Math.random() * 60 });
+const shots = [];
+function drawShips(dt, t) {
+  sctx.clearRect(0, 0, W, H);
+  for (const s of ships) { s.x += Math.cos(s.a) * s.sp * dt; s.y += Math.sin(s.a) * s.sp * dt; s.a += Math.sin(t * 0.5 + s.x) * 0.4 * dt;
+    if (s.x < -40) s.x = W + 40; if (s.x > W + 40) s.x = -40; if (s.y < -40) s.y = H + 40; if (s.y > H + 40) s.y = -40;
+    s.cd -= 1; if (s.cd <= 0 && Math.random() < 0.03) { s.cd = 40; shots.push({ x: s.x, y: s.y, vx: Math.cos(s.a) * 400, vy: Math.sin(s.a) * 400, life: 60, col: s.col }); }
+    sctx.save(); sctx.translate(s.x, s.y); sctx.rotate(s.a);
+    sctx.shadowColor = s.col; sctx.shadowBlur = 8; sctx.fillStyle = s.col; sctx.beginPath(); sctx.moveTo(14, 0); sctx.lineTo(-9, 7); sctx.lineTo(-5, 0); sctx.lineTo(-9, -7); sctx.closePath(); sctx.fill(); sctx.restore();
+  }
+  for (let i = shots.length - 1; i >= 0; i--) { const p = shots[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life--; if (p.life <= 0) { shots.splice(i, 1); continue; }
+    sctx.strokeStyle = p.col; sctx.lineWidth = 2; sctx.shadowColor = p.col; sctx.shadowBlur = 6; sctx.beginPath(); sctx.moveTo(p.x, p.y); sctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02); sctx.stroke(); }
+  sctx.shadowBlur = 0;
+}
+
+let start = performance.now(), last = start;
+function frame() {
+  const now = performance.now(), t = (now - start) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!dragging) { cam.x += cam.vx; cam.y += cam.vy; }
+  if (mode === "gpu") renderGPU(t); else if (mode === "gl") renderGL(t); else renderCPU(t);
+  drawShips(dt, t);
+  requestAnimationFrame(frame);
+}
+(async () => {
+  if (await initGPU()) mode = "gpu"; else if (initGL()) mode = "gl"; else mode = "cpu";
+  document.getElementById("eng").textContent = mode === "gpu" ? "WebGPU" : mode === "gl" ? "WebGL2" : "Canvas2D (CPU)";
+  resize(); frame();
+})();
+</script>
+</body>
+</html>

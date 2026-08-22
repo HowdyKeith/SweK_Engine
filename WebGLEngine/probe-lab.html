@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Probe Lab - a released instrument on a timelike geodesic</title>
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1000px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}
+  .sub{color:#6f8a7c;margin-bottom:16px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:12px 14px;margin-bottom:14px}
+  h2{font-size:14px;margin:0 0 6px;color:#9fe8c0}
+  table{border-collapse:collapse;width:100%;margin-top:6px}
+  th,td{text-align:left;padding:3px 10px 3px 0;border-bottom:1px solid #1a2a22}
+  th{color:#6f8a7c;font-weight:normal}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:#7fe0a4}.hot{color:#f28b8b}.dim{color:#6f8a7c}.warn{color:#e6c877}
+  canvas{background:#05080a;border:1px solid #1a2a22;width:100%;max-width:760px;height:auto;display:block}
+  label{margin-right:14px}
+  input[type=range]{vertical-align:middle;width:150px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Probe Lab</h1>
+  <div class="sub">A probe released on a <b>timelike</b> geodesic around a Schwarzschild mass &mdash; the matter
+    case completing the light case in the geodesic instrument. Both obey almost the same equation; the probe just
+    carries one extra Newtonian term, and everything relativistic lives in the <code>3Mu&sup2;</code>.</div>
+
+  <div class="card">
+    <h2>The orbit</h2>
+    <div style="margin-bottom:6px">
+      <label>semi-major a <input id="a" type="range" min="20" max="400" step="5" value="80"> <span class="dim" id="av"></span></label>
+      <label>eccentricity e <input id="e" type="range" min="0" max="0.7" step="0.01" value="0.4"> <span class="dim" id="ev"></span></label>
+      <label><input id="newt" type="checkbox"> Newtonian (drop 3Mu&sup2;)</label>
+    </div>
+    <canvas id="cv" width="760" height="480"></canvas>
+    <div class="dim" style="margin-top:6px">Units are geometric, M = 1. The white circle is the horizon at 2M, the
+      dashed ring is the ISCO at 6M. Untick nothing and the ellipse turns; tick <b>Newtonian</b> and it must close
+      exactly &mdash; any turning there would be the integrator, not the spacetime.</div>
+    <table id="orb"></table>
+  </div>
+
+  <div class="card">
+    <h2>Probe telemetry &mdash; what actually comes back</h2>
+    <div class="dim">Fly a probe and read its log. Everything else on this page computes a trajectory; this
+      records what an onboard clock and spectrometer would say along it. The clock carries an exact key: an
+      <b>orbiting</b> probe runs at <code>&radic;(1&minus;3M/r)</code> while one <b>held still</b> at the same
+      radius runs at <code>&radic;(1&minus;2M/r)</code> &mdash; two versus three, and the difference is its speed.</div>
+    <div style="margin:8px 0">
+      <label>release r <input id="tr" type="range" min="7" max="120" step="1" value="20"> <span class="dim" id="trv"></span></label>
+      <label>turns <input id="tt" type="range" min="1" max="6" step="1" value="3"> <span class="dim" id="ttv"></span></label>
+      <label><input id="tecc" type="checkbox"> eccentric (L below circular)</label>
+    </div>
+    <canvas id="tel" width="760" height="260"></canvas>
+    <table id="telnum"></table>
+  </div>
+
+  <div class="card">
+    <h2>What the probe reports from its distance</h2>
+    <div class="dim">A static observer's clock rate and redshift, as a function of where it is holding station.</div>
+    <table id="obs"></table>
+  </div>
+
+  <div class="card">
+    <h2>Driving it</h2>
+    <div class="dim">A controller is told a target radius and nothing else. Each trial it releases the probe and
+      observes <b>one bit</b> &mdash; did it drift in, or out &mdash; then bisects. The exact answer
+      <code>L = r&radic;(M/(r&minus;3M))</code> is used only afterwards, to mark the paper. Inside the ISCO the
+      orbit still exists, so the controller still finds the right number and reports it <b>unstable</b>: right
+      number, useless plan. At or inside the photon sphere it refuses rather than returning its closest attempt.</div>
+    <table id="nav"></table>
+  </div>
+
+  <div class="card">
+    <h2>Missions &mdash; the measurement adjudicates</h2>
+    <div class="dim">A proposer states an objective; the controller attempts it; <b>the physics decides</b>. The
+      proposer can be a model in the roundhouse, a script, or you &mdash; the adjudicator does not care which,
+      and contains no model calls at all. Note that not everything succeeds: a planner that only ever reported
+      <span class="ok">achieved</span> would be a yes-man with a physics engine attached.</div>
+    <table id="mis"></table>
+    <div style="margin-top:10px" class="dim">And the lab can rediscover its own innermost holdable orbit by
+      experiment &mdash; bisecting on whether a nudged orbit stays bounded, with <b>6M never mentioned to the
+      search</b>:</div>
+    <table id="iscoFind"></table>
+  </div>
+
+  <div class="card">
+    <h2>Exact keys</h2>
+    <table id="keys"></table>
+  </div>
+</div>
+
+<script type="module">
+import { horizon, iscoRadius, iscoAngularMomentum, circularOmega, redshift, timeDilation,
+         circularL, isStableCircular, traceOrbit, measuredPrecession, precessionExact,
+         arcsecPerCentury, properTimeToCentre } from "./physics/blackhole/probe.js";
+import { steerToCircular, NAV } from "./physics/blackhole/navigate.js";
+import { runMission, adjudicate, findLowestStable, VERDICT } from "./physics/blackhole/mission.js";
+import { fitPlot } from "./ui/fitCanvas.js";
+import { flyProbe, orbitalTimeDilation, energyOf } from "./physics/blackhole/probe.js";
+
+const $ = (id) => document.getElementById(id);
+const M = 1;
+
+function draw() {
+  const a = +$("a").value, e = +$("e").value, newt = $("newt").checked;
+  $("av").textContent = a + "M"; $("ev").textContent = e.toFixed(2);
+  const p = a * (1 - e * e), L = Math.sqrt(M * p), u0 = (1 + e) / p;
+  const cv = $("cv"), g = cv.getContext("2d");
+  g.clearRect(0, 0, cv.width, cv.height);
+  const cx = cv.width / 2, cy = cv.height / 2;
+  const rMax = a * (1 + e) * 1.08, s = Math.min(cv.width, cv.height) / 2 / rMax;
+
+  // integrate and draw
+  const dphi = 4e-4;
+  let u = u0, du = 0, phi = 0;
+  const acc = (uu) => -uu + M / (L * L) + (newt ? 0 : 3 * M * uu * uu);
+  g.strokeStyle = newt ? "#7fb0e0" : "#7fe0a4"; g.lineWidth = 1; g.beginPath();
+  let first = true, turns = 0;
+  while (phi < 16 * Math.PI && u > 1e-9 && u < 1 / (2 * M)) {
+    const k1u=du,k1d=acc(u), k2u=du+.5*dphi*k1d,k2d=acc(u+.5*dphi*k1u),
+          k3u=du+.5*dphi*k2d,k3d=acc(u+.5*dphi*k2u), k4u=du+dphi*k3d,k4d=acc(u+dphi*k3u);
+    u += (dphi/6)*(k1u+2*k2u+2*k3u+k4u); du += (dphi/6)*(k1d+2*k2d+2*k3d+k4d); phi += dphi;
+    const r = 1/u, x = cx + s*r*Math.cos(phi), y = cy + s*r*Math.sin(phi);
+    first ? (g.moveTo(x,y), first=false) : g.lineTo(x,y);
+  }
+  g.stroke();
+  // horizon + ISCO
+  g.fillStyle="#e8eef0"; g.beginPath(); g.arc(cx,cy,Math.max(2,s*horizon(M)),0,7); g.fill();
+  g.strokeStyle="#3a5a4a"; g.setLineDash([4,4]); g.beginPath(); g.arc(cx,cy,s*iscoRadius(M),0,7); g.stroke(); g.setLineDash([]);
+
+  const m = measuredPrecession(M, a, e, { dphi: 2e-4, newtonian: newt });
+  const ex = precessionExact(M, a, e);
+  const rows = [
+    ["semi-latus rectum p", p.toFixed(4) + "M", ""],
+    ["angular momentum L", L.toFixed(6), "L_isco = " + iscoAngularMomentum(M).toFixed(6)],
+    ["measured precession / orbit", m.ok ? m.perOrbit.toExponential(6) : "n/a", newt ? "must be 0" : "6&pi;M/p = " + ex.toExponential(6)],
+  ];
+  if (m.ok) {
+    const good = newt ? Math.abs(m.perOrbit) < 1e-6 : Math.abs(m.perOrbit / ex - 1) < 0.2;
+    rows.push([newt ? "orbit closes?" : "agrees with the closed form?",
+      newt ? (Math.abs(m.perOrbit) < 1e-6 ? "yes" : "NO") : (100*Math.abs(m.perOrbit/ex-1)).toFixed(2) + "% off",
+      good ? "<span class='ok'>as it must</span>" : "<span class='hot'>unexpected</span>"]);
+  }
+  $("orb").innerHTML = rows.map(r => '<tr><td class="dim">'+r[0]+'</td><td class="num">'+r[1]+'</td><td class="dim">'+r[2]+'</td></tr>').join("");
+}
+
+function observers() {
+  let h = '<tr><th>station r</th><th>1 + z</th><th>d&tau;/dt</th><th>stable orbit?</th><th></th></tr>';
+  for (const r of [1000, 100, 20, 10, 6, 4, 3, 2.5, 2]) {
+    const z = redshift(M, r), d = timeDilation(M, r);
+    const st = r > 6 ? "<span class='ok'>yes</span>" : (r > 3 ? "<span class='warn'>unstable</span>" : "<span class='hot'>none</span>");
+    const note = r === 6 ? "the ISCO" : r === 3 ? "photon sphere" : r === 2 ? "the horizon" : "";
+    h += '<tr><td>'+r+'M</td><td class="num">'+(Number.isFinite(z)?(1+z).toFixed(6):(z===Infinity?"&infin;":"n/a"))+
+         '</td><td class="num">'+(Number.isFinite(d)?d.toFixed(6):"n/a")+'</td><td>'+st+'</td><td class="dim">'+note+'</td></tr>';
+  }
+  h += '<tr><td colspan="5" class="dim">Inside the horizon a static observer cannot exist, so the table reports n/a rather than inventing one.</td></tr>';
+  $("obs").innerHTML = h;
+}
+
+function keys() {
+  const Msun = 1476.6, aM = 5.7909e10, eM = 0.20563, per = 87.9691;
+  const asc = arcsecPerCentury(precessionExact(Msun, aM, eM), per);
+  const rows = [
+    ["ISCO", iscoRadius(M).toFixed(6) + "M", "exactly 6M", iscoRadius(M) === 6],
+    ["L at the ISCO", iscoAngularMomentum(M).toPrecision(12), "2&radic;3 M", Math.abs(iscoAngularMomentum(M)-2*Math.sqrt(3))<1e-15],
+    ["...and circularL(6M), independently", circularL(M,6).toPrecision(12), "same", Math.abs(circularL(M,6)-iscoAngularMomentum(M))<1e-12],
+    ["&Omega; at r=100M", circularOmega(M,100).toExponential(9), "&radic;(M/r&sup3;) exactly", Math.abs(circularOmega(M,100)-Math.sqrt(1e-6))<1e-18],
+    ["1+z at the horizon", "&infin;", "diverges", redshift(M,2)===Infinity],
+    ["Mercury", asc.toFixed(3) + "&Prime;/century", "observed ~43.0", Math.abs(asc-43)<0.5],
+    ["proper time to fall from 20M", properTimeToCentre(M,20).toFixed(4), "finite", Number.isFinite(properTimeToCentre(M,20))],
+  ];
+  $("keys").innerHTML = '<tr><th>quantity</th><th>value</th><th>exact</th><th></th></tr>' +
+    rows.map(r => '<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td><td class="num dim">'+r[2]+'</td><td class="'+(r[3]?'ok':'hot')+'">'+(r[3]?'holds':'MISMATCH')+'</td></tr>').join("");
+}
+
+function navigation() {
+  let h = '<tr><th>target r</th><th>verdict</th><th>L found</th><th>exact L</th><th>error</th><th>trials</th></tr>';
+  for (const r of [50, 20, 10, 6, 5, 4, 3, 2.5]) {
+    const s = steerToCircular(1, r);
+    const ex = circularL(1, r);
+    const cls = s.verdict === NAV.CIRCULARISED ? "ok" : s.verdict === NAV.UNSTABLE ? "warn" : "hot";
+    h += '<tr><td>' + r + 'M</td><td class="' + cls + '">' + s.verdict + '</td>' +
+         '<td class="num">' + (s.L !== undefined ? s.L.toPrecision(10) : '&mdash;') + '</td>' +
+         '<td class="num dim">' + (Number.isFinite(ex) ? ex.toPrecision(10) : 'none exists') + '</td>' +
+         '<td class="num">' + (s.L !== undefined && Number.isFinite(ex) ? Math.abs(s.L - ex).toExponential(2) : '&mdash;') + '</td>' +
+         '<td class="num dim">' + (s.iterations || '&mdash;') + '</td></tr>';
+  }
+  h += '<tr><td colspan="6" class="dim">Below 3M the row shows no L at all &mdash; a best-effort number for an orbit that cannot exist is the failure this design avoids.</td></tr>';
+  $("nav").innerHTML = h;
+}
+
+for (const id of ["a","e","newt"]) $(id).addEventListener("input", draw);
+function missions() {
+  const props = [
+    { type: "circular", r: 20 }, { type: "circular", r: 8 }, { type: "circular", r: 6.5 },
+    { type: "circular", r: 4 }, { type: "circular", r: 2.5 },
+    { type: "survey", r: 10 }, { type: "orbitTheMoon" },
+  ];
+  const a = adjudicate(1, props);
+  const cls = (v) => v === VERDICT.ACHIEVED ? "ok" : v === VERDICT.REFUTED ? "warn" : "hot";
+  let h = '<tr><th>proposal</th><th>verdict</th><th>why</th></tr>';
+  for (const { objective, result } of a.results) {
+    h += '<tr><td><code>' + JSON.stringify(objective) + '</code></td><td class="' + cls(result.verdict) + '">' +
+         result.verdict + '</td><td class="dim">' + (result.why || '') + '</td></tr>';
+  }
+  h += '<tr><td colspan="3" class="dim">tally: ' + JSON.stringify(a.tally) + '</td></tr>';
+  $("mis").innerHTML = h;
+
+  const f = findLowestStable(1);
+  $("iscoFind").innerHTML =
+    '<tr><th>found by experiment</th><th>exact ISCO</th><th>deficit</th><th>trials</th></tr>' +
+    '<tr><td class="num">' + f.r.toPrecision(9) + 'M</td><td class="num dim">6M</td><td class="num warn">' +
+    (100 * (6 - f.r) / 6).toFixed(3) + '% inside</td><td class="num dim">' + f.trials + '</td></tr>' +
+    '<tr><td colspan="4" class="dim">It lands <b>inside</b>, systematically, and that is not scatter: the instability growth rate vanishes at the boundary, so a finite integration arc cannot see a runaway that has barely begun. Reported rather than tuned until it reads 6.000.</td></tr>';
+}
+
+// v2880 -- fitPlot instead of raw CSS. The v2872 helper was written, documented and then NOT USED: every page
+// got hand-written CSS and the module sat gate-only, which the graveyard census caught. Using it is also better
+// than the CSS was: fitPlot resizes the BACKING STORE to the container times devicePixelRatio and redraws, so on
+// a HiDPI screen the curve is genuinely sharper rather than a 760px buffer stretched wider.
+fitPlot($("cv"), () => draw(), { aspect: 480 / 760, maxWidth: 1100 });
+
+// ---- telemetry: the log, plotted, beside the numbers -------------------------------------------------------
+function telemetry() {
+  const r0 = +$("tr").value, turns = +$("tt").value, ecc = $("tecc").checked;
+  $("trv").textContent = r0 + "M"; $("ttv").textContent = turns;
+  const Lc = circularL(1, r0);
+  const f = flyProbe(1, { r0, turns, L: ecc ? Lc * 0.93 : null, sampleEvery: 30 });
+  const cv = $("tel"), g = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  if (!f.samples.length) return;
+
+  const pad = 34, w = W - pad * 2, h = H - pad * 2;
+  const taus = f.samples.map(s => s.tau), rs = f.samples.map(s => s.r), rates = f.samples.map(s => s.rate);
+  const tMax = Math.max(...taus) || 1;
+  const rLo = Math.min(...rs), rHi = Math.max(...rs), rSpan = (rHi - rLo) || 1;
+  const rateLo = Math.min(...rates.slice(1)), rateHi = Math.max(...rates.slice(1)), rateSpan = (rateHi - rateLo) || 1e-6;
+
+  g.strokeStyle = "#1a2a22"; g.strokeRect(pad, pad, w, h);
+  g.fillStyle = "#6f8a7c"; g.font = "11px ui-monospace,monospace";
+  g.fillText("proper time \u03c4 \u2192", pad, H - 10);
+
+  // r(tau) -- the orbit as the probe experiences it
+  g.strokeStyle = "#7fe0a4"; g.lineWidth = 1.5; g.beginPath();
+  f.samples.forEach((s, i) => {
+    const x = pad + (s.tau / tMax) * w, y = pad + h - ((s.r - rLo) / rSpan) * h;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  });
+  g.stroke();
+  g.fillStyle = "#7fe0a4"; g.fillText("r  " + rLo.toFixed(2) + " .. " + rHi.toFixed(2) + "M", pad + 6, pad + 14);
+
+  // cumulative dtau/dt -- the clock divergence, settling onto the exact value
+  g.strokeStyle = "#e6c877"; g.lineWidth = 1.5; g.beginPath();
+  f.samples.slice(1).forEach((s, i) => {
+    const x = pad + (s.tau / tMax) * w, y = pad + h - ((s.rate - rateLo) / rateSpan) * h;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  });
+  g.stroke();
+  g.fillStyle = "#e6c877"; g.fillText("d\u03c4/dt  " + rateLo.toFixed(6) + " .. " + rateHi.toFixed(6), pad + 6, pad + 28);
+
+  const exact = ecc ? null : orbitalTimeDilation(1, r0);
+  if (exact !== null && exact > rateLo && exact < rateHi) {
+    const y = pad + h - ((exact - rateLo) / rateSpan) * h;
+    g.strokeStyle = "#4c8f6a"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(pad, y); g.lineTo(pad + w, y); g.stroke(); g.setLineDash([]);
+  }
+
+  const row = (k, v, note) => '<tr><td class="dim">' + k + '</td><td class="num">' + v + '</td><td class="dim">' + (note || '') + '</td></tr>';
+  const err = exact !== null ? Math.abs(f.meanRate - exact) : null;
+  $("telnum").innerHTML =
+    row("proper time \u03c4 logged", f.tau.toFixed(4), "the onboard clock") +
+    row("coordinate time t", f.t.toFixed(4), "a distant clock over the same trip") +
+    row("mean d\u03c4/dt", f.meanRate.toPrecision(12), exact !== null ? "exact \u221a(1\u22123M/r) = " + exact.toPrecision(12) : "eccentric orbit: no single-radius closed form") +
+    (err !== null ? row("error", err.toExponential(2), err < 1e-9 ? '<span class="ok">integrated, not evaluated</span>' : '<span class="hot">unexpected</span>') : "") +
+    row("held still at the same r", timeDilation(1, r0).toPrecision(12), "slower still when moving \u2014 speed on top of depth") +
+    row("angular momentum L", f.L.toPrecision(10), ecc ? "93% of circular" : "circular") +
+    (f.captured ? row("outcome", "CAPTURED", '<span class="hot">reached the horizon; the log stops where the probe did</span>') : "");
+}
+for (const id of ["tr", "tt", "tecc"]) $(id).addEventListener("input", telemetry);
+telemetry();
+observers(); keys(); navigation(); missions();
+</script>
+</body>
+</html>

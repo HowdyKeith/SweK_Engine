@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Slime mold</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Slime Mold">
+<meta name="demo:desc"   content="Physarum agent simulation: sense, steer, deposit, diffuse — with bloom.">
+<meta name="demo:cats"   content="sim,particles">
+<meta name="demo:swatch" content="S">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center;flex-wrap:wrap}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1}
+  #topbar button,#topbar select{padding:6px 10px;border-radius:6px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:13px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+  #sim{background:#000;max-width:100vmin;max-height:100vmin;border-radius:4px;touch-action:none;image-rendering:auto}
+  #footer{padding:8px 12px;font-size:11px;color:#789;text-align:center}
+  /* v2873 -- the action fills the page (no canvas rule existed). Per-cell grid: display grows, backing store untouched. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🟡 Slime Mold</h1>
+    <select id="palSel" title="Palette">
+      <option value="0">Gold</option><option value="1">Toxic</option><option value="2">Plasma</option><option value="3">Ice</option>
+    </select>
+    <button id="btnGlow">✨ Bloom</button>
+    <button id="btnReseed">🎲 Reseed</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host"><canvas id="sim" width="256" height="256"></canvas></div>
+  <div id="footer">Physarum agents · sense → steer → deposit → diffuse · tap to seed a colony</div>
+</div>
+<script type="module">
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const cv = document.getElementById("sim");
+const N = cv.width;                       // square field == canvas size
+const ctx = cv.getContext("2d");
+let trail = new Float32Array(N * N), next = new Float32Array(N * N);
+const img = ctx.createImageData(N, N);
+
+// ---- tunables (Jones 2010 Physarum model) ----
+let AGENTS = 6000;
+let SENSOR_ANG = 0.55, SENSOR_DIST = 9, TURN = 0.5, SPEED = 1.0, DEPOSIT = 0.22, DECAY = 0.90, DIFFUSE = 0.55;
+let glow = true, paletteIdx = 0, colorCycle = false, phase = 0;
+
+// ---- agents (struct-of-arrays) ----
+let ax = new Float32Array(0), ay = new Float32Array(0), ah = new Float32Array(0);
+function spawn(count){
+  AGENTS = count|0;
+  ax = new Float32Array(AGENTS); ay = new Float32Array(AGENTS); ah = new Float32Array(AGENTS);
+  for (let i = 0; i < AGENTS; i++){
+    const r = Math.random() * N * 0.30, a = Math.random() * 6.28318;
+    ax[i] = N/2 + Math.cos(a) * r; ay[i] = N/2 + Math.sin(a) * r; ah[i] = Math.random() * 6.28318;
+  }
+}
+function reseed(){ trail.fill(0); next.fill(0); spawn(AGENTS); }
+spawn(AGENTS);
+
+const wrap = (v) => ((v % N) + N) % N;
+function sampleAt(x, y){ return trail[wrap(y|0) * N + wrap(x|0)]; }
+function senseDir(i, off){ const a = ah[i] + off; return sampleAt(ax[i] + Math.cos(a) * SENSOR_DIST, ay[i] + Math.sin(a) * SENSOR_DIST); }
+
+function stepAgents(){
+  for (let i = 0; i < AGENTS; i++){
+    const f = senseDir(i, 0), l = senseDir(i, SENSOR_ANG), r = senseDir(i, -SENSOR_ANG);
+    if (f > l && f > r){ /* keep heading */ }
+    else if (f < l && f < r){ ah[i] += (Math.random() < 0.5 ? 1 : -1) * TURN; }   // wander
+    else if (l > r){ ah[i] += TURN; }
+    else if (r > l){ ah[i] -= TURN; }
+    const nx = wrap(ax[i] + Math.cos(ah[i]) * SPEED), ny = wrap(ay[i] + Math.sin(ah[i]) * SPEED);
+    ax[i] = nx; ay[i] = ny;
+    const idx = (ny|0) * N + (nx|0);
+    trail[idx] = Math.min(1, trail[idx] + DEPOSIT);
+  }
+}
+function diffuseDecay(){
+  for (let y = 0; y < N; y++){
+    const ym = wrap(y-1) * N, yp = wrap(y+1) * N, yc = y * N;
+    for (let x = 0; x < N; x++){
+      const xm = wrap(x-1), xp = wrap(x+1);
+      const s = trail[yc + x];
+      const sum = trail[ym + x] + trail[yp + x] + trail[yc + xm] + trail[yc + xp];
+      next[yc + x] = (s * (1 - DIFFUSE) + (sum * 0.25) * DIFFUSE) * DECAY;
+    }
+  }
+  const t = trail; trail = next; next = t;
+}
+
+// ---- palette LUT (256 entries; rebuilt when palette/phase changes) ----
+const LUT = new Uint8Array(256 * 3);
+function lerp(a, b, t){ return a + (b - a) * t; }
+function stops(t, cs){
+  // cs: array of [pos, r,g,b] (0..1)
+  let i = 0; while (i < cs.length - 1 && t > cs[i+1][0]) i++;
+  const a = cs[i], b = cs[Math.min(i+1, cs.length-1)];
+  const span = (b[0] - a[0]) || 1, k = Math.max(0, Math.min(1, (t - a[0]) / span));
+  return [lerp(a[1], b[1], k), lerp(a[2], b[2], k), lerp(a[3], b[3], k)];
+}
+const PALETTES = [
+  [[0,0.05,0.04,0.10],[0.45,0.85,0.45,0.10],[0.80,1.0,0.85,0.30],[1,1.0,1.0,0.85]],   // gold
+  [[0,0.02,0.06,0.03],[0.45,0.10,0.70,0.20],[0.80,0.55,1.0,0.30],[1,0.90,1.0,0.80]],   // toxic green
+  [[0,0.04,0.02,0.12],[0.40,0.55,0.10,0.55],[0.75,1.0,0.35,0.45],[1,1.0,0.95,0.70]],   // plasma
+  [[0,0.02,0.04,0.08],[0.45,0.10,0.55,0.70],[0.80,0.55,0.95,1.0],[1,0.92,1.0,1.0]],    // ice
+];
+function buildLUT(){
+  const base = PALETTES[paletteIdx];
+  for (let i = 0; i < 256; i++){
+    let t = Math.pow(i / 255, 0.70);
+    if (colorCycle) t = (t + 0.12 * Math.sin(phase + i * 0.02)) ;
+    t = Math.max(0, Math.min(1, t));
+    const c = stops(t, base);
+    LUT[i*3] = c[0]*255|0; LUT[i*3+1] = c[1]*255|0; LUT[i*3+2] = c[2]*255|0;
+  }
+}
+buildLUT();
+
+function render(){
+  const d = img.data;
+  for (let i = 0; i < N * N; i++){
+    let v = trail[i]; if (v > 1) v = 1; const li = (v * 255)|0, o = li*3, p = i*4;
+    d[p] = LUT[o]; d[p+1] = LUT[o+1]; d[p+2] = LUT[o+2]; d[p+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  if (glow){                                   // cheap bloom: blur + additive re-draw
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.filter = "blur(3px)"; ctx.globalAlpha = 0.6;
+    ctx.drawImage(cv, 0, 0);
+    ctx.restore();
+  }
+}
+
+let running = true;
+function frame(){
+  if (running){
+    stepAgents();
+    diffuseDecay();
+    if (colorCycle){ phase += 0.03; buildLUT(); }
+    render();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- interaction ----
+function seedAt(cx, cy){
+  for (let i = 0; i < Math.min(AGENTS, 1200); i++){
+    const j = (Math.random() * AGENTS)|0;
+    const r = Math.random() * 12, a = Math.random() * 6.28318;
+    ax[j] = wrap(cx + Math.cos(a) * r); ay[j] = wrap(cy + Math.sin(a) * r); ah[j] = a;
+  }
+  for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++){
+    if (dx*dx + dy*dy > 64) continue;
+    trail[wrap(cy+dy) * N + wrap(cx+dx)] = 1;
+  }
+}
+function toField(e){
+  const rect = cv.getBoundingClientRect();
+  const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const py = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  return [px / rect.width * N, py / rect.height * N];
+}
+cv.addEventListener("pointerdown", (e) => { const [x, y] = toField(e); seedAt(x, y); });
+document.getElementById("btnReseed").addEventListener("click", reseed);
+document.getElementById("palSel").addEventListener("change", (e) => { paletteIdx = +e.target.value; buildLUT(); });
+const glowBtn = document.getElementById("btnGlow");
+glowBtn.addEventListener("click", () => { glow = !glow; glowBtn.style.opacity = glow ? "1" : "0.5"; });
+
+// ─── v822 — Universal viewer protocol ────────────────────
+(function demoProtocol() {
+    const params = [
+        { name: "agents",     label: "Agents",       min: 500, max: 12000, step: 500, default: 6000, set: (v) => spawn(v) },
+        { name: "sensorAng",  label: "Sensor angle", min: 0.1, max: 1.4,  step: 0.05, default: 0.55, set: (v) => { SENSOR_ANG = v; } },
+        { name: "sensorDist", label: "Sensor dist",  min: 2,   max: 24,   step: 1,    default: 9,    set: (v) => { SENSOR_DIST = v; } },
+        { name: "turn",       label: "Turn speed",   min: 0.1, max: 1.2,  step: 0.05, default: 0.5,  set: (v) => { TURN = v; } },
+        { name: "decay",      label: "Decay",        min: 0.80, max: 0.99, step: 0.01, default: 0.90, set: (v) => { DECAY = v; } },
+        { name: "palette",    label: "Palette",      min: 0,   max: 3,    step: 1,    default: 0,    set: (v) => { paletteIdx = v|0; buildLUT(); } },
+        { name: "colorCycle", label: "Color cycle",  min: 0,   max: 1,    step: 1,    default: 0,    set: (v) => { colorCycle = !!v; buildLUT(); } },
+        { name: "bloom",      label: "Bloom",        min: 0,   max: 1,    step: 1,    default: 1,    set: (v) => { glow = !!v; } },
+    ];
+    function announce() {
+        try { window.parent?.postMessage({ type: "demo:params", params: params.map(({ set, ...p }) => p) }, "*"); } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data; if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") { try { p.set(d.value); } catch (err) {} }
+        } else if (d.type === "demo:request-thumb") {
+            try { window.parent?.postMessage({ type: "demo:thumb", dataUrl: cv.toDataURL("image/jpeg", 0.6) }, "*"); } catch (err) {}
+        } else if (d.type === "demo:request-params") { announce(); }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

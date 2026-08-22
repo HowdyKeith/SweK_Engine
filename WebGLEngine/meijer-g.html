@@ -1,0 +1,245 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Meijer G-function (v3055)</title>
+<style>
+ html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 40px;max-width:1000px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:20px 0 6px;color:#8fd0a8;letter-spacing:.5px}
+ .sub,.note{color:#6f8a7c;max-width:880px}
+ .panel{border:1px solid #24382e;padding:10px 12px;margin:8px 0;background:#0d1411}
+ button{background:#16241d;color:#cfe9d8;border:1px solid #2e4a3b;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1e3227} button.good{border-color:#2e6a4a}
+ input{background:#0c1410;color:#cfe9d8;border:1px solid #24382e;border-radius:4px;padding:4px 6px;font:inherit}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#6f8a7c;font-weight:normal;border-bottom:1px solid #24382e}
+ .ok{color:#8fe0a8} .bad{color:#f0b0a0} .warn{color:#e8c49a}
+ .verdict{font-size:13px;padding:8px 10px;margin:6px 0;border-left:3px solid #2e4a3b}
+ .law{color:#9ab8a8;border-left:3px solid #2e4a3b;padding-left:10px;margin:6px 0;max-width:880px}
+ code{color:#b8d8c4}
+</style></head><body><div id="w">
+
+<h1>Meijer G-function &mdash; and the family that grades it</h1>
+<div class="sub">Evaluated by <b>residue sum</b>, not by integrating the Mellin-Barnes contour: closing the contour
+and summing residues at the poles of the first <code>m</code> gamma factors gives an exact linear combination of
+generalized hypergeometrics. Different algorithm, different limits, stated rather than implied.</div>
+
+<div class="law">The reason G is worth having here: nearly every classical special function is a G at particular
+parameters, so the answer key is a <b>family</b>. A key that only tested <code>e^-z</code> would pass an
+implementation that ignored half its parameters &mdash; <code>e^-z</code> is m=1,n=0,p=0,q=1 and exercises none of
+them. Each row below is computed independently and compared pointwise.</div>
+
+<h2>1. The family, checked live</h2>
+<div class="panel">
+  <button id="run" class="good">check every reduction</button>
+  <span class="note">each target computed by its own series &mdash; nothing here is a stored table</span>
+  <table id="tbl"></table>
+</div>
+
+<h2>2. Cancellation &mdash; why a plausible number can be worthless</h2>
+<div class="panel">
+  <div class="note">Double precision carries ~16 decimal digits. An alternating series whose largest term is
+  10<sup>c</sup> times its own sum has spent <b>c</b> of them. <code>e^-z</code> through its own series is exact at
+  z=2, wrong in the 10th digit at z=8, and at z=20 the answer is off by <b>more than itself</b> &mdash; while still
+  being a finite, plausible-looking float. The evaluator reports this before you compare anything.</div>
+  <table id="cancel"></table>
+</div>
+
+<h2>3. Evaluate anything</h2>
+<div class="panel">
+  <div>m <input id="m" size="2" value="1"> n <input id="n" size="2" value="0">
+       a <input id="a" size="14" placeholder="comma list" value="">
+       b <input id="b" size="14" value="0">
+       z <input id="z" size="8" value="2"></div>
+  <button id="ev" class="good">evaluate</button>
+  <div id="out" class="verdict">&mdash;</div>
+  <div class="note">Refusals name the condition and what would be needed instead. Try b = <code>0.5,-0.5</code>
+  (poles collide), or m=1 n=1 a=<code>0</code> b=<code>0</code> with z=1.4 (outside the radius of convergence).</div>
+</div>
+
+<h2>4. The instrument &mdash; a distribution measured, not a function evaluated</h2>
+<div class="panel">
+  <div class="note">If X<sub>1</sub>..X<sub>n</sub> are independent Gamma(a<sub>i</sub>,1), the <b>product</b> has an
+  exact law and that law is a Meijer G &mdash; pdf <code>G^{n,0}_{0,n}</code>, cdf <code>G^{n,1}_{1,n+1}</code>, a
+  different family. So we can sample the product by Monte Carlo and grade the samples against a law nobody
+  tabulated. Four independent routes must agree: the sampler, the pdf, the cdf, and the moments
+  (<code>&prod;&Gamma;(a+k)/&Gamma;(a)</code>, no G in it at all).</div>
+  <div>shapes <input id="sh" size="18" value="1.3, 2.7"> samples <input id="ns" size="6" value="4000">
+       seed <input id="sd" size="8" value="987654321"></div>
+  <button id="mc" class="good">sample and grade</button>
+  <button id="sab">SABOTAGE: grade against shapes 8% off</button>
+  <div id="ksout" class="verdict">&mdash;</div>
+  <div class="note">A KS test that passes proves little on its own &mdash; D always shrinks with n and always looks
+  small. The instrument only earns the name if the same samples are <b>rejected</b> against a law that is subtly
+  wrong. That is what the sabotage button is for.</div>
+</div>
+
+<h2>5. Ratios &mdash; where the reference is ELEMENTARY</h2>
+<div class="panel">
+  <div class="note">Z = X/Y with X~Gamma(a,1), Y~Gamma(b,1). Via G this is
+  <code>1/(z &Gamma;(a)&Gamma;(b)) &middot; G^{1,1}_{1,1}(1/z | 1-a ; b)</code>; the witness is the beta-prime
+  density <code>z^(a-1) / (B(a,b)(1+z)^(a+b))</code>, which contains nothing harder than a Beta. The product
+  instrument could only check G against G plus moments &mdash; <b>here a residue-sum bug has nowhere to hide</b>.
+  It also exercises a family the product never touched: n=1, so an upper parameter is used, and the argument is
+  1/z rather than z.</div>
+  <div>a <input id="ra" size="6" value="1.7"> b <input id="rb" size="6" value="2.3">
+       samples <input id="rn" size="6" value="4000"> seed <input id="rs" size="8" value="4242"></div>
+  <button id="rtab" class="good">check the density against the elementary form</button>
+  <table id="rtable"></table>
+  <div class="law" style="margin-top:10px">The hole at z = 1 is real and inherent, not a tuning problem.
+  p = q = 1 gives radius of convergence 1, so the G needs |1/z| &lt; 1. The reciprocal identity
+  <code>f_Z(z) = f_Z'(1/z)/z&sup2;</code> with shapes swapped turns z &lt; 1 into z' &gt; 1 &mdash; but it moves the
+  argument <i>across</i> 1, it does not make it smaller. Both branches refuse near z = 1. The elementary form
+  covers the gap and is what a caller should use; the G is the thing being <i>checked</i> wherever it converges.</div>
+  <div style="margin-top:10px">
+    <button id="rmc" class="good">sample and grade</button>
+    <button id="rsab1" class="warn">SABOTAGE: grade against a 12% off</button>
+    <button id="rsab2" class="warn">SABOTAGE: grade against swapped shapes</button>
+  </div>
+  <div id="rksout" class="verdict">&mdash;</div>
+  <div class="note">The law is <b>not symmetric in a and b</b>, so swapping them is a genuinely different
+  distribution and must be rejected. And <code>E[Z^k]</code> only exists for k &lt; b &mdash; a moment that does
+  not exist is refused as a property of the law, not returned as a number.</div>
+</div>
+
+</div>
+<script type="module">
+import { meijerG, gamma } from "/math/meijerG.js";
+import { sampleProduct, mulberry32, ksTest, exactMoment, shapeProblems } from "/math/productDist.js";
+import { ratioPdfG, ratioPdfExact, ratioCdfExact, sampleRatio, ksRatio, ratioMoment, ratioShapeProblems } from "/math/ratioDist.js";
+const $ = (id) => document.getElementById(id);
+const rel = (g, w) => Math.abs(g - w) / Math.max(Math.abs(w), 1e-300);
+
+const J = (v,x)=>{let s=0;for(let k=0;k<120;k++)s+=Math.pow(-1,k)/(gamma(k+1)*gamma(k+v+1))*Math.pow(x/2,2*k+v);return s;};
+const I = (v,x)=>{let s=0;for(let k=0;k<160;k++)s+=1/(gamma(k+1)*gamma(k+v+1))*Math.pow(x/2,2*k+v);return s;};
+const K = (v,x)=>Math.PI/2*(I(-v,x)-I(v,x))/Math.sin(Math.PI*v);
+const lowG=(a,z)=>{let t=Math.pow(z,a)*Math.exp(-z)/a,s=t;for(let k=1;k<400;k++){t*=z/(a+k);s+=t;if(Math.abs(t)<1e-17*Math.abs(s))break;}return s;};
+
+const ROWS = [
+  ["e^-z",      "G^{1,0}_{0,1}(z | ; 0)",              2.0,  {m:1,n:0,a:[],b:[0],z:2},            Math.exp(-2)],
+  ["1/(1+z)",   "G^{1,1}_{1,1}(z | 0 ; 0)",            0.5,  {m:1,n:1,a:[0],b:[0],z:0.5},         1/1.5],
+  ["ln(1+z)",   "G^{1,2}_{2,2}(z | 1,1 ; 1,0)",        0.5,  {m:1,n:2,a:[1,1],b:[1,0],z:0.5},     Math.log(1.5)],
+  ["J_0.5(x)",  "G^{1,0}_{0,2}(x^2/4 | ; v/2,-v/2)",   1.3,  {m:1,n:0,a:[],b:[0.25,-0.25],z:1.3*1.3/4},  J(0.5,1.3)],
+  ["J_1.7(x)",  "G^{1,0}_{0,2}(x^2/4 | ; v/2,-v/2)",   2.1,  {m:1,n:0,a:[],b:[0.85,-0.85],z:2.1*2.1/4},  J(1.7,2.1)],
+  ["2K_0.4(x)", "G^{2,0}_{0,2}(x^2/4 | ; v/2,-v/2)",   1.1,  {m:2,n:0,a:[],b:[0.2,-0.2],z:1.1*1.1/4},    2*K(0.4,1.1)],
+  ["Gamma(a,z)","G^{2,0}_{1,2}(z | 1 ; 0,a)",          1.2,  {m:2,n:0,a:[1],b:[0,0.4],z:1.2},     gamma(0.4)-lowG(0.4,1.2)],
+];
+
+$("run").onclick = () => {
+  let html = "<tr><th>reduces to</th><th>as</th><th>G</th><th>independent reference</th><th>rel err</th><th>digits left</th></tr>";
+  for (const [name, form, , spec, want] of ROWS) {
+    const r = meijerG(spec);
+    if (!r.ok) { html += "<tr><td>"+name+"</td><td>"+form+"</td><td colspan=4 class='bad'>REFUSED: "+r.reason+"</td></tr>"; continue; }
+    const e = rel(r.value, want);
+    // The bar each row must clear is the one the code's OWN cancellation predicts -- not a constant I picked
+    // until this went green, which would be the opposite of a check.
+    const budget = Math.pow(10, r.cancellation) * 2.3e-16 * 40;
+    const cls = e <= budget ? "ok" : "bad";
+    html += "<tr><td>"+name+"</td><td class='note'>"+form+"</td><td>"+r.value.toPrecision(12)+"</td><td>"+want.toPrecision(12)
+         +"</td><td class='"+cls+"'>"+e.toExponential(1)+"</td><td>"+r.digitsLeft.toFixed(1)+"</td></tr>";
+  }
+  $("tbl").innerHTML = html;
+};
+
+(function cancelTable(){
+  let html = "<tr><th>z</th><th>G value</th><th>e^-z</th><th>digits lost</th><th>actual rel err</th><th>verdict</th></tr>";
+  for (const z of [0.5, 2, 8, 20, 40]) {
+    const r = meijerG({m:1,n:0,a:[],b:[0],z});
+    const e = rel(r.value, Math.exp(-z));
+    html += "<tr><td>"+z+"</td><td>"+r.value.toExponential(6)+"</td><td>"+Math.exp(-z).toExponential(6)
+         +"</td><td>"+r.cancellation.toFixed(1)+"</td><td class='"+(e<1e-8?"ok":"bad")+"'>"+e.toExponential(1)
+         +"</td><td class='"+(r.reliable?"ok":"bad")+"'>"+(r.reliable?"usable":"NOT RELIABLE")+"</td></tr>";
+  }
+  $("cancel").innerHTML = html;
+})();
+
+$("ev").onclick = () => {
+  const nums = (s) => s.split(",").map((x)=>x.trim()).filter(Boolean).map(Number);
+  const spec = { m:+$("m").value, n:+$("n").value, a:nums($("a").value), b:nums($("b").value), z:+$("z").value };
+  const r = meijerG(spec);
+  const o = $("out");
+  if (!r.ok) { o.className = "verdict bad"; o.textContent = "REFUSED: " + r.reason; return; }
+  o.className = "verdict " + (r.reliable ? "ok" : "warn");
+  o.textContent = "G = " + r.value.toPrecision(15) + "   [" + r.digitsLeft.toFixed(1) + " digits left, "
+    + r.cancellation.toFixed(1) + " lost to cancellation, " + r.terms + " series terms]"
+    + (r.reliable ? "" : "   -- NOT RELIABLE: every digit above is cancellation noise.");
+};
+
+let _samples = null, _shapes = null;
+function drawSamples() {
+    const shapes = $("sh").value.split(",").map((x) => +x.trim()).filter((x) => !Number.isNaN(x));
+    const probs = shapeProblems(shapes);
+    if (probs.length) { $("ksout").className = "verdict bad"; $("ksout").textContent = "REFUSED: " + probs[0]; return null; }
+    const rng = mulberry32(+$("sd").value || 1);
+    const n = Math.max(200, Math.min(20000, +$("ns").value || 4000));
+    const s = []; for (let i = 0; i < n; i++) s.push(sampleProduct(shapes, rng));
+    _samples = s; _shapes = shapes;
+    return { s, shapes };
+}
+function report(res, shapes, label) {
+    const mean = _samples.reduce((p, q) => p + q, 0) / _samples.length;
+    const o = $("ksout");
+    o.className = "verdict " + (res.reject ? "bad" : "ok");
+    o.textContent = label + ": D=" + res.D.toFixed(5) + "  p=" + (res.pValue < 1e-4 ? res.pValue.toExponential(2) : res.pValue.toFixed(4))
+      + "  (critical D at 95% = " + res.critical95.toFixed(5) + ")   ->   " + (res.reject ? "REJECTED" : "not rejected")
+      + "\nMC mean " + mean.toFixed(4) + " vs exact " + exactMoment(shapes, 1).toFixed(4)
+      + "   |   " + res.evaluated + " points used, " + res.refused + " excluded as unreliable";
+}
+$("mc").onclick = () => { const d = drawSamples(); if (!d) return; report(ksTest(d.s, d.shapes), d.shapes, "graded against the TRUE law"); };
+$("sab").onclick = () => {
+    if (!_samples) { const d = drawSamples(); if (!d) return; }
+    const off = _shapes.map((a) => a * 1.08);
+    report(ksTest(_samples, off), _shapes, "the SAME samples graded against shapes 8% off");
+};
+
+// ---- ratios -------------------------------------------------------------------------------------------
+const rShapes = () => [+$("ra").value, +$("rb").value];
+$("rtab").onclick = () => {
+  const [a, b] = rShapes();
+  const probs = ratioShapeProblems(a, b);
+  if (probs.length) { $("rtable").innerHTML = "<tr><td class='bad'>REFUSED: " + probs[0] + "</td></tr>"; return; }
+  let html = "<tr><th>z</th><th>branch</th><th>G</th><th>elementary (beta-prime)</th><th>rel err</th><th>digits left</th></tr>";
+  for (const z of [0.05, 0.2, 0.5, 0.9, 0.99, 1, 1.01, 1.1, 2, 5, 20, 90]) {
+    const g = ratioPdfG(z, a, b), e = ratioPdfExact(z, a, b);
+    if (!g.ok) {
+      // A refusal near z=1 is the CONTENT of this table, not a gap in it. Showing the elementary value beside it
+      // is what makes the point: the instrument still works there, the G route simply cannot reach it.
+      html += "<tr><td>" + z + "</td><td colspan=2 class='warn'>REFUSED: " + g.reason.slice(0, 58) + "</td><td>"
+           + e.toPrecision(8) + "</td><td class='warn'>&mdash;</td><td>&mdash;</td></tr>";
+      continue;
+    }
+    const err = Math.abs(g.value - e) / Math.max(e, 1e-300);
+    const budget = Math.pow(10, g.cancellation) * 2.3e-16 * 40;
+    html += "<tr><td>" + z + "</td><td class='note'>" + g.branch + "</td><td>" + g.value.toPrecision(10) + "</td><td>"
+         + e.toPrecision(10) + "</td><td class='" + (err <= budget ? "ok" : "bad") + "'>" + err.toExponential(1)
+         + "</td><td>" + (16 - g.cancellation).toFixed(1) + "</td></tr>";
+  }
+  $("rtable").innerHTML = html;
+};
+
+let _rsamp = null, _rab = null;
+function rDraw() {
+  const [a, b] = rShapes();
+  const probs = ratioShapeProblems(a, b);
+  if (probs.length) { $("rksout").className = "verdict bad"; $("rksout").textContent = "REFUSED: " + probs[0]; return null; }
+  const rng = mulberry32(+$("rs").value || 1);
+  const n = Math.max(200, Math.min(20000, +$("rn").value || 4000));
+  const s = []; for (let i = 0; i < n; i++) s.push(sampleRatio(a, b, rng));
+  _rsamp = s; _rab = [a, b];
+  return s;
+}
+function rReport(res, label) {
+  const [a, b] = _rab;
+  const m = ratioMoment(a, b, 1);
+  const mean = _rsamp.reduce((p, q) => p + q, 0) / _rsamp.length;
+  const o = $("rksout");
+  o.className = "verdict " + (res.reject ? "bad" : "ok");
+  o.textContent = label + ": D=" + res.D.toFixed(5) + "  p=" + (res.pValue < 1e-4 ? res.pValue.toExponential(2) : res.pValue.toFixed(4))
+    + "  (critical " + res.critical95.toFixed(5) + ")  ->  " + (res.reject ? "REJECTED" : "not rejected")
+    + "\nMC mean " + mean.toFixed(4) + " vs exact " + (m.ok ? m.value.toFixed(4) : "REFUSED: " + m.reason);
+}
+$("rmc").onclick = () => { const s = rDraw(); if (!s) return; rReport(ksRatio(s, _rab[0], _rab[1]), "graded against the TRUE law"); };
+$("rsab1").onclick = () => { if (!_rsamp) { if (!rDraw()) return; } rReport(ksRatio(_rsamp, _rab[0] * 1.12, _rab[1]), "SAME samples, a 12% off"); };
+$("rsab2").onclick = () => { if (!_rsamp) { if (!rDraw()) return; } rReport(ksRatio(_rsamp, _rab[1], _rab[0]), "SAME samples, shapes SWAPPED"); };
+$("rtab").click();
+
+$("run").click();
+</script></body></html>

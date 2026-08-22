@@ -1,0 +1,330 @@
+<!doctype html>
+<!-- android-peer.html
+     v2922 - THE HUB. Everything the Android peer round is, on one page: what was registered (v2919), how the
+     phone votes (v2920), how its GPU auditions (v2921), and the front door that grades the ballot and returns
+     the verdict to the peer info pool (v2922). The live panel talks to /android/status and /android/verdict,
+     mounted in server.js by ai-bridge/installAndroidPeerBridge.mjs; without the bridge the page still works as
+     documentation and shows the two lines to paste by hand. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Android Peer</title>
+<style>
+  :root { --bg:#0a0e0c; --ink:#cfe9d8; --dim:#7fa78e; --line:#224a36; --go:#6fe39a; --warn:#ffd166; --err:#ff7a76; }
+  body { font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); color: var(--ink); margin: 0; padding: 18px; max-width: 980px; }
+  h1 { font-size: 19px; margin: 0 0 2px; } h2 { font-size: 15px; color: var(--go); border-bottom: 1px solid var(--line); padding-bottom: 4px; margin: 26px 0 10px; }
+  .sub { color: var(--dim); font-size: 12px; }
+  code, pre { background: #0f1712; border: 1px solid var(--line); border-radius: 5px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.45; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { text-align: left; padding: 5px 10px 5px 0; vertical-align: top; border-bottom: 1px solid #14251c; }
+  th { color: var(--dim); font-weight: normal; }
+  a { color: var(--go); } .dim { color: var(--dim); }
+  .CONFIRMED { color: var(--go); } .FALSIFIED { color: var(--err); } .AWAITING { color: var(--warn); } .EXCLUDED { color: var(--dim); }
+  button { font: inherit; background: #17402a; color: var(--ink); border: 1px solid #2c6a45; border-radius: 6px; padding: 9px 16px; cursor: pointer; }
+  button:disabled { opacity: .45; }
+  .pill { display:inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; margin-right: 6px; }
+  .ok { color: var(--go); border-color: #2c6a45; } .no { color: var(--dim); }
+  #door { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: #0d1410; }
+</style>
+</head>
+<body>
+<h1>&#129302; SweK Android Peer</h1>
+<div style="font-size:.85em;opacity:.75;margin:.3em 0 1em"><a href="/report.html">&#128202; ledger reports (human-eyes view)</a></div>
+<div class="sub">the phone as the fleet's next peer - assessed v2919, harnessed v2920, GPU-auditioned v2921, front-doored v2922.
+Every claim below was frozen <em>before</em> any device ran anything; this page exists so the phone can grade them, not confirm them.</div>
+
+<h2>what this is - the six items</h2>
+<table>
+  <tr><th>1</th><td><b>Termux path</b> - ai-bridge's 13 required deps are pure JS or WASM, zero native addons: <code>pkg install nodejs</code> + <code>npm install --omit=optional</code> has no gyp step to fail.</td></tr>
+  <tr><th>2</th><td><b>Cheapest real port test</b> - the roundhouse suite: pure Node, CPU-only, self-grading physics gates, zero node_modules needed. A green suite on bionic is a fourth libc for the strict core.</td></tr>
+  <tr><th>3</th><td><b>Second GPU vendor</b> - <a href="/magmap-android.html">magmap-android.html</a> runs the unchanged magmap WGSL on the phone's Adreno/Mali against a tolerance set from the emulated f32 floor in v2903, before any second vendor existed.</td></tr>
+  <tr><th>4</th><td><b>Auto-update</b> - refined from "unmodified" to <em>one symlink</em>: the updater scans <code>~/Downloads</code>, which stock Termux lacks; <code>ln -s ~/storage/downloads ~/Downloads</code> is the whole predicted fix.</td></tr>
+  <tr><th>5</th><td><b>Persistence</b> - the genuinely hard part. Termux:Boot + wake-lock + battery exemption predicted to survive Doze and <em>not</em> survive memory pressure; a real service means a nodejs-mobile wrapper app.</td></tr>
+  <tr><th>6</th><td><b>Won't port</b> - the KPop Listener (PowerShell + /tmp pipes), the Deno GPU Brain (glibc-only; proot fixes libc, loses GPU), the .bat launchers, and the optional ffmpeg/puppeteer heavies.</td></tr>
+</table>
+
+<p style="margin:.6em 0"><a href="/join.html">&#128225; join the fleet (remote peer, behind NAT) &rarr;</a> <span style="font-size:.85em;opacity:.7">hand this link to anyone; the page fills in the lighthouse URL itself</span></p>
+<h2>install - on the phone (Termux)</h2>
+
+<p style="max-width:64ch;line-height:1.55"><strong>Get Termux from F-Droid, not the Play Store</strong> - the
+Play Store build is abandoned and its package repositories fail. For <code>termux-wake-lock</code> you need the
+<strong>Termux:API app</strong> as well as the <code>termux-api</code> package; the package alone is only the
+client and the commands silently do nothing. For start-on-boot, add <strong>Termux:Boot</strong>.</p>
+
+<p style="max-width:64ch;line-height:1.55">Download <code>SweK_Engine_vNNNN.zip</code> in Chrome first, then
+paste this whole block into Termux. Pasting multiple lines runs each as it arrives. It picks the
+<strong>highest version number</strong> if you have several zips (including Chrome's <code>(1)</code>
+duplicates), <strong>waits for the storage permission dialog</strong> instead of racing it, and stops at the
+first real failure with a plain reason:</p>
+
+<pre id="oneblock">pkg update -y &amp;&amp; pkg upgrade -y &amp;&amp; pkg install -y nodejs unzip termux-api &amp;&amp; \
+{ [ -d "$HOME/storage/downloads" ] || { echo "&gt;&gt; Tap ALLOW on the storage prompt..."; termux-setup-storage; \
+  n=0; while [ ! -d "$HOME/storage/downloads" ] &amp;&amp; [ $n -lt 60 ]; do sleep 1; n=$((n+1)); done; }; } &amp;&amp; \
+{ [ -d "$HOME/storage/downloads" ] || { echo "!! storage still not granted - re-run termux-setup-storage and tap ALLOW"; false; }; } &amp;&amp; \
+ZIP="$(ls -1 "$HOME/storage/downloads"/SweK_Engine_v*.zip 2&gt;/dev/null | sed 's/.*SweK_Engine_v\([0-9]*\).*/\1 &amp;/' | sort -rn | head -1 | cut -d' ' -f2-)" &amp;&amp; \
+{ [ -n "$ZIP" ] || { echo "!! no SweK_Engine_vNNNN.zip in Downloads - download it in Chrome first"; false; }; } &amp;&amp; \
+echo "&gt;&gt; using: $ZIP" &amp;&amp; cd "$HOME" &amp;&amp; unzip -oq "$ZIP" &amp;&amp; \
+DIR="$(ls -1d "$HOME"/SweK_Engine_v*/ 2&gt;/dev/null | sed 's/.*SweK_Engine_v\([0-9]*\).*/\1 &amp;/' | sort -rn | head -1 | cut -d' ' -f2-)" &amp;&amp; \
+cd "${DIR}WebGLEngine" &amp;&amp; echo "" &amp;&amp; echo "&gt;&gt; READY in: $(pwd)" &amp;&amp; \
+echo "&gt;&gt; next: bash tools/roundhouse/termux_peer.sh   (15-25 min)"</pre>
+
+<p style="max-width:64ch;line-height:1.55">It deliberately does <strong>not</strong> launch the suite - that is
+a 15-25 minute run and should be a decision, not a side effect of pasting an installer.</p>
+
+<details style="margin:1em 0"><summary style="cursor:pointer"><strong>if <code>unzip</code> says "cannot find or open ... SweK_Engine_v*.zip"</strong></summary>
+<p style="max-width:64ch;line-height:1.55">That exact error means the shell glob matched <em>nothing</em>, so the
+literal <code>*</code> was handed to unzip. The zip is not where the command looked. Diagnose with:</p>
+<pre>ls ~/storage/           # is 'downloads' even there? if not, permission was never granted
+ls ~/storage/downloads/ | grep -i swek</pre>
+<ol style="max-width:64ch;line-height:1.55">
+<li><strong>Several zips downloaded.</strong> <code>unzip A.zip B.zip</code> does not mean "unzip both" - it means
+<em>extract the member named B.zip out of A.zip</em>, so a multi-match glob extracts nothing. Name the exact
+version instead. (The block above does this for you.)</li>
+<li><strong>Chrome renamed it</strong> to <code>SweK_Engine_v2951 (1).zip</code> - the space and parentheses break an
+unquoted glob. Quote it: <code>unzip -o "$HOME/storage/downloads/SweK_Engine_v2951 (1).zip"</code>.</li>
+<li><strong>Storage permission never granted</strong> - <code>~/storage/downloads</code> does not exist at all. Re-run
+<code>termux-setup-storage</code> and tap ALLOW. Android sometimes revokes it silently after an update.</li>
+<li><strong>unzip not installed</strong> - the error is <code>unzip: command not found</code>, easy to misread as a path
+problem. <code>pkg install unzip -y</code>.</li>
+</ol></details>
+
+<details style="margin:1em 0"><summary style="cursor:pointer">two things NOT to add to that block, and why</summary>
+<p style="max-width:64ch;line-height:1.55">An external assistant suggested chaining
+<code>termux-setup-storage &amp;&amp; ln -s ~/storage/downloads ~/Downloads &amp;&amp; unzip ... &amp;&amp; bash termux_peer.sh</code>.
+Three problems:</p>
+<ul style="max-width:64ch;line-height:1.55">
+<li><strong>It races the permission dialog.</strong> <code>termux-setup-storage</code> returns immediately; the Android
+prompt is answered asynchronously. The next command runs before you have tapped ALLOW, so the symlink and the
+unzip both fail on a directory that does not exist yet. The block above <em>waits</em> for the directory instead.</li>
+<li><strong>Creating the symlink by hand contaminates claim 4.</strong>
+<code>autoUpdateSymlinksRequired</code> is a prediction the phone is supposed to <em>measure</em>. The probe records
+what it <em>found</em>; <code>termux_peer.sh</code> performs the fix separately. Making the symlink yourself before the
+probe runs means the experiment can no longer tell you whether it was required - it just confirms what you did.</li>
+<li><strong>It auto-launches the 15-25 minute suite</strong> as a side effect of an install paste.</li>
+</ul></details>
+
+<h2>operate - one script, one page, one command</h2>
+<pre># 1. THE BALLOT (phone, in WebGLEngine/):
+bash tools/roundhouse/termux_peer.sh
+#    - records the real `npm install --omit=optional` exit code (red is recorded red)
+#    - makes the one predicted symlink if its precondition holds
+#    - runs all roundhouse selfchecks under the shared budget (~15-25 min on a phone)
+#    - drops android-phone.json into shared Downloads
+
+# 2. THE GPU AUDITION (phone, Chrome): open  http://&lt;this-box&gt;:&lt;port&gt;/magmap-android.html
+#    tap run, then "download magmap-report.json" (also lands in Downloads)
+
+# 3. THE VERDICT (this box): press the button below, or equivalently
+node tools/roundhouse/androidVerdict.mjs tools/roundhouse/android-reference.json \
+     android-phone.json magmap-report.json</pre>
+<div class="dim">The ballot and the report travel home through Downloads - the same directory peerFilesBridge grabs from and the
+auto-update claim certifies. The road is part of what is being tested.</div>
+
+<h2>what to expect</h2>
+<table>
+  <tr><th>claim (frozen v2919)</th><th>predicted</th><th>graded by</th></tr>
+  <tr><td>npmInstallOmitOptionalSucceeds</td><td class="CONFIRMED">true</td><td>the install's actual exit code, recorded by termux_peer.sh</td></tr>
+  <tr><td>roundhouseSelfchecksPassOnBionic</td><td class="CONFIRMED">true</td><td>the suite vs the reference; slow is excluded, only disagreement falsifies</td></tr>
+  <tr><td>magmapPassesOnMobileGpuAtRegisteredTol</td><td class="CONFIRMED">true</td><td>full-grid worst error vs MAGMAP_TOL=1e-5; the tolerance does not move</td></tr>
+  <tr><td>autoUpdateSymlinksRequired</td><td class="AWAITING">exactly 1</td><td>the ~/Downloads probe - falsifiable in both directions, including "zero were needed"</td></tr>
+  <tr><td>survivesDozeWithBootWakeLock</td><td class="CONFIRMED">true</td><td class="AWAITING">longitudinal - an overnight uptime log, not a run</td></tr>
+  <tr><td>survivesMemoryPressure</td><td class="FALSIFIED">false</td><td class="AWAITING">longitudinal - the OS getting hungry while a log is kept</td></tr>
+  <tr><td>gpuBrainRunsUnderTermux</td><td class="FALSIFIED">false</td><td>falsified the day a Deno brain heartbeats from bionic</td></tr>
+  <tr><td>kpopListenerRunsUnderTermux</td><td class="FALSIFIED">false</td><td>same shape: a PowerShell listener on Termux would falsify it</td></tr>
+</table>
+<div class="dim">A red install, a failing gate, or an over-tolerance GPU is a <em>finding</em>, not an embarrassment - the registration
+exists so the phone can disagree with it on the record.</div>
+
+<h2>find &amp; invite peers on this network</h2>
+<div id="sweep" style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#0d1410;">
+  <div style="margin-bottom:8px">
+    <button id="sweepBtn">sweep the LAN for Android candidates</button>
+    <label style="font-size:12px;margin-left:8px;color:var(--dim)"><input type="checkbox" id="probeChk"> also probe port 5555 (sends packets)</label>
+  </div>
+  <div class="dim" style="font-size:12px;margin-bottom:8px">Detection is passive: tier A is phones that loaded a page here and said "Android" in their user-agent;
+    tier B reads this box's ARP cache (nothing sent). The probe is opt-in because it is the only part that sends anything.</div>
+  <table id="candTable"><tr><th>device</th><th>why it's a candidate</th><th></th></tr></table>
+  <div id="candEmpty" class="dim" style="font-size:12px">no sweep run yet.</div>
+</div>
+<div id="inviteBox" style="border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#0d1410;margin-top:10px;display:none">
+  <div id="inviteFor" style="margin-bottom:6px"></div>
+  <div class="dim" style="font-size:12px;margin-bottom:8px">This mints a one-time, expiring link. It installs nothing by itself &mdash; the phone's owner opens it and chooses. Confirm to create it.</div>
+  <button id="inviteConfirm">confirm &amp; mint invite</button>
+  <button id="inviteCancel" style="background:#231010;border-color:#5a2424;color:var(--err)">cancel</button>
+  <div id="inviteResult" style="display:none;margin-top:10px">
+    <div class="dim" style="font-size:12px">hand this link to the phone's owner (LAN address, or your tunnel URL for someone off-site):</div>
+    <pre id="inviteUrl"></pre>
+  </div>
+</div>
+<div class="dim" style="font-size:12px;margin-top:8px"><b>Remote volunteers:</b> the invite link works through a Cloudflare tunnel exactly as it does on the LAN &mdash;
+give an off-site tester (a cousin, say) your tunnel URL and the same link, and their phone reaches the hub, downloads the peer, and returns its ballot the same way. The APK push (<code>adb</code>) is LAN-only and needs the phone's owner to have enabled wireless debugging and approved this host first; the download path needs no such thing.</div>
+
+<h2>front door - grade the ballot from here</h2>
+<div id="door">
+  <div id="doorStatus" class="dim">checking /android/status ...</div>
+  <div style="margin:10px 0"><button id="gradeBtn" disabled>grade the ballot now</button>
+      <span class="dim">POST /android/verdict - loads the newest android-phone.json (+ magmap-report.json if present), grades, and returns the verdict to the pool</span></div>
+  <pre id="verdictOut" style="display:none"></pre>
+  <div id="notInstalled" style="display:none">
+    <div class="AWAITING">front door not mounted - the bridge answers 404/network-fail. Install it:</div>
+    <pre>node ai-bridge/installAndroidPeerBridge.mjs</pre>
+    <div class="dim">or paste by hand: after the <code>buildName</code> require in ai-bridge/server.js:</div>
+    <pre>const androidPeerBridge = require("./androidPeerBridge.js");   /* v2922 android-peer (install) */</pre>
+    <div class="dim">and before the <code>/self/zip</code> route:</div>
+    <pre>if (androidPeerBridge.handle(req, res)) return;   /* v2922 android-peer (install) */</pre>
+  </div>
+</div>
+
+<h2>the peer info pool - where the verdict goes</h2>
+<div>Grading writes the verdict to <b>two existing roads</b>, no new one:</div>
+<table>
+  <tr><td><code>tools/roundhouse/android-verdict.json</code></td><td>served by this bridge at <a href="/android/verdict">/android/verdict</a> - any peer that can reach this box can read the Android peer's standing.</td></tr>
+  <tr><td><code>~/Downloads/swek-android-verdict.json</code></td><td>the peerFilesBridge road (v1591 grab/send) - the verdict travels between peers the same way builds and ballots do.</td></tr>
+</table>
+
+<h2>related pages &amp; modules</h2>
+<table>
+  <tr><td><a href="/server.html">server.html</a></td><td>server mode - the &#129302; Android Peer button in its header lands here</td></tr>
+  <tr><td><a href="/magmap-android.html">magmap-android.html</a></td><td>item 3's experiment: the WGSL kernel on this device's GPU</td></tr>
+  <tr><td><a href="/ios-peer.html">ios-peer.html</a></td><td>the iPhone/iPad peer: portable physics subset in-page + the Apple GPU as a first-class third vendor</td></tr>
+  <tr><td><code>tools/roundhouse/androidPeer.mjs</code></td><td>v2919 - the six items + the frozen registration (gate: androidPeer-selfcheck.mjs, 15 checks)</td></tr>
+  <tr><td><code>tools/roundhouse/androidRunner.mjs</code> / <code>termux_peer.sh</code></td><td>v2920 - the ballot: suite runner, host/libc fingerprint, Termux probes</td></tr>
+  <tr><td><code>tools/roundhouse/androidVerdict.mjs</code></td><td>v2920/21 - the grader: reference defines the graded set, slow is not wrong, right host or no verdict (gate: 12 checks)</td></tr>
+  <tr><td><code>tools/roundhouse/magmapGpu.mjs</code> / <code>magmapReport.mjs</code></td><td>v2903/21 - the kernel and the one report schema both page and grader import (gate: 14 checks)</td></tr>
+  <tr><td><code>ai-bridge/androidPeerBridge.js</code></td><td>v2922 - this front door (gate: androidPeerBridge-selfcheck.mjs)</td></tr>
+  <tr><td><code>tools/roundhouse/android-reference.json</code></td><td>the glibc reference transcript the phone is graded against</td></tr>
+</table>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const pill = (on, label) => `<span class="pill ${on ? "ok" : "no"}">${on ? "&#10003;" : "&#183;"} ${label}</span>`;
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+let pendingCandidate = null;
+$("sweepBtn").onclick = async () => {
+  $("sweepBtn").disabled = true; $("candEmpty").textContent = "sweeping...";
+  try {
+    const resp = await fetch("/android/candidates" + ($("probeChk").checked ? "?probe=1" : ""));
+    if (resp.status === 403) {
+      const w = document.getElementById("scanScope") || (() => { const d = document.createElement("div"); d.id = "scanScope"; d.style = "font-size:12px;margin-bottom:8px;padding:6px 8px;border-radius:5px;background:#231d10;border:1px solid #5a4a1f;color:var(--warn)"; $("sweep").insertBefore(d, $("candTable")); return d; })();
+      w.innerHTML = "&#128274; sweeping the LAN is <b>operator-only</b> and not available over the tunnel &mdash; it would scan the host's network, not yours. Ask the host operator to sweep and hand you an invite link.";
+      $("candEmpty").textContent = ""; $("sweepBtn").disabled = false; return;
+    }
+    const r = await resp.json();
+    if (r.viaTunnel) {
+      $("candEmpty").innerHTML = "";
+      const warn = document.getElementById("scanScope") || (() => { const d = document.createElement("div"); d.id = "scanScope"; d.style = "font-size:12px;margin-bottom:8px;padding:6px 8px;border-radius:5px;background:#231d10;border:1px solid #5a4a1f;color:var(--warn)"; $("sweep").insertBefore(d, $("candTable")); return d; })();
+      warn.innerHTML = "&#9888; viewing over the tunnel: this scans the <b>host box's</b> network, not yours. Inviting a candidate still works; the list is the host's LAN.";
+    } else { const w = document.getElementById("scanScope"); if (w) w.remove(); }
+    const t = $("candTable");
+    t.innerHTML = '<tr><th>device</th><th>why it\'s a candidate</th><th></th></tr>';
+    if (!r.candidates || !r.candidates.length) { $("candEmpty").textContent = "no Android candidates found. " + (r.note || ""); }
+    else {
+      $("candEmpty").textContent = r.note || "";
+      for (const c of r.candidates) {
+        const tr = document.createElement("tr");
+        const label = (c.vendor ? c.vendor + " " : "") + c.ip + (c.remote ? " (remote)" : "");
+        const conf = c.confidence === "self-identified" ? '<span class="CONFIRMED">' + c.confidence + "</span>" : '<span class="AWAITING">' + esc(c.confidence) + "</span>";
+        tr.innerHTML = `<td>${esc(label)}<br><span class="dim" style="font-size:11px">${conf}${c.adbReachable ? ' &middot; <span class="CONFIRMED">adb port open</span>' : ""}</span></td>` +
+          `<td class="dim" style="font-size:12px">${(c.why || []).map(esc).join("<br>")}</td>` +
+          `<td><button data-ip="${esc(c.ip)}" data-label="${esc(label)}">invite</button></td>`;
+        tr.querySelector("button").onclick = () => openInvite(c.ip, label);
+        t.appendChild(tr);
+      }
+    }
+  } catch (e) { $("candEmpty").textContent = "sweep failed: " + e.message; }
+  finally { $("sweepBtn").disabled = false; }
+};
+function openInvite(ip, label) {
+  pendingCandidate = { ip, label };
+  $("inviteFor").innerHTML = "invite <b>" + esc(label) + "</b> &mdash; a pre-filled offer this device's owner must accept on their phone.";
+  $("inviteBox").style.display = "block"; $("inviteResult").style.display = "none";
+  $("inviteBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("inviteCancel").onclick = () => { $("inviteBox").style.display = "none"; pendingCandidate = null; };
+$("inviteConfirm").onclick = async () => {
+  if (!pendingCandidate) return;
+  $("inviteConfirm").disabled = true;
+  try {
+    const r = await (await fetch("/android/invite", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true, ip: pendingCandidate.ip, note: pendingCandidate.label }) })).json();
+    if (r.ok) { $("inviteResult").style.display = "block"; $("inviteUrl").textContent = r.url; }
+    else $("inviteUrl").textContent = "could not mint: " + r.error;
+  } finally { $("inviteConfirm").disabled = false; }
+};
+
+async function refresh() {
+  try {
+    const s = await (await fetch("/android/status")).json();
+    if (!s || !s.ok) throw new Error("bad status");
+    $("doorStatus").innerHTML =
+      pill(s.reference.present, "reference " + (s.reference.present ? s.reference.checks + " checks" : "missing")) +
+      pill(s.phone.present, "phone ballot" + (s.phone.present && s.phone.host ? " (" + (s.phone.host.libc || "?") + ")" : "")) +
+      pill(s.magmap.present, "magmap report" + (s.magmap.present && s.magmap.adapter ? " (" + (s.magmap.adapter.vendor || "?") + ")" : "")) +
+      pill(s.lastVerdict.present, "last verdict" + (s.lastVerdict.present ? " " + s.lastVerdict.at : ""));
+    $("gradeBtn").disabled = !(s.reference.present && s.phone.present);
+    if (s.reference.present && !s.phone.present)
+      $("doorStatus").innerHTML += `<div class="dim" style="margin-top:6px">waiting for android-phone.json in Downloads - run termux_peer.sh on the phone</div>`;
+    $("notInstalled").style.display = "none";
+  } catch (e) {
+    $("doorStatus").innerHTML = "";
+    $("notInstalled").style.display = "block";
+    $("gradeBtn").disabled = true;
+  }
+}
+$("gradeBtn").onclick = async () => {
+  $("gradeBtn").disabled = true;
+  try {
+    const r = await (await fetch("/android/verdict", { method: "POST" })).json();
+    const out = $("verdictOut"); out.style.display = "block";
+    if (!r.ok) { out.textContent = "not graded: " + r.error; return; }
+    out.innerHTML = r.verdict.lines.map((ln) => {
+      const m = ln.match(/\b(CONFIRMED|FALSIFIED|EXCLUDED|AWAITING)\b/);
+      return m ? ln.replace(m[1], `<span class="${m[1]}">${m[1]}</span>`) : ln;
+    }).join("\n") + `\n\nreturned to the pool: ${r.wrote.join("  +  ")}`;
+  } finally { $("gradeBtn").disabled = false; refresh(); }
+};
+refresh(); setInterval(refresh, 15000);
+</script>
+
+<h2>move files - copyparty on the phone</h2>
+<p class="dim">This page could run the physics subset and <b>not move a single file</b>. copyparty is a one-file
+Python server that runs in Termux and speaks http, WebDAV and FTP, with resumable uploads and downloads.</p>
+<p class="dim"><b>SweK does not start it and does not install it for you.</b> It is registered in Auto-Install
+(v3166) with <code>autoRun</code> deliberately OFF: a file server that starts itself is a decision about what is
+exposed and to whom, and that is yours to make, not a registry's.</p>
+<div id="cpBox" style="border:1px solid #1e4a5a;border-radius:6px;padding:8px;margin:8px 0">
+  <button id="cpCheck">check port &amp; install</button>
+  <pre id="cpOut" style="white-space:pre-wrap;margin:6px 0 0;font-size:12px">not checked yet</pre>
+</div>
+<p class="dim"><b>The port is 3923 by default</b> - copyparty's own, and it collides with nothing SweK claims
+(8787 the engine, 8080 spaceprojectsim). <b>There is no auto-allocator, and that is deliberate:</b> the tree's
+<code>freePort()</code> is a KILL - it frees a port by terminating whatever holds it - so a collision here is
+REPORTED for you to resolve, never resolved by force. A port that silently drifted would hand you a URL that
+changes between sessions.</p>
+<p class="dim"><b>Read this before serving read-write.</b> copyparty with no accounts gives everyone on the
+network read/write access to the folder it serves - its own README says so. The command the checker prints for
+iOS is <code>-v .::r</code>, read-only, which is the safer default for a phone. It also carries real CVEs and
+publishes advisories, so a copy left running is a thing to keep updated rather than forget.</p>
+<script>
+// v3169 -- THE CHECKER REPORTS, IT DOES NOT ACT. Three facts on their own evidence (v3040's law from the
+// tunnel checkbox): installed, port free, and who holds it are separate questions with separate answers, and
+// collapsing them into "ready / not ready" is how a control comes to lie about the thing it controls.
+document.getElementById("cpCheck").addEventListener("click", async () => {
+  const out = document.getElementById("cpOut");
+  out.textContent = "checking...";
+  try {
+    const s = await fetch("/economy/copyparty").then((r) => r.json());
+    out.textContent =
+      "installed on THIS box : " + s.installed + (s.installed ? "" : "   <- pip install copyparty, or use Auto-Install") +
+      "\nport " + s.port + " free      : " + s.portFree + (s.portFree ? "" : "   <- held by " + s.portHeldBy) +
+      "\n\nrun it ON THE PHONE, not here:\n  " + s.termux +
+      "\n\nread-only (safer):\n  " + s.aShell +
+      "\n\n" + s.warning;
+  } catch (e) { out.textContent = "FAILED: " + ((e && e.message) || e); }
+});
+</script>
+</body>
+</html>

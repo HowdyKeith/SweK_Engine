@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Ship</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 880px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 12px 14px; margin-bottom: 13px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 6px 13px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  .danger { border-color: #8f6a4c; color: #f0d2b6; }
+  input { background: #0a1210; color: #cfe9d8; border: 1px solid #2c463a; font: inherit; padding: 4px 7px; }
+  label { color: #6f8a7c; margin-right: 8px; }
+  .pass { color: #7fe0a4; } .fail { color: #e0a0a0; } .dim { color: #6f8a7c; } .warn { color: #e0c58a; }
+  pre { white-space: pre-wrap; color: #8fb3a0; margin: 8px 0 0; max-height: 420px; overflow: auto; background: #0a1210; padding: 9px; border: 1px solid #1a2a22; }
+  table td { padding: 1px 12px 1px 0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Ship</h1>
+  <div class="sub">Drives <span class="dim">tools/ship/ship.mjs</span> &mdash; the whole ritual, one command, one
+    exit code. This page does not reimplement it; reimplementing is the hole that script exists to close.</div>
+
+  <div class="card">
+    <table id="state"><tr><td class="dim">loading...</td></tr></table>
+  </div>
+
+  <div class="card">
+    <div><label>version <input id="version" size="9"></label>
+         <label>markers <input id="markers" size="34" placeholder="e.g. shipBridge,ship.html"></label></div>
+    <div style="margin-top:10px">
+      <button id="bDry" class="primary">Dry run</button>
+      <span class="dim">reads and verifies &mdash; safe to click</span>
+    </div>
+    <div style="margin-top:10px">
+      <label>confirm <input id="confirm" size="9" placeholder="type version"></label>
+      <button id="bShip" class="danger">Ship for real</button>
+      <span class="dim">bumps markers, rewrites the changelog, renames the folder, publishes a zip</span>
+    </div>
+  </div>
+
+  <div class="card" id="outCard" style="display:none">
+    <div id="outHead"></div>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+let busy = false;
+
+async function load() {
+  const s = await (await fetch("/ship/status")).json();
+  if (!s.ok) { $("state").innerHTML = '<tr><td class="fail">bridge unreachable</td></tr>'; return; }
+  const m = s.markers;
+  $("state").innerHTML = `
+    <tr><td class="dim">ENGINE_VERSION</td><td>${esc(m.engine || "?")}</td></tr>
+    <tr><td class="dim">BRAIN_BUILD</td><td>${esc(m.brain || "?")}</td></tr>
+    <tr><td class="dim">markers agree</td><td class="${m.agree ? "pass" : "fail"}">${m.agree ? "yes" : "NO"}</td></tr>
+    <tr><td class="dim">next version</td><td>${esc(s.suggestedVersion || "?")}</td></tr>`
+    + (s.note ? `<tr><td colspan="2" class="warn">${esc(s.note)}</td></tr>` : "");
+  if (!$("version").value) $("version").value = s.suggestedVersion || "";
+}
+
+function setBusy(on, what) {
+  busy = on;
+  $("bDry").disabled = on; $("bShip").disabled = on;
+  if (on) { $("outCard").style.display = "block"; $("outHead").innerHTML = `<span class="dim">${what} running...</span>`; $("out").textContent = ""; }
+}
+
+async function go(real) {
+  if (busy) return;
+  const v = $("version").value.trim(), mk = $("markers").value.trim();
+  const q = new URLSearchParams({ version: v, markers: mk });
+  if (real) q.set("confirm", $("confirm").value.trim());
+  setBusy(true, real ? "SHIP" : "Dry run");
+  let j;
+  try { j = await (await fetch("/ship/" + (real ? "run" : "dryrun") + "?" + q)).json(); }
+  catch (e) { j = { ok: false, message: "request failed: " + e.message }; }
+  setBusy(false);
+  const head = j.ok
+    ? `<span class="pass">${real ? "SHIPPED" : "DRY RUN PASSED"}</span> <span class="dim">${v} in ${((j.ms||0)/1000).toFixed(1)}s</span>`
+    : `<span class="fail">${j.error === "confirm-required" ? "CONFIRMATION REQUIRED" : (real ? "SHIP REFUSED" : "DRY RUN FAILED")}</span>
+       <span class="dim">${esc(j.message || ("exit " + j.exitCode))}</span>`;
+  $("outHead").innerHTML = head;
+  $("out").textContent = j.output || j.message || "(no output)";
+  if (j.ok && real) load();
+}
+
+$("bDry").onclick = () => go(false);
+$("bShip").onclick = () => go(true);
+load();
+</script>
+</body>
+</html>

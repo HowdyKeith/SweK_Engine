@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Box3D demo</title>
+<style>
+  html,body { margin:0; background:#070b12; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; }
+  #wrap { padding:10px; }
+  #hud { margin:0 0 8px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  #mode { padding:2px 8px; border-radius:5px; border:1px solid #2a6a4a; background:#10261c; color:#9fe6c0; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  canvas { display:block; background:#0a0f18; border:1px solid #1e2a44; border-radius:8px; width:900px; height:560px; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 1200px; height: auto; display: block; }
+  a { color:#5ad6ff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <b style="color:#2fd6b0">&#129521; Box3D destruction</b>
+    <span id="mode" class="fallback">detecting&hellip;</span>
+    <span id="stat" style="color:#7d8fa8"></span>
+    <a href="/box3d-info.html">info / build &#8599;</a>
+  </div>
+  <canvas id="c" width="900" height="560"></canvas>
+</div>
+<script type="module">
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { createKaijuBox3DScene } from "/physics/kaijuBox3dScene.js";
+
+// A tiny gravity world matching the box3d world-handle interface, so the page ALWAYS renders (never a black
+// screen for render QA) even when the WASM is not built. When box3d is built, we use the real thing instead.
+function fallbackWorld(gravity = [0, -20, 0]) {
+  const bs = [];
+  const g = (i) => bs[i];
+  return {
+    addBox({ type, pos }) { bs.push({ kind: type, pos: pos.slice(), vel: [0, 0, 0], ang: 0, avel: 0 }); return bs.length - 1; },
+    step(dt) { for (const b of bs) { if (b.kind !== "dynamic") continue; b.vel[1] += gravity[1] * dt; b.pos[0] += b.vel[0] * dt; b.pos[1] += b.vel[1] * dt; b.ang += b.avel * dt; if (b.pos[1] <= 0) { b.pos[1] = 0; b.vel[1] = 0; b.vel[0] *= 0.6; b.avel *= 0.5; } } },
+    bodyCount() { return bs.length; },
+    readTransforms() { const a = new Float32Array(bs.length * 7); for (let i = 0; i < bs.length; i++) { const o = i * 7, b = bs[i]; a[o] = b.pos[0]; a[o + 1] = b.pos[1]; a[o + 2] = b.pos[2]; const h = b.ang / 2; a[o + 5] = Math.sin(h); a[o + 6] = Math.cos(h); } return a; },
+    stateHash() { let h = 2166136261 >>> 0; for (const b of bs) for (const v of [b.pos[0], b.pos[1], b.ang]) { h = (h ^ ((Math.round(v * 100)) >>> 0)) >>> 0; h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; },
+    impulse(i, v) { const b = g(i); b.vel[0] += v[0] * 0.12; b.vel[1] += v[1] * 0.12; b.avel += (v[0] > 0 ? -1 : 1) * 2.2; },
+    angularImpulse(i, v) { g(i).avel += (v[1] || 1) * 0.6; },
+    setVelocity(i, v) { const b = g(i); b.vel[0] = v[0]; b.vel[1] = v[1]; b.avel = (v[0] > 0 ? -1 : 1) * 3; },
+    setTransform(i, p) { g(i).pos = p.slice(); },
+    setType(i, t) { g(i).kind = t; },
+  };
+}
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+// side view: world x in [-42,42] -> canvas x; world y (up) in [0,34] -> canvas y (inverted). ground at bottom.
+const X0 = -42, X1 = 42, Y1 = 34, GROUND_PX = H - 40;
+const sx = W / (X1 - X0), sy = (GROUND_PX - 20) / Y1;
+const toX = (wx) => (wx - X0) * sx;
+const toY = (wy) => GROUND_PX - wy * sy;
+const zAngle = (q) => Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+
+function rrect(px, py, w, h, ang, fill) {
+  ctx.save(); ctx.translate(px, py); ctx.rotate(-ang); ctx.fillStyle = fill;
+  ctx.fillRect(-w / 2, -h, w, h); ctx.restore();
+}
+
+let scene = null, blds = [], next = 0, lastTopple = 0, resetAt = 0, ready = false;
+function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, -20, 0] }) : fallbackWorld([0, -20, 0]); }
+
+function buildScene() {
+  scene = createKaijuBox3DScene(makeWorld(), { groundHalf: 200, kaijuStart: [-60, 8, 0] });
+  blds = [];
+  for (let i = 0; i < 9; i++) { const b = { x: -34 + i * 8, z: 0, w: 4.5, d: 4, h: 8 + (i % 4) * 3 }; b.toppled = false; blds.push(b); }
+  scene.addBuildings(blds);
+  next = 0; lastTopple = 0; resetAt = 0;
+}
+
+function sizeFor(e) {
+  if (e.kind === "building" && e.ref) return [e.ref.w || 4.5, e.ref.h || 10];
+  if (e.kind === "prop") return [2.2, 1.4];
+  return [1.3, 1.3];
+}
+function colorFor(e) { return e.kind === "building" ? "#6b7fa8" : e.kind === "prop" ? "#79d68a" : "#e08a3a"; }
+
+function frame(t) {
+  // scripted demolition: topple the next building every ~1.1s, scatter debris, occasionally hurl a prop.
+  if (scene) {
+    if (!lastTopple) lastTopple = t;
+    if (next < blds.length && t - lastTopple > 1100) {
+      const b = blds[next++]; b.toppled = true; lastTopple = t;
+      scene.topple(b, [34, 6, 0]);
+      scene.spawnDebris([b.x + b.w / 2, 1.5, 0], 5, { spread: 7 });
+      if (next % 3 === 0) scene.throwProp([b.x, b.h, 0], [24, 8, 0], [0, 7, 0]);
+    }
+    if (next >= blds.length && !resetAt) resetAt = t + 3500;   // let the dust settle, then restart
+    if (resetAt && t > resetAt) buildScene();
+    scene.step(1 / 60, 4);
+  }
+
+  ctx.clearRect(0, 0, W, H);
+  // ground
+  ctx.fillStyle = "#12203a"; ctx.fillRect(0, GROUND_PX, W, H - GROUND_PX);
+  ctx.strokeStyle = "#28406a"; ctx.beginPath(); ctx.moveTo(0, GROUND_PX + 0.5); ctx.lineTo(W, GROUND_PX + 0.5); ctx.stroke();
+  // standing buildings (drawn from their footprint, as the kaiju renderer would)
+  for (const b of blds) if (!b.toppled) rrect(toX(b.x + b.w / 2), toY(0), b.w * sx, b.h * sy, 0, "#3f5273");
+  // dynamic bodies from box3d (toppled buildings + debris + props)
+  if (scene) for (const e of scene.activeBodies()) {
+    const [w, h] = sizeFor(e); rrect(toX(e.pos[0]), toY(Math.max(0, e.pos[1])), w * sx, h * sy, zAngle(e.quat), colorFor(e));
+  }
+  document.getElementById("stat").textContent = scene ? `standing ${scene.standingCount()} · active ${scene.activeCount()} · hash ${scene.stateHash().toString(16)}` : "";
+  requestAnimationFrame(frame);
+}
+
+(async () => {
+  const modeEl = document.getElementById("mode");
+  let st = { ready: false };
+  try { st = await box3d.init(); } catch (e) { st = { ready: false, reason: e && e.message }; }
+  ready = !!st.ready;
+  if (ready) { modeEl.textContent = "box3d WASM"; modeEl.className = ""; }
+  else { modeEl.textContent = "JS fallback (build the WASM on the Box3D page)"; modeEl.className = "fallback"; }
+  buildScene();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

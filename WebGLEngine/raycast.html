@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raycast Local LLM</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#ff6363; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:860px; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; display:flex; flex-direction:column; gap:8px; }
+  .card h2 { margin:0; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { padding:7px 13px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  button.run { border-color:#3a6a4a; background:#153a25; color:#9fe88f; }
+  button:disabled { opacity:.45; cursor:default; }
+  .kv { display:grid; grid-template-columns:170px 1fr; gap:4px 12px; font-size:12px; }
+  .kv b { color:var(--dim); font-weight:400; }
+  .good { color:#9fe88f; } .bad { color:#f88; } .warn { color:#eac06a; }
+  pre { margin:0; padding:8px; background:#070a0f; border:1px solid var(--line); border-radius:6px; font-size:11px;
+        max-height:260px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<header><h1>&#128640; Raycast Local LLM</h1><span class="hint">Mac launcher + free on-device AI, wired to the engine's Ollama.</span></header>
+<main>
+  <div class="hint">
+    Raycast's local-models feature (v1.99+) runs open-source LLMs through Ollama with <b>no Raycast Pro subscription</b> —
+    only their cloud models are paid. On Intel Macs inference is CPU-only (no Metal), so small models
+    (3B&ndash;7B) are the sweet spot: the setup row pulls <b>llama3.2:3b</b>. Apple Silicon can go bigger.
+  </div>
+
+  <div class="card">
+    <h2>Detect</h2>
+    <div class="kv">
+      <b>This engine box</b><span id="kPlat">checking&hellip;</span>
+      <b>Raycast.app</b><span id="kRay">&hellip;</span>
+      <b>Ollama (11434)</b><span id="kOll">&hellip;</span>
+      <b>Local models</b><span id="kMod">&hellip;</span>
+    </div>
+    <div id="gate" class="hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>Install</h2>
+    <div class="row">
+      <button id="bRay"  title="brew install --cask raycast (idempotent)">Install Raycast</button>
+      <button id="bOll"  title="brew install ollama + start the service">Install Ollama</button>
+      <button id="bWire" title="ensure Ollama serving + pull llama3.2:3b (Intel-friendly)">Set up Local LLM</button>
+    </div>
+    <div class="hint">Rows come from the normal install catalog (<code>tool-raycast</code>, <code>tool-ollama</code>, <code>raycast-llm</code>) and run on THIS box.
+      Last step is one manual click in Raycast: Settings &rarr; AI &rarr; enable &rarr; Local Models &rarr; sync.</div>
+    <pre id="out" style="display:none;"></pre>
+  </div>
+
+  <div class="card">
+    <h2>Run</h2>
+    <div class="row">
+      <button id="bLaunch" class="run" title="open -a Raycast">Launch Raycast</button>
+      <button id="bChat"   class="run" title="deep-link raycast://extensions/raycast/raycast-ai/ai-chat">Open AI Chat</button>
+    </div>
+    <div id="runStat" class="hint"></div>
+  </div>
+
+  <div class="card">
+    <h2>SweK Extension (dev)</h2>
+    <div class="row">
+      <button id="bExtDev"  class="run" title="copy bundled extension to ~/swek-raycast-extension, auto-generate icon.png, npm install, npx ray develop">Install + Run Extension</button>
+      <button id="bExtStop" title="stop the ray develop process (the extension STAYS installed in Raycast)">Stop</button>
+    </div>
+    <div class="hint">One button = <code>npm install &amp;&amp; npm run dev</code>: the bundled extension is copied to a stable
+      <code>~/swek-raycast-extension</code> (so dev never pins an EngineProject folder), a placeholder icon.png is generated,
+      and Raycast pops the SweK Engine commands. They stay installed after Stop.</div>
+    <pre id="extOut" style="display:none;"></pre>
+  </div>
+
+  <div class="card">
+    <h2>Make SweK Engine &mdash; pick your app set</h2>
+    <div class="row" style="gap:12px;">
+      <button id="mkAll" style="padding:4px 9px;font-size:11px;">all</button>
+      <button id="mkNone" style="padding:4px 9px;font-size:11px;">none</button>
+      <span class="hint" id="mkCount"></span>
+    </div>
+    <div id="mkList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:4px 12px;font-size:12px;"></div>
+    <div class="row">
+      <button id="mkLocal" class="run" title="generate ~/swek-raycast-engine from the checked set, then npm install + ray develop (this box, Mac)">Create Raycast App (this box)</button>
+      <button id="mkPush" class="run" title="push the checked set to the peer selected in the Remote card below — it generates + dev-runs THERE">Push set to peer &rarr; create</button>
+    </div>
+    <div class="hint">Checked pages become Raycast commands ("Open Pip-Boy", "Open Trading Floor"&hellip;) that deep-open the page on the
+      bridge URL preference. The three <b>(rich)</b> entries are the full interactive commands from the bundled extension.
+      Re-running the maker regenerates <code>~/swek-raycast-engine</code> from scratch, so the set is always exactly what's checked.</div>
+    <pre id="mkOut" style="display:none;"></pre>
+  </div>
+
+  <div class="card">
+    <h2>Remote &mdash; drive a Mac peer (middle man)</h2>
+    <div class="row">
+      <select id="peerSel" style="padding:6px 8px;background:#0c0f14;color:#e8eef8;border:1px solid #2a3340;border-radius:6px;font:11px ui-monospace,monospace;min-width:240px;"></select>
+      <button id="bPeerRefresh" title="reload known peers (saved + discovered + external tunnels)">&#8635;</button>
+    </div>
+    <div class="row">
+      <button id="rRay"  title="run tool-raycast on the peer (as a background job)">Install Raycast</button>
+      <button id="rOll"  title="run tool-ollama on the peer">Install Ollama</button>
+      <button id="rWire" title="run raycast-llm on the peer (Ollama service + llama3.2:3b)">Set up Local LLM</button>
+      <button id="rExt"  class="run" title="npm install + ray develop on the peer">Install + Run Extension</button>
+      <button id="rLaunch" class="run" title="open Raycast on the peer">Launch</button>
+      <button id="rChat" class="run" title="open Raycast AI chat on the peer">AI Chat</button>
+    </div>
+    <div class="hint">This bridge relays whitelisted actions to a KNOWN mesh peer's <code>/raycast/peer-exec</code> &mdash;
+      so from this PC you can execute the whole create-app process on the Mac. Install rows run as background jobs on
+      the peer (brew/model pulls take minutes) and are polled here. Pair unknown peers first (LAN discovery, or
+      Hosting &rarr; external peer for a cloudflared URL).</div>
+    <pre id="relayOut" style="display:none;"></pre>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, error: e && e.message }; }); }
+
+  var isMac = false;
+  function refresh() {
+    j("/raycast/status").then(function (s) {
+      isMac = !!(s && s.mac);
+      $("kPlat").innerHTML = s && s.platform ? (isMac ? "<span class='good'>macOS</span>" : "<span class='warn'>" + s.platform + "</span>") : "<span class='bad'>bridge unreachable</span>";
+      $("kRay").innerHTML  = !isMac ? "<span class='warn'>n/a (Mac only)</span>" : (s.raycastInstalled ? "<span class='good'>&#10003; installed</span>" : "<span class='bad'>&#10007; not found</span>");
+      $("kOll").innerHTML  = s && s.ollamaUp ? "<span class='good'>&#10003; serving</span>" : "<span class='bad'>&#10007; not reachable</span>";
+      $("kMod").textContent = (s && s.models && s.models.length) ? s.models.join(", ") : "none";
+      $("gate").innerHTML = isMac ? "" :
+        "This bridge is not a Mac. Raycast install/launch is gated to macOS &mdash; open <b>this same panel on your Mac SweK peer</b> " +
+        "(its server.html &rarr; &#128640; Raycast, or http://&lt;mac-peer&gt;:8787/raycast.html). The Ollama rows still work here for the engine's own LLM features.";
+      $("bLaunch").disabled = $("bChat").disabled = !isMac;
+    });
+  }
+
+  function execRow(id, btn) {
+    btn.disabled = true; var old = btn.textContent; btn.textContent = "running\u2026";
+    var out = $("out"); out.style.display = "block"; out.textContent = "[" + id + "] running \u2014 brew/model pulls can take a few minutes\u2026";
+    j("/install/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: id }) }).then(function (r) {
+      btn.disabled = false; btn.textContent = old;
+      var lines = [];
+      (r && r.ran || []).forEach(function (c) {
+        lines.push("$ " + c.cmd);
+        if (c.stdout) lines.push(c.stdout.trim());
+        if (c.stderr) lines.push(c.stderr.trim());
+        lines.push("(exit " + c.exitCode + ")\n");
+      });
+      if (!lines.length) lines.push(JSON.stringify(r));
+      out.textContent = "[" + id + "]\n" + lines.join("\n");
+      refresh();
+    });
+  }
+
+  $("bRay").onclick    = function () { execRow("tool-raycast", this); };
+  $("bOll").onclick    = function () { execRow("tool-ollama", this); };
+  $("bWire").onclick   = function () { execRow("raycast-llm", this); };
+  $("bLaunch").onclick = function () { j("/raycast/launch", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(function (r) { $("runStat").innerHTML = r && r.ok ? "<span class='good'>&#10003; " + (r.note || "launched") + "</span>" : "<span class='bad'>&#10007; " + ((r && r.error) || "launch failed") + "</span>"; }); };
+  $("bChat").onclick   = function () { j("/raycast/launch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ target: "ai-chat" }) }).then(function (r) { $("runStat").innerHTML = r && r.ok ? "<span class='good'>&#10003; " + (r.note || "opened") + "</span>" : "<span class='bad'>&#10007; " + ((r && r.error) || "launch failed") + "</span>"; }); };
+
+  // ---- SweK Extension dev-runner (this box) ----
+  var extPoll = null;
+  function extStatusTick() {
+    j("/raycast/ext/status").then(function (s) {
+      var out = $("extOut"); out.style.display = "block";
+      out.textContent = "[phase: " + (s.phase || "?") + (s.running ? " · running" : "") + (s.dir ? " · " + s.dir : "") + "]\n" + ((s.log || []).join("\n") || "(no output yet)");
+      out.scrollTop = out.scrollHeight;
+      if (extPoll && !s.running && s.phase !== "copy" && s.phase !== "npm-install") { clearInterval(extPoll); extPoll = null; }
+    });
+  }
+  $("bExtDev").onclick = function () {
+    if (!isMac) { $("extOut").style.display = "block"; $("extOut").textContent = "This box is not a Mac — use the Remote card below to run it on your Mac peer."; return; }
+    j("/raycast/ext/dev", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(function () { if (!extPoll) extPoll = setInterval(extStatusTick, 2000); extStatusTick(); });
+  };
+  $("bExtStop").onclick = function () { j("/raycast/ext/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(extStatusTick); };
+
+  // ---- Remote relay (drive a Mac peer from this box) ----
+  function peerRefresh() {
+    var sel = $("peerSel"); sel.innerHTML = "";
+    var seen = {};
+    function add(url, name) { url = (url || "").replace(/\/+$/, ""); if (!url || seen[url]) return; seen[url] = 1; var o = document.createElement("option"); o.value = url; o.textContent = (name ? name + " — " : "") + url; sel.appendChild(o); }
+    j("/sync/peers").then(function (r) {
+      ((r && r.peers) || []).forEach(function (p) { add(p.url || p, p.name); });
+      return j("/hosting/tunnel-registry");
+    }).then(function (t) {
+      (((t && t.tunnels) || [])).forEach(function (p) { if (!p.self) add(p.tunnelUrl, p.peerName); });
+      if (!sel.options.length) { var o = document.createElement("option"); o.value = ""; o.textContent = "(no known peers — pair one first)"; sel.appendChild(o); }
+    });
+  }
+  var jobPoll = null;
+  function relay(action, id, btn) {
+    var peer = $("peerSel").value; var out = $("relayOut"); out.style.display = "block";
+    if (!peer) { out.textContent = "pick a peer first"; return; }
+    if (btn) btn.disabled = true;
+    out.textContent = "[relay] " + action + (id ? " " + id : "") + " -> " + peer + " \u2026";
+    j("/raycast/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: action, id: id || "" }) }).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (r && r.started && r.job) {
+        out.textContent = "[relay] job " + r.job + " started on " + peer + " \u2014 polling\u2026";
+        if (jobPoll) clearInterval(jobPoll);
+        jobPoll = setInterval(function () {
+          j("/raycast/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: "job-status", id: r.job }) }).then(function (s) {
+            if (!s || !s.ok) { out.textContent = "[relay] job poll failed: " + JSON.stringify(s); clearInterval(jobPoll); jobPoll = null; return; }
+            if (s.running) { out.textContent = "[relay] job " + r.job + " running \u2014 " + Math.round((s.elapsed_ms || 0) / 1000) + "s (brew/model pulls take a while)"; return; }
+            clearInterval(jobPoll); jobPoll = null;
+            var lines = [];
+            var ran = (s.result && s.result.ran) || [];
+            ran.forEach(function (c) { lines.push("$ " + c.cmd); if (c.stdout) lines.push(c.stdout.trim()); if (c.stderr) lines.push(c.stderr.trim()); lines.push("(exit " + c.exitCode + ")\n"); });
+            out.textContent = "[relay] job done on " + peer + "\n" + (lines.join("\n") || JSON.stringify(s.result));
+            out.scrollTop = out.scrollHeight;
+          });
+        }, 4000);
+      } else if (r && (r.phase || r.log)) {
+        out.textContent = "[relay·" + peer + "] phase: " + (r.phase || "?") + "\n" + ((r.log || []).join("\n") || "");
+        if (action === "ext-dev") { if (jobPoll) clearInterval(jobPoll); jobPoll = setInterval(function () { j("/raycast/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: "ext-status" }) }).then(function (s) { out.textContent = "[relay\u00b7" + peer + "] phase: " + (s.phase || "?") + (s.running ? " \u00b7 running" : "") + "\n" + ((s.log || []).join("\n") || ""); out.scrollTop = out.scrollHeight; if (!s.running && s.phase !== "copy" && s.phase !== "npm-install") { clearInterval(jobPoll); jobPoll = null; } }); }, 3000); }
+      } else {
+        out.textContent = "[relay\u00b7" + peer + "] " + JSON.stringify(r, null, 1);
+      }
+    });
+  }
+  $("bPeerRefresh").onclick = peerRefresh;
+  $("rRay").onclick    = function () { relay("exec", "tool-raycast", this); };
+  $("rOll").onclick    = function () { relay("exec", "tool-ollama", this); };
+  $("rWire").onclick   = function () { relay("exec", "raycast-llm", this); };
+  $("rExt").onclick    = function () { relay("ext-dev", "", this); };
+  $("rLaunch").onclick = function () { relay("launch", "", this); };
+  $("rChat").onclick   = function () { relay("chat", "", this); };
+  peerRefresh();
+
+  // ---- Make SweK Engine (checkbox set -> generated Raycast app) ----
+  var DEFAULT_CHECKED = { "server-panel": 1, "main-engine": 1, "raycast-panel": 1, "rich-status": 1, "rich-panels": 1, "rich-toast": 1 };
+  function mkCount() { var n = document.querySelectorAll("#mkList input:checked").length; $("mkCount").textContent = n + " selected"; }
+  function mkIds() { return Array.prototype.map.call(document.querySelectorAll("#mkList input:checked"), function (c) { return c.value; }); }
+  function mkLoad() {
+    j("/raycast/make/apps").then(function (r) {
+      var list = $("mkList"); list.innerHTML = "";
+      ((r && r.apps) || []).forEach(function (a) {
+        var lab = document.createElement("label");
+        lab.style.cssText = "display:flex;gap:6px;align-items:center;cursor:pointer;" + (a.rich ? "color:#eac06a;" : "");
+        lab.title = a.hint + (a.path ? " (" + a.path + ")" : "");
+        var cb = document.createElement("input"); cb.type = "checkbox"; cb.value = a.id; cb.checked = !!DEFAULT_CHECKED[a.id]; cb.onchange = mkCount;
+        var sp = document.createElement("span"); sp.textContent = a.title;
+        lab.appendChild(cb); lab.appendChild(sp); list.appendChild(lab);
+      });
+      mkCount();
+    });
+  }
+  $("mkAll").onclick  = function () { document.querySelectorAll("#mkList input").forEach(function (c) { c.checked = true; });  mkCount(); };
+  $("mkNone").onclick = function () { document.querySelectorAll("#mkList input").forEach(function (c) { c.checked = false; }); mkCount(); };
+  $("mkLocal").onclick = function () {
+    var ids = mkIds(); var out = $("mkOut"); out.style.display = "block";
+    if (!ids.length) { out.textContent = "check at least one app"; return; }
+    out.textContent = "[make] generating " + ids.length + " command(s)\u2026";
+    j("/raycast/make", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apps: ids, dev: true }) }).then(function (r) {
+      if (!r || !r.ok) { out.textContent = "[make] failed: " + ((r && r.error) || "?"); return; }
+      out.textContent = "[make] generated " + (r.commands || []).length + " command(s) at " + (r.dir || "") + (r.note ? "\n" + r.note : "");
+      if (r.started || r.phase) { if (!extPoll) extPoll = setInterval(extStatusTick, 2000); extStatusTick(); }
+    });
+  };
+  $("mkPush").onclick = function () {
+    var ids = mkIds(); var out = $("mkOut"); out.style.display = "block";
+    var peer = $("peerSel").value;
+    if (!ids.length) { out.textContent = "check at least one app"; return; }
+    if (!peer) { out.textContent = "pick a peer in the Remote card first"; return; }
+    out.textContent = "[make\u2192" + peer + "] pushing set (" + ids.length + ")\u2026";
+    j("/raycast/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: "make", id: ids.join(",") }) }).then(function (r) {
+      if (!r || !r.ok) { out.textContent = "[make\u2192" + peer + "] failed: " + ((r && r.error) || "?"); return; }
+      out.textContent = "[make\u2192" + peer + "] generated " + (r.commands || []).length + " command(s) at " + (r.dir || "") + (r.note ? "\n" + r.note : "\nnpm install + ray develop starting on the peer \u2014 tailing\u2026");
+      if (jobPoll) clearInterval(jobPoll);
+      jobPoll = setInterval(function () {
+        j("/raycast/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: "ext-status" }) }).then(function (s) {
+          out.textContent = "[make\u2192" + peer + "] phase: " + (s.phase || "?") + (s.running ? " \u00b7 running" : "") + "\n" + ((s.log || []).join("\n") || "");
+          out.scrollTop = out.scrollHeight;
+          if (!s.running && s.phase !== "copy" && s.phase !== "npm-install") { clearInterval(jobPoll); jobPoll = null; }
+        });
+      }, 3000);
+    });
+  };
+  mkLoad();
+
+  refresh();
+  setInterval(refresh, 15000);
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

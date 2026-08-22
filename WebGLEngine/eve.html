@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="EVE — pilot link">
+<meta name="demo:desc" content="Live EVE Online pilot telemetry via ESI + SSO (pilot, ship, system, online, ISK) with a 3D ship view. Cloud API — register an app at developers.eveonline.com and log in once. Runs on the PC bridge.">
+<title>🛰️ EVE — SweK Engine</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>
+  :root { --bg:#04080f; --panel:#0a1320; --edge:#15314e; --gold:#ffcf6b; --cyan:#8ff7ff; --teal:#5ff0e6; --txt:#d7e6f5; --dim:#6f88a6; --good:#79ffc6; --bad:#ff7b7b; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; }
+  body { background:radial-gradient(ellipse at 50% -10%, #0a1c30 0%, #04080f 60%, #02050a 100%); color:var(--txt); font:14px/1.45 "Inter",system-ui,Segoe UI,Roboto,sans-serif; min-height:100vh; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.45;
+    background-image:radial-gradient(1px 1px at 22% 28%, #cffcff, transparent), radial-gradient(1px 1px at 72% 62%, #aef, transparent), radial-gradient(1px 1px at 42% 82%, #7df, transparent), radial-gradient(1px 1px at 88% 22%, #fff, transparent); background-repeat:repeat; }
+  #bar, .wrap { position:relative; z-index:1; }
+  #bar { display:flex; align-items:center; gap:14px; padding:13px 18px; border-bottom:1px solid var(--edge); position:sticky; top:0; background:linear-gradient(180deg,#07142099,#04080f); }
+  #bar h1 { font-size:18px; margin:0; letter-spacing:3px; text-transform:uppercase; font-weight:600; }
+  #bar h1 small { color:var(--gold); font-size:11px; letter-spacing:2px; }
+  #status { font-size:11px; color:var(--dim); margin-left:auto; }
+  .wrap { padding:16px 18px 60px; max-width:920px; margin:0 auto; }
+  h2 { font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:var(--gold); margin:22px 0 10px; border-bottom:1px solid var(--edge); padding-bottom:5px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:13px 15px; flex:1; min-width:140px; }
+  .lbl { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; }
+  .med { font-size:18px; font-weight:600; margin-top:4px; color:var(--teal); }
+  .big { font-size:26px; font-weight:700; margin-top:3px; color:var(--cyan); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#555; margin-right:6px; vertical-align:middle; }
+  .dot.on { background:var(--good); box-shadow:0 0 8px var(--good); }
+  #shipwrap { width:100%; height:240px; border:1px solid var(--edge); border-radius:10px; background:#04080f; overflow:hidden; }
+  .btn { padding:9px 16px; background:#10283f; color:var(--teal); border:1px solid var(--edge); border-radius:8px; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; }
+  .btn.gold { background:#3a2e10; color:var(--gold); border-color:#5a4a1a; }
+  #offline { text-align:center; padding:50px 20px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div id="bar"><h1>EVE <small>PILOT LINK</small></h1><span id="status">connecting…</span></div>
+<div class="wrap">
+  <div id="offline">
+    <p>No EVE pilot link.</p>
+    <p class="lbl" style="text-transform:none;letter-spacing:0;max-width:520px;margin:10px auto;">
+      Register an app at <b>developers.eveonline.com</b> (callback <code>http://localhost:8787/eve/callback</code>,
+      scopes: read_location, read_ship_type, read_online, read_character_wallet), put the Client ID/Secret in the
+      connector config, then log in once.</p>
+    <p><a class="btn gold" href="/eve/login">▶ Log in with EVE</a></p>
+    <p class="lbl" id="cfgnote" style="text-transform:none;letter-spacing:0;"></p>
+  </div>
+  <div id="content" style="display:none;">
+    <div class="row">
+      <div class="card"><div class="lbl">Pilot</div><div class="med" id="pilot">—</div></div>
+      <div class="card"><div class="lbl">Status</div><div class="med"><span class="dot" id="onlinedot"></span><span id="online">—</span></div></div>
+      <div class="card"><div class="lbl">Wallet</div><div class="big" id="isk">—</div></div>
+    </div>
+    <h2>Ship</h2>
+    <div id="shipwrap"></div>
+    <div class="row" style="margin-top:12px;">
+      <div class="card"><div class="lbl">Vessel</div><div class="med" id="ship">—</div></div>
+      <div class="card"><div class="lbl">Type</div><div class="med" id="shiptype">—</div></div>
+      <div class="card"><div class="lbl">System</div><div class="med" id="system">—</div></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { mountShipView } from "/shipview.js";
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n == null ? "—" : Math.round(n).toLocaleString());
+  let ship = null, lastType = null;
+  function ensureShip() { if (!ship) ship = mountShipView($("shipwrap"), { autoSpin: true }); return ship; }
+  function render(s) {
+    if (!s || !s.ready || !s.data) {
+      $("offline").style.display = "block"; $("content").style.display = "none";
+      $("status").textContent = s && s.authorised ? "linked — waiting…" : "not authorised";
+      return;
+    }
+    const d = s.data;
+    $("status").textContent = "● LINKED" + (s.ageMs != null ? " · " + Math.round(s.ageMs / 1000) + "s" : "");
+    $("offline").style.display = "none"; $("content").style.display = "block";
+    $("pilot").textContent = d.character || "—";
+    $("online").textContent = d.online == null ? "—" : (d.online ? "Online" : "Offline");
+    $("onlinedot").className = "dot" + (d.online ? " on" : "");
+    $("isk").textContent = d.isk != null ? fmt(d.isk) + " ISK" : "—";
+    $("ship").textContent = d.ship || "—";
+    $("shiptype").textContent = d.shipType || "—";
+    $("system").textContent = d.system || "—";
+    const sv = ensureShip();
+    if (d.shipTypeId && d.shipTypeId !== lastType) { lastType = d.shipTypeId; sv.setModel("/GPU_Assets/ships/" + d.shipTypeId + ".glb"); }
+  }
+  async function load() {
+    try { render(await (await fetch("/eve/state", { cache: "no-store" })).json()); }
+    catch (e) { $("status").textContent = "bridge unreachable"; }
+  }
+  async function note() {
+    try { const st = await (await fetch("/eve/status", { cache: "no-store" })).json();
+      $("cfgnote").textContent = st.configured ? "Client ID/Secret set ✓ — callback " + st.callbackUrl : "Set Client ID/Secret first (POST /eve/config).";
+    } catch (e) {}
+  }
+  note(); load(); setInterval(load, 5000);
+</script>
+<script src="kiosk.js"></script>
+</body>
+</html>

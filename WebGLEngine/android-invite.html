@@ -1,0 +1,66 @@
+<!doctype html>
+<!-- android-invite.html -- v2923
+     What a phone's owner sees after the operator hands them an invite link. It EXPLAINS before it offers, and it
+     offers a script the user runs themselves. Nothing on this page installs, pushes, or auto-runs anything -- the
+     invite is a door, and walking through it is a choice made on the phone. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join as a SweK Android Peer</title>
+<style>
+  :root { --bg:#0a0e0c; --ink:#cfe9d8; --dim:#7fa78e; --line:#224a36; --go:#6fe39a; --warn:#ffd166; }
+  body { font: 15px/1.55 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); color: var(--ink); margin: 0; padding: 18px; max-width: 760px; }
+  h1 { font-size: 19px; margin: 0 0 4px; } h2 { font-size: 14px; color: var(--go); margin: 22px 0 8px; }
+  .sub { color: var(--dim); font-size: 12px; } code, pre { background: #0f1712; border: 1px solid var(--line); border-radius: 5px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+  button { font: inherit; background: #17402a; color: var(--ink); border: 1px solid #2c6a45; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+  .yes { color: var(--go); } .no { color: var(--warn); } a { color: var(--go); }
+</style>
+</head>
+<body>
+<h1>&#129302; Join as a SweK Android Peer</h1>
+<div class="sub">someone running a SweK Engine invited this phone to volunteer as a compute peer. Here is exactly what that means before you decide.</div>
+
+<div class="card">
+<h2>what this will and won't do</h2>
+<div><span class="yes">&#10003;</span> download a set of readable script files into <code>~/swek-peer</code> on this phone</div>
+<div><span class="yes">&#10003;</span> when <em>you</em> choose to run them, execute a physics test suite and report the results</div>
+<div><span class="no">&#183;</span> it will <b>not</b> install an app, ask for root, start on boot, or touch anything outside that one folder</div>
+<div><span class="no">&#183;</span> nothing leaves this phone unless you hand the results file back yourself</div>
+</div>
+
+<h2>step 1 &mdash; get Termux (one time)</h2>
+<div class="sub">Termux is a terminal app. Install it from <a href="https://f-droid.org/packages/com.termux/">F-Droid</a> (the Play Store build is deprecated). Then in Termux:</div>
+<pre>pkg install nodejs
+termux-setup-storage</pre>
+
+<h2>step 2 &mdash; fetch the peer (nothing runs yet)</h2>
+<div class="sub">This downloads the files and stops. Read them if you like &mdash; that is why they are scripts, not a binary.</div>
+<pre id="cmd">curl -fsSL "LOADING..." | bash</pre>
+<button id="copy">copy the command</button>
+<span id="copied" class="yes" style="display:none">copied</span>
+
+<h2>step 3 &mdash; run it when you're ready</h2>
+<pre>cd ~/swek-peer && bash tools/roundhouse/termux_peer.sh</pre>
+<div class="sub">The suite takes about 15&ndash;25 minutes. It writes <code>android-phone.json</code> into your shared Downloads.
+To contribute the result, hand that file back to the operator (they will tell you how &mdash; usually it is picked up automatically from Downloads).</div>
+
+<div class="card">
+<h2>the GPU part (optional)</h2>
+<div class="sub">In Chrome on this phone, open the engine's <code>/magmap-android.html</code>, tap run, and download the report. It tests whether this
+phone's GPU agrees with the reference to the last few digits. Also optional, also yours to hand back or not.</div>
+</div>
+
+<script>
+const t = new URLSearchParams(location.search).get("t") || "";
+const base = location.origin;
+const cmd = `curl -fsSL "${base}/android/bootstrap.sh?t=${t}" | bash`;
+document.getElementById("cmd").textContent = cmd;
+document.getElementById("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(cmd); const c = document.getElementById("copied"); c.style.display = "inline"; setTimeout(() => c.style.display = "none", 2000); } catch {}
+};
+</script>
+</body>
+</html>

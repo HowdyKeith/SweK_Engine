@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Cell Tracking &mdash; welcome</title>
+<style>
+  :root { --bg:#0a0e14; --panel:#111725; --line:#243149; --ink:#e6edf7; --dim:#8ea1bd;
+          --accent:#5ad6ff; --go:#54e0a8; --warn:#ffc861; --pink:#e05cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(1200px 600px at 70% -10%, #16203a 0%, var(--bg) 60%); color:var(--ink);
+         font:14px/1.6 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:22px 20px 14px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:22px; letter-spacing:.2px; }
+  header p.tag { margin:6px 0 0; color:var(--dim); font-size:14px; }
+  main { padding:18px 20px 40px; max-width:940px; margin:0 auto; }
+  section { border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:16px 18px; margin:14px 0; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--accent); letter-spacing:.3px; }
+  p { margin:8px 0; }
+  .dim { color:var(--dim); }
+  .lead { font-size:15.5px; }
+  a { color:var(--accent); }
+  .btn { display:inline-block; padding:8px 14px; border-radius:9px; text-decoration:none; font-weight:600; font-size:13px;
+         background:#16233b; color:#bfe0ff; border:1px solid #2d466b; margin:4px 6px 4px 0; }
+  .btn.go { background:#123528; color:#8fe9c2; border-color:#2c6a4e; }
+  .btn.big { padding:10px 18px; font-size:14px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:6px; }
+  ol.steps { margin:8px 0; padding-left:20px; } ol.steps li { margin:6px 0; }
+  ul.ideas { margin:8px 0; padding-left:20px; } ul.ideas li { margin:5px 0; }
+  table { border-collapse:collapse; font-size:13px; margin:8px 0; width:100%; }
+  th, td { padding:5px 10px; text-align:left; border-bottom:1px solid #1b2740; }
+  th { color:var(--dim); font-weight:600; }
+  .num { color:#8fe9c2; }
+  code { background:#0a1120; border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:12.5px; }
+  .call { border-left:3px solid var(--go); background:#0f1c17; padding:10px 14px; border-radius:0 8px 8px 0; }
+  .pill { display:inline-block; font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:20px; padding:2px 9px; margin-right:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#129516; Cell Tracking</h1>
+  <p class="tag">Following individual living cells through time &mdash; and a place for a curious scientist to join in.</p>
+</header>
+<main>
+
+<section>
+  <h2>What this is</h2>
+  <p class="lead">A microscope films a <b>zebrafish embryo</b> as it grows: a 3D movie where thousands of cells
+     drift, divide, and rearrange, frame after frame. This project <b>tracks every cell through that movie</b> &mdash;
+     detecting each one, following it from frame to frame, and spotting the moment it divides into two &mdash; so you
+     end up with a <b>family tree of the embryo</b>: which cell became which, all the way down.</p>
+  <p class="dim">It's a working entry for the <b>royerlab</b> Kaggle cell-tracking competition, built and validated
+     end-to-end. The same idea drives real developmental biology and cancer research: to understand how a body builds
+     itself, you have to be able to follow the cells.</p>
+  <div class="row">
+    <span class="pill">3D + time</span><span class="pill">microscopy</span><span class="pill">cell lineages</span><span class="pill">open science</span>
+  </div>
+</section>
+
+<section>
+  <h2>See it first</h2>
+  <p>The viewer draws the tracks in 3D &mdash; each cell a point, each lineage a colored trail through time. Best way
+     to understand it is to spin one around.</p>
+  <div class="row">
+    <a class="btn go big" href="/celltrack-viewer.html" target="_blank" rel="noopener">Open the Cell Track Viewer &#8599;</a>
+    <a class="btn" href="/celltrack-viewer-gpu.html" target="_blank" rel="noopener">GPU viewer &#8599;</a>
+    <a class="btn" href="/celltrack-splat.html" target="_blank" rel="noopener">Splat viewer &#8599;</a>
+  </div>
+</section>
+
+<section>
+  <h2>Try it right here</h2>
+  <p>One click generates a small synthetic embryo movie and runs the real tracker on it, start to finish. When it
+     finishes, open the viewer to see the lineage tree it built. <span class="dim">(The run happens on the host
+     machine and needs the Python pipeline installed &mdash; the button tells you if it isn't.)</span></p>
+  <div class="row">
+    <button id="goRun" class="btn go big">&#9658; Generate a synthetic embryo &amp; track it</button>
+    <button id="goStop" class="btn" style="display:none">Stop</button>
+    <a id="goView" class="btn" href="/celltrack-viewer.html" target="_blank" rel="noopener" style="display:none">Open the viewer &#8599;</a>
+    <button id="goShare" class="btn" style="display:none" title="Seed this run's result as a torrent and broadcast the magnet to LAN peers (P2P, no server)">&#9776; Share this run</button>
+    <label id="autoShareWrap" style="display:none;font-size:12px;color:var(--dim);margin-left:6px;cursor:pointer"><input type="checkbox" id="autoShare"> auto-share finished runs</label>
+  </div>
+  <div id="goStage" class="dim" style="margin-top:8px"></div>
+  <pre id="goLog" style="display:none;max-height:220px;overflow:auto;background:#0a1120;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;margin-top:8px;color:#bcd0ea"></pre>
+</section>
+
+<section>
+  <h2>How it works, in four steps</h2>
+  <ol class="steps">
+    <li><b>Detect</b> &mdash; find every cell nucleus in each 3D frame (a blob detector tuned to the cells' size).</li>
+    <li><b>Link</b> &mdash; decide which detection in the next frame is the <i>same</i> cell as this one.</li>
+    <li><b>Divisions</b> &mdash; where one cell becomes two, record the split so the family tree branches.</li>
+    <li><b>Score</b> &mdash; compare the tracks to a known answer and write a submission in the competition's format.</li>
+  </ol>
+  <p class="dim">Two ways to do the linking: a fast <b>frame-by-frame</b> baseline (Hungarian assignment), and a
+     smarter <b>whole-movie optimizer</b> that decides every keep/link/appear/divide at once (using royerlab's own
+     <code>tracksdata</code>, solved by the free SCIP solver). On clean data the simple one is perfect; on realistic
+     noisy data the optimizer wins:</p>
+  <table>
+    <tr><th>linking method</th><th>clean input</th><th>noisy + 8% missed</th></tr>
+    <tr><td>frame-by-frame (Hungarian)</td><td class="num">1.100</td><td>0.845</td></tr>
+    <tr><td>whole-movie optimizer (ILP)</td><td>1.093</td><td class="num">0.880</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>For a teacher &amp; students</h2>
+  <p>You don't need real microscope data or a lab to start &mdash; the pipeline ships a <b>synthetic embryo
+     generator</b> that makes movies matching the real format, so a class can run the whole thing today:</p>
+  <ol class="steps">
+    <li><b>Generate</b> a synthetic embryo movie (you control cell count, division rate, noise).</li>
+    <li><b>Track</b> it with either linker and <b>watch the lineage tree</b> build in the viewer.</li>
+    <li><b>Break it on purpose</b> &mdash; add noise, drop detections &mdash; and see the score drop, then tune it back.</li>
+  </ol>
+  <div class="call">
+    <b>Classroom angles.</b> Cell division &amp; lineage as a family tree; how scientists turn a fuzzy image into
+    data; what "an algorithm makes mistakes and we measure them" really means; an honest look at accuracy,
+    trade-offs, and why the fancier method isn't always better. It connects biology, data, and a little bit of
+    optimization &mdash; without any black boxes.
+  </div>
+</section>
+
+<section>
+  <h2>Contribute as an external peer</h2>
+  <p>SweK Engine runs as a small <b>fleet of peers</b> &mdash; machines that share work over the network. A science
+     teacher next door can join as an <b>external peer</b>: no install ceremony, just a link the operator shares.
+     What that lets you do:</p>
+  <ul class="ideas">
+    <li><b>Explore</b> the tracked datasets in the viewer, from your own laptop.</li>
+    <li><b>Run</b> a tracking job on your machine &mdash; generate synthetic data, track it, evaluate the score &mdash;
+        and have the results show up for everyone on the fleet.</li>
+    <li><b>Bring data or ideas</b> &mdash; a real dataset, a tuning idea for <code>sigma</code>/<code>threshold</code>,
+        or a classroom experiment worth sharing.</li>
+  </ul>
+  <p class="dim">Getting connected: the operator opens an access link for you (the engine can share a secure tunnel URL
+     to a trusted peer), you open it in a browser, and you're in &mdash; same pages, same viewer, same pipeline. The
+     controls for the pipeline itself live in <a href="/server.html" style="color:var(--accent)">server.html</a>
+     under the cell-tracking tools.</p>
+  <div class="row">
+    <a class="btn" href="/hosting.html" target="_blank" rel="noopener">Hosting &amp; access &#8599;</a>
+    <a class="btn" href="/cell-tracking/README.md" target="_blank" rel="noopener">Technical README &#8599;</a>
+    <a class="btn" href="https://github.com/royerlab" target="_blank" rel="noopener">royerlab on GitHub &#8599;</a>
+  </div>
+</section>
+
+<section>
+  <h2>The honest state of it</h2>
+  <p class="dim">This is a <b>classical-CV baseline</b>, not a trained neural network &mdash; it gets you a real,
+     scoreable result today, and it's tuned and validated on synthetic data built to match the real format and
+     physical scale. On actual microscopy you'd re-tune the detector for that scope's noise and cell density. It's a
+     genuine, honest starting point &mdash; which is exactly what makes it a good thing to learn on and build from.</p>
+</section>
+
+</main>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const stage = (t) => { $("goStage").textContent = t; };
+  const showLog = (t) => { const el = $("goLog"); el.style.display = "block"; el.textContent = t || ""; el.scrollTop = el.scrollHeight; };
+  const logText = (s) => (s && s.logTail) ? (Array.isArray(s.logTail) ? s.logTail.join("\n") : String(s.logTail)) : "";
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const jget = (u) => fetch(u, { cache: "no-store" }).then((r) => r.json());
+  const jpost = (u, b) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) }).then((r) => r.json());
+  let stopped = false;
+
+  async function waitDone() {
+    for (;;) {
+      if (stopped) return { stopped: true };
+      let s; try { s = await jget("/celltrack/status"); } catch { await sleep(1200); continue; }
+      const lt = logText(s); if (lt) showLog(lt);
+      if (s && !s.running) return s;
+      await sleep(1200);
+    }
+  }
+  async function runScript(script, label) {
+    stage(label + "\u2026");
+    let r; try { r = await jpost("/celltrack/run", { script }); } catch (e) { stage("could not reach the host"); return { ok: false }; }
+    if (r && r.ok === false) { stage("could not start: " + (r.error || "?")); return { ok: false }; }
+    const s = await waitDone();
+    if (s.stopped) return { stopped: true };
+    if (s.exitCode === 0) return { ok: true };
+    stage(label + " failed (exit " + s.exitCode + ") \u2014 see the log"); return { ok: false };
+  }
+
+  $("goRun").onclick = async () => {
+    stopped = false; $("goRun").disabled = true; $("goStop").style.display = ""; $("goView").style.display = "none";
+    try {
+      stage("checking the pipeline\u2026");
+      let deps; try { deps = await jget("/celltrack/deps"); } catch {}
+      if (deps && deps.ok === false) { stage("the Python pipeline isn't ready on the host \u2014 install it from server.html (cell-tracking tools), then try again."); if (logText(deps)) showLog(logText(deps)); return; }
+      let st; try { st = await jget("/celltrack/status"); } catch {}
+      if (st && st.available === false) { stage("the cell-tracking pipeline isn't present on this host."); return; }
+      if (st && st.running) { stage("a run is already going \u2014 watching it below (Stop to cancel)."); showLog(logText(st)); const s0 = await waitDone(); if (s0.stopped) { stage("stopped."); return; } }
+      const g = await runScript("make_synthetic", "generating a synthetic embryo"); if (!g.ok) return; if (stopped) { stage("stopped."); return; }
+      const t = await runScript("run_pipeline", "detecting + tracking cells"); if (!t.ok) return;
+      stage("done \u2014 a submission was written. Open the viewer to see the lineage tree it built.");
+      $("goView").style.display = "";
+      $("goShare").style.display = ""; $("autoShareWrap").style.display = "";
+      if ($("autoShare").checked) shareRun(true);   // auto-share finished runs when the peer opts in
+    } finally { $("goRun").disabled = false; $("goStop").style.display = "none"; }
+  };
+  $("goStop").onclick = async () => { stopped = true; stage("stopping\u2026"); try { await jpost("/celltrack/stop", {}); } catch {} };
+
+  // v2348 — one-click P2P: seed this run's result folder as a torrent and broadcast the magnet to LAN peers.
+  async function shareRun(auto) {
+    let st; try { st = await jget("/celltrack/status"); } catch { if (!auto) stage("couldn't reach the host to share."); return; }
+    if (!st || !st.outPath) { if (!auto) stage("no run result to share yet."); return; }
+    stage((auto ? "auto-sharing" : "sharing") + " this run over P2P\u2026");
+    let r; try { r = await jpost("/webtorrent/seed", { path: st.outPath }); } catch { stage("share failed \u2014 is the host reachable?"); return; }
+    if (r && r.ok) stage("\u2713 sharing \u201c" + (st.outName || r.name) + "\u201d to LAN peers (magnet broadcast). Peers see a one-tap Fetch.");
+    else if (r && !r.installed && r.available === false) stage("WebTorrent isn't installed on this host yet \u2014 open the P2P Share page and click Install.");
+    else stage("share failed: " + ((r && r.error) || "unknown"));
+  }
+  $("goShare").onclick = () => shareRun(false);
+  try { $("autoShare").checked = localStorage.getItem("celltrack.autoshare") === "1"; $("autoShare").addEventListener("change", (e) => localStorage.setItem("celltrack.autoshare", e.target.checked ? "1" : "0")); } catch {}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Show on Echo</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:640px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:11px 13px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); } .note a { color:var(--go); }
+  .note ol { margin:7px 0 0; padding-left:18px; } .note li { margin:3px 0; }
+  .warn { background:#221c10; border-color:#5a4a22; color:#d8c28a; }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; background:var(--panel); margin-bottom:12px; }
+  label { display:block; color:var(--dim); font-size:12px; margin:9px 0 4px; }
+  input, select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .row { display:flex; gap:8px; align-items:flex-end; }
+  .pg { display:flex; gap:8px; align-items:center; margin-top:7px; }
+  .pg input.lbl { flex:1; } .pg input.num { flex:0 0 56px; text-align:center; } .pg input.url { flex:1.4; }
+  .pg button.show { flex:0 0 auto; background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:7px; padding:8px 12px; font:inherit; cursor:pointer; }
+  .pg button.del { flex:0 0 auto; background:#221c10; color:var(--warn); border:1px solid #5a4a22; border-radius:7px; cursor:pointer; }
+  button.add { background:#10151d; color:var(--dim); border:1px solid var(--line); border-radius:7px; padding:7px 11px; font:inherit; cursor:pointer; margin-top:9px; }
+  button.save { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:8px 14px; font:inherit; cursor:pointer; }
+  .hdr { display:flex; gap:8px; color:var(--dim); font-size:11px; margin-top:4px; } .hdr .a{flex:1}.hdr .b{flex:0 0 56px;text-align:center}.hdr .c{flex:1.4}.hdr .d{flex:0 0 132px}
+  #msg { color:var(--dim); font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">📺</span> Show a page on the Echo Show</span></header>
+  <main>
+    <div class="note">
+      Alexa has <b>no built-in command</b> to open a URL — "Alexa, open Silk" only opens the browser to its homepage. To open a specific page you install a tiny one-time skill that uses the APL <b>OpenURL</b> command, then this panel fires the text command that triggers it.
+      <ol>
+        <li>Install <a href="https://github.com/aldadic/home-assistant-on-echo-show" target="_blank">aldadic's "home-assistant-on-echo-show"</a> skill (or the community "MyPage" skill). Name it <b>dashboard viewer</b> (or set the name below).</li>
+        <li>In the skill, map page numbers → this PC's LAN URLs, e.g. page 1 → <code>http://&lt;this-PC&gt;:8787/wall.html</code>, page 2 → <code>/board.html</code>.</li>
+        <li>Needs the HA <b>Alexa Devices</b> integration (for send_text_command) + your Echo's device id below.</li>
+      </ol>
+    </div>
+    <div class="note warn">
+      Heads-up: the Echo Show drops the browser back to its home screen after a few minutes of inactivity and forgets the page — it's not a true always-on kiosk. For an always-on panel, use a Fire tablet + Fully Kiosk or one of the wall phones.
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div style="flex:1"><label>Skill invocation name</label><input id="skill" placeholder="dashboard viewer" /></div>
+        <div style="flex:1"><label>Echo device id (Alexa Devices)</label><input id="device" placeholder="device_id of the Echo Show" /></div>
+      </div>
+
+      <label style="margin-top:12px;">Pages (number must match the skill mapping)</label>
+      <div class="hdr"><span class="a">label</span><span class="b">page</span><span class="c">url (reference)</span><span class="d"></span></div>
+      <div id="pages"></div>
+      <button class="add" id="add">+ add page</button>
+
+      <div style="margin-top:13px;"><button class="save" id="save">Save</button></div>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const LS = "swek.echoShow.v1";
+  function load(){ try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch { return {}; } }
+  function save(){
+    const pages = [];
+    $("pages").querySelectorAll(".pg").forEach(r => { const lbl = r.querySelector(".lbl").value.trim(), num = parseInt(r.querySelector(".num").value, 10), url = r.querySelector(".url").value.trim(); if (lbl && num) pages.push({ lbl, num, url }); });
+    localStorage.setItem(LS, JSON.stringify({ skill: $("skill").value.trim(), device: $("device").value.trim(), pages }));
+  }
+
+  function addRow(p){
+    p = p || { lbl:"", num:"", url:"" };
+    const d = document.createElement("div"); d.className = "pg";
+    d.innerHTML = '<input class="lbl" placeholder="Wall switchboard" /><input class="num" type="number" min="1" max="10" placeholder="1" /><input class="url" placeholder="/wall.html" /><button class="show">📺 Show</button><button class="del">✕</button>';
+    d.querySelector(".lbl").value = p.lbl || ""; d.querySelector(".num").value = p.num || ""; d.querySelector(".url").value = p.url || "";
+    d.querySelector(".del").onclick = () => { d.remove(); save(); };
+    d.querySelector(".show").onclick = () => showPage(parseInt(d.querySelector(".num").value, 10));
+    $("pages").appendChild(d);
+  }
+  $("add").onclick = () => addRow();
+  $("save").onclick = () => { save(); $("msg").textContent = "✓ saved"; };
+
+  function showPage(num){
+    if (!num) { $("msg").textContent = "set a page number first"; return; }
+    save();
+    const skill = ($("skill").value.trim() || "dashboard viewer");
+    const device = $("device").value.trim();
+    if (!device) { $("msg").textContent = "✗ enter the Echo's device id first"; return; }
+    const text = "tell " + skill + " to open page " + num;
+    $("msg").textContent = "sending: \u201c" + text + "\u201d …";
+    fetch("/alexa/command", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text, mode:"devices", target: device }) })
+      .then(r => r.json()).then(j => $("msg").textContent = j && j.ok ? ("📺 sent to Echo: " + text) : ("✗ " + (j && j.error || "failed"))).catch(e => $("msg").textContent = "✗ " + e);
+  }
+
+  // prefill device from the saved Alexa command config if present
+  fetch("/alexa/config", { cache:"no-store" }).then(r => r.json()).then(c => { const st = load(); if (!st.device && c && c.mode === "devices" && c.target) $("device").value = c.target; }).catch(()=>{});
+
+  (function init(){
+    const st = load();
+    $("skill").value = st.skill || "dashboard viewer"; $("device").value = st.device || "";
+    (st.pages && st.pages.length ? st.pages : [{ lbl:"Wall switchboard", num:1, url:"/wall.html" }, { lbl:"Custom board", num:2, url:"/board.html" }]).forEach(addRow);
+  })();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

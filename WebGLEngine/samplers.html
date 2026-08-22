@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — beating critical slowing down</title>
+<meta name="demo:desc" content="Two escapes from a sampler that is not wrong, just stuck. Wolff flips whole clusters instead of single spins and does not critically slow down: the effective-samples-per-flipped-spin advantage over Metropolis grows from 30x to 165x as the lattice grows, because Metropolis collapses while Wolff holds. Parallel tempering runs a ladder of temperatures and lets neighbours trade configurations. Both are checked against the same falsifier the plain device owes: Yang's exact magnetisation. Both sabotages produce perfectly legitimate configurations of the WRONG ensemble.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:940px; margin:0 auto; padding:16px; line-height:1.6; }
+  canvas { border:1px solid #22304a; border-radius:6px; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; margin-right:6px; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  table { border-collapse:collapse; margin-top:10px; } td,th { border:1px solid #22304a; padding:5px 10px; }
+  .num { text-align:right; } .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+  h3 { margin:18px 0 4px; font-size:14px; font-weight:normal; color:#9fb4d8; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h3>Wolff clusters against Metropolis at T_c</h3>
+  <div class="dim">Work is counted in FLIPPED SPINS, not in "sweeps" — a cluster move touches many spins, and calling it a sweep would flatter Wolff by exactly the factor being measured. Gate: physics/statmech/wolff-selfcheck.mjs.</div>
+  <p><button id="race">Run the race (L = 16, 32)</button>
+     <button id="wsab" class="sab" title="P_add = 1-exp(-J/T): a legitimate Ising sampler at DOUBLE the temperature it claims">Sabotage P_add</button></p>
+  <div id="wout"><span class="dim">idle</span></div>
+
+  <h3>Parallel tempering: does the ladder survive the swapping?</h3>
+  <div class="dim">Configurations move between ensembles, so the marginal at each temperature is what a bad swap rule corrupts. Below T_c the reference is Yang's exact curve; above it, a same-lattice control run, because Yang's zero is an infinite-lattice statement and this lattice is not infinite. Gate: physics/statmech/tempering-selfcheck.mjs.</div>
+  <p><button id="temp">Run the ladder</button>
+     <button id="tsab" class="sab" title="'both configurations are legitimate, so trading them is harmless' — it is not">Sabotage swap rule</button></p>
+  <div id="tout"><span class="dim">idle</span></div>
+</div>
+<script type="module">
+import { yangMagnetisation, ONSAGER_TC } from "./physics/statmech/ising.js";
+import { wolffMeasure, metropolisMeasure, essPerWork, pAddWRONG, pAddCorrect } from "./physics/statmech/wolff.js";
+import { runTempering, plainRun, swapAlwaysWRONG } from "./physics/statmech/tempering.js";
+
+const wout = document.getElementById("wout"), tout = document.getElementById("tout");
+
+async function race(pAdd, label) {
+  wout.innerHTML = "<span class='dim'>sampling…</span>";
+  await new Promise((r) => setTimeout(r, 20));
+  let html = "<table><tr><th>L</th><th class='num'>Wolff ESS/work</th><th class='num'>Metropolis ESS/work</th><th class='num'>advantage</th><th class='num'>Wolff |M|</th><th class='num'>Yang</th></tr>";
+  for (const L of [16, 32]) {
+    const w = wolffMeasure({ L, T: ONSAGER_TC, moves: 1500, warmupMoves: 200, pAdd });
+    const m = metropolisMeasure({ L, T: ONSAGER_TC, sweeps: 1500, warmupSweeps: 200 });
+    const ew = essPerWork(w), em = essPerWork(m);
+    const w18 = wolffMeasure({ L, T: 1.8, moves: 1200, warmupMoves: 200, pAdd });
+    const good = Math.abs(w18.absM - yangMagnetisation(1.8)) < 0.02;
+    html += "<tr><td>" + L + "</td><td class='num'>" + ew.essPerWork.toFixed(4) + "</td><td class='num'>" +
+      em.essPerWork.toFixed(5) + "</td><td class='num'><b>" + (ew.essPerWork / em.essPerWork).toFixed(0) +
+      "x</b></td><td class='num'><b class='" + (good ? "good" : "bad") + "'>" + w18.absM.toFixed(4) +
+      "</b></td><td class='num'>" + yangMagnetisation(1.8).toFixed(4) + "</td></tr>";
+  }
+  html += "</table><div class='dim' style='margin-top:6px;'>" + label + "</div>";
+  wout.innerHTML = html;
+}
+document.getElementById("race").onclick = () => race(pAddCorrect,
+  "|M| at T=1.8 is measured against Yang's exact value — speed is only worth having if the distribution is still right.");
+document.getElementById("wsab").onclick = () => race(pAddWRONG,
+  "SABOTAGE LIVE: P_add = 1−exp(−J/T). The clusters are healthy and the sampler is fast. It is sampling the ensemble at DOUBLE the temperature it claims, so |M| misses Yang entirely — no internal diagnostic would have flagged it.");
+
+async function ladder(accept, label) {
+  tout.innerHTML = "<span class='dim'>running five replicas…</span>";
+  await new Promise((r) => setTimeout(r, 20));
+  const temps = [1.8, 2.0, 2.2, 2.4, 2.7];
+  const r = runTempering({ L: 16, temps, sweeps: 1500, accept });
+  let html = "<table><tr><th>T</th><th class='num'>tempered |M|</th><th class='num'>reference</th><th>source</th><th>verdict</th></tr>";
+  temps.forEach((T, i) => {
+    const below = T < ONSAGER_TC;
+    const ref = below ? yangMagnetisation(T) : plainRun({ L: 16, T, sweeps: 1500 }).absM;
+    const okRow = Math.abs(r.absM[i] - ref) < 0.05;
+    html += "<tr><td>" + T + "</td><td class='num'>" + r.absM[i].toFixed(4) + "</td><td class='num'>" + ref.toFixed(4) +
+      "</td><td class='dim'>" + (below ? "Yang, exact" : "same-lattice control") + "</td><td><b class='" +
+      (okRow ? "good" : "bad") + "'>" + (okRow ? "preserved" : "CORRUPTED") + "</b></td></tr>";
+  });
+  html += "</table><div class='dim' style='margin-top:6px;'>swap rates " + r.swapRate.map((x) => x.toFixed(2)).join(", ") +
+    " · spread across the ladder " + (r.absM[0] - r.absM[4]).toFixed(4) + "<br>" + label + "</div>";
+  tout.innerHTML = html;
+}
+document.getElementById("temp").onclick = () => ladder(undefined,
+  "P_swap = min(1, exp((β_i − β_j)(E_i − E_j))) is the unique rule that leaves every marginal alone.");
+document.getElementById("tsab").onclick = () => ladder(swapAlwaysWRONG,
+  "SABOTAGE LIVE: swap unconditionally. Every configuration traded is a real configuration, every chain looks healthy, and the spread across the ladder collapses — the temperatures have stopped meaning anything.");
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

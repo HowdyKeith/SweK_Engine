@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Roundhouse Agent</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 860px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 16px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 12px 14px; margin-bottom: 14px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 6px 13px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  th, td { text-align: left; padding: 3px 10px 3px 0; border-bottom: 1px solid #1a2a22; }
+  th { color: #6f8a7c; font-weight: normal; }
+  .pass { color: #7fe0a4; } .fail { color: #e0a0a0; } .dim { color: #6f8a7c; }
+  .big { font-size: 15px; color: #9fe8c0; }
+  .pill { display: inline-block; border: 1px solid #2c463a; padding: 1px 7px; margin-right: 5px; }
+  #log { white-space: pre-wrap; color: #8fb3a0; max-height: 210px; overflow: auto; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Roundhouse Agent</h1>
+  <div class="sub">Route a task to the cheapest model whose answer survives a real SweK gate. The verifier is
+    engine code, not a bigger model.</div>
+
+  <div class="card">
+    <div id="chain" class="dim">loading chain...</div>
+    <div id="keystate" style="margin-top:6px"></div>
+    <div id="localstate" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <button id="bDry" class="primary">Dry run</button>
+    <button id="bRun">One task</button>
+    <button id="bBench">Benchmark 12</button>
+    <span class="dim" id="busy"></span>
+    <div class="dim" style="margin-top:8px">Dry run needs no key and no network &mdash; it exercises the real
+      routing, escalation, tracing and replay against a mock model.</div>
+  </div>
+
+  <div class="card" id="result" style="display:none"></div>
+  <div class="card"><div class="dim">log</div><div id="log"></div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const log = (m) => { $("log").textContent += m + "\n"; $("log").scrollTop = 1e6; };
+let keyReady = false;
+
+async function jget(url, opts) {
+  const r = await fetch(url, opts);
+  const j = await r.json().catch(() => ({ ok: false, error: "bad-json" }));
+  return j;
+}
+
+async function loadStatus() {
+  try {
+    const s = await jget("/roundhouse/status");
+    if (!s.ok) { $("chain").textContent = "status failed"; return; }
+    $("chain").innerHTML = "chain: " + s.chain.map(m =>
+      `<span class="pill">${m.name} <span class="dim">(${m.cost})</span></span>`).join(" &rarr; ") +
+      `<div class="dim" style="margin-top:6px">gate: ${s.gate}</div>`;
+    keyReady = s.key.available;
+    $("keystate").innerHTML = keyReady
+      ? `<span class="pass">API key available</span> <span class="dim">(source: ${s.key.source})</span>`
+      : `<span class="fail">No API key</span> <span class="dim">&mdash; live runs disabled. Store a Claude key in the
+         credential vault the AI bridge already uses, or set ANTHROPIC_API_KEY for the server. Dry run works now.</span>`;
+    $("bRun").disabled = !keyReady;
+    $("bBench").disabled = !keyReady;
+    await loadLocal();
+  } catch (e) { $("chain").textContent = "bridge unreachable: " + e.message; }
+}
+
+// A local Ollama tier costs no key and no money. Put it at the cheap end and the SweK gate still decides -- if
+// the local answer is wrong the route escalates to a paid tier, so you spend only on what local could not do.
+async function loadLocal() {
+  try {
+    const m = await jget("/roundhouse/models");
+    const sel = document.getElementById("localsel");
+    if (!m.ok || !m.available) {
+      $("localstate").innerHTML = `<span class="dim">No local models found at ${m.base || "localhost:11434"} &mdash;
+        install Ollama and pull one (e.g. <span class="pill">ollama pull qwen2.5:7b</span>) to route a free tier first.</span>`;
+      return;
+    }
+    $("localstate").innerHTML = `local tier: <select id="localsel"><option value="">(none - API only)</option>` +
+      m.models.map(x => `<option value="${x.name}">${x.name}</option>`).join("") + `</select>
+      <span class="dim">free, runs on this machine; the gate still adjudicates</span>`;
+    document.getElementById("localsel").onchange = () => {
+      const on = !!document.getElementById("localsel").value;
+      $("bRun").disabled = !(keyReady || on);   // a local tier alone needs no key
+    };
+  } catch { /* no bridge -> no local tier, page still works */ }
+}
+function localModel() { const el = document.getElementById("localsel"); return el ? el.value : ""; }
+
+function busy(on, what) {
+  $("busy").textContent = on ? (what + " ...") : "";
+  for (const b of ["bDry", "bRun", "bBench"]) $(b).disabled = on || (b !== "bDry" && !keyReady);
+}
+
+function renderRun(j) {
+  const rows = j.steps.map(s =>
+    `<tr><td>${s.model}</td><td class="${s.verified ? "pass" : "fail"}">${s.verified ? "PASS" : "FAIL"}</td></tr>`).join("");
+  $("result").style.display = "block";
+  $("result").innerHTML = `
+    <div class="big">${j.verified ? "verified" : "UNVERIFIED"} &mdash; chose ${j.chosen}</div>
+    <div class="dim">task: exposed faces of a 3&times;4&times;5 box &mdash; gate truth = ${j.truth}</div>
+    <table><tr><th>model tried</th><th>SweK gate</th></tr>${rows}</table>
+    <table style="margin-top:10px">
+      <tr><td>escalations</td><td>${j.escalations}</td></tr>
+      <tr><td>spent (relative)</td><td>${j.totalCost} vs ${j.ifAlwaysStrongest} if always strongest</td></tr>
+      <tr><td>saved</td><td class="${j.saved >= 0 ? "pass" : "fail"}">${j.saved}</td></tr>
+      <tr><td>replay audit</td><td class="${j.replayConsistent ? "pass" : "fail"}">${j.replayConsistent ? "consistent" : "INCONSISTENT"}</td></tr>
+    </table>` + (j.dry ? `<div class="dim" style="margin-top:8px">dry run &mdash; mock model, no network</div>` : "");
+}
+
+function renderBench(s, dry) {
+  $("result").style.display = "block";
+  $("result").innerHTML = `
+    <div class="big">${s.verified}/${s.tasks} verified &mdash; saved ${s.saved} (${(100 * s.savedPct).toFixed(1)}%)</div>
+    <table style="margin-top:8px">
+      <tr><td>spent (relative)</td><td>${s.spent} vs ${s.ifAlwaysStrongest} if always strongest</td></tr>
+      <tr><td>cheap-win rate</td><td>${(100 * s.cheapWinRate).toFixed(1)}%</td></tr>
+      <tr><td>unresolved</td><td>${s.exhausted}</td></tr>
+      <tr><td>resolved by</td><td>${Object.entries(s.byModel).map(([m, c]) => m + ":" + c).join("  ") || "&mdash;"}</td></tr>
+    </table>
+    <div class="dim" style="margin-top:8px">Routing only saves when the cheap model is often right; a wrong cheap
+      answer still costs a call before escalating.</div>` + (dry ? `<div class="dim">dry run &mdash; mock model</div>` : "");
+}
+
+async function go(mode, dry) {
+  busy(true, dry ? "dry run" : mode);
+  log(`[${new Date().toLocaleTimeString()}] ${mode}${dry ? " (dry)" : ""} ...`);
+  const j = await jget("/roundhouse/" + (mode === "bench" ? "bench" : "run"), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dry, count: 12, local: localModel() }),
+  });
+  busy(false);
+  if (!j.ok) { log("  error: " + (j.message || j.error)); return; }
+  if (mode === "bench") renderBench(j.stats, j.dry); else renderRun(j);
+  log("  done" + (j.dry ? " (dry)" : ""));
+}
+
+$("bDry").onclick = () => go("run", true);
+$("bRun").onclick = () => go("run", false);
+$("bBench").onclick = () => go("bench", false);
+loadStatus();
+</script>
+</body>
+</html>

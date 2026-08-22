@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; FLIP/PIC Fluid (WebGPU)</title>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; color:#dfe7f2; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:14px; align-items:center; flex-wrap:wrap; max-width:calc(100% - 28px); background:rgba(6,10,22,.66); border:1px solid #1a2440; border-radius:10px; padding:8px 13px; backdrop-filter:blur(6px); }
+  b.t { color:#5fe6d0; } #mode { padding:2px 8px; border-radius:5px; border:1px solid #1f5a52; background:#0a1a17; color:#7fe6d6; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  label { color:#9fb0c8; } input[type=range] { vertical-align:middle; width:96px; }
+  button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#0e1b1a; color:#8fe6d6; border:1px solid #245047; }
+  button:hover { background:#123028; } button.on { background:#1b3a33; color:#bff5e8; }
+  #stat { color:#7f93ab; } a { color:#8fd1ff; text-decoration:none; }
+  #note { position:fixed; left:12px; bottom:10px; z-index:5; color:#5c7088; font-size:11px; background:rgba(6,10,22,.6); border:1px solid #16203a; border-radius:8px; padding:6px 10px; max-width:min(680px,92vw); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span><b class="t">SweK</b> &middot; FLIP/PIC fluid <span id="mode">WebGPU</span></span>
+  <button id="drop">Drop block</button>
+  <button id="dam">Dam break</button>
+  <button id="pause">Pause</button>
+  <label>FLIP <input id="flip" type="range" min="0" max="100" value="95"><span id="flipv">0.95</span></label>
+  <label>gravity <input id="grav" type="range" min="0" max="30" value="12"></label>
+  <label>iters <input id="iters" type="range" min="10" max="120" value="60"><span id="itersv">60</span></label>
+  <button id="solver">solver: Jacobi</button>
+  <button id="stflip">ST-FLIP: off</button>
+  <span id="stat"></span>
+</div>
+<div id="note">Hybrid FLIP/PIC on a staggered MAC grid: atomic particle&rarr;grid splat, Jacobi pressure projection (incompressibility), grid&rarr;particle FLIP/PIC blend, RK2 advection. Algorithm mirrors <b>fluid/flip2d.mjs</b>, whose physics is unit-tested (divergence collapse, settling, mass conservation). ST-FLIP (SIGGRAPH 2026) large-time-step spacetime sampling is toggleable (motion-blurs the P2G deposit across the time-slab). A red-black Gauss-Seidel + SOR solver is also selectable.</div>
+<script type="module">
+const NX = 128, NY = 128;                 // grid cells
+const N_U = (NX + 1) * NY, N_V = NX * (NY + 1), N_C = NX * NY;
+const MAX_P = 200000;                     // particle capacity
+const SCALE = 16384.0;                    // fixed-point scale for atomic float accumulation
+const cvs = document.getElementById("c");
+const modeEl = document.getElementById("mode"), statEl = document.getElementById("stat");
+function fallback(msg) { modeEl.textContent = "no WebGPU"; modeEl.className = "fallback"; document.getElementById("note").innerHTML = "This demo needs <b>WebGPU</b> (Chrome/Edge 113+, or Safari 18+/Firefox with it enabled). " + (msg || ""); }
+
+if (!navigator.gpu) { fallback(); } else init().catch((e) => { console.error(e); fallback(String(e.message || e)); });
+
+async function init() {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) return fallback("No GPU adapter.");
+  const device = await adapter.requestDevice();
+  // v3822 -- SURFACE GPU ERRORS INSTEAD OF FREEZING SILENTLY. Compute-pipeline validation and shader-compile
+  // errors in WebGPU are ASYNCHRONOUS: createComputePipeline does not throw, so a bad stage left init() looking
+  // like it succeeded while every dispatch quietly did nothing -- the controls and the stat line updated, the
+  // initial particle block rendered once, and the sim never moved. That is precisely the "frozen blue block".
+  // These two handlers turn that silent failure into a visible, specific message (and log it), so the exact
+  // cause -- a WGSL error naming a stage, a device limit like maxStorageBuffersPerShaderStage, or a lost
+  // device/driver -- is shown on the page rather than swallowed.
+  function gpuErr(kind, msg) {
+    console.error("[fluid-webgpu] " + kind + ": " + msg);
+    try {
+      const note = document.getElementById("note");
+      if (note) note.innerHTML = "<b style=\"color:#ff8a8a\">" + kind + "</b> &mdash; the fluid could not run on this GPU/driver, which is why it is frozen. <code style=\"color:#ffb0b0\">" +
+        String(msg).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</code>";
+    } catch (_) {}
+  }
+  device.addEventListener("uncapturederror", (ev) => gpuErr("WebGPU error", (ev.error && ev.error.message) || String(ev.error)));
+  device.lost.then((info) => { if (info && info.reason !== "destroyed") gpuErr("GPU device lost", info.message || ""); });
+  const ctx = cvs.getContext("webgpu");
+  const fmt = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format: fmt, alphaMode: "opaque" });
+
+  // ---- buffers ----
+  const mk = (n, extra = 0) => device.createBuffer({ size: n, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | extra });
+  const bufPos = mk(MAX_P * 2 * 4);         // particle position (vec2 f32)
+  const bufVel = mk(MAX_P * 2 * 4);         // particle velocity (vec2 f32)
+  const bufUNum = mk(N_U * 4), bufUWt = mk(N_U * 4);   // atomic<i32> accumulators
+  const bufVNum = mk(N_V * 4), bufVWt = mk(N_V * 4);
+  const bufU = mk(N_U * 4), bufV = mk(N_V * 4);         // normalized velocity
+  const bufUPrev = mk(N_U * 4), bufVPrev = mk(N_V * 4); // pre-projection (for FLIP delta)
+  const bufP = mk(N_C * 4), bufPNew = mk(N_C * 4);      // pressure ping-pong
+  const bufType = mk(N_C * 4);                          // 0 air, 1 fluid, 2 solid
+  const bufDiv = mk(N_C * 4);
+  const bufParams = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bufCount = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+
+  // ---- WGSL: the solver mirrors fluid/flip2d.mjs exactly ----
+  const COMMON = `
+    struct Params { nx:u32, ny:u32, dt:f32, gravity:f32, flip:f32, scale:f32, nParticles:u32, stSub:u32 };
+    @group(0) @binding(0) var<uniform> P : Params;
+    fn ui(i:u32,j:u32)->u32 { return i + j*(P.nx+1u); }
+    fn vi(i:u32,j:u32)->u32 { return i + j*P.nx; }
+    fn ci(i:u32,j:u32)->u32 { return i + j*P.nx; }
+    const AIR:i32=0; const FLUID:i32=1; const SOLID:i32=2;
+  `;
+  // atomic accumulate helper (fixed point)
+  const wgsl = {};
+
+  wgsl.clear = COMMON + `
+    @group(0) @binding(1) var<storage,read_write> uNum:array<atomic<i32>>;
+    @group(0) @binding(2) var<storage,read_write> uWt:array<atomic<i32>>;
+    @group(0) @binding(3) var<storage,read_write> vNum:array<atomic<i32>>;
+    @group(0) @binding(4) var<storage,read_write> vWt:array<atomic<i32>>;
+    @group(0) @binding(5) var<storage,read_write> typeG:array<i32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x;
+      if (n < arrayLength(&uNum)) { atomicStore(&uNum[n],0); atomicStore(&uWt[n],0); }
+      if (n < arrayLength(&vNum)) { atomicStore(&vNum[n],0); atomicStore(&vWt[n],0); }
+      if (n < P.nx*P.ny) {
+        let i = n % P.nx; let j = n / P.nx;
+        let solid = (i==0u || j==0u || i==P.nx-1u || j==P.ny-1u);
+        typeG[n] = select(AIR, SOLID, solid);
+      }
+    }`;
+
+  wgsl.p2g = COMMON + `
+    @group(0) @binding(1) var<storage,read_write> uNum:array<atomic<i32>>;
+    @group(0) @binding(2) var<storage,read_write> uWt:array<atomic<i32>>;
+    @group(0) @binding(3) var<storage,read_write> vNum:array<atomic<i32>>;
+    @group(0) @binding(4) var<storage,read_write> vWt:array<atomic<i32>>;
+    @group(0) @binding(5) var<storage,read> pos:array<vec2<f32>>;
+    @group(0) @binding(6) var<storage,read> vel:array<vec2<f32>>;
+    fn splatU(gx:f32, gy:f32, val:f32, wsc:f32) {
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx = gx-f32(i0); let fy = gy-f32(j0);
+      for (var dj=0; dj<=1; dj++) { for (var di=0; di<=1; di++) {
+        let i = i0+di; let j = j0+dj;
+        if (i<0 || j<0 || i> i32(P.nx) || j>=i32(P.ny)) { continue; }
+        let wt = select(1.0-fx,fx,di==1) * select(1.0-fy,fy,dj==1) * wsc;
+        let idx = ui(u32(i),u32(j));
+        atomicAdd(&uNum[idx], i32(val*wt*P.scale));
+        atomicAdd(&uWt[idx],  i32(wt*P.scale));
+      }}
+    }
+    fn splatV(gx:f32, gy:f32, val:f32, wsc:f32) {
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx = gx-f32(i0); let fy = gy-f32(j0);
+      for (var dj=0; dj<=1; dj++) { for (var di=0; di<=1; di++) {
+        let i = i0+di; let j = j0+dj;
+        if (i<0 || j<0 || i>=i32(P.nx) || j> i32(P.ny)) { continue; }
+        let wt = select(1.0-fx,fx,di==1) * select(1.0-fy,fy,dj==1) * wsc;
+        let idx = vi(u32(i),u32(j));
+        atomicAdd(&vNum[idx], i32(val*wt*P.scale));
+        atomicAdd(&vWt[idx],  i32(wt*P.scale));
+      }}
+    }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let k = g.x; if (k >= P.nParticles) { return; }
+      let p = pos[k]; let vv = vel[k];      // h = 1
+      if (P.stSub <= 1u) {
+        splatU(p.x, p.y-0.5, vv.x, 1.0);
+        splatV(p.x-0.5, p.y, vv.y, 1.0);
+      } else {
+        // ST-FLIP: motion-blur the deposit across the time-slab -- splat along the trajectory at stSub sub-times,
+        // each carrying 1/stSub of the weight, with a per-particle low-discrepancy jitter. Antialiases the P2G
+        // transfer at large dt (mirrors flip2d.mjs). WGSL atomics accumulate the fixed-point fractional weights.
+        let jit = fract(f32(k) * 0.6180339887);
+        let invS = 1.0 / f32(P.stSub);
+        for (var s:u32=0u; s<P.stSub; s++) {
+          let tau = (f32(s)+jit) * invS * P.dt;
+          splatU(p.x + tau*vv.x, p.y + tau*vv.y - 0.5, vv.x, invS);
+          splatV(p.x + tau*vv.x - 0.5, p.y + tau*vv.y, vv.y, invS);
+        }
+      }
+    }`;
+
+  wgsl.normalize = COMMON + `
+    @group(0) @binding(1) var<storage,read> uNum:array<i32>;
+    @group(0) @binding(2) var<storage,read> uWt:array<i32>;
+    @group(0) @binding(3) var<storage,read> vNum:array<i32>;
+    @group(0) @binding(4) var<storage,read> vWt:array<i32>;
+    @group(0) @binding(5) var<storage,read_write> u:array<f32>;
+    @group(0) @binding(6) var<storage,read_write> v:array<f32>;
+    @group(0) @binding(7) var<storage,read_write> uPrev:array<f32>;
+    @group(0) @binding(8) var<storage,read_write> vPrev:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x;
+      if (n < arrayLength(&u)) { let w = uWt[n]; let val = select(0.0, f32(uNum[n])/f32(w), w>0); u[n]=val; uPrev[n]=val; }
+      if (n < arrayLength(&v)) { let w = vWt[n]; let val = select(0.0, f32(vNum[n])/f32(w), w>0); v[n]=val; vPrev[n]=val; }
+    }`;
+
+  wgsl.markForces = COMMON + `
+    @group(0) @binding(1) var<storage,read> pos:array<vec2<f32>>;
+    @group(0) @binding(2) var<storage,read_write> typeG:array<i32>;
+    @group(0) @binding(3) var<storage,read_write> v:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let k = g.x;
+      // add gravity to v faces (one thread per face via same index space; guarded)
+      if (k < arrayLength(&v)) { v[k] = v[k] + P.gravity * P.dt; }
+      // mark fluid cells (benign race: all write FLUID)
+      if (k < P.nParticles) {
+        let p = pos[k]; let i = i32(floor(p.x)); let j = i32(floor(p.y));
+        if (i>0 && j>0 && i<i32(P.nx)-1 && j<i32(P.ny)-1) { let c = ci(u32(i),u32(j)); if (typeG[c]!=SOLID) { typeG[c]=FLUID; } }
+      }
+    }`;
+
+  wgsl.solidVel = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read_write> u:array<f32>;
+    @group(0) @binding(3) var<storage,read_write> v:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x;
+      if (n < arrayLength(&u)) {
+        let i = n % (P.nx+1u); let j = n / (P.nx+1u);
+        if (j < P.ny) {
+          var l = SOLID; var r = SOLID;                 // guard indices: WGSL has no short-circuit, so read only when valid
+          if (i>0u && i<=P.nx) { l = typeG[ci(i-1u,j)]; }
+          if (i<P.nx)          { r = typeG[ci(i,j)]; }
+          if (l==SOLID || r==SOLID) { u[n]=0.0; }
+        }
+      }
+      if (n < arrayLength(&v)) {
+        let i = n % P.nx; let j = n / P.nx;
+        var d = SOLID; var up = SOLID;
+        if (j>0u && j<=P.ny) { d = typeG[ci(i,j-1u)]; }
+        if (j<P.ny)          { up = typeG[ci(i,j)]; }
+        if (d==SOLID || up==SOLID) { v[n]=0.0; }
+      }
+    }`;
+
+  wgsl.divergence = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> u:array<f32>;
+    @group(0) @binding(3) var<storage,read> v:array<f32>;
+    @group(0) @binding(4) var<storage,read_write> divg:array<f32>;
+    @group(0) @binding(5) var<storage,read_write> p:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x; if (n >= P.nx*P.ny) { return; }
+      let i = n % P.nx; let j = n / P.nx;
+      if (typeG[n]==FLUID) { divg[n] = u[ui(i+1u,j)] - u[ui(i,j)] + v[vi(i,j+1u)] - v[vi(i,j)]; }
+      else { divg[n] = 0.0; }
+      if (typeG[n]!=FLUID) { p[n] = 0.0; }   // reset non-fluid; fluid cells keep warm-start value
+    }`;
+
+  wgsl.jacobi = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> divg:array<f32>;
+    @group(0) @binding(3) var<storage,read> p:array<f32>;
+    @group(0) @binding(4) var<storage,read_write> pNew:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x; if (n >= P.nx*P.ny) { return; }
+      let i = n % P.nx; let j = n / P.nx;
+      if (i==0u || j==0u || i>=P.nx-1u || j>=P.ny-1u || typeG[n]!=FLUID) { pNew[n]=0.0; return; }
+      let tL=typeG[ci(i-1u,j)]; let tR=typeG[ci(i+1u,j)]; let tD=typeG[ci(i,j-1u)]; let tU=typeG[ci(i,j+1u)];
+      var denom=0.0; var sum=0.0;
+      if (tL!=SOLID) { denom+=1.0; if (tL==FLUID) { sum+=p[ci(i-1u,j)]; } }
+      if (tR!=SOLID) { denom+=1.0; if (tR==FLUID) { sum+=p[ci(i+1u,j)]; } }
+      if (tD!=SOLID) { denom+=1.0; if (tD==FLUID) { sum+=p[ci(i,j-1u)]; } }
+      if (tU!=SOLID) { denom+=1.0; if (tU==FLUID) { sum+=p[ci(i,j+1u)]; } }
+      pNew[n] = select(0.0, (sum - divg[n]/P.dt) / denom, denom>0.0);
+    }`;
+
+  wgsl.rbgs = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> divg:array<f32>;
+    @group(0) @binding(3) var<storage,read_write> p:array<f32>;
+    struct RB { omega:f32, color:u32, pad0:u32, pad1:u32 };
+    @group(0) @binding(4) var<uniform> rb:RB;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x; if (n >= P.nx*P.ny) { return; }
+      let i = n % P.nx; let j = n / P.nx;
+      if (i==0u || j==0u || i>=P.nx-1u || j>=P.ny-1u) { return; }
+      if (((i+j)&1u) != rb.color) { return; }             // red-black: only this color's cells (all independent)
+      if (typeG[n]!=FLUID) { return; }
+      let tL=typeG[ci(i-1u,j)]; let tR=typeG[ci(i+1u,j)]; let tD=typeG[ci(i,j-1u)]; let tU=typeG[ci(i,j+1u)];
+      var denom=0.0; var sum=0.0;
+      if (tL!=SOLID) { denom+=1.0; if (tL==FLUID) { sum+=p[ci(i-1u,j)]; } }
+      if (tR!=SOLID) { denom+=1.0; if (tR==FLUID) { sum+=p[ci(i+1u,j)]; } }
+      if (tD!=SOLID) { denom+=1.0; if (tD==FLUID) { sum+=p[ci(i,j-1u)]; } }
+      if (tU!=SOLID) { denom+=1.0; if (tU==FLUID) { sum+=p[ci(i,j+1u)]; } }
+      if (denom>0.0) { let gs=(sum - divg[n]/P.dt)/denom; p[n] = p[n] + rb.omega*(gs - p[n]); }   // SOR, in place
+    }`;
+
+  wgsl.applyP = COMMON + `
+    @group(0) @binding(1) var<storage,read> typeG:array<i32>;
+    @group(0) @binding(2) var<storage,read> p:array<f32>;
+    @group(0) @binding(3) var<storage,read_write> u:array<f32>;
+    @group(0) @binding(4) var<storage,read_write> v:array<f32>;
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let n = g.x;
+      if (n < arrayLength(&u)) {
+        let i = n % (P.nx+1u); let j = n / (P.nx+1u);
+        if (j<P.ny && i>0u && i<P.nx) {
+          let cL=ci(i-1u,j); let cR=ci(i,j);
+          if (typeG[cL]!=SOLID && typeG[cR]!=SOLID && (typeG[cL]==FLUID || typeG[cR]==FLUID)) { u[n] = u[n] - P.dt*(p[cR]-p[cL]); }
+        }
+      }
+      if (n < arrayLength(&v)) {
+        let i = n % P.nx; let j = n / P.nx;
+        if (j>0u && j<P.ny) {
+          let cD=ci(i,j-1u); let cU=ci(i,j);
+          if (typeG[cD]!=SOLID && typeG[cU]!=SOLID && (typeG[cD]==FLUID || typeG[cU]==FLUID)) { v[n] = v[n] - P.dt*(p[cU]-p[cD]); }
+        }
+      }
+    }`;
+
+  wgsl.g2p = COMMON + `
+    @group(0) @binding(1) var<storage,read> u:array<f32>;
+    @group(0) @binding(2) var<storage,read> v:array<f32>;
+    @group(0) @binding(3) var<storage,read> uPrev:array<f32>;
+    @group(0) @binding(4) var<storage,read> vPrev:array<f32>;
+    @group(0) @binding(5) var<storage,read_write> pos:array<vec2<f32>>;
+    @group(0) @binding(6) var<storage,read_write> vel:array<vec2<f32>>;
+    fn sU(gx:f32, gy:f32) -> f32 {
+      let w = i32(P.nx)+1; let h = i32(P.ny);
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx=gx-f32(i0); let fy=gy-f32(j0); var s=0.0;
+      for (var dj=0; dj<=1; dj++){ for (var di=0; di<=1; di++){
+        let i = clamp(i0+di,0,w-1); let j = clamp(j0+dj,0,h-1);
+        s += select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*u[i + j*w];
+      }} return s;
+    }
+    fn sUp(gx:f32, gy:f32) -> f32 {
+      let w = i32(P.nx)+1; let h = i32(P.ny);
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx=gx-f32(i0); let fy=gy-f32(j0); var s=0.0;
+      for (var dj=0; dj<=1; dj++){ for (var di=0; di<=1; di++){
+        let i = clamp(i0+di,0,w-1); let j = clamp(j0+dj,0,h-1);
+        s += select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*uPrev[i + j*w];
+      }} return s;
+    }
+    fn sV(gx:f32, gy:f32) -> f32 {
+      let w = i32(P.nx); let h = i32(P.ny)+1;
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx=gx-f32(i0); let fy=gy-f32(j0); var s=0.0;
+      for (var dj=0; dj<=1; dj++){ for (var di=0; di<=1; di++){
+        let i = clamp(i0+di,0,w-1); let j = clamp(j0+dj,0,h-1);
+        s += select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*v[i + j*w];
+      }} return s;
+    }
+    fn sVp(gx:f32, gy:f32) -> f32 {
+      let w = i32(P.nx); let h = i32(P.ny)+1;
+      let i0 = i32(floor(gx)); let j0 = i32(floor(gy)); let fx=gx-f32(i0); let fy=gy-f32(j0); var s=0.0;
+      for (var dj=0; dj<=1; dj++){ for (var di=0; di<=1; di++){
+        let i = clamp(i0+di,0,w-1); let j = clamp(j0+dj,0,h-1);
+        s += select(1.0-fx,fx,di==1)*select(1.0-fy,fy,dj==1)*vPrev[i + j*w];
+      }} return s;
+    }
+    @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+      let k = g.x; if (k >= P.nParticles) { return; }
+      var p = pos[k]; var vv = vel[k];
+      // G2P: FLIP (add grid delta) / PIC (replace) blend
+      let picU = sU(p.x, p.y-0.5); let picV = sV(p.x-0.5, p.y);
+      let dU = picU - sUp(p.x, p.y-0.5); let dV = picV - sVp(p.x-0.5, p.y);
+      let flipU = vv.x + dU; let flipV = vv.y + dV;
+      vv.x = P.flip*flipU + (1.0-P.flip)*picU;
+      vv.y = P.flip*flipV + (1.0-P.flip)*picV;
+      // Advect (RK2). ST-FLIP SEAM: a per-particle sub-step time offset would modulate this integration.
+      let um = sU(p.x, p.y-0.5); let vm = sV(p.x-0.5, p.y);
+      let mx = p.x + 0.5*P.dt*um; let my = p.y + 0.5*P.dt*vm;
+      let u2 = sU(mx, my-0.5); let v2 = sV(mx-0.5, my);
+      p.x = p.x + P.dt*u2; p.y = p.y + P.dt*v2;
+      let lo = 1.001; let hiX = f32(P.nx)-1.001; let hiY = f32(P.ny)-1.001;
+      if (p.x<lo){ p.x=lo; if(vv.x<0.0){vv.x=0.0;} } if (p.x>hiX){ p.x=hiX; if(vv.x>0.0){vv.x=0.0;} }
+      if (p.y<lo){ p.y=lo; if(vv.y<0.0){vv.y=0.0;} } if (p.y>hiY){ p.y=hiY; if(vv.y>0.0){vv.y=0.0;} }
+      pos[k]=p; vel[k]=vv;
+    }`;
+
+  wgsl.render = COMMON + `
+    @group(0) @binding(1) var<storage,read> pos:array<vec2<f32>>;
+    @group(0) @binding(2) var<storage,read> vel:array<vec2<f32>>;
+    struct VOut { @builtin(position) clip:vec4<f32>, @location(0) col:vec3<f32> };
+    @vertex fn vs(@builtin(vertex_index) vtx:u32, @builtin(instance_index) inst:u32) -> VOut {
+      // small quad per particle (2 triangles)
+      var corners = array<vec2<f32>,6>(vec2(-1.,-1.),vec2(1.,-1.),vec2(-1.,1.),vec2(-1.,1.),vec2(1.,-1.),vec2(1.,1.));
+      let pr = 1.6 / f32(P.nx);   // particle radius in NDC-ish (grid normalized)
+      let gp = pos[inst];
+      let ndc = vec2<f32>(gp.x/f32(P.nx)*2.0-1.0, gp.y/f32(P.ny)*2.0-1.0);
+      let c = corners[vtx];
+      var o:VOut;
+      o.clip = vec4<f32>(ndc + c*pr, 0.0, 1.0);
+      let sp = clamp(length(vel[inst])/14.0, 0.0, 1.0);
+      // LCARS-ish: deep teal (slow) -> gold -> white (fast)
+      let teal = vec3<f32>(0.15,0.55,0.75); let gold = vec3<f32>(0.95,0.75,0.25); let white=vec3<f32>(1.0,1.0,1.0);
+      o.col = select(mix(teal,gold,sp*2.0), mix(gold,white,(sp-0.5)*2.0), sp>0.5);
+      return o;
+    }
+    @fragment fn fs(i:VOut) -> @location(0) vec4<f32> { return vec4<f32>(i.col, 1.0); }`;
+
+  // ---- pipelines ----
+  // v3822 -- VALIDATE EVERY SHADER BY NAME BEFORE BUILDING PIPELINES. getCompilationInfo() is the only way to
+  // see a WGSL error synchronously here; without it a bad stage would fail as an uncaptured error at first
+  // dispatch and the sim would just sit still. Naming the stage (clear/p2g/normalize/.../render) turns a black
+  // freeze into "WGSL (normalize) error: <line>" so the culprit is unambiguous.
+  {
+    let firstErr = null;
+    for (const name of Object.keys(wgsl)) {
+      const mod = device.createShaderModule({ code: wgsl[name] });
+      if (mod.getCompilationInfo) {
+        try {
+          const ci = await mod.getCompilationInfo();
+          for (const m of ci.messages) if (m.type === "error" && !firstErr) firstErr = "WGSL (" + name + ") error: " + m.message + " [line " + m.lineNum + "]";
+        } catch (_) {}
+      }
+    }
+    if (firstErr) { gpuErr("Shader compile error", firstErr); return; }
+  }
+  function comp(code) { return device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } }); }
+  const pClear = comp(wgsl.clear), pP2G = comp(wgsl.p2g), pNorm = comp(wgsl.normalize),
+        pMark = comp(wgsl.markForces), pSolid = comp(wgsl.solidVel), pDiv = comp(wgsl.divergence),
+        pJac = comp(wgsl.jacobi), pRBGS = comp(wgsl.rbgs), pApply = comp(wgsl.applyP), pG2P = comp(wgsl.g2p);
+  // red-black color+omega uniform: two 256-aligned slots (color 0 / color 1), addressed by dynamic offset
+  const RB_STRIDE = 256;
+  const bufRB = device.createBuffer({ size: RB_STRIDE * 2, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const rbLayout = device.createBindGroupLayout({ entries: [
+    { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
+    { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+    { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+    { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+    { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform", hasDynamicOffset: true } },
+  ] });
+  const pRBGSx = device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [rbLayout] }), compute: { module: device.createShaderModule({ code: wgsl.rbgs }), entryPoint: "main" } });
+  function writeRB(omega) { const a = new ArrayBuffer(RB_STRIDE * 2); const d = new DataView(a); d.setFloat32(0, omega, true); d.setUint32(4, 0, true); d.setFloat32(RB_STRIDE, omega, true); d.setUint32(RB_STRIDE + 4, 1, true); device.queue.writeBuffer(bufRB, 0, a); }
+  const rmod = device.createShaderModule({ code: wgsl.render });
+  const pRender = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: rmod, entryPoint: "vs" }, fragment: { module: rmod, entryPoint: "fs", targets: [{ format: fmt }] },
+    primitive: { topology: "triangle-list" },
+  });
+
+  const bg = (pipe, entries) => device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: entries.map((b, i) => ({ binding: i, resource: b.buffer ? b : { buffer: b } })) });
+
+  // ---- state / particle seeding ----
+  let nParticles = 0;
+  const posArr = new Float32Array(MAX_P * 2), velArr = new Float32Array(MAX_P * 2);
+  let rngS = 12345; const rng = () => { rngS = (rngS * 16807) % 2147483647; return rngS / 2147483647; };
+  function seedBlock(x0, y0, x1, y1, perCell = 2) {
+    nParticles = 0; const step = 1 / perCell;
+    for (let y = y0 + step * 0.5; y < y1 && nParticles < MAX_P; y += step)
+      for (let x = x0 + step * 0.5; x < x1 && nParticles < MAX_P; x += step) {
+        posArr[nParticles * 2] = x + (rng() - 0.5) * step * 0.5; posArr[nParticles * 2 + 1] = y + (rng() - 0.5) * step * 0.5;
+        velArr[nParticles * 2] = 0; velArr[nParticles * 2 + 1] = 0; nParticles++;
+      }
+    device.queue.writeBuffer(bufPos, 0, posArr, 0, nParticles * 2);
+    device.queue.writeBuffer(bufVel, 0, velArr, 0, nParticles * 2);
+    device.queue.writeBuffer(bufType, 0, new Int32Array(N_C));   // clear
+    device.queue.writeBuffer(bufP, 0, new Float32Array(N_C));
+  }
+  const presets = {
+    drop: () => seedBlock(NX * 0.28, NY * 0.55, NX * 0.72, NY * 0.9, 2),
+    dam: () => seedBlock(2, 2, NX * 0.34, NY * 0.85, 2),
+  };
+  presets.drop();
+
+  // ---- params ----
+  let flip = 0.95, gravity = -12, iters = 60, paused = false, solver = "jacobi", stSub = 1;
+  const zerosC = new Float32Array(N_C);
+  function writeParams(dt) {
+    const f = new ArrayBuffer(48); const dv = new DataView(f);
+    dv.setUint32(0, NX, true); dv.setUint32(4, NY, true); dv.setFloat32(8, dt, true); dv.setFloat32(12, gravity, true);
+    dv.setFloat32(16, flip, true); dv.setFloat32(20, SCALE, true); dv.setUint32(24, nParticles, true); dv.setUint32(28, stSub, true);
+    device.queue.writeBuffer(bufParams, 0, f);
+  }
+
+  const WG = (n) => Math.ceil(n / 64);
+  const bigGrid = Math.max(N_U, N_V, N_C);
+
+  function frame() {
+    if (!paused) {
+      const dt = 1 / 60; writeParams(dt);
+      if (solver === "rbgs") device.queue.writeBuffer(bufP, 0, zerosC);   // RBGS runs fresh, not warm-started
+      const enc = device.createCommandEncoder();
+      const pass = enc.beginComputePass();
+      // 1. clear grid + solids
+      pass.setPipeline(pClear); pass.setBindGroup(0, bg(pClear, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufType])); pass.dispatchWorkgroups(WG(bigGrid));
+      // 2. P2G
+      pass.setPipeline(pP2G); pass.setBindGroup(0, bg(pP2G, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufPos, bufVel])); pass.dispatchWorkgroups(WG(nParticles));
+      // 3. normalize -> u,v,uPrev,vPrev
+      pass.setPipeline(pNorm); pass.setBindGroup(0, bg(pNorm, [bufParams, bufUNum, bufUWt, bufVNum, bufVWt, bufU, bufV, bufUPrev, bufVPrev])); pass.dispatchWorkgroups(WG(bigGrid));
+      // 4. gravity + mark fluid
+      pass.setPipeline(pMark); pass.setBindGroup(0, bg(pMark, [bufParams, bufPos, bufType, bufV])); pass.dispatchWorkgroups(WG(Math.max(nParticles, N_V)));
+      // 5. solid boundaries
+      pass.setPipeline(pSolid); pass.setBindGroup(0, bg(pSolid, [bufParams, bufType, bufU, bufV])); pass.dispatchWorkgroups(WG(bigGrid));
+      // 6. divergence (+ reset non-fluid pressure, keep warm-start on fluid)
+      pass.setPipeline(pDiv); pass.setBindGroup(0, bg(pDiv, [bufParams, bufType, bufU, bufV, bufDiv, bufP])); pass.dispatchWorkgroups(WG(N_C));
+      // 7. pressure solve -- Jacobi (warm-started ping-pong) or red-black Gauss-Seidel + SOR (fresh, in-place)
+      let finalP = bufP;
+      if (solver === "rbgs") {
+        writeRB(1.4);   // omega; RBGS runs fresh (bufP was zeroed before this encoder)
+        for (let it = 0; it < iters; it++) {
+          for (let color = 0; color < 2; color++) {
+            pass.setPipeline(pRBGSx);
+            pass.setBindGroup(0, device.createBindGroup({ layout: rbLayout, entries: [
+              { binding: 0, resource: { buffer: bufParams } }, { binding: 1, resource: { buffer: bufType } },
+              { binding: 2, resource: { buffer: bufDiv } }, { binding: 3, resource: { buffer: bufP } },
+              { binding: 4, resource: { buffer: bufRB, offset: 0, size: 16 } },
+            ] }), [color * RB_STRIDE]);
+            pass.dispatchWorkgroups(WG(N_C));
+          }
+        }
+        finalP = bufP;
+      } else {
+        let src = bufP, dst = bufPNew;
+        for (let it = 0; it < iters; it++) {
+          pass.setPipeline(pJac); pass.setBindGroup(0, bg(pJac, [bufParams, bufType, bufDiv, src, dst])); pass.dispatchWorkgroups(WG(N_C));
+          const t = src; src = dst; dst = t;
+        }
+        finalP = src;
+      }
+      // 8. apply pressure gradient
+      pass.setPipeline(pApply); pass.setBindGroup(0, bg(pApply, [bufParams, bufType, finalP, bufU, bufV])); pass.dispatchWorkgroups(WG(bigGrid));
+      pass.setPipeline(pSolid); pass.setBindGroup(0, bg(pSolid, [bufParams, bufType, bufU, bufV])); pass.dispatchWorkgroups(WG(bigGrid));
+      // 9. G2P + advect
+      pass.setPipeline(pG2P); pass.setBindGroup(0, bg(pG2P, [bufParams, bufU, bufV, bufUPrev, bufVPrev, bufPos, bufVel])); pass.dispatchWorkgroups(WG(nParticles));
+      pass.end();
+      // Jacobi warm-starts: keep the settled pressure in bufP for next frame. (RBGS already ends in bufP.)
+      if (solver !== "rbgs" && finalP !== bufP) enc.copyBufferToBuffer(finalP, 0, bufP, 0, N_C * 4);
+      device.queue.submit([enc.finish()]);
+    }
+    // ---- render ----
+    const enc2 = device.createCommandEncoder();
+    const view = ctx.getCurrentTexture().createView();
+    const rp = enc2.beginRenderPass({ colorAttachments: [{ view, clearValue: { r: 0.008, g: 0.012, b: 0.04, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+    rp.setPipeline(pRender); rp.setBindGroup(0, bg(pRender, [bufParams, bufPos, bufVel])); rp.draw(6, nParticles);
+    rp.end(); device.queue.submit([enc2.finish()]);
+    statEl.textContent = nParticles.toLocaleString() + " particles \u00b7 " + NX + "\u00d7" + NY + " \u00b7 " + iters + " iters \u00b7 " + (solver === "rbgs" ? "RBGS-SOR" : "Jacobi");
+    requestAnimationFrame(frame);
+  }
+
+  // ---- canvas sizing (square, fit) ----
+  function resize() { const s = Math.min(innerWidth, innerHeight) * (window.devicePixelRatio || 1); cvs.width = s; cvs.height = s; }
+  addEventListener("resize", resize); resize();
+
+  // ---- controls ----
+  document.getElementById("drop").onclick = () => presets.drop();
+  document.getElementById("dam").onclick = () => presets.dam();
+  const pb = document.getElementById("pause"); pb.onclick = () => { paused = !paused; pb.textContent = paused ? "Play" : "Pause"; pb.className = paused ? "on" : ""; };
+  document.getElementById("flip").oninput = (e) => { flip = e.target.value / 100; document.getElementById("flipv").textContent = flip.toFixed(2); };
+  document.getElementById("grav").oninput = (e) => { gravity = -e.target.value; };
+  document.getElementById("iters").oninput = (e) => { iters = +e.target.value; document.getElementById("itersv").textContent = iters; };
+  const sb = document.getElementById("solver"); sb.onclick = () => { solver = (solver === "jacobi") ? "rbgs" : "jacobi"; sb.textContent = "solver: " + (solver === "rbgs" ? "RBGS-SOR" : "Jacobi"); sb.className = (solver === "rbgs") ? "on" : ""; };
+  const stb = document.getElementById("stflip"); stb.onclick = () => { stSub = (stSub > 1) ? 1 : 4; stb.textContent = "ST-FLIP: " + (stSub > 1 ? "on (x" + stSub + ")" : "off"); stb.className = (stSub > 1) ? "on" : ""; };
+
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

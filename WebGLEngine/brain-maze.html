@@ -1,0 +1,601 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SweK Engine — Brain Maze (the GPU Brain solves an obstacle room)</title>
+<style>
+  :root { --ink:#cfe2f2; --dim:#6d829a; --line:#26405e; --go:#4ade80; --bad:#ff5a5a; }
+  body { margin:0; background:#06090a; color:var(--ink); font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:10px 14px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:14px; color:var(--go); }
+  p.lede { margin:6px 0 0; font-size:11px; color:var(--dim); line-height:1.6; max-width:820px; }
+  .wrap { display:flex; gap:14px; padding:14px; flex-wrap:wrap; }
+  .bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  button, select { font:11px ui-monospace,monospace; padding:3px 10px; background:#1a2438; color:#b0c4ff;
+                   border:1px solid #3a4a6a; border-radius:5px; cursor:pointer; }
+  button.primary { background:#12261e; color:#9fe6c0; border-color:#2a6a4a; }
+  button:disabled { opacity:.5; cursor:default; }
+  canvas { border:1px solid var(--line); border-radius:6px; background:#04070a; image-rendering:pixelated; cursor:crosshair; }
+  /* v2873 -- the action fills the page. Backing store stays the per-cell grid: one pixel is one cell, so the DISPLAY grows and pixelated keeps a cell square. Enlarging the store would invent detail the sim never computed. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+  .side { min-width:260px; font-size:11px; }
+  .kv { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #12202f; }
+  .kv b { color:#8ab4ff; font-weight:normal; }
+  #status { font-size:11px; }
+  .ok { color:var(--go); } .err { color:var(--bad); } .warn { color:#caa05a; }
+  /* v2232 -- key debug pinned to a compact sticky bar at the top, instead of a side column that wraps below the canvas. */
+  .hud { position:sticky; top:0; z-index:6; background:#06090a; border-bottom:1px solid var(--line); padding:6px 14px; display:flex; flex-direction:column; gap:4px; }
+  .hud .row { display:flex; flex-wrap:wrap; gap:3px 14px; align-items:center; font-size:11px; }
+  .hud .kv { display:inline-flex; gap:5px; padding:0; border:0; white-space:nowrap; }
+  .hud .kv span { color:var(--dim); }
+  .hud .kv b { color:#8ab4ff; font-weight:normal; }
+</style>
+
+<header>
+  <h1>&#129504; Brain Maze &mdash; the GPU Brain solves an obstacle room</h1>
+  <p class="lede">
+    A maze is just a heightmap: walls are tall cells, and the solver's slope cost makes them impassable &mdash;
+    no maze-specific code exists anywhere in the brain. This page POSTs the maze to
+    <code>/ai/brain/snapshot</code>, the brain solves a flow field and publishes it to
+    <code>/ai/brain/flowfield</code>, and the walker below steers by sampling that field.
+    <b>Draw walls with the mouse.</b> The walker re-routes as soon as the brain re-solves &mdash; you are watching
+    the brain think, not a scripted path.
+  </p>
+</header>
+
+<div class="hud">
+  <div id="status" class="warn">connecting to the brain&hellip;</div>
+  <div class="row">
+    <div class="kv"><span>state</span><b id="kState">&mdash;</b></div>
+    <div class="kv"><span>last solve</span><b id="kSolve">&mdash;</b></div>
+    <div class="kv"><span>age</span><b id="kAge">&mdash;</b></div>
+    <div class="kv"><span>grid</span><b id="kGrid">&mdash;</b></div>
+    <div class="kv"><span>walls</span><b id="kWalls">0</b></div>
+    <div class="kv"><span>walker</span><b id="kWalker">&mdash;</b></div>
+    <div class="kv"><span>re-solves</span><b id="kSolves">0</b></div>
+    <div class="kv"><span>solved by</span><b id="kBackend">&mdash;</b></div>
+    <div class="kv"><span>field health</span><b id="kHealth">&mdash;</b></div>
+    <button id="btnDiag" style="font:inherit;font-size:11px;padding:2px 9px;border-radius:5px;cursor:pointer;background:#152136;color:#b9d4ff;border:1px solid #2f486c;">Copy diagnostic</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="bar">
+      <button class="primary" id="btnRandom">Randomize dungeon</button>
+      <button id="btnClear">Clear walls</button>
+      <button id="btnReset">Reset walkers</button>
+      <button id="btnPause">Pause</button>
+      <select id="sizeSel" title="Dungeon size. Larger grids scale the wall cost so the solver still can't tunnel, and add more rooms.">
+        <option value="48">size: medium (48)</option>
+        <option value="72">size: large (72)</option>
+        <option value="96">size: huge (96)</option>
+      </select>
+      <select id="walkerCount" title="How many walkers to release from the entrance — they all follow the one field to the boss room.">
+        <option value="1">walkers: 1</option>
+        <option value="6">walkers: 6</option>
+        <option value="16">walkers: 16</option>
+        <option value="40">walkers: 40</option>
+      </select>
+      <select id="drawMode">
+        <option value="wall">draw: walls</option>
+        <option value="erase">draw: erase</option>
+        <option value="goal">draw: move goal</option>
+      </select>
+      <select id="solverSel" title="Which flow-field solver the brain uses. auto = probe GPU vs the exact CPU Dijkstra and keep whichever actually wins; gpu = force the watched GPU path (demotes to CPU if it truncates); cpu = exact Dijkstra. The choice rides in on the next snapshot; 'solved by' below shows what actually ran.">
+        <option value="auto">solver: auto (probe)</option>
+        <option value="gpu">solver: gpu (watched)</option>
+        <option value="cpu">solver: cpu (exact)</option>
+      </select>
+      <label style="color:var(--dim)"><input type="checkbox" id="showArrows" checked> flow arrows</label>
+      <label style="color:var(--dim)"><input type="checkbox" id="showDist"> distance shading</label>
+    </div>
+    <canvas id="cv" width="768" height="768"></canvas>
+    <p style="color:var(--dim);line-height:1.6;margin-top:10px;max-width:768px">
+      The walker follows <code>fx/fz</code> at its own cell. If the field is stale or wrong, it will visibly stall or
+      walk into a wall &mdash; which is the point. This room is a lie detector for the solver.
+    </p>
+    <p style="color:var(--dim);line-height:1.6;max-width:768px">
+      Needs the Deno brain running against this bridge. No brain &rarr; no field &rarr; the walker stands still and this
+      page says so rather than faking motion.
+    </p>
+  </div>
+</div>
+
+<script type="module">
+let W = 48, H = 48; const CELL = 4;  // v2226 — W/H now resizable (medium/large/huge). 48^2 solves in well under 1ms; even 96^2 (9216) stays fast.
+const OX = 0, OZ = 0;
+let WALL_H = 4000; const FLOOR_H = 0;    // v2186 — was 1000, which the solver TUNNELED THROUGH.
+// The cost model charges 1 + slopeK*(dh/cell) to enter a wall cell (slopeK=3, cell=4), so a
+// WALL_H=1000 wall costs 1+3*(1000/4) = 751 to cross — but a detour around a baffle can be
+// >751 floor cells, so Dijkstra's shortest path went THROUGH the wall, the flow field pointed
+// into it, and the walker (correctly refusing walls) stalled: "gets to a wall and gives up".
+// The room's own comment table measured this UNDERWATER (where floors also cost +25, shrinking
+// the gap) and landed on 1000 — too low once floors are lifted above water. A single wall
+// crossing must cost more than the largest possible detour (~2304 cells on a 48² grid):
+// 1+3*(H/4) > 2304  =>  H > 3071. 4000 gives margin. Combined with FLOOR_LIFT (floors above
+// water) this makes walls genuinely impassable and the flow never points into one.
+const FLOOR_LIFT = 10;               // added to every SNAPSHOT height so floors sit above the solver's WATER_LEVEL (8): see postSnapshot
+// The brain has NO concept of "impassable" -- a wall is just a steep, expensive cell
+// (cost ~= 1 + slopeK*dh/cell). So a wall is only a wall if crossing it costs more than
+// ANY detour around it. Measured on this 48^2 grid with two gapped baffles, by walking
+// the exact field down its gradient and counting wall cells crossed:
+//     WALL_H  cost/cell  wall cells crossed
+//        60        46          2      <- Dijkstra correctly smashes through: cheaper than a 40-cell detour
+//       200       151          2
+//       400       301          1
+//       800       601          0      <- first height where walls are truly impassable
+//      2000      1501          0
+// 1000 gives margin. This is exactly the bug the room is meant to expose: an early build
+// used 60 and the walker stalled with "field points INTO a wall" -- the field was right,
+// the MAZE was wrong.
+
+// v2209 -- the room is generated by a MINIMUM SPANNING TREE over a Delaunay graph of scattered rooms, so it
+// cannot be disconnected. The layout algorithm is majidmanzarpour/threejs-procedural-dungeon's, read and
+// re-implemented in `dungeon/dungeonGen.js`. Its renderer is not: this engine already draws.
+import { generateDungeonFitting } from "./dungeon/dungeonGen.js";
+// v2852 -- STALL DIAGNOSIS. Keith: "it will run into a wall and instead of looking for a secondary path... it
+// should realize it is stopped, but not stuck." STOPPED, NOT STUCK is the whole diagnosis: the walker is
+// standing where the field told it to stand and correctly refusing to enter a wall. THREE different causes
+// produce that symptom and they have OPPOSITE fixes -- walls too cheap for the grid size, a truncated GPU
+// field, or a spurious basin -- and only if all three are clean is it the walker's fault. Everything needed to
+// tell them apart was ALREADY being computed on this page and nothing consulted it at the moment it mattered,
+// which is the same failure as the render-QA baseline write in v2848.
+import { detectStall, diagnose as diagnoseStall, wallsAreImpassable } from "./brain/tools/stallDiagnosis.mjs";
+const _walkHist = [];
+let _lastStall = null;
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let px = cv.width / W;             // pixels per cell (recomputed on resize)
+
+let heights = new Float32Array(W * H);
+let goal = { gx: W - 4, gy: (H / 2) | 0 };
+let walker = { x: 4 * CELL, z: ((H / 2) | 0) * CELL };
+let walkers = [walker];              // v2226 — the swarm. walkers[0] IS `walker` (kept stable so the selfcheck's binding stays valid).
+let field = null;                    // {w,h,cell,ox,oz,fx,fz}
+let fieldSeen = 0, paused = false, lastPostedSig = "";
+// One seed, one room. `?seed=` reproduces a report exactly, which is the whole reason a screenshot of a
+// stalled walker is now worth sending.
+// `location` is not guaranteed: this module is booted headlessly by brain/tools/maze-walker-selfcheck.mjs,
+// which stubs a DOM and no browser. A page that throws on line one is a page nobody can test.
+let mazeSeed = ((typeof location !== "undefined" && Number(new URLSearchParams(location.search || "").get("seed"))) || 0)
+    || ((Math.random() * 0xffffffff) >>> 0);
+let lastDungeon = null;
+
+const $ = (id) => document.getElementById(id);
+const idx = (gx, gy) => gy * W + gx;
+const inb = (gx, gy) => gx >= 0 && gy >= 0 && gx < W && gy < H;
+
+function randomizeMaze() {
+    // A dungeon, not a scatter of blocks. `generateDungeonFitting` shrinks until it fits rather than
+    // clipping, because clipping severs a corridor -- and severing a corridor is exactly what the minimum
+    // spanning tree exists to make impossible. If it cannot fit one, it says null and we do not pretend.
+    const d = generateDungeonFitting(mazeSeed, W, H, { rooms: Math.round(12 * W / 48), corridorWidth: 3, loopiness: 0.18 });
+    lastDungeon = d;
+    if (!d) { setStatus("bad", "no dungeon fits this room"); return; }
+
+    heights = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) if (d.grid[i] !== 0) heights[i] = WALL_H;
+
+    // The goal is the boss room, and the walker starts at the entrance. That is what the room semantics are
+    // FOR: a BFS from the entrance assigns depth, and the deepest room is the boss.
+    const boss = d.rooms[d.boss], entrance = d.rooms[d.entrance];
+    goal = { gx: boss.gx, gy: boss.gy };
+    spawnWalkers();   // v2226 — mutate the primary walker to the entrance + (re)build the swarm there
+
+    ensureRoute();   // v2209 -- now an ASSERTION, not a repair. See below.
+}
+
+// v2226 — how many walkers the control asks for (defaults to 1 when the control isn't present,
+// e.g. the headless selfcheck's stubbed DOM).
+function walkerCountVal() { const el = $("walkerCount"); const n = el ? parseInt(el.value, 10) : 1; return Math.max(1, Math.min(60, n || 1)); }
+function solverModeVal() { const el = $("solverSel"); const v = el ? String(el.value || "auto").toLowerCase() : "auto"; return (v === "gpu" || v === "cpu") ? v : "auto"; }   // v2230 -- field-solver mode sent with each snapshot
+// (Re)build the swarm at the dungeon entrance. The primary walker (walkers[0]) is MUTATED in place,
+// never reassigned, so the selfcheck's imported `walker` binding stays valid. Extras are jittered to
+// nearby passable floor so they don't all stack on one pixel.
+function spawnWalkers() {
+    const ent = (lastDungeon && lastDungeon.rooms) ? lastDungeon.rooms[lastDungeon.entrance] : { gx: 4, gy: (H / 2) | 0 };
+    walker.x = OX + ent.gx * CELL; walker.z = OZ + ent.gy * CELL;
+    const n = walkerCountVal();
+    walkers = [walker];
+    for (let i = 1; i < n; i++) {
+        let gx = ent.gx, gy = ent.gy;
+        for (let tries = 0; tries < 12; tries++) {
+            const jx = ent.gx + ((Math.random() * 9) | 0) - 4, jy = ent.gy + ((Math.random() * 9) | 0) - 4;
+            if (inb(jx, jy) && heights[idx(jx, jy)] <= 1) { gx = jx; gy = jy; break; }
+        }
+        walkers.push({ x: OX + gx * CELL, z: OZ + gy * CELL });
+    }
+}
+// v2209 -- THIS USED TO CARVE. It BFSed from the start to the goal and, when about one room in eighty came
+// out sealed, drew a Bresenham corridor through the walls until they connected. That was a patch over a
+// generator that could not promise a route.
+//
+// The generator promises one now: every room ends on a minimum spanning tree, and a tree is connected by
+// construction. So this is an ASSERTION. If it ever fires, the MST is not an MST, and carving a corridor
+// would hide the bug rather than fix it. It says so on screen instead.
+function ensureRoute() {
+    const start = cellAt(walker.x, walker.z);
+    const seen = new Uint8Array(W * H); const q = [[start.gx, start.gy]];
+    if (!inb(start.gx, start.gy) || heights[idx(start.gx, start.gy)] > 1) { setStatus("bad", "the entrance is a wall -- the generator is wrong"); return false; }
+    seen[idx(start.gx, start.gy)] = 1;
+    while (q.length) {
+        const [x, y] = q.shift();
+        if (x === goal.gx && y === goal.gy) return true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (inb(nx, ny) && !seen[idx(nx, ny)] && heights[idx(nx, ny)] <= 1) { seen[idx(nx, ny)] = 1; q.push([nx, ny]); }
+        }
+    }
+    setStatus("bad", `seed ${mazeSeed}: the boss room is unreachable. A spanning tree cannot do this -- please report the seed.`);
+    return false;
+}
+function clearAround(gx, gy, r) {
+    for (let y = gy - r; y <= gy + r; y++) for (let x = gx - r; x <= gx + r; x++)
+        if (inb(x, y)) heights[idx(x, y)] = FLOOR_H;
+}
+function wallCount() { let n = 0; for (let i = 0; i < heights.length; i++) if (heights[i] > 1) n++; return n; }
+
+// ---- talk to the brain -------------------------------------------------------
+function snapshotSig() { return goal.gx + "," + goal.gy + ":" + wallCount(); }
+
+async function postSnapshot(force) {
+    const sig = snapshotSig();
+    if (!force && sig === lastPostedSig) return;
+    lastPostedSig = sig;
+    const body = {
+        w: W, h: H, cell: CELL, ox: OX, oz: OZ,
+        // v2186 — mark walls IMPASSABLE (not just expensive). The solver's cost model gives
+        // walls FINITE cost, so the true shortest path to some floor cells ran THROUGH a wall;
+        // the flow/dist gradient there pointed into a wall the walker can't enter, creating
+        // floor "local minima" that trapped it — "gets to a wall and gives up". With impassDh
+        // set, no shortest path crosses a wall and the field is globally descendable (proven:
+        // 0 floor minima / 200 rooms). Any per-cell height jump above this is uncrossable;
+        // FLOOR_LIFT keeps floors above the solver's water penalty so floor-floor steps (0)
+        // stay traversable while floor-wall steps (WALL_H) do not.
+        impassDh: WALL_H * 0.5,
+        // v2204 -- AND ASK FOR ENOUGH SWEEPS. The GPU solver is a fixed-iteration Jacobi, not an exact
+        // Dijkstra: it runs ceil(max(w,h)*1.7) = 82 sweeps on this 48x48 room, and a maze whose geodesic
+        // snakes needs up to 162. Measured: 4 rooms in 30 had a WRONG distance field at 82 sweeps -- 1,519
+        // cells wrong -- so the flow far from the goal pointed nowhere and the walker stalled against a
+        // wall. That is the bug this room exists to catch, and it was catching it. A 4-connected geodesic
+        // visits at most w*h cells, so w*h is the true upper bound; the feed-forward controller then settles
+        // at `needed + margin` after one solve. The CPU backend is an exact Dijkstra and ignores this.
+        iterCap: W * H,
+        heights: Array.from(heights, v => v + FLOOR_LIFT),
+        // v2159 -- the brain expects goals in WORLD coords and converts them itself:
+        //     gx = Math.round((g.x - snap.ox) / snap.cell)   (brain.js ~1938)
+        // Sending {gx,gy} makes g.x undefined -> NaN -> the goal collapses to cell (0,0),
+        // so every arrow points up-left and the walker climbs the left edge. That is the
+        // exact bug this page shipped with. Send {x,z}.
+        goals: [{ x: OX + goal.gx * CELL, z: OZ + goal.gy * CELL }],
+        player: { x: walker.x, y: 0, z: walker.z },
+        kaiju: [],
+        fieldSolver: solverModeVal(),   // v2230 -- live GPU/AUTO/CPU toggle; brain rebuilds solvers when this changes
+    };
+    try {
+        await fetch("/ai/brain/snapshot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    } catch (e) { /* reported by the poller */ }
+}
+
+async function pollField() {
+    if (!cv || !cv.isConnected) return;   // v2737 -- orphaned interval on a swapped-away page
+    try {
+        const r = await fetch("/ai/brain/flowfield", { cache: "no-store" });
+        const j = await r.json();
+        const f = j && j.field;
+        if (f && f.fx && f.w === W && f.h === H) {
+            if (!field || f.ts !== field.ts) { fieldSeen++; }
+            field = f;
+            if (!field || f.ts !== (lastDiagTs)) { lastDiagTs = f.ts; diagnose(); }
+            setStatus("ok", "brain is solving — walker is following the live field");
+        } else if (f && f.w && f.w !== W) {
+            setStatus("warn", `brain is solving a ${f.w}x${f.h} field (the game engine's), not this room's ${W}x${H} — close the engine page or use a separate bridge`);
+        } else {
+            setStatus("warn", "no field yet — is the Deno brain running against this bridge?");
+        }
+    } catch (e) {
+        field = null;
+        setStatus("err", "can't reach the bridge: " + (e.message || e));
+    }
+}
+
+async function pollHealth() {
+    if (!cv || !cv.isConnected) return;   // v2737 -- orphaned interval on a swapped-away page
+    try {
+        const h = await fetch("/ai/brain/health", { cache: "no-store" }).then(r => r.json());
+        $("kState").textContent = h.state || "—";
+        $("kState").style.color = h.state === "live" ? "#4ade80" : (h.state === "idle" ? "#ffd35a" : "#ff5a5a");
+        $("kSolve").textContent = h.lastSolveMsAgo != null ? Math.round(h.lastSolveMsAgo / 1000) + "s ago" : "—";
+    } catch (e) { $("kState").textContent = "unreachable"; }
+}
+
+function setStatus(cls, msg) { const s = $("status"); if (!s) return; s.className = cls; s.textContent = msg; }
+
+// ---- the walker: steer by sampling fx/fz at its own cell ---------------------
+// The FIELD is exact (verified: pure cell-stepping down the gradient reaches the goal
+// and never enters a wall). Continuous motion is what needs care: a straight dt-step can
+// clip a wall corner, and Math.round can snap the probe cell across a boundary. So we
+// clamp the step to under half a cell and SLIDE along a single axis when the diagonal is
+// blocked. Only when both axes are blocked do we report a genuinely bad field.
+function cellAt(x, z) { return { gx: Math.round((x - OX) / CELL), gy: Math.round((z - OZ) / CELL) }; }
+function blocked(x, z) { const { gx, gy } = cellAt(x, z); return !inb(gx, gy) || heights[idx(gx, gy)] > 1; }
+
+// v2159 -- when the flow vector runs into a wall, sliding along an axis is NOT enough:
+// if the flow is purely +x (fz == 0) the "slide on Z" step is dz == 0, a no-op that still
+// reports success, and the walker spins in place forever against the baffle. That was the
+// stall. Instead, fall back to DESCENDING THE DISTANCE FIELD: step toward the cheapest
+// passable neighbour. dist strictly decreases toward the goal, so this always makes
+// progress when a route exists -- and when it doesn't, we say so.
+// v2186 — with walls now IMPASSABLE in the solver (snapshot impassDh), the published dist
+// field is globally descendable: every passable non-goal cell has a 4-neighbour of strictly
+// lower dist (proven 0 floor minima / 200 rooms). So the fallback is a plain descent to the
+// cheapest passable orthogonal neighbour — no basin-escape gymnastics required. Diagonals are
+// a corner-safe tiebreak toward the goal on rounding plateaus.
+function routeNeighbour(gx, gy) {
+    if (!field || !field.dist) return null;
+    const here = field.dist[idx(gx, gy)];
+    let best = null, bestD = here;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = gx + dx, ny = gy + dy;
+        if (!inb(nx, ny) || heights[idx(nx, ny)] > 1) continue;
+        const d = field.dist[idx(nx, ny)];
+        if (d < bestD) { bestD = d; best = { gx: nx, gy: ny }; }
+    }
+    if (best) return best;
+    let tie = null, tieG = Math.hypot(gx - goal.gx, gy - goal.gy);
+    for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const nx = gx + dx, ny = gy + dy;
+        if (!inb(nx, ny) || heights[idx(nx, ny)] > 1) continue;
+        if (heights[idx(gx + dx, gy)] > 1 || heights[idx(gx, gy + dy)] > 1) continue;
+        if (field.dist[idx(nx, ny)] <= here) { const g = Math.hypot(nx - goal.gx, ny - goal.gy); if (g < tieG) { tieG = g; tie = { gx: nx, gy: ny }; } }
+    }
+    return tie;
+}
+
+// v2207 -- THE ROOM DIAGNOSES ITSELF.
+//
+// A screenshot of a walker parked against a wall cannot tell you whether the field is wrong, the walker is
+// wrong, or the walker is simply mid-path. These three numbers can, and they are the same three a headless
+// test would compute:
+//
+//   reachable   how much of the floor the field can actually reach from the goal.
+//   minima      reachable, non-goal floor cells with NO strictly-lower passable 4-neighbour. The walker's
+//               `routeNeighbour` fallback needs one of those at every step. If this is not zero, THE FIELD
+//               IS THE PROBLEM and no amount of walker cleverness will save it.
+//   truncated   a GPU field whose controller wanted more sweeps than its cap allowed. Far from the goal the
+//               distances are simply wrong. The CPU backend is an exact Dijkstra and cannot truncate.
+let lastDiagTs = null;
+let lastDiag = null;
+function diagnose() {
+    if (!field || !field.dist) { lastDiag = null; return; }
+    const s = field.solver || {};
+    $("kBackend").textContent = (s.backend || "unknown")
+        + (s.iters != null ? ` \u00b7 ${s.iters} sweeps` : "")
+        + (s.needed != null ? ` (needed ${s.needed})` : "");
+    $("kBackend").style.color = s.truncated ? "var(--bad, #f4808c)" : "";
+
+    let floor = 0, reach = 0, minima = 0;
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        const i = idx(x, y);
+        if (heights[i] > 1) continue;
+        floor++;
+        if (field.dist[i] >= 1e7) continue;
+        reach++;
+        if (x === goal.gx && y === goal.gy) continue;
+        let lower = false;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const j = idx(x + dx, y + dy);
+            if (heights[j] > 1) continue;
+            if (field.dist[j] < field.dist[i]) { lower = true; break; }
+        }
+        if (!lower) minima++;
+    }
+    lastDiag = { backend: s.backend || null, iters: s.iters ?? null, needed: s.needed ?? null,
+                 iterCap: s.iterCap ?? null, impassDh: s.impassDh ?? null, truncated: !!s.truncated,
+                 grid: [W, H], goal: [goal.gx, goal.gy], walls: wallCount(), floor, reachable: reach, minima,
+                 walker: { cell: cellAt(walker.x, walker.z), status: $("kWalker").textContent } };
+    const pct = floor ? Math.round((100 * reach) / floor) : 0;
+    $("kHealth").textContent = `${reach}/${floor} reachable (${pct}%) \u00b7 ${minima} minima`
+        + (s.truncated ? " \u00b7 TRUNCATED" : "");
+    // A minimum is the field failing. Say so loudly, because everything downstream is then a symptom.
+    $("kHealth").style.color = (minima > 0 || s.truncated) ? "#f4808c" : (pct < 90 ? "#ffc04e" : "");
+}
+
+$("btnDiag").onclick = async () => {
+    diagnose();
+    const d = lastDiag || { error: "no field yet" };
+    d.at = new Date().toISOString();
+    const text = JSON.stringify(d, null, 2);
+    try { await navigator.clipboard.writeText(text); $("btnDiag").textContent = "copied"; }
+    catch (e) { console.log(text); $("btnDiag").textContent = "see the console"; }
+    setTimeout(() => { $("btnDiag").textContent = "Copy diagnostic"; }, 1800);
+};
+
+// v2226 — the movement, per walker, returning a STATUS string (so the swarm can step many). Operates on
+// the passed walker `w`; the field/goal are shared. Guards a stale-sized field during a resize.
+function stepOne(w, dt) {
+    if (!field || paused) return "paused";
+    if (field.w && (field.w !== W || field.h !== H)) return "waiting for field";
+    const { gx, gy } = cellAt(w.x, w.z);
+    if (!inb(gx, gy)) return "off-grid";
+    if (gx === goal.gx && gy === goal.gy) return "arrived \u2713";
+    const i = idx(gx, gy);
+    const fx = field.fx[i], fz = field.fz[i];
+    const len = Math.hypot(fx, fz);
+
+    const speed = 18;                                   // world units/sec
+    const step = Math.min(speed * dt, CELL * 0.45);     // never tunnel a cell
+
+    const inWall = heights[i] > 1;
+
+    if (!inWall && len > 1e-3) {
+        const dx = (fx / len) * step, dz = (fz / len) * step;
+        if (!blocked(w.x + dx, w.z + dz)) { w.x += dx; w.z += dz; return `cell ${gx},${gy}`; }
+        if (Math.abs(dx) > step * 0.02 && !blocked(w.x + dx, w.z)) { w.x += dx; return `cell ${gx},${gy} (sliding x)`; }
+        if (Math.abs(dz) > step * 0.02 && !blocked(w.x, w.z + dz)) { w.z += dz; return `cell ${gx},${gy} (sliding z)`; }
+    }
+    // flow blocked/absent/in-wall -> route via the basin-escaping distance descent
+    const nb = routeNeighbour(gx, gy);
+    if (!nb) return (len > 1e-3) ? "boxed in (no passable neighbour)" : "no flow here (unreachable?)";
+    const tx = OX + nb.gx * CELL, tz = OZ + nb.gy * CELL;
+    let ax = tx - w.x, az = tz - w.z; const al = Math.hypot(ax, az) || 1;
+    ax = (ax / al) * step; az = (az / al) * step;
+    if (inWall || !blocked(w.x + ax, w.z + az)) { w.x += ax; w.z += az; }
+    else if (Math.abs(ax) > 1e-6 && !blocked(w.x + ax, w.z)) { w.x += ax; }
+    else if (Math.abs(az) > 1e-6 && !blocked(w.x, w.z + az)) { w.z += az; }
+    else { w.x += ax; w.z += az; }   // pathological sliver — push through rather than freeze
+    return `cell ${gx},${gy} (routing)`;
+}
+// The single-walker entry point the selfcheck drives: steps `walker` and reports to the HUD, unchanged.
+function stepWalker(dt) {
+    const s = stepOne(walker, dt);
+    const el = (typeof document !== "undefined") ? $("kWalker") : null; if (el) el.textContent = s;
+    // v2852 -- sample the lead walker and, when it stops making progress, say WHY rather than only that it did.
+    if (typeof document !== "undefined" && walker) {
+        _walkHist.push({ x: walker.x, z: walker.z, atGoal: /goal|arrived|done/i.test(String(s)) });
+        if (_walkHist.length > 60) _walkHist.shift();
+        const stall = detectStall(_walkHist, { window: 30, minMove: 0.5 });
+        if (stall.stalled) {
+            // P is declared later in this module, so referencing it from here hits the temporal dead zone in
+            // some call orders -- the same class of bug es-away-mission had in v2839. A DIAGNOSTIC MUST NEVER
+            // BREAK THE THING IT IS DIAGNOSING, so it degrades to "no field info" rather than throwing.
+            const _P = (typeof P !== "undefined" && P) ? P : {};
+            const f = _P.lastDiag || {};
+            const sol = _P.solver || {};
+            const d = diagnoseStall({
+                stall,
+                grid: { W, H, wallH: WALL_H, cell: CELL, slopeK: 3 },
+                field: { truncated: !!sol.truncated, iters: sol.iters, needed: sol.needed, minima: f.minima || 0 },
+            });
+            if (!_lastStall || _lastStall.cause !== d.cause) {
+                _lastStall = d;
+                const w = $("kWalker");
+                if (w) w.textContent = s + "  \u2014 STALLED: " + d.cause;
+                console.warn("[maze stall] " + d.cause + " -- " + d.fix);
+                console.warn("[maze stall]   " + d.detail);
+            }
+        } else if (_lastStall) { _lastStall = null; }
+    }
+    return s;
+}
+
+// ---- draw --------------------------------------------------------------------
+function draw() {
+    if (!cv || !cv.isConnected) return;   // v2737 -- detached canvas -> the $() lookups below would be null
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    let maxD = 1;
+    if (field && field.dist) for (let i = 0; i < field.dist.length; i++) if (field.dist[i] < 1e8) maxD = Math.max(maxD, field.dist[i]);
+
+    const fieldOk = field && (!field.w || (field.w === W && field.h === H));   // v2226 — ignore a stale-sized field mid-resize
+    for (let gy = 0; gy < H; gy++) for (let gx = 0; gx < W; gx++) {
+        const i = idx(gx, gy);
+        if (heights[i] > 1) { ctx.fillStyle = "#16202c"; ctx.fillRect(gx * px, gy * px, px, px); continue; }
+        if ($("showDist").checked && fieldOk && field.dist) {
+            const d = field.dist[i]; const t = (d < 1e8) ? (1 - d / maxD) : 0;
+            ctx.fillStyle = `rgba(80,160,255,${(t * 0.55).toFixed(3)})`;
+            ctx.fillRect(gx * px, gy * px, px, px);
+        }
+    }
+    if ($("showArrows").checked && fieldOk && field.fx) {
+        ctx.strokeStyle = "rgba(159,230,192,0.55)"; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let gy = 0; gy < H; gy += 2) for (let gx = 0; gx < W; gx += 2) {
+            const i = idx(gx, gy);
+            if (heights[i] > 1) continue;
+            const fx = field.fx[i], fz = field.fz[i], len = Math.hypot(fx, fz);
+            if (len < 1e-3) continue;
+            const cx = gx * px + px / 2, cy = gy * px + px / 2, s = px * 1.1;
+            ctx.moveTo(cx, cy); ctx.lineTo(cx + (fx / len) * s, cy + (fz / len) * s);
+        }
+        ctx.stroke();
+    }
+    // goal
+    ctx.fillStyle = "#4ade80";
+    ctx.beginPath(); ctx.arc(goal.gx * px + px / 2, goal.gy * px + px / 2, px * 0.7, 0, 6.283); ctx.fill();
+    // walkers — primary gold, the rest light-blue. Small so a crowd reads as a swarm.
+    for (const w of walkers) {
+        const wx = (w.x - OX) / CELL * px, wy = (w.z - OZ) / CELL * px;
+        ctx.fillStyle = (w === walker) ? "#ffd35a" : "#7fd0ff";
+        ctx.beginPath(); ctx.arc(wx, wy, (w === walker ? 0.75 : 0.55) * px, 0, 6.283); ctx.fill();
+    }
+
+    $("kWalls").textContent = wallCount();
+    $("kGrid").textContent = `${W}x${H} cell=${CELL}`;
+    $("kSolves").textContent = fieldSeen;
+    $("kAge").textContent = field && field.ts ? Math.max(0, Math.round((Date.now() - field.ts) / 100) / 10) + "s" : "—";
+    // v2214 -- kBackend is owned by diagnose() (reads field.solver.backend, adds sweeps/needed, colours on
+    // truncation). The old per-frame line here read the nonexistent TOP-LEVEL field.backend and blanked it
+    // to "—" every frame, clobbering the correct value. Removed.
+}
+
+// ---- input -------------------------------------------------------------------
+let painting = false;
+function cellFromEvent(e) {
+    const r = cv.getBoundingClientRect();
+    return { gx: Math.floor((e.clientX - r.left) / (r.width / W)), gy: Math.floor((e.clientY - r.top) / (r.height / H)) };
+}
+function paint(e) {
+    const { gx, gy } = cellFromEvent(e);
+    if (!inb(gx, gy)) return;
+    const mode = $("drawMode").value;
+    if (mode === "goal") { goal = { gx, gy }; clearAround(gx, gy, 1); }
+    else heights[idx(gx, gy)] = (mode === "wall") ? WALL_H : FLOOR_H;
+    postSnapshot(true);
+}
+cv.addEventListener("mousedown", (e) => { painting = true; paint(e); });
+cv.addEventListener("mousemove", (e) => { if (painting) paint(e); });
+window.addEventListener("mouseup", () => { painting = false; });
+
+$("btnRandom").onclick = () => { mazeSeed = (Math.random() * 0xffffffff) >>> 0; randomizeMaze(); postSnapshot(true); };
+$("btnClear").onclick = () => { heights = new Float32Array(W * H); postSnapshot(true); };
+$("btnReset").onclick = () => { spawnWalkers(); };
+$("btnPause").onclick = () => { paused = !paused; $("btnPause").textContent = paused ? "Resume" : "Pause"; };
+// v2226 — resize the dungeon. Bigger grids need a bigger WALL_H or the shortest path tunnels through a wall
+// again (a single wall crossing must cost more than the longest possible detour ~ W*H cells): keep
+// 1 + 3*(WALL_H/CELL) > W*H, with margin. 48^2 stays exactly 4000 (unchanged), larger grids scale up.
+$("sizeSel").onchange = () => {
+    W = H = parseInt($("sizeSel").value, 10) || 48;
+    WALL_H = Math.max(4000, Math.ceil(W * H * CELL / 3 * 1.3));
+    px = cv.width / W;
+    heights = new Float32Array(W * H);
+    mazeSeed = (Math.random() * 0xffffffff) >>> 0;   // a fresh dungeon at the new size
+    randomizeMaze(); postSnapshot(true);
+};
+$("walkerCount").onchange = () => { spawnWalkers(); };
+
+// v2230 -- GPU / AUTO / CPU field-solver toggle. Defaults to AUTO (probe gpu vs the exact cpu Dijkstra,
+// keep whichever wins), persists like the engine's other UI prefs, and on change pushes a snapshot at
+// once so the brain rebuilds its solvers under the new mode without waiting for the next poll tick.
+(function(){
+  var el = $("solverSel"); if (!el) return;
+  var saved = null; try { saved = localStorage.getItem("voxelengine.mazeSolver"); } catch(e){}
+  el.value = (saved === "gpu" || saved === "cpu" || saved === "auto") ? saved : "auto";
+  el.onchange = function(){ try { localStorage.setItem("voxelengine.mazeSolver", solverModeVal()); } catch(e){} postSnapshot(true); };
+})();
+
+// ---- loops -------------------------------------------------------------------
+randomizeMaze();
+postSnapshot(true);
+setInterval(() => postSnapshot(false), 1000);   // re-assert the maze; brain reads GET /snapshot
+setInterval(pollField, 250);                    // 4Hz, same rate the brain solves at
+setInterval(pollHealth, 3000);
+
+let t0 = performance.now();
+function frame(t) {
+    if (!cv || !cv.isConnected) return;   // v2737 -- page/DOM swapped away: stop the loop cleanly instead of throwing on null refs
+    const dt = Math.min(0.05, (t - t0) / 1000); t0 = t;
+    if (!paused && field) {
+        let arrived = 0, primary = "";
+        for (const w of walkers) { const s = stepOne(w, dt); if (w === walker) primary = s; if (s.indexOf("arrived") === 0) arrived++; }
+        const el = $("kWalker");
+        if (el) el.textContent = walkers.length > 1 ? (arrived + "/" + walkers.length + " arrived") : primary;
+    }
+    draw();
+    requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// expose for headless tests
+window.__maze = { get field() { return field; }, get walker() { return walker; }, get goal() { return goal; },
+                  heights: () => heights, step: stepWalker, W, H, CELL };
+</script>

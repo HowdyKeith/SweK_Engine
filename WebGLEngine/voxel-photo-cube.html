@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Voxel Photo Cube &amp; Gallery &mdash; SweK Engine</title>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  :root { --acc:#2bff88; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#020a06; color:#bfffd9; font:13px ui-monospace,SFMono-Regular,monospace; overflow:hidden; }
+  #wrap { display:flex; height:100%; }
+  #panel { width:300px; flex:0 0 300px; padding:14px; overflow:auto; background:linear-gradient(180deg,#04140b,#020a06); border-right:1px solid #145; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; }
+  h1 { font-size:16px; color:var(--acc); margin:0 0 2px; letter-spacing:.5px; }
+  .sub { color:#5fae84; font-size:11px; margin-bottom:12px; }
+  .grp { margin:0 0 13px; }
+  .lbl { color:#7fd6a8; font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; margin-bottom:5px; }
+  button, select, input[type=file] { font:12px ui-monospace,monospace; }
+  button { width:100%; padding:8px; margin:2px 0; background:#0c2a18; color:#bfffd9; border:1px solid #1aa257; border-radius:6px; cursor:pointer; }
+  button:hover { background:#114; border-color:var(--acc); }
+  button.primary { background:#0c3; color:#021; border-color:var(--acc); font-weight:bold; }
+  .two { display:flex; gap:6px; }
+  .two button { margin:2px 0; }
+  select { width:100%; padding:6px; background:#0c0f14; color:#e8eef8; border:1px solid #2a3340; border-radius:6px; }
+  input[type=range] { width:100%; }
+  label.row { display:flex; align-items:center; gap:7px; cursor:pointer; font-size:12px; padding:3px 0; }
+  .hint { color:#5fae84; font-size:10.5px; line-height:1.5; }
+  #slots { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-top:6px; }
+  .slot { aspect-ratio:1; border:1px solid #1aa257; border-radius:5px; background:#06200f; display:flex; align-items:center; justify-content:center; font-size:9px; color:#5fae84; text-align:center; overflow:hidden; cursor:pointer; position:relative; }
+  .slot.set { border-color:var(--acc); color:var(--acc); }
+  .slot .fi { position:absolute; top:2px; left:3px; font-size:8px; color:#3a7; text-shadow:0 0 3px #000; }
+  #status { position:absolute; left:50%; top:14px; transform:translateX(-50%); background:rgba(4,20,11,.85); border:1px solid #1aa257; border-radius:7px; padding:6px 13px; font-size:12px; color:var(--acc); pointer-events:none; }
+  #back { position:absolute; right:14px; top:12px; color:#7fd6a8; font-size:11px; text-decoration:none; background:rgba(4,20,11,.7); padding:5px 9px; border-radius:6px; border:1px solid #145; }
+  a { color:#7fd1ff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="panel">
+    <h1>Voxel Photo Cube</h1>
+    <div class="sub">Photos &rarr; walls of voxels. Cube or gallery. Then flow water/lava/snow, or mow paths.</div>
+
+    <div class="grp">
+      <div class="lbl">Layout</div>
+      <select id="layout">
+        <option value="cube" selected>Cube (6 faces)</option>
+        <option value="wall">Gallery wall (up to 12)</option>
+      </select>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Add a photo</div>
+      <input id="file" type="file" accept="image/*" multiple style="width:100%;color:#bfffd9;">
+      <div class="hint" style="margin-top:4px;">Fills the next free slot (tap a slot below to pick its photo). On a phone this opens the gallery/camera.</div>
+      <div id="slots"></div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Resolution (voxels / panel)</div>
+      <select id="res">
+        <option value="48">48 &mdash; light</option>
+        <option value="64" selected>64 &mdash; GTX 1070/1080 friendly</option>
+        <option value="96">96 &mdash; high</option>
+        <option value="128">128 &mdash; ultra (newer card)</option>
+        <option value="192">192 &mdash; max (new card / Mac)</option>
+      </select>
+      <div class="hint" style="margin-top:4px;">Higher = sharper, more voxels.</div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Surface depth</div>
+      <select id="depth">
+        <option value="flat">Flat (perfect head-on)</option>
+        <option value="relief" selected>Relief &mdash; brightness = height</option>
+        <option value="terrain">Terrain &mdash; generated noise</option>
+        <option value="random">Random bumps</option>
+      </select>
+      <label class="row"><span style="flex:1;">Depth amount</span></label>
+      <input id="depthAmt" type="range" min="0" max="100" value="35">
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Assembly</div>
+      <select id="assembly">
+        <option value="instant">Instant</option>
+        <option value="dotmatrix" selected>Dot-matrix (raster)</option>
+        <option value="sparkle">Sparkle (random)</option>
+        <option value="bloom">Bloom (center-out)</option>
+      </select>
+      <label class="row"><span style="flex:1;">Assembly speed (voxels/frame)</span></label>
+      <input id="asmSpeed" type="range" min="20" max="3000" value="280">
+      <div class="hint">Render stays full speed &mdash; this just sets how fast voxels pop in.</div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Material flow (on the front panel)</div>
+      <select id="material">
+        <option value="1" selected>Water &mdash; flows + spreads</option>
+        <option value="2">Lava &mdash; slow + glowing</option>
+        <option value="3">Snow &mdash; drifts + piles</option>
+      </select>
+      <div class="two"><button id="rain">Rain</button><button id="geyser">Geyser</button></div>
+      <button id="clearFluid">Stop &amp; clear fluid</button>
+      <label class="row"><span style="flex:1;">Flow rate</span></label>
+      <input id="flowRate" type="range" min="1" max="40" value="10">
+      <div class="hint">Falls/spills down the front panel and settles on the relief. Spilling off the edge onto a lower panel is expected.</div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Lawnmower (on the front panel)</div>
+      <div class="two"><button id="mow">Mow stripes</button><button id="regrow">Regrow</button></div>
+      <label class="row"><span style="flex:1;">Mow speed</span></label>
+      <input id="mowSpeed" type="range" min="10" max="800" value="140">
+      <div class="hint">Carves lanes through the photo voxels like a mower; Regrow puts them back.</div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl">Look</div>
+      <label class="row"><span style="flex:1;">Voxel gap</span></label>
+      <input id="gap" type="range" min="0" max="40" value="6">
+      <label class="row"><input id="spin" type="checkbox" checked> Auto-spin cube (after front loads)</label>
+      <input id="spinSpeed" type="range" min="0" max="100" value="35">
+    </div>
+
+    <div class="grp">
+      <button id="rebuild" class="primary">Rebuild</button>
+      <button id="clear">Clear all</button>
+    </div>
+    <div class="hint">Drag to orbit &middot; scroll/pinch to zoom.</div>
+  </div>
+  <div id="stage">
+    <a id="back" href="/">&larr; back to engine</a>
+    <div id="status">Add a photo to begin&hellip;</div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage");
+const setStatus = (t) => { const s = $("status"); if (!t) s.style.display = "none"; else { s.style.display = ""; s.textContent = t; } };
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020a06);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+camera.position.set(2.4, 1.9, 3.6);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+// v1966 — shared 3D navigation pad (buttons + keyboard + gamepad) driving these OrbitControls.
+import("/ui/orbitNavPad.js").then(m => m.mountOrbitNavPad({ camera, controls, THREE })).catch(()=>{});
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const dlight = new THREE.DirectionalLight(0xffffff, 1.0); dlight.position.set(3, 5, 4); scene.add(dlight);
+const dlight2 = new THREE.DirectionalLight(0x88aaff, 0.4); dlight2.position.set(-4, -2, -3); scene.add(dlight2);
+
+const CUBE = 2.0;
+const PANEL = 1.4, PGAP = 0.28;     // gallery-wall panel size + gap
+const MAXSLOTS = 12;
+const root = new THREE.Group(); scene.add(root);
+
+const FACES = [
+  { name: "Front",  pos: [0, 0, CUBE / 2],  rot: [0, 0, 0] },
+  { name: "Right",  pos: [CUBE / 2, 0, 0],   rot: [0, Math.PI / 2, 0] },
+  { name: "Back",   pos: [0, 0, -CUBE / 2],  rot: [0, Math.PI, 0] },
+  { name: "Left",   pos: [-CUBE / 2, 0, 0],  rot: [0, -Math.PI / 2, 0] },
+  { name: "Top",    pos: [0, CUBE / 2, 0],   rot: [-Math.PI / 2, 0, 0] },
+  { name: "Bottom", pos: [0, -CUBE / 2, 0],  rot: [Math.PI / 2, 0, 0] },
+];
+
+let LAYOUT = "cube";
+const slotImages = new Array(MAXSLOTS).fill(null);
+const slotThumbUrl = new Array(MAXSLOTS).fill(null);
+const slotRecs = new Array(MAXSLOTS).fill(null);
+
+function slotCount() { return LAYOUT === "cube" ? 6 : MAXSLOTS; }
+function slotInfo(slot) {
+  if (LAYOUT === "cube") { const f = FACES[slot]; return { name: f.name, pos: f.pos, rot: f.rot, span: CUBE }; }
+  const cols = 4, col = slot % cols, row = (slot / cols) | 0;
+  const stepX = PANEL + PGAP, stepY = PANEL + PGAP;
+  return { name: "Tile " + (slot + 1), pos: [(col - 1.5) * stepX, (1 - row) * stepY, 0], rot: [0, 0, 0], span: PANEL };
+}
+
+// --- value noise (terrain) ---
+function hash(x, y) { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; }
+function smooth(t) { return t * t * (3 - 2 * t); }
+function valNoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  const u = smooth(xf), v = smooth(yf);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x, y) { let s = 0, amp = 0.6, f = 1; for (let o = 0; o < 4; o++) { s += amp * valNoise(x * f, y * f); f *= 2; amp *= 0.5; } return s; }
+
+function samplePixels(img, N) {
+  const c = document.createElement("canvas"); c.width = N; c.height = N;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, N, N);
+  return g.getImageData(0, 0, N, N).data;
+}
+
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _col = new THREE.Color();
+function assemblyMode() { return $("assembly").value; }
+
+function disposeSlot(slot) {
+  const rec = slotRecs[slot]; if (!rec) return;
+  clearFluidIf(slot); clearMowIf(slot);
+  root.remove(rec.grp);
+  try { rec.mesh.geometry.dispose(); rec.mesh.material.dispose(); } catch (e) {}
+  slotRecs[slot] = null;
+}
+
+function buildSlot(slot, img) {
+  disposeSlot(slot);
+  if (!img) return;
+  const info = slotInfo(slot);
+  const span = info.span;
+  const N = parseInt($("res").value, 10) || 64;
+  const depthMode = $("depth").value;
+  const depthAmt = (parseInt($("depthAmt").value, 10) / 100) * (span * 0.35);
+  const gap = parseInt($("gap").value, 10) / 100;
+  const data = samplePixels(img, N);
+  const vox = span / N;
+  const size = vox * (1 - gap * 0.9);
+  const count = N * N;
+  const geo = new THREE.BoxGeometry(size, size, size);
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0.0 });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  const grp = new THREE.Group(); grp.position.fromArray(info.pos); grp.rotation.fromArray(info.rot);
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  let n = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const o = (j * N + i) * 4;
+      const r = data[o] / 255, gg = data[o + 1] / 255, b = data[o + 2] / 255;
+      const lum = 0.299 * r + 0.587 * gg + 0.114 * b;
+      let h = 0;
+      if (depthMode === "relief") h = lum;
+      else if (depthMode === "terrain") h = fbm(i * 0.12, j * 0.12);
+      else if (depthMode === "random") h = hash(i, j);
+      pos[n * 3] = (i + 0.5) * vox - span / 2;
+      pos[n * 3 + 1] = span / 2 - (j + 0.5) * vox;
+      pos[n * 3 + 2] = h * depthAmt + size / 2;
+      col[n * 3] = r; col[n * 3 + 1] = gg; col[n * 3 + 2] = b;
+      n++;
+    }
+  }
+  const order = new Int32Array(count); for (let k = 0; k < count; k++) order[k] = k;
+  const mode = assemblyMode();
+  if (mode === "sparkle") { for (let k = count - 1; k > 0; k--) { const r = (Math.random() * (k + 1)) | 0; const t = order[k]; order[k] = order[r]; order[r] = t; } }
+  else if (mode === "bloom") { const cx = (N - 1) / 2, cy = (N - 1) / 2; order.sort((a, b) => { const ax = a % N - cx, ay = (a / N | 0) - cy, bx = b % N - cx, by = (b / N | 0) - cy; return (ax * ax + ay * ay) - (bx * bx + by * by); }); }
+  const rec = { slot, grp, mesh, N, count, pos, col, order, revealed: 0, size, span, vox, hidden: new Uint8Array(count) };
+  if (mode === "instant") { for (let k = 0; k < count; k++) placeVoxel(rec, k); rec.revealed = count; }
+  else { _s.set(0, 0, 0); _q.identity(); _p.set(0, 0, 0); _m.compose(_p, _q, _s); for (let k = 0; k < count; k++) mesh.setMatrixAt(k, _m); }
+  mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  grp.add(mesh); root.add(grp);
+  slotRecs[slot] = rec;
+}
+
+function placeVoxel(rec, idx) {
+  if (rec.hidden[idx]) { _s.set(0, 0, 0); } else { _s.set(1, 1, 1); }
+  _p.set(rec.pos[idx * 3], rec.pos[idx * 3 + 1], rec.pos[idx * 3 + 2]); _q.identity();
+  _m.compose(_p, _q, _s); rec.mesh.setMatrixAt(idx, _m);
+  _col.setRGB(rec.col[idx * 3], rec.col[idx * 3 + 1], rec.col[idx * 3 + 2]); rec.mesh.setColorAt(idx, _col);
+}
+function hideVoxelIdx(rec, idx) { rec.hidden[idx] = 1; _s.set(0, 0, 0); _q.identity(); _p.set(0, 0, 0); _m.compose(_p, _q, _s); rec.mesh.setMatrixAt(idx, _m); }
+
+function revealStep() {
+  const rate = parseInt($("asmSpeed").value, 10) || 280;
+  let anyFull = false;
+  for (let s = 0; s < MAXSLOTS; s++) {
+    const rec = slotRecs[s]; if (!rec) continue;
+    if (rec.revealed < rec.count) {
+      const end = Math.min(rec.count, rec.revealed + rate);
+      for (let k = rec.revealed; k < end; k++) placeVoxel(rec, rec.order[k]);
+      rec.revealed = end;
+      rec.mesh.instanceMatrix.needsUpdate = true; if (rec.mesh.instanceColor) rec.mesh.instanceColor.needsUpdate = true;
+    }
+    if (rec.revealed >= rec.count) anyFull = true;
+  }
+  if (!firstSlotDone && anyFull) firstSlotDone = true;
+}
+
+// ---- slots panel ----
+function renderSlotThumb(slot) {
+  const el = document.querySelector('.slot[data-slot="' + slot + '"]'); if (!el) return;
+  const nm = slotInfo(slot).name;
+  if (slotImages[slot]) { el.classList.add("set"); el.style.backgroundImage = "url(" + slotThumbUrl[slot] + ")"; el.style.backgroundSize = "cover"; el.innerHTML = '<span class="fi">' + nm + '</span>'; }
+  else { el.classList.remove("set"); el.style.backgroundImage = ""; el.innerHTML = '<span class="fi">' + nm + '</span><span>empty</span>'; }
+}
+function buildSlotsPanel() {
+  const host = $("slots"); host.innerHTML = "";
+  for (let s = 0; s < slotCount(); s++) {
+    const d = document.createElement("div"); d.className = "slot"; d.dataset.slot = s;
+    d.onclick = () => { const inp = $("file"); inp.dataset.target = s; inp.click(); };
+    host.appendChild(d); renderSlotThumb(s);
+  }
+}
+
+let firstSlotDone = false, framedOnce = false;
+async function addImage(slot, file) {
+  setStatus("Voxelizing " + slotInfo(slot).name + "\u2026");
+  const url = URL.createObjectURL(file);
+  const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+  slotImages[slot] = img; slotThumbUrl[slot] = url;
+  await new Promise(r => setTimeout(r, 16));
+  buildSlot(slot, img);
+  renderSlotThumb(slot);
+  setStatus("");
+  if (!framedOnce) { framedOnce = true; frameView(); }
+}
+
+function nextFreeSlot() {
+  const free = []; for (let i = 0; i < slotCount(); i++) if (!slotImages[i]) free.push(i);
+  if (!free.length) return 0;
+  if (LAYOUT === "cube" && assemblyMode() !== "instant" && $("spin").checked && free.length > 1) {
+    const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir);
+    const nrm = new THREE.Vector3(); let best = free[0], bestDot = -Infinity;
+    for (const fi of free) { nrm.set(0, 0, 1).applyEuler(new THREE.Euler().fromArray(FACES[fi].rot)).applyQuaternion(root.quaternion); const d = nrm.dot(camDir); if (d > bestDot) { bestDot = d; best = fi; } }
+    return best;
+  }
+  return free[0];
+}
+
+// front-most slot that has an image (target for flow + mow)
+function activeSlot() {
+  let best = -1, bestDot = -Infinity;
+  const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir);
+  const nrm = new THREE.Vector3();
+  for (let s = 0; s < slotCount(); s++) {
+    if (!slotImages[s]) continue;
+    const info = slotInfo(s);
+    nrm.set(0, 0, 1).applyEuler(new THREE.Euler().fromArray(info.rot)).applyQuaternion(root.quaternion);
+    const d = -nrm.dot(camDir);   // facing camera => larger
+    if (d > bestDot) { bestDot = d; best = s; }
+  }
+  return best;
+}
+
+// ================= MATERIAL FLOW (per-slot falling sand) =================
+let fluid = null;   // { slot, N, occ:Uint8Array, mesh, source, mat }
+function clearFluidIf(slot) { if (fluid && fluid.slot === slot) clearFluid(); }
+function clearFluid() {
+  if (!fluid) return;
+  const rec = slotRecs[fluid.slot]; if (rec) rec.grp.remove(fluid.mesh);
+  try { fluid.mesh.geometry.dispose(); fluid.mesh.material.dispose(); } catch (e) {}
+  fluid = null;
+}
+function startFluid(source) {
+  const slot = activeSlot();
+  if (slot < 0) { setStatus("Add a photo first"); setTimeout(() => setStatus(""), 1200); return; }
+  const rec = slotRecs[slot]; const N = rec.N;
+  if (!fluid || fluid.slot !== slot || fluid.N !== N) {
+    clearFluid();
+    const geo = new THREE.BoxGeometry(rec.vox, rec.vox, rec.vox);
+    const mat = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.0 });
+    const mesh = new THREE.InstancedMesh(geo, mat, N * N); mesh.count = 0;
+    rec.grp.add(mesh);
+    fluid = { slot, N, occ: new Uint8Array(N * N), mesh, source, mat: parseInt($("material").value, 10) };
+  }
+  fluid.source = source; fluid.mat = parseInt($("material").value, 10);
+}
+const _fcol = new THREE.Color();
+function matColor(c, i, j) {
+  if (c === 1) { _fcol.setRGB(0.15, 0.45 + 0.2 * hash(i, j), 0.95); }      // water
+  else if (c === 2) { const f = 0.6 + 0.4 * hash(i + frameCount * 0.05 | 0, j); _fcol.setRGB(1.0, 0.35 * f, 0.04); } // lava glow
+  else { const w = 0.9 + 0.1 * hash(i, j); _fcol.setRGB(w, w, w); }        // snow
+  return _fcol;
+}
+function stepFluid() {
+  if (!fluid) return;
+  const m = fluid.mat;
+  if (m === 2 && (frameCount % 3) !== 0) return;   // lava slow
+  if (m === 3 && (frameCount % 2) !== 0) return;   // snow slower
+  const N = fluid.N, occ = fluid.occ;
+  const rate = parseInt($("flowRate").value, 10) || 10;
+  // spawn
+  if (fluid.source === "rain") {
+    for (let s = 0; s < rate; s++) { const i = (Math.random() * N) | 0; if (occ[i] === 0) occ[i] = m; }
+  } else if (fluid.source === "geyser") {
+    const ci = (N / 2) | 0, burst = Math.min(N - 1, 4 + (rate >> 1));
+    for (let d = -1; d <= 1; d++) { const i = ci + d; if (i < 0 || i >= N) continue; for (let up = 0; up < burst; up++) { const j = N - 1 - up; if (occ[j * N + i] === 0) occ[j * N + i] = m; } }
+  }
+  // gravity (down = +j); bottom-up so a moved cell is not reprocessed
+  const water = (m === 1);
+  const lr = (frameCount & 1) === 0;
+  for (let j = N - 2; j >= 0; j--) {
+    for (let ii = 0; ii < N; ii++) {
+      const i = lr ? ii : (N - 1 - ii);
+      const here = j * N + i, mm = occ[here]; if (!mm) continue;
+      if (occ[here + N] === 0) { occ[here + N] = mm; occ[here] = 0; continue; }
+      const canL = i > 0 && occ[here + N - 1] === 0;
+      const canR = i < N - 1 && occ[here + N + 1] === 0;
+      if (canL && canR) { if (Math.random() < 0.5) occ[here + N - 1] = mm; else occ[here + N + 1] = mm; occ[here] = 0; continue; }
+      if (canL) { occ[here + N - 1] = mm; occ[here] = 0; continue; }
+      if (canR) { occ[here + N + 1] = mm; occ[here] = 0; continue; }
+      if (water) {   // spread sideways when settled
+        const sl = i > 0 && occ[here - 1] === 0, sr = i < N - 1 && occ[here + 1] === 0;
+        if (sl && sr) { if (Math.random() < 0.5) occ[here - 1] = mm; else occ[here + 1] = mm; occ[here] = 0; }
+        else if (sl) { occ[here - 1] = mm; occ[here] = 0; }
+        else if (sr) { occ[here + 1] = mm; occ[here] = 0; }
+      }
+    }
+  }
+}
+function renderFluid() {
+  if (!fluid) return;
+  const rec = slotRecs[fluid.slot]; if (!rec) { clearFluid(); return; }
+  const N = fluid.N, occ = fluid.occ, vox = rec.vox, span = rec.span;
+  let n = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const c = occ[j * N + i]; if (!c) continue;
+      const idx = j * N + i;
+      _p.set((i + 0.5) * vox - span / 2, span / 2 - (j + 0.5) * vox, rec.pos[idx * 3 + 2] + rec.size * 0.7);
+      _q.identity(); _s.set(1, 1, 1); _m.compose(_p, _q, _s); fluid.mesh.setMatrixAt(n, _m);
+      fluid.mesh.setColorAt(n, matColor(c, i, j)); n++;
+      if (n >= N * N) { j = N; break; }
+    }
+  }
+  fluid.mesh.count = n;
+  fluid.mesh.instanceMatrix.needsUpdate = true; if (fluid.mesh.instanceColor) fluid.mesh.instanceColor.needsUpdate = true;
+}
+
+// ================= LAWNMOWER =================
+let mow = null;   // { slot, order:Int32Array, idx, marker, mowing }
+function clearMowIf(slot) { if (mow && mow.slot === slot) { removeMower(); mow = null; } }
+function removeMower() { if (mow && mow.marker) { const rec = slotRecs[mow.slot]; if (rec) rec.grp.remove(mow.marker); mow.marker = null; } }
+function startMow() {
+  const slot = activeSlot(); if (slot < 0) { setStatus("Add a photo first"); setTimeout(() => setStatus(""), 1200); return; }
+  const rec = slotRecs[slot]; const N = rec.N;
+  const order = new Int32Array(N * N); let p = 0;
+  for (let i = 0; i < N; i++) { if (i % 2 === 0) { for (let j = 0; j < N; j++) order[p++] = j * N + i; } else { for (let j = N - 1; j >= 0; j--) order[p++] = j * N + i; } }
+  removeMower();
+  const mk = new THREE.Mesh(new THREE.BoxGeometry(rec.vox * 1.5, rec.span, rec.vox * 2.5), new THREE.MeshStandardMaterial({ color: 0xffe24a, emissive: 0x553300 }));
+  rec.grp.add(mk);
+  mow = { slot, order, idx: 0, marker: mk, mowing: true };
+}
+function mowStep() {
+  if (!mow || !mow.mowing) return;
+  const rec = slotRecs[mow.slot]; if (!rec) { mow = null; return; }
+  const N = rec.N, span = rec.span, vox = rec.vox;
+  const rate = parseInt($("mowSpeed").value, 10) || 140;
+  const end = Math.min(mow.order.length, mow.idx + rate);
+  for (let k = mow.idx; k < end; k++) hideVoxelIdx(rec, mow.order[k]);
+  mow.idx = end;
+  rec.mesh.instanceMatrix.needsUpdate = true;
+  const headIdx = mow.order[Math.min(end, mow.order.length - 1)];
+  const hi = headIdx % N;
+  if (mow.marker) mow.marker.position.set((hi + 0.5) * vox - span / 2, 0, rec.size * 1.2 + 0.02);
+  if (mow.idx >= mow.order.length) { mow.mowing = false; removeMower(); }
+}
+function regrow() {
+  if (mow) { removeMower(); }
+  const slot = activeSlot(); if (slot < 0) return;
+  const rec = slotRecs[slot];
+  for (let idx = 0; idx < rec.count; idx++) { if (rec.hidden[idx]) { rec.hidden[idx] = 0; placeVoxel(rec, idx); } }
+  rec.mesh.instanceMatrix.needsUpdate = true; if (rec.mesh.instanceColor) rec.mesh.instanceColor.needsUpdate = true;
+  mow = null;
+}
+
+// ---- layout + file wiring ----
+function applyLayout() {
+  for (let s = 0; s < MAXSLOTS; s++) disposeSlot(s);
+  clearFluid(); mow = null;
+  LAYOUT = $("layout").value;
+  firstSlotDone = false; framedOnce = false;
+  buildSlotsPanel();
+  let any = false;
+  for (let s = 0; s < slotCount(); s++) if (slotImages[s]) { buildSlot(s, slotImages[s]); any = true; }
+  if (any) { framedOnce = true; frameView(); }
+  setStatus(any ? "" : "Add a photo to begin\u2026");
+}
+
+$("layout").addEventListener("change", applyLayout);
+
+$("file").addEventListener("change", async (e) => {
+  const files = [...e.target.files]; if (!files.length) return;
+  let target = e.target.dataset.target !== "" && e.target.dataset.target != null ? parseInt(e.target.dataset.target, 10) : nextFreeSlot();
+  e.target.dataset.target = "";
+  for (const f of files) { await addImage(target, f); target = nextFreeSlot(); }
+  e.target.value = "";
+});
+
+$("rebuild").onclick = () => { firstSlotDone = false; clearFluid(); mow = null; for (let s = 0; s < slotCount(); s++) if (slotImages[s]) buildSlot(s, slotImages[s]); };
+$("clear").onclick = () => { for (let s = 0; s < MAXSLOTS; s++) { slotImages[s] = null; disposeSlot(s); renderSlotThumb(s); } clearFluid(); mow = null; firstSlotDone = false; framedOnce = false; setStatus("Add a photo to begin\u2026"); };
+["res", "depth", "depthAmt", "gap"].forEach(id => $(id).addEventListener("change", () => $("rebuild").onclick()));
+
+$("rain").onclick = () => startFluid("rain");
+$("geyser").onclick = () => startFluid("geyser");
+$("clearFluid").onclick = () => clearFluid();
+$("mow").onclick = () => startMow();
+$("regrow").onclick = () => regrow();
+
+function frameView() { camera.position.set(LAYOUT === "cube" ? 2.4 : 0.2, LAYOUT === "cube" ? 1.9 : 0.6, LAYOUT === "cube" ? 3.6 : 6.2); controls.target.set(0, 0, 0); controls.update(); }
+
+let frameCount = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  frameCount++;
+  revealStep();
+  stepFluid(); renderFluid();
+  mowStep();
+  const spin = LAYOUT === "cube" && $("spin").checked && firstSlotDone;
+  if (spin) { const sp = (parseInt($("spinSpeed").value, 10) / 100) * 0.012; root.rotation.y += sp; root.rotation.x += sp * 0.18; }
+  controls.update();
+  renderer.render(scene, camera);
+}
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize);
+
+buildSlotsPanel(); resize(); loop();
+</script>
+</body>
+</html>

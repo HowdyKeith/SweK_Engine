@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="demo:title" content="Kriging">
+<meta name="demo:category" content="physics lab">
+<title>Kriging - the prediction and what it does not know</title>
+<style>
+  html,body{margin:0;background:#0a0b0d;color:#dde3e8;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:980px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#7f8a93;margin-bottom:14px}
+  .card{border:1px solid #232b31;background:#0e1216;padding:12px 14px;margin-bottom:13px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  canvas{border:1px solid #1c2429;background:#06080a;cursor:crosshair}
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; }
+  #pred,#varc{width:440px;height:340px}
+  label{color:#7f8a93;margin-right:6px}input[type=range]{width:130px;vertical-align:middle}
+  select,button{background:#0c1114;color:#dde3e8;border:1px solid #2b353c;font:inherit;padding:3px 8px}
+  button{cursor:pointer}button:hover{background:#151d22}
+  .num{color:#8fd0c0}.dim{color:#7f8a93}.good{color:#8fe0a8}
+  td{padding:1px 14px 1px 0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Kriging &mdash; the prediction, and what it does not know</h1>
+  <div class="sub">Click to place samples. The left panel is the interpolated field; the right is the
+    <em>variance</em> &mdash; the panel most tools leave out, and the only one that tells you where the answer is
+    a guess.</div>
+
+  <div class="card">
+    <label>variogram</label>
+    <select id="model"><option value="spherical">spherical</option><option value="exponential">exponential</option><option value="gaussian">gaussian</option></select>
+    <label style="margin-left:12px">range</label><input id="range" type="range" min="10" max="200" value="70"><span class="num" id="rangev"></span>
+    <label style="margin-left:12px">nugget</label><input id="nugget" type="range" min="0" max="200" value="5"><span class="num" id="nuggetv"></span>
+    <div style="margin-top:8px">
+      <button id="seed">seed samples</button><button id="clear">clear</button>
+      <span class="dim">&mdash; click the left panel to add a sample; the field and the variance both update.</span>
+    </div>
+  </div>
+
+  <div class="card row">
+    <div>
+      <canvas id="pred" width="440" height="340"></canvas>
+      <div class="dim" style="width:440px">prediction &mdash; dots are the samples</div>
+    </div>
+    <div>
+      <canvas id="varc" width="440" height="340"></canvas>
+      <div class="dim" style="width:440px">variance &mdash; <span class="good">dark is confident</span>, bright is
+        not. It is exactly zero at every sample, and grows with distance from all of them.</div>
+    </div>
+  </div>
+
+  <div class="card"><table id="tbl"></table>
+    <div class="dim" style="margin-top:8px">Kriging is the <b>best linear unbiased</b> estimator: the weights sum
+      to exactly 1 (unbiased), and of every weight set that does, this one gives the smallest variance (best).
+      The variogram is a <b>modelling choice</b> &mdash; it is not derived from the samples, and changing it
+      changes the answer.</div>
+  </div>
+</div>
+
+<script type="module">
+import { MODELS, ordinaryKriging, localKriging, kdNeighbourhood, combine } from "/physics/geostats/kriging.js";
+import { build as kdBuild, kNearest, worthIndexing } from "/physics/spatial/kdtree.js";
+
+const $=(id)=>document.getElementById(id);
+const P=$("pred"), V=$("varc"), pg=P.getContext("2d"), vg=V.getContext("2d");
+const W=P.width, H=P.height, STEP=4;
+let samples=[];
+
+const sync=()=>{ $("rangev").textContent=$("range").value; $("nuggetv").textContent=($("nugget").value/100).toFixed(2); };
+$("range").oninput=$("nugget").oninput=()=>{sync();draw();};
+$("model").onchange=draw; sync();
+
+function gammaNow(){
+  return MODELS[$("model").value]({ nugget: +$("nugget").value/100, sill: 8, range: +$("range").value });
+}
+function seedSamples(){
+  samples=[];
+  let s=4242; const rnd=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+  for(let i=0;i<10;i++){ const x=30+rnd()*(W-60), y=30+rnd()*(H-60);
+    samples.push({at:[x,y], value: Math.sin(x/70)*10 + Math.cos(y/55)*6}); }
+  draw();
+}
+$("seed").onclick=seedSamples;
+$("clear").onclick=()=>{samples=[];draw();};
+P.onclick=(e)=>{
+  const r=P.getBoundingClientRect();
+  const x=(e.clientX-r.left)*W/r.width, y=(e.clientY-r.top)*H/r.height;
+  samples.push({at:[x,y], value: Math.sin(x/70)*10 + Math.cos(y/55)*6});
+  draw();
+};
+
+function ramp(t){                      // blue -> teal -> warm, for the prediction
+  t=Math.max(0,Math.min(1,t));
+  return [40+t*215, 60+t*150, 150-t*90];
+}
+function heat(t){                      // dark -> bright, for the variance
+  t=Math.max(0,Math.min(1,t));
+  return [20+t*230, 20+t*120, 40+t*60];
+}
+
+function draw(){
+  pg.fillStyle="#06080a"; pg.fillRect(0,0,W,H);
+  vg.fillStyle="#06080a"; vg.fillRect(0,0,W,H);
+  if(samples.length===0){
+    pg.fillStyle="#7f8a93"; pg.font="12px monospace";
+    pg.fillText("click to place samples, or press 'seed samples'", 20, 30);
+    $("tbl").innerHTML='<tr><td class="dim">no samples yet</td></tr>';
+    return;
+  }
+  const gamma=gammaNow();
+  // v2853 -- THIS PAGE IS WHY THE k-d TREE EXISTS. Every redraw solves ~9,350 kriging systems, each O(n^3) in
+  // the sample count, and you can add samples by clicking. kdNeighbourhood consults the v2841 selectivity rule
+  // and BUILDS A TREE ONLY WHEN THE RULE SAYS IT PAYS -- below that threshold a linear scan is competitive and
+  // the tree is not built at all. v2842 measured 21.6x at 1000 samples and 70.6x at 5000.
+  const nb=kdNeighbourhood(samples,{buildKd:kdBuild,kNearest,k:12,worthIndexing});
+  const solve=(q)=> nb.use ? localKriging(samples,q,gamma,{k:12,nearestFn:nb.nearestFn})
+                           : ordinaryKriging(samples,q,gamma);
+  let vmin=Infinity,vmax=-Infinity,smin=Infinity,smax=-Infinity;
+  const grid=[];
+  for(let y=0;y<H;y+=STEP) for(let x=0;x<W;x+=STEP){
+    const r=solve([x,y]);
+    if(!r) continue;
+    grid.push({x,y,v:r.value,s:r.variance});
+    if(r.value<vmin)vmin=r.value; if(r.value>vmax)vmax=r.value;
+    if(r.variance<smin)smin=r.variance; if(r.variance>smax)smax=r.variance;
+  }
+  const span=(vmax-vmin)||1, sspan=(smax-smin)||1;
+  for(const c of grid){
+    let [r,g,b]=ramp((c.v-vmin)/span);
+    pg.fillStyle=`rgb(${r|0},${g|0},${b|0})`; pg.fillRect(c.x,c.y,STEP,STEP);
+    [r,g,b]=heat((c.s-smin)/sspan);
+    vg.fillStyle=`rgb(${r|0},${g|0},${b|0})`; vg.fillRect(c.x,c.y,STEP,STEP);
+  }
+  for(const s of samples){
+    for(const ctx of [pg,vg]){
+      ctx.beginPath(); ctx.arc(s.at[0],s.at[1],4,0,7);
+      ctx.fillStyle="#0a0b0d"; ctx.fill();
+      ctx.lineWidth=1.5; ctx.strokeStyle="#dde3e8"; ctx.stroke();
+    }
+  }
+  // the checks, live: exactness at a sample, unbiasedness, and a combination
+  const at=ordinaryKriging(samples,samples[0].at,gamma);
+  const mid=ordinaryKriging(samples,[W/2,H/2],gamma);
+  const sum=mid.weights.reduce((a,b)=>a+b,0);
+  const other={value:mid.value+3, variance:mid.variance*0.4};
+  const c=combine({value:mid.value,variance:mid.variance}, other);
+  $("tbl").innerHTML=`
+    <tr><td class="dim">samples</td><td class="num">${samples.length}</td>
+        <td class="dim">neighbourhood</td><td class="num">${nb.use?"k-d tree (k=12)":"linear scan &mdash; "+nb.reason.slice(0,44)}</td></tr>
+    <tr><td class="dim">&nbsp;</td><td>&nbsp;</td>
+        <td class="dim">variance range</td><td class="num">${smin.toFixed(4)} to ${smax.toFixed(4)}</td></tr>
+    <tr><td class="dim">at a sample: predicted / observed</td>
+        <td class="num">${at.value.toFixed(6)} / ${samples[0].value.toFixed(6)}</td>
+        <td class="dim">exact?</td><td class="${at.value===samples[0].value?"good":"num"}">${at.value===samples[0].value?"bit-identical, variance 0":"NOT EXACT"}</td></tr>
+    <tr><td class="dim">weights at centre sum to</td><td class="num">${sum.toFixed(12)}</td>
+        <td class="dim">unbiased?</td><td class="${Math.abs(sum-1)<1e-9?"good":"num"}">${Math.abs(sum-1)<1e-9?"yes":"no"}</td></tr>
+    <tr><td class="dim">combined with a second estimate</td>
+        <td class="num">${c.value.toFixed(4)} &plusmn;${c.variance.toFixed(4)}</td>
+        <td class="dim">below both inputs?</td>
+        <td class="${c.variance<mid.variance&&c.variance<other.variance?"good":"num"}">${c.variance<mid.variance&&c.variance<other.variance?"yes - that is why you combine":"no"}</td></tr>`;
+}
+seedSamples();
+</script>
+</body>
+</html>

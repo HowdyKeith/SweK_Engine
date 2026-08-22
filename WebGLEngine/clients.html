@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Devices</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--shield); }
+  header .sp { flex:1; }
+  .counts { color:var(--dim); font-size:13px; }
+  .counts b { color:var(--ink); }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--go); margin-right:5px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  main { max-width:760px; margin:0 auto; padding:14px 16px 28px; }
+  .dev { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:13px 15px; margin-bottom:10px; }
+  .dev .top { display:flex; align-items:center; gap:11px; }
+  .dev .ic { font-size:24px; }
+  .dev .nm { font-weight:600; }
+  .dev .meta { color:var(--dim); font-size:12px; margin-top:1px; }
+  .dev.pc .ic { color:var(--pc); } .dev.phone .ic { color:var(--phone); } .dev.shield { border-color:#1f5a44; } .dev.shield .ic { color:var(--shield); }
+  .tag { font-size:10px; text-transform:uppercase; letter-spacing:.06em; border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:var(--dim); margin-left:auto; }
+  .dev.shield .tag { color:var(--shield); border-color:#1f5a44; }
+  .acts { display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
+  .acts button { background:#0e141d; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  .acts button:active { transform:scale(.97); }
+  .ua { color:var(--dim); font-size:11px; margin-top:7px; word-break:break-all; opacity:.7; }
+  #empty { color:var(--dim); padding:22px 4px; }
+  #msg { color:var(--dim); font-size:12.5px; margin-top:8px; min-height:18px; }
+  #bridgeStat { font-size:11.5px; color:var(--dim); font-family:ui-monospace,monospace; }
+  #about { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:12px 14px; color:var(--dim); font-size:12.5px; line-height:1.55; margin-bottom:12px; }
+  #about b { color:var(--ink); }
+  #launch { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-bottom:14px; }
+  #launch .lh { font-size:12px; color:var(--ink); font-weight:600; }
+  #launch .lb { display:flex; gap:7px; flex-wrap:wrap; margin-top:9px; }
+  #launch .lb button { background:#0e141d; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 11px; font:inherit; font-size:13px; cursor:pointer; }
+  #launch .lb button:active { transform:scale(.97); }
+  #launch .lhint { color:var(--dim); font-size:11.5px; margin-top:9px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🖥️</span> Connected devices</span>
+    <span class="sp"></span>
+    <span class="counts" id="counts"><span class="dot"></span>…</span>
+    <span id="bridgeStat" title="whether this page can reach the bridge">checking…</span>
+  </header>
+  <main>
+    <!-- v1949 — purpose blurb: this panel counts WebSocket clients, which the light pages are NOT. -->
+    <div id="about">
+      This panel lists devices connected to the bridge over its <b>WebSocket relay</b>. Light console pages
+      (this one, the server console, the WASM pages) talk to the bridge over plain HTTP, so they <b>don't</b>
+      appear here — only things that open the engine's WebSocket do: the render engine, avatar/Pip-Boy modes,
+      a phone view, the Android TV Device, or the viewer pages below. Open one and it shows up within a few seconds.
+    </div>
+    <!-- v1949 — launch buttons: each opens a page that DOES register a WS client, so you can populate the list. -->
+    <div id="launch">
+      <span class="lh">Open a device to populate this list:</span>
+      <div class="lb">
+        <button data-open="/index.html?forceEngine=1" title="the full render engine — registers as a 'pc' client">🖥 Open SweK Engine</button>
+        <button data-open="/spectator.html" title="lightweight viewer — registers a WS client">👁 Spectator</button>
+        <button data-open="/control.html" title="controller page — registers a WS client">🎮 Control</button>
+        <button data-open="/terminal.html" title="terminal page — registers a WS client">⌨ Terminal</button>
+        <button data-open="/rps.html" title="rock-paper-scissors — registers a WS client">✊ RPS</button>
+      </div>
+      <div class="lhint">They open in new tabs; leave one open and watch it appear here. Open on your phone for a 📱 row, or cast to the Android TV Device for a 📺 row.</div>
+    </div>
+    <!-- v1942 — htmx: declarative poll. hx-get fetches a server-rendered HTML fragment every 4s and swaps
+         it into #list; the fragment also carries an hx-swap-oob update for #counts. No hand-rolled
+         fetch + innerHTML loop. The vanilla /clients JSON route still exists for other consumers. -->
+    <div id="list"
+         hx-get="/clients/fragment"
+         hx-trigger="load, every 4s"
+         hx-swap="innerHTML"></div>
+    <div id="msg"></div>
+  </main>
+  <script src="/vendor/htmx/htmx.2.0.10.min.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // v1949 — bridge heartbeat: distinguish "bridge reachable but genuinely 0 clients" from "poll failed".
+  // htmx fires afterRequest on every /clients/fragment poll; a network failure fires sendError/timeout.
+  const stat = $("bridgeStat");
+  function setStat(ok){
+    if (ok) { stat.textContent = "● bridge online"; stat.style.color = "#2bff88"; }
+    else    { stat.textContent = "● bridge unreachable"; stat.style.color = "#ff6b6b"; }
+  }
+  const listEl = document.getElementById("list");
+  listEl.addEventListener("htmx:afterRequest", function(e){
+    // successful = got a 2xx from the fragment route (bridge answered, even if the list is empty)
+    var xhr = e.detail && e.detail.xhr;
+    setStat(!!(xhr && xhr.status >= 200 && xhr.status < 400));
+  });
+  listEl.addEventListener("htmx:sendError", function(){ setStat(false); });
+  listEl.addEventListener("htmx:timeout", function(){ setStat(false); });
+  listEl.addEventListener("htmx:responseError", function(e){
+    var xhr = e.detail && e.detail.xhr; setStat(false);
+  });
+
+  // v1949 — launch buttons open the WS-registering pages in new tabs.
+  document.getElementById("launch").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-open]"); if (!b) return;
+    window.open(b.getAttribute("data-open"), "_blank");
+    $("msg").textContent = "opened " + b.getAttribute("data-open") + " — watch for it to appear above (up to ~4s)";
+  });
+
+  // Shield "open panel" buttons are re-created on every htmx swap, so bind via delegation on a stable parent.
+  document.getElementById("list").addEventListener("click", function(e){
+    const b = e.target.closest("button[data-ip]"); if (!b) return;
+    openOnShield(b.getAttribute("data-ip"), b.getAttribute("data-path"));
+  });
+
+  async function openOnShield(ip, path){
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { $("msg").textContent = "✗ this device's IP isn't usable for ADB"; return; }
+    const url = location.origin + path;
+    $("msg").textContent = "opening " + path + " on " + ip + " …";
+    try { const r = await (await fetch("/shield/exec", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action:"openUrl", ip, url }) })).json();
+      $("msg").textContent = r && r.ok ? ("📺 opened " + path + " on " + ip) : ("⚠ failed: " + (r && r.error || "?") + " (adb authorized to this Shield?)"); }
+    catch (e) { $("msg").textContent = "✗ " + e; }
+  }
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

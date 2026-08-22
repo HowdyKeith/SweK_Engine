@@ -1,0 +1,9 @@
+# Windows launchers must stay CRLF. The v3903 end-of-script marker in
+# START_NODE_Engine.bat depends on it, and nothing else in this repo would
+# notice git normalising them away.
+*.bat   -text
+*.cmd   -text
+*.command -text
+
+# Everything else: leave bytes alone rather than guessing per platform.
+* -text

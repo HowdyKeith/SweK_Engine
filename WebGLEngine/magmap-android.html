@@ -1,0 +1,207 @@
+<!doctype html>
+<!-- magmap-android.html
+     v2921 - ITEM 3'S EXPERIMENT. Open this in Chrome-for-Android (over the ai-bridge server or any static
+     server; file:// will not load ES modules). It runs the UNCHANGED magmap WGSL - imported from
+     tools/roundhouse/magmapGpu.mjs, not copied, so the page cannot drift from the gated kernel - on whatever
+     adapter the phone offers, adjudicates a 34-cell sample on the CPU exactly as the desktop path does, then
+     walks the FULL grid against the f64 reference and reports the worst relative error against MAGMAP_TOL.
+     The tolerance was set in v2903 from the emulated f32 floor, before any second vendor existed. The button
+     below does not negotiate it.
+
+     Output: magmap-report.json (download button), consumed by
+         node tools/roundhouse/androidVerdict.mjs android-reference.json android-phone.json magmap-report.json -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK magmap - second GPU vendor audition</title>
+<style>
+  /* v3002 -- see the note above the canvas. A RULE rather than an inline style, because the canvasFill gate
+     recognises `canvas { width: 100% }` and does not read inline attributes -- a real (small) blind spot in the
+     detector, recorded in its own source rather than worked around silently. */
+  #map { width: 100%; max-width: 420px; height: auto; aspect-ratio: 1 / 1; image-rendering: pixelated; display: none; }
+
+  body { font: 15px/1.45 ui-monospace, Menlo, Consolas, monospace; background: #0a0e0c; color: #cfe9d8; margin: 0; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 4px; } .sub { color: #7fa78e; font-size: 12px; margin-bottom: 14px; }
+  button { font: inherit; background: #17402a; color: #cfe9d8; border: 1px solid #2c6a45; border-radius: 6px; padding: 10px 16px; }
+  button:disabled { opacity: .45; }
+  table { border-collapse: collapse; margin: 12px 0; } td { padding: 3px 10px 3px 0; vertical-align: top; }
+  td:first-child { color: #7fa78e; }
+  .pass { color: #6fe39a; } .fail { color: #ff7a76; } .warn { color: #ffd166; }
+  #banner { font-size: 20px; font-weight: bold; margin: 10px 0; }
+  canvas { image-rendering: pixelated; border: 1px solid #2c6a45; margin: 8px 0; }
+  textarea { width: 100%; height: 130px; background: #0f1712; color: #9fc9ae; border: 1px solid #2c6a45; font: 11px ui-monospace, monospace; }
+  a.dl { color: #6fe39a; }
+</style>
+</head>
+<body>
+<h1>magmap - second GPU vendor audition</h1>
+<div class="sub">the WGSL is imported from the gated kernel, unmodified - + - * / sqrt only, trig arrives as CPU tables.
+The pass line is MAGMAP_TOL, set from the emulated f32 floor in v2903, before this phone existed.</div>
+<button id="run">run the kernel on this device's GPU</button>
+<div id="banner"></div>
+<table id="facts"></table>
+<!-- v3002 -- FIELD canvas, not a drawing. The backing store stays 21x21 because THAT IS ALL THE DETAIL THERE
+     IS: the magmap grid is 21x21 and inflating the buffer would invent cells the kernel never computed. What
+     grows is the DISPLAY, with image-rendering:pixelated so a cell stays a square rather than being smeared
+     into detail nobody measured. Same prescription as the wind tunnel; the opposite of the one a curve wants.
+     It was a fixed 189px postage stamp on a phone screen, which is the device this page exists for. -->
+<canvas id="map" width="21" height="21"></canvas>
+<div id="save" style="display:none">
+  <button id="sendrep">send to hub</button>
+  <a class="dl" id="dl" download="magmap-report.json">download magmap-report.json</a>
+  (drop it next to android-phone.json; the verdict takes it as the third argument)
+  <textarea id="json" readonly></textarea>
+</div>
+
+<p style="margin-top:.8em"><a href="/magmap-bench.html">&#9889; A/B bench: time kernel variants on this GPU &rarr;</a><br><span style="font-size:.85em;opacity:.7">the kernel was never tuned -- this times workgroup sizes and shared-memory trig, and rejects any variant that changes a result</span></p>
+
+<p style="margin-top:1.2em"><a href="/report.html" style="font-size:1.05em">&#128241; see all devices on record &rarr;</a><br><span style="font-size:.85em;opacity:.7">the permanent results ledger: every device that has reported, its verdict, and a copy-as-text button</span></p>
+
+<details style="margin-top:1.5em">
+  <summary style="cursor:pointer">optional: keep this peer running across reboots (persistence)</summary>
+  <p style="max-width:60ch;line-height:1.5">
+    A button on a web page cannot install anything into Termux — the browser has no filesystem or shell access.
+    What it <em>can</em> do is hand you the exact commands. Install the <strong>Termux:Boot add-on from F-Droid</strong>
+    (the Play Store build is deprecated and will not run boot scripts), then paste these into Termux once:
+  </p>
+  <textarea id="bootcmd" readonly style="height:5em"></textarea>
+  <button id="copycmd">copy the commands</button>
+  <a class="dl" id="dlboot" download="termux_boot_peer.sh" style="margin-left:1em">download termux_boot_peer.sh</a>
+  <p style="max-width:60ch;line-height:1.5;opacity:.8">
+    This gives start-on-boot and Doze survival, <strong>not</strong> a foreground service — Android still reaps
+    Termux under memory pressure, and a reap in the ledger <em>confirms</em> that prediction rather than failing
+    it. The phone writes <code>swek-persistence-ledger.jsonl</code> to Downloads; upload it with the transcript
+    and the desktop grades survival. Nothing here is submitted to F-Droid or the Termux repo — those host the app
+    and its add-ons; our scripts run inside Termux and only depend on Termux:Boot.
+  </p>
+</details>
+
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { magmapRun, MAGMAP_TOL, F32_FLOOR } from "./tools/roundhouse/magmapGpu.mjs";
+import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
+import { makeMagmapReport } from "./tools/roundhouse/magmapReport.mjs";
+
+const $ = (id) => document.getElementById(id);
+const row = (k, v, cls = "") => { const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${k}</td><td class="${cls}">${v}</td>`; $("facts").appendChild(tr); };
+
+$("run").onclick = async () => {
+  $("run").disabled = true; $("facts").innerHTML = ""; $("banner").textContent = "";
+  try {
+    if (!navigator.gpu) {
+      // v3845 -- a phone opening this over http://<lan-ip> has WebGPU and is being told to go turn on a flag.
+      // The flags hint is right for a SECURE origin and useless otherwise, so ask which case this is first.
+      const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+      $("banner").textContent = "WebGPU unavailable"; $("banner").className = "warn";
+      row("hint", p.reason === "insecure-origin" ? p.message
+        : "recent Chrome-for-Android ships WebGPU; check chrome://flags/#enable-unsafe-webgpu only if chrome://gpu says it is off", "warn");
+      return;
+    }
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) { $("banner").textContent = "no adapter"; $("banner").className = "fail"; return; }
+    // adapter.info is the standard path; requestAdapterInfo() the older one. Take whichever exists.
+    const info = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {}) || {};
+    const device = await adapter.requestDevice();
+    device.__adapterLabel = [info.vendor, info.architecture].filter(Boolean).join(" / ") || "unknown";
+    row("adapter", `${info.vendor || "?"} / ${info.architecture || "?"} ${info.device || ""} ${info.description || ""}`);
+    row("tol / f32 floor", `${MAGMAP_TOL} / ${F32_FLOOR} (margin ${(MAGMAP_TOL / F32_FLOOR).toFixed(1)}x)`);
+
+    // 1. propose on the GPU, adjudicate the 34-cell sample on the CPU - the desktop path, verbatim
+    const t0 = performance.now();
+    const run = await magmapRun({ device });
+    row("gpu run + sample adjudication", `${(performance.now() - t0).toFixed(0)} ms; sampled worst ` +
+        run.verdict.worstRelDiff.toExponential(2) + `, ${run.verdict.disagreed}/${run.verdict.checked} over tol`,
+        run.verdict.accepted ? "pass" : "fail");
+
+    // 2. the full grid against the f64 reference - every cell, no sampling
+    const report = makeMagmapReport({ adapter: info, ua: navigator.userAgent, run, tol: MAGMAP_TOL, floor: F32_FLOOR });
+    if (run.map) {
+      const { n, span, rho, nR, nT } = run;
+      const table = sampleTable(nT);
+      const t1 = performance.now();
+      let worst = 0, at = -1;
+      const raw = run.map.value;   // markGpu-tagged; .value is the Float32Array
+      for (let k = 0; k < n * n; k++) {
+        const cpu = referenceCell(k, { n, span, rho, table, nR });
+        const rel = Math.abs(raw[k] - cpu) / Math.max(Math.abs(cpu), 1e-300);
+        if (rel > worst) { worst = rel; at = k; }
+      }
+      report.fullGrid = { worstRelDiff: worst, worstIndex: at, cells: n * n, ms: performance.now() - t1 };
+      row("full grid (" + n * n + " cells)", "worst " + worst.toExponential(2) + " at cell " + at +
+          " (" + report.fullGrid.ms.toFixed(0) + " ms of CPU reference)", worst <= MAGMAP_TOL ? "pass" : "fail");
+
+      // the picture - the GPU's actual job. Log-scaled so the caustic reads.
+      const cv = $("map"), ctx = cv.getContext("2d"), img = ctx.createImageData(n, n);
+      let mx = 0; for (const v of raw) mx = Math.max(mx, v);
+      for (let k = 0; k < n * n; k++) {
+        const s = Math.log1p(raw[k]) / Math.log1p(mx), i = k * 4;
+        img.data[i] = 20 + 90 * s; img.data[i + 1] = 40 + 200 * s; img.data[i + 2] = 30 + 120 * s; img.data[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0); cv.style.display = "block";
+    } else {
+      row("full grid", "proposal REJECTED by adjudication - map fell back to CPU; the report records the rejection", "fail");
+    }
+    row("graded peak (never from the GPU)", "peakErrFrac " + run.graded.peakErrFrac.toExponential(2) + " [" + run.graded.source + "]");
+
+    // 3. the verdict this phone just earned, stated in the grader's words but NOT graded here -
+    //    the desktop verdict is the instrument of record; this banner is a preview
+    const worstFull = report.fullGrid ? report.fullGrid.worstRelDiff : run.verdict.worstRelDiff;
+    const ok = worstFull <= MAGMAP_TOL && run.verdict.accepted;
+    $("banner").textContent = ok ? "UNDER TOLERANCE - a second vendor, pending the desktop verdict"
+                                 : "OVER TOLERANCE - the tolerance does not move; this is a finding";
+    $("banner").className = ok ? "pass" : "fail";
+
+    const blob = JSON.stringify(report, null, 2);
+    $("json").value = blob;
+    $("dl").href = URL.createObjectURL(new Blob([blob], { type: "application/json" }));
+    $("save").style.display = "block";
+  } catch (e) {
+    $("banner").textContent = "error: " + (e && e.message || e); $("banner").className = "fail";
+  } finally { $("run").disabled = false; }
+};
+
+  // -- send the report straight to the hub over the connection this page already came from -----------------------
+  (function sendHelper() {
+    const b = document.getElementById("sendrep");
+    if (!b) return;
+    b.onclick = async () => {
+      const ta = document.getElementById("json");
+      if (!ta || !ta.value) { b.textContent = "run the kernel first"; return; }
+      b.disabled = true; b.textContent = "sending...";
+      try {
+        const r = await fetch("/android/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: ta.value });
+        const j = await r.json();
+        b.textContent = j.ok ? (j.fleet ? "sent \u2713 fleet: " + j.fleet.confirmedFamilies.length + " famil(y/ies)" : "sent to hub \u2713") : "failed: " + (j.error || r.status);
+      } catch (e) { b.textContent = "failed (offline? use download)"; }
+      b.disabled = false;
+    };
+  })();
+
+  // -- persistence install helper: the browser hands over commands, it cannot run them ---------------------------
+  (function persistenceHelper() {
+    const cmd = [
+      "# 1. install Termux:Boot from F-Droid first (not Play Store), then:",
+      "mkdir -p ~/.termux/boot",
+      "cp ~/SweK_Engine*/WebGLEngine/tools/roundhouse/termux_boot_peer.sh ~/.termux/boot/",
+      "chmod +x ~/.termux/boot/termux_boot_peer.sh",
+      "# from now on every boot appends to ~/storage/downloads/swek-persistence-ledger.jsonl"
+    ].join("\n");
+    const box = document.getElementById("bootcmd");
+    if (box) box.value = cmd;
+    const copy = document.getElementById("copycmd");
+    if (copy) copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(cmd); copy.textContent = "copied \u2713"; setTimeout(() => copy.textContent = "copy the commands", 1500); }
+      catch { box.select(); copy.textContent = "select + copy manually"; }
+    };
+    // offer the actual boot script for download, fetched live so it is never a stale copy
+    const dlboot = document.getElementById("dlboot");
+    if (dlboot) fetch("./tools/roundhouse/termux_boot_peer.sh")
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(t => { dlboot.href = URL.createObjectURL(new Blob([t], { type: "text/x-shellscript" })); })
+      .catch(() => { dlboot.textContent = "(boot script: copy from tools/roundhouse/termux_boot_peer.sh)"; dlboot.removeAttribute("href"); });
+  })();
+</script>
+</body>
+</html>

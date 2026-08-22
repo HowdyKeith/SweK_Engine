@@ -1,0 +1,2786 @@
+{
+ "version": 1,
+ "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
+ "count": 397,
+ "pages": [
+  {
+   "f": "AudioLab.html",
+   "t": "Audio Lab — Web Audio Synthesis Explorer",
+   "d": "Web Audio synthesis explorer — oscillators, filters, FX chains.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "RobotExpressive.html",
+   "t": "Robot Avatar",
+   "d": "Generated robot face — grey-robot-man with expressions.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ac.html",
+   "t": "AC",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "agenda.html",
+   "t": "🗓 Agenda — SweK Engine",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "agent-arena.html",
+   "t": "Agent Arena -- a learner that beats its baselines",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "aibrain.html",
+   "t": "AI Brain (VBA bridge)",
+   "d": "VBA-bridge visualizer for engine AI state.",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "air-quality.html",
+   "t": "Air Quality",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "alexa.html",
+   "t": "Alexa command",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "amplified-diff.html",
+   "t": "SweK &middot; Amplified Diff",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "android-invite.html",
+   "t": "Join as a SweK Android Peer",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
+   "f": "android-peer.html",
+   "t": "SweK Android Peer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "angle-of-repose.html",
+   "t": "Angle of repose - two solvers against atan(mu) (v3630)",
+   "d": "Two independent solvers - box3d rigid-body wasm and an XPBD particle solver - both bisect for the angle at which a block slides, and both are graded against atan(mu), the closed form neither is told.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "anime4k.html",
+   "t": "Anime4K Upscaler",
+   "d": "Anime4K's classic real-time upscaler, reimplemented natively in SweK: bilinear 2x then a DoG deblur (overshoot-clamped) and line-darkening. WebGPU compute on a rig, CPU reference here. Compare nearest / bilinear / Anime4K side by side; upload your own image.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "arch-diagram.html",
+   "t": "SweK Architecture",
+   "d": "An animated map of the engine's insides for the portfolio: the multi-runtime core feeding the physics facade (SweK CPU / box3d / Jolt), the content-to-voxels filter pipeline, the comic reader FX, the GPU Brain, Endless Sky, the nebula/wormhole/living-box showcase, persistence + RAG, peers, and the QA-gated ship ritual. Data pulses flow along the real dependencies. Hand-built, self-contained.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "arrival.html",
+   "t": "Arrival",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "ascii-object.html",
+   "t": "SweK &middot; ASCII Object",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ascii-video.html",
+   "t": "ASCII Video Player",
+   "d": "Load a JSON frame document and play it as ASCII video. Validates the grid, refuses ragged frames by name, and measures inter-frame churn so flicker is a number rather than an opinion.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "asset-library.html",
+   "t": "Asset Library + Tinder — SweK Engine",
+   "d": "Browse, triage (swipe keep/discard), and delete generated assets. Works on PC, phone, and Shield.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "asset-studio.html",
+   "t": "Asset Studio",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "asset2voxels.html",
+   "t": "Asset 2 Voxels",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "assets-ingest.html",
+   "t": "Asset Ingest &middot; SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "asteroids.html",
+   "t": "Asteroids (autopilot)",
+   "d": "A self-playing UFO hunts drifting rocks and dodges to survive. Tap to add a rock.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "avatar-push.html",
+   "t": "Avatars",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "avatar-server.html",
+   "t": "Avatar Server",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "avatarpreview.html",
+   "t": "Avatar / rig preview",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "avatarstage.html",
+   "t": "Avatar Stage",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "backend-dom.html",
+   "t": "Third backend — DOM/CSS against WebGL2",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "backend-physics-check.html",
+   "t": "Backend adjudicator",
+   "d": "Cross-peer lockstep in this engine runs on either physics backend. The ship gate proves Jolt and box3d expose the same methods -- it has never proved they agree on the same physics, and box3d cannot be run where this engine is developed, so the question can only be settled here, on your machine. This page runs the same exact checks the ship gate runs against BOTH backends, then drops identical worlds in each and compares them body by body. If they disagree, two peers replaying identical inputs would drift apart and the lockstep comparator would report a divergence with nothing to blame. There is a sabotage button that nudges one body by a millionth of a metre, so you can watch the comparator prove it can see a difference at all.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ball-alerts.html",
+   "t": "Ball Alerts",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bands.html",
+   "t": "SweK Physics — band structure",
+   "d": "An electron in a periodic potential cannot have just any energy. The Kronig-Penney relation says exactly which: allowed when |RHS| <= 1, forbidden otherwise, with no approximation in the statement. The forbidden gap is the falsifier — a region the theory declares EMPTY, which is a stronger claim than an agreement within a tolerance.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "battleship3d.html",
+   "t": "ABYSS — 3D Battleship",
+   "d": "3D naval combat with deep-water atmosphere.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bayes-fit.html",
+   "t": "SweK Physics — Bayesian inference on HMC",
+   "d": "HMC as an inference instrument: fit a noisy oscillator's (A, omega) by rolling trajectories over the log-posterior. Two keys grade it — an exact conjugate posterior (algebra, not another chain) and frequentist CALIBRATION: over repeated fresh datasets the 90% interval must cover the known truth ~90% of the time. The sabotage understates the noise: every posterior looks tighter and better, and the coverage counter is the only place the failure is visible.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "beam.html",
+   "t": "SweK Physics — the cantilever beam",
+   "d": "Two exact keys from one discretisation that fail in different ways. Static: the tip deflection is exactly FL^3/3EI. Dynamic: the vibration frequencies are roots of cos(b)cosh(b) = -1, so the ratios 6.2669 and 17.5475 are irrational numbers no plausible bug produces by accident. A tenfold stiffness change moves the deflection tenfold and leaves every ratio bit-identical, which is why one key cannot replace the other.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "benchmark.html",
+   "t": "Device Benchmark",
+   "d": "GPU + CPU benchmark suite.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "benchmarks.html",
+   "t": "SweK Benchmarks",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "binder-budget.html",
+   "t": "SweK Physics — the brain allocates the measurement budget",
+   "d": "Experiment design as a proposer-adjudicator handshake: strategies choose WHICH temperature to measure next to pin the Ising Binder crossing with a fixed budget of real Monte Carlo measurements. Bisection races even coverage; the degenerate 'easy data' policy collects smooth measurements far from the transition and never brackets it. The falsifier no strategy contains: the final crossing must land on Onsager's T_c = 2.2692.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "biome-map-demo.html",
+   "t": "Worley Biome Map (v2779)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "blackhole.html",
+   "t": "SweK &middot; Schwarzschild Black Hole (WebGPU)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-avatar.html",
+   "t": "Avataro / Avatarina",
+   "d": "A blobulator kept as an avatar. Oddly normal, either or both -- Avataro / Avatarina / both, a palette you toggle. It breathes when idle and reacts when you tap: dance, rotate head, high-five, wave, nod, bounce. Reactions displace its metaballs and blend cumulatively -- stack a few and it makes an emergent shape rather than a canned animation, because metaballs merge by nature. Drag to orbit, pinch to zoom. This is the reactive core; a GPU-brain driver and a threat-tentacle-with-fire tip come next.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-gravity.html",
+   "t": "Gravity Is A Goal",
+   "d": "A blob that is genuinely held down. Gravity pulls, buoyancy exists only while it is hot, heat exists only while it spends energy, and energy only returns while it is not spending -- so hovering is never free and it has to bob for its altitude. The lava lamp was never unbound by gravity; a lamp IS buoyancy against gravity. What it lacked was choice. Here a seeded perceptron (or the GPU brain when connected) decides when to burn and when to coast, and the height is earned: doing nothing falls, burning flat out reaches but cannot hold, and the brain holds three times longer on the same tank. The skin tells the truth -- it glows lava when it is working and freezes to ice when it gives up -- and the wormhole gauge reads its energy.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-herd.html",
+   "t": "The Herd",
+   "d": "Avataro and a herd of blobs, each with its own mind -- the same driver that runs the avatar runs every one of them, so they roam, keep their distance, and each picks its own moves on its own schedule. Because metaballs merge by summing, they bond with each other as well as with the host, and the count in the corner is the honest one: how many creatures you SEE is the number of connected components of the merge graph, not how many exist. Two bond, you see one. They part, you see two. Drag to orbit, pinch to zoom.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-selfie.html",
+   "t": "Selfie",
+   "d": "A blobulator's idea of a selfie: it casts its own X-ray shadows and is rebuilt from them, with nothing simulated anywhere. A metaball's shadow is closed-form -- for Wyvill's kernel it collapses to a single term, (32/35)*A*R*u^3.5, verified against brute-force integration to 4e-15. So the sinogram is written down exactly and back-projection must find the wax from those shadows alone. Getting here took two real failures worth more than the page: the blobulator's own kernel decays as 1/d-squared and never reaches zero, so filtered back-projection had no compact support and was biased by 108% no matter how many angles it got; truncating the kernel fixed that and introduced a hard edge, which rings. Wyvill's kernel is compact AND smooth, and the reconstruction lands at six hundredths of a percent -- better than the medical phantom, which is pinned near 14% forever because a head has edges.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-shock.html",
+   "t": "Blast Wax",
+   "d": "Metaballs hit by a real shockwave. The blast is not an animation curve and not a radial fudge -- it is the compressible Euler equations, solved by the same module that earned a strong shock compressing gas by exactly 6.003 against Rankine-Hugoniot, conserves mass to seven parts in a quadrillion, and reproduces Sedov's blast radius law. The blobs do not know a shock is coming. They are simply dragged by the gas velocity at their own position, so when the front arrives they get shoved -- and the front's radius, measured live off the page's own density field, follows the Sedov law it was checked against. Nothing here is scripted: the wave arrives when the physics says it arrives.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-stage.html",
+   "t": "The Stage",
+   "d": "Blobs that want the gauges but can never leave the stage. Each one is drawn to whichever instrument is nearest, so the gauges become the reason to be somewhere and the stage sorts itself into camps. They still have to earn every inch of altitude -- gravity pulls, buoyancy only exists while they are hot, heat only while they spend, and each is flown by the trained policy that learned to hold a height better than a hand-tuned controller. The walls are an invariant, not a force: containment clamps after integration, so nothing tunnels out no matter how hard it is shoved. They lean on the glass instead.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blob-studio.html",
+   "t": "Blob Studio",
+   "d": "A mini studio for the blobulator narrator: several blob speakers seated fuse-safe, any one holding the floor with its carved mouth driven by its own synthesized voice, named lower-thirds, and camera shots (wide / punch-in / two-shot). Records the composited canvas WITH the multi-voice audio and exports a YouTube-ready mp4.",
+   "g": "blobs",
+   "p": 0
+  },
+  {
+   "f": "blobarium.html",
+   "t": "Blobarium — the blob, in real physics, warmed, x-rayed",
+   "d": "",
+   "g": "blobs",
+   "p": 0
+  },
+  {
+   "f": "blobulator-gpu.html",
+   "t": "SweK &middot; Blobulator GPU (WebGPU raymarched SDF)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "blobulator.html",
+   "t": "SweK &middot; Blobulator (Lava Lamp / Flaming River)",
+   "d": "",
+   "g": "blobs",
+   "p": 0
+  },
+  {
+   "f": "blueprint.html",
+   "t": "Ship Blueprint",
+   "d": "A sprite becomes a mesh becomes a clean LCARS vector blueprint: silhouette + crease edges only, with hidden lines removed by occlusion (or dashed, if you want the ghosted construction look). Rotate it -- the line art re-solves each frame. The occlusion-aware vectorization idea, game-scale.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "board.html",
+   "t": "Board",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "boids.html",
+   "t": "Boids flocking",
+   "d": "Classic flocking — separation, alignment, cohesion. Tap to scatter.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "boot-sidecar.html",
+   "t": "boot sidecar reports",
+   "d": "Slow startup work handed to a helper process, so boot reads a timestamped file instead of talking to the outside world. This page shows every known sidecar report in the three states the contract defines and never collapses them into two: no report is not the same as a stale one, and a stale one is not the same as fresh. A malformed report reads as ABSENT, because a file the server trusts at boot is a trust surface.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "boundary-rank.html",
+   "t": "The boundary is not where accuracy dies (v3640)",
+   "d": "Boundary cells were excluded by name in three rounds. Measured: 92 of 94 reproduce a linear field exactly. The real defect is rank - two cells whose gradient is not inaccurate but undetermined, exactly two at every mesh size, and the code answered zero without saying so.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "box3d-blobs.html",
+   "t": "SweK &middot; Box3D Blobs (physics-driven lava)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "box3d-contacts.html",
+   "t": "Box3D Contacts &mdash; the overlay, and what it may claim",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "box3d-demo.html",
+   "t": "SweK &middot; Box3D demo",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "box3d-info.html",
+   "t": "SweK &middot; Box3D",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "box3d-replay.html",
+   "t": "SweK &middot; Box3D Replay &mdash; scrub the physics, and find the frame that broke",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "box3d-vs-jolt.html",
+   "t": "box3d vs Jolt",
+   "d": "The same physics scene stepped on box3d and Jolt side by side, with a live pixel-diff between the two renders. The visual companion to the trajectory divergence harness -- render-QA screenshots this on a rig to pixel-diff the backends. Jolt always runs; box3d needs its WASM built.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "box3d.html",
+   "t": "SweK &middot; Box3D",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "brain-3d.html",
+   "t": "GPU Brain 3D (the brain's actual mechanics, in 3D)",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-bench.html",
+   "t": "SweK Engine &mdash; Which half of a brain belongs on a GPU",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-fleet.html",
+   "t": "GPU Brain Fleet &mdash; Training Pool",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-lab.html",
+   "t": "Brain Lab",
+   "d": "Watch the GPU Brain learn, live: train a hunt policy, transfer it to intercept (warm start beats scratch), and clone a scripted behavior by imitation -- all running in idle time with a watchdog health gauge showing training / stalled / recovered.",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-maze.html",
+   "t": "Brain Maze (the GPU Brain solves an obstacle room)",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-quadrants.html",
+   "t": "Brain Quadrants (one GPU pass, many regions)",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-replay.html",
+   "t": "SweK &middot; Brain Replay &mdash; watch it learn, from decision zero",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "brain-room.html",
+   "t": "Brain Room &mdash; a clean 3D test world",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "bridge.html",
+   "t": "Bridge health",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bzflag-info.html",
+   "t": "BZFlag",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bzflag-test.html",
+   "t": "SweK Engine &mdash; BZFlag network test",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bzflag.html",
+   "t": "BZFlag world viewer — SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "camoufox.html",
+   "t": "Camoufox — install & detect",
+   "d": "Install and detect Camoufox (anti-detect scraping browser) in a dedicated venv. Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "cams.html",
+   "t": "Cameras",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "case-study.html",
+   "t": "SweK Engine &mdash; a physics engine you can prove",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "catalog.html",
+   "t": "- Subsystem Catalog",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "celltrack-splat.html",
+   "t": "Cell Splats &mdash; anisotropic Gaussians + drift correction",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "celltrack-viewer-gpu.html",
+   "t": "Cell Volume Viewer (WebGPU)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "celltrack-viewer.html",
+   "t": "Cell Track Viewer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "celltrack.html",
+   "t": "SweK &middot; Cell Tracking &mdash; welcome",
+   "d": "",
+   "g": "celltrack",
+   "p": 0
+  },
+  {
+   "f": "cellular-automata.html",
+   "t": "Game of Life",
+   "d": "Conway's B3/S23 cellular automaton on a GPU grid. Tap to reseed.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "changelog.html",
+   "t": "SweK Changelog",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "clients.html",
+   "t": "Devices",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "cloudedge.html",
+   "t": "CloudEdge Camera",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "cockpit.html",
+   "t": "Cockpit HUD",
+   "d": "Gauges 3000 wired to real ship state: shields, hull, fuel, weapon charge, and target lock all driven by a live dogfight, with explosion + wreckage VFX on every hit. The spectacle becomes a dashboard.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "codemap.html",
+   "t": "SweK &middot; Codemap &mdash; the tree as a city, aged by its own comments",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-parallax.html",
+   "t": "Comic Parallax",
+   "d": "The 3D-parallax comic-character filter: take a flat comic panel character, run it through the sprite->mesh path for depth, and stack it through that depth so it pops off the page and parallaxes as you move -- a 2.5D pop-up from a plain 2D sprite. Move the mouse (or tilt) to shift the view.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-translate.html",
+   "t": "Comic Translator",
+   "d": "Front door for ogkalu2/comic-translate -- SOTA comic/manga translation (bubble detection, OCR, inpaint cleaning, LLM translation). Detect, install, and launch it from the engine; the heavy lifting runs on the rig.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-voxel-blob.html",
+   "t": "Comic Voxel Blob",
+   "d": "Round three of content->voxels->filters: the comic page coalesces into a living blob that REACHES OUT -- a pseudopod extends toward a target (your cursor, or an orbiting mark it probes for) and swarms it, while the body holds as a mass. Move the mouse and it reaches for you.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-voxel-fire.html",
+   "t": "Comic Voxel Fire",
+   "d": "Round one of content->voxels->filters: a comic page is sampled into a colored voxel slab and set alight -- an ignition front sweeps up and carries the page into embers. Crank the resolution to stress the voxel count. WebGL2 instanced cubes, Canvas2D fallback.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-voxel-physics.html",
+   "t": "Comic Voxel Physics",
+   "d": "Round four of content->voxels->filters, and the generalization: the comic page is a slab of rigid voxels. Punch it and it shatters, gravity drops the pieces, and a floor catches them so they pile up. Click to strike anywhere. Portable CPU rigid-body-lite; routes through the Jolt backend for real collisions.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comic-voxel-water.html",
+   "t": "Comic Voxel Water",
+   "d": "Round two of content->voxels->filters: a comic page becomes a voxel surface and ripples like ink floating on water. A 2D wave equation displaces each voxel; tap the page to drop a stone. Reuses the voxel slab from the fire round. WebGL2 instanced cubes, Canvas2D fallback.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "comics.html",
+   "t": "Comics",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "composer.html",
+   "t": "Composer · Facebook",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "connect.html",
+   "t": "Connect a device",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "consistency-fleet.html",
+   "t": "SweK Physics — the fleet consistency board",
+   "d": "Run ONE side of a consistency pair on this machine and submit the number. The hub assembles pairs from whatever the fleet has reported and recomputes agreement itself: peers measure, the hub grades. The rule enforced in code is that two routes with the same mechanism can never form a pair, however many different machines they ran on — that is reproducibility, not consistency, and a board that confused the two would certify agreements carrying no information.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "consistency.html",
+   "t": "SweK Physics — the consistency board",
+   "d": "A new kind of key: one physical constant, two routes independent in MECHANISM, agreement gated. The Ising critical temperature by Binder cumulant against Fisher amplitude-ratio; the trap's free-energy difference by Jarzynski against Crooks; the LBM's viscosity as configured against what the fluid's shear waves actually do. This is how metrology certifies numbers nobody has a closed form for — independent instruments that agree. Pairs will grow.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "control.html",
+   "t": "Control",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "cosmic-map.html",
+   "t": "EV cosmic map -- a galaxy you can verify",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "cosmic-web.html",
+   "t": "Cosmic Web",
+   "d": "The large-scale structure of the universe, grown rather than drawn. It starts as a Gaussian random field carrying a prescribed power spectrum -- and that field is checked: build it to P(k) = k^-2, measure the spectrum back out, and it returns what was asked for to about four percent on well-sampled shells. Then Zel'dovich (1970): every parcel of matter coasts along its initial impulse, x = q + D*Psi(q), and filaments, sheets and voids fall out of nothing but that. The displacement solves Poisson in Fourier space to machine precision, and the moment a sheet folds on itself -- a caustic, the seed of every cluster here -- lands where the mathematics says it must, at D = 1/A. Drag the slider and watch a smooth universe become a web. The isosurface is the same marching-cubes code the fluid pages use.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "counter-strike.html",
+   "t": "Counter-Strike tactics &mdash; GPU Brain",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "couple.html",
+   "t": "- Coupling Bench",
+   "d": "",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "credits.html",
+   "t": "End Credits",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "csg.html",
+   "t": "CSG — solid modelling with dual contouring",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "ct.html",
+   "t": "CT reconstruction -- graded against a phantom we know",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "cube.html",
+   "t": "WebGL2 Cube Debug",
+   "d": "Minimal WebGL2 cube — context smoke test.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "current-loop.html",
+   "t": "Current loop - the exact off-axis field (v3626)",
+   "d": "The exact magnetic field of a circular current loop in K and E, drawn as a field map with the m-vs-k convention mutant beside it - the mutant is byte-identical on the axis and wrong by hundreds of percent off it.",
+   "g": "em",
+   "p": 0
+  },
+  {
+   "f": "curriculum.html",
+   "t": "Curriculum &mdash; what to attempt next",
+   "d": "Start a proposer run and watch it: the frontier of unplanted binds, ungraded physics and doorless modules, each naming the gate that would decide it. Phone-first, one column, and the progress is a phase count rather than a countdown.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "curved-wall.html",
+   "t": "A third category: true, and badly written down (v3646)",
+   "d": "On a curved zero-flux wall the condition holds pointwise but one row per face asserts a single number for something that varies. The error converges at first order where a false assertion stays flat at 0.5 forever - a discretisation error converges and a false assertion does not.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "debug.html",
+   "t": "🐛 Debug Console — Voxel Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "device.html",
+   "t": "Roundhouse Devices",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "devtools.html",
+   "t": "Engine DevTools &mdash; see your own pages",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "dictation.html",
+   "t": "Dictation (Whisper)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "diffraction.html",
+   "t": "Diffraction -- patterns graded against the analytic forms",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "diffusion.html",
+   "t": "SweK Physics — diffusion by two routes",
+   "d": "The diffusion coefficient of a Lennard-Jones fluid, read from one trajectory two ways: Einstein's mean-squared-displacement slope from positions, and the Green-Kubo velocity-autocorrelation integral from velocities. Their equality is a theorem, so a disagreement is never different physics, it is always a bug. Sabotage computes the MSD from WRAPPED coordinates: it saturates, looks beautifully converged, and reports a number about the box.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "diorama-composer.html",
+   "t": "Avatar diorama composer",
+   "d": "Compose the avatar diorama: pick the avatar, gauges, llama, room and on-hand props, preview it live, and export/load the layout.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "discontinuity.html",
+   "t": "The repair I recommended twice, on trial (v3644)",
+   "d": "Across a discontinuity the vertex stencil halves the peak error and doubles the contaminated band - integrated it is 20% worse. It is a rank repair, not a general widening, and applying it only where the rank is deficient keeps both benefits.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "discovery-lab.html",
+   "t": "Discovery Lab - equations rediscovered, and silence where there is none",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "doc.html",
+   "t": "Doc skills",
+   "d": "Create and read Office docs from a JSON spec. xlsx-first: build task fixtures with formulas, then read an output back to check formulas + values. Runs on the bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "dock-brain.html",
+   "t": "GPU Brain: Learn to Dock",
+   "d": "A thruster-controlled ship learns to dock with the GPU Brain: relative target + velocity in, turn + thrust out, trained by evolution strategy. No drag, so it must anticipate momentum and counter-thrust to arrive slow. Watch it go from drifting to docking.",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "dock-hazards.html",
+   "t": "GPU Brain: Dock Through a Hazard Field",
+   "d": "The GPU Brain learns to dock a DRIFTING target while threading an asteroid field -- the docking policy meets the hull-combat hazards. Relative target + velocity + nearest asteroid in, turn + thrust out, trained by evolution strategy in a worker so the sim stays live.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "doctor.html",
+   "t": "Doctor",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "doorbell.html",
+   "t": "Doorbell",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "echo-show.html",
+   "t": "Show on Echo",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "economy.html",
+   "t": "SweK Economy Probe",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "elliptic.html",
+   "t": "Elliptic integrals, and the pendulum they grade (v3625)",
+   "d": "Carlson RF/RD elliptic integrals checked live three ways against Legendre's relation, and the exact large-angle pendulum period they predict - drawn as a pendulum wave that must snap into line on the tick.",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "endless-sky.html",
+   "t": "Endless Sky",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-away-mission.html",
+   "t": "ES Away Mission",
+   "d": "The raycast life-box: the GPU Brain boards a derelict and salvages it, autonomously, forever. A first-person raycast interior of corridors, rooms, and doors that open as it approaches. The brain seeks the nearest salvage, routes around walls, secures it, and when the hull is clear a new derelict is drifted in -- it never wins, it just keeps boarding, the way the Living Box never stops flying. seekTarget is the pilot; the GPU Brain drops into the same hook on-rig. Bloom, minimap, a mission ticker. Press P to take the helm.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-box3d-3d.html",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D",
+   "d": "Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-box3d-fly3d.html",
+   "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)",
+   "d": "Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-box3d.html",
+   "t": "SweK &middot; Endless Sky on Box3D",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "es-hull-combat.html",
+   "t": "EV Hull Combat",
+   "d": "Endless Sky ships fight with real hull physics: rams deal damage from impact momentum, destroyed ships burst into tumbling wreckage, and asteroid fields are hazards. Deterministic under lockstep for co-op. box3d on a rig; JS fallback here.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "euler-blast.html",
+   "t": "Blast",
+   "d": "Compressible Euler -- the solver for the flows the lattice is measurably wrong for. Dump energy into a point and stand back: the shock radius grows as the square root of time, an answer exact since the 1940s and written nowhere in this code. The page fits that exponent live while it runs, so you can watch one half appear out of nothing but a hot spot and the Euler equations. The other button turns two layers over -- heavy resting on light -- and gravity refuses the arrangement. Euler has no viscosity and no diffusivity anywhere in it, so the interface between them stays sharp and the mushrooms keep their edges. Colour is temperature, on the same blackbody ramp the lava wears.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "euler-gpu-check.html",
+   "t": "Euler adjudicator",
+   "d": "The compressible Euler kernel was written on a machine with no GPU, so this page is the check, and it runs on your hardware. It has a better test available than the lattice adjudicator did: a strong shock compresses gas by exactly (gamma+1)/(gamma-1), which is 6.000 at gamma 1.4 -- an answer known since Rankine and Hugoniot in the 1870s and written nowhere in the kernel. So the GPU is not merely asked to agree with the CPU; it is asked to find that number alone. There is a sabotage button that makes the kernel's equation of state 2% wrong, so you can watch the check go red.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "ev-admin.html",
+   "t": "EV Admin &mdash; Live Pilots",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ev-loader.html",
+   "t": "EV Loader",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ev-mission-creator.html",
+   "t": "Mission Authoring Console · SweK EV Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ev-sprites.html",
+   "t": "EV Sprite Viewer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ev.html",
+   "t": "Stellar Atlas",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "eve.html",
+   "t": "🛰️ EVE — SweK Engine",
+   "d": "Live EVE Online pilot telemetry via ESI + SSO (pilot, ship, system, online, ISK) with a 3D ship view. Cloud API — register an app at developers.eveonline.com and log in once. Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "external-linalg.html",
+   "t": "External Linear Algebra &mdash; an answer key nobody here wrote",
+   "d": "Runs the lab's own rank and det against Accelerate's LAPACK on a Mac. Shows the three commands, the current grade, and the state ABSENT when the reference has not run -- which is not a pass.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "fabric.html",
+   "t": "The Fabric",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "face-mirror.html",
+   "t": "Face Mirror — MediaPipe demo",
+   "d": "MediaPipe face tracking → live mirror.",
+   "g": "face",
+   "p": 0
+  },
+  {
+   "f": "face.html",
+   "t": "Face Avatar",
+   "d": "Procedural face avatar with expressions.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fallout.html",
+   "t": "☢ Pip-Boy — SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fanbeam.html",
+   "t": "Fan-beam CT",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "fdtd.html",
+   "t": "SweK Physics — Maxwell on a grid",
+   "d": "The only solver here that can be told in advance exactly how wrong it will be. Discretising Maxwell gives waves that travel slightly slow, by a closed-form factor, so what is graded is not 'the answer is right' but 'the answer is wrong by exactly this much'. At the magic timestep S=1 the error is exactly zero, and taking a SMALLER step makes it worse.",
+   "g": "em",
+   "p": 0
+  },
+  {
+   "f": "fingerprint.html",
+   "t": "SweK Fingerprint -- Fleet Reproducibility",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "fire-demo.html",
+   "t": "SweK &middot; Fire Demo",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fleet-arena.html",
+   "t": "Fleet Agent -- a learned scheduler that routes by capability",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "fleet-bench.html",
+   "t": "SweK Fleet Bench",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "flesh.html",
+   "t": "SweK &middot; Flesh &mdash; skin that follows the skeleton",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "flight-coop.html",
+   "t": "SweK &middot; Co-op Lockstep (Endless Sky on Box3D)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "flight-gpu.html",
+   "t": "SweK &middot; Flight GPU (Endless Sky on Box3D, WebGPU 3D)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "flight.html",
+   "t": "SweK &middot; Flight sandbox",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "floor-atlas.html",
+   "t": "the fleet floor atlas",
+   "d": "Every WGSL kernel here ships a tolerance earned from a floor measured on one machine and doubled. The fleet has been accumulating the same measurement from real silicon in every submitted bench report, and nothing was reading it. This does: worst measured gap per adapter per kernel, with the margin that tolerance actually has on that device. Float gaps and the zero-tolerance integer spin count are kept in separate columns and never pooled, because the aggregate an atlas naturally wants to compute is the meaningless one.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "fluid-box3d.html",
+   "t": "SweK &middot; box3d + Fluid (two-way coupling)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fluid-rigid-2d.html",
+   "t": "SweK &middot; Fluid + Rigid (one-way coupling)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fluid-selfie.html",
+   "t": "Fluid Selfie",
+   "d": "A running fluid wearing a skin made of its own X-ray shadows. The physics is SPH, and its kernel is the blobulator's kernel -- metaballs picked it in 1986 for looking like wax, fluid dynamics picked it in 2003 for being smooth and compact, and they are the same function. So the fluid's sinogram is closed-form: written down exactly, never integrated. The scanner gathers its views one per frame while the fluid keeps moving, so the smear you see is real, not an effect -- and it is worst when the fluid moves by about its own structure size during the scan, which is why real CT scanners are fast and patients hold their breath. Momentum is conserved to 1.6e-15, the kernel integrates to 1 to fourteen decimals, and a particle lattice recovers a density nobody told it.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "fluid-webgpu-3d.html",
+   "t": "SweK &middot; FLIP/PIC Fluid 3D (WebGPU)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fluid-webgpu.html",
+   "t": "SweK &middot; FLIP/PIC Fluid (WebGPU)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fog-of-war.html",
+   "t": "Fog of War (line-of-sight + toroidal memory)",
+   "d": "FOG OF WAR on a toroidal explored-memory buffer (v3839). The current field of view is recomputed every frame by RECURSIVE SHADOWCASTING, so the pillars actually occlude -- what is behind a pillar is dark and vision does not leak diagonally through a corner. What has been seen is REMEMBERED (dim) in a persistent toroidal wearField buffer that follows the viewer, until it travels far enough that old ground scrolls out of the window and is forgotten -- which is why a fixed buffer that follows the viewer is the right structure, not an infinite map. Three states per cell: unseen (black), remembered (dim), visible (lit). The viewer wanders on its own. Answer-key gate: fogOfWar-selfcheck (origin sees itself, an open disc lit to its radius, walls occlude, no corner leak, tri-state memory monotone).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fpscontrol.html",
+   "t": "FPS control — engine → bridge → VBA",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fpsmirror.html",
+   "t": "FPS mirror — bridge → this screen",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "fresnel-join.html",
+   "t": "Four Fresnels, and what Schlick cannot do (v3629)",
+   "d": "Four declarations of Fresnel reflection in one engine plus a fifth thing wearing the name - joined here for the first time - and Schlick's approximation graded against the exact law, where Brewster's zero and total internal reflection are not approximated but absent.",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "fresnel.html",
+   "t": "Fresnel (near-field) diffraction",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "frugon.html",
+   "t": "SweK LLM Cost",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "gallery.html",
+   "t": "SweK &middot; Demo Gallery",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "gate-plan.html",
+   "t": "the gate planner",
+   "d": "The serial suite runs about twenty six minutes, so in practice a change is defended by whatever its author remembered to run. The planner picks which gates to spend a budget on: gates that DIRECTLY import a changed file first, then transitively reachable ones, then the rest, cheapest first inside each band. This page reads a snapshot rather than computing one, using the boot sidecar contract, so it can say plainly whether the plan it is showing is fresh, stale, or absent.",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "gates.html",
+   "t": "SweK Gates",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "gauges-spacetime.html",
+   "t": "Spacetime Gauges",
+   "d": "Two instruments that read a value as a piece of spacetime instead of a bar. The wormhole opens its throat as the value rises -- rings recede into it, twisting and fading with depth. The black hole grows its horizon, which squeezes the accretion band into a narrower, faster ring, with the photon ring outside the horizon and the inner disk orbiting faster than the outer. Only ONE is shown at a time, held long enough to actually read, then it rotates -- a cluster of everything at once is wallpaper; one instrument is an instrument. Drag the slider, or let it follow a live source.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "gauges3000.html",
+   "t": "Gauges 3000",
+   "d": "A WebGPU glowing avatar core ringed by an LCARS gauge cluster -- animated arcs, needles, and a status ticker, with live core/memory readings where available. WebGPU for the avatar, Canvas2D for the gauges, graceful fallback everywhere.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "geodesic.html",
+   "t": "Black-hole lensing -- GR-exact light bending",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "gfx-device.html",
+   "t": "Unified Device",
+   "d": "SweK's unified graphics device (the MUGL idea, in-house): one WebGPU-shaped API that both WebGL2 and WebGPU implement. This page writes its render ONCE and runs it on whichever backend the browser has -- WebGPU preferred, WebGL2 fallback. The backend it chose is shown live; the toggle forces the other. The selection + the unified op stream are verified headless via a null recorder backend; the real draws are the browser's.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "glb_viewer.html",
+   "t": "Rigged GLB Viewer",
+   "d": "Load a skinned/animated GLB (RigAnything output, Fox.glb, any rigged mesh). Plays skeletal + morph animations, shows the skeleton overlay.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "govee.html",
+   "t": "Govee Lights",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "gradient-join.html",
+   "t": "Two gradients, one exact key (v3638)",
+   "d": "Least-squares and Green-Gauss are both called the gradient. On a linear field the answer is known exactly with nothing to converge - least-squares is exact at every skew, Green-Gauss is not, and a convergence study on a smooth field cannot tell them apart at all.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "grammar.html",
+   "t": "Grammar &middot; SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "graph_viewer.html",
+   "t": "Code Graph (Graphify)",
+   "d": "Render a Graphify GraphML knowledge graph of the codebase as a navigable 3D force-directed constellation. Nodes by community, hubs sized by degree.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "gravity-waves.html",
+   "t": "Water waves - the dispersion relation the engine does not have (v3627)",
+   "d": "Surface gravity waves: omega^2 = g k tanh(k h), a speed predicted from depth alone - drawn against the lattice dispersion of the height-field water the engine actually ships, whose speed is 1/sqrt(2) cells per step and whose stiffness sits exactly on the 2D stability limit.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "gray-scott.html",
+   "t": "Gray-Scott reaction-diffusion",
+   "d": "Reaction-diffusion patterns: spots, stripes, mitosis-like blobs.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "grid-refinement.html",
+   "t": "What adaptivity costs - a refinement interface reflects (v3632)",
+   "d": "A grid refinement interface is an impedance discontinuity: the true reflection is exactly zero because the medium is identical on both sides, so everything measured is numerical artefact - second order in cell size, bounded in ratio, and it costs the magic time step everywhere else.",
+   "g": "em",
+   "p": 0
+  },
+  {
+   "f": "ha-capabilities.html",
+   "t": "Home Assistant",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "ha-diagram.html",
+   "t": "Home Assistant integration map",
+   "d": "A map of the avatar's Home Assistant integrations: what's set up, what you could set up, and what isn't on the network.",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "ha-switches.html",
+   "t": "Lights, Switches &amp; Valves",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "health.html",
+   "t": "Bridge health",
+   "d": "Live status of the ai-bridge endpoints — pings the per-tool detect/status/config routes, grouped, with latency. Ping all + auto-refresh.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "heightfield-vs-volume.html",
+   "t": "SweK &middot; Heightfield vs Volume",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "hmc-bench.html",
+   "t": "HMC leapfrog kernel bench (GPU proposes, CPU adjudicates)",
+   "d": "The second fleet kernel: HMC's batch leapfrog in WGSL, one thread per chain, pure + - * / arithmetic (no transcendentals to argue rounding about). The device rolls 4096 chains; the CPU recomputes the f64 reference and grades every endpoint against the earned tolerance. The verdict is never the device's — a REJECTED kernel's timing is irrelevant. Submit sends the raw measurement to the fleet ledger; the hub re-grades from the same numbers.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "hmc.html",
+   "t": "SweK Physics — Hamiltonian Monte Carlo",
+   "d": "MCMC where the proposal is physics: parameters get momenta and a leapfrog trajectory rolls over the negative log-density, so the sampler moves along the contours instead of shuffling. The acceptance rate IS the integrator diagnostic (near 1 when H is conserved). Sabotage buttons demonstrate both directions of the classic trap: wrong gradient (correct but slow) vs wrong accept-potential and non-symplectic Euler (confidently wrong — caught only by the exact-moments key).",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "home.html",
+   "t": "Home Control &mdash; SweK Engine",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "hosting.html",
+   "t": "Remote Hosting",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "hub.html",
+   "t": "Connectors & devices",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "huly.html",
+   "t": "Huly · SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "immich.html",
+   "t": "Immich",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "index.html",
+   "t": "SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "indexPlus.html",
+   "t": "Voxel Engine Showcase v2.6",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "instrument-bench.html",
+   "t": "Instrument Bench &mdash; SweK Engine",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "instruments.html",
+   "t": "Instruments - the SweK physics lab",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "interferometer.html",
+   "t": "Interferometer -- metrology of a surface we know exactly",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "ios-peer.html",
+   "t": "SweK iOS Peer (iPhone / iPad)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ising-bench.html",
+   "t": "Ising kernel bench (Philox, zero tolerance)",
+   "d": "The third fleet kernel and the first with ZERO-tolerance adjudication: checkerboard Metropolis driven by counter-based Philox4x32-10, integer arithmetic end to end. The device runs hundreds of sweeps; the CPU mirror recomputes every spin and a single differing bit anywhere is a rejection. Magnetisation is overlaid on Yang's exact curve so the physics is visible while the bits are graded.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ising.html",
+   "t": "Ising model - a phase transition",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "join.html",
+   "t": "- join the fleet",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "jolt-arena.html",
+   "t": "Jolt Destructible Arena",
+   "d": "A wall built from boxes joined by breakable Jolt constraints: it stands rigid until you hit it, then the joints at the impact break and it crumbles. Click to lob a boulder. Real Jolt physics, deterministic destruction (lockstep-safe).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "kaggle-config.html",
+   "t": "Kaggle Config",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "kepler.html",
+   "t": "Kepler orbits - symplectic vs RK4",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "kerr.html",
+   "t": "Kerr - rotating black hole",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "kinematic.html",
+   "t": "Kinematic controller - collide and slide",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "krbn-compare.html",
+   "t": "- Krbn compare (our obj vs Krbn, + lift to 3D)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "krbn.html",
+   "t": "Krbn Hologram &mdash; SweK",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "kriging.html",
+   "t": "Kriging - the prediction and what it does not know",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "kuramoto.html",
+   "t": "SweK Physics — Kuramoto synchronization",
+   "d": "A thousand oscillators, each with its own natural frequency, each nudged toward the crowd's average phase. Below K_c = 2*gamma the crowd never organizes; above it the order parameter must climb the exact closed-form branch r(K) = sqrt(1 - Kc/K) — a whole curve the update rule never contains. Fireflies, pacemaker cells, power grids. Sabotage swaps in a plausible K*r^2 coupling that cannot bootstrap from noise.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "lab-census.html",
+   "t": "Lab census",
+   "d": "The physics lab's coverage in one read: how many proven modules a device bind reaches, how many binds declare a plant, how many devices can face the four-criterion corroboration battery, how many are reachable from an instrument, and whether the job dispatcher is actually ticking. Every figure is imported from the tool that owns it -- the page re-derives nothing, which is the whole point: four censuses that each print their own prose is why the numbers in the notes went stale.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "lab-export.html",
+   "t": "Lab export -- SweK",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "lan.html",
+   "t": "SweK LAN Console",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
+   "f": "landau-zener.html",
+   "t": "SweK Physics — Landau-Zener",
+   "d": "Drive a two-level system through an avoided crossing and ask what survives. The answer is a closed form the integrator never contains: P = exp(-pi D^2 / 2v). Both limits are counterintuitive and both are live here — sweep FAST and the system jumps the gap intact, sweep SLOW and it follows the crossing round and flips. 'Fast' is set by D^2/v, not by v alone. Sabotage puts D instead of D/2 in the off-diagonal: same shape, wrong everywhere.",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "langevin.html",
+   "t": "SweK Physics — Jarzynski / stochastic thermodynamics",
+   "d": "A Brownian particle in a stiffening trap, graded by the Jarzynski equality: <exp(-W/kT)> = exp(-dF/kT) holds EXACTLY over nonequilibrium trajectories at any driving speed, against the closed-form dF = (kT/2)ln(k1/k0). Watch work histograms accumulate, the second law appear as <W> >= dF, and the sabotage where every trajectory is statistically perfect while the reported free energy is wrong — visible only to the Jarzynski key. v3283: the Crooks theorem joined the gate — run the protocol backward and the forward and reverse work histograms must cross exactly at dF, with a log-ratio slope of 1/kT.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "lbm-fluid.html",
+   "t": "Lattice Boltzmann",
+   "d": "Real fluid, from the equations up. D2Q9 lattice Boltzmann with BGK collision, Guo forcing and halfway bounce-back walls -- written from the physics rather than ported from anything. It is verified against the exact analytic solution of pressure-driven channel flow to within 0.07 percent, and its viscosity is never set: it emerges from the relaxation time exactly as theory demands. Put a cylinder in it and the von Karman vortex street arrives on its own -- steady below Reynolds 47, shedding above it. Nobody told it that number. The WebGPU compute path shares the same constants, interpolated rather than retyped.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "lbm3d-flow.html",
+   "t": "Duct",
+   "d": "The lattice in three dimensions, which is where this engine actually lives -- every fluid before this one was flat. D3Q19 drives a duct past a sphere: nineteen velocities per cell, no viscosity ever set, and a wake that forms because the equations say it must. The shell is an isosurface of speed, marched fresh out of the live field; the sparks are tracers riding the actual velocity, not a scripted animation. A note on the colour: this lattice is isothermal by construction and has no temperature at all, so the blackbody ramp is reading SPEED here, not heat -- said plainly, because a ramp that looks like fire and means nothing would be a paint job. The same solver was verified against Hagen-Poiseuille to half a percent.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "lbm3d-gpu-check.html",
+   "t": "GPU adjudicator",
+   "d": "The D3Q19 compute kernel was written on a machine with no GPU and no browser, so unlike everything else in this engine's fluid work it could not be checked against an exact answer before it shipped. This page is the check, and it runs on your hardware, not mine. It puts the GPU kernel and the verified CPU solver on the identical problem from the identical state, steps both, and compares them cell by cell -- then asks the GPU, alone, to reproduce Hagen-Poiseuille's paraboloid, which the CPU earned to half a percent. There is a sabotage button. It corrupts one weight in the kernel so you can watch the adjudicator go red, because a check you have never seen fail is a check you should not trust.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "lbm3d-gpu.html",
+   "t": "Torrent",
+   "d": "The same D3Q19 lattice that earned Hagen-Poiseuille to half a percent, running on the GPU at a scale the CPU cannot touch: 655,360 cells, 12.5 million populations, where the CPU manages 22,400 cells at 16 ms a step and would need almost half a second for this one. Every number underneath this was earned before the page existed -- the kernel was adjudicated against the verified CPU solver on real hardware, cell by cell, and made to reproduce Hagen-Poiseuille by itself, and the check that says so was watched failing under deliberate sabotage first. The GPU does the physics; the isosurface and the tracers are the same proven code the small CPU version uses. Colour reads SPEED, not heat: this lattice is isothermal by construction and has no temperature in it at all.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "librechat.html",
+   "t": "LibreChat · SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "limiter-seam.html",
+   "t": "The limiter at a refinement seam (v3636)",
+   "d": "Does a slope limiter survive non-uniform spacing? Monotonicity does, for both spellings, with a factor-of-two margin independent of the widths - what breaks is accuracy, only at the seam, only for the spelling almost everyone writes, and it is bit-identical on a uniform grid.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "lineage.html",
+   "t": "Lineage &#183; SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "live-panel.html",
+   "t": "Live Panels &mdash; the numbers underneath the view",
+   "d": "The behind-the-scenes panels a view carries as insets: an FFT spectrum of a vibrating chain whose peak lands on the analytic mode frequency, and |zeta(1/2+it)| along the critical line dipping at the nontrivial zeros. Click an inset to promote it; the old primary is demoted, never dropped.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "living-box.html",
+   "t": "Living Box",
+   "d": "Art, not a game: a self-running box where matter spirals into a black hole against a living nebula, consumed and reborn forever, while a little 3D-sprite ship is flown by an evade-brain that never dies -- it just flies to evade. Autonomous. Leave it running like a screensaver. The GPU Brain can take the stick on a rig.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "login.html",
+   "t": "Engine — sign in",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "logistic.html",
+   "t": "Logistic map - the road to chaos",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "macrodroid.html",
+   "t": "MacroDroid / Tasker recipes",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "magmap-android.html",
+   "t": "SweK magmap - second GPU vendor audition",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "magmap-bench.html",
+   "t": "- magmap kernel A/B bench",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "maigret.html",
+   "t": "Maigret — username OSINT",
+   "d": "Search a username across hundreds of sites with Maigret. Runs on the PC bridge (pip install maigret).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "markdown-tools.html",
+   "t": "Markdown",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "mc-flesh.html",
+   "t": "Marching-cubes flesh -- a surface graded against the field it came from",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "md-demo.html",
+   "t": "SweK MD Lab",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "meijer-g.html",
+   "t": "Meijer G-function (v3055)",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "method-lab.html",
+   "t": "the method instruments",
+   "d": "Three instruments that measure the lab rather than the physics: the proposer registry (which knobs a machine may turn, and on whose evidence), the knob registry (which instruments are governed and which are deliberately not), and periodic boundaries for molecular dynamics. None of them has a picture to show, so this page shows their keys and their gates instead of pretending otherwise.",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "models.html",
+   "t": "Model comparison - which model earns the cheap slot",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "mods-library.html",
+   "t": "Mods Library + Tinder — SweK Engine",
+   "d": "Browse installed mods / model sets as swipeable cards -- swipe or arrow-key to keep or discard a WHOLE mod, then Empty discarded to uninstall the entire sets at once. The set-level companion to the per-asset library.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "module-history.html",
+   "t": "Module history -- SweK",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "mpm-gpu-check.html",
+   "t": "MPM GPU adjudicator",
+   "d": "The MPM compute kernel was written on a machine with no GPU. It has been run on a WGSL interpreter and agrees with the graded CPU loop to about 1e-7 relative, but an interpreter is not a driver: it cannot prove the shader compiles on real hardware, and because it runs invocations one after another it CANNOT SEE A RACE. This page is the check that can, and it runs on your hardware. It puts the kernel and the graded loop on the identical fixture from the identical state, steps both, and compares them particle by particle; asks the GPU alone to reproduce the discrete free-fall parabola; and runs the same scene twice to test the determinism the fixed-point atomics were chosen for, which is exactly the claim a race would break. There is a sabotage button. It mistypes one coefficient of the B-spline stencil so you can watch the adjudicator go red, because a check you have never seen fail is a check you should not trust.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "mpm-gpu.html",
+   "t": "Drift &mdash; MPM on the GPU",
+   "d": "The same material point method mpm.html runs at 25 particles, on the GPU at 65,536 and more. The CPU loop costs 1.9 microseconds a particle, so this scene would take it 125 milliseconds a step and eight steps a second, where the page asks for hundreds. Every stage of the kernel is the graded module it came from, and it holds NO material constant at all: the stiffness, the friction coefficient and the plastic clamp limits are computed by physics/mpm in JavaScript and arrive as uniforms, so there is nothing to retype and nothing that can silently disagree. WGSL has no float atomics, so the particle-to-grid scatter accumulates in fixed point -- which makes it bit-deterministic run to run, and costs the free-fall key about as much as single precision costs it anyway. The free-fall readout is the honest one: 4.7e-6 where the CPU reads 8.9e-16, because this is f32 and that gap is the hardware, not the kernel.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "mpm.html",
+   "t": "MPM — Material Point Method",
+   "d": "Runs the graded 2D MPM loop and draws it. Shows the free-fall key live: the centre of mass follows the analytic parabola whatever the material does internally, and the readout says how far off it is.",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "mpm3d.html",
+   "t": "MPM in 3D",
+   "d": "The 3D MPM loop, drawn (v3841). mpm3dBind proved the transfer identities lift to 3D; this is the loop above them -- p2g3, a 27-node stress scatter, gravity, g2p3, a 3x3 deformation-gradient update -- running an elastic block that falls into a box and settles. The graded key is the same one that graded the 2D loop: the centre of mass follows the analytic fall whatever the block does internally (step3d-selfcheck), now in three axes, with a 3x3 Neo-Hookean stress whose Cauchy tensor is symmetric (angular-momentum balance) and which returns NaN for an inverted particle rather than clamping. Drag to orbit. Run/Reset. Answer-key gate: step3d-selfcheck.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "multigrid.html",
+   "t": "SweK Multigrid Bench",
+   "d": "",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "muster.html",
+   "t": "Bot Muster",
+   "d": "Convene a squad of GPU-brain pilots into a LAN room and put on a skirmish: plan the ownership split (fair + complete), launch the bots, watch them, dismiss them. Rendezvous hashing splits the ships with no coordinator.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "nebula-device.html",
+   "t": "Nebula on the Unified Device",
+   "d": "A live procedural nebula rendered through SweK's unified device -- one render path that runs on WebGPU (preferred) or WebGL2 (fallback). The nebula is a domain-warped fbm fullscreen shader, parameterized by time + resolution uniforms; only the shader text differs per backend (WGSL vs GLSL), everything else is written once. The uniform reaches both backends through the same pass.uniform() call: a bind-group uniform buffer on WebGPU, individual uniforms on WebGL2. Live backend + fps readout; toggle forces the other runtime.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "nebula-live.html",
+   "t": "Living Nebula",
+   "d": "The nebula gas swirls for real -- a handful of vortex particles (vortons) induce a divergence-free velocity field that rotates the wisps around drifting cores, the Gourlay/VorteGrid technique. Verified CPU vorton physics; this is the ES-jump backdrop, alive.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "nebula.html",
+   "t": "Nebula",
+   "d": "A parallax volumetric nebula for the EV flight view: domain-warped colored gas, a starfield, and depth from a drifting camera -- with ships flying through it so combat happens INSIDE the cloud. WebGPU, WebGL2 fallback, Canvas2D fallback. Drag to steer the camera.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "nest-protect.html",
+   "t": "Nest Protect",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "netcheck.html",
+   "t": "Network Diagnostic (AP Isolation)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "node-gradient.html",
+   "t": "The third declaration, and the fourth hiding inside it (v3639)",
+   "d": "Node-based Green-Gauss is supposed to be the linearity-preserving one - and it is, but only with a linearity-preserving node interpolation. With inverse-distance node values it is 15x better and still not exact, and at a boundary it reads 32% on a mesh with no shear at all.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "normal-modes.html",
+   "t": "A counting law grades a force field (v3652)",
+   "d": "Normal modes are the Hessian of the MD force field already in the tree, graded by counting laws from geometry - 3N-6 and six zeros for a bent molecule, 3N-5 and five for a linear one. The linear case returns seven, and the reason is that the cosine-harmonic angle is quartic at 180 degrees.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "office-floor.html",
+   "t": "Office floor - who is working on what",
+   "d": "The roundhouse office manager: which peer takes which proposal, and what gets escalated to a human.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "opengen.html",
+   "t": "Open Generative AI · SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "orbs.html",
+   "t": "State orbs (v3357)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "outlook-rules.html",
+   "t": "Outlook Rules",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "pachinko.html",
+   "t": "SweK Pachinko",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "page-index.html",
+   "t": "SweK Page Index -- launch and assemble",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "panel-brain.html",
+   "t": "GPU Brain -- live-mind panel",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "panel-gauge.html",
+   "t": "Gauge -- single-metric panel",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "panels.html",
+   "t": "Simple View &mdash; SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "paramecium.html",
+   "t": "Paramecium — a reflex that beats a learner",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "path-tracer.html",
+   "t": "Path Tracer",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "percolation.html",
+   "t": "SweK Physics — bond percolation",
+   "d": "Open each bond with probability p and ask whether a path crosses the system. The threshold p_c = 1/2 is EXACT (Kesten, from self-duality), and the finite-size key needs no allowance: on an L x (L+1) rectangle the horizontal crossing probability at p = 1/2 is exactly 1/2 at every size. Drag p across the threshold and watch the spanning cluster appear; the counter accumulates real crossing statistics against the exact value.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "petfbi-board.html",
+   "t": "PetFBI — Lost Pet Board",
+   "d": "",
+   "g": "petfbi",
+   "p": 0
+  },
+  {
+   "f": "petfbi-setup.html",
+   "t": "PetFBI &mdash; Setup &amp; Workbook",
+   "d": "",
+   "g": "petfbi",
+   "p": 0
+  },
+  {
+   "f": "petfbi.html",
+   "t": "PetFBI — posting board",
+   "d": "Shared lost-pet posting board — claim a report, mark it posted, live status so admins don't double-post.",
+   "g": "petfbi",
+   "p": 0
+  },
+  {
+   "f": "phase-change.html",
+   "t": "Phase change - four transitions, four keys nothing here is told (v3669)",
+   "d": "Melting, freezing, gasification and crystallisation, each graded against a closed form the solver never sees - a Stefan front, an asymmetry predicted from material properties, an expansion ratio that is exactly 1 at the critical point, and an Avrami exponent set by counting dimensions.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "physics-bench.html",
+   "t": "Physics Benchmark",
+   "d": "The classic pyramid-of-falling-boxes stress test, made measurable. A live falling pyramid, plus a benchmark that ramps the body count on each available engine (SweK CPU / box3d / Jolt), charts ms-per-step and fps, and reports each engine's max bodies at 60fps. Shows the honest tradeoff: cheap-but-floor-only vs real body-body stacking.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "physics-lab.html",
+   "t": "- Physics Lab",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "physics-showcase.html",
+   "t": "- Physics Showcase",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "physics-verified.html",
+   "t": "Verified",
+   "d": "Every number in these tables is being computed in your browser, right now, from the equations -- and compared against an answer that was known before any of this code existed. Poiseuille's parabola, the lattice speed of sound, a shock compressing by exactly six, Galileo's falling body. Nothing here is recorded or quoted; the solvers are re-run live and the results are whatever they are. Both halves of the engine are here: the fluids and the rigid bodies that the ship flight and cross-peer lockstep are built on. What could not be checked in seconds is listed underneath, unhidden, because a verification page that only shows its wins is an advertisement.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "pipboy-models.html",
+   "t": "SweK Pip-Boy Models",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "play.html",
+   "t": "demo loader",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "policy-mass.html",
+   "t": "Mass vs Merit",
+   "d": "",
+   "g": "brain",
+   "p": 0
+  },
+  {
+   "f": "pom-demo.html",
+   "t": "Parallax Occlusion (v2784)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "population.html",
+   "t": "population field planner",
+   "d": "",
+   "g": "face",
+   "p": 0
+  },
+  {
+   "f": "predict.html",
+   "t": "Predictive flow -- anticipating a threat's next move",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "predictions.html",
+   "t": "SweK &middot; Open Predictions &mdash; written down before the measurement",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "presence.html",
+   "t": "Presence",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "probe-lab.html",
+   "t": "Probe Lab - a released instrument on a timelike geodesic",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "pulsar.html",
+   "t": "Pulsar -- a neutron star as a clock",
+   "d": "",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "push2run.html",
+   "t": "Push2Run",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "quadratic-recon.html",
+   "t": "The fix I proposed was wrong (v3647)",
+   "d": "The previous round proposed a higher-order boundary row to recover what curvature costs. It is wrong three ways: the row is already exact at its quadrature point, a constant gradient cannot satisfy it, and a second row makes it worse. A quadratic reconstruction with no boundary row converges at second order.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "quadratic-wall.html",
+   "t": "A boundary row is worth what the model can do with it (v3648)",
+   "d": "The quadratic with the boundary row: it helps by a steady 40% and buys a constant factor, not an order. And the face midpoint is not on the wall - it sits inside by a(1-cos(pi/nt)), so the row states a true condition at a place where it is not quite true.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "ragdoll.html",
+   "t": "SweK &middot; Ragdoll &mdash; a rig is a joint graph",
+   "d": "",
+   "g": "box3d",
+   "p": 0
+  },
+  {
+   "f": "rank-repair-3d.html",
+   "t": "The verdict carries, the trade does not (v3643)",
+   "d": "The same three repairs in three dimensions: the verdicts carry exactly, but a false zero-Neumann now reads 1.134 against the refusal's 1.000 - worse than doing nothing, where in 2D it looked better. And the vertex widening is 14.8x the rows against 2D's 3.9x, yet cheaper per defect fixed.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "rank-repair.html",
+   "t": "Three repairs, and one of them lies (v3642)",
+   "d": "What to do at a cell whose gradient is undetermined: a vertex stencil is exact and needs no physics, Dirichlet is exact and costs no stencil, and zero-Neumann restores the rank while producing a 55% wrong answer - the error falls from 1.000 to 0.547 and the situation gets worse.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "ray-march-demo.html",
+   "t": "Voxel Ray Marcher (v2782)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "raycast.html",
+   "t": "Raycast Local LLM",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "raymarch-gl-demo.html",
+   "t": "GPU Voxel Ray Marcher (v2783)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "raymarch-live.html",
+   "t": "Live Region Ray March (v3045)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "raymarch-options.html",
+   "t": "Ray-march options (v3351)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "realterrain.html",
+   "t": "REAL TERRAIN",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "regrid-cost.html",
+   "t": "Changing the grid under a live field (v3633)",
+   "d": "What it costs to remap a field onto a new grid: sampling keeps the value and loses the sum, averaging keeps the sum and loses the value, refining is second order once and coarsening back conservatively is first order every time and accumulates linearly.",
+   "g": "em",
+   "p": 0
+  },
+  {
+   "f": "remap-2d.html",
+   "t": "Limiting in two dimensions - the prediction that was wrong (v3635)",
+   "d": "In 2D a slope becomes a gradient and the corners add both at once - so per-axis limiting should fail, and it does not: the corner takes half of each slope and the mean of two numbers never exceeds their max. The guarantee is tight, ends at the cell wall, and what breaks it is the smooth field, not the step.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "remap-order.html",
+   "t": "Conservation, order, and overshoot - pick two (v3634)",
+   "d": "A conservative cell-average remap that is also high order: conservation is exact for any slope, the unlimited slope is third order and overshoots by 18.75% on a step, minmod is second order and never overshoots - so the trade moves to the peak rather than vanishing.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "remote-desktop.html",
+   "t": "SweK Remote Desktop",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
+   "f": "render-review.html",
+   "t": "Render Review",
+   "d": "Swipe through the headless render batch (GET /export/renders) like the asset viewer: each autonomous take plays as a video card, swipe right to keep or left to discard (arrow keys too, buttons on desktop). Kept clips list at the end with one-tap Upload to YouTube via the export pipeline -- so only the take you chose ever gets posted. Closes the render -> review -> publish loop.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "report.html",
+   "t": "- ledger reports (for human eyes)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "rig.html",
+   "t": "Rig",
+   "d": "Every check in the engine, one click each, real exit codes -- plus the eight things only a human at the rig can do.",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "rle-mesh-demo.html",
+   "t": "RLE Mesh Demo (v2775)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "rmt.html",
+   "t": "SweK Physics — random matrices and the chaos detector",
+   "d": "A detector for quantum chaos that looks only at a list of numbers. Chaotic spectra repel (GOE, mean gap ratio 4-2sqrt3); integrable ones do not (Poisson, 2ln2-1). Three ensembles run live: a true GOE, an exactly solvable integrable billiard, and a matrix that is RANDOM but uncorrelated — which shows no repulsion at all, because repulsion comes from the symmetry class, not from randomness.",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "rocket-league.html",
+   "t": "Rocket League RL &mdash; SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "roundhouse.html",
+   "t": "Roundhouse Agent",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "row-weight.html",
+   "t": "The knob nobody asked about (v3649)",
+   "d": "Moving the boundary row onto the wall makes the constraint exactly satisfiable and the answer 3.5% worse. Looking for that 3.5% found the row's weight - a hardcoded 1 for six rounds - worth 1.7x, larger than every effect being measured around it.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "rps.html",
+   "t": "Rock · Paper · Scissors — cyclic dominance",
+   "d": "May-Leonard cyclic-competition cellular automaton.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "run-inspector.html",
+   "t": "Roundhouse Run Inspector",
+   "d": "",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "runtimes.html",
+   "t": "Multi-runtime link",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "samplers.html",
+   "t": "SweK Physics — beating critical slowing down",
+   "d": "Two escapes from a sampler that is not wrong, just stuck. Wolff flips whole clusters instead of single spins and does not critically slow down: the effective-samples-per-flipped-spin advantage over Metropolis grows from 30x to 165x as the lattice grows, because Metropolis collapses while Wolff holds. Parallel tempering runs a ladder of temperatures and lets neighbours trade configurations. Both are checked against the same falsifier the plain device owes: Yang's exact magnetisation. Both sabotages produce perfectly legitimate configurations of the WRONG ensemble.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "schrodinger.html",
+   "t": "Schrodinger 1D - levels and tunnelling",
+   "d": "",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "scrape.html",
+   "t": "Scrape console — Camoufox",
+   "d": "Drive Camoufox: rendered source, run JS, screenshot, grab a network resource. PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "scrapling.html",
+   "t": "Scrapling — adaptive fetcher",
+   "d": "Fetch a page with Scrapling (basic httpx or stealth camoufox-backed), pull text, links, or a CSS selector. Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "server.html",
+   "t": "Server Mode",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "servicesdash.html",
+   "t": "Services Dashboard",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "settings.html",
+   "t": "Settings",
+   "d": "One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, PetFBI board backend + mailer, plus tool readiness.",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "shield-apps.html",
+   "t": "App installer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "shield-display.html",
+   "t": "Shield display",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ship.html",
+   "t": "SweK Ship",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "shipavatar.html",
+   "t": "🚀 Ship Avatar — SweK Engine",
+   "d": "A flying ship in space as an avatar/status panel. Reacts to mood/gauges (speed), alerts (erratic flight), and critical states (shield impacts); dodges incoming messages. Works standalone with no game feed.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "showcase.html",
+   "t": "a personal distributed OS",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "sinogram-gpu.html",
+   "t": "Sinogram GPU",
+   "d": "The whole scan as one texture. A sinogram is an image -- detector across, angle down -- and every pixel is one ray that depends on no other ray, so a fragment shader computing one texture IS the entire scan. This is the Neo Geo trick: Doom ran on a machine with no framebuffer because a raycast column is a vertically scaled sprite, and someone noticed the data already had the shape the hardware wanted. This page adjudicates rather than asserts: it runs the same arithmetic on the GPU and on the CPU and prints the worst disagreement between them, because the arithmetic is proven headless but a GPU executing it faithfully is not. Casting is the real cost -- about ten times the reconstruction -- and it is the embarrassingly parallel half.",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "skillbook.html",
+   "t": "Skillbook trial — SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "skin-depth.html",
+   "t": "Skin depth, and a bisected threshold against a predicted one (v3628)",
+   "d": "Skin depth exact vs the famous good-conductor limit (55% wrong at loss tangent 1), measured on a lossy 1D FDTD - and the stability meter's bisected threshold graded against FDTD's exactly predictable Courant limit for the first time.",
+   "g": "em",
+   "p": 0
+  },
+  {
+   "f": "skyrim.html",
+   "t": "🐉 Skyrim — SweK Engine",
+   "d": "Live Skyrim SE/AE player stats (level, health/magicka/stamina, gold, location) via a Papyrus-written JSON file. Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slime-mold.html",
+   "t": "Slime mold",
+   "d": "Physarum agent simulation: sense, steer, deposit, diffuse — with bloom.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slotmachine.html",
+   "t": "SweK Slots",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "slug-text.html",
+   "t": "SweK &middot; Slug text",
+   "d": "The first on-GPU draw of the Slug outline-text renderer merged at v3823: one quadratic TrueType font is packed into a curve texture and a band texture once, then the same data is drawn at eight sizes from 8px to a wall-filling title with no atlas to rebuild and no size-dependent baking, because the fragment shader reads the actual Bezier control points and solves for coverage per pixel. The Cross-check button reads the framebuffer back and compares coverage against slugEval.slugRender at matching points -- the check the library's note left open. Font: IBM Plex Serif (SIL OFL 1.1). Slug (c) Eric Lengyel, MIT OR Apache-2.0.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "social.html",
+   "t": "Social &middot; SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "solar.html",
+   "t": "Solar",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "spacedesk.html",
+   "t": "spacedesk auto-launch",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "spatial-agreement.html",
+   "t": "Spatial agreement - five structures, one question",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "spectator.html",
+   "t": "Engine Spectator",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "sphere-impostor.html",
+   "t": "Sphere impostor -- SweK",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "splat-lab.html",
+   "t": "Splat Lab - Gaussian splatting, graded",
+   "d": "",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "splat_viewer.html",
+   "t": "Splat Viewer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "sprite-raycast.html",
+   "t": "Sprite Raycaster",
+   "d": "SweK's third sprite path (after extrude and voxelize): an NGRayEx-style DDA raycaster. Textured walls AND floor/ceiling via floor-casting; ES ships drawn as distance-scaled billboards with 8-frame per-facing turnaround (they show their real heading as you circle them) and true wall occlusion. Flown by the navigation brain (the GPU Brain drops into the same hook on-rig). Bloom, minimap, autonomous. Press P for manual (WASD + arrows).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "spritemesh.html",
+   "t": "Sprite to 3D",
+   "d": "Turns a 2D sprite into an extruded 3D mesh -- trace the silhouette from the centroid, fan-triangulate, extrude for depth -- then spins it so you see real parallax. The missing link for offline-scanning sprites into 3D: true blueprints + a 3D-parallax comic-character filter, from art we already have.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ssao-compare.html",
+   "t": "SSAO comparison (v3369)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "ssim-compare.html",
+   "t": "SSIM Compare &mdash; the local map, and what a whole-image number cannot say",
+   "d": "Two images side by side with the global SSIM, the windowed mean and the WORST WINDOW, plus the local SSIM map drawn as a heatmap with the worst window marked. Drop in two real renders, or use the built-in local-defect demonstration.",
+   "g": "sampling",
+   "p": 0
+  },
+  {
+   "f": "star_gas.html",
+   "t": "Star &amp; Gas Field",
+   "d": "Navigate a 3D star catalog + gas-density cloud loaded from Google Sheets. Click a star to read its light properties.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "starfield.html",
+   "t": "🚀 Starfield — SweK Engine",
+   "d": "Live Starfield telemetry (health, O2, level, position) via the SFSE Console API, plus a console command box. Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "statistical-mechanics.html",
+   "t": "Statistical mechanics &mdash; the front door",
+   "d": "The front door for the statistical-mechanics arc: the Maxwell-Boltzmann speed distribution, the Planck law, the Debye heat capacity, Bose-Einstein condensation, the degenerate Fermi gas, the Sackur-Tetrode entropy, the finite-temperature chemical potential that ties the three statistics together, and the paramagnet's Schottky anomaly (localised spins -- ising.js without the interactions). Eight graded modules that had no door at all -- runnable only by typing a selfcheck path (seven found this page at v3818, the paramagnet at v3820). The page computes nothing itself: every figure comes from a module under physics/ with its own gate, and the headline of each panel is the KEY that module is graded on. The chemical-potential panel is the one to look at: one density constraint sets the fugacity for all three gases, mu = kT ln z, and the classical answer falls out of both quantum ones as the gas thins.",
+   "g": "physicslab",
+   "p": 0
+  },
+  {
+   "f": "svg-forge.html",
+   "t": "SweK &middot; SVG forge",
+   "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "sync-probe.html",
+   "t": "SweK Sync Walk Probe",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
+   "f": "tactical-scan.html",
+   "t": "Tactical Scan",
+   "d": "The ship's computer scanning a target: a Sobel edge pass turns the ship sprite into an LCARS vector schematic, a scan line sweeps down and lights the outline, a reticle frames it, and a readout shows hull/shield/weapon. Works on our 2D sprites today -- no 3D model needed.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "terminal.html",
+   "t": "Terminal",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "tet-rank.html",
+   "t": "The 2D answer does not transfer (v3641)",
+   "d": "In 2D the set of cells whose gradient cannot be determined from cell averages is exactly two, forever. In 3D it is 6n - it grows linearly with the mesh, tracking the box edges rather than its faces, so refinement makes the defect rarer and more numerous at the same time.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "thead.html",
+   "t": "Wireframe Head",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "thermal-flow.html",
+   "t": "Convection",
+   "d": "The thermal lattice, made visible. A second distribution carries heat the way the first carries momentum, and one line couples them: hot fluid is lighter. Heat a layer from below and nothing happens -- the heat just conducts through -- until the Rayleigh number crosses 1708, and then the fluid organises itself into rolls. Nothing in the code contains that number; drag the slider across it and watch it decide. Or turn the layers over -- heavy resting on light -- and gravity refuses the arrangement: the interface goes unstable and overturns into mushrooms. The colour is the temperature, on the same blackbody ramp the lava uses, because here the heat really is the material.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "thermal3d-cells.html",
+   "t": "Plumes",
+   "d": "Rayleigh-Benard convection in three dimensions: a layer heated from below organising itself into plumes, hot columns rising and cold sheets falling. Nothing tells it to. The surfaces are isosurfaces of temperature, marched fresh from the live field, and here the blackbody ramp is honestly reading heat -- unlike the duct, where it reads speed and says so. The Mach gauge matters: this engine measured its own lattice's Galilean error and wrote down a rule -- trust it below Mach 0.1. Push the Rayleigh slider hard enough and the page will tell you when you have broken the engine's own rule, because a demo that quietly runs outside its verified range is a lie with nice colours.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "tomography.html",
+   "t": "Tomograph",
+   "d": "A CT scanner, owned rather than imported. The shadows are not simulated -- the Radon transform of an ellipse is closed-form, so the sinogram on the left is written down exactly, and it was checked against a brute-force line integral to 1.57e-5 before anything reconstructed anything. Filtered back-projection then recovers the object from those shadows alone, converging to 0.06% away from edges as the angle count rises. Drag the angle slider and watch a smear become a head. The volume it produces is a 3D scalar field, so the same marching cubes that draws the D3Q19 wake and the cosmic web draws this too -- reconstruction was never a rendering problem for this engine.",
+   "g": "optics",
+   "p": 0
+  },
+  {
+   "f": "tools.html",
+   "t": "SweK Tools",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "toroidal-wave.html",
+   "t": "Toroidal Wave Buffer",
+   "d": "A TOROIDAL DEFORM BUFFER driving a real-time wave simulation on a curved surface (v3837). An N x N field is addressed with wraparound (modulo) indexing, so it has no edges -- a ripple leaving one side re-enters the other, the domain is periodic, and scrolling the read origin moves the whole field under the viewport with no buffer copy. Because a wrapped grid IS a torus topologically, the field maps onto a torus with no seam and the waves chase themselves around it. The 2D wave equation runs on the CPU here (leapfrog, wraparound 5-point Laplacian, CFL-safe); the GPU ping-pong-texture version is the optimisation. Drops splat with toroidal wrap; Scroll demonstrates the moving window; Reset stills the field. Answer-key gate: toroidalField-selfcheck (wraparound indexing, the cross-seam energy transfer, CFL stability, scroll==shift, seamless torus map).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "torrents.html",
+   "t": "SweK Torrents — Voxel View",
+   "d": "A 3D voxel render of BiglyBT torrents: each tower is a download, lit cubes are progress, color is state, glow is speed.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "torsion-modes.html",
+   "t": "The count detects an absent term (v3653)",
+   "d": "Four atoms close the gap: dihedrals and improper were in neither normal-mode fixture. Removing either term gives the molecule a free internal motion and an extra zero mode - so the counting law detects whether a term contributes at all, which no single-term gate can.",
+   "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "trace-truth.html",
+   "t": "Trace Truth -- SweK as a 4D ground-truth generator",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "trader.html",
+   "t": "TradingAgents — congress trades",
+   "d": "Browse politician stock disclosures: member list with trade counts, click for a per-member breakdown. Education/sim only. Free senate-watcher data, or FMP for current.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "trading.html",
+   "t": "Trading Applications &middot; SweK",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "tradingfloor.html",
+   "t": "LCARS · Trading Floor",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "tri-limiter.html",
+   "t": "Triangles - where the argument finally does not run (v3637)",
+   "d": "On a square the offset from cell centre to furthest evaluation point is exactly half the lever the gradient was built on. On a triangle it is sqrt(5/2) = 1.5811 - above one - so the escape is forced by geometry rather than by the limiter, and only the centroid conserves.",
+   "g": "discretise",
+   "p": 0
+  },
+  {
+   "f": "tts.html",
+   "t": "Local TTS",
+   "d": "Local text-to-speech via Windows SAPI or Piper. Speak aloud on the PC, or render a WAV the browser plays. Runs on the bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "turing.html",
+   "t": "SweK Physics — Turing patterns",
+   "d": "Diffusion is the process that smooths everything, and Turing showed it can DESTABILISE a uniform state into stripes when the inhibitor diffuses faster than the activator. The Brusselator is used because its algebra is exact: the threshold B_c = (1 + A sqrt(Du/Dv))^2 is closed form and the simulation is never told it. Below it every mode decays however long you wait.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "uitars.html",
+   "t": "UI-TARS · Local Test",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "universal-viewer.html",
+   "t": "Universal Viewer — SweK Engine Demos",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "uvtt.html",
+   "t": "UVTT dungeon loader",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "verify.html",
+   "t": "SweK Verification Console",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "view.html",
+   "t": "GLB Viewer",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "volume-cache.html",
+   "t": "3D Volume Cache (v3041)",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "voxearth.html",
+   "t": "Voxel Earth",
+   "d": "Spinning voxel globe; zoom from orbit to a local geological strata view.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "voxel-mesh.html",
+   "t": "Voxels to Mesh",
+   "d": "The cap on SweK's voxelize path: a voxel volume becomes a watertight triangle mesh you can spin, and export as OBJ. Interior faces are culled so the surface is closed; drag to orbit, pinch/wheel to zoom (the shared gesture controls); Download OBJ saves a real 3D asset. Pick a shape or crank the resolution -- the same voxelsToMesh() runs on the filter-series page voxels too, so content -> voxels -> mesh -> asset.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "voxel-photo-cube.html",
+   "t": "Voxel Photo Cube &amp; Gallery &mdash; SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "voxel-viewer.html",
+   "t": "Voxel Viewer / Generator",
+   "d": "",
+   "g": "voxelrender",
+   "p": 0
+  },
+  {
+   "f": "wadmap.html",
+   "t": "WAD Map — Engine Companion",
+   "d": "DOOM WAD map viewer — load a .wad and explore the level geometry.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wall-condition.html",
+   "t": "The control this arc owed (v3645)",
+   "d": "Two rounds measured zero-Neumann producing a wrong answer and said the assertion was what was false. Here is a field where it is true: on the wall that really is a zero-flux wall it is exact, free and rank-restoring - and on the next wall along it is worse than doing nothing.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "wall.html",
+   "t": "Switchboard",
+   "d": "",
+   "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "wallpaper.html",
+   "t": "SweK &middot; Wallpaper",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "warp-map.html",
+   "t": "Warp Map",
+   "d": "A star map that clusters because a power spectrum put the structure there, not because anyone drew it. The field comes from makeGRF -- white noise filtered by the square root of a prescribed P(k), whose measured spectrum comes back at 1.006 of what was asked for over twelve universes -- and the stars are Poisson-sampled from it. Toggle SCATTER to see the same star count with no field behind it: a pure scatter has variance exactly equal to its mean, which is what Poisson means, and it measures 1.0. The clustered map measures well above that, and the excess is structure. Chopping a smooth field into countable stars costs exactly V/N in shot noise, predicted before the code runs. Click any star to warp to it.",
+   "g": "cosmic",
+   "p": 0
+  },
+  {
+   "f": "wasm-bench.html",
+   "t": "WASM Lab",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wasm-demo.html",
+   "t": "WASM demo",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wasm-sandbox.html",
+   "t": "WASM sandbox",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "water.html",
+   "t": "WebGL2 Water &mdash; ripples, caustics, Fresnel",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "waveguide.html",
+   "t": "SweK Physics — waveguide cutoffs",
+   "d": "A hollow metal pipe carries nothing below its cutoff frequency. TE and TM modes come from the same 2D eigenproblem differing only in a boundary condition, and that difference decides which mode is dominant: solving TM with the wrong condition returns a tidy, plausible cutoff for a pipe that does not exist. The mode SET is what catches it, not the frequencies.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wear-field.html",
+   "t": "Wear Field (Toroidal Accumulation)",
+   "d": "A PERSISTENT TOROIDAL ACCUMULATION BUFFER following a ship (v3838) -- the snowflow deform buffer proper, the persistent half the stateless wave could not do. An N x N field is world-locked by wraparound addressing so it covers a size x size window that FOLLOWS the ship without ever being copied; the ship stamps wear/scorch into it every frame and it DECAYS, so a trail smears behind and heals over time. The subtle part, gated in wearField-selfcheck: the SCROLL-AND-CLEAR -- when the window recenters, only the newly-exposed texels (world the ship has just reached) are zeroed, while everything still in the window keeps accumulating; clearing everything would erase the trail, clearing nothing would ghost the world you left and returned to. The buffer runs on the CPU here; the GPU ping-pong-texture version is the optimisation. Pause/Reset/Heal. Answer-key gate: wearField-selfcheck (toroidal addressing, accumulation, persistence across scroll, re-entry clearing, decay).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "weather.html",
+   "t": "THE WEATHER",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "webgpu-bench.html",
+   "t": "WebGPU Lab",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "webtorrent.html",
+   "t": "SweK P2P Share",
+   "d": "Seed SweK output folders (cell-tracking runs, exports) as torrents and fetch them from peers. Native WebRTC/TCP P2P — no central server; magnets broadcast on the peer bus.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "webwright.html",
+   "t": "Webwright — scraper authoring &amp; skills",
+   "d": "Install/detect Webwright; store and run re-runnable Camoufox scrapers as skills. PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "weight-scaling.html",
+   "t": "The optimum converges, but not to one number (v3650)",
+   "d": "Does the boundary row's optimal weight move with refinement? It converges to about 0.218 at fixed mesh shape - but it is a function of the cell aspect ratio, moving 2.2x across shapes, and the shipped default of 1 is outside the whole measured range.",
+   "g": "boundaries",
+   "p": 0
+  },
+  {
+   "f": "wind-tunnel.html",
+   "t": "Wind Tunnel (v2796)",
+   "d": "",
+   "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "wormhole-jump.html",
+   "t": "Wormhole Jump",
+   "d": "Ellis-metric wormhole with real gravitational lensing, now showing the LIVING vorton-swirled nebula of each system -- the far one through the throat, the near one bending around it. Hit Jump to fly through. WebGPU / WebGL2 / Canvas2D, all from one verified reference.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "wormhole.html",
+   "t": "SweK &middot; Ellis Wormhole (WebGPU)",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "writeup.html",
+   "t": "Demo Writeup &mdash; SweK Engine",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "x4.html",
+   "t": "🛰️ X4 — SweK Engine",
+   "d": "Live X4: Foundations telemetry (pilot, credits, ship hull/shield, sector, logbook) via a community mod feed. Push (game POSTs to the bridge) or poll (mycumycu External App). Runs on the PC bridge.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "xbox.html",
+   "t": "Xbox",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "youtube-export.html",
+   "t": "YouTube Export",
+   "d": "Record a narrated SweK Engine showcase and export it as a YouTube-ready mp4. The avatar narrates the engine in first person -- overview, the box3d/Jolt physics, Escape Velocity, the living box -- over a live scene of sprite-mesh ships flying an evade brain through a nebula. Everything (scene, avatar, title, captions) composites onto one canvas, records to webm, and the server transcodes to H.264 mp4 with a paste-ready description.",
+   "g": "",
+   "p": 0
+  }
+ ]
+}

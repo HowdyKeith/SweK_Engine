@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SweK Engine — Avatar Server</title>
+<style>
+  :root { --bg:#0a0e0c; --line:#1f2b24; --ink:#cfe9d8; --dim:#6f8a7c; --go:#2bff88; --warn:#ffcf5a; --err:#ff6b6b; --accent:#7fd0ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.4 ui-monospace,Menlo,Consolas,monospace; overflow:hidden; }
+  body { display:flex; flex-direction:column; }
+  header { padding:7px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#0b1310cc; backdrop-filter:blur(4px); z-index:5; }
+  .title { font-weight:600; letter-spacing:.5px; }
+  .title .glyph { color:var(--accent); }
+  .ver { color:var(--dim); font-size:11px; }
+  .spacer { flex:1; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  label.cap { color:var(--dim); font-size:11px; letter-spacing:.5px; }
+  button, select { background:#10231a; color:var(--go); border:1px solid #224a36; border-radius:8px; padding:6px 11px; font:inherit; cursor:pointer; }
+  button:hover { background:#143020; }
+  button.on { background:#163e6b; color:#cfeaff; border-color:#2f6fae; }
+  select { color:var(--ink); border-color:#2a4a5e; background:#0c1820; }
+  .modes button { min-width:74px; }
+  main { flex:1; min-height:0; position:relative; }
+  iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#06080a; }
+  #hint { position:absolute; left:12px; bottom:10px; color:var(--dim); font-size:11px; background:#0b1310aa; padding:4px 8px; border-radius:6px; pointer-events:none; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="glyph">🧍</span> SweK Engine · Avatar Server</span>
+    <span class="ver" id="ver">—</span>
+    <span class="spacer"></span>
+    <div class="row">
+      <label class="cap">View</label>
+      <select id="host" title="What the avatar window shows">
+        <option value="avatarstage.html">Character (avatar)</option>
+        <option value="pipboy-models.html">Pip-Boy</option>
+        <option value="shipavatar.html">Ship avatar (connector)</option>
+        <option value="avatarstage.html?scene=focus">Rigged head / torso</option>
+        <option value="thead.html">Wireframe head (default, no model)</option>
+      </select>
+    </div>
+    <div class="row modes" style="margin-left:6px;">
+      <label class="cap">Mode</label>
+      <button id="mServer" title="Minimal server: bridge + live debug, no WebGL">🖥 Server</button>
+      <button id="mAvatar" class="on" title="Avatar server: the engine seen through the avatar window">🧍 Avatar</button>
+      <button id="mFull" title="Full engine client (the complete render)">▶ Full</button>
+      <button id="mComics" title="Comics reader: the standalone .cbz/.cbr/.pdf reader in its own window">📖 Comics</button>
+    </div>
+  </header>
+  <main>
+    <iframe id="view" title="avatar window" allow="autoplay; microphone; camera; xr-spatial-tracking"></iframe>
+    <div id="hint">avatar-server mode · pick a view, or switch modes top-right</div>
+  </main>
+<script>
+  // Avatar-server boot mode: a lean shell that hosts the chosen lightweight client
+  // (avatar / pip-boy / a game connector) in one window — "the engine through the
+  // avatar window" — with a persistent mode switch (server / avatar / full) and a
+  // view picker. No full voxel engine here; each view loads its own page in-frame.
+  (function(){
+    try { localStorage.setItem("voxelengine.bootMode", "avatar"); } catch(e){}
+    var frame = document.getElementById("view");
+    var host  = document.getElementById("host");
+
+    // restore last-chosen view (default: character/avatar)
+    var saved = "avatarstage.html";
+    try { saved = localStorage.getItem("voxelengine.avatarHost") || saved; } catch(e){}
+    var known = Array.prototype.map.call(host.options, function(o){ return o.value; });
+    if (known.indexOf(saved) < 0) saved = "avatarstage.html";
+    host.value = saved;
+
+    function load(src){
+      // ?embed=1 lets the inner page know it's hosted (so it can hide its own
+      // mode chrome if it supports it; harmless otherwise).
+      frame.src = src + (src.indexOf("?") < 0 ? "?" : "&") + "embed=1";
+      try { localStorage.setItem("voxelengine.avatarHost", src); } catch(e){}
+    }
+    load(saved);
+    host.addEventListener("change", function(){ load(host.value); });
+
+    // mode switch
+    document.getElementById("mServer").onclick = function(){ try { localStorage.setItem("voxelengine.bootMode","server"); } catch(e){} location.href = "/server.html"; };
+    document.getElementById("mFull").onclick   = function(){ try { localStorage.setItem("voxelengine.bootMode","full"); } catch(e){} location.href = "/index.html?forceEngine=1"; };
+    document.getElementById("mComics").onclick = function(){ try { localStorage.setItem("voxelengine.bootMode","comics"); } catch(e){} location.href = "/comics.html"; };
+    document.getElementById("mAvatar").onclick = function(){ /* already here */ };
+
+    // version stamp (best-effort) — same /runtime endpoint server.html uses
+    fetch("/runtime", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      document.getElementById("ver").textContent = (j && (j.version || j.engine || "")) ? ("v" + (j.version || j.engine) + (j.runtime ? " · " + j.runtime : "")) : "running";
+    }).catch(function(){});
+
+    // let an inner page request a mode/view change via postMessage
+    window.addEventListener("message", function(e){
+      var d = e && e.data; if (!d || typeof d !== "object") return;
+      if (d.type === "engine:mode" && d.mode) {
+        if (d.mode === "server") document.getElementById("mServer").click();
+        else if (d.mode === "full") document.getElementById("mFull").click();
+        else if (d.mode === "comics") document.getElementById("mComics").click();
+      } else if (d.type === "avatar:view" && d.view && known.indexOf(d.view) >= 0) {
+        host.value = d.view; load(d.view);
+      }
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "swek-rendezvous",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SweK Engine cloud rendezvous + WebRTC signaling + shared-room server (dependency-free).",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

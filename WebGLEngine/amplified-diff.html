@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK &middot; Amplified Diff</title>
+<!--
+     v3252 -- SHOW THE RESIDUAL, AMPLIFIED.
+
+     Taken from Infatoshi/netherite, which rewrote Minecraft 1.11.2 in C and CUDA and bit-verified it against
+     the real game. Its receipt for the inventory screen is the whole technique: "my inventory screen minus
+     Minecraft's, AMPLIFIED 80x so you can see anything at all. 112,796 pixels. 442 differ, each by 0.3%".
+
+     *** TWO IMAGES THAT DIFFER BY A THIRD OF A PERCENT LOOK LIKE THE SAME IMAGE. *** render-qa already gates
+     numerically, and already refuses to conflate too-different with SUSPICIOUSLY IDENTICAL. What it could not do
+     is let a person SEE a near-match -- and "looks fine" is the verdict this project spends its rounds refusing.
+-->
+<style>
+  html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:1100px;margin:0 auto;padding:16px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#6f8a7c;margin-bottom:14px}
+  .card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px}
+  .drop{border:1px dashed #2c463a;padding:18px;text-align:center;color:#6f8a7c;cursor:pointer}
+  .drop.has{border-style:solid;color:#b6f0cf}
+  .row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1 1 300px}
+  canvas{max-width:100%;background:#04140b;border:1px solid #1a2a22;image-rendering:pixelated}
+  label{color:#6f8a7c}input[type=range]{width:180px;vertical-align:middle}
+  .receipt{color:#b6f0cf;font-size:14px;margin-top:8px}
+  .warn{color:#e0c58a}.dim{color:#6f8a7c}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Amplified Diff</h1>
+  <div class="sub">Two renders, subtracted and multiplied until the difference is visible.
+    <span class="dim">The image answers WHERE. The numbers answer HOW MUCH. Neither is enough alone.</span></div>
+
+  <div class="card row">
+    <div><div id="dropA" class="drop">drop or click &mdash; image A</div><canvas id="cvA"></canvas></div>
+    <div><div id="dropB" class="drop">drop or click &mdash; image B</div><canvas id="cvB"></canvas></div>
+  </div>
+
+  <div class="card">
+    <label>gain <input id="gain" type="range" min="1" max="200" value="80"> <b id="gainN">80</b>&times;</label>
+    <span class="dim" style="margin-left:12px">netherite used 80&times;</span>
+    <div class="receipt" id="receipt">load two images of the same size</div>
+    <div class="dim" style="margin-top:6px">
+      <b>The amplified image saturates.</b> At 80&times; anything above 3/255 is already full white, so the picture
+      cannot tell a small difference from a large one &mdash; it only says <b>where</b>.
+      <code>max delta</code> is computed from the raw bytes <i>before</i> the gain and is the only honest magnitude here.
+    </div>
+    <canvas id="cvD"></canvas>
+  </div>
+</div>
+
+<script type="module">
+import { amplifiedDiff, diffReceipt } from "./tools/render-qa/amplifiedDiff.mjs";
+
+const $ = (id) => document.getElementById(id);
+const imgs = { A: null, B: null };
+
+function wire(key, dropId, cvId) {
+  const drop = $(dropId), cv = $(cvId);
+  const load = (file) => {
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      cv.getContext("2d").drawImage(img, 0, 0);
+      imgs[key] = cv; drop.classList.add("has"); drop.textContent = key + ": " + img.naturalWidth + "x" + img.naturalHeight;
+      run();
+    };
+    img.onerror = () => { drop.textContent = key + ": that file did not decode as an image"; };
+    img.src = URL.createObjectURL(file);
+  };
+  drop.onclick = () => { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
+                         i.onchange = () => load(i.files[0]); i.click(); };
+  drop.ondragover = (e) => { e.preventDefault(); };
+  drop.ondrop = (e) => { e.preventDefault(); load(e.dataTransfer.files[0]); };
+}
+wire("A", "dropA", "cvA"); wire("B", "dropB", "cvB");
+
+$("gain").oninput = () => { $("gainN").textContent = $("gain").value; run(); };
+
+function run() {
+  const A = imgs.A, B = imgs.B;
+  if (!A || !B) return;
+  // *** A SIZE MISMATCH IS NOT A DIFFERENCE, IT IS A DIFFERENT PICTURE, and the module throws rather than
+  // comparing the overlap -- which would call the missing part "identical".
+  if (A.width !== B.width || A.height !== B.height) {
+    $("receipt").innerHTML = '<span class="warn">' + A.width + "x" + A.height + " vs " + B.width + "x" + B.height +
+      " &mdash; different sizes. That is not a pixel difference and will not be reported as one.</span>";
+    return;
+  }
+  const a = A.getContext("2d").getImageData(0, 0, A.width, A.height);
+  const b = B.getContext("2d").getImageData(0, 0, B.width, B.height);
+  let res;
+  try { res = amplifiedDiff(a.data, b.data, { gain: parseInt($("gain").value, 10) }); }
+  catch (e) { $("receipt").innerHTML = '<span class="warn">' + e.message + "</span>"; return; }
+
+  const cv = $("cvD"); cv.width = A.width; cv.height = A.height;
+  cv.getContext("2d").putImageData(new ImageData(res.out, A.width, A.height), 0, 0);
+  $("receipt").textContent = diffReceipt(res.stats);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Arrival</title>
+<style>
+* { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .title { font-weight:600; } .title .g { color:var(--go); }
+  main { max-width:620px; margin:0 auto; padding:14px; }
+  .note { background:#14201b; border:1px solid #2a4036; border-radius:9px; padding:10px 12px; color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .note b { color:var(--ink); }
+  .card { border:1px solid var(--line); border-radius:11px; padding:14px; background:var(--panel); }
+  label { display:block; color:var(--dim); font-size:12px; margin:10px 0 4px; }
+  input, select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .ck { display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > div { flex:1; min-width:130px; }
+  .prow { display:flex; gap:8px; margin-top:6px; }
+  .prow input.nm { flex:0 0 130px; } .prow button { flex:0 0 auto; background:#221c10; color:var(--warn); border:1px solid #5a4a22; border-radius:7px; cursor:pointer; }
+  #urlRow { display:none; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button.go { background:#10231a; color:var(--ok); border:1px solid #224a36; border-radius:8px; padding:8px 14px; font:inherit; cursor:pointer; }
+  button.add { background:#10151d; color:var(--dim); border:1px solid var(--line); border-radius:7px; padding:6px 10px; font:inherit; cursor:pointer; margin-top:6px; }
+  #msg { color:var(--dim); font-size:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🏠</span> Arrival fan-out</span></header>
+  <main>
+    <div class="note">
+      When a tracked person arrives home, greet them everywhere at once: avatar quip + spoken greeting (local TTS + the Echo) and, optionally, a Shield scene + a light. Fires automatically off Home Assistant presence; you can also hit <b>GET <code>/arrival/ring?person=Keith</code></b> from a phone geofence (MacroDroid/Tasker).
+    </div>
+    <div class="card">
+      <label class="ck"><input id="enabled" type="checkbox" /> Auto-greet on arrival</label>
+
+      <label>Default greeting (use {name})</label>
+      <input id="greet" placeholder="Welcome home, {name}!" />
+
+      <label>Per-person greetings (override the default)</label>
+      <div id="people"></div>
+      <button class="add" id="addPerson">+ add person</button>
+
+      <label class="ck"><input id="speak" type="checkbox" /> Speak it aloud (local TTS)</label>
+      <label class="ck"><input id="haSpeaker" type="checkbox" /> Also speak on the Home Assistant / Echo speaker</label>
+
+      <div class="row" style="margin-top:6px;">
+        <div><label>Turn on a light (optional)</label><input id="light" placeholder="light.entry" /></div>
+        <div><label>Auto-off after (sec, 0 = stay)</label><input id="flashSec" type="number" min="0" max="600" placeholder="0" /></div>
+      </div>
+
+      <div class="row">
+        <div><label>On the Android TV Device</label><select id="shieldAction"><option value="none">Nothing</option><option value="blink">Open Blink app</option><option value="url">Open a page</option></select></div>
+        <div><label>Android TV Device IP</label><input id="shieldIp" data-rt-placeholder="192.168.x.x" placeholder="192.168.x.x" /></div>
+      </div>
+      <div id="urlRow"><label>Page URL (relative ok)</label><input id="shieldUrl" placeholder="/pipboy-models.html" /></div>
+
+      <div class="actions">
+        <button class="go" id="save">Save</button>
+        <button class="go" id="test">🏠 Test (greet "Keith")</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script type="module">
+// v3455 -- FIRST CONVERSION TO ui/roundTrip.js. This page is the whole defect in one file: the load did
+// `$("shieldIp").value = c.shieldIp || "192.168.10.114"` and the save posted that value back, so A FAILED FETCH
+// PUT A HARDCODED IP INTO THE FORM AND THE NEXT SAVE WROTE IT INTO THE CONFIG AS THOUGH SOMEBODY CHOSE IT.
+// `enabled`/`speak`/`haSpeaker` were worse: `c.enabled !== false` reads a MISSING field as TRUE, so a config
+// that never loaded saved back as fully enabled. THE CATCH BRANCH DID NOT EVEN CLEAR THE FORM.
+//
+// The six rules are Keith's (v3243) and live in ui/roundTrip.js; this is the first call site to use them
+// rather than restate them. Made a module so the import is static -- there are ZERO inline on* handlers in
+// this page, so module scoping cannot orphan one.
+import { applyLoaded, collectIfKnown } from "/ui/roundTrip.js";
+  const $ = (id) => document.getElementById(id);
+  function syncUrl(){ $("urlRow").style.display = $("shieldAction").value === "url" ? "block" : "none"; }
+  $("shieldAction").addEventListener("change", syncUrl);
+
+  function addRow(name, greet){
+    const div = document.createElement("div"); div.className = "prow";
+    div.innerHTML = '<input class="nm" placeholder="Keith" /><input class="gr" placeholder="Hey Geek, welcome home!" /><button>✕</button>';
+    div.querySelector(".nm").value = name || ""; div.querySelector(".gr").value = greet || "";
+    div.querySelector("button").onclick = () => div.remove();
+    $("people").appendChild(div);
+  }
+  $("addPerson").onclick = () => addRow("", "");
+
+  // ONE declaration of the field list, ABOVE its uses. It also worked below -- the fetch callback runs after
+  // the module body, so the temporal dead zone had closed -- but v3421 lost a round to exactly that, and a
+  // declaration that is correct only because of async timing is a trap for whoever edits this next.
+  const FIELDS = ["enabled", "greet", "speak", "haSpeaker", "light", "flashSec", "shieldAction", "shieldIp", "shieldUrl"];
+
+  fetch("/arrival/config", { cache:"no-store" }).then(r => r.json()).then(c => {
+    if (!c) return;
+    // THE RAW FIELD IS PASSED, NEVER `c.x || fallback`: undefined means NOT LOADED and applyLoaded puts the
+    // control into its unknown state, while false and 0 are values somebody chose and survive.
+    for (const k of FIELDS) applyLoaded($(k), c[k]);
+    const g = c.greetings || {}; Object.keys(g).forEach(k => addRow(k, g[k])); if (!Object.keys(g).length) addRow("", ""); syncUrl();
+  }).catch(() => {
+    // *** THE FAILED-LOAD BRANCH IS THE WHOLE POINT AND IT USED TO DO NOTHING. *** Leaving the form at its HTML
+    // defaults is exactly how a browser default becomes a saved setting on the next click.
+    for (const k of FIELDS) applyLoaded($(k), undefined);
+    addRow("", ""); syncUrl();
+  });
+
+  function body(){
+    const greetings = {};
+    $("people").querySelectorAll(".prow").forEach(r => { const n = r.querySelector(".nm").value.trim(); const v = r.querySelector(".gr").value.trim(); if (n && v) greetings[n] = v; });
+    // OMIT RATHER THAN SEND. Every `|| "default"` that used to sit here was a browser default being posted as a
+    // choice; collectIfKnown writes the key only when the control actually holds one.
+    const out = { greetings };
+    for (const k of FIELDS) collectIfKnown(out, k, $(k));
+    return out;
+  }
+  $("save").onclick = () => { $("msg").textContent = "saving…"; fetch("/arrival/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(r => r.json()).then(() => $("msg").textContent = "✓ saved").catch(e => $("msg").textContent = "✗ " + e); };
+  $("test").onclick = () => { $("msg").textContent = "firing…"; fetch("/arrival/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body()) }).then(() => fetch("/arrival/ring?person=Keith")).then(r => r.json()).then(j => $("msg").textContent = j && j.ok ? ("🏠 fired: " + (j.did || []).join(", ")) : "✗ failed").catch(e => $("msg").textContent = "✗ " + e); };
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

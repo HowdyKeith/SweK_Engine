@@ -1,0 +1,209 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Multigrid Bench</title>
+<!--
+     v3224 -- THE PAGE THAT ANSWERS "IS THE GPU MULTIGRID WORTH WIRING" WITH A TABLE INSTEAD OF AN ARGUMENT.
+
+     fluid/multigridGPU.js is a complete WebGPU port of the 2D pressure solve -- the whole V-cycle on device,
+     reusing the proven CPU assembly from multigrid.mjs. It is FINISHED, GATED, AND CONNECTED TO NOTHING, and it
+     has sat that way because the question "should we wire it" has never had a number attached.
+
+     *** THE COST OF WIRING IT IS SMALL AND MEASURED: THREE EDITS. *** flip2d.mjs's _project already contains a
+     SOLVER SWITCH ("mgpcg" / "rbgs"), so the device path is a third branch rather than a rewrite; step() and
+     _project() become async; and Flip2D has exactly ONE importer outside fluid/ -- fluid-rigid-2d.html, whose
+     rAF callback awaits. THE EARLIER CLAIM THAT IT "CHANGES THE SHAPE OF EVERY CALLER OF THE PHYSICS TICK" WAS
+     MINE AND WAS WRONG BY INSPECTION.
+
+     *** SO THE OPEN QUESTION IS NOT COST. IT IS WHETHER THERE IS A PAYOFF, AND NOBODY HAS MEASURED ONE. ***
+
+     AND THE CPU GATHER PATH IS NOT THE ANSWER, WHICH I NEARLY REPORTED THAT IT WAS. shadowSolve is the same
+     V-cycle rewritten as a GATHER so it maps onto a GPU, and on one unwarmed pair it looked 1.45x FASTER than
+     the scatter form -- a free win with no GPU and no async. WARMED UP IT IS SLOWER EVERYWHERE: ratios 0.96,
+     0.67, 0.81, 0.85 at 32/64/128/192 squared. THE FIRST NUMBER WAS JIT WARM-UP, the trap this tree already
+     recorded about its own brick panel ("the first march includes JIT warmup, so compare QUERIES not
+     milliseconds"). That is why this page DISCARDS WARM-UP RUNS AND SAYS SO ON THE PAGE rather than in a
+     comment: the whole reason it exists is that a single cold pair sent me to a false conclusion.
+-->
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 11px 13px; margin-bottom: 12px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 5px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { text-align: right; padding: 3px 10px 3px 0; border-bottom: 1px solid #16241d; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #6f8a7c; font-weight: normal; }
+  .ok { color: #7fe0a4; } .warn { color: #e0c58a; } .bad { color: #e0a0a0; } .dim { color: #6f8a7c; }
+  .note { color: #8fb3a0; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Multigrid Bench</h1>
+  <div class="sub">The 2D pressure V-cycle, three ways, on the same problem.
+    <span class="dim">Scatter is what the fluid runs today; gather is the GPU-shaped rewrite; device is the WebGPU port, WIRED OPT-IN AS SOLVER <code>mggpu</code> SINCE v3225 &mdash; this line said &ldquo;wired to nothing&rdquo; for 127 versions after it stopped being true, which is why a sentence about wiring belongs beside a check rather than in prose.</span></div>
+
+  <div class="card">
+    <button id="run" class="primary">Run the bench</button>
+    <label class="dim" style="margin-left:10px">warm-up runs <input id="warm" type="number" value="3" min="0" max="20" style="width:46px;background:#0a1210;color:#cfe9d8;border:1px solid #2c463a;font:inherit"></label>
+    <span id="msg" class="dim" style="margin-left:10px"></span>
+    <div class="note">Warm-up runs are executed and <b>thrown away</b> before anything is timed.
+      A single cold pair made the gather path look 1.45&times; faster than scatter; warmed up it is
+      <b>slower everywhere</b>. That reversal is the reason this page exists.</div>
+  </div>
+
+  <div class="card">
+    <table id="tbl">
+      <thead><tr><th>grid</th><th>scatter (CPU)</th><th>gather (CPU)</th><th>device (GPU)</th><th>gather/scatter</th><th>device/scatter</th><th>worst rel. diff</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="verdict" class="note"></div>
+  </div>
+
+  <div class="card">
+    <div class="dim">What the numbers decide, stated before you read them so the reading is not motivated:</div>
+    <div class="note">
+      &bull; <b>Correctness is already settled.</b> The gather path agrees with scatter to about 1e-7 relative at
+      every size, and fluid/multigridGPU-selfcheck gates that headlessly. This page is not asking whether the
+      port is right.<br>
+      &bull; <b>The gather column is not a proposal.</b> It exists so the algorithm maps onto a GPU. If it beats
+      scatter here, that is a machine-specific accident of cache behaviour, not a reason to switch the CPU path.<br>
+      &bull; <b>Only the device column can justify the wiring</b>, and the wiring costs three edits: step() and
+      _project() become async, and fluid-rigid-2d.html awaits. A device column that is merely <i>close</i> to
+      scatter is a REASON NOT TO, because async is a real cost paid every frame.<br>
+      &bull; <b>The device path is WIRED as of v3225, opt-in and off by default</b> &mdash;
+      <code>new Flip2D(nx, ny, { solver: "mggpu", gpuDevice })</code>. It REFUSES without a device rather than
+      falling back to the CPU, because a solver that quietly ran somewhere else would make this whole table
+      meaningless. So the numbers below can now be checked against the real fluid, not just this bench.<br>
+      &bull; <b>Two substeps per frame.</b> fluid-rigid-2d.html steps twice per rAF, so an awaited device solve
+      is two round-trips inside one frame. Halving a solve that then straddles a frame boundary is not a win.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { PoissonMG, FLUID } from "./fluid/multigrid.mjs";
+import { GpuMultigrid, shadowSolve } from "./fluid/multigridGPU.js";
+
+const $ = (id) => document.getElementById(id);
+const SIZES = [32, 64, 128, 192];
+const VCYCLES = 8;
+
+// THE SAME PROBLEM EVERY TIME, and it is DERIVED rather than random: a random field would make two runs
+// incomparable and a uniform one would let a broken solve look correct.
+function problem(n) {
+  const N = n * n;
+  const type = new Int32Array(N).fill(FLUID);
+  for (let i = 0; i < n; i++) { type[i] = 0; type[(n - 1) * n + i] = 0; type[i * n] = 0; type[i * n + n - 1] = 0; }
+  const div = new Float64Array(N);
+  for (let i = 0; i < N; i++) div[i] = Math.sin(i * 0.017) * 0.5;
+  return { type, div, N };
+}
+
+const ms = (f) => { const t = performance.now(); f(); return performance.now() - t; };
+
+async function device() {
+  // v3845 -- "this browser exposes no navigator.gpu" is the FACT; on a LAN origin it is not the CAUSE, and the
+  // `why` string is the only thing a reader sees. Calling it a capability of the BROWSER sends them to the
+  // wrong place entirely: the same browser exposes it on localhost.
+  if (!navigator.gpu) {
+    const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    return { dev: null, why: p.reason === "insecure-origin" ? p.message
+      : "this browser exposes no navigator.gpu -- WebGPU is unavailable, which is a CAPABILITY and not a failure" };
+  }
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return { dev: null, why: "requestAdapter() returned null -- no WebGPU adapter on this machine" };
+    return { dev: await adapter.requestDevice(), why: "" };
+  } catch (e) { return { dev: null, why: "requestDevice() threw: " + e.message }; }
+}
+
+$("run").onclick = async () => {
+  $("run").disabled = true;
+  $("msg").textContent = "acquiring a device\u2026";
+  const { dev, why } = await device();
+  const warm = Math.max(0, Math.min(20, parseInt($("warm").value, 10) || 0));
+  const rows = [];
+  $("tbl").querySelector("tbody").innerHTML = "";
+
+  for (const n of SIZES) {
+    $("msg").textContent = "running " + n + "\u00d7" + n + "\u2026";
+    await new Promise((r) => setTimeout(r, 0));           // let the message paint
+    const { type, div, N } = problem(n);
+    const a = new PoissonMG(n, n, { pre: 2, post: 2 });
+    const b = new PoissonMG(n, n, { pre: 2, post: 2 });
+    const p1 = new Float64Array(N), p2 = new Float64Array(N), p3 = new Float64Array(N);
+
+    // DISCARDED. Not "ignored" -- executed, so the JIT compiles, and then not counted.
+    for (let i = 0; i < warm; i++) { a.solve(type, div, 1 / 60, p1, VCYCLES); shadowSolve(b, type, div, 1 / 60, p2, VCYCLES); }
+
+    const tScatter = ms(() => a.solve(type, div, 1 / 60, p1, VCYCLES));
+    const tGather = ms(() => shadowSolve(b, type, div, 1 / 60, p2, VCYCLES));
+
+    let tDev = null, devErr = "";
+    if (dev) {
+      try {
+        const g = new GpuMultigrid(dev, n, n, { pre: 2, post: 2 });
+        for (let i = 0; i < warm; i++) await g.solve(type, div, 1 / 60, p3, VCYCLES);
+        const t0 = performance.now();
+        await g.solve(type, div, 1 / 60, p3, VCYCLES);
+        tDev = performance.now() - t0;
+      } catch (e) { devErr = e.message; }
+    }
+
+    // Correctness against the path the fluid ACTUALLY RUNS, which is the only reference that matters here.
+    let worst = 0, norm = 0;
+    for (let i = 0; i < N; i++) { worst = Math.max(worst, Math.abs(p1[i] - p2[i])); norm = Math.max(norm, Math.abs(p1[i])); }
+    rows.push({ n, tScatter, tGather, tDev, devErr, rel: norm ? worst / norm : 0 });
+    render(rows, dev, why);
+  }
+  $("msg").textContent = "";
+  $("run").disabled = false;
+};
+
+function render(rows, dev, why) {
+  const f = (x) => (x == null ? "\u2014" : x.toFixed(1) + "ms");
+  $("tbl").querySelector("tbody").innerHTML = rows.map((r) => {
+    const gs = r.tGather / r.tScatter, ds = r.tDev == null ? null : r.tDev / r.tScatter;
+    const cls = (v) => (v == null ? "dim" : v < 0.9 ? "ok" : v > 1.1 ? "bad" : "warn");
+    return "<tr><td>" + r.n + "\u00d7" + r.n + "</td><td>" + f(r.tScatter) + "</td><td>" + f(r.tGather) +
+           "</td><td>" + (r.devErr ? '<span class="bad">threw</span>' : f(r.tDev)) +
+           '</td><td class="' + cls(gs) + '">' + gs.toFixed(2) + "\u00d7</td>" +
+           '<td class="' + cls(ds) + '">' + (ds == null ? "\u2014" : ds.toFixed(2) + "\u00d7") + "</td>" +
+           '<td class="dim">' + r.rel.toExponential(1) + "</td></tr>";
+  }).join("");
+
+  // *** THE VERDICT NAMES THE ABSENCE RATHER THAN LEAVING A BLANK COLUMN. *** A device column of dashes and a
+  // device column of ones mean opposite things, and a page that showed both as empty would be useless exactly
+  // where the decision lives.
+  const v = $("verdict");
+  if (!dev) {
+    v.innerHTML = '<span class="warn">NO DEVICE COLUMN: ' + why + '.</span> The CPU columns are complete and ' +
+      'settle nothing on their own &mdash; <b>the gather path exists to run on a GPU, and without one this page ' +
+      'cannot say whether wiring it is worth three edits.</b> Run this on the rig.';
+  } else if (rows.some((r) => r.devErr)) {
+    v.innerHTML = '<span class="bad">The device path threw: ' + rows.find((r) => r.devErr).devErr +
+      '</span> &mdash; which is a finding, not a blank. The port has never been executed on hardware before now.';
+  } else {
+    const best = rows[rows.length - 1];
+    const ratio = best.tDev / best.tScatter;
+    v.innerHTML = ratio < 0.5
+      ? '<span class="ok">Device is ' + (1 / ratio).toFixed(1) + '\u00d7 faster than the CPU path at ' + best.n +
+        '\u00d7' + best.n + '.</span> That is a payoff worth three edits &mdash; and it still has to survive TWO ' +
+        'awaited solves inside one animation frame.'
+      : '<span class="warn">Device is ' + ratio.toFixed(2) + '\u00d7 the CPU path at ' + best.n + '\u00d7' + best.n +
+        '.</span> <b>That is a reason NOT to wire it:</b> async is a cost paid every frame, and a device solve ' +
+        'that merely matches the CPU buys nothing for it.';
+  }
+}
+</script>
+</body>
+</html>

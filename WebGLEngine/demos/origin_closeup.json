@@ -1,0 +1,5 @@
+{
+    "name": "Origin Closeup",
+    "description": "Low-altitude side view at world origin. Good for inspecting voxel detail.",
+    "camera": { "x": 8, "y": 28, "z": 22, "yaw": -0.5, "pitch": -0.15 }
+}

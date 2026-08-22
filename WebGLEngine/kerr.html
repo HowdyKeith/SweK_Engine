@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Kerr - rotating black hole</title>
+<style>
+  html, body { margin: 0; background: #07090c; color: #cfe0e9; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f7f8a; margin-bottom: 14px; }
+  .card { border: 1px solid #24303a; background: #0d1319; padding: 12px 14px; margin-bottom: 13px; }
+  canvas { width: 100%; height: 360px; border: 1px solid #1a242c; background: #04070a; display: block;
+           /* v2872 -- height:auto was MISSING: this canvas scaled to 100% width with a fixed height attribute,
+              so on any window wider than its natural size the plot was STRETCHED. Responsive is not the same as
+              undistorted, and it looked deliberate. */
+           height: auto; }
+  label { color: #6f7f8a; margin-right: 6px; }
+  input[type=range] { width: 300px; vertical-align: middle; }
+  .num { color: #9fd0e8; } .dim { color: #6f7f8a; } .warn { color: #e8c89f; }
+  table { border-collapse: collapse; } td { padding: 1px 16px 1px 0; }
+  .key { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 5px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Kerr &mdash; rotating black hole</h1>
+  <div class="sub">Spin drags spacetime, so a photon going <em>with</em> the rotation behaves differently from one
+    going against it. The shadow stops being a circle.</div>
+
+  <div class="card">
+    <label>spin a/M</label><input id="a" type="range" min="0" max="999" value="600">
+    <span class="num" id="av"></span>
+    <span class="dim" id="naked"></span>
+    <div style="margin-top:8px" class="dim">
+      <span class="key" style="background:#000;border:1px solid #4a5a66"></span>horizon
+      <span class="key" style="background:#2a3a4a;margin-left:12px"></span>ergosphere
+      <span class="key" style="background:#7fd0a4;margin-left:12px"></span>prograde photon orbit
+      <span class="key" style="background:#e89f9f;margin-left:12px"></span>retrograde
+      <span class="key" style="background:#9fb8e8;margin-left:12px"></span>shadow edge
+    </div>
+  </div>
+
+  <div class="card"><canvas id="cv" width="880" height="360"></canvas></div>
+
+  <div class="card">
+    <table>
+      <tr><td class="dim">outer horizon r+</td><td class="num" id="rp"></td>
+          <td class="dim">ergosphere (equator)</td><td class="num" id="ee"></td></tr>
+      <tr><td class="dim">photon orbit prograde</td><td class="num" id="pp"></td>
+          <td class="dim">retrograde</td><td class="num" id="pr"></td></tr>
+      <tr><td class="dim">shadow edge prograde</td><td class="num" id="bp"></td>
+          <td class="dim">retrograde</td><td class="num" id="br"></td></tr>
+      <tr><td class="dim">shadow asymmetry</td><td class="num" id="asym"></td>
+          <td class="dim">ISCO pro / retro</td><td class="num" id="isco"></td></tr>
+    </table>
+    <div class="dim" style="margin-top:8px" id="note"></div>
+  </div>
+</div>
+
+<script type="module">
+import { fitPlot } from "./ui/fitCanvas.js";
+import { kerrSummary, ergosphere, horizons, isSubExtremal } from "/physics/blackhole/kerr.js";
+
+const $ = (id) => document.getElementById(id);
+const M = 1;
+
+function draw() {
+  const a = $("a").value / 1000 * M;
+  $("av").textContent = (a / M).toFixed(3);
+  const k = kerrSummary(M, a);
+  const nak = !isSubExtremal(M, a);
+  $("naked").textContent = nak ? "  naked singularity - no horizon" : "";
+
+  $("rp").textContent = k.outerHorizon.toFixed(4) + " M";
+  $("ee").textContent = k.ergoEquator.toFixed(4) + " M";
+  $("pp").textContent = k.photonPrograde.toFixed(4) + " M";
+  $("pr").textContent = k.photonRetrograde.toFixed(4) + " M";
+  $("bp").textContent = k.bPrograde.toFixed(4) + " M";
+  $("br").textContent = k.bRetrograde.toFixed(4) + " M";
+  $("asym").textContent = (k.shadowAsymmetry * 100).toFixed(1) + " %";
+  $("isco").textContent = k.iscoPrograde.toFixed(3) + " / " + k.iscoRetrograde.toFixed(3) + " M";
+  $("note").innerHTML = a === 0
+    ? "At zero spin every quantity collapses onto the Schwarzschild values &mdash; horizon 2M, photon sphere 3M, shadow 3&radic;3 M &mdash; which is exactly what the gate checks against the non-rotating module."
+    : `The ergosphere sits at exactly 2M on the equator for <em>any</em> spin, and touches the horizon at the poles.
+       Prograde light orbits at ${k.photonPrograde.toFixed(2)}M, retrograde at ${k.photonRetrograde.toFixed(2)}M &mdash;
+       that gap is frame dragging expressed as geometry.`;
+
+  const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, S = H / 18;    // pixels per M
+
+  // shadow silhouette: offset circle, flattened on the prograde side
+  ctx.fillStyle = "rgba(159,184,232,0.10)"; ctx.strokeStyle = "#9fb8e8"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 240; i++) {
+    const t = i / 240 * Math.PI * 2;
+    // interpolate the edge radius between prograde (left) and retrograde (right)
+    const w = (Math.cos(t) + 1) / 2;                       // 1 at +x (retrograde side)
+    const r = (k.bPrograde * (1 - w) + k.bRetrograde * w) * S;
+    const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ergosphere: r_E(theta), oblate
+  ctx.fillStyle = "rgba(42,58,74,0.55)"; ctx.strokeStyle = "#3d5568"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= 240; i++) {
+    const t = i / 240 * Math.PI * 2;
+    const r = ergosphere(M, a, t) * S;
+    const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // photon orbits
+  const ring = (r, col, dash) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.arc(cx, cy, r * S, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  };
+  ring(k.photonRetrograde, "#e89f9f", [5, 4]);
+  ring(k.photonPrograde, "#7fd0a4", [5, 4]);
+
+  // horizon
+  if (!nak) {
+    ctx.fillStyle = "#000"; ctx.strokeStyle = "#4a5a66"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, k.outerHorizon * S, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+
+  // spin arrow
+  ctx.strokeStyle = "#6f7f8a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, 1.1 * S, -0.9, 0.9); ctx.stroke();
+  ctx.fillStyle = "#6f7f8a"; ctx.font = "11px monospace";
+  ctx.fillText("spin", cx + 1.4 * S, cy - 1.3 * S);
+  ctx.fillText("prograde", cx - k.bPrograde * S - 4, cy - 6);
+  ctx.textAlign = "right"; ctx.fillText("retrograde", cx + k.bRetrograde * S + 2, cy - 6); ctx.textAlign = "left";
+}
+
+$("a").oninput = draw;
+// v2880 -- backing-store resize via the shared helper (see ui/fitCanvas.js): sharper on HiDPI than a
+// stretched fixed buffer, and it stops that module being a proven-but-unused orphan.
+fitPlot(document.getElementById("cv"), () => draw(), { maxWidth: 1100 });
+
+</script>
+</body>
+</html>

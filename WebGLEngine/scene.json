@@ -1,0 +1,150 @@
+{
+    "meta": {
+        "seed": 1337,
+        "tickRate": 60,
+        "source": "default-fallback (post v2.15 \u2014 two enemies + one prop use mesh_0)",
+        "note": "Replace this file with output from VBA ECS_Exporter (writes to C:\\downloads\\WebGL\\scene.json by default)."
+    },
+    "entities": [
+        {
+            "id": 1,
+            "tag": "player",
+            "components": {
+                "transform": {
+                    "x": 6,
+                    "y": 30,
+                    "z": 6,
+                    "yaw": 0
+                },
+                "velocity": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "camera": {
+                    "pitch": 0
+                }
+            }
+        },
+        {
+            "id": 100,
+            "tag": "enemy",
+            "components": {
+                "transform": {
+                    "x": 10,
+                    "y": 25,
+                    "z": 8
+                },
+                "velocity": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "enemy": {
+                    "health": 5,
+                    "state": "idle"
+                },
+                "ai": {
+                    "type": "wander"
+                },
+                "render": {
+                    "type": "mesh",
+                    "assetId": "mesh_0"
+                }
+            }
+        },
+        {
+            "id": 101,
+            "tag": "enemy",
+            "components": {
+                "transform": {
+                    "x": -4,
+                    "y": 25,
+                    "z": 12
+                },
+                "velocity": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "enemy": {
+                    "health": 5,
+                    "state": "idle"
+                },
+                "ai": {
+                    "type": "wander"
+                },
+                "render": {
+                    "type": "mesh",
+                    "assetId": "mesh_0"
+                }
+            }
+        },
+        {
+            "id": 102,
+            "tag": "enemy",
+            "components": {
+                "transform": {
+                    "x": 14,
+                    "y": 25,
+                    "z": -6
+                },
+                "velocity": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "enemy": {
+                    "health": 5,
+                    "state": "idle"
+                },
+                "ai": {
+                    "type": "wander"
+                }
+            }
+        },
+        {
+            "id": 200,
+            "tag": "prop",
+            "components": {
+                "transform": {
+                    "x": 0,
+                    "y": 25,
+                    "z": -10
+                },
+                "render": {
+                    "type": "mesh",
+                    "assetId": "mesh_0"
+                }
+            }
+        },
+        {
+            "id": 201,
+            "tag": "prop",
+            "components": {
+                "transform": {
+                    "x": 4,
+                    "y": 25,
+                    "z": -10
+                },
+                "render": {
+                    "type": "mesh"
+                }
+            }
+        },
+        {
+            "id": 202,
+            "tag": "prop",
+            "components": {
+                "transform": {
+                    "x": 8,
+                    "y": 25,
+                    "z": -10
+                },
+                "render": {
+                    "type": "mesh"
+                }
+            }
+        }
+    ]
+}

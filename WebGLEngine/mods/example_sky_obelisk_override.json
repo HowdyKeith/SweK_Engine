@@ -1,0 +1,5 @@
+{
+    "type": "asset_override",
+    "default": "kaiju_sky",
+    "asset": "obelisk"
+}

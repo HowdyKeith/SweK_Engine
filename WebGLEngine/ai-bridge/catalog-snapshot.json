@@ -1,0 +1,732 @@
+{
+  "schemaVersion": 1,
+  "kind": "swek-catalog-snapshot",
+  "producedBy": "cli/catalogSnapshot",
+  "producedAt": "2026-08-22T00:40:48.888Z",
+  "inputs": {
+    "catalog": "/home/user/SweK_Engine/WebGLEngine/ai-bridge/install_catalog.json"
+  },
+  "observations": [
+    {
+      "id": "chrome-devtools-mcp",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "journey-forge-local",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "gltfpack",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "alt-sendme",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "ollama",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "comfyui",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "bridge",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-manager",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-trellis2",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-essentials",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-layerdiffuse",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-gguf",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-trimesh",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-pymeshlab",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-meshlib",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-imageio",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-nvdiffrast",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-kiui",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-openclip",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-fake-triton",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-flowty-crm-clone",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-flowty-crm-req",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-flowty-crm-cuda",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-pyhocon",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-3d-pack",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-triposr",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-hunyuan3d",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-hitem3d",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-accelerate",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-safetensors",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-pixal3d-stack",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-mol-pipeline",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-mto-pipeline",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-wnd-pipeline",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-juggernaut",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-sdxl",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-dinov3",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-trellis-fp8",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-totalsegmentator",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-cumesh",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-ovoxel",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-nvdiffrast",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-flex-gemm-nodes",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-flex-gemm-pipeline",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-triton",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "patch-defaults",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "flag-launch",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-opencv-reset",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-opencv-force",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-ultrashape",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-ultrashape",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-cubvh",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-diso",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-trellis2-wheels",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-embed-headers",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-ollama",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-git",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-7zip",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-cuda-voxelizer",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-comfy3d-pack",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-sparc3d",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-gradio",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "sparc3d-gradio",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "kaggle-cli-classic",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "kaggle-legacy-key",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-triposplat",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-triposplat",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-triposplat",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "py-triposplat-gradio",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "node-triposplat-workflow",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "model-triposplat-flux2-vae",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "sheets-googleapis",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-bun",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-bun-uninstall",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-ffmpeg",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-mesh2motion",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "x4-http-mod",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "x4-external-app",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "x4-telemetry-push",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "x4-msapi-legacy",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-marketing",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-mattpocock",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-addyosmani",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-taste",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-newsjack",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-agent-reach",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-skillspector",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-immich",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-firecrawl",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-voicebox",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-markitdown",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-dokploy",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-apple-container",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "feed-iptv",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "app-codegraph",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-dev-browser",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "skill-humanizer",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "tool-raycast",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "raycast-llm",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "jellyfin",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "turbo-fieldfare",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "ntfy-server",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    },
+    {
+      "id": "ardy",
+      "name": null,
+      "kind": null,
+      "hasInstall": false,
+      "hasUrl": false
+    }
+  ]
+}

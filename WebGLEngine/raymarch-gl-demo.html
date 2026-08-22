@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GPU Voxel Ray Marcher (v2783)</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display: flex; gap: 16px; padding: 14px; flex-wrap: wrap; }
+  canvas { width: 640px; height: 440px; border: 1px solid #24382e; background: #000; }
+  #side { min-width: 220px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  .row { margin: 8px 0; }
+  input[type=range] { width: 170px; vertical-align: middle; }
+  .note { color: #6f8a7c; margin-top: 10px; max-width: 260px; }
+  .err { color: #e0a0a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <canvas id="c" width="640" height="440"></canvas>
+    <div class="note" id="note">GPU ray march -- fullscreen shader, DDA per pixel against a 3D-texture volume.
+      This is the shader whose logic is gated identical to the CPU oracle. Needs WebGL2.</div>
+  </div>
+  <div id="side">
+    <h1>GPU Voxel Ray Marcher</h1>
+    <div class="row">yaw <input id="yaw" type="range" min="0" max="360" value="45"></div>
+    <div class="row">pitch <input id="pitch" type="range" min="-45" max="20" value="-18"></div>
+    <div class="row">height <input id="cam" type="range" min="14" max="48" value="30"></div>
+    <div class="note" id="stats"></div>
+  </div>
+</div>
+<script type="module">
+import { VoxelRaymarchPass } from "/render/voxelRaymarchPass.js";
+
+const c = document.getElementById("c");
+const gl = c.getContext("webgl2");
+const note = document.getElementById("note");
+if (!gl) { note.innerHTML = '<span class="err">WebGL2 unavailable — check chrome://gpu / hardware acceleration.</span>'; }
+
+// --- bake a heightmap volume into a Uint8 3D texture ---
+const DX = 64, DY = 56, DZ = 64;
+function height(x, z) { return Math.floor(10 + 6 * Math.sin(x * 0.18) * Math.cos(z * 0.15) + 4 * Math.sin((x + z) * 0.09) + 3 * Math.cos(x * 0.31)); }
+function buildVolume() {
+    const vol = new Uint8Array(DX * DY * DZ);
+    const at = (x, y, z) => x + DX * (y + DY * z);   // x fastest, then y, then z  (matches texelFetch ivec3 order)
+    for (let z = 0; z < DZ; z++) for (let x = 0; x < DX; x++) {
+        const h = Math.min(DY - 1, height(x, z));
+        for (let y = 0; y < h; y++) {
+            let id;
+            if (y === h - 1) id = h > 16 ? 3 : (h < 9 ? 2 : 1);   // snow / sand / grass
+            else if (y >= h - 3) id = 4;                           // dirt
+            else id = 6;                                           // stone
+            vol[at(x, y, z)] = id;
+        }
+    }
+    for (let z = 26; z < 34; z++) for (let x = 26; x < 34; x++) for (let y = 30; y < 36; y++) vol[at(x, y, z)] = 5;  // floating block
+    return vol;
+}
+
+let pass = null;
+if (gl) {
+    pass = new VoxelRaymarchPass(gl);
+    // NOTE: the demo's volume uses x-fastest,y,z order; the shader texelFetch uses ivec3(x,y,z) which for a
+    // texImage3D(width=DX,height=DY,depth=DZ) indexes exactly x + DX*(y + DY*z) -> matches buildVolume's `at`.
+    pass.uploadVolume(buildVolume(), DX, DY, DZ);
+    if (pass.dead) note.innerHTML = '<span class="err">Shader failed to compile (see console).</span>';
+}
+
+const $ = (id) => document.getElementById(id);
+function draw() {
+    if (!gl || !pass || pass.dead) return;
+    const t0 = performance.now();
+    const yaw = $("yaw").value * Math.PI / 180, pitch = $("pitch").value * Math.PI / 180, cy = parseFloat($("cam").value);
+    const R = 60, cx0 = DX / 2, cz0 = DZ / 2;
+    const eye = [cx0 + R * Math.cos(yaw), cy, cz0 + R * Math.sin(yaw)];
+    let fwd = [cx0 - eye[0], (12 + Math.tan(pitch) * R) - eye[1], cz0 - eye[2]];
+    const fl = Math.hypot(...fwd); fwd = fwd.map(v => v / fl);
+    let right = [fwd[2], 0, -fwd[0]]; const rl = Math.hypot(...right) || 1; right = [right[0] / rl, 0, right[2] / rl];
+    const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    const tanFov = Math.tan(0.5 * 60 * Math.PI / 180);
+
+    gl.viewport(0, 0, c.width, c.height);
+    pass.render({ eye, fwd, right, up, tanFov }, c.width, c.height);
+    $("stats").textContent = (performance.now() - t0).toFixed(1) + " ms/frame  ·  " + c.width + "x" + c.height;
+}
+$("yaw").oninput = $("pitch").oninput = $("cam").oninput = draw;
+draw();
+</script>
+</body>
+</html>

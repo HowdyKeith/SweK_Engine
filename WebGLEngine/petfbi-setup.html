@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PetFBI &mdash; Setup &amp; Workbook</title>
+<style>
+  :root { --bg:#0b0f14; --panel:#11161e; --line:#1c2531; --ink:#dde6f2; --dim:#8b97a8; --accent:#2bff88; --accentbd:#1aa257; --blue:#4a7dff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:17px; } header .tag { color:var(--accent); font:11px ui-monospace,monospace; border:1px solid var(--accentbd); border-radius:5px; padding:2px 7px; }
+  .wrap { max-width:920px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:15px; }
+  .card h2 { margin:0 0 4px; font-size:15px; } .card .hint { color:var(--dim); font-size:12px; margin-bottom:11px; line-height:1.5; }
+  label { display:block; font-size:11px; color:var(--dim); margin:8px 0 3px; }
+  input, select, textarea { width:100%; padding:8px 9px; background:#0c0f14; color:var(--ink); border:1px solid #2a3340; border-radius:7px; font:13px system-ui; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--accentbd); }
+  textarea { font:12.5px ui-monospace,monospace; min-height:150px; resize:vertical; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1; min-width:120px; }
+  button { padding:8px 14px; background:#1c2733; color:var(--ink); border:1px solid #2a3a4a; border-radius:8px; cursor:pointer; font-size:13px; }
+  button.go { background:#16361f; border-color:var(--accentbd); color:#bfffd9; }
+  button.blue { background:#16243f; border-color:#33518f; color:#cfe0ff; }
+  button:hover { filter:brightness(1.15); } button:disabled { opacity:.5; cursor:default; }
+  .msg { font-size:11.5px; color:var(--dim); margin-top:6px; min-height:14px; }
+  .pill { display:inline-block; font:11px ui-monospace,monospace; background:#0c0f14; border:1px solid var(--line); border-radius:5px; padding:2px 6px; margin:2px 4px 2px 0; color:#9fb0c8; cursor:pointer; }
+  .pill:hover { border-color:var(--accentbd); color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:8px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:600; font-size:11px; }
+  td .del { color:#ff8a8a; cursor:pointer; font-size:11px; }
+  pre.preview { background:#06140b; border:1px solid var(--accentbd); border-radius:8px; padding:11px; color:#bfffd9; font:12.5px/1.5 ui-monospace,monospace; white-space:pre-wrap; word-break:break-word; min-height:120px; margin:0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media(max-width:680px){ .grid2{ grid-template-columns:1fr; } }
+  code { background:#0c0f14; padding:1px 5px; border-radius:4px; color:#9fe8c0; font-size:12px; }
+  a { color:var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <h1>PetFBI</h1><span class="tag">Setup &amp; Workbook</span>
+  <span id="wbStat" style="margin-left:auto;font:11px ui-monospace,monospace;color:var(--dim);"></span>
+</header>
+<div class="wrap">
+
+  <!-- Workbook location -->
+  <div class="card">
+    <h2>Workbook</h2>
+    <div class="hint">All routing lives in one <code>.xlsx</code>: a <code>&lt;STATE&gt; Pages</code> sheet per state, an <code>Admins</code> sheet, and a <code>Templates</code> sheet. Set where it lives, then create it.</div>
+    <div class="row">
+      <div style="flex:3;"><label>Workbook path (.xlsx)</label><input id="wbPath" placeholder="C:\VoxelBAK\petfbi-workbook.xlsx" /></div>
+      <button id="wbBrowse" class="blue">Browse&hellip;</button>
+      <button id="wbSavePath">Save path</button>
+      <button id="wbCreate" class="go">Create / repair</button>
+    </div>
+    <div class="msg" id="wbMsg"></div>
+  </div>
+
+  <!-- Setup wizard: pages -->
+  <div class="card">
+    <h2>Add a Facebook page</h2>
+    <div class="hint">Each page you post to needs its <b>state</b>, <b>page name</b>, and (ideally) its numeric <b>page ID</b>. Facebook doesn't expose the ID without logging in &mdash; find it on the page: <b>About &rarr; Page transparency &rarr; Page ID</b>, or via <a href="https://lookup-id.com/" target="_blank" rel="noopener">lookup-id.com</a> / <a href="https://findmyfbid.com/" target="_blank" rel="noopener">findmyfbid.com</a>. You can add the page without the ID and fill it in later.</div>
+    <div class="row">
+      <div style="max-width:110px;"><label>State</label><input id="pgState" placeholder="TX" maxlength="3" /></div>
+      <div style="flex:3;"><label>FB page name</label><input id="pgName" placeholder="Corpus Christi Lost &amp; Found Pets" /></div>
+    </div>
+    <div class="row">
+      <div><label>Page ID (numeric, optional)</label><input id="pgId" placeholder="123456789012345" /></div>
+      <button id="pgLookup" class="blue">Look up</button>
+      <div><label>Town (optional)</label><input id="pgTown" placeholder="Corpus Christi" /></div>
+      <div style="max-width:150px;"><label>Kind</label><select id="pgKind"><option value="statewide">statewide</option><option value="town">town</option><option value="species">species</option></select></div>
+      <button id="pgAdd" class="go">Add page</button>
+    </div>
+    <div class="msg" id="pgMsg"></div>
+    <div class="row" style="margin-top:6px;"><div style="max-width:160px;"><label>Show pages for state</label><input id="pgFilter" placeholder="(all)" maxlength="3" /></div><button id="pgRefresh">Refresh</button></div>
+    <div id="pgList"></div>
+  </div>
+
+  <!-- Admins -->
+  <div class="card">
+    <h2>Admins</h2>
+    <div class="hint">People who get emailed the assembled report for their towns. Towns is a comma-separated list (blank = all in the state).</div>
+    <div class="row">
+      <div><label>Name</label><input id="adName" placeholder="Jane Doe" /></div>
+      <div style="flex:2;"><label>Email</label><input id="adEmail" placeholder="jane@example.com" /></div>
+    </div>
+    <div class="row">
+      <div style="flex:2;"><label>Towns (comma-separated, optional)</label><input id="adTowns" placeholder="Corpus Christi, Portland" /></div>
+      <div style="max-width:110px;"><label>State</label><input id="adState" placeholder="TX" maxlength="3" /></div>
+      <button id="adAdd" class="go">Add admin</button>
+    </div>
+    <div class="msg" id="adMsg"></div>
+    <div id="adList"></div>
+  </div>
+
+  <!-- Template editor -->
+  <div class="card">
+    <h2>Template editor</h2>
+    <div class="hint">Post body per <b>status &times; type</b>. Placeholders in <code>[BRACKETS]</code> are filled from the parsed report; unfilled ones are dropped. The preview on the right mirrors the engine using sample values.</div>
+    <div class="row" style="align-items:flex-end;">
+      <div style="max-width:150px;"><label>Status</label><select id="tStatus"></select></div>
+      <div style="max-width:150px;"><label>Type</label><select id="tType"></select></div>
+      <button id="tReload">Reload</button>
+      <button id="tSave" class="go" style="margin-left:auto;">Save templates</button>
+    </div>
+    <div style="margin:9px 0 4px;">
+      <span style="font-size:11px;color:var(--dim);">Insert:</span>
+      <span id="tChips"></span>
+    </div>
+    <div class="grid2">
+      <div><label>Template</label><textarea id="tBody" spellcheck="false"></textarea></div>
+      <div><label>Live preview (sample values)</label><pre class="preview" id="tPrev"></pre></div>
+    </div>
+    <div class="msg" id="tMsg"></div>
+  </div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const jget = (u) => fetch(u, { cache: "no-store" }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+const jpost = (u, b) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+
+// ---------- workbook status / path ----------
+async function refreshStatus() {
+  const s = await jget("/petfbi/wb/status");
+  if (s && s.ok && s.exists) $("wbStat").textContent = (s.pages || 0) + " pages \u00b7 " + (s.admins || 0) + " admins \u00b7 " + (s.states || []).join(", ");
+  else $("wbStat").textContent = "no workbook yet";
+}
+(async () => { const i = await jget("/petfbi/wb/info"); if (i && i.path) $("wbPath").value = i.path; refreshStatus(); loadPages(); loadAdmins(); loadTemplates(); })();
+
+$("wbSavePath").onclick = async () => { $("wbMsg").textContent = "saving\u2026"; const j = await jpost("/petfbi/wb/path", { path: $("wbPath").value.trim() }); $("wbMsg").textContent = j && j.ok ? ("\u2713 path set: " + j.path) : ("\u2717 " + ((j && j.error) || "failed")); };
+$("wbCreate").onclick = async () => { $("wbMsg").textContent = "creating\u2026"; const j = await jpost("/petfbi/wb/init", { state: $("pgState").value.trim() }); if (j && j.ok) { $("wbMsg").textContent = "\u2713 workbook ready: " + (j.sheets || []).join(", "); refreshStatus(); loadTemplates(); } else $("wbMsg").textContent = "\u2717 " + ((j && j.error) || "failed"); };
+$("wbBrowse").onclick = async () => { const p = await pickServerPath({ mode: "folder", title: "Pick a folder for the workbook" }); if (p) { const sep = p.indexOf("\\") >= 0 ? "\\" : "/"; $("wbPath").value = p.replace(/[\\\/]$/, "") + sep + "petfbi-workbook.xlsx"; } };
+
+// ---------- pages ----------
+$("pgAdd").onclick = async () => {
+  const state = $("pgState").value.trim(), fbPage = $("pgName").value.trim();
+  if (!state || !fbPage) { $("pgMsg").textContent = "state and page name are required"; return; }
+  $("pgMsg").textContent = "adding\u2026";
+  const j = await jpost("/petfbi/wb/add-page", { state, fbPage, pageId: $("pgId").value.trim(), town: $("pgTown").value.trim(), kind: $("pgKind").value });
+  if (j && j.ok) { $("pgMsg").textContent = "\u2713 added " + fbPage; $("pgName").value = $("pgId").value = $("pgTown").value = ""; refreshStatus(); loadPages(); } else $("pgMsg").textContent = "\u2717 " + ((j && j.error) || "failed");
+};
+$("pgRefresh").onclick = loadPages;
+$("pgLookup").onclick = async () => {
+  const name = $("pgName").value.trim() || $("pgId").value.trim();
+  if (!name) { $("pgMsg").textContent = "enter the page name (or its facebook.com URL) first"; return; }
+  $("pgMsg").textContent = "looking up the page ID\u2026";
+  const j = await jget("/petfbi/wb/lookup-id?name=" + encodeURIComponent(name));
+  if (j && j.ok && j.pageId) { $("pgId").value = j.pageId; $("pgMsg").textContent = "\u2713 found page ID " + j.pageId; }
+  else $("pgMsg").textContent = "\u2717 " + ((j && j.error) || "not found") + " (find it via About \u2192 Page transparency, or lookup-id.com)";
+};
+async function loadPages() {
+  const st = $("pgFilter").value.trim();
+  const j = await jget("/petfbi/wb/pages" + (st ? ("?state=" + encodeURIComponent(st)) : ""));
+  const host = $("pgList"); host.innerHTML = "";
+  if (!j || !j.ok) { host.innerHTML = "<div class='msg'>" + ((j && j.error) || "error") + "</div>"; return; }
+  if (!j.pages.length) { host.innerHTML = "<div class='msg'>no pages yet</div>"; return; }
+  let h = "<table><tr><th>State</th><th>FB page</th><th>Page ID</th><th>Town</th><th>Kind</th><th></th></tr>";
+  j.pages.forEach(p => { h += "<tr><td>" + esc(p.state) + "</td><td>" + esc(p.fbPage) + "</td><td>" + esc(p.pageId || "&mdash;") + "</td><td>" + esc(p.town || "") + "</td><td>" + esc(p.kind || "") + "</td><td><span class='del' data-sheet='" + esc(p._sheet) + "' data-row='" + p._row + "'>remove</span></td></tr>"; });
+  h += "</table>"; host.innerHTML = h;
+  host.querySelectorAll(".del").forEach(el => el.onclick = async () => { if (!confirm("Remove this page?")) return; await jpost("/petfbi/wb/del-row", { sheet: el.dataset.sheet, row: el.dataset.row }); refreshStatus(); loadPages(); });
+}
+
+// ---------- admins ----------
+$("adAdd").onclick = async () => {
+  const name = $("adName").value.trim(), email = $("adEmail").value.trim();
+  if (!name || !email) { $("adMsg").textContent = "name and email are required"; return; }
+  $("adMsg").textContent = "adding\u2026";
+  const j = await jpost("/petfbi/wb/add-admin", { name, email, towns: $("adTowns").value.trim(), state: $("adState").value.trim() });
+  if (j && j.ok) { $("adMsg").textContent = "\u2713 added " + name; $("adName").value = $("adEmail").value = $("adTowns").value = ""; refreshStatus(); loadAdmins(); } else $("adMsg").textContent = "\u2717 " + ((j && j.error) || "failed");
+};
+async function loadAdmins() {
+  const j = await jget("/petfbi/wb/admins"); const host = $("adList"); host.innerHTML = "";
+  if (!j || !j.ok) { host.innerHTML = "<div class='msg'>" + ((j && j.error) || "error") + "</div>"; return; }
+  if (!j.admins.length) { host.innerHTML = "<div class='msg'>no admins yet</div>"; return; }
+  let h = "<table><tr><th>Name</th><th>Email</th><th>Towns</th><th>State</th><th></th></tr>";
+  j.admins.forEach(a => { h += "<tr><td>" + esc(a.Name) + "</td><td>" + esc(a.Email) + "</td><td>" + esc(a.Towns || "") + "</td><td>" + esc(a.State || "") + "</td><td><span class='del' data-row='" + a._row + "'>remove</span></td></tr>"; });
+  h += "</table>"; host.innerHTML = h;
+  host.querySelectorAll(".del").forEach(el => el.onclick = async () => { if (!confirm("Remove this admin?")) return; await jpost("/petfbi/wb/del-row", { sheet: "Admins", row: el.dataset.row }); refreshStatus(); loadAdmins(); });
+}
+
+// ---------- templates ----------
+let TEMPLATES = {};
+const PLACEHOLDERS = ["TOWN", "STATE", "COLOR", "STREET", "DATE", "BREED", "AGE", "COLLAR", "DESCRIPTION", "EMAIL", "PETIDNUM", "NAME", "ZIP", "GENDER-HE/SHE", "GENDER-HER/HIS"];
+const SAMPLE = { TOWN: "Corpus Christi", STATE: "TX", COLOR: "brown", STREET: "Brett St", DATE: "Jan 5", BREED: "German Shepherd", AGE: "3 yrs", COLLAR: "blue, no tags", DESCRIPTION: "Friendly, microchipped, answers to Rex.", EMAIL: "finder@example.com", PETIDNUM: "123456", NAME: "Rex", ZIP: "78411", GENDER: "male" };
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function expand(tpl, f) { let s = tpl || ""; const g = (f.GENDER || "").toLowerCase(); const heshe = g[0] === "f" ? "She" : (g[0] === "m" ? "He" : "They"); const herhis = g[0] === "f" ? "Her" : (g[0] === "m" ? "His" : "Their"); for (const k in f) { if (k === "GENDER") continue; s = s.split("[" + k + "]").join(f[k] || ""); } s = s.split("[GENDER-HE/SHE]").join(heshe).split("[GENDER-HER/HIS]").join(herhis); s = s.replace(/\[[A-Z0-9_\/-]+\]/g, ""); s = s.replace(/[ \t]+\n/g, "\n").trim(); return s; }
+function curKey() { return { st: $("tStatus").value, ty: $("tType").value }; }
+function fillTypeOptions() { const st = $("tStatus").value; const tsel = $("tType"); const cur = tsel.value; tsel.innerHTML = ""; Object.keys((TEMPLATES[st]) || {}).forEach(ty => { const o = document.createElement("option"); o.value = ty; o.textContent = ty; tsel.appendChild(o); }); if ([...tsel.options].some(o => o.value === cur)) tsel.value = cur; }
+function showTemplate() { const { st, ty } = curKey(); $("tBody").value = ((TEMPLATES[st] || {})[ty]) || ""; preview(); }
+function preview() { $("tPrev").textContent = expand($("tBody").value, SAMPLE); }
+async function loadTemplates() {
+  const j = await jget("/petfbi/wb/templates"); if (!j || !j.ok) { $("tMsg").textContent = (j && j.error) || "template load failed"; return; }
+  TEMPLATES = j.templates || {};
+  const ssel = $("tStatus"); ssel.innerHTML = ""; Object.keys(TEMPLATES).forEach(st => { const o = document.createElement("option"); o.value = st; o.textContent = st; ssel.appendChild(o); });
+  fillTypeOptions(); showTemplate();
+  $("tChips").innerHTML = ""; PLACEHOLDERS.forEach(p => { const s = document.createElement("span"); s.className = "pill"; s.textContent = "[" + p + "]"; s.onclick = () => insertAtCursor("[" + p + "]"); $("tChips").appendChild(s); });
+}
+function insertAtCursor(text) { const ta = $("tBody"); const a = ta.selectionStart || 0, b = ta.selectionEnd || 0; ta.value = ta.value.slice(0, a) + text + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + text.length; ta.focus(); syncCur(); preview(); }
+function syncCur() { const { st, ty } = curKey(); if (!TEMPLATES[st]) TEMPLATES[st] = {}; TEMPLATES[st][ty] = $("tBody").value; }
+$("tStatus").onchange = () => { fillTypeOptions(); showTemplate(); };
+$("tType").onchange = showTemplate;
+$("tReload").onclick = loadTemplates;
+$("tBody").addEventListener("input", () => { syncCur(); preview(); });
+$("tSave").onclick = async () => { syncCur(); $("tMsg").textContent = "saving\u2026"; const j = await jpost("/petfbi/wb/templates", { templates: TEMPLATES }); $("tMsg").textContent = j && j.ok ? ("\u2713 saved " + j.count + " template(s) to the workbook") : ("\u2717 " + ((j && j.error) || "failed")); refreshStatus(); };
+
+// ---------- compact server folder picker (phone-friendly) ----------
+function pickServerPath(opts) {
+  opts = opts || {}; const mode = opts.mode || "folder";
+  return new Promise((resolve) => {
+    const ov = document.createElement("div"); ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:14px;";
+    const box = document.createElement("div"); box.style.cssText = "background:#11161e;border:1px solid #2a3340;border-radius:12px;width:min(540px,96vw);max-height:84vh;display:flex;flex-direction:column;overflow:hidden;color:#dde6f2;font:13px ui-monospace,monospace;";
+    const head = document.createElement("div"); head.style.cssText = "padding:11px 13px;border-bottom:1px solid #1c2531;font-weight:bold;"; head.textContent = opts.title || "Select a folder";
+    const cur = document.createElement("div"); cur.style.cssText = "padding:7px 13px;font-size:11px;color:#9fb0c8;background:#0c0f14;word-break:break-all;border-bottom:1px solid #1c2531;";
+    const list = document.createElement("div"); list.style.cssText = "flex:1;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:2px;min-height:180px;";
+    const foot = document.createElement("div"); foot.style.cssText = "padding:9px 13px;border-top:1px solid #1c2531;display:flex;gap:8px;justify-content:flex-end;";
+    const mk = (t, p) => { const b = document.createElement("button"); b.textContent = t; b.style.cssText = "padding:8px 13px;border-radius:7px;cursor:pointer;font:12px ui-monospace,monospace;" + (p ? "background:#16361f;color:#bfffd9;border:1px solid #1aa257;" : "background:#1c2733;color:#dde6f2;border:1px solid #2a3a4a;"); return b; };
+    const cancel = mk("Cancel", false), choose = mk(mode === "file" ? "Select file" : "Use this folder", true);
+    foot.append(cancel, choose); box.append(head, cur, list, foot); ov.appendChild(box); document.body.appendChild(ov);
+    let here = opts.start || "";
+    const close = (v) => { try { document.body.removeChild(ov); } catch (e) {} resolve(v); };
+    cancel.onclick = () => close(null); choose.onclick = () => close(here || null); ov.onclick = (e) => { if (e.target === ov) close(null); };
+    const row = (label, icon, onClick) => { const r = document.createElement("div"); r.style.cssText = "display:flex;gap:8px;align-items:center;padding:9px;border-radius:6px;cursor:pointer;"; r.onmouseenter = () => r.style.background = "#1a212c"; r.onmouseleave = () => r.style.background = ""; const i = document.createElement("span"); i.textContent = icon; const t = document.createElement("span"); t.textContent = label; t.style.wordBreak = "break-all"; r.append(i, t); r.onclick = onClick; return r; };
+    async function roots() { here = ""; cur.textContent = "Drives / start"; list.innerHTML = ""; choose.style.display = "none"; const j = await fetch("/fs/roots").then(r => r.json()).catch(() => null); if (!j || !j.ok) { list.appendChild(row("can't read drives (sign in if remote)", "\u26A0", () => {})); return; } if (j.home) list.appendChild(row("Home  " + j.home, "\uD83C\uDFE0", () => browse(j.home))); if (j.engine) list.appendChild(row("Engine folder", "\u2699", () => browse(j.engine))); (j.roots || []).forEach(d => list.appendChild(row(d, "\uD83D\uDCBD", () => browse(d)))); }
+    async function browse(dir) { choose.style.display = ""; const j = await fetch("/fs/list?path=" + encodeURIComponent(dir)).then(r => r.json()).catch(() => null); if (!j || !j.ok) { cur.textContent = dir + " \u2014 " + ((j && j.error) || "unreadable"); return; } here = j.path; cur.textContent = j.path; list.innerHTML = ""; list.appendChild(row(".. up", "\u2B06", () => { if (j.parent) browse(j.parent); else roots(); })); (j.folders || []).forEach(f => list.appendChild(row(f.name, "\uD83D\uDCC1", () => browse(f.path)))); if (mode === "file") (j.files || []).forEach(f => list.appendChild(row(f.name, "\uD83D\uDCC4", () => close(f.path)))); }
+    if (here) browse(here); else roots();
+  });
+}
+</script>
+</body>
+</html>

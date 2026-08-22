@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK — Ising kernel bench (Philox, zero tolerance)</title>
+<meta name="demo:desc" content="The third fleet kernel and the first with ZERO-tolerance adjudication: checkerboard Metropolis driven by counter-based Philox4x32-10, integer arithmetic end to end. The device runs hundreds of sweeps; the CPU mirror recomputes every spin and a single differing bit anywhere is a rejection. Magnetisation is overlaid on Yang's exact curve so the physics is visible while the bits are graded.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:860px; margin:0 auto; padding:18px; line-height:1.6; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .good { color:#9be15d; } .bad { color:#ff9a9a; } .dim { color:#7f96b8; }
+  table { border-collapse:collapse; margin-top:8px; } td,th { border:1px solid #22304a; padding:4px 10px; text-align:right; }
+  pre { background:#0a0e18; border:1px solid #17202f; border-radius:6px; padding:10px; overflow:auto; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">Ising checkerboard — fleet kernel bench</h2>
+  <div class="dim">64×64 lattice, 400 sweeps at T=2.0. Philox is counter-based — key (seed, sweep, parity), counter = site — so any thread order gives the same bits, and the CPU mirror must match EVERY SPIN. Tolerance is zero; there is no floor to argue about because there is no floating point in the kernel. The gate (tools/roundhouse/isingGpu-selfcheck.mjs) pins the Random123 vectors and Yang's curve headlessly; this page is where a real device earns its verdict.</div>
+  <p><button id="run">Run bench</button> <button id="submit" disabled>Submit measurement to fleet ledger</button></p>
+  <div id="out">idle</div>
+  <pre id="json" style="display:none;"></pre>
+</div>
+<script type="module">
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { WGSL_ISING, acceptThresholds, makeLattice, mirrorSweep, adjudicateSpins } from "./tools/roundhouse/isingGpu.mjs";
+import { yangMagnetisation } from "./physics/statmech/ising.js";
+
+const out = document.getElementById("out"), jsonEl = document.getElementById("json");
+let report = null;
+const L = 64, T = 2.0, SWEEPS = 400, SEED = 2026;
+
+document.getElementById("run").onclick = async () => {
+  // v3845 -- same fix as hmc-bench: a LAN origin is not a missing GPU, and telling a reader to find another
+  // machine is the most expensive possible wrong answer.
+  {
+    const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    if (!p.available) {
+      out.innerHTML = "<span class='bad'>" + (p.reason === "insecure-origin" ? p.message
+        : "WebGPU unavailable — rig instrument; run on a machine with a GPU.") + "</span>";
+      return;
+    }
+  }
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+  if (!adapter) { out.innerHTML = "<span class='bad'>no adapter</span>"; return; }
+  const device = await adapter.requestDevice();
+  const info = adapter.info || {};
+  out.textContent = "building pipeline…";
+  const th = acceptThresholds(T);
+  const spins0 = makeLattice(L, SEED);
+  const mod = device.createShaderModule({ code: WGSL_ISING });
+  const pipe = device.createComputePipeline({ layout: "auto", compute: { module: mod, entryPoint: "main" } });
+  const bSpin = device.createBuffer({ size: L * L * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+  device.queue.writeBuffer(bSpin, 0, new Int32Array(spins0));
+  const bTh = device.createBuffer({ size: 5 * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(bTh, 0, th);
+  const uni = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: uni } }, { binding: 1, resource: { buffer: bSpin } }, { binding: 2, resource: { buffer: bTh } } ] });
+  out.textContent = "dispatching " + SWEEPS + " sweeps (two parity passes each)…";
+  const t0 = performance.now();
+  for (let sw = 0; sw < SWEEPS; sw++) {
+    for (let parity = 0; parity < 2; parity++) {
+      device.queue.writeBuffer(uni, 0, new Uint32Array([L, sw, parity, SEED]));
+      const enc = device.createCommandEncoder();
+      const pass = enc.beginComputePass();
+      pass.setPipeline(pipe); pass.setBindGroup(0, bg);
+      pass.dispatchWorkgroups(Math.ceil((L * L / 2) / 64));
+      pass.end();
+      device.queue.submit([enc.finish()]);
+    }
+  }
+  const stage = device.createBuffer({ size: L * L * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const enc = device.createCommandEncoder();
+  enc.copyBufferToBuffer(bSpin, 0, stage, 0, L * L * 4);
+  device.queue.submit([enc.finish()]);
+  await stage.mapAsync(GPUMapMode.READ);
+  const gpuSpins = new Int32Array(stage.getMappedRange().slice(0)); stage.unmap();
+  const ms = performance.now() - t0;
+  out.textContent = "mirroring " + SWEEPS + " sweeps on the CPU (every spin, zero tolerance)…";
+  await new Promise((r) => setTimeout(r, 10));
+  const mirror = makeLattice(L, SEED);
+  for (let sw = 0; sw < SWEEPS; sw++) mirrorSweep(mirror, L, sw, SEED, th);
+  const v = adjudicateSpins(gpuSpins, mirror);
+  let M = 0; for (let i = 0; i < L * L; i++) M += gpuSpins[i];
+  const absM = Math.abs(M) / (L * L), yang = yangMagnetisation(T);
+  const verdict = v.pass ? "<b class='good'>ACCEPTED — bit-exact</b>" : "<b class='bad'>REJECTED</b>";
+  out.innerHTML = "adapter: " + (info.vendor || "?") + " / " + (info.architecture || "?") +
+    "<table><tr><th>sweeps</th><th>ms</th><th>spins differing (tol 0)</th><th>|m| final</th><th>Yang m(T)</th><th>verdict (CPU's)</th></tr>" +
+    "<tr><td>" + SWEEPS + "</td><td>" + ms.toFixed(0) + "</td><td>" + v.diff + "/" + v.n + "</td><td>" + absM.toFixed(4) + "</td><td>" + yang.toFixed(4) + "</td><td>" + verdict + "</td></tr></table>";
+  report = { kind: "swek-ising-bench", version: 3283, at: new Date().toISOString(),
+    adapter: { vendor: info.vendor || null, architecture: info.architecture || null },
+    L, T, sweeps: SWEEPS, seed: SEED, ms: Math.round(ms), spinsDiffer: v.diff, absM, tol: 0 };
+  jsonEl.textContent = JSON.stringify(report, null, 2); jsonEl.style.display = "block";
+  document.getElementById("submit").disabled = false;
+};
+document.getElementById("submit").onclick = async () => {
+  try {
+    const r = await fetch("/android/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(report) });
+    const j = await r.json();
+    out.innerHTML += "<div>" + (j.ok ? "<span class='good'>submitted — the hub re-grades from these numbers</span>" : "<span class='bad'>submit failed: " + (j.error || r.status) + "</span>") + "</div>";
+  } catch (e) { out.innerHTML += "<div class='bad'>submit failed: " + e.message + "</div>"; }
+};
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

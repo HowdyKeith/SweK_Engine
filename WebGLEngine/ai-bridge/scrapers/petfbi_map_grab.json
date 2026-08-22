@@ -1,0 +1,1 @@
+{"task":"Find the Google Maps image on a page (network capture + DOM scan) and return its URL.","params":[{"name":"--url","required":true,"desc":"page URL containing the map"},{"name":"--timeout","required":false,"desc":"ms (default 45000)"}]}

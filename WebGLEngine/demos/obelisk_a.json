@@ -1,0 +1,5 @@
+{
+    "name": "Memory Obelisk A",
+    "description": "Camera framed on the cyan memory obelisk near (12, _, 8).",
+    "camera": { "x": 30, "y": 45, "z": 25, "yaw": -0.7, "pitch": -0.35 }
+}

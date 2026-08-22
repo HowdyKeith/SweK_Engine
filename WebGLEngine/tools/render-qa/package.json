@@ -1,0 +1,19 @@
+{
+  "name": "swek-render-qa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless render QA for SweK pages: boot each page in headless Chromium, screenshot the canvas, assert pixel invariants (not-black, not-uniform, color/region present), and diff against baselines. Runs on your box (Galaxina ideal); the sandbox has no GPU/browser.",
+  "bin": { "swek-render-qa": "render-qa.mjs" },
+  "scripts": {
+    "postinstall": "playwright install chromium",
+    "qa": "node render-qa.mjs",
+    "baseline": "node render-qa.mjs --update-baselines"
+  },
+  "dependencies": {
+    "playwright": "^1.61.1",
+    "pngjs": "^7.0.0",
+    "pixelmatch": "^7.2.0"
+  },
+  "engines": { "node": ">=18" }
+}

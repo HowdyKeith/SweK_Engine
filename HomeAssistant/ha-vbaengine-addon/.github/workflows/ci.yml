@@ -1,0 +1,40 @@
+name: Add-on CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint add-on config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Home Assistant add-on linter
+        uses: frenck/action-addon-linter@v2.16
+        with:
+          path: "./vbaengine_panel"
+
+  build:
+    name: Sanity build image (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Confirms the Dockerfile + server.js build into a runnable image.
+      # Uses the node base directly (BUILD_FROM default) — not a multi-arch
+      # supervisor build, just a "does it build" gate.
+      - name: docker build
+        run: docker build -t vbaengine-panel:ci ./vbaengine_panel
+
+      - name: smoke test (server starts + serves /)
+        run: |
+          docker run -d --name panel -e INGRESS_PORT=8099 -p 8099:8099 vbaengine-panel:ci
+          for i in $(seq 1 10); do
+            if curl -fsS http://localhost:8099/ >/dev/null 2>&1; then echo "served OK"; ok=1; break; fi
+            sleep 1
+          done
+          docker logs panel || true
+          docker rm -f panel >/dev/null 2>&1 || true
+          test "$ok" = "1"

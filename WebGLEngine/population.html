@@ -1,0 +1,222 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SweK · population field planner</title>
+<style>
+body{background:#0a0f0d;color:#cfe;font:13px/1.5 system-ui,sans-serif;margin:0;padding:18px}
+h1{font-size:16px;margin:0 0 4px} .sub{color:#8b97a8;font-size:12px;margin-bottom:14px;max-width:70ch}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#8b97a8}
+select,input{background:#0c1410;color:#cfe;border:1px solid #2a5a3a;border-radius:6px;padding:5px 8px;font:12px system-ui}
+table{border-collapse:collapse;margin-top:6px} td,th{padding:4px 12px 4px 0;text-align:left;font-size:12px}
+th{color:#8b97a8;font-weight:400} .big{font-size:15px;color:#9fe6b0} .warn{color:#fc6} .bad{color:#f88}
+#grid{margin-top:14px;image-rendering:pixelated;border:1px solid #2a5a3a}
+.note{color:#8b97a8;font-size:11px;max-width:78ch;margin-top:14px;border-top:1px solid #1d2a24;padding-top:10px}
+</style></head><body>
+<h1>Population field · readback planner</h1>
+<div class="sub">Population state lives in one float texture, one texel per agent slot. The question this page
+answers is the one that decides whether the design is affordable: <b>how much has to come back across the bus
+to know what should spawn</b>. Reducing to tiles on the GPU first is the difference between a multi-megabyte
+sync stall and a few kilobytes.</div>
+
+<div class="row">
+  <label>field side<select id="side"></select></label>
+  <label>tile size<select id="tile"></select></label>
+  <label>target per tile<input id="target" type="number" value="8" min="1" max="512" style="width:70px"></label>
+</div>
+
+<table id="out"></table>
+<canvas id="grid" width="256" height="256" style="width:100%;max-width:320px;height:auto"></canvas>
+
+<!-- v3120 -- THE SHADERS HAD NOWHERE TO BE COMPILED. v3119 shipped populationGPU.js with real GLSL and the
+     page was a pure planner that never made a GL context, so nothing in the project would ever have compiled
+     them: not here, not on the rig, not in render-qa. "First run on the rig is the real test" was true and
+     nobody had written down WHICH run that would be. This is it, and adding the page to the render-qa manifest
+     makes it every run. -->
+<h1 style="font-size:14px;margin:18px 0 4px">Live GPU check</h1>
+<div class="sub">Builds the real field on this machine's GPU and reports one of three outcomes. The three are
+kept apart on purpose: <b>a machine that cannot do float render targets is not a broken shader</b>, and one
+word for both would make every laptop look like a defect.</div>
+<div class="row"><button id="gpuBtn">compile &amp; run on GPU</button>
+  <!-- v3122 -- the one thing v3121 could not prove: that the GLSL and the JS reference produce the SAME
+       NUMBERS. This seeds a known field, steps ONCE on the device, reads the whole thing back, and diffs it
+       against stepReference on the same input. A full readback is what v3118 argued against PER FRAME; once,
+       to settle this, it is exactly the right tool. -->
+  <button id="verBtn">verify GPU against JS reference</button> <button id="drawBtn">draw the field</button></div>
+  <canvas id="popCanvas" width="512" height="512" style="display:block;margin-top:8px;border:1px solid #333;background:#0a0a0a;width:100%;max-width:640px;height:auto"></canvas>
+<table id="gpuOut"></table>
+<canvas id="glcv" width="8" height="8" style="display:none;width:100%;max-width:10px;height:auto"></canvas>
+<div class="note" id="limits"></div>
+
+<script type="module">
+import { fieldPlan, tilePlan, readbackCost, spawnIntents, intentsOrUnknown } from "/sim/populationField.js";
+const $ = (id) => document.getElementById(id);
+for (const s of [64,128,256,512,1024,2048]) $("side").add(new Option(s+" x "+s, s, s===1024, s===1024));
+const fmtB = (b) => b >= 1048576 ? (b/1048576).toFixed(1)+" MB" : (b/1024).toFixed(1)+" KB";
+
+function tileOpts(side){
+  const cur = +$("tile").value; $("tile").innerHTML = "";
+  for (let t = 8; t <= side; t *= 2) if (side % t === 0) $("tile").add(new Option(t+" x "+t, t, t===32, t===(cur||32)));
+}
+function render(){
+  const side = +$("side").value;
+  let f, t, c;
+  try { f = fieldPlan({ side }); t = tilePlan(f, { tile: +$("tile").value }); c = readbackCost(f, t); }
+  catch (e) { $("out").innerHTML = "<tr><td class='bad'>"+e.message+"</td></tr>"; return; }
+
+  // A worked example rather than a claim: a field with a few empty tiles, so the intents are real output.
+  const counts = new Float32Array(t.tiles).fill(+$("target").value);
+  counts[0] = 0; if (t.tiles > 9) counts[9] = Math.max(0, +$("target").value - 3);
+  const res = intentsOrUnknown("alive", counts, t, { target: +$("target").value });
+
+  $("out").innerHTML = [
+    ["agent slots", f.slots.toLocaleString()],
+    ["full readback (RGBA32F)", "<span class='warn'>"+fmtB(f.bytes)+" — and a GPU→CPU sync stall</span>"],
+    ["tiles", t.tiles.toLocaleString()+" of "+t.slotsPerTile.toLocaleString()+" slots each"],
+    ["reduced readback", "<span class='big'>"+fmtB(t.bytes)+"</span>"],
+    ["reduction", "<span class='big'>"+c.ratio.toFixed(0)+"×</span>"],
+    ["spawn intents in the worked example", res.intents.length+" tiles under target"],
+  ].map(([k,v]) => "<tr><th>"+k+"</th><td>"+v+"</td></tr>").join("");
+
+  const g = $("grid").getContext("2d"), n = t.tilesPerSide, px = 256/n;
+  g.fillStyle = "#0c1410"; g.fillRect(0,0,256,256);
+  for (let i=0;i<t.tiles;i++){
+    const x=(i%n)*px, y=Math.floor(i/n)*px;
+    const deficit = Math.max(0, +$("target").value - counts[i]) / Math.max(1,+$("target").value);
+    g.fillStyle = deficit>0 ? "rgba(255,204,102,"+(0.25+0.75*deficit)+")" : "rgba(60,110,80,0.5)";
+    g.fillRect(x+0.5,y+0.5,Math.max(1,px-1),Math.max(1,px-1));
+  }
+  $("limits").innerHTML =
+    "<b>What a tile count cannot tell you:</b> how many and roughly where — never <i>which</i>. Exact per-agent "+
+    "identity needs a prefix sum or an append buffer, a bigger structure and a separate piece of work. "+
+    "<b>And a readback that never lands reads as UNKNOWN, not as zero spawns</b> — spawning on a stalled "+
+    "pipeline invents population from nothing, while refusing to spawn gives a world that quietly stops growing "+
+    "and looks like a design choice. The GPU half (ping-pong textures, update shader, reduction pass, "+
+    "PBO+fenceSync readback) is <i>not built yet</i>; this page plans it.";
+}
+$("gpuBtn").addEventListener("click", async () => {
+  const row = (k, v, cls) => "<tr><th>"+k+"</th><td"+(cls?" class='"+cls+"'":"")+">"+v+"</td></tr>";
+  const gl = $("glcv").getContext("webgl2");
+  if (!gl) { $("gpuOut").innerHTML = row("result", "UNSUPPORTED — no WebGL2 on this browser", "warn"); return; }
+  if (!gl.getExtension("EXT_color_buffer_float")) {
+    // UNSUPPORTED IS NOT BROKEN. Naming the missing capability is what lets render-qa, and a person, tell a
+    // limited machine from a defective shader.
+    $("gpuOut").innerHTML = row("result", "UNSUPPORTED — EXT_color_buffer_float missing (cannot render to RGBA32F)", "warn");
+    return;
+  }
+  try {
+    const { createPopulationGPU } = await import("/sim/populationGPU.js");
+    const side = Math.min(256, +$("side").value);          // a CHECK, not a benchmark: small and quick
+    const pop = createPopulationGPU(gl, { side, tile: +$("tile").value <= side ? +$("tile").value : 32 });
+    const t0 = performance.now();
+    pop.step(t0);
+    // Poll briefly for the fence. NOT a spin-wait on the GPU -- a handful of animation frames, and if it has
+    // not landed we say SO rather than calling it a failure, because a slow fence is not a broken one.
+    let counts = null;
+    for (let i = 0; i < 30 && !counts; i++) { await new Promise(r => requestAnimationFrame(r)); counts = pop.poll(performance.now()); }
+    const plans = pop.plans;
+    $("gpuOut").innerHTML =
+      row("result", counts ? "<b class='big'>COMPILED AND RAN</b>" : "compiled; fence not resolved in 30 frames (health: " + pop.health() + ")", counts ? "" : "warn") +
+      row("field actually built", plans.field.side + " × " + plans.field.side + " (" + plans.field.slots.toLocaleString() + " slots)") +
+      row("tiles read back", plans.tiles.tiles + " numbers, " + (plans.tiles.bytes/1024).toFixed(1) + " KB") +
+      row("readback", counts ? counts.length + " tile counts collected" : "pending") +
+      row("pump", JSON.stringify(pop.stats()));
+    pop.dispose();
+  } catch (e) {
+    // A COMPILE FAILURE IS THE INTERESTING CASE and it keeps the driver's log. Rethrown so render-qa's
+    // pageerror handler sees it too -- a page that swallowed this would pass QA while being broken.
+    $("gpuOut").innerHTML = row("result", "FAILED — " + String(e && e.message || e), "bad");
+    setTimeout(() => { throw e; }, 0);
+  }
+});
+
+// v3150 -- THE FIRST TIME ANYTHING HAS DRAWN THIS FIELD. Every other check on it is numeric and they all
+// compare the simulation to ITSELF; a field that agrees with its own reference and looks like static, or a
+// clump, or nothing, would pass every one. THIS IS THE CHECK THAT NEEDS EYES.
+$("drawBtn").addEventListener("click", async () => {
+  const out = $("out");
+  out.textContent = " drawing...";
+  try {
+    const R = await import("./sim/populationRender.js");
+    const P = await import("./sim/populationField.js");
+    const cv = $("popCanvas"), gl = cv.getContext("webgl2");
+    // THREE OUTCOMES KEPT APART, as v3120 established: ran / UNSUPPORTED (capability NAMED) / FAILED.
+    if (!gl) { out.textContent = "UNSUPPORTED: no WebGL2 in this browser -- a capability, NOT a failure"; return; }
+    if (!gl.getExtension("EXT_color_buffer_float")) { out.textContent = "UNSUPPORTED: EXT_color_buffer_float missing -- the field needs float targets"; return; }
+    const G = await import("./sim/populationGPU.js");
+    const side = 256, field = P.fieldPlan({ side });
+    const sim = G.makePopulationGPU(gl, { side, tile: 32 });
+    // SEED A POPULATION ON PURPOSE, so that an empty canvas is never the expected answer. v3122's lesson: a
+    // system whose checks pass because it does nothing is the quietest failure here, and a blank screen that
+    // could mean "nothing spawned yet" would be exactly that failure wearing a picture.
+    const rgba = new Float32Array(field.slots * 4);
+    for (let i = 0; i < field.slots; i++) {
+      const alive = (i % 3) !== 0;
+      const a = i * 0.0013, r = 8 + ((i * 37) % 40);
+      rgba[i * 4] = Math.cos(a) * r; rgba[i * 4 + 1] = Math.sin(a) * r; rgba[i * 4 + 2] = ((i * 7) % 32) - 16;
+      rgba[i * 4 + 3] = P.packSlot(i % 5, alive);
+    }
+    sim.seed(rgba);
+    const sh = (t, src) => { const o = gl.createShader(t); gl.shaderSource(o, src); gl.compileShader(o);
+      if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, R.VERT_SRC));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, R.FRAG_SRC));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const s = 1 / 48;
+    const vp = new Float32Array([s,0,0,0, 0,s,0,0, 0,0,s,0, 0,0,0,1]);
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.clearColor(0.04, 0.04, 0.05, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const res = R.drawPopulation(gl, { program: prog, fieldTex: sim.currentTexture(), field, viewProj: vp, pointScale: 2.0, vao });
+    const err = gl.getError();
+    out.textContent = "DREW " + res.instances + " instances in " + res.calls + " call. gl.getError=" + err +
+      (err ? "  <-- NONZERO: the draw did not go through cleanly" : "  (0 = clean)") +
+      "\nAbout two thirds are seeded alive and should appear as coloured rings. AN EMPTY CANVAS MEANS " +
+      "SOMETHING IS WRONG -- the seed is deliberate so blank is never the expected answer.";
+  } catch (e) { out.textContent = "FAILED: " + ((e && e.message) || e); throw e; }
+});
+
+$("verBtn").addEventListener("click", async () => {
+  const row = (k, v, cls) => "<tr><th>"+k+"</th><td"+(cls?" class='"+cls+"'":"")+">"+v+"</td></tr>";
+  const gl = $("glcv").getContext("webgl2");
+  if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
+    $("gpuOut").innerHTML = row("verify", "UNSUPPORTED — needs WebGL2 + EXT_color_buffer_float", "warn"); return;
+  }
+  try {
+    const [{ createPopulationGPU }, { packSlot }, { stepReference }, V] = await Promise.all([
+      import("/sim/populationGPU.js"), import("/sim/populationField.js"),
+      import("/sim/populationUpdate.js"), import("/sim/populationVerify.js"),
+    ]);
+    const side = 64;                                   // small: this is a comparison, not a load test
+    const pop = createPopulationGPU(gl, { side, tile: 16 });
+
+    // A KNOWN field. Agents placed AWAY FROM THE BOUNDARY on purpose: at the edge, a 1e-7 float difference
+    // flips a liveness decision, and that would be a real disagreement reported for a fixture's reasons.
+    const seed = new Float32Array(side * side * 4);
+    for (let i = 0; i < side * side; i++) {
+      const o = i * 4;
+      seed[o] = 8 + (i % 47) * 0.9; seed[o + 1] = 8 + ((i * 7) % 43) * 1.0; seed[o + 2] = 8 + ((i * 13) % 41) * 1.05;
+      seed[o + 3] = packSlot(1 + (i % 60), i % 3 !== 0);       // two thirds alive, a spread of kinds
+    }
+    pop.seed(seed);
+    const t = 0.25;
+    pop.stepAt ? pop.stepAt(t) : pop.step(t * 1000);
+    const got = pop.readFullForVerification();
+    const want = stepReference(seed, side, t).next;
+    const r = V.compareFields(got, want);
+    $("gpuOut").innerHTML =
+      row("verify", "<b class='" + (r.agree ? "big" : "bad") + "'>" + V.verdictLine(r) + "</b>") +
+      row("slots compared", r.slots.toLocaleString()) +
+      row("liveness mismatches", r.livenessMismatches + (r.livenessMismatches ? " — <b>exact equality is required here</b>" : " (exact)")) +
+      row("worst position drift", r.worstPos.toExponential(3) + " (epsilon " + r.epsilon.toExponential(1) + ")") +
+      (r.examples.length ? row("examples", "<pre style='font-size:11px'>" + JSON.stringify(r.examples, null, 1) + "</pre>", "bad") : "");
+    pop.dispose();
+  } catch (e) {
+    $("gpuOut").innerHTML = row("verify", "FAILED — " + String(e && e.message || e), "bad");
+    setTimeout(() => { throw e; }, 0);
+  }
+});
+
+$("side").addEventListener("change", () => { tileOpts(+$("side").value); render(); });
+$("tile").addEventListener("change", render); $("target").addEventListener("input", render);
+tileOpts(1024); render();
+</script></body></html>

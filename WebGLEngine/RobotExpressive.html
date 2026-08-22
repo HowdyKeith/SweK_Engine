@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SweK Engine — Robot Avatar</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Robot Avatar">
+<meta name="demo:desc"   content="Generated robot face — grey-robot-man with expressions.">
+<meta name="demo:cats"   content="ai,face">
+<meta name="demo:swatch" content="🤖">
+
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #1a1230 0%, #06040d 80%);
+    color: #ffd884;
+    font-family: monospace;
+    user-select: none;
+  }
+  #robot-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #status {
+    position: fixed;
+    top: 10px; left: 10px;
+    font-size: 11px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 153, 0, 0.35);
+    border-radius: 4px;
+    letter-spacing: 1.5px;
+  }
+  #status .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #444;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  #status .dot.on { background: #5eff8a; }
+  #emotion {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    color: #ff9933;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(255, 153, 0, 0.6);
+  }
+  #clip {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: rgba(252, 153, 0, 0.5);
+    font-family: monospace;
+  }
+  #hint {
+    position: fixed;
+    bottom: 10px; right: 12px;
+    font-size: 9px;
+    color: rgba(252, 153, 0, 0.35);
+    text-align: right;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<canvas id="robot-canvas"></canvas>
+<!-- Round 262 — mouth overlay for speech lip-sync. SVG ellipse
+     positioned over the robot's face area. Hidden by default; opens/
+     closes during kpop:speak via robotFaceAvatar.js. RobotExpressive
+     GLB has no jaw bone or mouth morph, so 2D overlay is the practical
+     approach. The "robot" view (test_rig procedural) also benefits. -->
+<svg id="mouth-overlay"
+     viewBox="0 0 40 40"
+     style="position:fixed; top:25%; left:50%; transform:translate(-50%,-50%);
+            width:26px; height:18px; pointer-events:none;
+            z-index:5; opacity:0; transition:opacity 80ms;">
+  <ellipse id="mouth-shape" cx="20" cy="20" rx="11" ry="4"
+           fill="rgba(20,8,5,0.85)" stroke="rgba(80,30,20,0.9)" stroke-width="1.2"/>
+</svg>
+<!-- Round 260 — chrome elements hidden by default. They unhide via
+     inline script below when the page is opened directly (no ?voice=
+     query). When embedded in PipAvatar's iframe (voice=M1), all the
+     "— idle —" overlays and hint text stay hidden so the PIP shows
+     just the robot. -->
+<div id="status" style="display:none"><span class="dot"></span><span id="status-text">Connecting...</span></div>
+<div id="emotion" style="display:none">— idle —</div>
+<div id="clip" style="display:none"></div>
+<div id="hint" style="display:none">click canvas to cycle emotions<br>listener events drive expressions</div>
+
+<!-- v857 — favorite button. Lets the user star the currently-loaded glb
+     so it appears in the KPop avatar cycle on phone + PC. Always
+     visible (even when embedded) so users browsing the avatar can
+     star from anywhere. Toggles via window.kpopFavorites which is
+     auto-installed by ui/kpopFavorites.js. -->
+<button id="favBtn" title="Add to KPop avatar favorites"
+        style="position:fixed; top:8px; right:8px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#888;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">☆</button>
+
+<!-- v862 — costume picker. Sibling to ⭐ button, sits to its left.
+     Click cycles through palette tints (native/blue/red/gold/emerald/
+     violet/pastel/dark/neon/sunset). Per-avatar selection persists.
+     Glyph shows current costume's emoji. -->
+<button id="costumeBtn" title="Cycle costume tint"
+        style="position:fixed; top:8px; right:52px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#ccc;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">⚪</button>
+
+<!-- v864 — Phase 2 accessory pickers. Three buttons left of costume.
+     Each cycles its slot (hat / eyewear / cape). Glyph shows the
+     current variant's emoji or ❌ for none. -->
+<button id="hatBtn" title="Cycle hat"
+        style="position:fixed; top:8px; right:96px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#ccc;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">❌</button>
+<button id="eyewearBtn" title="Cycle eyewear"
+        style="position:fixed; top:8px; right:140px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#ccc;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">❌</button>
+<button id="capeBtn" title="Cycle cape"
+        style="position:fixed; top:8px; right:184px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#ccc;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">❌</button>
+<button id="streamerBtn" title="Cycle streamer"
+        style="position:fixed; top:8px; right:228px; z-index:8;
+               background:rgba(10,16,30,0.78); color:#ccc;
+               border:1px solid rgba(120,200,255,0.35);
+               border-radius:6px; padding:4px 10px;
+               font:14px ui-monospace,monospace; cursor:pointer;">❌</button>
+
+<!-- v884 — Orientation toolbar (front-view realign). Left vertical panel.
+     Many imported glb/voxel models load overhead / on their back / facing
+     away; these 90° snaps (+ fine yaw) stand them up + face them front,
+     persisted PER avatar so the choice travels with the favorite. Readout
+     surfaces the height + head-box measurements so you can see the actual
+     avatar that's loaded. This also seeds the left vertical toolbar groundwork. -->
+<button id="orientToggle" title="Show orient panel"
+  style="position:fixed; top:8px; left:8px; z-index:10; width:30px; height:30px;
+         border-radius:8px; border:1px solid rgba(120,200,255,0.30);
+         background:rgba(8,14,26,0.86); color:#f6a821; font:14px ui-monospace,monospace;
+         cursor:pointer; display:none;">⊹</button>
+<div id="orientPanel"
+     style="position:fixed; top:8px; left:8px; z-index:9;
+            background:rgba(8,14,26,0.86); color:#cde;
+            border:1px solid rgba(120,200,255,0.30); border-left:3px solid #f6a821;
+            border-radius:8px; padding:8px 9px; width:140px;
+            font:11px ui-monospace,monospace; user-select:none;">
+  <div style="font-weight:700; letter-spacing:0.08em; color:#f6a821; margin-bottom:6px;">ORIENT<span id="orientClose" title="Hide" style="float:right; cursor:pointer; color:#9ab; font-weight:400;">✕</span></div>
+  <div style="display:flex; gap:4px; margin-bottom:4px;">
+    <button class="oBtn" data-axis="yaw" data-deg="-90" title="Turn left 90°">◀ Y</button>
+    <button class="oBtn" data-axis="yaw" data-deg="90"  title="Turn right 90°">Y ▶</button>
+  </div>
+  <div style="display:flex; gap:4px; margin-bottom:4px;">
+    <button class="oBtn" data-axis="pitch" data-deg="-90" title="Tip back 90° (stand up)">▲ P</button>
+    <button class="oBtn" data-axis="pitch" data-deg="90"  title="Tip forward 90°">P ▼</button>
+  </div>
+  <div style="display:flex; gap:4px; margin-bottom:6px;">
+    <button class="oBtn" data-axis="roll" data-deg="-90" title="Roll CCW 90°">↺ R</button>
+    <button class="oBtn" data-axis="roll" data-deg="90"  title="Roll CW 90°">R ↻</button>
+  </div>
+  <div style="margin-bottom:4px;">
+    <div style="color:#9ab; margin-bottom:2px;">fine yaw <span id="oYawVal">0°</span></div>
+    <input id="oYaw" type="range" min="0" max="359" step="1" value="0" style="width:100%; accent-color:#f6a821;">
+  </div>
+  <div style="display:flex; gap:4px; margin-bottom:6px;">
+    <button id="oReset" title="Reset to front" style="flex:1;">reset</button>
+    <button id="oFav"   title="Apply + add to favorites" style="flex:1; border-color:#f6a821; color:#f6a821;">★ fav</button>
+  </div>
+  <div id="oReadout" style="color:#7f96b5; font-size:10px; line-height:1.45; border-top:1px solid rgba(120,200,255,0.18); padding-top:5px;">measuring…</div>
+  <!-- v888 — color-as-indicator: per-favorite default color + a live test wash. -->
+  <div style="border-top:1px solid rgba(120,200,255,0.18); margin-top:6px; padding-top:5px;">
+    <div style="color:#f6a821; font-weight:700; letter-spacing:0.06em; margin-bottom:4px;">INDICATOR</div>
+    <div id="colSwatches" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:5px;"></div>
+    <div style="display:flex; gap:4px;">
+      <button id="colTest" title="Flash this as a live status wash" style="flex:1;">test</button>
+      <button id="colClear" title="Clear default + override" style="flex:1;">clear</button>
+    </div>
+  </div>
+</div>
+<style>
+  #orientPanel button {
+    background:rgba(20,30,48,0.9); color:#cde;
+    border:1px solid rgba(120,200,255,0.32); border-radius:5px;
+    padding:4px 0; flex:1; cursor:pointer; font:11px ui-monospace,monospace;
+  }
+  #orientPanel button:hover { background:rgba(40,60,90,0.95); }
+</style>
+
+<!-- v857 — load the favorites store so window.kpopFavorites is
+     available before the inline script below uses it. Module form
+     auto-installs the singleton on window. -->
+<script type="module" src="./ui/kpopFavorites.js"></script>
+<!-- v862 — load the costume store. Same pattern as kpopFavorites. -->
+<script type="module" src="./ui/avatarCostumes.js"></script>
+<!-- v864 — load the accessory store. Same pattern. -->
+<script type="module" src="./ui/avatarAccessories.js"></script>
+<!-- v884 — load the orientation store (front-view realign). robotFaceAvatar
+     imports it too, but loading here guarantees window.avatarOrientation
+     exists for the inline orientation toolbar wiring below. -->
+<script type="module" src="./ui/avatarOrientation.js"></script>
+<!-- v888 — color-as-indicator store (per-favorite default color + override). -->
+<script type="module" src="./ui/avatarColor.js"></script>
+<!-- v889 — drive the indicator from system load (CPU/GPU/RAM). -->
+<script type="module" src="./ui/gaugeColorProvider.js"></script>
+
+<script>
+  // If opened directly (not embedded), restore the diagnostic chrome
+  // so the standalone page is still useful.
+  if (!new URLSearchParams(location.search).get("voice")) {
+      for (const id of ["status", "emotion", "hint"]) {
+          const el = document.getElementById(id);
+          if (el) el.style.display = "";
+      }
+  }
+
+  // v857 — Favorite-button wiring. Resolves the current model
+  // identifier (?glb=URL or ?asset=NAME), then mirrors the favorited
+  // state on the ☆ glyph. Click toggles. Subscribes to onChange so
+  // multi-tab updates stay visible.
+  (function bindFavoriteBtn(){
+    const params = new URLSearchParams(location.search);
+    const glb    = params.get("glb");
+    const asset  = params.get("asset");
+    const url    = glb || asset || "RobotExpressive";
+    const label  = (glb)
+      ? (glb.split("/").pop() || "Custom Avatar").replace(/\.(glb|gltf)$/i, "")
+      : (asset || "Robot Man");
+    const btn = document.getElementById("favBtn");
+    if (!btn) return;
+    function paint() {
+      const fav = window.kpopFavorites;
+      if (!fav) { btn.textContent = "☆"; return; }
+      const is = fav.has(url);
+      btn.textContent = is ? "★" : "☆";
+      btn.style.color = is ? "#ffd560" : "#888";
+      btn.style.borderColor = is ? "rgba(255,213,96,0.6)" : "rgba(120,200,255,0.35)";
+      btn.title = is ? "Remove from favorites" : "Add to KPop avatar favorites";
+    }
+    btn.addEventListener("click", function(){
+      const fav = window.kpopFavorites;
+      if (!fav) return;
+      fav.toggle(url, label);
+      paint();
+    });
+    // Subscribe so cross-tab/cross-frame changes stay in sync. The
+    // store reads from localStorage; multi-window scenarios will need
+    // an explicit storage event listener — added below.
+    function init() {
+      const fav = window.kpopFavorites;
+      if (!fav) { setTimeout(init, 80); return; }
+      paint();
+      fav.onChange(paint);
+    }
+    init();
+    // localStorage changes from OTHER tabs/windows fire a 'storage'
+    // event that the singleton in this window doesn't otherwise know
+    // about. Re-read on storage events so multi-window editing stays
+    // consistent.
+    window.addEventListener("storage", function(e){
+      if (e.key === "voxelEngine.kpopFavorites" && window.kpopFavorites?._load) {
+        window.kpopFavorites._load();
+        paint();
+      }
+    });
+  })();
+
+  // v862 — Costume picker wiring. Resolves current avatar identity
+  // (same as favorite button does), tracks costume per avatar via
+  // window.avatarCostumes, click cycles. Updates glyph + tooltip on
+  // change. Costume application to the WebGL render happens in
+  // robotFaceAvatar.js (it reads _costume.tint per frame).
+  (function bindCostumeBtn(){
+    const params = new URLSearchParams(location.search);
+    const url = params.get("glb") || params.get("asset") || "RobotExpressive";
+    const btn = document.getElementById("costumeBtn");
+    if (!btn) return;
+    function paint() {
+      const store = window.avatarCostumes;
+      if (!store) { btn.textContent = "⚪"; return; }
+      const c = store.get(url);
+      btn.textContent = c.emoji || "⚪";
+      btn.title = "Costume: " + c.label + " — click to cycle (" + (store.list().length) + " palettes)";
+    }
+    btn.addEventListener("click", function(){
+      const store = window.avatarCostumes;
+      if (!store) return;
+      store.cycle(url);
+      paint();
+    });
+    // Wait for module to install singleton
+    function init() {
+      const store = window.avatarCostumes;
+      if (!store) { setTimeout(init, 80); return; }
+      paint();
+      store.onChange(function(change){
+        if (change?.avatarUrl === url) paint();
+      });
+    }
+    init();
+    window.addEventListener("storage", function(e){
+      if (e.key === "voxelEngine.avatarCostumes" && window.avatarCostumes?._load) {
+        window.avatarCostumes._load();
+        paint();
+      }
+    });
+  })();
+
+  // v864 — Accessory picker wiring. Three buttons (hat / eyewear /
+  // cape), each cycling its slot via window.avatarAccessories.
+  (function bindAccessoryBtns(){
+    const params = new URLSearchParams(location.search);
+    const url = params.get("glb") || params.get("asset") || "RobotExpressive";
+    const slotConfig = [
+      { btnId: "hatBtn",      slotKey: "hat",      label: "Hat",      emptyEmoji: "👒" },
+      { btnId: "eyewearBtn",  slotKey: "eyewear",  label: "Eyewear",  emptyEmoji: "🕶" },
+      { btnId: "capeBtn",     slotKey: "cape",     label: "Cape",     emptyEmoji: "🦸" },
+      { btnId: "streamerBtn", slotKey: "streamer", label: "Streamer", emptyEmoji: "🎀" },
+    ];
+    function emojiFor(slotKey, variantKey) {
+      const slots = window.ACCESSORY_SLOTS;
+      if (!slots) return "❌";
+      const slot = slots.find(s => s.key === slotKey);
+      if (!slot) return "❌";
+      const v = slot.variants.find(v => v.key === variantKey);
+      return v ? v.emoji : "❌";
+    }
+    function paint() {
+      const store = window.avatarAccessories;
+      for (const cfg of slotConfig) {
+        const btn = document.getElementById(cfg.btnId);
+        if (!btn) continue;
+        if (!store) { btn.textContent = "❌"; continue; }
+        const cur = store.getSlot(url, cfg.slotKey);
+        btn.textContent = (cur === "none") ? cfg.emptyEmoji : emojiFor(cfg.slotKey, cur);
+        btn.style.opacity = (cur === "none") ? "0.55" : "1.0";
+        btn.title = cfg.label + ": " + (cur === "none" ? "none" : cur) + " — click to cycle";
+      }
+    }
+    for (const cfg of slotConfig) {
+      const btn = document.getElementById(cfg.btnId);
+      if (!btn) continue;
+      btn.addEventListener("click", function(){
+        const store = window.avatarAccessories;
+        if (!store) return;
+        store.cycleSlot(url, cfg.slotKey);
+        paint();
+      });
+    }
+    function init() {
+      const store = window.avatarAccessories;
+      if (!store) { setTimeout(init, 80); return; }
+      paint();
+      store.onChange(function(change){
+        if (change?.avatarUrl === url) paint();
+      });
+    }
+    init();
+    window.addEventListener("storage", function(e){
+      if (e.key === "voxelEngine.avatarAccessories" && window.avatarAccessories?._load) {
+        window.avatarAccessories._load();
+        paint();
+      }
+    });
+  })();
+
+  // ─── v853: error capture pipeline ───────────────────────────────
+  //
+  // Inside-iframe console + error capture that postMessages out to the
+  // parent window (PipAvatar listens, forwards as engine:iframe-error,
+  // HeartbeatAvatar logs + flips to dead-eye). This is the primary
+  // debugging path for the Android TV Device glb avatar not showing — failures
+  // inside RobotExpressive.html now surface up to the engine page's error
+  // log instead of being trapped silently inside the iframe.
+  //
+  // Also installs a /shield/error-report POST fallback for Shield
+  // (Android TV) where the iframe parent may be a different page that
+  // doesn't have the engine:iframe-error listener. Best-effort; logs
+  // to console if both paths fail.
+  (function installErrorCapture() {
+    function postOut(payload) {
+      // Try parent postMessage first (works when embedded in PipAvatar)
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(payload, "*");
+          return;
+        }
+      } catch {}
+      // Fallback: POST to bridge endpoint (for standalone Shield use)
+      // The bridge relays to debug:push for the /debug.html viewer.
+      try {
+        fetch("/debug/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "kpavatar:error",
+            ts: Date.now(),
+            ua: navigator.userAgent,
+            ...payload,
+          }),
+          keepalive: true,
+        }).catch(() => {});
+      } catch {}
+    }
+
+    // Surface uncaught errors
+    window.addEventListener("error", (ev) => {
+      postOut({
+        type: "kpavatar:error",
+        message: String(ev?.message || "uncaught error"),
+        stack: ev?.error?.stack || null,
+        url: location.href,
+        filename: ev?.filename || null,
+        line: ev?.lineno || null,
+        col: ev?.colno || null,
+      });
+    });
+    // Surface unhandled promise rejections (common path for fetch/glb fails)
+    window.addEventListener("unhandledrejection", (ev) => {
+      const reason = ev?.reason;
+      postOut({
+        type: "kpavatar:error",
+        message: "Unhandled promise rejection: " +
+                 (reason?.message || String(reason)).slice(0, 300),
+        stack: reason?.stack || null,
+        url: location.href,
+      });
+    });
+    // Wrap console.error so deliberate error logs (incl. our own
+    // explicit "glb load failed" lines) also bubble out. Wraps only
+    // .error/.warn — not .log — to avoid the parent drowning in chatter.
+    const origError = console.error.bind(console);
+    const origWarn  = console.warn.bind(console);
+    console.error = function(...args) {
+      origError(...args);
+      try {
+        postOut({
+          type: "kpavatar:error",
+          message: args.map(a => {
+            if (a instanceof Error) return a.message;
+            if (typeof a === "object") { try { return JSON.stringify(a); } catch { return String(a); } }
+            return String(a);
+          }).join(" ").slice(0, 500),
+          source: "console.error",
+        });
+      } catch {}
+    };
+    console.warn = function(...args) {
+      origWarn(...args);
+      try {
+        postOut({
+          type: "kpavatar:warn",
+          message: args.map(a => {
+            if (a instanceof Error) return a.message;
+            if (typeof a === "object") { try { return JSON.stringify(a); } catch { return String(a); } }
+            return String(a);
+          }).join(" ").slice(0, 500),
+          source: "console.warn",
+        });
+      } catch {}
+    };
+    // Heartbeat ping every 10s so debug.html can show "iframe alive"
+    // alongside "Shield glb still missing". One-way; no reply expected.
+    setInterval(() => {
+      postOut({ type: "kpavatar:ping", ts: Date.now() });
+    }, 10000);
+    // First ping on load
+    postOut({ type: "kpavatar:ping", ts: Date.now(), loaded: true });
+  })();
+</script>
+<script type="module" src="./face/robotFaceAvatar.js">
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        // No tunable parameters exposed.
+    ];
+    function getCanvas() {
+        return document.querySelector("canvas");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+
+<!-- v884 — orientation toolbar wiring. Talks to window.robotAvatar (installed
+     by robotFaceAvatar.js) which routes through the avatarOrientation store. -->
+<script>
+(function bindOrientPanel(){
+  function ready(){ return window.robotAvatar && typeof window.robotAvatar.rotate === "function"; }
+  function keyLabel(){
+    var k = (window.robotAvatar && window.robotAvatar.key && window.robotAvatar.key()) || "";
+    return (k.split("/").pop() || k).replace(/\.(glb|gltf)$/i, "") || "Avatar";
+  }
+  function refreshReadout(){
+    var el = document.getElementById("oReadout");
+    if (!el || !window.robotAvatar) return;
+    var m = window.robotAvatar.metrics ? window.robotAvatar.metrics() : {};
+    var head = window.robotAvatar.measureHead ? window.robotAvatar.measureHead() : null;
+    var o = window.robotAvatar.getOrientation ? window.robotAvatar.getOrientation() : {yaw:0,pitch:0,roll:0};
+    var lines = [];
+    if (m && m.modelHeight) lines.push("height " + m.modelHeight.toFixed(2) + "u");
+    if (m && m.scaleRatio)  lines.push("scale " + m.scaleRatio.toFixed(2) + "×");
+    if (head) lines.push("head " + head.width.toFixed(2) + "w×" + head.height.toFixed(2) + "h");
+    else      lines.push("head: bone not found");
+    // v3786 -- SAY WHY THE SKINNED FIT DID NOT HAPPEN. "height 0.03u / scale 0.01x" is the RAW box, and it
+    // prints identically whether the skinned measurement was skipped, refused or never reached. The module
+    // now names the branch it took; showing it here turns an unfalsifiable "it does not work" into a cause.
+    var why = window.robotAvatar.skinnedFitReason ? window.robotAvatar.skinnedFitReason() : null;
+    if (why && why !== "ok" && why.indexOf("ok (") !== 0) lines.push("fit: " + why);
+    lines.push("rot " + (o.yaw|0) + "/" + (o.pitch|0) + "/" + (o.roll|0) + "°");
+    el.innerHTML = lines.join("<br>");
+  }
+  function syncYawSlider(){
+    var s = document.getElementById("oYaw"), lbl = document.getElementById("oYawVal");
+    if (!s || !window.robotAvatar) return;
+    var o = window.robotAvatar.getOrientation();
+    s.value = String(o.yaw | 0);
+    if (lbl) lbl.textContent = (o.yaw|0) + "°";
+  }
+
+  function wire(){
+    document.querySelectorAll("#orientPanel .oBtn").forEach(function(b){
+      b.addEventListener("click", function(){
+        var axis = b.getAttribute("data-axis");
+        var deg  = parseFloat(b.getAttribute("data-deg")) || 0;
+        window.robotAvatar.rotate(axis, deg);
+        syncYawSlider(); refreshReadout();
+      });
+    });
+    // v931 — collapse/expand the orient panel. It used to be permanently shown,
+    // covering the avatar (especially on the phone). Now: a ✕ hides it to a small
+    // ⊹ launcher icon; tapping ⊹ reopens it. Default collapsed when embedded.
+    var _oPanel = document.getElementById("orientPanel");
+    var _oTog   = document.getElementById("orientToggle");
+    var _oClose = document.getElementById("orientClose");
+    function _setOrientOpen(open){
+      if (_oPanel) _oPanel.style.display = open ? "" : "none";
+      if (_oTog)   _oTog.style.display   = open ? "none" : "";
+    }
+    if (_oTog)   _oTog.addEventListener("click", function(){ _setOrientOpen(true); });
+    if (_oClose) _oClose.addEventListener("click", function(){ _setOrientOpen(false); });
+    var _embedded = !!new URLSearchParams(location.search).get("voice");
+    _setOrientOpen(!_embedded);   // embedded (phone) → start collapsed to the ⊹ icon
+    var s = document.getElementById("oYaw"), lbl = document.getElementById("oYawVal");
+    if (s) s.addEventListener("input", function(){
+      if (lbl) lbl.textContent = s.value + "°";
+      window.robotAvatar.setYaw(parseInt(s.value, 10) || 0);
+      refreshReadout();
+    });
+    var reset = document.getElementById("oReset");
+    if (reset) reset.addEventListener("click", function(){
+      window.robotAvatar.resetOrientation(); syncYawSlider(); refreshReadout();
+    });
+    var fav = document.getElementById("oFav");
+    if (fav) fav.addEventListener("click", function(){
+      try {
+        var k = window.robotAvatar.key();
+        if (window.kpopFavorites && k) window.kpopFavorites.add(k, keyLabel());
+        // reflect in the existing ☆ button if present
+        var fb = document.getElementById("favBtn");
+        if (fb) { fb.textContent = "★"; fb.style.color = "#f6a821"; }
+        fav.textContent = "★ saved";
+        setTimeout(function(){ fav.textContent = "★ fav"; }, 1200);
+      } catch(e){}
+    });
+    syncYawSlider();
+    refreshReadout();
+    setInterval(refreshReadout, 700);   // head metrics settle after first frames
+
+    // v888 — color-as-indicator swatches. Picks set the per-favorite default
+    // color (a resting wash); "test" flashes a live override; "clear" removes
+    // both. Reads the avatar key from window.robotAvatar.key().
+    bindColorSwatches();
+  }
+
+  function bindColorSwatches(){
+    var host = document.getElementById("colSwatches");
+    if (!host) return;
+    var SWATCHES = [
+      ["red",    [0.85,0.20,0.22]], ["amber", [0.95,0.62,0.16]],
+      ["green",  [0.30,0.80,0.42]], ["cyan",  [0.30,0.78,1.00]],
+      ["violet", [0.66,0.42,1.00]], ["white", [0.90,0.92,0.98]],
+    ];
+    function key(){ return (window.robotAvatar && window.robotAvatar.key && window.robotAvatar.key()) || ""; }
+    SWATCHES.forEach(function(s){
+      var b = document.createElement("button");
+      b.title = s[0];
+      b.style.cssText = "width:20px;height:20px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);cursor:pointer;padding:0;background:rgb("+
+        Math.round(s[1][0]*255)+","+Math.round(s[1][1]*255)+","+Math.round(s[1][2]*255)+");";
+      b.addEventListener("click", function(){
+        try { window.avatarColor && window.avatarColor.setFavoriteDefault(key(), s[1]); } catch(e){}
+      });
+      host.appendChild(b);
+    });
+    var test = document.getElementById("colTest");
+    if (test) test.addEventListener("click", function(){
+      try {
+        var def = window.avatarColor && window.avatarColor.getFavoriteDefault(key());
+        var c = def || [0.95,0.62,0.16];
+        window.avatarColor.setOverride(c[0], c[1], c[2], 0.7);
+        setTimeout(function(){ try { window.avatarColor.clearOverride(); } catch(e){} }, 2200);
+      } catch(e){}
+    });
+    var clr = document.getElementById("colClear");
+    if (clr) clr.addEventListener("click", function(){
+      try { window.avatarColor.setFavoriteDefault(key(), null); window.avatarColor.clearOverride(); } catch(e){}
+    });
+  }
+
+  var tries = 0;
+  (function waitReady(){
+    if (ready()) { wire(); return; }
+    if (tries++ > 100) { wire(); return; }   // wire anyway; buttons guard internally
+    setTimeout(waitReady, 100);
+  })();
+})();
+</script>
+</body>
+</html>

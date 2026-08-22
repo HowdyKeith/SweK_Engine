@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Dictation (Whisper)</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#d8e6f2; --dim:#8397ab; --line:#1e2c3a; --accent:#7fd0ff; --go:#1f6feb; --rec:#e5484d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  main { max-width:760px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:16px; color:var(--accent); margin:0 0 4px; }
+  .lead { color:var(--dim); font-size:12px; line-height:1.6; margin:0 0 16px; }
+  .lead a { color:var(--accent); }
+  .card { border:1px solid var(--line); border-radius:9px; padding:14px; margin-bottom:14px; background:#0c141d; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  select,input,button { background:#0c1622; color:var(--ink); border:1px solid var(--line); border-radius:6px; font:12px ui-monospace,monospace; padding:6px 10px; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button:disabled { opacity:0.5; cursor:default; }
+  #rec { background:var(--go); border-color:var(--go); color:#fff; font-weight:600; padding:9px 18px; }
+  #rec.recording { background:var(--rec); border-color:var(--rec); }
+  .grow { flex:1 1 auto; min-width:120px; }
+  #stat { color:var(--dim); font-size:12px; min-height:16px; }
+  textarea { width:100%; min-height:160px; background:#06090d; color:#cfe6d8; border:1px solid var(--line); border-radius:8px; padding:10px; font:13px ui-monospace,monospace; resize:vertical; }
+  .tools { display:flex; gap:8px; margin-top:8px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#39424d; display:inline-block; }
+  .dot.on { background:var(--rec); animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:0.35; } }
+  .hint { color:var(--dim); font-size:11px; margin-top:6px; }
+</style>
+<script src="/engine/favicon-inject.js"></script>
+</head>
+<body>
+<main>
+  <h1>&#127908; Dictation &mdash; Whisper (speech &rarr; text)</h1>
+  <p class="lead">Records your microphone in the browser and transcribes it with a <b>locally-run</b> <a href="https://github.com/ggml-org/whisper.cpp" target="_blank" rel="noopener">whisper.cpp</a> server (offline, no cloud). Install &amp; start it from &#9881; Auto-Install &rarr; Whisper. You can transcribe on <b>this box</b> or hand the audio to a <b>peer</b> that has whisper running (e.g. a faster machine).</p>
+
+  <div class="card">
+    <div class="row">
+      <span class="dot" id="dot"></span>
+      <button id="rec">&#9679; Record</button>
+      <select id="target" title="Where to run the transcription"><option value="">Transcribe: this box</option></select>
+      <select id="lang" title="Spoken language (auto-detect by default)">
+        <option value="">auto-detect</option><option value="en">English</option><option value="es">Spanish</option>
+        <option value="fr">French</option><option value="de">German</option><option value="it">Italian</option>
+        <option value="pt">Portuguese</option><option value="zh">Chinese</option><option value="ja">Japanese</option>
+      </select>
+    </div>
+    <div id="stat">checking whisper&hellip;</div>
+    <div class="hint">Tip: click Record, speak, click Stop. First transcription can take a moment while the model warms up.</div>
+  </div>
+
+  <div class="card">
+    <textarea id="out" placeholder="Transcribed text appears here&hellip; (you can edit it)"></textarea>
+    <div class="tools">
+      <button id="copy">Copy</button>
+      <button id="polish" title="Clean up punctuation/capitalization + drop filler words via your local Ollama">&#10024; Polish (Ollama)</button>
+      <button id="typeit" title="Type the text into whatever app currently has focus on this machine">&#9000; Type into focused app</button>
+      <button id="clear">Clear</button>
+      <button id="dl">Download .txt</button>
+    </div>
+    <div class="hint" id="typehint" style="margin-top:6px"></div>
+  </div>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var rec = null, chunks = [], recording = false, mime = "audio/webm";
+
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }); }
+
+  function refresh() {
+    j("/whisper/status").then(function (s) {
+      if (s && s.reachable) $("stat").innerHTML = "<span style='color:#9fe88f'>\u2713 whisper reachable at " + (s.baseUrl || "") + "</span>";
+      else $("stat").innerHTML = "<span style='color:#caa05a'>whisper not reachable at " + ((s && s.baseUrl) || "?") + " \u2014 install/start it (\u2699 Auto-Install)</span>";
+    }).catch(function () { $("stat").textContent = "status check failed"; });
+  }
+
+  // populate peer targets (so a chosen peer can do the transcription)
+  function loadPeers() {
+    j("/peer/list").then(function (r) {
+      if (!r || !r.ok || !r.peers) return;
+      var sel = $("target");
+      r.peers.forEach(function (p) {
+        if (!p || !p.url) return;
+        var o = document.createElement("option"); o.value = p.url; o.textContent = "Transcribe on: " + (p.ip || p.url.replace(/^https?:\/\//, "")); sel.appendChild(o);
+      });
+    }).catch(function () {});
+  }
+
+  async function startRec() {
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // prefer webm/opus; whisper.cpp server converts via ffmpeg. Fall back to default.
+      var opts = {};
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported("audio/webm")) { opts.mimeType = "audio/webm"; mime = "audio/webm"; }
+      else { mime = "audio/wav"; }
+      rec = new MediaRecorder(stream, opts);
+      chunks = [];
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        var blob = new Blob(chunks, { type: mime });
+        sendClip(blob);
+      };
+      rec.start();
+      recording = true;
+      $("rec").innerHTML = "&#9632; Stop"; $("rec").classList.add("recording"); $("dot").classList.add("on");
+      $("stat").textContent = "recording\u2026 click Stop when done";
+    } catch (e) {
+      $("stat").innerHTML = "<span style='color:#f88'>mic access denied or unavailable: " + (e && e.message || e) + "</span>";
+    }
+  }
+  function stopRec() {
+    if (rec && recording) { rec.stop(); recording = false; $("rec").innerHTML = "&#9679; Record"; $("rec").classList.remove("recording"); $("dot").classList.remove("on"); $("stat").textContent = "transcribing\u2026"; }
+  }
+
+  function sendClip(blob) {
+    var fmt = (blob.type.indexOf("webm") >= 0) ? "webm" : (blob.type.indexOf("ogg") >= 0 ? "ogg" : "wav");
+    var peer = $("target").value;
+    var lang = $("lang").value;
+    var url = "/whisper/transcribe?fmt=" + fmt + (peer ? ("&peer=" + encodeURIComponent(peer)) : "") + (lang ? ("&lang=" + encodeURIComponent(lang)) : "");
+    $("rec").disabled = true;
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: blob })
+      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        $("rec").disabled = false;
+        if (r && r.ok) {
+          var cur = $("out").value;
+          $("out").value = cur ? (cur.replace(/\s*$/, "") + " " + r.text) : r.text;   // append, so you can dictate in chunks
+          $("stat").innerHTML = "<span style='color:#9fe88f'>\u2713 " + (r.text ? r.text.length : 0) + " chars" + (peer ? " (via peer)" : "") + "</span>";
+        } else {
+          $("stat").innerHTML = "<span style='color:#f88'>\u2717 " + (((r && r.error) || "transcription failed") + "").slice(0, 160) + "</span>";
+        }
+      })
+      .catch(function (e) { $("rec").disabled = false; $("stat").innerHTML = "<span style='color:#f88'>\u2717 " + e + "</span>"; });
+  }
+
+  $("rec").addEventListener("click", function () { if (recording) stopRec(); else startRec(); });
+  $("copy").addEventListener("click", function () { navigator.clipboard.writeText($("out").value).then(function () { $("stat").textContent = "copied"; }); });
+
+  // v1975 — Polish: local-Ollama cleanup pass over the transcript.
+  $("polish").addEventListener("click", function () {
+    var txt = $("out").value.trim(); if (!txt) { $("stat").textContent = "nothing to polish"; return; }
+    $("polish").disabled = true; var old = $("polish").innerHTML; $("polish").innerHTML = "polishing\u2026";
+    fetch("/dictate/polish", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ text: txt, style: "clean" }) })
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (j && j.ok && j.text) { $("out").value = j.text; $("stat").textContent = "polished via " + (j.model||"ollama"); }
+        else { $("stat").textContent = "polish failed: " + ((j&&j.error)||"is Ollama running?"); }
+      }).catch(function(e){ $("stat").textContent = "polish error: " + e; })
+      .finally(function(){ $("polish").disabled = false; $("polish").innerHTML = old; });
+  });
+
+  // v1975 — Type into focused app: hand the text to the bridge, which types it into the focused window.
+  $("typeit").addEventListener("click", function () {
+    var txt = $("out").value; if (!txt.trim()) { $("stat").textContent = "nothing to type"; return; }
+    $("stat").textContent = "click your target window \u2014 typing in 3\u2026";
+    var n = 3; var iv = setInterval(function(){ n--; if (n>0) { $("stat").textContent = "typing in " + n + "\u2026"; return; } clearInterval(iv);
+      fetch("/dictate/type", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ text: txt, mode: "auto" }) })
+        .then(function(r){ return r.json(); }).then(function(j){
+          if (j && j.ok) { $("stat").textContent = "typed " + (j.chars||"") + " chars (" + (j.mode||"") + ")"; }
+          else { $("stat").textContent = "type failed: " + ((j&&j.error)||"see /dictate/status"); }
+        }).catch(function(e){ $("stat").textContent = "type error: " + e; });
+    }, 1000);
+  });
+
+  // show what the type-out can do on this box (honest capability + any setup note)
+  fetch("/dictate/status").then(function(r){ return r.json(); }).then(function(j){
+    if (!j) return; var el = $("typehint");
+    if (j.available) el.textContent = "Type-into-app ready on " + j.platform + " (" + j.tool + ")." + (j.note ? (" Note: " + j.note) : "");
+    else el.textContent = "Type-into-app not ready: " + (j.note || ("no supported tool on " + j.platform));
+  }).catch(function(){});
+  $("clear").addEventListener("click", function () { $("out").value = ""; });
+  $("dl").addEventListener("click", function () {
+    var b = new Blob([$("out").value], { type: "text/plain" }); var a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = "dictation.txt"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  refresh(); loadPeers();
+})();
+</script>
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

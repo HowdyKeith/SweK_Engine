@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Blobulator GPU (WebGPU raymarched SDF)</title>
+<style>
+  html, body { margin:0; height:100%; background:#07050b; overflow:hidden; color:#e9e0f0; font:13px ui-sans-serif,system-ui,sans-serif; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:5; background:rgba(16,10,22,.72); border:1px solid #3a2740; border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); max-width:390px; }
+  #hud h1 { margin:0 0 4px; font-size:15px; } #hud p { margin:4px 0; color:#b39ac2; font-size:12px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  button, select { font:12px ui-monospace,monospace; padding:5px 11px; border-radius:7px; border:1px solid #5a3a52; background:#241726; color:#f0d9ec; cursor:pointer; }
+  button.go { background:#3a1c10; color:#ffcf9a; border-color:#7a3d1e; }
+  button.rec { background:#3a1015; color:#ff9aa2; border-color:#6a2a30; }
+  label.sl { display:flex; align-items:center; gap:6px; color:#b39ac2; font-size:11px; }
+  .dim { color:#9c86ad; font-size:11px; } #fps { font-variant-numeric:tabular-nums; }
+  #fallback { position:fixed; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  #fallback .card { max-width:520px; background:rgba(16,10,22,.85); border:1px solid #3a2740; border-radius:12px; padding:22px 26px; }
+  #fallback h2 { margin:0 0 8px; color:#ffcf9a; } #fallback a { color:#8ab4ff; }
+
+  /* collapsible HUD: a small tab on mobile so it never covers the view */
+  #hud { max-height:80vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #hud.min { max-height:none; overflow:visible; }
+  #hud.min > :not(h1) { display:none; }
+  #hud h1 { cursor:default; }
+  .hudTab { display:inline-block; cursor:pointer; border:1px solid #3a2740; border-radius:6px; padding:0 8px; margin-right:8px; font-size:14px; line-height:1.4; color:#b39ac2; background:rgba(255,255,255,.05); user-select:none; -webkit-tap-highlight-color:transparent; }
+  .hudTab:hover { color:#e9e0f0; border-color:#6a4d80; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* v3656 -- ?embed=1, ADDED BECAUSE A GATE FOUND IT MISSING, NOT BECAUSE ANYBODY REPORTED IT.
+   ui/avatarSwitch.js has mounted this page with ?embed=1 since v3556 and the page never read the word.
+   Same defect as blob-avatar.html, found the same round by ui/avatarSwitch-embed-selfcheck.mjs, which is
+   the point of writing the rule as a CLASS: Keith reported ONE of these three. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("embed") !== "1") return;
+    document.documentElement.setAttribute("data-embed", "1");
+    var st = document.createElement("style");
+    st.textContent = 'html[data-embed="1"] ' + "#hud".split(",").map(function (s) { return s.trim(); })
+      .join(', html[data-embed="1"] ') + ' { display: none !important; }' +
+      'html[data-embed="1"] body { overflow: hidden; }';
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+</script>
+<div id="hud">
+  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest(\'#hud\').classList.toggle(\'min\')" title="show/hide controls">&#9776;</span>&#129514; Blobulator GPU</h1>
+  <p id="blurb">A <b>WebGPU raymarched SDF</b>: metaballs as a smooth-union of spheres, sphere-traced in a fragment
+     shader with analytic normals &mdash; no mesh, no marching cubes. Blob positions come from <b>Box3D</b>.
+     <span id="fps" class="dim"></span></p>
+  <div class="row">
+    <label class="sl">preset
+      <select id="preset"><option value="0" selected>Fire</option><option value="1">Water</option></select>
+    </label>
+    <label class="sl">blobs <input id="blobs" type="range" min="8" max="60" value="34"></label>
+    <label class="sl">blend <input id="blend" type="range" min="5" max="30" value="14"></label>
+  </div>
+  <div class="row">
+    <label class="sl">fountain <input id="fount" type="range" min="0" max="100" value="55"></label>
+    <button id="pour" class="go">&#127799; Pour</button>
+    <button id="quake" class="go">&#128165; Erupt</button>
+    <button id="spin" class="go">&#8635; orbit: on</button>
+    <button id="physBtn" class="go" onclick="togglePhysics()">Physics: box3d</button>
+  </div>
+  <div class="row" style="border-top:1px solid #3a2740;padding-top:8px">
+    <button id="brain" class="go">&#129504; Brain: off</button>
+    <label class="sl">task
+      <select id="task"><option value="fountain" selected>learned fountain</option><option value="sheepdog">sheepdog (herd)</option><option value="spread">spread</option><option value="clump">clump</option><option value="sculpt">sculpt ring</option></select>
+    </label>
+    <span class="dim" id="brainMsg"></span>
+  </div>
+  <div class="row">
+    <select id="dur"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <span class="dim" id="msg"></span>
+  </div>
+</div>
+<div id="fallback"><div class="card">
+  <h2>WebGPU isn't available here</h2>
+  <p class="dim" id="fbwhy"></p>
+  <p>This page needs WebGPU (Chrome/Edge, or Safari 18+). The original marching-cubes Blobulator runs anywhere:</p>
+  <p><a id="fblink" href="blobulator.html">&#8594; Open the WebGL Blobulator</a></p>
+  <p class="dim">Redirecting there automatically&hellip;</p>
+</div></div>
+
+<script type="module">
+import { box3d } from "/physics/box3d/box3dLoader.js";
+// v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
+// AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
+// not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
+import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { createJoltBackend } from "/physics/jolt/joltLoader.js";
+let useJolt = false, joltBackend = null;
+import { makeBlobBrain } from "/brain/blobBrain.js";
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+const canvas = document.getElementById("c");
+function fallback(why) {
+  document.getElementById("hud").style.display = "none";
+  document.getElementById("c").style.display = "none";
+  document.getElementById("fbwhy").textContent = why || "";
+  document.getElementById("fallback").style.display = "flex";
+  setTimeout(() => { location.href = "/blobulator.html"; }, 4000);
+}
+
+// ---------------- tank + physics (CPU / Box3D WASM), same model as box3d-blobs ----------------
+const TW = 8, TH = 20, MAXBLOBS = 64;
+let RES_K = 1.4, preset = 0, fountain = 0.55, wantBlobs = 34;
+let world = null, ready = false;
+const blobData = new Float32Array(MAXBLOBS * 4);      // x,y,z,radius per blob (uploaded to GPU)
+const brainData = new Float32Array(MAXBLOBS * 6);     // x,y,z,vx,vy,vz per blob (for the GPU Brain)
+let brain = null, brainOn = false, brainAction = null, brainTask = "fountain";
+let blobCount = 0;
+let fb = [];
+function seedFallback(n) { fb = []; for (let i = 0; i < n; i++) fb.push({ ph: Math.random() * 6.28, sp: 0.4 + Math.random(), xa: (Math.random() * 2 - 1) * TW * 0.6, za: (Math.random() * 2 - 1) * TW * 0.6, xp: Math.random() * 6.28, zp: Math.random() * 6.28 }); }
+function firstDynamic() { return 5; }
+async function initPhysics() {
+  try { const st = await box3d.init(); ready = !!(st && st.ready); } catch (e) { ready = false; }
+  if (!ready) { document.getElementById("blurb").innerHTML = "A <b>WebGPU raymarched SDF</b> blobulator. <span style='color:#ffcf9a'>Box3D WASM isn't built here, so the blobs use a scripted fallback</span> (build/pull it on box3d-info.html for real physics). <span id='fps' class='dim'></span>"; seedFallback(wantBlobs); return; }
+  buildWorld();
+}
+function buildWorld() {
+  if (world) { try { world.destroy(); } catch (e) {} }
+  const backend = (useJolt && joltBackend) ? joltBackend : box3d;
+  world = backend.createWorld({ gravity: [0, -20, 0] });
+  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [TW + 1, 0.5, TW + 1] });
+  world.addBox({ type: "static", pos: [TW, TH / 2, 0], half: [0.5, TH, TW] });
+  world.addBox({ type: "static", pos: [-TW, TH / 2, 0], half: [0.5, TH, TW] });
+  world.addBox({ type: "static", pos: [0, TH / 2, TW], half: [TW, TH, 0.5] });
+  world.addBox({ type: "static", pos: [0, TH / 2, -TW], half: [TW, TH, 0.5] });
+  for (let i = 0; i < wantBlobs; i++) addBlob();
+}
+async function togglePhysics() {
+  const btn = document.getElementById("physBtn");
+  if (!useJolt) { if (btn) btn.textContent = "loading Jolt\u2026";
+    try { if (!joltBackend) joltBackend = await createJoltBackend(); useJolt = true; ready = true; buildWorld(); if (btn) btn.textContent = "Physics: Jolt"; }
+    catch (e) { useJolt = false; if (btn) btn.textContent = "Physics: box3d (Jolt failed)"; }
+  } else { useJolt = false; if (btn) btn.textContent = "Physics: box3d"; const st = await box3d.init(); ready = !!(st && st.ready); if (ready) buildWorld(); }
+}
+window.togglePhysics = togglePhysics;
+function addBlob() { if (!ready || !world) return; try { world.addBox({ type: "dynamic", pos: [(Math.random() - 0.5) * TW * 1.3, TH * (0.5 + Math.random() * 0.4), (Math.random() - 0.5) * TW * 1.3], half: [0.7, 0.7, 0.7], density: 1 }); } catch (e) {} }
+
+let fountT = 0;
+function updateCenters(t, dt) {
+  blobCount = 0;
+  if (ready && world) {
+    world.step(1 / 60, 4);
+    fountT += dt;
+    if (!brainOn && fountain > 0 && fountT > 0.12) { fountT = 0; const xf0 = world.readTransforms(), nB = world.bodyCount(); const launches = Math.round(fountain * 3); for (let l = 0; l < launches; l++) { const idx = firstDynamic() + Math.floor(Math.random() * Math.max(1, nB - firstDynamic())); if (idx >= nB) continue; if (xf0[idx * 7 + 1] < TH * 0.5) world.impulse(idx, [(Math.random() - 0.5) * 6, 26 + Math.random() * 22 * fountain, (Math.random() - 0.5) * 6]); } }
+    const xf = world.readTransforms(), nB = world.bodyCount();
+    let c = 0;
+    for (let b = firstDynamic(); b < nB && c < MAXBLOBS; b++) {
+      blobData[c * 4] = xf[b * 7]; blobData[c * 4 + 1] = xf[b * 7 + 1]; blobData[c * 4 + 2] = xf[b * 7 + 2]; blobData[c * 4 + 3] = 1.7;
+      brainData[c * 6] = xf[b * 7]; brainData[c * 6 + 1] = xf[b * 7 + 1]; brainData[c * 6 + 2] = xf[b * 7 + 2];   // copy positions BEFORE any further box3d call (readVelocities may reallocate)
+      c++;
+    }
+    blobCount = c;
+    if (brainOn) { const vel = world.readVelocities(); for (let i = 0, b = firstDynamic(); i < blobCount; i++, b++) { brainData[i * 6 + 3] = vel[b * 3]; brainData[i * 6 + 4] = vel[b * 3 + 1]; brainData[i * 6 + 5] = vel[b * 3 + 2]; } }
+  } else {
+    for (let i = 0; i < fb.length && blobCount < MAXBLOBS; i++) { const b = fb[i]; blobData[blobCount * 4] = b.xa * Math.sin(t * 0.5 * b.sp + b.xp); blobData[blobCount * 4 + 1] = TH * (0.5 + 0.4 * Math.sin(t * b.sp + b.ph)); blobData[blobCount * 4 + 2] = b.za * Math.cos(t * 0.43 * b.sp + b.zp); blobData[blobCount * 4 + 3] = 1.7; blobCount++; }
+  }
+}
+// the Brain steers by nudging each blob toward the action's goal, with a low-blob launch + jitter -- applied
+// as a small impulse every frame (continuous control from the ~15 Hz decision). Uses the COPIED brainData
+// positions, so calling impulse here can't corrupt a live box3d view.
+function applyBrainAction(dt) {
+  if (!brainOn || !ready || !world || !brainAction) return;
+  const cl = (v, a, b) => v < a ? a : v > b ? b : v;
+  // clamp the action so an erratic/early policy can't fling the blobs apart past the smooth-union blend threshold
+  // (that's what makes the surface "un-blob" and flash) -- gentle, bounded impulses keep the lava coherent
+  const gx = brainAction[0], gy = brainAction[1], gz = brainAction[2];
+  const gain = cl(brainAction[3], -40, 40), launch = cl(brainAction[4], 0, 40), jit = cl(brainAction[5], 0, 14);
+  for (let i = 0, b = firstDynamic(); i < blobCount; i++, b++) {
+    const x = brainData[i * 6], y = brainData[i * 6 + 1], z = brainData[i * 6 + 2];
+    let dx = gx - x, dy = gy - y, dz = gz - z; const L = Math.hypot(dx, dy, dz) || 1; dx /= L; dy /= L; dz /= L;
+    const lo = y < TH * 0.5 ? 1 : 0;
+    let ix = (dx * gain + (Math.random() - 0.5) * jit) * dt, iy = (dy * gain + launch * lo) * dt, iz = (dz * gain + (Math.random() - 0.5) * jit) * dt;
+    const im = Math.hypot(ix, iy, iz), CAP = 2.2 * dt * 60;   // cap per-blob impulse so nothing gets flung out of the tank
+    if (im > CAP) { const s = CAP / im; ix *= s; iy *= s; iz *= s; }
+    world.impulse(b, [ix, iy, iz]);
+  }
+}
+
+// ---------------- WGSL: raymarch a smooth-union-of-spheres SDF ----------------
+const WGSL = `
+struct U {
+  eye: vec3f, _p0: f32,
+  fwd: vec3f, tanHalf: f32,
+  right: vec3f, aspect: f32,
+  up: vec3f, time: f32,
+  count: u32, preset: u32, k: f32, _p1: f32,
+};
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(1) var<storage, read> blobs: array<vec4f>;
+
+const TANK_H: f32 = 20.0;
+
+fn smin(a: f32, b: f32, k: f32) -> f32 {
+  let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+fn mapScene(p: vec3f) -> f32 {
+  var d = 1e9;
+  let n = u.count;
+  for (var i = 0u; i < n; i = i + 1u) {
+    let b = blobs[i];
+    d = smin(d, length(p - b.xyz) - b.w, u.k);
+  }
+  return d;
+}
+fn calcN(p: vec3f) -> vec3f {
+  let e = vec2f(0.012, 0.0);
+  return normalize(vec3f(
+    mapScene(p + e.xyy) - mapScene(p - e.xyy),
+    mapScene(p + e.yxy) - mapScene(p - e.yxy),
+    mapScene(p + e.yyx) - mapScene(p - e.yyx)));
+}
+fn fireRamp(hh: f32) -> vec3f {
+  let x = clamp(hh, 0.0, 1.0);
+  let c0 = vec3f(0.06, 0.0, 0.0); let c1 = vec3f(0.55, 0.04, 0.0); let c2 = vec3f(1.0, 0.22, 0.0);
+  let c3 = vec3f(1.0, 0.55, 0.08); let c4 = vec3f(1.0, 0.85, 0.35); let c5 = vec3f(1.0, 1.0, 0.86);
+  if (x < 0.22) { return mix(c0, c1, x / 0.22); }
+  if (x < 0.45) { return mix(c1, c2, (x - 0.22) / 0.23); }
+  if (x < 0.68) { return mix(c2, c3, (x - 0.45) / 0.23); }
+  if (x < 0.85) { return mix(c3, c4, (x - 0.68) / 0.17); }
+  return mix(c4, c5, (x - 0.85) / 0.15);
+}
+fn sky(rd: vec3f) -> vec3f {
+  let t = clamp(rd.y * 0.5 + 0.5, 0.0, 1.0);
+  return mix(vec3f(0.02, 0.05, 0.09), vec3f(0.30, 0.52, 0.78), t);
+}
+
+struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
+@vertex fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
+  var pts = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VSOut;
+  let p = pts[vid];
+  o.pos = vec4f(p, 0.0, 1.0);
+  o.uv = p;
+  return o;
+}
+@fragment fn fs(inp: VSOut) -> @location(0) vec4f {
+  let uv = inp.uv;
+  let rd = normalize(u.fwd + uv.x * u.tanHalf * u.aspect * u.right + uv.y * u.tanHalf * u.up);
+  let ro = u.eye;
+  var t = 0.0; var hit = false; var p = ro; var glow = 0.0;
+  for (var i = 0; i < 140; i = i + 1) {
+    p = ro + rd * t;
+    let d = mapScene(p);
+    glow = glow + 0.014 / (1.0 + d * d * 3.0);            // cheap volumetric bloom near the surface
+    if (d < 0.003) { hit = true; break; }
+    t = t + max(d, 0.01);
+    if (t > 180.0) { break; }
+  }
+  let lightDir = normalize(vec3f(0.4, 0.85, 0.3));
+  if (u.preset == 0u) {
+    // --- FIRE ---
+    var col = vec3f(0.02, 0.008, 0.012);
+    if (hit) {
+      let n = calcN(p);
+      let heat = clamp(1.0 - (p.y / TANK_H) * 1.05 + 0.10 * sin(p.x * 0.4 + u.time * 7.0), 0.0, 1.0);
+      let base = fireRamp(heat);
+      let fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.0);
+      col = base * (0.6 + 0.4 * max(n.y, 0.0)) + vec3f(1.0, 0.6, 0.2) * fres * 0.7;
+    }
+    col = col + vec3f(1.0, 0.45, 0.12) * glow * 0.9;       // ember haze glow
+    return vec4f(col, 1.0);
+  }
+  // --- WATER ---
+  if (!hit) { return vec4f(sky(rd), 1.0); }
+  let n = calcN(p);
+  let fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, -rd), 0.0), 5.0);   // Schlick
+  let refl = sky(reflect(rd, n));
+  let deep = vec3f(0.0, 0.13, 0.19);
+  let shallow = vec3f(0.10, 0.42, 0.5);
+  let body = mix(deep, shallow, clamp(max(n.y, 0.0), 0.0, 1.0));
+  let spec = pow(max(dot(reflect(rd, n), lightDir), 0.0), 80.0);
+  let col = mix(body, refl, fres) + vec3f(spec) + vec3f(0.1, 0.3, 0.4) * glow * 0.25;
+  return vec4f(col, 1.0);
+}
+`;
+
+// ---------------- WebGPU setup ----------------
+let device, ctx, format, pipeline, uBuf, sBuf, bind, uArr, uF32, uU32;
+async function initGPU() {
+  const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  if (!_p.available) { fallback(_p.message); return false; }
+  let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }) || await navigator.gpu.requestAdapter() || await navigator.gpu.requestAdapter({ powerPreference: "low-power" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
+  if (!adapter) { fallback("no GPU adapter (WebGPU disabled or blocklisted)."); return false; }
+  try { device = await adapter.requestDevice(); } catch (e) { fallback("requestDevice threw: " + e.message); return false; }
+  device.lost.then((info) => { if (info && info.reason !== "destroyed") fallback("GPU device lost: " + info.message); });
+  ctx = canvas.getContext("webgpu");
+  if (!ctx) { fallback("canvas.getContext('webgpu') returned null."); return false; }
+  format = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({ device, format, alphaMode: "opaque" });
+
+  uArr = new ArrayBuffer(80); uF32 = new Float32Array(uArr); uU32 = new Uint32Array(uArr);
+  uBuf = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  sBuf = device.createBuffer({ size: MAXBLOBS * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+
+  let mod;
+  try { mod = device.createShaderModule({ code: WGSL }); const ci = await (mod.getCompilationInfo ? mod.getCompilationInfo() : Promise.resolve(null)); if (ci && ci.messages) { for (const m of ci.messages) if (m.type === "error") { fallback("WGSL compile error: " + m.message); return false; } } }
+  catch (e) { fallback("shader module failed: " + e.message); return false; }
+
+  try {
+    pipeline = device.createRenderPipeline({
+      layout: "auto",
+      vertex: { module: mod, entryPoint: "vs" },
+      fragment: { module: mod, entryPoint: "fs", targets: [{ format }] },
+      primitive: { topology: "triangle-list" },
+    });
+  } catch (e) { fallback("pipeline failed: " + e.message); return false; }
+
+  bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [
+    { binding: 0, resource: { buffer: uBuf } },
+    { binding: 1, resource: { buffer: sBuf } },
+  ] });
+  return true;
+}
+
+function resize() { const dpr = Math.min(2, window.devicePixelRatio || 1); const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr); if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; } }
+addEventListener("resize", resize); resize();
+
+// ---------------- loop ----------------
+let spin = true, theta = 0.6, prev = performance.now(), fpsT = performance.now(), fpsN = 0;
+// v2450 -- frame() re-arms itself at the BOTTOM, so anything that threw above that line killed the animation for good
+// and did so silently. That is how a single missing method (world.bodyCount on Jolt) froze this whole page. Now the
+// loop survives its own bugs: it reports the first fault once, in the open, and keeps running.
+let _frameFault = null;
+function _reportFault(e) {
+  if (_frameFault) return; _frameFault = String((e && e.message) || e);
+  console.error("[swek] frame fault (the loop kept going):", e);
+  const b = document.getElementById("blurb");
+  if (b) b.innerHTML += " <span style='color:#ff9a9a'>frame fault: " + _frameFault + " -- the loop is still running; this feature is degraded.</span>";
+}
+
+function frame() {
+  try { _frameBody(); } catch (e) { _reportFault(e); }
+  requestAnimationFrame(frame);
+}
+function _frameBody() {
+  const now = performance.now(), t = now / 1000; let dt = (now - prev) / 1000; prev = now; if (dt > 0.05) dt = 0.05;
+  resize();
+  updateCenters(t, dt);
+  applyBrainAction(dt);
+  device.queue.writeBuffer(sBuf, 0, blobData, 0, MAXBLOBS * 4);
+
+  // camera (orbit)
+  if (spin) theta += 0.0028;
+  const r = 46, cyEye = TH * 0.62, cx = Math.cos(theta) * r, cz = Math.sin(theta) * r;
+  const cxT = 0, cyT = TH * 0.34, czT = 0;
+  let fx = cxT - cx, fy = cyT - cyEye, fz = czT - cz; const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+  // right = normalize(cross(fwd, worldUp)) with worldUp=(0,1,0) -> (-fz, 0, fx)
+  let rx = -fz, ry = 0, rz = fx; const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
+  // up = cross(right, fwd)
+  const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;
+  const tanHalf = Math.tan((50 * Math.PI / 180) / 2), aspect = canvas.width / canvas.height;
+  uF32[0] = cx; uF32[1] = cyEye; uF32[2] = cz;
+  uF32[4] = fx; uF32[5] = fy; uF32[6] = fz; uF32[7] = tanHalf;
+  uF32[8] = rx; uF32[9] = ry; uF32[10] = rz; uF32[11] = aspect;
+  uF32[12] = ux; uF32[13] = uy; uF32[14] = uz; uF32[15] = t;
+  uU32[16] = blobCount; uU32[17] = preset; uF32[18] = RES_K; uF32[19] = 0;
+  device.queue.writeBuffer(uBuf, 0, uArr);
+
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), clearValue: { r: 0.027, g: 0.02, b: 0.043, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+  device.queue.submit([enc.finish()]);
+
+  fpsN++; if (now - fpsT > 500) { const el = document.getElementById("fps"); if (el) el.textContent = Math.round(fpsN * 1000 / (now - fpsT)) + " fps \u00b7 " + blobCount + " blobs" + (ready ? " \u00b7 box3d" : " \u00b7 fallback"); fpsT = now; fpsN = 0; }
+}
+
+// ---------------- controls ----------------
+const $ = (id) => document.getElementById(id);
+$("preset").onchange = (e) => { preset = +e.target.value; };
+$("blobs").oninput = (e) => { wantBlobs = +e.target.value; if (ready) { const have = Math.max(0, (world ? world.bodyCount() : 0) - firstDynamic()); for (let i = have; i < wantBlobs; i++) addBlob(); } else seedFallback(wantBlobs); };
+$("blend").oninput = (e) => { RES_K = +e.target.value / 10; };
+$("fount").oninput = (e) => { fountain = (+e.target.value) / 100; };
+$("pour").onclick = () => { if (ready) for (let i = 0; i < 8; i++) addBlob(); else seedFallback(fb.length + 8); };
+$("quake").onclick = () => { if (!ready || !world) return; const nB = world.bodyCount(); for (let b = firstDynamic(); b < nB; b++) world.impulse(b, [(Math.random() - 0.5) * 20, 30 + Math.random() * 30, (Math.random() - 0.5) * 20]); };
+$("spin").onclick = () => { spin = !spin; $("spin").textContent = "\u21bb orbit: " + (spin ? "on" : "off"); };
+// v2300 -- GPU Brain controls. The Brain needs Box3D (it steers real bodies), so the toggle is a no-op in the
+// scripted fallback. Switching task resets the learner for that reward; sheepdog gets a moving target (set in
+// the decision loop), the others let the policy choose its own goal so it can discover the behaviour.
+$("brain").onclick = () => {
+  if (!ready) { $("brainMsg").textContent = "needs Box3D built (see box3d-info.html)"; return; }
+  brainOn = !brainOn;
+  $("brain").innerHTML = brainOn ? "\ud83e\udde0 Brain: ON" : "\ud83e\udde0 Brain: off";
+  $("brain").className = brainOn ? "go" : "";
+  if (brainOn && brain) { brain.setMode(brainTask); if (brainTask !== "sheepdog") brain.setTarget(null); }
+};
+$("task").onchange = (e) => { brainTask = e.target.value; if (brain) { brain.setMode(brainTask); if (brainTask !== "sheepdog") brain.setTarget(null); } };
+$("rec").onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); $("rec").textContent = "\u25CF Record"; return; }
+  const secs = +($("dur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, canvas)) { $("rec").textContent = "\u25A0 recording " + secs + "s"; $("msg").textContent = "capturing\u2026"; setTimeout(() => { $("rec").textContent = "\u25CF Record"; $("msg").textContent = "saved"; }, secs * 1000 + 200); }
+  else { $("msg").textContent = "no MediaRecorder here"; }
+};
+
+// ---------------- boot ----------------
+// the ~15 Hz decision loop, decoupled from the 60 fps render because forward() reads back over the GPU.
+async function brainLoop() {
+  for (;;) {
+    try {
+      if (brainOn && brain && blobCount > 0) {
+        if (brainTask === "sheepdog") { const tt = performance.now() / 1000; brain.setTarget([Math.cos(tt * 0.35) * TW * 0.62, TH * 0.5, Math.sin(tt * 0.35) * TW * 0.62]); }
+        brainAction = await brain.step(brainData, blobCount, { TW, TH });
+        const s = brain.stats(); const el = document.getElementById("brainMsg"); if (el) el.textContent = "ep " + s.episode + " \u00b7 reward " + s.reward.toFixed(2) + " \u00b7 avg " + s.avg.toFixed(2);
+      }
+    } catch (e) { /* keep steering with the last action */ }
+    await new Promise((r) => setTimeout(r, 66));
+  }
+}
+(async () => {
+  const ok = await initGPU();
+  if (!ok) return;                 // fallback UI already shown + redirect armed
+  try { brain = makeBlobBrain(device); brainLoop(); } catch (e) { const el = document.getElementById("brain"); if (el) { el.disabled = true; el.title = "brain init failed: " + e.message; } }
+  await initPhysics();
+  frame();
+})();
+</script>
+
+<script>(function(){var h=document.getElementById("hud");if(h&&window.matchMedia&&window.matchMedia("(max-width:640px)").matches)h.classList.add("min");})();</script>
+</body>
+</html>

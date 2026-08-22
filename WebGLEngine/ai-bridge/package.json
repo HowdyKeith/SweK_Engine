@@ -1,0 +1,34 @@
+{
+  "name": "voxelengine-ai-bridge",
+  "version": "1.0.0",
+  "description": "WebSocket bridge between VoxelEngine browser client and Node-side tools (asset listing, mod loading, narrative LLM, etc.)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "bun": "bun server.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.18.0",
+    "@noble/ciphers": "^1.1.3",
+    "aedes": "^1.0.2",
+    "bonjour-service": "^1.4.0",
+    "discord.js": "^14.16.3",
+    "jolt-physics": "^1.1.0",
+    "libsodium-wrappers": "^0.7.15",
+    "mqtt": "^5.15.1",
+    "node-unrar-js": "^2.0.2",
+    "openrgb-sdk": "^0.6.0",
+    "opusscript": "^0.0.8",
+    "selfsigned": "^2.4.1",
+    "ws": "^8.21.0"
+  },
+  "optionalDependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "puppeteer-core": "^24.0.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=18",
+    "bun": ">=1.0"
+  }
+}

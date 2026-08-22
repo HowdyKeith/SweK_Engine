@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="GPU Brain: Learn to Dock">
+<meta name="demo:desc" content="A thruster-controlled ship learns to dock with the GPU Brain: relative target + velocity in, turn + thrust out, trained by evolution strategy. No drag, so it must anticipate momentum and counter-thrust to arrive slow. Watch it go from drifting to docking.">
+<meta name="demo:category" content="brain">
+<title>GPU Brain: Learn to Dock</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; --ring:#f6a623; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; overflow:hidden; }
+  #hud { position:fixed; top:12px; left:14px; z-index:5; max-width:340px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:7px 13px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--cyan); }
+  button:disabled { opacity:.5; cursor:default; }
+  .stat { color:var(--dim); font-size:12px; line-height:1.6; }
+  .stat b { color:#dbe7ff; }
+  .big { color:var(--green); font-size:15px; }
+  canvas { display:block; }
+  #bar { height:5px; background:#0c1526; border-radius:3px; overflow:hidden; margin-top:4px; }
+  #barf { height:100%; width:0; background:var(--cyan); transition:width .1s; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>&#9673; GPU Brain &middot; Learn to Dock</h1>
+  <div class="stat" id="status">Untrained policy &mdash; the ship drifts and overshoots. Press Train.</div>
+  <div class="row" style="margin-top:8px"><button id="trainBtn" onclick="train()">Train (evolution strategy)</button><button onclick="resetPolicy()">Reset brain</button></div>
+  <div id="bar"><div id="barf"></div></div>
+  <div class="stat" style="margin-top:8px">dock rate <b id="dock" class="big">--</b> &middot; avg arrival <b id="dist">--</b>u<br>docked this run <b id="docks">0</b> &middot; missed <b id="miss">0</b></div>
+  <div class="stat" style="margin-top:8px;color:#55617a">obs: relative target + velocity (ship frame) &rarr; MLP &rarr; turn + thrust. Runs on the GPU Brain's BatchedMLP.</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import { FlightPolicy, DockEnv, evaluate, trainDockES } from "./brain/rl/dockPolicy.js";
+import { DOCK_R } from "./brain/rl/dockEnv.js";
+
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+function resize() { cvs.width = innerWidth; cvs.height = innerHeight; } addEventListener("resize", resize); resize();
+
+let policy = new FlightPolicy({ hidden: [16, 16], seed: 3 });
+let env = new DockEnv({ maxSteps: 220 });
+let obs = env.reset(Math.floor(Math.random() * 1e6));
+let docks = 0, miss = 0, trained = false;
+let trail = [];
+
+function resetPolicy() { policy = new FlightPolicy({ hidden: [16, 16], seed: 3 }); trained = false; docks = 0; miss = 0; document.getElementById("dock").textContent = "--"; document.getElementById("dist").textContent = "--"; document.getElementById("status").textContent = "Untrained policy \u2014 the ship drifts and overshoots. Press Train."; }
+
+function train() {
+  const btn = document.getElementById("trainBtn"); btn.disabled = true;
+  document.getElementById("status").textContent = "Training the GPU Brain by evolution strategy\u2026";
+  const barf = document.getElementById("barf"); barf.style.width = "10%";
+  // run in a timeout so the spinner paints before the (brief) blocking train
+  setTimeout(() => {
+    const before = evaluate(policy.getParams(), { episodes: 30 });
+    const { params } = trainDockES({ iters: 55, pop: 20, sigma: 0.12, lr: 0.08, trainEps: 9, seed: 3 });
+    policy.setParams(params); trained = true;
+    const after = evaluate(params, { episodes: 40 });
+    barf.style.width = "100%";
+    document.getElementById("dock").textContent = (after.dockRate * 100).toFixed(0) + "%";
+    document.getElementById("dist").textContent = after.avgDist.toFixed(0);
+    document.getElementById("status").textContent = "Trained. dock rate " + (before.dockRate * 100).toFixed(0) + "% \u2192 " + (after.dockRate * 100).toFixed(0) + "% \u2014 watch it arrive slow, on target.";
+    docks = 0; miss = 0; btn.disabled = false; setTimeout(() => barf.style.width = "0%", 800);
+  }, 60);
+}
+
+function draw() {
+  ctx.fillStyle = "#04060d"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  ctx.save(); ctx.translate(cvs.width / 2, cvs.height / 2); const sc = Math.min(cvs.width, cvs.height) / 1500; ctx.scale(sc, sc);
+  // dock ring at target
+  ctx.strokeStyle = "#f6a623"; ctx.lineWidth = 3; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.arc(env.tx, env.ty, DOCK_R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = "#5a4a20"; ctx.beginPath(); ctx.arc(env.tx, env.ty, DOCK_R + 6, 0, 7); ctx.stroke();
+  // trail
+  ctx.strokeStyle = "rgba(89,209,255,0.35)"; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < trail.length; i++) { const p = trail[i]; if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); } ctx.stroke();
+  // ship
+  ctx.save(); ctx.translate(env.x, env.y); ctx.rotate(env.h);
+  ctx.fillStyle = trained ? "#5fe08a" : "#59d1ff"; ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(-22, 17); ctx.lineTo(-12, 0); ctx.lineTo(-22, -17); ctx.closePath(); ctx.fill();
+  ctx.restore(); ctx.restore();
+}
+
+function tick() {
+  // step the live episode with the current policy
+  const a = policy.act(obs); const r = env.step(a); obs = r.obs;
+  trail.push([env.x, env.y]); if (trail.length > 120) trail.shift();
+  if (r.done) {
+    if (r.info.docked) docks++; else miss++;
+    document.getElementById("docks").textContent = docks; document.getElementById("miss").textContent = miss;
+    obs = env.reset(Math.floor(Math.random() * 1e6)); trail = [];
+  }
+  draw(); requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

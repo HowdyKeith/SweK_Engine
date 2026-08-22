@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar 3D Card — Preview</title>
+<style>
+    :root { --panel: #0d1726; --line: #1d3350; --txt: #cfe6f7; --accent: #22dd77; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #060912; color: var(--txt);
+        font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif; overflow: hidden; }
+    #scene { position: fixed; inset: 0; }
+    .hud { position: fixed; top: 16px; left: 16px; z-index: 5;
+        background: rgba(13,23,38,0.82); backdrop-filter: blur(8px);
+        border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; width: 280px;
+        box-shadow: 0 16px 50px rgba(0,0,0,0.5); }
+    .hud h1 { margin: 0 0 2px; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: #eafff2; }
+    .hud .sub { margin: 0 0 14px; font-size: 11px; color: #6f86a6; letter-spacing: 0.03em; }
+    .row { margin: 12px 0; }
+    .row label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; color: #9fb6d4; }
+    .row label b { color: #eafff2; font-variant-numeric: tabular-nums; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .presets { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+    .presets button { flex: 1; min-width: 64px; padding: 7px 4px; font-size: 11px; cursor: pointer;
+        background: #112138; color: var(--txt); border: 1px solid var(--line); border-radius: 8px; }
+    .presets button:hover { border-color: var(--accent); color: #eafff2; }
+    .tag { position: fixed; bottom: 14px; left: 16px; z-index: 5; font-size: 11px; color: #4d627d; }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div class="hud">
+    <h1>SOLAR&nbsp;3D&nbsp;·&nbsp;PREVIEW</h1>
+    <p class="sub">Same renderer the HA card uses — mock data</p>
+    <div class="row">
+        <label>Battery <b id="vBatt">62%</b></label>
+        <input id="batt" type="range" min="0" max="100" value="62">
+    </div>
+    <div class="row">
+        <label>Sun elevation <b id="vEl">35°</b></label>
+        <input id="el" type="range" min="-18" max="80" value="35">
+    </div>
+    <div class="row">
+        <label>Sun azimuth <b id="vAz">140°</b></label>
+        <input id="az" type="range" min="0" max="360" value="140">
+    </div>
+    <div class="row">
+        <label>Cloud cover <b id="vCl">25%</b></label>
+        <input id="cl" type="range" min="0" max="100" value="25">
+    </div>
+    <div class="presets">
+        <button data-p="dawn">Dawn</button>
+        <button data-p="noon">Noon</button>
+        <button data-p="dusk">Dusk</button>
+        <button data-p="night">Night</button>
+        <button data-p="storm">Storm</button>
+    </div>
+</div>
+<div class="tag">drag to orbit · scroll to zoom</div>
+
+<script type="module">
+let THREE;
+        try { THREE = await import("./three.module.js"); }      // vendored (offline)
+        catch (e) { THREE = await import("https://esm.sh/three@0.160.0"); }  // fallback
+import { buildSolarScene } from "./solar-3d-card.js";
+
+const scene = buildSolarScene(THREE);
+scene.mount(document.getElementById("scene"));
+window.addEventListener("resize", () => scene.resize());
+
+const els = {
+    batt: document.getElementById("batt"), el: document.getElementById("el"),
+    az: document.getElementById("az"), cl: document.getElementById("cl"),
+    vBatt: document.getElementById("vBatt"), vEl: document.getElementById("vEl"),
+    vAz: document.getElementById("vAz"), vCl: document.getElementById("vCl"),
+};
+function push() {
+    els.vBatt.textContent = els.batt.value + "%";
+    els.vEl.textContent = els.el.value + "°";
+    els.vAz.textContent = els.az.value + "°";
+    els.vCl.textContent = els.cl.value + "%";
+    scene.update({
+        batteryLevel: +els.batt.value, sunElevation: +els.el.value,
+        sunAzimuth: +els.az.value, cloudCoverage: +els.cl.value,
+    });
+}
+["batt", "el", "az", "cl"].forEach(k => els[k].addEventListener("input", push));
+
+const PRESETS = {
+    dawn:  { batt: 28, el: 4,   az: 90,  cl: 20 },
+    noon:  { batt: 88, el: 68,  az: 180, cl: 10 },
+    dusk:  { batt: 74, el: 2,   az: 268, cl: 35 },
+    night: { batt: 46, el: -12, az: 320, cl: 25 },
+    storm: { batt: 19, el: 30,  az: 160, cl: 95 },
+};
+document.querySelectorAll(".presets button").forEach(b =>
+    b.addEventListener("click", () => {
+        const p = PRESETS[b.dataset.p];
+        els.batt.value = p.batt; els.el.value = p.el; els.az.value = p.az; els.cl.value = p.cl;
+        push();
+    }));
+push();
+</script>
+</body>
+</html>

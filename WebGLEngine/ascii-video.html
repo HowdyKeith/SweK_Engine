@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ASCII Video Player</title>
+<meta name="demo:desc" content="Load a JSON frame document and play it as ASCII video. Validates the grid, refuses ragged frames by name, and measures inter-frame churn so flicker is a number rather than an opinion.">
+<style>
+  :root { --bg:#05070d; --fg:#cfe; --dim:#7a8; --warn:#fc6; --bad:#f77; --ok:#7f9; }
+  body { background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; margin:0; padding:14px; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:12px; max-width:78ch; line-height:1.45; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  button, select, input[type=number] { background:#111a26; color:var(--fg); border:1px solid #2a3a4a; border-radius:6px; padding:5px 10px; font-size:12px; }
+  button:disabled { opacity:.45; }
+  #stage { background:#000; border:1px solid #223; border-radius:8px; padding:10px; overflow:auto; }
+  pre { margin:0; font-family:"Menlo","DejaVu Sans Mono",monospace; font-size:11px; line-height:1.0; letter-spacing:0; white-space:pre; }
+  #errs { color:var(--bad); font-size:12px; white-space:pre-wrap; margin-top:8px; }
+  #stats { color:var(--dim); font-size:12px; margin-top:8px; line-height:1.5; }
+  b.ok { color:var(--ok); } b.warn { color:var(--warn); } b.bad { color:var(--bad); }
+</style>
+</head>
+<body>
+<h1>ASCII Video Player</h1>
+<div class="sub">
+  Plays a JSON frame document: <code>{ fps, cols, rows, frames: ["…","…"] }</code>, each frame being
+  <code>rows</code> lines of exactly <code>cols</code> characters.
+  <b>This page owns no generator.</b> It imports text somebody else produced — a gradient-descent converter, a
+  lookup-table one, or a hand-typed grid — and never asks which. Validation refuses the failures that would
+  otherwise render fine and look like art: a short row, a missing line, a stray tab.
+</div>
+
+<div class="row">
+  <input type="file" id="file" accept=".json,application/json" title="a JSON frame document">
+  <label title="A folder of one .txt per frame, from ANY generator SweK does not contain — gradscii-art, a script, hand-typed. Frames are ordered NATURAL-NUMERICALLY, so frame10 lands after frame2.">
+    external .txt frames <input type="file" id="txts" accept=".txt,text/plain" multiple></label>
+  <button id="demo">Load a built-in demo</button>
+  <button id="play" disabled>Play</button>
+  <button id="stop" disabled>Stop</button>
+  <label>fps <input type="number" id="fps" min="1" max="60" step="1" value="12" style="width:64px"></label>
+</div>
+
+<div id="stage"><pre id="out">(no frames loaded)</pre></div>
+<div id="errs"></div>
+<div id="stats"></div>
+
+<script type="module">
+import { importFrames, churn, flickerOnStill } from "/tools/ship/asciiFrames.mjs";
+import { rampFrom, convertFrame, reconstructionError } from "/tools/ship/asciiLut.mjs";
+import { fromTextFiles } from "/tools/ship/asciiExternal.mjs";
+
+const $ = (id) => document.getElementById(id);
+let doc = null, timer = null, at = 0;
+
+function show(lines) { $("out").textContent = lines.join("\n"); }
+
+function render(res) {
+  $("errs").textContent = "";
+  $("stats").textContent = "";
+  if (!res.ok) {
+    // NAME EVERY REFUSAL. An importer that says "invalid" has told the reader nothing they can act on.
+    $("errs").textContent = "REFUSED (" + res.errors.length + "):\n  " + res.errors.join("\n  ");
+    $("play").disabled = true; $("stop").disabled = true;
+    show(["(refused — see below)"]);
+    return;
+  }
+  doc = res; at = 0;
+  $("fps").value = res.fps;
+  show(res.frames[0]);
+  $("play").disabled = false;
+
+  const c = churn(res.frames);
+  const still = flickerOnStill(res.frames);
+  // *** CHURN IS REPORTED, NOT JUDGED. High churn on a moving clip is the video moving; high churn on a still
+  // section is the GENERATOR flickering. This page cannot tell which without knowing the source, so it says
+  // both readings and lets the person decide -- naming a verdict it cannot support would be worse than none.
+  const pct = (v) => (100 * v).toFixed(1) + "%";
+  $("stats").innerHTML =
+    res.count + " frames, " + res.cols + "×" + res.rows + " at " + res.fps + " fps — " +
+    res.durationSec.toFixed(2) + "s<br>" +
+    "inter-frame churn: mean <b class='" + (c.mean > 0.5 ? "warn" : "ok") + "'>" + pct(c.mean) + "</b>, " +
+    "worst <b class='" + (c.worst > 0.8 ? "warn" : "ok") + "'>" + pct(c.worst) + "</b><br>" +
+    "<span style='color:#7a8'>Churn is the fraction of cells that changed. On a MOVING clip this is the motion. " +
+    "On a section the source holds STILL it should be zero — anything above zero there means the generator is " +
+    "flickering, not the video. This page cannot tell which you loaded, so it reports and does not judge.</span>";
+}
+
+$("file").onchange = async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try { render(importFrames(JSON.parse(await f.text()))); }
+  catch (err) { $("errs").textContent = "could not parse the file as JSON: " + (err && err.message); }
+};
+
+// *** THE "KEEP IT ENTIRELY EXTERNAL" ROUTE. A generator SweK does not contain writes one .txt per frame;
+// this reads TEXT AND NAMES and nothing else. SweK contains no generator, links against none, and cannot tell
+// which one produced these files -- so no licence follows the output in.
+$("txts").onchange = async (e) => {
+  const list = [...(e.target.files || [])];
+  if (!list.length) return;
+  const fps = Math.max(1, Math.min(60, Number($("fps").value) || 12));
+  const blobs = await Promise.all(list.map(async (f) => ({ name: f.name, text: await f.text() })));
+  const r = fromTextFiles(blobs, { fps });
+  if (!r.ok) {
+    $("errs").textContent = "REFUSED (" + r.errors.length + "):\n  " + r.errors.join("\n  ");
+    $("stats").textContent = ""; $("play").disabled = true; show(["(refused — see below)"]);
+    return;
+  }
+  render(importFrames(r.doc));
+  // WARNINGS ARE SHOWN EVEN ON SUCCESS. A non-contiguous set is fine for a step dump and a DROPPED FRAME in a
+  // per-frame export, and this page cannot tell which was handed to it -- so it says so rather than choosing.
+  const head = "read " + r.order.length + " files in natural-numeric order: " +
+      r.order.slice(0, 3).join(", ") + (r.order.length > 3 ? ", … , " + r.order[r.order.length - 1] : "");
+  $("stats").innerHTML = head + "<br>" + $("stats").innerHTML +
+      (r.warnings.length ? "<br><b class='warn'>" + r.warnings.join("<br>") + "</b>" : "");
+};
+
+$("demo").onclick = () => {
+  // *** THE DEMO GOES THROUGH OUR OWN LUT CONVERTER RATHER THAN HAND-PICKING CHARACTERS. It builds a
+  // GRAYSCALE FIELD -- a moving disc on a gradient -- and hands it to tools/ship/asciiLut.mjs, whose ramp is
+  // DERIVED by counting ink in glyph bitmaps rather than typed from the folklore " .:-=+*#%@". So the page
+  // exercises the generator it ships with, and churn on this clip is REAL MOTION rather than a picked effect.
+  const cols = 48, rows = 14, n = 24, W = 192, H = 84, frames = [];
+  const ramp = rampFrom();
+  let worstRmse = 0;
+  for (let i = 0; i < n; i++) {
+    const cx = W * (0.5 - 0.35 * Math.cos(2 * Math.PI * i / n)), cy = H * 0.5;
+    const gray = new Float64Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const d = Math.hypot(x - cx, y - cy) / (H * 0.32);
+      gray[y * W + x] = Math.min(1, (y / H) * 0.35 + Math.max(0, 1 - d) * 0.75);
+    }
+    frames.push(convertFrame(gray, W, H, cols, rows, ramp));
+    worstRmse = Math.max(worstRmse, reconstructionError(gray, W, H, cols, rows, ramp).rmse);
+  }
+  render(importFrames({ fps: 12, cols, rows, frames }));
+  // The converter's own quality number, beside the playback -- reported, not judged.
+  $("stats").innerHTML += "<br><span style='color:#7a8'>generated by the built-in LUT converter; worst " +
+    "per-frame reconstruction rmse " + worstRmse.toFixed(4) + " against the box-averaged source. The ramp is " +
+    "<code>" + ramp.map((g) => g.ch).join("").replace(/</g, "&lt;") + "</code>, DERIVED by counting ink in the " +
+    "glyph bitmaps rather than typed from the usual &quot; .:-=+*#%@&quot;.</span>";
+};
+
+$("play").onclick = () => {
+  if (!doc || timer) return;
+  const fps = Math.max(1, Math.min(60, Number($("fps").value) || doc.fps));
+  $("stop").disabled = false; $("play").disabled = true;
+  timer = setInterval(() => { at = (at + 1) % doc.count; show(doc.frames[at]); }, 1000 / fps);
+};
+$("stop").onclick = () => { clearInterval(timer); timer = null; $("stop").disabled = true; $("play").disabled = false; };
+</script>
+</body>
+</html>

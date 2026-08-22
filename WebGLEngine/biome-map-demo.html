@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Worley Biome Map (v2779)</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { display: flex; gap: 16px; padding: 14px; flex-wrap: wrap; }
+  canvas { image-rendering: pixelated; border: 1px solid #24382e; background: #000; }
+  /* v2873 -- the action fills the page. Backing store stays the per-cell grid: one pixel is one cell, so the DISPLAY grows and pixelated keeps a cell square. Enlarging the store would invent detail the sim never computed. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+  #side { min-width: 220px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  .row { margin: 6px 0; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  .sw { width: 16px; height: 16px; border: 1px solid #0006; }
+  button, input { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 3px 8px; }
+  .note { color: #6f8a7c; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <canvas id="c" width="480" height="480"></canvas>
+    <div class="note">2D canvas -- renders without WebGL. Each pixel is a world column; colour is the blended
+      biome, so cell borders read as soft gradients. [no GPU required]</div>
+  </div>
+  <div id="side">
+    <h1>Worley Biome Map</h1>
+    <div class="row">seed <input id="seed" type="number" value="1337" style="width:90px"> <button id="go">redraw</button> <button id="rnd">random</button></div>
+    <div class="row"><label><input id="mode" type="checkbox"> show heat field (grayscale)</label></div>
+    <div class="row"><label><input id="borders" type="checkbox" checked> mark cell borders</label></div>
+    <div class="row">scale <input id="scale" type="range" min="1" max="6" value="3" step="1"></div>
+    <div class="legend" id="legend"></div>
+    <div class="note" id="stats"></div>
+  </div>
+</div>
+<script type="module">
+import { biomeAt, biomeHeatField, BIOMES, worley } from "/world/worleyBiomes.js";
+
+const c = document.getElementById("c"), ctx = c.getContext("2d");
+const W = c.width, H = c.height;
+const $ = (id) => document.getElementById(id);
+
+// legend
+$("legend").innerHTML = Object.entries(BIOMES).map(([k, b]) =>
+    `<div><span class="sw" style="background:rgb(${b.color.map(v => Math.round(v * 255)).join(",")})"></span>${k}</div>`).join("");
+
+function draw() {
+    const seed = parseInt($("seed").value) | 0;
+    const worldPerPx = parseInt($("scale").value);   // world units per pixel
+    const showHeat = $("mode").checked, markBorders = $("borders").checked;
+    const img = ctx.createImageData(W, H);
+    const counts = {};
+    for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+            const wx = px * worldPerPx, wz = py * worldPerPx;
+            let r, g, b;
+            if (showHeat) {
+                const heat = biomeHeatValue(wx, wz, seed);
+                r = g = b = Math.round(heat * 255);
+            } else {
+                const bm = biomeAt(wx, wz, seed);
+                counts[bm.primary] = (counts[bm.primary] || 0) + 1;
+                r = bm.params.color[0] * 255; g = bm.params.color[1] * 255; b = bm.params.color[2] * 255;
+                if (markBorders) {
+                    const w = worley(wx, wz, seed);
+                    if (w.f2 - w.f1 < worldPerPx * 1.2) { r *= 0.45; g *= 0.45; b *= 0.45; }   // darken Voronoi edges
+                }
+            }
+            const o = (py * W + px) * 4;
+            img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+    const total = W * H;
+    $("stats").textContent = showHeat ? "heat field: 0 (cold/black) .. 255 (hot/white)" :
+        Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${(100 * n / total).toFixed(0)}%`).join("  ");
+}
+
+// heat value for the preview (0..1), matching worleyBiomes.cellClimate on the sample's cell
+function biomeHeatValue(wx, wz, seed) {
+    const hf = biomeHeatField(Math.floor(wx / 16), Math.floor(wz / 16), 16, seed);
+    const lx = ((wx % 16) + 16) % 16, lz = ((wz % 16) + 16) % 16;
+    return hf[(lz | 0) * 16 + (lx | 0)] / 255;
+}
+
+$("go").onclick = draw;
+$("rnd").onclick = () => { $("seed").value = Math.floor(Math.random() * 100000); draw(); };
+$("mode").onchange = $("borders").onchange = $("scale").oninput = draw;
+draw();
+</script>
+</body>
+</html>

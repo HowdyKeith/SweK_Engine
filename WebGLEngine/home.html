@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Control &mdash; SweK Engine</title>
+<style>
+  :root { --acc:#2bff88; --bg:#020a06; --card:#0c0f14; --bd:#1c2531; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:#dfe7f2; font:15px/1.4 ui-monospace,SFMono-Regular,monospace; }
+  header { position:sticky; top:0; z-index:5; background:linear-gradient(180deg,#04140b,#020a06); border-bottom:1px solid #145; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+  h1 { font-size:18px; color:var(--acc); margin:0; letter-spacing:.5px; flex:1; }
+  #status { font-size:12px; color:#9bd6ff; }
+  main { padding:12px 14px 40px; max-width:760px; margin:0 auto; }
+  .sec { margin:0 0 20px; }
+  .sh { font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:#7fd6a8; margin:0 0 8px; display:flex; align-items:center; gap:10px; }
+  .sh .tools { margin-left:auto; display:flex; gap:8px; }
+  .row { display:flex; align-items:center; gap:10px; padding:11px 13px; background:var(--card); border:1px solid var(--bd); border-radius:10px; margin-bottom:7px; flex-wrap:wrap; }
+  .nm { flex:1; min-width:120px; color:#eef3fa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  button { font:14px ui-monospace,monospace; padding:10px 14px; border-radius:9px; border:1px solid #2a3340; background:#16202c; color:#cde; cursor:pointer; min-height:42px; }
+  button:hover { border-color:var(--acc); }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline:3px solid var(--acc); outline-offset:2px; }
+  button.on { background:#0c3; color:#021; border-color:var(--acc); font-weight:bold; }
+  button.danger { color:#ffb4b4; }
+  button.go { color:#9fe88f; }
+  input[type=range] { width:120px; height:30px; }
+  input[type=color] { width:42px; height:38px; border:1px solid #2a3340; border-radius:8px; background:var(--card); }
+  select { font:14px ui-monospace,monospace; padding:8px 10px; background:var(--card); color:#e8eef8; border:1px solid #2a3340; border-radius:8px; min-height:42px; }
+  .val { color:#9fe0c0; }
+  .set { min-width:54px; text-align:center; color:#ffe0a0; font-size:16px; }
+  .muted { color:#7a8290; }
+  a.back { color:#7fd6a8; text-decoration:none; font-size:13px; }
+  .note { color:#7a8290; font-size:12px; margin:2px 0 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127968; Home Control</h1>
+  <span id="status">connecting&hellip;</span>
+  <button id="rescan" style="min-height:36px;padding:7px 12px;">&#8635;</button>
+</header>
+<main>
+  <div class="note">Lightweight smart-home control &mdash; runs on a phone, Android&nbsp;TV, or an older iPad (no 3D engine needed). Everything is pulled live from Home&nbsp;Assistant.</div>
+  <div class="sec" id="secLights"><div class="sh">Lights <span class="tools"><button id="allOn" class="go">All on</button><button id="allOff" class="danger">All off</button></span></div><div id="lights"></div></div>
+  <div class="sec" id="secSwitches"><div class="sh">Switches</div><div id="switches"></div></div>
+  <div class="sec" id="secClimate"><div class="sh">Climate &mdash; thermostats / AC</div><div id="climate"></div></div>
+  <div class="sec" id="secSensors"><div class="sh">Temperature &amp; humidity</div><div id="sensors"></div></div>
+  <a class="back" href="/">&larr; back to engine</a>
+</main>
+
+<script>
+var statusEl = document.getElementById("status");
+function setStatus(t, col) { statusEl.textContent = t; statusEl.style.color = col || "#9bd6ff"; }
+
+function haStates(domain) { return fetch("/ha/states" + (domain ? ("?domain=" + domain) : ""), { cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return null; }); }
+function haCall(domain, service, data) { return fetch("/ha/call", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: domain, service: service, data: data || {} }) }).then(function (r) { return r.json(); }).catch(function () { return null; }); }
+function norm(d) { if (Array.isArray(d)) return { list: d, ok: true }; if (d && Array.isArray(d.states)) return { list: d.states, ok: d.configured !== false }; return { list: [], ok: false }; }
+function repoll(fn) { setTimeout(fn, 650); }
+function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+function loadLights() {
+  return haStates("light").then(function (d) {
+    var n = norm(d), host = document.getElementById("lights"); host.innerHTML = "";
+    if (!n.ok) { setStatus("Home Assistant not set up", "#e8c45a"); host.appendChild(el("div", "muted", "Set HA URL + token in the engine's Home Assistant settings, then reload.")); return; }
+    if (!n.list.length) { host.appendChild(el("div", "muted", "(no lights)")); return; }
+    n.list.forEach(function (e) {
+      var on = e.state === "on", r = el("div", "row");
+      r.appendChild(el("div", "nm", e.name));
+      var t = el("button", on ? "on" : "", on ? "On" : "Off");
+      t.onclick = function () { haCall("light", on ? "turn_off" : "turn_on", { entity_id: e.entity_id }).then(function () { repoll(loadLights); }); };
+      r.appendChild(t);
+      var bri = document.createElement("input"); bri.type = "range"; bri.min = "1"; bri.max = "100"; bri.value = String(Math.round(((e.brightness || 0) / 255) * 100) || (on ? 100 : 1));
+      bri.onchange = function () { haCall("light", "turn_on", { entity_id: e.entity_id, brightness_pct: parseInt(bri.value, 10) }).then(function () { repoll(loadLights); }); };
+      r.appendChild(bri);
+      var col = document.createElement("input"); col.type = "color"; col.value = "#ffd9a0";
+      col.onchange = function () { var h = col.value; haCall("light", "turn_on", { entity_id: e.entity_id, rgb_color: [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)] }); };
+      r.appendChild(col);
+      host.appendChild(r);
+    });
+  });
+}
+function loadSwitches() {
+  return haStates("switch").then(function (d) {
+    var n = norm(d), host = document.getElementById("switches"); host.innerHTML = "";
+    if (!n.list.length) { host.appendChild(el("div", "muted", "(no switches)")); return; }
+    n.list.forEach(function (e) {
+      var on = e.state === "on", r = el("div", "row"); r.appendChild(el("div", "nm", e.name));
+      var t = el("button", on ? "on" : "", on ? "On" : "Off");
+      t.onclick = function () { haCall("switch", on ? "turn_off" : "turn_on", { entity_id: e.entity_id }).then(function () { repoll(loadSwitches); }); };
+      r.appendChild(t); host.appendChild(r);
+    });
+  });
+}
+function loadClimate() {
+  return haStates("climate").then(function (d) {
+    var n = norm(d), host = document.getElementById("climate"); host.innerHTML = "";
+    if (!n.list.length) { host.appendChild(el("div", "muted", "(no thermostats / AC units)")); return; }
+    n.list.forEach(function (e) {
+      var r = el("div", "row");
+      var cur = (e.current_temperature != null) ? (e.current_temperature + "\u00b0") : "\u2014";
+      var info = el("div", "nm"); info.innerHTML = e.name + ' <span class="muted">now ' + cur + " \u00b7 " + (e.hvac_action || e.state || "") + "</span>";
+      r.appendChild(info);
+      if (e.temperature != null) {
+        var step = e.target_temp_step || 1, target = e.temperature;
+        var minus = el("button", "", "\u2212"), set = el("span", "set", target + "\u00b0"), plus = el("button", "", "+");
+        function nudge(dir) { target = target + dir * step; if (e.min_temp != null) target = Math.max(e.min_temp, target); if (e.max_temp != null) target = Math.min(e.max_temp, target); set.textContent = target + "\u00b0"; haCall("climate", "set_temperature", { entity_id: e.entity_id, temperature: target }); }
+        minus.onclick = function () { nudge(-1); }; plus.onclick = function () { nudge(1); };
+        r.appendChild(minus); r.appendChild(set); r.appendChild(plus);
+      }
+      if (Array.isArray(e.hvac_modes) && e.hvac_modes.length) {
+        var sel = document.createElement("select");
+        e.hvac_modes.forEach(function (m) { var o = document.createElement("option"); o.value = m; o.textContent = m; if (m === e.state) o.selected = true; sel.appendChild(o); });
+        sel.onchange = function () { haCall("climate", "set_hvac_mode", { entity_id: e.entity_id, hvac_mode: sel.value }).then(function () { repoll(loadClimate); }); };
+        r.appendChild(sel);
+      }
+      host.appendChild(r);
+    });
+  });
+}
+function loadSensors() {
+  return haStates("sensor").then(function (d) {
+    var n = norm(d), host = document.getElementById("sensors"); host.innerHTML = "";
+    var keep = n.list.filter(function (e) { return e.device_class === "temperature" || e.device_class === "humidity" || /temp|humid/i.test(e.name); });
+    if (!keep.length) { host.appendChild(el("div", "muted", "(no temp/humidity sensors)")); return; }
+    keep.forEach(function (e) { var r = el("div", "row"); r.appendChild(el("div", "nm", e.name)); var v = el("div", "val", e.state + (e.unit ? (" " + e.unit) : "")); r.appendChild(v); host.appendChild(r); });
+  });
+}
+function refreshAll() {
+  setStatus("reading the house\u2026");
+  Promise.all([loadLights(), loadSwitches(), loadClimate(), loadSensors()]).then(function () {
+    if (statusEl.textContent.indexOf("not set up") < 0) setStatus("connected \u00b7 live");
+  });
+}
+document.getElementById("rescan").onclick = refreshAll;
+document.getElementById("allOn").onclick = function () { haCall("light", "turn_on", { entity_id: "all" }).then(function () { repoll(loadLights); }); };
+document.getElementById("allOff").onclick = function () { haCall("light", "turn_off", { entity_id: "all" }).then(function () { repoll(loadLights); }); };
+refreshAll();
+setInterval(function () { loadSensors(); }, 30000);   // keep sensor readings fresh
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

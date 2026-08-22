@@ -1,0 +1,1659 @@
+{
+ "note": "Layer 1 of three: STATIC. No clock, no rig run, travels in the zip. Edges are MEASURED relations and each carries its KIND.",
+ "captured": null,
+ "nodes": [
+  {
+   "id": "acoustics",
+   "section": "physicslab",
+   "modules": 3,
+   "interrogated": true,
+   "observables": 2
+  },
+  {
+   "id": "beam",
+   "section": null,
+   "modules": 2,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "blackhole",
+   "section": null,
+   "modules": 2,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "blobbodies",
+   "section": null,
+   "modules": 2,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "blobkelvin",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 3
+  },
+  {
+   "id": "blobthermal",
+   "section": null,
+   "modules": 2,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "born",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "box3d",
+   "section": null,
+   "modules": 0,
+   "interrogated": false,
+   "observables": 3
+  },
+  {
+   "id": "centrifuge",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": null
+  },
+  {
+   "id": "chaos",
+   "section": "matter",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "clocks",
+   "section": "systools",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 12
+  },
+  {
+   "id": "compose",
+   "section": null,
+   "modules": 0,
+   "interrogated": false,
+   "observables": null
+  },
+  {
+   "id": "ct",
+   "section": "optics",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "diffusion",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": 7
+  },
+  {
+   "id": "discovery",
+   "section": "matter",
+   "modules": 4,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "eccentric",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 11
+  },
+  {
+   "id": "em",
+   "section": "physicslab",
+   "modules": 4,
+   "interrogated": true,
+   "observables": 8
+  },
+  {
+   "id": "fdtd",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "fieldnav",
+   "section": null,
+   "modules": 0,
+   "interrogated": false,
+   "observables": 7
+  },
+  {
+   "id": "figureeight",
+   "section": "physicslab",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 10
+  },
+  {
+   "id": "friction",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 13
+  },
+  {
+   "id": "galaxy",
+   "section": "cosmic",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "geometry",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "geostats",
+   "section": "optics",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "gyroscope",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 14
+  },
+  {
+   "id": "heidler",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 17
+  },
+  {
+   "id": "hmc",
+   "section": "cosmic",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 5
+  },
+  {
+   "id": "hydrostatic",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "inference",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "inspiral",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": 11
+  },
+  {
+   "id": "interferometer",
+   "section": "optics",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "invariants",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": null
+  },
+  {
+   "id": "ising",
+   "section": "matter",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "kepler",
+   "section": "cosmic",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "kerr",
+   "section": "cosmic",
+   "modules": 3,
+   "interrogated": true,
+   "observables": 16
+  },
+  {
+   "id": "kh",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 9
+  },
+  {
+   "id": "kuramoto",
+   "section": "sampling",
+   "modules": 2,
+   "interrogated": true,
+   "observables": 8
+  },
+  {
+   "id": "landauzener",
+   "section": "cosmic",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 5
+  },
+  {
+   "id": "langevin",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": 5
+  },
+  {
+   "id": "lens",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "md",
+   "section": null,
+   "modules": 6,
+   "interrogated": false,
+   "observables": 29
+  },
+  {
+   "id": "nuclear",
+   "section": "physicslab",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 5
+  },
+  {
+   "id": "optics",
+   "section": null,
+   "modules": 3,
+   "interrogated": false,
+   "observables": 3
+  },
+  {
+   "id": "pbc",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 9
+  },
+  {
+   "id": "percolation",
+   "section": "matter",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 6
+  },
+  {
+   "id": "pipe3d",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": 14
+  },
+  {
+   "id": "plastic",
+   "section": "fluidgpu",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 18
+  },
+  {
+   "id": "poisson",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": null
+  },
+  {
+   "id": "probe",
+   "section": "matter",
+   "modules": 6,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "pulsar",
+   "section": "cosmic",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "quantum",
+   "section": "matter",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 4
+  },
+  {
+   "id": "reaction",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 7
+  },
+  {
+   "id": "rmt",
+   "section": "cosmic",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 7
+  },
+  {
+   "id": "seismic",
+   "section": "physicslab",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 6
+  },
+  {
+   "id": "spacefill",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 15
+  },
+  {
+   "id": "spatial",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "splat",
+   "section": "optics",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "tempering",
+   "section": "sampling",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 6
+  },
+  {
+   "id": "thermal",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 5
+  },
+  {
+   "id": "tidal",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 6
+  },
+  {
+   "id": "twobody",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": 12
+  },
+  {
+   "id": "twof",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 8
+  },
+  {
+   "id": "vibrations",
+   "section": "physicslab",
+   "modules": 1,
+   "interrogated": false,
+   "observables": 0
+  },
+  {
+   "id": "whitedwarf",
+   "section": null,
+   "modules": 1,
+   "interrogated": true,
+   "observables": null
+  },
+  {
+   "id": "windtunnel",
+   "section": "fluidgpu",
+   "modules": 2,
+   "interrogated": false,
+   "observables": 3
+  },
+  {
+   "id": "wolff",
+   "section": "sampling",
+   "modules": 1,
+   "interrogated": true,
+   "observables": 7
+  },
+  {
+   "id": "zeta",
+   "section": null,
+   "modules": 1,
+   "interrogated": false,
+   "observables": 14
+  }
+ ],
+ "edges": [
+  {
+   "a": "acoustics",
+   "b": "em",
+   "kinds": [
+    "room",
+    "substrate"
+   ]
+  },
+  {
+   "a": "acoustics",
+   "b": "figureeight",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "acoustics",
+   "b": "nuclear",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "acoustics",
+   "b": "seismic",
+   "kinds": [
+    "room",
+    "substrate"
+   ]
+  },
+  {
+   "a": "acoustics",
+   "b": "vibrations",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "beam",
+   "b": "probe",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "beam",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "beam",
+   "b": "twobody",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "blobbodies",
+   "b": "blobthermal",
+   "kinds": [
+    "substrate"
+   ]
+  },
+  {
+   "a": "chaos",
+   "b": "discovery",
+   "kinds": [
+    "room",
+    "substrate"
+   ]
+  },
+  {
+   "a": "chaos",
+   "b": "ising",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "chaos",
+   "b": "percolation",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "chaos",
+   "b": "probe",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "chaos",
+   "b": "quantum",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "compose",
+   "b": "em",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "compose",
+   "b": "fdtd",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "ct",
+   "b": "geostats",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "ct",
+   "b": "interferometer",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "ct",
+   "b": "splat",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "geostats",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "ising",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "kepler",
+   "kinds": [
+    "coupling",
+    "substrate"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "percolation",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "probe",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "quantum",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "splat",
+   "kinds": [
+    "substrate"
+   ]
+  },
+  {
+   "a": "discovery",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "fdtd",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "figureeight",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "nuclear",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "pulsar",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "seismic",
+   "kinds": [
+    "room",
+    "substrate"
+   ]
+  },
+  {
+   "a": "em",
+   "b": "vibrations",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "figureeight",
+   "b": "nuclear",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "figureeight",
+   "b": "seismic",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "figureeight",
+   "b": "vibrations",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "hmc",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "kepler",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "kerr",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "landauzener",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "pulsar",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "galaxy",
+   "b": "rmt",
+   "kinds": [
+    "room",
+    "substrate"
+   ]
+  },
+  {
+   "a": "geostats",
+   "b": "interferometer",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "geostats",
+   "b": "splat",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "kepler",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "kerr",
+   "kinds": [
+    "coupling",
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "landauzener",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "poisson",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "pulsar",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "quantum",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "rmt",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "hmc",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "interferometer",
+   "b": "splat",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "ising",
+   "b": "percolation",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "ising",
+   "b": "probe",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "ising",
+   "b": "quantum",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kepler",
+   "b": "kerr",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kepler",
+   "b": "landauzener",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kepler",
+   "b": "pulsar",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kepler",
+   "b": "rmt",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "landauzener",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "lens",
+   "kinds": [
+    "substrate"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "poisson",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "pulsar",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "quantum",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "rmt",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "tidal",
+   "kinds": [
+    "substrate"
+   ]
+  },
+  {
+   "a": "kerr",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "kuramoto",
+   "b": "tempering",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "kuramoto",
+   "b": "wolff",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "landauzener",
+   "b": "pulsar",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "landauzener",
+   "b": "rmt",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "lens",
+   "b": "probe",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "lens",
+   "b": "tidal",
+   "kinds": [
+    "substrate"
+   ]
+  },
+  {
+   "a": "nuclear",
+   "b": "seismic",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "nuclear",
+   "b": "vibrations",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "percolation",
+   "b": "probe",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "percolation",
+   "b": "quantum",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "plastic",
+   "b": "windtunnel",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "poisson",
+   "b": "quantum",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "poisson",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "poisson",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "probe",
+   "b": "quantum",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "probe",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "probe",
+   "b": "twobody",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "pulsar",
+   "b": "rmt",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "quantum",
+   "b": "splat",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "quantum",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "seismic",
+   "b": "vibrations",
+   "kinds": [
+    "room"
+   ]
+  },
+  {
+   "a": "splat",
+   "b": "twobody",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "splat",
+   "b": "whitedwarf",
+   "kinds": [
+    "coupling"
+   ]
+  },
+  {
+   "a": "tempering",
+   "b": "wolff",
+   "kinds": [
+    "room"
+   ]
+  }
+ ],
+ "placed": [
+  {
+   "id": "acoustics",
+   "x": -0.113492,
+   "y": -0.239332
+  },
+  {
+   "id": "beam",
+   "x": 0.096245,
+   "y": 0.158628
+  },
+  {
+   "id": "blackhole",
+   "x": -0.602824,
+   "y": -0.696797
+  },
+  {
+   "id": "blobbodies",
+   "x": -0.83529,
+   "y": 0.239993
+  },
+  {
+   "id": "blobkelvin",
+   "x": -0.738482,
+   "y": 0.472738
+  },
+  {
+   "id": "blobthermal",
+   "x": -0.817804,
+   "y": 0.209644
+  },
+  {
+   "id": "born",
+   "x": 0.158353,
+   "y": 0.914167
+  },
+  {
+   "id": "box3d",
+   "x": -0.595919,
+   "y": -0.382647
+  },
+  {
+   "id": "centrifuge",
+   "x": 0.616595,
+   "y": -0.551845
+  },
+  {
+   "id": "chaos",
+   "x": 0.101404,
+   "y": 0.243067
+  },
+  {
+   "id": "clocks",
+   "x": -0.066007,
+   "y": -0.872883
+  },
+  {
+   "id": "compose",
+   "x": -0.014897,
+   "y": -0.291291
+  },
+  {
+   "id": "ct",
+   "x": 0.172241,
+   "y": 0.353693
+  },
+  {
+   "id": "diffusion",
+   "x": -0.25058,
+   "y": 0.737691
+  },
+  {
+   "id": "discovery",
+   "x": 0.158606,
+   "y": 0.228893
+  },
+  {
+   "id": "eccentric",
+   "x": -0.925091,
+   "y": -0.2171
+  },
+  {
+   "id": "em",
+   "x": -0.029138,
+   "y": -0.201499
+  },
+  {
+   "id": "fdtd",
+   "x": 0.00604,
+   "y": -0.267742
+  },
+  {
+   "id": "fieldnav",
+   "x": -0.781482,
+   "y": -0.511865
+  },
+  {
+   "id": "figureeight",
+   "x": -0.089692,
+   "y": -0.246247
+  },
+  {
+   "id": "friction",
+   "x": -0.20898,
+   "y": 0.94
+  },
+  {
+   "id": "galaxy",
+   "x": 0.292869,
+   "y": 0.091795
+  },
+  {
+   "id": "geometry",
+   "x": -0.407217,
+   "y": -0.796265
+  },
+  {
+   "id": "geostats",
+   "x": 0.161279,
+   "y": 0.316187
+  },
+  {
+   "id": "gyroscope",
+   "x": -0.629485,
+   "y": 0.009101
+  },
+  {
+   "id": "heidler",
+   "x": -0.546134,
+   "y": 0.507518
+  },
+  {
+   "id": "hmc",
+   "x": 0.248344,
+   "y": 0.152375
+  },
+  {
+   "id": "hydrostatic",
+   "x": -0.782861,
+   "y": -0.056793
+  },
+  {
+   "id": "inference",
+   "x": 0.773762,
+   "y": -0.423322
+  },
+  {
+   "id": "inspiral",
+   "x": -0.469272,
+   "y": -0.56769
+  },
+  {
+   "id": "interferometer",
+   "x": 0.141384,
+   "y": 0.349975
+  },
+  {
+   "id": "invariants",
+   "x": -0.751943,
+   "y": -0.269443
+  },
+  {
+   "id": "ising",
+   "x": 0.109138,
+   "y": 0.220244
+  },
+  {
+   "id": "kepler",
+   "x": 0.263752,
+   "y": 0.125442
+  },
+  {
+   "id": "kerr",
+   "x": 0.235821,
+   "y": 0.128026
+  },
+  {
+   "id": "kh",
+   "x": 0.487118,
+   "y": -0.687014
+  },
+  {
+   "id": "kuramoto",
+   "x": -0.433394,
+   "y": 0.250678
+  },
+  {
+   "id": "landauzener",
+   "x": 0.293696,
+   "y": 0.114856
+  },
+  {
+   "id": "langevin",
+   "x": -0.052873,
+   "y": 0.849883
+  },
+  {
+   "id": "lens",
+   "x": 0.188769,
+   "y": 0.080824
+  },
+  {
+   "id": "md",
+   "x": 0.033518,
+   "y": -0.703642
+  },
+  {
+   "id": "nuclear",
+   "x": -0.11375,
+   "y": -0.215337
+  },
+  {
+   "id": "optics",
+   "x": 0.32687,
+   "y": 0.80747
+  },
+  {
+   "id": "pbc",
+   "x": 0.884061,
+   "y": -0.122827
+  },
+  {
+   "id": "percolation",
+   "x": 0.125462,
+   "y": 0.242027
+  },
+  {
+   "id": "pipe3d",
+   "x": 0.195108,
+   "y": -0.786657
+  },
+  {
+   "id": "plastic",
+   "x": 0.229281,
+   "y": -0.570438
+  },
+  {
+   "id": "poisson",
+   "x": 0.241652,
+   "y": 0.202651
+  },
+  {
+   "id": "probe",
+   "x": 0.12853,
+   "y": 0.191082
+  },
+  {
+   "id": "pulsar",
+   "x": 0.227509,
+   "y": 0.056535
+  },
+  {
+   "id": "quantum",
+   "x": 0.17631,
+   "y": 0.200392
+  },
+  {
+   "id": "reaction",
+   "x": 0.595293,
+   "y": 0.663057
+  },
+  {
+   "id": "rmt",
+   "x": 0.27126,
+   "y": 0.094156
+  },
+  {
+   "id": "seismic",
+   "x": -0.092571,
+   "y": -0.204242
+  },
+  {
+   "id": "spacefill",
+   "x": 0.79468,
+   "y": 0.412732
+  },
+  {
+   "id": "spatial",
+   "x": -0.536339,
+   "y": 0.729023
+  },
+  {
+   "id": "splat",
+   "x": 0.178977,
+   "y": 0.231876
+  },
+  {
+   "id": "tempering",
+   "x": -0.412715,
+   "y": 0.222318
+  },
+  {
+   "id": "thermal",
+   "x": -0.240753,
+   "y": -0.852082
+  },
+  {
+   "id": "tidal",
+   "x": 0.251667,
+   "y": 0.026741
+  },
+  {
+   "id": "twobody",
+   "x": 0.077712,
+   "y": 0.181685
+  },
+  {
+   "id": "twof",
+   "x": 0.723917,
+   "y": -0.237086
+  },
+  {
+   "id": "vibrations",
+   "x": -0.079872,
+   "y": -0.224643
+  },
+  {
+   "id": "whitedwarf",
+   "x": 0.216027,
+   "y": 0.198526
+  },
+  {
+   "id": "windtunnel",
+   "x": 0.262508,
+   "y": -0.5578
+  },
+  {
+   "id": "wolff",
+   "x": -0.399158,
+   "y": 0.255278
+  },
+  {
+   "id": "zeta",
+   "x": 0.262476,
+   "y": -0.908917
+  }
+ ],
+ "components": [
+  [
+   "acoustics",
+   "beam",
+   "chaos",
+   "compose",
+   "ct",
+   "discovery",
+   "em",
+   "fdtd",
+   "figureeight",
+   "galaxy",
+   "geostats",
+   "hmc",
+   "interferometer",
+   "ising",
+   "kepler",
+   "kerr",
+   "landauzener",
+   "lens",
+   "nuclear",
+   "percolation",
+   "poisson",
+   "probe",
+   "pulsar",
+   "quantum",
+   "rmt",
+   "seismic",
+   "splat",
+   "tidal",
+   "twobody",
+   "vibrations",
+   "whitedwarf"
+  ],
+  [
+   "kuramoto",
+   "tempering",
+   "wolff"
+  ],
+  [
+   "blobbodies",
+   "blobthermal"
+  ],
+  [
+   "plastic",
+   "windtunnel"
+  ],
+  [
+   "blackhole"
+  ],
+  [
+   "blobkelvin"
+  ],
+  [
+   "born"
+  ],
+  [
+   "box3d"
+  ],
+  [
+   "centrifuge"
+  ],
+  [
+   "clocks"
+  ],
+  [
+   "diffusion"
+  ],
+  [
+   "eccentric"
+  ],
+  [
+   "fieldnav"
+  ],
+  [
+   "friction"
+  ],
+  [
+   "geometry"
+  ],
+  [
+   "gyroscope"
+  ],
+  [
+   "heidler"
+  ],
+  [
+   "hydrostatic"
+  ],
+  [
+   "inference"
+  ],
+  [
+   "inspiral"
+  ],
+  [
+   "invariants"
+  ],
+  [
+   "kh"
+  ],
+  [
+   "langevin"
+  ],
+  [
+   "md"
+  ],
+  [
+   "optics"
+  ],
+  [
+   "pbc"
+  ],
+  [
+   "pipe3d"
+  ],
+  [
+   "reaction"
+  ],
+  [
+   "spacefill"
+  ],
+  [
+   "spatial"
+  ],
+  [
+   "thermal"
+  ],
+  [
+   "twof"
+  ],
+  [
+   "zeta"
+  ]
+ ],
+ "islands": [
+  "blackhole",
+  "blobkelvin",
+  "born",
+  "box3d",
+  "centrifuge",
+  "clocks",
+  "diffusion",
+  "eccentric",
+  "fieldnav",
+  "friction",
+  "geometry",
+  "gyroscope",
+  "heidler",
+  "hydrostatic",
+  "inference",
+  "inspiral",
+  "invariants",
+  "kh",
+  "langevin",
+  "md",
+  "optics",
+  "pbc",
+  "pipe3d",
+  "reaction",
+  "spacefill",
+  "spatial",
+  "thermal",
+  "twof",
+  "zeta"
+ ],
+ "counts": {
+  "devices": 67,
+  "edges": 94,
+  "byKind": {
+   "substrate": 11,
+   "coupling": 29,
+   "room": 61
+  },
+  "multiKind": 7,
+  "components": 33,
+  "largest": 31,
+  "interrogated": 22,
+  "withBaseline": 62
+ }
+}

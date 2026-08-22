@@ -1,0 +1,78 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SweK Economy Probe</title><style>
+html,body{margin:0;background:#0a0e0c;color:#cfe9d8;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;}
+#w{max-width:1000px;margin:0 auto;padding:16px;} h1{font-size:17px;margin:0 0 2px;} .sub{color:#6f8a7c;margin-bottom:12px;}
+.card{border:1px solid #24382e;background:#0e1512;padding:11px 13px;margin-bottom:12px;}
+button{font:inherit;background:#16211b;color:#cfe9d8;border:1px solid #2c463a;padding:5px 12px;margin-right:6px;cursor:pointer;}
+button:hover:not(:disabled){background:#1d2c24;} button:disabled{opacity:.45;cursor:default;} .primary{border-color:#4c8f6a;color:#b6f0cf;}
+input{background:#0a1210;color:#cfe9d8;border:1px solid #2c463a;font:inherit;padding:4px 6px;}
+.stat{display:inline-block;min-width:112px;margin:0 14px 6px 0;} .stat b{font-size:19px;} .stat span{display:block;color:#6f8a7c;font-size:11px;}
+.dim{color:#6f8a7c;}.hot{color:#e0a0a0;}.warn{color:#e0c58a;}.ok{color:#7fe0a4;}
+pre{white-space:pre-wrap;color:#a8c9b8;background:#0a1210;border:1px solid #1a2a22;padding:8px;margin:6px 0 0;}
+table{border-collapse:collapse;width:100%;} td,th{text-align:left;padding:2px 8px 2px 0;border-bottom:1px solid #16241d;} th{color:#6f8a7c;font-weight:normal;}
+</style></head><body><div id="w">
+<h1>Economy Probe <span class="dim">&mdash; spaceprojectsim</span></h1>
+<div class="sub">Pause their sim, plant a known supply delta, step <b>exactly one tick</b>, and read whether the ship's decision changed. A counterfactual, not an inference. <b>Most ships cannot be measured</b>: their <code>plan_goal</code> is a priority waterfall, so any ship resting, refuelling, selling or retrofitting never reaches the scored band at all.</div>
+
+<div class="card"><button id="bStat" class="primary">Status</button>
+<button id="bStart" class="primary" title="Launch the simulator if it is not already running -- first run is a cargo build and can take minutes">Start sim</button><button id="bCensus">Census</button><button id="bResume">Resume sim</button><span class="dim" id="msg"></span><div id="stat" style="margin-top:8px"></div></div>
+
+<div class="card">
+  location <input id="loc" value="market-earth-station" size="22">
+  commodity <input id="com" value="ore" size="6">
+  delta <input id="del" value="-400" size="6">
+  ship <input id="shp" value="" size="10" placeholder="ship id">
+  <button id="bProbe" class="primary">Probe</button>
+  <div class="dim" style="margin-top:6px">Delta is clamped to &plusmn;5000 and the step to 50 ticks. The sim is left <b>PAUSED</b> afterwards on purpose &mdash; auto-resuming would destroy the state you just perturbed.</div>
+  <div id="out" style="margin-top:9px"></div>
+</div>
+
+<div class="card dim"><b>Sweep multiplicatively, not additively.</b> Their score is ln(profit) &times; (1 + prefer_goals). Every doubling shifts it by exactly ln2 regardless of base, but a fixed +100 is a 0.693 shift from a base of 100 and only 0.095 from 1000. An additive sweep tests a moving target and reads the falloff as planner insensitivity when it is just arithmetic.</div>
+</div>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i);},esc=function(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"})[c];});};
+var st=function(v,l,c){return '<div class="stat"><b class="'+(c||"")+'">'+esc(v)+"</b><span>"+esc(l)+"</span></div>";};
+var get=function(u){return fetch(u,{cache:"no-store"}).then(function(r){return r.json();});};
+function fail(d){return '<div class="hot"><b>'+esc(d.error||"failed")+"</b></div>"+(d.detail?'<div class="dim">'+esc(d.detail)+"</div>":"")+(d.fix?"<pre>"+esc(d.fix)+"</pre>":"");}
+// v3165 -- START THE SIM THE PANEL DRIVES. The three outcomes stay apart: ALREADY-RUNNING, STARTED, and a
+// FAILURE that NAMES which absence it hit -- no checkout, no cargo, exited, or spawned-but-silent. Collapsing
+// those into "could not start" would send you to the wrong place three times out of four.
+$("bStart").addEventListener("click", async () => {
+  const out = $("out");
+  out.textContent = "starting... (a first run is a cargo build and can take minutes -- this waits up to 3)";
+  try {
+    const r = await fetch("/economy/start", { method: "POST" }).then((x) => x.json());
+    const st = r.status || {};
+    out.textContent =
+      (r.ok ? (r.state === "ALREADY-RUNNING" ? "ALREADY RUNNING" : "STARTED") : "NOT STARTED (" + r.state + ")") +
+      "\n  " + r.why +
+      "\n  repo: " + (st.repo || "NOT FOUND -- set SPACESIM_DIR or clone beside the engine") +
+      "\n  cargo on PATH: " + st.haveCargo +
+      "\n  answering on " + st.base + ": " + st.running;
+  } catch (e) { out.textContent = "FAILED: " + ((e && e.message) || e); }
+});
+
+$("bStat").onclick=function(){$("msg").textContent=" checking...";get("/economy/status").then(function(d){$("msg").textContent="";
+ $("stat").innerHTML=d.ok?st(d.reachable?"yes":"no","sim reachable",d.reachable?"ok":"hot")+st("\u00b1"+d.maxDelta,"delta clamp")+st(d.maxTicks,"tick clamp")+'<div class="dim">'+esc(d.base)+"</div>":fail(d);});};
+$("bCensus").onclick=function(){$("msg").textContent=" counting...";get("/economy/census").then(function(d){$("msg").textContent="";
+ if(!d.ok){$("stat").innerHTML=fail(d);return;}
+ var c=d.census;
+ $("stat").innerHTML=st(c.band,"in band",c.measurable?"ok":"hot")+st(c.blocked,"blocked on waterfall","warn")+st(c.other,"other")+st(c.total,"ships")
+  +st((c.fraction*100).toFixed(0)+"%","measurable",c.measurable?"ok":"hot")
+  +'<div class="'+(c.measurable?"dim":"hot")+'" style="margin-top:4px">'+esc(c.why)+"</div>"
+  +"<table><tr><th>goal</th><th>ships</th></tr>"+Object.keys(d.histogram).sort(function(a,b){return d.histogram[b]-d.histogram[a];}).map(function(k){return "<tr><td>"+esc(k)+"</td><td>"+d.histogram[k]+"</td></tr>";}).join("")+"</table>";});};
+$("bProbe").onclick=function(){$("msg").textContent=" probing...";$("bProbe").disabled=true;
+ var q="location="+encodeURIComponent($("loc").value)+"&commodity="+encodeURIComponent($("com").value)+"&delta="+encodeURIComponent($("del").value)+"&ship="+encodeURIComponent($("shp").value);
+ get("/economy/probe?"+q).then(function(d){$("bProbe").disabled=false;$("msg").textContent="";
+  if(!d.ok){$("out").innerHTML=fail(d);return;}
+  var v=d.verdict,cls=v.outcome==="MOVED"?"ok":v.outcome==="UNMOVED"?"warn":"hot";
+  $("out").innerHTML='<div class="stat"><b class="'+cls+'">'+esc(v.outcome)+"</b><span>outcome</span></div>"+st(d.census.band,"band size")+st(d.delta,"delta applied",d.clamped?"warn":"")
+   +(v.from?'<div class="dim">'+esc(v.from)+" &rarr; "+esc(v.to)+"</div>":"")
+   +'<div style="margin-top:4px">'+esc(v.why)+"</div>"
+   +'<div class="warn" style="margin-top:6px">'+esc(d.simState)+"</div>"
+   +"<pre>"+d.steps.map(function(s){return s.status+"  "+s.path;}).join("\n")+"</pre>";});};
+$("bResume").onclick=function(){get("/economy/resume").then(function(d){$("msg").innerHTML=d.ok?' <span class="ok">resumed</span>':' <span class="hot">'+esc(d.error||"failed")+"</span>";});};
+$("bStat").click();
+})();
+</script></body></html>

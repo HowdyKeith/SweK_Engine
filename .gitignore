@@ -1,0 +1,94 @@
+# === VoxelEngine monorepo .gitignore ===
+
+# Node
+**/node_modules/
+**/package-lock.json
+npm-debug.log*
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+.venv/
+# per-tool venvs (created on the rig by the install buttons, not committed)
+camoufox_env/
+scrapling_env/
+doc_env/
+
+# Bridge runtime state + caches (regenerated; some hold local data)
+**/asset_library/
+**/tts-out/
+**/doc-out/
+**/petfbi-board.json
+**/petfbi-counts.json
+**/gen-queue.json
+**/toasts.json
+**/uitars.json
+
+# Secrets / local config — these live in ~/.voxelbridge, but never commit copies
+**/.voxelbridge/
+.env
+*.env
+**/trader.json
+**/petfbi.json
+**/tts.json
+*app*password*
+*apppw*
+
+# Build artifacts + working forks
+EngineProject_*/
+*.zip
+*.tar.gz
+# ...but voxelcaster.zip is a DELIVERABLE, not a build artifact: it is the sideloaded
+# Roku channel (manifest + icon + 78 lines of BrightScript, 1.7 KB) that ai-bridge/
+# server.js POSTs to a TV's /plugin_install, and that ui/rokuRemotePanel.js offers as
+# "via sideloaded VoxelCaster channel". The *.zip rule above was aimed at EngineProject_*
+# forks and caught this as collateral; without it a fresh clone's cast button fails with
+# "couldn't read channel zip". The tools/ship/deleted/deleted_*.zip tombstones stay out.
+!WebGLEngine/roku-channel/voxelcaster.zip
+
+# Large/generated binaries — uncomment if you'd rather keep them off-repo (use Git LFS)
+# **/*.onnx
+# **/*.vox
+# (the small sample GLBs in GPU_Assets are ~200KB each and fine to commit)
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# === Held back from the public mirror (v3845) ===
+# Keith's call: the CODE ships, the internal working record does not. These are the
+# session notes, not build inputs. They ride in the versioned zip, which remains the
+# complete build.
+#
+# okf/claims/ WAS held back and is NOT any more: it is read by main.js,
+# predictions.html, ai-bridge/okfService-selfcheck.mjs and tools/ship/orphanTriage*,
+# so withholding it left the mirror unable to run its own gates. Project data, not a
+# personal note -- scanned for credentials and personal data before publishing, clean.
+# okf/log.md stays out and costs nothing: the one "log.md" reference in
+# predictions.html is PROSE inside a why: string describing the OKF spec, not a read.
+BACKLOG.md
+TODO.md
+WebGLEngine/okf/log.md
+Root Utils/email-draft.md
+
+# v3923 -- per-host observed gate runtimes. gate-timings.json is the shipped REFERENCE; this is one
+# box's comparison against it and must never travel, or a fast machine would export its scale to a slow one.
+WebGLEngine/tools/ship/host-timings.local.json
+
+# v3936 -- SHIP-RUN DIAGNOSTICS, DELIBERATELY LOCAL.
+# refusal() writes a step's full output here when the ritual stops, because a 2h24m sweep that reports
+# "29 FAILED, 11 TIMED OUT" and prints eight names is unrepeatable otherwise. That log is for whoever ran the
+# ritual on THAT box: it is one machine's run, it is rewritten by the next one, and committing it would churn
+# on every ship while telling a reader of the repo nothing they can act on.
+#
+# THIS IS NOT THE tools/ship/deleted/ CASE, and the difference is worth stating because the two look alike.
+# A deletion receipt is a claim about the tree that must outlive the machine, which is exactly why v3936 moved
+# that record to a TRACKED file after finding the zips could never survive a clone. A refusal log is a claim
+# about one run. Durable record: tracked. Run artifact: ignored.
+WebGLEngine/tools/ship/last-refusal-*.log
+WebGLEngine/tools/ship/last-selfchecks-full.log

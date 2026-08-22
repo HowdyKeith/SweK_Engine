@@ -1,0 +1,94 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>The 2D answer does not transfer (v3641)</title>
+<meta name="demo:desc" content="In 2D the set of cells whose gradient cannot be determined from cell averages is exactly two, forever. In 3D it is 6n - it grows linearly with the mesh, tracking the box edges rather than its faces, so refinement makes the defect rarer and more numerous at the same time.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ input[type=range]{vertical-align:middle;width:180px}
+</style></head><body><div id="w">
+<h1>The 2D answer does not transfer</h1>
+<div class="sub">The previous round found that on a triangulated rectangle the set of cells whose gradient
+<b>cannot be determined from cell averages at all</b> is exactly <b>two</b>, at every mesh size, while the boundary
+itself grows without bound. It called the three-dimensional version a genuine open question rather than a guess.</div>
+<div class="law"><b>In 3D it is 6n.</b> A gradient has three unknowns and each face neighbour supplies one
+equation, so a tetrahedron needs <b>three</b> non-coplanar neighbours where a triangle needed two non-collinear
+ones. A tet has four faces, so there is margin &mdash; and more ways to fall short. Measured: 24, 36, 48, 72, 96 at
+n = 4, 6, 8, 12, 16. <b>def/n = 6.00 in every row.</b></div>
+<h2>1. The scaling</h2>
+<div class="panel"><button id="go" class="good">count across five mesh sizes</button><table id="t"></table></div>
+<div class="law"><b>The deficient set tracks the box's edges; the boundary tracks its faces.</b> Deficiency needs
+<i>two</i> box faces at once &mdash; a tet on one face loses a neighbour and still has three, which is enough
+&mdash; and the places where two faces meet are the twelve <b>edges</b>, whose total length is O(n). Measured, not
+assumed: <b>every</b> deficient tet sits on an edge, none in the interior, and 6n over twelve edges is n/2 per
+edge.</div>
+<div class="law"><b>So refinement makes the defect rarer and more numerous at the same time.</b> The fraction falls
+from 6.25% to 0.39% while the count rises from 24 to 96. A solver that handles them one at a time has <i>more</i>
+work every time it refines; a solver that ignores them has a <i>smaller fraction</i> wrong. Both are true and they
+are about different things.</div>
+<h2>2. Three neighbours are enough</h2>
+<div class="panel"><button id="rank" class="good">split the error by rank</button><table id="t2"></table></div>
+<div class="law">Every rank-3 tet is exact &mdash; <b>including the 672 boundary tets that have only three
+neighbours</b>. Three non-coplanar differences determine a three-vector exactly, so a tet missing one face is fully
+determined. The same shape as 2D, where two neighbours sufficed: <b>the margin is one face, not zero</b>. And the
+deficient ones read exactly <code>1.000</code>, which is the zero again &mdash; a refusal, not a measurement.</div>
+<div class="law">Graded by <code>physics/mesh/tetRank-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Not claimed:</b> that 6n holds for any
+tetrahedralisation &mdash; it is measured for the Kuhn subdivision of a box, and the <i>reason</i> it is O(n) is
+what generalises. A mesh with no straight edges would need the argument re-run. Related:
+<a href="/boundary-rank.html" style="color:#9ab6e8">boundary rank</a> (the 2D case).</div>
+<script type="module">
+import { makeTetMesh, analyticCells3, gradientLS3, rankCensus3, boundaryCells3, linearityError3 } from "/physics/mesh/tetReconstruct.mjs";
+import { makeTriMesh, analyticCells, rankCensus } from "/physics/mesh/triReconstruct.mjs";
+const $ = (i) => document.getElementById(i);
+const LIN3 = (x, y, z) => 0.3 + 0.7 * x - 0.4 * y + 0.55 * z;
+const M3 = (n) => makeTetMesh({ nx: n, ny: n, nz: n, h: 1, skew: 0.25 });
+const def = (c) => (c.byRank[0] || 0) + (c.byRank[1] || 0) + (c.byRank[2] || 0);
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+$("go").onclick = () => {
+    const out = [];
+    for (const n of [4, 6, 8, 12, 16]) {
+        const m = M3(n), u = analyticCells3(LIN3, m), c = rankCensus3(u, m);
+        let b = 0; for (const v of boundaryCells3(m)) b += v;
+        const d = def(c);
+        out.push(["n = " + n, c.total, b, "<span class='bad'>" + d + "</span>",
+            "def/n = " + (d / n).toFixed(2) + " &nbsp; frac = " + (100 * d / c.total).toFixed(2) + "%"]);
+    }
+    for (const n of [8, 16, 32, 64]) {
+        const m = makeTriMesh({ nx: n, ny: n, h: 20 / n, skew: 0.25 });
+        const c = rankCensus(analyticCells((x, y) => 0.3 + 0.7 * x - 0.4 * y, m), m);
+        out.push(["2D, n = " + n, c.total, "&mdash;", "<span class='ok'>" + (c.byRank[1] || 0) + "</span>",
+            "<span class='dim'>constant, forever</span>"]);
+    }
+    rows($("t"), ["mesh", "cells", "boundary", "rank-deficient", "note"], out);
+};
+$("rank").onclick = () => {
+    const out = [];
+    for (const skew of [0, 0.25]) {
+        const m = makeTetMesh({ nx: 8, ny: 8, nz: 8, h: 1, skew });
+        const w = linearityError3(m), c = rankCensus3(analyticCells3(LIN3, m), m);
+        out.push(["skew " + skew.toFixed(2) + ", rank 3", "<span class='ok'>" + (w[3] || 0).toExponential(3) + "</span>",
+            (c.byRank[3] || 0) + " tets", "exact &mdash; three neighbours suffice"]);
+        out.push(["skew " + skew.toFixed(2) + ", rank 2", "<span class='bad'>" + (w[2] || 0).toExponential(3) + "</span>",
+            (c.byRank[2] || 0) + " tets", "<span class='bad'>exactly 1.000 &mdash; a refusal, not an error</span>"]);
+    }
+    const m = M3(8), c = rankCensus3(analyticCells3(LIN3, m), m);
+    out.push(["neighbour histogram", JSON.stringify(c.byNbr), c.total + " tets",
+        "<span class='dim'>" + (c.byNbr[3] || 0) + " tets have three neighbours and are exact</span>"]);
+    rows($("t2"), ["what", "linearity error", "count", "note"], out);
+};
+</script>
+</div></body></html>

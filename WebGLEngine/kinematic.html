@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="demo:title" content="Kinematic controller">
+<meta name="demo:category" content="physics lab">
+<title>Kinematic controller - collide and slide</title>
+<style>
+  html,body{margin:0;background:#080a0c;color:#d8e2e6;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:960px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#7d8a90;margin-bottom:14px}
+  .card{border:1px solid #222d33;background:#0d1316;padding:12px 14px;margin-bottom:13px}
+  canvas{border:1px solid #1b2429;background:#050809;display:block;width:100%;height:420px}
+  label{color:#7d8a90;margin-right:6px}input[type=range]{width:150px;vertical-align:middle}
+  button{font:inherit;background:#151d21;color:#d8e2e6;border:1px solid #2a353b;padding:5px 12px;margin-right:6px;cursor:pointer}
+  .num{color:#8fd4c0}.dim{color:#7d8a90}.good{color:#8fe0a8}.bad{color:#e8a0a0}
+  td{padding:1px 16px 1px 0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Kinematic controller &mdash; collide and slide</h1>
+  <div class="sub">Movement is <em>dictated</em>, not simulated. The body decides where it wants to go, finds what
+    is in the way, and is placed. No forces, no mass &mdash; which is what makes every claim below exactly
+    checkable rather than a matter of feel.</div>
+
+  <div class="card">
+    <label>speed</label><input id="speed" type="range" min="1" max="60" value="8"><span class="num" id="speedv"></span>
+    <label style="margin-left:12px">step height</label><input id="step" type="range" min="0" max="15" value="11"><span class="num" id="stepv"></span>
+    <label style="margin-left:12px"><input id="sub" type="checkbox" checked> substepping</label>
+    <span class="dim">&mdash; switch it off and drive fast at a wall</span>
+    <div style="margin-top:8px">
+      <button id="go">walk right</button><button id="left">walk left</button><button id="reset">reset</button>
+      <span class="dim" id="warn"></span>
+    </div>
+  </div>
+
+  <div class="card"><canvas id="cv" width="940" height="420"></canvas>
+    <div class="dim" style="margin-top:4px">Side view. <span class="good">green</span> contact normals point back
+      out of whatever blocked the body. The lip on the right is one voxel tall &mdash; drop the step height to 0
+      and it becomes a wall.</div>
+  </div>
+
+  <div class="card"><table id="tbl"></table></div>
+</div>
+
+<script type="module">
+import { stepCharacter, overlapsSolid } from "/physics/character/kinematic.js";
+
+const $=(id)=>document.getElementById(id);
+const HALF=[0.3,0.9,0.3];
+// a side-on test world: ground, a tall wall, a one-voxel lip, and an overhang to walk under
+const solid=(x,y,z)=>{
+  if (y<0) return true;                    // ground
+  if (x>=18 && x<=19) return true;         // tall wall on the right
+  if (x>=10 && y===0) return true;         // one-voxel lip
+  if (x>=13 && x<=15 && y===3) return true;// overhang
+  return false;
+};
+let pos=[2,0.9,0], vel=[0,0,0], dir=0, lastNormals=[], lastMoved=[0,0,0];
+const sync=()=>{ $("speedv").textContent=$("speed").value; $("stepv").textContent=($("step").value/10).toFixed(1); };
+$("speed").oninput=$("step").oninput=sync; sync();
+$("go").onclick=()=>{dir=1;}; $("left").onclick=()=>{dir=-1;};
+$("reset").onclick=()=>{pos=[2,0.9,0];vel=[0,0,0];dir=0;};
+
+function frame(){
+  const speed=parseInt($("speed").value), stepHeight=parseInt($("step").value)/10;
+  // substepping OFF is the sabotage, live: a large cap means the destination is tested and the wall is missed
+  const maxSubstep = $("sub").checked ? 0.4 : 1000;
+  vel[0]=dir*speed;
+  const s=stepCharacter({pos,half:HALF,velocity:vel,isSolid:solid,dt:1/60,gravity:-24,stepHeight,maxSubstep});
+  pos=s.pos; vel=s.velocity; lastNormals=s.normals; lastMoved=s.moved;
+  const inside=overlapsSolid(pos,HALF,solid);
+  $("warn").innerHTML = inside ? '<span class="bad">the body is INSIDE a solid &mdash; that is the tunnelling this prevents</span>' : "";
+
+  const c=$("cv"), g=c.getContext("2d"), W=c.width, H=c.height, S=34, oy=H-70;
+  g.clearRect(0,0,W,H);
+  // voxels
+  for(let x=0;x<Math.ceil(W/S);x++) for(let y=-1;y<9;y++){
+    if(!solid(x,y,0)) continue;
+    g.fillStyle = y<0 ? "#141c20" : "#1d282d";
+    g.fillRect(x*S, oy-(y+1)*S, S-1, S-1);
+  }
+  // the body
+  const bx=pos[0]*S, by=oy-pos[1]*S;
+  g.fillStyle="#8fd4c0"; g.globalAlpha=0.85;
+  g.fillRect(bx-HALF[0]*S, by-HALF[1]*S, HALF[0]*2*S, HALF[1]*2*S);
+  g.globalAlpha=1;
+  // contact normals
+  g.strokeStyle="#8fe0a8"; g.lineWidth=2;
+  for(const n of lastNormals){
+    if(n[2]!==0) continue;
+    g.beginPath(); g.moveTo(bx,by); g.lineTo(bx+n[0]*S*0.9, by-n[1]*S*0.9); g.stroke();
+    g.beginPath(); g.arc(bx+n[0]*S*0.9, by-n[1]*S*0.9, 3, 0, 7); g.fillStyle="#8fe0a8"; g.fill();
+  }
+  g.fillStyle="#7d8a90"; g.font="11px monospace";
+  g.fillText("lip", 10*S+4, oy-S-6); g.fillText("wall", 18*S+4, oy-4*S); g.fillText("overhang", 13*S+4, oy-4*S-6);
+
+  $("tbl").innerHTML=`
+    <tr><td class="dim">position</td><td class="num">${pos.map(v=>v.toFixed(3)).join(", ")}</td>
+        <td class="dim">grounded</td><td class="${s.grounded?"good":"dim"}">${s.grounded}</td></tr>
+    <tr><td class="dim">moved this frame</td><td class="num">${lastMoved.map(v=>v.toFixed(4)).join(", ")}</td>
+        <td class="dim">substeps</td><td class="num">${s.substeps}</td></tr>
+    <tr><td class="dim">requested / achieved</td><td class="num">${s.requestedDist.toFixed(4)} / ${s.movedDist.toFixed(4)}</td>
+        <td class="dim">never further?</td><td class="${s.movedDist<=s.requestedDist+1e-9?"good":"bad"}">${s.movedDist<=s.requestedDist+1e-9}</td></tr>
+    <tr><td class="dim">contacts</td><td class="num" colspan="3">${lastNormals.length?lastNormals.map(n=>"["+n.join(",")+"]").join(" "):"none"}</td></tr>
+    <tr><td class="dim">inside a solid?</td><td class="${inside?"bad":"good"}" colspan="3">${inside?"YES - invariant broken":"no - the invariant holds"}</td></tr>`;
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A boundary row is worth what the model can do with it (v3648)</title>
+<meta name="demo:desc" content="The quadratic with the boundary row: it helps by a steady 40% and buys a constant factor, not an order. And the face midpoint is not on the wall - it sits inside by a(1-cos(pi/nt)), so the row states a true condition at a place where it is not quite true.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{background:#080a0f;border:1px solid #232b3d;display:block}
+</style></head><body><div id="w">
+<h1>A boundary row is worth what the model can do with it</h1>
+<div class="sub">The previous round showed the boundary row was not the limiting factor on a curved wall &mdash; a
+constant gradient cannot satisfy it &mdash; and named the closing question: the <b>quadratic with the row</b>,
+where the row should now be satisfiable.</div>
+<div class="law"><b>And the first thing it found corrects a sentence I shipped last round.</b> v3647 wrote "the row
+is already exact at its own quadrature point." That was two claims wearing one sentence: the <b>normal</b> is exact
+at the arc midpoint, to round-off &mdash; but the <b>point</b> is not on the wall at all. A chord's midpoint lies
+<i>inside</i> the circle by <code>a(1 &minus; cos(&pi;/nt))</code>, a closed form, O(h&sup2;).
+<b>An exact direction at an inexact location.</b></div>
+<h2>1. Two claims, one sentence</h2>
+<div class="panel"><button id="g1" class="good">separate them</button><table id="t1"></table></div>
+<div class="law">So the row is satisfiable to <b>O(h&sup2;)</b> rather than exactly &mdash; against the constant
+gradient's <b>O(h)</b> residual. The quadratic's obstacle is the <b>geometry of the face</b>; the linear one's was
+the <b>model</b>.</div>
+<h2>2. With and without</h2>
+<div class="panel">
+  <button id="g2" class="good">measure all three</button>
+  <canvas id="cv" width="620" height="360" style="max-width:100%"></canvas>
+  <table id="t2"></table>
+</div>
+<div class="law"><b>The row now helps, by a steady 40%</b> &mdash; ratios 0.590 / 0.686 / 0.647 / 0.619 / 0.603,
+converging to a constant. <b>But it buys a constant factor, not an order</b>: 1.92 against 1.88. It moves the line
+down and does not tilt it, which is what an O(h&sup2;)-satisfiable constraint on an O(h&sup2;) method must do.</div>
+<h2>3. Seven rounds in one sentence</h2>
+<div class="panel"><button id="g3" class="good">the four cases</button><table id="t3"></table></div>
+<div class="law"><b>A boundary row helps exactly to the extent the reconstruction can satisfy it.</b> Perfectly,
+not at all, or to second order &mdash; and a fourth case that isn't on the scale, where the model satisfies a wrong
+thing and lands worse than refusing. <b>The row was never a free correction and never a fault. It is a constraint,
+and a constraint is worth what the model can do with it.</b></div>
+<div class="law">Graded by <code>physics/mesh/quadraticWall-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. <b>Not done, and it is the obvious one:</b> move the
+row's evaluation point <i>onto</i> the wall &mdash; the offset is a closed form, so a corrected midpoint is one
+line, and whether that recovers the remaining factor is a measurement rather than a deduction. Related:
+<a href="/quadratic-recon.html" style="color:#9ab6e8">quadratic recon</a>,
+<a href="/curved-wall.html" style="color:#9ab6e8">curved wall</a>.</div>
+<script type="module">
+import { makeAnnulus, potentialFlow, cellValues, annulusFaces, gradientWall, wallSideError } from "/physics/mesh/curvedWall.mjs";
+import { vertexNeighbours } from "/physics/mesh/rankRepair.mjs";
+import { quadraticGradient, quadraticGradientWithWall, faceMidpointOffset, normalExactness } from "/physics/mesh/quadraticRecon.mjs";
+const $ = (i) => document.getElementById(i);
+const { phi, grad } = potentialFlow({});
+const S = [24, 48, 96, 192, 384].map((nt) => {
+    const m = makeAnnulus({ nr: Math.max(4, Math.round(nt / 8)), nt, a: 1, b: 3 });
+    return { nt, m, u: cellValues(m, phi), F: annulusFaces(m), vn: vertexNeighbours(m) };
+});
+const ord = (v) => v.slice(1).map((e, i) => Math.log2(v[i] / e));
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+const E0 = () => S.map((s) => wallSideError(s.m, s.F, grad, quadraticGradient(s.u, s.m, s.vn), "inner"));
+const E1 = () => S.map((s) => wallSideError(s.m, s.F, grad, quadraticGradientWithWall(s.u, s.m, s.vn, s.F), "inner"));
+const EL = () => S.map((s) => wallSideError(s.m, s.F, grad, gradientWall(s.u, s.m, { wall: "inner", faces: s.F }), "inner"));
+$("g1").onclick = () => {
+    const res = S.map((s) => { let w = 0;
+        for (let t = 0; t < s.m.tri.length; t++) for (const f of s.F[t]) { if (f.kind !== "inner") continue;
+            const [gx, gy] = grad(f.mx, f.my); w = Math.max(w, Math.abs(gx * f.nx + gy * f.ny)); }
+        return w; });
+    rows($("t1"), ["nt", "normal exactness", "face-midpoint offset", "a(1&minus;cos&pi;/nt)", "|grad(midpoint)&middot;n|"],
+        S.map((s, i) => { const o = faceMidpointOffset(s.m, s.F, "inner");
+            return [s.nt, "<span class='ok'>" + normalExactness(s.m, s.F, "inner").toExponential(2) + "</span>",
+                "<span class='bad'>" + o.worst.toExponential(3) + "</span>", o.closedForm.toExponential(3),
+                "<span class='warn'>" + res[i].toExponential(3) + "</span>"]; })
+        .concat([["orders", "<span class='dim'>flat &mdash; round-off</span>",
+            ord(S.map((s) => faceMidpointOffset(s.m, s.F, "inner").worst)).map((x) => x.toFixed(2)).join(", "),
+            "&mdash;", ord(res).map((x) => x.toFixed(2)).join(", ")]]));
+};
+$("g2").onclick = () => {
+    const eL = EL(), e0 = E0(), e1 = E1();
+    rows($("t2"), ["nt", "linear + row", "quadratic, no row", "quadratic + row", "with / without"],
+        S.map((s, i) => [s.nt, "<span class='warn'>" + eL[i].toExponential(2) + "</span>", e0[i].toExponential(3),
+            "<span class='ok'>" + e1[i].toExponential(3) + "</span>", (e1[i] / e0[i]).toFixed(4)])
+        .concat([["orders", "<span class='warn'>" + ord(eL).map((o) => o.toFixed(2)).join(", ") + "</span>",
+            ord(e0).map((o) => o.toFixed(2)).join(", "),
+            "<span class='ok'>" + ord(e1).map((o) => o.toFixed(2)).join(", ") + "</span>",
+            "<span class='dim'>a constant, not an order</span>"]]));
+    const cv = $("cv"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#080a0f"; ctx.fillRect(0, 0, W, H);
+    const L = 48, B = 32, T = 14, R = 14, lo = -3.6, hi = 0;
+    const X = (i) => L + i / (S.length - 1) * (W - L - R);
+    const Y = (v) => T + (1 - (Math.log10(Math.max(v, 1e-5)) - lo) / (hi - lo)) * (H - T - B);
+    ctx.strokeStyle = "#232b3d"; ctx.fillStyle = "#68748c";
+    for (let e = -3; e <= 0; e++) { ctx.beginPath(); ctx.moveTo(L, Y(Math.pow(10, e))); ctx.lineTo(W - R, Y(Math.pow(10, e))); ctx.stroke(); ctx.fillText("1e" + e, 6, Y(Math.pow(10, e)) + 4); }
+    const line = (v, col) => { ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.beginPath();
+        v.forEach((x, i) => { const px = X(i), py = Y(x); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }); ctx.stroke(); ctx.lineWidth = 1; };
+    line(eL, "#e8c49a"); line(e0, "#9ab6e8"); line(e1, "#8fe0a8");
+    S.forEach((s, i) => { ctx.fillStyle = "#68748c"; ctx.fillText(String(s.nt), X(i) - 8, H - 12); });
+    ctx.fillStyle = "#e8c49a"; ctx.fillText("linear + row  (order 0.93)", L + 8, T + 14);
+    ctx.fillStyle = "#9ab6e8"; ctx.fillText("quadratic, no row  (1.88)", L + 8, T + 30);
+    ctx.fillStyle = "#8fe0a8"; ctx.fillText("quadratic + row  (1.92, 40% lower)", L + 8, T + 46);
+};
+$("g3").onclick = () => {
+    const s = S[2];
+    const bad = wallSideError(s.m, s.F, grad, gradientWall(s.u, s.m, { wall: "outer", faces: s.F }), "outer");
+    const none = wallSideError(s.m, s.F, grad, gradientWall(s.u, s.m, { wall: "none", faces: s.F }), "outer");
+    const e0 = E0(), e1 = E1();
+    rows($("t3"), ["case", "what the model can do with the row", "result"], [
+        ["flat wall, true, linear", "satisfy it perfectly", "<span class='ok'>exact &mdash; 1.805e-15</span>"],
+        ["curved wall, true, linear", "not at all (O(h) residual)", "<span class='warn'>no help, order 1</span>"],
+        ["curved wall, true, quadratic", "to O(h&sup2;)",
+            "<span class='ok'>" + (100 * (1 - e1[4] / e0[4])).toFixed(0) + "% better, order unchanged</span>"],
+        ["any wall, false", "satisfy a wrong thing", "<span class='bad'>" + bad.toExponential(2) +
+            " against " + none.toExponential(2) + " with no row</span>"]]);
+};
+</script>
+</div></body></html>

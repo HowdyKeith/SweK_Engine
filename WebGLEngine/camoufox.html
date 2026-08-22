@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="demo:title" content="Camoufox — install & detect">
+<meta name="demo:desc" content="Install and detect Camoufox (anti-detect scraping browser) in a dedicated venv. Runs on the PC bridge.">
+<meta name="demo:cats" content="tool">
+<title>Camoufox — install & detect</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --amber:#ffb14e; --dim:#7fa8d8; --text:#cfe6ff; --good:#7fe0a0; --bad:#ff7b7b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:ui-monospace,'Antonio',monospace; }
+  #bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:linear-gradient(180deg,#0a1422,#0a0d18); border-bottom:1px solid var(--edge); position:sticky; top:0; z-index:5; }
+  #bar h1 { font-size:15px; margin:0; color:var(--blue); letter-spacing:.06em; text-transform:uppercase; }
+  #bar .sub { font-size:11px; color:var(--dim); }
+  .btn { background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:6px; padding:7px 13px; font:12px ui-monospace,monospace; cursor:pointer; }
+  .btn:disabled { opacity:.45; cursor:default; }
+  .btn.go { background:#10401f; color:var(--good); border-color:#2f6f4a; }
+  #status { margin-left:auto; font-size:12px; }
+  .wrap { max-width:880px; margin:0 auto; padding:16px; }
+  .lead { font-size:12px; color:var(--dim); line-height:1.5; margin:0 0 14px; }
+  .lead code { color:var(--amber); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid #14304a; border-left-width:4px; border-radius:6px 6px 6px 14px; padding:10px 12px; }
+  .card .k { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; }
+  .card .v { font-size:13px; margin-top:4px; word-break:break-all; }
+  .card.ok { border-left-color:var(--good); } .card.no { border-left-color:#5a2330; } .card.wait { border-left-color:var(--amber); }
+  .card .v .dot { font-size:14px; }
+  .steps { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+  .step { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid #14304a; border-radius:6px; padding:10px 12px; }
+  .step .n { width:22px; height:22px; flex:0 0 auto; border-radius:50%; border:1px solid var(--edge); display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--blue); }
+  .step .t { flex:1; } .step .t b { color:var(--text); font-size:13px; } .step .t .d { font-size:11px; color:var(--dim); }
+  #ready { text-align:center; padding:12px; border-radius:8px; margin-bottom:14px; font-size:13px; }
+  #ready.y { background:#10401f; color:var(--good); border:1px solid #2f6f4a; }
+  #ready.n { background:#1a1020; color:var(--amber); border:1px solid #5a4410; }
+  #log { background:#04070d; border:1px solid var(--edge); border-radius:6px; padding:10px; font-size:11px; white-space:pre-wrap; word-break:break-word; max-height:320px; overflow:auto; color:#bcd; }
+  .ttl { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <h1>🦊 Camoufox</h1>
+  <span class="sub">install &amp; detect · runs on the PC bridge</span>
+  <button class="btn" id="redetect">↻ Detect</button>
+  <span id="status">—</span>
+</div>
+<div class="wrap">
+  <p class="lead">Camoufox is the anti-detect Firefox we drive with Playwright — the modern replacement for the retired IE WebBrowser control. It installs into a dedicated venv (<code id="venvdir">C:\camoufox_env</code>) so it never touches the ComfyUI environment. The browser binary is a separate ~300–400&nbsp;MB download.</p>
+
+  <div id="ready" class="n">Detecting…</div>
+
+  <div class="cards" id="cards"></div>
+
+  <p class="ttl">Install steps (idempotent — safe to re-run)</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div class="t"><b>Create venv</b><div class="d">python -m venv — skipped if it already exists</div></div><button class="btn" data-step="venv">Run</button></div>
+    <div class="step"><div class="n">2</div><div class="t"><b>Install camoufox</b><div class="d">pip install -U camoufox (in the venv)</div></div><button class="btn" data-step="pkg">Run</button></div>
+    <div class="step"><div class="n">3</div><div class="t"><b>Fetch browser</b><div class="d">python -m camoufox fetch — the big 300–400 MB download</div></div><button class="btn" data-step="browser">Run</button></div>
+  </div>
+
+  <p class="ttl">Log</p>
+  <div id="log">Ready.</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function log(msg) { const l = $("log"); l.textContent = (l.textContent === "Ready." ? "" : l.textContent + "\n") + msg; l.scrollTop = l.scrollHeight; }
+function card(k, ok, v, cls) { return `<div class="card ${cls || (ok ? "ok" : "no")}"><div class="k">${k}</div><div class="v"><span class="dot">${ok ? "🟢" : "🔴"}</span> ${v}</div></div>`; }
+
+let DET = null;
+async function detect() {
+  $("status").textContent = "detecting…";
+  setButtons(true);
+  try {
+    DET = await fetch("/camoufox/detect", { cache: "no-store" }).then(r => r.json());
+  } catch { $("status").textContent = "bridge offline"; setButtons(false); return; }
+  if (DET.venvDir) $("venvdir").textContent = DET.venvDir;
+  const bp = DET.basePython || {}, vv = DET.venv || {}, pk = DET.package || {}, br = DET.browser || {};
+  $("cards").innerHTML =
+    card("Base Python", !!bp.found, bp.found ? (bp.version || "found") : "not on PATH") +
+    card("venv", !!vv.exists, vv.exists ? "present" : "not created") +
+    card("camoufox package", !!pk.installed, pk.installed ? ("v" + (pk.version || "?")) : (vv.exists ? (pk.error || "not installed") : "—")) +
+    card("Browser binary", !!br.fetched, br.fetched ? ("fetched" + (br.version ? " · " + br.version : "")) : (pk.installed ? "not fetched" : "—"));
+  const r = $("ready");
+  if (DET.ready) { r.className = "y"; r.textContent = "✅ Camoufox is ready — venv, package, and browser all present."; }
+  else { r.className = "n"; r.textContent = "⚠ Not ready yet — run the steps below in order (1 → 2 → 3)."; }
+  $("status").textContent = DET.ready ? "ready" : "incomplete";
+  setButtons(false);
+}
+function setButtons(busy) {
+  document.querySelectorAll(".btn").forEach(b => b.disabled = busy);
+}
+async function runStep(step, btn) {
+  setButtons(true);
+  const label = btn.closest(".step").querySelector("b").textContent;
+  log("▶ " + label + " …" + (step === "browser" ? " (this can take several minutes)" : ""));
+  let res;
+  try {
+    res = await fetch("/camoufox/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ step }) }).then(r => r.json());
+  } catch { log("✕ bridge offline"); setButtons(false); return; }
+  if (res.skipped) log("• " + label + ": " + (res.stdout || "already present"));
+  else if (res.ok) log("✓ " + label + " done." + (res.stdout ? "\n" + res.stdout.trim().split("\n").slice(-6).join("\n") : ""));
+  else log("✕ " + label + " failed" + (res.error ? ": " + res.error : (res.code != null ? " (exit " + res.code + ")" : "")) + (res.stderr ? "\n" + res.stderr.trim().split("\n").slice(-8).join("\n") : ""));
+  await detect();
+}
+
+$("redetect").onclick = detect;
+document.querySelectorAll(".step .btn").forEach(b => b.onclick = () => runStep(b.dataset.step, b));
+detect();
+</script>
+</body>
+</html>

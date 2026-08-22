@@ -1,0 +1,219 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Current loop - the exact off-axis field (v3626)</title>
+<meta name="demo:desc" content="The exact magnetic field of a circular current loop in K and E, drawn as a field map with the m-vs-k convention mutant beside it - the mutant is byte-identical on the axis and wrong by hundreds of percent off it.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0}
+ canvas{background:#080a0f;border:1px solid #232b3d}
+ .maps{display:flex;gap:10px;flex-wrap:wrap}
+ .cap{color:#7c88a0;font-size:11px;margin:2px 0 8px}
+ input[type=range]{vertical-align:middle;width:180px}
+</style></head><body><div id="w">
+
+<h1>A circular current loop &mdash; the field <i>off</i> the axis</h1>
+<div class="sub">Every textbook gives the field on the axis of a current loop, because that one is elementary. The
+field <b>everywhere else</b> is one of the few exact off-axis solutions in electromagnetism, and it is written in
+complete elliptic integrals: with <code>A=(a+r)&sup2;+z&sup2;</code>, <code>B=(a-r)&sup2;+z&sup2;</code>,
+<code>m=4ar/A</code>,
+<div style="margin:6px 0 0 14px">
+<code>B<sub>z</sub> = &mu;<sub>0</sub>I / (2&pi;&radic;A) &middot; [ K(m) + E(m)(a&sup2;-r&sup2;-z&sup2;)/B ]</code><br>
+<code>B<sub>r</sub> = &mu;<sub>0</sub>Iz / (2&pi;r&radic;A) &middot; [ -K(m) + E(m)(a&sup2;+r&sup2;+z&sup2;)/B ]</code>
+</div></div>
+
+<div class="law"><b>The parameter is <code>m</code>, not the modulus <code>k</code>.</b> Half the literature writes
+these with <code>k</code> where <code>k&sup2; = 4ar/A</code>, and the two conventions give different fields. The
+picture below is why that is dangerous rather than merely wrong.</div>
+
+<h2>1. The same formula, both conventions, side by side</h2>
+<div class="panel">
+  <div>
+    <button id="draw" class="good">draw the field</button>
+    <label>current I <input id="cur" type="range" min="0.2" max="3" step="0.1" value="1"></label>
+    <span id="curv" class="dim"></span>
+    <label><input id="lines" type="checkbox" checked> field lines</label>
+  </div>
+  <div class="maps">
+    <div><canvas id="cvA" width="320" height="300"></canvas><div class="cap">correct &mdash; parameter <code>m</code></div></div>
+    <div><canvas id="cvB" width="320" height="300"></canvas><div class="cap">mutant &mdash; reads it as modulus <code>k</code></div></div>
+    <div><canvas id="cvD" width="320" height="300"></canvas><div class="cap">relative difference (black = identical)</div></div>
+  </div>
+  <div class="note">Half-plane: the loop is the bright dot on the right, the <b>axis is the left edge</b>. Colour is
+  log|B|. The difference map is black all the way up the axis and blazes everywhere else.</div>
+</div>
+
+<div class="law"><b>Look at the left edge of the third panel.</b> On the axis <code>r = 0</code> forces
+<code>m = 0</code>, and <code>m = k&sup2;</code> has fixed points at exactly 0 and 1 &mdash; so both conventions give
+<code>K = E = &pi;/2</code> and the two fields are <b>byte-identical</b> there. The mutant reproduces the elementary
+on-axis law, the centre value <code>&mu;<sub>0</sub>I/2a</code>, and the on-axis far-field dipole to the same digits
+as the correct field. It is wrong only where nobody has an elementary answer to check against.</div>
+
+<h2>2. The five keys, checked live</h2>
+<div class="panel">
+  <button id="runKeys" class="good">check every key</button>
+  <span class="note">four of the five come from outside the module entirely</span>
+  <table id="tKeys"></table>
+</div>
+
+<h2>3. The identity that catches it</h2>
+<div class="panel">
+  <button id="runDiv" class="good">measure div B on both</button>
+  <span class="note"><code>div B = (1/r)&part;(rB<sub>r</sub>)/&part;r + &part;B<sub>z</sub>/&part;z</code> &mdash; an
+  identity of nature with <b>no reference value at all</b>, so nothing can be tuned to satisfy it</span>
+  <table id="tDiv"></table>
+</div>
+<div class="law">The correct field's residue is the <b>central-difference stencil</b>, not the field: halve
+<code>h</code> and it falls by four, every time. The mutant sits five to eight orders above that floor. This is the
+check nobody reaches for first and the only one of the five that a wrong convention cannot survive &mdash; because a
+field that is not a magnetic field has nowhere to hide from an identity.</div>
+
+<div class="law">Graded headless by <code>physics/em/currentLoop-selfcheck.mjs</code>, runnable from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. The elliptic integrals underneath are
+<code>math/elliptic.js</code> &mdash; see <a href="/elliptic.html" style="color:#9ab6e8">elliptic.html</a>.
+<code>&mu;<sub>0</sub></code> is imported from <code>physics/em/maxwell.mjs</code>, not re-declared here.</div>
+
+<script type="module">
+import { ellipK, ellipEc } from "/math/elliptic.js";
+import { loopField, onAxisExact, centreExact, loopFieldBiotSavart,
+         divergence, ampereCirculation, dipoleField, MU0 } from "/physics/em/currentLoop.mjs";
+
+const $ = (id) => document.getElementById(id);
+const rel = (a, b) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-300);
+const cls = (g) => g ? "ok" : "bad";
+const rows = (el, head, data) => {
+    el.innerHTML = "<tr>" + head.map((h) => "<th>" + h + "</th>").join("") + "</tr>" +
+        data.map((r) => "<tr>" + r.map((c) => "<td>" + c + "</td>").join("") + "</tr>").join("");
+};
+
+// the mutant, one token different from the shipped field
+function mutant({ a = 1, I = 1, r = 0, z = 0, mu0 = MU0 } = {}) {
+    const A = (a + r) * (a + r) + z * z, B = (a - r) * (a - r) + z * z;
+    if (!(B > 0)) return null;
+    const q = 4 * a * r / A, m = q * q;
+    const K = ellipK(m), E = ellipEc(m);
+    if (K === null || E === null) return null;
+    const pre = mu0 * I / (2 * Math.PI * Math.sqrt(A));
+    return { Bz: pre * (K + E * (a * a - r * r - z * z) / B),
+             Br: r === 0 ? 0 : pre * (z / r) * (-K + E * (a * a + r * r + z * z) / B), m };
+}
+
+const RMAX = 2.2, ZMAX = 2.2, A_LOOP = 1;
+const px2rz = (x, y, W, H) => [x / W * RMAX, (0.5 - y / H) * 2 * ZMAX];
+
+function paint(cv, fn, I) {
+    const W = cv.width, H = cv.height, g = cv.getContext("2d"), img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const [r, z] = px2rz(x + 0.5, y + 0.5, W, H);
+        const f = fn({ a: A_LOOP, I, r, z });
+        const i = 4 * (y * W + x);
+        if (!f) { img.data[i] = 90; img.data[i + 1] = 20; img.data[i + 2] = 20; img.data[i + 3] = 255; continue; }
+        const mag = Math.hypot(f.Br, f.Bz) / (MU0 * Math.abs(I));
+        const t = Math.max(0, Math.min(1, (Math.log10(mag + 1e-9) + 2) / 3.2));
+        img.data[i] = Math.round(255 * Math.min(1, t * 1.6));
+        img.data[i + 1] = Math.round(255 * Math.max(0, t * 1.2 - 0.25));
+        img.data[i + 2] = Math.round(255 * Math.max(0, 0.55 - Math.abs(t - 0.35)));
+        img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    // the loop itself, and the axis
+    g.strokeStyle = "#9ab6e8"; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, H); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.arc(A_LOOP / RMAX * W, H / 2, 3.5, 0, 7); g.fill();
+}
+
+function paintDiff(cv, I) {
+    const W = cv.width, H = cv.height, g = cv.getContext("2d"), img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const [r, z] = px2rz(x + 0.5, y + 0.5, W, H);
+        const a = loopField({ a: A_LOOP, I, r, z }), b = mutant({ a: A_LOOP, I, r, z });
+        const i = 4 * (y * W + x);
+        if (!a || !b) { img.data[i] = 90; img.data[i + 3] = 255; continue; }
+        const d = Math.hypot(a.Br - b.Br, a.Bz - b.Bz) / Math.max(Math.hypot(a.Br, a.Bz), 1e-300);
+        const t = Math.max(0, Math.min(1, (Math.log10(d + 1e-17) + 6) / 6));
+        img.data[i] = Math.round(255 * t); img.data[i + 1] = Math.round(80 * t);
+        img.data[i + 2] = Math.round(255 * t * 0.5); img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    g.strokeStyle = "#9ab6e8"; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, H); g.stroke();
+}
+
+function streamlines(cv, fn, I) {
+    const W = cv.width, H = cv.height, g = cv.getContext("2d");
+    g.strokeStyle = "rgba(220,235,255,0.45)"; g.lineWidth = 1;
+    const rz2px = (r, z) => [r / RMAX * W, (0.5 - z / (2 * ZMAX)) * H];
+    for (const seed of [0.15, 0.35, 0.55, 0.75, 0.92, 1.25, 1.6, 2.0]) {
+        for (const dir of [1, -1]) {
+            let r = seed, z = 0.0001, first = true;
+            g.beginPath();
+            for (let s = 0; s < 900; s++) {
+                const f = fn({ a: A_LOOP, I, r, z });
+                if (!f) break;
+                const n = Math.hypot(f.Br, f.Bz); if (!(n > 0)) break;
+                const step = 0.008 * dir;
+                r += step * f.Br / n; z += step * f.Bz / n;
+                if (r < 0 || r > RMAX || Math.abs(z) > ZMAX) break;
+                const [px, py] = rz2px(r, z);
+                if (first) { g.moveTo(px, py); first = false; } else g.lineTo(px, py);
+            }
+            g.stroke();
+        }
+    }
+}
+
+$("cur").oninput = () => { $("curv").textContent = (+$("cur").value).toFixed(1) + " A"; };
+$("cur").oninput();
+$("draw").onclick = () => {
+    const I = +$("cur").value;
+    paint($("cvA"), loopField, I); paint($("cvB"), mutant, I); paintDiff($("cvD"), I);
+    if ($("lines").checked) { streamlines($("cvA"), loopField, I); streamlines($("cvB"), mutant, I); }
+};
+
+$("runKeys").onclick = () => {
+    const out = [];
+    let w = 0; for (const z of [0, 0.3, 1, 3, 10]) w = Math.max(w, rel(loopField({ r: 0, z }).Bz, onAxisExact({ z })));
+    let wm = 0; for (const z of [0, 0.3, 1, 3, 10]) wm = Math.max(wm, rel(mutant({ r: 0, z }).Bz, onAxisExact({ z })));
+    out.push(["1. on-axis elementary law", w.toExponential(3), wm.toExponential(3),
+        "<span class='warn'>identical &mdash; blind to the convention</span>"]);
+    out.push(["1b. centre = &mu;0I/2a", rel(loopField({ r: 0, z: 0 }).Bz, centreExact({})).toExponential(3),
+        rel(mutant({ r: 0, z: 0 }).Bz, centreExact({})).toExponential(3), "<span class='warn'>identical</span>"]);
+    let wb = 0, wbm = 0;
+    for (const [r, z] of [[0.5, 0.3], [1.5, 0.5], [0.3, 1.2]]) {
+        const b = loopFieldBiotSavart({ r, z });
+        wb = Math.max(wb, rel(loopField({ r, z }).Bz, b.Bz), rel(loopField({ r, z }).Br, b.Br));
+        wbm = Math.max(wbm, rel(mutant({ r, z }).Bz, b.Bz), rel(mutant({ r, z }).Br, b.Br));
+    }
+    out.push(["2. Biot-Savart, off axis", "<span class='ok'>" + wb.toExponential(3) + "</span>",
+        "<span class='bad'>" + (100 * wbm).toFixed(1) + "%</span>", "the route that shares no code"]);
+    const amp = ampereCirculation({ rho: 0.05 }) / MU0;
+    out.push(["4. Ampere, |circulation|/&mu;0I", "<span class='ok'>" + Math.abs(amp).toFixed(9) + "</span>", "&mdash;",
+        "sign is the circuit orientation, reported not removed"]);
+    const R = 40, r = R / Math.SQRT2, z = R / Math.SQRT2;
+    out.push(["5. far field vs dipole (45&deg;, R=40)", rel(loopField({ r, z }).Bz, dipoleField({ r, z }).Bz).toExponential(3),
+        rel(mutant({ r, z }).Bz, dipoleField({ r, z }).Bz).toExponential(3), "falls as (a/R)&sup2;"]);
+    rows($("tKeys"), ["key", "correct field", "mutant", "note"], out);
+};
+
+$("runDiv").onclick = () => {
+    const out = [];
+    for (const [r, z] of [[0.5, 0.3], [1.5, 0.5], [0.3, 1.2], [2.0, 0.8]]) {
+        const a = divergence({ r, z }), b = divergence({ r, z, field: mutant });
+        out.push(["r=" + r + ", z=" + z, "<span class='ok'>" + a.relative.toExponential(3) + "</span>",
+            "<span class='bad'>" + b.relative.toExponential(3) + "</span>",
+            (b.relative / a.relative).toExponential(1) + "x"]);
+    }
+    const hs = [4e-3, 2e-3, 1e-3, 5e-4].map((h) => divergence({ r: 0.5, z: 0.3, h }).relative);
+    out.push(["h sweep on the correct field", hs.map((e) => e.toExponential(2)).join(" &rarr; "),
+        "orders " + hs.slice(1).map((e, i) => Math.log2(hs[i] / e).toFixed(3)).join(", "),
+        "<span class='dim'>order 2 = the stencil, not the field</span>"]);
+    rows($("tDiv"), ["point", "correct |div B| / (|B|/a)", "mutant", "ratio"], out);
+};
+</script>
+</div></body></html>

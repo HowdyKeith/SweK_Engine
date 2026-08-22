@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="ES Away Mission">
+<meta name="demo:desc" content="The raycast life-box: the GPU Brain boards a derelict and salvages it, autonomously, forever. A first-person raycast interior of corridors, rooms, and doors that open as it approaches. The brain seeks the nearest salvage, routes around walls, secures it, and when the hull is clear a new derelict is drifted in -- it never wins, it just keeps boarding, the way the Living Box never stops flying. seekTarget is the pilot; the GPU Brain drops into the same hook on-rig. Bloom, minimap, a mission ticker. Press P to take the helm.">
+<meta name="demo:category" content="fx">
+<title>ES Away Mission</title>
+<style>
+  html,body { margin:0; height:100%; background:#02040a; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:#f6a623; letter-spacing:.16em; text-transform:uppercase; z-index:3; }
+  #obj { position:fixed; left:14px; top:34px; color:#59d1ff; font-size:11px; z-index:3; }
+  #tick { position:fixed; left:14px; bottom:14px; color:#7fd0a0; font-size:11px; z-index:3; max-width:60%; }
+  #st { position:fixed; right:14px; bottom:12px; color:#5f7aa0; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; ES Away Mission</div>
+<div id="obj"></div>
+<div id="tick"></div>
+<div id="st"></div>
+<script type="module">
+import { makeCamera, raycastColumns, projectSprites, pilotStep, moveCollide, rotate, floorCastRow, spriteFrame, registerDoors, updateDoors, seekTarget } from "./fx/raycast/raycaster.js";
+import { makeBloom } from "./fx/post/bloom.js";
+import { makeBrainPilot } from "./fx/raycast/brainPilot.js";
+import { installDefaultPolicy } from "./fx/raycast/policyBrain.js";
+import { computeFlowField, makeFieldPilot, packFields, pickNearestField } from "./fx/raycast/flowField.js";
+import { attachGestures } from "./ui/touchGestures.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), st = document.getElementById("st"), objEl = document.getElementById("obj"), tickEl = document.getElementById("tick");
+const bloom = makeBloom({ threshold: 0.58, intensity: 0.75, blurPx: 6 });
+let W = 0, H = 0, RW = 0, RH = 0; const SCALE = 3;
+const rbuf = document.createElement("canvas"), rctx = rbuf.getContext("2d");
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; RW = rbuf.width = Math.max(180, (W / SCALE) | 0); RH = rbuf.height = Math.max(110, (H / SCALE) | 0); }
+addEventListener("resize", resize);
+
+// derelict interior: 1 brick hull, 2 panel, 3 amber trim, 4 door, 0 open
+const M = [
+  [1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,2,2,4,2,0,0,0,2,4,2,2,0,0,1],
+  [1,0,2,0,0,2,0,0,0,2,0,0,2,0,0,1],
+  [1,0,2,0,0,2,2,4,2,2,0,0,2,0,0,2],
+  [2,4,0,0,0,0,0,0,0,0,0,0,0,0,4,2],
+  [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
+  [1,0,3,3,0,2,2,4,2,2,0,0,3,0,0,1],
+  [1,0,3,0,0,2,0,0,0,2,0,0,3,0,0,1],
+  [1,0,0,0,0,2,4,0,4,2,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,2,2,2,2,1,1,1,1,1,1]];
+const MH = M.length, MW = M[0].length, doors = registerDoors(M, 4);
+
+function texData(kind) {
+  const S = 64, s = document.createElement("canvas"); s.width = s.height = S; const g = s.getContext("2d");
+  if (kind === 1) { g.fillStyle = "#4a3226"; g.fillRect(0, 0, S, S); g.fillStyle = "#2e2018"; for (let y = 0; y < S; y += 16) for (let x = 0; x < S; x += 32) g.fillRect(x + ((y / 16) % 2 ? 16 : 0), y, 30, 14); }
+  else if (kind === 2) { g.fillStyle = "#223c54"; g.fillRect(0, 0, S, S); g.strokeStyle = "#4a90c0"; g.lineWidth = 2; g.strokeRect(4, 4, S - 8, S - 8); g.fillStyle = "#2e4e68"; g.fillRect(S / 2 - 3, 8, 6, S - 16); }
+  else if (kind === 3) { g.fillStyle = "#4c3714"; g.fillRect(0, 0, S, S); g.fillStyle = "#f6a623"; g.fillRect(0, S / 2 - 4, S, 8); g.fillStyle = "#2e2208"; for (let x = 0; x < S; x += 12) g.fillRect(x, 0, 6, S); }
+  else if (kind === 4) { g.fillStyle = "#6a2424"; g.fillRect(0, 0, S, S); g.fillStyle = "#a84545"; g.fillRect(6, 6, S - 12, S - 12); g.fillStyle = "#f6a623"; g.fillRect(S / 2 - 2, 10, 4, S - 20); g.fillStyle = "#301010"; for (let y = 0; y < S; y += 10) g.fillRect(0, y, S, 2); }
+  else if (kind === "floor") { g.fillStyle = "#141c28"; g.fillRect(0, 0, S, S); g.strokeStyle = "#232f40"; for (let i = 0; i <= S; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, S); g.moveTo(0, i); g.lineTo(S, i); g.stroke(); } }
+  else { g.fillStyle = "#080d16"; g.fillRect(0, 0, S, S); g.fillStyle = "#121a28"; for (let i = 0; i < 36; i++) g.fillRect((i * 37) % S, (i * 53) % S, 1, 1); }
+  return g.getImageData(0, 0, S, S);
+}
+const TEX = { 1: texData(1), 2: texData(2), 3: texData(3), 4: texData(4) }, FLOOR = texData("floor"), CEIL = texData("ceil");
+
+function salvageImg() { const S = 26, c = document.createElement("canvas"); c.width = c.height = S; const g = c.getContext("2d"); const r = g.createRadialGradient(S / 2, S / 2, 1, S / 2, S / 2, S / 2); r.addColorStop(0, "#fff6d0"); r.addColorStop(0.4, "#f6a623"); r.addColorStop(1, "rgba(246,166,35,0)"); g.fillStyle = r; g.fillRect(0, 0, S, S); return c; }
+function wreckImg(hue) { const F = 8, S = 30, c = document.createElement("canvas"); c.width = F * S; c.height = S; const g = c.getContext("2d"); for (let f = 0; f < F; f++) { g.save(); g.translate(f * S + S / 2, S / 2); g.rotate(f * Math.PI / 4); g.globalAlpha = 0.85; g.fillStyle = hue; g.beginPath(); g.moveTo(0, -12); g.lineTo(5, 6); g.lineTo(9, 9); g.lineTo(0, 7); g.lineTo(-9, 9); g.lineTo(-5, 6); g.closePath(); g.fill(); g.restore(); } return c; }
+const SALV = salvageImg(), WRECK = wreckImg("#6a7a9a");
+let salvage = [], wrecks = [{ x: 3.5, y: 6.5, img: WRECK, frames: 8, facing: 1.2, h: 0.55 }, { x: 12.5, y: 5.5, img: WRECK, frames: 8, facing: 4.0, h: 0.55 }];
+let missions = 0, secured = 0;
+// v2839 -- MOVED ABOVE newDerelict. `let` is not hoisted, so calling newDerelict() at top level (which calls
+// tick(), which assigns tickMsg) reached tickMsg ONE LINE before its declaration ran. The page threw
+// "Cannot access 'tickMsg' before initialization" during load and rendered essentially nothing --
+// render QA measured nonBlackFrac 0.0007, which is a black screen with a couple of lit pixels.
+let tickMsg = "", tickAt = 0; function tick(m) { tickMsg = m; tickAt = performance.now(); }
+function newDerelict() { salvage = [{ x: 3.5, y: 3.5 }, { x: 10.5, y: 3.5 }, { x: 7.5, y: 8.5 }, { x: 13.5, y: 8.5 }, { x: 3.5, y: 9.5 }].map(p => ({ x: p.x, y: p.y, img: SALV, frames: 1, h: 0.45, glow: 1, got: false })); missions++; tick("new derelict drifted in \u2014 boarding"); }
+newDerelict();
+
+// the away-mission BRAIN: seek the nearest un-secured salvage, secure on reach, loop forever (life-box).
+function getNearestSalvage(cam) { let best = null, bd = 1e9; for (const s of salvage) { if (s.got) continue; const d = Math.hypot(s.x - cam.px, s.y - cam.py); if (d < bd) { bd = d; best = s; } } return best; }
+// collection + mission loop, run every frame for whichever pilot is flying (CPU navigator or the live GPU Brain)
+// flow-field nav (the CPU form of the 4-grid QuadrantScheduler primitive): a field to the current salvage, recomputed
+// only when the target cell changes; the pilot follows it, routing optimally around walls. Also drawn on the minimap.
+let _fields = [], _fieldsKey = "";
+function _salvageKey() { return salvage.filter(s => !s.got).map(s => (s.x | 0) + "," + (s.y | 0)).join("|"); }
+function ensureFields() { const k = _salvageKey(); if (k !== _fieldsKey) { _fields = packFields(M, salvage.filter(s => !s.got)); _fieldsKey = k; } }   // repack only when the salvage set changes -- one QuadrantScheduler solve on the GPU
+function getField(cam) { ensureFields(); if (!_fields.length) return null; const idx = pickNearestField(_fields, cam.px, cam.py); return idx >= 0 ? _fields[idx] : _fields[0]; }   // pilot follows the PATH-nearest salvage's field
+const fieldPilot = makeFieldPilot(getField, { speed: 0.045, turn: 0.12 });
+let useField = false;
+function checkSalvage(cam) { const s = getNearestSalvage(cam); if (!s) { newDerelict(); return; } const d = Math.hypot(s.x - cam.px, s.y - cam.py); if (d < 0.7) { s.got = true; secured++; tick("salvage secured (" + secured + " total)"); } else if (d < 2 && tickMsg.indexOf("approaching") < 0) tick("approaching salvage"); }
+// CPU navigator (fallback pilot): head for the nearest salvage
+function awayBrain(cam) { const s = getNearestSalvage(cam); if (!s) return { turn: 0.02, forward: 0.02 }; return seekTarget(cam, M, s.x, s.y, { speed: 0.045, turn: 0.11 }); }
+
+// LIVE GPU-Brain pilot: use it if the rig exposes one, else fall back to the CPU navigator. The rig's WebGPU policy
+// can register window.__swekBrainInfer(stateVec)->[turn,forward], or serve POST /ai/brain/act; either plugs straight in.
+let brainPilot = null, brainName = "CPU nav";
+const pageInstalledPolicy = installDefaultPolicy();   // seeds window.__swekBrainInfer with an in-browser neural policy unless the rig beat us to it
+async function connectBrain() {
+  if (typeof window.__swekBrainInfer === "function") { brainPilot = makeBrainPilot(window.__swekBrainInfer, getNearestSalvage, { maxTurn: 0.11, maxSpeed: 0.05 }); brainName = pageInstalledPolicy ? "neural policy" : "GPU BRAIN (local)"; return; }
+  try {
+    const probe = await fetch("/ai/brain/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ state: [0, 0, 0, 0, 0, 1, 0, 0.5] }) });
+    if (probe.ok) { const j = await probe.json(); if (Array.isArray(j.action) || Array.isArray(j)) { const infer = async (state) => { const r = await fetch("/ai/brain/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ state: Array.from(state) }) }); const jj = await r.json(); return jj.action || jj; }; brainPilot = makeBrainPilot(infer, getNearestSalvage, { maxTurn: 0.11, maxSpeed: 0.05 }); brainName = "GPU BRAIN (rig)"; } }
+  } catch (e) {}
+}
+connectBrain();
+
+let cam = makeCamera(7.5, 6.0, 0.4), manual = false; const keys = {};
+addEventListener("keydown", e => { const k = e.key.toLowerCase(); if (k === "p") manual = !manual; if (k === "f") useField = !useField; keys[k] = true; keys[e.key] = true; });
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; keys[e.key] = false; });
+attachGestures(cv, { onPan: (pan, fingers) => { if (fingers === 1) { manual = true; rotate(cam, pan.dx * 0.004); moveCollide(cam, -cam.dirX * pan.dy * 0.004, -cam.dirY * pan.dy * 0.004, M); } }, onTap: () => { manual = !manual; } });
+
+const zbuf = new Float32Array(4096);
+function render() {
+  const img = rctx.createImageData(RW, RH), d = img.data;
+  for (let y = (RH / 2 | 0) + 1; y < RH; y++) {
+    const fc = floorCastRow(cam, y, RW, RH); if (!fc) continue; let fx = fc.floorX, fy = fc.floorY; const cy = RH - y - 1, fog = Math.max(0.16, 1 - fc.rowDist / 12);
+    for (let x = 0; x < RW; x++) { const tx = ((fx - Math.floor(fx)) * 64) & 63, ty = ((fy - Math.floor(fy)) * 64) & 63, ti = (ty * 64 + tx) * 4; let o = (y * RW + x) * 4; d[o] = FLOOR.data[ti] * fog; d[o + 1] = FLOOR.data[ti + 1] * fog; d[o + 2] = FLOOR.data[ti + 2] * fog; d[o + 3] = 255; o = (cy * RW + x) * 4; d[o] = CEIL.data[ti] * fog; d[o + 1] = CEIL.data[ti + 1] * fog; d[o + 2] = CEIL.data[ti + 2] * fog + 6; d[o + 3] = 255; fx += fc.stepX; fy += fc.stepY; }
+  }
+  const cols = raycastColumns(M, cam, RW);
+  for (let x = 0; x < RW; x++) { const c = cols[x], perp = c.perp; zbuf[x] = perp; const h = Math.min(RH * 4, (RH / perp) | 0), y0 = ((RH - h) / 2) | 0; const tex = TEX[c.cell] || TEX[1], tx = Math.min(63, (c.wallX * 64) | 0), fog = Math.max(0.22, 1 - perp / 11) * (c.side ? 0.65 : 1); for (let y = 0; y < h; y++) { const yy = y0 + y; if (yy < 0 || yy >= RH) continue; const ty = Math.min(63, ((y / h) * 64) | 0), ti = (ty * 64 + tx) * 4, o = (yy * RW + x) * 4; d[o] = tex.data[ti] * fog; d[o + 1] = tex.data[ti + 1] * fog; d[o + 2] = tex.data[ti + 2] * fog; d[o + 3] = 255; } }
+  rctx.putImageData(img, 0, 0);
+  const bills = wrecks.concat(salvage.filter(s => !s.got));
+  for (const b of projectSprites(bills, cam, RW)) { const spr = b.spr, size = Math.abs((RH / b.depth) * (spr.h || 0.6)) | 0, sx = b.screenX | 0, half = (size / 2) | 0, vy = (RH / 2) | 0; const fi = spr.frames > 1 ? spriteFrame(spr, cam, spr.frames) : 0, fw = spr.img.width / (spr.frames || 1); for (let col = -half; col < half; col++) { const px = sx + col; if (px < 0 || px >= RW) continue; if (b.depth >= zbuf[px]) continue; const u = fi * fw + ((col + half) / size) * fw; rctx.save(); if (spr.glow) rctx.globalCompositeOperation = "lighter"; rctx.drawImage(spr.img, u, 0, 1, spr.img.height, px, vy - half, 1, size); rctx.restore(); } }
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(rbuf, 0, 0, W, H); bloom(cv, ctx, W, H); drawMinimap();
+}
+function drawMinimap() {
+  const s = 7, ox = W - MW * s - 12, oy = 12; ctx.globalAlpha = 0.85;
+  const minDistAt = (x, y) => { let m = Infinity; for (const f of _fields) { const d = f.dist[y * f.W + x]; if (d < m) m = d; } return m; };
+  let maxD = 1; if (_fields.length) for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) { const d = minDistAt(x, y); if (isFinite(d)) maxD = Math.max(maxD, d); }
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) { const cell = M[y][x]; let col = cell ? (cell === 4 ? "#a84545" : cell === 2 ? "#223c54" : cell === 3 ? "#7a5a20" : "#3a2a1a") : "rgba(8,13,22,0.5)";
+    if (!cell && _fields.length) { const d = minDistAt(x, y); if (isFinite(d)) { const t = d / maxD; col = "rgb(" + Math.round(40 + t * 40) + "," + Math.round(200 - t * 150) + "," + Math.round(120 + t * 100) + ")"; } }
+    ctx.fillStyle = col; ctx.fillRect(ox + x * s, oy + y * s, s - 1, s - 1); }
+  for (const b of salvage) if (!b.got) { ctx.fillStyle = "#f6a623"; ctx.fillRect(ox + b.x * s - 1, oy + b.y * s - 1, 3, 3); }
+  ctx.fillStyle = "#59d1ff"; ctx.beginPath(); ctx.arc(ox + cam.px * s, oy + cam.py * s, 3, 0, 6.28); ctx.fill(); ctx.strokeStyle = "#59d1ff"; ctx.beginPath(); ctx.moveTo(ox + cam.px * s, oy + cam.py * s); ctx.lineTo(ox + (cam.px + cam.dirX) * s, oy + (cam.py + cam.dirY) * s); ctx.stroke(); ctx.globalAlpha = 1;
+}
+resize();
+function frame() {
+  updateDoors(doors, M, cam, 1 / 60, {});
+  if (manual) { const spd = 0.055; if (keys["w"]) moveCollide(cam, cam.dirX * spd, cam.dirY * spd, M); if (keys["s"]) moveCollide(cam, -cam.dirX * spd, -cam.dirY * spd, M); if (keys["a"]) moveCollide(cam, cam.dirY * spd, -cam.dirX * spd, M); if (keys["d"]) moveCollide(cam, -cam.dirY * spd, cam.dirX * spd, M); if (keys["ArrowLeft"]) rotate(cam, -0.05); if (keys["ArrowRight"]) rotate(cam, 0.05); }
+  else { const b = useField ? fieldPilot : ((brainPilot && brainPilot.healthy()) ? brainPilot : awayBrain); pilotStep(cam, M, salvage, { brain: b }); }
+  checkSalvage(cam);
+  render();
+  const left = salvage.filter(s => !s.got).length;
+  objEl.textContent = "DERELICT " + missions + " \u00b7 salvage " + (salvage.length - left) + "/" + salvage.length + " \u00b7 " + secured + " secured";
+  if (performance.now() - tickAt < 3500) tickEl.textContent = "\u25B8 " + tickMsg; else tickEl.textContent = manual ? "\u25B8 you have the helm (P for brain)" : "\u25B8 brain is boarding";
+  const pilotLabel = manual ? "manual" : (useField ? "4-grid field (F)" : ((brainPilot && brainPilot.healthy()) ? brainName : "CPU nav")); st.textContent = pilotLabel + " \u00b7 (" + cam.px.toFixed(1) + "," + cam.py.toFixed(1) + ")";
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

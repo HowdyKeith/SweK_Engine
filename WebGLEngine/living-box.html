@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Living Box">
+<meta name="demo:desc" content="Art, not a game: a self-running box where matter spirals into a black hole against a living nebula, consumed and reborn forever, while a little 3D-sprite ship is flown by an evade-brain that never dies -- it just flies to evade. Autonomous. Leave it running like a screensaver. The GPU Brain can take the stick on a rig.">
+<meta name="demo:category" content="fx">
+<title>Living Box</title>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #cap { position:fixed; left:14px; top:12px; color:#f6a623; letter-spacing:.16em; text-transform:uppercase; z-index:3; }
+  #st { position:fixed; right:14px; bottom:12px; color:#5f7aa0; font-size:11px; z-index:3; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cap">&#9670; Living Box</div>
+<div id="st"></div>
+<script type="module">
+import { makeDebris, stepBlackHole, evadeSteer, stepShip } from "./fx/showcase/livingBox.js";
+import { spriteToMesh } from "./fx/spritemesh/spriteMesh.js";
+import { nebulaColorAt } from "./fx/nebula/nebula.js";
+import { makeVortons, step2D, nebulaSwirlColorAt } from "./fx/vorton/vortonNebula.js";
+import { makeBloom } from "./fx/post/bloom.js";
+import { makeOrbitControls, attachOrbit } from "./ui/touchCamera.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), st = document.getElementById("st");
+const bloom = makeBloom({ threshold: 0.5, intensity: 0.95, blurPx: 7 });
+let W = 0, H = 0;
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; buildNebula(); }
+addEventListener("resize", resize);
+
+// static living-nebula backdrop, rendered once at low res
+let neb = null, V = makeVortons(7);
+function buildNebula() {
+  const nw = 200, nh = Math.max(120, Math.round(nw * H / W)), buf = new Uint8ClampedArray(nw * nh * 4);
+  for (let y = 0; y < nh; y++) for (let x = 0; x < nw; x++) { const c = nebulaSwirlColorAt(x, y, nw, nh, { x: 0, y: 0 }, 2.0, V, 0.35, 40, nebulaColorAt); const i = (y * nw + x) * 4; buf[i] = c[0] * 90; buf[i + 1] = c[1] * 90; buf[i + 2] = c[2] * 110; buf[i + 3] = 255; }
+  const t = new OffscreenCanvas(nw, nh); t.getContext("2d").putImageData(new ImageData(buf, nw, nh), 0, 0); neb = t;
+}
+resize();
+
+// a little ship: 3D but reads like a sprite (low-poly extruded silhouette)
+function shipSprite() { const S = 48, s = document.createElement("canvas"); s.width = S; s.height = S; const g = s.getContext("2d"); g.translate(S / 2, S / 2); g.fillStyle = "#cfe0ff"; g.beginPath(); g.moveTo(0, -20); g.lineTo(7, 8); g.lineTo(16, 15); g.lineTo(4, 13); g.lineTo(0, 19); g.lineTo(-4, 13); g.lineTo(-16, 15); g.lineTo(-7, 8); g.closePath(); g.fill(); return s; }
+const shipMesh = spriteToMesh(shipSprite(), { segments: 28, depth: 0.5 });
+
+const R = 1.25, hole = { x: 0, y: 0, z: 0, mass: 0.62, soft: 0.02, swirl: 0.9, horizon: 0.13, danger: 0.8 };
+const debris = makeDebris(520, R, 5); const ship = { x: R * 0.7, y: 0.2, z: 0, vx: 0, vy: 0, vz: 0, heading: 0 };
+let seed = 12345; const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+let cam = 0.3, consumedTot = 0, scale = 0.34;
+const orbit = makeOrbitControls({ az: 0.3, el: 0.0, dist: 2, minDist: 0.9, maxDist: 6 });
+attachOrbit(cv, orbit);   // drag to look, pinch/wheel to zoom, auto-spins when idle -- perfectly easy on a phone
+
+function project(x, y, z) { const cy = Math.cos(cam), sy = Math.sin(cam); const X = x * cy + z * sy, Z = -x * sy + z * cy, Y = y; const persp = 3.0 / (3.0 - Z); return { sx: W / 2 + X * Math.min(W, H) * scale * persp, sy: H / 2 + Y * Math.min(W, H) * scale * persp, z: Z, persp }; }
+
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; orbit.autospin(dt, 0.12); cam = orbit.st.az; scale = 0.34 * (2 / orbit.st.dist); hole.x = Math.sin(now / 5300) * 0.25; hole.y = Math.cos(now / 6700) * 0.18;
+  consumedTot += stepBlackHole(debris, hole, R, dt, rng);
+  const dir = evadeSteer(ship, hole, debris, R); stepShip(ship, dir, dt, { accel: 3.2, maxV: 1.5 });
+
+  // backdrop
+  if (neb) { ctx.globalAlpha = 1; ctx.drawImage(neb, 0, 0, W, H); } else { ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H); }
+  ctx.fillStyle = "rgba(2,3,10,0.35)"; ctx.fillRect(0, 0, W, H);
+
+  // collect drawables (debris + ship tris) and painter-sort
+  const draws = [];
+  for (const p of debris) { const d = Math.hypot(p.x - hole.x, p.y - hole.y, p.z - hole.z), pr = project(p.x, p.y, p.z); const heat = Math.max(0, 1 - d / 0.6); draws.push({ z: pr.z, kind: "d", sx: pr.sx, sy: pr.sy, s: (1.4 + heat * 2.5) * pr.persp, heat }); }
+  // ship triangles
+  const cyaw = Math.cos(ship.heading), syaw = Math.sin(ship.heading);
+  const sp = shipMesh.positions.map(v => { const lx = v[0] * cyaw - v[1] * syaw, ly = v[0] * syaw + v[1] * cyaw; return project(ship.x + lx * 0.14, ship.y + ly * 0.14, ship.z + v[2] * 0.14); });
+  const shipZ = project(ship.x, ship.y, ship.z).z;
+  draws.push({ z: shipZ + 0.001, kind: "ship", sp });
+  // black hole
+  const hp = project(hole.x, hole.y, hole.z); draws.push({ z: hp.z, kind: "hole", sx: hp.sx, sy: hp.sy, r: hole.horizon * Math.min(W, H) * scale * hp.persp });
+  draws.sort((a, b) => a.z - b.z);
+
+  for (const o of draws) {
+    if (o.kind === "d") { ctx.globalAlpha = 0.5 + o.heat * 0.5; ctx.fillStyle = o.heat > 0.5 ? "rgb(255," + (200 - o.heat * 80 | 0) + ",180)" : "rgb(" + (120 + o.heat * 100 | 0) + ",180,255)"; ctx.fillRect(o.sx - o.s / 2, o.sy - o.s / 2, o.s, o.s); }
+    else if (o.kind === "hole") { ctx.globalAlpha = 1; const g = ctx.createRadialGradient(o.sx, o.sy, o.r * 0.6, o.sx, o.sy, o.r * 3.2); g.addColorStop(0, "#000"); g.addColorStop(0.5, "rgba(120,60,200,0.35)"); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.sx, o.sy, o.r * 3.2, 0, 6.28); ctx.fill(); ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(o.sx, o.sy, o.r, 0, 6.28); ctx.fill(); ctx.strokeStyle = "rgba(200,140,255,0.7)"; ctx.lineWidth = 1.5; ctx.stroke(); }
+    else if (o.kind === "ship") { ctx.globalAlpha = 1; for (const c of shipMesh.cells) { const a = o.sp[c[0]], b = o.sp[c[1]], d = o.sp[c[2]]; ctx.fillStyle = "#a9c4ff"; ctx.strokeStyle = "rgba(89,209,255,0.5)"; ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.lineTo(d.sx, d.sy); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  }
+  ctx.globalAlpha = 1;
+  bloom(cv, ctx, W, H);
+  st.textContent = debris.length + " bodies \u00b7 " + consumedTot + " consumed \u00b7 ship evading, never dies";
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

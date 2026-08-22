@@ -1,0 +1,40 @@
+{
+  "kind": "swek-magmap-gpu-report",
+  "version": 2921,
+  "at": "2026-07-25T03:26:00.727Z",
+  "adapter": {
+    "vendor": "arm",
+    "architecture": "valhall",
+    "device": "",
+    "description": ""
+  },
+  "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+  "cfg": {
+    "n": 21,
+    "span": 1,
+    "rho": 0.1,
+    "nR": 48,
+    "nT": 48
+  },
+  "proposedBy": "gpu",
+  "tol": 0.00001,
+  "floor": 0.000004385,
+  "adjudication": {
+    "accepted": true,
+    "checked": 34,
+    "disagreed": 0,
+    "worstRelDiff": 0.000002789037748719737,
+    "worstIndex": 130
+  },
+  "fullGrid": {
+    "worstRelDiff": 0.0000050863670272553635,
+    "worstIndex": 220,
+    "cells": 441,
+    "ms": 69.60000002384186
+  },
+  "gradedPeak": {
+    "peakErrFrac": 1.3518298890650412e-7,
+    "source": "cpu-f64"
+  },
+  "fellBack": false
+}

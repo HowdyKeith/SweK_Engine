@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Endless Sky on Box3D</title>
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; }
+  #wrap { padding:10px; }
+  #hud { margin:0 0 8px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  #mode { padding:2px 8px; border-radius:5px; border:1px solid #2a6a4a; background:#10261c; color:#9fe6c0; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  canvas { display:block; background:#04060c; border:1px solid #16223c; border-radius:8px; width:900px; height:600px; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 1200px; height: auto; display: block; }
+  button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#152136; color:#b9d4ff; border:1px solid #2f486c; }
+  a { color:#5ad6ff; }
+  #rec.on { background:#2a1015; color:#ff9aa2; border-color:#6a2a30; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <b style="color:#2fd6b0">&#128640; Endless Sky on Box3D</b>
+    <span id="mode" class="fallback">detecting&hellip;</span>
+    <span id="stat" style="color:#7d8fa8"></span>
+    <select id="recDur" title="clip length" style="background:#152136;color:#b9d4ff;border:1px solid #2f486c;border-radius:5px;font:11px ui-monospace,monospace;padding:2px 4px"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+    <button id="rec" title="record a presentation clip of the fight to a .webm">&#9679; Record</button>
+    <a href="/flight-gpu.html" title="WebGPU 3D view of this fight">&#129680; 3D view &#8599;</a>
+    <a href="/es-box3d-3d.html" title="Three.js 3D render pass: real hull meshes, free camera, same planar sim (Long Silence Round A)">&#128506; 3D (Three.js) &#8599;</a>
+    <a href="/box3d-info.html">box3d &#8599;</a>
+  </div>
+  <canvas id="c" width="900" height="600"></canvas>
+</div>
+<script type="module">
+import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
+import { headingVector } from "/ev/flightModel.js";
+import { DEFAULT_W, decide as tacticsDecide, applyBrainWeights } from "/ev/esTactics.js";
+import { createESBox3D } from "/physics/esBox3d.js";
+import { box3d } from "/physics/box3d/box3dLoader.js";
+import { planarFallbackWorld } from "/physics/planarFallbackWorld.js";
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+// inlined so we don't pull es-arena.mjs (which imports node "fs") into the browser.
+const CLASSES = [
+  { id: 1, name: "Raider",   shield: 80,  armor: 60, speed: 340, accel: 240, maneuver: 11, dps: 12 },
+  { id: 2, name: "Marauder", shield: 120, armor: 90, speed: 300, accel: 200, maneuver: 8,  dps: 18 },
+  { id: 3, name: "Corsair",  shield: 60,  armor: 40, speed: 400, accel: 280, maneuver: 14, dps: 8  },
+];
+const SHOT = { speed: 1050, life: 1.7, dmgShield: 14, dmgArmor: 12, cooldownMs: 360 };
+const HIT_RADIUS = 90;
+const W_A = applyBrainWeights({ wWeak: 0, wFocus: 0, wThreat: 0, wPlayer: 0, wClose: 1 }, DEFAULT_W);   // scatter
+const W_B = { ...DEFAULT_W };                                                                             // hand
+
+function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+function makeFleet(team, center, count, rng) {
+  return spawnEnemies(CLASSES, {}, center, { count, team, minR: 150, spread: 500, rnd: rng }).map((e, i) => ({
+    ...e, id: team + "#" + i, team, vx: e.vx || 0, vy: e.vy || 0,
+    dps: (e.cls && e.cls.dps) || e.dps || 10, _cool: 0, _tgtId: null, _fleeing: false,
+  }));
+}
+function snapshot(fleet) { const o = []; for (const e of fleet) if (!e.dead) o.push({ id: e.id, x: e.x, y: e.y, team: e.team, shield: e.shield, armor: e.armor, maxShield: e.maxShield, maxArmor: e.maxArmor, dps: e.dps, dead: false }); return o; }
+
+// decide + drive one side onto the box3d substrate; collect shots (movement is applied by esbx.step/sync after).
+function sideDriveShots(mine, foes, weights, esbx, dt, nowMs) {
+  const shots = [];
+  for (const e of mine) {
+    if (e.dead) continue;
+    const d = tacticsDecide(e, foes, weights, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
+    e._fleeing = !!d.fleeing; e._tgtId = (d.target && !d.target._flee) ? d.target.id : null;
+    if (!d.target) continue;
+    const ai = stepAI(e, d.target, { range: 1400, standoff: d.fleeing ? 0 : 160 });
+    esbx.driveShip(e._bx, { turn: ai.turn, thrust: ai.thrust }, dt);
+    if (ai.firing && d.engaging && nowMs >= (e._cool || 0)) {
+      e._cool = nowMs + SHOT.cooldownMs; const dir = headingVector(e.heading);
+      shots.push({ team: e.team, x: e.x, y: e.y, vx: dir.x * SHOT.speed, vy: dir.y * SHOT.speed, life: SHOT.life });
+    }
+  }
+  return shots;
+}
+function advanceShots(shots, ships, dt) {
+  const rr = HIT_RADIUS * HIT_RADIUS, alive = [];
+  for (const sh of shots) {
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
+    if (sh.life <= 0) continue;
+    let hit = false;
+    for (const e of ships) { if (e.dead || e.team === sh.team) continue; const dx = e.x - sh.x, dy = e.y - sh.y; if (dx * dx + dy * dy <= rr) { if (applyDamage(e, SHOT.dmgShield, SHOT.dmgArmor)) e.dead = true; hit = true; break; } }
+    if (!hit) alive.push(sh);
+  }
+  return alive;
+}
+
+// ---- render ----
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height, HALF = 1900;                 // world half-extent shown
+const sc = Math.min(W, H) / (HALF * 2);
+const toX = (wx) => W / 2 + wx * sc, toY = (wy) => H / 2 + wy * sc;
+function ship(e) {
+  const hv = headingVector(e.heading), px = toX(e.x), py = toY(e.y), r = 9;
+  const nx = px + hv.x * r * 1.6, ny = py + hv.y * r * 1.6;      // nose
+  const bx = px - hv.x * r, by = py - hv.y * r, ox = -hv.y, oy = hv.x;
+  ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(bx + ox * r * 0.8, by + oy * r * 0.8); ctx.lineTo(bx - ox * r * 0.8, by - oy * r * 0.8); ctx.closePath();
+  ctx.fillStyle = e.team === "A" ? "#4fd0ff" : "#ff9a4f"; ctx.fill();
+  const hp = (e.shield + e.armor) / ((e.maxShield || 1) + (e.maxArmor || 1));   // health tint ring
+  if (hp < 0.5) { ctx.strokeStyle = "rgba(255,80,80,.7)"; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+let A = [], B = [], shots = [], t = 0, esbx = null, ready = false, wins = { A: 0, B: 0 };
+function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, 0, 0] }) : planarFallbackWorld(); }   // space: zero g
+function newBattle() {
+  const rng = makeRng((Math.random() * 1e9) | 0);
+  A = makeFleet("A", { x: -1300, y: 0 }, 6, rng); B = makeFleet("B", { x: 1300, y: 0 }, 6, rng);
+  esbx = createESBox3D(makeWorld(), { shipHalf: 60 });
+  for (const e of A.concat(B)) e._bx = esbx.add(e, e.stats);
+  shots = []; t = 0;
+}
+
+function frame() {
+  const dt = 1 / 30, nowMs = t * 1000;
+  const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
+  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
+  else {
+    const sA = sideDriveShots(A, snapshot(B), W_A, esbx, dt, nowMs);
+    const sB = sideDriveShots(B, snapshot(A), W_B, esbx, dt, nowMs);
+    esbx.step(dt); esbx.sync();                       // one shared step -> ships collide
+    shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
+  }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#0a1626"; for (const sh of shots) { ctx.fillRect(toX(sh.x) - 1, toY(sh.y) - 1, 2, 2); }
+  ctx.fillStyle = "#8fb4ff"; for (const sh of shots) { ctx.fillStyle = sh.team === "A" ? "#7fe0ff" : "#ffca7f"; ctx.fillRect(toX(sh.x) - 1.5, toY(sh.y) - 1.5, 3, 3); }
+  for (const e of A) if (!e.dead) ship(e);
+  for (const e of B) if (!e.dead) ship(e);
+  document.getElementById("stat").textContent = `A ${A.filter((e) => !e.dead).length} vs B ${B.filter((e) => !e.dead).length}  ·  battles A:${wins.A} B:${wins.B}  ·  ${ready ? "box3d" : "fallback"} collisions`;
+  requestAnimationFrame(frame);
+}
+
+// ---- record a presentation clip via the shared recorder (webm; convert to mp4 with ffmpeg) ----
+const recBtn = document.getElementById("rec");
+recBtn.onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); recBtn.textContent = "\u25CF Record"; recBtn.classList.remove("on"); return; }
+  const secs = +(document.getElementById("recDur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, cv)) {
+    recBtn.textContent = "\u25A0 recording " + secs + "s"; recBtn.classList.add("on");
+    setTimeout(() => { recBtn.textContent = "\u25CF Record"; recBtn.classList.remove("on"); }, secs * 1000 + 200);
+  } else { recBtn.textContent = "no MediaRecorder"; }
+};
+
+(async () => {
+  const modeEl = document.getElementById("mode");
+  let st = { ready: false }; try { st = await box3d.init(); } catch (e) { st = { ready: false, reason: e && e.message }; }
+  ready = !!st.ready;
+  modeEl.textContent = ready ? "box3d WASM" : "JS fallback (build the WASM on the Box3D page)";
+  modeEl.className = ready ? "" : "fallback";
+  newBattle(); requestAnimationFrame(frame);
+})();
+</script>
+<script type="module">
+if (new URLSearchParams(location.search).has("reel")) {
+  const { startReel } = await import("./ui/reelCard.js");
+  startReel({ title: "SweK Engine", subtitle: "box3D Flight", file: "swek-box3d-flight", rate: 0.97,
+    narrate: [
+      "Same physics, now flying a ship. Newtonian thrust and drag on the box 3 D backend.",
+      "This exact sim also runs headless in Node \u2014 which is how the L A N co-op stays in lockstep.",
+      "Deterministic, so a fight plays out identically on every machine in the house."
+    ] });
+}
+</script>
+</body>
+</html>

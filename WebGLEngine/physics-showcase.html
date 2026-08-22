@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<!--
+  physics-showcase.html -- physics showcase. RIG-ONLY (runs from the engine root so its ES imports of ./physics/xpbd/*
+  resolve; will not preview in a standalone sandbox, like couple.html / server.html / fingerprint.html).
+
+  A single bench that runs the engine's deterministic physics modules live and draws them in 3D. Each scene imports the
+  same gated code the fingerprint proves bit-identical -- the inflating balloon is volume.js, the bulging muscle is
+  muscleVolume.js composing volume with contraction, the flapping flag is windCloth.js sampling a wind field. Pick a
+  scene, drive its slider, watch the verified solver run. This page holds no physics; it only renders.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK -- Physics Showcase</title>
+<style>
+  :root { --bg:#000; --amber:#ff9f00; --orange:#ff7700; --cyan:#33ccff; --panel:#12100a; --text:#ffcc66; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Antonio","Arial Narrow",sans-serif; letter-spacing:.03em; }
+  #wrap { display:flex; gap:14px; padding:14px; min-height:100vh; }
+  #stageCol { flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
+  #panel { flex:0 0 300px; display:flex; flex-direction:column; gap:10px; }
+  .bar { background:var(--amber); color:#000; border-radius:0 22px 0 0; padding:8px 16px; font-size:20px; font-weight:700; text-transform:uppercase; }
+  .block { background:var(--panel); border-left:6px solid var(--orange); border-radius:0 0 0 18px; padding:12px 14px; }
+  .block h3 { margin:0 0 8px; font-size:13px; letter-spacing:.14em; color:var(--amber); text-transform:uppercase; }
+  canvas { background:#05070d; border:2px solid var(--orange); border-radius:14px; width:100%; display:block; }
+  select, button { font-family:inherit; font-size:14px; background:#241a08; color:var(--text); border:1px solid var(--orange); border-radius:8px; padding:7px 10px; cursor:pointer; }
+  button.lcars { background:var(--orange); color:#000; font-weight:700; text-transform:uppercase; }
+  button.lcars.on { background:var(--cyan); }
+  button:hover { filter:brightness(1.15); }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12px; margin:8px 0; text-transform:uppercase; letter-spacing:.06em; }
+  input[type=range] { width:150px; accent-color:var(--orange); }
+  .val { color:var(--cyan); min-width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .hint { font-size:11px; color:#b8935a; line-height:1.5; text-transform:none; letter-spacing:normal; }
+  #status { font-size:12px; color:var(--cyan); font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageCol">
+    <div class="bar">SweK &middot; Physics Showcase</div>
+    <canvas id="stage" width="900" height="640"></canvas>
+    <div class="block"><div id="status">initialising&hellip;</div></div>
+  </div>
+  <div id="panel">
+    <div class="bar" style="border-radius:22px 0 0 0">Scene</div>
+    <div class="block">
+      <select id="sceneSel" style="width:100%"></select>
+      <div class="hint" id="sceneDesc" style="margin-top:8px"></div>
+    </div>
+    <div class="block"><h3>Drive</h3><div id="params"></div></div>
+    <div class="block">
+      <h3>View</h3>
+      <div class="btns"><button class="lcars" id="playBtn">Pause</button><button id="resetBtn">Reset</button><button id="spinBtn" class="on">Spin: on</button></div>
+      <label class="row">Yaw <input type="range" id="yaw" min="0" max="360" value="35" /><span class="val" id="yawv">35</span></label>
+      <label class="row">Pitch <input type="range" id="pitch" min="-60" max="60" value="18" /><span class="val" id="pitchv">18</span></label>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { generateIcosphere, buildEdges, enclosedVolume, volumeSubstep } from "./physics/xpbd/volume.js";
+import { buildMuscleBelly, contractMuscle, muscleVolumeSubstep, bellyShape } from "./physics/xpbd/muscleVolume.js";
+import { buildClothConstraints } from "./physics/xpbd/clothMesh.js";
+import { colorConstraints } from "./physics/xpbd/xpbd.js";
+import { windClothSubstep, maxStrain } from "./physics/xpbd/windCloth.js";
+import { buildVectorGrid } from "./physics/xpbd/sampledField.js";
+
+const cvs = document.getElementById("stage"), ctx = cvs.getContext("2d");
+
+const SCENES = {
+  balloon: {
+    label: "Balloon  (volume / pressure)",
+    desc: "A closed mesh under a single global volume constraint. Drive the pressure to inflate or deflate; at rest it conserves volume.",
+    params: [{ name: "inflation", label: "Inflation", min: 0.4, max: 2.4, default: 1.6, step: 0.05 }],
+    build() {
+      const sph = generateIcosphere(2);
+      const edges = buildEdges(sph.pos, sph.tris, 0.0004), batches = colorConstraints(edges);
+      const restVol = enclosedVolume(sph.pos, sph.tris);
+      const state = { pos: Float64Array.from(sph.pos), vel: new Float64Array(sph.n * 3), invMass: new Float64Array(sph.n).fill(1) };
+      return { state, edges, tris: sph.tris, n: sph.n, batches, restVol };
+    },
+    step(s, p) { volumeSubstep(s.state, s.edges, s.batches, s.tris, s.restVol, { dt: 0.016, iterations: 8, inflation: p.inflation, gravity: [0, 0, 0] }); },
+    status(s) { return "volume " + enclosedVolume(s.state.pos, s.tris).toFixed(2) + " / rest " + s.restVol.toFixed(2); },
+  },
+  muscle: {
+    label: "Muscle  (volume + contractile fibres)",
+    desc: "An elongated closed mesh whose axial fibres contract. Volume is conserved, so shortening forces the belly to bulge -- a biological actuator composed from two constraints. Fibres drawn in cyan.",
+    params: [{ name: "activation", label: "Activation", min: 0, max: 1, default: 0.7, step: 0.05 }],
+    build() {
+      const belly = buildMuscleBelly(2, 2.2), batches = colorConstraints(belly.edges);
+      const restVol = enclosedVolume(belly.pos, belly.tris);
+      const state = { pos: Float64Array.from(belly.pos), vel: new Float64Array(belly.n * 3), invMass: new Float64Array(belly.n).fill(1) };
+      return { state, edges: belly.edges, tris: belly.tris, n: belly.n, batches, restVol };
+    },
+    step(s, p) { contractMuscle(s.edges, p.activation, 0.35); muscleVolumeSubstep(s.state, s.edges, s.batches, s.tris, s.restVol, { dt: 0.016, iterations: 10, useVolume: true }); },
+    status(s) { const sh = bellyShape(s.state.pos, s.n); return "length " + sh.length.toFixed(2) + "  girth " + sh.girth.toFixed(2) + "  vol " + enclosedVolume(s.state.pos, s.tris).toFixed(2); },
+  },
+  flag: {
+    label: "Flag  (cloth in a sampled wind)",
+    desc: "A cloth pinned at its pole in a sampled wind field. The wind and the edge constraints negotiate into a billow; the fabric flaps but holds together. Pinned nodes in red.",
+    params: [{ name: "wind", label: "Wind", min: 0, max: 9, default: 5, step: 0.5 }],
+    build() {
+      const W = 14, H = 9, SP = 0.18, N = W * H;
+      const { cons } = buildClothConstraints(W, H, SP, { structural: 0.0, shear: 0.0005, bending: 0.002 });
+      const batches = colorConstraints(cons);
+      const pos = new Float64Array(3 * N), vel = new Float64Array(3 * N), invMass = new Float64Array(N).fill(1);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; pos[3 * i] = x * SP - 1.2; pos[3 * i + 1] = 0.8 - y * SP; pos[3 * i + 2] = 0; if (x === 0) invMass[i] = 0; }
+      const g = { nx: 8, ny: 8, nz: 8, ox: -2, oy: -2, oz: -1.5, sp: 0.6 };
+      const field = { grid: buildVectorGrid(g.nx, g.ny, g.nz, g.ox, g.oy, g.oz, g.sp, () => [0, 0, 1]), dims: g };
+      const edges = cons.map((c) => [c.i, c.j]);
+      return { state: { pos, vel, invMass }, edges, cons, n: N, batches, field };
+    },
+    step(s, p) { windClothSubstep(s.state, s.cons, s.batches, s.field, { dt: 0.016, iterations: 12, gravity: [0, -2, 0], windStrength: p.wind }); },
+    status(s) { return "strain " + maxStrain(s.state.pos, s.cons).toFixed(3) + "  (fabric holding)"; },
+  },
+};
+
+let scene, sceneDef, params = {}, playing = true, spin = true, spinAngle = 0;
+
+function project(x, y, z, f) {
+  const yaw = (parseFloat(document.getElementById("yaw").value) + spinAngle) * Math.PI / 180, pit = parseFloat(document.getElementById("pitch").value) * Math.PI / 180;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pit), sp = Math.sin(pit);
+  const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+  const y2 = cp * y - sp * z1, z2 = sp * y + cp * z1;
+  const d = 6, s = f.scale * d / (d + z2);
+  return [f.cx + x1 * s, f.cy - y2 * s, z2];
+}
+function bounds(s) { let m = 0; for (let i = 0; i < s.n; i++) { const x = s.state.pos[3 * i], y = s.state.pos[3 * i + 1], z = s.state.pos[3 * i + 2]; const r = Math.sqrt(x * x + y * y + z * z); if (r > m) m = r; } return m; }
+
+function render() {
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  const r = Math.max(bounds(scene), 0.5), f = { cx: cvs.width / 2, cy: cvs.height / 2, scale: Math.min(cvs.width, cvs.height) * 0.34 / r };
+  const p = scene.state.pos;
+  for (const e of scene.edges) {
+    const i = e[0] ?? e.i, j = e[1] ?? e.j;
+    const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f), b = project(p[3 * j], p[3 * j + 1], p[3 * j + 2], f);
+    const depth = (a[2] + b[2]) / 2, shade = Math.max(0.15, Math.min(1, 0.6 + depth * 0.18));
+    ctx.strokeStyle = e.muscle ? "rgba(120,220,255," + shade + ")" : "rgba(255,150,40," + shade + ")";
+    ctx.lineWidth = e.muscle ? 1.6 : 1;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  for (let i = 0; i < scene.n; i++) { const a = project(p[3 * i], p[3 * i + 1], p[3 * i + 2], f); ctx.fillStyle = scene.state.invMass[i] === 0 ? "#ff3322" : "#ffcc66"; ctx.beginPath(); ctx.arc(a[0], a[1], scene.state.invMass[i] === 0 ? 3.5 : 2, 0, 7); ctx.fill(); }
+}
+
+const sel = document.getElementById("sceneSel");
+for (const id of Object.keys(SCENES)) { const o = document.createElement("option"); o.value = id; o.textContent = SCENES[id].label; sel.appendChild(o); }
+function selectScene(id) {
+  sceneDef = SCENES[id]; scene = sceneDef.build(); params = {}; for (const pr of sceneDef.params) params[pr.name] = pr.default;
+  const box = document.getElementById("params"); box.innerHTML = "";
+  for (const pr of sceneDef.params) {
+    const row = document.createElement("label"); row.className = "row";
+    const val = document.createElement("span"); val.className = "val"; val.textContent = pr.default.toFixed(2);
+    const inp = document.createElement("input"); inp.type = "range"; inp.min = pr.min; inp.max = pr.max; inp.step = pr.step; inp.value = pr.default;
+    inp.oninput = () => { params[pr.name] = parseFloat(inp.value); val.textContent = params[pr.name].toFixed(2); };
+    row.append(pr.label + " ", inp, val); box.appendChild(row);
+  }
+  document.getElementById("sceneDesc").textContent = sceneDef.desc;
+  render();
+}
+sel.onchange = () => selectScene(sel.value);
+document.getElementById("resetBtn").onclick = () => selectScene(sel.value);
+const playBtn = document.getElementById("playBtn");
+playBtn.onclick = () => { playing = !playing; playBtn.classList.toggle("on", !playing); playBtn.textContent = playing ? "Pause" : "Play"; };
+const spinBtn = document.getElementById("spinBtn");
+spinBtn.onclick = () => { spin = !spin; spinBtn.classList.toggle("on", spin); spinBtn.textContent = spin ? "Spin: on" : "Spin: off"; };
+document.getElementById("yaw").oninput = (e) => document.getElementById("yawv").textContent = e.target.value;
+document.getElementById("pitch").oninput = (e) => document.getElementById("pitchv").textContent = e.target.value;
+
+let frame = 0;
+function loop() {
+  if (playing) { for (let k = 0; k < 2; k++) sceneDef.step(scene, params); frame++; }
+  if (spin) spinAngle = (spinAngle + 0.3) % 360;
+  render();
+  document.getElementById("status").textContent = sel.value + "  |  frame " + frame + "  |  " + sceneDef.status(scene);
+  requestAnimationFrame(loop);
+}
+selectScene(Object.keys(SCENES)[0]);
+loop();
+</script>
+</body>
+</html>

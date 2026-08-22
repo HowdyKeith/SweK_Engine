@@ -1,0 +1,89 @@
+// Variable stroke width (docs/DESIGN.md §4). A pencil line is not a constant-weight
+// ruler stroke: it swells and thins under hand pressure and tapers at its ends.
+// This computes a per-vertex width for a screen polyline, which the SVG backend
+// turns into a filled *ribbon* (offset the centreline by ±w/2). Width = base
+// weight (the emphasis already set by role/importance) × taper × pressure, with
+// the taper/pressure *character* scaled by the element's one hand knob (`wobble`)
+// so `wobble: 0` stays a uniform technical line.
+/** fraction of the run length over which each end ramps from tip to full width */
+const TAPER_FRAC = 0.18;
+/** end width as a fraction of the mid width (a visible tip, not a vanishing point) */
+const END_FLOOR = 0.35;
+/** ± width swing from the pressure noise, at full character */
+const PRESSURE_AMP = 0.35;
+/** pressure-noise cycles per screen pixel (a swell roughly every ~30px) */
+const PRESSURE_FREQ = 0.03;
+/** how strongly camera depth bends the weight (0 = off). */
+const DEPTH_EXP = 0.55;
+/** clamp so far strokes stay legible and near ones don't blow up. */
+const DEPTH_MIN = 0.55;
+const DEPTH_MAX = 1.6;
+/**
+ * Depth-emphasis multiplier for a stroke at camera-space `depth`, relative to the
+ * focal plane `refDepth` (eye→target). Nearer than the focus ⇒ bolder (> 1),
+ * farther ⇒ thinner (< 1), clamped. A perception cue, independent of the hand
+ * knob — it applies even to ruler-clean (`wobble: 0`) lines.
+ */
+export function depthEmphasis(depth, refDepth) {
+    if (!(depth > 0) || !(refDepth > 0))
+        return 1;
+    return Math.max(DEPTH_MIN, Math.min(DEPTH_MAX, Math.pow(refDepth / depth, DEPTH_EXP)));
+}
+/** integer-lattice hash → [-1, 1] (self-contained, matches wobble's family). */
+function lattice(i, seed) {
+    let h = Math.imul((i | 0) ^ seed, 2246822519);
+    h ^= h >>> 15;
+    h = Math.imul(h, 3266489917);
+    h ^= h >>> 13;
+    return ((h >>> 0) / 0xffffffff) * 2 - 1;
+}
+/** smooth 1-D value noise in [-1, 1]. */
+function valueNoise(x, seed) {
+    const i = Math.floor(x);
+    const f = x - i;
+    const u = f * f * (3 - 2 * f);
+    const a = lattice(i, seed);
+    const b = lattice(i + 1, seed);
+    return a + (b - a) * u;
+}
+/** two-octave fractal noise for a slightly livelier pressure. */
+function fbm(x, seed) {
+    return 0.68 * valueNoise(x, seed) + 0.32 * valueNoise(x * 2.03 + 11.7, seed ^ 0x9e3779b9);
+}
+/**
+ * The built-in pencil profile: a smooth thin→thick→thin taper at the ends times a
+ * seeded 1-D pressure noise along the (screen) arclength, blended in by `amount`
+ * so a stroke with `wobble: 0` stays perfectly uniform.
+ */
+export function createWidth(params = {}) {
+    const taperFrac = params.taperFrac ?? TAPER_FRAC;
+    const endFloor = params.endFloor ?? END_FLOOR;
+    const amp = params.pressureAmp ?? PRESSURE_AMP;
+    const freq = params.pressureFreq ?? PRESSURE_FREQ;
+    return {
+        widths({ path, seed, baseWidth, amount }) {
+            const n = path.length;
+            if (n < 2)
+                return path.map(() => baseWidth);
+            // cumulative screen arclength
+            const L = [0];
+            for (let i = 1; i < n; i++)
+                L.push(L[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+            const total = L[n - 1] || 1;
+            const blend = Math.max(0, amount);
+            const out = [];
+            for (let i = 0; i < n; i++) {
+                const u = L[i] / total;
+                const e = Math.min(1, Math.max(0, Math.min(u, 1 - u) / taperFrac));
+                const taper = endFloor + (1 - endFloor) * (e * e * (3 - 2 * e)); // smoothstep ramp
+                const pressure = 1 + amp * fbm(L[i] * freq, seed);
+                const mult = 1 + blend * (taper * pressure - 1); // amount 0 ⇒ uniform
+                out.push(Math.max(0.15, baseWidth * mult));
+            }
+            return out;
+        },
+    };
+}
+/** Default width strategy — the pencil taper + pressure profile. */
+export const defaultWidth = createWidth();
+//# sourceMappingURL=width.js.map

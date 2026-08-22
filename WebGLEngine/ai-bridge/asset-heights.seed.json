@@ -1,0 +1,10 @@
+{
+  "_comment": "Pre-delivered height seed. roleTargets = desired in-world height per role (units). assets = pre-known natives/targets keyed by bare filename. Natives come from a rig round-trip (GET /assets/heights/export); targets are authored here. Disk values (measured + user overrides) win over this seed.",
+  "roleTargets": {
+    "terrainNPC": 3,
+    "dungeonMonster": 4,
+    "civDefender": 4,
+    "seaCreature": 1.5
+  },
+  "assets": {}
+}

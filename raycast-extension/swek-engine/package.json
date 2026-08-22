@@ -1,0 +1,56 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "swek-engine",
+  "title": "SweK Engine",
+  "description": "Control your SweK Engine from Raycast: status, peers, panels, toasts. Points at the bridge on localhost:8787 by default; set a LAN or Cloudflare tunnel URL in preferences to drive a remote box.",
+  "icon": "icon.png",
+  "author": "helga",
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "engine-status",
+      "title": "Engine Status",
+      "subtitle": "SweK Engine",
+      "description": "Bridge health, version, tunnel, peers, KPop listener, Ollama.",
+      "mode": "view"
+    },
+    {
+      "name": "open-panel",
+      "title": "Open Engine Panel",
+      "subtitle": "SweK Engine",
+      "description": "Jump to any engine page (server, control, hosting, Raycast LLM, Pip-Boy...).",
+      "mode": "view"
+    },
+    {
+      "name": "send-toast",
+      "title": "Send Toast",
+      "subtitle": "SweK Engine",
+      "description": "Fire a KPop toast on the engine box through /kpop/toast.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "bridgeUrl",
+      "type": "textfield",
+      "required": false,
+      "title": "Bridge URL",
+      "description": "SweK ai-bridge base URL. Local box: http://127.0.0.1:8787 - a LAN peer: http://192.168.x.x:8787 - or your Cloudflare tunnel https URL.",
+      "default": "http://127.0.0.1:8787"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.88.4",
+    "@raycast/utils": "^1.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "@types/react": "^18.3.3",
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build -e dist",
+    "lint": "ray lint"
+  }
+}

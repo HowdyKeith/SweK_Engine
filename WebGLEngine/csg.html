@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!-- WebGLEngine/csg.html -- v3432
+     THE CONSUMER, BUILT BEFORE THE EXTRACTOR HAD ONE.
+     The v3429 inventory found ten pages contouring an isosurface and all ten contouring something SMOOTH; no
+     page in the tree did CSG or SDF primitives at all. This is that page. Everything it draws is contoured by
+     physics/mesh/dualContour.mjs from exact SDFs in physics/mesh/csg.mjs -- no sampled field, no baked mesh. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSG — solid modelling with dual contouring</title>
+<style>
+  :root { --bg:#12141a; --panel:#1b1e26; --ink:#dfe3ec; --dim:#8d95a8; --line:#2a2f3b; --hot:#6fd3c7; --warn:#e2a45c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:17px; font-weight:600; }
+  header p { margin:5px 0 0; color:var(--dim); font-size:13px; max-width:74ch; }
+  .wrap { display:flex; gap:16px; padding:16px; flex-wrap:wrap; align-items:flex-start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  canvas { background:#0c0e13; border:1px solid var(--line); border-radius:8px; display:block; cursor:grab; }
+  canvas:active { cursor:grabbing; }
+  .side { width:330px; }
+  h2 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
+  label { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0; font-size:13px; }
+  input[type=range] { width:150px; }
+  select, button { background:#232733; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:5px 9px; font:inherit; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--hot); }
+  #tree { list-style:none; margin:0; padding:0; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; }
+  #tree li { padding:3px 6px; border-radius:4px; cursor:pointer; }
+  #tree li.sel { background:#2b3140; color:var(--hot); }
+  #stats { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:var(--dim); white-space:pre-wrap; margin:0; }
+  .note { color:var(--dim); font-size:12.5px; margin:10px 0 0; }
+  .warn { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>CSG — solid modelling with dual contouring</h1>
+  <p>Primitives combined by boolean operations into an exact signed distance field, contoured live. The mesh is
+     built by <code>physics/mesh/dualContour.mjs</code> from Hermite data — a crossing point and an
+     <em>analytic</em> normal on every grid edge — so sharp corners land where they actually are instead of
+     being cut off. Toggle <b>mass-point</b> to see what a naive implementation does to the same field.</p>
+</header>
+
+<div class="wrap">
+  <div>
+    <canvas id="view" width="620" height="620" style="width:100%;max-width:780px;height:auto"></canvas>
+    <p class="note">Drag to rotate. Wireframe of the contoured quads; the corner marker is the exact analytic
+       corner, so any gap between it and the mesh <em>is</em> the error.</p>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>Model</h2>
+      <ul id="tree"></ul>
+      <label>add
+        <select id="prim"><option value="box">box</option><option value="sphere">sphere</option><option value="cylinder">cylinder</option></select>
+      </label>
+      <label>as
+        <select id="op"><option value="union">union</option><option value="subtract">subtract</option><option value="intersect">intersect</option></select>
+      </label>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="add">add</button><button id="undo">undo</button><button id="reset">reset</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px">
+      <h2>Contouring</h2>
+      <label>grid n <input id="n" type="range" min="8" max="48" step="4" value="20"><span id="nv">20</span></label>
+      <label>offset <input id="off" type="range" min="0" max="5" step="1" value="0"><span id="offv">0/6</span></label>
+      <label>mass-point (the naive fallback) <input id="mass" type="checkbox"></label>
+      <p class="note">The offset slider shifts the grid within a cell. <b>One alignment measures alignment, not
+         accuracy</b> — v3417 learned that the expensive way, so the number below is swept, not sampled.</p>
+    </div>
+
+    <div class="panel" style="margin-top:12px">
+      <h2>Measured</h2>
+      <pre id="stats">…</pre>
+      <p class="note" id="verdict"></p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { box, sphere, cylinder, union, subtract, intersect } from "./physics/mesh/csg.mjs";
+import { dualContour, nearestVertexDistance } from "./physics/mesh/dualContour.mjs";
+
+const MT_BASELINE = 0.377;   // v3417's marching-tetrahedra corner cut, its BEST case
+
+const START = () => [{ op: "base", prim: "box", args: [[0, 0, 0], [0.6, 0.6, 0.6]] }];
+let tree = START();
+const make = (e) => e.prim === "box" ? box(...e.args) : e.prim === "sphere" ? sphere(...e.args) : cylinder(...e.args);
+function build() {
+  let node = make(tree[0]);
+  for (const e of tree.slice(1)) {
+    const p = make(e);
+    node = e.op === "subtract" ? subtract(node, p) : e.op === "intersect" ? intersect(node, p) : union(node, p);
+  }
+  return node;
+}
+
+const $ = (id) => document.getElementById(id);
+let yaw = 0.7, pitch = 0.45, drag = null;
+const cv = $("view"), ctx = cv.getContext("2d");
+
+function project(p) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const x = p[0] * cy - p[2] * sy, z = p[0] * sy + p[2] * cy;
+  const y = p[1] * cp - z * sp, zz = p[1] * sp + z * cp;
+  const s = 300 / (3.4 + zz);
+  return [cv.width / 2 + x * s * 1.6, cv.height / 2 - y * s * 1.6, zz];
+}
+
+function render() {
+  const n = +$("n").value, off = (+$("off").value / 6) * (2 / n) * 0.97, mass = $("mass").checked;
+  $("nv").textContent = n; $("offv").textContent = $("off").value + "/6";
+  const node = build();
+  const t0 = performance.now();
+  const m = dualContour(node, { lo: -1 + off, hi: 1 + off, n, massPoint: mass });
+  const ms = performance.now() - t0;
+
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = mass ? "#e2a45c" : "#6fd3c7";
+  ctx.globalAlpha = 0.55; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const q of m.quads) {
+    const pts = q.map((i) => project(m.verts[i]));
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+  }
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  // The exact analytic corner of the base box, and the mesh's best attempt at it.
+  const corner = tree[0].prim === "box" ? tree[0].args[1].slice() : null;
+  let cut = null;
+  if (corner) {
+    cut = nearestVertexDistance(m.verts, corner) / m.h;
+    const c = project(corner);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(c[0], c[1], 6, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  $("stats").textContent =
+    `vertices   ${m.verts.length}\nquads      ${m.quads.length}\ncell h     ${m.h.toFixed(5)}\n` +
+    `contour    ${ms.toFixed(1)} ms\n` +
+    (cut === null ? "" : `cut/h      ${cut < 1e-3 ? cut.toExponential(2) : cut.toFixed(4)}\n` +
+                          `marching tets (v3417)  ${MT_BASELINE}`);
+  if (cut !== null) {
+    $("verdict").innerHTML = mass
+      ? `<span class="warn">Mass-point: the vertex is the average of the edge crossings, and every crossing lies on a grid edge — so the average does too, and a corner never does. This is the same blindness as marching tets wearing a newer name. Slide the offset: the error swings with the <em>alignment</em>.</span>`
+      : `The QEF puts the vertex where the sampled planes intersect, which is inside the cell. Slide the offset and the resolution — <b>this number does not move</b>. v3417 measured the old one at ${MT_BASELINE} and flat across a 4× refinement.`;
+  }
+}
+
+function drawTree() {
+  $("tree").innerHTML = tree.map((e, i) =>
+    `<li${i ? "" : ' class="sel"'}>${i ? e.op : "base"} · ${e.prim}</li>`).join("");
+}
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+$("add").onclick = () => {
+  const prim = $("prim").value, op = $("op").value;
+  const c = [rnd(-0.5, 0.5), rnd(-0.5, 0.5), rnd(-0.5, 0.5)];
+  tree.push({ op, prim, args: prim === "box" ? [c, [rnd(0.2, 0.4), rnd(0.2, 0.4), rnd(0.2, 0.4)]]
+                        : prim === "sphere" ? [c, rnd(0.2, 0.45)] : [c, rnd(0.15, 0.35), rnd(0.3, 0.7)] });
+  drawTree(); render();
+};
+$("undo").onclick = () => { if (tree.length > 1) tree.pop(); drawTree(); render(); };
+$("reset").onclick = () => { tree = START(); drawTree(); render(); };
+for (const id of ["n", "off", "mass"]) $(id).oninput = render;
+
+cv.onpointerdown = (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); };
+cv.onpointermove = (e) => {
+  if (!drag) return;
+  yaw += (e.clientX - drag[0]) * 0.01; pitch += (e.clientY - drag[1]) * 0.01;
+  pitch = Math.max(-1.4, Math.min(1.4, pitch)); drag = [e.clientX, e.clientY]; render();
+};
+cv.onpointerup = () => { drag = null; };
+
+drawTree(); render();
+</script>
+</body>
+</html>

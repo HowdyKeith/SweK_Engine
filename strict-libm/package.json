@@ -1,0 +1,11 @@
+{
+  "name": "strict-libm",
+  "version": "1.0.0",
+  "description": "Host-Math-free, byte-deterministic sin/cos/hypot/log2/atan2 for cross-platform reproducible rendering and lockstep physics.",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": { ".": "./index.mjs" },
+  "scripts": { "test": "node test.mjs", "demo": "node demo.mjs" },
+  "keywords": ["deterministic", "cross-platform", "libm", "reproducible", "lockstep", "webgl", "trigonometry"],
+  "license": "MIT"
+}

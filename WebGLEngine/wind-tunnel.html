@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Wind Tunnel (v2796)</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  /* v2872 -- THE ACTION GETS THE PAGE. The canvas was nailed to 440x164 in a wrapping flex row, so a 110x41
+     lattice occupied about a fifth of a 1080p screen and the vortex street was the size of a postage stamp.
+     Now the view column GROWS and the controls stay a fixed sidebar, because a slider does not benefit from
+     being wider while a flow field does. Below 900px the sidebar drops underneath instead of squeezing the view. */
+  #wrap { display: flex; gap: 16px; padding: 14px; align-items: flex-start; }
+  #view { flex: 1 1 0; min-width: 0; }          /* min-width:0 or a flex child refuses to shrink below content */
+  canvas { border: 1px solid #24382e; background: #05080a; image-rendering: pixelated;
+           width: 100%; max-width: 1400px; height: auto; display: block; }
+  #side { flex: 0 0 300px; min-width: 260px; }
+  @media (max-width: 900px) { #wrap { flex-wrap: wrap; } #side { flex: 1 1 100%; } }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  .row { margin: 7px 0; }
+  input[type=range] { width: 150px; vertical-align: middle; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 3px 9px; }
+  table { border-collapse: collapse; margin-top: 8px; }
+  td { padding: 1px 8px 1px 0; }
+  .num { color: #9fe8c0; }
+  .note { color: #6f8a7c; margin-top: 10px; max-width: 70ch; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="view">
+    <canvas id="c" width="440" height="164"></canvas>
+    <div class="note">2D canvas — no WebGL needed. Colour is speed; white curves are streamlines traced through
+      the velocity field. Drag and lift come from momentum exchange on the cylinder's boundary links.</div>
+  </div>
+  <div id="side">
+    <h1>LBM Wind Tunnel</h1>
+    <!-- v2874 -- put a real model in the tunnel. The mesh is voxelised to a CROSS-SECTION, and the caveat below
+         is not decoration: this tunnel is 2D, so the number belongs to the slice and not to the body. -->
+    <div class="row" style="border-bottom:1px solid #24382e;padding-bottom:8px;">
+      <label style="cursor:pointer">model <input id="glb" type="file" accept=".glb" style="font-size:11px;max-width:150px"></label>
+      <label style="cursor:pointer">profile <input id="svg" type="file" accept=".svg" style="font-size:11px;max-width:150px"></label>
+      <button id="clearGlb" style="font-size:11px;padding:2px 7px;">cylinder</button>
+      <div id="glbInfo" style="color:#6f8a7c;margin-top:4px;font-size:11px;">using the built-in cylinder</div>
+    </div>
+    <div class="row">drive <input id="g" type="range" min="1" max="40" value="15"> <span class="num" id="gv"></span></div>
+    <div class="row">cylinder D <input id="d" type="range" min="5" max="15" step="2" value="9"> <span class="num" id="dv"></span></div>
+    <div class="row"><button id="run">restart</button> <button id="pause">pause</button> <label><input id="sl" type="checkbox" checked> streamlines</label></div>
+    <table>
+      <tr><td>step</td><td class="num" id="t">0</td></tr>
+      <tr><td>Re (measured)</td><td class="num" id="re">–</td></tr>
+      <tr><td>C<sub>d</sub></td><td class="num" id="cd">–</td></tr>
+      <tr><td>C<sub>l</sub></td><td class="num" id="cl">–</td></tr>
+      <tr><td>momentum balance</td><td class="num" id="bal">–</td></tr>
+    </table>
+    <div class="note">Momentum balance = total solid force vs applied body force. It is a derived identity, so it
+      doubles as a convergence check: it falls toward 0% as the flow reaches steady state.</div>
+  </div>
+</div>
+<script type="module">
+import { makeLBM } from "/simulation/lbm/lbm2d.js";
+import { solidForce, solidForceBalance, coefficients, streamlineField } from "/simulation/lbm/windTunnel.mjs";
+
+const c = document.getElementById("c"), ctx = c.getContext("2d");
+const $ = (id) => document.getElementById(id);
+const NX = 220, NY = 82, SCALE = 2;
+
+// v2874 -- an optional mesh cross-section replaces the cylinder as the solid.
+// THE 2D CAVEAT, ON SCREEN AND NOT ONLY IN A COMMENT: a 2D tunnel measures a 2D flow. The drag of a SLICE is not
+// the drag of the BODY -- a sphere's mid-slice is a cylinder, whose Cd is roughly double a sphere's at the same
+// Reynolds number, and for a car or a fuselage they are not close at all. Useful for comparing SHAPES here;
+// not an aerodynamic result about the object.
+let meshMask = null;   // {nx, ny, solidAt}
+// v2982 -- AN SVG PROFILE IS THE HONEST INPUT FOR A 2D TUNNEL. The .glb path above must reduce a solid to a
+// SLICE and carry the caveat that the Cd belongs to the slice and not the body. An SVG has no such caveat: it IS
+// the 2D shape being tested. Draw an aerofoil, test the aerofoil.
+async function loadSVGFile(file) {
+  const info = $("glbInfo");
+  try {
+    info.textContent = "reading " + file.name + "...";
+    const text = await file.text();
+    const { parseSVG, rasterProfile, profileArea } = await import("/physics/mesh/svgProfile.mjs");
+    const { polys, shapes } = parseSVG(text);
+    const sec = rasterProfile(polys, { nx: NX, ny: NY, pad: 0.05 });
+    if (!sec.filled) { info.innerHTML = '<span style="color:#f28b8b">' + file.name + " rasterised to nothing solid.</span>"; return; }
+    meshMask = sec;
+    info.innerHTML = file.name + " &mdash; " + shapes.join(", ") + ", " + sec.filled + " solid cells" +
+      '<br><span style="color:#7fe0a4">2D PROFILE: no slice caveat. This IS the shape being tested, so the Cd is its own.</span>';
+    reset();
+  } catch (e) {
+    info.innerHTML = '<span style="color:#f28b8b">' + String((e && e.message) || e) + "</span>";
+  }
+}
+
+async function loadGLBFile(file) {
+  const info = $("glbInfo");
+  try {
+    info.textContent = "reading " + file.name + "...";
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const [{ parseGLB }, { crossSection, isClosed }] = await Promise.all([
+      import("/physics/mesh/glb.mjs"), import("/physics/mesh/voxelize.mjs"),
+    ]);
+    const mesh = parseGLB(buf);
+    const closed = isClosed(mesh);
+    // Refuse an open mesh rather than voxelising it: ray parity flips once and never flips back, so half the
+    // tunnel would fill with solid and still produce a confident drag number.
+    // v3037 -- THE REFUSAL WAS CORRECT AND WAS A DEAD END. Refusing an open mesh is right: ray parity flips
+    // once and never flips back, so half the tunnel fills with solid and still yields a confident drag number.
+    // But the user is then holding a model and no way forward, and the usual advice -- go and repair the mesh --
+    // changes the shape being measured, which for a graded instrument is worse than refusing.
+    //
+    // There is a second reduction that needs no repair at all. PROJECT the triangles instead of slicing them:
+    // no interior test, so nothing is undefined on an open surface. It answers a DIFFERENT question -- the
+    // silhouette is the maximum cross-section, not the section at a height -- so it is offered, never
+    // substituted silently, and it carries its own caveat rather than inheriting the slice's.
+    if (!closed.closed) {
+      info.innerHTML = '<span style="color:#f28b8b">' + file.name + " is not a closed surface (" +
+        closed.boundaryEdges + " boundary edges). Ray-parity fill would put a wall in the tunnel.</span>" +
+        '<br><button id="silBtn" style="font:inherit;margin-top:4px;cursor:pointer">use the SILHOUETTE instead (no repair)</button>';
+      const btn = document.getElementById("silBtn");
+      if (btn) btn.addEventListener("click", async () => {
+        try {
+          const { profileFromGLBMesh, profileArea } = await import("/physics/mesh/glbProfile.mjs");
+          const sil = profileFromGLBMesh(mesh, { nx: NX, ny: NY, pad: 0.05, axis: "z" });
+          meshMask = sil;
+          info.innerHTML = file.name + " &mdash; " + mesh.triangles + " tris, " + sil.filled + " solid cells" +
+            '<br><span style="color:#e6c877">SILHOUETTE, not a section: this is the MAXIMUM cross-section (what the shadow would be), so the Cd belongs to that outline and not to the body. The mesh was NOT repaired -- it is the shape you supplied.</span>';
+          reset();
+        } catch (e) {
+          info.innerHTML = '<span style="color:#f28b8b">' + String((e && e.message) || e) + "</span>";
+        }
+      });
+      return;
+    }
+    const sec = crossSection(mesh, { nx: NX, ny: NY, pad: 0.05 });
+    meshMask = sec;
+    info.innerHTML = file.name + " &mdash; " + mesh.triangles + " tris, " + sec.filled + " solid cells" +
+      '<br><span style="color:#e6c877">2D tunnel: this is a CROSS-SECTION. The Cd belongs to the slice, not the body.</span>';
+    reset();
+  } catch (e) {
+    info.innerHTML = '<span style="color:#f28b8b">' + String((e && e.message) || e) + "</span>";
+  }
+}
+let lbm, D, CX, CY, step = 0, paused = false;
+
+function build() {
+    D = parseInt($("d").value); $("dv").textContent = D;
+    const g = parseInt($("g").value) * 2e-6; $("gv").textContent = g.toExponential(1);
+    CX = 46; CY = (NY - 1) / 2 + 0.5;
+    const solidAt = meshMask
+        ? (x, y) => meshMask.solidAt(x, y)
+        : (x, y) => ((x - CX) ** 2 + (y - CY) ** 2) <= (D / 2) ** 2;
+    lbm = makeLBM({ nx: NX, ny: NY, tau: 0.6, force: [g, 0], solidAt });
+    step = 0;
+}
+
+function draw() {
+    const img = ctx.createImageData(NX, NY);
+    let vmax = 1e-9;
+    for (let k = 0; k < NX * NY; k++) if (!lbm.solid[k]) vmax = Math.max(vmax, Math.hypot(lbm.ux[k], lbm.uy[k]));
+    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+        const k = lbm.idx(x, y), o = (y * NX + x) * 4;
+        if (lbm.solid[k]) { img.data[o] = 60; img.data[o + 1] = 70; img.data[o + 2] = 78; img.data[o + 3] = 255; continue; }
+        const s = Math.min(1, Math.hypot(lbm.ux[k], lbm.uy[k]) / vmax);
+        img.data[o] = 20 + 200 * s * s; img.data[o + 1] = 40 + 150 * s; img.data[o + 2] = 90 + 120 * (1 - s); img.data[o + 3] = 255;
+    }
+    const off = document.createElement("canvas"); off.width = NX; off.height = NY;
+    off.getContext("2d").putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, c.width, c.height);
+
+    if ($("sl").checked) {
+        ctx.strokeStyle = "rgba(235,245,240,0.55)"; ctx.lineWidth = 1;
+        for (const L of streamlineField(lbm, { count: 16, x0: 2, opts: { steps: 320, ds: 0.7 } })) {
+            if (L.length < 2) continue;
+            ctx.beginPath();
+            let prev = null;
+            for (const [x, y] of L) {
+                const px = x * (c.width / NX), py = y * (c.height / NY);
+                if (prev && Math.abs(px - prev) > c.width / 2) { ctx.stroke(); ctx.beginPath(); ctx.moveTo(px, py); }  // periodic wrap
+                else if (prev === null) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                prev = px;
+            }
+            ctx.stroke();
+        }
+    }
+}
+
+function readout() {
+    const f = solidForce(lbm, (x, y) => ((x - CX) ** 2 + (y - CY) ** 2) <= (D / 2) ** 2 + 2);
+    let U = 0; for (let dy = -2; dy <= 2; dy++) U = Math.max(U, lbm.ux[lbm.idx(Math.max(1, CX - 3 * D), Math.round(CY) + dy)]);
+    const { cd, cl } = coefficients(f, { rho: 1, U, D });
+    const bal = solidForceBalance(lbm);
+    $("t").textContent = step;
+    $("re").textContent = (U * D / lbm.nu).toFixed(1);
+    $("cd").textContent = isFinite(cd) ? cd.toFixed(2) : "–";
+    $("cl").textContent = isFinite(cl) ? cl.toFixed(4) : "–";
+    $("bal").textContent = (bal.relError * 100).toFixed(2) + "%";
+}
+
+function frame() {
+    if (!paused) { for (let i = 0; i < 25; i++) { lbm.step(); step++; } draw(); readout(); }
+    requestAnimationFrame(frame);
+}
+$("run").onclick = build;
+$("pause").onclick = () => { paused = !paused; $("pause").textContent = paused ? "resume" : "pause"; };
+$("g").oninput = $("d").oninput = build;
+build(); frame();
+
+$("glb").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) loadGLBFile(f); });
+$("clearGlb").addEventListener("click", () => { meshMask = null; $("glbInfo").textContent = "using the built-in cylinder"; reset(); });
+$("svg").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) loadSVGFile(f); });
+</script>
+</body>
+</html>

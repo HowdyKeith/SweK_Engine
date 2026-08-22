@@ -1,0 +1,21 @@
+{
+  "name": "VBA Engine · Tasker Deck",
+  "port": 8790,
+
+  "backends": {
+    "autoremote": { "key": "" },
+    "tasker_http": { "baseUrl": "http://192.168.11.50:1821" },
+    "mqtt":        { "url": "mqtt://192.168.11.10:1883", "username": "", "password": "" },
+    "ha":          { "baseUrl": "http://homeassistant.local:8123", "token": "" }
+  },
+
+  "tasks": [
+    { "id": "flash_lights", "label": "Flash Lights",   "icon": "💡", "group": "Home",   "backend": "autoremote",  "message": "flash_lights" },
+    { "id": "speak_hello",  "label": "Speak Hello",    "icon": "🔊", "group": "Phone",  "backend": "autoremote",  "message": "speak=hello from the deck" },
+    { "id": "toast",        "label": "Toast Test",     "icon": "🍞", "group": "Phone",  "backend": "tasker_http", "method": "POST", "path": "/toast", "body": "hi from the web panel" },
+    { "id": "find_phone",   "label": "Find Phone",     "icon": "📳", "group": "Phone",  "backend": "tasker_http", "method": "GET",  "path": "/findphone" },
+    { "id": "wifi_off",     "label": "Wi-Fi Off",      "icon": "📶", "group": "System", "backend": "mqtt",        "topic": "tasker/cmd", "payload": "wifi:off" },
+    { "id": "wifi_on",      "label": "Wi-Fi On",       "icon": "📶", "group": "System", "backend": "mqtt",        "topic": "tasker/cmd", "payload": "wifi:on" },
+    { "id": "ha_goodnight", "label": "HA: Goodnight",  "icon": "🌙", "group": "Home",   "backend": "ha",          "domain": "tasker", "service": "perform_task", "data": { "name": "Goodnight" } }
+  ]
+}

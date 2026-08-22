@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — the fleet consistency board</title>
+<meta name="demo:desc" content="Run ONE side of a consistency pair on this machine and submit the number. The hub assembles pairs from whatever the fleet has reported and recomputes agreement itself: peers measure, the hub grades. The rule enforced in code is that two routes with the same mechanism can never form a pair, however many different machines they ran on — that is reproducibility, not consistency, and a board that confused the two would certify agreements carrying no information.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:920px; margin:0 auto; padding:18px; line-height:1.65; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 11px; font:12px ui-monospace,monospace; cursor:pointer; margin:0 6px 6px 0; }
+  table { border-collapse:collapse; margin-top:10px; width:100%; } td,th { border:1px solid #22304a; padding:5px 9px; text-align:left; }
+  .num { text-align:right; } .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+  input { background:#0a0e18; color:#cfe0ff; border:1px solid #24344e; border-radius:5px; padding:4px 7px; font:12px ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">Fleet consistency board</h2>
+  <div class="dim">This machine runs ONE route and submits a number. It does not decide anything: the hub assembles pairs and recomputes agreement, because a peer that could submit its own verdict would be grading the fleet's physics from the least supervised process in it. Routes with the SAME mechanism can never pair, however many hosts ran them — identical deterministic numbers agreeing tells you nothing about the physics. Gate: physics/consistencyFleet-selfcheck.mjs.</div>
+  <p>host label <input id="host" size="18" value=""> <span class="dim">(named, because an anonymous measurement cannot be audited)</span></p>
+  <div id="buttons"></div>
+  <div id="out"><span class="dim">pick a route…</span></div>
+</div>
+<script type="module">
+import { ROUTES, runRoute, foldRoute, assemble, fleetLines } from "./physics/consistencyFleet.mjs";
+
+const out = document.getElementById("out"), hostEl = document.getElementById("host");
+hostEl.value = (navigator.platform || "peer") + "-" + Math.random().toString(36).slice(2, 6);
+let local = {};
+
+const bwrap = document.getElementById("buttons");
+for (const [id, r] of Object.entries(ROUTES)) {
+  const b = document.createElement("button");
+  b.textContent = id;
+  b.title = r.pair + " · side " + r.side + " · mechanism " + r.mechanism;
+  b.onclick = () => go(id);
+  bwrap.appendChild(b);
+}
+
+function render(note) {
+  const asm = assemble(local);
+  let html = "<table><tr><th>constant</th><th>route A</th><th class='num'>value</th><th>route B</th><th class='num'>value</th><th class='num'>diff</th><th>verdict</th></tr>";
+  for (const p of asm.pairs) {
+    html += "<tr><td>" + p.pair + "</td><td class='dim'>" + p.a.mechanism + "<br>@" + p.a.host + "</td><td class='num'>" + p.a.value.toFixed(5) +
+      "</td><td class='dim'>" + p.b.mechanism + "<br>@" + p.b.host + "</td><td class='num'>" + p.b.value.toFixed(5) +
+      "</td><td class='num'>" + p.diff.toFixed(5) + "</td><td><b class='" + (p.agree ? "good" : "bad") + "'>" +
+      (p.agree ? "AGREE" : "DISAGREE") + "</b>" + (p.crossHost ? " <span class='dim'>cross-host</span>" : "") + "</td></tr>";
+  }
+  html += "</table><pre class='dim' style='white-space:pre-wrap;'>" + fleetLines(asm).join("\n") + "</pre>";
+  if (note) html += "<div class='dim'>" + note + "</div>";
+  out.innerHTML = html;
+}
+
+async function go(id) {
+  out.innerHTML = "<span class='dim'>running " + id + " — real measurement, nothing cached…</span>";
+  await new Promise((r) => setTimeout(r, 30));
+  let rep;
+  try { rep = runRoute(id, { host: hostEl.value || "unnamed" }); }
+  catch (e) { out.innerHTML = "<span class='bad'>" + e.message + "</span>"; return; }
+  local = foldRoute(local, rep);
+  render("measured " + rep.value.toFixed(5) + " in " + rep.ms + "ms. Submitting to the hub…");
+  try {
+    const r = await fetch("/android/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rep) });
+    const j = await r.json();
+    render(j.ok
+      ? "<span class='good'>submitted</span> — hub holds " + (j.board ? j.board.routesHeld + " route(s) across " + j.board.hosts + " host(s), " + j.board.pairs + " pair(s) assembled, " + j.board.disagree + " disagreeing" : "no board note returned")
+      : "<span class='bad'>submit failed: " + (j.error || r.status) + "</span>");
+  } catch (e) { render("<span class='bad'>submit failed: " + e.message + "</span> (the local table above is still a real measurement)"); }
+}
+render();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

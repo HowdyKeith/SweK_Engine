@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SweK Engine — Xbox</title>
+<style>
+  :root { --bg:#0c1410; --panel:#101a14; --line:#234032; --ink:#e3f0e8; --dim:#8caa98; --go:#9bf0b8; --on:#41e08a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,Menlo,Consolas,monospace; }
+  header { padding:11px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; position:sticky; top:0; background:#0b120eee; backdrop-filter:blur(5px); }
+  .title { font-weight:600; letter-spacing:.4px; } .title .g { color:var(--go); }
+  main { max-width:760px; margin:0 auto; padding:14px; }
+  h2 { font-size:12px; letter-spacing:1.4px; text-transform:uppercase; color:var(--go); border-bottom:1px solid var(--line); padding-bottom:5px; margin:20px 0 10px; }
+  .sub { color:var(--dim); font-size:12px; margin:-4px 0 12px; }
+  label { display:block; color:var(--dim); font-size:11px; margin:8px 0 2px; }
+  input { width:100%; padding:8px; background:#0a120d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:12px ui-monospace,monospace; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row > div { flex:1; min-width:120px; }
+  button { background:#10231a; color:var(--on); border:1px solid #224a36; border-radius:8px; padding:8px 13px; font:inherit; cursor:pointer; }
+  button:hover { background:#143020; }
+  button.lite { background:#0e1812; color:var(--ink); border-color:#1f3329; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  td, th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--dim); font-weight:600; }
+  .name { color:var(--ink); } .fam { color:var(--dim); font-size:11px; word-break:break-all; }
+  #status, #perf { color:var(--dim); font-size:12px; margin-top:8px; white-space:pre-wrap; }
+  #shot img { max-width:100%; border:1px solid var(--line); border-radius:8px; margin-top:8px; }
+  .ok { color:var(--on); } .err { color:#f88; }
+</style>
+</head>
+<body>
+  <header><span class="title"><span class="g">🎮</span> Xbox <span style="color:var(--dim);font-weight:400;">· Device Portal</span></span></header>
+  <main>
+    <p class="sub">Controls an Xbox One / Series in <b>Developer Mode</b> over its Device Portal. On the console: Dev Home → Remote Access → turn on, set a username + password. Then enter the console IP + those credentials below. LAN-only; the password stays on the bridge.</p>
+
+    <h2>Connection</h2>
+    <div class="row">
+      <div><label>Console IP</label><input id="host" placeholder="192.168.50.xx"></div>
+      <div style="max-width:90px;flex:0 0 90px;"><label>Port</label><input id="port" value="11443"></div>
+    </div>
+    <div class="row">
+      <div><label>Dev Portal user</label><input id="user" placeholder="username"></div>
+      <div><label>Password</label><input id="pass" type="password" placeholder="(unchanged if blank)"></div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button id="save">Save</button>
+      <button id="test" class="lite">Test connection</button>
+    </div>
+    <div id="status"></div>
+
+    <h2>Installed apps & games</h2>
+    <div class="row"><button id="loadApps" class="lite">Load apps</button></div>
+    <table id="appTable"><thead><tr><th>App</th><th></th></tr></thead><tbody></tbody></table>
+
+    <h2>System performance</h2>
+    <div class="row"><button id="loadPerf" class="lite">Read perf</button></div>
+    <div id="perf"></div>
+
+    <h2>Screenshot</h2>
+    <div class="row"><button id="shotBtn" class="lite">Capture screenshot</button></div>
+    <div id="shot"></div>
+
+    <p class="sub" style="margin-top:18px;">Note: Dev Mode needs a one-time dev-account activation. Retail (non-dev) Xbox has no usable local API. The screenshot path can differ by console/OS build — if it errors, the rest still works.</p>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const setStatus = (msg, cls) => { const s = $("status"); s.textContent = msg; s.className = cls || ""; };
+  function jget(u){ return fetch(u, { cache:"no-store" }).then(r => r.json()); }
+  function jpost(u, body){ return fetch(u, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body || {}) }).then(r => r.json()); }
+
+  jget("/xbox/config").then(c => { if (c){ $("host").value = c.host || ""; $("port").value = c.port || 11443; $("user").value = c.user || ""; if (c.passSet) $("pass").placeholder = "•••••• (saved)"; } }).catch(()=>{});
+
+  $("save").onclick = () => {
+    const body = { host: $("host").value.trim(), port: parseInt($("port").value, 10) || 11443, user: $("user").value.trim() };
+    if ($("pass").value) body.pass = $("pass").value;
+    jpost("/xbox/config", body).then(() => { setStatus("✓ saved", "ok"); $("pass").value = ""; }).catch(e => setStatus("save failed: " + e, "err"));
+  };
+  $("test").onclick = () => { setStatus("connecting…"); jget("/xbox/status").then(j => { if (j && j.ok) setStatus("✓ reachable — " + (j.name || "Xbox"), "ok"); else setStatus("✗ " + ((j && (j.error || j.hint)) || "no response"), "err"); }).catch(e => setStatus("✗ " + e, "err")); };
+
+  $("loadApps").onclick = () => {
+    const tb = $("appTable").querySelector("tbody"); tb.innerHTML = '<tr><td colspan="2" style="color:var(--dim)">loading…</td></tr>';
+    jget("/xbox/apps").then(j => {
+      tb.innerHTML = "";
+      if (!j || !j.ok) { tb.innerHTML = '<tr><td colspan="2" class="err">' + ((j && j.error) || "failed") + '</td></tr>'; return; }
+      if (!j.apps.length) { tb.innerHTML = '<tr><td colspan="2" style="color:var(--dim)">no apps returned</td></tr>'; return; }
+      j.apps.sort((a,b) => (a.name||"").localeCompare(b.name||"")).forEach(a => {
+        const tr = document.createElement("tr");
+        const td1 = document.createElement("td"); td1.innerHTML = '<div class="name">' + (a.name||a.familyName) + '</div><div class="fam">' + a.familyName + (a.version?(" · v"+a.version):"") + '</div>';
+        const td2 = document.createElement("td"); td2.style.whiteSpace = "nowrap";
+        const lb = document.createElement("button"); lb.textContent = "Launch"; lb.onclick = () => { lb.textContent = "…"; jpost("/xbox/launch", { praid: a.praid, familyName: a.familyName }).then(r => { lb.textContent = (r && r.ok) ? "✓" : "✗"; setTimeout(()=>lb.textContent="Launch", 1200); if (r && !r.ok) setStatus("launch: " + (r.error||"failed"), "err"); }); };
+        td2.appendChild(lb);
+        tr.append(td1, td2); tb.appendChild(tr);
+      });
+    }).catch(e => { tb.innerHTML = '<tr><td colspan="2" class="err">' + e + '</td></tr>'; });
+  };
+
+  $("loadPerf").onclick = () => {
+    $("perf").textContent = "reading…";
+    jget("/xbox/perf").then(j => {
+      if (!j || !j.ok) { $("perf").textContent = "✗ " + ((j && j.error) || "failed"); $("perf").className = "err"; return; }
+      $("perf").className = ""; const p = j.perf || {};
+      const lines = [];
+      try { if (p.AvailablePages != null && p.TotalPages != null) lines.push("mem pages: " + p.AvailablePages + " free / " + p.TotalPages + " total"); } catch {}
+      try { if (p.CpuLoad != null) lines.push("cpu load: " + p.CpuLoad + "%"); } catch {}
+      try { if (p.GPUData && p.GPUData.AvailableAdapters) p.GPUData.AvailableAdapters.forEach((g,i) => lines.push("gpu" + i + ": " + (g.Description||"") + (g.SystemSideMemory!=null?(" · sysmem "+g.SystemSideMemory):""))); } catch {}
+      try { if (p.NetworkingData && p.NetworkingData.NetworkInBytes != null) lines.push("net in/out: " + p.NetworkingData.NetworkInBytes + " / " + p.NetworkingData.NetworkOutBytes); } catch {}
+      $("perf").textContent = lines.length ? lines.join("\n") : JSON.stringify(p, null, 1).slice(0, 1200);
+    }).catch(e => { $("perf").textContent = "✗ " + e; $("perf").className = "err"; });
+  };
+
+  $("shotBtn").onclick = () => {
+    $("shot").innerHTML = '<span style="color:var(--dim)">capturing…</span>';
+    jget("/xbox/screenshot").then(j => {
+      if (j && j.ok && j.image) { $("shot").innerHTML = ""; const img = new Image(); img.src = "data:" + (j.mime||"image/png") + ";base64," + j.image; $("shot").appendChild(img); }
+      else $("shot").innerHTML = '<span class="err">✗ ' + ((j && (j.error || j.hint)) || "failed") + '</span>';
+    }).catch(e => { $("shot").innerHTML = '<span class="err">✗ ' + e + '</span>'; });
+  };
+</script>
+</body>
+</html>

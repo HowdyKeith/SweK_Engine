@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Instrument Bench &mdash; SweK Engine</title>
+<!--
+  v3581 -- A FRONT DOOR FOR THE INSTRUMENTS THAT ONLY EVER HAD A TERMINAL.
+
+  *** 34 OF 104 INSTRUMENTS CARRY page: null. *** They are reachable only by running a selfcheck by hand, which
+  is the debt policyMass sat in until v3030 -- and the six added this session are all in it, including two
+  entire new AREAS (control, crystal) with no visual surface at all.
+
+  THE GATES CANNOT MOVE TO THE BROWSER. They import box3d through node and read files off disk. But v3327 split
+  every one into a REPORTING TOOL that prints and a GATE that exits nonzero, and THE REPORTING HALF IS EXACTLY
+  WHAT A PAGE WANTS. So this page is generic rather than six pages: it asks the bridge to run reportLines() and
+  renders what comes back. Eight instruments gain a door without one being written for them, and any future
+  module that follows the split gets one for free.
+
+  *** IT SHOWS THE REPORT, NOT A VERDICT. *** The gate is what exits nonzero and it stays where it is. A page
+  claiming "PASS" while running only the reporting half would be asserting something it never checked -- the
+  exact confusion the v3327 split exists to prevent, rebuilt in HTML.
+-->
+<style>
+  :root { --bg:#0b0f0c; --fg:#cfe9d8; --dim:#7f9c8c; --go:#6fe39b; --line:#1e3a2a; --warn:#ffcc66; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--go); letter-spacing:.5px; }
+  .sub { color:var(--dim); font-size:11px; max-width:80ch; }
+  .wrap { display:flex; gap:0; align-items:stretch; min-height:calc(100vh - 62px); }
+  .side { width:290px; flex:none; border-right:1px solid var(--line); overflow:auto; }
+  .area { color:var(--dim); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding:10px 14px 4px; }
+  .inst { display:block; width:100%; text-align:left; background:none; border:0; color:var(--fg);
+          padding:6px 14px; cursor:pointer; font:inherit; border-left:2px solid transparent; }
+  .inst:hover { background:#12211a; }
+  .inst.on { background:#12211a; border-left-color:var(--go); color:var(--go); }
+  .inst small { display:block; color:var(--dim); font-size:10px; }
+  .main { flex:1; padding:14px 18px; overflow:auto; }
+  pre { margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; }
+  .meta { color:var(--dim); font-size:11px; margin-bottom:10px; }
+  .err { color:#ff9a9a; }
+  .note { color:var(--warn); font-size:11px; border:1px solid #3a3320; background:#14120a;
+          padding:8px 10px; border-radius:5px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128300; Instrument Bench</h1>
+  <div class="sub">Instruments whose module exposes <code>reportLines()</code>. The bridge runs the reporting half in node and this renders it. <strong>The gate beside each one is still what exits nonzero</strong> &mdash; this page shows a report, not a verdict.</div>
+</header>
+<div class="wrap">
+  <div class="side" id="side"><div class="area">loading&hellip;</div></div>
+  <div class="main" id="main"><div class="meta">Pick an instrument.</div></div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+let LIST = [], current = null;
+
+function renderSide() {
+  const byArea = {};
+  for (const i of LIST) (byArea[i.area] = byArea[i.area] || []).push(i);
+  let h = "";
+  for (const area of Object.keys(byArea).sort()) {
+    h += '<div class="area">' + area + "</div>";
+    for (const i of byArea[area])
+      h += '<button class="inst' + (current === i.id ? " on" : "") + '" data-id="' + i.id + '">' +
+           i.name + "<small>" + i.module + "</small></button>";
+  }
+  $("side").innerHTML = h;
+}
+
+async function run(id) {
+  current = id; renderSide();
+  $("main").innerHTML = '<div class="meta">running&hellip;</div>';
+  try {
+    const r = await fetch("/instruments/report?id=" + encodeURIComponent(id), { cache: "no-store" });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "the bridge refused");
+    // THE MODULE'S OWN LINES, VERBATIM. Reformatting them here would be a second copy of the report's
+    // structure, drifting from the one the terminal prints -- the defect this session found in nine files.
+    $("main").innerHTML =
+      '<div class="meta">' + j.module + "  &middot;  ran in " + j.ms + "ms  &middot;  gate: <code>node " +
+      j.gate + "</code></div>" +
+      '<div class="note">This is the REPORT. To find out whether it passes, run the gate.</div>' +
+      "<pre>" + j.lines.map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("\n") + "</pre>";
+  } catch (e) {
+    $("main").innerHTML = '<div class="meta err">could not run ' + id + ": " + (e && e.message || e) + "</div>";
+  }
+}
+
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest && ev.target.closest(".inst");
+  if (b) run(b.dataset.id);
+});
+
+fetch("/instruments/list", { cache: "no-store" }).then((r) => r.json()).then((j) => {
+  if (!j.ok) throw new Error(j.error);
+  LIST = j.instruments || [];
+  renderSide();
+  // ABSENT IS NOT EMPTY: a bridge that is not running looks exactly like a tree with no instruments, and the
+  // two need different actions from whoever is reading.
+  if (!LIST.length) $("side").innerHTML = '<div class="area">no reportable instruments found</div>';
+  const want = location.hash.replace(/^#/, "");
+  if (want && LIST.some((i) => i.id === want)) run(want);
+}).catch((e) => {
+  $("side").innerHTML = '<div class="area err">bridge unreachable &mdash; ' + (e && e.message || e) +
+                        "<br>this page needs the node bridge; the gates still run from a terminal</div>";
+});
+</script>
+</body>
+</html>

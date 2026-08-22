@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — the brain allocates the measurement budget</title>
+<meta name="demo:desc" content="Experiment design as a proposer-adjudicator handshake: strategies choose WHICH temperature to measure next to pin the Ising Binder crossing with a fixed budget of real Monte Carlo measurements. Bisection races even coverage; the degenerate 'easy data' policy collects smooth measurements far from the transition and never brackets it. The falsifier no strategy contains: the final crossing must land on Onsager's T_c = 2.2692.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:940px; margin:0 auto; padding:16px; line-height:1.6; }
+  canvas { border:1px solid #22304a; border-radius:6px; width:100%; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:5px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="dim" style="margin-bottom:8px;">Each dot is a REAL Binder measurement (U4 at L=8 and L=16, thousands of Metropolis sweeps). d(T) = U4(8) − U4(16) is negative below T_c and positive above; the crossing is where it changes sign. A strategy sees the data so far and proposes the next temperature. Watch where each spends its 9-measurement budget.</div>
+  <canvas id="c" width="900" height="380"></canvas>
+  <div style="margin:10px 0; display:flex; gap:8px; flex-wrap:wrap;">
+    <button id="runActive">Run: bisection (active)</button>
+    <button id="runUniform">Run: even coverage</button>
+    <button id="runEasy" class="sab" title="prefers smooth low-variance data far from the transition — the attractor a confidence-reward falls into">Run: easy-data (degenerate)</button>
+  </div>
+  <div id="hud">choose a strategy…</div>
+</div>
+<script type="module">
+import { ONSAGER_TC } from "./physics/statmech/ising.js";
+import { measurePair, bracketOf, crossingOf, uniformStrategy, activeStrategy, easyStrategy } from "./physics/statmech/binderBudget.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), hud = document.getElementById("hud");
+const SPAN = [2.05, 2.50], BUDGET = 9;
+const tx = (t) => 40 + (t - SPAN[0]) / (SPAN[1] - SPAN[0]) * 820, ty = (d) => 190 - d * 800;
+
+function draw(points, label) {
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, 900, 380);
+  ctx.strokeStyle = "#22304a"; ctx.beginPath(); ctx.moveTo(40, 190); ctx.lineTo(860, 190); ctx.stroke();
+  ctx.strokeStyle = "rgba(246,166,35,0.7)"; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(tx(ONSAGER_TC), 20); ctx.lineTo(tx(ONSAGER_TC), 360); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#f6a623"; ctx.fillText("Onsager T_c = " + ONSAGER_TC.toFixed(4) + " (the falsifier — no strategy contains it)", tx(ONSAGER_TC) + 6, 30);
+  points.forEach((p, i) => {
+    ctx.fillStyle = i < 3 ? "rgba(127,150,184,0.8)" : "rgba(89,209,255,0.95)";
+    ctx.beginPath(); ctx.arc(tx(p.T), ty(p.d), 5, 0, 6.3); ctx.fill();
+    ctx.fillStyle = "#7f96b8"; ctx.fillText(String(i + 1), tx(p.T) - 3, ty(p.d) - 9);
+  });
+  const br = bracketOf(points);
+  if (br) { ctx.fillStyle = "rgba(155,225,93,0.15)"; ctx.fillRect(tx(br[0]), 20, tx(br[1]) - tx(br[0]), 340); }
+  ctx.fillStyle = "#7f96b8"; ctx.fillText("T", 870, 194); ctx.fillText("d(T) = U4(8) − U4(16)", 44, 18);
+  ctx.fillStyle = "#cfe0ff"; ctx.fillText(label, 44, 372);
+}
+
+async function run(strategy, name) {
+  hud.textContent = name + ": seeding 3 measurements…";
+  const opts = { seed: (Date.now() & 0xff) + 3, warmup: 1200, samples: 6000 };
+  const points = [];
+  const addPoint = (T) => points.push(measurePair(T, opts));
+  addPoint(SPAN[0]); addPoint((SPAN[0] + SPAN[1]) / 2); addPoint(SPAN[1]);
+  draw(points, name);
+  for (let i = 3; i < BUDGET; i++) {
+    await new Promise((r) => setTimeout(r, 30));   // let the frame paint between real measurements
+    const T = Math.max(SPAN[0], Math.min(SPAN[1], strategy(points, SPAN)));
+    hud.textContent = name + ": measurement " + (i + 1) + "/" + BUDGET + " at T = " + T.toFixed(4) + "…";
+    addPoint(T); draw(points, name);
+  }
+  const br = bracketOf(points), cr = crossingOf(points);
+  const hit = cr != null && Math.abs(cr - ONSAGER_TC) < 0.06;
+  hud.innerHTML = "<b>" + name + "</b> · bracket " + (br ? (br[1] - br[0]).toFixed(4) : "<b class='bad'>NONE</b>") +
+    " · crossing " + (cr == null ? "<b class='bad'>not found</b>" : "<b class='" + (hit ? "good" : "bad") + "'>" + cr.toFixed(4) + "</b>") +
+    " vs Onsager " + ONSAGER_TC.toFixed(4) +
+    " <span class='dim'>— the gate (physics/statmech/binderBudget-selfcheck.mjs) races all three at one seed: active 0.0035 bracket, uniform 0.0562, easy-data 0.2180.</span>";
+}
+document.getElementById("runActive").onclick = () => run(activeStrategy, "bisection (active)");
+document.getElementById("runUniform").onclick = () => run(uniformStrategy, "even coverage");
+document.getElementById("runEasy").onclick = () => run(easyStrategy, "easy-data (degenerate)");
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

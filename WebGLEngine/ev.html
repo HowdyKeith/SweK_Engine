@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK · Stellar Atlas</title>
+<style>
+  :root { --bg:#06070d; --panel:#0d1018; --edge:#1d2330; --ink:#cdd6e6; --dim:#7c8699; --accent:#5aa9ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:10px; padding:9px 14px; background:var(--panel); border-bottom:1px solid var(--edge); }
+  header h1 { margin:0; font-size:14px; font-weight:600; letter-spacing:.04em; white-space:nowrap; }
+  header h1 small { color:var(--dim); font-weight:400; letter-spacing:0; }
+  #crumb { color:var(--accent); }
+  .spacer { flex:1; }
+  .btn,select { background:#161b27; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:6px 12px; cursor:pointer; font:inherit; white-space:nowrap; }
+  .btn:hover { border-color:var(--accent); color:#fff; }
+  .btn:disabled { opacity:.35; cursor:default; border-color:var(--edge); color:var(--dim); }
+  #stage { position:relative; flex:1; overflow:hidden; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; }
+  canvas#flightCv { cursor:crosshair; }
+  canvas:active { cursor:grabbing; }
+  .hide { display:none !important; }
+  #sysLabels { position:absolute; inset:0; pointer-events:none; }
+  #evBubbles { position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
+  .evChatBubble { position:absolute; transform:translate(-50%,-100%); background:rgba(10,16,24,.92); color:#dff; border:1px solid #3a5a7a; border-radius:8px; padding:2px 8px; font-size:12px; white-space:nowrap; max-width:210px; overflow:hidden; text-overflow:ellipsis; }
+  .evEscBubble { position:absolute; transform:translate(-50%,-100%); background:rgba(8,22,16,.92); color:#bfe9d4; border:1px solid #2f7a5a; border-radius:8px; padding:1px 7px; font-size:11px; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+  .evHpBar { position:absolute; transform:translate(-50%,-100%); width:34px; height:5px; background:rgba(10,16,24,.85); border:1px solid #4a2a2a; border-radius:3px; overflow:hidden; }
+  .evHpBar > i { display:block; height:100%; width:100%; background:#4c8; transition:width .15s linear; }
+  .qcBtn { background:#16202e; color:#cfe; border:1px solid var(--edge); border-radius:7px; padding:7px 8px; font:inherit; font-size:12px; cursor:pointer; text-align:left; line-height:1.15; }
+  .qcBtn:hover { background:#1d2c3e; border-color:#3a5a7a; }
+  .lbl { position:absolute; transform:translate(-50%,8px); color:var(--ink); font-size:11px; white-space:nowrap; text-shadow:0 1px 3px #000,0 0 6px #000; opacity:.92; }
+  .lbl.land { color:#bfe0ff; }
+  .plbl { color:#7df3c0; }
+  #drop { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; text-align:center; color:var(--dim); pointer-events:none; padding:24px; }
+  #drop b { color:var(--ink); font-size:15px; }
+  #drop.over { background:rgba(90,169,255,.07); outline:2px dashed var(--accent); outline-offset:-14px; }
+  #status,#counts { position:absolute; bottom:12px; background:rgba(13,16,24,.85); border:1px solid var(--edge); border-radius:8px; padding:8px 12px; backdrop-filter:blur(6px); }
+  #status { left:12px; min-width:200px; } #counts { right:12px; color:var(--dim); }
+  #checkBtn { position:absolute; right:12px; bottom:50px; z-index:6; background:#13243c; border:1px solid var(--edge); border-radius:8px; color:#bfe9d4; padding:6px 11px; font:inherit; font-size:12px; cursor:pointer; }
+  #checkBtn:hover { border-color:var(--accent); }
+  #checkReport { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:380px; max-height:70vh; overflow:auto; background:rgba(10,16,24,.97); border:1px solid var(--edge); border-radius:12px; padding:14px 16px; box-shadow:0 18px 50px rgba(0,0,0,.6); z-index:8; }
+  #status .name { color:#fff; font-size:14px; } #status .meta { color:var(--dim); }
+  .err { color:#ff8a8a; }
+  /* flight HUD */
+  #hud { position:absolute; left:12px; bottom:12px; background:rgba(13,16,24,.82); border:1px solid var(--edge); border-radius:10px; padding:10px 14px; min-width:210px; backdrop-filter:blur(6px); }
+  #hud .sys { color:#fff; font-size:14px; margin-bottom:6px; }
+  #hud .bar { height:7px; background:#1a2030; border-radius:4px; overflow:hidden; margin:4px 0 8px; }
+  #hud .bar > i { display:block; height:100%; background:linear-gradient(90deg,#2a7,#5cf); width:0; }
+  #hud .land { color:#bfe0ff; min-height:18px; }
+  #ctrls { position:absolute; right:12px; top:12px; color:var(--dim); background:rgba(13,16,24,.78); border:1px solid var(--edge); border-radius:10px; padding:9px 13px; line-height:1.7; }
+  #ctrls b { color:var(--ink); }
+  /* landing */
+  #landing { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(4,5,10,.62); backdrop-filter:blur(3px); }
+  #port { width:min(520px,92vw); background:linear-gradient(180deg,#0e1320,#0a0d16); border:1px solid var(--edge); border-radius:14px; padding:22px 24px; box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  #port h2 { margin:0 0 2px; font-size:22px; color:#fff; } #port .sub { color:var(--dim); margin-bottom:16px; }
+  #port .svc { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:16px; }
+  #port .svc .btn { text-align:left; padding:11px 13px; }
+  #port .note { color:var(--dim); font-size:12px; border-top:1px solid var(--edge); padding-top:12px; }
+  #port .row { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
+  #toast { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); background:#161b27; border:1px solid var(--edge); border-radius:8px; padding:8px 14px; opacity:0; transition:opacity .2s; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>Stellar Atlas <small>— <span id="crumb">EV-compatible engine</span></small></h1>
+    <div class="spacer"></div>
+    <button class="btn hide" id="backBtn">&larr; Galaxy</button>
+    <select class="hide" id="shipSel" title="ship to fly"></select>
+    <button class="btn hide" id="launchBtn">Launch &#9650;</button>
+    <button class="btn hide" id="mapBtn">Map</button>
+    <button class="btn" id="mpBtn">Multiplayer</button>
+    <button class="btn" id="pilotBtn">&#128100; Pilot</button>
+    <button class="btn" id="computerBtn" title="ask the ship's computer (local RAG over your universe)">&#128225; Computer</button>
+    <button class="btn" id="musicBtn" title="play EV music — drop Nova Music.mp3 or any tracks">&#9834; Music</button>
+    <a class="btn" href="./ev-mission-creator.html" style="text-decoration:none" title="author your own missions">&#9998; Missions</a>
+    <button class="btn" id="openBtn">Open data file…</button>
+    <button class="btn hide" id="forgetBtn" title="clear the cached EV data so you can load a different set or add a plug-in">Forget data</button>
+    <button class="btn" id="fitBtn">Fit</button>
+    <select class="btn" id="qualSel" title="render quality — supersampling for sharp ships on any display">
+      <option value="0.75">Quality: Performance</option>
+      <option value="1" selected>Quality: Native</option>
+      <option value="1.5">Quality: Sharp (1.5×)</option>
+      <option value="2">Quality: Ultra (2× SSAA)</option>
+    </select>
+    <label class="btn" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer" title="crisp pixel-art scaling vs smooth"><input type="checkbox" id="crispChk" style="margin:0"> Crisp</label>
+    <input id="file" type="file" hidden multiple>
+  </header>
+  <div id="stage">
+    <canvas id="galaxyCv"></canvas>
+    <canvas id="systemCv" class="hide"></canvas>
+    <canvas id="flightCv" class="hide"></canvas>
+    <div id="sysLabels" class="hide"></div>
+    <div id="evBubbles"></div>
+    <div id="netLabels" class="hide" style="position:absolute;inset:0;pointer-events:none"></div>
+    <div id="mpPanel" class="hide" style="position:absolute;right:12px;top:8px;z-index:6;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:12px;width:290px;box-shadow:0 14px 40px rgba(0,0,0,.5)"><div style="color:#fff;margin-bottom:8px">Co-op presence</div><input id="mpName" placeholder="callsign" style="width:100%;margin-bottom:7px;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><select id="mpMode" style="width:100%;margin-bottom:7px;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><option value="p2p">WebRTC P2P (preferred)</option><option value="tabs">Same-machine tabs (no server)</option><option value="http">Rendezvous server (HTTP)</option><option value="supabase">Supabase Realtime</option></select><input id="mpUrl" class="hide" placeholder="rendezvous URL (HTTP relay or P2P signaling) e.g. http://host:8787" style="width:100%;margin-bottom:7px;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><input id="mpSbUrl" class="hide" placeholder="Supabase project URL" style="width:100%;margin-bottom:7px;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><input id="mpSbKey" class="hide" placeholder="Supabase anon / publishable key" style="width:100%;margin-bottom:7px;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><div style="display:flex;gap:8px"><button class="btn" id="mpConnect">Connect</button><button class="btn" id="mpDisc">Disconnect</button><button class="btn" id="mpRooms" title="browse active rooms + their mods on the server">Rooms</button><button class="btn" id="mpLeaders" title="top pilots on this server by combat rating">Leaders</button></div><div id="mpStatus" style="color:var(--dim);margin-top:8px;font-size:12px">offline — others flying the same data file appear as ghost ships in your system</div><div id="roomMod" class="hide" style="margin-top:8px;border-top:1px solid var(--edge);padding-top:8px;font-size:12px"></div></div>
+    <div id="pilotPanel" class="hide" style="position:absolute;right:12px;top:8px;z-index:6;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:12px;width:290px;box-shadow:0 14px 40px rgba(0,0,0,.5)"><div style="color:#fff;margin-bottom:8px">Pilot file</div><div class="row" style="gap:6px;margin-bottom:8px"><input id="pilotName" placeholder="pilot name" style="flex:1;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><button class="btn" id="pilotSave">Save</button></div><div id="pilotList" style="max-height:220px;overflow:auto;font-size:12px"></div><div id="pilotNote" style="color:var(--dim);margin-top:8px;font-size:11px">saves ship, cargo, outfits, credits, missions, location &amp; date to this browser</div></div>
+    <div id="computerPanel" class="hide" style="position:absolute;right:12px;top:8px;z-index:6;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:12px;width:320px;box-shadow:0 14px 40px rgba(0,0,0,.5)"><div style="color:#fff;margin-bottom:8px">Ship's computer <span style="color:var(--dim);font-size:10px">&mdash; local RAG</span></div><div class="row" style="gap:6px;margin-bottom:8px"><input id="askInput" placeholder="ask about this universe&hellip;" style="flex:1;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:6px;font:inherit"><button class="btn" id="askBtn">Ask</button></div><div id="askAnswer" style="font-size:12px;min-height:20px;margin-bottom:8px"></div><div style="border-top:1px solid var(--edge);padding-top:8px"><button class="btn" id="indexBtn">Index this universe</button> <span id="indexStat" style="color:var(--dim);font-size:11px"></span></div><div style="color:var(--dim);margin-top:8px;font-size:11px">indexes planet + mission text into the local RAG store; needs the SweK server (:8787)</div></div>
+    <div id="qChat" class="hide" style="position:absolute;left:12px;bottom:12px;z-index:6;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:10px;width:300px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="color:#fff;font-weight:bold">Quick chat</span><select id="qcTarget" title="public, or whisper to one pilot" style="flex:1;background:#11151f;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:4px;font:inherit;font-size:12px"><option value="all">Public (all)</option></select></div>
+      <div id="qcGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+      <div id="qcFeed" style="margin-top:8px;max-height:90px;overflow:auto;font-size:12px;border-top:1px solid var(--edge);padding-top:6px"></div>
+    </div>
+    <div id="musicPanel" class="hide" style="position:absolute;right:12px;top:8px;z-index:7;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:12px;width:290px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+      <div style="color:#fff;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span>&#9834; Music</span><span id="musicClose" style="cursor:pointer;color:var(--dim)">✕</span></div>
+      <div id="musicNow" style="color:var(--dim);font-size:12px;margin-bottom:8px;min-height:16px">No tracks loaded</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <button class="btn" id="musicPrev" title="previous">&#9198;</button>
+        <button class="btn" id="musicPlay" title="play/pause">&#9654;</button>
+        <button class="btn" id="musicNext" title="next">&#9197;</button>
+        <button class="btn" id="musicLoop" title="loop playlist" style="opacity:.5">&#8635;</button>
+      </div>
+      <input id="musicVol" type="range" min="0" max="1" step="0.01" value="0.6" style="width:100%;margin-bottom:8px" title="volume">
+      <div id="musicList" style="max-height:160px;overflow:auto;font-size:12px;border-top:1px solid var(--edge);padding-top:6px;margin-bottom:8px"></div>
+      <button class="btn" id="musicAdd" style="width:100%">&#43; Add music files</button>
+      <input id="musicFiles" type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav" multiple hidden>
+      <div style="color:var(--dim);font-size:11px;margin-top:6px">Drop <b>Nova Music.mp3</b> or any tracks. Plays locally — nothing uploaded.</div>
+    </div>
+    <div id="svcPanel" class="hide" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;width:min(520px,92vw);max-height:80vh;overflow:auto;background:var(--panel);border:1px solid var(--edge);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b id="svcTitle" style="color:#fff">Service</b><span style="color:var(--dim)">Credits: <span id="svcCredits">0</span> · <span id="svcClose" style="cursor:pointer">✕</span></span></div>
+      <div id="svcBody"></div>
+    </div>
+    <audio id="musicAudio" style="display:none"></audio>
+    <div id="convo" class="hide" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:12;width:min(620px,94vw);max-height:82vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--edge);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden">
+      <div id="convoScene" style="color:var(--dim);font-size:11px;padding:8px 12px;border-bottom:1px solid var(--edge);letter-spacing:.06em;text-transform:uppercase"></div>
+      <div id="convoText" style="padding:12px 14px;overflow:auto;white-space:pre-wrap;line-height:1.5;font-size:13px;color:var(--ink)"></div>
+      <div id="convoChoices" style="padding:8px 12px 12px;border-top:1px solid var(--edge);display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+    <div id="comms" class="hide" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;width:min(440px,90vw);background:var(--panel);border:1px solid var(--edge);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden">
+      <div style="display:flex;gap:12px;padding:14px">
+        <canvas id="commsPic" width="120" height="120" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--edge);background:#0a0d14;flex:none;object-fit:cover"></canvas>
+        <div style="flex:1;min-width:0">
+          <div id="commsName" style="color:#fff;font-weight:bold;margin-bottom:2px">—</div>
+          <div id="commsSub" style="color:var(--dim);font-size:12px;margin-bottom:8px">—</div>
+          <div id="commsText" style="color:var(--ink);font-size:13px;line-height:1.4;max-height:120px;overflow:auto"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding:0 14px 14px"><button class="btn" id="commsClose" style="margin-left:auto">Close channel</button></div>
+    </div>
+    <div id="drop">
+      <b>Drop an EV / EV Nova data file (or all six Nova Data .rez) here</b>
+      <div>resource fork, .ndat, Windows .rez, MacBinary (.bin) or AppleDouble — parsed locally, nothing uploaded</div>
+    </div>
+    <div id="status" hidden><div class="name"></div><div class="meta"></div></div>
+    <div id="counts"></div>
+    <button id="checkBtn" class="hide" title="validate the parsed data against itself - catches byte-offset drift">&#10003; Check data</button>
+    <button id="inspectBtn" class="hide" title="list every resource type + count in the loaded files - useful for plug-ins/TCs">&#128269; Inspect resources</button>
+    <div id="inspectReport" class="hide" style="position:absolute;left:12px;bottom:56px;max-width:520px;max-height:60vh;overflow:auto;background:rgba(13,16,24,.96);border:1px solid var(--edge);border-radius:10px;padding:12px;font-size:12px;z-index:8;box-shadow:0 14px 40px rgba(0,0,0,.6)"></div>
+    <div id="checkReport" class="hide"></div>
+    <div id="hud" class="hide"><div class="sys" id="hudSys"></div><div id="hudDate" style="color:var(--dim);font-size:11px;margin-bottom:2px"></div><div>speed <span id="hudSpd">0</span> / <span id="hudMax">0</span></div><div class="bar"><i id="hudBar"></i></div><div>heading <span id="hudHdg">0</span>&deg;</div><div>shield <span id="hudShd">0</span></div><div class="bar"><i id="hudShdBar" style="background:linear-gradient(90deg,#39f,#6cf)"></i></div><div>armor <span id="hudArm">0</span></div><div class="bar"><i id="hudArmBar" style="background:linear-gradient(90deg,#b65,#fb6)"></i></div><div>hostiles: <span id="hudEne">0</span></div><div>pilots nearby: <span id="hudPil">0</span></div><div>armed: <span id="hudArmed">—</span></div><div class="land" id="hudLand"></div><div style="margin-top:6px"><button id="hudClear" title="everyone forgives - clears govts you provoked" style="background:#2a1a1a;border:1px solid var(--edge);border-radius:6px;color:#fb8;padding:3px 8px;font:inherit;font-size:11px;cursor:pointer">Clear record</button></div><div id="hudGrudges" style="margin-top:6px;font-size:11px"></div></div>
+    <div id="ctrls" class="hide"><b>&#9650;/W</b> thrust · <b>&#9668;&#9658;/AD</b> turn · <b>Space</b> fire · <b>C</b> hail · <b>L</b> land · <b>Q</b> map · wheel zoom</div>
+    <div id="landing" class="hide">
+      <div id="port">
+        <canvas id="landPictCanvas" style="display:none;width:100%;max-width:520px;border-radius:8px;margin:0 auto 12px;border:1px solid var(--edge)"></canvas>
+        <canvas id="dockCanvas" width="240" height="240" style="display:block;width:200px;height:200px;margin:2px auto 12px"></canvas>
+        <h2 id="portName"></h2><div class="sub" id="portSub"></div>
+        <div class="svc" id="portSvc"></div>
+        <div id="portNews" style="margin:8px 0;text-align:left;font-size:13px;line-height:1.45"></div>
+        <div id="portMissions" style="margin:10px 0;text-align:left"></div>
+        <div id="portDesc" style="color:var(--ink);font-size:13px;line-height:1.5;max-height:180px;overflow:auto;margin:8px 0;text-align:left;white-space:pre-wrap"></div>
+        <div class="note" id="portNote">This panel reads the spöb flags to show which services this stellar offers. Live trading/outfit/shipyard arrive in a later milestone.</div>
+        <div class="row"><button class="btn" id="leaveBtn">Leave</button><button class="btn" id="voxBtn" title="voxelize this body to a MagicaVoxel .vox (solid hull + glowing energy core)">Export .vox</button></div>
+      </div>
+    </div>
+    <div id="death" class="hide" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,2,4,.66);backdrop-filter:blur(3px)"><div style="text-align:center"><div style="font-size:26px;color:#ff8a8a;margin-bottom:14px">Your ship was destroyed</div><button class="btn" id="deathBtn">Return to map</button></div></div>
+    <div id="toast"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three/jsm/" } }
+</script>
+<script type="module">
+import { loadResourceFork, mergeForks } from "./ev/resourceFork.js";
+import { readZip } from "./ev/zipReader.js";
+
+// v2165 -- plugin art roots. ES resolves a sprite against every enabled plugin before the base
+// game. Ask the SweK server which plugins are installed and hand esSprites.js their raw image
+// roots (raw.githubusercontent serves them with access-control-allow-origin:*). Plugins with no
+// images/ dir are skipped -- adding a root that 404s every sprite only costs round-trips.
+// Newest install first, so a later plugin overrides an earlier one, matching ES.
+// No server, or route absent -> the array stays empty and the base game resolves exactly as before.
+try {
+  const pl = await fetch("/es/plugins", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+  if (pl && pl.ok && Array.isArray(pl.plugins)) {
+    const bases = pl.plugins.filter((p) => p.imagesBase).map((p) => p.imagesBase);
+    if (bases.length) {
+      window.ES_PLUGIN_IMAGE_BASES = bases;
+      console.log(`[es] ${bases.length} plugin art root(s) registered`);
+    }
+  }
+} catch (e) { /* no bridge: base game art only */ }
+
+// v2167 -- brain-served tactics weights, from the producer that now exists: GET /ai/brain/tactics.
+// The bridge serves weights ONLY once they are informed by enough real outcomes; until then it
+// returns source:"hand" and weights:null, and esTactics keeps its own defaults. Nothing pretends the
+// brain is steering when it isn't.
+try {
+  const t = await fetch("/ai/brain/tactics", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+  if (t && t.ok && t.weights) {
+    window.ES_TACTICS_WEIGHTS = t.weights;
+    console.log(`[es] tactics: GPU Brain policy (${t.samples} outcomes)`);
+  } else if (t && t.ok) {
+    console.log(`[es] tactics: hand policy (${t.samples}/${t.minSamples} outcomes recorded)`);
+  }
+} catch (e) { /* no bridge: hand policy */ }
+
+// Report combat outcomes back so the policy can learn. Batched and fire-and-forget: a dropped POST
+// costs one lesson, never a frame.
+window.__esTacticsOutcome = (samples) => {
+  try {
+    fetch("/ai/brain/tactics", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ samples }) })
+      .catch(() => {});
+  } catch (e) {}
+};
+import { buildUniverse, resolveLoadout, listGrudges, GRUDGE_TTL_MS, grudgeBlocs, readDesc, parseChar, CHAR } from "./ev/evData.js";
+import { ControlBits } from "./ev/controlbits.js";
+import { runEvChecks } from "./ev/evChecks.mjs";
+import { voxelizeBall, exportVoxFromKinds } from "./tools/voxExporter.js";
+import { GalaxyMap } from "./ev/galaxyMap.js";
+import { SystemView } from "./ev/systemView.js";
+import { FlightView } from "./ev/flightView.js";
+import { serializePilot, savePilot, loadPilot, deletePilot, listPilots, mostRecentPilot } from "./ev/esPilot.js";   // v2317 -- the pilot file
+import { installRecorder } from "./ui/canvasRecorder.js";   // v2270 — swekRecord.start(s): record the live multiplayer + box3d fight
+installRecorder();
+import { namespaceWing } from "./ev/esAuthority.js";   // v2172 -- private wings for mission npcs + persons
+import { readShan, decodeRLED } from "./ev/sprites.js";
+import { shipFlightStats } from "./ev/flightModel.js";
+import { PresenceManager, broadcastTransport, httpPresenceTransport, supabaseTransport, makeNet } from "./ev/presence.js";
+import * as roomPlugins from "./ev/esRoomPlugins.js";   // v2322 -- room mod manifests (consent-gated)
+import { p2pTransport } from "./ev/p2p.js";
+
+const $ = (id) => document.getElementById(id);
+const galaxyCv = $("galaxyCv"), systemCv = $("systemCv"), flightCv = $("flightCv"), sysLabels = $("sysLabels");
+const drop = $("drop"), statusEl = $("status"), countsEl = $("counts"), crumb = $("crumb");
+const nameEl = statusEl.querySelector(".name"), metaEl = statusEl.querySelector(".meta");
+let uni = null, rf = null, mode = "galaxy", curSystem = null, curShip = null, landingReturn = "system", landedSpob = null;
+let dock = { show() {}, hide() {}, dispose() {} };   // EV dock 3D viewport (mounted async; no-op until three.js loads)
+let dockSpob = null;
+import("./ev/dockView.js").then((m) => { try { dock = m.mountDockView($("dockCanvas")); } catch (e) { console.warn("dock view init failed", e); } }).catch((e) => console.warn("dock view unavailable", e));
+let net = null, myCallsign = "Pilot"; const myId = "p" + Math.random().toString(36).slice(2, 9);
+let roomHeartbeat = null;   // v2323 -- keeps the room fresh in the SQLite registry while connected
+let mpTr = null, mpMgr = null;
+const QCHAT = ["Greetings, pilot.", "Form up on me.", "On your wing.", "Affirmative.", "Nice flying!", "Safe travels."];
+const _chats = {};           // peerId -> { text, until }
+let combatUrl = null, combatRoom = null, combatSeq = 0, combatTimer = null;   // bot-combat event channel (Stage 2)
+const _bubbles = new Map();  // peerId -> bubble div
+const _escBubbles = new Map();  // escortId -> bubble div
+function positionEscortBubbles(list){ const layer = $("evBubbles"); if (!layer) return; const seen = new Set(); (list || []).forEach(c => { seen.add(c.id); let b = _escBubbles.get(c.id); if (!b){ b = document.createElement("div"); b.className = "evEscBubble"; layer.appendChild(b); _escBubbles.set(c.id, b); } b.textContent = c.line; b.style.left = c.sx + "px"; b.style.top = (c.sy - 18) + "px"; }); _escBubbles.forEach((b, id) => { if (!seen.has(id)){ b.remove(); _escBubbles.delete(id); } }); }
+const _hpbars = new Map();    // peerId -> hp bar div (bot pirate ghosts)
+const DEFAULT_SHIP = { id: 0, name: "Shuttle", accel: 300, speed: 300, maneuver: 30, shield: 100, armor: 100 };
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 1600); }
+const govtLabel = (g) => g >= 128 ? "govt " + g : "independent";
+
+let map, sv, fv;
+try {
+  map = GalaxyMap(galaxyCv, {
+    onHover: (sys) => { if (mode !== "galaxy") return; if (!sys) { statusEl.hidden = true; return; }
+      statusEl.hidden = false; nameEl.textContent = sys.name || ("System " + sys.id);
+      metaEl.textContent = `${govtLabel(sys.govt)} · ${sys.spobs.length} stellar${sys.spobs.length === 1 ? "" : "s"} · ${sys.links.length} link${sys.links.length === 1 ? "" : "s"}`; },
+    onSelect: (sys) => enterSystem(sys),
+  });
+  sv = SystemView(systemCv, {
+    onHover: (s) => { if (mode !== "system") return; if (!s) { statusEl.hidden = true; return; }
+      statusEl.hidden = false; nameEl.textContent = s.name || ("Stellar " + s.id);
+      metaEl.textContent = `${s.isStation ? "station" : "planet"} · ${govtLabel(s.govt)}` + (s.canLand ? " · landable" : " · no landing"); },
+    onSelectSpob: (s) => { if (s.canLand) { landingReturn = "system"; enterLanding(s); } else toast((s.name || "This stellar") + " — can't land here"); },
+    onRender: (labels) => { sysLabels.innerHTML = labels.map((l) => `<div class="lbl${l.land ? " land" : ""}" style="left:${l.sx}px;top:${l.sy}px">${(l.name || "").replace(/[<>&]/g, "")}</div>`).join(""); },
+  });
+  fv = FlightView(flightCv, {
+    onHud: (i) => { $("hudSys").textContent = (i.system || "") + (i.physics ? " \u00b7 " + i.physics : ""); $("hudSpd").textContent = Math.round(i.speed); $("hudMax").textContent = Math.round(i.maxSpeed);
+      $("hudBar").style.width = Math.min(100, 100 * i.speed / Math.max(1, i.maxSpeed)) + "%"; $("hudHdg").textContent = Math.round(i.heading);
+      $("hudArmed").textContent = i.armed; $("hudShd").textContent = Math.round(i.shield); $("hudShdBar").style.width = Math.min(100, 100*i.shield/Math.max(1,i.maxShield)) + "%"; $("hudArm").textContent = Math.round(i.armor); $("hudArmBar").style.width = Math.min(100, 100*i.armor/Math.max(1,i.maxArmor)) + "%"; $("hudEne").textContent = i.enemies; $("hudPil").textContent = i.pilots; $("hudLand").textContent = i.landPrompt ? "↓ press L to land on " + i.landPrompt : ""; },
+    onLand: (spob) => {
+      // v2172 -- a wormhole is not a place to land, it is a door. ES sends you through to the far system.
+      if (spob && spob.wormholeTo != null && uni && uni.systemById[spob.wormholeTo]) {
+        const dest = uni.systemById[spob.wormholeTo];
+        try { toast("Wormhole -> " + (dest.name || "somewhere else")); } catch (e) {}
+        enterSystem(dest);
+        return;
+      }
+      landingReturn = "flight"; landedSpob = spob; enterLanding(spob);
+    },
+    onExit: () => enterSystem(curSystem),
+    onDeath: () => $("death").classList.remove("hide"),
+    onPeers: (peers) => { $("netLabels").innerHTML = peers.map((p) => `<div class="lbl plbl" style="left:${p.sx}px;top:${p.sy}px">${(p.name || "").replace(/[<>&]/g, "")}</div>`).join(""); },
+  });
+} catch (e) { countsEl.innerHTML = '<span class="err">WebGL2 unavailable: ' + e.message + '</span>'; }
+
+function setMode(m) {
+  mode = m; statusEl.hidden = true;
+  galaxyCv.classList.toggle("hide", m !== "galaxy");
+  systemCv.classList.toggle("hide", m !== "system");
+  flightCv.classList.toggle("hide", m !== "flight");
+  sysLabels.classList.toggle("hide", m !== "system");
+  $("hud").classList.toggle("hide", m !== "flight");
+  $("ctrls").classList.toggle("hide", m !== "flight");
+  $("landing").classList.toggle("hide", m !== "landing");
+  if (m !== "landing") { try { dock.hide(); } catch (e) {} }
+  $("death").classList.add("hide");
+  $("mpBtn").classList.toggle("hide", m === "flight" || m === "landing");
+  $("netLabels").classList.toggle("hide", m !== "flight");
+  $("counts").classList.toggle("hide", m !== "galaxy");
+  $("backBtn").classList.toggle("hide", m !== "system");
+  $("shipSel").classList.toggle("hide", m !== "system");
+  $("launchBtn").classList.toggle("hide", m !== "system");
+  $("mapBtn").classList.toggle("hide", m !== "flight");
+  $("openBtn").classList.toggle("hide", m !== "galaxy");
+  $("fitBtn").classList.toggle("hide", m === "flight" || m === "landing");
+}
+
+function enterSystem(sys) {
+  const prev = curSystem;
+  curSystem = sys; if (fv) fv.stop(); setMode("system");
+  // ES: leaving a system with mission targets alive resolves their `evade` objective (they got away).
+  try { if (esRun && prev && prev.id !== sys.id) esRun.onPlayerJump(prev.id, sys.id); } catch (e) {}
+  try { if (prev && prev.id !== sys.id && window.swekWormholeJump) window.swekWormholeJump(); } catch (e) {}   // v2374 -- play the wormhole on a real jump
+  try { if (esStore && esStore.player) esStore.player.system = sys.id; } catch (e) {}
+  // v2174 -- ONE DAY PER SYSTEM ENTRY. ES's own rule, and its only clock: Engine::EnterSystem calls
+  // PlayerInfo::AdvanceDate, which fires the events whose day has come and then fails the missions you
+  // can no longer deliver on time.
+  try {
+    if (esRun && esRun.advanceDate) {
+      if (!esClockPrimed) { esClockPrimed = true; esDateShow(esRun.date()); }   // being placed is not a jump
+      else { const day = esRun.advanceDate(1); esDateShow(day.date); esAccountDay(1); }
+    }
+  } catch (e) {}
+  crumb.textContent = (sys.name || "System " + sys.id) + " · " + govtLabel(sys.govt);
+  requestAnimationFrame(() => { sv.resize(); sv.setSystem(sys); }); }
+
+// v2177 -- CONVERSATIONS. The last big honest stub in the mission runner: a `conversation` used to be
+// dropped on the floor and acceptance assumed, so every branching story in the game had one branch.
+//
+// Text is expanded twice on the way to the screen, in ES's order: `<token>` substitutions (the data's
+// conditional ones, then the hard-coded ones only we can fill), and `${phrase}` interpolation.
+function esSubMap(extra) {
+  const base = esSubsMod && esSubsList ? esSubsMod.substitutionMap(esSubsList, (n) => (esRun ? esRun.test(n) : false)) : {};
+  const me = esSubsMod ? esSubsMod.playerSubstitutions({
+    first: "Captain", last: (curShip && curShip.name) || "Pilot",
+    ship: (curShip && curShip.name) || "ship", model: (curShip && curShip.name) || "ship",
+    system: curSystem ? curSystem.name : null,
+    planet: dockSpob ? dockSpob.name : null,
+    origin: dockSpob ? dockSpob.name : null,
+    startPlanet: esStart && uni.spobs[esStart.planet] ? uni.spobs[esStart.planet].name : null,
+    startSystem: esStart && uni.systemById[esStart.system] ? uni.systemById[esStart.system].name : null,
+    startDate: esDateMod && esRun ? esDateMod.formatDate(esRun.date()) : null,
+    credits: esStart ? esStart.account.credits : null,
+    debt: esAccount && esAcctMod ? esAcctMod.totalDebt(esAccount) : null,
+    ...(extra || {}),
+  }) : {};
+  return { ...base, ...me };
+}
+let esMissionSubs = null;   // the mission whose text we are currently expanding, if any
+function esExpandText(t) {
+  let map = esSubMap();
+  // A mission's own `substitutions` sit ON TOP of the global ones, for its text and nobody else's.
+  if (esMissionSubs && esMissionSubs.length && esSubsMod)
+    map = { ...map, ...esSubsMod.substitutionMap(esMissionSubs, (n) => (esRun ? esRun.test(n) : false)) };
+  let out = esSubsMod ? esSubsMod.applySubstitutions(t, map) : t;
+  try { if (esVoiceMod && uni && uni.phrases) out = out.replace(/\$\{([^}]+)\}/g, (_, n) => esPhraseText(n)); } catch (e) {}
+  return out;
+}
+function esPhraseText(name) {
+  try { const m = uni && uni.phrases; if (!m) return ""; return (esPhraseMod && esPhraseMod.expandPhrase) ? esPhraseMod.expandPhrase(name, m) : ""; } catch (e) { return ""; }
+}
+let esPhraseMod = null;
+
+// Plays to the end, then hands the caller ES's own outcome word: accept / decline / defer / launch /
+// flee / depart / die / explode. Nothing here decides what a mission does with it.
+function esPlayConversation(name, node, ctx) {
+  if (!esConvMod || !uni) return null;
+  const src = node || (name && uni.conversations ? uni.conversations[name] : null);
+  if (!src) { toast("(conversation missing: " + (name || "inline") + ")"); return null; }
+  esMissionSubs = (ctx && ctx.subs) || null;
+  let conv;
+  try { conv = esConvMod.buildConversation(src); } catch (e) { return null; }
+  const run = esConvMod.startConversation(conv, {
+    test: (n) => (esRun ? esRun.test(n) : true),
+    // A conversation's `action` block pays you, gives you outfits, schedules events and fails missions.
+    // It runs through the mission runner's own dispatch, so there is exactly one place those verbs live.
+    apply: (n) => { try { if (esRun) esRun.apply(n, ctx || {}); } catch (e) {} },
+    expand: esExpandText,
+  });
+
+  const panel = $("convo"), textEl = $("convoText"), sceneEl = $("convoScene"), choiceEl = $("convoChoices");
+  const draw = () => {
+    sceneEl.textContent = run.scene() || "";
+    textEl.textContent = run.text();
+    choiceEl.innerHTML = "";
+    if (run.done()) {
+      const b = document.createElement("button");
+      b.className = "btn"; b.textContent = "(" + run.outcomeName() + ")";
+      b.onclick = () => { panel.classList.add("hide"); esConvFinish(run, ctx); };
+      choiceEl.appendChild(b);
+      return;
+    }
+    if (run.isName()) {
+      const b = document.createElement("button");
+      b.className = "btn"; b.textContent = "Sign your name";
+      b.onclick = () => { run.submitName(); draw(); };
+      choiceEl.appendChild(b);
+      return;
+    }
+    for (const c of run.choices()) {
+      const b = document.createElement("button");
+      b.className = "btn"; b.style.textAlign = "left"; b.textContent = c.text.trim();
+      b.onclick = () => { run.choose(c.index); draw(); };
+      choiceEl.appendChild(b);
+    }
+  };
+  panel.classList.remove("hide");
+  draw();
+  return run;
+}
+
+// ES: LAUNCH / FLEE / DEPART force the player off the ground as well as settling the mission; DIE and
+// EXPLODE end the game. We surface the word and take off; dying is out of scope and says so.
+function esConvFinish(run, ctx) {
+  esMissionSubs = null;
+  const r = run.result();
+  if (ctx) ctx.convResult = r;
+  // v2178 -- the whole point. An offer conversation ending in `accept` takes the mission; `decline`
+  // refuses it for good; `defer` puts it back on the board. The settle callback belongs to esMissions.
+  const settle = ctx && ctx.__settle;
+  if (settle) { try { settle(r || "decline"); } catch (e) {} }
+  if (r === "die") { toast("You died."); return; }
+  if (run.requiresLaunch() && mode === "landing") { try { $("leaveBtn").click(); } catch (e) {} }
+  if (!settle && r) toast("Conversation: " + run.outcomeName());
+}
+
+// A mission has been offered. Play whatever `on offer` produced, and settle with ES's outcome word.
+// A `dialog` (44 missions) is a yes/no panel; a conversation (1,220) is the story itself.
+function esPresentOffer(o, settle) {
+  if (o.conversation) {
+    const ctx = { subs: o.subs, __settle: settle };
+    const run = esPlayConversation(o.conversation.name, o.conversation.node, ctx);
+    if (!run) settle("accept");                     // the conversation is missing: do not eat the mission
+    return;
+  }
+  if (o.dialog) {
+    esMissionSubs = o.subs || null;
+    const panel = $("convo"), textEl = $("convoText"), sceneEl = $("convoScene"), choiceEl = $("convoChoices");
+    sceneEl.textContent = o.name || "";
+    textEl.textContent = esExpandText(o.dialog);
+    choiceEl.innerHTML = "";
+    for (const [label, outcome] of [["Accept", "accept"], ["Decline", "decline"]]) {
+      const b = document.createElement("button");
+      b.className = "btn"; b.textContent = label;
+      b.onclick = () => { panel.classList.add("hide"); esMissionSubs = null; settle(outcome); };
+      choiceEl.appendChild(b);
+    }
+    panel.classList.remove("hide");
+    return;
+  }
+  settle("accept");
+}
+
+// v2176 -- STARTS. Five of them in the base game; four are unlocked from the beginning and one needs
+// the human campaign finished. ES's picker shows the locked ones as "???"; we simply take the first
+// unlocked start, preferring "default" -- the classic experience, which its own description promises
+// will begin in debt.
+function esPickStart(u) {
+  const list = (u && u.starts) || [];
+  return list.find((s) => !s.locked && s.id === "default") || list.find((s) => !s.locked) || list[0] || null;
+}
+
+// Where the pilot wakes up, when, how rich, and how deep in debt. Conditions come last, through the
+// same applyActions a mission's `on offer` runs -- `set "license: Pilot's"` is not a special case.
+function esApplyStart(st) {
+  esStart = st;
+  if (!st) { esAccount = esAcctMod ? esAcctMod.makeAccount({ credits: esStore ? esStore.get("credits") : 0 }) : null; return; }
+  esAccount = esAcctMod.makeAccount({ credits: st.account.credits, score: st.account.score, mortgages: st.account.mortgages });
+  try { esStore.set("credits", st.account.credits); } catch (e) {}
+  try { if (st.conditions.length && esRun) esRun.apply({ children: st.conditions }); } catch (e) {}
+  esSyncCredits();
+  // Placing the pilot is not a day of travel: prime the clock so the first enterSystem does not
+  // silently cost a day (ES sets the date in PlayerInfo::New and only advances on a real jump).
+  esClockPrimed = false;
+  try {
+    const sys = uni.systemById[st.system];
+    if (sys) { enterSystem(sys); }
+    if (st.conversation) esPlayConversation(st.conversation, null, null);   // v2177 -- the banker, at last
+    toast(`${st.name} — ${uni.spobs[st.planet] ? uni.spobs[st.planet].name : "?"}`
+      + (esAcctMod.totalDebt(esAccount) ? ` · debt ${esAcctMod.totalDebt(esAccount).toLocaleString()}` : ""));
+  } catch (e) {}
+}
+
+// One day of accounting, ES's order: crew salaries, maintenance, then each mortgage all-or-nothing.
+// Salaries and maintenance are zero for now -- the flight layer models neither a crew nor ship upkeep,
+// and inventing a number would be worse than passing the zero the plumbing is built to carry.
+function esAccountDay(days) {
+  if (!esAccount || !esAcctMod || !esStore) return;
+  const fleet = (esStore.player && esStore.player.fleet) || [];
+  let crew = 0; for (const s of fleet) crew += (s && s.crew) || 0;
+  if (!crew && esStore.player && esStore.player.ship) crew = esStore.player.ship.crew || 0;
+  const salaries = 100 * Math.max(0, crew - 1);   // v2320 -- ES: 100 cr/day per crew member other than the captain. Base ES has no ship maintenance.
+  for (let i = 0; i < Math.max(1, days | 0); i++) {
+    esAccount.credits = esStore.get("credits");
+    const r = esAcctMod.step(esAccount, { salaries, maintenance: 0 });
+    esStore.set("credits", esAccount.credits);
+    if (r.message) toast(r.message);
+  }
+  esSyncCredits();
+  esDateShow(esRun ? esRun.date() : null);
+}
+
+// v2175 -- the spaceport talks. 218 news items, filtered to this planet, 62 of them gated on a
+// condition. `to show` is evaluated by the same condition store the missions gate on, so a story about
+// a war you have not started stays unwritten.
+function esShowNews(spob) {
+  const el = document.getElementById("portNews"); if (!el) return;
+  el.innerHTML = "";
+  if (!esActive || !esVoiceMod || !uni || !spob) return;
+  try {
+    const sys = spob._systemId != null ? uni.systemById[spob._systemId] : null;
+    const gate = (esRun && esRun.test) ? esRun.test : null;
+    const n = esVoiceMod.pickNews(uni, spob, sys, { gate });
+    if (!n) return;
+    el.innerHTML = `<div style="color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(n.name)}</div>`
+      + `<div style="color:var(--ink);margin-top:2px">${escapeHtml(n.message)}</div>`;
+  } catch (e) {}
+}
+
+// The date belongs on screen -- a clock nobody can read is a clock nobody trusts.
+function esDateShow(date) {
+  const el = document.getElementById("hudDate");
+  if (!el || !date || !esDateMod) return;
+  const debt = (esAccount && esAcctMod) ? esAcctMod.totalDebt(esAccount) : 0;
+  el.textContent = esDateMod.formatDate(date) + (debt ? " · debt " + debt.toLocaleString() : "");
+}
+function backToGalaxy() { if (fv) fv.stop(); setMode("galaxy"); crumb.textContent = uni ? `${uni.counts.systems} systems` : "EV-compatible engine"; requestAnimationFrame(() => map.resize()); }
+
+function selectedShip() {
+  if (!uni || !uni.ships.length) return DEFAULT_SHIP;
+  const id = parseInt($("shipSel").value, 10);
+  return uni.ships.find((s) => s.id === id) || uni.ships[0] || DEFAULT_SHIP;
+}
+function enterFlight(startX = 0, startY = 0, heading = 0) {
+  curShip = selectedShip(); setMode("flight");
+  let loadout = resolveLoadout(curShip, uni ? uni.weapons : {});
+  if (!loadout.length && uni) { const w = Object.values(uni.weapons)[0]; if (w) loadout = [{ weapon: w, count: 1 }]; }
+  crumb.textContent = (curSystem.name || "System") + " · flying " + (curShip.name || "ship");
+  const enemyClasses = uni ? uni.ships.slice(0, 8) : [];
+  // Stage 3: if the loaded data includes this ship's sprite (shän -> rlëD, present
+  // when Nova Ships/Graphics files were merged in), render it as a textured ship.
+  trySetShipSprite(curShip);
+  // Enemy/AI ships as sprites too: register the classes that can spawn here —
+  // the system's dude-driven classes plus the fallback enemyClasses (capped).
+  const spriteClasses = [];
+  const seen = new Set();
+  const personClasses = (uni && uni.persons) ? uni.persons.flatMap((p) => p.classes) : [];
+  for (const c of [...(enemyClasses || []), ...personClasses, ...((uni && uni.ships) || []).slice(0, 24)]) {
+    if (c && c.id != null && !seen.has(c.id)) { seen.add(c.id); spriteClasses.push(c); }
+  }
+  loadEnemySprites(spriteClasses);
+  requestAnimationFrame(() => { fv.resize();
+    if (fv.setRenderScale) fv.setRenderScale(parseFloat($("qualSel").value || "1"));
+    if (fv.setCrisp) fv.setCrisp($("crispChk").checked);
+    const esActive = uni && uni.source === "endless-sky";
+    // v2251 -- EV hostiles are now brain-driven too: the same esTactics policy (and its learning loop) that
+    // flies ES ships. Defaults on; set window.EV_BRAIN=false before entering to restore classic EV nearest-target.
+    const brainOn = esActive || (window.EV_BRAIN !== false);
+    fv.enter(curSystem, shipFlightStats(curShip), { loadout, speedScale: 1, x: startX, y: startY, heading, playerShip: curShip, weapons: uni ? uni.weapons : {}, enemyClasses, enemyCount: 3, net, callsign: myCallsign, shipName: curShip.name || "", onPeers: positionBubbles, universe: uni, onBotHit: combatHit, onNpcHit: net ? npcHit : undefined, onCallout: (line) => chatFeed("Escort: " + line, false), onCalloutBubbles: positionEscortBubbles, onSound: (kind) => sfx.play(kind),
+      // v2168 -- co-op authority: hand flightView the room so hostiles are seeded from (room, system).
+      // Every pilot in the room then meets the same ships. Solo (net === null) -> undefined -> Math.random.
+      room: net ? roomId() : undefined,
+      spawn: esActive ? esSpawn : undefined,
+      // v2166 -- combat tactics: hostiles pick a target worth shooting and break off a lost fight.
+      // v2251 -- now on for EV too (brainOn). Weights come from the brain when it serves them, else esTactics' hand policy.
+      tactics: brainOn,
+      tacticsWeights: brainOn ? (window.ES_TACTICS_WEIGHTS || null) : null,
+      onTacticsOutcome: brainOn ? ((samples) => window.__esTacticsOutcome && window.__esTacticsOutcome(samples)) : undefined,
+      onKill: (k) => { try { if (esActive && esRun) { esNotePersonKill(k); const failed = esRun.recordEvent(k, "destroy"); if (failed && failed.length) failed.forEach((n) => { try { toast("Mission failed: " + n); } catch (e) {} }); } else missions.recordKill(); } catch (e) {} } }); });
+}
+
+// Decode a ship's rotating sprite by ship/shän id. Returns {dec, shan} or null.
+function loadShipSpriteById(id) {
+  try {
+    if (!rf || id == null) return null;
+    const shan = readShan(rf, id);
+    if (!shan) return null;
+    const rled = rf.get("rlëD", shan.baseImageID) || rf.get("rleD", shan.baseImageID);
+    if (!rled) return null;
+    const dec = decodeRLED(rled);
+    return (dec && dec.ok) ? { dec, shan } : null;
+  } catch (e) { return null; }
+}
+
+// Try to load a ship's rotating sprite into the flight view. The shän ID matches
+// the shïp ID in EV; its baseImageID points at the rlëD. Silently no-ops (keeps
+// the triangle) if the graphics data isn't loaded or the ship has no sprite.
+function trySetShipSprite(ship) {
+  if (!fv) return;
+  if (uni && uni.source === "endless-sky") {
+    if (fv.setSprite) fv.setSprite(null);   // triangle until the PNG loads, then upgrade
+    if (ship && ship.sprite) {
+      import("./ev/esSprites.js")
+        .then((m) => m.esShipAtlas(ship.sprite))
+        .then((dec) => { if (dec && fv.setSprite) fv.setSprite(dec, 1); })
+        .catch(() => {});
+    }
+    return;
+  }
+  const got = ship && loadShipSpriteById(ship.id);
+  if (got) fv.setSprite(got.dec, got.shan.baseSetCount);
+  else if (fv.setSprite) fv.setSprite(null);
+}
+
+// Register sprites for the enemy ship classes that will spawn, so AI ships draw
+// as their real sprites too. Best-effort; classes without art stay triangles.
+function loadEnemySprites(classes) {
+  if (!fv || !fv.setShipSprite) return;
+  try { fv.clearShipSprites && fv.clearShipSprites(); } catch (e) {}
+  if (uni && uni.source === "endless-sky") {
+    import("./ev/esSprites.js").then((m) => {
+      for (const cls of (classes || [])) {
+        if (!cls || cls.id == null || !cls.sprite) continue;
+        m.esShipAtlas(cls.sprite).then((dec) => { if (dec) fv.setShipSprite(cls.id, dec, 1); }).catch(() => {});
+      }
+    }).catch(() => {});
+    return (classes || []).length;
+  }
+  let n = 0;
+  for (const cls of (classes || [])) {
+    if (!cls || cls.id == null) continue;
+    const got = loadShipSpriteById(cls.id);
+    if (got) { fv.setShipSprite(cls.id, got.dec, got.shan.baseSetCount); n++; }
+  }
+  return n;
+}
+
+function enterLanding(spob) {
+  setMode("landing");
+  try { dockSpob = spob; dock.show(spob); } catch (e) {}
+  $("portName").textContent = spob.name || ("Stellar " + spob.id);
+  const tech = spob.techLevel > 0 ? "tech " + spob.techLevel : "no tech";
+  $("portSub").textContent = `${spob.isStation ? "Station" : "Planet"} · ${govtLabel(spob.govt)} · ${tech}` + (spob.tribute > 0 ? ` · tribute ${spob.tribute}` : "");
+  const svc = [["Spaceport Bar", spob.hasBar], ["Commodity Exchange", spob.hasCommodity], ["Outfit Ship", spob.canOutfit], ["Shipyard", spob.canBuyShips]];
+  $("portSvc").innerHTML = svc.map(([label, on]) => `<button class="btn" ${on ? "" : "disabled"} data-svc="${label}">${label}${on ? "" : " · n/a"}</button>`).join("");
+  $("portSvc").querySelectorAll("button:not([disabled])").forEach((b) => b.onclick = () => {
+    if (b.dataset.svc === "Spaceport Bar") { if (esRun) esRun.renderBar(spob); else missions.renderBar(spob); return; }
+    if (uni && uni.source === "endless-sky" && esEcon) esOpenService(b.dataset.svc, spob);   // v2319 -- real per-system economy (prices, outfit/ship cost) for ES data
+    else openService(b.dataset.svc, spob);
+  });
+  esShowNews(spob);
+  $("leaveBtn").textContent = landingReturn === "flight" ? "Depart ▲" : "Leave";
+  // Landing description text (dësc). The exact spöb->dësc link field can shift by
+  // scenario, so we try the parsed DescID, the spöb id, and nearby offsets' raw
+  // values, and take the first that yields real prose. This self-corrects instead
+  // of trusting one offset blindly.
+  let desc = "";
+  try {
+    if (rf) {
+      const cands = [];
+      if (spob.landDesc) cands.push(spob.landDesc);
+      if (spob.id != null) { cands.push(spob.id); cands.push(spob.id + 1000); }
+      // also probe the raw spöb bytes around the documented DescID slot (76..84)
+      const raw = rf.get("sp\u00F6b", spob.id);
+      if (raw && raw.byteLength >= 86) {
+        const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+        for (const off of [78, 76, 80, 82, 84]) { const v = dv.getInt16(off, false); if (v >= 128) cands.push(v); }
+      }
+      const seen = new Set();
+      for (const cand of cands) {
+        if (cand == null || seen.has(cand)) continue; seen.add(cand);
+        const t = readDesc(rf, cand);
+        if (t && t.length > 12 && /[a-z]{3}/i.test(t)) { desc = t; break; }   // looks like prose
+      }
+    }
+  } catch (e) {}
+  $("portDesc").textContent = desc || "";
+  $("portDesc").style.display = desc ? "block" : "none";
+  // Missions: complete any whose destination is here, then show the board.
+  try { if (esRun) { esRun.onArrive(spob.id, curSystem ? curSystem.id : null); esSyncCredits(); esRun.render(spob); } else { missions.onArrive(spob.id, curSystem ? curSystem.id : null); missions.render(spob); } } catch (e) { console.warn("missions", e); }
+  showLandscape(spob);
+}
+// Show the planet's landscape PICT (LandPICT) as the landing backdrop when the
+// graphics data is loaded. Falls back to the 3D dock view if there's no picture.
+async function showLandscape(spob) {
+  const cv = $("landPictCanvas"); cv.style.display = "none";
+  // Endless Sky: landscapes are PNG/JPG under images/land/. Draw the sprite named on the planet.
+  if (uni && uni.source === "endless-sky") {
+    try {
+      if (!spob || !spob.landscape) return;
+      const m = await import("./ev/esSprites.js");
+      const land = await m.esLoadLandscape(spob.landscape);
+      if (!land) return;
+      cv.width = land.width; cv.height = land.height;
+      cv.getContext("2d").drawImage(land.img, 0, 0);
+      cv.style.display = "block";
+      $("dockCanvas").style.display = "none";
+    } catch (e) { console.warn("ES landscape failed", e); }
+    return;
+  }
+  try {
+    if (!rf || !spob || !spob.landPict) return;
+    const bytes = rf.get("PICT", spob.landPict);
+    if (!bytes) return;
+    const { decodePICT } = await import("./ev/pict.js");
+    const img = decodePICT(bytes);
+    if (!img || !img.ok) return;
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext("2d");
+    ctx.putImageData(new ImageData(img.rgba, img.width, img.height), 0, 0);
+    cv.style.display = "block";
+    $("dockCanvas").style.display = "none";   // prefer the real art over the voxel body
+  } catch (e) { console.warn("landscape PICT failed", e); }
+}
+function leaveLanding() {
+  $("dockCanvas").style.display = "block"; $("landPictCanvas").style.display = "none";
+  if (landingReturn === "flight" && landedSpob) enterFlight(landedSpob.x + 120, landedSpob.y, 180);
+  else enterSystem(curSystem);
+}
+
+async function loadFile(file) { return loadFiles([file]); }
+
+// --- IndexedDB cache: remember the loaded data files so you don't re-pick the
+//     six Nova Data .rez every launch. We cache the RAW bytes (not the parsed
+//     universe) so plug-in swaps + re-parses work, and it's format-agnostic.
+const EVDB = "swek-ev", EVSTORE = "data", EVKEY = "current";
+function evIdb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(EVDB, 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore(EVSTORE); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function evCacheSave(files) {
+  try {
+    const recs = [];
+    for (const f of files) recs.push({ name: f.name, bytes: await f.arrayBuffer() });
+    const db = await evIdb();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(EVSTORE, "readwrite");
+      tx.objectStore(EVSTORE).put({ savedAt: Date.now(), files: recs }, EVKEY);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  } catch (e) { console.warn("EV cache save failed", e); }
+}
+async function evCacheLoad() {
+  try {
+    const db = await evIdb();
+    const rec = await new Promise((res, rej) => {
+      const tx = db.transaction(EVSTORE, "readonly");
+      const g = tx.objectStore(EVSTORE).get(EVKEY);
+      g.onsuccess = () => res(g.result); g.onerror = () => rej(g.error);
+    });
+    db.close();
+    return rec && rec.files && rec.files.length ? rec : null;
+  } catch (e) { console.warn("EV cache load failed", e); return null; }
+}
+async function evCacheClear() {
+  try { const db = await evIdb(); const tx = db.transaction(EVSTORE, "readwrite"); tx.objectStore(EVSTORE).delete(EVKEY); db.close(); } catch (e) {}
+}
+
+async function loadFiles(files, opts = {}) {
+  try {
+    files = Array.from(files || []);
+    if (!files.length) return;
+    countsEl.textContent = files.length > 1 ? `parsing ${files.length} files…` : ("parsing " + files[0].name + "…");
+
+    // v2160 -- in-memory .zip expansion (v2138), re-applied on top of the Endless Sky
+    // ev.html. Runs BEFORE the ES detection below, so a zipped drop works for BOTH
+    // engines: ES .txt data, a prebuilt es-universe.json, or an EV resource fork.
+    // NOTE the skip list deliberately does NOT include .txt or .json -- the v2138 list
+    // skipped .txt, which would have silently thrown away every Endless Sky data file.
+    if (files.some((f) => /\.zip$/i.test(f.name))) {
+      const expanded = [];
+      for (const f of files) {
+        if (!/\.zip$/i.test(f.name)) { expanded.push(f); continue; }
+        try {
+          countsEl.textContent = "unzipping " + f.name + "…";
+          const entries = await readZip(new Uint8Array(await f.arrayBuffer()));
+          for (const e of entries) {
+            if (/\.(md|rtf|png|jpg|jpeg|gif|pdf|html?)$/i.test(e.name)) continue;
+            expanded.push(new File([e.bytes], e.name.split("/").pop()));
+          }
+        } catch (err) { console.warn("zip", f.name, err && err.message); }
+      }
+      if (expanded.length) files = expanded;
+    }
+
+    // --- Endless Sky path (SweK ES adapter) -------------------------------------------------
+    // Endless Sky data is plain-text .txt node trees (system/planet/ship/...), not Mac resource
+    // forks, so it never parses as EV. Detect it and build the universe through ev/esData.js,
+    // which emits the SAME uni shape buildUniverse() does, then reuse the normal render path.
+    // Also accepts a prebuilt es-universe.json (from es-build.mjs) as a single-file drop.
+    {
+      // (a) prebuilt universe JSON
+      if (files.length === 1 && /\.json$/i.test(files[0].name)) {
+        try {
+          const j = JSON.parse(await files[0].text());
+          if (j && j.source === "endless-sky" && Array.isArray(j.systems)) {
+            uni = j;
+            uni.systemById = {}; for (const s of uni.systems) uni.systemById[s.id] = s;
+            uni.shipById = {}; for (const s of (uni.ships || [])) uni.shipById[s.id] = s;
+            uni.outfitByName = uni.outfitByName || {}; for (const id in (uni.outfits || {})) uni.outfitByName[uni.outfits[id].name] = uni.outfits[id];
+            uni.shipByName = uni.shipByName || {}; for (const s of (uni.ships || [])) uni.shipByName[s.name] = s;
+            uni.govtByName = uni.govtByName || {}; for (const id in (uni.govts || {})) uni.govtByName[uni.govts[id].name] = uni.govts[id];
+            rf = { container: "Endless Sky", count: uni.counts.systems, list: () => [], get: () => null, typeList: () => [] };
+            commsPictIds = null; try { sfx.reset(); } catch (e) {}
+            try { initControlBits(); } catch (e) {}
+            $("shipSel").innerHTML = (uni.ships.length ? uni.ships : [DEFAULT_SHIP]).map((s) => `<option value="${s.id}">${(s.name || "Ship " + s.id).replace(/[<>&]/g, "")}</option>`).join("");
+            map.setUniverse(uni); drop.classList.add("hide"); backToGalaxy();
+            countsEl.textContent = `${uni.counts.systems} systems · ${uni.counts.spobs} stellars · ${uni.counts.ships} ships · Endless Sky`
+              + (opts.shipped ? " · shipped with the engine" : "");
+            $("checkBtn").classList.remove("hide"); $("inspectBtn").classList.remove("hide"); $("forgetBtn").classList.remove("hide");
+            await initEsRunner();
+            if (!opts.fromCache) evCacheSave(files);
+            return;
+          }
+        } catch (e) { /* not our JSON — fall through */ }
+      }
+      // (b) raw ES .txt data files (drag the contents of the ES data/ folder, or use webkitdirectory)
+      const esTexts = [];
+      for (const f of files) {
+        if (!/\.(txt|data)$/i.test(f.name)) continue;
+        let head = "";
+        try { head = await f.slice(0, 8192).text(); } catch (e) { continue; }
+        if (/^[ \t]*(system|planet|ship|outfit|government|fleet|effect|mission)\b/m.test(head)) {
+          try { esTexts.push(await f.text()); } catch (e) {}
+        }
+      }
+      if (esTexts.length) {
+        const { parseESFiles } = await import("./ev/esParse.js");
+        const { buildUniverseFromES } = await import("./ev/esData.js");
+        uni = buildUniverseFromES(parseESFiles(esTexts));
+        rf = { container: "Endless Sky", count: uni.counts.systems, list: () => [], get: () => null, typeList: () => [] };
+        commsPictIds = null; try { sfx.reset(); } catch (e) {}
+        try { initControlBits(); } catch (e) {}
+        if (!uni.systems.length) {
+          countsEl.innerHTML = '<span class="err">Parsed ' + esTexts.length + ' Endless Sky file(s) but found no systems. Make sure "map systems.txt" and the region folders are included.</span>';
+          return;
+        }
+        $("shipSel").innerHTML = (uni.ships.length ? uni.ships : [DEFAULT_SHIP]).map((s) => `<option value="${s.id}">${(s.name || "Ship " + s.id).replace(/[<>&]/g, "")}</option>`).join("");
+        map.setUniverse(uni); drop.classList.add("hide"); backToGalaxy();
+        countsEl.textContent = `${uni.counts.systems} systems · ${uni.counts.spobs} stellars · ${uni.counts.ships} ships · Endless Sky`;
+        $("checkBtn").classList.remove("hide"); $("inspectBtn").classList.remove("hide"); $("forgetBtn").classList.remove("hide");
+        await initEsRunner();
+        if (!opts.fromCache) evCacheSave(files);
+        return;
+      }
+    }
+
+    const forks = [], skipped = [];
+    for (const f of files) {
+      try { const fk = loadResourceFork(await f.arrayBuffer()); fk._file = f.name; forks.push(fk); }
+      catch (e) { console.warn("skip", f.name, e.message); skipped.push({ name: f.name, why: e.message }); }
+    }
+    window.__evSkipped = skipped;   // inspectable
+    // Per-file type map, so the inspector can tell you which .bin holds sÿst etc.
+    window.__evFileTypes = forks.map((fk) => ({ file: fk._file || "?", types: (fk.typeList ? fk.typeList() : []) }));
+    if (!forks.length) { countsEl.innerHTML = `<span class="err">None of those parsed as EV data.${skipped.length ? " Skipped: " + skipped.map(s=>s.name).join(", ") : ""}</span>`; return; }
+    rf = forks.length === 1 ? forks[0] : mergeForks(forks);
+    commsPictIds = null;   // reset portrait cache for the new data set
+    try { sfx.reset(); } catch (e) {}
+    uni = buildUniverse(rf);
+    mergeAuthoredMissions();   // fold in any missions built in the creator
+    loadAuthoredDescs();       // and their briefing text
+    initControlBits();   // starting control bits from chär, for mission gating
+    if (!uni.systems.length) {
+      // No flyable galaxy in this drop. Show exactly what resource types ARE here
+      // so you can tell a graphics-only half from a data file, and give guidance
+      // that also covers total conversions (not just base Nova's six Data files).
+      const types = rf.typeList();
+      const hasSprites = types.some((t) => t === "rlëD" || t === "rleD" || t === "shän" || t === "shan" || t === "PICT");
+      // top resource types by count, for the diagnostic
+      const counts = types.map((t) => ({ t, n: (rf.list(t) || []).length })).sort((a, b) => b.n - a.n);
+      const topTypes = counts.slice(0, 10).map((c) => `${c.t}×${c.n}`).join(", ");
+      const dataTypes = ["sÿst", "shïp", "spöb", "gövt", "wëap"].filter((t) => types.includes(t));
+      const dataHint = dataTypes.length
+        ? `<br><b>Note:</b> this set DOES contain ${dataTypes.join(", ")} — if there are no systems it may be a plug-in that overlays a base scenario; try loading it together with the TC's main data file.`
+        : `<br>This looks like the <b>graphics/ship</b> half of a plug-in. The systems live in another file — look for the main data file in the same folder (often the largest, or the one without "Graphics"/"Sounds"/"Sprites" in the name) and load it too.`;
+      countsEl.innerHTML = `<span class="err">Loaded <b>${rf.count}</b> resources (${rf.container}), but <b>no sÿst</b> systems to fly.</span>`
+        + `<div style="color:var(--dim);margin-top:6px;font-size:12px">Types found: ${topTypes || "—"}.${dataHint}`
+        + (skipped.length ? `<br><span style="color:#f99"><b>⚠ ${skipped.length} file(s) were skipped (failed to parse):</b> ${skipped.map(s=>s.name).join(", ")}. If the galaxy data is among these, that's why there are no systems — tell me the parse error.</span>` : ``)
+        + (hasSprites ? ` The ship art IS here — open <a href="ev-sprites.html" style="color:var(--accent)">EV Sprites</a> to browse it.` : ``)
+        + `</div>`;
+      $("inspectBtn").classList.remove("hide");   // let the user see the full type inventory
+      return;
+    }
+    $("shipSel").innerHTML = (uni.ships.length ? uni.ships : [DEFAULT_SHIP]).map((s) => `<option value="${s.id}">${(s.name || "Ship " + s.id).replace(/[<>&]/g, "")}</option>`).join("");
+    map.setUniverse(uni); drop.classList.add("hide"); backToGalaxy();
+    countsEl.textContent = `${uni.counts.systems} systems · ${uni.counts.spobs} stellars · ${uni.counts.ships} ships · ${rf.container}${opts.fromCache ? " · cached" : ""}`;
+    $("checkBtn").classList.remove("hide");
+    $("inspectBtn").classList.remove("hide");
+    $("forgetBtn").classList.remove("hide");
+    // cache the raw files for next launch (unless we just restored them)
+    if (!opts.fromCache) evCacheSave(files);
+  } catch (e) { countsEl.innerHTML = '<span class="err">' + e.message + '</span>'; }
+}
+
+// on launch: if we have cached data, restore it automatically (fully offline).
+async function evTryRestore() {
+  const rec = await evCacheLoad();
+  if (!rec) return false;
+  const files = rec.files.map((r) => new File([r.bytes], r.name));
+  await loadFiles(files, { fromCache: true });
+  return true;
+}
+
+// v2186 -- AND IF WE HAVE NONE, FETCH THE ONE THAT SHIPS WITH THE ENGINE.
+//
+// ev.html has never loaded `es-universe.json` by itself. The engine has shipped a baked galaxy since
+// v2162 and endless-sky.html has a button that says "Fly it in Stellar Atlas", and the button opened an
+// empty page: you had to know to drag the file onto it. Every check in the ES suite passed, because every
+// check hands the universe to the code directly. Nothing tested the click.
+//
+// So: cache first (it may be a plugin, or a different game), then the shipped universe, then the drop UI.
+// A 404 is not an error. It means somebody deleted the file, and the drop UI is exactly the right answer.
+async function evTryShipped() {
+  try {
+    const r = await fetch("./es-universe.json", { cache: "no-store" });
+    if (!r.ok) return false;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (!bytes.length) return false;
+    await loadFiles([new File([bytes], "es-universe.json")], { fromCache: true, shipped: true });
+    return !!uni;
+  } catch (e) { return false; }
+}
+
+$("openBtn").onclick = () => $("file").click();
+$("file").onchange = (e) => { if (e.target.files.length) loadFiles(e.target.files); };
+$("forgetBtn").onclick = async () => {
+  await evCacheClear();
+  $("forgetBtn").classList.add("hide"); $("checkBtn").classList.add("hide");
+  drop.classList.remove("hide"); uni = null;
+  countsEl.textContent = "cache cleared — drop your EV data (or a plug-in set) to load again";
+};
+// auto-restore cached data on launch so you don't re-pick the six files
+// Cache first (it may be a plugin, or a different game), then the galaxy the engine ships with, then the
+// drop UI. `countsEl` says which one you got, so nobody has to guess.
+evTryRestore().then((restored) => (restored ? true : evTryShipped()));
+$("fitBtn").onclick = () => { if (mode === "system") { sv.fit(); sv.render(); } else if (mode === "galaxy" && map) { map.fit(); map.render(); } };
+$("qualSel").onchange = (e) => { if (fv && fv.setRenderScale) fv.setRenderScale(parseFloat(e.target.value)); };
+$("crispChk").onchange = (e) => { if (fv && fv.setCrisp) fv.setCrisp(e.target.checked); };
+$("backBtn").onclick = backToGalaxy;
+$("launchBtn").onclick = () => enterFlight(0, 0, 0);
+$("mapBtn").onclick = () => enterSystem(curSystem);
+$("leaveBtn").onclick = leaveLanding;
+$("deathBtn").onclick = () => { $("death").classList.add("hide"); enterSystem(curSystem); };
+const roomId = () => uni ? `${uni.counts.systems}x${uni.counts.spobs}` : "default";
+$("mpBtn").onclick = () => $("mpPanel").classList.toggle("hide");
+
+// --- Music player: plays Nova Music.mp3 (or any dropped audio) via a native
+//     <audio> element. Fully offline; supports a playlist, play/pause, prev/next,
+//     loop, and volume. Object URLs are revoked on replacement to avoid leaks.
+const music = (() => {
+  const audio = $("musicAudio");
+  let tracks = [];   // { name, url }
+  let idx = -1, loop = false;
+  audio.volume = parseFloat($("musicVol").value);
+  const now = () => $("musicNow");
+  function renderList() {
+    $("musicList").innerHTML = tracks.length
+      ? tracks.map((t, i) => `<div data-i="${i}" style="padding:3px 4px;border-radius:4px;cursor:pointer;${i === idx ? "background:#1a2436;color:#9cf" : "color:var(--ink)"}">${i === idx ? "▶ " : ""}${(t.name || "track " + (i + 1)).replace(/[<>&]/g, "?")}</div>`).join("")
+      : `<div style="color:var(--dim)">No tracks. Add Nova Music.mp3 or any audio.</div>`;
+    $("musicList").querySelectorAll("[data-i]").forEach((el) => el.onclick = () => play(+el.dataset.i));
+    now().textContent = idx >= 0 && tracks[idx] ? (audio.paused ? "Paused: " : "Playing: ") + (tracks[idx].name || "") : (tracks.length ? tracks.length + " track(s) ready" : "No tracks loaded");
+    $("musicPlay").innerHTML = audio.paused ? "&#9654;" : "&#9208;";
+  }
+  function play(i) {
+    if (!tracks.length) return;
+    idx = (i + tracks.length) % tracks.length;
+    audio.src = tracks[idx].url;
+    audio.play().catch((e) => { now().textContent = "Tap ▶ to start (browser blocked autoplay)"; });
+    renderList();
+  }
+  function add(files) {
+    const before = tracks.length;
+    for (const f of files) {
+      if (!/audio|\.mp3$|\.m4a$|\.ogg$|\.wav$/i.test(f.type + " " + f.name)) continue;
+      tracks.push({ name: f.name.replace(/\.[^.]+$/, ""), url: URL.createObjectURL(f) });
+    }
+    // sort so "Nova Music" lands first if present
+    tracks.sort((a, b) => (/nova music/i.test(b.name) ? 1 : 0) - (/nova music/i.test(a.name) ? 1 : 0));
+    renderList();
+    if (before === 0 && tracks.length) play(0);   // auto-start the first add
+    return tracks.length - before;
+  }
+  audio.addEventListener("ended", () => {
+    if (idx < tracks.length - 1) play(idx + 1);
+    else if (loop) play(0);
+    else renderList();
+  });
+  audio.addEventListener("play", renderList);
+  audio.addEventListener("pause", renderList);
+  $("musicPlay").onclick = () => { if (!tracks.length) { $("musicFiles").click(); return; } audio.paused ? audio.play().catch(()=>{}) : audio.pause(); };
+  $("musicPrev").onclick = () => play(idx - 1);
+  $("musicNext").onclick = () => play(idx + 1);
+  $("musicLoop").onclick = () => { loop = !loop; $("musicLoop").style.opacity = loop ? "1" : "0.5"; };
+  $("musicVol").oninput = (e) => { audio.volume = parseFloat(e.target.value); };
+  $("musicAdd").onclick = () => $("musicFiles").click();
+  $("musicFiles").onchange = (e) => { const n = add([...e.target.files]); if (n) toast(n + " track(s) added"); e.target.value = ""; };
+  return { add, toggle: () => $("musicPanel").classList.toggle("hide") };
+})();
+$("musicBtn").onclick = () => music.toggle();
+$("musicClose").onclick = () => $("musicPanel").classList.add("hide");
+
+// --- Comms / hail: talk to the nearest ship. Shows a portrait (a headshot PICT
+//     from the loaded graphics) + a government-flavored greeting. Uses the PICT
+//     decoder built in v2118. Pure cosmetic/flavor — no mission scripting yet.
+let commsPictIds = null;   // cached list of available portrait PICT ids
+function availablePortraits() {
+  if (commsPictIds) return commsPictIds;
+  commsPictIds = [];
+  try { if (rf) commsPictIds = (rf.list("PICT") || []).map((m) => m.id); } catch (e) {}
+  return commsPictIds;
+}
+function greetingFor(target) {
+  const g = target.govt != null && uni && uni.govts ? uni.govts[target.govt] : null;
+  const gname = g ? (g.name || "") : "";
+  if (target.peer) return [`This is ${target.name}. Fly safe out here, Captain.`, `Good to see another human ship in ${curSystem ? curSystem.name : "this system"}.`];
+  const t = target.team || "enemy";
+  if (t === "ally") return [`${target.name} here. We're with you — call the targets and we'll burn them down.`];
+  if (t === "enemy") return [`${target.name}: "You're a long way from safe, ${'stranger'}. Turn back or be scattered across ${curSystem ? curSystem.name : "this system"}."`, `${gname ? gname + " vessel" : "Hostile"}: "This is your only warning."`];
+  return [`${target.name}: "State your business and move along."`];
+}
+async function hailNearest() {
+  if (mode !== "flight" || !fv || !fv.nearestShip) { toast("Hailing only works in flight"); return; }
+  const target = fv.nearestShip();
+  if (!target) { toast("No ships in range to hail"); return; }
+  $("commsName").textContent = target.name || "Unidentified ship";
+  const g = target.govt != null && uni && uni.govts ? uni.govts[target.govt] : null;
+  $("commsSub").textContent = [g && g.name, target.team === "ally" ? "friendly" : target.team === "enemy" ? "hostile" : target.peer ? "pilot" : "neutral", target.dist ? Math.round(target.dist) + " units" : ""].filter(Boolean).join(" · ");
+  // v2175 -- ES ships have something to say, and it is written down: 641 phrases, 261 hail names across
+  // 126 governments, and a unique captain who speaks for herself. Fall back to the EV greeting only when
+  // there is no ES universe loaded.
+  let said = "";
+  try {
+    if (esActive && esVoiceMod && uni) said = esVoiceMod.hailFor(uni, target, { hostile: target.team === "enemy" });
+  } catch (e) {}
+  const lines = greetingFor(target);
+  // If a government has descriptive text, prefer a snippet of it for flavor.
+  let flavor = "";
+  try {
+    if (rf && target.govt != null && target.govt >= 128) {
+      const t = readDesc(rf, target.govt);
+      if (t && t.length > 12) flavor = t.split("\n")[0].slice(0, 220);
+    }
+  } catch (e) {}
+  $("commsText").textContent = said || flavor || lines[Math.floor(Math.random() * lines.length)];
+  // portrait: try the ship class's PICT id neighborhood, else any available headshot
+  const cv = $("commsPic"); const ctx = cv.getContext("2d"); ctx.clearRect(0, 0, cv.width, cv.height);
+  await drawPortrait(cv, target);
+  $("comms").classList.remove("hide");
+}
+async function drawPortrait(cv, target) {
+  try {
+    if (!rf) return;
+    const ids = availablePortraits(); if (!ids.length) return;
+    // Heuristic: EV comm portraits are often keyed near person/ship ids. Pick a
+    // stable one per target so the same ship shows the same face.
+    const seed = (target.cls && target.cls.id) || Math.abs(hashStr(target.name || "x"));
+    const pid = ids[seed % ids.length];
+    const bytes = rf.get("PICT", pid); if (!bytes) return;
+    const { decodePICT } = await import("./ev/pict.js");
+    const img = decodePICT(bytes); if (!img || !img.ok) return;
+    // draw cover-fit into the 120x120 canvas
+    const tmp = document.createElement("canvas"); tmp.width = img.width; tmp.height = img.height;
+    tmp.getContext("2d").putImageData(new ImageData(img.rgba, img.width, img.height), 0, 0);
+    const ctx = cv.getContext("2d");
+    const s = Math.max(cv.width / img.width, cv.height / img.height);
+    const w = img.width * s, h = img.height * s;
+    ctx.drawImage(tmp, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+  } catch (e) { console.warn("portrait failed", e); }
+}
+function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
+$("commsClose").onclick = () => $("comms").classList.add("hide");
+
+// --- Missions: a basic offer -> accept -> travel -> complete loop reading mïsn
+//     resources. Not the full EV scripting engine (no control-bit branching yet),
+//     but a real, playable mission cycle. Active missions persist in-session.
+let credits = 500000;   // starting purse; mission rewards + trade adjust it
+const player = { cargo: {}, cargoHold: 100, outfits: {} };   // cargo: id->tons; outfits: id->count
+const missions = (() => {
+  let active = [];   // { id, name, brief, pay, destStel, destName, done }
+  function offersAt(spob, loc) {
+    if (!uni || !uni.missions) return [];
+    const out = [];
+    for (const id in uni.missions) {
+      const m = uni.missions[id];
+      // offered here if AvailStel matches this spöb, or is a "special/anywhere"
+      // code. EV uses -1/-2 and large special values (e.g. 30000+ = stellar-class/
+      // govt-wide) to mean "not a specific stellar" — treat those as available.
+      const special = m.availStel < 0 || m.availStel >= 30000;
+      const here = m.availStel === spob.id || special;
+      if (!here) continue;
+      if (active.some((a) => a.id === m.id)) continue;
+      if (m.availBits && !bits.evaluate(m.availBits)) continue;   // control-bit gate
+      // location filter. EV availLoc is richer than a simple 0/1: 0 (and negatives)
+      // = mission computer / job board; anything >=1 (bar, and TC-specific values
+      // like 6) = bar / Ready Room, where story missions live. This keeps missions
+      // visible instead of vanishing when a scenario uses an unmapped loc.
+      if (loc != null) {
+        const isBar = m.availLoc >= 1;
+        if (loc === 1 && !isBar) continue;      // Ready Room: only bar-type
+        if (loc === 0 && isBar) continue;       // computer: only non-bar
+      }
+      out.push(m);
+      if (out.length >= 12) break;
+    }
+    return out;
+  }
+  function brief(m) {
+    // Authored missions carry their briefing in authoredDescs (from the creator).
+    if (m.briefDesc && authoredDescs[m.briefDesc]) return authoredDescs[m.briefDesc];
+    if (m.brief) return m.brief;   // authored missions may carry text inline too
+    // Prefer the dësc id parsed from the mïsn (briefDesc); fall back to the common
+    // id conventions for scenarios where it wasn't found.
+    try {
+      const cands = [];
+      if (m.briefDesc) cands.push(m.briefDesc);
+      cands.push(m.id + 4000, m.id + 128, m.id);
+      for (const cand of cands) {
+        const t = readDesc(rf, cand);
+        if (t && t.length > 12) return t;
+      }
+    } catch (e) {}
+    return "";
+  }
+  function destName(m) {
+    const s = m.travelStel;
+    if (uni && uni.spobs && uni.spobs[s]) return uni.spobs[s].name || ("Stellar " + s);
+    if (uni && uni.systemById && uni.systemById[s]) return uni.systemById[s].name || ("System " + s);
+    return s > 0 ? ("destination " + s) : "an unknown destination";
+  }
+  function accept(m) {
+    if (active.some((a) => a.id === m.id)) return;
+    const obj = objectiveOf(m);
+    active.push({ id: m.id, name: m.name || ("Mission " + m.id), brief: brief(m), pay: m.pay || 0,
+      destStel: m.travelStel, destName: destName(m), onSuccess: m.onSuccess || "",
+      altSets: m.altSets || [], compMessage: m.compMessage || "",
+      objective: obj, progress: 0, done: false });
+    if (m.onAccept) bits.applySet(m.onAccept);   // OnAccept bits
+    toast("Mission accepted: " + (m.name || m.id));
+  }
+  // Determine the mission's objective from its fields. EV cargo missions carry a
+  // CargoQty; ship-goal missions carry a ship count. Default = travel.
+  function objectiveOf(m) {
+    if (m.cargoQty && m.cargoQty > 0) return { kind: "cargo", qty: m.cargoQty, need: 1, note: `Deliver ${m.cargoQty} tons of cargo to ${destName(m)}` };
+    if (m.shipCount && m.shipCount > 0) return { kind: "destroy", need: m.shipCount, note: `Destroy ${m.shipCount} ship${m.shipCount > 1 ? "s" : ""}` };
+    return { kind: "travel", need: 1, note: `Travel to ${destName(m)}` };
+  }
+  // On arriving at a stellar/system, complete active missions whose objective is
+  // satisfied there. Travel/cargo complete on reaching the destination; destroy
+  // missions complete when their kill quota is met (tracked via recordKill).
+  function onArrive(stelId, systemId) {
+    let completed = 0;
+    for (const a of active) {
+      if (a.done) continue;
+      const atDest = a.destStel === stelId || a.destStel === systemId;
+      const obj = a.objective || { kind: "travel", need: 1 };
+      let satisfied = false;
+      if (obj.kind === "destroy") satisfied = a.progress >= obj.need && atDest;   // kill quota then return
+      else satisfied = atDest;   // travel + cargo: reaching the destination
+      if (satisfied) {
+        a.done = true; completed++;
+        credits += a.pay || 0;
+        if (a.onSuccess) bits.applySet(a.onSuccess);       // OnSuccess control bits
+        for (const s of (a.altSets || [])) bits.applySet(s);   // branch-outcome bits
+        const msg = a.compMessage ? `${a.name}: ${a.compMessage}` : `Mission complete: ${a.name}`;
+        toast(`${msg}${a.pay ? " · +" + a.pay.toLocaleString() + " cr" : ""}`);
+      }
+    }
+    if (completed) active = active.filter((a) => !a.done);
+    return completed;
+  }
+  // Record a kill toward any active destroy-objective missions.
+  function recordKill() {
+    for (const a of active) { if (!a.done && a.objective && a.objective.kind === "destroy") a.progress = Math.min(a.objective.need, (a.progress || 0) + 1); }
+  }
+  function render(spob) {
+    const el = $("portMissions"); if (!el) return;
+    const offers = offersAt(spob, 0);   // mission computer (job board)
+    const mine = active.filter((a) => !a.done);
+    let html = "";
+    if (mine.length) {
+      html += `<div style="color:#9cf;font-size:12px;margin-bottom:4px">Active missions</div>`;
+      html += mine.map((a) => {
+        const obj = a.objective || {};
+        let prog = "";
+        if (obj.kind === "destroy") prog = ` <span style="color:#fb8">[${a.progress || 0}/${obj.need} destroyed]</span>`;
+        const goal = obj.note ? `<div style="color:var(--dim);font-size:11px;margin-left:10px">${escapeHtml(obj.note)}${prog}</div>` : "";
+        return `<div style="font-size:12px;color:var(--ink);padding:2px 0">• ${escapeHtml(a.name)} <span style="color:var(--dim)">→ ${escapeHtml(a.destName)}${a.pay ? " · " + a.pay.toLocaleString() + " cr" : ""}</span>${goal}</div>`;
+      }).join("");
+    }
+    if (offers.length) {
+      html += `<div style="color:#9cf;font-size:12px;margin:8px 0 4px">Mission computer</div>`;
+      html += offers.map((m) => missionCard(m)).join("");
+    }
+    el.innerHTML = html;
+    el.querySelectorAll("[data-mi]").forEach((b) => b.onclick = () => { const m = uni.missions[b.dataset.mi]; if (m) { accept(m); render(spob); } });
+  }
+  function missionCard(m) {
+    const b = brief(m);
+    const snippet = b ? `<div style="color:var(--dim);font-size:11px;margin:3px 0;max-height:60px;overflow:auto">${escapeHtml(b.slice(0, 260))}${b.length > 260 ? "…" : ""}</div>` : "";
+    return `<div style="border:1px solid var(--edge);border-radius:6px;padding:6px;margin-bottom:6px">
+      <div style="color:#fff;font-size:13px">${escapeHtml(m.name || "Mission " + m.id)}</div>
+      ${m.pay ? `<div style="color:#7d7;font-size:11px">${m.pay.toLocaleString()} cr</div>` : ""}
+      ${snippet}
+      <button class="btn" data-mi="${m.id}" style="margin-top:4px;font-size:12px">Accept</button>
+    </div>`;
+  }
+  // The bar / Ready Room: story & character missions (availLoc 1). Rendered into
+  // the shared service panel so it feels like a distinct destination.
+  function renderBar(spob) {
+    const offers = offersAt(spob, 1);
+    const body = $("svcBody");
+    $("svcTitle").textContent = barName(spob);
+    $("svcCredits").textContent = credits.toLocaleString();
+    let html = `<div style="color:var(--dim);font-size:12px;margin-bottom:10px">${barFlavor(spob)}</div>`;
+    if (offers.length) {
+      html += offers.map((m) => missionCard(m)).join("");
+    } else {
+      html += `<div style="color:var(--dim)">No one here has work for you right now. Come back after you've made a name for yourself — or in another system.</div>`;
+    }
+    // Diagnostic: how many bar missions exist here but are gated by control bits?
+    const gated = barGatedHere(spob);
+    if (gated.length) {
+      html += `<div style="margin-top:12px;border-top:1px solid var(--edge);padding-top:8px">
+        <div style="color:var(--dim);font-size:11px;cursor:pointer" id="barDbgToggle">▸ ${gated.length} more mission(s) here require prior story progress (tap to inspect)</div>
+        <div id="barDbg" class="hide" style="font-size:11px;color:var(--dim);margin-top:6px"></div></div>`;
+    }
+    body.innerHTML = html;
+    body.querySelectorAll("[data-mi]").forEach((b) => b.onclick = () => { const m = uni.missions[b.dataset.mi]; if (m) { accept(m); renderBar(spob); } });
+    const tog = $("barDbgToggle");
+    if (tog) tog.onclick = () => {
+      const d = $("barDbg"); d.classList.toggle("hide");
+      d.innerHTML = gated.map((m) => `<div style="padding:2px 0">${escapeHtml(m.name || "Mission " + m.id)} — needs <code style="color:#9cf">${escapeHtml(m.availBits)}</code></div>`).join("");
+    };
+    $("svcPanel").classList.remove("hide");
+  }
+  // Bar missions offered here that exist but are currently gated by control bits.
+  function barGatedHere(spob) {
+    if (!uni || !uni.missions) return [];
+    const out = [];
+    for (const id in uni.missions) {
+      const m = uni.missions[id];
+      const special = m.availStel < 0 || m.availStel >= 30000;
+      const here = m.availStel === spob.id || special;
+      const isBar = m.availLoc >= 1;
+      if (!here || !isBar) continue;
+      if (active.some((a) => a.id === m.id)) continue;
+      if (m.availBits && !bits.evaluate(m.availBits)) out.push(m);   // exists but gated
+      if (out.length >= 12) break;
+    }
+    return out;
+  }
+  function barName(spob) {
+    // If the scenario re-skins the bar (e.g. Star Trek's "Ready Room"), we can't
+    // read its label from data reliably, so use a spacey generic that fits EV.
+    return "Spaceport Bar — " + (spob.name || "");
+  }
+  function barFlavor(spob) {
+    return "You step into the dim, crowded bar. Pilots and traders trade rumors over drinks; someone in the corner is watching you.";
+  }
+  return { render, renderBar, onArrive, recordKill, active: () => active,
+    snapshot: () => JSON.parse(JSON.stringify(active)), restore: (arr) => { active = Array.isArray(arr) ? arr : []; } };
+})();
+function escapeHtml(s) { return String(s == null ? "" : s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])); }
+// --- Economy: commodity trading, outfitting, and shipyard. Prices vary a little
+//     per stellar by a stable pseudo-random factor so buy-low/sell-high works.
+function priceFactor(spobId, itemId) {
+  const h = Math.abs(((spobId * 2654435761) ^ (itemId * 40503)) % 1000) / 1000;   // 0..1 stable
+  return 0.8 + h * 0.4;   // 0.8x .. 1.2x
+}
+function cargoUsed() { let n = 0; for (const k in player.cargo) n += player.cargo[k]; return n; }
+// Endless Sky economy UI: real per-system commodity prices, and shipyard/outfitter buying/selling
+// through esEconomy. Renders into the same service panel the EV path uses.
+function esOpenService(kind, spob) {
+  const sysId = curSystem ? curSystem.id : (spob && spob._systemId);
+  const body = $("svcBody"); const setCredits = () => { esSyncCredits(); const c = $("svcCredits"); if (c) c.textContent = esStore.get("credits").toLocaleString(); };
+  setCredits();
+  const esc = (s) => escapeHtml(s);
+  if (kind === "Commodity Exchange") {
+    $("svcTitle").textContent = "Commodity Exchange — " + (spob.name || "");
+    const list = esEcon.commodityList(sysId);
+    body.innerHTML = `<div style="color:var(--dim);font-size:12px;margin-bottom:8px">Cargo: ${esEcon.cargoUsed()}/${esEcon.cargoSpace()} tons</div>` +
+      list.map((c) => `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${esc(c.name)}</span><span style="color:#7d7">${c.price} cr</span>
+        <span style="color:var(--dim);width:52px;text-align:right">${c.have} t</span>
+        <button class="btn" data-b="${esc(c.name)}" style="font-size:11px">Buy</button>
+        <button class="btn" data-s="${esc(c.name)}" ${c.have ? "" : "disabled"} style="font-size:11px">Sell</button></div>`).join("");
+    body.querySelectorAll("[data-b]").forEach((b) => b.onclick = () => { const r = esEcon.buy(b.dataset.b, 1, sysId); if (!r.ok) toast(r.why); esOpenService(kind, spob); });
+    body.querySelectorAll("[data-s]").forEach((b) => b.onclick = () => { esEcon.sell(b.dataset.s, 1, sysId); esOpenService(kind, spob); });
+  } else if (kind === "Outfit Ship") {
+    $("svcTitle").textContent = "Outfitter — " + (spob.name || "");
+    const list = esEcon.outfitsForSale(spob);
+    const f = esEcon.flagship();
+    body.innerHTML = `<div style="color:var(--dim);font-size:12px;margin-bottom:8px">Outfit space free: ${esEcon.outfitSpaceFree()} · speed ${f.speed} · turn ${f.maneuver}</div>` +
+      (list.length ? list.map((o) => { const owned = f.outfits[o.name] || 0; const cost = +o.cost || 0;
+        return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${esc(o.name)}${owned ? ` <span style='color:#9cf'>×${owned}</span>` : ""}</span>
+        <span style="color:#7d7">${cost.toLocaleString()} cr</span>
+        <button class="btn" data-ob="${esc(o.name)}" style="font-size:11px">Buy</button>
+        <button class="btn" data-os="${esc(o.name)}" ${owned ? "" : "disabled"} style="font-size:11px">Sell</button></div>`; }).join("")
+        : "<div style='color:var(--dim)'>Nothing for sale here.</div>");
+    body.querySelectorAll("[data-ob]").forEach((b) => b.onclick = () => { const r = esEcon.buyOutfit(b.dataset.ob); if (!r.ok) toast(r.why); else toast("Installed " + b.dataset.ob); esOpenService(kind, spob); });
+    body.querySelectorAll("[data-os]").forEach((b) => b.onclick = () => { esEcon.sellOutfit(b.dataset.os); esOpenService(kind, spob); });
+  } else if (kind === "Shipyard") {
+    $("svcTitle").textContent = "Shipyard — " + (spob.name || "");
+    const list = esEcon.shipsForSale(spob);
+    body.innerHTML = list.length ? list.map((s) => `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${esc(s.name)}${esEcon.flagship() && esEcon.flagship().name === s.name ? " <span style='color:#9cf'>(current)</span>" : ""}</span>
+        <span style="color:var(--dim);font-size:11px">shd ${s.shield || 0} · arm ${s.armor || 0}</span>
+        <span style="color:#7d7">${(+s.cost || 0).toLocaleString()} cr</span>
+        <button class="btn" data-sb="${esc(s.name)}" style="font-size:11px">Buy</button></div>`).join("")
+      : "<div style='color:var(--dim)'>No ships for sale here.</div>";
+    body.querySelectorAll("[data-sb]").forEach((b) => b.onclick = () => { const r = esEcon.buyShip(b.dataset.sb); if (!r.ok) toast(r.why); else { const rec = uni.shipByName[b.dataset.sb]; if (rec) { curShip = rec; try { trySetShipSprite(curShip); } catch (e) {} } } esOpenService(kind, spob); });
+  } else { $("svcTitle").textContent = kind; body.innerHTML = `<div style="color:var(--dim)">The ${esc(kind)} isn't interactive yet.</div>`; }
+  $("svcPanel").classList.remove("hide");
+}
+
+function openService(kind, spob) {
+  if (esEcon) { esOpenService(kind, spob); return; }
+  $("svcCredits").textContent = credits.toLocaleString();
+  const body = $("svcBody");
+  if (kind === "Commodity Exchange") {
+    $("svcTitle").textContent = "Commodity Exchange — " + (spob.name || "");
+    const list = Object.values(uni.commodities || {});
+    if (!list.length) { body.innerHTML = "<div style='color:var(--dim)'>No commodity data in this scenario.</div>"; }
+    else body.innerHTML = `<div style="color:var(--dim);font-size:12px;margin-bottom:8px">Cargo: ${cargoUsed()}/${player.cargoHold} tons</div>` + list.map((c) => {
+      const price = Math.round((c.basePrice || 100) * priceFactor(spob.id, c.id));
+      const have = player.cargo[c.id] || 0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${escapeHtml(c.name || "Commodity " + c.id)}</span>
+        <span style="color:#7d7">${price} cr</span>
+        <span style="color:var(--dim);width:52px;text-align:right">${have} t</span>
+        <button class="btn" data-buy="${c.id}" data-price="${price}" style="font-size:11px">Buy</button>
+        <button class="btn" data-sell="${c.id}" data-price="${price}" ${have ? "" : "disabled"} style="font-size:11px">Sell</button>
+      </div>`;
+    }).join("");
+    body.querySelectorAll("[data-buy]").forEach((b) => b.onclick = () => tradeBuy(+b.dataset.buy, +b.dataset.price, spob, kind));
+    body.querySelectorAll("[data-sell]").forEach((b) => b.onclick = () => tradeSell(+b.dataset.sell, +b.dataset.price, spob, kind));
+  } else if (kind === "Outfit Ship") {
+    $("svcTitle").textContent = "Outfitter — " + (spob.name || "");
+    const list = Object.values(uni.outfits || {}).slice(0, 40);
+    if (!list.length) { body.innerHTML = "<div style='color:var(--dim)'>No outfit data in this scenario.</div>"; }
+    else body.innerHTML = list.map((o) => {
+      const owned = player.outfits[o.id] || 0;
+      const price = (o.cost && o.sellable) ? o.cost : 10000;   // nominal until cost field is pinned
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${escapeHtml(o.name || "Outfit " + o.id)}${owned ? ` <span style='color:#9cf'>×${owned}</span>` : ""}</span>
+        <span style="color:#7d7">${price.toLocaleString()} cr${(o.cost && o.sellable) ? "" : "*"}</span>
+        <button class="btn" data-obuy="${o.id}" data-cost="${price}" style="font-size:11px">Buy</button>
+        <button class="btn" data-osell="${o.id}" data-cost="${price}" ${owned ? "" : "disabled"} style="font-size:11px">Sell</button>
+      </div>`;
+    }).join("") + `<div style="color:var(--dim);font-size:11px;margin-top:8px">* nominal price — outfit Cost field not yet pinned to real data</div>`;
+    body.querySelectorAll("[data-obuy]").forEach((b) => b.onclick = () => outfitBuy(+b.dataset.obuy, +b.dataset.cost, spob, kind));
+    body.querySelectorAll("[data-osell]").forEach((b) => b.onclick = () => outfitSell(+b.dataset.osell, +b.dataset.cost, spob, kind));
+  } else if (kind === "Shipyard") {
+    $("svcTitle").textContent = "Shipyard — " + (spob.name || "");
+    const list = (uni.ships || []).slice(0, 30);
+    body.innerHTML = list.map((s) => {
+      const price = (s.holds ? s.holds * 1000 : 0) + (s.shield || 0) * 200 + (s.armor || 0) * 200 + 20000;   // synthesized (EV ship cost field varies)
+      return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--edge)">
+        <span style="flex:1">${escapeHtml(s.name || "Ship " + s.id)}${curShip && curShip.id === s.id ? " <span style='color:#9cf'>(current)</span>" : ""}</span>
+        <span style="color:var(--dim);font-size:11px">shield ${s.shield || 0} · armor ${s.armor || 0}</span>
+        <span style="color:#7d7">${price.toLocaleString()} cr</span>
+        <button class="btn" data-shipbuy="${s.id}" data-price="${price}" ${curShip && curShip.id === s.id ? "disabled" : ""} style="font-size:11px">Buy</button>
+      </div>`;
+    }).join("");
+    body.querySelectorAll("[data-shipbuy]").forEach((b) => b.onclick = () => shipBuy(+b.dataset.shipbuy, +b.dataset.price, spob, kind));
+  } else {
+    $("svcTitle").textContent = kind;
+    body.innerHTML = `<div style="color:var(--dim)">The ${escapeHtml(kind)} isn't interactive yet.</div>`;
+  }
+  $("svcPanel").classList.remove("hide");
+}
+function tradeBuy(id, price, spob, kind) {
+  if (cargoUsed() >= player.cargoHold) { toast("Cargo hold full"); return; }
+  if (credits < price) { toast("Not enough credits"); return; }
+  credits -= price; player.cargo[id] = (player.cargo[id] || 0) + 1; openService(kind, spob);
+}
+function tradeSell(id, price, spob, kind) {
+  if (!(player.cargo[id] > 0)) return;
+  credits += price; player.cargo[id]--; if (!player.cargo[id]) delete player.cargo[id]; openService(kind, spob);
+}
+function outfitBuy(id, cost, spob, kind) {
+  if (credits < cost) { toast("Not enough credits"); return; }
+  credits -= cost; player.outfits[id] = (player.outfits[id] || 0) + 1; toast("Installed " + (uni.outfits[id] && uni.outfits[id].name || "outfit")); openService(kind, spob);
+}
+function outfitSell(id, cost, spob, kind) {
+  if (!(player.outfits[id] > 0)) return;
+  credits += Math.round(cost * 0.75); player.outfits[id]--; if (!player.outfits[id]) delete player.outfits[id]; openService(kind, spob);
+}
+function shipBuy(id, price, spob, kind) {
+  if (credits < price) { toast("Not enough credits"); return; }
+  const s = (uni.ships || []).find((x) => x.id === id); if (!s) return;
+  credits -= price; curShip = s; player.outfits = {};   // new hull, fresh
+  toast("Purchased " + (s.name || "ship")); openService(kind, spob);
+}
+$("svcClose").onclick = () => $("svcPanel").classList.add("hide");
+const bits = new ControlBits();   // control-bit state for mission gating/branching
+// Fold in missions authored in the Mission Creator (stored locally by that page).
+// They live in author-space ids and merge into uni.missions so the bar / computer
+// offers them exactly like TC missions — a self-authored campaign, play-tested live.
+// Endless Sky mission/event runner (built lazily when ES data is loaded). Kept separate from the EV
+// `missions` object above; the landing/bar/arrival sites prefer it when uni.source === "endless-sky".
+let esRun = null, esStore = null, esEcon = null, esFleetsMod = null, esDateMod = null, esVoiceMod = null, esAcctMod = null;
+let esStart = null, esAccount = null, esClockPrimed = false;
+let esConvMod = null, esSubsMod = null, esSubsList = null;
+async function initEsRunner() {
+  try {
+    if (!uni || uni.source !== "endless-sky") { esRun = null; esEcon = null; esFleetsMod = null; return; }
+    const [{ createConditionStore }, { createEsMissionRunner }, { createEconomy, makeFlagship }, fleetsMod, dateMod, voiceMod] = await Promise.all([
+      import("./ev/esConditions.js"), import("./ev/esMissions.js"), import("./ev/esEconomy.js"), import("./ev/esFleets.js"), import("./ev/esDate.js"), import("./ev/esVoice.js")]);
+    esFleetsMod = fleetsMod; esDateMod = dateMod; esVoiceMod = voiceMod;
+    esAcctMod = await import("./ev/esAccount.js");
+    esConvMod = await import("./ev/esConversation.js");
+    esPhraseMod = await import("./ev/esPhrase.js");
+    esSubsMod = await import("./ev/esSubs.js");
+    esSubsList = uni.substitutions || [];
+    const start = esPickStart(uni);
+    const flag = curShip ? makeFlagship(uni.shipByName && uni.shipByName[curShip.name] ? uni.shipByName[curShip.name] : curShip) : null;
+    // v2176 -- the start says where and when. `date 16 11 3013` is data, not a constant we chose; the
+    // hardcoded fallback in esDate.js is only for a universe with no `start` blocks at all.
+    const d0 = start && start.date ? dateMod.makeDate(start.date.year, start.date.month, start.date.day) : dateMod.startDate();
+    const esPlayer = { conditions: {}, credits: start ? start.account.credits : (typeof credits === "number" ? credits : 0), reputation: {},
+      visitedSystems: new Set(), visitedPlanets: new Set(), licenses: new Set(), cargo: {},
+      system: curSystem ? curSystem.id : null, ship: flag, fleet: flag ? [flag] : [],
+      date: d0, startEpochDay: d0.epochDay };
+    esStore = createConditionStore(esPlayer, uni);
+    esRun = createEsMissionRunner(uni, esStore, { toast: (typeof toast === "function" ? toast : () => {}),
+      onConversation: (name, node, ctx) => esPlayConversation(name, node, ctx),
+      onOffer: (o, settle) => esPresentOffer(o, settle) });
+    esEcon = createEconomy(uni, esStore, esPlayer, { toast: (typeof toast === "function" ? toast : () => {}) });
+    esApplyStart(start);
+  } catch (e) { console.warn("ES runner init failed", e); esRun = null; esEcon = null; }
+}
+function esSyncCredits() {
+  try { if (esStore) { credits = esStore.get("credits"); const c = $("svcCredits"); if (c) c.textContent = credits.toLocaleString(); } } catch (e) {}
+}
+
+// v2317 -- THE PILOT FILE. gatherPilot() reads the live game state into a save blob; applyPilot() rebuilds
+// it. The ES save state is the condition store's backing esPlayer (conditions/reputation/visited/licenses/
+// cargo/date) plus plain fields (ship, credits, location, account) and the EV ControlBits + mission list.
+function gatherPilot(name) {
+  const esOn = !!(esRun && esStore && uni && uni.source === "endless-sky");
+  const s = {
+    pilotName: name || (curShip && curShip.name) || "Pilot", credits,
+    shipId: curShip && curShip.id != null ? curShip.id : null, shipName: curShip ? curShip.name : null,
+    cargo: { ...player.cargo }, cargoHold: player.cargoHold, outfits: { ...player.outfits },
+    systemId: curSystem ? curSystem.id : null, planetId: landedSpob ? landedSpob.id : null,
+    esActive: esOn, bits: (bits && bits.snapshot) ? bits.snapshot() : [],
+    evActive: (missions && missions.snapshot) ? missions.snapshot() : [],
+  };
+  if (esOn) {
+    const p = esStore.player || {};
+    s.conditions = esStore.snapshot ? esStore.snapshot() : { ...(p.conditions || {}) };
+    s.reputation = { ...(p.reputation || {}) };
+    s.visitedSystems = p.visitedSystems ? [...p.visitedSystems] : [];
+    s.visitedPlanets = p.visitedPlanets ? [...p.visitedPlanets] : [];
+    s.licenses = p.licenses ? [...p.licenses] : [];
+    s.esCargo = { ...(p.cargo || {}) };
+    s.dateEpochDay = p.date ? p.date.epochDay : null;
+    s.account = esAccount ? { credits: esAccount.credits, score: esAccount.score, mortgages: esAccount.mortgages } : null;
+    s.startId = esStart ? esStart.id : null;
+    s.esActiveMissions = (esRun && esRun.snapshotActive) ? esRun.snapshotActive() : [];
+  }
+  return serializePilot(s);
+}
+
+async function applyPilot(blob) {
+  if (!blob || !uni) return false;
+  if (blob.shipName && uni.shipByName && uni.shipByName[blob.shipName]) curShip = uni.shipByName[blob.shipName];
+  else if (blob.shipId != null && uni.ships) { const s = uni.ships.find((x) => x.id === blob.shipId); if (s) curShip = s; }
+  try { if (curShip) trySetShipSprite(curShip); } catch (e) {}
+  credits = blob.credits | 0;
+  player.cargo = { ...(blob.cargo || {}) }; player.cargoHold = blob.cargoHold || 100; player.outfits = { ...(blob.outfits || {}) };
+  if (bits && bits.restore) bits.restore(blob.bits || []);
+  if (missions && missions.restore) missions.restore(blob.evActive || []);
+  if (blob.es && uni.source === "endless-sky") {
+    try {
+      const [{ createConditionStore }, { createEsMissionRunner }, econMod, dateMod, acctMod] = await Promise.all([
+        import("./ev/esConditions.js"), import("./ev/esMissions.js"), import("./ev/esEconomy.js"), import("./ev/esDate.js"), import("./ev/esAccount.js")]);
+      esAcctMod = acctMod; esDateMod = dateMod;
+      const es = blob.es;
+      const flag = curShip ? econMod.makeFlagship(uni.shipByName && uni.shipByName[curShip.name] ? uni.shipByName[curShip.name] : curShip) : null;
+      const date = (es.dateEpochDay != null) ? dateMod.dateFromEpochDay(es.dateEpochDay) : dateMod.startDate();
+      const esPlayer = { conditions: { ...(es.conditions || {}) }, credits, reputation: { ...(es.reputation || {}) },
+        visitedSystems: new Set(es.visitedSystems || []), visitedPlanets: new Set(es.visitedPlanets || []),
+        licenses: new Set(es.licenses || []), cargo: { ...(es.cargo || {}) },
+        system: blob.systemId, ship: flag, fleet: flag ? [flag] : [], date, startEpochDay: date.epochDay };
+      esStore = createConditionStore(esPlayer, uni);
+      esRun = createEsMissionRunner(uni, esStore, { toast: (typeof toast === "function" ? toast : () => {}),
+        onConversation: (n, nd, c) => esPlayConversation(n, nd, c), onOffer: (o, st) => esPresentOffer(o, st) });
+      esEcon = econMod.createEconomy(uni, esStore, esPlayer, { toast: (typeof toast === "function" ? toast : () => {}) });
+      esAccount = es.account ? acctMod.makeAccount(es.account) : acctMod.makeAccount({ credits });
+      esStart = (uni.starts || []).find((x) => x.id === es.startId) || esStart;
+      esStore.set("credits", credits);
+      if (esRun.restoreActive) esRun.restoreActive(es.activeMissions || []);   // rebuild in-flight missions exactly as saved
+    } catch (e) { console.warn("pilot ES restore failed", e); }
+  }
+  esSyncCredits(); try { if (esRun && esRun.date) esDateShow(esRun.date()); } catch (e) {}
+  const sys = blob.systemId != null && uni.systemById ? uni.systemById[blob.systemId] : null;
+  if (sys) {
+    enterSystem(sys);
+    if (blob.planetId != null && uni.spobs && uni.spobs[blob.planetId]) { landingReturn = "system"; landedSpob = uni.spobs[blob.planetId]; enterLanding(uni.spobs[blob.planetId]); }
+  } else { setMode("galaxy"); }
+  toast("Pilot loaded: " + (blob.name || "Pilot"));
+  return true;
+}
+
+// v2323 -- SQLite server sync (best-effort; the SweK server is same-origin on :8787). Cloud pilots survive
+// across devices + browsers; local (browser) pilots are the fallback when the server isn't reachable. Also
+// backs the co-op room registry (register/heartbeat/browse).
+const swek = {
+  async savePilot(name, blob) { try { const r = await fetch("/swek/pilot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, blob }) }); return r.ok; } catch (e) { return false; } },
+  async listPilots() { try { const r = await fetch("/swek/pilots", { cache: "no-store" }); if (!r.ok) return []; return (await r.json()).pilots || []; } catch (e) { return []; } },
+  async loadPilot(name) { try { const r = await fetch("/swek/pilot?name=" + encodeURIComponent(name), { cache: "no-store" }); const j = await r.json(); return j.ok ? j.pilot : null; } catch (e) { return null; } },
+  async deletePilot(name) { try { await fetch("/swek/pilot?name=" + encodeURIComponent(name), { method: "DELETE" }); } catch (e) {} },
+  async registerRoom(id, manifest, meta) { try { await fetch("/swek/room", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ id, manifest }, meta || {})) }); } catch (e) {} },
+  async listRooms() { try { const r = await fetch("/swek/rooms", { cache: "no-store" }); if (!r.ok) return []; return (await r.json()).rooms || []; } catch (e) { return []; } },
+  async submitScore(name, s) { try { await fetch("/swek/score", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ name }, s || {})) }); } catch (e) {} },
+  async leaderboard(by) { try { const r = await fetch("/swek/leaderboard?by=" + (by || "rating") + "&limit=20", { cache: "no-store" }); if (!r.ok) return []; return (await r.json()).leaderboard || []; } catch (e) { return []; } },
+};
+
+async function renderPilotList() {
+  const el = $("pilotList"); if (!el) return;
+  const byName = new Map();
+  for (const p of listPilots()) byName.set(p.name, { name: p.name, credits: p.credits, shipName: p.shipName, local: true, cloud: false });
+  for (const p of await swek.listPilots()) { const e = byName.get(p.name) || { name: p.name, local: false }; e.cloud = true; e.credits = p.credits != null ? p.credits : e.credits; e.shipName = p.shipName || e.shipName; byName.set(p.name, e); }
+  const list = [...byName.values()];
+  if (!list.length) { el.innerHTML = '<div style="color:var(--dim)">No saved pilots yet.</div>'; return; }
+  el.innerHTML = list.map((p) => `<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--edge)">`
+    + `<div><b>${escapeHtml(p.name || "Pilot")}</b>${p.cloud ? ' <span title="saved on server" style="color:#9cf">\u2601</span>' : ""}<div style="color:var(--dim);font-size:10px">${(p.credits || 0).toLocaleString()} cr${p.shipName ? " \u00b7 " + escapeHtml(p.shipName) : ""}</div></div>`
+    + `<div class="row" style="gap:4px"><button class="btn" data-load="${escapeHtml(p.name || "")}">Load</button><button class="btn" data-del="${escapeHtml(p.name || "")}">\u2715</button></div></div>`).join("");
+  el.querySelectorAll("[data-load]").forEach((b) => b.onclick = async () => { let blob = loadPilot(b.dataset.load) || await swek.loadPilot(b.dataset.load); if (blob) { $("pilotPanel").classList.add("hide"); await applyPilot(blob); } else toast("Couldn't read that pilot"); });
+  el.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => { deletePilot(b.dataset.del); await swek.deletePilot(b.dataset.del); renderPilotList(); });
+}
+$("pilotBtn").onclick = () => { const p = $("pilotPanel"); p.classList.toggle("hide"); if (!p.classList.contains("hide")) { const n = $("pilotName"); if (n && !n.value) n.value = (curShip && curShip.name) || "Pilot"; renderPilotList(); } };
+$("pilotSave").onclick = async () => { const name = ($("pilotName").value || "Pilot").trim() || "Pilot"; const blob = gatherPilot(name); const r = savePilot(name, blob); const cloud = await swek.savePilot(name, blob); swek.submitScore(name, { combatRating: (esStore ? esStore.get("combat rating") : 0) | 0, kills: (esStore ? esStore.get("ships destroyed") : 0) | 0, credits }); toast(r.ok ? ("Pilot saved: " + name + (cloud ? " (local + cloud)" : " (local)")) : "Save failed"); renderPilotList(); };
+
+// v2328 -- the ship's computer: ask the GPU Brain over a local RAG index of this universe's own text.
+$("computerBtn").onclick = () => { $("computerPanel").classList.toggle("hide"); };
+async function indexCorpus() {
+  if (!uni) { $("indexStat").textContent = "load a universe first"; return; }
+  const docs = [];
+  for (const id in (uni.spobs || {})) { const s = uni.spobs[id]; if (s && s.landDesc && s.landDesc.length > 30) docs.push({ id: "planet:" + (s.name || id), text: (s.name || "") + " \u2014 " + s.landDesc }); }
+  for (const m of (uni.esMissions || [])) { const name = m.tokens && m.tokens[1]; const dn = (m.children || []).find((c) => c.tokens && c.tokens[0] === "description"); const txt = dn && dn.tokens[1]; if (name && txt && txt.length > 20) docs.push({ id: "mission:" + name, text: name + " \u2014 " + txt }); }
+  if (!docs.length) { $("indexStat").textContent = "no indexable text found"; return; }
+  $("indexStat").textContent = "indexing " + docs.length + "\u2026";
+  let added = 0;
+  for (let i = 0; i < docs.length; i += 50) {
+    try { const r = await fetch("/swek/rag/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docs: docs.slice(i, i + 50) }) }).then((x) => x.json()); if (r.ok) added += (r.added || 0); } catch (e) { $("indexStat").textContent = "need the :8787 server"; return; }
+    $("indexStat").textContent = "indexed " + added + "/" + docs.length + "\u2026";
+  }
+  $("indexStat").textContent = "indexed " + added + " passages";
+  toast("Ship's computer indexed " + added + " passages");
+}
+async function askComputer() {
+  const q = ($("askInput").value || "").trim(); if (!q) return;
+  const out = $("askAnswer"); out.innerHTML = '<span style="color:var(--dim)">thinking\u2026</span>';
+  try {
+    const r = await fetch("/ai/brain/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q, k: 4 }) }).then((x) => x.json());
+    if (!r.ok) { out.textContent = "computer offline"; return; }
+    let html = r.answer ? `<div style="margin-bottom:6px">${escapeHtml(r.answer)}</div>` : '<div style="color:var(--warn);margin-bottom:6px">No LLM reached &mdash; here\'s what I found:</div>';
+    if (r.sources && r.sources.length) html += '<div style="color:var(--dim);font-size:10px">sources: ' + r.sources.map((s) => escapeHtml(String(s.id || "").replace(/^(planet|mission):/, ""))).join(", ") + '</div>';
+    out.innerHTML = html || '<span style="color:var(--dim)">nothing on record</span>';
+  } catch (e) { out.textContent = "couldn't reach the computer (need the :8787 server)"; }
+}
+$("indexBtn").onclick = indexCorpus;
+$("askBtn").onclick = askComputer;
+$("askInput").onkeydown = (e) => { if (e.key === "Enter") askComputer(); };
+// ES ship mix for a system: ambient traffic (from the system's `fleet` refs) plus any accepted mission's
+// NPCs that spawn here. Fed to flightView via opts.spawn. Returns combat-entity ships.
+// v2172 -- `ctx` carries the co-op seed and our peer id. Two kinds of ship come out of here and they are
+// owned differently:
+//   AMBIENT traffic is deterministic from (room, system) once it is given ctx.rnd, so every pilot in the
+//     room spawns the identical mix and it goes on the rendezvous ring: exactly one peer simulates each.
+//   MISSION npcs and PERSONS depend on state only THIS player has (which mission is accepted, which
+//     unique captain this player has already killed), so nobody else can spawn or fly them. They get a
+//     private wing id and are replicated to the other pilots as ghosts.
+// Before v2172 ctx.rnd did not exist here: ambient rolled Math.random on every client and handed out ids
+// 1..n, so two pilots spawned different ships with identical ids and the ring split them apart.
+function esSpawn(system, around, speedScale, ctx = {}) {
+  const out = [];
+  const rng = ctx.rnd;   // undefined when solo -> esFleets falls back to Math.random, as before
+  try { if (esFleetsMod && system) for (const s of esFleetsMod.spawnAmbient(system, uni, around, { speedScale, minR: 1100, spread: 900, rng })) out.push(s); } catch (e) {}
+
+  // Mission npcs and persons each number themselves from 1, so they get DIFFERENT tags -- one shared
+  // prefix would collide "peer:m1" with "peer:m1" and the two would fight over one identity.
+  const missionNpcs = [], personShips = [];
+  try { if (esRun && system) for (const s of esRun.onSystemEnter(system.id, around, { speedScale, minR: 1200, spread: 700 })) missionNpcs.push(s); } catch (e) {}
+  try {
+    if (esFleetsMod && esFleetsMod.spawnPersons && system) {
+      const ps = esFleetsMod.spawnPersons(system, uni, around, { speedScale, minR: 1200, spread: 600, rng, isDestroyed: esPersonDestroyed });
+      if (ps.length) { try { toast("Contact: " + ps[0]._person); } catch (e) {} }
+      for (const s of ps) personShips.push(s);
+    }
+  } catch (e) {}
+  if (ctx.me) { try { namespaceWing(missionNpcs, ctx.me, "m"); namespaceWing(personShips, ctx.me, "p"); } catch (e) {} }
+  return out.concat(missionNpcs, personShips);
+}
+
+// A person, once destroyed, never comes back -- and that is per-player state, so it lives in the same
+// condition store missions gate on. The key is OURS (ES tracks it in the pilot save, not in conditions),
+// so it is namespaced to make that obvious to anyone reading a saved store.
+const esPersonKey = (name) => "swek: person destroyed: " + name;
+function esPersonDestroyed(name) { try { return esStore ? esStore.get(esPersonKey(name)) > 0 : false; } catch (e) { return false; } }
+function esNotePersonKill(entity) {
+  if (!entity || !entity._person || !esStore) return;
+  try { esStore.set(esPersonKey(entity._person), 1); toast(entity._person + " destroyed."); } catch (e) {}
+}
+
+function mergeAuthoredMissions() {
+  try {
+    if (!uni) return;
+    const raw = localStorage.getItem("__evAuthoredMissions");
+    if (!raw) return;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || !list.length) return;
+    uni.missions = uni.missions || {};
+    let n = 0;
+    for (const m of list) {
+      if (m && m.id != null) { uni.missions[m.id] = Object.assign({ compMessage: "", altSets: [] }, m); n++; }
+    }
+    if (n) toast(n + " authored mission(s) loaded");
+  } catch (e) { console.warn("authored missions", e); }
+}
+// Authored briefing text (dësc) authored in the creator, keyed by dësc id.
+let authoredDescs = {};
+function loadAuthoredDescs() {
+  try { authoredDescs = JSON.parse(localStorage.getItem("__evAuthoredDescs") || "{}") || {}; } catch (e) { authoredDescs = {}; }
+}
+function initControlBits() {  bits.reset();
+  try {
+    if (!rf) return;
+    // starting bits from the first chär (pilot start) resource
+    const chars = rf.list(CHAR) || [];
+    if (chars.length) { const c = parseChar(rf.get(CHAR, chars[0].id)); bits.initFromString(c.startBits); }
+  } catch (e) { console.warn("control bits init", e); }
+}
+
+// --- Sound effects: decode EV 'snd ' resources and play them on combat events.
+//     Uses WebAudio; sounds are decoded lazily + cached. Generic fire/explosion
+//     sounds are picked from the loaded snd resources (weapon-specific snd ids
+//     can be wired once parseWeap exposes them).
+const sfx = (() => {
+  let ctx = null, enabled = true, master = 0.5;
+  const cache = new Map();     // snd id -> AudioBuffer (or null if undecodable)
+  let sndIds = null, pick = { fire: null, explosion: null, impact: null };
+  function ac() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } return ctx; }
+  function ids() {
+    if (sndIds) return sndIds;
+    sndIds = [];
+    try { if (rf) sndIds = (rf.list("snd ") || []).map((m) => m.id); } catch (e) {}
+    // choose stable generic sounds: earliest ids tend to be UI/weapon in EV
+    if (sndIds.length) { pick.fire = sndIds[0]; pick.impact = sndIds[Math.min(1, sndIds.length - 1)]; pick.explosion = sndIds[Math.min(2, sndIds.length - 1)]; }
+    return sndIds;
+  }
+  async function buffer(id) {
+    if (id == null) return null;
+    if (cache.has(id)) return cache.get(id);
+    let buf = null;
+    try {
+      const bytes = rf && rf.get("snd ", id);
+      if (bytes) {
+        const { decodeSND, sndToAudioBuffer } = await import("./ev/snd.js");
+        const dec = decodeSND(bytes);
+        if (dec.ok && ac()) buf = sndToAudioBuffer(ctx, dec);
+      }
+    } catch (e) { console.warn("snd decode", id, e); }
+    cache.set(id, buf); return buf;
+  }
+  async function play(kind) {
+    if (!enabled || !rf) return;
+    ids();
+    const id = pick[kind] != null ? pick[kind] : pick.fire;
+    const buf = await buffer(id);
+    if (!buf || !ac()) return;
+    if (ctx.state === "suspended") { try { await ctx.resume(); } catch (e) {} }
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const g = ctx.createGain(); g.gain.value = master * (kind === "explosion" ? 1 : kind === "impact" ? 0.5 : 0.7);
+    src.connect(g); g.connect(ctx.destination); src.start();
+  }
+  return {
+    play,
+    setEnabled: (v) => { enabled = v; },
+    setVolume: (v) => { master = v; },
+    reset: () => { cache.clear(); sndIds = null; pick = { fire: null, explosion: null, impact: null }; },
+    available: () => { try { return rf ? (rf.list("snd ") || []).length : 0; } catch (e) { return 0; } },
+  };
+})();
+$("mpMode").onchange = () => { const m = $("mpMode").value; $("mpUrl").classList.toggle("hide", m !== "http" && m !== "p2p"); $("mpSbUrl").classList.toggle("hide", m !== "supabase"); $("mpSbKey").classList.toggle("hide", m !== "supabase"); };
+$("mpMode").onchange();
+$("mpConnect").onclick = () => {
+  if (net) net.close();
+  myCallsign = ($("mpName").value || "").trim() || ("Pilot-" + myId.slice(1, 5));
+  const mode = $("mpMode").value;
+  const mgr = new PresenceManager(myId);
+  let tr;
+  if (mode === "p2p") { const url = ($("mpUrl").value || "").trim(); if (!url) { $("mpStatus").textContent = "enter a rendezvous URL for P2P signaling"; return; } tr = p2pTransport(url.replace(/\/+$/, ""), roomId(), myId, { name: myCallsign }); }
+  else if (mode === "http") { const url = ($("mpUrl").value || "").trim(); if (!url) { $("mpStatus").textContent = "enter a rendezvous URL"; return; } tr = httpPresenceTransport(url.replace(/\/+$/, ""), roomId(), myId); }
+  else if (mode === "supabase") { const su = ($("mpSbUrl").value || "").trim(), sk = ($("mpSbKey").value || "").trim(); if (!su || !sk) { $("mpStatus").textContent = "enter Supabase project URL + key"; return; } tr = supabaseTransport(su, sk, roomId(), myId, { onError: (e) => { $("mpStatus").textContent = "Supabase error: " + ((e && e.message) || e); } }); }
+  else { tr = broadcastTransport(roomId()); }
+  net = makeNet(mgr, tr);
+  mpTr = tr; mpMgr = mgr;
+  tr.onMessage((m) => { mgr.applyMessage(m); onChat(m); onRoomMsg(m); });   // makeNet wired presence; re-wire to ALSO catch chat + room mod
+  $("qChat").classList.remove("hide"); fillChatTargets();
+  if (mode === "p2p" || mode === "http") { combatUrl = ($("mpUrl").value || "").trim().replace(/\/+$/, ""); combatRoom = roomId(); combatSeq = 0; startCombatPoll(); }
+  $("mpStatus").textContent = "online \u00b7 " + tr.kind + " \u00b7 room " + roomId() + " \u00b7 " + myCallsign;
+  try { const man = myPluginManifest(); const fp = roomPlugins.manifestFingerprint(man); mpTr.send({ type: "manifest", from: myId, fp, manifest: man }); swek.registerRoom(roomId(), man, { fingerprint: fp, host: myCallsign, players: 1 }); } catch (e) {}   // advertise my mod + register the room
+  if (roomHeartbeat) clearInterval(roomHeartbeat);
+  roomHeartbeat = setInterval(() => { try { const man = myPluginManifest(); swek.registerRoom(roomId(), man, { fingerprint: roomPlugins.manifestFingerprint(man), host: myCallsign, players: (mpMgr && mpMgr.peers ? mpMgr.peers.size + 1 : 1) }); } catch (e) {} }, 30000);
+  $("mpBtn").textContent = "Multiplayer \u25cf";
+};
+$("mpDisc").onclick = () => { if (net) { net.close(); net = null; } mpTr = null; mpMgr = null; if (roomHeartbeat) { clearInterval(roomHeartbeat); roomHeartbeat = null; } stopCombatPoll(); combatUrl = null; $("qChat").classList.add("hide"); $("mpStatus").textContent = "offline"; $("mpBtn").textContent = "Multiplayer"; const rm = $("roomMod"); if (rm) rm.classList.add("hide"); };
+
+// v2322 -- ROOM MOD MANIFEST. A room advertises the plugins it's running; a joiner diffs against their own
+// and, if the room uses art/data they lack, is ASKED before anything streams in. Art roots register LIVE
+// (no reload); data plugins need a rebuild to apply. URLs are allowlisted (esRoomPlugins), so a room can't
+// point you at an arbitrary host.
+function myPluginManifest() { try { return roomPlugins.manifestFromImageBases(window.ES_PLUGIN_IMAGE_BASES || []); } catch (e) { return []; } }
+const _roomModSeen = new Set();
+function onRoomMsg(m) {
+  if (!m || m.type !== "manifest" || m.from === myId) return;
+  const d = roomPlugins.diffManifest(myPluginManifest(), m.manifest || []);
+  if (d.match || !d.missing.length) return;
+  const fp = m.fp || roomPlugins.manifestFingerprint(m.manifest || []);
+  if (_roomModSeen.has(fp)) return; _roomModSeen.add(fp);   // ask once per distinct room mod
+  const el = $("roomMod"); if (!el) return;
+  const artN = roomPlugins.imageRootsOf(d.missing).length, dataN = roomPlugins.dataUrlsOf(d.missing).length;
+  el.classList.remove("hide");
+  el.innerHTML = `<div style="color:var(--warn);margin-bottom:5px">This room runs ${d.missing.length} plugin(s) you don't have`
+    + `<div style="color:var(--dim);font-size:10px">${d.missing.map((p) => escapeHtml(p.name)).join(", ")}</div></div>`
+    + (artN ? `<button class="btn" id="roomModArt">Load art (${artN})</button> ` : "")
+    + (dataN ? `<button class="btn" id="roomModData" title="fetch + merge the room's data plugins and rebuild the universe">Load mod (${dataN})</button> ` : "")
+    + `<button class="btn" id="roomModNo" style="margin-top:5px">No thanks</button>`;
+  const missing = d.missing;
+  const ab = $("roomModArt"); if (ab) ab.onclick = async () => { await installRoomArt(missing); el.classList.add("hide"); };
+  const db2 = $("roomModData"); if (db2) db2.onclick = async () => { el.classList.add("hide"); await installRoomData(missing); };
+  const nb = $("roomModNo"); if (nb) nb.onclick = () => el.classList.add("hide");
+}
+async function installRoomArt(missing) {
+  try {
+    const roots = roomPlugins.imageRootsOf(missing); if (!roots.length) return;
+    const existing = window.ES_PLUGIN_IMAGE_BASES || [];
+    const merged = existing.concat(roots.filter((r) => !existing.includes(r)));
+    window.ES_PLUGIN_IMAGE_BASES = merged;
+    const m = await import("./ev/esSprites.js");
+    if (m.setEsPluginImageBases) m.setEsPluginImageBases(merged);
+    if (m.esClearSpriteCache) m.esClearSpriteCache();   // re-resolve ships against the new roots
+    toast(`Loaded ${roots.length} room art root(s) — plugin ships now render`);
+  } catch (e) { toast("Couldn't load room art"); }
+}
+// v2323 -- DATA plugin auto-install: fetch the room's data plugin(s) from allowlisted hosts, merge them with
+// the cached data set, and rebuild the universe through the same loadFiles() path a manual install uses.
+async function installRoomData(missing) {
+  try {
+    const urls = roomPlugins.dataUrlsOf(missing).filter((u) => roomPlugins.isAllowedUrl(u));
+    if (!urls.length) return;
+    toast(`Fetching ${urls.length} room data plugin(s)\u2026`);
+    const pluginFiles = [];
+    for (const url of urls) {
+      try { const txt = await fetch(url).then((r) => (r.ok ? r.text() : null)); if (txt) pluginFiles.push(new File([txt], "roomplugin-" + pluginFiles.length + ".txt", { type: "text/plain" })); } catch (e) {}
+    }
+    if (!pluginFiles.length) { toast("Couldn't fetch room data plugins"); return; }
+    const rec = await evCacheLoad();
+    const base = rec && rec.files ? rec.files.map((r) => new File([r.bytes], r.name)) : [];
+    await loadFiles(base.concat(pluginFiles));   // rebuilds the universe + re-caches with the plugin merged
+    toast(`Room mod installed \u2014 universe rebuilt with ${pluginFiles.length} plugin file(s)`);
+  } catch (e) { toast("Room data merge failed"); }
+}
+$("mpLeaders").onclick = async () => {
+  const el = $("roomMod"); if (!el) return;
+  const lb = await swek.leaderboard("rating");
+  el.classList.remove("hide");
+  if (!lb.length) { el.innerHTML = '<div style="color:var(--dim)">No scores yet \u2014 save a pilot to submit yours.</div>'; return; }
+  el.innerHTML = '<div style="color:#fff;margin-bottom:5px">Leaderboard \u2014 combat rating</div>' + lb.map((r, i) =>
+    `<div class="row" style="justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--edge)"><span>${i + 1}. <b>${escapeHtml(r.name)}</b></span><span style="color:var(--dim);font-size:10px">${r.combatRating} \u00b7 ${r.kills}k \u00b7 ${(r.credits || 0).toLocaleString()}cr</span></div>`).join("");
+};
+$("mpRooms").onclick = async () => {
+  const el = $("roomMod"); if (!el) return;
+  const rooms = await swek.listRooms();
+  el.classList.remove("hide");
+  if (!rooms.length) { el.innerHTML = '<div style="color:var(--dim)">No active rooms on the server (or no server).</div>'; return; }
+  el.innerHTML = '<div style="color:#fff;margin-bottom:5px">Active rooms</div>' + rooms.map((r) => {
+    const mods = (r.manifest && r.manifest.length) ? r.manifest.map((p) => escapeHtml(p.name)).join(", ") : "base game";
+    const mine = r.id === roomId();
+    return `<div style="padding:4px 0;border-bottom:1px solid var(--edge)"><b>${escapeHtml(r.id)}</b>${mine ? ' <span style="color:#7d7">(yours)</span>' : ""} <span style="color:var(--dim);font-size:10px">${r.players || 1} pilot(s) \u00b7 ${escapeHtml(r.host || "?")}</span><div style="color:var(--dim);font-size:10px">mod: ${mods}</div></div>`;
+  }).join("");
+};
+  $("hudClear").onclick = () => { const k = fv.clearRecord(); toast(k ? ("Record cleared - " + k + " government(s) stand down") : "Your record is already clean"); };
+  function showCheckReport() {
+    if (!uni) return;
+    const r = runEvChecks(uni), col = { pass: "#7fe0b0", warn: "#ffcf7a", fail: "#ff8a8a" }, esc = (x) => (x || "").replace(/[<>&]/g, "");
+    const rows = r.checks.map((c) => '<div style="display:flex;gap:8px;align-items:baseline;margin:3px 0"><span style="color:' + col[c.level] + ';width:38px;flex:none;font-weight:700;font-size:10.5px">' + c.level.toUpperCase() + '</span><span style="flex:1">' + esc(c.name) + '</span><span style="color:var(--dim);font-size:11.5px;text-align:right">' + esc(c.detail) + '</span></div>').join("");
+    const head = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="color:' + (r.ok ? "#7fe0b0" : "#ff8a8a") + '">Parser check: ' + (r.ok ? "PASS" : "FAIL") + '</b><span style="color:var(--dim);font-size:11.5px">' + r.fails + ' fail \u00b7 ' + r.warns + ' warn</span></div>';
+    const foot = '<div style="margin-top:10px;color:var(--dim);font-size:11px">Low resolve rates usually mean a parser field offset has drifted.<button id="checkClose" style="float:right;background:#13243c;border:1px solid var(--edge);border-radius:6px;color:var(--ink);padding:3px 10px;font:inherit;font-size:11px;cursor:pointer">Close</button></div>';
+    const el = $("checkReport"); el.innerHTML = head + rows + foot; el.classList.remove("hide");
+    $("checkClose").onclick = () => el.classList.add("hide");
+  }
+  $("checkBtn").onclick = showCheckReport;
+  $("inspectBtn").onclick = () => {
+    const el = $("inspectReport");
+    if (!rf || !rf.typeList) { el.innerHTML = "No data loaded."; el.classList.remove("hide"); return; }
+    // EV Nova resource types worth calling out, grouped by role.
+    const ROLE = {
+      "sÿst": "systems (galaxy)", "spöb": "stellar objects", "shïp": "ships", "wëap": "weapons",
+      "oütf": "outfits", "gövt": "governments", "mïsn": "missions", "dûde": "ship groups",
+      "flët": "fleets", "chär": "pilot start", "përs": "persons", "rlëD": "sprites (art)",
+      "shän": "ship animations", "PICT": "pictures", "snd ": "sounds", "spïn": "sprite index",
+      "crön": "background events", "jünk": "commodities", "dësc": "descriptions", "STR#": "string lists",
+    };
+    const types = rf.typeList().map((t) => ({ t, n: (rf.list(t) || []).length })).sort((a, b) => b.n - a.n);
+    const raw = (typeof rf.typeRaw === "function") ? rf.typeRaw() : {};
+    const total = types.reduce((s, x) => s + x.n, 0);
+    const hasSyst = types.some((x) => x.t === "sÿst");
+    // Detect a system-like type that isn't matching (e.g. a byte-variant of sÿst):
+    // starts with 's', ends with 't', with a high middle byte.
+    const systLike = types.filter((x) => x.t !== "sÿst" && /^s..t$/.test(x.t) && (raw[x.t] || "").split(" ")[1] >= "80");
+    // Per-file attribution: for the key data types, which loaded file(s) provide them?
+    const fileTypes = window.__evFileTypes || [];
+    let fileAttr = "";
+    if (fileTypes.length > 1) {
+      const KEY = ["sÿst", "spöb", "shïp", "wëap", "oütf", "gövt", "mïsn"];
+      const present = KEY.filter((k) => types.some((x) => x.t === k));
+      const lines = present.map((k) => {
+        const files = fileTypes.filter((ft) => ft.types.includes(k)).map((ft) => ft.file);
+        return `<tr><td style="padding:1px 10px 1px 0;font-family:monospace">${k}</td><td style="padding:1px 0;color:${files.length?"#9cf":"#f99"}">${files.length ? files.join(", ") : "— not in any loaded file"}</td></tr>`;
+      }).join("");
+      const missing = KEY.filter((k) => !types.some((x) => x.t === k));
+      fileAttr = `<div style="margin-bottom:8px;font-size:12px"><b>Which file has each data type</b> (${fileTypes.length} files loaded):<table style="border-collapse:collapse;margin-top:4px">${lines}</table>`
+        + (missing.length ? `<div style="color:#f99;margin-top:4px">Not present in ANY loaded file: ${missing.join(", ")} — these are in a file you haven't dropped.</div>` : ``)
+        + `</div>`;
+    }
+    const rows = types.map((x) => {
+      const role = ROLE[x.t] || "";
+      const flag = x.t === "sÿst" ? "background:#183a20;color:#8f8" : (["shïp", "spöb", "wëap", "oütf", "gövt", "mïsn"].includes(x.t) ? "background:#1a2436;color:#9cf" : "");
+      return `<tr><td style="padding:2px 10px 2px 0;font-family:monospace;${flag}">${x.t.replace(/[<>&]/g, "?")}</td><td style="padding:2px 10px 2px 0;font-family:monospace;color:var(--dim);font-size:11px">${raw[x.t] || ""}</td><td style="padding:2px 10px 2px 0;text-align:right">${x.n}</td><td style="padding:2px 0;color:var(--dim)">${role}</td></tr>`;
+    }).join("");
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`
+      + `<b>Resource inventory</b> <span style="cursor:pointer;color:var(--dim)" id="inspClose">✕</span></div>`
+      + `<div style="color:var(--dim);margin-bottom:8px">${total} resources · ${types.length} types · ${rf.container}`
+      + (hasSyst ? ` · <span style="color:#8f8">has sÿst ✓ (should be flyable)</span>` : ` · <span style="color:#f99">no sÿst — not a flyable data file</span>`) + `</div>`
+      + (systLike.length ? `<div style="color:#fd8;margin-bottom:8px;font-size:12px">⚠ Possible system-type variant(s): ${systLike.map(x=>`<span style="font-family:monospace">${x.t.replace(/[<>&]/g,"?")}</span> [${raw[x.t]}] ×${x.n}`).join(", ")} — the systems may be under a byte-variant type code.</div>` : ``)
+      + fileAttr
+      + `<table style="border-collapse:collapse"><tr><td style="color:var(--dim);font-size:11px">type</td><td style="color:var(--dim);font-size:11px">bytes</td><td style="color:var(--dim);font-size:11px">count</td><td></td></tr>${rows}</table>`;
+    el.classList.remove("hide");
+    $("inspClose").onclick = () => el.classList.add("hide");
+  };
+  $("voxBtn").onclick = () => {
+    try {
+      const sp = dockSpob || {}, ball = voxelizeBall(7, sp.isStation ? 2.5 : 1.6);
+      const bytes = exportVoxFromKinds(ball.size, ball.size, ball.size, ball.voxels);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+      a.download = ((sp.name || "stellar").replace(/[^a-z0-9_-]+/gi, "_")) + ".vox";
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast("Exported " + a.download + " (" + ball.voxels.length + " voxels)");
+    } catch (e) { toast("vox export failed: " + e.message); }
+  };
+  function fmtCountdown(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+  let grudgeSort = "hot";   // "hot" = most time left first; "soon" = closest to fading first
+  const BLOC_COLORS = ["#62d0c4", "#d8a657", "#c879d8", "#7db86b", "#e58fb0", "#6f9ad8", "#d98f5a", "#a8c84e"];   // per-alliance-bloc row dots
+  function renderGrudges() {
+    const el = $("hudGrudges"); if (!el) return;
+    const list = listGrudges(uni, Date.now(), grudgeSort);
+    if (!list.length) { if (el.innerHTML) el.innerHTML = ""; return; }
+    const sortLabel = grudgeSort === "hot" ? "hottest" : "fading soon";
+    const blocs = grudgeBlocs(uni, list.map((g) => g.id));
+    el.innerHTML = '<div id="grudgeSortBtn" style="color:#fb8;margin-bottom:2px;cursor:pointer;user-select:none" title="click to flip the sort order">grudges \u00b7 ' + sortLabel + ' \u25be</div>' + list.map((g) => {
+      const pct = Math.max(0, Math.min(100, g.msLeft / GRUDGE_TTL_MS * 100)), nm = (g.name || "").replace(/[<>&]/g, "");
+      const dot = BLOC_COLORS[(blocs[g.id] || 0) % BLOC_COLORS.length];
+      return '<div style="display:flex;align-items:center;gap:5px;margin:1px 0">' +
+        '<span style="width:8px;height:8px;border-radius:50%;flex:none;background:' + dot + '" title="alliance bloc"></span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + nm + '">' + nm + '</span>' +
+        '<span style="color:#fb8;font-variant-numeric:tabular-nums">' + fmtCountdown(g.msLeft) + '</span>' +
+        '<span style="width:38px;height:5px;background:#311;border-radius:2px;overflow:hidden;flex:none"><i style="display:block;height:100%;width:' + pct.toFixed(0) + '%;background:linear-gradient(90deg,#f74,#fb8)"></i></span>' +
+        '</div>';
+    }).join("");
+  }
+  $("hudGrudges").addEventListener("click", (e) => { if (e.target && e.target.id === "grudgeSortBtn") { grudgeSort = grudgeSort === "hot" ? "soon" : "hot"; renderGrudges(); } });
+  setInterval(renderGrudges, 500);
+
+// === EV quick canned chat (public broadcast or private whisper to one pilot) ===
+function escc(x){ return String(x==null?"":x).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
+function chatFeed(line, mine){ const f = $("qcFeed"); if (!f) return; const d = document.createElement("div"); d.style.cssText = "margin:1px 0;" + (mine ? "color:#8fd9ff" : "color:#cfe"); d.textContent = line; f.appendChild(d); f.scrollTop = f.scrollHeight; while (f.children.length > 30) f.removeChild(f.firstChild); }
+function onChat(m){ if (!m || m.type !== "chat" || m.from === myId) return; if (m.to && m.to !== myId) return; const name = m.fromName || "pilot"; _chats[m.from] = { text: String(m.text || ""), until: Date.now() + 6000 }; chatFeed((m.to ? "[whisper] " : "") + name + ": " + m.text, false); }
+function positionBubbles(list){ const layer = $("evBubbles"); if (!layer) return; const now = Date.now(), seen = new Set(); (list || []).forEach(pr => { const c = _chats[pr.id]; if (c && c.until > now){ seen.add(pr.id); let b = _bubbles.get(pr.id); if (!b){ b = document.createElement("div"); b.className = "evChatBubble"; layer.appendChild(b); _bubbles.set(pr.id, b); } b.textContent = c.text; b.style.left = pr.sx + "px"; b.style.top = (pr.sy - 30) + "px"; b.style.display = "block"; } }); _bubbles.forEach((b, id) => { if (!seen.has(id)) b.style.display = "none"; });
+  const seenHp = new Set();
+  (list || []).forEach(pr => {
+    if (pr.hp == null) return; seenHp.add(pr.id);
+    let h = _hpbars.get(pr.id);
+    if (!h){ h = document.createElement("div"); h.className = "evHpBar"; h.appendChild(document.createElement("i")); layer.appendChild(h); _hpbars.set(pr.id, h); }
+    const pct = Math.max(0, Math.min(100, pr.hp)), f = h.firstChild;
+    f.style.width = pct + "%"; f.style.background = pct > 55 ? "#4c8" : (pct > 25 ? "#dc5" : "#e55");
+    h.style.left = pr.sx + "px"; h.style.top = (pr.sy - 16) + "px"; h.style.display = "block";
+  });
+  _hpbars.forEach((h, id) => { if (!seenHp.has(id)) h.style.display = "none"; }); }
+function sendChat(text){ if (!mpTr) return; const sel = $("qcTarget"); const to = (sel && sel.value && sel.value !== "all") ? sel.value : null; const pkt = { type: "chat", from: myId, fromName: myCallsign, text: text }; if (to) pkt.to = to; try { mpTr.send(pkt); } catch (e) {} chatFeed("You" + (to ? " (whisper)" : "") + ": " + text, true); }
+function fillChatTargets(){ const sel = $("qcTarget"); if (!sel || !mpMgr) return; const cur = sel.value; let opts = '<option value="all">Public (all)</option>'; const now = Date.now(); for (const pp of mpMgr.peers.values()){ if (now - pp.lastT > 6000) continue; opts += '<option value="' + escc(pp.id) + '">' + escc(pp.name || pp.id) + '</option>'; } sel.innerHTML = opts; if (cur) { try { sel.value = cur; } catch (e) {} } }
+(function(){ const g = $("qcGrid"); if (g){ QCHAT.forEach(line => { const b = document.createElement("button"); b.className = "qcBtn"; b.textContent = line; b.onclick = () => sendChat(line); g.appendChild(b); }); } setInterval(fillChatTargets, 5000); })();
+
+// === Bot combat (Stage 2): broadcast hits on bot ghosts, ingest incoming bot shots ===
+function combatSend(ev){ if (!combatUrl) return; fetch(combatUrl + "/event?room=" + encodeURIComponent(combatRoom), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ events: [ev] }) }).catch(() => {}); }
+function combatHit(botId, ds, da){ combatSend({ type: "hit", target: botId, dmgShield: ds, dmgArmor: da, t: Date.now() }); }
+// v2171 -- a hit on an npc somebody ELSE owns. We never touch its hull; we tell its owner, who does.
+// The event ring is a broadcast bus, so every peer sees this and every peer but the owner drops it
+// (esAuthority.validateDamage recomputes ownership rather than trusting the packet).
+function npcHit(ev){ combatSend(ev); }
+function stopCombatPoll(){ if (combatTimer){ clearInterval(combatTimer); combatTimer = null; } }
+function startCombatPoll(){ stopCombatPoll(); combatTimer = setInterval(async () => {
+    if (!combatUrl) return;
+    try { const r = await fetch(combatUrl + "/event?room=" + encodeURIComponent(combatRoom) + "&since=" + combatSeq); if (!r.ok) return; const j = await r.json(); combatSeq = j.seq || combatSeq;
+        if (fv && fv.isRunning && fv.isRunning()) for (const ev of (j.events || [])) {
+            if (!ev) continue;
+            if (ev.type === "shot" && ev.team === "enemy") fv.ingestShot(ev);
+            else if (ev.type === "npcHit" && ev.from !== myId) fv.ingestDamage(ev);   // v2171 -- inbound damage on our npcs
+        }
+    } catch (e) {}
+}, 250); }
+
+function resizeActive() { if (mode === "galaxy") map && map.resize(); else if (mode === "system") sv && sv.resize(); else if (mode === "flight") fv && fv.resize(); }
+window.addEventListener("resize", resizeActive);
+// Hail nearest ship with C (flight only). Ignored while typing in inputs.
+window.addEventListener("keydown", (e) => {
+  if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+  if ((e.key === "c" || e.key === "C") && mode === "flight") { e.preventDefault(); hailNearest(); }
+  if (e.key === "Escape") $("comms").classList.add("hide");
+});
+requestAnimationFrame(() => map && map.resize());
+
+["dragenter", "dragover"].forEach((ev) => $("stage").addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => $("stage").addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+$("stage").addEventListener("drop", (e) => {
+  const fs = e.dataTransfer.files; if (!fs || !fs.length) return;
+  // Split audio out to the music player; everything else goes to the data loader.
+  const audio = [...fs].filter((f) => /audio|\.mp3$|\.m4a$|\.ogg$|\.wav$/i.test(f.type + " " + f.name));
+  const data = [...fs].filter((f) => !audio.includes(f));
+  if (audio.length) { const n = music.add(audio); $("musicPanel").classList.remove("hide"); if (n) toast(n + " track(s) added — ♪"); }
+  if (data.length) loadFiles(data);
+});
+</script>
+<script type="module">import "./ui/wormholeTransition.js";</script>
+<script type="module">import "./ui/targetScanHud.js";</script>
+
+<!-- v3178 -- THE SUN, DRAGGABLE. v3177 lit the planets as SPHERE IMPOSTORS against a FIXED direction, and a
+     fixed light cannot prove the claim: A STATIC LIT SPHERE AND A STATIC SHADED DISC LOOK THE SAME -- both are
+     bright on one side. The difference is only visible IN MOTION. Drag the dot and watch the boundary: a flat
+     disc's is STRAIGHT and slides across; A SPHERE'S TERMINATOR BOWS, and collapses to a crescent at grazing.
+     THE CONTROL EXISTS TO MAKE THE CLAIM FALSIFIABLE, not to look pretty. -->
+<div id="sunPanel" style="position:fixed;right:10px;bottom:10px;z-index:40;background:rgba(8,14,20,.86);
+     border:1px solid #1e4a5a;border-radius:8px;padding:8px 10px;font-size:11px;color:#9fd7ea;user-select:none">
+  <div style="margin-bottom:5px"><b>&#9728; sun</b> <span id="sunTxt" style="color:#6f9fb4"></span></div>
+  <canvas id="sunPad" width="92" height="92" title="Drag to move the light. Watch a planet's terminator BOW --
+a flat disc's boundary would stay straight." style="border-radius:50%;border:1px solid #2a5f73;cursor:crosshair;display:block"></canvas>
+  <div style="margin-top:5px;color:#6f9fb4">watch the terminator <b>bow</b></div>
+</div>
+<script type="module">
+import { setLightDir, lightDir } from "./ev/flightView.js";
+(function sunPad(){
+  const cv = document.getElementById("sunPad"), txt = document.getElementById("sunTxt");
+  if (!cv || !cv.getContext) return;
+  const g = cv.getContext("2d"), R = cv.width / 2;
+  function paint(){
+    const d = lightDir();
+    g.clearRect(0,0,cv.width,cv.height);
+    g.fillStyle = "#0c1620"; g.beginPath(); g.arc(R,R,R-1,0,Math.PI*2); g.fill();
+    // THE PAD IS THE SPHERE SEEN FROM THE FRONT, so the dot sits where the light does.
+    g.strokeStyle = "#2a5f73"; g.beginPath(); g.arc(R,R,R-1,0,Math.PI*2); g.stroke();
+    const x = R + d[0]*(R-6), y = R - d[1]*(R-6);
+    g.fillStyle = d[2] >= 0 ? "#ffd98a" : "#5a4a20";   // BEHIND is dimmer, and it is a real state, not an error
+    g.beginPath(); g.arc(x,y,5,0,Math.PI*2); g.fill();
+    txt.textContent = d.map(v=>v.toFixed(2)).join(", ") + (d[2] < 0 ? "  (behind)" : "");
+  }
+  function set(ev){
+    const r = cv.getBoundingClientRect();
+    const nx = ((ev.clientX - r.left) / r.width  * 2 - 1);
+    const ny = -((ev.clientY - r.top) / r.height * 2 - 1);
+    const rr = nx*nx + ny*ny;
+    // OUTSIDE THE DISC IS NOT A DIRECTION ON THE FRONT HEMISPHERE. Clamping to the rim gives z = 0, a light
+    // exactly edge-on, which is the honest reading of "dragged past the edge".
+    const k = rr > 1 ? 1/Math.sqrt(rr) : 1;
+    const px = nx*k, py = ny*k;
+    setLightDir(px, py, Math.sqrt(Math.max(0, 1 - px*px - py*py)));
+    paint();
+  }
+  let down = false;
+  cv.addEventListener("pointerdown", e => { down = true; cv.setPointerCapture(e.pointerId); set(e); });
+  cv.addEventListener("pointermove", e => { if (down) set(e); });
+  cv.addEventListener("pointerup",   e => { down = false; try { cv.releasePointerCapture(e.pointerId); } catch {} });
+  paint();
+})();
+</script>
+</body>
+</html>

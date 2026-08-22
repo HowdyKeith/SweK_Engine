@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — WASM sandbox</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  main { max-width:820px; margin:0 auto; padding:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:16px; margin-bottom:14px; }
+  .lead { color:var(--dim); font-size:13px; margin:0 0 12px; }
+  .ex { border:1px solid var(--line); border-radius:10px; padding:11px 13px; margin-bottom:9px; cursor:pointer; background:#0c1410; }
+  .ex.sel { border-color:#2a5a3a; background:#0d1a12; }
+  .ex .nm { font-weight:600; } .ex .d { color:var(--dim); font-size:12px; margin-top:2px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  label { font-size:12px; color:var(--dim); }
+  input[type=number] { width:90px; background:#0c1410; color:var(--ink); border:1px solid var(--line); border-radius:8px; font:13px ui-monospace,monospace; padding:7px 9px; }
+  button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:9px 15px; font:inherit; font-size:13px; cursor:pointer; }
+  button:active { transform:scale(.98); }
+  pre { background:#0c1410; border:1px solid var(--line); border-radius:8px; padding:11px; font:12px ui-monospace,monospace; overflow:auto; margin:10px 0 0; color:#cfe; max-height:220px; }
+  .verdict { font-weight:700; margin-top:11px; padding:8px 11px; border-radius:8px; font-size:13px; }
+  .verdict.ok { background:#0d2218; color:#7fefb0; border:1px solid #1e4a30; }
+  .verdict.kill { background:#2a1e08; color:#ffd27f; border:1px solid #5a4420; }
+  .verdict.no { background:#22100c; color:#ff9b8a; border:1px solid #5a2a1a; }
+  .guarantees { color:var(--dim); font-size:12px; }
+  .guarantees b { color:var(--ink); }
+  code { background:#0c1410; border:1px solid var(--line); border-radius:5px; padding:1px 5px; font-size:11.5px; }
+  #status { font-size:11.5px; color:var(--dim); }
+  details summary { cursor:pointer; color:#9ed5ff; font-size:12px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🛡️</span> WASM sandbox — run untrusted code safely</span>
+    <span style="flex:1"></span>
+    <span id="status">…</span>
+  </header>
+  <main>
+    <div class="card">
+      <p class="lead">Type <b>real JavaScript</b> and run it inside QuickJS-in-WASM — with <b>no access to this machine</b> (no <code>require</code>, <code>fetch</code>, <code>process</code>, or filesystem), a <b>memory limit</b>, and an <b>interrupt timeout</b>. The last expression's value is returned.</p>
+      <textarea id="jsCode" spellcheck="false" style="width:100%;min-height:110px;background:#0c1410;color:#cfe;border:1px solid var(--line);border-radius:8px;font:12.5px ui-monospace,monospace;padding:11px;resize:vertical;">const fib = n =&gt; n &lt; 2 ? n : fib(n-1) + fib(n-2);
+[...Array(12)].map((_,i) =&gt; fib(i)).join(', ');</textarea>
+      <div class="row">
+        <label>timeout ms</label><input id="jsTimeout" type="number" value="1000" />
+        <label>memory MB</label><input id="jsMem" type="number" value="8" />
+        <button id="jsGo">▶ Run JavaScript in sandbox</button>
+        <span id="jsStatus" style="font-size:11.5px;color:var(--dim)"></span>
+      </div>
+      <div id="jsOut"></div>
+      <div style="margin-top:10px"><details><summary>try these (each is safely contained)</summary>
+        <div class="guarantees" style="margin-top:6px">
+          • <code>typeof require</code> / <code>fetch</code> / <code>process</code> → all undefined (no host)<br>
+          • <code>while(true){}</code> → interrupted by the timeout<br>
+          • <code>let a=[];for(;;)a.push(new Array(1e5).fill(0))</code> → stopped by the memory limit<br>
+          • <code>[3,1,2].sort().join()</code> → normal compute returns <code>1,2,3</code>
+        </div></details>
+      </div>
+    </div>
+    <div class="card">
+      <p class="lead">Or run a <b>raw WASM module</b> — the same sandbox one level lower: a wasm binary with only the memory + output capabilities the host grants it. A module that imports anything else can't even instantiate.</p>
+      <div id="examples"></div>
+      <div class="row">
+        <label>input N</label><input id="input" type="number" value="50" />
+        <label>timeout ms</label><input id="timeout" type="number" value="1000" />
+        <label>max pages (×64KB)</label><input id="pages" type="number" value="16" />
+        <button id="go">▶ Run in sandbox</button>
+      </div>
+      <div id="out"></div>
+    </div>
+    <div class="card">
+      <div class="guarantees">
+        <div>What makes this a real sandbox (all verified, not decorative):</div>
+        <div style="margin-top:6px">• <b>No host access</b> — the module only sees <code>emitInt</code> / <code>emitByte</code> + its own capped memory. A module that imports anything else (a network call, a file read) <b>fails to instantiate</b> — it can't acquire a capability the host never handed it.</div>
+        <div style="margin-top:4px">• <b>Time-bounded</b> — an infinite loop can't be interrupted from inside plain WASM, so the module runs in a worker thread the host <b>terminates</b> when the timeout hits. Try the "Infinite loop" example.</div>
+        <div style="margin-top:4px">• <b>Memory-bounded</b> — the memory has a hard maximum, so a module that grows memory forever is stopped by the cap. Try the "Memory bomb" example.</div>
+        <div style="margin-top:8px">To run arbitrary JavaScript or Python this way, you'd drop a language interpreter compiled to WASM (e.g. QuickJS) into this same harness — the isolation model is identical.</div>
+      </div>
+    </div>
+  </main>
+<script>
+  var $ = function(id){ return document.getElementById(id); };
+  var sel = null, EX = [];
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // ---- JavaScript sandbox (QuickJS-in-WASM) ----
+  fetch("/wasm/js/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+    $("jsStatus").textContent = j && j.ok ? (j.engine || "ready") : ("engine error: "+((j&&j.error)||"?"));
+    $("jsStatus").style.color = j && j.ok ? "#7fefb0" : "#ff9b8a";
+  }).catch(function(){ $("jsStatus").textContent = "bridge unreachable"; });
+
+  function runJs(){
+    var code = $("jsCode").value;
+    $("jsOut").innerHTML = "<div class='guarantees' style='margin-top:10px'>running in QuickJS sandbox…</div>";
+    fetch("/wasm/js/run",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ code: code, timeoutMs: parseInt($("jsTimeout").value,10)||1000, memBytes: (parseInt($("jsMem").value,10)||8)*1024*1024 })})
+      .then(function(r){return r.json();}).then(function(j){
+        var html;
+        if (j.killed){ html = "<div class='verdict kill'>⏱ "+esc(j.error||"interrupted by the sandbox")+"</div>"; }
+        else if (!j.ok){ html = "<div class='verdict no'>✗ "+esc(j.error||"failed")+"</div>"; }
+        else {
+          var v = (typeof j.value === "string") ? j.value : JSON.stringify(j.value);
+          html = "<div class='verdict ok'>✓ ran in "+esc(j.ms)+"ms · returned ("+esc(j.type)+")</div><pre>"+esc(v)+"</pre>";
+        }
+        $("jsOut").innerHTML = html;
+      }).catch(function(e){ $("jsOut").innerHTML = "<div class='verdict no'>request failed: "+esc(String(e))+"</div>"; });
+  }
+  $("jsGo").addEventListener("click", runJs);
+
+  // ---- raw WASM module sandbox ----
+  fetch("/wasm/sandbox/status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+    $("status").textContent = j && j.ok ? (j.exampleCount + " examples · worker sandbox ready") : "sandbox error";
+    $("status").style.color = j && j.ok ? "#7fefb0" : "#ff9b8a";
+  }).catch(function(){ $("status").textContent = "bridge unreachable"; });
+
+  fetch("/wasm/sandbox/examples",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+    EX = (j && j.examples) || [];
+    $("examples").innerHTML = EX.map(function(e,i){
+      return '<div class="ex'+(i===0?' sel':'')+'" data-id="'+esc(e.id)+'"><div class="nm">'+esc(e.label)+'</div><div class="d">'+esc(e.desc)+'</div></div>';
+    }).join("");
+    sel = EX.length ? EX[0].id : null;
+    if (EX[0]) $("input").value = (EX[0].input!=null?EX[0].input:50);
+    Array.prototype.forEach.call(document.querySelectorAll(".ex"), function(node){
+      node.addEventListener("click", function(){
+        Array.prototype.forEach.call(document.querySelectorAll(".ex"), function(n){ n.classList.remove("sel"); });
+        node.classList.add("sel"); sel = node.getAttribute("data-id");
+        var e = EX.filter(function(x){ return x.id===sel; })[0]; if (e && e.input!=null) $("input").value = e.input;
+      });
+    });
+  });
+
+  function run(){
+    if (!sel){ return; }
+    $("out").innerHTML = "<div class='guarantees' style='margin-top:10px'>running in sandbox…</div>";
+    fetch("/wasm/sandbox/run",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ example: sel, input: parseInt($("input").value,10)||0, timeoutMs: parseInt($("timeout").value,10)||1000, maxPages: parseInt($("pages").value,10)||16 })})
+      .then(function(r){return r.json();}).then(function(j){
+        var html = "";
+        if (j.killed){
+          html += "<div class='verdict kill'>⏱ terminated by the sandbox — "+esc(j.error||"")+"</div>";
+        } else if (!j.ok){
+          html += "<div class='verdict no'>✗ "+esc(j.error||"failed")+"</div>";
+        } else {
+          html += "<div class='verdict ok'>✓ ran in "+esc(j.ms)+"ms · returned "+esc(String(j.rc))+"</div>";
+          if (j.out && j.out.length) html += "<pre>emitted: "+esc(JSON.stringify(j.out))+"</pre>";
+          if (j.text) html += "<pre>"+esc(j.text)+"</pre>";
+          if (j.imports) html += "<div class='guarantees' style='margin-top:8px'>capabilities the module was granted: <code>"+esc(j.imports.join(", "))+"</code> — nothing else.</div>";
+        }
+        $("out").innerHTML = html;
+      }).catch(function(e){ $("out").innerHTML = "<div class='verdict no'>request failed: "+esc(String(e))+"</div>"; });
+  }
+  $("go").addEventListener("click", run);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

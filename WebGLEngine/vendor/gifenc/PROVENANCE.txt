@@ -1,0 +1,6 @@
+gifenc 1.0.3
+MIT
+git://github.com/mattdesl/gifenc.git
+author: Matt DesLauriers
+vendored v2590 from npm registry (allowlisted). dist/gifenc.esm.js only -- 12K, no dependencies.
+VERIFIED BY ENCODING, NOT BY READING: 8 frames 64x64 -> 1364 bytes, magic GIF89a, trailer 0x3b.

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK -- Krbn compare (our obj vs Krbn, + lift to 3D)</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --bg:#06140c; --panel:#0a1c12; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.06em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:920px; font-size:12px; }
+  header b { color:var(--green); }
+  .wrap { padding:16px 18px; }
+  .stage { position:relative; width:100%; max-width:920px; margin:0 auto; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#04100a; }
+  canvas { display:block; width:100%; height:auto; }
+  .wipeLine { position:absolute; top:0; bottom:0; width:2px; background:var(--cyan); box-shadow:0 0 8px var(--cyan); pointer-events:none; }
+  .tag { position:absolute; top:8px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border-radius:4px; background:#02120a99; }
+  .tagL { left:10px; color:var(--amber); border:1px solid #5a4620; }
+  .tagR { right:10px; color:var(--green); border:1px solid #2a5a3a; }
+  .controls { max-width:920px; margin:14px auto 0; display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+  .ctl { display:flex; flex-direction:column; gap:3px; }
+  .ctl label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  input[type=range] { width:170px; accent-color:var(--cyan); }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:6px 14px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  button.hi { color:var(--amber); border-color:#5a4620; }
+  select { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:5px 8px; font:12px ui-monospace,monospace; }
+  .chk { display:flex; align-items:center; gap:6px; color:var(--ink); font-size:12px; }
+  .note { max-width:920px; margin:14px auto 0; color:var(--dim); font-size:11px; border-top:1px solid var(--line); padding-top:10px; }
+  .note b { color:var(--cyan); }
+  #status { max-width:920px; margin:8px auto 0; color:var(--green); font-size:11px; min-height:16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Krbn compare &mdash; our obj vs Krbn, in lockstep, + lift to 3D</h1>
+  <p>The <b>real emitted geometry</b> (the blobulator's mesh, Krbn's own MeshInput type) drawn two ways: <b>left</b> our shaded 3D, <b>right</b> Krbn's flat line drawing. Drag the <b>wipe</b> anywhere; <b>Play</b> orbits with both sides on the same frame. <b>Lift to 3D</b> ray-casts Krbn's flat points back onto the surface, and <b>Export OBJ</b> writes the whole drawing out as importable 3D polylines &mdash; Krbn's line-work as a real object you can orbit in Blender.</p>
+</header>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <canvas id="cvgl" width="920" height="560" style="position:absolute;inset:0;width:100%;height:auto;"></canvas>
+    <canvas id="cv" width="920" height="560" style="position:relative;background:transparent;"></canvas>
+    <div class="wipeLine" id="wipeLine"></div>
+    <div class="tag tagL">our obj &mdash; shaded 3D</div>
+    <div class="tag tagR">krbn &mdash; flat drawing</div>
+  </div>
+  <div class="controls">
+    <div class="ctl"><label>Scene</label><select id="scene"><option value="blob">blob (emitted mesh)</option><option value="splat">splat (ellipsoid cloud)</option><option value="ragdoll">ragdoll (rig)</option><option value="flesh">flesh (capsule field)</option></select></div>
+    <button id="play">&#9658; Play</button>
+    <div class="ctl"><label>Time (orbit)</label><input type="range" id="time" min="0" max="1000" value="120" /></div>
+    <div class="ctl"><label>Wipe &mdash; obj / krbn</label><input type="range" id="wipe" min="0" max="100" value="50" /></div>
+    <label class="chk"><input type="checkbox" id="lift" /> lift Krbn strokes to 3D</label>
+    <button id="export" class="hi">&#8681; Export OBJ</button>
+  </div>
+  <div id="status"></div>
+  <div class="note">
+    <b>Honest scope:</b> the left pane is a real WebGL2 render of the geometry, and it falls back to a canvas-2D render if the GPU or the shader is unavailable (the status line says which is live). Its shader uses the same projection as the Krbn side, so the two stay aligned across the wipe. It is not a byte-for-byte copy of index.html's own shader and lighting &mdash; exact parity with the main engine view is a further tuning pass. The Krbn side uses the real perspective projection; the lift and the export use ray&ndash;mesh back-projection onto the geometry we already hold. Backed by <b>tools/krbn/krbnCompare.js</b> and <b>tools/krbn/strokeLift.js</b>, both gated.
+  </div>
+</div>
+<script type="module">
+import { project, backProject, KRBN_CAM } from "./tools/krbn/krbnCompare.js";
+import { liftStrokes, toOBJ } from "./tools/krbn/strokeLift.js";
+import { sceneMesh, SCENES } from "./tools/krbn/sceneMeshes.js";
+
+const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+const light = (() => { const v = [-0.4, -0.5, 0.75], m = Math.hypot(...v); return [v[0]/m, v[1]/m, v[2]/m]; })();
+
+// scene geometry (picker-driven) + camera auto-fit
+let mesh, fit;
+function computeFit(m) {
+  let c = [0,0,0]; for (const p of m.positions) { c[0]+=p[0]; c[1]+=p[1]; c[2]+=p[2]; }
+  const k = m.positions.length || 1; c = [c[0]/k, c[1]/k, c[2]/k];
+  let r = 0; for (const p of m.positions) { const d = Math.hypot(p[0]-c[0], p[1]-c[1], p[2]-c[2]); if (d > r) r = d; }
+  return { center: c, radius: r || 1 };
+}
+let sceneName = "blob";
+function setScene(name) { sceneName = name; try { mesh = sceneMesh(name); } catch (e) { mesh = sceneMesh("blob"); sceneName = "blob"; } fit = computeFit(mesh); }
+setScene("blob");
+
+const sub = (a,b) => [a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const norm = a => { const m = Math.hypot(a[0],a[1],a[2])||1; return [a[0]/m,a[1]/m,a[2]/m]; };
+const depth = (p,eye) => Math.hypot(p[0]-eye[0], p[1]-eye[1], p[2]-eye[2]);
+
+function camAt(t) { const a = t*Math.PI*2, R = fit.radius*1.75, h = fit.radius*0.65;
+  return { eye:[fit.center[0]+R*Math.cos(a), fit.center[1]+R*Math.sin(a), fit.center[2]+h], target:fit.center, up:[0,0,1], scale:SCALE, viewport:VIEW }; }
+
+// wireframe strokes (2D) from the current projection -- the drawing Krbn draws / we export
+function wireStrokes2D(pr) {
+  const strokes = [];
+  for (const [i,j,k] of mesh.triangles) { const a=pr[i],b=pr[j],c=pr[k]; if(a&&b&&c) strokes.push([[a[0],a[1]],[b[0],b[1]],[c[0],c[1]],[a[0],a[1]]]); }
+  return strokes;
+}
+
+// ---- WebGL2 renderer (real, rig-verify) -- replicates krbnCompare.project in the shader so the WebGL
+// left and the 2D Krbn right stay pixel-aligned across the wipe. Falls back to canvas-2D on any failure.
+const cvgl = document.getElementById("cvgl");
+let gl = null, glProg = null, glLoc = {}, glBuf = null, glMeshName = null;
+const VS = `#version 300 es
+in vec3 aPos; in vec3 aNormal;
+uniform vec3 uEye, uRight, uUp, uFwd; uniform float uF;
+out vec3 vN;
+void main(){
+  vec3 rel = aPos - uEye;
+  float cz = max(dot(rel, uFwd), 0.001);
+  gl_Position = vec4((dot(rel,uRight)/cz)*uF, (dot(rel,uUp)/cz)*uF, 1.0 - 0.1/cz, 1.0);
+  vN = aNormal;
+}`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vN; out vec4 o; uniform vec3 uLight;
+void main(){
+  float d = max(0.12, abs(dot(normalize(vN), normalize(uLight))));
+  o = vec4(vec3(0.80,0.58,0.27)*(0.26+0.74*d) + vec3(0.04,0.05,0.03), 1.0);
+}`;
+function glCompile(g2, type, src){ const s = g2.createShader(type); g2.shaderSource(s, src); g2.compileShader(s); if(!g2.getShaderParameter(s, g2.COMPILE_STATUS)) throw new Error(g2.getShaderInfoLog(s)); return s; }
+function tryInitGL(){
+  try {
+    const g2 = cvgl.getContext("webgl2", { antialias:true, alpha:false }); if(!g2) return false;
+    const p = g2.createProgram();
+    g2.attachShader(p, glCompile(g2, g2.VERTEX_SHADER, VS));
+    g2.attachShader(p, glCompile(g2, g2.FRAGMENT_SHADER, FS));
+    g2.linkProgram(p); if(!g2.getProgramParameter(p, g2.LINK_STATUS)) throw new Error(g2.getProgramInfoLog(p));
+    gl = g2; glProg = p;
+    for (const u of ["uEye","uRight","uUp","uFwd","uF","uLight"]) glLoc[u] = g2.getUniformLocation(p, u);
+    glLoc.aPos = g2.getAttribLocation(p, "aPos"); glLoc.aNormal = g2.getAttribLocation(p, "aNormal");
+    g2.enable(g2.DEPTH_TEST); return true;
+  } catch(e){ gl = null; return false; }
+}
+function smoothNormals(m){
+  const N = m.positions.length, acc = new Float32Array(3*N);
+  for (const [i,j,k] of m.triangles){ const A=m.positions[i],B=m.positions[j],C=m.positions[k]; const n = cross(sub(B,A), sub(C,A)); for (const q of [i,j,k]){ acc[3*q]+=n[0]; acc[3*q+1]+=n[1]; acc[3*q+2]+=n[2]; } }
+  for (let i=0;i<N;i++){ const d=Math.hypot(acc[3*i],acc[3*i+1],acc[3*i+2])||1; acc[3*i]/=d; acc[3*i+1]/=d; acc[3*i+2]/=d; }
+  return acc;
+}
+function uploadMesh(name){
+  if (!gl || glMeshName === name) return;
+  const pos = new Float32Array(mesh.positions.flat()), nrm = smoothNormals(mesh), idx = new Uint32Array(mesh.triangles.flat());
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW); gl.enableVertexAttribArray(glLoc.aPos); gl.vertexAttribPointer(glLoc.aPos, 3, gl.FLOAT, false, 0, 0);
+  const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.STATIC_DRAW); gl.enableVertexAttribArray(glLoc.aNormal); gl.vertexAttribPointer(glLoc.aNormal, 3, gl.FLOAT, false, 0, 0);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  glBuf = { vao, count: idx.length }; glMeshName = name;
+}
+function drawGL(cam){
+  try {
+    const fwd = norm(sub(cam.target, cam.eye)), right = norm(cross(fwd, cam.up)), up = cross(right, fwd);
+    gl.viewport(0,0,VIEW.width,VIEW.height); gl.clearColor(0.016,0.063,0.039,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(glProg); gl.bindVertexArray(glBuf.vao);
+    gl.uniform3f(glLoc.uEye, cam.eye[0],cam.eye[1],cam.eye[2]); gl.uniform3f(glLoc.uRight, right[0],right[1],right[2]); gl.uniform3f(glLoc.uUp, up[0],up[1],up[2]); gl.uniform3f(glLoc.uFwd, fwd[0],fwd[1],fwd[2]);
+    gl.uniform1f(glLoc.uF, 1/Math.tan(cam.scale)); gl.uniform3f(glLoc.uLight, light[0],light[1],light[2]);
+    gl.drawElements(gl.TRIANGLES, glBuf.count, gl.UNSIGNED_INT, 0); return true;
+  } catch(e){ return false; }
+}
+
+// ---- 2D drawing (the Krbn side always; the shaded side only in fallback) ---------------------------
+function drawKrbnSide(pr, cam, x0, x1, lift, opaqueBg){
+  g.save(); g.beginPath(); g.rect(x0,0,x1-x0,VIEW.height); g.clip();
+  if (opaqueBg){ g.fillStyle = "#04100a"; g.fillRect(x0,0,x1-x0,VIEW.height); }
+  g.strokeStyle = "#9fe6c0"; g.lineWidth = 0.8;
+  for (const [i,j,k] of mesh.triangles){ const a=pr[i],b=pr[j],c=pr[k]; if(!a||!b||!c) continue; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.closePath(); g.stroke(); }
+  if (lift){ g.fillStyle = "#33ccff"; for (const p of pr){ if(!p) continue; const h = backProject(p[0],p[1],mesh,cam); if(h){ const rp = project(h,cam); if(rp){ g.beginPath(); g.arc(rp[0],rp[1],2,0,7); g.fill(); } } } }
+  g.restore();
+}
+function drawShaded2D(pr, cam, x0, x1){
+  const eye = cam.eye; g.save(); g.beginPath(); g.rect(x0,0,x1-x0,VIEW.height); g.clip();
+  const tris = mesh.triangles.map(([i,j,k]) => { const A=mesh.positions[i],C=mesh.positions[j],D=mesh.positions[k]; const n = norm(cross(sub(C,A),sub(D,A))); return { i,j,k, sh:Math.max(0.1, Math.abs(n[0]*light[0]+n[1]*light[1]+n[2]*light[2])), z:depth(A,eye) }; }).sort((a,b) => b.z - a.z);
+  for (const tr of tris){ const a=pr[tr.i],b=pr[tr.j],c=pr[tr.k]; if(!a||!b||!c) continue; const v = Math.round(55 + tr.sh*155); g.fillStyle = "rgb("+Math.round(v*1.15)+","+Math.round(v*0.85)+","+Math.round(v*0.4)+")"; g.strokeStyle = "rgba(255,204,102,0.18)"; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.closePath(); g.fill(); g.stroke(); }
+  g.restore();
+}
+function draw(t, wipePct, lift) {
+  const cam = camAt(t); const pr = mesh.positions.map(p => project(p, cam)); const wipeX = VIEW.width*wipePct/100;
+  if (gl){ uploadMesh(sceneName); if (drawGL(cam)){ g.clearRect(0,0,VIEW.width,VIEW.height); drawKrbnSide(pr, cam, wipeX, VIEW.width, lift, true); return; } gl = null; }
+  g.fillStyle = "#04100a"; g.fillRect(0,0,VIEW.width,VIEW.height);
+  drawShaded2D(pr, cam, 0, wipeX);
+  drawKrbnSide(pr, cam, wipeX, VIEW.width, lift, false);
+}
+
+const elT = document.getElementById("time"), elW = document.getElementById("wipe"), elL = document.getElementById("lift"),
+      elP = document.getElementById("play"), elX = document.getElementById("export"), elScene = document.getElementById("scene"),
+      wipeLine = document.getElementById("wipeLine"), stage = document.getElementById("stage"), status = document.getElementById("status");
+let playing = false;
+function render() { draw((+elT.value)/1000, +elW.value, elL.checked); wipeLine.style.left = (stage.clientWidth*(+elW.value)/100)+"px"; }
+function tick() { if(!playing) return; elT.value = (+elT.value+3)%1001; render(); requestAnimationFrame(tick); }
+elP.onclick = () => { playing = !playing; elP.innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9658; Play"; if(playing) tick(); };
+[elT,elW,elL].forEach(e => e.oninput = render);
+elScene.onchange = () => { setScene(elScene.value); status.textContent = "Scene: " + elScene.value + " -- " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles."; render(); };
+window.addEventListener("resize", render);
+
+// EXPORT: lift the current drawing to 3D polylines and download as OBJ
+elX.onclick = () => {
+  const cam = camAt((+elT.value)/1000);
+  const pr = mesh.positions.map(p => project(p, cam));
+  const strokes = wireStrokes2D(pr);
+  const lifted = liftStrokes(strokes, mesh, cam);
+  const obj = toOBJ(lifted);
+  const blob = new Blob([obj], { type: "model/obj" });
+  const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href = url; a.download = "krbn-drawing-3d.obj"; a.click(); URL.revokeObjectURL(url);
+  status.textContent = "Exported krbn-drawing-3d.obj -- " + lifted.length + " polylines, " + lifted.reduce((n,p)=>n+p.length,0) + " vertices, draped on the surface. Import it and orbit.";
+};
+
+const glOK = tryInitGL();
+status.textContent = (glOK ? "WebGL2 render active" : "canvas-2D render (WebGL unavailable -- using fallback)") + " -- scene: blob, " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles.";
+render();
+</script>
+</body>
+</html>

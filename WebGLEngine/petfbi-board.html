@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PetFBI — Lost Pet Board</title>
+<style>
+  :root{
+    --bg:#f4f6f4; --panel:#ffffff; --line:#dfe5e0; --text:#16211b; --muted:#5f6f66;
+    --accent:#1f7a5a; --accent-soft:#e2f2eb; --accent-ink:#0d5540;
+    --amber:#c77d10; --amber-soft:#fbf0dc; --danger:#c4402f; --danger-soft:#fbe6e2;
+    --blue:#2a6f97; --blue-soft:#e3eef4; --slate:#64748b; --slate-soft:#eef1f4;
+    --radius:12px; --shadow:0 1px 2px rgba(20,40,30,.05),0 10px 26px rgba(20,40,30,.06);
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code",Menlo,monospace;
+  }
+  [data-theme="dark"]{
+    --bg:#0e1512; --panel:#151d19; --line:#26332c; --text:#e6efe9; --muted:#8ba295;
+    --accent:#31a97e; --accent-soft:#132821; --accent-ink:#7fe6c0;
+    --amber:#e0a13c; --amber-soft:#2a2110; --danger:#f0705d; --danger-soft:#2c1512;
+    --blue:#5aa9d6; --blue-soft:#122430; --slate:#94a3b8; --slate-soft:#1b232c;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 26px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14.5px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:12px 22px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:11px}
+  .badge{width:38px;height:38px;border-radius:10px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(150deg,var(--accent),var(--blue));color:#fff;font-weight:800;font-size:12px;
+    letter-spacing:.5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+  .brand h1{font-size:16px;margin:0;font-weight:800;letter-spacing:-.3px}
+  .brand .tag{font-size:11.5px;color:var(--muted);margin-top:1px;font-weight:500}
+  .spacer{flex:1}
+  .who{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 8px}
+  .who select{border:0;background:none;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;outline:none}
+  .iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:9px;
+    padding:7px 11px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;font-weight:600}
+  .iconbtn:hover{border-color:var(--accent)}
+  .cloudpill{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--slate);flex:none}
+  .dot.on{background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .dot.warn{background:var(--amber);box-shadow:0 0 0 3px color-mix(in srgb,var(--amber) 22%,transparent)}
+  /* tabs */
+  nav.tabs{display:flex;gap:2px;padding:10px 22px 0;background:var(--panel);border-bottom:1px solid var(--line)}
+  nav.tabs button{border:0;background:none;color:var(--muted);padding:10px 15px;cursor:pointer;
+    font-size:14px;font-weight:700;border-radius:9px 9px 0 0;position:relative}
+  nav.tabs button.active{color:var(--text)}
+  nav.tabs button.active::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2.5px;
+    background:var(--accent);border-radius:3px}
+  main{padding:20px 22px 56px;max-width:1180px;margin:0 auto}
+  /* filter bar */
+  .filterbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .search{position:relative;flex:1;min-width:220px}
+  .search input{width:100%;padding:10px 12px 10px 36px;border:1px solid var(--line);background:var(--panel);
+    color:var(--text);border-radius:10px;font-size:14px}
+  .search svg{position:absolute;left:11px;top:11px;color:var(--muted)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;
+    padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .chip .n{font-variant-numeric:tabular-nums;opacity:.75}
+  .chip.on{color:var(--text);border-color:var(--accent);background:var(--accent-soft)}
+  /* board columns */
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:start}
+  .col{background:transparent}
+  .col h2{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);
+    margin:0 0 10px;display:flex;align-items:center;gap:8px;font-weight:800}
+  .col h2 .count{background:var(--slate-soft);color:var(--muted);border-radius:999px;
+    padding:1px 8px;font-size:11px}
+  .stackcol{display:flex;flex-direction:column;gap:12px}
+  /* report card */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:transform .08s,border-color .12s}
+  .card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+  .card .map{height:118px;background:var(--slate-soft) center/cover no-repeat;position:relative;
+    display:grid;place-items:center;color:var(--muted)}
+  .card .map .noimg{font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .card .stat{position:absolute;top:9px;left:9px;font-size:11px;font-weight:800;letter-spacing:.3px;
+    padding:3px 9px;border-radius:999px;text-transform:uppercase}
+  .card .body{padding:12px 13px 13px}
+  .card .ttl{font-weight:800;font-size:14.5px;line-height:1.3;margin-bottom:5px}
+  .card .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .pet{display:inline-flex;align-items:center;gap:4px;font-weight:700;color:var(--text)}
+  .card .foot{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:12px;
+    color:var(--muted);display:flex;align-items:center;gap:6px;min-height:20px}
+  .avatar{width:19px;height:19px;border-radius:5px;background:var(--accent-soft);color:var(--accent-ink);
+    display:grid;place-items:center;font-size:10px;font-weight:800;flex:none}
+  /* status colors */
+  .s-new{background:var(--blue-soft);color:var(--blue)}
+  .s-needsinfo{background:var(--amber-soft);color:var(--amber)}
+  .s-claimed{background:var(--accent-soft);color:var(--accent-ink)}
+  .s-posted{background:var(--slate-soft);color:var(--slate)}
+  .s-archived{background:var(--slate-soft);color:var(--slate)}
+  .col-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .cd-new{background:var(--blue)} .cd-needsinfo{background:var(--amber)}
+  .cd-claimed{background:var(--accent)} .cd-posted{background:var(--slate)} .cd-archived{background:var(--slate)}
+  /* buttons */
+  .btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:9px;
+    padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.warn{background:var(--amber);border-color:var(--amber);color:#fff}
+  .btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+  .btn.ghost{background:transparent}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  /* modal */
+  .scrim{position:fixed;inset:0;background:rgba(10,20,15,.5);backdrop-filter:blur(2px);z-index:60;
+    display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+  .scrim.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    width:100%;max-width:560px;animation:pop .16s ease-out}
+  @keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+  .modal .mh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .modal .mh h3{margin:0;font-size:16px;font-weight:800;flex:1}
+  .modal .mb{padding:16px 18px}
+  .modal .mf{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);
+    background:var(--bg);color:var(--text);border-radius:9px;font-size:14px;font-family:inherit}
+  .field textarea{min-height:70px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .mapprev{height:150px;border-radius:10px;border:1px solid var(--line);background:var(--slate-soft) center/cover no-repeat;
+    display:grid;place-items:center;color:var(--muted);font-size:12px;margin-bottom:13px}
+  .lifecycle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);margin-bottom:14px;flex-wrap:wrap}
+  .lifecycle .st{padding:3px 9px;border-radius:999px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+  .lifecycle .arr{opacity:.4}
+  /* admins table */
+  .tablewrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;padding:11px 14px;background:var(--bg);color:var(--muted);font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);font-weight:800}
+  td{padding:11px 14px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
+  .rolechip{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink)}
+  .empty{text-align:center;padding:54px 20px;color:var(--muted)}
+  .empty .big{font-size:34px;margin-bottom:8px}
+  .empty h3{margin:0 0 5px;color:var(--text);font-size:16px}
+  /* toast */
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-size:13.5px;font-weight:600;
+    z-index:90;transition:.22s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  #toast.show{transform:translateX(-50%);opacity:1}
+  #toast.err{background:var(--danger);color:#fff}
+  .link{color:var(--accent);text-decoration:none;font-weight:700}
+  .link:hover{text-decoration:underline}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .step{margin-bottom:14px;font-size:13.5px;line-height:1.5}
+  .src{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.3px}
+  .src-pawboost{background:var(--blue-soft);color:var(--blue)}
+  .src-petfbi{background:var(--accent-soft);color:var(--accent-ink)}
+  .step b{color:var(--text)}
+  .step code{font-family:var(--mono);font-size:12px;background:var(--slate-soft);padding:1px 6px;border-radius:5px}
+  .sqlbox{position:relative;margin-top:8px}
+  .sqlbox textarea{width:100%;min-height:118px;font-family:var(--mono);font-size:11px;line-height:1.45;
+    background:#0b1310;color:#c8e6d8;border:1px solid var(--line);border-radius:9px;padding:10px 10px 10px;resize:vertical;white-space:pre}
+  [data-theme="light"] .sqlbox textarea{background:#0e1512;color:#d6efe2}
+  .sqlbox .btn{position:absolute;top:7px;right:7px;padding:4px 10px;font-size:11.5px;z-index:2}
+  @media(max-width:640px){.row2{grid-template-columns:1fr}main{padding:16px 14px 48px}header{padding:11px 14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="badge">PET<br>FBI</div>
+    <div><h1>Lost Pet Board</h1><div class="tag">Claim it, post it, no double-posting</div></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="who" title="Who you are — used when you claim or post a report">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+    <select id="meSel" onchange="setMe(this.value)"></select>
+  </div>
+  <div class="cloudpill" id="cloudPill" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="openSettings()" title="Data storage — click to connect a shared cloud board">
+    <span class="dot" id="cloudDot"></span><span id="cloudTxt">Local only</span>
+  </div>
+  <button class="iconbtn" id="themeBtn" onclick="toggleTheme()" title="Toggle dark / light">🌙</button>
+</header>
+
+<nav class="tabs">
+  <button id="tab-board" class="active" onclick="go('board')">Board</button>
+  <button id="tab-admins" onclick="go('admins')">Admins</button>
+</nav>
+
+<main id="view"></main>
+
+<!-- modal host -->
+<!-- v3010: a scrim is a DISMISSAL SURFACE, not a control. role="button" here would announce a
+       "button" that does nothing when focused and is not what a backdrop is. Its keyboard equivalent is
+       ESCAPE, wired below, which is the actual accessible behaviour. -->
+  <div class="scrim" id="scrim" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ============================ constants ============================ */
+const STATUSES = [
+  {key:"new",       label:"New"},
+  {key:"needsinfo", label:"Needs info"},
+  {key:"claimed",   label:"Claimed"},
+  {key:"posted",    label:"Posted"},
+  {key:"archived",  label:"Archived"},
+];
+const STATUS_LABEL = Object.fromEntries(STATUSES.map(s=>[s.key,s.label]));
+const PET_TYPES = ["Dog","Cat","Bird","Rabbit","Other"];
+const PET_ICON = {Dog:"🐕",Cat:"🐈",Bird:"🐦",Rabbit:"🐇",Other:"🐾"};
+
+/* ---- PetFBI email parser: flatten a report email into a board report ----
+ * Reports arrive from the Outlook rules. We keep only what the board and the
+ * Facebook-post template need: title, petType, SEX (drives post gender),
+ * status (Lost/Found->new, Reunited->archived), the report link, the PetFBI
+ * Report ID (dedupe key), and location. All the other detail is ignored.   */
+function parsePetFbiEmail(raw){
+  const text=String(raw||"").replace(/\r/g,""); const lines=text.split("\n").map(l=>l.trim());
+  const cap=s=>String(s||"").charAt(0).toUpperCase()+String(s||"").slice(1).toLowerCase();
+  const val=label=>{const re=new RegExp("^"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*:\\s*(.+)$","i");
+    for(const l of lines){const m=l.match(re);if(m)return m[1].trim();}return "";};
+  let headline="",hRe=/^(Lost|Found|Reunited)\s+([A-Za-z]+)\s*[-–—]\s*(.+)$/i;
+  for(const l of lines){if(hRe.test(l)){headline=l;break;}}
+  let kind="",petType="",petName="",title="";
+  if(headline){const m=headline.match(hRe);kind=m[1].toLowerCase();petType=cap(m[2]);petName=m[3].trim();
+    title=cap(kind)+" "+petType+" - "+petName;}
+  const status=(kind==="reunited")?"archived":"new";
+  let sexRaw=val("M/F")||val("Sex")||val("Gender"),sex="";
+  if(/^m/i.test(sexRaw))sex="Male";else if(/^f/i.test(sexRaw))sex="Female";
+  const reportId=val("Pet FBI Report ID")||val("Report ID");
+  const location=val("Location Specifics")||val("Location")||val("State, Zip");
+  let link="";const urlRe=/(https?:\/\/[^\s"'<>]+)/i;
+  for(let i=0;i<lines.length;i++){if(/view full report|open report/i.test(lines[i])){
+    for(let k=i;k<Math.min(i+3,lines.length);k++){const u=lines[k].match(urlRe);if(u){link=u[1];break;}}if(link)break;}}
+  if(!link){const any=text.match(/https?:\/\/[^\s"'<>]*petfbi[^\s"'<>]*/i);if(any)link=any[0];}
+  const petTypeNorm=PET_TYPES.includes(petType)?petType:"Other";
+  return {ok:!!(title&&reportId),source:"petfbi",title,petType:petTypeNorm,sex,status,reportId,location,landmark:"",link,kind,petName};
+}
+
+/* ---- PawBoost alert parser: same board shape, source-tagged "pawboost".
+ * PawBoost uses label-on-one-line, value-on-the-NEXT-line, and its subject
+ * line carries a summary: "Have you seen Storm? Lost cat in Providence, RI
+ * 02909 (ID: 73095374". Landmark ("Nearest Landmark") is kept too. */
+function parsePawBoostEmail(raw){
+  const text=String(raw||"").replace(/\r/g,""); const lines=text.split("\n").map(l=>l.trim());
+  const cap=s=>String(s||"").charAt(0).toUpperCase()+String(s||"").slice(1).toLowerCase();
+  const val=label=>{const re=new RegExp("^"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*:?\\s*$","i");
+    for(let i=0;i<lines.length;i++){if(re.test(lines[i])&&i+1<lines.length){const v=lines[i+1].trim();if(v)return v;}}return "";};
+  let petName="",petType="",kind="",loc="",reportId="";
+  const subj=lines.find(l=>/have you seen .+\?/i.test(l))||"";
+  const m=subj.match(/have you seen\s+(.+?)\?\s*(lost|found|reunited)\s+(cat|dog|bird|rabbit|pet)\s+in\s+(.+?)\s*\(id:\s*(\d+)/i);
+  if(m){petName=m[1].trim();kind=m[2].toLowerCase();petType=cap(m[3]);loc=m[4].trim();reportId=m[5];}
+  const name=val("Name")||petName, species=val("Species")||petType, sexRaw=val("Sex");
+  const pbId=val("PawBoost ID")||reportId, locSeen=val("Location Last Seen")||loc;
+  const landmark=val("Nearest Landmark")||val("Last seen near")||"";
+  petType=cap(species||petType||"Pet"); if(!["Cat","Dog","Bird","Rabbit"].includes(petType))petType="Other";
+  let sex=""; if(/^m/i.test(sexRaw))sex="Male";else if(/^f/i.test(sexRaw))sex="Female";
+  const status=/reunited/i.test(text)?"archived":"new";
+  const finalName=name||petName||"Unknown"; kind=kind||"lost";
+  const title=cap(kind)+" "+petType+" - "+finalName;
+  let link=""; const u=text.match(/https?:\/\/(?:www\.)?pawboost\.com\/[^\s"'<>]+/i); if(u)link=u[0];
+  return {ok:!!(finalName&&(pbId||reportId)),source:"pawboost",title,petType,sex,status,
+    reportId:String(pbId||reportId),location:locSeen,landmark,link,kind,petName:finalName};
+}
+
+/* auto-detect the source and dispatch to the right parser */
+function parseReportEmail(raw){
+  const t=String(raw||"");
+  if(/pawboost/i.test(t) || /have you seen .+\?/i.test(t)) return parsePawBoostEmail(raw);
+  return parsePetFbiEmail(raw);
+}
+
+/* ============================ state ============================ */
+let DB = { reports:[], admins:[] };
+let ME = localStorage.getItem("petfbi_me") || "";
+let CLOUD = JSON.parse(localStorage.getItem("petfbi_cloud")||"null");   // {url,key}
+let FILTER = "active";       // active = everything except archived
+let SEARCH = "";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const initials = n => String(n||"?").trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase()||"?";
+const fmtWhen = ts => { if(!ts) return ""; const d=new Date(Number(ts)); return isNaN(d)?"":d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
+const newId = () => "rep_"+Date.now().toString(36)+"_"+Math.floor(Math.random()*1e6).toString(36);
+
+/* ============================ theme ============================ */
+function applyTheme(t){document.documentElement.dataset.theme=t;$("#themeBtn").textContent=t==="dark"?"☀️":"🌙";localStorage.setItem("petfbi_theme",t);}
+function toggleTheme(){applyTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");}
+applyTheme(localStorage.getItem("petfbi_theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+
+/* ============================ toast ============================ */
+let toastT=null;
+function toast(msg,isErr){const t=$("#toast");t.textContent=msg;t.className="show"+(isErr?" err":"");clearTimeout(toastT);toastT=setTimeout(()=>t.className="",2400);}
+
+/* ============================ persistence ============================ */
+function saveLocal(){localStorage.setItem("petfbi_data",JSON.stringify(DB));}
+function loadLocal(){
+  const raw=localStorage.getItem("petfbi_data");
+  if(raw){try{DB=JSON.parse(raw);}catch{DB={reports:[],admins:[]};}}
+  if(!DB.reports)DB.reports=[]; if(!DB.admins)DB.admins=[];
+  if(!DB.admins.length){ // seed the sample Admins row from the workbook
+    DB.admins=[{id:"adm_1",name:"You",email:"you@gmail.com",state:"*",towns:"*",role:"Admin"}];
+    saveLocal();
+  }
+}
+
+/* ---- Supabase REST (no library; also works offline) ---- */
+function cloudOn(){return !!(CLOUD&&CLOUD.url&&CLOUD.key);}
+async function sb(path,opts={}){
+  const r=await fetch(CLOUD.url.replace(/\/$/,"")+"/rest/v1/"+path,{...opts,headers:{
+    apikey:CLOUD.key,Authorization:"Bearer "+CLOUD.key,"Content-Type":"application/json",
+    Prefer:"return=representation,resolution=merge-duplicates",...(opts.headers||{})}});
+  if(!r.ok)throw new Error((await r.text())||("HTTP "+r.status));
+  return r.status===204?null:r.json();
+}
+// map camelCase (app) <-> snake_case (db)
+const rToDB=r=>({id:r.id,title:r.title,pet_type:r.petType,status:r.status,link:r.link,map_url:r.mapUrl,
+  notes:r.notes,claimed_by:r.claimedBy,posted_by:r.postedBy,ts:r.ts,claimed_at:r.claimedAt,posted_at:r.postedAt,
+  sex:r.sex,report_id:r.reportId,location:r.location,source:r.source,landmark:r.landmark});
+const rFromDB=x=>({id:x.id,title:x.title,petType:x.pet_type,status:x.status,link:x.link,mapUrl:x.map_url,
+  notes:x.notes,claimedBy:x.claimed_by,postedBy:x.posted_by,ts:x.ts,claimedAt:x.claimed_at,postedAt:x.posted_at,
+  sex:x.sex,reportId:x.report_id,location:x.location,source:x.source,landmark:x.landmark});
+const aToDB=a=>({id:a.id,name:a.name,email:a.email,state:a.state,towns:a.towns,role:a.role});
+const aFromDB=x=>({id:x.id,name:x.name,email:x.email,state:x.state,towns:x.towns,role:x.role});
+
+async function cloudPull(){
+  const [reps,adm]=await Promise.all([
+    sb("petfbi_reports?select=*&order=ts.desc"),
+    sb("petfbi_admins?select=*&order=name")
+  ]);
+  DB.reports=reps.map(rFromDB);
+  DB.admins=adm.length?adm.map(aFromDB):DB.admins;
+  saveLocal();
+}
+async function cloudUpsertReport(r){ if(cloudOn()) await sb("petfbi_reports",{method:"POST",body:JSON.stringify(rToDB(r))}); }
+async function cloudDeleteReport(id){ if(cloudOn()) await sb("petfbi_reports?id=eq."+encodeURIComponent(id),{method:"DELETE"}); }
+async function cloudUpsertAdmin(a){ if(cloudOn()) await sb("petfbi_admins",{method:"POST",body:JSON.stringify(aToDB(a))}); }
+async function cloudDeleteAdmin(id){ if(cloudOn()) await sb("petfbi_admins?id=eq."+encodeURIComponent(id),{method:"DELETE"}); }
+// re-fetch ONE report to catch races (someone else claimed it first)
+async function cloudGetReport(id){
+  if(!cloudOn()) return null;
+  const rows=await sb("petfbi_reports?select=*&id=eq."+encodeURIComponent(id));
+  return rows&&rows[0]?rFromDB(rows[0]):null;
+}
+
+function setCloudUI(state){ // 'on' | 'off' | 'warn'
+  const dot=$("#cloudDot"),txt=$("#cloudTxt");
+  dot.className="dot"+(state==="on"?" on":state==="warn"?" warn":"");
+  txt.textContent=state==="on"?"Cloud synced":state==="warn"?"Cloud error — local":"Local only";
+}
+
+/* ============================ coordination logic (the "brain") ============================ *
+ * Ported faithfully from the PetFBI board Apps Script. These guards are the
+ * whole point: they stop two admins double-posting the same report. We enforce
+ * them BEFORE writing, and in cloud mode we re-read the live row first so a
+ * stale local copy can't punch through a claim someone else already made.     */
+async function claimReport(id){
+  const who = ME.trim();
+  if(!who){ toast("Pick who you are first (top-right).",true); return; }
+  let r = await freshCopy(id); if(!r) return;
+  if(r.status==="posted")  return toast("Already posted by "+(r.postedBy||"someone"),true);
+  if(r.status==="archived")return toast("That report is archived.",true);
+  if(r.status==="claimed" && r.claimedBy && r.claimedBy!==who)
+    return toast("Already claimed by "+r.claimedBy,true);
+  r.status="claimed"; r.claimedBy=who; r.claimedAt=Date.now();
+  await commit(r,"Claimed — it's yours");
+}
+async function unclaimReport(id){
+  let r = await freshCopy(id); if(!r) return;
+  if(r.status==="posted") return toast("Already posted — can't unclaim.",true);
+  r.status="new"; r.claimedBy=""; r.claimedAt="";
+  await commit(r,"Released back to the board");
+}
+async function markPosted(id){
+  let r = await freshCopy(id); if(!r) return;
+  if(r.status==="archived") return toast("That report is archived.",true);
+  r.status="posted"; r.postedBy=(ME.trim()||r.claimedBy||"someone"); r.postedAt=Date.now();
+  await commit(r,"Marked posted ✓");
+}
+async function setStatus(id,status){
+  let r = await freshCopy(id); if(!r) return;
+  r.status=status;
+  if(status==="new"){r.claimedBy="";r.claimedAt="";}
+  await commit(r,STATUS_LABEL[status]?("Moved to "+STATUS_LABEL[status]):"Updated");
+}
+// get the freshest copy of a report: live from cloud if connected, else local
+async function freshCopy(id){
+  if(cloudOn()){
+    try{ const live=await cloudGetReport(id);
+      if(!live){ toast("That report no longer exists.",true); await refresh(); return null; }
+      // sync our local copy to the live one
+      const i=DB.reports.findIndex(x=>x.id===id); if(i>=0)DB.reports[i]=live; return {...live};
+    }catch(e){ setCloudUI("warn"); }
+  }
+  const r=DB.reports.find(x=>x.id===id); return r?{...r}:null;
+}
+async function commit(r,okMsg){
+  const i=DB.reports.findIndex(x=>x.id===r.id);
+  if(i>=0)DB.reports[i]=r; else DB.reports.unshift(r);
+  saveLocal();
+  try{ await cloudUpsertReport(r); if(cloudOn())setCloudUI("on"); }
+  catch(e){ setCloudUI("warn"); toast("Saved locally — cloud write failed",true); }
+  render(); if(okMsg)toast(okMsg);
+}
+
+/* ============================ views ============================ */
+let TAB="board";
+function go(tab){TAB=tab;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+  $("#tab-"+tab).classList.add("active"); render();}
+
+function render(){ TAB==="board"?renderBoard():renderAdmins(); }
+
+/* ---- board ---- */
+function counts(){
+  const c={}; STATUSES.forEach(s=>c[s.key]=0);
+  DB.reports.forEach(r=>{c[r.status]=(c[r.status]||0)+1;});
+  c.active = DB.reports.filter(r=>r.status!=="archived").length;
+  return c;
+}
+function visibleReports(){
+  let list=DB.reports.slice();
+  if(FILTER==="active") list=list.filter(r=>r.status!=="archived");
+  else list=list.filter(r=>r.status===FILTER);
+  if(SEARCH){const q=SEARCH.toLowerCase();
+    list=list.filter(r=>[r.title,r.petType,r.notes,r.claimedBy,r.postedBy].some(v=>String(v||"").toLowerCase().includes(q)));}
+  return list;
+}
+function renderBoard(){
+  const c=counts();
+  const chip=(key,label)=>`<button class="chip ${FILTER===key?"on":""}" onclick="setFilter('${key}')">${label}<span class="n">${c[key]||0}</span></button>`;
+  let html=`
+    <div class="filterbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" placeholder="Search reports…" value="${esc(SEARCH)}" oninput="SEARCH=this.value;renderBoardKeepFocus()">
+      </div>
+      <div class="chips">
+        ${chip("active","Active")}
+        ${STATUSES.map(s=>chip(s.key,s.label)).join("")}
+      </div>
+      <button class="btn" onclick="openPasteEmail()">📧 Paste email</button>
+      <button class="btn primary" onclick="openReport()">＋ New report</button>
+    </div>`;
+
+  const list=visibleReports();
+  if(!list.length){
+    html+=`<div class="empty"><div class="big">🐾</div><h3>${SEARCH?"No matches":"No reports here yet"}</h3>
+      <p>${SEARCH?"Try a different search.":"Add a lost-pet report and it lands on the board for the team to claim."}</p>
+      ${SEARCH?"":'<button class="btn primary" onclick="openReport()">＋ Add the first report</button>'}</div>`;
+    $("#view").innerHTML=html; return;
+  }
+
+  // when a single status is filtered, show a flat grid; for "active" show grouped columns
+  if(FILTER!=="active"){
+    html+=`<div class="board">${list.map(cardHTML).join("")}</div>`;
+  }else{
+    const groups=["new","needsinfo","claimed","posted"];
+    html+=`<div class="board">`;
+    groups.forEach(g=>{
+      const items=list.filter(r=>r.status===g);
+      html+=`<div class="col"><h2><span class="col-dot cd-${g}"></span>${STATUS_LABEL[g]}<span class="count">${items.length}</span></h2>
+        <div class="stackcol">${items.map(cardHTML).join("")||`<div style="color:var(--muted);font-size:12.5px;padding:4px 2px">—</div>`}</div></div>`;
+    });
+    html+=`</div>`;
+  }
+  $("#view").innerHTML=html;
+}
+function renderBoardKeepFocus(){
+  // re-render the board list but keep the search box focused/caret
+  const q=$("#q"); const pos=q?q.selectionStart:null;
+  renderBoard();
+  const nq=$("#q"); if(nq){nq.focus(); if(pos!=null)nq.setSelectionRange(pos,pos);}
+}
+function cardHTML(r){
+  const who = r.status==="posted" ? (r.postedBy&&`<span class="avatar">${initials(r.postedBy)}</span> Posted by ${esc(r.postedBy)}`)
+            : r.claimedBy ? `<span class="avatar">${initials(r.claimedBy)}</span> ${esc(r.claimedBy)}`
+            : `<span style="opacity:.7">Unclaimed</span>`;
+  const mapInner = r.mapUrl
+    ? `style="background-image:url('${esc(r.mapUrl)}')"`
+    : "";
+  const mapBody = r.mapUrl ? "" : `<div class="noimg">🗺️<span>no map yet</span></div>`;
+  return `<div class="card" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="openReport('${r.id}')">
+    <div class="map" ${mapInner}>
+      <div class="stat s-${r.status}">${STATUS_LABEL[r.status]||r.status}</div>
+      ${mapBody}
+    </div>
+    <div class="body">
+      <div class="ttl">${esc(r.title)||"(untitled report)"}</div>
+      <div class="meta">
+        <span class="pet">${PET_ICON[r.petType]||"🐾"} ${esc(r.petType)||"Pet"}</span>
+        ${r.source?`<span class="src src-${esc(r.source)}">${r.source==="pawboost"?"PawBoost":"PetFBI"}</span>`:""}
+        ${r.sex?`<span>· ${r.sex==="Male"?"♂":"♀"} ${esc(r.sex)}</span>`:""}
+        ${r.ts?`<span>· ${fmtWhen(r.ts)}</span>`:""}
+        ${r.link?`· <a class="link" href="${esc(r.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">source ↗</a>`:""}
+      </div>
+      <div class="foot">${who||""}</div>
+    </div>
+  </div>`;
+}
+// the stat pill needs to sit over the map; fix positioning by wrapping
+function setFilter(k){FILTER=k;renderBoard();}
+
+/* ---- report modal ---- */
+/* ---- paste-email ingest (manual fallback for the bridge auto-feed) ---- */
+function openPasteEmail(){
+  $("#modal").innerHTML=`
+    <div class="mh"><span style="font-size:18px">📧</span><h3>Paste a report email</h3>
+      <button class="iconbtn" onclick="closeModal()">✕</button></div>
+    <div class="mb">
+      <p class="hint" style="margin-top:0">Paste a <b>Pet FBI</b> or <b>PawBoost</b> report email — it auto-detects the
+        source and flattens it into a board report (title, pet type, sex for the post, status, link, location, ID).
+        Lost/Found land as <b>New</b>, Reunited goes to <b>Archived</b>.</p>
+      <div class="field"><label>Report email</label>
+        <textarea id="pe_text" style="min-height:150px" placeholder="The following report has been entered at Pet FBI…"></textarea></div>
+      <div id="pe_prev"></div>
+    </div>
+    <div class="mf"><div style="flex:1"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="previewEmail()">Preview</button>
+      <button class="btn primary" onclick="ingestEmail()">Add to board</button>
+    </div>`;
+  showModal();
+}
+function previewEmail(){
+  const p=parseReportEmail($("#pe_text").value);
+  const host=$("#pe_prev");
+  if(!p.ok){host.innerHTML=`<p class="hint" style="color:var(--danger)">Couldn't find a title + Pet FBI Report ID. Paste the full email (including the "Lost Cat - Name" line and the "Pet FBI Report ID:" line).</p>`;return;}
+  const dupe=DB.reports.find(r=>r.reportId&&r.reportId===p.reportId);
+  host.innerHTML=`
+    <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:6px;font-size:13px">
+      <div style="font-weight:800;margin-bottom:6px">${PET_ICON[p.petType]||"🐾"} ${esc(p.title)}</div>
+      <div class="meta" style="display:flex;gap:12px;flex-wrap:wrap;color:var(--muted)">
+        <span>Status: <b style="color:var(--text)">${STATUS_LABEL[p.status]}</b></span>
+        <span>Sex: <b style="color:var(--text)">${esc(p.sex)||"—"}</b></span>
+        <span>ID: <b style="color:var(--text)">${esc(p.reportId)}</b></span>
+      </div>
+      ${p.location?`<div class="hint" style="margin-top:6px">📍 ${esc(p.location)}</div>`:""}
+      ${dupe?`<div class="hint" style="color:var(--amber);margin-top:8px">⚠ A report with this Pet FBI ID is already on the board — adding will update it, not duplicate.</div>`:""}
+    </div>`;
+}
+async function ingestEmail(){
+  const p=parseReportEmail($("#pe_text").value);
+  if(!p.ok){toast("Need a title + a report ID (Pet FBI or PawBoost) — check the email.",true);return;}
+  // dedupe by source+reportId: the same numeric id could in theory collide across
+  // sources, so match on both.
+  let existing=DB.reports.find(r=>r.reportId&&r.reportId===p.reportId&&(r.source||"petfbi")===(p.source||"petfbi"));
+  let r;
+  if(existing){
+    r={...existing,title:p.title,petType:p.petType,sex:p.sex,location:p.location,landmark:p.landmark||existing.landmark,link:p.link||existing.link,source:p.source};
+    // a Reunited follow-up archives the earlier Lost/Found for the same pet
+    if(p.status==="archived")r.status="archived";
+  }else{
+    r={id:newId(),source:p.source,title:p.title,petType:p.petType,status:p.status,sex:p.sex,reportId:p.reportId,
+       location:p.location,landmark:p.landmark,link:p.link,mapUrl:"",notes:"",claimedBy:"",postedBy:"",ts:Date.now(),claimedAt:"",postedAt:""};
+  }
+  closeModal();
+  await commit(r, existing?("Updated “"+p.title+"”"):("Added “"+p.title+"” to the board"));
+}
+
+function openReport(id){
+  const r = id ? DB.reports.find(x=>x.id===id) : null;
+  const editing=!!r;
+  const d = r || {id:newId(),title:"",petType:"Dog",status:"new",link:"",mapUrl:"",notes:"",claimedBy:"",postedBy:"",ts:Date.now()};
+  const lifecycle = `
+    <div class="lifecycle">
+      ${STATUSES.filter(s=>s.key!=="archived").map((s,i)=>`
+        ${i?'<span class="arr">→</span>':''}
+        <span class="st ${d.status===s.key?('s-'+s.key):''}" style="${d.status===s.key?'':'background:var(--slate-soft);color:var(--muted)'}">${s.label}</span>
+      `).join("")}
+    </div>`;
+  const mapPrev = d.mapUrl
+    ? `<div class="mapprev" style="background-image:url('${esc(d.mapUrl)}')"></div>`
+    : `<div class="mapprev">🗺️ paste a Google Maps image URL below to preview</div>`;
+
+  $("#modal").innerHTML=`
+    <div class="mh">
+      <span style="font-size:20px">${PET_ICON[d.petType]||"🐾"}</span>
+      <h3>${editing?"Edit report":"New lost-pet report"}</h3>
+      <button class="iconbtn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mb">
+      ${editing?lifecycle:""}
+      ${mapPrev}
+      <div class="field"><label>Title</label>
+        <input id="f_title" value="${esc(d.title)}" placeholder="e.g. Lost beagle near Warwick Pond"></div>
+      <div class="row2">
+        <div class="field"><label>Pet type</label>
+          <select id="f_pet">${PET_TYPES.map(p=>`<option ${d.petType===p?"selected":""}>${p}</option>`).join("")}</select></div>
+        <div class="field"><label>Status</label>
+          <select id="f_status">${STATUSES.map(s=>`<option value="${s.key}" ${d.status===s.key?"selected":""}>${s.label}</option>`).join("")}</select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Sex (for the FB post)</label>
+          <select id="f_sex">${["","Male","Female"].map(s=>`<option value="${s}" ${(d.sex||"")===s?"selected":""}>${s||"—"}</option>`).join("")}</select></div>
+        <div class="field"><label>Pet FBI Report ID</label>
+          <input id="f_reportId" value="${esc(d.reportId||"")}" placeholder="e.g. 801272"></div>
+      </div>
+      <div class="field"><label>Location</label>
+        <input id="f_location" value="${esc(d.location||"")}" placeholder="Town, County, State, Zip"></div>
+      <div class="field"><label>Source link (PetFBI report)</label>
+        <input id="f_link" value="${esc(d.link)}" placeholder="https://…"></div>
+      <div class="field"><label>Map image URL</label>
+        <input id="f_map" value="${esc(d.mapUrl)}" placeholder="https://…/staticmap.png" oninput="livePreviewMap(this.value)"></div>
+      <div class="field"><label>Notes</label>
+        <textarea id="f_notes" placeholder="Anything the poster should know…">${esc(d.notes)}</textarea></div>
+      ${editing&&(d.claimedBy||d.postedBy)?`<div class="hint">${d.claimedBy?("Claimed by "+esc(d.claimedBy)):""}${d.postedBy?(" · Posted by "+esc(d.postedBy)):""}</div>`:""}
+    </div>
+    <div class="mf">
+      ${editing?`<button class="btn danger ghost" onclick="removeReport('${d.id}')">Delete</button><div style="flex:1"></div>`:`<div style="flex:1"></div>`}
+      ${editing?actionButtons(d):""}
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveReport('${d.id}',${editing})">${editing?"Save changes":"Add to board"}</button>
+    </div>`;
+  showModal();
+}
+function actionButtons(d){
+  let b="";
+  if(d.status!=="posted"&&d.status!=="archived"){
+    if(d.status==="claimed"&&d.claimedBy===ME.trim()){
+      b+=`<button class="btn ghost" onclick="unclaimReport('${d.id}');closeModal()">Release</button>`;
+      b+=`<button class="btn warn" onclick="markPosted('${d.id}');closeModal()">Mark posted</button>`;
+    }else if(d.status!=="claimed"){
+      b+=`<button class="btn primary" onclick="claimReport('${d.id}');closeModal()">Claim</button>`;
+    }else{
+      b+=`<button class="btn" disabled title="Claimed by ${esc(d.claimedBy)}">Claimed by ${esc(d.claimedBy)}</button>`;
+    }
+  }
+  if(d.status!=="archived") b+=`<button class="btn ghost" onclick="setStatus('${d.id}','archived');closeModal()">Archive</button>`;
+  else b+=`<button class="btn ghost" onclick="setStatus('${d.id}','new');closeModal()">Restore</button>`;
+  b+=`<button class="btn ghost" onclick="composePostFor('${d.id}')">📝 Compose post</button>`;
+  return b;
+}
+
+/* ---- compose the FB post + routing for a report (calls the bridge pipeline) ---- */
+async function composePostFor(id){
+  const r=DB.reports.find(x=>x.id===id); if(!r)return;
+  $("#modal").innerHTML=`
+    <div class="mh"><span style="font-size:18px">📝</span><h3>Compose post — ${esc(r.title)}</h3>
+      <button class="iconbtn" onclick="openReport('${id}')">← Back</button></div>
+    <div class="mb"><p class="hint" style="margin-top:0">Building the post text and page routing from your templates…</p></div>`;
+  showModal();
+  try{
+    const res=await fetch("/petfbi/compose",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({report:r})});
+    const data=await res.json();
+    if(!data.ok){$("#modal .mb").innerHTML=`<p class="hint" style="color:var(--danger)">Couldn't compose: ${esc(data.error||"unknown")}.<br>Is the sheet snapshot present? (PetFBI/config/petfbi-sheets.json)</p>`;return;}
+    const pagesHtml=(data.pages||[]).map(p=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">
+        <span class="src src-petfbi" style="text-transform:capitalize">${esc(p.role)}</span>
+        <span style="flex:1">${esc(p.fbPage||p.fbURL||"(page)")}</span>
+        <span class="hint">${(p.images||[]).join(" + ")}</span>
+      </div>`).join("")||`<p class="hint">No pages matched — check the town/state or add a page tag in your sheet.</p>`;
+    $("#modal").innerHTML=`
+      <div class="mh"><span style="font-size:18px">📝</span><h3>Post for ${esc(r.title)}</h3>
+        <button class="iconbtn" onclick="openReport('${id}')">← Back</button></div>
+      <div class="mb" style="max-height:66vh;overflow:auto">
+        <div class="hint" style="margin-top:0">Template: <b>${esc(data.templateUsed||"?")}</b></div>
+        <div class="sqlbox" style="margin-top:8px">
+          <button class="btn" onclick="copyText('postText',this)">⧉ Copy text</button>
+          <textarea id="postText" readonly style="min-height:210px;font-family:inherit;font-size:13px;white-space:pre-wrap">${esc(data.text||"")}</textarea>
+        </div>
+        <div style="font-weight:800;font-size:13px;margin:14px 0 4px">Posts to these pages:</div>
+        ${pagesHtml}
+        <p class="hint" style="margin-top:12px">The images (pet photo, map, flyer) are fetched by the bridge from the report page — use <b>Assemble</b> in the pipeline to download them to local files for the poster. This preview shows the text + routing only.</p>
+      </div>
+      <div class="mf"><div style="flex:1"></div>
+        <button class="btn" onclick="openReport('${id}')">← Back</button>
+        <button class="btn primary" onclick="copyText('postText',this)">⧉ Copy post text</button>
+      </div>`;
+  }catch(e){$("#modal .mb").innerHTML=`<p class="hint" style="color:var(--danger)">Compose failed: ${esc(String(e&&e.message||e))}. The board must be served by the engine bridge for this (open it at http://localhost:8787/petfbi-board.html).</p>`;}
+}
+function livePreviewMap(url){const p=document.querySelector(".mapprev");if(!p)return;
+  if(url){p.style.backgroundImage=`url('${url.replace(/'/g,"%27")}')`;p.textContent="";}
+  else{p.style.backgroundImage="";p.textContent="🗺️ paste a Google Maps image URL below to preview";}}
+async function saveReport(id,editing){
+  const g=s=>$("#f_"+s).value.trim();
+  const title=g("title"); if(!title){toast("Give the report a title.",true);$("#f_title").focus();return;}
+  let r = editing ? {...DB.reports.find(x=>x.id===id)} : {id,claimedBy:"",postedBy:"",ts:Date.now(),claimedAt:"",postedAt:""};
+  r.title=title; r.petType=$("#f_pet").value; r.status=$("#f_status").value;
+  r.sex=$("#f_sex").value; r.reportId=g("reportId"); r.location=g("location");
+  r.link=g("link"); r.mapUrl=g("map"); r.notes=g("notes");
+  if(r.status==="new"){r.claimedBy="";r.claimedAt="";}
+  closeModal();
+  await commit(r, editing?"Report updated":"Report added to the board");
+}
+async function removeReport(id){
+  if(!confirm("Delete this report for everyone? This can't be undone.")) return;
+  DB.reports=DB.reports.filter(r=>r.id!==id); saveLocal();
+  try{ await cloudDeleteReport(id); }catch(e){ setCloudUI("warn"); }
+  closeModal(); render(); toast("Report deleted");
+}
+
+/* ---- admins ---- */
+function renderAdmins(){
+  const rows=DB.admins.map(a=>`
+    <tr>
+      <td><strong>${esc(a.name)}</strong></td>
+      <td>${esc(a.email)||"—"}</td>
+      <td>${esc(a.state)||"*"}</td>
+      <td>${esc(a.towns)||"*"}</td>
+      <td><span class="rolechip">${esc(a.role)||"Admin"}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn ghost" onclick="openAdmin('${a.id}')">Edit</button>
+        <button class="btn danger ghost" onclick="removeAdmin('${a.id}')">Remove</button>
+      </td>
+    </tr>`).join("");
+  $("#view").innerHTML=`
+    <div class="filterbar">
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:15px">Admins</div>
+        <div class="hint" style="margin-top:2px">Who's on the team, and the areas they cover. Names here fill the “claimed by” picker.</div>
+      </div>
+      <button class="btn primary" onclick="openAdmin()">＋ Add admin</button>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>State</th><th>Towns</th><th>Role</th><th></th></tr></thead>
+      <tbody>${rows||`<tr><td colspan="6" class="empty" style="padding:34px">No admins yet — add yourself to get started.</td></tr>`}</tbody>
+    </table></div>`;
+}
+function openAdmin(id){
+  const a = id ? DB.admins.find(x=>x.id===id) : null;
+  const editing=!!a;
+  const d = a || {id:"adm_"+Date.now().toString(36),name:"",email:"",state:"*",towns:"*",role:"Admin"};
+  $("#modal").innerHTML=`
+    <div class="mh"><h3>${editing?"Edit admin":"Add admin"}</h3><button class="iconbtn" onclick="closeModal()">✕</button></div>
+    <div class="mb">
+      <div class="field"><label>Name</label><input id="a_name" value="${esc(d.name)}" placeholder="Full name"></div>
+      <div class="field"><label>Email</label><input id="a_email" value="${esc(d.email)}" placeholder="name@example.com"></div>
+      <div class="row2">
+        <div class="field"><label>State (or * for all)</label><input id="a_state" value="${esc(d.state)}"></div>
+        <div class="field"><label>Role</label><select id="a_role">
+          ${["Admin","Poster","Viewer"].map(r=>`<option ${d.role===r?"selected":""}>${r}</option>`).join("")}</select></div>
+      </div>
+      <div class="field"><label>Towns covered (or * for all)</label><input id="a_towns" value="${esc(d.towns)}" placeholder="Warwick, Cranston…"></div>
+    </div>
+    <div class="mf"><div style="flex:1"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="saveAdmin('${d.id}',${editing})">${editing?"Save":"Add admin"}</button>
+    </div>`;
+  showModal();
+}
+async function saveAdmin(id,editing){
+  const name=$("#a_name").value.trim(); if(!name){toast("Name is required.",true);return;}
+  const a={id,name,email:$("#a_email").value.trim(),state:$("#a_state").value.trim()||"*",
+    towns:$("#a_towns").value.trim()||"*",role:$("#a_role").value};
+  const i=DB.admins.findIndex(x=>x.id===id);
+  if(i>=0)DB.admins[i]=a; else DB.admins.push(a);
+  saveLocal();
+  try{ await cloudUpsertAdmin(a); }catch(e){ setCloudUI("warn"); }
+  closeModal(); fillMe(); render(); toast(editing?"Admin updated":"Admin added");
+}
+async function removeAdmin(id){
+  if(!confirm("Remove this admin?")) return;
+  DB.admins=DB.admins.filter(a=>a.id!==id); saveLocal();
+  try{ await cloudDeleteAdmin(id); }catch(e){ setCloudUI("warn"); }
+  fillMe(); render(); toast("Admin removed");
+}
+
+/* ---- "me" picker ---- */
+function fillMe(){
+  const sel=$("#meSel"); const names=DB.admins.map(a=>a.name).filter(Boolean);
+  sel.innerHTML=`<option value="">— who are you? —</option>`+names.map(n=>`<option ${ME===n?"selected":""}>${esc(n)}</option>`).join("");
+  if(ME&&!names.includes(ME)){sel.innerHTML+=`<option selected>${esc(ME)}</option>`;}
+}
+function setMe(v){ME=v;localStorage.setItem("petfbi_me",v);render();}
+
+/* ============================ settings / cloud ============================ */
+function openSettings(){
+  const c=CLOUD||{url:"",key:""};
+  $("#modal").innerHTML=`
+    <div class="mh"><h3>Shared cloud board</h3><button class="iconbtn" onclick="closeModal()">✕</button></div>
+    <div class="mb">
+      <p class="hint" style="font-size:13px;margin-top:0">
+        Connect a free Supabase database so every admin sees the same board in real time.
+        Leave this empty to keep everything in this browser only.</p>
+      <div class="field"><label>Supabase project URL</label>
+        <input id="s_url" value="${esc(c.url)}" placeholder="https://xxxx.supabase.co"></div>
+      <div class="field"><label>Supabase anon key</label>
+        <input id="s_key" value="${esc(c.key)}" placeholder="eyJhbGci…"></div>
+      <p class="hint">The <b>anon</b> key is designed to be public, so it's safe here. Anyone with this app + key can
+        read and write the board — perfect for your admin team. (Per-person logins are a bigger build.)</p>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:4px" onclick="openSetupGuide()">
+        📖 First time? Set up the shared board — step by step</button>
+    </div>
+    <div class="mf">
+      ${cloudOn()?`<button class="btn danger ghost" onclick="disconnectCloud()">Disconnect</button>`:""}
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="connectCloud()">Connect & sync</button>
+    </div>`;
+  showModal();
+}
+
+/* ---- embedded Supabase SQL (so the single file needs no other downloads) ---- */
+const SCHEMA_SQL = `-- PetFBI board — tables (run once). Supabase -> SQL Editor -> New query -> paste -> Run.
+create table if not exists petfbi_reports (
+  id text primary key, title text not null, pet_type text default 'Dog',
+  status text default 'new', link text default '', map_url text default '',
+  notes text default '', claimed_by text default '', posted_by text default '',
+  ts bigint, claimed_at bigint, posted_at bigint,
+  sex text default '', report_id text default '', location text default '',
+  source text default 'petfbi', landmark text default ''
+);
+create table if not exists petfbi_admins (
+  id text primary key, name text not null, email text default '',
+  state text default '*', towns text default '*', role text default 'Admin'
+);
+alter table petfbi_reports enable row level security;
+drop policy if exists "demo" on petfbi_reports;
+create policy "demo" on petfbi_reports for all using (true) with check (true);
+alter table petfbi_admins enable row level security;
+drop policy if exists "demo" on petfbi_admins;
+create policy "demo" on petfbi_admins for all using (true) with check (true);
+create index if not exists petfbi_reports_ts_idx on petfbi_reports (ts desc);`;
+
+const SAMPLE_SQL = `-- PetFBI board — optional sample data (run after the schema).
+delete from petfbi_reports; delete from petfbi_admins;
+insert into petfbi_admins (id,name,email,state,towns,role) values
+  ('adm_you','You','you@gmail.com','*','*','Admin'),
+  ('adm_mom','Mom','mom@example.com','CA','*','Poster');
+insert into petfbi_reports (id,title,pet_type,status,link,map_url,notes,claimed_by,posted_by,ts,claimed_at,posted_at) values
+  ('rep_s1','Lost beagle near Warwick Pond','Dog','new','https://petfbi.org/report/s1','','Brown & white, blue collar','','',1751900000000,null,null),
+  ('rep_s2','Gray tabby found on Post Rd','Cat','needsinfo','','','No microchip scanned yet','','',1751890000000,null,null),
+  ('rep_s3','Missing husky, Cranston line','Dog','claimed','https://petfbi.org/report/s3','','Answers to Koda','You','',1751880000000,1751881000000,null),
+  ('rep_s4','Cockatiel loose downtown','Bird','posted','','','Posted to the group','Mom','Mom',1751700000000,1751701000000,1751702000000);`;
+
+function copyText(id,btn){
+  const el=$("#"+id); el.select(); el.setSelectionRange(0,99999);
+  try{ document.execCommand("copy"); const t=btn.textContent; btn.textContent="✓ Copied"; setTimeout(()=>btn.textContent=t,1400); }
+  catch{ toast("Select the text and copy manually",true); }
+}
+function openSetupGuide(){
+  $("#modal").innerHTML=`
+    <div class="mh"><span style="font-size:18px">📖</span><h3>Set up the shared board</h3>
+      <button class="iconbtn" onclick="openSettings()">← Back</button></div>
+    <div class="mb" style="max-height:66vh;overflow:auto">
+      <p class="hint" style="font-size:13px;margin-top:0">About 5 minutes, free, no credit card. Do this once — then every
+        admin just pastes the same two keys and shares the board.</p>
+
+      <div class="step"><b>1. Make a free account.</b> Go to <a class="link" href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>,
+        click <b>Start your project</b>, sign in with GitHub or email.</div>
+
+      <div class="step"><b>2. New project.</b> Click <b>New project</b>, give it any name (e.g. <code>petfbi</code>),
+        let it generate a password (save it), pick the closest region, <b>Create</b>. Wait ~1–2 min.</div>
+
+      <div class="step"><b>3. Build the tables.</b> Left sidebar → <b>SQL Editor</b> → <b>New query</b>. Paste this, click <b>Run</b>.
+        <span class="hint">"Success. No rows returned" = it worked.</span>
+        <div class="sqlbox">
+          <button class="btn" onclick="copyText('sqlSchema',this)">⧉ Copy</button>
+          <textarea id="sqlSchema" readonly>${esc(SCHEMA_SQL)}</textarea>
+        </div>
+      </div>
+
+      <div class="step"><b>4. (Optional) Add sample data</b> so it's not empty — same spot, paste + Run.
+        <div class="sqlbox">
+          <button class="btn" onclick="copyText('sqlSample',this)">⧉ Copy</button>
+          <textarea id="sqlSample" readonly>${esc(SAMPLE_SQL)}</textarea>
+        </div>
+      </div>
+
+      <div class="step"><b>5. Get your two keys.</b> Bottom-left <b>gear (Project Settings)</b> → <b>API</b>.
+        Copy the <b>Project URL</b> and the <b>anon public</b> key. (The anon key is meant to be public — safe to paste here.)</div>
+
+      <div class="step"><b>6. Connect.</b> Click <b>Back</b>, paste the URL + anon key, hit <b>Connect &amp; sync</b>.
+        The dot turns green. Done — share this file (or host it) and everyone with the same keys sees the same board.</div>
+    </div>
+    <div class="mf"><div style="flex:1"></div>
+      <button class="btn primary" onclick="openSettings()">← Back to connect</button></div>`;
+  showModal();
+}
+async function connectCloud(){
+  const url=$("#s_url").value.trim(), key=$("#s_key").value.trim();
+  if(!url||!key){toast("Paste both the URL and the anon key.",true);return;}
+  CLOUD={url,key}; localStorage.setItem("petfbi_cloud",JSON.stringify(CLOUD));
+  closeModal(); toast("Connecting…");
+  try{
+    await cloudPull(); setCloudUI("on"); render(); fillMe();
+    toast("Connected — board is now shared ✓");
+  }catch(e){
+    setCloudUI("warn");
+    toast("Couldn't reach the database — check the URL/key and that the tables exist.",true);
+  }
+}
+function disconnectCloud(){CLOUD=null;localStorage.removeItem("petfbi_cloud");setCloudUI("off");closeModal();toast("Disconnected — back to local only");}
+
+/* ============================ modal plumbing ============================ */
+function showModal(){$("#scrim").classList.add("show");}
+function closeModal(){$("#scrim").classList.remove("show");}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+/* ============================ boot ============================ */
+async function refresh(){ if(cloudOn()){ try{await cloudPull();setCloudUI("on");}catch(e){setCloudUI("warn");} } render(); }
+async function boot(){
+  loadLocal(); fillMe();
+  if(cloudOn()){
+    setCloudUI("warn");
+    try{ await cloudPull(); setCloudUI("on"); }catch(e){ setCloudUI("warn"); toast("Cloud unreachable — showing local copy",true); }
+  }else setCloudUI("off");
+  render();
+  // light polling so a shared board stays fresh while open
+  setInterval(()=>{ if(cloudOn()&&!$("#scrim").classList.contains("show")) refresh(); }, 20000);
+}
+boot();
+</script>
+</body>
+</html>

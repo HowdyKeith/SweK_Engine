@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engine — sign in</title>
+<style>
+  :root { --bg:#06090f; --panel:#0a1422; --edge:#2f628f; --blue:#9ac8ff; --dim:#7fa8d8; --text:#cfe6ff; --bad:#ff7b7b; --good:#7fe0a0; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:radial-gradient(circle at 50% 30%, #0c1626, #06090f 70%); color:var(--text); font-family:ui-monospace,Menlo,monospace; }
+  .wrap { min-height:100%; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .card { width:100%; max-width:360px; background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:26px 22px; box-shadow:0 12px 40px rgba(0,0,0,0.5); }
+  h1 { font-size:16px; margin:0 0 4px; color:var(--blue); letter-spacing:.06em; }
+  p.sub { font-size:11px; color:var(--dim); margin:0 0 20px; line-height:1.5; }
+  label { font-size:11px; color:var(--dim); display:block; margin-bottom:6px; }
+  input { width:100%; background:#04070d; color:var(--text); border:1px solid var(--edge); border-radius:8px; padding:11px 12px; font:14px ui-monospace,monospace; }
+  button { width:100%; margin-top:14px; background:#173656; color:var(--blue); border:1px solid var(--edge); border-radius:8px; padding:11px; font:13px ui-monospace,monospace; cursor:pointer; }
+  button:active { background:#1d4a78; }
+  #msg { font-size:12px; margin-top:12px; min-height:16px; }
+  #msg.bad { color:var(--bad); } #msg.good { color:var(--good); }
+  .setup { margin-top:18px; padding-top:16px; border-top:1px solid #14304a; font-size:11px; color:var(--dim); line-height:1.5; display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🔒 Engine sign-in</h1>
+    <p class="sub">Name yourself and enter the password to continue.</p>
+    <label for="who">Your name</label>
+    <input type="text" id="who" value="Hiring Agent" autocomplete="off" maxlength="40" spellcheck="false">
+    <label for="pw">Password</label>
+    <input type="password" id="pw" autocomplete="current-password">
+    <button id="go">Sign in</button>
+    <div id="msg"></div>
+    <div class="setup" id="setup">
+      No password is set yet. On the host machine you can set one:
+      open this page at <b>localhost:8787</b> and a setup box will appear, or
+      <code>POST /auth/setup {"password":"…"}</code> from the PC.
+    </div>
+  </div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const msg = (t, cls) => { const m = $("msg"); m.textContent = t || ""; m.className = cls || ""; };
+  async function status(){ try { return await fetch("/auth/status").then(r=>r.json()); } catch { return {}; } }
+  async function signIn(){
+    const password = $("pw").value;
+    const name = (($("who") && $("who").value) || "Hiring Agent").trim() || "Hiring Agent";
+    if (!password) { msg("Enter the password", "bad"); return; }
+    msg("Signing in…");
+    try {
+      const r = await fetch("/auth/login", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ password, name }) }).then(x=>x.json());
+      if (r.ok) { msg("Welcome, " + (r.name || name) + " — redirecting…", "good"); location.href = "/"; }
+      else msg(r.error || "Wrong password", "bad");
+    } catch { msg("Bridge unreachable", "bad"); }
+  }
+  $("go").onclick = signIn;
+  $("pw").addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
+
+  // First-time setup helper: if auth isn't enabled yet AND we're on localhost,
+  // turn the form into a "set a password" box.
+  (async () => {
+    const s = await status();
+    const local = /^(localhost|127\.|\[::1\])/.test(location.host);
+    if (s && s.enabled === false) {
+      if (local) {
+        document.querySelector("h1").textContent = "🔑 Set a password";
+        document.querySelector("p.sub").textContent = "No password is set. Choose one (min 6 chars) to protect this bridge before exposing it.";
+        $("pw").setAttribute("autocomplete","new-password");
+        $("go").textContent = "Set password";
+        $("go").onclick = async () => {
+          const password = $("pw").value;
+          if (!password || password.length < 6) { msg("At least 6 characters", "bad"); return; }
+          msg("Saving…");
+          try { const r = await fetch("/auth/setup", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ password }) }).then(x=>x.json());
+            if (r.ok) { msg("Password set — sign in now", "good"); setTimeout(()=>location.reload(), 900); }
+            else msg(r.error || "Failed", "bad");
+          } catch { msg("Bridge unreachable", "bad"); }
+        };
+      } else {
+        $("setup").style.display = "block";
+        msg("No password set yet — do first-time setup from the host machine.", "");
+      }
+    }
+  })();
+</script>
+</body>
+</html>

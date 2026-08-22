@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to rgb.config.json. The bridge tries openrgb_sdk -> openrgb_cli -> ha and uses the first that's up; set RGB_BACKEND to force one. For openrgb_sdk, enable 'SDK Server' in OpenRGB (port 6742). For ha, list your light.* entities. SOLAR_FOLLOW tints SOLAR_TARGETS (or all devices) by battery %.",
+  "RGB_BACKEND": "auto",
+  "OPENRGB_HOST": "127.0.0.1",
+  "OPENRGB_PORT": 6742,
+  "OPENRGB_CLI": "OpenRGB",
+  "HA_RGB_ENTITIES": ["light.light_bar_left", "light.light_bar_right"],
+  "SOLAR_BATTERY_ENTITY": "sensor.solar_battery_level",
+  "SOLAR_TARGETS": [],
+  "SOLAR_FOLLOW": false,
+  "SOLAR_POLL_MS": 30000
+}

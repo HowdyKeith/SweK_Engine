@@ -1,0 +1,22 @@
+{
+  "name": "swek-dictate-tray",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SweK global-hotkey dictation helper: hotkey -> mic (ffmpeg) -> whisper.cpp (via the SweK bridge) -> optional Ollama polish -> type into the focused app. Talks only to your local SweK bridge on :8787.",
+  "type": "commonjs",
+  "main": "dictate-tray.js",
+  "bin": { "swek-dictate": "dictate-tray.js" },
+  "scripts": {
+    "start": "node dictate-tray.js",
+    "once": "node dictate-tray.js --once"
+  },
+  "dependencies": {
+    "node-global-key-listener": "^0.3.0",
+    "systray2": "^2.1.4"
+  },
+  "optionalDependencies": {
+    "@ricky0123/vad-node": "^0.0.3",
+    "onnxruntime-node": "^1.27.0"
+  },
+  "engines": { "node": ">=18" }
+}

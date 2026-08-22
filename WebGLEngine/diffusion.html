@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — diffusion by two routes</title>
+<meta name="demo:desc" content="The diffusion coefficient of a Lennard-Jones fluid, read from one trajectory two ways: Einstein's mean-squared-displacement slope from positions, and the Green-Kubo velocity-autocorrelation integral from velocities. Their equality is a theorem, so a disagreement is never different physics, it is always a bug. Sabotage computes the MSD from WRAPPED coordinates: it saturates, looks beautifully converged, and reports a number about the box.">
+<style>
+  html,body { margin:0; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { max-width:940px; margin:0 auto; padding:18px; line-height:1.65; }
+  canvas { border:1px solid #22304a; border-radius:6px; width:100%; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 12px; font:12px ui-monospace,monospace; cursor:pointer; margin-right:6px; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  table { border-collapse:collapse; margin-top:10px; } td,th { border:1px solid #22304a; padding:5px 10px; }
+  .num { text-align:right; } .dim { color:#7f96b8; } .good { color:#9be15d; } .bad { color:#ff9a9a; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h2 style="margin:0 0 4px;">Self-diffusion, two routes</h2>
+  <div class="dim">The fourth pair on the consistency board and the first with <b>no closed form on either side</b>: a Lennard-Jones D at one state point is not something algebra hands you, so two mechanisms are the only check there is. Einstein integrates displacement over long times; Green-Kubo correlates velocities over short ones. They fail in opposite directions, so between them they say <i>which</i> problem you have. Gate: <code>physics/md/diffusion-selfcheck.mjs</code>.</div>
+  <p><button id="run">Run trajectory</button>
+     <button id="sab" class="sab" title="MSD from wrapped coordinates: it saturates, looks converged, and measures the box">Sabotage: wrapped MSD</button></p>
+  <div id="out"><span class="dim">idle — a run is a real MD trajectory, a few seconds</span></div>
+  <canvas id="plot" width="900" height="320"></canvas>
+  <div class="dim" style="margin-top:6px;">left: mean-squared displacement against time (Einstein fits the late, linear part). right: the velocity autocorrelation (Green-Kubo integrates it until it decays into noise).</div>
+</div>
+<script type="module">
+import { runTrajectory, einsteinD, greenKuboD } from "./physics/md/diffusion.js";
+
+const out = document.getElementById("out");
+const cv = document.getElementById("plot"), ctx = cv.getContext("2d");
+
+function draw(tr) {
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, 900, 320);
+  const n = tr.msd.length;
+  const maxM = Math.max(...tr.msd), maxV = Math.abs(tr.vacf[0]);
+  // MSD panel
+  ctx.strokeStyle = "#22304a"; ctx.strokeRect(40, 20, 390, 270);
+  ctx.strokeStyle = "rgba(89,209,255,0.95)"; ctx.beginPath();
+  for (let i = 0; i < n; i++) { const x = 40 + 390 * i / n, y = 290 - 270 * tr.msd[i] / maxM; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke();
+  ctx.fillStyle = "rgba(155,225,93,0.18)"; ctx.fillRect(40 + 390 * 0.5, 20, 390 * 0.5, 270);
+  ctx.fillStyle = "#9be15d"; ctx.fillText("Einstein fit window", 40 + 390 * 0.52, 34);
+  ctx.fillStyle = "#7f96b8"; ctx.fillText("MSD", 44, 16); ctx.fillText("t", 424, 304);
+  // VACF panel
+  ctx.strokeStyle = "#22304a"; ctx.strokeRect(470, 20, 390, 270);
+  const zero = 20 + 270 * 0.75;
+  ctx.strokeStyle = "#22304a"; ctx.beginPath(); ctx.moveTo(470, zero); ctx.lineTo(860, zero); ctx.stroke();
+  ctx.strokeStyle = "rgba(246,166,35,0.95)"; ctx.beginPath();
+  for (let i = 0; i < n; i++) { const x = 470 + 390 * i / n, y = zero - (270 * 0.75) * tr.vacf[i] / maxV; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke();
+  ctx.fillStyle = "rgba(246,166,35,0.16)"; ctx.fillRect(470, 20, 390 * 0.6, 270);
+  ctx.fillStyle = "#f6a623"; ctx.fillText("Green-Kubo integration window", 476, 34);
+  ctx.fillStyle = "#7f96b8"; ctx.fillText("<v(0)·v(t)>", 474, 16); ctx.fillText("t", 852, 304);
+}
+
+async function go(wrapMSD) {
+  out.innerHTML = "<span class='dim'>running a real MD trajectory…</span>";
+  await new Promise((r) => setTimeout(r, 30));
+  const tr = runTrajectory({ seed: (Date.now() & 0xffff) | 1, steps: 3000, warmup: 1000, wrapMSD });
+  const e = einsteinD({ msd: tr.msd, dt: tr.dt });
+  const g = greenKuboD({ vacf: tr.vacf, dt: tr.dt });
+  draw(tr);
+  const rel = Math.abs(e.D - g.D) / ((e.D + g.D) / 2);
+  const agree = rel < 0.10;
+  out.innerHTML = "<table><tr><th>route</th><th>reads</th><th class='num'>D</th></tr>" +
+    "<tr><td>Einstein</td><td class='dim'>positions, long times</td><td class='num'>" + e.D.toFixed(5) + "</td></tr>" +
+    "<tr><td>Green-Kubo</td><td class='dim'>velocities, short times</td><td class='num'>" + g.D.toFixed(5) + "</td></tr>" +
+    "</table><div style='margin-top:6px;'>relative difference <b class='" + (agree ? "good" : "bad") + "'>" + (rel * 100).toFixed(1) + "%</b>" +
+    " against a 10% tolerance earned from a measured 6.3% seed spread · N=" + tr.N + ", rho=" + tr.density.toFixed(3) + ", " + tr.origins + " time origins" +
+    (wrapMSD ? "<br><span class='bad'>SABOTAGE LIVE: the MSD is built from wrapped coordinates. It stops growing, the fit is clean, and Einstein now reports a number about the box — while Green-Kubo, which reads velocities, is untouched. A single estimator would have reported the smaller number with a straight face.</span>" : "") + "</div>";
+}
+document.getElementById("run").onclick = () => go(false);
+document.getElementById("sab").onclick = () => go(true);
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

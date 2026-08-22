@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK Physics — Hamiltonian Monte Carlo</title>
+<meta name="demo:desc" content="MCMC where the proposal is physics: parameters get momenta and a leapfrog trajectory rolls over the negative log-density, so the sampler moves along the contours instead of shuffling. The acceptance rate IS the integrator diagnostic (near 1 when H is conserved). Sabotage buttons demonstrate both directions of the classic trap: wrong gradient (correct but slow) vs wrong accept-potential and non-symplectic Euler (confidently wrong — caught only by the exact-moments key).">
+<style>
+  html,body { margin:0; height:100%; background:#05070d; color:#cfe0ff; font:13px ui-monospace,Menlo,monospace; }
+  #wrap { display:flex; flex-direction:column; height:100%; }
+  #stage { position:relative; flex:1; min-height:0; }
+  #c { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 10px; background:#0a0e18; border-top:1px solid #17202f; }
+  button { background:#132033; color:#cfe0ff; border:1px solid #24344e; border-radius:6px; padding:6px 10px; font:12px ui-monospace,monospace; cursor:pointer; }
+  button.sab { border-color:#5a2230; color:#ff9a9a; }
+  button.on { outline:2px solid #f6a623; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(6,10,20,.85); border:1px solid #22304a; border-radius:8px; padding:10px 12px; line-height:1.55; max-width:430px; }
+  .good { color:#9be15d; } .bad { color:#ff9a9a; } .dim { color:#7f96b8; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="hud">loading…</div>
+  </div>
+  <div id="bar">
+    <button id="mClean" class="on">Clean HMC</button>
+    <button id="mGrad" class="sab" title="roll on an isotropic field, accept with the TRUE potential — still correct, pays in acceptance">Sabotage: wrong gradient</button>
+    <button id="mAccept" class="sab" title="accept against the WRONG potential — acceptance stays high, the chain converges to the wrong law">Sabotage: wrong accept-U</button>
+    <button id="mEuler" class="sab" title="non-symplectic Euler under the same accept rule">Sabotage: Euler</button>
+    <button id="reset">Reset chain</button>
+    <button id="tune" title="the proposer-adjudicator handshake: a measured search over (eps, L) maximizes effective samples per gradient, then the exact-moments key adjudicates the winner before it is adopted. The proposer never writes the verdict.">Auto-tune (eps, L)</button>
+    <span class="dim">the ellipse is the EXACT 2-sigma contour of the target; the sample cloud must fill it — and only the clean and wrong-gradient chains do</span>​<a href="/bayes-fit.html" style="color:#8fb4d8;margin-left:8px;">→ inference instrument</a>
+  </div>
+</div>
+<script type="module">
+import { makeRng, gaussian2D, leapfrog, eulerStepWRONG, hmcStep } from "./physics/hmc/hmc.js";
+
+const cv = document.getElementById("c"), ctx = cv.getContext("2d"), hud = document.getElementById("hud");
+let W = 0, H = 0;
+function resize() { const r = cv.getBoundingClientRect(); W = cv.width = Math.max(480, r.width | 0); H = cv.height = Math.max(320, r.height | 0); }
+addEventListener("resize", resize);
+
+const target = gaussian2D([1, -1], [[1, 0.8], [0.8, 1]]);
+const iso = gaussian2D([1, -1], [[1, 0], [0, 1]]);
+const MODES = {
+  clean:  { label: "clean HMC", opts: {} },
+  grad:   { label: "wrong gradient (accept exact)", opts: { gradFn: iso.gradU } },
+  accept: { label: "wrong accept-U", opts: { gradFn: iso.gradU, acceptU: iso.U } },
+  euler:  { label: "Euler (non-symplectic)", opts: { integrator: eulerStepWRONG } },
+};
+let mode = "clean", rng = makeRng(7), q = target.mu.slice();
+let samples = [], accepted = 0, steps = 0, sumAbsDH = 0, lastTraj = null;
+
+function resetChain() { rng = makeRng(7); q = target.mu.slice(); samples = []; accepted = 0; steps = 0; sumAbsDH = 0; lastTraj = null; }
+
+for (const [id, m] of [["mClean", "clean"], ["mGrad", "grad"], ["mAccept", "accept"], ["mEuler", "euler"]]) {
+  document.getElementById(id).onclick = () => { mode = m; resetChain();
+    for (const b of document.querySelectorAll("#bar button")) b.classList.remove("on");
+    document.getElementById(id).classList.add("on"); };
+}
+document.getElementById("reset").onclick = resetChain;
+// v3282 -- the proposer-adjudicator handshake, live: search (eps, L) for ESS/gradient, adjudicate the winner
+// against the exact moments, adopt ONLY on a pass. The chain visibly changes gait when adopted.
+let tunedCfg = null;
+document.getElementById("tune").onclick = async function () {
+  this.disabled = true; this.textContent = "tuning…";
+  const { tuneHMC, adjudicate } = await import("./physics/hmc/tune.js");
+  const { best } = tuneHMC(target, { seed: (Date.now() & 0xff) + 1 });
+  const verdict = adjudicate(target, best, { seed: 21 });
+  if (verdict.pass) { tunedCfg = { eps: best.eps, L: best.L }; resetChain();
+    this.textContent = "tuned: eps=" + best.eps + " L=" + best.L + " (" + best.essPerGrad.toExponential(1) + " ESS/grad, adjudicated ✓)"; }
+  else { this.textContent = "proposer's pick FAILED adjudication — not adopted"; }
+  this.disabled = false;
+};
+
+// one HMC transition per animation frame, tracing the trajectory so you can SEE it roll
+function stepOnce() {
+  const o = MODES[mode].opts, eps = tunedCfg ? tunedCfg.eps : 0.18, L = tunedCfg ? tunedCfg.L : 24;
+  const gradFn = o.gradFn || target.gradU, integ = o.integrator || leapfrog, Ufn = o.acceptU || target.U;
+  const p0 = [rng.gauss(), rng.gauss()];
+  const Hof = (qq, pp) => Ufn(qq) + (pp[0] * pp[0] + pp[1] * pp[1]) / 2;
+  const H0 = Hof(q, p0);
+  // integrate step by step to record the path
+  let qq = q.slice(), pp = p0.slice(), traj = [qq.slice()];
+  for (let i = 0; i < L; i++) { const r = integ(qq, pp, eps, 1, gradFn); qq = r.q; pp = r.p; traj.push(qq.slice()); }
+  const dH = Hof(qq, pp) - H0;
+  const acc = Math.log(rng.u()) < -dH;
+  if (acc) { q = qq; accepted++; }
+  steps++; sumAbsDH += Math.abs(dH);
+  samples.push(q.slice()); if (samples.length > 4000) samples.shift();
+  lastTraj = { traj, acc };
+}
+
+const px = (x, y) => [W / 2 + (x - 1) * 90, H / 2 + (y + 1) * 90];   // centered on the mean
+function drawContour() {
+  // exact 2-sigma ellipse of S = [[1,.8],[.8,1]]: eigvecs at 45deg, eigvals 1.8 and 0.2
+  ctx.strokeStyle = "rgba(89,209,255,0.5)"; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let a = 0; a <= 6.30; a += 0.05) {
+    const ex = Math.cos(a) * 2 * Math.sqrt(1.8), ey = Math.sin(a) * 2 * Math.sqrt(0.2);
+    const x = (ex - ey) / Math.SQRT2 + 1, y = (ex + ey) / Math.SQRT2 - 1;
+    const [sx, sy] = px(x, y);
+    a === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+}
+
+function frame() {
+  stepOnce(); stepOnce();   // two transitions per frame keeps it lively
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, W, H);
+  drawContour();
+  ctx.fillStyle = "rgba(155,225,93,0.35)";
+  for (const s of samples) { const [x, y] = px(s[0], s[1]); ctx.fillRect(x - 1, y - 1, 2, 2); }
+  if (lastTraj) {
+    ctx.strokeStyle = lastTraj.acc ? "rgba(246,166,35,0.9)" : "rgba(255,120,120,0.7)"; ctx.lineWidth = 1.5; ctx.beginPath();
+    lastTraj.traj.forEach((s, i) => { const [x, y] = px(s[0], s[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.stroke();
+  }
+  // live moments vs truth
+  let mx = 0, my = 0; for (const s of samples) { mx += s[0]; my += s[1]; } mx /= samples.length || 1; my /= samples.length || 1;
+  let cxy = 0, cxx = 0, cyy = 0; for (const s of samples) { const a = s[0] - mx, b = s[1] - my; cxx += a * a; cxy += a * b; cyy += b * b; }
+  const n = Math.max(1, samples.length - 1); cxx /= n; cxy /= n; cyy /= n;
+  const accPct = steps ? (accepted / steps * 100) : 0;
+  const corrOk = Math.abs(cxy - 0.8) < 0.15 && Math.abs(cxx - 1) < 0.2;
+  hud.innerHTML =
+    "<b>" + MODES[mode].label + "</b><br>" +
+    "accept <b class='" + (accPct > 90 ? "good" : accPct > 40 ? "dim" : "bad") + "'>" + accPct.toFixed(1) + "%</b>" +
+    " · mean |dH| " + (steps ? (sumAbsDH / steps).toExponential(1) : "-") + " · " + steps + " transitions<br>" +
+    "recovered cov [" + cxx.toFixed(2) + ", " + cxy.toFixed(2) + ", " + cyy.toFixed(2) + "] vs truth [1.00, 0.80, 1.00] " +
+    (samples.length > 800 ? ("<b class='" + (corrOk ? "good" : "bad") + "'>" + (corrOk ? "MATCHES" : "WRONG LAW") + "</b>") : "<span class='dim'>(collecting…)</span>") + "<br>" +
+    "<span class='dim'>acceptance is the integrator diagnostic; the moments are the answer key. Wrong-gradient stays green (slower); wrong accept-U and Euler go red — the gate (physics/hmc/hmc-selfcheck.mjs) pins all four.</span>";
+  requestAnimationFrame(frame);
+}
+resize(); frame();
+</script>
+<script type="module" src="/ui/recordFloat.js"></script>
+</body>
+</html>

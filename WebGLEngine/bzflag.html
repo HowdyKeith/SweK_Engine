@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BZFlag world viewer — SweK</title>
+<style>
+  :root { --bg:#0a0d10; --panel:#12171c; --edge:#243039; --ink:#c9d6de; --dim:#6d818e; --hot:#2fd6b0; }
+  * { box-sizing:border-box }
+  html,body { height:100%; margin:0; background:var(--bg); color:var(--ink);
+              font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace }
+  #stage { position:fixed; inset:0 }
+  canvas { display:block; width:100%; height:100% }
+  #hud { position:fixed; left:12px; top:12px; z-index:2; background:rgba(18,23,28,.88);
+         border:1px solid var(--edge); border-radius:10px; padding:10px 12px; min-width:260px; max-width:340px }
+  #hud h1 { font-size:12px; margin:0 0 6px; letter-spacing:.14em; text-transform:uppercase; color:var(--hot) }
+  #hud .row { display:flex; justify-content:space-between; gap:12px; color:var(--dim) }
+  #hud .row b { color:var(--ink); font-weight:600 }
+  #cov { margin-top:8px; padding-top:8px; border-top:1px solid var(--edge); color:var(--dim); white-space:pre-wrap; font-size:11px; max-height:34vh; overflow:auto }
+  #drop { position:fixed; inset:0; z-index:3; display:none; place-items:center;
+          background:rgba(10,13,16,.85); border:2px dashed var(--hot); color:var(--hot); font-size:16px }
+  #drop.on { display:grid }
+  #help { position:fixed; right:12px; bottom:12px; z-index:2; color:var(--dim); font-size:11px; text-align:right }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl"></canvas></div>
+<div id="hud">
+  <h1>BZFlag world</h1>
+  <div class="row"><span>map</span><b id="mName">—</b></div>
+  <div class="row"><span>world</span><b id="mSize">—</b></div>
+  <div class="row"><span>obstacles</span><b id="mObs">—</b></div>
+  <div class="row"><span>triangles</span><b id="mTri">—</b></div>
+  <div class="row"><span>links / zones</span><b id="mLZ">—</b></div>
+  <!-- v2839 -- THESE FIVE ROWS WERE WRITTEN TO BUT NEVER EXISTED. The render loop set mTank and mReload
+       every frame, so document.getElementById returned null and the page threw "Cannot set properties of
+       null (setting textContent)" -- killing the frame that was drawing it. The values were always being
+       computed; there was simply nowhere to put them. -->
+  <div class="row"><span>room</span><b id="mRoom">—</b></div>
+  <div class="row"><span>score (k/d)</span><b id="mScore">—</b></div>
+  <div class="row"><span>peers</span><b id="mPeers">—</b></div>
+  <div class="row"><span>tank</span><b id="mTank">—</b></div>
+  <div class="row"><span>reload</span><b id="mReload">—</b></div>
+  <div id="cov"></div>
+  <details id="bzTools" style="margin-top:8px;border-top:1px solid var(--edge);padding-top:6px;">
+    <summary style="cursor:pointer;color:var(--hot);font-size:12px;">map tools (run on this box)</summary>
+    <div style="font-size:10px;color:var(--dim);margin:4px 0;">a filesystem path to a <code>.bzw</code> ON THIS MACHINE (the drop above only loads it in the browser):</div>
+    <input id="bzPath" type="text" placeholder="C:\path\to\hix.bzw" style="width:100%;box-sizing:border-box;background:#0a0f13;border:1px solid var(--edge);color:var(--ink);border-radius:4px;padding:3px 6px;font:11px ui-monospace,monospace;">
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">
+      <button id="bzCov" style="flex:1;min-width:66px;background:#10231a;color:var(--hot);border:1px solid #224a36;border-radius:5px;padding:4px 6px;font:11px ui-monospace,monospace;cursor:pointer;">Coverage</button>
+      <button id="bzBuild" style="flex:1;min-width:66px;background:#10231a;color:var(--hot);border:1px solid #224a36;border-radius:5px;padding:4px 6px;font:11px ui-monospace,monospace;cursor:pointer;">Build artifact</button>
+      <button id="bzClone" style="flex:1;min-width:66px;background:#14202b;color:#8fc7ff;border:1px solid #244a6c;border-radius:5px;padding:4px 6px;font:11px ui-monospace,monospace;cursor:pointer;">Clone BZFlag maps</button>
+      <button id="bzSelf" style="flex:1;min-width:66px;background:#14202b;color:#8fc7ff;border:1px solid #244a6c;border-radius:5px;padding:4px 6px;font:11px ui-monospace,monospace;cursor:pointer;">Run selfchecks</button>
+      <button id="bzToolStop" style="flex:1;min-width:66px;background:#2b1414;color:#e8736a;border:1px solid #6c2424;border-radius:5px;padding:4px 6px;font:11px ui-monospace,monospace;cursor:pointer;" title="Abort the running build, coverage, or selfcheck">Stop</button>
+    </div>
+    <div style="font-size:9px;color:var(--dim);margin-top:4px;">BZFlag is cloned to <code>~/.voxelbridge/bzflag</code> (outside SweK) &mdash; its maps are never vendored.</div>
+    <pre id="bzOut" style="display:none;margin-top:6px;max-height:200px;overflow:auto;background:#080c0f;border:1px solid var(--edge);border-radius:4px;padding:6px;font:10px ui-monospace,monospace;color:#bfe;white-space:pre-wrap;"></pre>
+  </details>
+</div>
+<div id="drop">drop a .bzw file</div>
+<div id="help">W/S drive &middot; A/D turn &middot; SPACE jump &middot; F fire &middot; C camera<br>drag to orbit &middot; wheel to zoom &middot; drop a .bzw<br><span style="color:var(--hot)">?url=http://host:8788&amp;room=arena</span> for the GPU Brain &middot; <span style="color:var(--hot)">?bzfs=host:5154</span> to PLAY on a real BZFlag server (add <span style="color:var(--hot)">&amp;observe</span> to watch)</div>
+
+<script type="module">
+import { parseBZW } from "./bz/bzwParse.js";
+import { buildWorld, boundsOf } from "./bz/bzwWorld.js";
+import { buildWorldMesh, boxMesh, transformMesh } from "./bz/bzGeom.js";
+import { makeBZDB } from "./bz/bzdb.js";
+import { makeTank, stepTank, stepShot } from "./bz/bzTank.js";
+import { killTank, respawn, findSpawn } from "./bz/bzCombat.js";
+import { tankId, packTank, peerTanks, makeNetState, reportHits, queueDamage, ingestDamage, deadPeers, SYSTEM } from "./bz/bzNet.js";
+import { PresenceManager, httpPresenceTransport, makeNet } from "./ev/presence.js";
+import { createClient, State } from "./bz/net/bzfsClient.mjs";
+import { adaptWorld } from "./bz/net/bzWorldAdapt.js";
+import { TeamColor, PlayerType } from "./bz/net/bzProtocol.js";
+import { Status } from "./bz/net/bzPlayerState.js";
+import { createPlaySession } from "./bz/net/bzfsPlay.js";
+import { coverageReport, formatCoverage } from "./bz/bzCoverage.js";
+
+const $ = (id) => document.getElementById(id);
+// v2839 -- a HUD row that is missing must degrade to NOT SHOWN, never to a thrown frame. The five rows below
+// were absent for long enough that the page failed render QA on every run; a null-safe setter means the next
+// one costs a blank readout instead of the whole game loop.
+const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; return !!el; };
+const cv = $("gl");
+const gl = cv.getContext("webgl2", { antialias: true, depth: true });
+if (!gl) { document.body.innerHTML = "<p style='padding:20px'>WebGL2 is required.</p>"; throw new Error("no webgl2"); }
+
+// --- shaders -----------------------------------------------------------------------------------
+// Flat-lit: BZFlag's obstacles are hard-edged and a per-face normal is all they want. The rim term keeps
+// a box from disappearing into the background when it faces away from the light.
+const VS = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec3 aCol;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+uniform vec3 uTint;
+out vec3 vNrm; out vec3 vCol; out float vZ;
+void main(){
+  vec4 p = uModel * vec4(aPos,1.0);
+  vNrm = mat3(uModel) * aNrm; vCol = aCol * uTint; vZ = p.z;
+  gl_Position = uMVP * p;
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec3 vNrm; in vec3 vCol; in float vZ;
+uniform vec3 uLight;
+out vec4 fragColor;
+void main(){
+  vec3 n = normalize(vNrm);
+  float d = max(dot(n, normalize(uLight)), 0.0);
+  float ambient = 0.28 + 0.10 * n.z;
+  vec3 c = vCol * (ambient + 0.80 * d);
+  // a faint height cue, because a flat-lit world of boxes reads badly without one
+  c *= 0.92 + 0.08 * clamp(vZ / 40.0, 0.0, 1.0);
+  fragColor = vec4(c, 1.0);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+const uMVP = gl.getUniformLocation(prog, "uMVP");
+const uLight = gl.getUniformLocation(prog, "uLight");
+const uModel = gl.getUniformLocation(prog, "uModel");
+const uTint = gl.getUniformLocation(prog, "uTint");
+const IDENT = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+
+// --- matrices (column-major, as GL wants) --------------------------------------------------------
+function perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+}
+function lookAt(eye, at, up) {
+  const z = norm(sub(eye, at)), x = norm(cross(up, z)), y = cross(z, x);
+  return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+          -dot(x, eye), -dot(y, eye), -dot(z, eye), 1];
+}
+function mul4(a, b) { const o = new Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; }
+  return o; }
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm=(a)=>{const l=Math.hypot(...a)||1;return [a[0]/l,a[1]/l,a[2]/l];};
+
+// --- state --------------------------------------------------------------------------------------
+let vao = null, indexCount = 0;
+let target = [0, 0, 0], dist = 600, yaw = 0.7, pitch = 0.30;
+let world = null, tank = null, chase = true;
+const CHASE_DIST = 34;          // metres. Five tank-lengths back: close enough to see it move.
+const CHASE_PITCH = 0.30;
+let shots = [];
+const db = makeBZDB();
+
+// --- the room ------------------------------------------------------------------------------------
+// Everything on the wire is bz/bzNet.js, and everything under IT is ev/presence.js and ev/esAuthority.js
+// -- written for a game about spaceships, unchanged. bz/tools/bz-live-probe.mjs plays this exact part with
+// no browser: a headless peer that fires at a real `brain/bzPilot.mjs` process and gets killed by it.
+const qs = new URLSearchParams(location.search);
+const NET_URL = (qs.get("url") || "").replace(/\/+$/, "");
+const ROOM = qs.get("room") || "arena";
+const MY_ID = qs.get("id") || ("web-" + Math.random().toString(36).slice(2, 8));
+// v2192 -- a rendezvous server run with SWEK_TOKEN refuses anybody who does not send it.
+const NET_TOKEN = qs.get("token") || "";
+const TOKEN_QS = NET_TOKEN ? "&token=" + encodeURIComponent(NET_TOKEN) : "";
+// v2200 -- ?bzfs=host:port connects to a REAL bzfs, through the WebSocket-to-TCP proxy on this same bridge.
+// It downloads the server's own world and observes. The proxy defaults to this page's origin as ws(s)://.
+const BZFS_TARGET = qs.get("bzfs") || "";
+const PROXY_URL = qs.get("proxy") || ((location.origin || "http://localhost").replace(/^http/, "ws"));
+// v2201 -- by default you PLAY on a real server; `&observe` watches instead. Over TCP alone, because a
+// browser cannot open the UDP fast lane. That is laggier, not broken: `bzfsClient` sends the hot messages
+// down the TCP stream when there is no datagram channel, which is the server's own fallback path.
+const BZFS_OBSERVE = qs.has("observe");
+const RESPAWN_MS = 3000;
+let net = null, mgr = null, netState = null, ghosts = [], evSeq = 0;
+let kills = 0, deaths = 0;
+let rng = () => Math.random();
+
+function joinRoom() {
+  if (!NET_URL) { setText("mRoom", "solo"); return; }
+  mgr = new PresenceManager(MY_ID);
+  net = makeNet(mgr, httpPresenceTransport(NET_URL, ROOM, MY_ID, { token: NET_TOKEN }));
+  netState = makeNetState();
+  setText("mRoom", ROOM);
+  // The event ring is a broadcast bus, not a mailbox: everyone's hits arrive and ownership decides whose
+  // they are. We queue them; the frame validates them, because the frame owns the peer set.
+  setInterval(async () => {
+    try {
+      const r = await fetch(`${NET_URL}/event?room=${encodeURIComponent(ROOM)}&since=${evSeq}${TOKEN_QS}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const j = await r.json();
+      evSeq = j.seq || evSeq;
+      for (const ev of (j.events || [])) if (ev && ev.type === "npcHit" && ev.from !== MY_ID) queueDamage(netState, ev);
+    } catch (e) {}
+  }, 200);
+  addEventListener("beforeunload", () => { try { net.close(); } catch (e) {} });
+}
+
+async function postEvents(events) {
+  if (!NET_URL || !events.length) return;
+  try {
+    // `TOKEN_QS` starts with `&`, and the URL already has `?room=`. It appends; it does not begin.
+    await fetch(`${NET_URL}/event?room=${encodeURIComponent(ROOM)}${TOKEN_QS}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ events }),
+    });
+  } catch (e) {}
+}
+const keys = Object.create(null);
+addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; if (e.key === " ") e.preventDefault(); });
+addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+// A tank body and a barrel, in the tank's own frame. `pos` is the centre of its underside, as everywhere.
+function buildTankMesh(spec) {
+  const m = { positions: [], normals: [], indices: [], colors: [] };
+  const push = (src, col) => {
+    const base = m.positions.length / 3;
+    for (const v of src.positions) m.positions.push(v);
+    for (const v of src.normals) m.normals.push(v);
+    for (const i of src.indices) m.indices.push(i + base);
+    for (let i = 0; i < src.positions.length / 3; i++) m.colors.push(col[0], col[1], col[2]);
+  };
+  push(boxMesh(spec.length / 2, spec.width / 2, spec.height * 0.7), [0.85, 0.25, 0.25]);
+  push(transformMesh(boxMesh(spec.length * 0.28, spec.width * 0.30, spec.height * 0.32),
+       [1,0,0,0, 0,1,0,0, 0,0,1, spec.height * 0.7, 0,0,0,1]), [0.65, 0.18, 0.18]);
+  push(transformMesh(boxMesh(spec.muzzleFront * 0.55, 0.16, 0.32),
+       [1,0,0, spec.muzzleFront * 0.55, 0,1,0,0, 0,0,1, spec.muzzleHeight - 0.16, 0,0,0,1]), [0.4, 0.4, 0.42]);
+  return m;
+}
+let tankVao = null, tankCount = 0, shotVao = null, shotCount = 0;
+function uploadTo(mesh) {
+  const v = gl.createVertexArray();
+  gl.bindVertexArray(v);
+  const buf = (loc, data, n) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, n, gl.FLOAT, false, 0, 0); };
+  buf(0, mesh.positions, 3); buf(1, mesh.normals, 3); buf(2, mesh.colors, 3);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+  return { v, n: mesh.indices.length };
+}
+function modelMatrix(pos, angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  // column-major for GL
+  return new Float32Array([c, s, 0, 0,  -s, c, 0, 0,  0, 0, 1, 0,  pos[0], pos[1], pos[2], 1]);
+}
+
+function upload(mesh) {
+  if (vao) gl.deleteVertexArray(vao);
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const buf = (loc, data, n) => {
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, n, gl.FLOAT, false, 0, 0);
+  };
+  buf(0, mesh.positions, 3);
+  buf(1, mesh.normals, 3);
+  buf(2, mesh.colors, 3);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), gl.STATIC_DRAW);
+  indexCount = mesh.indices.length;
+  gl.bindVertexArray(null);
+}
+
+function loadSource(text, name) {
+  const parsed = parseBZW(text);
+  // Coverage is a property of the TEXT: what keywords the `.bzw` used and whether we read them. A server's
+  // binary world has no such thing (it is the map it is running, not the map somebody typed), so it is
+  // computed here and passed in, not inside the shared world path.
+  const cov = formatCoverage(coverageReport(parsed));
+  loadWorldObject(buildWorld(parsed), name, cov);
+}
+
+// v2200 -- everything from a built world onward, whether it came from a `.bzw` text file or from a real
+// server's binary database (bz/net/bzWorldAdapt.js gives back the same shape). The browser draws them
+// identically, which is the whole point of the adapter.
+function loadWorldObject(w, name, coverageText) {
+  world = w;
+  const mesh = buildWorldMesh(w, { walls: true, ground: true });
+  upload(mesh);
+
+  // v2186 -- ON THE GROUND, not sixty metres above it. The first version dropped the tank from the sky and
+  // it fell for three and a half seconds before anything you pressed did anything.
+  tank = makeTank(db, { pos: [0, 0, 0], angle: Math.PI / 2 });
+  tank.id = tankId(MY_ID);
+  const spot = findSpawn(w, tank, [], rng);
+  if (spot) { tank.pos = spot.pos.slice(); tank.angle = spot.angle; }
+  shots = [];
+  if (tankVao) gl.deleteVertexArray(tankVao);
+  const tm = uploadTo(buildTankMesh(tank.spec)); tankVao = tm.v; tankCount = tm.n;
+  if (!shotVao) { const sm = boxMesh(0.5, 0.5, 0.5); sm.colors = new Array(sm.positions.length).fill(0).map((_, i) => (i % 3 === 1 ? 0.9 : 0.35));
+    const su = uploadTo(sm); shotVao = su.v; shotCount = su.n; }
+
+  const b = boundsOf(w);
+  target = [(b.lo[0] + b.hi[0]) / 2, (b.lo[1] + b.hi[1]) / 2, (b.lo[2] + b.hi[2]) / 2];
+  // v2186 -- CHASE, do not survey. The first version framed the whole map: 360 metres back from a six-metre
+  // tank in a four-hundred-metre world. Every key worked and nothing appeared to move, because a tank
+  // crossing twenty-five metres a second is a pixel a second at that range. `C` still gives you the map.
+  dist = CHASE_DIST;
+
+  setText("mName", name + (w.world.name ? ` · ${w.world.name}` : ""));
+  setText("mSize", `${w.world.size} units`);
+  setText("mObs", String(w.obstacles.length));
+  setText("mTri", String(mesh.indices.length / 3));
+  setText("mLZ", `${w.links.length} / ${w.zones.length}`);
+  // The coverage report goes on screen, not in a log -- for a `.bzw`. A server world sets its own line.
+  if (coverageText != null) setText("cov", coverageText + (w.errors.length ? `\n${w.errors.length} parse warnings` : ""));
+}
+
+// --- interaction ---------------------------------------------------------------------------------
+let drag = null;
+cv.addEventListener("mousedown", (e) => { drag = { x: e.clientX, y: e.clientY, b: e.button }; e.preventDefault(); });
+addEventListener("mouseup", () => { drag = null; });
+addEventListener("mousemove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.b === 2) {
+    const s = dist * 0.0015;
+    const right = [Math.cos(yaw), -Math.sin(yaw), 0];
+    target = [target[0] - right[0] * dx * s, target[1] - right[1] * dx * s, target[2] + dy * s];
+  } else {
+    yaw -= dx * 0.005;
+    pitch = Math.max(-1.45, Math.min(1.45, pitch - dy * 0.005));
+  }
+});
+cv.addEventListener("contextmenu", (e) => e.preventDefault());
+cv.addEventListener("wheel", (e) => { dist *= Math.exp(e.deltaY * 0.0012); dist = Math.max(20, Math.min(6000, dist)); e.preventDefault(); }, { passive: false });
+
+const drop = $("drop");
+["dragenter", "dragover"].forEach((n) => addEventListener(n, (e) => { e.preventDefault(); drop.classList.add("on"); }));
+["dragleave", "drop"].forEach((n) => addEventListener(n, (e) => { e.preventDefault(); drop.classList.remove("on"); }));
+addEventListener("drop", async (e) => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f) return;
+  loadSource(await f.text(), f.name);
+});
+
+// --- draw ------------------------------------------------------------------------------------------
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.floor(innerWidth * dpr); cv.height = Math.floor(innerHeight * dpr);
+  gl.viewport(0, 0, cv.width, cv.height);
+}
+addEventListener("resize", resize);
+resize();
+
+gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.CULL_FACE);   // the geometry is outward-wound; bzw-geom-selfcheck proves it
+gl.cullFace(gl.BACK);
+gl.clearColor(0.04, 0.05, 0.06, 1);
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+
+  // Drive. The physics is bz/bzTank.js, unchanged from what bz-tank-selfcheck.mjs proves headlessly.
+  if (tank && world) {
+    const now = Date.now();
+    const peerIds = net ? net.peerIds(SYSTEM) : [MY_ID];
+    ghosts = net ? peerTanks(net.peers(SYSTEM), MY_ID, tank.spec) : [];
+
+    // 1. Take our hits. Our tank is ours alone to kill, and nobody else's is ours to touch.
+    if (netState && !bzfsSession) {
+      const r = ingestDamage(netState, tank.id, MY_ID, peerIds);
+      if (r.killedBy && !tank.dead) { killTank(tank, r.killedBy, now); deaths++; }
+      for (const gone of deadPeers(netState, net.peers(SYSTEM))) if (gone !== MY_ID) kills++;
+    }
+
+    // 2. Come back, if it is time.
+    if (tank.dead) respawn(tank, world, ghosts, rng, now, RESPAWN_MS);
+
+    const input = {
+      forward: (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0),
+      turn: (keys.a || keys.arrowleft ? 1 : 0) - (keys.d || keys.arrowright ? 1 : 0),
+      jump: !!keys[" "],
+      fire: !!keys.f,
+    };
+
+    if (bzfsSession && bzfsSession.ready) {
+      // On a real server the session owns the tank: it flies other players' shots at our hull, reports our
+      // own death (bzfs does no hit detection), respawns us, and tells the server where we are and what we
+      // fired. Our local `shots` array stays empty -- our shots exist on everybody else's machine.
+      bzfsSession.step(dt, input, now);
+      setText("mScore", `${bzfsSession.kills} / ${bzfsSession.losses}`);
+      setText("mPeers", String(bzfsSession.targets().length));
+      setText("mRoom", (bzfsSession.flag ? "flag: " + bzfsSession.flag + " \u00b7 " : "") + bzfsRoomLabel);
+    } else if (!tank.dead) {
+      const r = stepTank(tank, input, world, dt);
+      if (r.fired) { r.fired.owner = tank.id; shots.push(r.fired); }
+    }
+
+    // 3. Fly our shots. A hit on somebody else's tank is REPORTED, never applied.
+    for (const s of shots) if (!s.dead) stepShot(s, world, dt);
+    if (netState && ghosts.length) postEvents(reportHits(shots, ghosts, MY_ID, netState, now));
+    shots = shots.filter((s) => !s.dead);
+
+    // 4. Say where we are.
+    if (net) net.send(packTank(tank, "Player"));
+
+    setText("mTank", tank.dead ? "destroyed" : `${tank.pos.map((v) => v.toFixed(0)).join(", ")}${tank.onGround ? "" : " · airborne"}`);
+    setText("mReload", tank.reload > 0 ? tank.reload.toFixed(1) + "s" : "ready");
+    setText("mPeers", net ? String(ghosts.length) : "—");
+    setText("mScore", net ? `${kills} / ${deaths}` : "—");
+    if (chase) {
+      target = [tank.pos[0], tank.pos[1], tank.pos[2] + tank.spec.height];
+      yaw = tank.angle + Math.PI;
+    }
+  }
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  if (vao) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const eye = [target[0] + dist * cp * Math.cos(yaw), target[1] + dist * cp * Math.sin(yaw), target[2] + dist * sp];
+    const view = lookAt(eye, target, [0, 0, 1]);
+    const proj = perspective(0.9, cv.width / cv.height, Math.max(1, dist / 800), dist * 6 + 4000);
+    const mvp = new Float32Array(mul4(proj, view));
+    gl.useProgram(prog);
+    gl.uniformMatrix4fv(uMVP, false, mvp);
+    gl.uniform3f(uLight, 0.4, 0.5, 0.76);
+
+    gl.uniformMatrix4fv(uModel, false, IDENT);
+    gl.uniform3f(uTint, 1, 1, 1);
+    gl.bindVertexArray(vao);
+    gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0);
+
+    if (tankVao && tank) {
+      gl.bindVertexArray(tankVao);
+      if (!tank.dead) {
+        gl.uniformMatrix4fv(uModel, false, modelMatrix(tank.pos, tank.angle));
+        gl.drawElements(gl.TRIANGLES, tankCount, gl.UNSIGNED_INT, 0);
+      }
+      // v2200 -- the tanks on a real bzfs, if we are observing one. Same draw as a room ghost.
+      if (bzfsClient) {
+        for (const g of bzfsPeers.values()) {
+          if (!g.alive) continue;
+          gl.uniform3f(uTint, 1.0, 0.75, 0.35);
+          gl.uniformMatrix4fv(uModel, false, modelMatrix([g.pos[0], g.pos[1], g.pos[2] || 0], g.angle || 0));
+          gl.drawElements(gl.TRIANGLES, tankCount, gl.UNSIGNED_INT, 0);
+        }
+        gl.uniform3f(uTint, 1, 1, 1);
+      }
+      // The other tanks in the room. A bot is tinted so you can tell the GPU Brain from a person.
+      for (const g of ghosts) {
+        if (g.dead) continue;
+        gl.uniform3f(uTint, g.bot ? 0.35 : 1.0, g.bot ? 1.5 : 1.0, g.bot ? 1.4 : 1.0);
+        gl.uniformMatrix4fv(uModel, false, modelMatrix(g.pos, g.angle));
+        gl.drawElements(gl.TRIANGLES, tankCount, gl.UNSIGNED_INT, 0);
+      }
+      gl.uniform3f(uTint, 1, 1, 1);
+    }
+    if (shotVao) {
+      gl.uniform3f(uTint, 1.6, 1.6, 1.0);
+      gl.bindVertexArray(shotVao);
+      for (const s of shots) {
+        gl.uniformMatrix4fv(uModel, false, modelMatrix(s.pos, s.angle));
+        gl.drawElements(gl.TRIANGLES, shotCount, gl.UNSIGNED_INT, 0);
+      }
+      gl.uniform3f(uTint, 1, 1, 1);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "c") return;
+  chase = !chase;
+  // Entering chase snaps to a distance a tank is visible from; leaving it frames the map again.
+  dist = chase ? CHASE_DIST : Math.max((world ? world.world.size : 800) * 0.9, 100);
+  pitch = chase ? CHASE_PITCH : 0.55;
+});
+requestAnimationFrame(frame);
+
+// The map that ships with the engine is ours; BZFlag's own are not vendored. Drop one in.
+// v2200 -- CONNECT TO A REAL BZFS, in a browser, through the proxy. It observes: it downloads the server's
+// own world, draws it, and shows the other tanks the server reports. It is the same `bzfsClient` a real
+// server already accepted over TCP; the only difference is the transport, and that difference is a `proxyUrl`.
+let bzfsClient = null, bzfsSession = null, bzfsRoomLabel = "";
+const bzfsPeers = new Map();
+function connectBzfs(target) {
+  const [host, portStr] = target.split(":");
+  const port = parseInt(portStr, 10) || 5154;
+  setText("mRoom", "connecting to " + host + ":" + port + "\u2026");
+  bzfsClient = createClient({
+    host, port, callsign: "web-" + Math.random().toString(36).slice(2, 6),
+    type: PlayerType.TankPlayer, udp: false, wantWorld: true,
+    proxyUrl: PROXY_URL,
+    log: (...a) => console.log("[bzfs]", ...a),
+    team: BZFS_OBSERVE ? TeamColor.ObserverTeam : TeamColor.AutomaticTeam,
+    on: {
+      accepted: () => { bzfsRoomLabel = (BZFS_OBSERVE ? "observing " : "playing on ") + host + ":" + port; setText("mRoom", bzfsRoomLabel); },
+      rejected: (r) => { setText("mRoom", "refused: " + r); setText("cov", "the server said: " + r); },
+      world: (bytes, info) => {
+        // The server's binary world, verified and adapted into the same shape a `.bzw` gives.
+        if (!info || !info.usable) { setText("cov", "world not usable: " + (info ? info.note : "none")); return; }
+        const a = adaptWorld(info.world);
+        if (!a.ok) { setText("cov", "could not adapt the server's world: " + a.reason); return; }
+        loadWorldObject(a, host + ":" + port);
+        setText("cov", "server world: " + a.obstacles.length + " obstacles, "
+          + a.world.size + " units, walked to the last byte"
+          + (BZFS_OBSERVE ? " \u00b7 observing" : " \u00b7 playing over TCP (no UDP fast lane in a browser)"));
+        if (BZFS_OBSERVE) { if (tank) tank.dead = true; return; }
+        // The session already exists -- MsgAddPlayer arrives before the world -- so it only needs the world.
+        bzfsSession.attach(world, tank, world.bzdb);
+      },
+      addPlayer: (p) => { bzfsPeers.set(p.id, { id: p.id, callsign: p.callsign, pos: [0, 0, 0], alive: true }); if (bzfsSession) bzfsSession.handlers.addPlayer(p); },
+      removePlayer: (p) => { bzfsPeers.delete(p.id); if (bzfsSession) bzfsSession.handlers.removePlayer(p); },
+      playerUpdate: (u) => {
+        const q = bzfsPeers.get(u.playerId);
+        if (q) { q.pos = u.state.pos; q.angle = u.state.azimuth; q.alive = (u.state.status & Status.Alive) !== 0; }
+        if (bzfsSession) bzfsSession.handlers.playerUpdate(u);
+      },
+      shotBegin: (sh) => { if (bzfsSession) bzfsSession.handlers.shotBegin(sh); },
+      killed: (k) => { if (bzfsSession) bzfsSession.handlers.killed(k); },
+      // v2202 -- drive over a flag and the session asks for it. Eight of the forty-six change this tank.
+      grabFlag: (g) => { if (bzfsSession) bzfsSession.handlers.grabFlag(g); },
+      dropFlag: (d) => { if (bzfsSession) bzfsSession.handlers.dropFlag(d); },
+      captureFlag: (c) => { if (bzfsSession) bzfsSession.handlers.captureFlag(c); },
+    },
+  });
+  // The same rules the GPU Brain plays by: bz/net/bzfsPlay.js. The only difference is where `input` comes
+  // from. It exists before the world does, because the server names the players first.
+  if (!BZFS_OBSERVE) bzfsSession = createPlaySession({ client: bzfsClient, rnd: rng, respawnMs: RESPAWN_MS });
+  bzfsClient.connect().catch((e) => { setText("mRoom", "no proxy: " + (e && e.message || e)); });
+}
+
+if (BZFS_TARGET) {
+  connectBzfs(BZFS_TARGET);
+} else {
+  joinRoom();
+  fetch("./bz/maps/arena.bzw").then((r) => r.text()).then((t) => loadSource(t, "arena.bzw")).catch(() => {
+    setText("cov", "drop a .bzw to begin");
+  });
+}
+</script>
+<script>
+// v2239 — map tools: run the .bzw coverage/build tools and BZFlag's own maps (cloned locally) from here.
+(function(){
+  var out = document.getElementById("bzOut"), pathEl = document.getElementById("bzPath");
+  if(!out) return;
+  var poll = null;
+  function show(t){ out.style.display="block"; out.textContent=t; }
+  function startPoll(){ if(poll) return; poll=setInterval(function(){
+    fetch("/bz/tools/output",{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.job){ return; }
+      var head = j.job.name + (j.job.running?" \u2014 running\u2026":" \u2014 done (exit "+j.job.exited+")");
+      show(head + "\n\n" + (j.job.log||[]).join("\n"));
+      if(!j.job.running){ clearInterval(poll); poll=null; }
+    }).catch(function(){});
+  }, 1200); }
+  function post(url, bodyObj){
+    show("starting\u2026");
+    fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(bodyObj||{})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j && j.ok===false){ show("error: " + (j.error||"failed")); } else { if(j&&j.command) show("$ "+j.command+"\n"); if(j&&j.already) show(j.note||"already done"); startPoll(); } })
+      .catch(function(e){ show("request failed: " + e); });
+  }
+  document.getElementById("bzCov").onclick   = function(){ post("/bz/coverage", { path: pathEl.value.trim() }); };
+  document.getElementById("bzBuild").onclick = function(){ post("/bz/build", { path: pathEl.value.trim() }); };
+  document.getElementById("bzClone").onclick = function(){ if(!confirm("Clone BZFlag (branch 2.4) into ~/.voxelbridge/bzflag? It's a shallow git clone of the public repo for local map analysis; nothing is vendored into SweK.")) return; post("/bz/maps/clone", {}); };
+  document.getElementById("bzSelf").onclick  = function(){ post("/bz/maps/selfcheck", {}); };
+  document.getElementById("bzToolStop").onclick = function(){ post("/bz/tools/stop", {}); };
+})();
+</script>
+</body>
+</html>

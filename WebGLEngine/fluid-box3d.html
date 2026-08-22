@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; box3d + Fluid (two-way coupling)</title>
+<style>
+  html,body { margin:0; height:100%; background:#02030a; color:#dfe7f2; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #c { position:fixed; inset:0; margin:auto; background:#04070f; display:block; cursor:grab; }
+  #c:active { cursor:grabbing; }
+  #hud { position:fixed; left:12px; top:10px; z-index:5; display:flex; gap:12px; align-items:center; flex-wrap:wrap; max-width:calc(100% - 28px); background:rgba(6,10,22,.66); border:1px solid #1a2440; border-radius:10px; padding:8px 13px; backdrop-filter:blur(6px); }
+  b.t { color:#5fe6d0; } #mode { padding:2px 8px; border-radius:5px; border:1px solid #1f5a52; background:#0a1a17; color:#7fe6d6; }
+  #mode.fallback { border-color:#5a4520; background:#1a1400; color:#e8c45a; }
+  button { font:11px ui-monospace,monospace; padding:3px 10px; border-radius:5px; cursor:pointer; background:#0e1b1a; color:#8fe6d6; border:1px solid #245047; }
+  button:hover { background:#123028; } button.on { background:#1b3a33; color:#bff5e8; }
+  #stat { color:#7f93ab; }
+  #note { position:fixed; left:12px; bottom:10px; z-index:5; color:#5c7088; font-size:11px; background:rgba(6,10,22,.6); border:1px solid #16203a; border-radius:8px; padding:6px 10px; max-width:min(720px,92vw); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <span><b class="t">SweK</b> &middot; box3d + fluid <span id="mode">loading&hellip;</span></span>
+  <button id="light">drop light</button>
+  <button id="heavy">drop heavy</button>
+  <button id="reset">reset</button>
+  <button id="pause">pause</button>
+  <span id="stat"></span>
+</div>
+<div id="note"><b>box3d owns the rigid bodies; the fluid supplies buoyancy + drag.</b> Each frame: box3d transforms &rarr; fluid stamps them as moving solids &rarr; the fluid pressure over each body is fed back to box3d as a force &rarr; box3d resolves gravity, contacts, and the buoyancy. Light bodies (teal) float, heavy ones (amber) sink. The coupler (<b>physics/fluidBox3d.js</b>) is unit-tested against a mock 3D world; it uses the real box3d WASM when built (see the box3d page), otherwise a JS gravity fallback so buoyancy still shows.</div>
+<script type="module">
+import { Flip3D } from "./fluid/flip3d.mjs";
+import { createFluidBox3D } from "./physics/fluidBox3d.js";
+
+const NX = 24, NY = 30, NZ = 24, G = -18;
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+const modeEl = document.getElementById("mode"), statEl = document.getElementById("stat");
+let paused = false, yaw = 0.6, pitch = 0.5, world = null, fluid = null, cp = null, recs = [];
+
+// --- JS 3D fallback world: mirrors the box3d handle API (addBox/setVelocity/angularImpulse/readTransforms/
+// readVelocities/step) with gravity + floor bounce + quaternion spin. Real box3d (contacts, stacking) is used
+// instead when the WASM is built. ---
+function jsFallbackWorld(gravity, lo, hi) {
+  const bs = [];
+  const qmul = (a, b) => [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  return {
+    addBox({ pos = [0, 0, 0], half = [1, 1, 1], density = 1 } = {}) { const m = density * 8 * half[0] * half[1] * half[2]; bs.push({ pos: [...pos], vel: [0, 0, 0], quat: [0, 0, 0, 1], avel: [0, 0, 0], half: [...half], density, I: m * (half[0] * half[0] + half[1] * half[1]) * 2 / 3 }); return bs.length - 1; },
+    setVelocity(i, v) { if (bs[i]) bs[i].vel = [v[0], v[1], v[2]]; },
+    angularImpulse(i, imp) { const b = bs[i]; if (!b) return; b.avel[0] += imp[0] / b.I; b.avel[1] += imp[1] / b.I; b.avel[2] += imp[2] / b.I; },
+    readTransforms() { const a = new Float32Array(bs.length * 7); for (let i = 0; i < bs.length; i++) { const o = i * 7, b = bs[i]; a[o] = b.pos[0]; a[o + 1] = b.pos[1]; a[o + 2] = b.pos[2]; a[o + 3] = b.quat[0]; a[o + 4] = b.quat[1]; a[o + 5] = b.quat[2]; a[o + 6] = b.quat[3]; } return a; },
+    readVelocities() { const a = new Float32Array(bs.length * 3); for (let i = 0; i < bs.length; i++) { const o = i * 3, b = bs[i]; a[o] = b.vel[0]; a[o + 1] = b.vel[1]; a[o + 2] = b.vel[2]; } return a; },
+    step(dt) { for (const b of bs) { b.vel[1] += gravity * dt; for (let d = 0; d < 3; d++) { b.pos[d] += b.vel[d] * dt; const loD = lo + b.half[d], hiD = hi - b.half[d]; if (b.pos[d] < loD) { b.pos[d] = loD; if (b.vel[d] < 0) b.vel[d] = -b.vel[d] * 0.2; } if (b.pos[d] > hiD) { b.pos[d] = hiD; if (b.vel[d] > 0) b.vel[d] = -b.vel[d] * 0.2; } }
+      const w = b.avel, dq = qmul([w[0], w[1], w[2], 0], b.quat); for (let k = 0; k < 4; k++) b.quat[k] += 0.5 * dq[k] * dt; const n = Math.hypot(b.quat[0], b.quat[1], b.quat[2], b.quat[3]) || 1; for (let k = 0; k < 4; k++) b.quat[k] /= n; for (let d = 0; d < 3; d++) b.avel[d] *= 0.99; } },
+    _bodies: bs,
+  };
+}
+
+async function makeWorld() {
+  try {
+    const mod = await import("./physics/box3d/box3dLoader.js");
+    const st = await mod.box3d.init();
+    if (st && st.ready) { modeEl.textContent = "box3d WASM"; modeEl.className = ""; return mod.box3d.createWorld({ gravity: [0, G, 0] }); }
+  } catch (e) { /* fall through */ }
+  modeEl.textContent = "JS fallback"; modeEl.className = "fallback";
+  return jsFallbackWorld(G, 1, NX - 1);
+}
+
+function reset() {
+  let s = 7; const rng = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  fluid = new Flip3D(NX, NY, NZ, { iters: 36, gravity: G, flipRatio: 0.9, twoWay: true });
+  fluid.fillBlock(2, 2, 2, NX - 2, 15, NZ - 2, 2, rng);
+  cp = createFluidBox3D(world, fluid, { gravity: G, scale: 1, substeps: 2 });
+  recs = [];
+}
+
+function drop(density) {
+  const x = 5 + Math.random() * (NX - 10), z = 5 + Math.random() * (NZ - 10), h = 2 + Math.random() * 1;
+  const rec = cp.addBox([x, NY - 5, z], [h, h, h], density); rec.density = density; recs.push(rec);
+  if (recs.length > 10) recs.shift();
+}
+
+// --- ortho 3D->2D projection (rotate by yaw/pitch, then flatten); returns [sx, sy, depth] ---
+function project(x, y, z) {
+  const cx = NX / 2, cy = NY / 2, cz = NZ / 2; let px = x - cx, py = y - cy, pz = z - cz;
+  const cy0 = Math.cos(yaw), sy0 = Math.sin(yaw); let rx = px * cy0 - pz * sy0, rz = px * sy0 + pz * cy0;
+  const cp0 = Math.cos(pitch), sp0 = Math.sin(pitch); let ry = py * cp0 - rz * sp0; rz = py * sp0 + rz * cp0;
+  const scl = Math.min(cvs.width, cvs.height) / (NY * 1.4);
+  return [cvs.width / 2 + rx * scl, cvs.height / 2 - ry * scl, rz];
+}
+
+function render() {
+  ctx.fillStyle = "#04070f"; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  // particles: build (screen, depth, color), sort far->near
+  const pts = [];
+  for (let k = 0; k < fluid.count(); k++) {
+    const p = project(fluid.px[k], fluid.py[k], fluid.pz[k]);
+    const sp = Math.min(1, Math.hypot(fluid.pvx[k], fluid.pvy[k], fluid.pvz[k]) / 12);
+    pts.push([p[0], p[1], p[2], sp]);
+  }
+  pts.sort((a, b) => a[2] - b[2]);
+  for (const q of pts) {
+    const sp = q[3]; let r, g, b;
+    if (sp < 0.5) { const t = sp * 2; r = 40 + t * 200; g = 150 + t * 50; b = 190 - t * 20; } else { const t = (sp - 0.5) * 2; r = 240; g = 200 + t * 55; b = 90 + t * 165; }
+    ctx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; ctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3);
+  }
+  // bodies: read box3d transforms, draw as projected cubes tinted by density
+  const xf = world.readTransforms();
+  const drawn = recs.map(r => ({ r, c: project(xf[r.idx * 7], xf[r.idx * 7 + 1], xf[r.idx * 7 + 2]) }));
+  drawn.sort((a, b) => a.c[2] - b.c[2]);
+  for (const { r, c } of drawn) {
+    const o = r.idx * 7, cx = xf[o], cy = xf[o + 1], cz = xf[o + 2], qx = xf[o + 3], qy = xf[o + 4], qz = xf[o + 5], qw = xf[o + 6];
+    const hx = r.fbody.hx, hy = r.fbody.hy, hz = r.fbody.hz;
+    const d = r.density != null ? r.density : 1, t = Math.max(0, Math.min(1, (d - 0.3) / 1.8));
+    const rr = (90 + t * 150) | 0, gg = (220 - t * 130) | 0, bb = (205 - t * 150) | 0;
+    // rotate each local corner by the box3d quaternion, then project
+    const qrot = (vx, vy, vz) => { const tx = 2 * (qy * vz - qz * vy), ty = 2 * (qz * vx - qx * vz), tz = 2 * (qx * vy - qy * vx);
+      return [vx + qw * tx + (qy * tz - qz * ty), vy + qw * ty + (qz * tx - qx * tz), vz + qw * tz + (qx * ty - qy * tx)]; };
+    const corners = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) { const lr = qrot(sx * hx, sy * hy, sz * hz); corners.push(project(cx + lr[0], cy + lr[1], cz + lr[2])); }
+    ctx.strokeStyle = `rgb(${rr},${gg},${bb})`; ctx.fillStyle = `rgba(${rr},${gg},${bb},0.14)`; ctx.lineWidth = 1.3;
+    const edges = [[0, 1], [0, 2], [0, 4], [1, 3], [1, 5], [2, 3], [2, 6], [3, 7], [4, 5], [4, 6], [5, 7], [6, 7]];
+    ctx.beginPath(); for (const [a, b2] of edges) { ctx.moveTo(corners[a][0], corners[a][1]); ctx.lineTo(corners[b2][0], corners[b2][1]); } ctx.stroke();
+  }
+  statEl.textContent = fluid.count().toLocaleString() + " particles \u00b7 " + recs.length + " bodies \u00b7 " + NX + "\u00b3";
+}
+
+function frame() {
+  if (!paused && cp) { cp.step(1 / 60); }
+  if (fluid) render();
+  requestAnimationFrame(frame);
+}
+
+function resize() { const dpr = Math.min(window.devicePixelRatio || 1, 2); cvs.width = innerWidth * dpr; cvs.height = innerHeight * dpr; }
+addEventListener("resize", resize); resize();
+
+let drag = false, lx = 0, ly = 0;
+cvs.addEventListener("pointerdown", e => { drag = true; lx = e.clientX; ly = e.clientY; cvs.setPointerCapture(e.pointerId); });
+cvs.addEventListener("pointerup", () => drag = false);
+cvs.addEventListener("pointermove", e => { if (!drag) return; yaw += (e.clientX - lx) * 0.008; pitch = Math.max(-1.3, Math.min(1.3, pitch - (e.clientY - ly) * 0.008)); lx = e.clientX; ly = e.clientY; });
+
+document.getElementById("light").onclick = () => drop(0.35 + Math.random() * 0.3);
+document.getElementById("heavy").onclick = () => drop(1.6 + Math.random() * 1.2);
+document.getElementById("reset").onclick = () => reset();
+const pb = document.getElementById("pause"); pb.onclick = () => { paused = !paused; pb.textContent = paused ? "play" : "pause"; pb.className = paused ? "on" : ""; };
+
+world = await makeWorld();
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

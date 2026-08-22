@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Solar</title>
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:radial-gradient(120% 80% at 50% -10%, #11211f 0%, var(--bg) 60%); color:var(--ink); font:14px/1.45 ui-rounded,system-ui,sans-serif; }
+  header { padding:12px 16px; display:flex; align-items:center; gap:10px; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--sun); }
+  header .sp { flex:1; }
+  .badge { font-size:11px; padding:3px 9px; border-radius:7px; border:1px solid var(--line); color:var(--dim); }
+  .badge.live { color:var(--grn); border-color:#224a36; } .badge.stale { color:var(--sun); border-color:#5a4a22; } .badge.off { color:var(--red); border-color:#5a2222; }
+  header button { background:#0f161b; color:var(--dim); border:1px solid var(--line); border-radius:9px; padding:7px 11px; font:inherit; cursor:pointer; }
+  main { max-width:680px; margin:0 auto; padding:6px 16px 24px; }
+  .gauges { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .card { background:#0e1513; border:1px solid var(--line); border-radius:18px; padding:14px; text-align:center; }
+  .card .lbl { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  .big { font-size:30px; font-weight:800; margin-top:2px; } .big small { font-size:14px; color:var(--dim); font-weight:600; }
+  .sub { color:var(--dim); font-size:12px; margin-top:2px; }
+  svg .track { stroke:#1c2622; } 
+  .bar { height:14px; border-radius:8px; background:#16201c; overflow:hidden; margin-top:10px; position:relative; }
+  .bar > i { position:absolute; top:0; bottom:0; display:block; }
+  .net { background:#0e1513; border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:14px; text-align:center; font-size:15px; }
+  .net b { font-size:18px; }
+  #cfg { background:#0e1513; border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:14px; display:none; }
+  #cfg.on { display:block; }
+  #cfg label { display:block; color:var(--dim); font-size:12px; margin:9px 0 4px; }
+  #cfg select { width:100%; padding:8px; background:#10151d; color:var(--ink); border:1px solid var(--line); border-radius:7px; font:inherit; }
+  .ck { display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer; color:var(--ink); }
+  #cfg button.save { margin-top:13px; background:#10231a; color:var(--grn); border:1px solid #224a36; border-radius:8px; padding:8px 14px; font:inherit; cursor:pointer; }
+  #msg { color:var(--dim); font-size:12px; margin-top:9px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">☀️</span> Solar &amp; energy</span>
+    <span class="sp"></span>
+    <span id="live" class="badge">…</span>
+    <button id="gear">⚙ Setup</button>
+  </header>
+  <main>
+    <div class="gauges">
+      <div class="card"><div class="lbl">Producing</div><svg id="gP" viewBox="0 0 120 92" width="100%" height="100"></svg><div class="big" id="vP">—</div></div>
+      <div class="card"><div class="lbl">Home battery</div><svg id="gB" viewBox="0 0 120 92" width="100%" height="100"></svg><div class="big" id="vB">—</div></div>
+    </div>
+    <div class="net" id="net">—</div>
+    <div class="gauges" style="margin-top:14px;">
+      <div class="card"><div class="lbl">Grid</div><div class="big" id="vG">—</div><div class="bar"><i id="bG"></i></div><div class="sub" id="sG"></div></div>
+      <div class="card"><div class="lbl">Energy today</div><div class="big" id="vE">—</div><div class="sub">generated since midnight</div></div>
+    </div>
+
+    <div id="cfg">
+      <div style="color:var(--dim); font-size:12px;">Map your Home Assistant sensors to each role (Enphase Envoy entities are auto-listed).</div>
+      <label>Production power (W/kW)</label><select id="cP"></select>
+      <label>Energy today (kWh)</label><select id="cE"></select>
+      <label>Grid net power (+import / −export)</label><select id="cG"></select>
+      <label>Home battery (%)</label><select id="cB"></select>
+      <label class="ck"><input id="cMood" type="checkbox" /> Tie the avatar's mood to the battery (low = worried, healthy = content)</label>
+      <button class="save" id="save">Save</button>
+      <div id="msg"></div>
+    </div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const num = (r) => r ? parseFloat(r.state) : NaN;
+  // normalize to watts: if unit is kW, x1000
+  function watts(r){ if (!r) return NaN; let v = parseFloat(r.state); if (isNaN(v)) return NaN; const u = (r.unit||"").toLowerCase(); if (u === "kw") v *= 1000; return v; }
+  function fmtPower(w){ if (isNaN(w)) return "—"; const a = Math.abs(w); return a >= 1000 ? (w/1000).toFixed(2) : Math.round(w).toString(); }
+  function unitPower(w){ return Math.abs(w) >= 1000 ? "kW" : "W"; }
+
+  // 270° dial: -135°..+135°
+  function polar(cx,cy,r,deg){ const a = (deg-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+  function arc(cx,cy,r,a0,a1){ const [x0,y0]=polar(cx,cy,r,a0),[x1,y1]=polar(cx,cy,r,a1); const big = (a1-a0)>180?1:0; return `M ${x0} ${y0} A ${r} ${r} 0 ${big} 1 ${x1} ${y1}`; }
+  function dial(svg, frac, color, centerText, sub){
+    frac = Math.max(0, Math.min(1, frac||0));
+    const cx=60, cy=60, r=44, a0=-135, a1=135, av=a0+(a1-a0)*frac;
+    svg.innerHTML =
+      `<path class="track" d="${arc(cx,cy,r,a0,a1)}" fill="none" stroke-width="10" stroke-linecap="round"/>` +
+      (frac>0?`<path d="${arc(cx,cy,r,a0,av)}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"/>`:"") +
+      `<text x="${cx}" y="${cy+2}" text-anchor="middle" fill="${color}" font-size="20" font-weight="800">${centerText}</text>` +
+      (sub?`<text x="${cx}" y="${cy+18}" text-anchor="middle" fill="#7e8c93" font-size="9">${sub}</text>`:"");
+  }
+
+  let states = [], MAXW = 10000;
+  async function sensors(){ try { const r = await fetch("/ha/states?domain=sensor", { cache:"no-store" }); const j = await r.json(); return Array.isArray(j) ? j : []; } catch { return []; } }
+
+  async function load(){
+    let s; try { s = await (await fetch("/ha/solar", { cache:"no-store" })).json(); } catch { s = null; }
+    const b = $("live");
+    if (!s || !s.available) { b.textContent = "no solar data"; b.className = "badge off"; }
+    else if (s.stale) { b.textContent = "stale"; b.className = "badge stale"; }
+    else { b.textContent = "live"; b.className = "badge live"; }
+    if (!s) return;
+    const R = s.roles || {};
+    const pw = watts(R.power), batt = num(R.battery), grid = watts(R.grid), eToday = R.energyToday ? parseFloat(R.energyToday.state) : NaN;
+
+    // production dial (scale to max seen, min 3kW)
+    if (!isNaN(pw)) MAXW = Math.max(MAXW, pw, 3000);
+    dial($("gP"), isNaN(pw)?0:pw/MAXW, "var(--sun)", isNaN(pw)?"—":fmtPower(pw), isNaN(pw)?"":unitPower(pw));
+    $("vP").innerHTML = isNaN(pw) ? "—" : (fmtPower(pw) + " <small>" + unitPower(pw) + "</small>");
+
+    // battery dial
+    const bcol = isNaN(batt)?"#7e8c93":(batt<20?"var(--red)":(batt<50?"var(--sun)":"var(--grn)"));
+    dial($("gB"), isNaN(batt)?0:batt/100, bcol, isNaN(batt)?"—":Math.round(batt)+"%", "");
+    $("vB").innerHTML = isNaN(batt) ? "—" : (Math.round(batt) + " <small>%</small>");
+
+    // grid bar (centered at 0; left=export green, right=import red)
+    if (!isNaN(grid)) {
+      const importing = grid > 0; const mag = Math.min(1, Math.abs(grid)/Math.max(MAXW, 2000));
+      $("vG").innerHTML = fmtPower(Math.abs(grid)) + " <small>" + unitPower(grid) + (importing ? " in" : " out") + "</small>";
+      $("bG").style.cssText = `left:50%; width:${mag*50}%; background:${importing?"var(--red)":"var(--grn)"}; transform:${importing?"none":"translateX(-100%)"};`;
+      $("sG").textContent = importing ? "importing from grid" : "exporting to grid";
+    } else { $("vG").textContent = "—"; $("sG").textContent = ""; }
+
+    $("vE").innerHTML = isNaN(eToday) ? "—" : (eToday.toFixed(1) + " <small>kWh</small>");
+
+    // net statement
+    let net = "—";
+    if (!isNaN(grid)) net = grid > 50 ? `Pulling <b style="color:var(--red)">${fmtPower(Math.abs(grid))}${unitPower(grid)}</b> from the grid` : (grid < -50 ? `Sending <b style="color:var(--grn)">${fmtPower(Math.abs(grid))}${unitPower(grid)}</b> back to the grid` : `<b style="color:var(--grn)">Balanced</b> — running on your own power`);
+    else if (!isNaN(pw)) net = pw > 50 ? `Producing <b style="color:var(--sun)">${fmtPower(pw)}${unitPower(pw)}</b>` : "Panels idle right now";
+    $("net").innerHTML = net;
+  }
+
+  // setup
+  function fillSelect(sel, list, current){ sel.innerHTML = '<option value="">— none —</option>' + list.map(e => '<option value="' + e.entity_id + '"' + (e.entity_id===current?" selected":"") + '>' + (e.name||e.entity_id) + '</option>').join(""); }
+  async function openCfg(){
+    $("cfg").classList.toggle("on");
+    if (!$("cfg").classList.contains("on") || states.length) return;
+    states = await sensors();
+    let cfg = {}; try { cfg = (await (await fetch("/ha/solar/config", { cache:"no-store" })).json()) || {}; } catch {}
+    fillSelect($("cP"), states, cfg.power); fillSelect($("cE"), states, cfg.energyToday); fillSelect($("cG"), states, cfg.grid); fillSelect($("cB"), states, cfg.battery);
+    $("cMood").checked = !!cfg.mood;
+  }
+  $("gear").onclick = openCfg;
+  $("save").onclick = () => {
+    $("msg").textContent = "saving…";
+    fetch("/ha/solar/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ power:$("cP").value, energyToday:$("cE").value, grid:$("cG").value, battery:$("cB").value, mood:$("cMood").checked }) })
+      .then(r => r.json()).then(() => { $("msg").textContent = "✓ saved"; load(); }).catch(e => $("msg").textContent = "✗ " + e);
+  };
+
+  load(); setInterval(load, 5000);
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

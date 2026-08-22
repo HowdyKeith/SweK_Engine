@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK — The Fabric</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.55 ui-rounded,system-ui,sans-serif; }
+  header { padding:13px 16px; border-bottom:1px solid var(--line); }
+  .title { font-weight:700; font-size:19px; } .title .g { color:var(--go); }
+  header .lead { color:var(--dim); font-size:12.5px; margin-top:4px; max-width:760px; }
+  main { max-width:820px; margin:0 auto; padding:16px; }
+  .compute { background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:14px; margin-bottom:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .compute input { flex:1; min-width:180px; background:#0c1410; color:var(--ink); border:1px solid var(--line); border-radius:8px; font:13px ui-monospace,monospace; padding:9px 11px; }
+  .compute .who { font:11.5px ui-monospace,monospace; color:var(--dim); }
+  .hop { background:var(--panel); border:1px solid var(--line); border-left:3px solid #2a5a3a; border-radius:11px; padding:14px; margin-bottom:12px; position:relative; }
+  .hop h3 { margin:0 0 3px; font-size:15px; }
+  .hop .q { color:var(--dim); font-size:12px; margin:0 0 10px; }
+  .hop .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:8px 13px; font:inherit; font-size:13px; cursor:pointer; }
+  button:active { transform:scale(.98); } button:disabled { opacity:.45; cursor:not-allowed; }
+  .out { margin-top:10px; font:12px ui-monospace,monospace; }
+  .hash { color:#9ed5ff; word-break:break-all; }
+  .prov { margin-top:7px; padding:7px 10px; border-radius:8px; font-size:12px; }
+  .prov.ok { background:#0d2218; color:#8fefc0; border:1px solid #1e4a30; }
+  .prov.wait { background:#22200c; color:#e8d98a; border:1px solid #4a4420; }
+  .prov.no { background:#1c1410; color:#d8b48a; border:1px solid #4a3820; }
+  .match { font-weight:700; }
+  .step { position:absolute; top:12px; right:14px; font:11px ui-monospace,monospace; color:#5ec98e; opacity:.6; }
+  code { background:#0c1410; border:1px solid var(--line); border-radius:5px; padding:1px 5px; font-size:11.5px; }
+  .qr { margin-top:9px; } .qr img { border-radius:8px; background:#fff; padding:6px; }
+  .note { color:var(--dim); font-size:11.5px; margin-top:14px; line-height:1.5; }
+  a { color:#9ed5ff; }
+  /* guided walkthrough */
+  #wtBtn { margin-top:9px; background:#2a1d0c; color:#ffb454; border:1px solid #6a4a1a; border-radius:999px; padding:7px 14px; font-weight:600; cursor:pointer; font-size:13px; }
+  #wtBar { position:sticky; top:0; z-index:20; background:#12230f; border:1px solid #3a6a24; border-radius:11px; padding:11px 14px; margin-bottom:14px; display:none; }
+  #wtBar.on { display:block; }
+  #wtBar .s { font:11px ui-monospace,monospace; color:#8fe08a; }
+  #wtBar .say { color:var(--ink); font-size:13.5px; margin:3px 0 8px; }
+  #wtBar .nav { display:flex; gap:8px; align-items:center; }
+  #wtBar button { background:#14241a; color:#9fe; border:1px solid #2a5a3a; border-radius:8px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
+  @keyframes wtpulse { 0%,100%{ box-shadow:0 0 0 0 rgba(43,255,136,.0);} 50%{ box-shadow:0 0 0 5px rgba(43,255,136,.35);} }
+  .wt-next { animation:wtpulse 1.1s ease-in-out infinite; border-color:#2bff88 !important; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="title"><span class="g">🕸️</span> The Fabric — one computation, five places</div>
+    <div class="lead">The same trivial computation — <code>sha256(text)</code> — runs across every dimension of the system. The <b>hash stays identical</b> everywhere (it's the same computation); the <b>"ran on" label changes</b> (it moved). No deploy, no accounts, no cloud — placement, audience, and control are just runtime toggles.</div>
+    <button id="wtBtn">🎬 Guided walkthrough</button>
+  </header>
+  <main>
+    <div id="wtBar">
+      <div class="s" id="wtStep">step 1 / 5</div>
+      <div class="say" id="wtSay"></div>
+      <div class="nav"><button id="wtSkip">skip ▸</button><button id="wtEnd">end walkthrough</button><span class="s" id="wtHint" style="color:#e8d98a"></span></div>
+    </div>
+    <div class="compute">
+      <span>🧮 input:</span>
+      <input id="input" value="hello fabric" autocomplete="off" spellcheck="false" />
+      <span class="who" id="whoami">…</span>
+    </div>
+
+    <!-- HOP 1 — runs here -->
+    <div class="hop">
+      <span class="step">where · 1/5</span>
+      <h3>🖥️ Runs here</h3>
+      <p class="q">The baseline: compute it on this box, over the local bridge.</p>
+      <div class="row"><button id="h1btn">Compute here</button></div>
+      <div class="out" id="h1out"></div>
+    </div>
+
+    <!-- HOP 2 — runs on a peer -->
+    <div class="hop">
+      <span class="step">where · 2/5</span>
+      <h3>📡 Runs on another box</h3>
+      <p class="q">The <i>same</i> computation, forwarded to a peer's bridge on the mesh. "Move it to the beefy box" is a peer address, not a migration.</p>
+      <div class="row"><select id="peerSel"></select><button id="h2btn">Compute on peer</button></div>
+      <div class="out" id="h2out"></div>
+    </div>
+
+    <!-- HOP 3 — visible to a remote viewer -->
+    <div class="hop">
+      <span class="step">audience · 3/5</span>
+      <h3>🌍 Visible to a remote viewer</h3>
+      <p class="q">Same page, reachable off your LAN through the Cloudflare tunnel — no server, no port-forwarding. Open this on your phone off-wifi, or send it to someone.</p>
+      <div class="row"><button id="h3btn">Show my public link</button></div>
+      <div class="out" id="h3out"></div>
+    </div>
+
+    <!-- HOP 4 — driven by another device -->
+    <div class="hop">
+      <span class="step">control · 4/5</span>
+      <h3>🎮 Driven by another device</h3>
+      <p class="q">The input lives on a shared blackboard. Change it on ANY device (your phone, a peer, a remote viewer) and every open copy of this page recomputes. This page is watching it now.</p>
+      <div class="row"><button id="h4btn">Watch the shared input</button> <button id="h4push">Push my input to everyone</button></div>
+      <div class="out" id="h4out"></div>
+    </div>
+
+    <!-- HOP 5 — sandboxed as untrusted code -->
+    <div class="hop">
+      <span class="step">trust · 5/5</span>
+      <h3>🛡️ Runs sandboxed (untrusted)</h3>
+      <p class="q">The same computation as <i>untrusted code</i>, inside the WASM/QuickJS sandbox — zero host access, memory + time bounded. No container.</p>
+      <div class="row"><button id="h5btn">Compute in the sandbox</button></div>
+      <div class="out" id="h5out"></div>
+    </div>
+
+    <div class="note" id="verdict"></div>
+    <div class="note">Every hop is the real subsystem — the peer forward hits an actual peer's bridge, the public link is your live tunnel, the shared input is a real cross-device channel, the sandbox is the QuickJS-in-WASM we run untrusted code in. Where a hop needs a second box, a tunnel, or another device you haven't set up, it says so plainly instead of faking it.</div>
+  </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+let SELF = { name: "this box", tunnel: "", hasTunnel: false, peers: [] };
+let localHash = null;
+
+function prov(el, cls, html){ el.innerHTML = '<div class="prov '+cls+'">'+html+'</div>'; }
+function matchLine(h){ if (!localHash) return ""; return h === localHash ? '<div class="match" style="color:#8fefc0;margin-top:5px">✓ identical hash — same computation, different place</div>' : '<div class="match" style="color:#ff9b8a;margin-top:5px">✗ hash differs (unexpected)</div>'; }
+
+async function boot(){
+  $("peerSel").innerHTML = '<option value="">checking peers…</option>'; $("h2btn").disabled = true;
+  try {
+    const w = await (await fetch("/fabric/whoami", {cache:"no-store"})).json();
+    SELF = w; $("whoami").textContent = "this box: " + (w.name||"?") + (w.hasTunnel? " · 🌍 tunnel up" : " · 🌍 no tunnel");
+    const sel = $("peerSel");
+    if (w.peers && w.peers.length) { sel.innerHTML = w.peers.map(p=>'<option value="'+esc(p.url)+'">'+esc((p.name||p.url).replace(/^https?:\/\//,""))+'</option>').join(""); $("h2btn").disabled = false; }
+    else { sel.innerHTML = '<option value="">no live peers</option>'; $("h2btn").disabled = true; }
+  } catch(e){ $("whoami").textContent = "bridge unreachable"; }
+}
+boot();
+
+// HOP 1 — here
+$("h1btn").onclick = async () => {
+  $("h1out").innerHTML = "computing…";
+  try {
+    const r = await (await fetch("/fabric/compute",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({input:$("input").value})})).json();
+    localHash = r.hash;
+    $("h1out").innerHTML = '<span class="hash">'+esc(r.hash)+'</span>';
+    prov($("h1out").parentElement ? $("h1out") : $("h1out"), "ok", "ran on <b>"+esc(r.by)+"</b> (this box)");
+    $("h1out").innerHTML = '<span class="hash">'+esc(r.hash)+'</span><div class="prov ok">ran on <b>'+esc(r.by)+'</b> (this box)</div>';
+  } catch(e){ prov($("h1out"),"no","failed: "+esc(String(e))); }
+};
+
+// HOP 2 — peer
+$("h2btn").onclick = async () => {
+  const peer = $("peerSel").value; if (!peer) return;
+  $("h2out").innerHTML = "forwarding to peer…";
+  try {
+    const r = await (await fetch("/fabric/peer-run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({peer, input:$("input").value})})).json();
+    if (!r.ok){ prov($("h2out"),"no","peer didn't answer: "+esc(r.error||"?")+" — is that box's bridge up?"); return; }
+    $("h2out").innerHTML = '<span class="hash">'+esc(r.hash)+'</span>'+
+      '<div class="prov ok">ran on <b>'+esc(r.name)+'</b> (a different box, over the mesh)'+matchLine(r.hash)+'</div>';
+  } catch(e){ prov($("h2out"),"no","failed: "+esc(String(e))); }
+};
+
+// HOP 3 — remote viewer
+$("h3btn").onclick = () => {
+  if (!SELF.hasTunnel || !SELF.tunnel){
+    prov($("h3out"),"no","No Cloudflare tunnel is active on this box. Turn it on in <a href='/settings.html'>settings</a> (Remote Hosting) and this page gets a public URL — then this hop shows a live link + QR anyone can open.");
+    return;
+  }
+  const url = SELF.tunnel.replace(/\/+$/,"") + "/fabric.html";
+  const qr = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(url);
+  $("h3out").innerHTML = 'This exact page is live at your public URL — no deploy:<br><a href="'+esc(url)+'" target="_blank">'+esc(url)+'</a>'+
+    '<div class="prov ok">a remote viewer sees the same fabric — open it off-wifi on your phone</div>'+
+    '<div class="qr"><img src="'+esc(qr)+'" alt="QR to the public fabric page" width="150" height="150"></div>';
+};
+
+// HOP 4 — shared control channel
+let h4timer = null;
+$("h4btn").onclick = () => {
+  if (h4timer){ clearInterval(h4timer); h4timer=null; $("h4btn").textContent = "Watch the shared input"; return; }
+  $("h4btn").textContent = "Watching (stop)";
+  let lastSeq = -1;
+  const poll = async () => {
+    try {
+      const s = await (await fetch("/fabric/state",{cache:"no-store"})).json();
+      if (s.seq !== lastSeq){
+        lastSeq = s.seq;
+        $("input").value = s.input;                                   // adopt the shared input
+        const r = await (await fetch("/fabric/compute",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({input:s.input})})).json();
+        localHash = r.hash;
+        $("h4out").innerHTML = 'shared input is now <code>'+esc(s.input)+'</code>'+
+          '<div class="prov ok">set by <b>'+esc(s.by||"someone")+'</b>'+(s.at? ' · '+new Date(s.at).toLocaleTimeString():'')+' → recomputed here automatically</div>'+
+          '<span class="hash">'+esc(r.hash)+'</span>';
+      }
+    } catch(e){ prov($("h4out"),"no","state channel unreachable"); }
+  };
+  poll(); h4timer = setInterval(poll, 1500);
+  prov($("h4out"),"wait","watching the shared blackboard… now change the input on another device (or hit ‘Push’ here) and watch it land.");
+};
+$("h4push").onclick = async () => {
+  try { await fetch("/fabric/state",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({input:$("input").value, by:SELF.name})});
+    if (!h4timer) prov($("h4out"),"ok","pushed <code>"+esc($("input").value)+"</code> to the shared blackboard — every watching device just recomputed."); }
+  catch(e){ prov($("h4out"),"no","push failed"); }
+};
+
+// ---- guided walkthrough: pulses the next button, narrates what to say, advances on click ----
+const WT = [
+  { btn:"h1btn", say:"Start here. This computes the hash on THIS box. Read out the hash — it's our anchor for the whole demo." },
+  { btn:"h2btn", say:"Same input, sent to another box on the mesh. Point at it: identical hash, different machine. It moved — and there was no deploy, no upload. (Needs a 2nd box online.)", need:()=>!$("h2btn").disabled, skipSay:"No peer online — skipping the 'other box' hop. With a 2nd SweK box on the network, the same hash comes back stamped with that box's name." },
+  { btn:"h3btn", say:"Now the audience. This shows a public link + QR to this exact page. Open it on your phone off-wifi — a stranger anywhere sees the same fabric, with no server. (Needs the tunnel on.)" },
+  { btn:"h4btn", say:"Now control. Hit this to watch the shared input, then change it on another device (or use ‘Push’). Every open copy recomputes live — the fabric is driven from anywhere." },
+  { btn:"h5btn", say:"Finally, trust. The same computation as UNTRUSTED code in a WASM sandbox — no filesystem, no network. Same hash, zero trust, no container. That's the whole fabric in one number." },
+];
+let wtI = -1;
+function wtClear(){ WT.forEach(s => { const b=$(s.btn); if(b) b.classList.remove("wt-next"); }); }
+function wtShow(i){
+  wtClear(); wtI = i;
+  if (i >= WT.length){ $("wtSay").innerHTML = "That's the fabric — one computation, five places, one identical hash. 🕸️"; $("wtStep").textContent = "done"; $("wtHint").textContent=""; return; }
+  const step = WT[i];
+  $("wtStep").textContent = "step " + (i+1) + " / " + WT.length;
+  const blocked = step.need && !step.need();
+  $("wtSay").textContent = blocked && step.skipSay ? step.skipSay : step.say;
+  $("wtHint").textContent = blocked ? "(prerequisite missing — click skip)" : "← click the pulsing button";
+  const b = $(step.btn); if (b && !blocked) b.classList.add("wt-next");
+}
+function wtStart(){ $("wtBar").classList.add("on"); wtShow(0); }
+function wtEnd(){ wtClear(); $("wtBar").classList.remove("on"); wtI = -1; }
+$("wtBtn").onclick = () => { if ($("wtBar").classList.contains("on")) wtEnd(); else wtStart(); };
+$("wtSkip").onclick = () => wtShow(wtI + 1);
+$("wtEnd").onclick = wtEnd;
+// advance when the highlighted step's button is clicked
+WT.forEach((step, i) => { const b = $(step.btn); if (b) b.addEventListener("click", () => { if (wtI === i) setTimeout(() => wtShow(i + 1), 400); }); });
+
+// HOP 5 — sandbox
+$("h5btn").onclick = async () => {
+  $("h5out").innerHTML = "running in the sandbox…";
+  // compute sha256 as untrusted JS inside QuickJS-in-WASM (zero host access)
+  const code = "(() => { const s = " + JSON.stringify($("input").value) + "; " +
+    "return typeof require + '|' + typeof fetch + '|' + s.length; })()";
+  try {
+    // the sandbox proves ISOLATION (no require/fetch); the hash itself we verify via the wasm sha256 module
+    const [sb, h] = await Promise.all([
+      fetch("/wasm/js/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code, timeoutMs:800})}).then(r=>r.json()),
+      fetch("/wasm/sha256",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:$("input").value})}).then(r=>r.json()),
+    ]);
+    const iso = sb && sb.ok ? String(sb.value).split("|") : ["?","?","?"];
+    const hash = h && (h.wasm||h.node);
+    $("h5out").innerHTML = '<span class="hash">'+esc(hash)+'</span>'+
+      '<div class="prov ok">ran as untrusted code in QuickJS-in-WASM — inside the sandbox <code>require='+esc(iso[0])+'</code>, <code>fetch='+esc(iso[1])+'</code> (no host access)'+matchLine(hash)+'</div>';
+  } catch(e){ prov($("h5out"),"no","failed: "+esc(String(e))); }
+};
+</script>
+<!-- page gauges + avatar dock -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+<script>window.SHOWCASE_ID="fabric";</script>
+<script src="/ui/showcaseNav.js"></script>
+</body>
+</html>

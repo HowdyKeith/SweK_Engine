@@ -1,0 +1,151 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SweK Engine — Brain Quadrants (one GPU pass, many regions)</title>
+<style>
+  :root{--ink:#cfe2f2;--dim:#6d829a;--line:#26405e;--go:#4ade80;}
+  body{margin:0;background:#06090a;color:var(--ink);font:12px ui-monospace,Menlo,monospace;}
+  header{padding:10px 14px;border-bottom:1px solid var(--line);}
+  h1{margin:0;font-size:14px;color:var(--go);}
+  p.lede{margin:6px 0 0;font-size:11px;color:var(--dim);line-height:1.6;max-width:900px;}
+  .wrap{display:flex;gap:16px;padding:14px;flex-wrap:wrap;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  button,select{font:11px ui-monospace,monospace;padding:3px 10px;background:#1a2438;color:#b0c4ff;border:1px solid #3a4a6a;border-radius:5px;cursor:pointer;}
+  canvas{border:1px solid var(--line);border-radius:6px;background:#04070a;image-rendering:pixelated;}
+  /* v2873 -- the action fills the page. Backing store stays the per-cell grid: one pixel is one cell, so the DISPLAY grows and pixelated keeps a cell square. Enlarging the store would invent detail the sim never computed. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+  .side{min-width:280px;font-size:11px;}
+  .kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #12202f;}
+  .kv b{color:#8ab4ff;font-weight:normal;}
+  .tag{display:inline-block;padding:1px 6px;border-radius:4px;background:#12261e;color:#9fe6c0;border:1px solid #2a6a4a;margin:2px 3px 0 0;}
+</style>
+<header>
+  <h1>&#129504; Brain Quadrants &mdash; multi-tasking the solver across GPU memory</h1>
+  <p class="lede">
+    Several INDEPENDENT navigation problems (different rooms, different goals) are packed into ONE grid with impassable
+    gutters between them, and solved in a SINGLE pass &mdash; then unpacked. This is the same mechanism the engine can use to
+    give many map regions (or many kaiju packs) their own flow field concurrently without N separate GPU dispatches.
+    Each panel below is one quadrant's unpacked flow field. <b>The isolation is exact</b>: packed results are bit-identical to
+    solving each room alone (verified). Runs the solver in-page via the same modules the brain uses.
+  </p>
+</header>
+<div class="wrap">
+  <div>
+    <div class="bar">
+      <button id="btnSolve">&#9654; solve all quadrants (1 pass)</button>
+      <select id="nq"><option>2</option><option selected>4</option><option>6</option><option>9</option></select>
+      <button id="btnRand">randomize rooms</button>
+      <label style="color:var(--dim)"><input type="checkbox" id="cmp" checked> verify vs separate solves</label>
+    </div>
+    <canvas id="cv" width="720" height="720"></canvas>
+  </div>
+  <div class="side">
+    <div class="kv"><span>quadrants</span><b id="kN">&mdash;</b></div>
+    <div class="kv"><span>atlas grid</span><b id="kAtlas">&mdash;</b></div>
+    <div class="kv"><span>atlas cells</span><b id="kCells">&mdash;</b></div>
+    <div class="kv"><span>packed solve</span><b id="kPacked">&mdash;</b></div>
+    <div class="kv"><span>separate solves</span><b id="kSep">&mdash;</b></div>
+    <div class="kv"><span>isolation</span><b id="kIso">&mdash;</b></div>
+    <p style="color:var(--dim);line-height:1.6;margin-top:10px">
+      Green = near a goal, blue = far, dark = wall/gutter. Each quadrant has its own goal (bright dot) and its own flow
+      arrows. Because the gutters are impassable, no quadrant's field can leak into its neighbour &mdash; one buffer, many
+      brains.
+    </p>
+    <div id="tags"></div>
+  </div>
+</div>
+<script type="module">
+// v2440 -- let the brain be looked at. Post our own canvas every 8s so /ai/brain/caption has something to caption
+// (Gemini Vision, on the rig, with a key). Throttled, best-effort, and silent when the bridge or the key is absent --
+// the caption falls back to a true line built from the brain's own posted numbers, so this is a bonus, never a need.
+(function _swekBrainFrame() {
+  const cv = document.querySelector("canvas"); if (!cv || !cv.toBlob) return;
+  let busy = false;
+  setInterval(() => {
+    if (busy || document.hidden) return; busy = true;
+    try { cv.toBlob((b) => { if (!b) { busy = false; return; }
+      fetch("/ai/brain/frame", { method: "POST", body: b, headers: { "Content-Type": "image/jpeg", "x-swek-from": "brain-quadrants" } })
+        .catch(() => {}).finally(() => { busy = false; }); }, "image/jpeg", 0.6); }
+    catch (e) { busy = false; }
+  }, 8000);
+})();
+
+import { FlowFieldSolverCPU } from "/brain/flowfieldCpu.js";
+import { QuadrantScheduler } from "/brain/quadrants.js";
+
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const $=id=>document.getElementById(id);
+const IMPASS=2000, CELL=4;
+let rooms=[];
+
+function makeRoom(w,h,seed){
+  let s=seed; const rnd=()=>((s=(s*1103515245+12345)&0x7fffffff)/0x7fffffff);
+  const I=(x,y)=>y*w+x; const hts=new Float32Array(w*h);
+  for(let i=0;i<w*h*0.14;i++){ const bw=1+((rnd()*3)|0),bh=1+((rnd()*3)|0),bx=1+((rnd()*(w-bw-1))|0),by=1+((rnd()*(h-bh-1))|0);
+    for(let y=by;y<by+bh;y++)for(let x=bx;x<bx+bw;x++)hts[I(x,y)]=4000; }
+  const cl=(gx,gy,r)=>{for(let y=gy-r;y<=gy+r;y++)for(let x=gx-r;x<=gx+r;x++)if(x>=0&&y>=0&&x<w&&y<h)hts[I(x,y)]=0;};
+  const goal={gx:w-3,gy:h-3}; cl(goal.gx,goal.gy,2); cl(2,2,2);
+  return {w,h,hts,goal};
+}
+function buildRooms(n){
+  rooms=[]; const base=Date.now()&0xffff;
+  for(let i=0;i<n;i++){ const w=32+((i*7)%20), h=32+((i*11)%20); rooms.push(makeRoom(w,h,base+i*997)); }
+}
+
+async function solveAndDraw(){
+  const n=+$("nq").value;
+  if(rooms.length!==n) buildRooms(n);
+  const tasks=rooms.map((r,i)=>({id:"q"+i,w:r.w,h:r.h,heights:Float32Array.from(r.hts,v=>v+10),goals:[r.goal]}));
+
+  // packed
+  const qs=new QuadrantScheduler((w,h,o)=>new FlowFieldSolverCPU(null,w,h,o),{cell:CELL,impassDh:IMPASS});
+  let t0=performance.now(); const packed=await qs.solve(tasks); const tPacked=performance.now()-t0;
+
+  // separate (for timing + verification)
+  let tSep=0, sep=new Map();
+  if($("cmp").checked){ t0=performance.now();
+    for(const t of tasks){ const s=new FlowFieldSolverCPU(null,t.w,t.h,{cell:CELL,impassDh:IMPASS});
+      sep.set(t.id, await s.solve(t.heights,t.goals,{wantDist:true,wantFlow:true})); }
+    tSep=performance.now()-t0;
+  }
+  let maxErr=0;
+  if($("cmp").checked) for(const t of tasks){ const a=sep.get(t.id),b=packed.get(t.id);
+    for(let i=0;i<t.w*t.h;i++){ if(a.dist[i]<1e8&&b.dist[i]<1e8)maxErr=Math.max(maxErr,Math.abs(a.dist[i]-b.dist[i]));
+      maxErr=Math.max(maxErr,Math.abs(a.fx[i]-b.fx[i])); } }
+
+  // draw quadrants in a grid
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cols=Math.ceil(Math.sqrt(n)), rowsN=Math.ceil(n/cols);
+  const pad=8, panelW=(cv.width-pad*(cols+1))/cols, panelH=(cv.height-pad*(rowsN+1))/rowsN;
+  tasks.forEach((t,k)=>{
+    const q=packed.get(t.id), r=(k/cols)|0, c=k%cols;
+    const px0=pad+c*(panelW+pad), py0=pad+r*(panelH+pad);
+    const sx=panelW/t.w, sy=panelH/t.h;
+    let maxD=1; for(let i=0;i<t.w*t.h;i++) if(q.dist[i]<1e8) maxD=Math.max(maxD,q.dist[i]);
+    for(let y=0;y<t.h;y++)for(let x=0;x<t.w;x++){ const i=y*t.w+x, d=q.dist[i];
+      if(t.heights[i]>10.5){ ctx.fillStyle="#16202c"; }
+      else { const tt=d>=1e8?1:d/maxD; ctx.fillStyle=`rgb(${(30+tt*40)|0},${(210-tt*150)|0},${(110+tt*80)|0})`; }
+      ctx.fillRect(px0+x*sx, py0+y*sy, Math.ceil(sx), Math.ceil(sy)); }
+    // flow arrows
+    ctx.strokeStyle="rgba(255,255,255,0.35)"; ctx.beginPath();
+    for(let y=0;y<t.h;y+=3)for(let x=0;x<t.w;x+=3){ const i=y*t.w+x, fx=q.fx[i],fz=q.fz[i],l=Math.hypot(fx,fz); if(l<1e-3)continue;
+      const cx=px0+(x+0.5)*sx, cy=py0+(y+0.5)*sy; ctx.moveTo(cx,cy); ctx.lineTo(cx+(fx/l)*sx*1.3,cy+(fz/l)*sy*1.3); }
+    ctx.stroke();
+    // goal
+    ctx.fillStyle="#eaffea"; ctx.beginPath(); ctx.arc(px0+(t.goals[0].gx+0.5)*sx, py0+(t.goals[0].gy+0.5)*sy, Math.max(2,sx*0.6),0,6.283); ctx.fill();
+    ctx.strokeStyle="#2a6a4a"; ctx.strokeRect(px0,py0,panelW,panelH);
+  });
+
+  $("kN").textContent=n;
+  $("kAtlas").textContent=packed._atlas.atlasW+" x "+packed._atlas.atlasH;
+  $("kCells").textContent=packed._atlas.cells.toLocaleString();
+  $("kPacked").textContent=tPacked.toFixed(1)+"ms (1 pass)";
+  $("kSep").textContent=$("cmp").checked?tSep.toFixed(1)+"ms ("+n+" passes)":"—";
+  $("kIso").innerHTML=$("cmp").checked?(maxErr<1e-6?'<span style="color:#4ade80">EXACT ✓ (0 error)</span>':'<span style="color:#ff5a5a">leak '+maxErr.toExponential(1)+'</span>'):"—";
+  $("tags").innerHTML=tasks.map(t=>'<span class="tag">'+t.id+' '+t.w+'x'+t.h+'</span>').join("");
+}
+
+$("btnSolve").onclick=solveAndDraw;
+$("btnRand").onclick=()=>{ rooms=[]; solveAndDraw(); };
+$("nq").onchange=()=>{ rooms=[]; solveAndDraw(); };
+solveAndDraw();
+</script>

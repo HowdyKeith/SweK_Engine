@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SweK Engine — Home Assistant integration map</title>
+<meta name="demo:desc" content="A map of the avatar's Home Assistant integrations: what's set up, what you could set up, and what isn't on the network.">
+<link rel="stylesheet" href="/theme.css" />
+<style>
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .wrap { max-width:880px; margin:0 auto; padding:18px 14px 60px; }
+  h1 { font-size:18px; margin:0 0 2px; }
+  .sub { color:var(--dim); font-size:12.5px; margin:0 0 14px; }
+  .status { font-size:12px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .status.ok { color:var(--ok); border-color:var(--ok); }
+  .status.no { color:var(--red); border-color:var(--red); }
+  .btn { font:inherit; font-size:12px; padding:5px 11px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+  .btn:hover { border-color:var(--accent); }
+
+  /* hub */
+  .hub { display:flex; flex-direction:column; align-items:center; margin:6px 0 0; }
+  .hubnode { display:flex; align-items:center; gap:12px; padding:12px 18px; border:1px solid var(--line); border-radius:14px;
+             background:var(--panel); box-shadow:0 6px 22px rgba(0,0,0,.35); }
+  .hubnode .ic { font-size:22px; }
+  .hubnode .arrow { color:var(--accent); font-size:18px; }
+  .hubnode .ttl { font-weight:600; }
+  .hubnode .st { font-size:11.5px; color:var(--dim); margin-top:2px; }
+  .spine { width:2px; height:22px; background:linear-gradient(var(--line), transparent); }
+
+  /* lanes */
+  .lane { border:1px solid var(--line); border-left-width:4px; border-radius:12px; background:var(--panel);
+          margin:0 0 14px; padding:12px 14px; }
+  .lane.setup  { border-left-color:var(--ok); }
+  .lane.could  { border-left-color:var(--warn); }
+  .lane.absent { border-left-color:var(--off); opacity:.92; }
+  .lane h2 { font-size:13.5px; margin:0 0 3px; display:flex; align-items:center; gap:8px; }
+  .lane h2 .cnt { margin-left:auto; font-size:12px; color:var(--dim); font-weight:400; }
+  .lane .blurb { color:var(--dim); font-size:12px; margin:0 0 10px; }
+  .lane.setup  h2 { color:var(--ok); }
+  .lane.could  h2 { color:var(--warn); }
+  .lane.absent h2 { color:var(--dim); }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:8px; }
+  .chip { border:1px solid var(--line); border-radius:10px; padding:9px 10px; background:rgba(0,0,0,.18); }
+  .chip .top { display:flex; align-items:center; gap:8px; }
+  .chip .top .ic { font-size:16px; }
+  .chip .top .nm { font-weight:600; font-size:13px; }
+  .chip .top .tag { margin-left:auto; font-size:9.5px; letter-spacing:.04em; padding:1px 6px; border-radius:6px; border:1px solid var(--line); color:var(--dim); }
+  .chip .en { color:var(--dim); font-size:11.5px; margin-top:5px; }
+  .chip a.inst { display:inline-block; margin-top:7px; font-size:11.5px; color:var(--accent); text-decoration:none; border:1px solid var(--line); border-radius:7px; padding:3px 8px; }
+  .chip a.inst:hover { border-color:var(--accent); }
+  .lane.absent .chip { background:rgba(0,0,0,.10); }
+  .empty { color:var(--dim); font-size:12px; font-style:italic; }
+  #foot { color:var(--dim); font-size:11.5px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <h1 style="flex:1;">Home Assistant integration map</h1>
+    <span class="status" id="stat">checking…</span>
+    <button class="btn" id="recheck">↻ Re-check</button>
+  </div>
+  <p class="sub">Every integration the avatar looks for, sorted by how reachable it is. Green is live in your HA. Amber is a core integration you could just turn on. Grey at the bottom isn't on the network — the add-on isn't installed in HA (e.g. Frigate) or there's no matching hardware (e.g. no cameras).</p>
+
+  <div class="hub">
+    <div class="hubnode">
+      <span class="ic">🤖</span><span class="arrow">⟷</span><span class="ic">🏠</span>
+      <span><span class="ttl">Avatar ⟷ Home Assistant</span><br><span class="st" id="hubst">…</span></span>
+    </div>
+    <div class="spine"></div>
+  </div>
+
+  <div class="lane setup" id="lane-setup">
+    <h2>✅ Set up &amp; connected <span class="cnt" id="cnt-setup"></span></h2>
+    <p class="blurb">Detected in your HA right now — the engine features these power are available.</p>
+    <div class="grid" id="grid-setup"></div>
+  </div>
+
+  <div class="lane could" id="lane-could">
+    <h2>➕ Ready to set up <span class="cnt" id="cnt-could"></span></h2>
+    <p class="blurb">Core HA integrations you haven't enabled yet — no add-on needed, just add them in HA to light these up.</p>
+    <div class="grid" id="grid-could"></div>
+  </div>
+
+  <div class="lane absent" id="lane-absent">
+    <h2>⚪ Not on the network <span class="cnt" id="cnt-absent"></span></h2>
+    <p class="blurb">Not installed in HA and nothing matching found — these need an add-on (HACS) or hardware on the network before they can connect.</p>
+    <div class="grid" id="grid-absent"></div>
+  </div>
+
+  <div id="foot"></div>
+</div>
+
+<script src="/ui/haIntegrations.js"></script>
+<script>
+  var INTEGRATIONS = window.HA_INTEGRATIONS || [];
+  var present = {}, connected = false;
+
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return ({ "&":"&amp;","<":"&lt;",">":"&gt;" })[c]; }); }
+  function installHref(it){
+    var gh = it.kind === "HACS" && it.url.match(/github\.com\/([^/]+)\/([^/?#]+)/);
+    return gh ? ("https://my.home-assistant.io/redirect/hacs_repository/?owner=" + gh[1] + "&repository=" + gh[2] + "&category=integration") : it.url;
+  }
+  // bucket: detected -> setup; core-not-detected -> could; HACS/external-not-detected -> absent
+  function bucketOf(it){ if (present[it.id]) return "setup"; return it.kind === "core" ? "could" : "absent"; }
+
+  function chip(it, bucket){
+    var showLink = bucket !== "setup";
+    return '<div class="chip">' +
+      '<div class="top"><span class="ic">' + (it.icon || "🔧") + '</span><span class="nm">' + esc(it.label) + '</span>' +
+        '<span class="tag">' + (it.kind === "HACS" ? "HACS" : "core") + '</span></div>' +
+      '<div class="en">' + esc(it.enables) + '</div>' +
+      (showLink ? '<a class="inst" target="_blank" rel="noopener" href="' + esc(installHref(it)) + '">' +
+                    (it.kind === "HACS" ? "Install via HACS ↗" : "Add in HA ↗") + '</a>' : "") +
+      '</div>';
+  }
+
+  function render(){
+    var buckets = { setup:[], could:[], absent:[] };
+    INTEGRATIONS.forEach(function(it){ buckets[bucketOf(it)].push(it); });
+    ["setup","could","absent"].forEach(function(b){
+      var host = document.getElementById("grid-" + b);
+      document.getElementById("cnt-" + b).textContent = buckets[b].length + "";
+      if (!connected && b !== "setup") { host.innerHTML = '<span class="empty">connect HA to evaluate</span>'; return; }
+      host.innerHTML = buckets[b].length ? buckets[b].map(function(it){ return chip(it, b); }).join("") :
+        '<span class="empty">' + (b === "setup" ? "nothing detected yet" : b === "could" ? "all core integrations are connected 🎉" : "nothing missing here") + '</span>';
+    });
+    var got = buckets.setup.length;
+    document.getElementById("foot").textContent = connected
+      ? (got + " of " + INTEGRATIONS.length + " integrations live · " + buckets.could.length + " ready to add · " + buckets.absent.length + " not on the network.")
+      : "Set your HA URL + token in ai-bridge/ha.config.json, then re-check. The token stays server-side.";
+  }
+
+  function load(){
+    var stat = document.getElementById("stat"), hub = document.getElementById("hubst");
+    stat.textContent = "checking…"; stat.className = "status";
+    fetch("/ha/capabilities", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){
+      connected = !!(j && j.available);
+      var all = ((j && j.components) || []).concat((j && j.domains) || []);
+      var have = {}; INTEGRATIONS.forEach(function(it){ have[it.id] = it.detect.some(function(d){ return all.indexOf(d) >= 0; }); });
+      present = have;
+      if (connected) { stat.textContent = "✓ connected" + (j.version ? " · HA " + j.version : ""); stat.className = "status ok";
+        hub.textContent = "linked" + (j.version ? " · HA " + j.version : "") + " · " + all.length + " components/domains seen"; }
+      else { stat.textContent = j && j.configured ? "✗ configured but unreachable" : "✗ not configured"; stat.className = "status no";
+        hub.textContent = "not linked — set HA URL + token, then re-check"; }
+      render();
+    }).catch(function(){
+      connected = false; present = {}; stat.textContent = "✗ bridge unreachable"; stat.className = "status no";
+      hub.textContent = "bridge unreachable"; render();
+    });
+  }
+  document.getElementById("recheck").onclick = load;
+  load();
+</script>
+</body>
+</html>

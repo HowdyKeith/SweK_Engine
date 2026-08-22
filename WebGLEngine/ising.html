@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ising model - a phase transition</title>
+<style>
+  html,body{margin:0;background:#0b0a0e;color:#e0d6ea;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  #wrap{max-width:900px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px}.sub{color:#8a7f95;margin-bottom:14px}
+  .card{border:1px solid #2c2436;background:#130f18;padding:12px 14px;margin-bottom:13px}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  canvas{border:1px solid #241d2c;background:#08060b;image-rendering:pixelated}
+  /* v2872 -- the field fills the page. The backing store stays the simulation grid (the lattice IS the image: 64x64 cells, one pixel each):
+     one pixel is one cell, and that is the honest resolution. Enlarging the store would invent detail
+     the simulation does not have, so the DISPLAY grows instead and pixelated keeps a cell a square. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block;
+           image-rendering: pixelated; }
+  #lat{width:260px;height:260px}#curve{width:520px;height:260px}
+  label{color:#8a7f95;margin-right:6px}input[type=range]{width:230px;vertical-align:middle}
+  button{font:inherit;background:#1d1726;color:#e0d6ea;border:1px solid #3a2f4a;padding:5px 12px;margin-right:6px;cursor:pointer}
+  button:hover{background:#261e31}
+  .num{color:#c9a8e8}.dim{color:#8a7f95}.hot{color:#e8a87c}.cold{color:#7ca8e8}
+  td{padding:1px 14px 1px 0}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Ising model &mdash; a phase transition</h1>
+  <div class="sub">Spins prefer to agree with their neighbours. Heat them and the agreement does not fade &mdash;
+    it <em>collapses</em>, at a temperature Onsager solved exactly in 1944.</div>
+
+  <div class="card">
+    <label>temperature T</label><input id="T" type="range" min="30" max="450" value="200">
+    <span class="num" id="Tv"></span>
+    <span class="dim" id="phase"></span>
+    <div style="margin-top:8px">
+      <button id="run">pause</button><button id="cold">cold start</button><button id="hotstart">random start</button>
+      <label style="margin-left:12px">size</label><select id="L"><option>32</option><option selected>64</option><option>96</option></select>
+    </div>
+  </div>
+
+  <div class="card row">
+    <canvas id="lat" width="64" height="64"></canvas>
+    <div>
+      <table>
+        <tr><td class="dim">Onsager T<sub>c</sub></td><td class="num">2.269185</td></tr>
+        <tr><td class="dim">|magnetisation|</td><td class="num" id="M">-</td></tr>
+        <tr><td class="dim">Yang exact |M|</td><td class="num" id="Y">-</td></tr>
+        <tr><td class="dim">energy per spin</td><td class="num" id="E">-</td></tr>
+        <tr><td class="dim">sweeps</td><td class="num" id="sw">0</td></tr>
+      </table>
+      <div class="dim" style="margin-top:8px;max-width:230px" id="note"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="dim">magnetisation vs temperature &mdash; <span class="num">measured</span> against
+      <span style="color:#7ce8a8">Yang's exact curve</span>. The dashed line is T<sub>c</sub>.</div>
+    <canvas id="curve" width="520" height="260"></canvas>
+    <div style="margin-top:6px"><button id="sweep">run temperature sweep</button>
+      <span class="dim" id="swstat"></span></div>
+  </div>
+</div>
+
+<script type="module">
+import { makeIsing, yangMagnetisation, ONSAGER_TC, measure } from "/physics/statmech/ising.js";
+
+const $=(id)=>document.getElementById(id);
+let sim=null, running=true, sweeps=0;
+
+function build(cold){
+  const L=parseInt($("L").value);
+  sim=makeIsing({L,T:parseFloat($("T").value)/100,seed:(Math.random()*1e9)|0,cold});
+  sweeps=0; $("lat").width=L; $("lat").height=L;
+}
+function draw(){
+  const L=sim.L, ctx=$("lat").getContext("2d"), im=ctx.createImageData(L,L);
+  for(let i=0;i<L*L;i++){
+    const up=sim.spins[i]>0;
+    im.data[i*4]=up?232:32; im.data[i*4+1]=up?214:26; im.data[i*4+2]=up?176:48; im.data[i*4+3]=255;
+  }
+  ctx.putImageData(im,0,0);
+}
+function stats(){
+  const T=sim.T, m=Math.abs(sim.magnetisation()), y=yangMagnetisation(T);
+  $("M").textContent=m.toFixed(4); $("Y").textContent=y.toFixed(4);
+  $("E").textContent=sim.energy().toFixed(4); $("sw").textContent=sweeps;
+  $("phase").innerHTML = T<ONSAGER_TC ? '<span class="cold">ordered</span>' : '<span class="hot">disordered</span>';
+  $("note").innerHTML = T<ONSAGER_TC
+    ? `Below T<sub>c</sub> the lattice picks a direction and holds it. Yang's exact value is the number to beat.`
+    : `Above T<sub>c</sub> there is no order parameter at all &mdash; Yang's curve is exactly zero here, and the
+       measured value is finite only because the lattice is finite.`;
+}
+function frame(){
+  if(running&&sim){ for(let i=0;i<2;i++){sim.sweep();sweeps++;} draw(); stats(); }
+  requestAnimationFrame(frame);
+}
+
+$("T").oninput=()=>{ const T=parseFloat($("T").value)/100; $("Tv").textContent=T.toFixed(3); if(sim)sim.T=T; };
+$("run").onclick=()=>{running=!running;$("run").textContent=running?"pause":"resume";};
+$("cold").onclick=()=>build(true);
+$("hotstart").onclick=()=>build(false);
+$("L").onchange=()=>build(false);
+
+$("sweep").onclick=async()=>{
+  $("sweep").disabled=true; $("swstat").textContent="running...";
+  const L=32, pts=[];
+  for(let i=0;i<=24;i++){
+    const T=1.4+(3.4-1.4)*i/24;
+    pts.push({T, m:measure({L,T,warmup:200,samples:250}).magnetisation, y:yangMagnetisation(T)});
+    await new Promise(r=>setTimeout(r,0));
+    $("swstat").textContent=`T = ${T.toFixed(2)}`;
+  }
+  const c=$("curve"), ctx=c.getContext("2d"), W=c.width, H=c.height, pad=28;
+  ctx.clearRect(0,0,W,H);
+  const X=(T)=>pad+(W-2*pad)*(T-1.4)/2.0, Y=(m)=>H-pad-(H-2*pad)*m;
+  ctx.strokeStyle="#241d2c"; ctx.beginPath(); ctx.moveTo(pad,Y(0)); ctx.lineTo(W-pad,Y(0)); ctx.stroke();
+  ctx.setLineDash([4,4]); ctx.strokeStyle="#5a4a6a";
+  ctx.beginPath(); ctx.moveTo(X(ONSAGER_TC),pad); ctx.lineTo(X(ONSAGER_TC),H-pad); ctx.stroke(); ctx.setLineDash([]);
+  const line=(key,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=1.6; ctx.beginPath();
+    pts.forEach((p,i)=>{ const x=X(p.T),y=Y(p[key]); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke(); };
+  line("y","#7ce8a8"); line("m","#c9a8e8");
+  ctx.fillStyle="#8a7f95"; ctx.font="11px monospace";
+  ctx.fillText("T_c",X(ONSAGER_TC)+3,pad+10); ctx.fillText("1.4",pad-8,H-pad+14); ctx.fillText("3.4",W-pad-10,H-pad+14);
+  $("sweep").disabled=false; $("swstat").textContent="done";
+};
+
+$("T").oninput(); build(false); frame();
+</script>
+</body>
+</html>

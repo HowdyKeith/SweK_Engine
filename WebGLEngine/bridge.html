@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine — Bridge health</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  header .sp { flex:1; }
+  .rt { font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid #26506f; color:var(--acc); background:#10202e; font-weight:700; }
+  .meta { color:var(--dim); font-size:12px; }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px 15px; }
+  .tile .hd { display:flex; align-items:center; gap:9px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--off); flex:0 0 auto; }
+  .dot.up { background:var(--ok); box-shadow:0 0 8px color-mix(in srgb,var(--ok) 60%,transparent); }
+  .dot.warn { background:var(--warn); } .dot.down { background:#3a4a42; } .dot.na { background:#2a3138; }
+  .tile .nm { font-weight:600; flex:1; }
+  .tile .badge { font-size:11px; color:var(--dim); }
+  .tile .det { color:var(--dim); font-size:12.5px; margin-top:7px; line-height:1.5; }
+  .tile .det b { color:var(--ink); font-weight:600; }
+  .pill { display:inline-block; font-size:11px; border:1px solid var(--line); border-radius:6px; padding:1px 7px; margin:2px 4px 0 0; color:var(--dim); }
+  .pill.bad { color:var(--warn); border-color:#5a4a22; }
+  #updated { color:var(--dim); font-size:11px; margin-top:14px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="title"><span class="g">🩺</span> Bridge health</span>
+    <span class="sp"></span>
+    <span class="rt" id="rt">…</span>
+    <span class="meta" id="up"></span>
+  </header>
+  <main>
+    <div class="grid" id="grid"></div>
+    <div id="updated"></div>
+  </main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const get = (u) => fetch(u, { cache:"no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
+  function dur(s){ s = s||0; const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60); return (d?d+"d ":"")+(h||d?h+"h ":"")+m+"m"; }
+
+  function tile(name, state, detailHtml, badge){
+    return '<div class="tile"><div class="hd"><span class="dot ' + state + '"></span><span class="nm">' + esc(name) + '</span>' + (badge?'<span class="badge">'+esc(badge)+'</span>':'') + '</div>' + (detailHtml?'<div class="det">'+detailHtml+'</div>':'') + '</div>';
+  }
+
+  async function load(){
+    const [health, runtime, clients, sys, ha, g2s, g2streams, comfy, gen, bg] = await Promise.all([
+      get("/bridge/health"), get("/runtime"), get("/clients"), get("/system/stats"),
+      get("/ha/states?domain=person"), get("/go2rtc/status"), get("/go2rtc/streams"),
+      get("/comfyui/state"), get("/gen/queue"), get("/bgsvc/status")
+    ]);
+
+    // header
+    if (health) { $("rt").textContent = (health.runtime === "bun" ? "Bun " : "Node ") + (health.version || "?"); $("up").innerHTML = "up <b style='color:var(--ink)'>" + dur(health.uptimeSec) + "</b> · pid " + health.pid + (health.rssMB ? " · " + health.rssMB + "MB" : ""); }
+
+    const tiles = [];
+
+    // runtime / process
+    if (health) tiles.push(tile("Runtime", "up",
+      "<b>" + (health.runtime === "bun" ? "Bun" : "Node") + " " + esc(health.version) + "</b>" + (health.node && health.runtime==="bun" ? " · node " + esc(health.node) : "") + "<br>" + esc(health.platform) + "/" + esc(health.arch) + " · pid " + health.pid + "<br>RSS " + (health.rssMB||"?") + "MB · heap " + (health.heapMB||"?") + "MB"));
+
+    // LAN
+    if (health) tiles.push(tile("LAN address", "up", "<b>" + esc(String(health.lanUrl||"").replace(/^https?:\/\//,"")) + "</b><br>port " + health.port));
+
+    // clients
+    if (clients) { const c = clients.clients || []; const by = {pc:0,phone:0,shield:0}; c.forEach(x => by[x.device]=(by[x.device]||0)+1);
+      tiles.push(tile("Connected clients", c.length?"up":"down", "<b>" + c.length + "</b> connected<br>💻 " + (by.pc||0) + " · 📱 " + (by.phone||0) + " · 📺 " + (by.shield||0), c.length?null:"none")); }
+
+    // system
+    if (sys) {
+      let d = "";
+      const cpu = sys.cpu && (sys.cpu.usagePct ?? sys.cpu.pct ?? sys.cpu.loadPct);
+      if (cpu != null) d += "CPU <b>" + Math.round(cpu) + "%</b>  ";
+      if (sys.memory && sys.memory.usedMB != null) d += "RAM <b>" + Math.round(sys.memory.usedMB/1024) + "/" + Math.round((sys.memory.totalMB||0)/1024) + "GB</b>  ";
+      const gp = sys.gpu && (sys.gpu.utilPct ?? sys.gpu.util);
+      if (gp != null) d += "<br>GPU <b>" + Math.round(gp) + "%</b>" + (sys.gpu && sys.gpu.name ? " · " + esc(sys.gpu.name) : "");
+      tiles.push(tile("System", "up", d || "stats available"));
+    }
+
+    // home assistant
+    { const ok = ha && (Array.isArray(ha) || ha.entities); const n = Array.isArray(ha) ? ha.length : (ha && ha.entities ? ha.entities.length : 0);
+      tiles.push(tile("Home Assistant", ok?"up":"down", ok ? ("<b>connected</b> · " + n + " people tracked") : "not configured / unreachable", ok?null:"off")); }
+
+    // cameras
+    { const run = g2s && g2s.running; const n = (g2streams && g2streams.streams || []).length;
+      tiles.push(tile("Cameras (go2rtc)", run?"up":"down", run ? ("<b>running</b> · " + n + " stream" + (n===1?"":"s")) : (g2s && g2s.installed ? "installed, stopped" : "not running"), run?null:(g2s&&g2s.installed?"stopped":"off"))); }
+
+    // comfyui
+    if (comfy) tiles.push(tile("ComfyUI", comfy.running?"up":(comfy.installed?"down":"na"), comfy.running ? ("<b>running</b> · pid " + comfy.pid) : (comfy.installed ? "installed, stopped" : "not installed"), comfy.running?null:(comfy.installed?"stopped":"n/a")));
+
+    // gen queue
+    if (gen) { const jobs = gen.jobs||[]; const active = jobs.filter(j=>j.status==="queued"||j.status==="running").length;
+      tiles.push(tile("Generation queue", gen.paused?"warn":(active?"up":"down"), "<b>" + jobs.length + "</b> jobs · " + active + " active" + (gen.paused?" · <b style='color:var(--warn)'>paused</b>":""))); }
+
+    // background services
+    if (bg && bg.services) { const svc = bg.services; const ids = Object.keys(svc); const running = ids.filter(k=>svc[k].running);
+      tiles.push(tile("Background services", running.length?"up":"down", "<b>" + running.length + "/" + ids.length + "</b> running<br>" + ids.map(k=>'<span class="pill'+(svc[k].running?'':' bad')+'">'+esc(svc[k].label||k)+'</span>').join(""))); }
+
+    // optional deps
+    if (runtime && runtime.features) { const deg = runtime.degraded || []; const all = Object.keys(runtime.features);
+      tiles.push(tile("Optional modules", deg.length?"warn":"up", (all.length-deg.length) + "/" + all.length + " present" + (deg.length ? "<br>" + deg.map(k=>'<span class="pill bad">'+esc(k)+'</span>').join("") : "<br>all good"))); }
+
+    $("grid").innerHTML = tiles.join("");
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  }
+  load(); setInterval(load, 5000);
+</script>
+</body>
+</html>

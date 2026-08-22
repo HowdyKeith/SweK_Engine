@@ -1,0 +1,329 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Live Region Ray March (v3045)</title>
+<style>
+  html, body { margin:0; background:#0a0e0c; color:#cfe9d8; font:12px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { padding:14px 18px 40px; max-width:1100px; }
+  h1 { font-size:15px; margin:0 0 4px; }
+  h2 { font-size:12px; margin:20px 0 6px; color:#8fd0a8; letter-spacing:.5px; }
+  .sub, .note { color:#6f8a7c; max-width:860px; }
+  .panel { border:1px solid #24382e; padding:10px 12px; margin:8px 0; background:#0d1411; }
+  button { background:#16241d; color:#cfe9d8; border:1px solid #2e4a3b; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 2px 0; }
+  button:hover { background:#1e3227; }
+  button.warn { border-color:#6a4030; color:#e8bfa8; }
+  button.good { border-color:#2e6a4a; }
+  .verdict { font-size:13px; padding:8px 10px; margin:6px 0; border-left:3px solid #2e4a3b; }
+  .pass { color:#8fe0a8; border-left-color:#3f8f5f; }
+  .halt { color:#f0b0a0; border-left-color:#a05040; }
+  .idle { color:#7f9a8c; }
+  canvas { width:720px; height:420px; border:1px solid #24382e; background:#000; }
+  table { border-collapse:collapse; } td { padding:1px 16px 1px 0; } td.k { color:#6f8a7c; }
+  input[type=range] { width:200px; vertical-align:middle; }
+  .law { color:#9ab8a8; border-left:3px solid #2e4a3b; padding-left:10px; margin:6px 0; max-width:860px; }
+  code { color:#b8d8c4; }
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<h1>Live region ray march -- one texture over a window of chunks</h1>
+<div class="sub">
+  The ray-march pass takes a single volume and a world does not fit in one 3D texture. This is the answer that
+  closes the v2783 note: a 4x4 window of 16x64x16 chunks stitched into one 64x64x64 R8UI texture that FOLLOWS THE
+  CAMERA, derived from the canonical RLE chunks, re-derived only when something it depends on moves.
+</div>
+
+<div class="law">
+  It does not composite with the raster pass. There is no depth exchange between the marcher and the meshed
+  world, so this draws the region on its own. That is a separate piece of work with its own answer key, and
+  saying so here is cheaper than someone discovering it later.
+</div>
+
+<div class="panel">
+  <canvas id="c" width="720" height="420" style="width:100%;max-width:900px;height:auto"></canvas>
+  <div class="note" id="glnote"></div>
+</div>
+
+<h2>Camera -- move it and watch what does NOT get rebuilt</h2>
+<div class="panel">
+  <div>x <input id="cx" type="range" min="-96" max="96" value="8"> <span id="cxv"></span>
+      &nbsp; z <input id="cz" type="range" min="-96" max="96" value="8"> <span id="czv"></span></div>
+  <div>yaw <input id="yaw" type="range" min="0" max="360" value="35">
+      &nbsp; height <input id="cy" type="range" min="20" max="70" value="44"></div>
+  <div id="upd" class="verdict idle">not started</div>
+  <table id="stats"></table>
+  <div class="note">Panning inside one window costs a signature build and nothing else. Crossing a chunk
+    boundary, or editing a chunk, rebuilds. Both counters below are live.</div>
+</div>
+
+<h2>The two checks, kept apart on purpose</h2>
+<div class="panel">
+  <div class="note"><b>Signature</b> is cheap and runs every frame: window origin plus each chunk's fingerprint.
+    It answers "has anything we track changed" and is <i>not</i> a correctness claim.
+    <b>verify()</b> walks every voxel against the chunks and names the first divergence, the chunk that owns it,
+    and the local coordinate inside that chunk. Press the sabotage and watch the cheap one shrug.</div>
+  <div id="ver" class="verdict idle">not verified yet</div>
+  <button id="btnVerify" class="good">verify (walk every voxel)</button>
+  <button id="btnCorrupt" class="warn">SABOTAGE: corrupt the derived region</button>
+  <button id="btnEdit" class="warn">edit a chunk in the world</button>
+  <button id="btnUnload" class="warn">unload a chunk (simulate streaming)</button>
+  <button id="btnDepth" class="good">toggle: compositing ON</button>
+  <button id="btnRetryGL">retry GL</button>
+  <span class="note">after fixing hardware acceleration or closing other WebGL tabs -- no reload needed</span>
+</div>
+
+</div>
+
+<script type="module">
+import { VoxelVolumeStream } from "/render/voxelVolumeStream.js";
+import { VoxelRaymarchPass } from "/render/voxelRaymarchPass.js";
+import { chunkToRLE, chunkIndexReal } from "/voxel/rleWorldBridge.js";
+import { chunkKey, describeRegion } from "/voxel/rleRegionVolume.js";
+import { volumeIndex } from "/voxel/rleVolumeCache.js";
+import { acquireGL } from "/render/glBootstrap.js";
+import { RasterProbe } from "/render/rasterProbe.js";
+
+const S = 16, H = 64, DIMS = { sx: S, sy: H, sz: S };
+const $ = (id) => document.getElementById(id);
+const verdict = (el, cls, text) => { el.className = "verdict " + cls; el.textContent = text; };
+
+// --- a generated world, held as engine-order chunks (world/chunk.js: x + sx*z + sx*sz*y) ------------------
+function genChunk(cx, cz) {
+    const v = new Uint8Array(S * H * S);
+    for (let x = 0; x < S; x++) for (let z = 0; z < S; z++) {
+        const wx = cx * S + x, wz = cz * S + z;
+        const h = Math.max(1, Math.min(H - 1, Math.floor(22 + 9 * Math.sin(wx * 0.07) + 7 * Math.cos(wz * 0.06) + 4 * Math.sin((wx - wz) * 0.04))));
+        for (let y = 0; y < h; y++) v[chunkIndexReal(x, y, z, DIMS)] = (y === h - 1) ? (h > 30 ? 3 : 1) : (y >= h - 3 ? 4 : 6);
+    }
+    return v;
+}
+const world = new Map();          // key -> engine-order Uint8Array
+const unloaded = new Set();
+function chunkOf(cx, cz) {
+    const k = chunkKey(cx, cz);
+    if (unloaded.has(k)) return null;
+    if (!world.has(k)) world.set(k, genChunk(cx, cz));
+    return world.get(k);
+}
+const rleCache = new Map();
+const provider = {
+    chunkSize: S, chunkHeight: H,
+    getChunkRLE(cx, cz) {
+        const k = chunkKey(cx, cz);
+        const c = chunkOf(cx, cz);
+        if (!c) { rleCache.delete(k); return null; }
+        if (!rleCache.has(k)) rleCache.set(k, chunkToRLE(c, DIMS, chunkIndexReal));
+        return rleCache.get(k);
+    },
+};
+
+// --- GPU ---------------------------------------------------------------------------------------------------
+const canvas = $("c");
+// v3050 -- THROUGH glBootstrap, NOT canvas.getContext. Keith's rig reported "no webgl2 context on this canvas"
+// while raymarch-gl-demo.html rendered fine, which is the signature of CONTEXT EXHAUSTION -- the failure v2777
+// diagnosed and v2778 built acquireGL to survive. This page and volume-cache.html both took raw contexts and
+// never released them, so they were part of the problem they then reported. acquireGL null-guards, wires
+// webglcontextlost/restored, and hands back a no-op STUB rather than null so nothing downstream throws.
+const _ctx = acquireGL(canvas, { onLost: () => { $("glnote").textContent = "WebGL2 context LOST (usually exhaustion -- close other GL tabs)"; },
+                                 onRestored: () => { $("glnote").textContent = "context restored"; } });
+const gl = _ctx.ok ? _ctx.gl : null;
+// A PAGE THAT DOES NOT RELEASE ITS CONTEXT IS A PAGE THAT CAUSES THE NEXT ONE TO FAIL (contextLeakGuard, v2778).
+// v3052 -- pagehide FIRES FOR BACK-FORWARD CACHE TOO, and I shipped this without checking. Entering bfcache is
+// not leaving: the document is frozen and restored intact on a back-navigation. Disposing the GL context there --
+// with {once:true}, so the listener was gone as well -- meant coming back gave a page whose context had been
+// released and whose cleanup could never run again. A dead page that looks like a broken one.
+// Release only on a REAL unload; on a bfcache restore, reload so the pass and stream rebuild around a fresh
+// context rather than half-living around a stale one.
+addEventListener("pagehide", (e) => { if (e.persisted) return; try { stream.dispose(); } catch {} try { _ctx.dispose(); } catch {} });
+addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+// v3068 -- COMPOSITING, made visible. The marcher now writes gl_FragDepth (FRAG_SRC_DEPTH, v3064) and a handful
+// of ordinary rasterised boxes are drawn into the same buffer, so the depth test has something to arbitrate.
+// Boxes floating in front of everything would look identical whether depth worked or not; these are placed to be
+// PARTLY BURIED, and the buried fraction is what tells you the truth.
+const NEAR = 0.25, FAR = 512;
+let useDepth = true;
+const pass = gl ? new VoxelRaymarchPass(gl, { depth: true, near: NEAR, far: FAR }) : null;
+const flat = gl ? new VoxelRaymarchPass(gl, { uint: true }) : null;   // the un-composited variant, for the toggle
+const probe = gl ? new RasterProbe(gl) : null;
+const BOXES = [
+    { offset: [12, 26, 22], color: [0.95, 0.45, 0.30] },
+    { offset: [30, 24, 30], color: [0.40, 0.80, 0.95] },
+    { offset: [46, 27, 14], color: [0.85, 0.80, 0.35] },
+    { offset: [22, 25, 46], color: [0.60, 0.95, 0.55] },
+];
+const stream = new VoxelVolumeStream(gl, provider, { nx: 4, nz: 4 });
+
+// v3047 -- SAY WHY THERE IS NOTHING TO LOOK AT. A blank canvas has at least five different causes here and they
+// have five different fixes; drawing nothing and printing nothing makes them indistinguishable. Every frame this
+// states the whole chain: context, program, texture, upload, region.
+// v3053 -- PAINTING THE REASON ONTO THE GL CANVAS POISONED IT. A canvas can only ever have ONE context type:
+// once getContext("2d") succeeds, getContext("webgl2") on that element returns null FOREVER. So v3047's helpful
+// diagnostic made the failure PERMANENT and made the v3051 "retry GL" button incapable of ever succeeding --
+// the retry asked for webgl2 on an element that had already been claimed by 2D. Whatever caused the first
+// failure, this is what guaranteed it stayed failed and made a reload the only recovery.
+//
+// The message now goes to an OVERLAY div stacked over the canvas. The canvas stays untouched and re-acquirable.
+function paintReason(msg) {
+    try {
+        let ov = document.getElementById("glOverlay");
+        if (!ov) {
+            ov = document.createElement("div");
+            ov.id = "glOverlay";
+            ov.style.cssText = "position:absolute;left:0;top:0;width:720px;height:420px;padding:14px;box-sizing:border-box;" +
+                "background:#140c0c;color:#f0b0a0;font:13px ui-monospace,monospace;white-space:pre-wrap;overflow:hidden;pointer-events:none;";
+            const host = canvas.parentNode;
+            host.style.position = "relative";
+            host.insertBefore(ov, canvas.nextSibling);
+        }
+        ov.style.display = "block";
+        ov.textContent = String(msg);
+    } catch {}
+}
+function clearReason() { const ov = document.getElementById("glOverlay"); if (ov) ov.style.display = "none"; }
+function chainState() {
+    if (!gl) return { ok: false, why: "no webgl2 context -- acquireGL refused. Most often CONTEXT EXHAUSTION: close other WebGL tabs (volume-cache, index, raymarch-gl-demo) and reload. Check chrome://gpu if it persists." };
+    const act = useDepth ? pass : flat;
+    if (!act) return { ok: false, why: "pass was never constructed" };
+    if (act.dead) return { ok: false, why: "SHADER/PROGRAM FAILED: " + (act.error || "no reason recorded") };
+    if (useDepth && probe && probe.dead) return { ok: false, why: "RASTER PROBE FAILED: " + probe.error };
+    if (!stream.volume) return { ok: false, why: "no region derived yet" };
+    if (stream.stats.lastUploadOk === false) return { ok: false, why: "TEXTURE UPLOAD REFUSED: " + stream.stats.lastUploadReason };
+    if (!act.tex) return { ok: false, why: "no texture bound to the pass (attachTo did not run)" };
+    return { ok: true, why: "context ok, program linked, region uploaded, texture bound" };
+}
+if (pass && pass.dead) { paintReason("Ray-march pass disabled -- " + pass.error); }
+
+function camWorld() { return { x: +$("cx").value, z: +$("cz").value, y: +$("cy").value }; }
+
+function draw() {
+    const active = useDepth ? pass : flat;
+    if (!gl || !active || !stream.attachTo(active)) return;   // still guarded here: attach can legitimately fail (no volume yet)
+    const o = stream.originWorld();
+    const c = camWorld();
+    // The pass marches in VOLUME coordinates, so the camera is expressed relative to the region origin.
+    const yaw = (+$("yaw").value) * Math.PI / 180;
+    const eye = [c.x - o.x, c.y, c.z - o.z];
+    const fwd = [Math.cos(yaw), -0.45, Math.sin(yaw)];
+    const fl = Math.hypot(fwd[0], fwd[1], fwd[2]);
+    const f = fwd.map((v) => v / fl);
+    let rt = [f[2], 0, -f[0]]; const rl = Math.hypot(rt[0], rt[1], rt[2]) || 1; rt = rt.map((v) => v / rl);
+    const up = [rt[1] * f[2] - rt[2] * f[1], rt[2] * f[0] - rt[0] * f[2], rt[0] * f[1] - rt[1] * f[0]];
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const cam = { eye, fwd: f, right: rt, up, tanFov: 0.6 };
+    // The marcher goes FIRST and writes depth; the boxes are then arbitrated against it by the depth test rather
+    // than by draw order. Drawing them first would still look right and would prove nothing.
+    active.render(cam, canvas.width, canvas.height);
+    if (probe && useDepth) probe.draw(cam, canvas.width / canvas.height, NEAR, FAR, BOXES.map((b) => ({ ...b, offset: [b.offset[0] - o.x, b.offset[1], b.offset[2] - o.z] })));
+}
+
+// v3051 -- IDLE WHEN THERE IS NOTHING TO DRAW. This closes the follow-up v2778 wrote down and never did
+// ("idle the render loop in stub mode -- currently spins no-op frames"), which I then reintroduced here.
+//
+// With no context this loop still ran a signature build, a chainState() and an innerHTML rewrite SIXTY TIMES A
+// SECOND to display the same sentence. Keith's console showed Chrome complaining about throttled requests in a
+// backgrounded tab, which is the visible edge of a page that never stops working when nobody is looking.
+//
+// Two guards, both already laws in this tree: a HIDDEN-PAGE guard (v2771 -- a backgrounded page does zero work,
+// the lever that ended the render-QA server death) and a BACKOFF when the chain is broken. A page with nothing
+// to draw polls once a second; it does not render nothing at 60fps.
+let _idleTimer = null;
+function schedule(ms) {
+    if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }
+    if (ms > 0) _idleTimer = setTimeout(tick, ms);
+    else requestAnimationFrame(tick);
+}
+function tick() {
+    if (document.hidden) return schedule(1000);      // backgrounded: do nothing at all, not "less"
+    const c = camWorld();
+    $("cxv").textContent = c.x; $("czv").textContent = c.z;
+    const r = stream.update(c.x, c.z);
+    if (r.changed) verdict($("upd"), stream.stats.missing ? "idle" : "pass", "REBUILT -- " + r.reason);
+    else verdict($("upd"), "idle", "skipped: " + r.reason + "  (the cheap check doing its job)");
+    const s = stream.stats;
+    $("stats").innerHTML = [
+        ["window", stream.lastWindow ? (stream.lastWindow.nx + "x" + stream.lastWindow.nz + " chunks from (" + stream.lastWindow.originCx + "," + stream.lastWindow.originCz + ")") : "-"],
+        ["region", stream.volume ? (stream.volume.dx + "x" + stream.volume.dy + "x" + stream.volume.dz + "  (" + (stream.volume.data.length / 1024).toFixed(0) + " KB, r8uint)") : "-"],
+        ["chunks", stream.volume ? (stream.volume.present.length + " loaded, " + stream.volume.missing.length + " NOT LOADED" + (stream.volume.missing.length ? " (" + stream.volume.missing.join(" ") + ")" : "")) : "-"],
+        ["derives / skips", s.derives + " / " + s.skipped],
+        ["last derive", s.lastDeriveMs.toFixed(1) + " ms"],
+        ["last upload", s.lastUploadOk === null ? "-" : (s.lastUploadOk ? "ok" : "REFUSED: " + s.lastUploadReason)],
+    ].map(([k, v]) => '<tr><td class="k">' + k + "</td><td>" + v + "</td></tr>").join("");
+    // v3067 -- ATTACH BEFORE ASKING. This was a deadlock of my own making, and Keith's rig printed it exactly:
+    // "no texture bound to the pass (attachTo did not run)" while the line above it said the upload was ok.
+    //
+    // chainState() required pass.tex. pass.tex is set by stream.attachTo(). attachTo lived inside draw(). And
+    // draw() only ran when chainState() said ok. So the check GATED THE ONLY CALL THAT COULD SATISFY IT, on
+    // every frame, forever -- a page that correctly derived its region, correctly uploaded it, and then reported
+    // itself broken with a message that was true.
+    //
+    // The diagnostic was not wrong. It was accurate about a state the diagnostic itself created. That is worse
+    // than a wrong message, because it reads as a finding.
+    //
+    // attachTo is cheap and idempotent (it assigns two fields), so it belongs with update() in the state-
+    // gathering half of the frame, not inside the drawing half that state-gathering guards.
+    if (pass) stream.attachTo(useDepth ? pass : flat);
+    const st2 = chainState();
+    $("glnote").innerHTML = st2.ok
+        ? "<span style='color:#8fe0a8'>" + st2.why + "</span>"
+        : "<span style='color:#f0b0a0'>NOTHING TO DRAW: " + st2.why + "</span>";
+    if (!st2.ok) { paintReason("NOTHING TO DRAW\n\n" + st2.why); return schedule(1000); }
+    clearReason();
+    // A THROW HERE USED TO KILL THE LOOP SILENTLY: the buttons kept working (their own handlers), the canvas
+    // stayed black, and the frame counter simply stopped. That reads as "it renders nothing" when it is really
+    // "it rendered once and then died", which is a different bug with a different fix.
+    try { draw(); }
+    catch (e) { paintReason("DRAW THREW: " + (e && e.message || e)); $("glnote").innerHTML = "<span style='color:#f0b0a0'>DRAW THREW: " + String(e && e.message || e) + "</span>"; return; }
+    schedule(0);
+}
+// A page that idles must WAKE. Without this, fixing the GPU and coming back to the tab would show a stale
+// message forever and read as "still broken" when it is really "still asleep".
+document.addEventListener("visibilitychange", () => { if (!document.hidden) schedule(0); });
+
+$("btnVerify").onclick = () => {
+    const t0 = performance.now();
+    const res = stream.verify();
+    verdict($("ver"), res.ok ? "pass" : "halt", describeRegion(res) + "   [" + (performance.now() - t0).toFixed(0) + " ms]");
+};
+$("btnCorrupt").onclick = () => {
+    if (!stream.volume) return;
+    const i = volumeIndex(5 + ((Math.random() * 50) | 0), 10 + ((Math.random() * 30) | 0), 5 + ((Math.random() * 50) | 0), stream.volume);
+    stream.volume.data[i] ^= 0xff;
+    verdict($("ver"), "idle", "one byte corrupted in the DERIVED region. The signature will not notice -- press verify.");
+};
+$("btnEdit").onclick = () => {
+    const w = stream.lastWindow; if (!w) return;
+    const cx = w.originCx + 1, cz = w.originCz + 1, k = chunkKey(cx, cz);
+    const c = chunkOf(cx, cz); if (!c) return;
+    for (let x = 2; x < 12; x++) for (let y = 30; y < 40; y++) for (let z = 2; z < 12; z++) c[chunkIndexReal(x, y, z, DIMS)] = 5;
+    rleCache.delete(k);
+    verdict($("ver"), "idle", "chunk " + k + " edited in the WORLD (the source). The next frame should rebuild without the camera moving.");
+};
+$("btnUnload").onclick = () => {
+    const w = stream.lastWindow; if (!w) return;
+    const k = chunkKey(w.originCx + 2, w.originCz + 1);
+    if (unloaded.has(k)) { unloaded.delete(k); verdict($("ver"), "idle", "chunk " + k + " loaded again -- a hole filling is a rebuild too."); }
+    else { unloaded.add(k); rleCache.delete(k); verdict($("ver"), "idle", "chunk " + k + " unloaded. It reads as AIR but is reported NOT LOADED -- sky and not-yet-streamed look identical to a renderer and mean opposite things."); }
+};
+
+$("btnDepth").onclick = () => {
+    useDepth = !useDepth;
+    $("btnDepth").textContent = "toggle: compositing " + (useDepth ? "ON" : "OFF");
+    verdict($("ver"), "idle", useDepth
+        ? "compositing ON -- the boxes are arbitrated by the depth buffer. Each should be PARTLY BURIED in terrain."
+        : "compositing OFF -- the marcher paints the whole frame and the boxes vanish. That is the un-composited variant, unchanged since v3040.");
+};
+$("btnRetryGL").onclick = () => {
+    // Re-acquire in place rather than telling someone to reload. acquireGL is cheap and returns the stub on
+    // failure, so a retry that fails leaves the page exactly as it was.
+    // Now actually possible: the canvas was never claimed by a 2D context, so webgl2 can still be granted.
+    const again = acquireGL(canvas, {});
+    if (!again.ok) { verdict($("ver"), "halt", "still no WebGL2 context on this canvas. It was never claimed by 2D (v3053), so this is the driver or the GPU process -- check chrome://gpu."); return; }
+    location.reload();   // a fresh context needs the pass and the stream rebuilt around it
+};
+tick();
+</script>
+</body>
+</html>

@@ -94,6 +94,7 @@
 
 import { Flip3D, FLUID } from "../../fluid/flip3d.mjs";
 
+import { pathToFileURL } from "node:url";
 export const FLIP3D_MODES = ["isotropy", "hydrostatic", "footprint", "flatdivergence"];
 
 export const FLIP3D_OBSERVABLES = [
@@ -262,6 +263,8 @@ export const flip3dDevice = {
     // returns mode "hydrostatic" and the front door still leads with it. ***
     modes: FLIP3D_MODES,
     plantMode: "flatdivergence", plantFlips: "worstRel", plantKind: "mode",
+    plantIdeal: 0, plantIdealWhy:
+        "worstRel is the worst relative anisotropy across directions, and an isotropic solve gives 0 exactly; flatdivergence takes it 0 -> 0.347 with every directional component going nonzero together",
     name: "flip3d-hydrostatic",
     observables: FLIP3D_OBSERVABLES,
     build: buildFlip3D,
@@ -271,7 +274,7 @@ export const flip3dDevice = {
 // ---- front door ------------------------------------------------------------------------------------------
 // device.html lists every name in DEVICE_NAMES from /device/list and runs it, so registering is the door; this
 // block is the one that works without a server.
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const hy = await buildFlip3D({ mode: "hydrostatic" });
     const is = await buildFlip3D({ mode: "isotropy" });
     console.log("[flip3d] THE 3D FLIP/PIC FLUID -- one ported key, and one that cannot be asked in 2D\n");

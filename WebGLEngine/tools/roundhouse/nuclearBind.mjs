@@ -1,0 +1,101 @@
+// tools/roundhouse/nuclearBind.mjs
+//
+// v3383 -- THE NUCLEAR DEVICE. First of three new fields; seismology and acoustics follow.
+//
+// MODES:
+//   "chain"    Bateman closed form graded against RK4 integration of the same ODEs, plus exact nucleon
+//              conservation. Two routes, no shared line.
+//   "equilib"  secular equilibrium as a LIMIT -- the daughter's activity approaching the parent's as the parent
+//              outlives it, and the RATE of approach.
+//   "binding"  the Bethe-Weizsaecker mass formula against NATURE: the most-bound Z for a given A, and the iron
+//              peak located by search rather than assumed.
+//
+// THE PLANTED ERROR IS THE SURFACE TERM. Deleting the A^(2/3) surface energy leaves a formula that still returns
+// plausible MeV numbers, still rises with A, and still looks like a binding curve -- and it has NO PEAK, because
+// the peak exists only where the surface term stops competing with the volume term. A device grading "is the
+// binding energy about 8 MeV" would pass it; only asking where the curve turns catches it.
+
+import {
+    batemanChain, batemanIntegrated, activityRatio,
+    bindingEnergy, bindingPerNucleon, mostStableZ, bindingPeak, fissionQ, SEMF,
+} from "../../physics/nuclear/decay.mjs";
+
+export const NUCLEAR_OBSERVABLES = [
+    "chainWorstDiff", "conservationResidual", "nA", "nB", "nC",
+    "activityRatio", "equilibDeparture", "equilibFirstOrder",
+    "peakA", "peakPerNucleon", "predictedZ", "predictedZCorrect", "fissionQ", "planted",
+];
+
+const DEF = { N0: 1, l1: 0.07, l2: 0.31, t: 20, A: 56, Z: 26 };
+const KNOWN = [[4, 2], [16, 8], [56, 26], [238, 92]];
+
+/** Binding with the SURFACE TERM REMOVED -- plausible everywhere, and with no peak anywhere. */
+function bindingNoSurface(A, Z) {
+    const { aV, aC, aA } = SEMF;
+    return aV * A - aC * Z * (Z - 1) / Math.cbrt(A) - aA * Math.pow(A - 2 * Z, 2) / A;
+}
+function peakNoSurface(Amin = 2, Amax = 250) {
+    let peakA = Amin, peak = -Infinity;
+    for (let A = Amin; A <= Amax; A++) {
+        let best = -Infinity;
+        for (let Z = 1; Z < A; Z++) best = Math.max(best, bindingNoSurface(A, Z));
+        if (best / A > peak) { peak = best / A; peakA = A; }
+    }
+    return { A: peakA, perNucleon: peak };
+}
+
+function buildNuclear({ mode = "chain", config = {} } = {}) {
+    const c = { ...DEF, ...config };
+    const blank = {
+        chainWorstDiff: null, conservationResidual: null, nA: null, nB: null, nC: null,
+        activityRatio: null, equilibDeparture: null, equilibFirstOrder: null,
+        peakA: null, peakPerNucleon: null, predictedZ: null, predictedZCorrect: null,
+        fissionQ: null, planted: !!config.planted,
+    };
+
+    if (mode === "equilib") {
+        const ls = [1e-2, 1e-3, 1e-4, 1e-5];
+        const dep = ls.map((l1) => Math.abs(activityRatio(c.N0, l1, 0.5, 200) - 1));
+        const ratios = dep.slice(1).map((v, i) => dep[i] / v);
+        return {
+            ...blank,
+            activityRatio: activityRatio(c.N0, ls[ls.length - 1], 0.5, 200),
+            equilibDeparture: dep[dep.length - 1],
+            equilibFirstOrder: ratios.every((r) => r > 5 && r < 20),
+        };
+    }
+
+    if (mode === "binding") {
+        const p = config.planted ? peakNoSurface() : bindingPeak();
+        const zs = KNOWN.map(([A]) => mostStableZ(A).Z);
+        return {
+            ...blank,
+            peakA: p.A, peakPerNucleon: p.perNucleon,
+            predictedZ: zs,
+            predictedZCorrect: KNOWN.every(([, Z], i) => zs[i] === Z),
+            // v3436 -- WAS fissionQ(238, 92), HARDCODED. The sensitivity matrix found A and Z declared in this
+            // device's defaults and moving nothing: two knobs a caller could set that the device ignored. Not a
+            // silently-ignored key from outside -- a key this device ADVERTISED and then did not read.
+            fissionQ: fissionQ(c.A, c.Z),
+        };
+    }
+
+    const closed = batemanChain(c.N0, c.l1, c.l2, c.t);
+    const integ = batemanIntegrated(c.N0, c.l1, c.l2, c.t);
+    return {
+        ...blank,
+        chainWorstDiff: Math.max(Math.abs(closed.A - integ.A), Math.abs(closed.B - integ.B), Math.abs(closed.C - integ.C)),
+        conservationResidual: Math.abs(closed.A + closed.B + closed.C - c.N0),
+        nA: closed.A, nB: closed.B, nC: closed.C,
+    };
+}
+
+export const nuclearDevice = {
+    // v3400 -- KNOB PLANT: the perturbation replaces a PHYSICS LAW or FUNCTION upstream of every observable,
+    // so the whole path from the wrong derivation to the reported number is graded. plantedError's second design
+    // rule ("perturb the physics, not the number") in its ordinary form.
+    plantKind: "knob",
+    modes: ["chain", "equilib", "binding"],
+    name: "nuclear-decay-and-binding", observables: NUCLEAR_OBSERVABLES, build: buildNuclear,
+    defaults: ({ mode } = {}) => ({ mode: mode || "chain", config: { ...DEF } }),
+};

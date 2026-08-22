@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket League RL &mdash; SweK Engine</title>
+<style>
+  :root { --bg:#070b0d; --ink:#dfe9ee; --dim:#7f97a4; --line:#183042; --go:#5ce6a4; --warn:#e0b05a; --bad:#f4808c; --acc:#8ab4ff; --pur:#e0b0ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  a { color:var(--acc); }
+  .wrap { max-width:920px; margin:0 auto; padding:18px 16px 60px; }
+  h1 { font-size:22px; margin:0 0 2px; }
+  h2 { font-size:15px; margin:20px 0 8px; color:var(--go); letter-spacing:.3px; }
+  .sub { color:var(--dim); margin:0 0 14px; }
+  .card { border:1px solid var(--line); border-radius:10px; background:#0a1216; padding:12px 14px; margin-bottom:12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  code, kbd { background:#06101a; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font:12.5px ui-monospace,SFMono-Regular,monospace; color:#bfe0ff; }
+  pre { background:#050c12; border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; max-height:300px; font:12px ui-monospace,monospace; color:#cfe2f2; margin:8px 0 0; white-space:pre-wrap; }
+  input[type=text], input[type=number], select { background:#06101a; color:var(--ink); border:1px solid var(--line); border-radius:6px; font:13px ui-monospace,monospace; padding:6px 8px; }
+  input[type=text] { min-width:280px; flex:1; }
+  button { font:13px ui-sans-serif,system-ui; padding:6px 14px; border-radius:7px; cursor:pointer; border:1px solid var(--line); background:#12202c; color:var(--acc); }
+  button.go { background:#0e2a1e; color:var(--go); border-color:#215c3f; }
+  button.warnb { background:#2a1c10; color:var(--warn); border-color:#5a3f20; }
+  button.stop { background:#2a1216; color:var(--bad); border-color:#5a2530; }
+  button:disabled { opacity:.5; cursor:default; }
+  .pill { display:inline-block; font:11px ui-monospace,monospace; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--dim); }
+  .pill.ok { color:var(--go); border-color:#215c3f; } .pill.no { color:var(--bad); border-color:#5a2530; } .pill.run { color:var(--pur); border-color:#5a3a7d; }
+  .gauges { display:flex; gap:10px; flex-wrap:wrap; }
+  .gauge { flex:1; min-width:130px; background:#06101a; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .gauge .k { font-size:10px; color:var(--dim); } .gauge .v { font-size:17px; font-weight:700; }
+  ul { margin:6px 0; padding-left:20px; } li { margin:3px 0; }
+  .muted { color:var(--dim); font-size:12.5px; }
+  label.f { display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>&#128663; Rocket League RL <span class="muted">&mdash; the brain/rl spike</span></h1>
+  <p class="sub">A continuous-control head trained by a real-physics reward. Point it at your dumped RocketSim
+  collision meshes, prepare, and run a training loop &mdash; or run the built-in kinematic stub with no setup.
+  <a href="/server.html">&larr; back to the panel</a></p>
+
+  <div class="card">
+    <b>What this is (and is not).</b> A <em>feasibility spike</em>: it proves a car-control policy can be
+    driven by a physics reward and improve. The <b>stub</b> backend is a point-mass stand-in that runs
+    anywhere; the <b>rocketsim</b> backend is ground-truth Rocket League physics. It is <em>not</em> a
+    competitive bot &mdash; that is millions of steps of training &mdash; and it is <em>not</em> MIRA: a policy
+    that &ldquo;wins&rdquo; inside a world model has only fooled the model. RocketSim is the ground truth.
+  </div>
+
+  <h2>1 &middot; Downloads &amp; references</h2>
+  <div class="card">
+    <ul>
+      <li><b>RocketSim</b> (the physics) &mdash; <code>pip install RocketSim</code> &middot;
+        <a href="https://github.com/ZealanL/RocketSim" target="_blank" rel="noopener">github.com/ZealanL/RocketSim</a>
+        (you can also use the <b>Install</b> button below)</li>
+      <li><b>Collision meshes</b> &mdash; <em>not redistributable</em>. Dump them once from an installed Rocket
+        League with the RocketSim mesh dumper, then point step&nbsp;2 at the resulting <code>collision_meshes</code> folder.</li>
+      <li><b>RLGym / RLGym-sim</b> (higher-level RL env, optional) &mdash;
+        <a href="https://rlgym.org/" target="_blank" rel="noopener">rlgym.org</a></li>
+      <li><b>Rocket Science dataset</b> (10k hours, for imitation/offline experiments) &mdash;
+        <a href="https://huggingface.co/datasets/kyutai/rocket-science" target="_blank" rel="noopener">huggingface.co/datasets/kyutai/rocket-science</a></li>
+      <li><b>MIRA</b> (the world model &mdash; reference only) &mdash;
+        <a href="https://github.com/mira-wm/mira" target="_blank" rel="noopener">github.com/mira-wm/mira</a></li>
+    </ul>
+    <div class="row" style="margin-top:6px;">
+      <button id="btnInstall" class="warnb">Install RocketSim (pip)</button>
+      <span id="installStat" class="muted"></span>
+    </div>
+  </div>
+
+  <h2>2 &middot; Point &amp; prepare</h2>
+  <div class="card">
+    <p class="muted" style="margin-top:0;">Give the path to your dumped <code>collision_meshes</code> folder, then Prepare.
+      Prepare probes that Python can import RocketSim <em>and</em> load the meshes. You can skip this entirely and just run the stub.</p>
+    <div class="row">
+      <input type="text" id="meshes" placeholder="/path/to/collision_meshes   (or C:\path\to\collision_meshes)" spellcheck="false">
+      <button id="btnPrepare" class="go">Prepare (probe RocketSim)</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <span>real physics:</span> <span id="simPill" class="pill">unknown</span>
+      <span id="simDetail" class="muted"></span>
+    </div>
+  </div>
+
+  <h2>3 &middot; Execute a training run</h2>
+  <div class="card">
+    <div class="row">
+      <label class="f">backend
+        <select id="backend"><option value="stub">stub (no setup)</option><option value="rocketsim">rocketsim (real physics)</option></select>
+      </label>
+      <label class="f">iters <input type="number" id="iters" value="30" min="1" max="5000" style="width:80px"></label>
+      <label class="f">pairs <input type="number" id="pairs" value="16" min="2" max="128" style="width:70px"></label>
+      <label class="f">episodes <input type="number" id="episodes" value="5" min="1" max="32" style="width:70px"></label>
+      <label class="f" style="flex:1">save policy to (optional)
+        <input type="text" id="save" placeholder="brain/rl/rocket_policy.json" spellcheck="false" style="min-width:180px">
+      </label>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnRun" class="go">&#9654; Execute</button>
+      <button id="btnStop" class="stop" disabled>&#9632; Stop</button>
+      <span id="runPill" class="pill">idle</span>
+      <span id="runErr" class="muted" style="color:var(--bad)"></span>
+    </div>
+    <div class="gauges" style="margin-top:10px;">
+      <div class="gauge"><div class="k">iteration</div><div class="v" id="gIter">&mdash;</div></div>
+      <div class="gauge"><div class="k">baseline return</div><div class="v" id="gBase" style="color:var(--dim)">&mdash;</div></div>
+      <div class="gauge"><div class="k">current return</div><div class="v" id="gCur" style="color:var(--acc)">&mdash;</div></div>
+      <div class="gauge"><div class="k">improvement</div><div class="v" id="gDelta" style="color:var(--go)">&mdash;</div></div>
+    </div>
+    <pre id="log">(run output appears here)</pre>
+  </div>
+
+  <p class="muted">Honest limits: the stub is a ground driver, not Rocket League (no car body, aerials or ball
+  spin) &mdash; it exercises the loop. The trainer is Evolution Strategies, a starter that needs no gradients
+  and fans out over the fleet; PPO/self-play is the upgrade once real physics is in the loop. A competitive
+  bot is a project, not this page.</p>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function post(url, body) { return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json(); }); }
+
+  function setPill(el, text, cls) { el.textContent = text; el.className = "pill" + (cls ? " " + cls : ""); }
+
+  $("btnInstall").onclick = function () {
+    $("installStat").textContent = "starting pip\u2026";
+    post("/rocket/install").then(function (j) {
+      $("installStat").textContent = j.ok ? ("installing: " + (j.command || "")) : ("error: " + (j.error || "failed"));
+    });
+  };
+
+  $("btnPrepare").onclick = function () {
+    var b = $("btnPrepare"); b.disabled = true; b.textContent = "probing\u2026";
+    setPill($("simPill"), "probing\u2026", "run"); $("simDetail").textContent = "";
+    post("/rocket/prepare", { meshes: $("meshes").value.trim() }).then(function (j) {
+      b.disabled = false; b.textContent = "Prepare (probe RocketSim)";
+      if (!j.ok) { setPill($("simPill"), "not ready", "no"); $("simDetail").textContent = j.error || ""; return; }
+      var s = j.sim || {};
+      setPill($("simPill"), s.ok ? "ready" : "not ready", s.ok ? "ok" : "no");
+      $("simDetail").textContent = s.detail || "";
+    }).catch(function (e) { b.disabled = false; b.textContent = "Prepare (probe RocketSim)"; setPill($("simPill"), "error", "no"); $("simDetail").textContent = String(e); });
+  };
+
+  $("btnRun").onclick = function () {
+    $("runErr").textContent = "";
+    post("/rocket/train/start", {
+      backend: $("backend").value,
+      iters: parseInt($("iters").value, 10),
+      pairs: parseInt($("pairs").value, 10),
+      episodes: parseInt($("episodes").value, 10),
+      save: $("save").value.trim(),
+    }).then(function (j) {
+      if (!j.ok) { $("runErr").textContent = j.error || "could not start"; return; }
+      $("log").textContent = "$ " + (j.command || "") + "\n";
+    });
+  };
+  $("btnStop").onclick = function () { post("/rocket/train/stop"); };
+
+  function fmt(x) { return (x == null) ? "\u2014" : (typeof x === "number" ? (Math.round(x * 1000) / 1000).toString() : x); }
+
+  function poll() {
+    fetch("/rocket/status", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) return;
+      // sim
+      if (j.sim) { setPill($("simPill"), j.sim.ok ? "ready" : "not ready", j.sim.ok ? "ok" : "no"); if (!document.activeElement || document.activeElement.id !== "simDetail") $("simDetail").textContent = j.sim.detail || ""; }
+      if (j.meshes && !$("meshes").value) $("meshes").value = j.meshes;
+      // install
+      if (j.install) $("installStat").textContent = j.install.running ? ("installing\u2026 " + (j.install.last || "")) : (j.install.exited === 0 ? "RocketSim installed" : ("install exited " + j.install.exited));
+      // train
+      var t = j.train, running = !!(t && t.running);
+      $("btnStop").disabled = !running; $("btnRun").disabled = running;
+      if (!t) { setPill($("runPill"), "idle"); }
+      else {
+        setPill($("runPill"), running ? (t.backend + " running") : (t.exited === 0 ? "done" : "stopped"), running ? "run" : (t.exited === 0 ? "ok" : "no"));
+        $("gIter").textContent = t.latest ? String(t.latest.iter) + " / " + t.iters : ("0 / " + t.iters);
+        $("gBase").textContent = fmt(t.baseline);
+        $("gCur").textContent = t.latest ? fmt(t.latest.base) : "\u2014";
+        $("gDelta").textContent = (t.delta == null) ? "\u2014" : (t.delta >= 0 ? "+" : "") + fmt(t.delta);
+        $("gDelta").style.color = (t.delta == null) ? "var(--dim)" : (t.delta >= 0 ? "var(--go)" : "var(--bad)");
+      }
+    }).catch(function () {});
+    fetch("/rocket/output", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.log && j.log.length) { var el = $("log"); var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20; el.textContent = j.log.join("\n"); if (atBottom) el.scrollTop = el.scrollHeight; }
+    }).catch(function () {});
+  }
+  poll(); setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/labDevices-selfcheck.mjs -- v2814
 //
-// Run: node tools/ship/labDevices-selfcheck.mjs   (~254s -- MEASURED; it runs the real instruments)
+// Run: node tools/ship/labDevices-selfcheck.mjs   (~123s -- MEASURED; it runs the real instruments)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES the three lab instruments wired in as roundhouse devices: optics, kerr, ct.
@@ -17,6 +17,9 @@ import { buildCT, ctDevice } from "../roundhouse/tomographyBind.mjs";
 import { buildInterferometer, interferometerDevice } from "../roundhouse/interferometerBind.mjs";
 import { buildFluid, fluidDevice } from "../roundhouse/fluidBind.mjs";
 import { buildThermal, thermalDevice } from "../roundhouse/thermalBind.mjs";
+import { buildMelt, meltDevice } from "../roundhouse/meltBind.mjs";            // v3850 - the thermal four join section 7
+import { buildFreeze, freezeDevice } from "../roundhouse/freezeBind.mjs";
+import { buildVaporize, vaporizeDevice } from "../roundhouse/vaporizeBind.mjs";
 import { buildPipe, pipeDevice } from "../roundhouse/pipe3dBind.mjs";
 import { buildGeometry, geometryDevice } from "../roundhouse/geometryBind.mjs";
 import { buildKH, khDevice } from "../roundhouse/khBind.mjs";
@@ -433,7 +436,7 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     ["ct", buildCT, ctDevice, ["parallel", "fan"]],
                     ["interferometer", buildInterferometer, interferometerDevice, ["recover", "nounwrap"]],
                     ["windtunnel", buildFluid, fluidDevice, ["balance", "drag", "sourceconfusion"]],   // v3845: + the declared reader plant
-                    ["thermal", buildThermal, thermalDevice, ["diffuse", "convect"]],
+                    ["thermal", buildThermal, thermalDevice, ["diffuse", "convect", "onedmoment"]],   // v3850: + the declared reader plant
                     ["pipe3d", buildPipe, pipeDevice, ["profile", "noslip"]],
                     ["geometry", buildGeometry, geometryDevice, ["sphere", "converge", "blob"]],
                     ["born", buildBorn, bornDevice, ["validity", "error", "scaling"]],
@@ -443,7 +446,17 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
                     ["chaos", buildChaos, chaosDevice, ["fixed", "doubling", "feigenbaum", "lyapunov"]],
                     ["splat", buildSplat, splatDevice, ["integral", "compose", "perspective", "shear", "precision"]],
                     ["discovery", buildDiscovery, discoveryDevice, ["kepler", "splat", "logistic", "nolaw", "visviva"]],
-                    ["probe", buildProbe, probeDevice, ["precession", "isco", "closure", "firstorder", "capture", "findisco", "mission", "pilot"]]];
+                    ["probe", buildProbe, probeDevice, ["precession", "isco", "closure", "firstorder", "capture", "findisco", "mission", "pilot"]],
+                    // *** v3850 -- THE THERMAL FOUR JOIN THIS CHECK, AND ADDING THEM FOUND SOMETHING. *** This
+                    // list held 17 devices and none of melt / freeze / vaporize, so their builders had been
+                    // returning keys that were never in their declared observable lists -- `kind`, `rows`,
+                    // `samples`, `material`, `cells`, `note`, `allPenaltiesEqualR` and more. An UNDECLARED
+                    // OBSERVABLE IS INVISIBLE TO EVERY CONSUMER THAT READS THE LIST RATHER THAN THE CODE,
+                    // which is the whole reason the list exists. Declared at v3850; this row is what keeps
+                    // them declared.
+                    ["melt", buildMelt, meltDevice, ["front", "stall", "naive"]],
+                    ["freeze", buildFreeze, freezeDevice, ["control", "reversibility", "slowfreeze"]],
+                    ["vaporize", buildVaporize, vaporizeDevice, ["ratio", "key", "trilemma", "celsius"]]];
     for (const [n, build, dev, modes] of checks) {
         let undeclared = [];
         for (const mode of modes) {
@@ -542,9 +555,22 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const a = buildMGGPU({ mode: "adjoint", config: { n: 32 } });
     const w = buildMGGPU({ mode: "window", config: { n: 32 } });
     const r = buildMGGPU({ mode: "reference", config: { n: 32 } });
+    // *** v3939 -- WAS `=== 4`, AND IT WENT RED BECAUSE THE DEVICE GOT BETTER. *** multigridgpu gained the
+    // `narrowwindow` plant, so a count frozen at four refused a fifth mode that is the whole point of having
+    // one. THE FIX WAS ALREADY WRITTEN, TWO CHECKS UP: v3806 hit this exact shape on multigrid3d
+    // (`=== 3`, frozen before `nopreconditioner` arrived), wrote "A COUNT IS NOT A CONTRACT", and changed it
+    // to a floor plus the primary. It fixed the sibling it was looking at and left the other two.
+    //
+    // SO THE CONTRACT IS ASSERTED, NOT THE TALLY: at least the modes this file drives, the PRIMARY first
+    // because the plant contract compares against modes[0], and the plant declared. A new mode is progress and
+    // must not need this line edited; a mode DISAPPEARING, or the primary moving, still goes red.
     ok("multigridgpu: declares its modes and every measured key is declared",
-        multigridGPUDevice.modes.length === 4 &&
-        [a, w, r, sv].every((o) => Object.keys(o).filter((k) => k !== "kind").every((k) => multigridGPUDevice.observables.includes(k))));
+        multigridGPUDevice.modes.length >= 4 && multigridGPUDevice.modes[0] === "adjoint" &&
+        typeof multigridGPUDevice.plantMode === "string" &&
+        multigridGPUDevice.modes.includes(multigridGPUDevice.plantMode) &&
+        [a, w, r, sv].every((o) => Object.keys(o).filter((k) => k !== "kind").every((k) => multigridGPUDevice.observables.includes(k))),
+        multigridGPUDevice.modes.length + " modes [" + multigridGPUDevice.modes.join(", ") + "], plant " +
+        multigridGPUDevice.plantMode + " flipping " + multigridGPUDevice.plantFlips);
 }
 
 // ---- *** freesurface: THE DEVICE'S OWN DECLARATIONS (v3728) *** ------------------------------------------------
@@ -616,9 +642,15 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         `line of physics/blobInduction.js`);
 
     const s = await buildInduction({ mode: "separation" });
+    // v3939 -- the same freeze, the same cause: induction gained the `radialdot` plant and `=== 3` refused it.
+    // See the multigridgpu note above; this is the third instance of v3806's finding and the last of the trio.
     ok("induction: declares its modes and every measured key is declared",
-        inductionDevice.modes.length === 3 &&
-        [f, s].every((o) => Object.keys(o).every((k) => inductionDevice.observables.includes(k))));
+        inductionDevice.modes.length >= 3 && inductionDevice.modes[0] === "faraday" &&
+        typeof inductionDevice.plantMode === "string" &&
+        inductionDevice.modes.includes(inductionDevice.plantMode) &&
+        [f, s].every((o) => Object.keys(o).every((k) => inductionDevice.observables.includes(k))),
+        inductionDevice.modes.length + " modes [" + inductionDevice.modes.join(", ") + "], plant " +
+        inductionDevice.plantMode + " flipping " + inductionDevice.plantFlips);
 }
 
 console.log("labDevices-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

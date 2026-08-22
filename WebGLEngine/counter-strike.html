@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counter-Strike tactics &mdash; GPU Brain</title>
+<style>
+  :root { --ink:#d7e3f4; --dim:#7f95b3; --line:#1b2b44; --go:#5fd08a; --bad:#f4808c; --acc:#8ab4ff; }
+  body { margin:0; background:#06090a; color:var(--ink); font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:10px 14px; border-bottom:1px solid var(--line); }
+  h1 { font-size:15px; margin:0 0 4px; }
+  .lede { color:var(--dim); max-width:900px; line-height:1.5; margin:0; }
+  code { color:var(--acc); }
+  .hud { position:sticky; top:0; z-index:6; background:#06090a; border-bottom:1px solid var(--line); padding:6px 14px; display:flex; flex-direction:column; gap:4px; }
+  .hud .row { display:flex; flex-wrap:wrap; gap:3px 14px; align-items:center; font-size:11px; }
+  .kv { display:inline-flex; gap:5px; white-space:nowrap; }
+  .kv span { color:var(--dim); } .kv b { color:var(--acc); font-weight:normal; }
+  #status { font-size:11px; } .ok { color:var(--go); } .err { color:var(--bad); } .warn { color:#caa05a; }
+  .wrap { display:flex; gap:14px; padding:14px; flex-wrap:wrap; }
+  .bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+  button { font:inherit; font-size:12px; padding:3px 11px; border-radius:5px; cursor:pointer; background:#152136; color:#b9d4ff; border:1px solid #2f486c; }
+  button.primary { background:#1d3559; }
+  canvas { background:#080d14; border:1px solid var(--line); border-radius:6px; display:block; }
+  /* v2873 -- the action fills the page. This canvas is a DRAWING, so it scales with aspect held and WITHOUT pixelated, which on a curve is just jagged. */
+  canvas { width: 100%; max-width: 1100px; height: auto; display: block; }
+  .side { min-width:240px; font-size:11px; }
+  .wrow { display:flex; align-items:center; gap:7px; padding:2px 0; }
+  .wrow span { width:70px; color:var(--dim); } .wrow .bar2 { flex:1; height:9px; background:#0d1a2a; border-radius:5px; position:relative; }
+  .wrow i { position:absolute; top:0; bottom:0; left:50%; width:1px; background:#2f486c; }
+  .wrow em { position:absolute; top:0; bottom:0; background:var(--acc); border-radius:5px; font-style:normal; }
+  .note { color:var(--dim); line-height:1.6; max-width:720px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127919; Counter-Strike tactics &mdash; which enemy does the brain shoot first?</h1>
+  <p class="lede">
+    In the half-second a peek gives you, several enemies are shootable at once. This page runs headless
+    engagements, scores each enemy with the weights the brain serves at <code>/ai/brain/cs/tactics</code>,
+    and posts the outcomes back so the policy learns the round-winning priority. Same target-scoring shape
+    as Endless Sky and BZFlag &mdash; a different schema. No retail game is involved.
+  </p>
+</header>
+
+<div class="hud">
+  <div id="status" class="warn">connecting to the brain&hellip;</div>
+  <div class="row">
+    <div class="kv"><span>policy</span><b id="kSource">&mdash;</b></div>
+    <div class="kv"><span>buffer</span><b id="kBuffer">0</b></div>
+    <div class="kv"><span>win rate</span><b id="kWin">&mdash;</b></div>
+    <div class="kv"><span>right target</span><b id="kBest">&mdash;</b></div>
+    <div class="kv"><span>engagements</span><b id="kCount">0</b></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="bar">
+      <button class="primary" id="btnRun">Run 200 engagements</button>
+      <button id="btnAuto">Auto: off</button>
+      <button id="btnReset">Reset policy</button>
+    </div>
+    <canvas id="cv" width="720" height="480"></canvas>
+    <p class="note">
+      You are the crosshair at centre, aiming right. Each dot is an enemy: brighter = more of the body
+      exposed, gold ring = on the bomb, red line = aiming back at you. Dimmed dots are behind cover or out
+      of range (<code>reach 0</code>) and can never be picked. The white ring is the brain's first shot.
+    </p>
+  </div>
+  <div class="side">
+    <div style="color:var(--dim);margin-bottom:6px">served weights (bar = value, tick = hand default)</div>
+    <div id="weights"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const ROUTE = "/ai/brain/cs/tactics";
+const EFF_RANGE = 1.0;
+const W_KEYS = ["wBias","wNear","wCross","wExposed","wLowHp","wThreat","wObjective"];
+const LABEL = { wBias:"bias", wNear:"near", wCross:"crosshair", wExposed:"exposed", wLowHp:"lowHp", wThreat:"threat", wObjective:"objective" };
+const W_MIN = -2, W_MAX = 4;
+
+function handWeights() { return { wBias:0.0, wNear:0.55, wCross:0.95, wExposed:0.85, wLowHp:0.65, wThreat:0.60, wObjective:0.45 }; }
+function trueWeights() { return { wBias:0.0, wNear:0.40, wCross:0.75, wExposed:0.95, wLowHp:0.55, wThreat:1.05, wObjective:1.25 }; }
+const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+
+function mulberry32(seed){ let a=seed>>>0; return function(){ a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+
+function featsOf(e){
+  const inRange = e.dist <= EFF_RANGE, behindCover = e.cover >= 0.98;
+  const reach = (inRange && !behindCover) ? 1 : 0;
+  const near = clamp01(1 - e.dist / EFF_RANGE);
+  const crosshair = clamp01(1 - Math.abs(e.bearingDeg) / 90);
+  const exposed = clamp01(1 - e.cover);
+  const lowHp = clamp01(1 - e.hp / 100);
+  const threat = clamp01((e.aiming ? 0.6 : 0.15) + 0.4 * e.weaponThreat);
+  const objective = e.objective ? 1 : 0;
+  return { reach, near, crosshair, exposed, lowHp, threat, objective };
+}
+function randEnemy(rng){ return { dist:rng()*1.3, bearingDeg:(rng()*2-1)*180, cover: rng()<0.15?0.99:rng()*0.85, hp:1+rng()*99, aiming:rng()<0.45, weaponThreat:rng(), objective:rng()<0.18 }; }
+function makeRound(rng, n){ const enemies=[]; for(let i=0;i<n;i++) enemies.push(randEnemy(rng)); let feats=enemies.map(featsOf); if(!feats.some(f=>f.reach===1)){ enemies[0].cover=0.2; enemies[0].dist=0.5; feats=enemies.map(featsOf);} return { enemies, feats }; }
+function score(w,f){ const d = w.wBias + w.wNear*f.near + w.wCross*f.crosshair + w.wExposed*f.exposed + w.wLowHp*f.lowHp + w.wThreat*f.threat + w.wObjective*f.objective; return (f.reach||0)*d; }
+function pick(round,w){ const s=round.feats.map((f,i)=>({i,s:score(w,f)})).filter(o=>round.feats[o.i].reach===1).sort((a,b)=>b.s-a.s); if(!s.length) return null; return { chosen:s[0].i, alt:s[1]?s[1].i:s[0].i }; }
+function resolve(round,ci,rng){ const ts=round.feats.map(f=>score(trueWeights(),f)); const el=round.feats.map((f,i)=>i).filter(i=>round.feats[i].reach===1); const vals=el.map(i=>ts[i]); const lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals); const best=el.reduce((b,i)=>ts[i]>ts[b]?i:b, el[0]); const norm=hi>lo?(ts[ci]-lo)/(hi-lo):1; const win=rng()<(0.06+0.88*norm); return { win, reward:win?1:-1, isBest:ci===best }; }
+
+let served = { weights: handWeights(), source: "hand", samples: 0 };
+let count = 0, lastRound = null, lastPick = null, seed = (Date.now()&0x7fffffff)>>>0;
+let auto = false, autoTimer = null;
+
+function setStatus(cls, msg){ const s=$("status"); s.className=cls; s.textContent=msg; }
+
+async function refresh(){
+  try {
+    const r = await fetch(ROUTE, { headers:{accept:"application/json"} }); const j = await r.json();
+    served = { weights: (j && j.weights) || handWeights(), source: (j && j.source) || "hand", samples: (j && j.samples) || 0 };
+    $("kSource").textContent = served.source; $("kBuffer").textContent = served.samples;
+    setStatus("ok", served.source==="learned" ? "brain is serving a LEARNED policy" : "brain is serving the hand policy (needs more data)");
+    drawWeights();
+  } catch(e){ setStatus("err", "can't reach the bridge: " + (e.message||e)); }
+}
+
+async function runBatch(n){
+  const rng = mulberry32(seed++); let wins=0, best=0, dec=0; const samples=[];
+  for(let k=0;k<n;k++){ const round=makeRound(rng, 3+Math.floor(rng()*3)); const p=pick(round, served.weights); if(!p) continue; const res=resolve(round,p.chosen,rng); dec++; if(res.win)wins++; if(res.isBest)best++; samples.push({chosen:round.feats[p.chosen], alt:round.feats[p.alt], reward:res.reward}); lastRound=round; lastPick=p; }
+  count += dec;
+  $("kWin").textContent = dec?((wins/dec*100).toFixed(1)+"%"):"—";
+  $("kBest").textContent = dec?((best/dec*100).toFixed(1)+"%"):"—";
+  $("kCount").textContent = count;
+  if(lastRound) draw(lastRound, lastPick);
+  try { await fetch(ROUTE,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({samples})}); } catch(e){}
+  await refresh();
+}
+
+function drawWeights(){
+  const host=$("weights"); host.innerHTML="";
+  const hand=handWeights();
+  for(const k of W_KEYS){
+    const v=served.weights[k]!=null?served.weights[k]:hand[k];
+    const pv=(v-W_MIN)/(W_MAX-W_MIN), ph=(hand[k]-W_MIN)/(W_MAX-W_MIN);
+    const row=document.createElement("div"); row.className="wrow";
+    row.innerHTML='<span>'+LABEL[k]+'</span><div class="bar2"><em style="left:0;width:'+(pv*100).toFixed(1)+'%"></em><i style="left:'+(ph*100).toFixed(1)+'%"></i></div><b style="color:var(--acc)">'+(+v).toFixed(2)+'</b>';
+    host.appendChild(row);
+  }
+}
+
+function draw(round, p){
+  const cv=$("cv"), g=cv.getContext("2d"), W=cv.width, H=cv.height, cx=W/2, cy=H/2;
+  g.clearRect(0,0,W,H);
+  // aim line (you face +x)
+  g.strokeStyle="#24425f"; g.lineWidth=1; g.beginPath(); g.moveTo(cx,cy); g.lineTo(W-8,cy); g.stroke();
+  // crosshair
+  g.strokeStyle="#5fd08a"; g.beginPath(); g.moveTo(cx-7,cy); g.lineTo(cx+7,cy); g.moveTo(cx,cy-7); g.lineTo(cx,cy+7); g.stroke();
+  const R = Math.min(W,H)/2 - 40;
+  round.enemies.forEach((e,i)=>{
+    const f=round.feats[i];
+    const ang = -e.bearingDeg * Math.PI/180;               // 0 = dead ahead (right), +up
+    const rad = 40 + (e.dist/1.3) * R;
+    const x = cx + Math.cos(ang)*rad, y = cy + Math.sin(ang)*rad;
+    const hit = f.reach===1;
+    // red aim-back line for a threatening, aiming enemy
+    if(e.aiming && hit){ g.strokeStyle="rgba(244,128,140,0.5)"; g.beginPath(); g.moveTo(x,y); g.lineTo(cx,cy); g.stroke(); }
+    // body: brightness by exposed, dim if unhittable
+    const lum = hit ? (0.35 + 0.6*f.exposed) : 0.16;
+    g.fillStyle = "rgba("+Math.round(150*lum+40)+","+Math.round(180*lum+40)+","+Math.round(230*lum+50)+",1)";
+    g.beginPath(); g.arc(x,y, 7+5*f.near, 0, 7); g.fill();
+    // objective gold ring
+    if(e.objective){ g.strokeStyle="#e8c15a"; g.lineWidth=2; g.beginPath(); g.arc(x,y, 11+5*f.near, 0, 7); g.stroke(); }
+    // chosen -> white ring + tag
+    if(p && i===p.chosen){ g.strokeStyle="#ffffff"; g.lineWidth=2; g.beginPath(); g.arc(x,y, 15+5*f.near, 0, 7); g.stroke(); g.fillStyle="#fff"; g.font="10px ui-monospace"; g.fillText("shoot first", x+14, y-10); }
+  });
+}
+
+$("btnRun").onclick = () => runBatch(200);
+$("btnReset").onclick = async () => { try { await fetch(ROUTE+"/reset",{method:"POST"}); count=0; $("kCount").textContent=0; } catch(e){} await refresh(); setStatus("warn","policy reset to the hand defaults"); };
+$("btnAuto").onclick = () => { auto=!auto; $("btnAuto").textContent="Auto: "+(auto?"on":"off"); if(auto){ autoTimer=setInterval(()=>runBatch(200), 1500); } else { clearInterval(autoTimer); } };
+
+// first paint: a demo round under the hand policy, then pull the served weights
+(function(){ const rng=mulberry32(seed); const round=makeRound(rng,4); draw(round, pick(round, served.weights)); })();
+refresh();
+</script>
+</body>
+</html>

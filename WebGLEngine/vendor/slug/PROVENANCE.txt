@@ -1,0 +1,42 @@
+Slug Algorithm -- reference shaders
+MIT OR Apache-2.0 (dual; MIT chosen and vendored here as LICENSE)
+https://github.com/EricLengyel/Slug
+author: Eric Lengyel, Terathon Software
+
+vendored v3823. NO CODE FROM THE UPSTREAM REPOSITORY IS SHIPPED IN THIS DIRECTORY.
+
+The upstream repository contains exactly two files of substance, SlugVertexShader.hlsl and
+SlugPixelShader.hlsl. Both are HLSL and this engine is WebGL2, so they were PORTED rather than
+vendored: the GLSL ES 3.00 translation lives in text/slugShader.js, and text/slugFont.js,
+text/slugAtlas.js and text/slugText.js are original work implementing the data structures the
+shaders read. This directory therefore carries the licence and this record and nothing else,
+because there is no upstream artefact to keep in sync.
+
+ATTRIBUTION IS A LICENCE CONDITION, NOT A COURTESY. The upstream README states it plainly: the
+code may be used freely by anyone for any purpose and the patent has been dedicated to the public
+domain, but anyone distributing software that uses it IS REQUIRED to give credit. The string that
+satisfies that is exported as SLUG_NOTICE from text/slugShader.js so a build step can emit it, it
+is reproduced in the header of every ported file, and it is repeated here:
+
+    Slug shader code Copyright 2017 by Eric Lengyel. Licensed MIT OR Apache-2.0.
+    https://github.com/EricLengyel/Slug
+
+PATENT. Slug was patented and the patent has been dedicated to the public domain by its author.
+That is the reason this integration exists at all -- the algorithm was commercial-licence-only for
+most of its life, and an engine could not have shipped it. Anyone auditing this dependency should
+confirm the dedication still stands rather than taking this file's word for it.
+
+The core algorithm is described in:
+    Eric Lengyel, "GPU-Centered Font Rendering Directly from Glyph Outlines",
+    Journal of Computer Graphics Techniques, Vol. 6, No. 2, 2017.
+    https://jcgt.org/published/0006/02/02/
+Changes since publication are catalogued at https://terathon.com/blog/decade-slug.html
+
+WHAT THE PORT CHANGED, so a future reader diffing against upstream is not surprised:
+  - HLSL intrinsics to their GLSL equivalents (asuint, saturate, frac, Load, nointerpolation).
+  - The two packed integer words arrive as a genuine uvec2 attribute through vertexAttribIPointer
+    instead of being bit-cast out of a float4, because WebGL2 has an integer attribute path and
+    D3D9-era vertex declarations did not. The BIT LAYOUT is unchanged.
+  - kLogBandTextureWidth is injected rather than hardcoded at 12, because WebGL2 guarantees only a
+    2048 texel MAX_TEXTURE_SIZE while the reference assumes 4096.
+Nothing else. The port is otherwise line-for-line and is meant to stay diffable by eye.

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Gravity Is A Goal">
+<meta name="demo:desc" content="A blob that is genuinely held down. Gravity pulls, buoyancy exists only while it is hot, heat exists only while it spends energy, and energy only returns while it is not spending -- so hovering is never free and it has to bob for its altitude. The lava lamp was never unbound by gravity; a lamp IS buoyancy against gravity. What it lacked was choice. Here a seeded perceptron (or the GPU brain when connected) decides when to burn and when to coast, and the height is earned: doing nothing falls, burning flat out reaches but cannot hold, and the brain holds three times longer on the same tank. The skin tells the truth -- it glows lava when it is working and freezes to ice when it gives up -- and the wormhole gauge reads its energy.">
+<meta name="demo:category" content="fx">
+<title>Gravity Is A Goal</title>
+<style>
+  html,body { margin:0; height:100%; background:#04060e; overflow:hidden; color:#9fb2d4; font:12px ui-monospace,Menlo,monospace; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:3; }
+  #cap { color:#f6a623; letter-spacing:.14em; text-transform:uppercase; font-size:13px; }
+  #stat { color:#7fe3c4; font-size:12px; margin-top:5px; line-height:1.5; }
+  #sub { color:#5f7aa0; font-size:11px; margin-top:4px; max-width:260px; line-height:1.4; }
+  #ctl { position:fixed; right:14px; top:12px; z-index:3; display:flex; flex-direction:column; gap:8px; }
+  button { background:rgba(16,22,36,.92); color:#c9b6ff; border:1px solid #3a3060; border-radius:18px; padding:8px 13px; font:600 11px ui-monospace,monospace; cursor:pointer; }
+  button.on { color:#7fe3c4; border-color:#2a6a5a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="cap">&#9670; Gravity Is A Goal</div><div id="stat"></div><div id="sub">hovering is never free &middot; it has to work for the height</div></div>
+<div id="ctl">
+  <button id="m0" class="on">pilot: trained</button>
+  <button id="m1">pilot: my guess</button>
+  <button id="m2">pilot: do nothing</button>
+  <button id="m3">pilot: burn flat out</button>
+  <button id="rst">reset</button>
+</div>
+<script type="module">
+import { makeBlobAgent, makeBlobPolicy, installDefaultPolicy, seededBlobWeights, loadPolicyWeights } from "./fx/avatar/blobGravity.js";
+import { metaField } from "./fx/avatar/pet.js";
+import { shadeTri } from "./fx/avatar/skins.js";
+import { paintWormhole, paintBlackHole } from "./fx/gauge/spacetimeGauges.js";
+import { makePortal } from "./fx/gauge/portal.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const statEl = document.getElementById("stat"), subEl = document.getElementById("sub");
+function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
+
+const GOAL = 3.0, BAND = 0.45;
+installDefaultPolicy();                                   // the GPU brain overrides this when it is connected
+let trained = makeBlobPolicy();                            // baked weights until the bridge answers
+let polSource = "baked";
+// what this machine (or its fleet) has actually learned survives restarts now -- ~/.voxelbridge/brain
+loadPolicyWeights().then(r => { trained = makeBlobPolicy(r.weights); polSource = r.source + (r.score ? " " + r.score.toFixed(2) : "") + (r.by ? " via " + r.by : ""); });
+const myGuess = makeBlobPolicy(seededBlobWeights());       // the hand-tuned PD it beat, kept honest for comparison
+let mode = 0, agent = makeBlobAgent({}), held = 0, best = 0;
+// THE GAUGE IS A DOOR. The wormhole's throat is drawn from the blob's energy, and that same throat is the aperture it
+// must fit through -- so it can only cross by arriving high AND still solvent. Burn the tank on the climb and the door
+// is shut. Through it, the blob is nowhere; it drops back out of the black hole with exactly what it carried in.
+const EXIT_Y = 4.4, EXIT_DX = 2.3;
+const portal = makePortal({ entryY: GOAL, exitY: EXIT_Y, radius: 1.0, minOpen: 0.35, transitTime: 0.9 });
+let blobX = 0, xTarget = 0, crossings = 0, doorMsg = "";
+const PILOTS = [
+  (st) => (window.__swekBlobBrain || trained)(st, GOAL),   // GPU brain if connected, else the learned/baked policy
+  (st) => myGuess(st, GOAL),                              // my hand-tuned guess -- the baseline it beat
+  () => ({ heat: 0, vent: 0 }),                           // do nothing -- gravity wins, every time
+  () => ({ heat: 1, vent: 0 })                            // burn flat out -- reaches, cannot hold
+];
+const btns = [document.getElementById("m0"), document.getElementById("m1"), document.getElementById("m2"), document.getElementById("m3")];
+btns.forEach((b, i) => b.onclick = () => { mode = i; btns.forEach((x, k) => x.className = k === i ? "on" : ""); reset(); });
+function reset() { agent = makeBlobAgent({}); held = 0; best = 0; blobX = 0; xTarget = 0; crossings = 0; doorMsg = ""; }
+document.getElementById("rst").onclick = reset;
+
+const N = 16, SP = 2.2, cell = (SP * 2) / (N - 1);
+let last = performance.now();
+function frame() {
+  const now = performance.now(), dt = Math.min(1 / 30, (now - last) / 1000); last = now;
+  const inTransit = portal.phase === "transit";
+  const st = agent.st;
+  if (!inTransit) {
+    agent.step(dt, PILOTS[mode](agent.st, GOAL));
+    if (Math.abs(st.y - GOAL) <= BAND) held += dt;
+    if (st.y > best) best = st.y;
+    if (Math.abs(blobX) < 0.25 && portal.phase === "flying") {           // only the entry column has a door
+      const r = portal.tryEnter(st);
+      if (r.pass) { crossings++; doorMsg = "through the throat"; }
+      else if (Math.abs(st.y - GOAL) < 0.5) doorMsg = r.reason;
+    }
+  }
+  const emerged = portal.step(dt, st);
+  if (emerged && emerged.emerged) { st.y = emerged.y; st.vy = 0; blobX = EXIT_DX; xTarget = 0; doorMsg = "dropped back in"; }   // nothing lost, only moved
+  if (st.y <= 0.02 && !inTransit) blobX += (xTarget - blobX) * Math.min(1, dt * 0.8);   // it walks back to the door once grounded
+
+  const W = cv.width, H = cv.height, S = Math.min(W, H) * 0.115;
+  const groundY = H * 0.86, px = W * 0.42;
+  const py = (wy) => groundY - wy * S * 1.35;
+  ctx.clearRect(0, 0, W, H);
+  // the goal band it is trying to hold
+  ctx.fillStyle = "rgba(127,227,196,0.09)"; ctx.fillRect(0, py(GOAL + BAND), W, py(GOAL - BAND) - py(GOAL + BAND));
+  ctx.strokeStyle = "rgba(127,227,196,0.5)"; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(0, py(GOAL)); ctx.lineTo(W, py(GOAL)); ctx.stroke(); ctx.setLineDash([]);
+  // the ground -- where gravity always wins in the end
+  ctx.fillStyle = "rgba(90,60,50,0.35)"; ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.strokeStyle = "rgba(255,140,90,0.45)"; ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+
+  // the blob: a squashed metaball, marched. Its SKIN tells the truth -- lava while it burns, ice when it gives up.
+  const squash = 1 + Math.max(-0.25, Math.min(0.25, st.vy * 0.04));
+  const balls = [{ p: [0, 0, 0], r: 0.95 / squash }, { p: [0, 0.42 * squash, 0], r: 0.42 }, { p: [0, -0.40 * squash, 0], r: 0.5 }];
+  const f = new Float32Array(N * N * N);
+  for (let z = 0; z < N; z++) { const wz = -SP + cell * z; for (let y = 0; y < N; y++) { const wy = -SP + cell * y; const row = (z * N + y) * N;
+    for (let x = 0; x < N; x++) f[row + x] = metaField(balls, -SP + cell * x, wy, wz); } }
+  const mesh = marchScalarField(f, N, N, N, 1.0, { origin: [-SP, -SP, -SP], cellSize: cell });
+  const P = mesh.positions, tris = [];
+  for (let i = 0; i + 8 < P.length; i += 9) {
+    const A = [P[i], P[i+1], P[i+2]], B = [P[i+3], P[i+4], P[i+5]], C = [P[i+6], P[i+7], P[i+8]];
+    let nx = (B[1]-A[1])*(C[2]-A[2]) - (B[2]-A[2])*(C[1]-A[1]);
+    let ny = (B[2]-A[2])*(C[0]-A[0]) - (B[0]-A[0])*(C[2]-A[2]);
+    let nz = (B[0]-A[0])*(C[1]-A[1]) - (B[1]-A[1])*(C[0]-A[0]);
+    const ml = Math.hypot(nx, ny, nz) || 1;
+    const lit = Math.max(0.15, (nx*0.4 + ny*0.75 + nz*0.5) / ml);
+    const p3 = [(A[0]+B[0]+C[0])/3, (A[1]+B[1]+C[1])/3, (A[2]+B[2]+C[2])/3];
+    tris.push({ z: p3[2], A, B, C, lit, n: [nx/ml, ny/ml, nz/ml], p3, th: Math.max(0, Math.min(1, 1 - Math.hypot(p3[0], p3[1], p3[2]) / 1.4)) });
+  }
+  tris.sort((a, b) => a.z - b.z);
+  const meltNow = Math.max(0, Math.min(1, (st.heat - 0.05) / 0.75));   // heat IS the material: cold ice -> hot lava
+  const bx = px + blobX * S;
+  if (!inTransit) for (const t of tris) {
+    const c = shadeTri("ice", { lit: t.lit, normal: t.n, thickness: t.th, pos: t.p3, t: now / 1000, melt: meltNow });
+    ctx.fillStyle = "rgba(" + Math.round(c[0]*255) + "," + Math.round(c[1]*255) + "," + Math.round(c[2]*255) + "," + c[3].toFixed(3) + ")";
+    ctx.beginPath(); ctx.moveTo(bx + t.A[0]*S, py(st.y) - t.A[1]*S); ctx.lineTo(bx + t.B[0]*S, py(st.y) - t.B[1]*S); ctx.lineTo(bx + t.C[0]*S, py(st.y) - t.C[1]*S); ctx.closePath(); ctx.fill();
+  }
+  // the door itself: its throat is the blob's energy, and that throat is the aperture it must fit through
+  ctx.globalAlpha = 0.92; paintWormhole(ctx, px, py(GOAL), S * 0.95, st.energy, now / 1000, { color: [120, 200, 255] }); ctx.globalAlpha = 1;
+  // the exit: it drops back in from here, carrying what it carried in
+  paintBlackHole(ctx, px + EXIT_DX * S, py(EXIT_Y), S * 0.85, 0.55 + 0.35 * Math.sin(now / 1400), now / 1000, { color: [255, 170, 90] });
+  ctx.fillStyle = "rgba(95,122,160,0.8)"; ctx.font = "9px ui-monospace,monospace"; ctx.textAlign = "center";
+  ctx.fillText("EXIT", px + EXIT_DX * S, py(EXIT_Y) + S * 1.05);
+  // the small readout still shows the tank
+  paintWormhole(ctx, W - 92, 96, 58, st.energy, now / 1000, { color: [120, 200, 255] });
+  ctx.fillStyle = "#5f7aa0"; ctx.fillText("ENERGY", W - 92, 172);
+
+  statEl.innerHTML = "policy: " + polSource + "<br>crossings " + crossings + " &nbsp; height " + st.y.toFixed(2) + " / " + GOAL.toFixed(1) + " &nbsp; peak " + best.toFixed(2) +
+    "<br>heat " + st.heat.toFixed(2) + " &nbsp; energy " + st.energy.toFixed(2) +
+    "<br>held in band " + held.toFixed(1) + "s &nbsp; burned " + st.spent.toFixed(2);
+  subEl.textContent = inTransit ? "inside the throat \u2014 it is nowhere" : (doorMsg || (mode === 2 ? "doing nothing: gravity takes it, and keeps it" : mode === 3 ? "burning flat out: it gets there, then the tank runs dry" : mode === 1 ? "the hand-tuned guess: it flies, but not this well" : (st.heat > 0.5 ? "working for it" : "coasting, cooling, falling")));
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

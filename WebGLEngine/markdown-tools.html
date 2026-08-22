@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#7fb3d6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:14px; max-width:920px; }
+  .section { border:1px solid var(--line); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:6px; }
+  .section h2 { font-size:13px; margin:0 0 2px; color:var(--accent); }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  input { padding:6px 8px; background:#0c0f14; color:#e8eef8; border:1px solid #2a3340; border-radius:6px; font:11px ui-monospace,monospace; }
+  input.grow { flex:1; min-width:150px; }
+  button { padding:6px 12px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  button.go { background:#2a4d3a; border-color:#4a7d5a; }
+  button.alt { background:#3a3a5a; border-color:#5a5a8a; }
+  .stat { font-size:11px; color:var(--dim); min-height:14px; }
+  textarea { width:100%; min-height:130px; background:#0a0e14; color:#cde; border:1px solid #2a3340; border-radius:6px; padding:8px; font:11px ui-monospace,monospace; resize:vertical; display:none; }
+  .tools { display:none; gap:6px; }
+  .tools button { padding:4px 10px; background:#10293a; color:#9ed5ff; border:1px solid #245; font-size:11px; }
+  a { color:#9bd6ff; }
+</style>
+<script src="/engine/favicon-inject.js"></script>
+</head>
+<body>
+<header><h1>&#128221; Markdown</h1><span class="hint">Turn documents and web pages into clean Markdown for feeding to the AI.</span></header>
+<main>
+  <div class="section">
+    <h2>&#128221; Doc &rarr; Markdown (markitdown)</h2>
+    <div class="hint">Convert a PDF / Word / PowerPoint / Excel / HTML / image into clean Markdown (Microsoft <b>markitdown</b>). Needs Python 3.10+.</div>
+    <div class="row">
+      <input id="mdPath" class="grow" placeholder="path to a document on this PC&hellip;">
+      <button id="mdBrowse">Browse&hellip;</button>
+      <button id="mdConv" class="go">Convert</button>
+      <button id="mdInst" class="alt" style="display:none">Install</button>
+    </div>
+    <div id="mdStat" class="stat">checking&hellip;</div>
+    <textarea id="mdOut" readonly placeholder="Markdown output&hellip;"></textarea>
+    <div id="mdTools" class="tools"><button id="mdCopy">Copy</button><button id="mdDl">Download .md</button></div>
+  </div>
+
+  <div class="section">
+    <h2>&#128293; Web &rarr; Markdown (Firecrawl)</h2>
+    <div class="hint">Scrape any URL into clean Markdown (<a href="https://firecrawl.dev" target="_blank" rel="noopener">Firecrawl</a>). Needs a free API key (firecrawl.dev).</div>
+    <div class="row"><input id="fcKey" type="password" class="grow" placeholder="fc-... API key"><button id="fcSave">Save key</button></div>
+    <div class="row"><input id="fcUrl" class="grow" placeholder="https://example.com/article"><button id="fcScrape" class="go">Scrape</button></div>
+    <div id="fcStat" class="stat">checking&hellip;</div>
+    <textarea id="fcOut" readonly placeholder="Markdown output&hellip;"></textarea>
+    <div id="fcTools" class="tools"><button id="fcCopy">Copy</button><button id="fcDl">Download .md</button></div>
+  </div>
+
+  <div class="section">
+    <h2>&#129516; Web &rarr; Markdown (Crawl4AI)</h2>
+    <div class="hint">Scrape any URL into clean Markdown via a <b>locally-run</b> <a href="https://github.com/unclecode/crawl4ai" target="_blank" rel="noopener">crawl4ai</a> server (no cloud, no API key). Install &amp; start it from &#9881; Auto-Install &rarr; Crawl4AI (default <code>http://127.0.0.1:11235</code>). If you started the server with a token, set it below.</div>
+    <div class="row"><input id="c4Base" class="grow" placeholder="http://127.0.0.1:11235"><input id="c4Tok" type="password" placeholder="bearer token (optional)"><button id="c4Save">Save</button></div>
+    <div class="row"><input id="c4Url" class="grow" placeholder="https://example.com/article"><button id="c4Scrape" class="go">Scrape</button></div>
+    <div id="c4Stat" class="stat">checking&hellip;</div>
+    <textarea id="c4Out" readonly placeholder="Markdown output&hellip;"></textarea>
+    <div id="c4Tools" class="tools"><button id="c4Copy">Copy</button><button id="c4Dl">Download .md</button></div>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, error: e && e.message }; }); }
+  function dl(text, name) { try { var b = new Blob([text], { type: "text/markdown" }); var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = name; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); } catch (e) {} }
+  function copy(text, btn) { try { navigator.clipboard.writeText(text); var old = btn.textContent; btn.textContent = "\u2713"; setTimeout(function () { btn.textContent = old; }, 1000); } catch (e) {} }
+
+  // ---- Doc -> Markdown ----
+  var mdMd = "";
+  function mdRefresh() {
+    j("/markitdown/status").then(function (s) {
+      if (s && s.installed) { $("mdStat").innerHTML = "<span style='color:#9fe88f'>\u2713 markitdown " + (s.version || "") + " \u00b7 " + (s.py || "") + "</span>"; $("mdInst").style.display = "none"; }
+      else { $("mdStat").innerHTML = "<span style='color:#caa05a'>not installed" + (s && s.py ? (" \u00b7 python: " + s.py) : "") + "</span>"; $("mdInst").style.display = ""; }
+    });
+  }
+  $("mdBrowse").addEventListener("click", function () {
+    // best-effort: reuse the engine's server-path picker if this window was opened from it
+    try {
+      if (window.opener && window.opener.pickServerPath) {
+        window.opener.pickServerPath({ mode: "file", ext: ["pdf", "docx", "pptx", "xlsx", "xls", "html", "htm", "csv", "json", "txt", "png", "jpg", "jpeg", "epub"], title: "Pick a document", start: $("mdPath").value.trim() })
+          .then(function (p) { if (p) $("mdPath").value = p; }).catch(function () {});
+      } else { $("mdStat").textContent = "paste the full path (file picker only available from the engine window)"; }
+    } catch (e) { $("mdStat").textContent = "paste the full path"; }
+  });
+  $("mdInst").addEventListener("click", function () {
+    $("mdInst").disabled = true; $("mdStat").innerHTML = "installing markitdown\u2026 (one-time)";
+    j("/markitdown/install", { method: "POST" }).then(function (r) { $("mdInst").disabled = false; if (r && r.ok) { $("mdStat").innerHTML = "<span style='color:#9fe88f'>\u2713 installed " + (r.version || "") + "</span>"; mdRefresh(); } else { $("mdStat").innerHTML = "<span style='color:#f88'>\u2717 " + (((r && r.error) || "install failed") + "").slice(0, 120) + "</span>"; } });
+  });
+  $("mdConv").addEventListener("click", function () {
+    var p = $("mdPath").value.trim(); if (!p) { $("mdStat").textContent = "pick a file first"; return; }
+    $("mdConv").disabled = true; $("mdStat").textContent = "converting\u2026";
+    j("/markitdown/convert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p }) }).then(function (r) {
+      $("mdConv").disabled = false;
+      if (r && r.ok) { mdMd = r.markdown || ""; $("mdOut").value = mdMd; $("mdOut").style.display = ""; $("mdTools").style.display = "flex"; $("mdStat").innerHTML = "<span style='color:#9fe88f'>\u2713 " + (r.chars || 0) + " chars from " + (r.file || "") + "</span>"; }
+      else { $("mdStat").innerHTML = "<span style='color:#f88'>\u2717 " + (((r && r.error) || "failed") + "").slice(0, 140) + "</span>"; }
+    });
+  });
+  $("mdCopy").addEventListener("click", function () { copy(mdMd, $("mdCopy")); });
+  $("mdDl").addEventListener("click", function () { dl(mdMd, (($("mdPath").value.split(/[\\/]/).pop() || "doc").replace(/\.[^.]+$/, "")) + ".md"); });
+  mdRefresh();
+
+  // ---- Web -> Markdown (Firecrawl) ----
+  var fcMd = "";
+  function fcRefresh() { j("/firecrawl/status").then(function (s) { $("fcStat").innerHTML = (s && s.configured) ? "<span style='color:#9fe88f'>\u2713 API key set</span>" : "<span style='color:#caa05a'>no API key yet \u2014 paste one above</span>"; if (s && s.configured) $("fcKey").placeholder = "[key saved \u2014 type to replace]"; }); }
+  $("fcSave").addEventListener("click", function () { j("/firecrawl/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: $("fcKey").value.trim() }) }).then(function () { $("fcKey").value = ""; fcRefresh(); }); });
+  $("fcScrape").addEventListener("click", function () {
+    var u = $("fcUrl").value.trim(); if (!u) { $("fcStat").textContent = "enter a URL"; return; }
+    $("fcScrape").disabled = true; $("fcStat").textContent = "scraping\u2026";
+    j("/firecrawl/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u }) }).then(function (r) {
+      $("fcScrape").disabled = false;
+      if (r && r.ok) { fcMd = r.markdown || ""; $("fcOut").value = fcMd; $("fcOut").style.display = ""; $("fcTools").style.display = "flex"; $("fcStat").innerHTML = "<span style='color:#9fe88f'>\u2713 " + (r.chars || 0) + " chars \u00b7 " + (r.title || r.url || "") + "</span>"; }
+      else { $("fcStat").innerHTML = "<span style='color:#f88'>\u2717 " + (((r && r.error) || "failed") + "").slice(0, 140) + "</span>"; }
+    });
+  });
+  $("fcCopy").addEventListener("click", function () { copy(fcMd, $("fcCopy")); });
+  $("fcDl").addEventListener("click", function () { dl(fcMd, "scrape.md"); });
+  fcRefresh();
+
+  // ---- Web -> Markdown (Crawl4AI, local server) ----
+  var c4Md = "";
+  function c4Refresh() {
+    j("/crawl4ai/status").then(function (s) {
+      if (s && s.reachable) $("c4Stat").innerHTML = "<span style='color:#9fe88f'>\u2713 server reachable at " + (s.baseUrl || "") + (s.tokenSet ? " (token set)" : "") + "</span>";
+      else $("c4Stat").innerHTML = "<span style='color:#caa05a'>server not reachable at " + ((s && s.baseUrl) || "?") + " \u2014 install/start crawl4ai (\u2699 Auto-Install)</span>";
+    }).catch(function(){ $("c4Stat").textContent = "status check failed"; });
+  }
+  $("c4Save").addEventListener("click", function () {
+    var body = { baseUrl: $("c4Base").value.trim(), token: $("c4Tok").value.trim() };
+    j("/crawl4ai/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(function () { $("c4Tok").value = ""; c4Refresh(); });
+  });
+  $("c4Scrape").addEventListener("click", function () {
+    var u = $("c4Url").value.trim(); if (!u) { $("c4Stat").textContent = "enter a URL"; return; }
+    $("c4Scrape").disabled = true; $("c4Stat").textContent = "crawling\u2026 (first crawl can take a few seconds)";
+    j("/crawl4ai/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: u }) }).then(function (r) {
+      $("c4Scrape").disabled = false;
+      if (r && r.ok) { c4Md = r.markdown || ""; $("c4Out").value = c4Md; $("c4Out").style.display = ""; $("c4Tools").style.display = "flex"; $("c4Stat").innerHTML = "<span style='color:#9fe88f'>\u2713 " + c4Md.length + " chars \u00b7 crawl4ai</span>"; }
+      else { $("c4Stat").innerHTML = "<span style='color:#f88'>\u2717 " + (((r && r.error) || "failed") + "").slice(0, 160) + "</span>"; }
+    });
+  });
+  $("c4Copy").addEventListener("click", function () { copy(c4Md, $("c4Copy")); });
+  $("c4Dl").addEventListener("click", function () { dl(c4Md, "crawl4ai.md"); });
+  c4Refresh();
+})();
+</script>
+<!-- v1759 page gauges + avatar dock (non-render pages) -->
+<script type="module">try{const{mountPageGauges}=await import("/ui/pageGauges.js");mountPageGauges();}catch(e){}</script>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Avatar Stage</title>
+<!--
+  v970 — the phone's avatar view, as a standalone page so the PC PIP can show
+  the SAME thing the phone does (control.html's #stageCanvas). Mounts the
+  diorama avatarStage: a rigged GLB that wanders among three 3D vitals
+  (ring=hunger / gyro=happy / barrel=energy), a wandering pet, and a ticker.
+  Duo mode (?glb2=Other) brings a SECOND avatar in to dance/highfive/spar/hug.
+
+  Query params:
+    ?glb=RobotExpressive | ?asset=BrainStem   avatar (else /avatar/current)
+    ?glb2=CesiumMan                            second avatar → duo interaction
+    ?pet=0                                     disable the wandering pet
+    ?voice=M1                                  cosmetic label (PIP passes it)
+
+  Gauges read live tama via postMessage {type:"tama",hunger,happiness,energy}
+  from the parent PIP; standalone they drift gently so it always looks alive.
+  Other PIP messages (head-lock / tts / audio_amp) are ignored gracefully;
+  a speak message pulses the ticker.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0c12; overflow: hidden;
+    font-family: system-ui, sans-serif; }
+  #wrap { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #stageCanvas { flex: 1 1 auto; width: 100%; display: block; min-height: 0; position: relative; z-index: 1; }
+  #ticker { flex: 0 0 22px; width: 100%; overflow: hidden; background: #0a0c12; position: relative; z-index: 2;
+    border-top: 1px solid #1c2433; display: flex; align-items: center; }
+  #tickerText { white-space: nowrap; color: #f0b54e; font: 12px ui-monospace, monospace;
+    padding-left: 100%; animation: tickscroll 16s linear infinite; }
+  @keyframes tickscroll { to { transform: translateX(-100%); } }
+  #status { position: fixed; top: 6px; left: 8px; font: 11px ui-monospace, monospace;
+    color: #7fa8d8; display: none; max-width: 90%; }
+
+  /* v3656 -- ?embed=1: THE AVATAR PANEL IS NOT A DIORAMA. avatarstage is a full stage -- three 3D vitals, a
+     WANDERING PET, a ticker, eleven tool buttons and a fidget menu -- and ui/avatarSwitch.js has been mounting
+     it into a 143x210 box since v3555. At that size the main avatar is framed off-screen and THE PET IS THE
+     ONLY THING THAT FITS, which is exactly what the panel showed. Chrome off, pet off, and the camera tightened
+     to the head so the avatar fills a PORTRAIT box rather than a landscape stage. */
+  html[data-embed="1"] #avatarTools,
+  html[data-embed="1"] #fidgetMenu,
+  html[data-embed="1"] #ticker { display: none !important; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="stageCanvas"></canvas>
+  <div id="ticker"><div id="tickerText">KPop Listener · standing by …</div></div>
+  <div id="avatarTools" style="position:absolute;left:8px;top:8px;z-index:6;display:flex;flex-direction:column;gap:6px;">
+    <button id="selfieBtn" title="Selfie (camera pulls back + flashes)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:17px;line-height:1;cursor:pointer;">📷</button>
+    <button id="setPathBtn" title="Set Local Path (assets folder)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#128193;</button>
+    <button id="cheerBtn" title="Cheerleader mode (pom-poms + front-and-center cheer pose)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#128227;</button>
+    <button id="visorBtn" title="Visor HUD (helmet targeting overlay + glowing eyes; pins the avatar front-and-centre)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#127919;</button>
+    <button id="loadModelBtn" title="Load a downloaded model (.glb) from your computer as the avatar" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#128229;</button>
+    <button id="headViewBtn" title="Head view — tighten the camera to the head (great for helmets/busts and the visor HUD)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#128270;</button>
+    <button id="talkTestBtn" title="Talk test — watch the visor vocoder + jaw move (turn on the visor HUD to see the bars)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#128483;</button>
+    <button id="lipSyncBtn" title="Lip-sync from microphone — talk and the avatar’s mouth/vocoder follow your voice (needs mic permission + HTTPS or localhost)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#127908;</button>
+    <button id="idleLifeBtn" title="Idle life — blink + subtle ambient motion (ear-wiggle / tail-wag / head-bob / breathing on models that have those bones)" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:15px;line-height:1;cursor:pointer;">&#10024;</button>
+    <button id="modeBtn" title="Boot mode: Server / Avatar / Full — opens the avatar-server hub" style="width:34px;height:34px;border:1px solid #2f6fae;border-radius:9px;background:#0c0f14cc;color:#7fd0ff;font-size:15px;line-height:1;cursor:pointer;">&#128421;</button>
+    <button id="fidgetMenuBtn" title="Fidget menu — pick a scene or activity" style="width:34px;height:34px;border:1px solid #355;border-radius:9px;background:#0c0f14cc;color:#cfe3ff;font-size:16px;line-height:1;cursor:pointer;">&#127918;</button>
+  </div>
+  <input type="file" id="loadModelFile" accept=".glb,.gltf,.vrm" style="display:none">
+  <div id="fidgetMenu" style="position:absolute;left:50px;top:8px;z-index:8;display:none;min-width:180px;max-height:84vh;overflow:auto;background:#0a0f15f2;border:1px solid #2a3a48;border-radius:11px;padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#dfe9f2;"></div>
+</div>
+<script id="fidgetMenuTpl" type="application/json">
+{ "Activities": [
+    ["\u26bd Soccer", "soccer"], ["\ud83c\udfb3 Bowling", "bowl"], ["\ud83c\udfbe Tennis rally", "tennis"],
+    ["\ud83e\udd39 Juggle", "juggle"], ["\ud83c\udfc0 Basketball hoop", "hoop"], ["\ud83d\ude81 Drone orbit", "drone"] ],
+  "Ambient scenes": [
+    ["\ud83d\udc26 Boids flock", "boids"], ["\ud83e\ude80 Pendulum wave", "pendulum"], ["\u2699\ufe0f Gears", "gears"],
+    ["\ud83d\udd35 Newton's cradle", "cradle"], ["\ud83d\udd4a\ufe0f Bird", "bird"], ["\ud83c\udf0a Waves", "wave"],
+    ["\u2604\ufe0f Asteroids", "asteroids"], ["\ud83d\udea2 Sinking ship", "sinkingship"], ["\u2693 Carrier at sea", "carrier"],
+    ["\ud83d\uddbc\ufe0f Gauge diorama", "diorama"], ["\ud83d\ude42 Avatar (focus)", "focus"] ] }
+</script>
+<div id="status"></div>
+<script src="/serverPathPicker.js"></script>
+<script>
+  // Set Local Path (global assets folder) — reload to pick up new /GPU_Assets.
+  (function () { var b = document.getElementById("setPathBtn"); if (b) b.onclick = function () { window.pickAssetsFolder(function (p, j) { var s = document.getElementById("status"); if (j && j.ok) { if (s) s.textContent = "assets folder set to " + p + " — reloading…"; setTimeout(function () { location.reload(); }, 600); } else if (s) s.textContent = "couldn't set path: " + ((j && j.error) || "failed"); }); }; })();
+</script>
+<script type="module">
+  import { mountStage } from "./face/avatarStage.js";
+  import avatarRegistry from "./ui/avatarRegistry.js";   // v1016 clean-house: rename + missing-file memory
+
+  const qs = new URLSearchParams(location.search);
+  let _chosenAvatar = null;   // v1009 — a live setAvatar persists across re-mounts
+  let _lastObjUrl = null;     // v1365 — object URL of a drop-in local model (revoked on next load)
+  let _extraGrabbables = [];   // v1011 — grabbable prop defs, re-applied on each (re)mount
+  let _comp = {};   // v1352 — diorama composition (from the composer panel)
+  async function loadComposition(){
+    try { const v = localStorage.getItem("voxelengine.dioramaComposition"); if (v) return JSON.parse(v) || {}; } catch {}
+    try { const r = await fetch("/diorama/composition", { cache:"no-store" }); if (r.ok) { const j = await r.json(); if (j && j.composition) return j.composition; } } catch {}
+    return {};
+  }
+  const setStatus = (m, warn) => { const e = document.getElementById("status");
+    if (e) { e.textContent = m || ""; e.style.display = m ? "block" : "none"; e.style.color = warn ? "#ffb14e" : "#7fa8d8"; } };
+  const resolveGlb = (u) => { if (!u) return "/GPU_Assets/RobotExpressive.glb";
+    if (/[\\/]/.test(u) || /\.(glb|gltf)$/i.test(u)) return u; return "/GPU_Assets/" + u + ".glb"; };
+  let stageHandle = null;   // v978 — kept so we can swap the avatar in-place
+
+  // v1007 — avatar-name + closed-captions overlay (top of canvas, right of the
+  // left tool strip). The avatar name shows briefly on load then fades; with CC
+  // on (toolbar CC button) or TTS muted, the same strip shows the spoken text.
+  const ccOv = document.createElement("div");
+  Object.assign(ccOv.style, {
+    position: "fixed", top: "6px", left: "50px", right: "8px",
+    font: "12px ui-monospace, monospace", color: "#bfe0ff", textAlign: "center",
+    textShadow: "0 1px 3px #000, 0 0 2px #000", pointerEvents: "none",
+    transition: "opacity 0.6s", opacity: "0", zIndex: "7", lineHeight: "1.3",
+  });
+  document.body.appendChild(ccOv);
+  let _ccOn = false, _ttsMuted = false, _nameTimer = null;
+  const ccActive = () => _ccOn || _ttsMuted;
+  function _displayName(n) {   // v1009 — the 4 engine-generated rigs are "Stick" figures, NOT RobotExpressive
+    const map = { RobotMan: "Stick Man", RobotManHF: "Stick Man", RobotWoman: "Stick Woman", RobotWomanHF: "Stick Woman" };
+    return map[String(n || "").replace(/\s+/g, "")] || n;
+  }
+  function showName(name) {
+    if (ccActive()) return;
+    name = _displayName(name);
+    ccOv.textContent = name || "";
+    ccOv.style.opacity = name ? "0.92" : "0";
+    clearTimeout(_nameTimer);
+    if (name) _nameTimer = setTimeout(() => { ccOv.style.opacity = "0"; }, 3500);
+  }
+  function showCC(text) {
+    if (!ccActive()) { ccOv.style.opacity = "0"; return; }
+    ccOv.textContent = text || "";
+    ccOv.style.opacity = text ? "0.95" : "0";
+  }
+
+  // ---- tama vitals (0..100) -------------------------------------------------
+  const tama = { hunger: 62, happiness: 74, energy: 58 };
+  let _haveLive = false, _tickerPulse = 0;
+  { const cb = document.getElementById("cheerBtn"); if (cb) cb.onclick = () => { try { if (stageHandle && stageHandle.cheerleader) { stageHandle.cheerleader.toggle(); cb.style.background = stageHandle.cheerleader.isOn() ? "#3a2a0cdd" : "#0c0f14cc"; } } catch {} }; }   // v1222
+  { const vb = document.getElementById("visorBtn"); let _von = false; if (vb) vb.onclick = () => { try { if (stageHandle && stageHandle.setVisorHud) { _von = stageHandle.setVisorHud(!_von); vb.style.background = _von ? "#06363fdd" : "#0c0f14cc"; } } catch {} }; }   // v1364 — visor HUD toggle
+  { const hb = document.getElementById("headViewBtn"); let _hv = false; if (hb) hb.onclick = () => { try { if (stageHandle && stageHandle.setHeadView) { _hv = stageHandle.setHeadView(!_hv); hb.style.background = _hv ? "#06363fdd" : "#0c0f14cc"; } } catch {} }; }   // v1365 — head view toggle
+  { const tb = document.getElementById("talkTestBtn"); if (tb) tb.onclick = () => { try { if (stageHandle && stageHandle.talkFor) stageHandle.talkFor(2800); } catch {} }; }   // v1366 — talk test
+  { const lsb = document.getElementById("lipSyncBtn");
+    const _ls = { on: false, ac: null, an: null, stream: null, raf: 0, buf: null, lvl: 0 };
+    function lipStop() {
+      _ls.on = false; if (_ls.raf) cancelAnimationFrame(_ls.raf); _ls.raf = 0;
+      try { _ls.stream && _ls.stream.getTracks().forEach((t) => t.stop()); } catch {}
+      try { _ls.ac && _ls.ac.close(); } catch {}
+      _ls.ac = _ls.an = _ls.stream = null;
+      try { if (stageHandle) { stageHandle.setTalking && stageHandle.setTalking(false); stageHandle.setTalkLevel && stageHandle.setTalkLevel(-1); } } catch {}
+      if (lsb) lsb.style.background = "#0c0f14cc";
+    }
+    async function lipStart() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus("mic needs HTTPS or localhost", true); return; }
+      try {
+        _ls.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        const AC = window.AudioContext || window.webkitAudioContext; _ls.ac = new AC();
+        const src = _ls.ac.createMediaStreamSource(_ls.stream);
+        _ls.an = _ls.ac.createAnalyser(); _ls.an.fftSize = 512; _ls.buf = new Float32Array(_ls.an.fftSize);
+        src.connect(_ls.an);
+        _ls.on = true; if (lsb) lsb.style.background = "#06363fdd";
+        try { stageHandle && stageHandle.setTalking && stageHandle.setTalking(true); } catch {}
+        const tick = () => {
+          if (!_ls.on) return;
+          _ls.an.getFloatTimeDomainData(_ls.buf);
+          let sum = 0; for (let i = 0; i < _ls.buf.length; i++) { const v = _ls.buf[i]; sum += v * v; }
+          const rms = Math.sqrt(sum / _ls.buf.length);
+          const target = Math.max(0, Math.min(1, (rms - 0.012) * 7));
+          _ls.lvl += (target - _ls.lvl) * 0.5;
+          try { stageHandle && stageHandle.setTalkLevel && stageHandle.setTalkLevel(_ls.lvl); } catch {}
+          _ls.raf = requestAnimationFrame(tick);
+        };
+        _ls.raf = requestAnimationFrame(tick);
+      } catch (e) { setStatus("mic denied or unavailable", true); lipStop(); }
+    }
+    if (lsb) lsb.onclick = () => { _ls.on ? lipStop() : lipStart(); };
+  }   // v1368 — mic lip-sync -> setTalkLevel
+  { const ib = document.getElementById("idleLifeBtn"); let _life = false; if (ib) ib.onclick = () => { try { if (stageHandle && stageHandle.setEffect) { _life = !_life; stageHandle.setEffect("life", _life); ib.style.background = _life ? "#06363fdd" : "#0c0f14cc"; } } catch {} }; }   // v1370 — idle life toggle
+  { const lb = document.getElementById("loadModelBtn"), fi = document.getElementById("loadModelFile");
+    if (lb && fi) { lb.onclick = () => fi.click();
+      fi.onchange = () => { const f = fi.files && fi.files[0]; if (!f) { return; } const nm = f.name, low = nm.toLowerCase();
+        if (!/\.(glb|gltf|vrm)$/.test(low)) { setStatus("not a model file: " + nm, true); fi.value = ""; return; }
+        try { if (_lastObjUrl) URL.revokeObjectURL(_lastObjUrl); } catch {}
+        const u = URL.createObjectURL(f); _lastObjUrl = u; _chosenAvatar = u;
+        setStatus("loading " + nm + " \u2026", false);
+        if (stageHandle && stageHandle.setAvatar) stageHandle.setAvatar(u).then((ok) => { setStatus(ok ? "" : ("couldn\u2019t load " + nm + (low.endsWith(".gltf") ? " \u2014 multi-file .gltf needs its folder; put it in your assets path instead" : "")), !ok); });
+        fi.value = ""; }; } }   // v1365 — drop-in local model loader
+  // v1279 — boot-mode switch. If hosted inside the avatar-server shell this just
+  // re-asserts it; standalone, it opens the hub where server/avatar/full live.
+  { const mb = document.getElementById("modeBtn"); if (mb) mb.onclick = () => { try { window.top.location.href = "/avatar-server.html"; } catch { location.href = "/avatar-server.html"; } }; }
+  addEventListener("message", (e) => {
+    const m = e.data || {};
+    if (m.type === "tama") {
+      _haveLive = true;
+      if (typeof m.hunger === "number")    tama.hunger    = m.hunger;
+      if (typeof m.happiness === "number") tama.happiness = m.happiness;
+      if (typeof m.energy === "number")    tama.energy    = m.energy;
+    } else if (m.type === "speak" || m.type === "kpop:speak" || m.type === "kpop:audio_amp" ||
+               (m.topic === "robot" && m.action === "speak")) {
+      _tickerPulse = Math.max(_tickerPulse, m.type === "kpop:audio_amp" ? (m.amp || 0.6) : 1);
+      // v993 — talking wakes the idle screensaver (snap back to the base scene)
+      // BEFORE talkFor, so the zoom lands on the restored focus stage.
+      try { window.__avatarActivity && window.__avatarActivity(); } catch {}
+      // v990 — zoom to the head while talking (restores the old talking-head
+      // framing). audio_amp ticks keep the zoom alive during live speech; a
+      // speak with text estimates duration from length.
+      if (stageHandle && stageHandle.talkFor) {
+        let ms = 2200;
+        if (m.type === "kpop:audio_amp") ms = 480;
+        else if (typeof m.text === "string") ms = Math.max(900, Math.min(7000, m.text.length * 65));
+        else if (typeof m.ms === "number") ms = m.ms;
+        stageHandle.talkFor(ms);
+      }
+      if (typeof m.text === "string") showCC(m.text);   // v1007 — caption when CC on / muted
+      try { const tt = document.getElementById("tickerText"); if (tt && typeof m.text === "string") tt.textContent = m.text; } catch {}   // v1008 — scroll the spoken line
+    } else if (m.type === "kpop:speak:end") {
+      if (stageHandle && stageHandle.setTalking) stageHandle.setTalking(false);
+      showCC("");
+    } else if (m.type === "setAvatar" && (m.glb || m.url)) {
+      // v978 — render a DIFFERENT avatar into this SAME diorama (no reload).
+      const u = resolveGlb(m.glb || m.url);
+      _chosenAvatar = u;   // v1009 — so screensaver / gauge-vis re-mounts keep this avatar (was reverting to the cached url)
+      if (stageHandle && stageHandle.setAvatar) { stageHandle.setAvatar(u).then(ok => { if (ok) setStatus("", false); }); }
+    } else if (m.type === "selfie") {
+      // v991 — trigger the selfie move + flash from a host message
+      if (stageHandle && stageHandle.selfie) stageHandle.selfie();
+    } else if (m.type === "avatar:cheer" || m.type === "cheer") {   // v1222 — cheerleader from the host
+      try { if (stageHandle && stageHandle.cheerleader) { if (m.on === false) stageHandle.cheerleader.stop(); else if (m.on === true) stageHandle.cheerleader.start(); else stageHandle.cheerleader.toggle(); } } catch {}
+    } else if (m.type === "cc") {            // v1007 — CC toggle from the panel toolbar
+      _ccOn = !!m.on; if (!ccActive()) showCC("");
+    } else if (m.type === "ttsMute") {       // v1007 — muted → auto-captions
+      _ttsMuted = !!m.muted; if (!ccActive()) showCC("");
+    } else if (m.type === "grab:add") {      // v1011/12 — register a grabbable prop (orb or a real GLB) into the diorama
+      const d = { kind: m.kind, x: (typeof m.x === "number" ? m.x : -0.35), color: m.color };
+      if (m.glb) d.glb = resolveGlb(m.glb);
+      if (m.splat) d.splat = m.splat;   // v1014 — baked splat cloud {positions, colors}
+      _extraGrabbables.push(d);
+      try { if (stageHandle && stageHandle.registerGrabbable) stageHandle.registerGrabbable(d); } catch {}
+    } else if (m.type === "grab:clear") {
+      _extraGrabbables = [];
+      try { if (stageHandle && stageHandle.clearGrabbables) stageHandle.clearGrabbables(); } catch {}
+    }
+    // head-lock / tts_boundary / cycleView etc. — ignored gracefully
+  });
+  // gentle autonomous drift when no live values are arriving (standalone)
+  setInterval(() => { if (_haveLive) return; const j = () => (Math.random() - 0.5) * 5;
+    tama.hunger = Math.max(20, Math.min(95, tama.hunger + j()));
+    tama.happiness = Math.max(20, Math.min(95, tama.happiness + j()));
+    tama.energy = Math.max(20, Math.min(95, tama.energy + j())); }, 1500);
+
+  // ---- ticker waveform (v980: removed from the panel; guarded so it no-ops) --
+  const tcv = document.getElementById("ticker"), tcx = tcv && tcv.getContext && tcv.getContext("2d");   // v1008 — text ticker has no 2d context; waveform no-ops
+  const sizeTicker = () => { if (!tcv) return; const r = tcv.getBoundingClientRect(); const dpr = Math.min(devicePixelRatio || 1, 2);
+    tcv.width = Math.max(2, r.width * dpr); tcv.height = Math.max(2, r.height * dpr); };
+  let tphase = 0;
+  function drawTicker() {
+    if (!tcx) return;   // v1008 — text ticker; waveform draw retired
+    const w = tcv.width, h = tcv.height; tcx.clearRect(0, 0, w, h);
+    tphase += 0.09; _tickerPulse *= 0.93;
+    const amp = (h * 0.16) * (1 + _tickerPulse * 3.0);
+    tcx.beginPath(); tcx.lineWidth = 2 * Math.min(devicePixelRatio || 1, 2); tcx.strokeStyle = "#f0b54e";
+    for (let x = 0; x < w; x++) {
+      const t = x / w * Math.PI * 8 + tphase;
+      const y = h / 2 + Math.sin(t) * amp * (0.4 + 0.6 * Math.sin(t * 0.3 + tphase));
+      if (x === 0) tcx.moveTo(x, y); else tcx.lineTo(x, y);
+    }
+    tcx.stroke();
+    requestAnimationFrame(drawTicker);
+  }
+
+  // ---- avatar resolve -------------------------------------------------------
+  async function currentAvatar() {
+    let url = qs.get("glb") || qs.get("asset") || (_comp && _comp.avatar) || "";
+    if (!url) { try { const r = await fetch("/avatar/current", { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); if (j && j.url) url = j.url; } } catch {} }
+    return resolveGlb(url || "RobotExpressive");
+  }
+
+  // ---- mount ----------------------------------------------------------------
+  (async function () {
+    try {
+      sizeTicker(); addEventListener("resize", sizeTicker); requestAnimationFrame(drawTicker);
+      const cv = document.getElementById("stageCanvas");
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const fit = () => { const r = cv.getBoundingClientRect(); cv.width = Math.max(2, r.width * dpr); cv.height = Math.max(2, r.height * dpr); };
+      fit(); addEventListener("resize", fit);
+      if (!cv.getContext || !cv.getContext("webgl2")) { setStatus("⚠ WebGL2 unavailable in this browser", true); return; }
+      // v992 — fidget cycler: rotate through the ambient fidget scenes (no avatar
+      // needed). Auto-advances ~12s; click the canvas to skip. Used by the
+      // universal-viewer "Fidget Toys" entry and as a screensaver target.
+      if (qs.get("cycle") === "fidget") {
+        const { pickFidget } = await import("./face/fidgetScenes.js");
+        let cur = null;
+        const advance = () => {
+          cur = pickFidget(cur);
+          try { stageHandle && stageHandle.destroy && stageHandle.destroy(); } catch {}
+          stageHandle = mountStage(cv, { scene: cur, onClick: advance });
+          try { window.avatarStage = stageHandle; } catch {}   // v1386 — expose setJaw/setChannelAxis to console
+          setStatus(cur, false);
+        };
+        advance();
+        setInterval(() => { if (document.visibilityState === "visible") advance(); }, 12000);
+        try { parent.postMessage({ type: "kpop:clipsLoaded" }, "*"); } catch {}
+        return;
+      }
+      const gauges = [
+        { style: "ring",   color: [1.00, 0.67, 0.20], getValue: () => (tama.hunger    || 0) / 100 },
+        { style: "gyro",   color: [0.36, 0.87, 0.53], getValue: () => (tama.happiness || 0) / 100 },
+        { style: "barrel", color: [0.65, 0.40, 1.00], getValue: () => (tama.energy    || 0) / 100 },
+      ];
+      // v1352 — apply saved diorama composition (avatar/gauge style+color/scene/pet/room/props).
+      _comp = await loadComposition();
+      if (Array.isArray(_comp.gauges)) _comp.gauges.forEach((gc, i) => { if (gauges[i] && gc) { if (gc.style) gauges[i].style = gc.style; if (Array.isArray(gc.color)) gauges[i].color = gc.color; if (gc.pos && typeof gc.pos.x === "number") gauges[i].pos = gc.pos; } });   // v1361 — free placement
+      // v1003 — per-gauge visibility. Same-origin localStorage mask written by
+      // Settings -> Avatar (3-char 0/1 [hunger, happy, energy]); default all on.
+      const gaugeMask = () => { if (Array.isArray(_comp.gauges)) return _comp.gauges.slice(0,3).map(g => (g && g.show === false) ? "0" : "1").join("").padEnd(3, "1"); try { const v = localStorage.getItem("voxelengine.pipGauges"); if (v && /^[01]{3}$/.test(v)) return v; } catch {} return "111"; };
+      const url = await currentAvatar();
+      const url2 = qs.get("glb2") ? resolveGlb(qs.get("glb2")) : null;   // duo: two avatars interacting
+      // avatarStage only builds/choreographs the 2nd avatar in scene:"duo";
+      // single avatar wanders among the 3D dials in scene:"diorama".
+      // v980 — the main avatar panel is a big single-avatar FOCUS view by
+      // default. ?fidget=1 = the gauge diorama (screensaver/fidget), ?surf=1 =
+      // surfing, ?glb2= = duo (pull back for two avatars).
+      let scene = "focus";
+      const _qScene = qs.get("scene");
+      const _KNOWN = ["focus","diorama","surf","duo","screen","boids","pendulum","gears","asteroids","cradle","bird","wave","sinkingship","carrier"];
+      if (qs.get("surf")) scene = "surf";
+      else if (url2) scene = "duo";
+      else if (qs.get("fidget")) scene = "diorama";
+      else if (_qScene && _KNOWN.includes(_qScene)) scene = _qScene;   // v992 — any scene by name (?scene=boids …)
+      else if (_comp.scene && _KNOWN.includes(_comp.scene)) scene = _comp.scene;   // v1352 — composition default scene
+      // v3656 -- ?embed=1 -> the flag the CSS above keys on, and the pet forced OFF. The panel showed the pet and
+      // not the avatar: a wandering pet is small enough to fit a 143x210 box and a 1.8u rigged figure is not, so
+      // the only thing that ever landed in frame was the thing that wanders. AN EMBEDDED AVATAR IS ONE AVATAR.
+      const _embed = qs.get("embed") === "1";
+      if (_embed) { try { document.documentElement.setAttribute("data-embed", "1"); } catch (e) {} }
+      const _pet = _embed ? false
+                 : ((qs.get("pet") !== null) ? (qs.get("pet") !== "0") : (_comp.pet !== undefined ? !!_comp.pet : true));   // v1352
+      // v993 — mountScene lets the panel re-mount with a different scene so it
+      // can drift into a screensaver when idle, then snap back. Avatar scenes
+      // reuse url/url2/gauges; ambient fidget scenes need none.
+      const AVATAR_SCENES = ["focus","diorama","surf","duo","screen"];
+      let _curScene = scene;   // v1003 — remembered so a gauge-visibility change can re-mount in place
+      function mountScene(sc){
+        try { stageHandle && stageHandle.destroy && stageHandle.destroy(); } catch {}
+        _curScene = sc;
+        const o = { scene: sc };
+        if (AVATAR_SCENES.includes(sc)) {
+          o.url = _chosenAvatar || url;   // v1009 — keep a live-swapped avatar across re-mounts
+          o.gauges = gauges.filter((g, i) => gaugeMask()[i] === "1");   // v1003 — show only the toggled-on dials
+          o.pet = _pet;
+          o.room = (qs.get("room") !== null) ? (qs.get("room") !== "0") : (_comp.room !== undefined ? !!_comp.room : true);   // v1013/1352 — composition default
+          { const _fa = parseFloat(qs.get("frame")); if (_fa > 0.3 && _fa < 3) o.frameAspect = _fa; }   // v1017 — tune diorama framing to match the phone
+          o.onSelfie = (dataURL) => { try { parent.postMessage({ type: "selfie:captured", dataURL, scene: _curScene }, "*"); } catch {} };   // v1018 — hand the captured frame to the gallery
+          if (url2) o.url2 = url2;
+          o.onAvatarLoaded = (path, requested, fellBack) => {   // v1007/1016 — fade-in name overlay + missing-file surfacing
+            const key = requested || path;
+            try { if (fellBack) avatarRegistry.markMissing(key); else avatarRegistry.markSeen(key); } catch {}
+            let nm = null;
+            try { nm = avatarRegistry.getName(key); } catch {}                       // a saved rename wins
+            if (!nm) nm = String((fellBack ? (requested || path) : path) || "").split("/").pop().replace(/\.(glb|gltf)$/i, "");
+            showName(fellBack ? (nm + " \u00B7 offline") : nm);                       // CesiumMan stays "CesiumMan \u00B7 offline", not silently "Stick Woman"
+            try { parent.postMessage({ type: "avatarLoaded", path: path, requested: key, fellBack: !!fellBack }, "*"); } catch {}
+          };
+        }
+        stageHandle = mountStage(cv, o);
+        // v3657 -- THE setHeadView CALL v3656 PUT HERE IS REMOVED, AND IT WAS THE WRONG TOOL FOR A REASON WORTH
+        // WRITING DOWN. setHeadView is not a framing preference -- it is a TRANSIENT SPEECH STATE: grab the head,
+        // put the mouth where the generated mouth needs it, speak, and release ONLY once the mouth is done.
+        // ui/demoChrome.js uses it exactly that way (true at 611, false at 597, around talking). Holding it ON
+        // for the life of an embedded panel PINS THE HEAD PERMANENTLY and leaves speech with nothing to toggle.
+        // I TOOK A STATE THAT MEANS "IS TALKING" AND USED IT TO MEAN "IS SMALL". The framing knob is ?frame=,
+        // below, which v1017 built for precisely this ("tune diorama framing to match the phone").
+        try { window.avatarStage = stageHandle; } catch {}   // v1386 — expose setJaw/setChannelAxis to console
+        try { if (stageHandle && stageHandle.registerGrabbable) _extraGrabbables.forEach(d => stageHandle.registerGrabbable(d)); } catch {}   // v1011 — re-apply grabbables on (re)mount
+      }
+      if (qs.get("orb")) _extraGrabbables.push({ kind: "orb", x: -0.35, color: [0.45, 0.85, 1.0] });   // v1011 — demo: a glowing orb the avatar fetches
+      if (qs.get("grab")) _extraGrabbables.push({ glb: resolveGlb(qs.get("grab")), x: 2.1 });   // v1012 — a real GLB prop grabbable (?grab=AssetName)
+      if (Array.isArray(_comp.props)) _comp.props.forEach((p, i) => { if (p && p.glb) _extraGrabbables.push({ glb: resolveGlb(p.glb), x: (p.x != null ? p.x : 1.6 + i * 0.5), z: (p.z != null ? p.z : 0) }); });   // v1363 — prop depth   // v1352 — "always on hand" props
+      mountScene(scene);
+      // v1295 — fidget menu: a single picker for every fidget scene + activity, so
+      // the fidget viewer doesn't depend on ?scene= URL params. Ambient scenes
+      // re-mount via mountScene(); avatar activities ensure the focus scene then
+      // call the matching cheerleader.* method.
+      (function buildFidgetMenu(){
+        const btn = document.getElementById("fidgetMenuBtn");
+        const menu = document.getElementById("fidgetMenu");
+        const tpl  = document.getElementById("fidgetMenuTpl");
+        if (!btn || !menu || !tpl) return;
+        let groups = {}; try { groups = JSON.parse(tpl.textContent); } catch { return; }
+        const activitySet = { soccer:1, bowl:1, tennis:1, juggle:1, hoop:1, drone:1 };
+        const playActivity = (id) => {
+          const go = () => { try { const c = stageHandle && stageHandle.cheerleader; if (!c) return;
+            if (id === "soccer") c.soccer(true); else if (id === "bowl") c.bowl(); else if (id === "tennis") c.tennis(true);
+            else if (id === "juggle") c.juggle(true); else if (id === "hoop") c.hoop(true); else if (id === "drone") c.drone(true);
+          } catch {} };
+          if (!AVATAR_SCENES.includes(_curScene)) { mountScene("focus"); setTimeout(go, 80); } else go();
+        };
+        const choose = (id) => {
+          if (activitySet[id]) playActivity(id);
+          else mountScene(id);
+          menu.style.display = "none";
+        };
+        Object.keys(groups).forEach(g => {
+          const h = document.createElement("div");
+          h.textContent = g.toUpperCase();
+          h.style.cssText = "color:#6f8aa0;font-size:10px;letter-spacing:1.3px;margin:6px 4px 4px;";
+          menu.appendChild(h);
+          (groups[g] || []).forEach(([label, id]) => {
+            const b = document.createElement("button");
+            b.textContent = label;
+            b.style.cssText = "display:block;width:100%;text-align:left;background:#101820;color:#dfe9f2;border:1px solid #1f2b34;border-radius:7px;padding:7px 9px;margin:3px 0;cursor:pointer;font:inherit;";
+            b.onmouseenter = () => b.style.background = "#16242f";
+            b.onmouseleave = () => b.style.background = "#101820";
+            b.onclick = () => choose(id);
+            menu.appendChild(b);
+          });
+        });
+        btn.onclick = () => { menu.style.display = (menu.style.display === "none") ? "block" : "none"; };
+        document.addEventListener("click", (e) => { if (menu.style.display !== "none" && !menu.contains(e.target) && e.target !== btn) menu.style.display = "none"; });
+      })();
+      // v1003 — Settings toggled a gauge's visibility: re-mount the current avatar
+      // scene so the 3D dials match (mask is read fresh from localStorage above).
+      addEventListener("message", (e) => {
+        const m = e.data || {};
+        if (m && m.type === "gaugeVis") { try { mountScene(_curScene); } catch {} }
+        if (m && m.type === "remount") { try { mountScene(_curScene); } catch {} }   // v1016 clean-house: recheck a returned avatar file
+      });
+      // v1005 — when the panel owns the camera (camdock=1), hide the in-iframe one.
+      if (qs.get("camdock") === "1") { try { const sb = document.getElementById("selfieBtn"); if (sb) sb.style.display = "none"; } catch {} }
+      try { document.getElementById("selfieBtn").addEventListener("click", () => { if (stageHandle && stageHandle.selfie) stageHandle.selfie(); }); } catch {}
+      setStatus("", false);
+      try { parent.postMessage({ type: "kpop:clipsLoaded" }, "*"); } catch {}
+
+      // v993 — idle screensaver. When the panel has been quiet (no speak, no
+      // touch) for ~75s, drift focus↔fidget↔surf through a scene cycle (advancing
+      // ~15s); any activity snaps back to the panel's base scene. ?saver=0 off.
+      if (qs.get("saver") !== "0" && !url2) {
+        const SAVER = ["surf","boids","focus","pendulum","gears","cradle","focus","bird","wave","diorama"];
+        const baseScene = scene;
+        let lastAct = Date.now(), saving = false, sIdx = 0;
+        window.__avatarActivity = () => { lastAct = Date.now(); if (saving) { saving = false; mountScene(baseScene); } };
+        cv.addEventListener("pointerdown", window.__avatarActivity);
+        setInterval(() => {
+          if (document.visibilityState !== "visible") return;
+          if (!saving) {
+            if (Date.now() - lastAct > 75000) { saving = true; sIdx = 0; mountScene(SAVER[0]); }
+          } else {
+            sIdx = (sIdx + 1) % SAVER.length;
+            mountScene(SAVER[sIdx]);
+          }
+        }, 15000);
+      }
+    } catch (e) {
+      console.warn("[avatarstage] mount failed:", e);
+      setStatus("stage failed: " + (e && e.message), true);
+    }
+  })();
+</script>
+<script>
+// v1105 — the left tool strip (#avatarTools) belongs in the full stage, but in
+// the short top-docked mini view it just adds clutter + height. Hide it when the
+// stage is short; show it when tall. ?tools=0 forces hidden, ?tools=1 forces shown.
+(function () {
+  var force = new URLSearchParams(location.search).get("tools");
+  function fitTools() {
+    var t = document.getElementById("avatarTools");
+    if (!t) return;
+    if (force === "0") { t.style.display = "none"; return; }
+    if (force === "1") { t.style.display = ""; return; }
+    t.style.display = (window.innerHeight < 240) ? "none" : "";   // 240px splits docked-mini from full
+  }
+  window.addEventListener("resize", fitTools);
+  if (document.readyState !== "loading") fitTools();
+  else document.addEventListener("DOMContentLoaded", fitTools);
+})();
+</script>
+<script src="/waterTank.js"></script>
+<script src="/hazeLayer.js"></script>
+<script src="/airCough.js"></script>
+<script>
+// v1311/1314/1316 — water tank (behind) + smog haze (front) + cough SFX overlays.
+(function () { try { window.initWaterTank && window.initWaterTank({ mount: document.getElementById("wrap"), behind: true, insetBottom: 22 }); } catch (e) {} try { window.initHazeLayer && window.initHazeLayer({ mount: document.getElementById("wrap"), insetBottom: 22, z: 3 }); } catch (e) {} try { window.initAirCough && window.initAirCough(); } catch (e) {} })();
+</script>
+<script>
+// v1334 — LIVE avatar hot-swap. A push (POST /avatar/set, or a person arriving home) swaps the
+// model in this diorama with no page reload, by re-using the existing "setAvatar" message handler.
+// SSE for instant swaps + a 5s poll fallback if the stream drops. Skipped if the page is pinned
+// to a specific avatar via ?glb= / ?asset=.
+(function liveAvatarSwap(){
+  try {
+    const _qs = new URLSearchParams(location.search);
+    if (_qs.get("glb") || _qs.get("asset")) return;
+    let last = null;
+    const swap = (url) => { if (!url || url === last) return; last = url; try { window.postMessage({ type: "setAvatar", url }, "*"); } catch {} };
+    fetch("/avatar/current", { cache: "no-store" }).then(r => r.json()).then(j => { if (j && j.url) last = j.url; }).catch(() => {});
+    try { const es = new EventSource("/avatar/events"); es.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m && m.kind === "avatar" && m.url) swap(m.url); else if (m && m.kind === "announce") { try { window.playPeerCameo && window.playPeerCameo(m); } catch {} } } catch {} }; } catch {}
+    setInterval(() => { fetch("/avatar/current", { cache: "no-store" }).then(r => r.json()).then(j => { if (j && j.url) swap(j.url); }).catch(() => {}); }, 5000);
+  } catch {}
+})();
+</script>
+<script>
+// v1552 — visiting-peer CAMEO. When a peer broadcasts an announcement (e.g. "out of disk
+// space"), its avatar steps into THIS scene, waves, speaks, jumps, and leaves. Rendered as a
+// composited overlay over the stage (so it works regardless of the 3D scene underneath); it
+// also drives the real ticker + TTS via the existing "speak" message. Announcements queue so
+// they never overlap. (Phase 2 / rig: render the peer's actual GLB walking among the gauges.)
+(function peerCameo(){
+  const Q = []; let busy = false;
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const anim = (el, frames, opts) => { try { const a = el.animate(frames, opts); return a.finished.catch(()=>{}); } catch { return wait((opts && opts.duration) || 0); } };
+  const KIND_TINT = { disk: "#ffb454", info: "#7fd0ff", warn: "#ff7f7f" };
+
+  function buildVisitor(tint){
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;bottom:8%;left:0;width:120px;height:170px;transform:translateX(120vw);will-change:transform;pointer-events:none;z-index:60;";
+    const bub = document.createElement("div");
+    bub.style.cssText = "position:absolute;bottom:150px;left:-40px;min-width:150px;max-width:240px;background:#0c1622f2;border:1px solid "+tint+";border-radius:12px;padding:8px 10px;color:#eaf3ff;font:12px system-ui,sans-serif;box-shadow:0 6px 20px #000a;opacity:0;";
+    const who = document.createElement("div"); who.style.cssText = "font-weight:700;color:"+tint+";font-size:11px;margin-bottom:2px;";
+    const msg = document.createElement("div"); msg.style.cssText = "line-height:1.35;";
+    bub.append(who, msg);
+    const fig = document.createElement("div");
+    fig.style.cssText = "position:absolute;bottom:0;left:0;width:120px;height:150px;transform-origin:50% 100%;";
+    fig.innerHTML =
+      "<svg viewBox='0 0 120 150' width='120' height='150'>"
+      + "<ellipse cx='60' cy='144' rx='30' ry='6' fill='#0008'/>"
+      + "<rect x='40' y='56' width='40' height='52' rx='10' fill='#1b2a3a' stroke='"+tint+"' stroke-width='2'/>"
+      + "<circle cx='60' cy='34' r='22' fill='#22364a' stroke='"+tint+"' stroke-width='2'/>"
+      + "<circle cx='52' cy='32' r='4.5' fill='"+tint+"'/><circle cx='68' cy='32' r='4.5' fill='"+tint+"'/>"
+      + "<rect x='56' y='8' width='8' height='10' rx='3' fill='"+tint+"'/><circle cx='60' cy='6' r='3' fill='"+tint+"'/>"
+      + "<rect x='34' y='60' width='10' height='34' rx='5' fill='#22364a'/>"
+      + "<g id='cameoArm' style='transform-origin:81px 62px'><rect x='76' y='60' width='10' height='34' rx='5' fill='#2b4458'/></g>"
+      + "<rect x='46' y='108' width='12' height='30' rx='5' fill='#22364a'/><rect x='62' y='108' width='12' height='30' rx='5' fill='#22364a'/>"
+      + "</svg>";
+    wrap.append(bub, fig);
+    return { wrap, fig, bub, who, msg, arm: () => fig.querySelector("#cameoArm") };
+  }
+
+  async function perform(a){
+    const tint = KIND_TINT[a.annKind] || KIND_TINT.info;
+    const v = buildVisitor(tint);
+    document.body.appendChild(v.wrap);
+    const W = window.innerWidth || 800;
+    const restX = Math.max(W*0.52, W-260);
+    await anim(v.wrap, [{ transform:"translateX("+W+"px)" }, { transform:"translateX("+restX+"px)" }], { duration: 1150, easing:"ease-out", fill:"forwards" });
+    try { await v.fig.animate([{ transform:"translateY(0)" },{ transform:"translateY(-4px)" },{ transform:"translateY(0)" }], { duration: 360, iterations: 3 }).finished; } catch {}
+    const gestures = (a.gestures && a.gestures.length) ? a.gestures : ["wave","speak","jump"];
+    for (const g of gestures){
+      if (g === "wave"){ await anim(v.arm(), [{ transform:"rotate(0deg)" },{ transform:"rotate(-55deg)" },{ transform:"rotate(-10deg)" },{ transform:"rotate(-55deg)" },{ transform:"rotate(0deg)" }], { duration: 1100, easing:"ease-in-out" }); }
+      else if (g === "speak"){
+        v.who.textContent = a.fromName || "a peer"; v.msg.textContent = a.text || "";
+        await anim(v.bub, [{ opacity:0, transform:"translateY(8px) scale(.96)" },{ opacity:1, transform:"translateY(0) scale(1)" }], { duration: 260, fill:"forwards" });
+        const ms = Math.max(1400, Math.min(7000, (a.text||"").length * 60));
+        try { window.postMessage({ type:"speak", text:(a.fromName? a.fromName+": ":"")+(a.text||""), ms }, "*"); } catch {}
+        try { fetch("/tts/speak", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text: a.text || "" }) }); } catch {}
+        await wait(Math.min(ms, 4200));
+      }
+      else if (g === "jump"){ await anim(v.fig, [{ transform:"translateY(0)" },{ transform:"translateY(-34px)" },{ transform:"translateY(0)" },{ transform:"translateY(-22px)" },{ transform:"translateY(0)" }], { duration: 900, easing:"ease-out" }); }
+      else if (g === "dance"){ await anim(v.fig, [{ transform:"rotate(-6deg)" },{ transform:"rotate(6deg)" },{ transform:"rotate(-6deg)" },{ transform:"rotate(0)" }], { duration: 800 }); }
+      else if (g === "bow"){ await anim(v.fig, [{ transform:"rotate(0)" },{ transform:"rotate(18deg)" },{ transform:"rotate(0)" }], { duration: 700 }); }
+      else if (g === "point"){ await anim(v.arm(), [{ transform:"rotate(0)" },{ transform:"rotate(-90deg)" },{ transform:"rotate(0)" }], { duration: 800 }); }
+    }
+    anim(v.bub, [{ opacity:1 },{ opacity:0 }], { duration: 350, fill:"forwards" });
+    await anim(v.wrap, [{ transform:"translateX("+restX+"px)" },{ transform:"translateX("+W+"px)" }], { duration: 1000, easing:"ease-in", fill:"forwards" });
+    try { v.wrap.remove(); } catch {}
+  }
+
+  async function pump(){
+    if (busy) return; busy = true;
+    while (Q.length){ const a = Q.shift(); try { await perform(a); } catch {} await wait(250); }
+    busy = false;
+  }
+  window.playPeerCameo = (a) => { try { if (!a) return; Q.push(a); if (Q.length > 6) Q.length = 6; pump(); } catch {} };
+})();
+</script>
+<script type="module">
+  // v1387 — webcam face-puppet: window.facePuppet.start() drives the avatar mouth.
+  import { makeFacePuppet } from "./face/facePuppet.js";
+  try { window.facePuppet = makeFacePuppet({}); } catch (e) { console.warn("[facePuppet] init failed", e); }
+</script>
+</body>
+</html>

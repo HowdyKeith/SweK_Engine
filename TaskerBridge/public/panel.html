@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d0b">
+<title>Tasker Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d0b; --bg2:#0e1410; --panel:#101713; --line:#1d2a22;
+  --txt:#cfe8d6; --dim:#6d8576; --phos:#5dff9b; --phos-d:#2bbd6a;
+  --amber:#ffb347; --cyan:#5bd6ff; --blue:#7aa2ff; --red:#ff6b6b;
+  --shadow:0 2px 0 #05080620, 0 10px 24px #00000055;
+  font-family:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #13201a 0%, var(--bg) 55%) fixed,
+    repeating-linear-gradient(0deg, transparent 0 23px, #0c130e80 23px 24px);
+  color:var(--txt); min-height:100dvh; padding:max(14px,env(safe-area-inset-top)) 14px 28px;
+  -webkit-tap-highlight-color:transparent;
+}
+/* faint scanline + grain overlay for the CRT feel */
+.scanlines{position:fixed; inset:0; pointer-events:none; z-index:50;
+  background:repeating-linear-gradient(0deg, #00000010 0 2px, transparent 2px 4px); mix-blend-mode:overlay; opacity:.5}
+
+.deck-head{display:flex; align-items:center; gap:14px; padding:6px 4px 14px; border-bottom:1px solid var(--line)}
+#signal{flex:0 0 auto; width:120px; height:40px; border:1px solid var(--line); border-radius:6px; background:#070b08}
+.title h1{font-size:18px; letter-spacing:.18em; margin:0; color:var(--phos); text-shadow:0 0 12px #5dff9b40}
+.title .sub{font-size:11px; color:var(--dim); letter-spacing:.06em; margin-top:3px}
+.conn{padding:1px 7px; border-radius:999px; font-weight:600; font-size:10px; letter-spacing:.08em}
+.conn.up{color:#06120a; background:var(--phos)}
+.conn.down{color:#1a0b0b; background:var(--red)}
+
+.filters{display:flex; gap:8px; flex-wrap:wrap; padding:14px 2px}
+.chip{appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--dim);
+  font:inherit; font-size:11px; letter-spacing:.06em; padding:6px 11px; border-radius:999px; cursor:pointer}
+.chip[aria-pressed="true"]{color:var(--bg); background:var(--phos); border-color:var(--phos); font-weight:600}
+
+.grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:820px){.grid{grid-template-columns:repeat(4,1fr)}}
+.empty{grid-column:1/-1; color:var(--dim); text-align:center; padding:40px 0; font-size:13px}
+
+.tile{position:relative; display:flex; flex-direction:column; gap:8px; min-height:104px;
+  padding:14px 13px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
+  background:linear-gradient(180deg,#13201a,var(--panel)); color:var(--txt);
+  font:inherit; text-align:left; box-shadow:var(--shadow); transition:transform .06s ease, border-color .15s, box-shadow .15s}
+.tile:active{transform:translateY(2px); box-shadow:0 1px 0 #05080620}
+.tile .ico{font-size:26px; line-height:1}
+.tile .lab{font-size:13px; font-weight:500; letter-spacing:.02em}
+.tile .be{position:absolute; top:11px; right:11px; font-size:9px; letter-spacing:.1em; padding:2px 6px;
+  border-radius:5px; border:1px solid currentColor; opacity:.8}
+.be.autoremote{color:var(--amber)} .be.tasker_http{color:var(--phos)} .be.mqtt{color:var(--cyan)} .be.ha{color:var(--blue)}
+.tile.firing{border-color:var(--phos); box-shadow:0 0 0 1px var(--phos), 0 0 22px #5dff9b35}
+.tile.ok::after,.tile.err::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; border-radius:0 0 12px 12px}
+.tile.ok::after{background:var(--phos)} .tile.err::after{background:var(--red)}
+
+.logwrap{margin-top:22px; border:1px solid var(--line); border-radius:10px; background:#0a0f0c; overflow:hidden}
+.logbar{display:flex; justify-content:space-between; align-items:center; padding:8px 12px;
+  font-size:10px; letter-spacing:.18em; color:var(--dim); border-bottom:1px solid var(--line)}
+.logbar button{appearance:none; background:none; border:none; color:var(--dim); font:inherit; font-size:10px; cursor:pointer; text-decoration:underline}
+.log{list-style:none; margin:0; padding:6px 0; max-height:34vh; overflow:auto; font-size:11.5px}
+.log li{padding:4px 12px; display:flex; gap:8px; align-items:baseline; border-bottom:1px solid #0e140f}
+.log .t{color:var(--dim); flex:0 0 auto}
+.log .ok{color:var(--phos)} .log .err{color:var(--red)}
+.log li:last-child{border-bottom:none}
+
+</style>
+</head>
+<body>
+<div class="scanlines" aria-hidden="true"></div>
+
+<header class="deck-head">
+  <canvas id="signal" width="120" height="40" aria-hidden="true"></canvas>
+  <div class="title">
+    <h1 id="deckName">TASKER DECK</h1>
+    <div class="sub">remote trigger console · <span id="conn" class="conn down">link down</span></div>
+  </div>
+</header>
+
+<nav id="filters" class="filters" aria-label="backend filter"></nav>
+
+<main id="grid" class="grid" aria-live="polite">
+  <div class="empty" id="empty">loading tasks…</div>
+</main>
+
+<section class="logwrap">
+  <div class="logbar"><span>ACTIVITY</span><button id="clearLog" type="button">clear</button></div>
+  <ul id="log" class="log"></ul>
+</section>
+
+<script>
+// TaskerBridge panel — fetches the task list, renders the deck, fires triggers.
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const grid = $("#grid"), filtersEl = $("#filters"), logEl = $("#log");
+  const connEl = $("#conn"), nameEl = $("#deckName");
+  let tasks = [], activeFilter = "all";
+
+  const BE_LABELS = { autoremote: "AUTOREMOTE", tasker_http: "HTTP", mqtt: "MQTT", ha: "HA" };
+
+  async function loadTasks() {
+    try {
+      const r = await fetch("./api/tasks");
+      const d = await r.json();
+      tasks = d.tasks || [];
+      if (d.name) { nameEl.textContent = d.name.toUpperCase(); document.title = d.name; }
+      setConn(true);
+      renderFilters();
+      render();
+    } catch (e) {
+      setConn(false);
+      $("#empty") && ($("#empty").textContent = "cannot reach the bridge server");
+    }
+  }
+
+  function setConn(up) {
+    connEl.textContent = up ? "link up" : "link down";
+    connEl.className = "conn " + (up ? "up" : "down");
+  }
+
+  function backends() {
+    return ["all", ...Array.from(new Set(tasks.map(t => t.backend)))];
+  }
+
+  function renderFilters() {
+    filtersEl.innerHTML = "";
+    for (const b of backends()) {
+      const c = document.createElement("button");
+      c.className = "chip"; c.type = "button";
+      c.textContent = b === "all" ? "ALL" : (BE_LABELS[b] || b.toUpperCase());
+      c.setAttribute("aria-pressed", String(b === activeFilter));
+      c.addEventListener("click", () => { activeFilter = b; renderFilters(); render(); });
+      filtersEl.appendChild(c);
+    }
+  }
+
+  function render() {
+    grid.innerHTML = "";
+    const list = tasks.filter(t => activeFilter === "all" || t.backend === activeFilter);
+    if (!list.length) { grid.innerHTML = '<div class="empty">no tasks for this filter</div>'; return; }
+    for (const t of list) {
+      const b = document.createElement("button");
+      b.className = "tile"; b.type = "button"; b.dataset.id = t.id;
+      b.innerHTML =
+        `<span class="be ${t.backend}">${BE_LABELS[t.backend] || t.backend}</span>` +
+        `<span class="ico">${t.icon || "▶"}</span>` +
+        `<span class="lab">${escapeHtml(t.label || t.id)}</span>`;
+      b.addEventListener("click", () => fire(t, b));
+      grid.appendChild(b);
+    }
+  }
+
+  async function fire(task, tile) {
+    if (tile.classList.contains("firing")) return;
+    tile.classList.remove("ok", "err");
+    tile.classList.add("firing");
+    pulse();
+    try {
+      const r = await fetch("./api/trigger", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: task.id }),
+      });
+      const d = await r.json();
+      tile.classList.remove("firing");
+      tile.classList.add(d.ok ? "ok" : "err");
+      setTimeout(() => tile.classList.remove("ok", "err"), 1400);
+      addLog(task.label || task.id, d.ok, d.ok ? (d.result?.via || "sent") : d.error);
+    } catch (e) {
+      tile.classList.remove("firing"); tile.classList.add("err");
+      setTimeout(() => tile.classList.remove("err"), 1400);
+      addLog(task.label || task.id, false, "network");
+    }
+  }
+
+  function addLog(label, ok, detail) {
+    const li = document.createElement("li");
+    const t = new Date().toLocaleTimeString([], { hour12: false });
+    li.innerHTML = `<span class="t">${t}</span><span class="${ok ? "ok" : "err"}">${ok ? "▸" : "✕"}</span>` +
+      `<span>${escapeHtml(label)} <span style="color:var(--dim)">— ${escapeHtml(String(detail))}</span></span>`;
+    logEl.prepend(li);
+    while (logEl.children.length > 60) logEl.lastChild.remove();
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  $("#clearLog").addEventListener("click", () => { logEl.innerHTML = ""; });
+
+  // --- little signal-scope canvas in the header (engine flavour) ---
+  const cv = $("#signal"), cx = cv.getContext("2d");
+  let phase = 0, jolt = 0;
+  function pulse() { jolt = 1; }
+  function tick() {
+    const w = cv.width, h = cv.height;
+    cx.clearRect(0, 0, w, h);
+    cx.strokeStyle = "#5dff9b"; cx.lineWidth = 1.5; cx.globalAlpha = 0.9;
+    cx.beginPath();
+    for (let x = 0; x < w; x++) {
+      const base = Math.sin((x * 0.18) + phase) * (2.5 + jolt * 9);
+      const spike = jolt > 0 && Math.abs(x - (w * 0.5)) < 6 ? (6 - Math.abs(x - w * 0.5)) * jolt * 2.2 : 0;
+      const y = h / 2 - base - spike;
+      x ? cx.lineTo(x, y) : cx.moveTo(x, y);
+    }
+    cx.stroke();
+    phase += 0.12; jolt *= 0.92; if (jolt < 0.01) jolt = 0;
+    requestAnimationFrame(tick);
+  }
+  tick();
+
+  loadTasks();
+  setInterval(() => fetch("./api/health").then(r => setConn(r.ok)).catch(() => setConn(false)), 5000);
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Anime4K Upscaler (WebGPU)">
+<meta name="demo:desc" content="Anime4K's classic real-time upscaler, reimplemented natively in SweK: bilinear 2x then a DoG deblur (overshoot-clamped) and line-darkening. WebGPU compute on a rig, CPU reference here. Compare nearest / bilinear / Anime4K side by side; upload your own image.">
+<meta name="demo:category" content="fx">
+<title>Anime4K Upscaler</title>
+<style>
+  :root { --bg:#04060d; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; }
+  body { margin:0; background:var(--bg); color:#dbe7ff; font:13px ui-monospace, Menlo, monospace; }
+  #hud { padding:14px 16px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--amber); margin:0 0 6px; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  button, label.file { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:8px; padding:7px 13px; font:600 11px ui-monospace, monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover, label.file:hover { border-color:var(--cyan); }
+  input[type=file] { display:none; }
+  input[type=range] { accent-color:var(--cyan); }
+  .stat { color:var(--dim); font-size:12px; }
+  .panes { display:flex; gap:16px; flex-wrap:wrap; padding:0 16px 20px; }
+  .pane { flex:1; min-width:260px; }
+  .pane h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 0 6px; }
+  .pane.a4k h2 { color:var(--green); }
+  canvas { width:100%; image-rendering:pixelated; border:1px solid #14203a; border-radius:8px; background:#000; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>&#9673; Anime4K Upscaler &middot; native WebGPU</h1>
+  <div class="row">
+    <button onclick="genTest()">Test image</button>
+    <label class="file">Upload image<input type="file" accept="image/*" onchange="loadFile(event)"></label>
+    <span class="stat">deblur <input type="range" id="deblur" min="0" max="3" step="0.1" value="1.4" oninput="render()"> <b id="dv">1.4</b></span>
+    <span class="stat">darken <input type="range" id="darken" min="0" max="1" step="0.05" value="0.5" oninput="render()"> <b id="kv">0.5</b></span>
+    <span class="stat" id="engine"></span>
+  </div>
+  <div class="stat" id="metric"></div>
+</div>
+<div class="panes">
+  <div class="pane"><h2>Original (nearest 2&times;)</h2><canvas id="cNear"></canvas></div>
+  <div class="pane"><h2>Bilinear 2&times;</h2><canvas id="cBil"></canvas></div>
+  <div class="pane a4k"><h2>Anime4K 2&times;</h2><canvas id="cA4k"></canvas></div>
+</div>
+<script type="module">
+import { anime4kCPU, upscale2x, luma, Anime4KGPU } from "./fx/anime4k/anime4k.js";
+import * as KERNELS from "./fx/anime4k/anime4kKernels.js";
+
+let srcImg = null; // {data:Float32Array rgba[0,1], w, h}
+let gpu = null;
+
+async function initGPU() {
+  if (!navigator.gpu) { document.getElementById("engine").textContent = "CPU reference (no WebGPU here)"; return; }
+  try { const adapter = await navigator.gpu.requestAdapter(); const device = await adapter.requestDevice(); gpu = new Anime4KGPU(device, KERNELS); document.getElementById("engine").textContent = "WebGPU compute"; }
+  catch (e) { document.getElementById("engine").textContent = "CPU reference (WebGPU init failed)"; }
+}
+
+function genTest() {
+  const w = 96, h = 96, data = new Float32Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4;
+    let r = 0.9, g = 0.86, b = 0.8;
+    const cx = 48, cy = 42, dd = Math.hypot(x - cx, y - cy);
+    if (dd < 30) { r = 0.98; g = 0.82; b = 0.7; }                 // face fill
+    if (Math.abs(dd - 30) < 1.1) { r = g = b = 0.1; }             // face outline (the anime line)
+    if (Math.hypot(x - 38, y - 36) < 4 && Math.hypot(x - 38, y - 36) > 2.4) { r = g = b = 0.08; } // eye
+    if (Math.hypot(x - 58, y - 36) < 4 && Math.hypot(x - 58, y - 36) > 2.4) { r = g = b = 0.08; }
+    if (y > 62 && y < 66 && x > 40 && x < 56 && ((x + y) % 3 === 0)) { r = g = b = 0.1; }         // mouth hint
+    if (x % 16 === 0 || y % 16 === 0) { r *= 0.7; g *= 0.7; b *= 0.7; }                            // faint grid texture
+    data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = 1; }
+  srcImg = { data, w, h }; render();
+}
+function loadFile(ev) {
+  const f = ev.target.files[0]; if (!f) return; const img = new Image();
+  img.onload = () => { const MAX = 200; let w = img.width, h = img.height; const s = Math.min(1, MAX / Math.max(w, h)); w = Math.round(w * s); h = Math.round(h * s);
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const cx = c.getContext("2d"); cx.drawImage(img, 0, 0, w, h);
+    const id = cx.getImageData(0, 0, w, h).data; const data = new Float32Array(w * h * 4); for (let i = 0; i < w * h * 4; i++) data[i] = id[i] / 255;
+    srcImg = { data, w, h }; render(); };
+  img.src = URL.createObjectURL(f);
+}
+function drawTo(id, buf, w, h) { const cv = document.getElementById(id); cv.width = w; cv.height = h; const ctx = cv.getContext("2d"); const im = ctx.createImageData(w, h); for (let i = 0; i < w * h * 4; i++) im.data[i] = Math.round(Math.max(0, Math.min(1, buf[i])) * 255); ctx.putImageData(im, 0, 0); }
+function edgeStep(b, W, H) { let s = 0; for (let y = 0; y < H; y++) for (let x = 0; x < W - 1; x++) { const L = (xx) => luma(b[(y * W + xx) * 4], b[(y * W + xx) * 4 + 1], b[(y * W + xx) * 4 + 2]); s = Math.max(s, Math.abs(L(x + 1) - L(x))); } return s; }
+
+async function render() {
+  if (!srcImg) return;
+  const sD = parseFloat(document.getElementById("deblur").value), sK = parseFloat(document.getElementById("darken").value);
+  document.getElementById("dv").textContent = sD.toFixed(1); document.getElementById("kv").textContent = sK.toFixed(2);
+  const { data, w, h } = srcImg;
+  drawTo("cNear", data, w, h);                                  // browser scales up with pixelated => nearest look
+  const bil = upscale2x(data, w, h); drawTo("cBil", bil.data, bil.w, bil.h);
+  let out;
+  if (gpu) { try { out = await gpu.run(data, w, h, { strengthDeblur: sD, strengthDarken: sK }); } catch { out = anime4kCPU(data, w, h, { scale: 2, strengthDeblur: sD, strengthDarken: sK }); } }
+  else out = anime4kCPU(data, w, h, { scale: 2, strengthDeblur: sD, strengthDarken: sK });
+  drawTo("cA4k", out.data, out.w, out.h);
+  const sb = edgeStep(bil.data, bil.w, bil.h), sa = edgeStep(out.data, out.w, out.h);
+  document.getElementById("metric").textContent = "edge steepness: bilinear " + sb.toFixed(3) + " \u2192 Anime4K " + sa.toFixed(3) + " (" + (sa / sb).toFixed(2) + "\u00d7 sharper)  \u00b7  " + w + "\u00d7" + h + " \u2192 " + out.w + "\u00d7" + out.h;
+}
+
+await initGPU(); genTest();
+</script>
+</body>
+</html>

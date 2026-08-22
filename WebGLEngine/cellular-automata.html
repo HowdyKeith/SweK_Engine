@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Game of Life</title>
+<!-- v822 — universal viewer discovery meta -->
+<meta name="demo:title"  content="Game of Life">
+<meta name="demo:desc"   content="Conway's B3/S23 cellular automaton on a GPU grid. Tap to reseed.">
+<meta name="demo:cats"   content="sim,cellular">
+<meta name="demo:swatch" content="L">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#04030a;color:#9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",monospace;overflow:hidden}
+  #wrap{display:flex;flex-direction:column;height:100%}
+  #topbar{display:flex;gap:8px;padding:10px 12px;background:rgba(15,20,35,0.85);border-bottom:1px solid rgba(180,140,220,0.25);align-items:center}
+  #topbar h1{margin:0;font-size:14px;font-weight:600;color:#cdf;flex:1}
+  #topbar button{padding:6px 12px;border-radius:6px;border:1px solid rgba(180,140,220,0.4);background:rgba(10,16,30,0.85);color:#cdf;font-size:13px;cursor:pointer}
+  #host{flex:1;position:relative;display:flex;align-items:center;justify-content:center}
+  #sim{background:#000;max-width:100vmin;max-height:100vmin;border-radius:4px;touch-action:none;image-rendering:pixelated}
+  #footer{padding:8px 12px;font-size:11px;color:#789;text-align:center}
+  /* v2873 -- the action fills the page (no canvas rule existed). Per-cell grid: display grows, backing store untouched. */
+  canvas { width: 100%; max-width: 900px; height: auto; display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <h1>🦠 Game of Life</h1>
+    <button id="btnReseed">🎲 Reseed</button>
+    <button id="btnBack">← Back</button>
+  </div>
+  <div id="host"><canvas id="sim" width="256" height="256"></canvas></div>
+  <div id="footer">Conway's CA · tap to reseed · ~40% density</div>
+</div>
+<script type="module">
+import { setupPhoneSim } from "./utils/phoneSim.js";
+document.getElementById("btnBack").addEventListener("click", () => location.href = "/control.html");
+
+const SIM_SIZE = 256;
+const UPDATE_FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+uniform sampler2D uState;
+uniform vec2 uTexel;
+void main(){
+  float self = texture(uState, vUV).r;
+  float count = 0.0;
+  for (int dy=-1; dy<=1; dy++) for (int dx=-1; dx<=1; dx++) {
+    if (dx==0 && dy==0) continue;
+    count += step(0.5, texture(uState, fract(vUV + vec2(float(dx),float(dy))*uTexel)).r);
+  }
+  float alive = step(0.5, self);
+  // B3/S23: birth on 3, survive on 2 or 3
+  float next = alive * step(1.5, count) * step(count, 3.5)
+             + (1.0 - alive) * step(2.5, count) * step(count, 3.5);
+  outColor = vec4(next, self * 0.85, 0.0, 1.0);   // r=alive, g=fading trail
+}`;
+const DISPLAY_FS = `#version 300 es
+precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+uniform sampler2D uState;
+void main(){
+  vec2 cell = texture(uState, vUV).rg;
+  // Alive cells bright cyan, fading trail dim purple
+  vec3 col = mix(vec3(0.15, 0.05, 0.20) * cell.g, vec3(0.40, 1.00, 0.85), cell.r);
+  outColor = vec4(col, 1.0);
+}`;
+// v823 — universal viewer tunable: reseed density
+let __reseedDensity = 0.40;
+function seed(gl, tex, size) {
+  const data = new Uint8Array(size*size*4);
+  for (let i=0;i<size*size;i++) {
+    const a = Math.random() < __reseedDensity ? 255 : 0;
+    data[i*4]=a; data[i*4+1]=0; data[i*4+2]=0; data[i*4+3]=255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, data);
+}
+const sim = setupPhoneSim({
+  canvas: document.getElementById("sim"),
+  simSize: SIM_SIZE,
+  stepsPerFrame: 2,
+  internalFmt: "RGBA8",
+  type: "UNSIGNED_BYTE",
+  updateFS: UPDATE_FS, displayFS: DISPLAY_FS, seed,
+  updateUniforms(gl, prog){
+    gl.uniform2f(gl.getUniformLocation(prog,"uTexel"), 1/SIM_SIZE, 1/SIM_SIZE);
+    gl.uniform1i(gl.getUniformLocation(prog,"uState"), 0);
+  },
+  displayUniforms(gl, prog){
+    gl.uniform1i(gl.getUniformLocation(prog,"uState"), 0);
+  },
+});
+if (sim.error) document.getElementById("host").innerHTML = `<div style="padding:40px;color:#f88">${sim.error}</div>`;
+document.getElementById("btnReseed").addEventListener("click", () => sim.reseed && sim.reseed());
+
+
+// ─── v822 — Universal viewer protocol ────────────────────
+// Demos opt-in via meta tags + postMessage. Viewer at
+// universal-viewer.html iframes this page + exchanges:
+//   demo:params  (demo → viewer)   announce tunable schema
+//   demo:set     (viewer → demo)   apply parameter change
+//   demo:thumb   (demo → viewer)   snapshot of canvas
+//   demo:request-thumb/params      pulled by viewer
+(function demoProtocol() {
+    const params = [
+        { name: "density", label: "Reseed density", min: 0.1, max: 0.7, step: 0.05, default: 0.4, set: (v) => { __reseedDensity = v; } },
+    ];
+    function getCanvas() {
+        return document.getElementById("sim");
+    }
+    function announce() {
+        try {
+            window.parent?.postMessage({
+                type: "demo:params",
+                params: params.map(({ set, ...p }) => p),
+            }, "*");
+        } catch (e) {}
+    }
+    window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "demo:set") {
+            const p = params.find(x => x.name === d.name);
+            if (p && typeof d.value === "number") {
+                try { p.set(d.value); } catch (err) {}
+            }
+        } else if (d.type === "demo:request-thumb") {
+            try {
+                const c = getCanvas();
+                if (!c) return;
+                window.parent?.postMessage({
+                    type: "demo:thumb",
+                    dataUrl: c.toDataURL("image/jpeg", 0.6),
+                }, "*");
+            } catch (err) {}
+        } else if (d.type === "demo:request-params") {
+            announce();
+        }
+    });
+    setTimeout(announce, 200);
+})();
+</script>
+<!-- v883 demo chrome (self-mount; idempotent) -->
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>

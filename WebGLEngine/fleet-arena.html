@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fleet Agent -- a learned scheduler that routes by capability</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --violet:#c9a0ff; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; }
+  header b { color:var(--green); } header code { color:var(--cyan); }
+  .controls { display:flex; gap:14px; align-items:center; padding:12px 18px; flex-wrap:wrap; }
+  button { background:#14241a; color:var(--green); border:1px solid #2a5a3a; border-radius:5px; padding:7px 16px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#1c3626; }
+  .ctl { display:flex; flex-direction:column; gap:2px; } .ctl label { font-size:10px; color:var(--dim); text-transform:uppercase; }
+  input[type=range] { width:150px; accent-color:var(--cyan); }
+  .wrap { padding:4px 18px 16px; display:grid; grid-template-columns:1fr 1fr; gap:18px; max-width:1000px; }
+  .card { border:1px solid var(--line); border-radius:8px; background:#04100a; padding:12px 14px; } .full { grid-column:1 / -1; }
+  .card h2 { margin:0 0 10px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.07em; }
+  .row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
+  .row .lab { width:88px; color:var(--dim); } .row .bar { height:15px; border-radius:3px; } .row .val { width:48px; text-align:right; }
+  table { width:100%; border-collapse:collapse; font-size:12px; } td,th { padding:4px 7px; border-bottom:1px solid #12281b; text-align:center; }
+  th { color:var(--dim); font-weight:normal; font-size:10px; } td.k { text-align:left; color:var(--dim); }
+  .hit { color:var(--green); } .miss { color:var(--red); }
+  .note { max-width:1000px; margin:14px 18px 24px; color:var(--dim); font-size:11px; border-top:1px solid var(--line); padding-top:10px; } .note b { color:var(--cyan); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fleet Agent &mdash; a learned scheduler that routes by capability</h1>
+  <p>Runs <code>brain/agent/fleet.js</code>, the module the gate runs. A task stream is routed across brains with different per-kind speeds &mdash; one fast at nav, another at render. Four schedulers compete for the lowest <b>makespan</b> (when the last brain finishes): <b>random</b>, <b>round-robin</b>, a <b>greedy</b> load-balancer, and a <b>learned</b> router that learns each brain's speed per kind from the times it sees and sends work to whoever finishes it soonest. Everything below is read from the run. Kill condition on <code>predictions.html</code>.</p>
+</header>
+<div class="controls">
+  <button id="run">&#9654; Run the fleet</button>
+  <div class="ctl"><label>Seed</label><input type="range" id="seed" min="1000" max="1400" step="13" value="1000" /></div>
+  <div class="ctl"><label>Tasks</label><input type="range" id="tasks" min="60" max="240" step="20" value="120" /></div>
+  <span id="status" style="color:var(--green);font-size:11px;"></span>
+</div>
+<div class="wrap">
+  <div class="card full"><h2>Makespan &mdash; lower is better</h2><div id="bars"></div></div>
+  <div class="card"><h2>What the router learned &mdash; fastest brain per kind</h2><div id="spec"></div></div>
+  <div class="card"><h2>Load balance &mdash; learned router</h2><div id="load"></div></div>
+</div>
+<div class="note" id="verdict"></div>
+<script type="module">
+import { runFleetLadder, mean } from "./brain/agent/fleet.js";
+const $ = (id) => document.getElementById(id);
+const COL = { random:"#e8736a", roundRobin:"#c9a0ff", greedy:"#ffcc66", learned:"#33ccff" };
+const LAB = { random:"random", roundRobin:"round-robin", greedy:"greedy-load", learned:"learned" };
+
+function render(r) {
+  const ms = { random:r.random.makespan, roundRobin:r.roundRobin.makespan, greedy:r.greedy.makespan, learned:r.learned.makespan };
+  const worst = Math.max(...Object.values(ms));
+  $("bars").innerHTML = ["random","roundRobin","greedy","learned"].map(k=>
+    "<div class='row'><span class='lab' style='color:"+COL[k]+"'>"+LAB[k]+"</span><div class='bar' style='width:"+(100*ms[k]/worst)+"%;background:"+COL[k]+";opacity:"+(k==="learned"?1:.6)+"'></div><span class='val'>"+ms[k].toFixed(1)+"</span></div>").join("");
+  // specialization matrix: for each kind, true-fastest brain vs learned-fastest
+  let mh=0,mt=0, rows="<table><tr><th>kind</th><th>true fastest</th><th>router learned</th></tr>";
+  for(let k=0;k<r.fleet.nKinds;k++){
+    let tf=0; for(let b=1;b<r.fleet.nBrains;b++) if(r.fleet.speed[b][k]>r.fleet.speed[tf][k]) tf=b;
+    let ef=0; for(let b=1;b<r.fleet.nBrains;b++) if(r.est[b][k]<r.est[ef][k]) ef=b;
+    const hit = tf===ef; if(hit)mh++; mt++;
+    rows+="<tr><td class='k'>kind "+k+"</td><td>brain "+tf+"</td><td class='"+(hit?"hit":"miss")+"'>brain "+ef+(hit?" &#10003;":" &#8800;")+"</td></tr>";
+  }
+  rows+="</table>";
+  $("spec").innerHTML = rows + "<div style='color:var(--dim);font-size:10px;margin-top:8px'>matched "+mh+"/"+mt+" (chance 1-in-"+r.fleet.nBrains+") &mdash; learned from observed times.</div>";
+  // load balance of the learned router
+  const L=r.learned.load, mx=Math.max(...L);
+  $("load").innerHTML = L.map((l,b)=>"<div class='row'><span class='lab'>brain "+b+"</span><div class='bar' style='width:"+(100*l/mx)+"%;background:#33ccff;opacity:.7'></div><span class='val'>"+l.toFixed(1)+"</span></div>").join("") +
+    "<div style='color:var(--dim);font-size:10px;margin-top:8px'>finish times close together = balanced; the router trades a little balance for putting fast work on fast brains.</div>";
+  const gain = (ms.greedy-ms.learned)/ms.greedy*100;
+  $("verdict").innerHTML = "<b>What this run shows:</b> the learned router finishes in <b>"+ms.learned.toFixed(1)+"</b> against greedy load-balancing's "+ms.greedy.toFixed(1)+" ("+gain.toFixed(0)+"% faster), round-robin's "+ms.roundRobin.toFixed(1)+", and random's "+ms.random.toFixed(1)+" &mdash; by learning who is fast at what and routing there. <b>What it will not tell you:</b> this is a fact about this fleet's spread of speeds and this task mix, not a law &mdash; a homogeneous fleet has nothing to specialise, and the learner would only tie greedy.";
+  $("status").textContent = "ran seed "+$("seed").value+", "+r.tasks.length+" tasks x 4 schedulers";
+}
+function go(){ $("status").textContent="running..."; setTimeout(()=>render(runFleetLadder(+$("seed").value, { nTasks:+$("tasks").value })), 10); }
+$("run").onclick = go; go();
+</script>
+</body>
+</html>

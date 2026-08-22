@@ -1,0 +1,61 @@
+:root{
+  --bg:#0a0d0b; --bg2:#0e1410; --panel:#101713; --line:#1d2a22;
+  --txt:#cfe8d6; --dim:#6d8576; --phos:#5dff9b; --phos-d:#2bbd6a;
+  --amber:#ffb347; --cyan:#5bd6ff; --blue:#7aa2ff; --red:#ff6b6b;
+  --shadow:0 2px 0 #05080620, 0 10px 24px #00000055;
+  font-family:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:
+    radial-gradient(120% 80% at 50% -10%, #13201a 0%, var(--bg) 55%) fixed,
+    repeating-linear-gradient(0deg, transparent 0 23px, #0c130e80 23px 24px);
+  color:var(--txt); min-height:100dvh; padding:max(14px,env(safe-area-inset-top)) 14px 28px;
+  -webkit-tap-highlight-color:transparent;
+}
+/* faint scanline + grain overlay for the CRT feel */
+.scanlines{position:fixed; inset:0; pointer-events:none; z-index:50;
+  background:repeating-linear-gradient(0deg, #00000010 0 2px, transparent 2px 4px); mix-blend-mode:overlay; opacity:.5}
+
+.deck-head{display:flex; align-items:center; gap:14px; padding:6px 4px 14px; border-bottom:1px solid var(--line)}
+#signal{flex:0 0 auto; width:120px; height:40px; border:1px solid var(--line); border-radius:6px; background:#070b08}
+.title h1{font-size:18px; letter-spacing:.18em; margin:0; color:var(--phos); text-shadow:0 0 12px #5dff9b40}
+.title .sub{font-size:11px; color:var(--dim); letter-spacing:.06em; margin-top:3px}
+.conn{padding:1px 7px; border-radius:999px; font-weight:600; font-size:10px; letter-spacing:.08em}
+.conn.up{color:#06120a; background:var(--phos)}
+.conn.down{color:#1a0b0b; background:var(--red)}
+
+.filters{display:flex; gap:8px; flex-wrap:wrap; padding:14px 2px}
+.chip{appearance:none; border:1px solid var(--line); background:var(--panel); color:var(--dim);
+  font:inherit; font-size:11px; letter-spacing:.06em; padding:6px 11px; border-radius:999px; cursor:pointer}
+.chip[aria-pressed="true"]{color:var(--bg); background:var(--phos); border-color:var(--phos); font-weight:600}
+
+.grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+@media(min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:820px){.grid{grid-template-columns:repeat(4,1fr)}}
+.empty{grid-column:1/-1; color:var(--dim); text-align:center; padding:40px 0; font-size:13px}
+
+.tile{position:relative; display:flex; flex-direction:column; gap:8px; min-height:104px;
+  padding:14px 13px; border:1px solid var(--line); border-radius:12px; cursor:pointer;
+  background:linear-gradient(180deg,#13201a,var(--panel)); color:var(--txt);
+  font:inherit; text-align:left; box-shadow:var(--shadow); transition:transform .06s ease, border-color .15s, box-shadow .15s}
+.tile:active{transform:translateY(2px); box-shadow:0 1px 0 #05080620}
+.tile .ico{font-size:26px; line-height:1}
+.tile .lab{font-size:13px; font-weight:500; letter-spacing:.02em}
+.tile .be{position:absolute; top:11px; right:11px; font-size:9px; letter-spacing:.1em; padding:2px 6px;
+  border-radius:5px; border:1px solid currentColor; opacity:.8}
+.be.autoremote{color:var(--amber)} .be.tasker_http{color:var(--phos)} .be.mqtt{color:var(--cyan)} .be.ha{color:var(--blue)}
+.tile.firing{border-color:var(--phos); box-shadow:0 0 0 1px var(--phos), 0 0 22px #5dff9b35}
+.tile.ok::after,.tile.err::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; border-radius:0 0 12px 12px}
+.tile.ok::after{background:var(--phos)} .tile.err::after{background:var(--red)}
+
+.logwrap{margin-top:22px; border:1px solid var(--line); border-radius:10px; background:#0a0f0c; overflow:hidden}
+.logbar{display:flex; justify-content:space-between; align-items:center; padding:8px 12px;
+  font-size:10px; letter-spacing:.18em; color:var(--dim); border-bottom:1px solid var(--line)}
+.logbar button{appearance:none; background:none; border:none; color:var(--dim); font:inherit; font-size:10px; cursor:pointer; text-decoration:underline}
+.log{list-style:none; margin:0; padding:6px 0; max-height:34vh; overflow:auto; font-size:11.5px}
+.log li{padding:4px 12px; display:flex; gap:8px; align-items:baseline; border-bottom:1px solid #0e140f}
+.log .t{color:var(--dim); flex:0 0 auto}
+.log .ok{color:var(--phos)} .log .err{color:var(--red)}
+.log li:last-child{border-bottom:none}

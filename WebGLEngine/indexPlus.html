@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Voxel Engine Showcase v2.6</title>
+
+<style>
+html, body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Consolas, monospace;
+    background: #000;
+}
+
+/* Round 305 — scope full-screen rule to #gl only. See index.html. */
+#gl {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+#overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #00ff00;
+    padding: 12px;
+    font-size: 12px;
+    white-space: pre;
+    border: 1px solid rgba(0,255,0,0.3);
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="gl"></canvas>
+<div id="overlay"></div>
+
+<script>
+
+const Engine = {
+
+    Stats: {
+        fps: 0,
+        visibleChunks: 0,
+        loadedChunks: 0,
+        drawCalls: 0,
+        triangles: 0
+    },
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    },
+
+    init() {
+
+        this.canvas = document.getElementById("gl");
+
+        this.gl = this.canvas.getContext("webgl2");
+
+        if (!this.gl) {
+            alert("WebGL2 not supported");
+            return;
+        }
+
+        this.resize();
+
+        window.addEventListener("resize", () => this.resize());
+
+        this.camera = {
+            position: [0, 50, 0],
+            yaw: 0,
+            pitch: 0
+        };
+
+        this.last = performance.now();
+
+        this.bootstrapSystems();
+
+        requestAnimationFrame(this.loop.bind(this));
+    }
+};
+
+</script>
+
+<script src="engine.bridge.json.js"></script>
+<script src="engine.bootstrap.js"></script>
+<script src="engine.loop.js"></script>
+
+<script>
+Engine.init();
+</script>
+
+</body>
+</html>

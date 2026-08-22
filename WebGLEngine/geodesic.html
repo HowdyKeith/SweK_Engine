@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Black-hole lensing -- GR-exact light bending</title>
+<style>
+  :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --red:#e8736a; --bg:#06140c; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.55 ui-monospace,"SF Mono",Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:15px; color:var(--amber); letter-spacing:.05em; text-transform:uppercase; }
+  header p { margin:0; color:var(--dim); max-width:940px; font-size:12px; } header b { color:var(--green); } header code { color:var(--cyan); }
+  .wrap { padding:12px 18px 8px; max-width:720px; }
+  canvas { display:block; width:100%; height:auto; border-radius:8px; background:#01040a; border:1px solid var(--line); }
+  .read { padding:6px 18px 18px; max-width:720px; font-size:12px; color:var(--dim); } .read b { color:var(--amber); }
+  .leg { font-size:11px; } .leg i { font-style:normal; } .leg .cap { color:var(--red); } .leg .esc { color:var(--cyan); } .leg .ph { color:var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Black-hole lensing &mdash; GR-exact light bending</h1>
+  <p>Light rays traced through the exact Schwarzschild null geodesic, <code>physics/blackhole/geodesic.js</code> &mdash; the real thing, not the pseudo-Newtonian potential. Rays with impact parameter below <b>3&radic;3&thinsp;M</b> are swallowed into the shadow; the rest bend around, more sharply the closer they pass the <b>photon sphere</b> at r&thinsp;=&thinsp;3M. Far out, the bend is the Einstein deflection 4M/b &mdash; the 1919 eclipse factor. Nobody feeds these numbers to the tracer; they fall out of the metric.</p>
+</header>
+<div class="wrap"><canvas id="cv" width="720" height="460"></canvas></div>
+<div class="read" id="read"></div>
+<script type="module">
+import { tracePath, criticalImpact, photonSphere, horizon } from "./physics/blackhole/geodesic.js";
+const M = 1, cv = document.getElementById("cv"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+const cx = W * 0.5, cy = H * 0.5, scale = 15;   // pixels per M
+const P = (x, y) => [cx + x * scale, cy - y * scale];
+
+g.fillStyle = "#01040a"; g.fillRect(0, 0, W, H);
+// photon sphere r=3M
+{ const [px, py] = P(0, 0); g.strokeStyle = "rgba(255,204,102,0.5)"; g.setLineDash([4, 4]); g.beginPath(); g.arc(px, py, photonSphere(M) * scale, 0, 7); g.stroke(); g.setLineDash([]); }
+// shadow (critical impact parameter)
+{ const [px, py] = P(0, 0); g.strokeStyle = "rgba(232,115,106,0.55)"; g.beginPath(); g.arc(px, py, criticalImpact(M) * scale, 0, 7); g.stroke(); }
+// rays across a range of impact parameters (both sides)
+const bc = criticalImpact(M);
+for (let s of [1, -1]) for (const b of [1.5, 3, 4.5, bc * 0.99, bc * 1.01, 6, 7.5, 9, 11, 14]) {
+  const r = tracePath(M, b);
+  g.strokeStyle = r.captured ? "rgba(232,115,106,0.75)" : "rgba(90,200,255,0.7)"; g.lineWidth = 1.1;
+  g.beginPath();
+  let started = false;
+  for (const [x, y] of r.pts) { const [px, py] = P(x, s * y); if (!started) { g.moveTo(px, py); started = true; } else g.lineTo(px, py); }
+  g.stroke();
+}
+// the black hole (event horizon disk)
+{ const [px, py] = P(0, 0); g.fillStyle = "#000"; g.beginPath(); g.arc(px, py, horizon(M) * scale, 0, 7); g.fill(); g.strokeStyle = "#333"; g.stroke(); }
+g.lineWidth = 1;
+
+document.getElementById("read").innerHTML =
+  "<span class='leg'><i class='esc'>&mdash;</i> escaping (deflected) &nbsp; <i class='cap'>&mdash;</i> captured &nbsp; <i class='ph'>&middot;&middot;</i> photon sphere r=3M &nbsp; <i style='color:#e8736a'>&mdash;</i> shadow edge</span><br>" +
+  "horizon r<sub>s</sub> = <b>" + horizon(M) + "M</b> &middot; photon sphere <b>" + photonSphere(M) + "M</b> &middot; shadow (critical impact) 3&radic;3&thinsp;M = <b>" + criticalImpact(M).toFixed(3) + "M</b>. Rays just outside the shadow wind past the photon sphere before escaping -- the strong-lensing regime.";
+</script>
+</body>
+</html>

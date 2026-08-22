@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SweK &middot; Blobulator (Lava Lamp / Flaming River)</title>
+<style>
+  html, body { margin:0; height:100%; background:#07050b; overflow:hidden; color:#e9e0f0;
+               font:13px ui-sans-serif,system-ui,sans-serif; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:14px; top:12px; z-index:5; background:rgba(16,10,22,.72); border:1px solid #3a2740;
+         border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); max-width:360px; }
+  #hud h1 { margin:0 0 4px; font-size:15px; } #hud p { margin:4px 0; color:#b39ac2; font-size:12px; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  button, select { font:12px ui-monospace,monospace; padding:5px 11px; border-radius:7px; border:1px solid #5a3a52;
+                   background:#241726; color:#f0d9ec; cursor:pointer; }
+  button.go { background:#3a1c10; color:#ffcf9a; border-color:#7a3d1e; }
+  button.rec { background:#3a1015; color:#ff9aa2; border-color:#6a2a30; }
+  label.sl { display:flex; align-items:center; gap:6px; color:#b39ac2; font-size:11px; }
+  .dim { color:#9c86ad; font-size:11px; } #fps { font-variant-numeric:tabular-nums; }
+
+  /* collapsible HUD: a small tab on mobile so it never covers the view */
+  #hud { max-height:80vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #hud.min { max-height:none; overflow:visible; }
+  #hud.min > :not(h1) { display:none; }
+  #hud h1 { cursor:default; }
+  .hudTab { display:inline-block; cursor:pointer; border:1px solid #3a2740; border-radius:6px; padding:0 8px; margin-right:8px; font-size:14px; line-height:1.4; color:#b39ac2; background:rgba(255,255,255,.05); user-select:none; -webkit-tap-highlight-color:transparent; }
+  .hudTab:hover { color:#e9e0f0; border-color:#6a4d80; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest(\'#hud\').classList.toggle(\'min\')" title="show/hide controls">&#9776;</span>&#129514; Blobulator <a href="blobulator-gpu.html" id="gpuLink" style="font-size:13px;color:#0b0e14;background:#8ab4ff;padding:3px 9px;border-radius:5px;text-decoration:none;font-weight:600;white-space:nowrap">&#9889; WebGPU version</a></h1>
+  <p id="blurb">Metaballs marched to an isosurface every frame. Reuses the engine's marching-cubes mesher.
+     <span id="fps" class="dim"></span></p>
+  <div class="row">
+    <label class="sl">mode
+      <select id="mode"><option value="lava">Lava lamp</option><option value="river" selected>Flaming river</option></select>
+    </label>
+    <label class="sl">blobs <input id="blobs" type="range" min="3" max="14" value="9"></label>
+    <label class="sl">res <input id="res" type="range" min="24" max="48" step="4" value="32"></label>
+  </div>
+  <div class="row">
+    <button id="spin" class="go">&#8635; orbit: on</button>
+    <select id="dur"><option value="10">10s</option><option value="20" selected>20s</option><option value="30">30s</option></select>
+    <button id="rec" class="rec">&#9679; Record</button>
+    <span class="dim" id="msg"></span>
+  </div>
+</div>
+
+<script type="module">
+import { attachGestures as _swekGestures } from "./ui/touchGestures.js";
+import { computeSkinColors, applySkinMaterial } from "./fx/avatar/skinsThree.js";
+import { blackbodyRamp as fireRamp } from "./fx/voxelize/fireRamp.js";   // v2438 -- the shared temperature ramp; this page carried a byte-identical copy
+import { SKIN_NAMES } from "./fx/avatar/skins.js";
+import * as THREE from "/vendor/three/three.module.js";
+import { marchScalarField } from "/simulation/MarchingCubes.js";
+import { installRecorder } from "/ui/canvasRecorder.js";
+installRecorder();
+
+const canvas = document.getElementById("c");
+let userAz = 0, userZoom = 1;
+_swekGestures(canvas, { onPan: (p, fg) => { if (fg === 1) { userAz -= p.dx * 0.006; spin = false; } }, onPinch: (sc) => { userZoom = Math.max(0.4, Math.min(3, userZoom / sc)); } });   // touch: drag rotate, pinch zoom
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x07050b);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 4000);
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+// --- lights (shared; tuned brighter/warmer in river mode) ---
+const hemi = new THREE.HemisphereLight(0x2a2440, 0x120a08, 0.6); scene.add(hemi);
+const bulb = new THREE.PointLight(0xff7326, 2.4, 400, 1.6); bulb.position.set(0, -26, 0); scene.add(bulb);
+const rim = new THREE.DirectionalLight(0xffd9b0, 0.5); rim.position.set(1, 1, 1); scene.add(rim);
+
+// =========================== LAVA LAMP (unchanged behavior) ===========================
+const COL_H = 46, COL_R = 13;
+const glass = new THREE.Mesh(
+  new THREE.CylinderGeometry(COL_R + 1.5, COL_R + 1.5, COL_H, 48, 1, true),
+  new THREE.MeshPhysicalMaterial({ color: 0xbfd6ff, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.08, side: THREE.DoubleSide })
+);
+glass.position.y = COL_H / 2; scene.add(glass);
+const base = new THREE.Mesh(new THREE.CylinderGeometry(COL_R + 3, COL_R + 4, 6, 48), new THREE.MeshStandardMaterial({ color: 0x201018, roughness: 0.6, emissive: 0x501a08, emissiveIntensity: 0.7 }));
+base.position.y = -3; scene.add(base);
+const waxMat = new THREE.MeshStandardMaterial({ color: 0xff5a1e, roughness: 0.28, metalness: 0.0, emissive: 0x431004, emissiveIntensity: 0.5 });
+
+// =========================== FLAMING RIVER (new) ===========================
+// A long channel of fiery metaballs: wax flows downstream, some blobs detach and rise like glowing balloons.
+// The isosurface is vertex-coloured with a fire ramp (white-hot core -> orange -> deep red as it cools/rises),
+// lit by a cheap fake normal term so it keeps its form while reading as self-glowing lava. Unlit basic material
+// so it glows in the dark scene. A bed slab + additive ember sprites sell the flame.
+const riverMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+const riverBed = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x140a0c, roughness: 0.9, emissive: 0x2a0a04, emissiveIntensity: 0.5 }));
+scene.add(riverBed); riverBed.visible = false;
+
+// one mesh reused for whichever mode is active
+// SKINS: "native" keeps the tuned wax/lava-river look this page already had; the rest are the shared materials,
+// coloured by the same shadeTri as everywhere else. skinMat is the vertexColors carrier they paint into.
+const skinMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+const SKIN_CYCLE = ["native"].concat(SKIN_NAMES); let skinIdx = 0;
+let blobMesh = new THREE.Mesh(new THREE.BufferGeometry(), waxMat);
+const _sb = document.createElement("button"); _sb.textContent = "skin: native";
+_sb.style.cssText = "position:fixed;right:12px;top:12px;z-index:9;background:rgba(16,22,36,.92);color:#ffd08a;border:1px solid #6a5a2a;border-radius:18px;padding:8px 13px;font:600 12px ui-monospace,monospace;cursor:pointer;";
+_sb.onclick = () => { skinIdx = (skinIdx + 1) % SKIN_CYCLE.length; _sb.textContent = "skin: " + SKIN_CYCLE[skinIdx]; };
+document.body.appendChild(_sb);
+scene.add(blobMesh);
+
+// embers (additive rising sparks) for river mode
+const EMBERS = 220;
+const emberGeo = new THREE.BufferGeometry();
+const emberPos = new Float32Array(EMBERS * 3);
+const emberVel = [];
+const emberCol = new Float32Array(EMBERS * 3);
+function seedEmber(i, LX, LY, LZ, fresh) {
+  emberPos[i * 3] = (Math.random() - 0.5) * LX;
+  emberPos[i * 3 + 1] = fresh ? Math.random() * LY : Math.random() * LY * 0.25;
+  emberPos[i * 3 + 2] = (Math.random() - 0.5) * LZ * 0.7;
+  emberVel[i] = { vy: 6 + Math.random() * 14, vx: (Math.random() - 0.5) * 3, vz: (Math.random() - 0.5) * 3, wob: Math.random() * 6.28 };
+}
+emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+emberGeo.setAttribute("color", new THREE.BufferAttribute(emberCol, 3));
+const emberMat = new THREE.PointsMaterial({ size: 1.4, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
+const embers = new THREE.Points(emberGeo, emberMat); scene.add(embers); embers.visible = false;
+
+// river metaballs live in FIELD space with real velocities so they flow + rise + respawn
+let river = [];
+function seedRiver(n, LX, LY, LZ) {
+  river = [];
+  for (let i = 0; i < n; i++) river.push(newRiverBall(LX, LY, LZ, true));
+}
+function newRiverBall(LX, LY, LZ, anywhere) {
+  const balloon = Math.random() < 0.42;                       // ~40% are rising balloons
+  return {
+    x: anywhere ? Math.random() * LX : LX * (0.02 + Math.random() * 0.12),   // spawn near the source (low X)
+    y: LY * (0.12 + Math.random() * 0.14),                    // in the river band, low
+    z: LZ * (0.5) + (Math.random() - 0.5) * LZ * 0.5,
+    vx: LX * (0.10 + Math.random() * 0.12),                   // downstream speed (field units/sec)
+    rise: balloon ? LY * (0.16 + Math.random() * 0.14) : 0,   // balloons climb; river blobs don't
+    rad: 0.11 + Math.random() * 0.07,                         // radius as fraction of min dim
+    zp: Math.random() * 6.28, zw: 0.6 + Math.random() * 1.1,  // meander
+    bob: Math.random() * 6.28,
+    life: 0,
+  };
+}
+
+// fire colour ramp: h in [0,1] -> [r,g,b]
+
+// build + march the river field, then paint fire vertex colours
+let riverDims = { LX: 1, LY: 1, LZ: 1, cs: 1 };
+function riverGeom(res, t, dt) {
+  const LX = Math.max(28, Math.round(res * 1.7));   // long (flow)
+  const LY = Math.max(20, Math.round(res * 1.35));  // tall  (balloons rise)
+  const LZ = Math.max(14, Math.round(res * 0.7));   // narrow(width)
+  const cs = 1.4;
+  riverDims = { LX, LY, LZ, cs };
+  if (!river.length) seedRiver(N, LX, LY, LZ);
+
+  // advance the balls
+  for (const b of river) {
+    b.life += dt;
+    b.x += b.vx * dt;
+    b.y += b.rise * dt + Math.sin(t * 1.7 + b.bob) * dt * (LY * 0.02);   // buoyant bob + climb
+    const flowedOut = b.x > LX * 1.02;
+    const roseOut = b.y > LY * 0.98;
+    if (flowedOut || roseOut) Object.assign(b, newRiverBall(LX, LY, LZ, false));
+  }
+
+  const plane = LX * LY;
+  const field = new Float32Array(LX * LY * LZ);
+  const minDim = Math.min(LX, LY, LZ);
+  const cx = [], cy = [], cz = [], cr2 = [];
+  for (const b of river) {
+    cx.push(b.x);
+    cy.push(b.y);
+    cz.push(b.z + Math.sin(t * b.zw + b.zp) * LZ * 0.16);
+    const r = b.rad * minDim; cr2.push(r * r);
+  }
+  for (let z = 0; z < LZ; z++) {
+    for (let y = 0; y < LY; y++) {
+      const row = z * plane + y * LX;
+      for (let x = 0; x < LX; x++) {
+        let sum = 0;
+        for (let k = 0; k < cx.length; k++) {
+          const dx = x - cx[k], dy = y - cy[k], dz = z - cz[k];
+          sum += cr2[k] / (dx * dx + dy * dy + dz * dz + 0.35);
+        }
+        field[row + x] = 1.0 - sum;
+      }
+    }
+  }
+  const m = marchScalarField(field, LX, LY, LZ, 0, { origin: [-(LX * cs) / 2, 0, -(LZ * cs) / 2], cellSize: cs });
+  return m;
+}
+
+// paint fire colours onto a marched geometry (river mode)
+const _c = [0, 0, 0], _up = new THREE.Vector3(0, 1, 0);
+function paintFire(g, positions, normals, t) {
+  const n = positions.length / 3;
+  const colors = new Float32Array(positions.length);
+  const LY = riverDims.LY, cs = riverDims.cs, worldH = LY * cs;
+  for (let i = 0; i < n; i++) {
+    const px = positions[i * 3], py = positions[i * 3 + 1];
+    const nx = normals[i * 3], ny = normals[i * 3 + 1], nz = normals[i * 3 + 2];
+    // heat: hot at the base, cooling as it rises; flicker along the length
+    const hgt = py / worldH;                                  // 0 at bed, 1 at top
+    let heat = 1.0 - hgt * 1.05;
+    heat += 0.10 * Math.sin(px * 0.35 + t * 7.0) + 0.06 * Math.sin(px * 0.9 - t * 11.0);
+    fireRamp(heat, _c);
+    // cheap fake shading so the form still reads (light from above-front)
+    const shade = 0.62 + 0.38 * Math.max(0, nx * 0.3 + ny * 0.85 + nz * 0.2);
+    colors[i * 3] = Math.min(1, _c[0] * shade * 1.05);
+    colors[i * 3 + 1] = Math.min(1, _c[1] * shade);
+    colors[i * 3 + 2] = Math.min(1, _c[2] * shade);
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
+// =========================== shared blobs (lava mode) ===========================
+let RES = 32, N = 9, balls = [];
+function seedBalls(n) {
+  balls = [];
+  for (let i = 0; i < n; i++) balls.push({
+    phase: Math.random() * Math.PI * 2, speed: 0.10 + Math.random() * 0.16, wob: 0.4 + Math.random() * 0.8,
+    rad: 0.16 + Math.random() * 0.10, xa: (Math.random() * 2 - 1) * 0.22, za: (Math.random() * 2 - 1) * 0.22,
+    xp: Math.random() * Math.PI * 2, zp: Math.random() * Math.PI * 2,
+  });
+}
+function lavaGeom(res, t) {
+  const rr = res, plane = rr * rr;
+  const field = new Float32Array(rr * rr * rr);
+  const cx = [], cy = [], cz = [], cr2 = [];
+  for (const b of balls) {
+    cy.push((0.5 + 0.42 * Math.sin(t * b.speed + b.phase)) * rr);
+    cx.push(rr * 0.5 + b.xa * rr * Math.sin(t * 0.23 * b.wob + b.xp));
+    cz.push(rr * 0.5 + b.za * rr * Math.cos(t * 0.19 * b.wob + b.zp));
+    cr2.push((b.rad * rr) * (b.rad * rr));
+  }
+  for (let z = 0; z < rr; z++) for (let y = 0; y < rr; y++) { const row = z * plane + y * rr; for (let x = 0; x < rr; x++) {
+    let sum = 0; for (let k = 0; k < cx.length; k++) { const dx = x - cx[k], dy = y - cy[k], dz = z - cz[k]; sum += cr2[k] / (dx * dx + dy * dy + dz * dz + 0.35); }
+    field[row + x] = 1.0 - sum;
+  } }
+  const worldCS = (COL_R * 2) / rr;
+  return marchScalarField(field, rr, rr, rr, 0, { origin: [-(rr * worldCS) / 2, 0, -(rr * worldCS) / 2], cellSize: worldCS });
+}
+
+// =========================== mode switching ===========================
+let mode = "river";
+function applyMode(m) {
+  mode = m;
+  const riverOn = m === "river";
+  glass.visible = base.visible = !riverOn;
+  riverBed.visible = embers.visible = riverOn;
+  const _sk = SKIN_CYCLE[skinIdx];
+  blobMesh.material = _sk !== "native" ? applySkinMaterial(THREE, skinMat, _sk) : (riverOn ? riverMat : waxMat);
+  blobMesh.geometry.dispose(); blobMesh.geometry = new THREE.BufferGeometry();
+  if (riverOn) {
+    hemi.intensity = 0.35; bulb.color.setHex(0xff5a12); bulb.intensity = 3.2; bulb.position.set(0, 4, 0);
+    seedRiver(N, riverDims.LX || 54, riverDims.LY || 42, riverDims.LZ || 22);
+    for (let i = 0; i < EMBERS; i++) seedEmber(i, 70, 56, 30, true);
+    document.getElementById("blurb").innerHTML = "Fiery metaballs flow downstream while some detach and rise like glowing balloons &mdash; a marched isosurface, vertex-painted with a heat ramp. <span id='fps' class='dim'></span>";
+  } else {
+    hemi.intensity = 0.6; bulb.color.setHex(0xff7326); bulb.intensity = 2.4; bulb.position.set(0, -26, 0);
+    seedBalls(N);
+    document.getElementById("blurb").innerHTML = "Metaballs marched to an isosurface every frame &mdash; warm wax rising, merging, splitting. <span id='fps' class='dim'></span>";
+  }
+}
+
+// =========================== main loop ===========================
+let spin = true, theta = 0.6, frameCount = 0, marchEvery = 1, fpsT = performance.now(), fpsN = 0, prev = performance.now();
+function frame() {
+  requestAnimationFrame(frame);
+  const now = performance.now(), t = now / 1000; let dt = (now - prev) / 1000; prev = now; if (dt > 0.05) dt = 0.05;
+  frameCount++;
+
+  if (mode === "river") {
+    if (frameCount % marchEvery === 0) {
+      const m = riverGeom(RES, t, dt);
+      const g = blobMesh.geometry;
+      const pos = new Float32Array(m.positions), nor = new Float32Array(m.normals);
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+      if (SKIN_CYCLE[skinIdx] !== "native") g.setAttribute("color", new THREE.BufferAttribute(computeSkinColors(pos, SKIN_CYCLE[skinIdx], { t, center: [0, wLY * cs * 0.4, 0], radius: COL_R * 1.6 }), 3));
+      paintFire(g, pos, nor, t);
+      g.computeBoundingSphere();
+      blobMesh.scale.set(1, 1, 1); blobMesh.position.set(0, 0, 0);
+      const { LX, LY, LZ, cs } = riverDims;
+      riverBed.scale.set(LX * cs * 1.15, 3, LZ * cs * 2.2); riverBed.position.set(0, -1.5, 0);
+    }
+    // advance + recolour embers (rising sparks)
+    const { LX, LY, LZ, cs } = riverDims; const wLX = LX * cs, wLY = LY * cs, wLZ = LZ * cs;
+    for (let i = 0; i < EMBERS; i++) {
+      const e = emberVel[i]; if (!e) { seedEmber(i, wLX, wLY, wLZ, true); continue; }
+      emberPos[i * 3] += (e.vx + Math.sin(t * 2 + e.wob) * 2) * dt;
+      emberPos[i * 3 + 1] += e.vy * dt;
+      emberPos[i * 3 + 2] += e.vz * dt;
+      if (emberPos[i * 3 + 1] > wLY * 0.98) seedEmber(i, wLX, wLY, wLZ, false);
+      const h = 1 - emberPos[i * 3 + 1] / (wLY || 1);
+      fireRamp(0.35 + h * 0.6, _c);
+      emberCol[i * 3] = _c[0]; emberCol[i * 3 + 1] = _c[1]; emberCol[i * 3 + 2] = _c[2];
+    }
+    emberGeo.attributes.position.needsUpdate = true; emberGeo.attributes.color.needsUpdate = true;
+    // camera: along the channel, gentle orbit
+    if (spin) theta += 0.0022;
+    const r = wLX * 0.78;
+    camera.position.set(Math.sin(theta + userAz) * r * 0.5 * userZoom, wLY * 0.52, Math.cos(theta + userAz) * r * userZoom);
+    camera.lookAt(0, wLY * 0.34, 0);
+  } else {
+    if (frameCount % marchEvery === 0) {
+      const m = lavaGeom(RES, t);
+      const g = blobMesh.geometry;
+      g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(m.positions), 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(m.normals), 3));
+      g.computeBoundingSphere();
+      const marchedH = (COL_R * 2); blobMesh.scale.set(1, COL_H / marchedH, 1); blobMesh.position.y = 0;
+      waxMat.color.setHSL(0.045 + 0.02 * Math.sin(t * 0.2), 0.9, 0.5);
+    }
+    if (spin) theta += 0.0035;
+    const r = 78 * userZoom; camera.position.set(Math.cos(theta + userAz) * r, COL_H * 0.52, Math.sin(theta + userAz) * r); camera.lookAt(0, COL_H * 0.5, 0);
+  }
+
+  renderer.render(scene, camera);
+  fpsN++; if (now - fpsT > 500) { const el = document.getElementById("fps"); if (el) el.textContent = Math.round(fpsN * 1000 / (now - fpsT)) + " fps \u00b7 " + (blobMesh.geometry.attributes.position ? (blobMesh.geometry.attributes.position.count / 3 | 0) : 0) + " tris"; fpsT = now; fpsN = 0; marchEvery = RES >= 44 ? 2 : 1; }
+}
+
+// --- controls ---
+const $ = (id) => document.getElementById(id);
+$("mode").onchange = (e) => applyMode(e.target.value);
+$("blobs").oninput = (e) => { N = +e.target.value; if (mode === "river") { const d = riverDims; seedRiver(N, d.LX, d.LY, d.LZ); } else seedBalls(N); };
+$("res").oninput = (e) => { RES = +e.target.value; };
+$("spin").onclick = () => { spin = !spin; $("spin").textContent = "\u21bb orbit: " + (spin ? "on" : "off"); };
+$("rec").onclick = () => {
+  if (window.swekRecord && window.swekRecord.recording()) { window.swekRecord.stop(); $("rec").textContent = "\u25CF Record"; return; }
+  const secs = +($("dur").value || 20);
+  if (window.swekRecord && window.swekRecord.start(secs, canvas)) {
+    $("rec").textContent = "\u25A0 recording " + secs + "s"; $("msg").textContent = "capturing\u2026 a .webm will download";
+    setTimeout(() => { $("rec").textContent = "\u25CF Record"; $("msg").textContent = "saved (ffmpeg -i clip.webm clip.mp4)"; }, secs * 1000 + 200);
+  } else { $("msg").textContent = "no MediaRecorder here"; }
+};
+
+applyMode("river");
+frame();
+</script>
+
+<script>(function(){var h=document.getElementById("hud");if(h&&window.matchMedia&&window.matchMedia("(max-width:640px)").matches)h.classList.add("min");})();</script>
+</body>
+</html>

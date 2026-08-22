@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SweK — Path Tracer</title>
+<!-- v3473 -- THE FRONT DOOR. Six rounds built answer keys with nothing to draw; this page is what they were
+     keys FOR, and it is also what turns physics/render/*.mjs from gate-only modules into modules a PAGE calls.
+     A .mjs with no page is the CLI-only deliverable this project refuses. -->
+<style>
+  body { background:#0b0f13; color:#cfe6dd; font:13px/1.6 ui-monospace,Menlo,Consolas,monospace; margin:0; padding:16px; }
+  h1 { font-size:16px; color:#9fe6c0; margin:0 0 2px; }
+  .sub { color:#7e9a92; margin:0 0 14px; }
+  .wrap { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; }
+  canvas { image-rendering:pixelated; border:1px solid #24405a; background:#000; width:384px; height:384px; }
+  .panel { min-width:300px; max-width:520px; }
+  label { display:block; margin:7px 0 2px; color:#8fc; }
+  select, input { background:#111a22; color:#cfe6dd; border:1px solid #24405a; border-radius:4px; padding:3px 6px; font:inherit; }
+  button { background:#12303f; color:#9fe6c0; border:1px solid #2a5a72; border-radius:5px; padding:4px 12px; font:inherit; cursor:pointer; }
+  .note { color:#7e9a92; font-size:11px; margin-top:10px; border-left:3px solid #24405a; padding-left:9px; }
+  .verdict { margin-top:10px; padding:7px 9px; border-radius:5px; border:1px solid #2a5a72; }
+  .good { border-color:#2f7a55; color:#9fe6c0; } .bad { border-color:#a05040; color:#f2b8b8; }
+  a { color:#9fe6c0; }
+</style>
+</head>
+<body>
+  <h1>Path Tracer</h1>
+  <p class="sub">Monte Carlo path tracing, in JavaScript, on the CPU &mdash; <a href="/server.html">&larr; back</a></p>
+
+  <div class="wrap">
+    <div><canvas id="cv" width="128" height="128" style="width:100%;max-width:160px;height:auto"></canvas>
+      <div id="prog" class="sub" style="margin-top:6px">idle</div></div>
+
+    <div class="panel">
+      <label>Scene</label>
+      <select id="scene">
+        <option value="furnace">Furnace &mdash; grey sphere in a white sky (must look FLAT)</option>
+        <option value="gradient">Gradient sky &mdash; the same sphere, sky brightest overhead</option>
+        <option value="pair">Two spheres &mdash; one shadows the other</option>
+        <option value="enclosed">Enclosed furnace &mdash; the same sphere lit by an emitting SHELL, not by sky()</option>
+        <option value="rough">Rough metal &mdash; a GGX microfacet sphere in the white furnace (visibly DARK)</option>
+        <option value="roughcomp">Rough metal + compensation &mdash; the same sphere, and it must VANISH</option>
+      </select>
+
+      <label>Samples per pixel <span id="sppv" class="sub"></span></label>
+      <input id="spp" type="range" min="1" max="8" value="5" style="width:220px" />
+
+      <label>Max bounces <span id="depv" class="sub"></span></label>
+      <input id="dep" type="range" min="1" max="12" value="6" style="width:220px" />
+
+      <label><input type="checkbox" id="rr" /> Russian roulette (q = 0.7)</label>
+
+      <p><button id="go">Render</button> <button id="check">Run the furnace check</button></p>
+
+      <!-- v3475 -- THE REGION SCAN'S FRONT DOOR. A .mjs with no page is the CLI-only deliverable this project
+           refuses, and this tool is exactly the sort that would have got one "later". -->
+      <label>Scan a region as ground truth &mdash; centre <span id="rgv" class="sub"></span>, 256 spp</label>
+      <input id="rg" type="range" min="8" max="48" step="8" value="24" style="width:220px" />
+      <p><button id="scan">Scan region</button></p>
+      <div id="scanout"></div>
+
+      <div id="verdict"></div>
+
+      <div class="note">
+        <b>The furnace scene should be boring.</b> A diffuse sphere of albedo &rho; inside a white emitting
+        environment must render to a flat field of exactly &rho; &mdash; <b>featureless, not invisible</b>. At
+        &rho;&nbsp;=&nbsp;0.18 you see a flat grey disc against a white sky, because the sphere reflects 18% and
+        the environment emits 100%; only at &rho;&nbsp;=&nbsp;1 does it truly vanish. What must be absent is
+        <i>shading</i> &mdash; no bright side, no dark side, no gradient from edge to centre. That is the test
+        every one of these modules was graded against before this page existed, and it is the one picture where
+        seeing <i>nothing</i> is the correct result. If the sphere is visible in that scene, something is wrong.
+        <br /><br />
+        The other two scenes are there because the furnace one is <i>exact</i>: with a constant sky and a convex
+        sphere, every path escapes on its first bounce and the image has no noise at all. Turn the sky into a
+        gradient, or put a second sphere in the way, and the grain appears &mdash; that grain is Monte Carlo
+        error, and it falls as 1/&radic;N.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Ray-marching the blob &mdash; a different renderer, on purpose</h2>
+  <p class="sub" style="max-width:760px">
+    The tracer above only knows spheres: <code>intersect()</code> loops <code>raySphere</code> and nothing else,
+    so it cannot see a mesh, a voxel volume or a marching-cubes surface. A blob is a <b>metaball field</b>, and
+    the honest way to trace one is to walk the field itself. Press the button and this marches
+    <code>physics/render/sdfMarch.mjs</code> through a two-ball Wyvill field, then checks every hit against the
+    surface <code>marchingTets</code> extracts from the same field &mdash; two independent routes to one surface.
+  </p>
+  <div class="wrap">
+    <div><canvas id="mcv" width="160" height="160" style="width:100%;max-width:200px;height:auto"></canvas>
+      <div id="mprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <label>Max step <span id="msv" class="sub"></span></label>
+      <input id="ms" type="range" min="1" max="6" value="4" style="width:220px" />
+      <label><input id="raw" type="checkbox" /> step by the field value (the plant)</label>
+      <button id="mgo">March it</button>
+      <div id="mout" class="sub" style="margin-top:10px;white-space:pre-wrap"></div>
+      <div class="sub" style="margin-top:10px;max-width:420px">
+        <b>Max step is a trade and it does not go away.</b> The Newton estimate |f&nbsp;&minus;&nbsp;iso|/|&nabla;f|
+        is only a distance where the field is locally sloped, and Wyvill falloff flattens to <i>exactly zero</i>
+        outside each ball &mdash; so the estimate is degenerate right where a ray arrives. Clamping it is what
+        lets the tracer cross that dead zone; the cost is that a feature thinner than the clamp can be stepped
+        over. The overshoot is bounded by one step, and it is always <i>late</i>, never early.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Does this material conserve energy?</h2>
+  <p class="sub" style="max-width:760px">
+    The furnace above grades a <i>Lambertian</i> surface, where the answer is the albedo. That is not what the
+    white furnace test is for in practice. Its real job is this: put a <b>GGX microfacet</b> surface in the same
+    white room with <code>F = 1</code> and no absorption anywhere, and ask how much light comes back. A
+    conserving model returns exactly 1. Single-scattering GGX &mdash; what almost every renderer ships &mdash;
+    returns <i>less</i>, and the shortfall is the energy that scattering between microfacets would have given
+    back.
+  </p>
+  <div class="wrap">
+    <div class="panel">
+      <button id="mfgo">Run the furnace tests</button>
+      <label><input id="mfcomp" type="checkbox" /> add the multiple-scattering compensation (must drive E to exactly 1)</label>
+      <label><input id="mfbeck" type="checkbox" /> use Beckmann's masking function with GGX's lobe (the plant)</label>
+      <div id="mfout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+    <div class="panel" style="max-width:420px">
+      <div class="sub">
+        <b>The smooth end is the dangerous end.</b> At roughness 0.05 the surface loses 0.3% &mdash; inside any
+        tolerance anybody would write. At roughness 1.0 the <i>same model at a knob setting somebody will use</i>
+        loses about two thirds, and still looks like a plausible rough metal. The plant is the same shape: a
+        masking function borrowed from a different microfacet distribution leaves the lobe normalised, leaves the
+        picture plausible, and breaks the weak furnace test &mdash; by 0.7% at roughness 0.1 and 31% at 1.0.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Fresnel &mdash; the term the furnace test above deliberately switches off</h2>
+  <p class="sub" style="max-width:760px">
+    Everything in the energy test above runs with <code>F = 1</code>. That is not a simplification, it is the
+    only way the deficit means anything: with a real Fresnel term the missing light has been <i>transmitted</i>,
+    not lost, and a correct model would look like it was haemorrhaging energy. Here are the exact equations,
+    with the two angles that are recovered from behaviour rather than typed in.
+  </p>
+  <div class="wrap">
+    <div class="panel">
+      <label>Index pair</label>
+      <select id="frpair">
+        <option value="1,1.33">air to water &mdash; 1.00 / 1.33</option>
+        <option value="1,1.5" selected>air to glass &mdash; 1.00 / 1.50</option>
+        <option value="1,2.4">air to diamond &mdash; 1.00 / 2.40</option>
+        <option value="1.5,1">glass to air &mdash; 1.50 / 1.00 (has a critical angle)</option>
+      </select>
+      <label><input id="frswap" type="checkbox" /> use the s amplitude for p as well (the plant)</label>
+      <button id="frgo">Solve it</button>
+      <div id="frout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+    <div class="panel" style="max-width:420px">
+      <div class="sub">
+        <b>The two checks everybody writes catch nothing.</b> Normal incidence and grazing are where anyone
+        verifies a Fresnel term by hand, and the plant is <i>bit-identical</i> at both &mdash; the two
+        polarisations coincide at normal incidence and both go to 1 edge-on. Only Brewster's angle notices, and
+        it notices by exactly a factor of two. Schlick's approximation, which most real-time renderers ship, is
+        exact at both ends too &mdash; and has no polarisation in it, so Brewster's zero does not blur, it does
+        not exist.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">The same BRDF on the GPU &mdash; and the one line that only matters there</h2>
+  <p class="sub" style="max-width:760px">
+    Every gate behind this page runs in float64. GLSL <code>highp</code> is IEEE binary32, and one expression in
+    GGX is a difference of numbers near 1: <code>cos&sup2;(a&sup2;&minus;1)+1</code>. The engine now writes it as
+    <code>(1&minus;cos&sup2;)+a&sup2;cos&sup2;</code> instead &mdash; the same number, a sum of positives. In
+    double precision the two are indistinguishable, so nothing on the CPU could ever have told them apart.
+    <b>This asks your GPU.</b> It draws no picture: each pixel is one (roughness, cos) pair and the value itself
+    is the output, read back as floats and compared against the CPU module.
+  </p>
+  <div class="wrap">
+    <div><canvas id="gcv" width="256" height="192" style="width:256px;image-rendering:pixelated;width:100%;max-width:320px;height:auto"></canvas>
+      <div id="gprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <button id="ggo">Ask the GPU</button>
+      <div id="gout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+      <div class="sub" style="margin-top:10px;max-width:420px">
+        Predicted from <code>Math.fround</code>, which models binary32 exactly: the textbook form should be
+        around 2.6e-2 out at roughness 0.001 and the rewrite around 1.3e-7. <b>Those are predictions about real
+        hardware, not measurements of it</b> &mdash; <code>highp</code> is a minimum guarantee, and a driver may
+        carry more precision or fold the expression differently. If your numbers disagree with the predictions,
+        that is the interesting result and not a failure.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Three ways to light a rough surface, and none of them wins everywhere</h2>
+  <p class="sub" style="max-width:760px">
+    A rough sphere under a small light can be lit by <b>sampling the light</b> and evaluating the BRDF, by
+    <b>sampling the BRDF</b> and hoping to hit the light, or by <b>doing both and weighting them</b>. All three
+    must give the <i>same answer</i> &mdash; only the noise may differ. The measurement below is the noise, and
+    the point is that the winner changes with the regime: a near-mirror finds a big light easily and almost
+    never finds a small one, and a rough surface is the other way round.
+  </p>
+  <div class="wrap">
+    <div class="panel">
+      <button id="dsgo">Compare the three</button>
+      <label><input id="dscomp" type="checkbox" /> attach the multiple-scattering compensation (v3499)</label>
+      <div id="dsout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+    <div class="panel" style="max-width:420px">
+      <div class="sub">
+        <b>The claim for MIS is not that it wins.</b> It is rarely the best cell and it is never the worst
+        &mdash; its worst case on this grid is about 7e-3 against 1e-1 for light sampling and 3e-1 for BRDF
+        sampling. That is <i>insurance</i>, not an optimisation, and it matters because a renderer picks one
+        strategy for a whole scene and cannot know which cell each pixel is in. On a <i>diffuse</i> surface the
+        same comparison came out the other way, because a diffuse BRDF has no lobe for the second route to be
+        good at.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Colour &mdash; and why the obvious check cannot decide it</h2>
+  <p class="sub" style="max-width:760px">
+    Radiance was a scalar through this whole arc. The key everybody reaches for is that <b>a grey world must
+    return identical values per channel</b> &mdash; true, exact, and <i>not sufficient</i>, because a renderer
+    that ignored colour entirely would satisfy it. The check that decides is the other one: <b>channel k of a
+    coloured render must equal a monochrome render of that channel's own value, bit for bit</b>. The answer key
+    was already built &mdash; ten rounds of graded scalar renderer, run three times.
+  </p>
+  <div class="wrap">
+    <div><canvas id="ccv" width="140" height="140" style="width:140px;width:100%;max-width:180px;height:auto"></canvas>
+      <div id="cprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <label>Scene</label>
+      <select id="cscene">
+        <option value="diffuse">Coloured diffuse &mdash; albedo [0.90, 0.18, 0.05]</option>
+        <option value="metal">Tinted conductor &mdash; F0 [0.95, 0.64, 0.54]</option>
+        <option value="grey">Grey &mdash; the check that cannot fail</option>
+      </select>
+      <label><input id="cplant" type="checkbox" /> average the channels before multiplying (the plant)</label>
+      <button id="cgo">Render in colour</button>
+      <div id="cout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">Stratified sampling &mdash; and the pixel where it does nothing</h2>
+  <p class="sub" style="max-width:760px">
+    Jittering samples inside an <i>n&times;n</i> grid instead of drawing them freely is the oldest trick in
+    Monte Carlo rendering. The thing worth measuring is not the error &mdash; any error shrinks if you throw
+    samples at it &mdash; it is the <b>convergence exponent</b>: independent samples fall as N<sup>&minus;1/2</sup>
+    whatever you do, and a better sampler shows up as a <i>steeper slope</i>. Below, both pixels are measured,
+    because <b>stratifying a dimension only helps where the variance lives in that dimension</b>.
+  </p>
+  <div class="wrap">
+    <div class="panel">
+      <button id="stgo">Fit the exponents</button>
+      <label><input id="stplant" type="checkbox" /> drop the jitter and keep the grid (the plant)</label>
+      <label><input id="stpath" type="checkbox" /> also stratify the first BOUNCE direction (v3500)</label>
+      <div id="stout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+    <div class="panel" style="max-width:420px">
+      <div class="sub">
+        <b>The centre pixel is the trap.</b> It is roughly thirty times noisier than the edge pixel, and every
+        bit of that noise is <i>path</i> variance &mdash; the bounce directions &mdash; which stratifying the
+        pixel domain cannot touch. With a single bounce it has <i>no</i> variance at all, so the exponent there
+        is not small, it does not exist. The pixel that looks like the obvious place to measure is both the
+        loudest and the one where the answer is flat.
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">The oracle &mdash; giving render-QA a right answer instead of a threshold</h2>
+  <p class="sub" style="max-width:760px">
+    Every check in <code>render-qa/checks.mjs</code> compares a picture against a number somebody chose, because
+    there was nothing to compare it to. A converged path trace is something to compare it to. Below, a
+    Lambertian sphere is lit from a swept angle and the <b>real</b> <code>terminatorBow</code> check runs on it
+    &mdash; beside the closed form the geometry predicts: the terminator is the great circle perpendicular to
+    the light, so it projects to <code>x = R&thinsp;cos&thinsp;&theta;&thinsp;&radic;(1&minus;(y/R)&sup2;)</code>.
+    <b>Nothing in the renderer is told that curve.</b>
+  </p>
+  <div class="wrap">
+    <div><canvas id="tocv" width="160" height="160" style="width:160px;width:100%;max-width:200px;height:auto"></canvas>
+      <div id="toprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <button id="togo">Sweep the light angle</button>
+      <div id="toout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:34px">The second oracle &mdash; how much of a QA budget is spent on being round</h2>
+  <p class="sub" style="max-width:760px">
+    <code>edgeBiasProfile</code> was built to find the 1/cos ray-march signature: geometry buried more at the
+    screen edges than at the centre. Its shipped limit is <code>maxEdgeBias 0.25</code>, and its own manifest
+    note says that number is a placeholder awaiting a first real run. Here is what a <b>correct</b> sphere
+    reads &mdash; against the closed form its silhouette is, since a sphere's outline is a circle and the
+    topmost covered row per column is <code>c<sub>y</sub> &minus; &radic;(R&sup2;&minus;dx&sup2;)</code>.
+  </p>
+  <div class="wrap">
+    <div><canvas id="ebcv" width="150" height="150" style="width:150px;width:100%;max-width:190px;height:auto"></canvas>
+      <div id="ebprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <button id="ebgo">Measure the profile</button>
+      <div id="ebout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+    </div>
+  </div>
+
+<script type="module">
+import { render, coverage } from "/physics/render/pathTracer.mjs";
+import { buildTable as mkT } from "/physics/render/energyCompensation.mjs";
+// Built once at module load: the table is 24 quadratures and would stall the page if rebuilt per frame.
+const _tables = {}; const mkTable = (a) => (_tables[a] ||= mkT(a, { K: 24, N: 140, M: 140 }));
+import { scanRegion, gradeable } from "/tools/render-qa/referenceScan.mjs";
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+const sppOf = () => [1, 2, 4, 8, 16, 32, 64, 128][+$("spp").value - 1];
+const showKnobs = () => { $("sppv").textContent = sppOf(); $("depv").textContent = $("dep").value; };
+$("spp").oninput = $("dep").oninput = showKnobs; showKnobs();
+
+const RHO = 0.18;
+const SCENES = {
+  furnace:  { scene: [{ centre:[0,0,0], radius:1, albedo:RHO }], sky: () => 1 },
+  // v3489 -- THE SAME FURNACE BUILT OUT OF GEOMETRY INSTEAD OF OUT OF sky(): a uniformly emitting shell around
+  // everything, which is how an environment light is ordinarily built. It must look IDENTICAL to the furnace
+  // above -- same flat grey disc, same reading -- and from v3474 to v3488 IT RENDERED PURE BLACK, because next-
+  // event estimation skips an emitter you are standing inside and the double-count guard then suppressed the
+  // bounce ray that would have collected it. NEITHER ROUTE PICKED THE LIGHT UP.
+  // v3493 -- THE MICROFACET BSDF INSIDE trace(). The rough sphere is DARK in a white furnace because
+  // single-scattering GGX loses energy between microfacets (v3490); with the compensation table attached it
+  // must read exactly 1 and disappear, which is what v3492 predicted by quadrature. THE TWO OPTIONS BELOW ARE
+  // THE SAME SURFACE AND THE ONLY DIFFERENCE IS WHETHER THE LOST ENERGY IS GIVEN BACK.
+  rough:     { scene: [{ centre:[0,0,0], radius:1, roughness:0.8 }], sky: () => 1 },
+  roughcomp: { scene: [{ centre:[0,0,0], radius:1, roughness:0.8, msTable: mkTable(0.8) }], sky: () => 1 },
+  enclosed: { scene: [{ centre:[0,0,0], radius:1, albedo:RHO },
+                      { centre:[0,0,0], radius:40, emit:1, albedo:0 }], sky: () => 0 },
+  gradient: { scene: [{ centre:[0,0,0], radius:1, albedo:0.6 }], sky: (d) => 0.25 + 1.75 * Math.max(0, d[1]) },
+  pair:     { scene: [{ centre:[0,-0.4,0], radius:1, albedo:0.7 },
+                      { centre:[0.9,1.5,0.4], radius:0.7, albedo:0.35 }], sky: (d) => 0.3 + 1.4 * Math.max(0, d[1]) },
+};
+const CAM = { w:128, h:128, eye:[0,0,4], look:[0,0,0], fovDeg:40 };
+
+function paint(img, w, h) {
+  const d = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    // sRGB-ish, so a flat 0.18 is visible rather than nearly black. The GAMMA IS DISPLAY ONLY -- the check
+    // below reads the linear buffer, because grading a gamma-encoded number would grade the display.
+    const v = Math.min(255, Math.round(255 * Math.pow(Math.max(0, img[i]), 1 / 2.2)));
+    d.data[i*4] = d.data[i*4+1] = d.data[i*4+2] = v; d.data[i*4+3] = 255;
+  }
+  ctx.putImageData(d, 0, 0);
+}
+
+let busy = false;
+async function go() {
+  if (busy) return; busy = true;
+  const { scene, sky } = SCENES[$("scene").value];
+  const opts = { ...CAM, spp: sppOf(), maxDepth: +$("dep").value, sky, rrQ: $("rr").checked ? 0.7 : null };
+  $("prog").textContent = "rendering…";
+  await new Promise((r) => setTimeout(r, 16));
+  const t0 = performance.now();
+  const img = render(scene, { ...opts, seed: 7 });
+  paint(img, CAM.w, CAM.h);
+  $("prog").textContent = `${CAM.w}x${CAM.h} at ${opts.spp} spp, ${opts.maxDepth} bounces — ${Math.round(performance.now() - t0)} ms`;
+  busy = false;
+  return { img, scene };
+}
+$("go").onclick = go;
+
+$("check").onclick = async () => {
+  $("scene").value = "furnace";
+  const { scene, sky } = SCENES.furnace;
+  const opts = { ...CAM, spp: 64, maxDepth: 8, sky, seed: 7 };
+  $("prog").textContent = "running the furnace check…";
+  await new Promise((r) => setTimeout(r, 16));
+  const img = render(scene, opts);
+  paint(img, CAM.w, CAM.h);
+  // INTERIOR PIXELS ONLY. The mask samples pixel centres and the renderer jitters inside the pixel, so the
+  // silhouette mixes sphere and sky -- that is antialiasing, not shading, and it is excluded by name here for
+  // the same reason the gate excludes it.
+  const raw = coverage(scene, CAM);
+  let n = 0, mn = Infinity, mx = -Infinity, sum = 0;
+  for (let y = 1; y < CAM.h - 1; y++) for (let x = 1; x < CAM.w - 1; x++) {
+    let all = true;
+    for (let dy = -1; dy <= 1 && all; dy++) for (let dx = -1; dx <= 1; dx++) if (!raw[(y+dy)*CAM.w + x+dx]) { all = false; break; }
+    if (!all) continue;
+    const v = img[y*CAM.w + x]; n++; sum += v; mn = Math.min(mn, v); mx = Math.max(mx, v);
+  }
+  const mean = sum / n, ok = Math.abs(mean - RHO) < 1e-6 && (mx - mn) < 1e-6;
+  $("verdict").innerHTML = `<div class="verdict ${ok ? "good" : "bad"}">` +
+    (ok ? "PASS" : "FAIL") + ` — ${n} interior pixels read [${mn.toFixed(6)}, ${mx.toFixed(6)}], mean ${mean.toFixed(6)}, against an albedo of ${RHO}.` +
+    (ok ? " The sphere is invisible, which is the correct picture." : " The sphere should have vanished.") + `</div>`;
+  $("prog").textContent = "furnace check complete";
+};
+
+$("rg").oninput = () => { $("rgv").textContent = $("rg").value + "x" + $("rg").value; };
+$("rgv").textContent = $("rg").value + "x" + $("rg").value;
+
+$("scan").onclick = async () => {
+  const key = $("scene").value;
+  const { scene, sky } = SCENES[key];
+  const n = +$("rg").value;
+  const R = { x0: Math.round((CAM.w - n) / 2), y0: Math.round((CAM.h - n) / 2), w: n, h: n };
+  // *** THE MODE IS DECIDED BY THE SCENE, NOT BY A CHECKBOX. The furnace has a known answer so it is GRADED;
+  // anything else is an INDICATOR and is reported without a verdict. A toggle here would let somebody grade a
+  // scene that has no right answer, which is the one thing referenceScan refuses to allow. ***
+  const mode = key === "furnace" ? "graded" : "indicator";
+  $("prog").textContent = "scanning " + n + "x" + n + " at 256 spp…";
+  await new Promise((r) => setTimeout(r, 16));
+  // v3486 -- *** THE SCAN NOW HONOURS THE ROULETTE TOGGLE, AND IT DID NOT BEFORE. *** Keith rendered the
+  // furnace WITH roulette on -- visibly grainy, exactly as v3471 predicts -- and the scan beside it still read
+  // [0.180000, 0.180000] with no spread, because it silently measured WITHOUT roulette every time. A control
+  // labelled "ground truth" that quietly measures a DIFFERENT configuration from the one on screen is worse
+  // than one that is merely wrong: it agrees with the picture by luck and disagrees by luck, and nobody can
+  // tell which. THE SCAN MEASURES WHAT YOU ARE LOOKING AT, and the readout says which configuration that was.
+  const rrQ = $("rr").checked ? 0.7 : null;
+  const scan = scanRegion(scene, R, { ...CAM, spp: 256, maxDepth: 8, sky, seed: 7, mode, rrQ });
+  const v = [...scan.pixels];
+  const mn = Math.min(...v), mx = Math.max(...v), mean = v.reduce((a, b) => a + b, 0) / v.length;
+  if (gradeable(scan)) {
+    // *** THE TEST DEPENDS ON THE ESTIMATOR, AND FORGETTING THAT WOULD HAVE MANUFACTURED A FALSE FAILURE THE
+    // MOMENT THE SCAN STARTED HONOURING THE TOGGLE. Without roulette this scene is EXACT -- constant sky, convex
+    // sphere, every path escaping on its first bounce -- so demanding min == max == rho is right. WITH roulette
+    // the estimator is UNBIASED BUT NOISY BY DESIGN (v3471), so the same demand would fail a correct renderer
+    // for doing exactly what was asked of it. The MEAN is the invariant either way; the SPREAD is the thing
+    // roulette is allowed to change. ***
+    const good = rrQ
+        ? Math.abs(mean - RHO) / RHO < 0.02          // unbiased: the mean must hold, the spread may not
+        : (Math.abs(mean - RHO) < 1e-6 && (mx - mn) < 1e-6);
+    $("scanout").innerHTML = `<div class="verdict ${good ? "good" : "bad"}">GRADED &mdash; ` +
+      (good ? "PASS" : "FAIL") + `: ${v.length} px read [${mn.toFixed(6)}, ${mx.toFixed(6)}] against an albedo of ${RHO}. ` +
+      `A furnace patch has a known answer, so this is a measurement and a failure here is a defect. ` +
+      `Measured ${rrQ ? "WITH Russian roulette (q=" + rrQ + ") -- so the MEAN is checked and the spread is expected: unbiased, noisier" : "without Russian roulette -- so this scene is EXACT and min must equal max"}.</div>`;
+  } else {
+    $("scanout").innerHTML = `<div class="verdict">INDICATOR &mdash; no verdict. ${v.length} px, ` +
+      `range [${mn.toFixed(4)}, ${mx.toFixed(4)}], mean ${mean.toFixed(4)}, ${scan.ms} ms. ` +
+      `This scene has no known answer, so the numbers are here to be LOOKED AT and nothing passes or fails on them. ` +
+      `Measured ${rrQ ? "WITH Russian roulette (q=" + rrQ + ")" : "without Russian roulette"}.</div>`;
+  }
+  $("prog").textContent = `region scan complete — ${scan.ms} ms`;
+};
+
+go();
+
+/* ---- v3488: the implicit-field ray marcher, with its answer key beside it ------------------------------- */
+import { marchBalls } from "/physics/render/sdfMarch.mjs";
+import { wyvill, wyvillGrad, marchingTets, surfaceDistance } from "/physics/mesh/marchingCubes.js";
+
+const BALLS = [{ cx:-0.35, cy:0, cz:0, r:1, s:1 }, { cx:0.35, cy:0, cz:0, r:1, s:1 }];
+const ISO = 0.5;
+const maxStepOf = () => [0.5, 0.25, 0.1, 0.05, 0.02, 0.005][+$("ms").value - 1];
+const showMs = () => { $("msv").textContent = maxStepOf(); };
+$("ms").oninput = showMs; showMs();
+
+$("mgo").onclick = () => {
+  const mcv = $("mcv"), mx = mcv.getContext("2d"), W = mcv.width, H = mcv.height;
+  const img = mx.createImageData(W, H);
+  const rawStep = $("raw").checked, maxStep = maxStepOf();
+  $("mprog").textContent = "marching...";
+  // The mesh is the SECOND route and is extracted from the same field, never from the tracer's hits.
+  const mesh = marchingTets((x,y,z) => wyvill(BALLS,x,y,z), (x,y,z) => wyvillGrad(BALLS,x,y,z),
+                            { N: 48, lo: -1.6, hi: 1.6, iso: ISO });
+  const eye = [0, 0.6, 3.2], L = [-0.35, -0.18, -0.92];
+  const nrm3 = (a) => { const k = Math.hypot(a[0],a[1],a[2]) || 1; return [a[0]/k, a[1]/k, a[2]/k]; };
+  const FWD = nrm3([-eye[0], -eye[1], -eye[2]]);                       // look at the origin
+  const RGT = nrm3([FWD[2], 0, -FWD[0]]);
+  const UPV = [RGT[1]*FWD[2]-RGT[2]*FWD[1], RGT[2]*FWD[0]-RGT[0]*FWD[2], RGT[0]*FWD[1]-RGT[1]*FWD[0]];
+  let hits = 0, worst = 0, sum = 0, steps = 0, reasons = {};
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    // An explicit orthonormal basis rather than a matrix, for the same reason pathTracer.mjs uses one: a
+    // matrix hides exactly the handedness error a flat test would catch.
+    const u = (x / W * 2 - 1) * 0.55, v = (1 - y / H * 2) * 0.55;
+    const d0 = [FWD[0] + RGT[0]*u + UPV[0]*v, FWD[1] + RGT[1]*u + UPV[1]*v, FWD[2] + RGT[2]*u + UPV[2]*v];
+    const n = Math.hypot(d0[0], d0[1], d0[2]);
+    const dir = [d0[0]/n, d0[1]/n, d0[2]/n];
+    const r = marchBalls(BALLS, eye, dir, { iso: ISO, wyvill, wyvillGrad, rawStep, maxStep,
+                                            epsilon: 1e-5, maxSteps: 600 });
+    reasons[r.reason] = (reasons[r.reason] || 0) + 1;
+    const i = (y * W + x) * 4;
+    if (r.hit && r.N) {
+      steps += r.steps; hits++;
+      const sd = surfaceDistance(mesh.verts, mesh.tris, r.P);
+      worst = Math.max(worst, sd); sum += sd;
+      const lam = Math.max(0.08, -(r.N[0]*L[0] + r.N[1]*L[1] + r.N[2]*L[2]));
+      img.data[i] = 40 + 205*lam; img.data[i+1] = 60 + 170*lam; img.data[i+2] = 90 + 140*lam;
+    } else { img.data[i] = 14; img.data[i+1] = 16; img.data[i+2] = 20; }
+    img.data[i+3] = 255;
+  }
+  mx.putImageData(img, 0, 0);
+  $("mprog").textContent = hits + " of " + (W*H) + " rays hit";
+  // THE ANSWER KEY IS PRINTED WITH THE PICTURE. A blob that merely looks like a blob is not a measurement.
+  $("mout").textContent =
+    "hits           " + hits + " / " + (W*H) + "\n" +
+    "mean steps     " + (hits ? (steps/hits).toFixed(1) : "-") + "\n" +
+    "worst |hit - marchingTets surface|   " + (hits ? worst.toExponential(3) : "-") + "\n" +
+    "mean                                 " + (hits ? (sum/hits).toExponential(3) : "-") + "\n" +
+    "cell size h of the check mesh        " + (3.2/48).toExponential(3) + "\n" +
+    "outcomes       " + Object.entries(reasons).map(([k,v]) => k+" "+v).join(", ") +
+    (rawStep ? "\n\nTHE PLANT IS ON: stepping by the field value overshoots, so rays leave the scene rather than landing on the surface."
+             : "\n\nThe residual is a fraction of a mesh cell, and it is the MESH that is approximate here -- refine N and it falls while the hits do not move.");
+};
+
+/* ---- v3490: the white furnace test's actual purpose ------------------------------------------------------ */
+import { ndfIntegral, furnaceIntegral, directionalAlbedo } from "/physics/render/microfacet.mjs";
+import { buildTable, albedoAt, compensatedAlbedo } from "/physics/render/energyCompensation.mjs";
+
+$("mfgo").onclick = () => {
+  const plant = $("mfbeck").checked ? { beckmann: true } : {};
+  const A = [0.05, 0.1, 0.2, 0.4, 0.6, 1.0], C = [0.9, 0.5, 0.2];
+  const pad = (x, n) => String(x).padEnd(n);
+  let out = "roughness   INT D cos dm    weak furnace (cos_o 0.9 / 0.5 / 0.2)\n";
+  for (const a of A) {
+    const w = C.map((c) => furnaceIntegral(a, c, { N: 260, M: 260, plant }).toFixed(5)).join("  ");
+    out += "  " + pad(a, 10) + pad(ndfIntegral(a, { plant }).toFixed(6), 15) + w + "\n";
+  }
+  const comp = $("mfcomp").checked;
+  out += "\nroughness   directional albedo E   (1 = conserves energy)" + (comp ? "        + compensation\n" : "\n");
+  for (const a of A) {
+    const e = C.map((c) => directionalAlbedo(a, c, { N: 260, M: 260, plant }).toFixed(5)).join("  ");
+    let line = "  " + pad(a, 10) + e;
+    if (comp) {
+      // The compensated column is computed by INTEGRATING the lobe, never by substituting (1 - E).
+      const T = buildTable(a, { K: 24, N: 160, M: 160, plant });
+      line += "     " + C.map((c) => compensatedAlbedo(T, c, { N: 200 }).toFixed(5)).join("  ");
+    }
+    out += line + "\n";
+  }
+  if (comp) out += "\nThe right-hand block is the same surface with the multiple-scattering term added. It reads 1 at every roughness and every angle -- and that requirement was written down a round BEFORE the term existed, so nothing here got to choose what working means. It restores the ENERGY, not the distribution.\n";
+  out += plant.beckmann
+    ? "\nTHE PLANT IS ON. The lobe still normalises to 1 -- the left column is untouched -- while the weak furnace test drifts away from 1 as roughness rises. THE CHECK EVERYBODY WRITES FIRST CANNOT SEE THIS."
+    : "\nThe left column and the weak furnace test are both exactly 1 by construction. E is the measured one, and every value below 1 is energy this model does not return.";
+  $("mfout").textContent = out;
+};
+
+/* ---- v3491: Fresnel, with both angles recovered rather than typed ---------------------------------------- */
+import { fresnel as frExact, rp as frRp, schlick as frSchlick, F0of, brewsterCos, criticalCos,
+         brewsterByBisection, criticalByBisection } from "/physics/render/fresnel.mjs";
+
+$("frgo").onclick = () => {
+  const [n1, n2] = $("frpair").value.split(",").map(Number);
+  const o = $("frswap").checked ? { pForS: true } : {};
+  const F0 = F0of(n1, n2);
+  const fix = (x, n) => (x === null ? "none" : x.toFixed(n));
+  let out = "";
+  out += "F at normal incidence   " + frExact(1, n1, n2, o).R.toFixed(12) + "\n";
+  out += "  ((n1-n2)/(n1+n2))^2   " + F0.toFixed(12) + "   <- never used to compute anything above\n\n";
+  out += "Brewster, BISECTED on the sign of r_p   " + fix(brewsterByBisection(n1, n2, { o }), 12) + "\n";
+  out += "  closed form 1/sqrt(1+(n2/n1)^2)       " + fix(brewsterCos(n1, n2), 12) + "\n";
+  out += "  R_p there                             " + (frRp(brewsterCos(n1, n2), n1, n2, o) ** 2).toExponential(3) + "\n\n";
+  out += "critical angle, BISECTED on a boolean   " + fix(criticalByBisection(n1, n2), 12) + "\n";
+  out += "  closed form sqrt(1-(n2/n1)^2)         " + fix(criticalCos(n1, n2), 12) + "\n\n";
+  out += "cos_i     R_s        R_p        R      R+T-1      Schlick\n";
+  for (const c of [1, 0.9, 0.7, brewsterCos(n1, n2), 0.4, 0.2, 0.05]) {
+    const f = frExact(c, n1, n2, o);
+    out += "  " + c.toFixed(4) + "  " + f.Rs.toFixed(6) + "  " + f.Rp.toFixed(6) + "  " + f.R.toFixed(6) +
+           "  " + (f.tir ? "   (TIR)  " : (f.R + f.T - 1).toExponential(1).padStart(9)) +
+           "  " + frSchlick(c, F0).toFixed(6) + "\n";
+  }
+  out += o.pForS
+    ? "\nTHE PLANT IS ON. Normal incidence and grazing are unchanged to the last bit. The Brewster row is exactly twice what it should be, and the bisection reports NO Brewster angle at all, because r_s never changes sign."
+    : "\nThe fourth row IS Brewster's angle. R_p is exactly zero there and the unpolarised value is exactly half R_s -- a minimum, never a zero, which is why a renderer working in unpolarised light cannot find this angle.";
+  $("frout").textContent = out;
+};
+
+/* ---- v3494: the GGX shader, asked in the only precision that can answer -------------------------------- */
+import { VERT_SRC as GV, FRAG_SRC_GGX, FRAG_SRC_GGX_NAIVE } from "/render/microfacetShader.js";
+import { D as cpuD, G2 as cpuG2 } from "/physics/render/microfacet.mjs";
+
+$("ggo").onclick = () => {
+  const cv = $("gcv"), W = cv.width, H = cv.height;
+  const gl = cv.getContext("webgl2", { antialias: false });
+  if (!gl) { $("gout").textContent = "no webgl2 context on this canvas"; return; }
+  // *** REFUSED BY NAME, NOT SILENTLY DEGRADED. An 8-bit readback quantises to 1/255 and every number this
+  // page is looking for is smaller than that -- without a float target it would report perfect agreement on a
+  // broken shader. A capability, not a failure.
+  if (!gl.getExtension("EXT_color_buffer_float")) {
+    $("gout").textContent = "EXT_color_buffer_float is not available here.\nThis measurement needs a float colour buffer: an 8-bit readback\nquantises to 1/255 and every difference being looked for is smaller\nthan that, so the answer would be a comfortable zero on any shader.";
+    return;
+  }
+  const mk = (frag) => {
+    const p = gl.createProgram();
+    for (const [type, src] of [[gl.VERTEX_SHADER, GV], [gl.FRAGMENT_SHADER, frag]]) {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      gl.attachShader(p, s);
+    }
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  };
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+    $("gout").textContent = "the float framebuffer is not complete on this driver"; return;
+  }
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const run = (frag) => {
+    const p = mk(frag); gl.useProgram(p);
+    gl.uniform2f(gl.getUniformLocation(p, "uGrid"), W, H);
+    gl.uniform2f(gl.getUniformLocation(p, "uAlphaRange"), 1.0, 0.001);
+    gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const buf = new Float32Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, buf);
+    return buf;
+  };
+  let out = "";
+  try {
+    const runs = { rewritten: run(FRAG_SRC_GGX), textbook: run(FRAG_SRC_GGX_NAIVE) };
+    // Bucket by roughness decade. THE ROUGHNESS AND COS ARE READ OUT OF THE SHADER'S OWN OUTPUT (b and a
+    // channels) rather than recomputed here -- a second copy of the mapping is a second declaration, and it
+    // would be the thing that disagrees rather than the arithmetic under test.
+    const buckets = [[1, 0.1], [0.1, 0.01], [0.01, 0.001]];
+    out += "roughness band     rewritten worst rel   textbook worst rel   (D)\n";
+    for (const [hi, lo] of buckets) {
+      const w = {};
+      for (const k of Object.keys(runs)) {
+        let worst = 0;
+        for (let i = 0; i < W * H; i++) {
+          const a = runs[k][i * 4 + 2], c = runs[k][i * 4 + 3];
+          if (!(a <= hi && a > lo) || c <= 0.02) continue;
+          const ref = cpuD(c, a);
+          if (ref > 0) worst = Math.max(worst, Math.abs(runs[k][i * 4] / ref - 1));
+        }
+        w[k] = worst;
+      }
+      out += "  " + (lo + " .. " + hi).padEnd(17) + w.rewritten.toExponential(2).padStart(14) +
+             w.textbook.toExponential(2).padStart(21) + "\n";
+    }
+    let g2worst = 0;
+    for (let i = 0; i < W * H; i++) {
+      const a = runs.rewritten[i * 4 + 2], c = runs.rewritten[i * 4 + 3];
+      if (c <= 0.02) continue;
+      g2worst = Math.max(g2worst, Math.abs(runs.rewritten[i * 4 + 1] - cpuG2(c, c, a)));
+    }
+    out += "\nG2 worst absolute difference (no cancellation in it): " + g2worst.toExponential(2);
+    out += "\n\nPredicted from binary32: textbook ~2.6e-2 in the lowest band, rewrite ~1.3e-7.\n" +
+           "If your driver disagrees, that IS the result -- highp is a minimum guarantee and a\n" +
+           "vendor may carry more precision or fold the expression differently.";
+    $("gprog").textContent = W + "x" + H + " cells, both shaders, read back as floats";
+  } catch (e) { out = "shader error: " + e.message; }
+  $("gout").textContent = out;
+};
+
+/* ---- v3495: the three direct-lighting strategies, measured rather than argued -------------------------- */
+import { trace as dsTrace } from "/physics/render/pathTracer.mjs";
+import { rng as dsRng } from "/physics/render/furnace.mjs";
+import { buildTable as dsBuild } from "/physics/render/energyCompensation.mjs";
+const _dsT = {}; const dsTable = (a) => (_dsT[a] ||= dsBuild(a, { K: 16, N: 120, M: 120 }));
+
+$("dsgo").onclick = () => {
+  const EYE = [1.5, 0, 2.6], VDIR = [-0.5, 0, -0.866], MIR = [-0.5, 0, 0.866];
+  // THE LIGHT SITS ON THE MIRROR DIRECTION. Off it, the BRDF route can never reach the light and returns a
+  // constant zero -- which looks like perfect precision and would win any ranking.
+  const shade = (a, r, mode, N, seed) => {
+    const R = 2000, C = [MIR[0] * 3, 0, MIR[2] * 3];
+    // v3499 -- the compensated surface under a light. THE POINT IS THAT THE THREE COLUMNS STILL AGREE:
+    // v3495 REFUSED this combination, and the refusal being closed is only visible as three matching numbers.
+    const surf = { centre: [0, 0, -R], radius: R, roughness: a };
+    if ($("dscomp").checked) surf.msTable = dsTable(a);
+    const sc = [surf, { centre: C, radius: r, emit: 4, albedo: 0 }];
+    const rr = dsRng(seed); let s = 0;
+    for (let i = 0; i < N; i++) s += dsTrace(EYE, VDIR, sc, rr, { maxDepth: 3, sky: () => 0, direct: mode });
+    return s / N;
+  };
+  const stat = (a, r, mode) => {
+    const v = []; for (let s = 1; s <= 12; s++) v.push(shade(a, r, mode, 2500, s));
+    const m = v.reduce((x, y) => x + y, 0) / v.length;
+    return { m, relSd: Math.sqrt(v.reduce((x, y) => x + (y - m) ** 2, 0) / v.length) / Math.max(1e-12, m) };
+  };
+  const MODES = ["bsdf", "nee", "mis"];
+  const cells = [[0.02, 0.2], [0.05, 0.2], [0.2, 0.2], [0.6, 0.2], [0.02, 1.0], [0.2, 1.0], [0.6, 1.0]];
+  let out = "rough  lightR   mean bsdf / nee / mis            rel sd bsdf / nee / mis        best\n";
+  const worst = { bsdf: 0, nee: 0, mis: 0 };
+  for (const [a, r] of cells) {
+    const s = {}; for (const m of MODES) { s[m] = stat(a, r, m); worst[m] = Math.max(worst[m], s[m].relSd); }
+    const best = [...MODES].sort((x, y) => s[x].relSd - s[y].relSd)[0];
+    out += "  " + String(a).padEnd(6) + String(r).padEnd(8) +
+           MODES.map((m) => s[m].m.toFixed(4)).join(" / ").padEnd(30) +
+           MODES.map((m) => s[m].relSd.toExponential(1)).join(" / ").padEnd(26) + best + "\n";
+  }
+  // v3507 -- THE THIRD NUMBER, AND THE ONE THAT DECIDES WHETHER NEIGHBOURS SHARE A MISTAKE. lag-1
+  // autocorrelation of the per-pixel error: near zero means the noise is noise.
+  out += "\nlag-1 neighbour autocorrelation of the error (near zero = independent):\n";
+  {
+    const SC = [{ centre:[0,0,-2000], radius:2000, albedo:0.9 }];
+    const SKY = (d) => (d[1] > 0.35 && d[1] < 0.55 ? 6 : 0.05);
+    const BW = 24, BH = 24;
+    const one = (o, seed) => render(SC, { w:BW, h:BH, eye:[0,0,4], look:[0,0,0], fovDeg:34, maxDepth:2, sky:SKY, spp:16, seed, ...o });
+    const ac = (o) => {
+      const R = new Float64Array(BW*BH);
+      for (let s = 100; s < 130; s++) { const v = one(o, s); for (let i = 0; i < v.length; i++) R[i] += v[i]/30; }
+      let num = 0, den = 0;
+      for (let s = 1; s <= 8; s++) { const v = one(o, s);
+        for (let y = 2; y < BH-2; y++) for (let x = 2; x < BW-3; x++) {
+          const a = v[y*BW+x]-R[y*BW+x], b = v[y*BW+x+1]-R[y*BW+x+1]; num += a*b; den += a*a; } }
+      return num/den;
+    };
+    const S = { pathStrat:true, stratDepth:1 };
+    out += "  free " + ac({}).toFixed(4) + "   stratified+shuffle " + ac(S).toFixed(4) +
+           "   NO shuffle " + ac({ ...S, plantNoShuffle:true }).toFixed(4) + "\n";
+  }
+  out += "\nworst anywhere: " + MODES.map((m) => m + " " + worst[m].toExponential(2)).join("   ");
+  out += "\n\nThe means must agree down every row -- that is the correctness claim, and the\n" +
+         "spread beside them is the only thing that separates the three. MIS is rarely\n" +
+         "the best cell and never the worst, which is the whole argument for it.";
+  $("dsout").textContent = out;
+};
+
+/* ---- v3497: colour, with the identity printed beside the picture --------------------------------------- */
+$("cgo").onclick = () => {
+  const CAM = { w: 60, h: 60, spp: 48, seed: 5, eye: [0, 0, 4], look: [0, 0, 0], fovDeg: 40, maxDepth: 6, sky: () => 1 };
+  const plant = $("cplant").checked;
+  const kind = $("cscene").value;
+  const VALS = kind === "diffuse" ? [0.9, 0.18, 0.05] : kind === "metal" ? [0.95, 0.64, 0.54] : [0.42, 0.42, 0.42];
+  const sc = (v) => (kind === "metal" ? [{ centre: [0,0,0], radius: 1, roughness: 0.3, F0: v }]
+                                      : [{ centre: [0,0,0], radius: 1, albedo: v }]);
+  $("cprog").textContent = "rendering...";
+  const rgb = render(sc(VALS), { ...CAM, rgb: true, plantMeanAlbedo: plant });
+  const cv = $("ccv"), cx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const img = cx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const sx = Math.min(CAM.w - 1, Math.floor(x * CAM.w / W)), sy = Math.min(CAM.h - 1, Math.floor(y * CAM.h / H));
+    const s = (sy * CAM.w + sx) * 3, i = (y * W + x) * 4;
+    // sRGB-ish only for display. THE PICTURE IS NOT THE CHECK -- the numbers below it are.
+    for (let k = 0; k < 3; k++) img.data[i + k] = Math.round(255 * Math.min(1, Math.pow(rgb[s + k], 1 / 2.2)));
+    img.data[i + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  // THE IDENTITY: three monochrome runs against the one coloured pass, compared BIT FOR BIT.
+  let mism = 0, worst = 0;
+  for (let k = 0; k < 3; k++) {
+    const mono = render(sc(VALS[k]), { ...CAM, plantMeanAlbedo: plant });
+    for (let i = 0; i < mono.length; i++)
+      if (rgb[i * 3 + k] !== mono[i]) { mism++; worst = Math.max(worst, Math.abs(rgb[i * 3 + k] - mono[i])); }
+  }
+  let greyEq = 0, tot = 0;
+  for (let i = 0; i < rgb.length; i += 3) { tot++; if (rgb[i] === rgb[i+1] && rgb[i+1] === rgb[i+2]) greyEq++; }
+  $("cprog").textContent = CAM.w + "x" + CAM.h + " at " + CAM.spp + " spp";
+  $("cout").textContent =
+    "channel k vs a monochrome run of value k\n" +
+    "  mismatching channel-pixels   " + mism + " of " + (CAM.w * CAM.h * 3) + "\n" +
+    "  worst difference             " + (mism ? worst.toExponential(3) : "0") + "\n\n" +
+    "pixels with all three channels equal\n" +
+    "  " + greyEq + " of " + tot + "\n\n" +
+    (plant
+      ? "THE PLANT IS ON. On the grey scene every number below is unchanged to within\nmachine precision -- a grey fixture cannot decide this. On either coloured\nscene the three channels have collapsed onto one, and the picture is still a\nperfectly plausible sphere."
+      : "The identity holds bit for bit because colour costs NO RANDOM NUMBERS: every\nrandom decision here is channel-independent, so the three channels walk one\npath and differ only in what they multiply.");
+};
+
+/* ---- v3498: the convergence exponent, fitted at two pixels ---------------------------------------------- */
+$("stgo").onclick = () => {
+  const SC = [{ centre: [0,0,0], radius: 1, albedo: 0.6 }];
+  const B = { w: 32, h: 32, eye: [0,0,4], look: [0,0,0], fovDeg: 40, sky: (d) => 0.25 + 1.75 * Math.max(0, d[1]) };
+  const SPP = [4, 16, 64, 256], SEEDS = 24;
+  const plant = $("stplant").checked;
+  const stat = (x, y, spp, o) => {
+    const v = [];
+    for (let s = 1; s <= SEEDS; s++) v.push(render(SC, { ...B, spp, seed: s, region: { x0:x, y0:y, w:1, h:1 }, ...o })[0]);
+    const m = v.reduce((a,b) => a+b, 0) / v.length;
+    return { m, sd: Math.sqrt(v.reduce((a,b) => a + (b-m)**2, 0) / v.length) };
+  };
+  const expo = (x, y, o) => {
+    const ys = SPP.map((n) => stat(x, y, n, o).sd);
+    if (ys.some((v) => v === 0)) return { e: null, ys };
+    const lx = SPP.map(Math.log), ly = ys.map(Math.log), n = SPP.length;
+    const mx = lx.reduce((a,b)=>a+b)/n, my = ly.reduce((a,b)=>a+b)/n;
+    return { e: lx.reduce((a,v,i)=>a+(v-mx)*(ly[i]-my),0) / lx.reduce((a,v)=>a+(v-mx)**2,0), ys };
+  };
+  // The edge pixel is FOUND, not chosen: the first place the coverage mask changes.
+  const m = coverage(SC, { ...B, spp: 1 });
+  let EDGE = [12, 4];
+  outer: for (let y = 1; y < 31; y++) for (let x = 1; x < 31; x++)
+    if (m[y*32+x] !== m[y*32+x+1] || m[y*32+x] !== m[(y+1)*32+x]) { EDGE = [x, y]; break outer; }
+  // v3500 -- THE GAIN COLUMN IS BESIDE THE EXPONENT ON PURPOSE: stratifying the bounce buys a CONSTANT
+  // FACTOR and moves the exponent NOT AT ALL, so a page showing only the slope reports it as nothing.
+  let out = "pixel            depth  uniform    stratified   sd at 4 spp   gain at 256\n";
+  for (const [lbl, pt] of [["centre [16,16]", [16,16]], ["edge   [" + EDGE + "]", EDGE]])
+    for (const depth of [1, 3]) {
+      const ps = $("stpath").checked;
+      const o = { maxDepth: depth }, os = { maxDepth: depth, strat: true, plantNoJitter: plant, pathStrat: ps, stratDepth: 1 };
+      const u = expo(pt[0], pt[1], o), s = expo(pt[0], pt[1], os);
+      out += "  " + lbl.padEnd(16) + String(depth).padEnd(7) +
+             (u.e === null ? "  none  " : u.e.toFixed(3).padStart(8)) + "   " +
+             (s.e === null ? "  none  " : s.e.toFixed(3).padStart(8)) + "     " +
+             u.ys[0].toExponential(2) + "   gain " + (u.ys[3] / s.ys[3]).toFixed(2) + "x\n";
+    }
+  out += "\n" + (plant
+    ? "THE PLANT IS ON. At the edge the exponent has collapsed toward zero -- the error\nstops falling however many samples you add, because the silhouette crosses each\nstratum at a fixed fraction. The VALUE at any one sample count still looks fine."
+    : "'none' means the standard deviation was exactly zero: with one bounce, every\nsample in that pixel hits the same surface and returns the same number. There is\nno pixel-area integral there to stratify, so the exponent does not exist.");
+  $("stout").textContent = out;
+};
+
+/* ---- v3501: the render-QA oracle ------------------------------------------------------------------------ */
+import { terminatorBow as toBow } from "/tools/render-qa/checks.mjs";
+
+$("togo").onclick = () => {
+  const W = 160, H = 160, CX = (W-1)/2, CY = (H-1)/2, DIST = 60, RL = 6;
+  const CAM = { w: W, h: H, eye: [0,0,4], look: [0,0,0], fovDeg: 29.0, maxDepth: 2, sky: () => 0 };
+  const RG = { x0: 0.04, x1: 0.96, y0: 0.10, y1: 0.90 };
+  const X0 = Math.round(RG.x0*W), X1 = Math.round(RG.x1*W), Y0 = Math.round(RG.y0*H), Y1 = Math.round(RG.y1*H);
+  // The disc radius is MEASURED from the coverage mask, never derived from the fov.
+  const mask = coverage([{ centre:[0,0,0], radius:1 }], { ...CAM, spp:1, seed:1 });
+  let RP = 0; for (let x = 0; x < W; x++) if (mask[Math.round(CY)*W + x]) RP = Math.max(RP, Math.abs(x-CX));
+  const shot = (t, spp) => {
+    const buf = render([{ centre:[0,0,0], radius:1, albedo:0.9 },
+                        { centre:[Math.sin(t)*DIST, 0, Math.cos(t)*DIST], radius:RL, emit:1, albedo:0 }],
+                       { ...CAM, spp, seed:3 });
+    let mx = 0; for (const v of buf) mx = Math.max(mx, v);
+    const d = new Uint8Array(W*H*4);
+    for (let i = 0; i < W*H; i++) { const v = Math.round(255*Math.min(1, buf[i]/mx)); d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=255; }
+    return { data:d, width:W, height:H };
+  };
+  const predict = (t) => {
+    const NL = (x,y) => { const u=(x-CX)/RP, v=(y-CY)/RP, s=1-u*u-v*v; return s<=0?null:u*Math.sin(t)+Math.sqrt(s)*Math.cos(t); };
+    const xs = [];
+    for (let y = Y0; y < Y1; y++) { let prev=null, c=null;
+      for (let x = X0; x < X1; x++) { const n = NL(x,y); if (n===null) { prev=null; continue; }
+        const val = Math.max(0,n); if (prev!==null && ((prev<1e-9)!==(val<1e-9))) { c=x; break; } prev=val; }
+      if (c!==null) xs.push((c-X0)/(X1-X0)); }
+    return xs.length>1 ? Math.max(...xs)-Math.min(...xs) : 0;
+  };
+  $("toprog").textContent = "tracing...";
+  let out = "light angle   predicted bow   measured bow   difference\n";
+  let last = null;
+  for (const deg of [30, 50, 70, 90]) {
+    const t = deg*Math.PI/180, img = shot(t, 160), r = toBow(img, RG), p = predict(t);
+    last = img;
+    out += "  " + (deg + "\u00b0").padEnd(13) + p.toFixed(4).padStart(8) + "      " +
+           (r.bow !== undefined ? r.bow.toFixed(4) : "  ---  ").padStart(8) + "     " +
+           (r.bow !== undefined ? Math.abs(r.bow-p).toFixed(4) : "--") + "\n";
+  }
+  out += "\nAt 90 degrees the terminator is a straight vertical line and the predicted bow\n" +
+         "is EXACTLY zero -- so the shipped manifest threshold (minBow 0.05, 'a flat disc,\n" +
+         "not a sphere') would fail a correct sphere lit from the side. The small residual\n" +
+         "is the light's own angular size: a 6-unit light at 60 units is a penumbra, not a line.";
+  const cx = $("tocv").getContext("2d"), im = cx.createImageData(W, H);
+  im.data.set(last.data); cx.putImageData(im, 0, 0);
+  $("toprog").textContent = W + "x" + H + ", last angle shown";
+  $("toout").textContent = out;
+};
+
+/* ---- v3502: the edgeBiasProfile oracle ------------------------------------------------------------------ */
+import { edgeBiasProfile as ebProf } from "/tools/render-qa/checks.mjs";
+
+$("ebgo").onclick = () => {
+  const W = 150, H = 150, CX = (W-1)/2, CY = (H-1)/2;
+  const CAM = { w:W, h:H, eye:[0,0,4], look:[0,0,0], fovDeg:34, maxDepth:2, sky:()=>0.02 };
+  const RG = { x0:0.02, x1:0.98, y0:0.02, y1:0.98 };
+  const X0 = Math.round(RG.x0*W), X1 = Math.round(RG.x1*W), Y0 = Math.round(RG.y0*H), Y1 = Math.round(RG.y1*H);
+  const shot = (sc, o={}) => {
+    const b = render(sc, { ...CAM, spp:20, seed:3, ...o });
+    let mx = 0; for (const v of b) mx = Math.max(mx, v);
+    const d = new Uint8Array(W*H*4);
+    for (let i = 0; i < W*H; i++) { const v = Math.round(255*Math.min(1, b[i]/mx)); d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=255; }
+    return { data:d, width:W, height:H };
+  };
+  const mask = coverage([{ centre:[0,0,0], radius:1 }], { ...CAM, spp:1, seed:1 });
+  let RP = 0; for (let x = 0; x < W; x++) if (mask[Math.round(CY)*W + x]) RP = Math.max(RP, Math.abs(x-CX));
+  // the closed form, walked exactly as the check walks the image
+  const predict = () => {
+    const Wr = X1-X0, Hr = Y1-Y0, step = Math.max(1, Math.floor(Wr/48)), prof = [];
+    for (let x = X0; x < X1; x += step) { const dx = x-CX; if (Math.abs(dx) >= RP) continue;
+      prof.push({ u: ((x-X0)/Wr)*2-1, top: (CY - Math.sqrt(RP*RP - dx*dx) - Y0)/Hr }); }
+    const avg = (a) => a.reduce((n,v)=>n+v,0)/a.length;
+    const m = avg(prof.filter(p=>Math.abs(p.u)<0.25).map(p=>p.top));
+    const L = avg(prof.filter(p=>p.u<=-0.6).map(p=>p.top)), R = avg(prof.filter(p=>p.u>=0.6).map(p=>p.top));
+    return ((L+R)/2) - m;
+  };
+  const sph = (l) => [{ centre:[0,0,0], radius:1, albedo:0.95 }, { centre:l, radius:1.2, emit:6, albedo:0 }];
+  $("ebprog").textContent = "tracing...";
+  let out = "scene                     edgeBias   asymmetry\n";
+  const head = shot(sph([0,0,6])), rh = ebProf(head, RG);
+  out += "  headlit sphere          " + rh.edgeBias.toFixed(4).padStart(8) + "   " + rh.asymmetry.toFixed(4) + "\n";
+  for (const l of [[3,4,3], [-3,4,3]]) {
+    const r = ebProf(shot(sph(l)), RG);
+    out += ("  sphere, light " + JSON.stringify(l)).padEnd(26) + r.edgeBias.toFixed(4).padStart(8) + "   " + r.asymmetry.toFixed(4) + "\n";
+  }
+  const slab = [{ centre:[0,-2001,0], radius:2000, albedo:0.95 }, { centre:[0,4,6], radius:1.2, emit:6, albedo:0 }];
+  const rs = ebProf(shot(slab, { eye:[0,1.2,4] }), RG);
+  out += "  flat slab (the zero)    " + rs.edgeBias.toFixed(4).padStart(8) + "   " + rs.asymmetry.toFixed(4) + "\n";
+  out += "\nclosed form for the circle: " + predict().toFixed(4) + "   shipped limit: 0.25\n\n" +
+         "A CORRECT sphere spends most of the budget on being round. The limit is not a\n" +
+         "statement about the 1/cos artefact it was written for -- it is a statement about\n" +
+         "the SHAPE in frame. And moving the light alone moves both numbers, because the\n" +
+         "check finds the topmost NON-BACKGROUND row: an unlit limb reads as background.";
+  const cx = $("ebcv").getContext("2d"), im = cx.createImageData(W, H);
+  im.data.set(head.data); cx.putImageData(im, 0, 0);
+  $("ebprog").textContent = "headlit sphere shown";
+  $("ebout").textContent = out;
+};
+</script>
+</body>
+</html>

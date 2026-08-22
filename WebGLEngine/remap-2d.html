@@ -1,0 +1,110 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Limiting in two dimensions - the prediction that was wrong (v3635)</title>
+<meta name="demo:desc" content="In 2D a slope becomes a gradient and the corners add both at once - so per-axis limiting should fail, and it does not: the corner takes half of each slope and the mean of two numbers never exceeds their max. The guarantee is tight, ends at the cell wall, and what breaks it is the smooth field, not the step.">
+<style>
+ html,body{margin:0;background:#0b0d12;color:#d5dcea;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+ #w{padding:14px 18px 60px;max-width:1020px}
+ h1{font-size:15px;margin:0 0 4px} h2{font-size:12px;margin:22px 0 6px;color:#9ab6e8;letter-spacing:.5px}
+ .sub,.note{color:#7c88a0;max-width:900px}
+ .panel{border:1px solid #232b3d;padding:10px 12px;margin:8px 0;background:#0e1219}
+ button{background:#182034;color:#d5dcea;border:1px solid #2e3c5a;padding:5px 10px;font:inherit;cursor:pointer;margin:2px 4px 2px 0}
+ button:hover{background:#1f2942} button.good{border-color:#3a6a8e}
+ table{border-collapse:collapse;margin:6px 0;width:100%} td,th{padding:2px 12px 2px 0;text-align:left;vertical-align:top}
+ th{color:#7c88a0;font-weight:normal;border-bottom:1px solid #232b3d}
+ .ok{color:#8fe0a8} .bad{color:#f0a8a0} .warn{color:#e8c49a} .dim{color:#68748c}
+ .law{color:#9fb0cc;border-left:3px solid #2e3c5a;padding-left:10px;margin:8px 0;max-width:900px}
+ code{color:#a8c8f0} canvas{border:1px solid #232b3d;display:block;image-rendering:pixelated}
+ .row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:6px 0}
+ .maps{display:flex;gap:10px;flex-wrap:wrap} .cap{color:#7c88a0;font-size:11px;margin:2px 0 8px}
+ select{background:#0c1018;color:#d5dcea;border:1px solid #2e3c5a;padding:3px 6px;font:inherit}
+</style></head><body><div id="w">
+<h1>Limiting in two dimensions</h1>
+<div class="sub">In 1D the limiter bought monotonicity <b>exactly</b> &mdash; zero new extrema, an exact boolean. In 2D
+a slope becomes a <b>gradient</b>, and the reconstruction's <b>corners add both slopes at once</b>, which 1D has no
+equivalent of. So per-axis limiting should escape the neighbourhood.</div>
+<div class="law"><b>It does not, and that is the round.</b> The corner offsets are &plusmn;&frac12; in <i>each</i>
+axis, so a corner takes <b>half</b> of each slope. With <code>|s<sub>x</sub>| &le; d<sub>x</sub></code> and
+<code>|s<sub>y</sub>| &le; d<sub>y</sub></code> the worst corner excess is
+<code>(d<sub>x</sub>+d<sub>y</sub>)/2</code> against a half-span of <code>max(d<sub>x</sub>,d<sub>y</sub>)</code>
+&mdash; and <b>the mean of two numbers never exceeds their maximum</b>. Two lines, and the prediction this round was
+built on is refuted.</div>
+<h2>1. Four gradients on one field</h2>
+<div class="panel">
+  <div class="row"><label>field <select id="fld"><option value="bump">smooth bump</option>
+    <option value="step">diagonal step</option></select></label>
+    <button id="go" class="good">refine and count escapes</button></div>
+  <div class="maps" id="maps"></div>
+  <table id="t"></table>
+</div>
+<div class="law"><b>The bound is attained, not comfortable.</b> Evaluated at the cell's own corner, minmod does
+produce escapes &mdash; and they are <b>one ulp</b>. <code>(d<sub>x</sub>+d<sub>y</sub>)/2 =
+max(d<sub>x</sub>,d<sub>y</sub>)</code> exactly whenever the two differences are equal, so the guarantee holds with
+<b>zero margin</b>. The clean zero above comes from subcell centres sitting strictly inside the cell &mdash; at
+ratio 4 the outermost is at 0.375, not 0.5.</div>
+<h2>2. Where the guarantee actually ends</h2>
+<div class="panel"><button id="sweep" class="good">walk the reconstruction out of its cell</button><table id="t2"></table></div>
+<div class="law"><b>The guarantee is about the cell, not about the slope.</b> At an offset of 1 &mdash; the
+neighbouring cell centre, which is where an unsplit corner-transport step samples &mdash; per-axis minmod escapes
+its own neighbourhood by <b>a third of the local span</b>. Barth&ndash;Jespersen buys nothing out there either,
+because its constraint is stated on the same corners.</div>
+<div class="law"><b>And the field that breaks it is the smooth one.</b> On a diagonal step minmod zeroes the slope
+at the discontinuity and never leaves, at <i>any</i> offset. A step is the fixture everyone reaches for when testing
+a limiter, and it is the one that cannot show this.</div>
+<div class="law">Graded by <code>physics/em/remap2d-selfcheck.mjs</code> from
+<a href="/gates.html" style="color:#9ab6e8">gates.html</a>. The 1D round is
+<a href="/remap-order.html" style="color:#9ab6e8">remap order</a> &mdash; and its third-order result for the
+unlimited slope <b>does not transfer</b>: 2D measures ~2.2, because the cross term survives the cancellation that
+made 1D third order.</div>
+<script type="module">
+import { refineCells2d, analyticCells2d, newExtrema2d, refineAccuracy2d, escapesAt, diagonalStep } from "/physics/em/remap2d.mjs";
+const $=(i)=>document.getElementById(i);
+const MODES=["none","centered","minmod","bj"];
+const N=41, bump=(x,y)=>Math.exp(-((x-20)**2+(y-20)**2)/80);
+const rows=(el,head,data)=>{el.innerHTML="<tr>"+head.map(h=>"<th>"+h+"</th>").join("")+"</tr>"+
+  data.map(r=>"<tr>"+r.map(c=>"<td>"+c+"</td>").join("")+"</tr>").join("");};
+const field=()=>$("fld").value==="step"?diagonalStep(N):analyticCells2d(bump,N,N,{});
+$("go").onclick=()=>{
+  const u=field(), r=4, NX=N*r;
+  $("maps").innerHTML="";
+  let lo=Infinity,hi=-Infinity;for(const v of u){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  for(const m of MODES){
+    const f=refineCells2d(u,N,N,r,m);
+    const wrap=document.createElement("div");
+    const cv=document.createElement("canvas");cv.width=NX;cv.height=NX;cv.style.width="230px";cv.style.height="230px";
+    const g=cv.getContext("2d"),img=g.createImageData(NX,NX);
+    for(let k=0;k<NX*NX;k++){const v=f[k];const t=(v-lo)/((hi-lo)||1);
+      const out=v>hi+1e-12||v<lo-1e-12;
+      img.data[4*k]=out?255:Math.round(255*Math.min(1,Math.max(0,t)));
+      img.data[4*k+1]=out?40:Math.round(200*Math.min(1,Math.max(0,t*0.85)));
+      img.data[4*k+2]=out?40:Math.round(255*Math.min(1,Math.max(0,0.5-Math.abs(t-0.4))));
+      img.data[4*k+3]=255;}
+    g.putImageData(img,0,0);
+    const cap=document.createElement("div");cap.className="cap";
+    const e=newExtrema2d(u,N,N,r,m);
+    cap.innerHTML=m+" &mdash; "+(e.count?("<span class='bad'>"+e.count+" escapes, "+(100*e.relative).toFixed(2)+"%</span>"):"<span class='ok'>none</span>");
+    wrap.appendChild(cv);wrap.appendChild(cap);$("maps").appendChild(wrap);}
+  const out=MODES.map(m=>{const e=newExtrema2d(u,N,N,r,m);
+    return [m,e.count?"<span class='bad'>"+e.count+"</span>":"<span class='ok'>0</span>",
+      (100*e.relative).toFixed(4)+"%",
+      m==="centered"?"unlimited":m==="none"?"first order, cannot overshoot":"limited"];});
+  rows($("t"),["gradient","new extrema vs own 5-point neighbourhood","worst","note"],out);
+};
+$("sweep").onclick=()=>{
+  const u=analyticCells2d(bump,N,N,{}), st=diagonalStep(N), out=[];
+  for(const off of [0.5,0.75,1.0]){
+    for(const m of ["minmod","bj","centered"]){
+      const s=escapesAt(u,N,N,m,off), d=escapesAt(st,N,N,m,off);
+      out.push(["offset "+off.toFixed(2)+", "+m,
+        "<span class='"+(s.relative>0.01?"bad":"ok")+"'>"+s.count+" ("+(100*s.relative).toFixed(2)+"%)</span>",
+        "<span class='"+(d.relative>0.01?"bad":"ok")+"'>"+d.count+" ("+(100*d.relative).toFixed(2)+"%)</span>",
+        off===0.5?"the cell's own corner":off===1?"the neighbouring cell centre":""]);}}
+  const orders=["none","centered","minmod","bj"].map(m=>{
+    const errs=[4,2,1].map(h=>refineAccuracy2d((x,y)=>Math.exp(-((x-80)**2+(y-80)**2)/1200),
+      Math.round(160/h)+1,Math.round(160/h)+1,2,{h,mode:m}).relative);
+    const o=Math.log2(errs[1]/errs[2]);
+    return [m+" (order)",errs.map(e=>e.toExponential(2)).join(" "),o.toFixed(3),
+      m==="centered"?"<span class='warn'>1D read 3.00 &mdash; does not transfer</span>":""];});
+  rows($("t2"),["what","smooth bump","diagonal step","note"],out.concat(orders));
+};
+</script>
+</div></body></html>

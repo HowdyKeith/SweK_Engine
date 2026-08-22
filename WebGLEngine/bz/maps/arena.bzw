@@ -1,0 +1,309 @@
+# arena.bzw -- an original map, written for this engine's selfcheck and demo.
+#
+# Not a BZFlag map. It exercises every rule bz/bzwWorld.js claims to know, so that the demo and the
+# tests are looking at the same thing. A `#` is only a comment as the first token of a line.
+
+world
+  name Arena
+  size 200
+  flagHeight 10
+end
+
+# `options` lines are handed to bzfs's own argument parser, one word at a time. `-srvmsg Welcome to the
+# arena.` becomes four arguments, and bzfs stops on "to". A real bzfs refused to load this map until the
+# message was one word -- which is a thing you learn by running one.
+options
+  -set _tankSpeed 25
+  -srvmsg Welcome
+end
+
+# --- four team bases, one per corner ------------------------------------------------------------
+base
+  position -160 -160 0
+  size 30 30 0
+  rotation 0
+  color 1
+end
+
+base
+  position 160 160 0
+  size 30 30 0
+  rotation 0
+  color 2
+end
+
+base
+  position -160 160 0
+  size 30 30 0
+  rotation 0
+  color 3
+end
+
+base
+  position 160 -160 0
+  size 30 30 0
+  rotation 0
+  color 4
+end
+
+# --- a ring of pyramids, one of them hanging from its apex ---------------------------------------
+pyramid
+  position 0 80 0
+  size 8 8 12
+end
+
+pyramid
+  position 0 -80 0
+  size 8 8 12
+end
+
+pyramid
+  position 80 0 0
+  size 8 8 12
+  rotation 45
+end
+
+pyramid
+  position -80 0 0
+  size 8 8 -12
+end
+
+# --- a central block you can shoot through but not drive through --------------------------------
+box
+  position 0 0 0
+  size 20 20 9
+  shootthrough
+  ricochet
+end
+
+# --- a corridor, defined once and instantiated four times ----------------------------------------
+define corridor
+  box
+    position 0 0 0
+    size 4 40 6
+  end
+  box
+    position 0 44 0
+    size 4 4 12
+  end
+enddef
+
+group corridor
+  position 120 0 0
+end
+
+group corridor
+  position -120 0 0
+  rotation 180
+end
+
+group corridor
+  position 0 120 0
+  rotation 90
+end
+
+group corridor
+  position 0 -120 0
+  rotation 270
+end
+
+# --- a pair of teleporters, linked both ways ------------------------------------------------------
+# Two gates facing each other along x, and linked so the map wraps. A tank driving east into the east
+# gate's BACK face comes out of the west gate's FRONT face, still driving east. The two 180-degree spins
+# in `getPointWRT` cancel, so the heading is preserved -- which is what makes it a wrap and not a spinner.
+# The faces nobody mentions fall through to BZFlag's passthru rule, and are ordinary doorways.
+teleporter tp_east
+  position 190 0 0
+  rotation 0
+  size 0.56 6 20
+  border 1.12
+end
+
+teleporter tp_west
+  position -190 0 0
+  rotation 0
+  size 0.56 6 20
+  border 1.12
+end
+
+link
+  from tp_east:b
+  to tp_west:f
+end
+
+link
+  from tp_west:b
+  to tp_east:f
+end
+
+# --- water in the trench, and a flag zone at the middle ------------------------------------------
+waterLevel
+  height -1
+end
+
+# The centre is where the flags land. It is NOT a spawn zone: `team` here would put a tank inside the
+# block in the middle of the map, and findSpawn would spend sixty-four tries discovering that.
+zone
+  position 0 0 0
+  size 30 30 10
+  flag GM L
+  safety 1
+end
+
+# --- v2183: the mesh family -----------------------------------------------------------------------
+# A bunker: a mesh cube whose north face is `drivethrough`, so you can drive in through one wall and
+# not the other three. Per-face flags are the reason a mesh is not just a box with more vertices.
+mesh
+  vertex -110 -10 0
+  vertex -90 -10 0
+  vertex -90 10 0
+  vertex -110 10 0
+  vertex -110 -10 7
+  vertex -90 -10 7
+  vertex -90 10 7
+  vertex -110 10 7
+  inside -100 0 3
+  face
+    vertices 4 5 6 7
+  endface
+  face
+    vertices 3 2 1 0
+  endface
+  face
+    vertices 1 2 6 5
+  endface
+  face
+    vertices 3 0 4 7
+  endface
+  face
+    vertices 2 3 7 6
+    drivethrough
+  endface
+  face
+    vertices 0 1 5 4
+  endface
+end
+
+# A tetrahedron. Four vertices, four faces, and a check point at its centroid.
+tetra
+  vertex 90 -12 0
+  vertex 114 -12 0
+  vertex 102 12 0
+  vertex 102 0 20
+end
+
+# A box and a pyramid, built as meshes. The shapes are the same; the obstacles are not.
+meshbox
+  position 0 -140 0
+  size 12 12 8
+  rotation 30
+end
+
+meshpyr
+  position 0 140 0
+  size 12 12 16
+end
+
+# --- v2187: the round ones, and what they are made of ---------------------------------------------
+# Placed on the inner diagonals, clear of the base corners, the pyramid ring, the corridors and the
+# bunker. A dome over a team's spawn is a dome nobody can leave.
+
+material
+  name brass
+  diffuse 0.72 0.58 0.24 1.0
+end
+
+material
+  name verdigris
+  matref brass
+  diffuse 0.24 0.60 0.50 1.0
+end
+
+transform
+  name lift
+  shift 0 0 6
+end
+
+# A dome. `divisions 4` is BZFlag's default: 8*4*4 = 128 faces, halved and closed with a disc.
+sphere
+  position -60 -60 0
+  size 20 20 14
+  divisions 4
+  hemi
+  matref verdigris
+end
+
+# Two columns.
+cone
+  position 60 60 0
+  size 8 8 22
+  divisions 12
+  matref brass
+end
+
+cone
+  position -60 60 0
+  size 8 8 22
+  divisions 12
+  matref brass
+end
+
+# A quarter arch.
+arc
+  position 60 -60 0
+  size 20 20 5
+  divisions 12
+  angle 90
+  ratio 0.4
+  matref verdigris
+end
+
+# A ring, lifted six metres by a named transform.
+arc
+  position 100 -100 0
+  size 18 18 3
+  divisions 16
+  ratio 0.35
+  xform lift
+  matref brass
+end
+
+# Recorded, not simulated: a physics driver and a world weapon.
+physics
+  name conveyor
+  linear 8 0 0
+  slide 2
+end
+
+weapon
+  position 0 0 20
+  type SW
+  initdelay 10
+  delay 8 8
+end
+
+# --- v2188: where each team comes back, and where the flags land ----------------------------------
+# A `zone` with a `team` list is a spawn zone for those teams. A team with no zone spawns anywhere.
+zone
+  position -160 -160 0
+  size 24 24 0
+  team 1
+end
+
+zone
+  position 160 160 0
+  size 24 24 0
+  team 2
+end
+
+zone
+  position -160 160 0
+  size 24 24 0
+  team 3
+end
+
+zone
+  position 160 -160 0
+  size 24 24 0
+  team 4
+end

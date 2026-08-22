@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SweK Gates</title>
+<style>
+  html, body { margin: 0; background: #0a0e0c; color: #cfe9d8; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+  #wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: #6f8a7c; margin-bottom: 14px; }
+  .card { border: 1px solid #24382e; background: #0e1512; padding: 11px 13px; margin-bottom: 12px; }
+  button { font: inherit; background: #16211b; color: #cfe9d8; border: 1px solid #2c463a; padding: 5px 12px; margin-right: 6px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #1d2c24; }
+  button:disabled { opacity: .45; cursor: default; }
+  .primary { border-color: #4c8f6a; color: #b6f0cf; }
+  .stop { border-color: #8f4c4c; color: #f0b6b6; }
+  input[type=text] { background: #0a1210; color: #cfe9d8; border: 1px solid #2c463a; font: inherit; padding: 4px 7px; width: 210px; }
+  #bar { height: 6px; background: #16211b; border: 1px solid #24382e; margin: 10px 0 4px; }
+  #barFill { height: 100%; width: 0; background: #4c8f6a; transition: width .15s; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid #16241d; }
+  th { color: #6f8a7c; font-weight: normal; position: sticky; top: 0; background: #0e1512; }
+  tr.gate { cursor: pointer; }
+  tr.gate:hover { background: #14201a; }
+  td.ms { text-align: right; color: #6f8a7c; }
+  .pass { color: #7fe0a4; } .fail { color: #e0a0a0; } .slow { color: #e0c58a; } .dim { color: #6f8a7c; }
+  #list { max-height: 460px; overflow: auto; }
+  pre { white-space: pre-wrap; color: #8fb3a0; margin: 6px 0 0; max-height: 300px; overflow: auto; background: #0a1210; padding: 8px; border: 1px solid #1a2a22; }
+  .tally b { font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SweK Gates</h1>
+  <div class="sub">Every <span class="dim">*-selfcheck.mjs</span> in the tree, discovered the same way the ship gate
+    discovers them. Run them here instead of waiting on one blocking batch.</div>
+
+  <div class="card">
+    <button id="bAll" class="primary">Run all</button>
+    <button id="bFiltered">Run filtered</button>
+    <button id="bStop" class="stop" disabled>Stop</button>
+    <input id="filter" type="text" placeholder="filter, e.g. voxel or rle">
+    <span class="dim" id="counts"></span>
+    <div id="bar"><div id="barFill"></div></div>
+    <div class="tally" id="tally"></div>
+  </div>
+
+  <div class="card" id="skipCard" style="display:none">
+    <div class="dim">Excluded by the suite &mdash; with the reason it was excluded, not a guess:</div>
+    <div id="skips"></div>
+  </div>
+
+  <div class="card">
+    <div id="list"><table id="tbl"><tr><th>gate</th><th>result</th><th class="ms">ms</th></tr></table></div>
+  </div>
+
+  <div class="card" id="outCard" style="display:none">
+    <div id="outName" class="dim"></div>
+    <pre id="out"></pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let gates = [], results = new Map(), stopped = false, running = false;
+
+const esc = (s) => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+const visible = () => { const f = $("filter").value.trim().toLowerCase(); return f ? gates.filter(g => g.toLowerCase().includes(f)) : gates; };
+
+function renderList() {
+  const rows = visible().map(g => {
+    const r = results.get(g);
+    let cell = '<span class="dim">-</span>', ms = "";
+    if (r) {
+      cell = r.pass ? '<span class="pass">PASS</span>'
+           // THE BUDGET TRAVELS WITH THE VERDICT: windTunnel missed the old 60s by THREE SECONDS, and a bare
+           // "TIMEOUT" cannot tell that from a gate that never had a chance.
+           : r.timedOut ? '<span class="slow">TIMEOUT</span> <span class="dim">(' + Math.round((r.budgetMs || 0) / 1000) + 's budget)</span>'
+           : '<span class="fail">FAIL (' + r.exitCode + ')</span>';
+      ms = r.ms;
+    }
+    return `<tr class="gate" data-g="${esc(g)}"><td>${esc(g)}</td><td>${cell}</td><td class="ms">${ms}</td></tr>`;
+  }).join("");
+  $("tbl").innerHTML = '<tr><th>gate</th><th>result</th><th class="ms">ms</th></tr>' + rows;
+  for (const tr of document.querySelectorAll("tr.gate")) tr.onclick = () => showOut(tr.dataset.g);
+  $("counts").textContent = `${visible().length} shown / ${gates.length} runnable`;
+}
+
+function showOut(g) {
+  const r = results.get(g);
+  $("outCard").style.display = "block";
+  $("outName").textContent = g + (r ? `  -  ${r.pass ? "pass" : "fail"} in ${r.ms}ms` : "  -  not run yet");
+  $("out").textContent = r ? (r.output || "(no output)") : "Run it to see output.";
+}
+
+function tally() {
+  const done = [...results.values()];
+  // v3212 -- A TIMEOUT IS COUNTED APART FROM A FAILURE HERE TOO. The rows have distinguished them since v3076
+  // and the TALLY still folded them together, so the headline on this page told the same lie the ship runner's
+  // did: "41 fail" when thirteen were budgets and eight of those pass given room. A failure needs a person; a
+  // timeout needs a bigger budget or a smaller fixture, and one number cannot say which.
+  const p = done.filter(r => r.pass).length;
+  const t = done.filter(r => !r.pass && r.timedOut).length;
+  const f = done.length - p - t;
+  $("tally").innerHTML = done.length
+    ? `<b class="pass">${p} pass</b> &nbsp; <b class="${f ? "fail" : "dim"}">${f} fail</b> &nbsp;
+       <b class="${t ? "slow" : "dim"}">${t} timeout</b> &nbsp;
+       <span class="dim">${done.length} run, ${(done.reduce((a, r) => a + r.ms, 0) / 1000).toFixed(1)}s total</span>`
+    : "";
+}
+
+async function runList(list) {
+  if (running) return;
+  running = true; stopped = false;
+  $("bAll").disabled = $("bFiltered").disabled = true; $("bStop").disabled = false;
+  let i = 0;
+  for (const g of list) {
+    if (stopped) break;
+    $("barFill").style.width = (100 * i / list.length) + "%";
+    try {
+      const r = await (await fetch("/gates/run?name=" + encodeURIComponent(g))).json();
+      results.set(g, r.ok ? r : { pass: false, exitCode: -1, ms: 0, output: r.message || r.error });
+    } catch (e) {
+      results.set(g, { pass: false, exitCode: -1, ms: 0, output: "request failed: " + e.message });
+    }
+    i++; renderList(); tally();
+  }
+  $("barFill").style.width = stopped ? $("barFill").style.width : "100%";
+  running = false;
+  $("bAll").disabled = $("bFiltered").disabled = false; $("bStop").disabled = true;
+}
+
+$("bAll").onclick = () => runList(gates);
+$("bFiltered").onclick = () => runList(visible());
+$("bStop").onclick = () => { stopped = true; };
+$("filter").oninput = renderList;
+
+(async function init() {
+  const l = await (await fetch("/gates/list")).json();
+  if (!l.ok) { $("counts").textContent = "bridge unreachable"; return; }
+  gates = l.runnable;
+  renderList();
+  if (l.skipped.length || l.alreadyGated.length) {
+    $("skipCard").style.display = "block";
+    $("skips").innerHTML =
+      l.skipped.map(s => `<div style="margin-top:6px"><span class="slow">${esc(s.file)}</span>
+        <div class="dim">${esc(s.reason)}</div></div>`).join("") +
+      (l.alreadyGated.length ? `<div style="margin-top:8px" class="dim">${l.alreadyGated.length} more are run
+        separately by verify.mjs with their own result parsing, so running them here would double ship time for
+        no information.</div>` : "");
+  }
+  if (!l.parsedExclusions) $("skips").innerHTML += '<div class="fail">Could not parse the suite exclusions - this list may not match the ship gate.</div>';
+})();
+</script>
+</body>
+</html>
