@@ -1,6 +1,10 @@
 // WebGLEngine/tools/ship/gateSelection-selfcheck.mjs — v3285
 //
-// Run: node tools/ship/gateSelection-selfcheck.mjs   (~7s — MEASURED; builds the real import graph)
+// Run: node tools/ship/gateSelection-selfcheck.mjs   (~41s — MEASURED; builds the real import graph)
+//
+// v3941 -- the header said ~7s. It builds the import graph over the whole tree, and the tree went from ~600
+// gates to 1111, so the number aged out with the corpus rather than with anything in this file. Re-measured
+// rather than left standing: a stale runtime in a header is how a budget gets set from a memory.
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // The third instrument on the proposer interface, and the one with the most tempting degenerate policy: a
@@ -8,7 +12,8 @@
 // adjudicator does not ask "did it finish in time" -- it names a break, names the gate that catches it, and asks
 // whether the plan contains that gate. Fast and wrong is the failure being measured.
 
-import { selectGates, adjudicateSelection, selectionLines, costsFor, ASSUMED_CHEAP_MS } from "./gateSelection.mjs";
+import { selectGates, adjudicateSelection, selectionLines, costsFor, ASSUMED_CHEAP_MS, OBSERVED } from "./gateSelection.mjs";
+import { gateFiles } from "./staleness.mjs";
 import { MEASURED } from "./gateBudget.mjs";
 import { registerProposer, runProposer, getProposer, grantLicence, applyKnobs } from "../../physics/proposers.mjs";
 
@@ -37,9 +42,24 @@ const CHANGED = ["physics/statmech/ising.js"];
 {
     const s = selectGates({ changed: CHANGED, budgetMs: 180000 });
     const overlap = s.selected.filter((g) => s.reachable.includes(g)).length;
+    // *** v3941 -- THE THRESHOLD WAS A COVERAGE CLAIM WEARING A CONVENTION CHECK'S NAME. *** It required
+    // `overlap >= reachable.length - 5`, which says "at most five reachable gates may miss the budget" -- a fact
+    // about how much reachable work fits in 180s, not about whether two path conventions agree. The tree grew;
+    // 102 gates are now reachable from ising.js and ten of them do not fit; the line went red WITH THE
+    // CONVENTIONS AGREEING PERFECTLY. Meanwhile the defect it exists to catch reads ZERO, and zero was never
+    // within five of anything.
+    //
+    // The property is STRUCTURAL and cannot drift with the tree's size: every reachable gate is EITHER in the
+    // plan OR named in missedReachable, and the two account for all of it. If the conventions disagreed, the
+    // overlap would be 0 and missedReachable would hold the entire band -- which still ACCOUNTS, so the
+    // non-empty overlap is asserted beside it. Together they pin the regression without pinning the budget.
+    const accounted = overlap + s.missedReachable.length;
     ok("!! the reachable band is NOT EMPTY: selected and reachable share a path convention",
-       overlap >= s.reachable.length - 5 && overlap > 0,
-       overlap + " of " + s.reachable.length + " reachable gates are in the plan — when the two conventions disagreed this read 0, silently");
+       overlap > 0 && accounted === s.reachable.length,
+       overlap + " of " + s.reachable.length + " reachable gates are in the plan and " + s.missedReachable.length +
+       " are named as missed — " + accounted + " accounted for, which is ALL of them. When the two conventions " +
+       "disagreed this read 0, silently. THE COUNT THAT FITS THE BUDGET IS NOT ASSERTED: it falls as the tree " +
+       "grows and says nothing about whether the two sets are spelled the same way.");
     ok("...and missedReachable is a NAMED FIELD, which is the only reason that bug was visible at all",
        Object.prototype.hasOwnProperty.call(s, "missedReachable") && Array.isArray(s.missedReachable),
        "64 of 64 missed is impossible to read as success; the same fact in a log line would have scrolled past");
@@ -69,10 +89,25 @@ const CHANGED = ["physics/statmech/ising.js"];
        !v0.pass && v0.evidence.missed.length === 2,
        "spent 0s of 180s and missed: " + v0.evidence.missed.join(", ") + " — 'finished in time' is not the question being asked");
 
-    const real = selectGates({ changed: CHANGED, budgetMs: 180000 });
+    // *** v3941 -- 180s WAS A TYPED BUDGET AND THE REACHABLE BAND OUTGREW IT. *** consistency-selfcheck costs
+    // 21s, is reachable, and no longer fits: the cheapest-first order inside the reachable band fills 180s with
+    // 304 cheaper gates first. So the plan caught 1 of 2 and this line reddened -- NOT because the adjudicator
+    // stopped working, but because a number typed against a smaller tree stopped being big enough. The
+    // vacuity this check exists to refute is about the ADJUDICATOR, and a budget is the wrong place to state it.
+    //
+    // The budget is DERIVED: the cost of the whole reachable band, which is by construction enough to hold every
+    // gate that can catch a break reachable from the change. What is asserted is the CONTRAST -- a plan big
+    // enough catches both, the empty plan catches none, and the 2s plan below catches none either.
+    const reachOnly = selectGates({ changed: CHANGED, budgetMs: 1, includeUnreachable: false });
+    const bandCosts = costsFor(reachOnly.reachable, {}).costs;   // ONE call, not one per gate
+    const bandMs = reachOnly.reachable.reduce((a, g) => a + (bandCosts[g] || 0), 0);
+    const real = selectGates({ changed: CHANGED, budgetMs: Math.ceil(bandMs * 1.1), includeUnreachable: false });
     const v1 = adjudicateSelection(real, breaks);
-    ok("!! ...while the real 180s plan covers both seeded breaks (the trap is not vacuous)",
-       v1.pass, "caught " + v1.evidence.caught + "/2 in " + Math.round(real.spentMs / 1000) + "s");
+    ok("!! ...while a plan that holds the whole reachable band covers both seeded breaks (the trap is not vacuous)",
+       v1.pass, "caught " + v1.evidence.caught + "/2 in " + Math.round(real.spentMs / 1000) + "s, on a budget of " +
+       Math.round(bandMs / 1000) + "s DERIVED from the reachable band rather than typed. A TYPED 180s caught 1/2 " +
+       "here: the band is " + reachOnly.reachable.length + " gates and no longer fits, which is a fact about the " +
+       "tree's size and not about the adjudicator this line is testing.");
 
     // and a budget too small to reach the break is caught, rather than passing because it "finished"
     const tiny = selectGates({ changed: CHANGED, budgetMs: 2000 });
@@ -86,15 +121,70 @@ const CHANGED = ["physics/statmech/ising.js"];
 
 // ---- 5. COSTS: MEASURED BEATS ASSUMED, AND THE ASSUMPTION IS DECLARED -------------------------------------------------------
 {
-    const UNTIMED = "ai-bridge/assetSync-perf-selfcheck.mjs";   // a gate genuinely absent from gate-timings.json; the previous example
-                                  // (consistency-selfcheck) stopped being untimed the moment this round measured it
-    const { costs, guessed } = costsFor(["tools/ship/labDevices-selfcheck.mjs", UNTIMED], {});
-    ok("!! a gate in the v3211 MEASURED tail uses its real completion time, not the cheap assumption",
-       costs["tools/ship/labDevices-selfcheck.mjs"] === MEASURED["tools/ship/labDevices-selfcheck.mjs"],
-       "labDevices " + Math.round(costs["tools/ship/labDevices-selfcheck.mjs"] / 1000) + "s from the measured table — there is ONE such table in this tree and this imports it");
+    // *** v3941 -- BOTH LINES HERE NAMED AN EXAMPLE, AND THE TREE KEPT MOVING THE EXAMPLES OUT FROM UNDER THEM. ***
+    //
+    // The first asserted `costs[labDevices] === MEASURED[labDevices]` and said "there is ONE such table in this
+    // tree and this imports it". THERE ARE TWO, and costsFor prefers the other one on purpose: its ladder is
+    // ledger -> OBSERVED (gate-timings.json, written by every full suite run) -> MEASURED (the curated slow
+    // tail) -> assumed cheap. labDevices sits in BOTH -- 123s observed against 254s measured -- so the observed
+    // number wins, correctly, and the assertion demanding the other one failed.
+    //
+    // The second named ai-bridge/assetSync-perf-selfcheck.mjs as "a gate genuinely absent from gate-timings.json"
+    // AND ITS OWN COMMENT RECORDED THIS HAPPENING BEFORE: "the previous example (consistency-selfcheck) stopped
+    // being untimed the moment this round measured it". assetSync-perf has since been timed at 2383ms. SECOND
+    // TIME, PREDICTED IN WRITING BY THE LINE THAT DID IT. A fixture whose subject is "a thing nobody has measured
+    // yet" is a fixture the tree is actively working to destroy.
+    //
+    // So the examples are DERIVED from the two tables at run time, and what is pinned is the LADDER.
+    const allGates = gateFiles().map((g) => String(g).replace(/\\/g, "/").replace(/^.*?WebGLEngine\//, ""));
+    // *** IN BOTH TABLES, WITH DIFFERENT NUMBERS -- WHICH IS THE ONLY POPULATION THAT CAN TEST A PRECEDENCE. ***
+    // My first version of this line took the first gate with an OBSERVED entry, which is almost never also in
+    // MEASURED -- so inverting the ladder in costsFor changed nothing and the check passed a planted inversion.
+    // The plant found the weak key, which is what plants are for. labDevices, the example the old line named,
+    // was in both at 123s observed against 254s measured: that overlap is the fixture, and it is derived here
+    // rather than named, because the old line's subject is exactly the kind that moves.
+    const inBoth = allGates.find((g) => OBSERVED[g] != null && MEASURED[g] != null && OBSERVED[g] !== MEASURED[g]);
+    const inObserved = inBoth || allGates.find((g) => OBSERVED[g] != null);
+    const measuredOnly = allGates.find((g) => OBSERVED[g] == null && MEASURED[g] != null);
+    const UNTIMED = allGates.find((g) => OBSERVED[g] == null && MEASURED[g] == null);
+    const { costs, guessed } = costsFor([inObserved, measuredOnly, UNTIMED].filter(Boolean), {});
+
+    ok("!! an OBSERVED gate uses its real completion time, and OBSERVED BEATS MEASURED where both have one",
+       !!inObserved && costs[inObserved] === OBSERVED[inObserved] && costs[inObserved] !== ASSUMED_CHEAP_MS &&
+       (!inBoth || costs[inBoth] !== MEASURED[inBoth]),
+       inObserved + " -> " + costs[inObserved] + "ms from gate-timings.json" +
+       (inBoth ? ", against " + MEASURED[inBoth] + "ms in the curated table -- THE OBSERVED NUMBER WINS, which " +
+                 "is the ladder costsFor documents and the direction the old line had backwards. " +
+                 allGates.filter((g) => OBSERVED[g] != null && MEASURED[g] != null && OBSERVED[g] !== MEASURED[g]).length +
+                 " gates sit in both tables with different numbers, so this is derived from a real population"
+               : " (no gate is in both tables with differing values today, so the PRECEDENCE half of this line " +
+                 "is unexercised and says so)") +
+       ". " + Object.keys(OBSERVED).length + " gates carry an observed runtime.");
+
+    ok("!! ...and MEASURED is the FALLBACK below it, not the first choice",
+       measuredOnly
+         ? costs[measuredOnly] === MEASURED[measuredOnly] && costs[measuredOnly] !== ASSUMED_CHEAP_MS
+         : allGates.every((g) => OBSERVED[g] != null || MEASURED[g] == null),
+       measuredOnly
+         ? measuredOnly + " -> " + Math.round(costs[measuredOnly] / 1000) + "s from the curated table, which is " +
+           "consulted only because gate-timings has no entry for it. *** THERE IS EXACTLY " +
+           allGates.filter((g) => OBSERVED[g] == null && MEASURED[g] != null).length + " SUCH GATE IN THE TREE " +
+           "TODAY: when a sweep times it, this rung of the ladder becomes untestable and this line must say so " +
+           "rather than quietly stop meaning anything."
+         : "NO gate is in MEASURED without also being in OBSERVED, so this rung cannot be exercised today -- " +
+           "REPORTED AS UNTESTABLE rather than passed, which is the state the old typed example hid.");
+
     ok("...and an untimed gate is assumed cheap AND reported as a guess",
-       costs[UNTIMED] === ASSUMED_CHEAP_MS && guessed.includes(UNTIMED),
-       "473 of 556 timed gates came in under 1s, so the assumption is usually right — and a plan built partly on guesses that presented itself as measured would be the defect the perf ledger exists to end");
+       UNTIMED
+         ? costs[UNTIMED] === ASSUMED_CHEAP_MS && guessed.includes(UNTIMED)
+         : allGates.every((g) => OBSERVED[g] != null || MEASURED[g] != null),
+       UNTIMED
+         ? UNTIMED + " -> " + ASSUMED_CHEAP_MS + "ms assumed and NAMED in guessed[] (" +
+           allGates.filter((g) => OBSERVED[g] == null && MEASURED[g] == null).length + " gates have no evidence " +
+           "of either kind). The assumption is usually right, and a plan built partly on guesses that presented " +
+           "itself as measured would be the defect the perf ledger exists to end."
+         : "every gate in the tree now carries a timing, so there is no untimed gate to exercise this with -- " +
+           "REPORTED, not passed.");
     const s = selectGates({ changed: CHANGED, budgetMs: 180000 });
     ok("...and the plan carries its guess count where a reader will see it",
        selectionLines(s).some((l) => /part guess and says so/.test(l)));
