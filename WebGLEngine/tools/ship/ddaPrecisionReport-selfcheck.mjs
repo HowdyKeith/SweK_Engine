@@ -138,9 +138,26 @@ console.log("\n5. THE FRONT DOOR EXISTS, WHICH IS THE ROUND");
 {
     const src = fs.readFileSync(path.join(ENG, "tools/ship/ddaPrecisionReport.mjs"), "utf8");
     const reg = fs.readFileSync(path.join(ENG, "tools/ship/reportingTools.mjs"), "utf8");
+    // *** v3941 -- THIS PINNED A SPELLING THAT ANOTHER GATE IN THIS DIRECTORY BANS, AND THE MODULE OBEYED THE
+    // OTHER ONE. *** The line required the literal `import.meta.url === `file://${process.argv[1]}``.
+    // winPathGuard-selfcheck exists to GREP THAT FORM OUT OF THE TREE -- its own header: it "never matches on
+    // Windows (backslashes, and file:// vs file:///), so the CLI main-module block never runs" -- and
+    // runLive-selfcheck asserts the correct form by name, `pathToFileURL(process.argv[1]`, refusing the template
+    // in the same line. ddaPrecisionReport.mjs was written to the law those two state, so THIS GATE WENT RED ON
+    // THE FIX. Three gates touched one idiom, two banned it, one required it, and the file that got it right lost.
+    //
+    // THE ROUND IS THAT A FRONT DOOR EXISTS, NOT HOW ITS GUARD IS SPELLED: a main-module test comparing
+    // import.meta.url against argv[1], and an exit 0. Asserted as that shape so the next correct spelling does
+    // not read as a regression -- and the Windows-broken template is refused here too, rather than demanded.
+    const guardShape = /import\.meta\.url\s*===/.test(src) && /process\.argv\[1\]/.test(src);
+    const bannedGuard = /import\.meta\.url\s*===\s*`file:\/\/\$\{process\.argv\[1\]\}`/.test(src);
     ok("!! the module PRINTS AND EXITS ZERO, with the gate beside it the thing that exits nonzero",
-        /import\.meta\.url === `file:\/\/\$\{process\.argv\[1\]\}`/.test(src) && /process\.exit\(0\)/.test(src),
-        "v3327's split. An empty report and a tool that never ran are indistinguishable (v3201)");
+        guardShape && !bannedGuard && /process\.exit\(0\)/.test(src),
+        "v3327's split. An empty report and a tool that never ran are indistinguishable (v3201). THE GUARD IS " +
+        "MATCHED BY SHAPE -- import.meta.url compared against argv[1] -- because the literal " +
+        "`file://${process.argv[1]}` this line used to REQUIRE is the spelling winPathGuard-selfcheck exists to " +
+        "ban and runLive-selfcheck refuses by name. A gate that demands what another gate forbids is not strict, " +
+        "it is a contradiction, and the module cannot satisfy both");
     ok("!! ...and it is REGISTERED, so tools.html runs it and the answer has a page",
         /ddaPrecisionReport\.mjs/.test(reg),
         "*** THIS IS THE WHOLE POINT OF THE ROUND. ddaFloat32.js's own header says the answer exists so that " +
