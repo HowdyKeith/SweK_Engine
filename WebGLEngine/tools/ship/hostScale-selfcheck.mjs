@@ -80,14 +80,37 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
 
 // ---- 6. *** THE DENOMINATOR, WHICH THE FIRST VERSION GOT WRONG *** -------------------------------------------
 {
+    // *** v3936 -- THIS ASSERTED AN EXAMPLE AND THE EXAMPLE MOVED, WHICH IS MY OWN v3923 MISTAKE. ***
+    // It read gate-timings for ONE named gate and required `truncated < REF / 2`. That is a MAGNITUDE standing in
+    // for a property. When this box re-ran the full sweep, assumptionMap's entry went from a heavily truncated
+    // number to 237619ms against a MEASURED 284000ms -- still short, still truncated, but no longer under half.
+    // THE GATE WENT RED ON A BETTER MEASUREMENT, which is the exact shape v3920 recorded when areaHygiene's band
+    // did it. A COUNT IS NOT A PROPERTY, and neither is a ratio.
+    //
+    // The property is STRUCTURAL and cannot move: a timings entry is a BARE NUMBER. Nothing in the file marks
+    // which entries are a completed run and which are the moment a budget killed one, so no reader can tell a
+    // time from a truncation. That is why this file cannot be the denominator -- not that any particular entry
+    // happens to be low today.
     const raw = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "gate-timings.json"), "utf8"));
-    const truncated = raw.timings[GATE];
-    ok("!! *** the scale divides by MEASURED, not by gate-timings.json, and here is why ***",
-       typeof truncated === "number" && truncated < REF / 2,
-       "gate-timings records " + truncated + "ms for a gate that MEASURED puts at " + REF + "ms and that takes " +
-       "234s here. ITS OWN METADATA SAYS THE CAPTURE USED A 300s CEILING, so entries for gates killed by it are " +
-       "the moment they died, and nothing in the file marks which. Dividing by it said this box runs at 4.90x. " +
-       "A file of times, some of which are not times");
+    const entries = Object.entries(raw.timings);
+    ok("!! *** an entry cannot say whether it is a TIME or a TRUNCATION, which is why MEASURED is the denominator ***",
+       entries.length > 0 && entries.every(([, v]) => typeof v === "number"),
+       entries.length + " entries, every one a bare number. A gate killed at its budget records the moment it died "
+       + "and looks exactly like a gate that finished. DIVIDING BY THIS SAID THIS BOX RUNS AT 4.90x. The fix is not "
+       + "to detect truncation -- it cannot be detected from here -- but to divide by a table of numbers that were "
+       + "all obtained the same way.");
+
+    // The truncation is REPORTED, not pinned. How many entries sit below their MEASURED value is a fact about
+    // today's data; it will change every sweep, and a gate that failed when it improved would be a ratchet
+    // pointing backwards. Reported so a reader can see the scale of it without anything depending on the number.
+    const below = entries.filter(([k, v]) => typeof MEASURED[k] === "number" && v < MEASURED[k]);
+    const worst = below.slice().sort((a, b) => (a[1] / MEASURED[a[0]]) - (b[1] / MEASURED[b[0]]))[0];
+    say(below.length + " of " + entries.filter(([k]) => typeof MEASURED[k] === "number").length
+        + " gates that MEASURED also covers record LESS time than MEASURED says"
+        + (worst ? "; worst is " + worst[0] + " at " + (worst[1] / MEASURED[worst[0]]).toFixed(3) + " of its "
+                 + "measured runtime (" + worst[1] + "ms against " + MEASURED[worst[0]] + "ms)" : "")
+        + ". REPORTED, NOT ASSERTED -- this moves every sweep and nothing here depends on it.");
+
     const f = tmp();
     recordRun("tools/ship/some-gate-not-in-measured.mjs", 999999, true, f);
     const h = hostScale(f);
