@@ -1,14 +1,19 @@
-# EngineProject v855 — complete archive
+# SweK_Engine v3939 -- complete archive
 
-The single source of truth: **both engines + listener + full workbook sets + the
-Home Assistant integration**, in one repository. Workbooks are meant to be built
-**from scratch** each time by importing the exploded module folders into your
-VBASync blank workbook.
+The single source of truth: **WebGL engine + Node ai-bridge + listener + the Home
+Assistant integration + the ship/verify toolchain**, in one repository. The
+versioned zip (`SweK_Engine_vNNNN.zip`) is cut from this tree; the zip always
+contains a single top-level folder named `SweK_Engine_vNNNN`, which is what the
+in-engine updater looks for.
+
+Current build: **v3939** (`WebGLEngine/main.js` `ENGINE_VERSION`). The brain
+carries its own `BRAIN_BUILD` in `WebGLEngine/brain/brain.js`. Never reuse a
+version number -- supersede forward.
 
 ## System architecture (diagram)
 
 See **`WebGLEngine/architecture.svg`** for a one-page diagram of the whole
-multi-runtime system — how the Excel/VBA simulation, the WebGL browser engine,
+multi-runtime system -- how the Excel/VBA simulation, the WebGL browser engine,
 the Node `ai-bridge` (:8787), the PowerShell+Python KPop Listener, and Home
 Assistant fit together, plus the external services (Ollama, OSM/elevation APIs,
 Twitch/Discord, games). Open it directly in a browser, or from the tray
@@ -16,24 +21,37 @@ Twitch/Discord, games). Open it directly in a browser, or from the tray
 
 ## Layout
 ```
-EngineProject_v566/
-├── VBAEngine/    ← exploded EngineCore (VBA OpenGL/D3D11). Import into your
-│                       VBASync blank workbook to build EngineCore_63_Enemies.
-│                       menus A/B, modInit, modDemoRegistry, modHAInstall,
-│                       modGLText (in-GL text), modEngineBridge (bridge client),
-│                       addons/ (incl. VBAOpenGL_Demos — extract & run).
-├── VBAVoxelEngine/   ← exploded VBA for the voxel/bridge workbook (Excel_3d_Engine).
-├── WebGLEngine/      ← the FULL WebGL engine (VoxelEngine). Slim it for HA on
-│                       delivery (see HomeAssistant/slim-build.mjs). Bundles the
-│                       Node bridge (ai-bridge/) with haDiscovery.js wired in, and
-│                       the engine's own ha/ iframe-panel installer, and
-│                       brains/ (ai-brain, dashboard, commander bridge pages).
-├── KPop Listener/    ← the PowerShell listener set.
-└── HomeAssistant/    ← add-on repo (ingress panel) + haDiscovery.js + wiring docs
-                        + slim-build.mjs/manifest + modHAInstall.bas.
+SweK_Engine_v3939/
+├── WebGLEngine/      <- the engine. Bundles the Node bridge (ai-bridge/, :8787)
+│                        with haDiscovery.js wired in, the ha/ iframe-panel
+│                        installer, brain/ + brains/ (ai-brain, dashboard,
+│                        commander bridge pages), and tools/ship/ -- the
+│                        changelog, staleness, knowledge-index, status, verify
+│                        and gate toolchain that cuts each build.
+├── HomeAssistant/    <- add-on repo (ingress panel) + haDiscovery.js + wiring
+│                        docs + slim-build.mjs/manifest + modHAInstall.bas.
+├── KPop Listener/    <- the PowerShell listener set.
+├── PetFBI/           <- the pet-tracking app.
+├── TaskerBridge/     <- Android/Tasker side of the bridge.
+├── raycast-extension/<- Raycast commands for the engine.
+├── agent-skills/     <- packaged skills.
+├── cloud/            <- hosting/deploy scaffolding.
+├── diso_tools/       <- disassembly/inspection utilities.
+├── strict-libm/      <- the pinned-math shim used by determinism gates.
+├── Shared/           <- assets and code shared across runtimes.
+├── Root Utils/       <- SESSION_START.md and the operator scripts.
+└── docs/             <- long-form notes.
 ```
 
+Launchers at the root: `START_SweK_LATEST.bat` / `START_NODE_Engine.bat`
+(Windows), `Start Mac SweK Engine.command` / `make_Mac_SweK_Runnable.sh` (macOS),
+`_SETUP.bat` for a first run.
+
 ## Build a workbook from scratch (VBASync)
+> The exploded `VBAEngineCore/` and `VBAVoxelEngine/` module folders are NOT in
+> this repository -- they ship separately. This section is kept because the
+> import procedure is unchanged; point it at wherever you keep those folders.
+
 1. Open your VBASync blank workbook; enable **Trust access to the VBA project object model**.
 2. Import everything in `VBAEngineCore/` (or `VBAVoxelEngine/` for the other one).
    `ThisWorkbook`/`Sheet*` are document modules — paste their code.
