@@ -180,6 +180,50 @@ export const MEASURED = {
     // 1 running every tool twice (562s with one run still red, 555s green), so this is not a budget
     // raised to fit a gate that was never trimmed.
     "tools/ship/toolFrontDoor-selfcheck.mjs":        555000,
+
+    // ================================================================================================================
+    // *** v3939 -- THE ROUNDHOUSE CENSUS CLUSTER, AND IT IS ONE DEVICE RATHER THAN FIVE GATES. ***
+    // ================================================================================================================
+    //
+    // Keith ran the gate list from the rig and five of these reported TIMEOUT at the 180s budget. They are not
+    // five problems, and the cause is not "108 devices, linearly slower". MEASURED, one default build per
+    // device across the whole registry:
+    //
+    //     108 devices, 275.3s total     twof alone 195.7s     -- 71% OF EVERY CENSUS'S COST, ONE DEVICE
+    //
+    // twof's default mode runs a 12,000-step lattice (runTwoF steps: 12000). Every census builds every device
+    // at its default, so all of them pay it. *** 195.7s ALONE EXCEEDS BOTH THE 143s LOCAL DEFAULT AND THE 180s
+    // RIG BUDGET, so no gate that builds the whole registry can pass at any plausible budget. *** Cutting that
+    // default would move a PHYSICS VERDICT -- inletDriftFrac at 500 steps is a transient where at 12,000 it is
+    // converged -- and a round must not move a verdict it is not about, so the cost is accepted and measured
+    // here instead. Keith has the number and the choice.
+    //
+    // MEASURED ON THIS BOX, wall-clock, each run to completion:
+    "tools/roundhouse/configContract-selfcheck.mjs":  72509,
+    "tools/roundhouse/compose-selfcheck.mjs":         88479,
+    "tools/roundhouse/assumptionMap-selfcheck.mjs":  278482,
+    "tools/roundhouse/census-selfcheck.mjs":         697984,
+    // *** NOT GIVEN A BUDGET, AND SAYING SO IS THE POINT: corroborationCensus ran past 1500s and was KILLED
+    // rather than finishing, so there is no completion time to double. An entry here would be a guess wearing a
+    // measurement's clothes -- the one thing this table exists to refuse. It keeps the default budget and stays
+    // on the timeout list until somebody lets it finish and records what it actually costs. ***
+    //
+    // curriculum-selfcheck is deliberately absent too, for the opposite reason: it completes in 349ms. It timed
+    // out on the rig against a tree where it did not, which is a rig question and not a budget one.
+
+    // *** v3939 -- twoF-selfcheck JOINS THE TAIL, AND THE CHOICE BETWEEN THE TWO REMEDIES IS THE POINT. ***
+    // gateBudget-selfcheck went red because the general population's observed worst is twoF-selfcheck at 92.8s
+    // against a SLOWEST_GENERAL of 46.6s, and its message says to RAISE SLOWEST_GENERAL from the new reading.
+    // *** THIS FILE'S OWN HEADER REFUSES THAT, in the paragraph beside the constant: "TWO POPULATIONS, TWO
+    // BUDGETS -- the fix is to put the tail gates in the tail, not to widen the budget for gates that never
+    // needed it." *** Two instructions in one file pointing opposite ways, and the header is the one with the
+    // argument: raising the constant to 92.8s would triple the DEFAULT for all ~1100 gates to 278s and turn a
+    // genuinely hung gate into a five-minute stall, which is the cost that paragraph exists to refuse.
+    //
+    // twoF is the same 12,000-step lattice that makes the census cluster expensive -- so it belongs beside
+    // twoFBind-selfcheck (already here at 256s) rather than setting the pace for a thousand gates that finish
+    // in milliseconds. MEASURED 92.8s, and it PASSES; it was never broken, only mis-populated.
+    "tools/roundhouse/twoF-selfcheck.mjs":            92800,
 };
 
 export const TAIL_HEADROOM = 2;

@@ -555,9 +555,22 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const a = buildMGGPU({ mode: "adjoint", config: { n: 32 } });
     const w = buildMGGPU({ mode: "window", config: { n: 32 } });
     const r = buildMGGPU({ mode: "reference", config: { n: 32 } });
+    // *** v3939 -- WAS `=== 4`, AND IT WENT RED BECAUSE THE DEVICE GOT BETTER. *** multigridgpu gained the
+    // `narrowwindow` plant, so a count frozen at four refused a fifth mode that is the whole point of having
+    // one. THE FIX WAS ALREADY WRITTEN, TWO CHECKS UP: v3806 hit this exact shape on multigrid3d
+    // (`=== 3`, frozen before `nopreconditioner` arrived), wrote "A COUNT IS NOT A CONTRACT", and changed it
+    // to a floor plus the primary. It fixed the sibling it was looking at and left the other two.
+    //
+    // SO THE CONTRACT IS ASSERTED, NOT THE TALLY: at least the modes this file drives, the PRIMARY first
+    // because the plant contract compares against modes[0], and the plant declared. A new mode is progress and
+    // must not need this line edited; a mode DISAPPEARING, or the primary moving, still goes red.
     ok("multigridgpu: declares its modes and every measured key is declared",
-        multigridGPUDevice.modes.length === 4 &&
-        [a, w, r, sv].every((o) => Object.keys(o).filter((k) => k !== "kind").every((k) => multigridGPUDevice.observables.includes(k))));
+        multigridGPUDevice.modes.length >= 4 && multigridGPUDevice.modes[0] === "adjoint" &&
+        typeof multigridGPUDevice.plantMode === "string" &&
+        multigridGPUDevice.modes.includes(multigridGPUDevice.plantMode) &&
+        [a, w, r, sv].every((o) => Object.keys(o).filter((k) => k !== "kind").every((k) => multigridGPUDevice.observables.includes(k))),
+        multigridGPUDevice.modes.length + " modes [" + multigridGPUDevice.modes.join(", ") + "], plant " +
+        multigridGPUDevice.plantMode + " flipping " + multigridGPUDevice.plantFlips);
 }
 
 // ---- *** freesurface: THE DEVICE'S OWN DECLARATIONS (v3728) *** ------------------------------------------------
@@ -629,9 +642,15 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         `line of physics/blobInduction.js`);
 
     const s = await buildInduction({ mode: "separation" });
+    // v3939 -- the same freeze, the same cause: induction gained the `radialdot` plant and `=== 3` refused it.
+    // See the multigridgpu note above; this is the third instance of v3806's finding and the last of the trio.
     ok("induction: declares its modes and every measured key is declared",
-        inductionDevice.modes.length === 3 &&
-        [f, s].every((o) => Object.keys(o).every((k) => inductionDevice.observables.includes(k))));
+        inductionDevice.modes.length >= 3 && inductionDevice.modes[0] === "faraday" &&
+        typeof inductionDevice.plantMode === "string" &&
+        inductionDevice.modes.includes(inductionDevice.plantMode) &&
+        [f, s].every((o) => Object.keys(o).every((k) => inductionDevice.observables.includes(k))),
+        inductionDevice.modes.length + " modes [" + inductionDevice.modes.join(", ") + "], plant " +
+        inductionDevice.plantMode + " flipping " + inductionDevice.plantFlips);
 }
 
 console.log("labDevices-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
