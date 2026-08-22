@@ -78,7 +78,12 @@ export function readQueue(engRoot = ENG) {
  * The five rows. Each carries `have`, `total`, and `owner` -- the file that computed it -- so a reader can go
  * argue with the tool rather than with this page.
  */
-export function labCensus(engRoot = ENG, { now = Date.now(), queue = null } = {}) {
+// v3941 -- `map` joins `now` and `queue` as an injection point, for the same reason they exist: the instruments
+// row maps reconcile()'s OBJECTS to device names, and while the live red list is empty that mapping cannot be
+// exercised at all. Its gate had bought non-vacuity by REQUIRING the list to be non-empty -- a check that
+// depends on the tree still owing something -- and went red the round the debt was paid off. A synthetic map
+// drives the real row instead.
+export function labCensus(engRoot = ENG, { now = Date.now(), queue = null, map = null } = {}) {
     const rows = [];
 
     const g = gradedCoverage(engRoot);
@@ -110,7 +115,7 @@ export function labCensus(engRoot = ENG, { now = Date.now(), queue = null } = {}
     // The instrument map's own reconciliation, 256 ms. `unexplained` is a device that touches real modules and
     // has NEITHER an instrument row NOR a written exemption -- a carried red, and the cheap close (adding rows)
     // is the wrong one: they want pages or stated reasons. Reported as a DEFICIT, so it reads as debt not score.
-    const m = reconcile();
+    const m = map || reconcile();
     // `devices` and `linked` are COUNTS here, not arrays -- read from the tool rather than assumed, after the
     // first version of this row printed "undefined of undefined" for exactly that reason.
     rows.push({ id: "instruments", have: m.linked, total: m.devices, owner: "tools/ship/deviceInstrumentMap.mjs",

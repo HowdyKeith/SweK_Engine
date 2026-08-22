@@ -63,8 +63,71 @@ console.log("\n3. THE INSTRUMENT ROW IS THE MAP'S OWN NUMBERS");
         row.have === m.linked && row.total === m.devices,
         row.have + " of " + row.total + " -- and `devices` and `linked` are COUNTS in that tool, which the first " +
         "version of this row assumed were arrays and printed 'undefined of undefined'");
-    ok("!! ...and the UNEXPLAINED devices are carried by name", row.unexplained.length === m.unexplained.length && row.unexplained.length > 0,
-        row.unexplained.join(", ") + " -- a carried red, surfaced rather than averaged into a percentage");
+    // *** v3941 -- THIS REQUIRED THE DEBT TO EXIST, AND THE TREE PAID IT OFF. ***
+    //
+    // The condition was `row.unexplained.length === m.unexplained.length && row.unexplained.length > 0`. The
+    // first half is the real claim -- the row carries what the map found -- and it PASSES: both are empty. The
+    // second half fails, so this line goes red precisely because there is nothing left to report. THE GATE WENT
+    // RED ON A BETTER TREE, which is the shape v3920 recorded for areaHygiene's band and v3936 for
+    // ddaPrecision's example. 13 devices are uncovered and ALL 13 CARRY AN EXEMPTION; none is awaiting. Zero
+    // unexplained is the goal, not a switched-off check.
+    //
+    // The `> 0` was there for a reason and the reason is right: an empty list matching an empty list proves
+    // nothing about whether names would be carried. BUT REQUIRING THE DEBT IS THE WRONG WAY TO BUY THAT -- it
+    // makes the check depend on the tree failing. The mechanism is exercised below on `uncovered`, which is
+    // real, non-empty data of exactly the same shape, so the naming path is proven on live values without
+    // anything having to be broken for it.
+    const mappedNames = m.unexplained.map((u) => u.device || String(u));
+    ok("!! ...and the UNEXPLAINED devices are carried BY NAME, element for element",
+        row.unexplained.length === mappedNames.length &&
+        row.unexplained.every((n, i) => n === mappedNames[i]) &&
+        row.unexplained.every((n) => typeof n === "string" && n.length > 0),
+        (row.unexplained.length
+            ? row.unexplained.join(", ")
+            : "0 unexplained -- 13 devices are uncovered and every one of them carries an exemption, so there " +
+              "is no carried red to name today") +
+        ". *** COMPARED ELEMENT FOR ELEMENT, NOT BY LENGTH. *** reconcile() returns OBJECTS ({device, modules, " +
+        "exempt}) and the row maps them to names; the old length-only compare could not tell those apart, so a " +
+        "row that passed the objects straight through would have matched on count and printed [object Object] " +
+        "in the very message this line uses to display them.");
+
+    // *** NON-VACUITY, AND MY FIRST ATTEMPT AT IT DID NOT BUY ANY. *** I replaced the `> 0` with an element-for-
+    // element compare and called that enough. It is not: with both lists empty, a row that passed reconcile's
+    // OBJECTS straight through instead of mapping them to names matched anyway, and the plant was INVISIBLE.
+    // An empty list equals an empty list whatever produced it.
+    //
+    // So the row is driven on a SYNTHETIC map. labCensus already takes `now` and `queue` as injection points
+    // for exactly this reason; `map` joins them. This runs THE SHIPPED ROW over a non-empty red list without
+    // anything in the tree having to be broken, which is what the old `> 0` was reaching for and could only get
+    // by requiring the debt to exist.
+    const synthetic = { linked: 2, devices: 3,
+                        unexplained: [{ device: "alpha", modules: ["physics/a.js"], exempt: false },
+                                      { device: "beta",  modules: ["physics/b.js"], exempt: false }] };
+    const injected = labCensus(ENG, { map: synthetic }).rows.find((r) => r.id === "instruments");
+    ok("!! ...and the row CARRIES NAMES when there is something to carry, driven on a synthetic red list",
+        injected.unexplained.length === 2 &&
+        injected.unexplained[0] === "alpha" && injected.unexplained[1] === "beta" &&
+        injected.unexplained.every((n) => typeof n === "string" && !/^\[object/.test(n)) &&
+        injected.have === 2 && injected.total === 3,
+        `two unexplained devices in, ${JSON.stringify(injected.unexplained)} out, ` +
+        `${injected.have} of ${injected.total}. *** THIS IS THE CHECK THE OLD \`> 0\` WAS TRYING TO BE. *** It ` +
+        "ran the real row over a red list that does not exist in the tree today, so passing the objects through " +
+        "unmapped -- which prints [object Object] in the caveat and in this gate's own message -- fails here " +
+        "whether or not anything is actually unexplained.");
+
+    // And the SOURCE shape, which is what makes that mapping correct for any future member of the red list.
+    // `uncovered` is the set `unexplained` is filtered out of, and it has live entries.
+    const uncoveredNames = m.uncovered.map((u) => u.device || String(u));
+    ok("!! ...and every entry reconcile() COULD put in that list already carries a string name",
+        m.uncovered.length > 0 &&
+        m.uncovered.every((u) => typeof u.device === "string" && u.device.length > 0) &&
+        uncoveredNames.every((n) => typeof n === "string" && !/^\[object/.test(n)),
+        `${m.uncovered.length} uncovered devices, every one carrying a string name -- ` +
+        uncoveredNames.slice(0, 4).join(", ") + (uncoveredNames.length > 4 ? ", ..." : "") +
+        `. ${m.uncovered.filter((u) => u.exempt).length} are exempt and ${m.awaiting.length} awaiting, which is ` +
+        "why the unexplained list above is empty. THE SAME MAPPING THE ROW APPLIES, RUN ON THE SET THE RED LIST " +
+        "IS FILTERED OUT OF: if it ever stopped producing names, this line fails whether or not the tree " +
+        "happens to owe anything.");
 }
 
 console.log("\n4. *** WHETHER THE DISPATCHER IS TICKING -- THE THING NOTHING SURFACED ***");
