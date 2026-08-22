@@ -73,6 +73,12 @@ desktop.ini
 # predictions.html is PROSE inside a why: string describing the OKF spec, not a read.
 BACKLOG.md
 TODO.md
+# v3940 -- changelog.mjs leaves a .bak beside each file it prepends to (that backup is what makes the
+# write survivable). BACKLOG.md and TODO.md are held back from the public mirror deliberately, so their
+# BACKUPS ARE THE SAME SESSION NOTES UNDER A DIFFERENT NAME -- and nothing was stopping a `git add -A`
+# from committing the copy while the original stayed ignored.
+BACKLOG.md.bak
+TODO.md.bak
 WebGLEngine/okf/log.md
 Root Utils/email-draft.md
 
