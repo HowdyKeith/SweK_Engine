@@ -23,8 +23,10 @@ ok("!! *** the CJS bridge really can reach the ESM tool -- driven, not asserted 
 // ---- THE HAPPY PATH, against real patch zips ---------------------------------------------------------------
 const UP = "/mnt/user-data/uploads";
 if (fs.existsSync(UP)) {
-    bridge.setConfig({ update: { downloadsDir: UP } });
-    const r = await bridge.patchScan();
+    // v3937 -- THE FOLDER IS AN ARGUMENT NOW, NOT A CONFIG WRITE. This called setConfig and never restored it,
+    // the same defect downloadScan-selfcheck carried -- and that one left Keith's live installer aimed at a
+    // temp folder of one-byte fixtures with auto-apply on. Nothing here writes to the config any more.
+    const r = await bridge.patchScan(UP);
     say("scanned " + r.dir + " at tree " + r.tree + ": " + r.rows.length + " patch-shaped zips");
     ok("!! it resolves patchBase across the boundary and returns rows", r.ok === true && r.rows.length > 0);
 
@@ -50,8 +52,7 @@ if (fs.existsSync(UP)) {
 }
 
 // ---- THE REFUSAL, driven ------------------------------------------------------------------------------------
-bridge.setConfig({ update: { downloadsDir: path.join(ENG, "__no_such_dir__") } });
-const bad = await bridge.patchScan();
+const bad = await bridge.patchScan(path.join(ENG, "__no_such_dir__"));
 ok("!! *** an unreadable directory REFUSES BY NAME rather than returning an empty clean result ***",
     bad.ok === false && typeof bad.why === "string" && /cannot read/.test(bad.why) && bad.rows.length === 0,
     "an empty report and a scan that never ran are indistinguishable -- v3201's finding, and the exact hazard " +

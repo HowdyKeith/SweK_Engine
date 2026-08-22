@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 // WebGLEngine/tools/roundhouse/detectionMap-selfcheck.mjs -- v3429
 //
 // Run: node tools/roundhouse/detectionMap-selfcheck.mjs
@@ -97,7 +99,9 @@ async function main() {
 
     // ---- 5. THE REAL LAB, AND THE THREE ANSWERS -------------------------------------------------------
     {
-        const engRoot = new URL("../..", import.meta.url).pathname;
+        // v3937 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
+// path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT.
+const engRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
         const r = await detectionMap(engRoot, D);
         say(`${r.census.devicesProbed} devices declare a plant, ${r.census.devicesWithLivePlant} live; ${r.census.observablesMoved} of ${r.census.observablesSeen} observables moved`);
         say(`blind ${r.census.blind}, constant labels ${r.census.constants}, undecidable ${r.census.undecidable}`);

@@ -1,3 +1,4 @@
+import path from "node:path";
 // WebGLEngine/ui/webgpuProbe-selfcheck.mjs -- v3666
 //
 // Run: node ui/webgpuProbe-selfcheck.mjs
@@ -85,7 +86,7 @@ const env = (gpu, secure, host, proto = "http:") => ({
 {
     say("4. HOW MANY OTHER PLACES SPELL THIS TEST THEMSELVES.");
     const { execSync } = await import("node:child_process");
-    const list = execSync("grep -rl 'navigator\\.gpu' --include=*.js --include=*.html --include=*.mjs . | grep -v node_modules", { cwd: new URL("..", import.meta.url).pathname }).toString().trim().split("\n");
+    const list = execSync("grep -rl 'navigator\\.gpu' --include=*.js --include=*.html --include=*.mjs . | grep -v node_modules", { cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") }).toString().trim().split("\n");
     const secure = list.filter((f) => /isSecureContext/.test(readFileSync(new URL("../" + f.replace(/^\.\//, ""), import.meta.url), "utf8")));
     say("     files touching navigator.gpu: " + list.length + "   of those considering the ORIGIN: " + secure.length);
     ok("this module and its caller are among those that do", secure.length >= 2);

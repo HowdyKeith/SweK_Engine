@@ -294,8 +294,8 @@ function _versionRe(anchorStart, suffix){
 // except that there was nothing, which is indistinguishable from an empty folder, a wrong folder, a partial
 // download and a name the pattern cannot read. Every zip in the scanned directory that this scanner DECLINED is
 // now reported with the reason, so the next miss is answerable from the status instead of from the source.
-function scanDownloadsRejects(){
-    const out = []; const dir = downloadsDir(); const re = _versionRe(false, "\\.zip$");
+function scanDownloadsRejects(dirArg){
+    const out = []; const dir = dirArg || downloadsDir(); const re = _versionRe(false, "\\.zip$");
     try {
         for (const f of fs.readdirSync(dir)){
             if (re.test(f)) continue;
@@ -335,15 +335,35 @@ function engineParentDir(){
 // fact about the world.
 const PARTIAL_SUFFIXES = ["\\.crdownload", "\\.part", "\\.download", "\\.opdownload"];
 
-function scanDownloads(){
-    let best = null; const dir = downloadsDir(); const re = _versionRe(false, "\\.zip$");
+// ================================================================================================================
+// *** v3937 -- A GATE POINTED THE LIVE INSTALLER AT ITS OWN FIXTURE FOLDER AND LEFT IT THERE. ***
+// ================================================================================================================
+//
+// Keith's rig offered to install v9302 over v3936. There is no v9302. /sys/update/check said:
+//     downloadsDir: C:\Users\Keith\AppData\Local\Temp\swekdl-4KVsxI    found: 9302
+//
+// That folder is ai-bridge/downloadScan-selfcheck.mjs's fixture directory. The gate writes ONE-BYTE zips named
+// SweK_Engine_v9101 (1).zip, v9102, v9103 ... to prove the scanner reads copy-suffixed names, then calls
+// setConfig({ update: { downloadsDir: dir, enabled: true, autoApply: true } }) -- and setConfig PERSISTS through
+// saveCfg(). It never put the value back. patchScanDoor-selfcheck does the same thing twice more.
+//
+// *** SO THE PRODUCTION INSTALLER WAS AIMED AT SYNTHETIC FILES, WITH AUTO-APPLY SWITCHED ON BY THE TEST. *** Had
+// the poll fired, it would have "upgraded" a real build to a file containing the letter x. The wrong version
+// number was the symptom people could see; the hazard was that a gate could arm the updater.
+//
+// THE FIX IS THAT THE SCANNERS TAKE A DIRECTORY. A gate passes its fixture path and persists nothing; production
+// passes nothing and gets downloadsDir() exactly as before. A TEST THAT HAS TO MUTATE PRODUCTION STATE TO RUN IS
+// A TEST THAT WILL EVENTUALLY FORGET TO PUT IT BACK -- and this one did, silently, until the update banner
+// started advertising a version that never existed.
+function scanDownloads(dirArg){
+    let best = null; const dir = dirArg || downloadsDir(); const re = _versionRe(false, "\\.zip$");
     try { for (const f of fs.readdirSync(dir)){ const m = f.match(re); if (m){ const v = parseInt(m[1], 10); if (!best || v > best.v) best = { v, file: path.join(dir, f) }; } } } catch {}
     return best;
 }
 
 // The newest version whose zip is still ARRIVING. Returns { v, file } or null. Never fed to the installer.
-function scanDownloadsPartial(){
-    let best = null; const dir = downloadsDir();
+function scanDownloadsPartial(dirArg){
+    let best = null; const dir = dirArg || downloadsDir();
     const re = _versionRe(false, "\\.zip(?:" + PARTIAL_SUFFIXES.join("|") + ")$");
     try { for (const f of fs.readdirSync(dir)){ const m = f.match(re); if (m){ const v = parseInt(m[1], 10); if (!best || v > best.v) best = { v, file: path.join(dir, f) }; } } } catch {}
     return best;
@@ -479,12 +499,14 @@ async function updateCheck(apply, opts){
     // v1498 — the SCAN + report (and an explicit apply) work regardless of u.enabled; the
     // `enabled` flag only governs the silent auto-poller (startUpdatePoller). So the client can
     // always check + offer a one-click install even with auto-update left off.
-    const found = scanDownloads();
+    // v3937 -- opts.dir lets a gate exercise the REFUSALS below without writing the live config. Production
+    // passes nothing. A rule that cannot be tested except by breaking production is a rule nobody will test.
+    const found = scanDownloads(opts.dir);
     // v3054 -- an in-flight newer zip is reported alongside, never instead. It is a fact about the folder, not a
     // file anyone may install, so it never becomes `found`.
-    const partial = scanDownloadsPartial();
+    const partial = scanDownloadsPartial(opts.dir);
     const arriving = (partial && partial.v > cur && (!found || partial.v > found.v)) ? partial.v : null;
-    const base = { ok: true, enabled: u.enabled, autoApply: u.autoApply, current: cur, downloadsDir: downloadsDir(), arriving };
+    const base = { ok: true, enabled: u.enabled, autoApply: u.autoApply, current: cur, downloadsDir: opts.dir || downloadsDir(), arriving };
     if (!found){
         lastNote = arriving ? ("v" + arriving + " is still downloading into " + downloadsDir()) : ("no version zip in " + downloadsDir());
         return { ...base, note: lastNote };
@@ -497,6 +519,34 @@ async function updateCheck(apply, opts){
             ? ("v" + arriving + " is still downloading (have v" + cur + "; newest complete zip v" + found.v + ")")
             : ("up to date (have v" + cur + ", newest in Downloads v" + found.v + ")");
         return { ...base, found: found.v, updateAvailable: false, note: lastNote };
+    }
+    // *** v3937 -- A CANDIDATE MUST LOOK LIKE A BUILD BEFORE IT IS OFFERED, AND IT DID NOT HAVE TO. ***
+    //
+    // The fixture that reached Keith's rig was ONE BYTE and five thousand versions ahead of the running build,
+    // and nothing between the scanner and the installer asked either question. Two cheap sanity checks, both
+    // stated as REFUSALS with reasons rather than silent skips -- a candidate that is declined and not named is
+    // the same blindness scanDownloadsRejects() was written to end.
+    //
+    // THE SIZE FLOOR IS NOT A GUESS AT WHAT A BUILD WEIGHS: it only separates a real archive from a placeholder.
+    // A genuine engine zip is tens of megabytes; the smallest legal zip is 22 bytes. 64 KiB sits between them by
+    // orders of magnitude and refuses nothing anybody would ship.
+    //
+    // THE VERSION CEILING IS A SANITY BOUND, NOT A POLICY. Builds climb a few numbers a day; a jump of more than
+    // a thousand is a parse that went wrong or a fixture that escaped, not a release anybody made. It is a
+    // NUMBER IN THE SOURCE so widening it is a deliberate act -- and if a real jump that big ever happens, the
+    // right response is to install by hand once and raise this with the reason beside it.
+    const MIN_BUILD_BYTES = 64 * 1024;
+    const MAX_VERSION_JUMP = 1000;
+    let candBytes = -1; try { candBytes = fs.statSync(found.file).size; } catch {}
+    if (candBytes >= 0 && candBytes < MIN_BUILD_BYTES){
+        lastNote = "REFUSED v" + found.v + ": " + found.file + " is " + candBytes + " bytes, which is not a build " +
+                   "(floor " + MIN_BUILD_BYTES + "). A placeholder or a truncated download, never installed.";
+        return { ...base, found: found.v, updateAvailable: false, refused: "too-small", note: lastNote };
+    }
+    if (found.v - cur > MAX_VERSION_JUMP){
+        lastNote = "REFUSED v" + found.v + ": " + (found.v - cur) + " versions ahead of v" + cur + " (limit " +
+                   MAX_VERSION_JUMP + "). That is a bad parse or a test fixture, not a release. Folder: " + downloadsDir();
+        return { ...base, found: found.v, updateAvailable: false, refused: "implausible-version", note: lastNote };
     }
     if (!apply){ lastNote = "v" + found.v + " available in Downloads (current v" + cur + ")"; return { ...base, found: found.v, updateAvailable: true, note: lastNote }; }
     if (!isWin && !isMac) return { ok: false, error: "apply is Windows/macOS-only" };
@@ -674,7 +724,9 @@ async function updateCheck(apply, opts){
 // lastFound is KEPT and still returned, because "the newest we have ever seen" is a genuinely different and
 // useful fact -- it is simply not the answer to "is there an update sitting in Downloads". The two are now
 // separate fields instead of one field wearing both meanings, and updateAvailable follows the CURRENT scan.
-function updateStatus(){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(); if (f) lastFound = f.v; const _p = scanDownloadsPartial(); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const rejected = f ? [] : scanDownloadsRejects(); const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, rejected, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
+// v3937 -- TAKES AN OPTIONAL DIRECTORY, so a gate can ask "what would you see in THIS folder" without
+// writing to the live config. downloadsDir() when nothing is passed: production is unchanged.
+function updateStatus(dirArg){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(dirArg); if (f) lastFound = f.v; const _p = scanDownloadsPartial(dirArg); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const rejected = f ? [] : scanDownloadsRejects(dirArg); const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, rejected, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: dirArg || downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
 
 // ───────────────────────── one-terminal flag (v3739) ───────────────────────
 // Keith: Avast dislikes the single-terminal construction, so START_NODE_Engine.bat's self-relaunch into a
@@ -1120,8 +1172,10 @@ async function pullNewestPeer(peers, opts){
 // AND A FULL BUILD IS NOT A PATCH: scanDownloads already reports SweK_Engine_vNNNN.zip, so those are EXCLUDED
 // by name here. Reporting a build as an unstated patch would manufacture a finding out of a file that was
 // never claiming anything.
-async function patchScan(){
-    const dir = downloadsDir();
+// v3937 -- TAKES AN OPTIONAL DIRECTORY, for the same reason the download scanners now do:
+// patchScanDoor-selfcheck was calling setConfig to aim this at a fixture folder, twice, without restoring.
+async function patchScan(dirArg){
+    const dir = dirArg || downloadsDir();
     let names = []; try { names = fs.readdirSync(dir); } catch (e) { return { ok: false, dir, why: "cannot read " + dir + ": " + e.code, rows: [] }; }
     const isBuild = _versionRe(true, "\\.zip$");
     const cand = names.filter((n) => /\.zip$/i.test(n) && !isBuild.test(n));

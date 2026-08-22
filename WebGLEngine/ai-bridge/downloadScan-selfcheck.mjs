@@ -34,15 +34,29 @@ let failed = 0;
 const say = (m) => console.log("  ----  " + m);
 const ok = (l, c, n) => { console.log("  " + (c ? "PASS" : "FAIL") + "  " + l + (n ? "   " + n : "")); if (!c) failed++; };
 
+// *** v3937 -- THIS GATE POINTED THE LIVE INSTALLER AT ITS OWN FIXTURES AND NEVER PUT IT BACK. ***
+//
+// statusIn() called setConfig({ downloadsDir: dir, enabled: true, autoApply: true }) to make the scanner look at
+// the temp folder below. setConfig PERSISTS -- it ends in saveCfg() -- so after this file ran, the RUNNING
+// ENGINE was aimed at a directory full of one-byte placeholders named SweK_Engine_v9101 (1).zip, v9102, v9103,
+// and it had auto-apply switched on BY THE TEST. Keith's rig duly offered to install v9302 over v3936, and the
+// only reason it did not is that he read the banner and asked.
+//
+// A TEST THAT MUTATES PRODUCTION STATE TO RUN WILL EVENTUALLY FORGET TO PUT IT BACK. So it no longer mutates
+// anything: updateStatus(dir) takes the folder as an ARGUMENT. Nothing is written, nothing needs restoring, and
+// there is no window in which a crash mid-gate leaves the updater armed. The fixtures are removed on the way
+// out too -- a temp folder full of fake builds is not something to leave lying next to a scanner.
+const _fixtures = [];
 function fixture(files) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), "swekdl-"));
     for (const f of files) fs.writeFileSync(path.join(d, f), "x");
+    _fixtures.push(d);
     return d;
 }
 function statusIn(dir) {
-    sb.setConfig({ update: { downloadsDir: dir, enabled: true, autoApply: true } });
-    return sb.updateStatus();
+    return sb.updateStatus(dir);
 }
+process.on("exit", () => { for (const d of _fixtures) { try { fs.rmSync(d, { recursive: true, force: true }); } catch {} } });
 
 console.log("downloadScan-selfcheck -- the name a browser actually writes\n");
 

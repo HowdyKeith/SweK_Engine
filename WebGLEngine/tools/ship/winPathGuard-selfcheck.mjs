@@ -18,6 +18,10 @@ import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BAD_PATHNAME = "new URL(import.meta.url).pathname";
+// ASSEMBLED so this file stays out of its own scan, the same care BAD_PATHNAME's spelling already takes.
+const RE_PATHNAME_ANY = new RegExp("new URL\\([^)]*import\\.meta\\.url\\s*\\)\\s*\\." + "pathname");
+// the drive-letter strip: a slice(1) or replace guarded on /^\/[A-Za-z]:/ -- percent-decoding is orthogonal.
+const RE_DRIVE_STRIP = /\^\\\/\[A-Za-z\]:/;
 // The OFFENCE is the comparison, not the fragment. Every sentence about this bug contains the fragment.
 const BAD_GUARD_RE = /import\.meta\.url\s*===\s*`file:\/\/\$\{process\.argv\[1\]\}`/;
 // Line-wise, like v3126's stripper: a non-greedy /* */ span once ate 965,179 characters of server.js.
@@ -48,6 +52,19 @@ function walk(dir, hits) {
             const s = stripComments(raw);
             if (s.includes(BAD_PATHNAME)) hits.push(rel + "  [new URL(import.meta.url).pathname]");
             if (BAD_GUARD_RE.test(s)) hits.push(rel + "  [file://${process.argv[1]} guard]");
+            // *** v3937 -- AND THE REL-ARGUMENT FORM, WHICH THIS GATE'S OWN RULE COVERS AND ITS TEST DID NOT. ***
+            // The header says the helper form is safe because "it has a rel argument AND STRIPS THE LEADING SLASH
+            // ITSELF". Only the first half was ever checked: BAD_PATHNAME is the literal no-rel spelling, so
+            // `new URL("../..", import.meta.url).pathname` with no strip sailed through, in FIVE FILES. Keith's
+            // rig proved it the expensive way -- detectionMap died with ENOENT on 'C:\C:\Intel\SweK_Engine_v3849
+            // \...\devices.mjs', the doubled drive letter this gate exists to prevent, produced by a spelling it
+            // was not looking at.
+            //
+            // THE STRIP IS WHAT MAKES IT SAFE, SO THE STRIP IS WHAT IS LOOKED FOR. brain/report.js and
+            // brain/brain.js both do `if (/^\/[A-Za-z]:/.test(s)) s = s.slice(1)` inside _localPath and stay
+            // correctly silent; a file that takes .pathname off import.meta.url and never drive-strips is
+            // flagged whatever its first argument is.
+            if (RE_PATHNAME_ANY.test(s) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
         }
     }
 }
