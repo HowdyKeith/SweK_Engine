@@ -40,6 +40,7 @@ import { describeWebGPU } from "/ui/webgpuProbe.mjs";
 import { magmapGpu, WGSL, MAGMAP_TOL } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
 import { VARIANTS, variantWgsl, validateVariant } from "./tools/roundhouse/magmapVariants.mjs";
+import { magmapTaichi, TAICHI_URL } from "./tools/roundhouse/magmapTaichi.mjs";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -97,6 +98,47 @@ $("run").onclick = async () => {
       } catch (e) { results.push({ id: v.id, status: "ERROR", why: String(e.message || e) }); }
     }
 
+    // ---- v3941: THE TAICHI LANE ---------------------------------------------------------------------------
+    // A SECOND CODEGEN, NOT AN EIGHTH VARIANT. Everything in VARIANTS is bit-identical to the shipped kernel BY
+    // CONSTRUCTION -- workgroup width and where the trig tables live, nothing else. taichi.js compiles its own
+    // WGSL from JavaScript source, so its agreement with the f64 reference is a MEASUREMENT. It is timed the
+    // same way and graded against the same tolerance, and it is kept OUT of the variant ranking below: "best
+    // variant" is a question about tuning the hand-written kernel, and folding a different compiler's output
+    // into that answer would make the winner mean two things.
+    //
+    // THE BUNDLE IS 3.5 MB AND IS LOADED ONLY WHEN THE BENCH RUNS. It is mostly the TypeScript compiler, which
+    // taichi re-parses the kernel source with at runtime -- see vendor/taichi-js/PROVENANCE.md.
+    let taichiResult = null;
+    {
+      st("loading taichi.js (3.5 MB)...");
+      try {
+        const ti = await import(TAICHI_URL);
+        st("compiling + timing the taichi kernel...");
+        const warm = await magmapTaichi(ti.default || ti, CFG);
+        const vals = warm.values || warm;
+        let worst = 0;
+        for (let k = 0; k < ref.length; k++) {
+          const d = Math.abs(vals[k] - ref[k]) / Math.max(Math.abs(ref[k]), 1e-30);
+          if (d > worst) worst = d;
+        }
+        const times = [];
+        for (let r = 0; r < REPS; r++) {
+          const t0 = performance.now();
+          await magmapTaichi(ti.default || ti, CFG);
+          times.push(performance.now() - t0);
+        }
+        taichiResult = { id: "taichi.js", ms: median(times), all: times.map((t) => +t.toFixed(2)),
+                         worstRelDiff: worst,
+                         status: worst <= MAGMAP_TOL ? "ok" : "REJECTED",
+                         why: worst <= MAGMAP_TOL
+                              ? "a second codegen landing inside the SAME tolerance the hand-written kernel earned"
+                              : `worst ${worst.toExponential(2)} exceeds tol ${MAGMAP_TOL} -- taichi's WGSL does not land inside the floor this map is graded against` };
+      } catch (e) {
+        // A FAILURE HERE IS A RESULT, NOT A CRASH, and it must not take the variant bench down with it.
+        taichiResult = { id: "taichi.js", status: "ERROR", why: String(e && e.message || e) };
+      }
+    }
+
     const okRuns = results.filter((r) => r.status === "ok");
     const baseRun = okRuns.find((r) => r.id === "base-wg64");
     const best = okRuns.slice().sort((a, b) => a.ms - b.ms)[0];
@@ -109,6 +151,15 @@ $("run").onclick = async () => {
               `<td class="num">${r.worstRelDiff != null ? r.worstRelDiff.toExponential(1) : "--"}</td>` +
               `<td class="${cls}">${esc(r.status)}</td><td class="note">${esc(r.why || r.note || "")}</td></tr>`;
     }
+    if (taichiResult) {
+      const t = taichiResult;
+      const speed = (baseRun && t.status === "ok") ? (baseRun.ms / t.ms) : null;
+      const cls = t.status === "ok" ? "" : "bad";
+      rows += `<tr><td class="${cls}">${esc(t.id)}</td><td class="num">${t.ms != null ? t.ms.toFixed(2) : "--"}</td>` +
+              `<td class="num">${speed ? speed.toFixed(2) + "x" : "--"}</td>` +
+              `<td class="num">${t.worstRelDiff != null ? t.worstRelDiff.toExponential(1) : "--"}</td>` +
+              `<td class="${cls}">${esc(t.status)}</td><td class="note">${esc(t.why || "")}</td></tr>`;
+    }
     const payload = {
       kind: "swek-magmap-bench", version: 2948, at: new Date().toISOString(),
       adapter: { vendor: info.vendor || "", architecture: info.architecture || "" },
@@ -116,6 +167,9 @@ $("run").onclick = async () => {
       baselineMs: baseRun ? baseRun.ms : null,
       best: best ? { id: best.id, ms: best.ms, speedup: baseRun ? baseRun.ms / best.ms : null } : null,
       results,
+      // kept as its own key rather than appended to `results`: a consumer averaging `results` must not
+      // silently average a different compiler's output into a variant-tuning conclusion.
+      taichi: taichiResult,
     };
     $("out").innerHTML =
       `<table><thead><tr><th>variant</th><th class="num">median ms</th><th class="num">vs base</th><th class="num">worst err</th><th>status</th><th>note</th></tr></thead><tbody>${rows}</tbody></table>
