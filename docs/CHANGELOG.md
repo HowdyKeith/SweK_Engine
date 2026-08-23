@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3949 — the Modal recipe: SHARP on a rented GPU, and the first end-to-end proof the feature works
+
+v3948's bridge could only run SHARP where PyTorch and a real GPU already are — Galaxina and nothing else, since the Macs have no CUDA and a multi-GB torch install is not something to put on a box to try one feature. `WebGLEngine/modal/sharp_modal.py` is the other half: deploy once, and any box in the fleet (or anything down the tunnel) can turn a photograph into a `.ply` without owning a GPU. The shape is taken from `Sharp-ML/SHARP-ML` — A10G, weights cached in a Volume — while its Next.js/Prisma/NextAuth stack is not, because that solves multi-tenant hosting this engine is not.
+
+The licence does not relax because the GPU is rented. Deploying means Modal's machines hold research-only weights, which is squarely still research use. The endpoint refuses unauthenticated calls (an open one is somebody else's GPU bill *and* those weights served to the public), compares its token with `compare_digest` so the length does not leak through timing, and repeats the terms in every reply. Endpoint and token go in `~/.voxelbridge/sharp.json` (0600) — githubBridge's rule verbatim, "outside the engine tree, so it never ships in a copy", which is stronger than trusting `SKIP_FILES` because a file that is not in the tree cannot be swept up by anything. `status()` reports whether there *is* a token and never what it is.
+
+And the remote path is the one part that could be driven from this sandbox, so it was — which is how the round got its only end-to-end evidence. The endpoint contract needs something that speaks HTTP, not a GPU, so the gate stands up a real server, sends a real image, and checks the bytes returned are the bytes written to disk. It found a real bug on its first run: two photographs sharing a basename, and the second silently overwrote the first — the name is derived from the source image, so that would have destroyed work with no error at all.
+
+`predict()` does not re-derive local-vs-remote; it uses the `where` that `status()` already reported. A status saying "modal" while the run shells out to a local python is the two-declarations defect with a green light in front of it — the same shape v3948's `-m` fix closed one layer down.
+
 ## Since v3948 — apple/ml-sharp: one photograph to a Gaussian splat, and the only missing piece was the producer
 
 Keith asked whether `apple/ml-sharp` could be integrated. It can, and it is a small bridge rather than a port because the consumer side has been finished for six hundred versions: `engine/splatParser.js` reads the exact INRIA `.ply` layout SHARP emits (`f_dc_0/1/2`, `opacity`, `scale_0..2`, `rot_0..3`, skipping `f_rest_*`), `SplatRenderer.js` draws it, `splat_viewer.html` and `universal-viewer.html` show it, and `.ply` already travels through the asset menu and the install panel.
