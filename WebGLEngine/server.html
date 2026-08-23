@@ -338,6 +338,22 @@ window.addEventListener("load", function () {
   </header>
   <main>
     <div id="remoteBanner" style="display:none;padding:7px 12px;margin:0 0 8px;border:1px solid;border-radius:6px;font-size:12px;font-weight:600;"></div>
+    <!-- v3944 -- *** THE FIREWALL PROMPT LIVED ON THE ONE PAGE THE DEFAULT BOOT MODE NEVER OPENS. ***
+         index.html's first-run overlay offers to open inbound TCP 8787, and /boot/mode defaults to "server" --
+         so Open-Engine.bat and Start_Everything.bat both land on server.html and that offer is never made. A
+         fresh box in the default mode therefore has phones / Shield / TV silently unable to reach it, with no
+         page anywhere saying why. The only other firewall control in the tree is on control.html, which this
+         page does not link to.
+         A BANNER RATHER THAN A MODAL, because the two pages are opened differently: index.html's overlay is
+         once-ever and gated on first run, while server.html is the console you come back to all day. A modal
+         here would be a door you have to close every time. -->
+    <div id="fwBanner" style="display:none;padding:7px 12px;margin:0 0 8px;border:1px solid #6a5010;border-radius:6px;font-size:12px;background:#1a1400;color:#ffd479;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="fwBannerTxt" style="flex:1;min-width:200px;font-weight:600;"></span>
+        <button id="fwBannerOpen" title="Add an inbound rule for TCP 8787 so phones / Shield / TV on this network can reach this PC. Windows will ask you to approve it (UAC)." style="font-size:11px;padding:2px 10px;background:#3a2a00;color:#ffd479;border:1px solid #6a5010;border-radius:5px;cursor:pointer;">Open firewall</button>
+        <button id="fwBannerNot" title="Hide this banner on this device. The status and the button stay in Tunnels, Clouds &amp; Hosting below." style="font-size:11px;padding:2px 8px;background:none;color:#b8900a;border:none;cursor:pointer;text-decoration:underline;">not now</button>
+      </div>
+    </div>
     <div id="peerVerOut" style="font-size:11px;color:var(--dim);padding:0 2px;"></div>
     <!-- v3850 -- MOVED OFF THE TITLE LINE. install-to-ready sat between the version and the update button,
          where it is neither: the title line is IDENTITY (which build am I, is there a newer one) and this is a
@@ -505,6 +521,12 @@ window.addEventListener("load", function () {
       <div style="display:flex;flex-direction:column;gap:9px;margin-top:8px;font-size:11px;">
         <div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#127760; Public tunnel</div><div id="cfTunnel" style="color:var(--dim);">checking&#8230;</div><div style="margin-top:5px;padding-top:5px;border-top:1px solid #1e4a5a"><div style="font-size:10px;color:var(--dim);margin-bottom:2px">rotation</div>          <label style="font-size:11px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">             <input type="checkbox" id="rotOn" /> auto-rotate every             <input type="range" id="rotEvery" min="1" max="24" step="1" value="4" list="rotTicks" style="flex:0 1 220px;max-width:50%;min-width:110px" /><datalist id="rotTicks"><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="6"></option><option value="8"></option><option value="12"></option><option value="24"></option></datalist>             <b id="rotVal" style="min-width:3em">4h</b>           </label>           <div style="font-size:10px;color:var(--dim);margin-top:3px">a new tunnel is ADDED &mdash; the old one is not retired and keeps serving peers that already hold it</div></div><div style="display:flex;gap:6px;margin-top:4px;"><button id="cfStart" style="display:none;font-size:11px;padding:2px 9px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:5px;cursor:pointer;">Start tunnel</button><button id="cfStop" style="display:none;font-size:11px;padding:2px 9px;background:#3a1c1c;color:#f99;border:1px solid #6a3a3a;border-radius:5px;cursor:pointer;">Stop</button></div><label title="When a temporary external URL comes up, email it to yourself. Sends through your local Outlook by default." style="display:flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;color:var(--dim);cursor:pointer;"><input id="cfEmailUrl" type="checkbox"> email me the link when a tunnel comes up <span style="color:#8fc;">(Outlook)</span> <a id="cfEmailTest" href="#" style="color:#9ed5ff;">(test)</a></label><div style="margin-top:3px;display:flex;align-items:center;gap:4px;"><input id="cfEmailTo" placeholder="your email (Outlook has no stored address)" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:10px ui-monospace,monospace;padding:2px 6px;width:210px;"><button id="cfEmailToSave" style="font-size:10px;padding:2px 8px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:4px;cursor:pointer;">save</button></div></div><div id="caPanel" style="display:none;"><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128290; Cross-arch session <span class="dim" style="font-weight:normal;font-size:10px;">(this Mac)</span></div><div id="caState" style="color:var(--dim);font-size:10px;">checking&#8230;</div><div style="margin-top:4px;"><button id="caRun" style="font-size:11px;padding:2px 9px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:5px;cursor:pointer;">Run cross-arch session</button><span class="dim" id="caBusy" style="font-size:10px;"></span></div><pre id="caLog" style="display:none;max-height:220px;overflow:auto;margin-top:6px;font-size:10px;color:#9fb8ab;white-space:pre-wrap;"></pre></div><div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#127760; Peer tunnels</div><div id="cfPeerTunnels" style="color:var(--dim);display:flex;flex-direction:column;gap:2px;">checking&#8230;</div></div><div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128193; Google Drive auto-update <span id="drvStat" style="color:var(--dim);font-weight:normal;font-size:10px;"></span></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><input id="drvFolder" placeholder="Drive folder ID (where .swekupdate.json files go)" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 7px;width:230px;"><label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input id="drvEnabled" type="checkbox"> auto</label><button id="drvSave" style="font-size:11px;padding:2px 10px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:5px;cursor:pointer;">Save</button><button id="drvCheck" title="check the Drive folder now for a newer .swekupdate.json" style="font-size:11px;padding:2px 10px;background:#243a4d;color:#cfe;border:1px solid #4a6a7d;border-radius:5px;cursor:pointer;">Check now</button></div><div style="color:var(--dim);font-size:10px;margin-top:2px;">Watches a Google Drive folder for Claude's *.swekupdate.json patches (needs the OAuth login or a service-account key already set). Folder ID = the long string in the folder's URL.</div></div>
         <div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128682; Remote landing page</div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><select id="cfLanding" title="Which SweK page the public tunnel serves at its root URL (what a remote visitor sees first)" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:2px 5px;cursor:pointer;"><option value="server.html">Server console</option><option value="index.html">Render (full engine)</option><option value="avatar-server.html">Avatar server</option><option value="control.html">Touch control</option><option value="comics.html">Comics</option><option value="universal-viewer.html">Universal Viewer</option></select><span style="color:var(--dim);font-size:10px;">served at the tunnel root</span></div></div><div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128274; Remote-access password <span id="authStat" style="color:var(--dim);font-weight:normal;font-size:10px;"></span></div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><form onsubmit="return false" style="display:contents" autocomplete="off"><input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="authPw" type="password" placeholder="set from this host (min 6)" style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 7px;width:170px;" autocomplete="current-password"></form><button id="authSet" title="Require this password for anyone changing settings over the tunnel. You on the host/LAN are never asked; a remote logs in once per session." style="font-size:11px;padding:2px 10px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:5px;cursor:pointer;">Set</button></div><div style="color:var(--dim);font-size:10px;margin-top:2px;">Remote (tunnel) changes need this; you on the host/LAN are never asked.</div></div><div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128225; Cloud rendezvous</div><div id="cloudRz" style="color:var(--dim);">checking&#8230;</div></div><div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128279; External web services</div><div id="cloudQuickLinks" style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px;"></div><div style="display:flex;flex-direction:column;gap:2px;"><a href="https://gemini.google.com" target="_blank" rel="noopener" style="color:#9ed5ff;">Google AI (Gemini)</a><span style="color:var(--dim);font-size:10px;">your live public tunnel + peer tunnels are listed above</span></div></div><div style="margin-top:2px;"><a href="/settings.html" target="_blank" style="display:inline-block;font-size:11px;padding:3px 11px;background:#2a2440;color:#cbb0ff;border:1px solid #4a4070;border-radius:5px;text-decoration:none;cursor:pointer;">&#9881;&#65039; Cloud Settings</a></div>
+        <!-- v3944 -- the firewall's PERMANENT home, so dismissing the banner above hides a nag rather than
+             losing the control. Same drawer as the tunnel because they are one subject: who can reach this box
+             and how. (The tunnel bypasses this rule entirely -- Cloudflare dials OUT -- which is exactly why a
+             remote viewer can be looking at a blocked LAN port and the row says so instead of offering a
+             button that would pop a UAC prompt on a screen nobody is sitting at.) -->
+        <div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128737;&#65039; LAN firewall</div><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;"><span id="cfFirewall" style="color:var(--dim);">checking&#8230;</span><button id="cfFwOpen" title="Add an inbound rule for TCP 8787 so phones / Shield / TV on this network can reach this PC. Windows will ask you to approve it (UAC)." style="display:none;font-size:11px;padding:2px 10px;background:#3a2a00;color:#ffd479;border:1px solid #6a5010;border-radius:5px;cursor:pointer;">Open firewall</button></div></div>
         <div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#129504; Cloud AI / compute host</div><div id="cloudAi" style="color:var(--dim);">checking&#8230;</div></div>
         <div><div style="color:#8fc;font-weight:bold;margin-bottom:2px;">&#128421;&#65039; GCP instances <span id="gcpMeta" style="color:var(--dim);font-weight:normal;"></span></div><div id="gcpInst" style="color:var(--dim);">checking&#8230;</div></div>
       </div>
@@ -7976,6 +7998,116 @@ import { mountGithubPanel } from "./ui/githubPanel.js";
         var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close");
         o.card.appendChild(ghRoot);
     };
+})();
+</script>
+<script>
+/* v3944 -- *** THE FIREWALL PROMPT LIVED ON THE ONE PAGE THE DEFAULT BOOT MODE NEVER OPENS. ***
+   index.html's first-run overlay offers to open inbound TCP 8787 so phones / Shield / TV can reach this PC.
+   /boot/mode DEFAULTS TO "server", and both launchers (Open-Engine.bat, Start_Everything.bat) read it and open
+   server.html -- so on a fresh box in the default mode that offer is never made, the LAN silently cannot reach
+   the engine, and no page anywhere says why. The tree's only other firewall control is on control.html, which
+   this page does not link to.
+
+   A PLAIN SCRIPT, NOT A MODULE, and deferred to idle: the status costs a netsh plus a Get-NetFirewallRule (a
+   second or two of PowerShell), and this page's own v3402 note records inline work running while modules were
+   still a minute behind on a cold boot. Nothing here is needed to render the console. */
+(function firewallWatch(){
+  var DISMISS = "voxelengine.fwBannerDismiss";
+  var bn      = document.getElementById("fwBanner");
+  var bnTxt   = document.getElementById("fwBannerTxt");
+  var bnOpen  = document.getElementById("fwBannerOpen");
+  var bnNot   = document.getElementById("fwBannerNot");
+  var row     = document.getElementById("cfFirewall");
+  var rowOpen = document.getElementById("cfFwOpen");
+  if (!bn || !row || !rowOpen) return;
+
+  var last   = null;   // the last status, so a repaint never has to re-ask
+  var onHost = false;  // only the box ITSELF can answer a UAC prompt
+  var busy   = "";     // an in-flight note, which outranks the status on both surfaces
+
+  function dismissed(){ try { return localStorage.getItem(DISMISS) === "1"; } catch (e) { return false; } }
+
+  /* *** ONE PAINTER FOR BOTH SURFACES. *** The banner and the drawer row state the same fact, and this page's
+     own history is one control living in two places and drifting -- v3245 merged three version buttons that had
+     done exactly that, one of them rebuilt on every check so it could not even inherit a fix. Everything below
+     reads `s` and writes both, so there is no second place that decides what a state means. */
+  function paint(s){
+    var port       = (s && s.port) || 8787;
+    /* firewallOn is only FALSE when netsh reported every profile off; an older bridge that does not send the
+       field at all must read as ON, because the safe error here is offering a button nobody needed rather than
+       hiding a port nobody can reach. */
+    var actionable = !!(s && s.ok !== false && s.win !== false && !s.ruleExists && s.firewallOn !== false);
+    var canOpen    = actionable && onHost;
+    var text;
+
+    if (busy)                        text = busy;
+    else if (!s)                     text = "couldn't ask the bridge";
+    else if (s.win === false)        text = "Windows only — nothing to open on this OS";
+    else if (s.ruleExists)           text = "✓ inbound TCP " + port + " allowed";
+    else if (s.firewallOn === false) text = "firewall is off — TCP " + port + " is reachable without a rule";
+    else if (!onHost)                text = "⚠ inbound TCP " + port + " is blocked — open it from the host PC";
+    else                             text = "⚠ inbound TCP " + port + " is blocked";
+
+    row.textContent = text;
+    row.style.color = busy ? "#ffcf6b" : actionable ? "#ffcf6b" : (s && s.ruleExists) ? "#9fe88f" : "var(--dim)";
+    rowOpen.style.display = canOpen ? "" : "none";
+
+    /* THE BANNER IS THE NAG AND THE ROW IS THE RECORD, so only the banner honours the dismissal -- "not now"
+       has to hide the reminder without also hiding the control, or saying no once would cost you the fix. */
+    var show = (canOpen || (busy && bn.style.display === "block")) && !dismissed();
+    bn.style.display = show ? "block" : "none";
+    if (show) bnTxt.textContent = busy ? busy
+      : "⚠ Windows firewall is blocking port " + port + " — phones / Shield / TV on your network can't reach this PC.";
+  }
+
+  function check(){
+    return fetch("/sys/firewall/status", { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ last = j; paint(j); return j; })
+      .catch(function(){ last = null; paint(null); return null; });
+  }
+
+  function openFirewall(){
+    busy = "requesting — approve the Windows (UAC) prompt…"; paint(last);
+    fetch("/sys/firewall/allow", { method: "POST" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || j.ok === false) { busy = "couldn't open: " + ((j && j.error) || "denied?"); paint(last); return; }
+        /* *** firewallAllow RETURNS WHEN THE ELEVATED PROCESS IS LAUNCHED, NOT WHEN THE RULE EXISTS *** -- the
+           rule appears only after the user approves UAC, seconds later, and they may never approve it at all.
+           Writing "done" here would be a green tick for a port that is still shut, which is precisely the
+           silent-failure shape this banner exists to end. So it watches for the rule instead of claiming it. */
+        busy = "waiting for the rule to appear…"; paint(last);
+        var left = 6;
+        (function again(){
+          setTimeout(function(){
+            check().then(function(s){
+              if (s && s.ruleExists) { busy = ""; paint(s); return; }
+              if (--left > 0) return again();
+              busy = ""; check();   // out of patience: show whatever is actually true, not a guess
+            });
+          }, 3000);
+        })();
+      })
+      .catch(function(){ busy = "firewall request failed"; paint(last); });
+  }
+
+  bnOpen.onclick  = openFirewall;   // ONE action, two buttons -- same argument as the one painter above
+  rowOpen.onclick = openFirewall;
+  bnNot.onclick   = function(){ try { localStorage.setItem(DISMISS, "1"); } catch (e) {} bn.style.display = "none"; };
+
+  function start(){
+    /* whoami FIRST, because "can this viewer approve a UAC prompt" changes what the page is allowed to offer.
+       _isLocalReq counts the box's own LAN IP as local, not just loopback, which matters here: the launchers
+       open the LAN address rather than localhost, so the host would otherwise read as a stranger to itself. */
+    fetch("/self/whoami", { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ onHost = !!(j && j.local); })
+      .catch(function(){})
+      .then(check);
+  }
+  if (window.requestIdleCallback) requestIdleCallback(start, { timeout: 8000 });
+  else setTimeout(start, 3000);
 })();
 </script>
 </body>

@@ -22,23 +22,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+// v3944 -- *** THIS FILE WAS THE FOURTH COPY OF THE LIST, AND v3942's OWN CHANGELOG NAMED IT IN ADVANCE: ***
+// "a fourth copy of this list would have been the same defect a fourth time." It was written in the same round
+// that extracted playwrightResolve.mjs and did not import it -- so the module built to stop the list going
+// stale in three places was immediately not used by the one gate added beside it. Importing it now.
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 const require_ = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
+const SHELL = HEADLESS_SHELL;
 
-// *** THE SAME LIST browserSafety-selfcheck.mjs TRIES DID NOT FIND IT HERE EITHER. *** This box's playwright
-// lives at /opt/node22/lib/node_modules/playwright -- a path in neither file's fallback list. Tried in order
-// rather than hardcoded to the one that happened to work, for the same reason browserSafety's own header
-// gives: a checkout with playwright installed anywhere normal should run the gate instead of skipping past it.
-let chromium, pwFrom;
-for (const m of ["playwright", "playwright-core",
-                  "/opt/node22/lib/node_modules/playwright/index.js",
-                  "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
-                  "/usr/local/lib/node_modules/playwright/index.js"]) {
-    try { ({ chromium } = require_(m)); pwFrom = m; break; } catch {}
-}
-if (!chromium) { console.log("SKIP: no playwright"); process.exit(0); }
-if (!fs.existsSync(SHELL)) { console.log("SKIP: no headless shell at " + SHELL); process.exit(0); }
+const { chromium, from: pwFrom } = resolvePlaywright(require_);
+const skip = browserSkipReason(chromium, pwFrom, SHELL);
+// v3944 -- and in the spelling selfchecks.mjs RECOGNISES. It printed a bare "SKIP:", which matches nothing, so
+// the run loop recorded the half-second this file took to decide it could not run AS ITS RUNTIME -- a budget
+// derived from a measurement of nothing, which is the writer bug v3941 added the skip-detection for.
+if (skip) { console.log("githubPanelLive-selfcheck: SKIPPED -- " + skip); process.exit(0); }
 
 const b = await chromium.launch({ executablePath: SHELL });
 const page = await b.newPage();
