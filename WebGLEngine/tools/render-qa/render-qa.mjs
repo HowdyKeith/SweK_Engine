@@ -259,6 +259,21 @@ async function main() {
       // top of every run so "no models configured" is visible as a fact rather than hidden as an excuse.
       /404 .*\.(glb|gltf|fbx|hdr|exr)(\?|$)/i,
       /404 .*\/(dedication|latest)\.(jpg|jpeg|png|webp)(\?|$)/i,
+      // v3956 -- *** A PAGE-INITIATED ABORT IS THE PAGE WORKING, NOT THE PAGE FAILING. ***
+      //
+      // settings.html wraps its calls in faFetch(url, ms), an AbortController that fires at 7s; box3d-info.html
+      // uses AbortSignal.timeout(9000). Both then HANDLE the abort -- settings renders "timed out after 7000ms"
+      // and box3d-info falls back to j = null. Both pages drew fine in Keith's run (nonBlackFrac 0.9381 and 1).
+      // The routes really are slow, and bgServicesBridge.js says so about itself in a comment: "which is why
+      // /bgsvc/status still timed out at 8s". So the request failing is the DESIGNED behaviour of a page that
+      // refuses to hang, and counting it as a page fault marks correct code broken.
+      //
+      // SCOPED BY THE SAME RULE THE BLOCK ABOVE ALREADY DRAWS -- missing CODE is broken, missing CONTENT is not.
+      // An ERR_ABORTED on a .js/.mjs/.wasm is a script that did not load and STAYS a failure: that is the shape
+      // of /ui/recordFloat.js, which appeared as a 404 AND an abort, and was a genuine 25-page bug. The negative
+      // lookahead is what keeps those apart, and the 404 beside a truly missing file fails on its own line
+      // regardless. What becomes benign is only the abort of a non-code request the page chose to give up on.
+      /^net::ERR_ABORTED (?!.*\.(?:js|mjs|wasm)(?:\?|$))/i,
     ];
     const pageIgnore = (pg.ignoreConsole || []).map((s) => new RegExp(s));
     const isBenign = (t) => BENIGN.some((re) => re.test(t)) || pageIgnore.some((re) => re.test(t));
