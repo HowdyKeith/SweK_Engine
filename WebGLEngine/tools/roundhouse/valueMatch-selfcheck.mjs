@@ -173,8 +173,11 @@ if (fails) { console.log("valueMatch-selfcheck: " + fails + " FAILURES"); proces
         "and a pairwise scan reports every pairing among them");
 }
 
-console.log("valueMatch-selfcheck: all checks pass");
-
+// *** v3941 -- THIS PRINTED "all checks pass" UNCONDITIONALLY RIGHT HERE, ONE STATEMENT AHEAD OF THE REAL
+// verdict below it. v3367 appended the unity-class section after an existing trailer instead of before it, so
+// a run where THIS SECTION FAILS still prints the all-clear line first and the FAILURES line second -- a
+// reader watching the tail of a long run sees the good news and stops looking. There was only ever meant to be
+// one trailer; this was the leftover from the one v3367 grew past. ***
 console.log();
 if (fails) { console.log("valueMatch-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("valueMatch-selfcheck: all checks pass");
