@@ -416,23 +416,58 @@ async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
     // carrying a valid Authorization header. Clearing the helper here means the header is the only credential
     // path git has, so GCM's popup never gets a chance to run.
     const tk = effTok();
-    const env = Object.assign({}, process.env);
-    if (tk) {
-        env.GIT_CONFIG_COUNT = "2";
-        env.GIT_CONFIG_KEY_0 = "http.extraHeader";
-        env.GIT_CONFIG_VALUE_0 = "Authorization: Bearer " + tk;
-        env.GIT_CONFIG_KEY_1 = "credential.helper";
-        env.GIT_CONFIG_VALUE_1 = "";
-    }
-    env.GIT_TERMINAL_PROMPT = "0";   // never hang waiting for credentials nobody is there to type
+    // *** v3958 -- credential.helper IS CLEARED WHETHER OR NOT THERE IS A TOKEN, AND THAT WAS THE BUG. ***
+    // It used to sit inside `if (tk)`, so a box with no token got GCM back. Both entries are unconditional now;
+    // the header is the only one that depends on having something to put in it.
+    const baseEnv = () => {
+        const e = Object.assign({}, process.env);
+        e.GIT_CONFIG_COUNT = "1";
+        e.GIT_CONFIG_KEY_0 = "credential.helper";
+        e.GIT_CONFIG_VALUE_0 = "";
+        e.GIT_TERMINAL_PROMPT = "0";   // never hang waiting for credentials nobody is there to type
+        return e;
+    };
+    const authedEnv = () => {
+        const e = baseEnv();
+        e.GIT_CONFIG_COUNT = "2";
+        e.GIT_CONFIG_KEY_1 = "http.extraHeader";
+        e.GIT_CONFIG_VALUE_1 = "Authorization: Bearer " + tk;
+        return e;
+    };
 
     const args = ["clone", "--depth", "1"];
     if (ref) args.push("--branch", ref);
     args.push("https://github.com/" + repo + ".git", tmp);
-    const cl = await _run("git", args, { env });
+
+    // *** A PUBLIC REPO MUST NOT FAIL TO CLONE BECAUSE OF A BAD TOKEN. ***
+    //
+    // Keith's v3943 run: "fatal: could not read Username for 'https://github.com': terminal prompts disabled".
+    // That is what a REJECTED credential looks like once GCM is out of the way -- GitHub answers 401 to the
+    // Authorization header, git falls back to asking for a username, and GIT_TERMINAL_PROMPT stops it. The
+    // popup was hiding this: GCM was supplying working credentials over the top of a token that does not work.
+    //
+    // SweK_Engine is PUBLIC (measured: an anonymous fetch of its info/refs answers 200), so the token is an
+    // OPTIMISATION here -- private repos and rate limits -- and never a requirement. Failing the whole clone on
+    // an expired PAT is refusing to do something that needs no permission at all. So an auth failure retries
+    // WITHOUT the header, and the reply says which path worked, because "it cloned" and "your token is dead"
+    // are both things you want to know and only one of them is obvious afterwards.
+    const AUTH_FAIL = /could not read Username|Authentication failed|invalid username or password|401|403/i;
+    let cl = tk ? await _run("git", args, { env: authedEnv() }) : await _run("git", args, { env: baseEnv() });
+    let usedAnon = !tk, tokenRejected = false;
+    if (!cl.ok && tk && AUTH_FAIL.test(cl.err || "")) {
+        tokenRejected = true;
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}   // a failed clone leaves a partial dir
+        cl = await _run("git", args, { env: baseEnv() });
+        usedAnon = true;
+    }
     if (!cl.ok) {
         try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-        return { ok: false, error: "clone failed: " + (cl.err || "").trim().split("\n").slice(-2).join(" ").slice(0, 300) };
+        const tail = (cl.err || "").trim().split("\n").slice(-2).join(" ").slice(0, 300);
+        return { ok: false, tokenRejected,
+                 error: "clone failed: " + tail + (tokenRejected
+                     ? "  -- the saved GitHub token was REJECTED and the anonymous retry failed too, so this repo is " +
+                       "either private or misspelled. Fix the token in the Account tab, or check the repo name."
+                     : "") };
     }
 
     const ver = _versionInTree(tmp);
@@ -452,7 +487,9 @@ async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
         try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
         return { ok: false, error: "could not name the clone " + dest + ": " + ((e && e.message) || e) };
     }
-    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: engineVersion() };
+    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: engineVersion(),
+             auth: usedAnon ? "anonymous" : "token", tokenRejected,
+             note: tokenRejected ? "cloned ANONYMOUSLY -- the saved GitHub token was rejected by GitHub (expired or wrong scope). The clone is fine; fix the token in the Account tab before anything needing private access or a release." : undefined };
 }
 function _num(v) { const m = String(v).match(/\d+/g); return m ? m.map(Number) : [0]; }
 function _verLt(a, b) { const x = _num(a), y = _num(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d < 0) return true; if (d > 0) return false; } return false; }
