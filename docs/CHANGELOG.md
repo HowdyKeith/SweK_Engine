@@ -8,6 +8,56 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3960 — the topic row had no order, only a history
+
+Keith, reading the chip row on server.html: *"I know that the first items in SweK Engine Topics are defined to show in order, but the rest of the category topics should be alphabetized if not set to show in order."*
+
+Nothing was set to show in order. The row is static markup and the chips sat in the sequence they were **written in** — Email rules and Asset Pipeline at the front because they are the oldest, Rocket League at the back because it is the newest, nine hundred versions of append. It reads as deliberate from the front, where the operational drawers happen to come first, and as noise from the middle onward. That is how an accident looks when its first few entries are accidentally right, which is why the belief was reasonable and still wrong.
+
+So the intent is written down rather than inferred from a file's edit history. **`CHIP_PINNED`** names the fifteen *service* drawers — the ones with live state you check rather than subjects you browse: is the mail rule armed, is the pipeline draining, is RustDesk configured, how far has render-qa got. Those keep their hand-set order, because you find them by position and a row that reshuffles them whenever somebody adds a topic is a row you have to re-read. **Everything not named is alphabetised**, so a new subject drawer needs no edit to the list and lands where its name says it should — the default is the rule, not the exception. The pin list is keyed by `data-tab`, not by label, so this round's three renames cannot silently unpin anything.
+
+Keith also asked for the three Physics Lab drawers to be prefixed:
+
+| was | is |
+| --- | --- |
+| 🔭 Optics & Imaging | 🔭 PL: Optics & Imaging |
+| 🌌 Cosmic & Relativity | 🌌 PL: Cosmic & Relativity |
+| ⚡ Electromagnetism | ⚡ PL: Electromagnetism |
+
+**The rename and the sort are one claim, not two.** A prefix exists so the family reads as a family — and a prefix that did not also make them *adjacent* would be three renames and no gain. Sorted, they land at 28, 29 and 30, and the gate checks the adjacency rather than merely checking the string.
+
+**The sort runs after the chip-group mover, and that sequencing is the whole safety argument.** `CHIP_GROUPS` lifts five chips *out* of this row (Escape Velocity and the three games into Game Theory, Rig Verify into System Tools). Sorting first would order chips that are about to leave; a sort over a stale list could put them back. Sorting what is still there, after the moves, is the only sequencing where the two features cannot destroy each other — and the gate asserts that none of the five reappears.
+
+Nodes are moved, never rebuilt. Each chip carries a click listener wired at load, a live `gtabState` span the bridges write into by id, and a `data-tab` pairing it with its panel; `appendChild` relocates all three and recreating one would drop all three silently. That is the same rule the page mover and the chip grouper already follow — and because it is a claim about the DOM rather than about this page, the new gate *clicks* three chips that ended up far from where the markup put them and watches their panels open.
+
+`tools/ship/chipOrder-selfcheck.mjs` is a browser gate for the same reason v3959's was: the order is produced at runtime, and the static markup is now, on purpose, in the wrong order. Reading the source proves nothing. Two probes show it is measuring the real thing — neutering the sort turns the alphabetical clause red, and reversing three entries in `CHIP_PINNED` makes the row follow, which is how the pin list is shown to be *driving* the order rather than merely agreeing with it.
+
+## Since v3959 — eleven pages were accused of not existing, and the accusation was seven hundred versions old
+
+Keith read a line at the bottom of server.html's Arriving row — *"11 registry entries found no link on this page: aibrain.html, brain-3d.html, brain-fleet.html, brain-lab.html, brain-maze.html, brain-quadrants.html, brain-room.html, dock-brain.html, lbm-fluid.html, lbm3d-flow.html, lbm3d-gpu-check.html"* — and said he was pretty sure some or all of those were in the separate panels.
+
+He was right about every one of them. All eleven are linked in server.html, several of them twice. They sit in the "Brain pages" row v2507 hand-built inside the GPU Brain drawer, and in the Fluid drawer — which are precisely the drawers the registry entries name. Nothing was missing. Nothing had ever been missing.
+
+**The lookup was narrowed on purpose and the sentence describing its failure was not.** v3259 confined the anchor search to the Arriving row, because a document-wide search took the first match and had eaten the Page Index toolbar button. That was the correct fix, and the note explaining it is still there. What went with it was the report, which kept saying *"found no link on this page"* — a true description of the search that had just been removed, and never a true description of the one that replaced it. "Not in Arriving" and "nowhere on the page" are different claims, and only the false one is frightening.
+
+A stale sentence is not a cosmetic bug. It is the alarm that teaches you to ignore alarms — and this one had been going off, in orange, on the front door of the engine, for seven hundred versions.
+
+Three cases are now told apart:
+
+| what is true | what the page does |
+| --- | --- |
+| the link is in the drawer this section wants | nothing — it is filed, and saying so is noise |
+| the link is elsewhere on the page | names it: it may be in the wrong drawer |
+| there is no link anywhere | names it — the real failure the line was written for |
+
+**And the first cut of the fix was still wrong, which the browser said and I would not have guessed.** It asked `slot.contains(a)` and went on accusing all eleven, because they are not in the auto-fill slot at all — they are hand-placed further down the same panel. A link in the right drawer is filed whoever put it there; the slot is one way in, not the definition of belonging. The fix is `home.contains`, where `home` is `slot.closest('[data-panel]')`. The difference between those two lines is invisible in source and obvious in a DOM.
+
+**So the new gate is a browser gate, and it provokes its own failures.** `tools/ship/pageSectionsReport-selfcheck.mjs` loads server.html in real Chromium and reads both surfaces — the console line and the orange span — because they are two renderings of one verdict and the entire risk is that they drift apart, which is exactly what happened here. The existing `pageSections-selfcheck.mjs` is static and could not have caught this: the registry is correct, the mover is correct, and the false sentence is a perfectly good string literal. The bug only exists once a DOM does.
+
+The harder half is that **a fix which reports nothing looks identical to a fix that silenced everything.** So the gate serves a doctored copy of the registry — adding a page nothing links, and a page filed in a different drawer — and requires both to still be shouted about, by name, on both surfaces, while the eleven stay quiet in the same run. Reverting `home` back to `slot` fails 13 of the 18 checks.
+
+The eleven pages are named in the gate individually rather than recomputed from the registry, on purpose. The claim being defended is not "whatever the registry currently says is quiet" — it is *these pages*, the ones that were falsely accused.
+
 ## Since v3958 — the popup was hiding a dead token, and a public repo was failing for want of permission it does not need
 
 v3943 cleared `credential.helper` so Git Credential Manager could not interrupt the clone. It worked — and what it uncovered is what GCM had been papering over: `fatal: could not read Username for 'https://github.com': terminal prompts disabled`. That is what a rejected credential looks like once the popup is gone. GitHub answers 401 to the Authorization header, git falls back to asking for a username, and `GIT_TERMINAL_PROMPT` stops it. GCM had been quietly supplying working credentials over the top of a token that does not work.

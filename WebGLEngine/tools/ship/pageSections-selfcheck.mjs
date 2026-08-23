@@ -217,8 +217,30 @@ const ui = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
 
 // ---- THE MOVER MAY ONLY TAKE FROM ARRIVING (v3259) ----------------------------------------------------------------------
 {
+    // v3959 -- *** THIS BANNED A STRING, AND THE STRING CAME BACK FOR A HONEST REASON. ***
+    // The ban was `!/document.querySelector('a[href="/' + page/` -- and it went red on a document-wide lookup
+    // that MOVES NOTHING. v3959 needed to know whether an unmoved page is linked somewhere else before calling
+    // it missing, because server.html had been accusing eleven pages that were sitting in the drawers all along.
+    // That lookup only ever READS.
+    //
+    // SO THE PROPERTY IS ASSERTED INSTEAD OF THE SPELLING, which is this check's own lesson turned on itself: a
+    // rule wider than its purpose fails something eventually. What v3259 actually bought is that THE NODE THAT
+    // GETS MOVED COMES FROM ARRIVING -- not that the word `document` never appears near an href. So: the Arriving
+    // lookup must exist, the node appended into a slot must be the one it returned, and the document-wide
+    // result must never be appended anywhere. A future edit that wires the wide lookup back into the move trips
+    // the third clause; a future edit that merely reads the page does not.
+    // Bounded by a REAL MARKER rather than a character count. The first cut of this used {0,3000} and the
+    // window stopped 29 characters short of `slot.appendChild(a)` -- so the check reported that the mover no
+    // longer moves anything, which was a fact about my regex.
+    const moverStart = ui.indexOf("for (const page of sec.pages)");
+    const moverEnd = ui.indexOf('console.log("[pageSections] moved', moverStart);
+    const mover = moverStart >= 0 && moverEnd > moverStart ? ui.slice(moverStart, moverEnd) : "";
+    ok("the mover loop can be found at all (every check below reads from it)", mover.length > 0);
+    const wide = (mover.match(/(?:const|let)\s+(\w+)\s*=\s*document\.querySelector\('a\[href="\/' \+ page/) || [])[1];
     ok("!! *** the move lookup is SCOPED to the Arriving row ***",
-        /arrivingRow\.querySelector\('a\[href=/.test(ui) && !/document\.querySelector\('a\[href="\/' \+ page/.test(ui),
+        /arrivingRow\.querySelector\('a\[href=/.test(mover) &&
+        /appendChild\(a\)/.test(mover) &&
+        !(wide && new RegExp("appendChild\\(\\s*" + wide + "\\s*\\)").test(mover)),
         "it searched the WHOLE DOCUMENT and took the first match. page-index.html is claimed by System Tools and " +
         "has TWO anchors -- the toolbar button added at v3227 and the Arriving link -- so querySelector returned " +
         "THE BUTTON and the drawer moved a control out of the toolbar. A LOOKUP WIDER THAN ITS PURPOSE FINDS " +
