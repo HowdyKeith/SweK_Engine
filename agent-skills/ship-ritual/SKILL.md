@@ -41,6 +41,20 @@ number you're about to ship. This single line is what the gate checks to catch
 "old code, new label."
 
 **3. Update the changelog atomically, ASCII-only.**
+
+*Name the file.* In SweK_Engine the round history is **`docs/CHANGELOG.md`** — one
+`## Since vNNNN` section per round, newest first. **It is not README.md.** This step
+said only "the changelog" for a long time, so each round appended a section to
+whatever file was to hand, and README.md reached 620 KB of which 99.1% was 286
+rounds of history: past the size GitHub renders, with the 5 KB a stranger opens the
+file for buried underneath. Split at v3941, and `rootLayout-selfcheck` now fails on
+a `## Since v` heading in README.md — and fails just as hard if the history stops
+being in `docs/CHANGELOG.md`, because deleting it is the cheap way to pass.
+
+The per-round block above `ENGINE_VERSION` in `main.js` is a *different* changelog
+with a different job (the reasoning, in the code, where `shipRitual.mjs` verifies
+it). Both get written; neither substitutes for the other.
+
 Write the entry to a temp file, back up the changelog, append, then verify it grew;
 restore on any error. Reject non-ASCII (emoji, smart quotes, en/em dashes — use `-`,
 `->`, plain quotes). `scripts/safe_prepend.py` does this safely; use it instead of a

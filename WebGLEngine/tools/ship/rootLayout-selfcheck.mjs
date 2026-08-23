@@ -140,6 +140,44 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
     ok("...and README, BACKLOG and TODO stayed, which is not an oversight",
        ["README.md", "BACKLOG.md", "TODO.md"].every((f) => loose.includes(f)),
        "They are the three files a stranger opens first, BACKLOG and TODO are written by the ship ritual every round, and .gitignore only works where it is. A tidy-up that hid the changelog would be tidier and worse.");
+
+    // *** v3941 -- THE README IS THE README, AND IT HAD BECOME THE CHANGELOG. ***
+    //
+    // Measured before the split: README.md was 620,317 bytes, and 607,579 of them -- 99.1% -- were 286
+    // "## Since vNNN" sections. The 5,432 bytes a stranger actually opens the file FOR sat underneath 286
+    // rounds of history, and the whole thing was past the size GitHub renders as markdown, so the front page
+    // of the repository showed no documentation at all.
+    //
+    // *** NOTHING BUILT IT AND NOTHING WILL REBUILD IT, WHICH IS EXACTLY WHY THIS CHECK EXISTS. *** No tool in
+    // tools/ or ai-bridge/ appends to README.md -- the growth was a HABIT, one section per round, and the
+    // ship ritual's own step 3 said "update the changelog" without ever naming a file. A habit leaves no
+    // artefact to fix; it just comes back. Fifty rounds from now the README is half a megabyte again unless
+    // something says no on the round it starts.
+    //
+    // BOTH HALVES ARE ASSERTED, because the cheap way to satisfy the first is to DELETE the history: the
+    // sections must be absent from README.md AND present in docs/CHANGELOG.md. A tidy-up that lost 286 rounds
+    // of reasoning would pass a check written only one way round, and this project keeps the negative results.
+    {
+        const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+        const logPath = path.join(ROOT, "docs", "CHANGELOG.md");
+        const log = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : "";
+        const inReadme = (readme.match(/^## Since v/gm) || []).length;
+        const inLog = (log.match(/^## Since v/gm) || []).length;
+        ok("!! *** the round-by-round history is in docs/CHANGELOG.md, NOT in README.md ***",
+           inReadme === 0,
+           inReadme
+             ? inReadme + " '## Since vNNN' section(s) are back in README.md. They belong in docs/CHANGELOG.md, " +
+               "beside the per-version changelogs Keith already had moved out of root. THE SHIP RITUAL'S STEP 3 " +
+               "SAYS 'update the changelog' -- IT MEANS docs/CHANGELOG.md."
+             : "README.md carries " + Math.round(readme.length / 1024) + " KB of documentation and none of the " +
+               "history. It was 606 KB of history and 5 KB of documentation before v3941 split them.");
+        ok("!! ...and the history is STILL THERE, because the cheap way to pass the line above is to delete it",
+           inLog > 250,
+           inLog + " section(s) in docs/CHANGELOG.md. *** A CHECK WRITTEN ONLY ONE WAY ROUND WOULD REWARD " +
+           "LOSING 286 ROUNDS OF REASONING, which is the only record of what was TRIED AND REJECTED. *** The " +
+           "count is a floor rather than an equality: the log may only grow, and pinning it would make the " +
+           "next round's entry a failure.");
+    }
 }
 
 console.log(fails ? "\nrootLayout-selfcheck: " + fails + " FAILED" : "\nrootLayout-selfcheck: all checks pass");
