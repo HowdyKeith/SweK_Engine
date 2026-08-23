@@ -268,7 +268,29 @@ async function main() {
     page.on("response", (r) => { const s = r.status(); if (s >= 400) consoleErrors.push(s + " " + String(r.url()).slice(0, 160)); });
     let probeResult = null, probeError = null, shotFallback = null;
     try {
-      await page.goto(url, { waitUntil: "load", timeout: 30000 });
+      // v3955 -- *** THE FATAL WAIT WAS THE ONE THAT DOES NOT DECIDE ANYTHING, AND THE TOLERANT ONE WAS THE
+      // VERDICT. *** goto's "load" fires only when EVERY subresource has settled; the canvas check below is what
+      // actually says a render happened -- and it was already written tolerant, with .catch(() => {}). So a page
+      // that draws perfectly but carries one slow request died here, 30 seconds in, BEFORE A SINGLE PIXEL WAS
+      // READ, and reported as a bare "Timeout 30000ms exceeded" with no stats at all.
+      //
+      // world-biomes is that: /index.html?biomes=1 timed out on Keith's rig while world-default, world-rle AND
+      // world-rle-biomes all completed with near-identical pixels -- and all four load in about a second here.
+      // A wait whose failure carries no evidence cannot tell "the page is broken" from "the network was busy".
+      //
+      // SO THE TIMEOUT IS RECORDED AND THE RUN CONTINUES TO THE CHECKS THAT MEAN SOMETHING. A page that really
+      // never renders still fails -- on the canvas wait and the pixel checks, WITH stats and a reason. A page
+      // that was merely slow now passes and says it was slow. Neither outcome is silent, which is the whole
+      // difference: this converts an unactionable timeout into either a verdict or a note beside a verdict.
+      let slowLoad = null;
+      try { await page.goto(url, { waitUntil: "load", timeout: 30000 }); }
+      catch (e) {
+        slowLoad = String((e && e.message) || e).split("\n")[0];
+        // Still get the document up: without this the page may be blank and every later check would blame the
+        // page for a wait that never finished. domcontentloaded returns as soon as the HTML is parsed.
+        await page.waitForLoadState("domcontentloaded", { timeout: 10000 }).catch(() => {});
+        consoleErrors.push("slow load (continued to the checks anyway): " + slowLoad.slice(0, 140));
+      }
       // wait for a canvas to exist + have non-zero size, then a settle delay for the first frames
       await page.waitForFunction(() => { const c = document.querySelector("canvas"); return c && c.width > 0 && c.height > 0; }, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(wait);
@@ -446,6 +468,35 @@ async function main() {
       }
     } catch (e) {
       rec.ok = false; rec.errors.push("harness: " + e.message);
+      // v3955 -- *** THE ASSERT RAN AFTER `finally { await ctx.close() }` AND THEREFORE NEVER RAN AT ALL. ***
+      // It lived below the try/finally, so page.evaluate() was always called on a context the harness had just
+      // closed: every assert failed with "Target page, context or browser has been closed", unconditionally,
+      // from the day the feature was added. Its own v2866 rules say "AN ASSERT THAT THROWS IS A FAILURE, NOT A
+      // SKIP" and "a renamed hook must break the run loudly" -- and it did break loudly, every time, for a
+      // reason that had nothing to do with the claim it was settling. Keith's render-qa shows it on
+      // voxel-viewer-greedy, the ONLY page in the manifest carrying an assert -- so one page's red line was
+      // the entire feature being dead.
+      // Moved inside the try, before the close. The video block stays below: video.path() is only available
+      // AFTER the context closes, which is presumably how the assert drifted down there in the first place.
+      if (pg.assert) {
+        const a = pg.assert;
+        let val = null, aerr = null;
+        try {
+          val = await page.evaluate(`(() => { try { return { v: !!(${a.expr}), raw: JSON.stringify((${a.expr})) }; } catch (e) { return { __err: String(e && e.message || e) }; } })()`);
+        } catch (e) { aerr = String((e && e.message) || e).slice(0, 200); }
+        if (aerr || !val || val.__err) {
+          rec.checks.push({ type: "assert", ok: false, msg: "assert THREW (" + (aerr || val.__err) + ") -- claim: " + (a.claim || "?") });
+          rec.ok = false;
+        } else {
+          const passed = !!val.v;
+          rec.checks.push({
+            type: "assert", ok: passed,
+            msg: (passed ? "holds" : "FAILED") + ": " + (a.claim || "?") + (a.why ? "  -- " + a.why : "") + (val.raw ? "  [" + String(val.raw).slice(0, 80) + "]" : ""),
+          });
+          if (!passed) rec.ok = false;
+        }
+        rec.assertClaim = a.claim || null;
+      }
     } finally { await ctx.close(); }
     if (video) {
       try {
@@ -472,26 +523,6 @@ async function main() {
     //   2. EVERY ASSERT NAMES THE CLAIM IT SETTLES. An assertion that cannot say what it is for is just a test,
     //      and the whole point is moving a specific claim from open to settled on evidence.
     //   3. ABSENT `assert` MEANS BEHAVIOUR IS EXACTLY AS BEFORE. No page is newly failable by adding this.
-    if (pg.assert) {
-      const a = pg.assert;
-      let val = null, aerr = null;
-      try {
-        val = await page.evaluate(`(() => { try { return { v: !!(${a.expr}), raw: JSON.stringify((${a.expr})) }; } catch (e) { return { __err: String(e && e.message || e) }; } })()`);
-      } catch (e) { aerr = String((e && e.message) || e).slice(0, 200); }
-      if (aerr || !val || val.__err) {
-        rec.checks.push({ type: "assert", ok: false, msg: "assert THREW (" + (aerr || val.__err) + ") -- claim: " + (a.claim || "?") });
-        rec.ok = false;
-      } else {
-        const passed = !!val.v;
-        rec.checks.push({
-          type: "assert", ok: passed,
-          msg: (passed ? "holds" : "FAILED") + ": " + (a.claim || "?") + (a.why ? "  -- " + a.why : "") + (val.raw ? "  [" + String(val.raw).slice(0, 80) + "]" : ""),
-        });
-        if (!passed) rec.ok = false;
-      }
-      rec.assertClaim = a.claim || null;
-    }
-
     // A probe is DATA, not a verdict: it never flips rec.ok. A number nobody has a threshold for yet is still
     // worth collecting, and a page that renders correctly should not fail because a debug hook moved.
     if (typeof probeResult !== "undefined" && probeResult !== null) {

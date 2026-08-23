@@ -8,6 +8,12 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3956 — two render-qa failures that were the harness, and one feature that never ran once
+
+**The assert ran after `finally { await ctx.close() }`.** v2866 added per-page asserts to settle claims a page can state about itself, with three rules — the first being "an assert that throws is a failure, not a skip; a renamed hook must break the run loudly". It broke loudly every single time, from the day it was added, because the block sat *below* the try/finally that closes the browser context: `page.evaluate()` was always called on a page the harness had just closed. Driven both ways: evaluating after the close reproduces the exact reported string, "Target page, context or browser has been closed"; evaluating before it returns `{v:true}`. `voxel-viewer-greedy` is the only page in the manifest carrying an assert, so one red line was the entire feature being dead. The video block stays below the close on purpose — `video.path()` is only available afterwards, which is presumably how the assert drifted down there.
+
+**And the fatal wait was the one that decides nothing.** `goto`'s `"load"` fires only when every subresource has settled, and it had no `catch` — while the canvas check right below it, which is what actually says a render happened, was already written tolerant. So a page that draws perfectly but carries one slow request died 30 seconds in, before a single pixel was read, and reported as a bare "Timeout 30000ms exceeded" with no stats at all. That is `world-biomes`: it timed out on the rig while `world-default`, `world-rle` and `world-rle-biomes` all completed with near-identical pixels — and all four load in about a second here, greedy and RLE alike. A wait whose failure carries no evidence cannot tell a broken page from a busy network. The timeout is now recorded and the run continues to the checks that mean something.
+
 ## Since v3955 — the 400 that was visible, and the one beside it that was not
 
 `asteroids.html`'s `400 /kpop/speak` is `face/avatarStage.js` sending `Text` without `Voice`. The route's own comment says "Both fields required — different from /kpop/toast", and it rejects before reaching the pipe. This was the only caller in the tree sending `Text` alone; the other three all send `{Voice, Text}`.
