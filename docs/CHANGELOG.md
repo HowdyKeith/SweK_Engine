@@ -8,6 +8,14 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3955 — the 400 that was visible, and the one beside it that was not
+
+`asteroids.html`'s `400 /kpop/speak` is `face/avatarStage.js` sending `Text` without `Voice`. The route's own comment says "Both fields required — different from /kpop/toast", and it rejects before reaching the pipe. This was the only caller in the tree sending `Text` alone; the other three all send `{Voice, Text}`.
+
+The chain is why nothing found it: `asteroids.html` mentions kpop nowhere and imports exactly one module, `ui/demoChrome.js`, which reaches this file through a **dynamic** `import("/face/avatarStage.js")`. A static walk of the page's imports — including the one written to trace it — returns a closure of two modules and no match. The request exists only at runtime, which is exactly why a browser-driven QA run is what caught it.
+
+And checking every other caller found a worse one, because it was *accepted* rather than rejected. `thead.html` posts `{text}` to `/kpop/speak-wav`, which reads `payload.Text` and defaults it to `""` when absent. So a lowercase key did not 400 — it asked for an empty utterance, every time, silently. The loud bug is the one that got reported; the quiet one beside it had been wrong for longer and nothing would ever have said so. A route that 400s on a missing field and a route that defaults it are two different contracts, and this pair is what the difference costs.
+
 ## Since v3954 — two bridges were required and never called, and one of them cost two pages
 
 `blobBrainBridge` appeared exactly once in server.js: on its own `require`. Neither `register()` nor `handle()` was ever reached, so `/ai/brain/blob/policy` answered 404 for its entire life and `fx/avatar/blobGravity.js` fell back to its baked weights every time — a feature failing closed and silent. render-qa reported it on blob-gravity and blob-stage. The require is what hid it: orphan detection asks "does anything reference this module", and a require *is* a reference, so an unwired bridge looks wired from every angle except the one that matters.

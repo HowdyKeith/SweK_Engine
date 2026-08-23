@@ -348,7 +348,12 @@ function _liveAmp(){
 async function playWavAmplitude(text){
   if (!_ensureAudio()) return false;
   try {
-    const r = await fetch("/kpop/speak-wav", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text: text }) });
+    // v3955 -- *** Text, NOT text, AND THIS ONE FAILED SILENTLY RATHER THAN LOUDLY. *** /kpop/speak-wav reads
+    // `payload.Text` and DEFAULTS IT TO "" when absent (unlike /kpop/speak, which 400s on a missing field), so
+    // a lowercase key produced a request for an empty utterance instead of an error. Found while checking every
+    // caller of the neighbouring route after render-qa's 400 on asteroids: that one was visible because it was
+    // rejected, and this one was not because it was accepted.
+    const r = await fetch("/kpop/speak-wav", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ Voice:"M1", Text: text }) });
     const j = await r.json();
     if (!j || !j.ok || !j.url) return false;
     // v3108 -- boundaryLint UNCHECKED_ERROR_BODY, found once HTML joined the walk. Without .ok a 404 page

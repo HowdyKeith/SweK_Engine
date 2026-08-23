@@ -2420,7 +2420,13 @@ export function mountStage(canvas, opts = {}){
   // Speak a quip through the shared pipeline so EVERY surface captions + zooms
   // (and the PC voices it). Also zoom locally for snappiness.
   function _speakQuip(text){ if(!text) return; try{ talkFor(Math.max(1200, Math.min(6000, text.length*60))); }catch(e){}
-    try{ fetch("/kpop/speak",{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ Text:text }) }); }catch(e){} }
+    // v3955 -- *** Voice WAS MISSING AND THE ROUTE REQUIRES BOTH FIELDS, SO EVERY QUIP WAS A 400. ***
+    // /kpop/speak's own comment says "Both fields required -- different from /kpop/toast", and it 400s on a
+    // missing Voice before it reaches the pipe. This was the ONLY caller in the tree sending Text alone; the
+    // other three all send {Voice, Text}. Keith's render-qa caught it on asteroids.html, which reaches here
+    // through demoChrome.js's DYNAMIC import of this file -- a chain no static scan of the page would show.
+    // "M1" is the tree's established default (23 call sites against 2 for M2).
+    try{ fetch("/kpop/speak",{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ Voice:"M1", Text:text }) }); }catch(e){} }
   function _enqueueQuip(text){ try{ fetch("/avatar/mood",{ method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ quip:text }) }); }catch(e){} }
   function _applyTamaNudge(t){ try{ const v=window._tamaVals||(window._tamaVals={hunger:50,happiness:50,energy:50});
     ["hunger","happiness","energy"].forEach(k=>{ if(typeof t[k]==="number") v[k]=Math.max(0,Math.min(100,(v[k]||0)+t[k])); }); }catch(e){} }
