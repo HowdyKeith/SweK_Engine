@@ -115,6 +115,28 @@ export function inspectZip(zipPath) {
     return { readable: true, note: true, base: statedBase(text), entries: entries.length, noteName: hit.name };
 }
 
+/**
+ * *** v3941 -- THE TOP-LEVEL SHAPE OF AN UNEXTRACTED ZIP, ASKED THROUGH THE ONE READER. ***
+ *
+ * sysadminBridge needed this and had grown its OWN central-directory walk to get it -- 0x02014b50 in the
+ * bridge, in code, which is the fourth reader this file's header refuses in advance and which patchScanDoor's
+ * gate correctly went red on. The bridge could not simply call readCentralDirectory either: the tree's layering
+ * is BRIDGES DELEGATE TO TOOLS AND TOOLS DELEGATE TO safeExtract, and moduleHistory's gate holds exactly that
+ * line for moduleHistoryBridge. So the question belongs here, beside inspectZip, which is already "the same
+ * question asked of a zip that has not been extracted".
+ *
+ * Returns { ok: true, names } or { ok: false, why } -- a REFUSAL WITH ITS REASON rather than an empty list,
+ * because the caller's fail-open branch has to be able to tell "no entries" from "could not read".
+ */
+export function topLevelNames(zipPath) {
+    let buf, entries;
+    try { buf = fs.readFileSync(zipPath); } catch (e) { return { ok: false, why: "cannot read " + zipPath + ": " + ((e && e.code) || e) }; }
+    try { entries = readCentralDirectory(buf); } catch (e) { return { ok: false, why: "not a readable zip: " + e.message }; }
+    const names = entries.map((e) => String(e.name || ""));
+    if (!names.length) return { ok: false, why: "the central directory listed no entries" };
+    return { ok: true, names };
+}
+
 /** The zip form of the verdict. Identical three states, so a caller cannot get a different answer by format. */
 export function auditableZip(zipPath, treeVersion) {
     const z = inspectZip(zipPath);
