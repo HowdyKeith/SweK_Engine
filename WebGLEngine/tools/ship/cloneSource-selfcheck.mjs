@@ -114,6 +114,35 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
         "instead of blocking the bridge forever on a prompt in a process with no terminal attached. ***");
 }
 
+// ---- 4b. A REPO NAME NOBODY COULD HAVE IS REFUSED AT THE WRITE ---------------------------------------------
+//
+// *** KEITH'S CONFIG HELD engineRepo = "Swek Engine" AND EVERY UPDATE HAD SILENTLY STOPPED. *** No GitHub repo
+// can contain a space, so versionCheck and fetchEngineBuild both 404'd and returned ok:false -- and the poller
+// swallows that in a try/catch, so nothing ever said so. engineUpdateSource-selfcheck was the only thing in the
+// tree that could see it. The Account field asked for "engine repo (for version alert)", which is a request for
+// a NAME, and "Swek Engine" is a good answer to that question; the repo is SweK_Engine.
+{
+    console.log("\n4b. A VALUE THAT CANNOT NAME A REPOSITORY IS REFUSED BEFORE IT IS SAVED");
+    ok("!! a display name with a space is refused",
+        !!gh.repoShapeError("Swek Engine") && !!gh.repoShapeError("My Repo/Thing"),
+        "*** THE FAILURE IT PREVENTS IS SILENT AND THREE LAYERS DOWN. *** Saved, it makes every update call " +
+        "404 inside a try/catch nobody reads -- v3940's own words: a feature that fails closed and silent is " +
+        "indistinguishable from a feature nobody turned on.");
+    ok("!! ...and a BARE NAME is still accepted, because _split deliberately prepends the owner",
+        !gh.repoShapeError("SweK_Engine") && !gh.repoShapeError("swek-blobulator"),
+        "rejecting the bare form would break a spelling that works today -- the rule is 'cannot name a repo', " +
+        "not 'is not owner/repo'");
+    ok("...and owner/repo and a pasted github.com URL both pass",
+        !gh.repoShapeError("HowdyKeith/SweK_Engine") &&
+        !gh.repoShapeError("https://github.com/HowdyKeith/SweK_Engine.git"),
+        "the check mirrors _split's own normalisation, so every form the resolver accepts is still saveable");
+    ok("...and empty stays legal, because NOT SET is a real state",
+        !gh.repoShapeError("") && !gh.repoShapeError(null));
+    ok("!! ...and the panel SHOWS the reason instead of a bare 'save failed'",
+        /j\.error \|\| "save failed"/.test(fs.readFileSync(path.join(ENG, "ui", "githubPanel.js"), "utf8")),
+        "a refusal whose reason is thrown away teaches the user to retype the same value");
+}
+
 // ---- 5. IT IS REACHABLE ------------------------------------------------------------------------------------
 {
     console.log("\n5. THERE IS A DOOR, WHICH IS THE WHOLE POINT");
