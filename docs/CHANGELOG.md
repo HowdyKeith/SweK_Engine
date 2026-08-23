@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3945 — a gate that could not pass in a clone, one line below the check explaining why that is fatal
+
+`rootLayout-selfcheck` asserted README.md, BACKLOG.md and TODO.md were all in the root. BACKLOG.md and TODO.md are in `.gitignore` on purpose — session notes deliberately held back from the public mirror, and `.gitignore` says so in those words. So the check passed on the rig, where the files sit, and could not pass in any clone, where they can never exist: it was asserting that nobody runs this gate on a checkout, which is the first place a fresh contributor would run it.
+
+The check directly above it is about exactly this — "a number that cannot be satisfied by any correct tree is not a strict check, it is a permanently red one … which is how this one went unread for hundreds of versions with a REAL finding inside it" — written at v3928 about a ceiling of twelve. The same fault was sitting one line further down as a *name* rather than a number, in the same file, unnoticed by the round that diagnosed it.
+
+What the check was reaching for is kept and made direct: the regression it fears is a tidy-up sweeping these into `docs/` the way the three CHANGELOGs went, or into `Root Utils` the way the scripts went — and a moved file is present on the rig and in a clone alike, so that fires everywhere. Presence in root is now required only of the files git actually carries, and which those are is read from `.gitignore` rather than retyped. The move check is scoped to two destinations rather than walking the tree, because vendored subprojects legitimately carry their own README.md (`HomeAssistant/ha-vbaengine-addon` has one) and a basename walk would report a move that never happened.
+
+The exemption is itself fenced: reading it from `.gitignore` means anything added there stops being required in root, which is right for session notes and wrong for the front page. Planted — with README.md added to `.gitignore` and the file removed, the presence check went green over a missing README, and only the fence caught it.
+
 ## Since v3944 — the firewall prompt lived on the one page the default boot mode never opens
 
 Keith asked whether server.html should check the firewall too. It should, and the reason is worse than a missing convenience: index.html's first-run overlay is the ONLY place in the tree that offers to open inbound TCP 8787, `/boot/mode` defaults to `"server"`, and both launchers read that default and open server.html. So a fresh box in the default mode is never asked, the phone / Shield / TV silently cannot reach it, and no page says why. The tree's one other firewall control is on control.html, which server.html does not link to.
