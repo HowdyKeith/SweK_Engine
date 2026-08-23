@@ -76,6 +76,20 @@ export const MEASURED = {
     "tools/roundhouse/thermalScaling-selfcheck.mjs": 232051,
     "tools/roundhouse/labExport-selfcheck.mjs":      241111,
     "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    250473,
+    // *** v3941 -- MEASURED TO COMPLETION AT LAST, AND THE MEASUREMENT IS WHY IT COULD NEVER PASS. ***
+    // valueMatch sat in UNRESOLVED on the 139.9s general default since v3924 ("exceeded a 150s cap; never
+    // timed before that"). Stopwatch-timed on this box across three runs: 471s, 468s and 477s -- THREE AND A
+    // HALF TIMES THE BUDGET IT WAS BEING KILLED AT. So on the rig it was never a slow gate, it was a gate
+    // nobody had seen the end of, and A TIMEOUT IS NOT A FAILURE: the real failure it was carrying (34 open
+    // matches on a shared small integer, the equal-one cluster outgrowing its own pairwise bookkeeping) was
+    // invisible for as long as it was over budget. Same shape as labResults at v3853, and the fourth time
+    // this table has found a hidden failure behind a missing entry rather than behind a bug.
+    //
+    // IT WILL OUTRUN THIS NUMBER, and that is recorded rather than papered over. valueMatch scans every
+    // numeric observable of every scannable device and compares them PAIRWISE, so its cost grows with the
+    // SQUARE of the lab -- the same growth corroborationCensus and labResults' entries already warn about,
+    // and steeper. This is a real completion on a real box, not a ceiling.
+    "tools/roundhouse/valueMatch-selfcheck.mjs":     477000,
     "tools/ship/labDevices-selfcheck.mjs":           253635,
     "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
     // *** v3913 -- THE EIGHTEEN THAT HAD CREPT PAST THE GENERAL LINE, PLUS TWO MEASURED THIS ROUND. ***
@@ -288,8 +302,6 @@ export const UNRESOLVED = {
     "tools/roundhouse/responseCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. Another registry-wide census; cost grows with the device count",
     "tools/roundhouse/sensitivity-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
-    "tools/roundhouse/valueMatch-selfcheck.mjs":
         "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
     "tools/ship/orphanTriage-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It walks the whole tree, so its cost is a file count rather than a physics fixture",

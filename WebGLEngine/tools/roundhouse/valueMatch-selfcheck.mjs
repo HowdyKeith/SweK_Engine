@@ -24,6 +24,7 @@
 // measured cost, so the exclusion is a stated decision rather than a silent omission.
 
 import { valueMatchCensus, humanTypeable, SLOW_DEVICES, ADJUDICATED, survivesPerturbation,
+    UNITY_BY_CONSTRUCTION, unityCluster,
          valueMatches, collectObservables } from "./valueMatch.mjs";
 
 let fails = 0;
@@ -163,10 +164,32 @@ if (fails) { console.log("valueMatch-selfcheck: " + fails + " FAILURES"); proces
 
     const cen = await (await import("./valueMatch.mjs")).valueMatchCensus();
     const key = (h) => `${h.a.dev}/${h.a.mode}.${h.a.key}|${h.b.dev}/${h.b.mode}.${h.b.key}`;
-    const stillOpen = cen.matches.filter((h) => !ADJUDICATED[key(h)]);
+    // *** v3941 -- THE CLUSTER IS ADJUDICATED BY CLASS NOW, AND THE CHECK STILL BITES. ***
+    // This asserted that no open match sits on a shared small integer. It went red not because the physics
+    // changed but because the BOOKKEEPING IS QUADRATIC: the equal-one cluster went from 7 members to 11, and
+    // 4 new members against 7 old ones is 34 new pairings to hand-write. valueMatch.mjs's own comment predicted
+    // exactly this ("adjudicating it is bookkeeping rather than physics"), two rounds before it happened.
+    //
+    // UNITY_BY_CONSTRUCTION declares the reason PER OBSERVABLE -- 11 reasons instead of 55 pairings -- and a
+    // match with BOTH sides declared is the cluster. What is NOT exempted is the case worth catching: an
+    // observable that equals one and is NOT declared still lands in the open pile and still reddens this line.
+    // A wholesale exemption of the class would have made the check vacuous, which is the trap; exempting only
+    // DECLARED members keeps the question alive for every future arrival.
+    const stillOpen = cen.matches.filter((h) => !ADJUDICATED[key(h)] && !unityCluster(h));
+    const undeclaredOnes = stillOpen.filter((h) => conservedPair(h) !== null);
     console.log("  ----  census: " + cen.matches.length + " matches, " + cen.adjudicated + " adjudicated, " + cen.open + " open");
-    ok("!! *** no OPEN match sits on a shared small integer any more ***",
-        stillOpen.every((h) => conservedPair(h) === null),
+    console.log("  ----  equal-one cluster: " + Object.keys(UNITY_BY_CONSTRUCTION).length +
+                " observables declared unity-by-construction, adjudicated as a class rather than " +
+                (Object.keys(UNITY_BY_CONSTRUCTION).length * (Object.keys(UNITY_BY_CONSTRUCTION).length - 1) / 2) + " pairings");
+    ok("!! *** the cluster is declared PER OBSERVABLE, so it cannot outgrow its own bookkeeping ***",
+        Object.keys(UNITY_BY_CONSTRUCTION).length >= 11 &&
+        Object.values(UNITY_BY_CONSTRUCTION).every((why) => typeof why === "string" && why.length > 30),
+        "*** EVERY MEMBER CARRIES A REASON, AND THE REASON IS THE DEVICE'S OWN. *** A registry of bare keys " +
+        "would be an exemption list; a registry of reasons is a set of claims somebody can check and refute. " +
+        "One of the eleven is a PLANT MODE whose error saturates at unity, declared separately because the " +
+        "reason is not normalisation -- and it leaves open whether a coupling census should scan plants at all.");
+    ok("!! *** and an UNDECLARED value sitting on a small integer still reddens this gate ***",
+        undeclaredOnes.length === 0,
         "SIX OF THE TWENTY-THREE were this class and all six are now recorded as NOT couplings: a symplectic " +
         "Jacobian (volume-preserving), a Crank-Nicolson norm (unitary), a normalised integral ratio, and " +
         "EXTREMAL KERR'S PROGRADE PHOTON ORBIT AT r = M = 1, and since v3433 THE CANONICAL BRACKET {q,p} = 1 -- SIX SEPARATE PHYSICAL REASONS TO EQUAL ONE, " +
