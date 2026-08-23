@@ -8,6 +8,18 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3948 — apple/ml-sharp: one photograph to a Gaussian splat, and the only missing piece was the producer
+
+Keith asked whether `apple/ml-sharp` could be integrated. It can, and it is a small bridge rather than a port because the consumer side has been finished for six hundred versions: `engine/splatParser.js` reads the exact INRIA `.ply` layout SHARP emits (`f_dc_0/1/2`, `opacity`, `scale_0..2`, `rot_0..3`, skipping `f_rest_*`), `SplatRenderer.js` draws it, `splat_viewer.html` and `universal-viewer.html` show it, and `.ply` already travels through the asset menu and the install panel.
+
+The licence is a constraint on this project, not a footnote. `LICENSE_MODEL` grants the weights "exclusively for Research Purposes", explicitly excluding "commercial exploitation, product development or use in any commercial product or service" — and this engine publishes public release zips, which are redistributions. So the weights are never vendored (torch caches them outside the tree) and a splat written where the packer would sweep it up is refused. `status()` returns the terms in every reply as booleans a caller can branch on.
+
+That refusal was wrong in its first form, and the test written for it is what said so. It asked "is this path inside the project" as a proxy for "would this be published" — and refused its own default, because `ai-bridge/asset_library` is inside the tree *and* in `SKIP_DIRS`, so the packer never copies it (measured on the built zip: zero entries). A proxy for a rule is not the rule, and this one failed toward refusing correct paths — the direction nobody notices, because the feature just seems not to work. `wouldBePackaged()` now reads `SKIP_DIRS` from `packagerBridge` (newly exported) and fails closed when there is no packer to ask.
+
+It would also have been the fifth Python resolver in one directory. Four bridges resolve an interpreter and only `cellTrackingBridge` checked its answer — it earned the rule at v1834 (the Windows Store alias stub that prints "Python was not found…" and exits 9009) while the other three hand back whatever the name resolves to; `grep -c PYOK` over the four read 0, 0, 0, 3. The probe is now `ai-bridge/pythonResolve.js` and `cellTrackingBridge` imports it.
+
+Not proven: no prediction has run here — no PyTorch, no weights — so everything below the CLI boundary is built against the documented contract, and one real run on Galaxina is what turns it into a fact. The gate drives the refusals, the path safety and the licence surface, and says so.
+
 ## Since v3947 — the release stopped being hand-carried, and the one opinion CI is not allowed to hold
 
 rig.html called a CI release matrix "THE HIGHEST-VALUE ITEM ON THIS PAGE" and the repository had no `.github/workflows` directory at all. Keith's own words on the entry: "You hand-carry a zip to a house in another town." It now builds, verifies and publishes on a pushed tag.

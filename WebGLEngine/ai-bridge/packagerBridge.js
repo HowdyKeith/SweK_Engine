@@ -237,4 +237,10 @@ async function makeGmailSafeFromZip(opts = {}) {
     return { ok: true, path: outZip, bytes, mb: +(bytes / 1048576).toFixed(1), copied, renamed, version: ver, srcZip, outDir };
 }
 
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, progress, engineVersion, externalAssetsDir, PROJECT_ROOT };
+// v3948 -- SKIP_DIRS and SKIP_FILES are EXPORTED so that a caller asking "would this path end up in a release?"
+// can read the answer instead of retyping the rule. sharpBridge needs exactly that question: it writes Gaussian
+// splats produced from research-licensed model weights, and a release zip is a redistribution. The first version
+// of that check used "is it under PROJECT_ROOT" as a proxy and was WRONG IN THE SAFE DIRECTION-LOOKING WAY --
+// it refused ai-bridge/asset_library, which is inside the project and skipped right here, so the bridge would
+// have refused its own default destination. A proxy for the real rule is not the real rule.
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES };

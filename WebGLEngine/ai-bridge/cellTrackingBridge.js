@@ -27,40 +27,20 @@ const SRC_DIR = path.join(CT_DIR, "src");
 // candidates and only accept one that actually runs and prints a real version.
 // Order: VOXEL_VENV_PY (explicit) → Windows: `py -3`, `py`, `python`, `python3` →
 // Unix: `python3`, `python`. Cached after first success.
-let _pyResolved = null;
-function _pyCandidates() {
-    const out = [];
-    const v = process.env.VOXEL_VENV_PY;
-    if (v && fs.existsSync(v)) out.push({ cmd: v, base: [] });
-    if (IS_WIN) {
-        out.push({ cmd: "py", base: ["-3"] });   // the Python launcher — the reliable one on Windows
-        out.push({ cmd: "py", base: [] });
-        out.push({ cmd: "python", base: [] });
-        out.push({ cmd: "python3", base: [] });
-    } else {
-        out.push({ cmd: "python3", base: [] });
-        out.push({ cmd: "python", base: [] });
-    }
-    return out;
-}
-function _verifyPy(cand) {
-    return new Promise((resolve) => {
-        const { execFileSync } = require("child_process");
-        try {
-            const out = String(execFileSync(cand.cmd, [...cand.base, "-c", "import sys;print('PYOK',sys.version.split()[0])"], { timeout: 8000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }));
-            // a real interpreter prints "PYOK 3.x.y". The Store stub prints its "not found" text instead.
-            resolve(/PYOK\s+\d+\.\d+/.test(out));
-        } catch (e) { resolve(false); }
-    });
-}
-async function _resolvePy() {
-    if (_pyResolved) return _pyResolved;
-    for (const cand of _pyCandidates()) {
-        // eslint-disable-next-line no-await-in-loop
-        if (await _verifyPy(cand)) { _pyResolved = cand; return cand; }
-    }
-    return null;   // nothing usable found
-}
+// v3948 -- THE PROBE MOVED TO ai-bridge/pythonResolve.js AND THIS FILE NOW IMPORTS IT.
+//
+// The verification below was written here at v1834 and was RIGHT: it is the only one of the four python
+// resolvers in this directory that checked its own answer. The other three -- agentReachBridge, autoInstall,
+// camoufoxBridge -- pick an interpreter by name and hand it back unverified, which is exactly the Store-stub
+// bug the comment above diagnoses. Measured at v3948: `grep -c PYOK` over the four reads 0, 0, 0, 3.
+//
+// Being right in one file is what this tree keeps calling a fact rather than a fix. The probe is now a module,
+// so a fifth caller (sharpBridge) could not repeat it a fifth time -- same argument as playwrightResolve.mjs.
+// The behaviour is unchanged: the candidate order and the PYOK test moved verbatim.
+const _pyMod = require("./pythonResolve.js");
+async function _resolvePy() { return _pyMod.resolve(); }
+const _pyCandidates = _pyMod.candidates;
+
 // legacy shape for log lines: a printable command string
 function _pyLabel(cand) { return cand ? [cand.cmd, ...cand.base].join(" ") : (IS_WIN ? "py -3" : "python3"); }
 
