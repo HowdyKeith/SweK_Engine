@@ -16243,6 +16243,24 @@ ${text.replace(/'/g, "''")}
     // v3941 -- the only route from "pushed to GitHub" to "running here". See cloneEngineSource: the release
     // path cannot deliver a version the local tree does not already have.
     if (req.method === "POST" && req.url === "/github/clone-source") { readJson(d => githubBridge.cloneEngineSource(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    // v3948 — apple/ml-sharp: one photograph -> a 3D Gaussian splat .ply, which engine/splatParser.js and
+    // SplatRenderer.js already read. Lazily required so a box without the bridge file still boots, and so the
+    // python probe in status() only runs when somebody actually asks.
+    // *** status() CARRIES THE LICENCE IN EVERY REPLY ON PURPOSE: *** the weights are research-only and this
+    // engine publishes public release zips, so the terms belong in front of whoever is about to press the
+    // button, not in a header they read once.
+    if (req.url.split("?")[0] === "/sharp/status" && req.method === "GET") {
+        try { require("./sharpBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/sharp/predict" && req.method === "POST") {
+        readJson(d => {
+            try { require("./sharpBridge.js").predict(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+            catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 
