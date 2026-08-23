@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/supersededFlag-selfcheck.mjs
 //
-// Run: node tools/ship/supersededFlag-selfcheck.mjs   (~2s -- MEASURED)
+// Run: node tools/ship/supersededFlag-selfcheck.mjs   (~0.06s — MEASURED v3941, was ~2s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3250 -- THE LAUNCHER CLOSED WITHOUT PAUSING BECAUSE OF A FILE IN %TEMP% FROM A PREVIOUS BOOT.

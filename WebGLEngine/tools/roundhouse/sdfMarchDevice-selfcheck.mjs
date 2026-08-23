@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/sdfMarchDevice-selfcheck.mjs -- v3496
 //
-// Run: node tools/roundhouse/sdfMarchDevice-selfcheck.mjs   (~3s)
+// Run: node tools/roundhouse/sdfMarchDevice-selfcheck.mjs   (~1.4s — MEASURED v3941, was ~3s)
 //
 // *** v3488 BUILT THE IMPLICIT-FIELD MARCHER WITH TWO EXTERNAL KEYS AND A PAGE, AND NOTHING IN tools/roundhouse
 // IMPORTED IT. It could be LOOKED AT and not RUN: no lab export, no corroboration, no planted-error census, no

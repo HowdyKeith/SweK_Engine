@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gateReach-selfcheck.mjs — v3318
 //
-// Run: node tools/ship/gateReach-selfcheck.mjs   (~20s — MEASURED individually; it builds the import graph)
+// Run: node tools/ship/gateReach-selfcheck.mjs   (~5.8s — MEASURED v3941, was ~20s; it builds the import graph)
 // Gated by tools/ship/selfchecks.mjs (tree walk).
 //
 // gradedCoverage reports "50 of 124 physics modules WITH A SELFCHECK are reachable from a device bind". True,
