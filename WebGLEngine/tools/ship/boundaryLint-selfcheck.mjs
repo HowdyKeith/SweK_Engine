@@ -1,6 +1,6 @@
 // tools/ship/boundaryLint-selfcheck.mjs
 //
-// Run: node tools/ship/boundaryLint-selfcheck.mjs   (~9s)
+// Run: node tools/ship/boundaryLint-selfcheck.mjs   (~2.4s — MEASURED v3941, was ~9s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v3103 -- A GREEN BUILD IS A SELF-REPORT.

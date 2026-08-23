@@ -1,6 +1,6 @@
 // tools/roundhouse/assumptionMap-selfcheck.mjs
 //
-// Run: node tools/roundhouse/assumptionMap-selfcheck.mjs   (~40s)
+// Run: node tools/roundhouse/assumptionMap-selfcheck.mjs   (~238s — MEASURED v3941, was ~40s)
 //
 // v3163 -- "22 OF 27 DEVICES DECLARE NO ASSUMPTIONS" IS A COUNT, AND A CRUDE COUNT IS AN UNASKED QUESTION.
 //
