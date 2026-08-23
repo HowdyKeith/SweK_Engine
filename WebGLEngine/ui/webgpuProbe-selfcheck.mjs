@@ -14,7 +14,8 @@ import path from "node:path";
 //
 // Every global arrives as an argument, so each environment below is a literal instead of a browser.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describeWebGPU, probeAdapter } from "./webgpuProbe.mjs";
 
 let fails = 0;
@@ -85,10 +86,38 @@ const env = (gpu, secure, host, proto = "http:") => ({
 // --- 4. THE CENSUS, WHICH IS THE PART THAT IS NOT FIXED ------------------------------------------------------------------
 {
     say("4. HOW MANY OTHER PLACES SPELL THIS TEST THEMSELVES.");
-    const { execSync } = await import("node:child_process");
-    const list = execSync("grep -rl 'navigator\\.gpu' --include=*.js --include=*.html --include=*.mjs . | grep -v node_modules", { cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..") }).toString().trim().split("\n");
-    const secure = list.filter((f) => /isSecureContext/.test(readFileSync(new URL("../" + f.replace(/^\.\//, ""), import.meta.url), "utf8")));
+    // *** v3941 -- THIS SHELLED OUT TO `grep ... | grep -v`, AND IT DIED BEFORE IT EVER GOT THERE. ***
+    // Two faults on one line, and Keith's box hit the first:
+    //   (1) fileURLToPath WAS NEVER IMPORTED. A ReferenceError at section 4 killed the whole gate, so the
+    //       eleven checks above it printed PASS and the process still exited 1 -- a gate that reported
+    //       success line by line and failure overall, which is the worst of both readings.
+    //   (2) THE CENSUS NEEDED A POSIX SHELL, grep, AND A PIPE. Fixing the import alone would have moved the
+    //       crash one line later on Windows, where none of the three exist. Same family as todo-selfcheck's
+    //       `bash -lc` and zipShapeFor's `tar -tf`: a tool reached for because it was in the author's
+    //       terminal, in a tree whose own law is that main-module detection has to survive Windows.
+    // The walk is node's, so the census runs anywhere the gate does. NOTE THE DUPLICATION HONESTLY: six other
+    // modules here carry their own walk() (orphanScan, duplicateFiles, checkerCensus, deadImportScan,
+    // shaderRefs, galaxyBind) and this is a seventh. Extracting one shared walker is the right round and is
+    // not this one -- writing it down beats leaving the next reader to rediscover the count.
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    const SKIP = new Set(["node_modules", ".git", "vendor", "rt", "__pycache__"]);
+    const list = [];
+    (function walk(dir) {
+        for (const name of readdirSync(dir)) {
+            if (SKIP.has(name)) continue;
+            const q = path.join(dir, name);
+            if (statSync(q).isDirectory()) { walk(q); continue; }
+            if (!/\.(js|mjs|html)$/.test(name)) continue;
+            if (readFileSync(q, "utf8").includes("navigator.gpu")) list.push(path.relative(ENG, q));
+        }
+    })(ENG);
+    const secure = list.filter((f) => /isSecureContext/.test(readFileSync(path.join(ENG, f), "utf8")));
     say("     files touching navigator.gpu: " + list.length + "   of those considering the ORIGIN: " + secure.length);
+    ok("!! the census actually WALKED something -- an empty scan is not a clean tree",
+        list.length > 10 && secure.length > 0,
+        "*** AN EMPTY REPORT AND A SCAN THAT NEVER RAN ARE INDISTINGUISHABLE, and this line exists because " +
+        "the walk it grades replaced a shell-out that could not run on half the machines in the fleet. *** " +
+        "Found " + list.length + " file(s) touching navigator.gpu.");
     ok("this module and its caller are among those that do", secure.length >= 2);
     say("   *** SO THE FIX IS ONE PANEL DEEP AND THE DEFECT IS TREE-WIDE. Keith said he has seen this on a few");
     say("   demos and would note the others; THIS CENSUS IS WHY THERE ARE OTHERS -- thirty-odd files each");
