@@ -69,7 +69,12 @@ export function runPortableSuite() {
 }
 
 // Node CLI convenience -- but the function above is the real interface, callable from a browser or a-Shell.
-if (typeof process !== "undefined" && process.argv && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- SEPARATOR-TOLERANT AND ANCHORED. `split("/")` returns THE WHOLE PATH on Windows, so this
+// guard was false and the block below never ran there. The leading "/" matters too: without it
+// `.../loopScope.mjs`.endsWith("Scope.mjs") is true, and a sibling could wake somebody else's main
+// block. THIS FILE MAY NOT IMPORT node:url -- a browser page imports it -- so a basename compare is
+// the strongest form available here, and winPathGuard re-derives that exemption rather than trusting it.
+if (typeof process !== "undefined" && process.argv && process.argv[1] && import.meta.url.endsWith("/" + process.argv[1].split(/[\\/]/).pop())) {
     const r = runPortableSuite();
     for (const c of r.checks) console.log((c.ok ? "  PASS  " : "  FAIL  ") + c.name + "   rel " + c.relErr.toExponential(2));
     console.log("\n  " + r.counts.pass + "/" + r.counts.total + (r.allPass ? " -- portable subset all pass" : " FAILURES"));

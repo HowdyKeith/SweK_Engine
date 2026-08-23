@@ -16,6 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -76,7 +77,9 @@ export function setScope(n) {
     return currentScope();
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     console.log("[loopScope] current: " + currentScope());
     for (const s of SCOPES) {
         console.log("  " + s.n + "  " + s.label.padEnd(24) + (s.ready ? "READY    " : "not ready") +

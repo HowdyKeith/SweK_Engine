@@ -76,6 +76,20 @@ export const MEASURED = {
     "tools/roundhouse/thermalScaling-selfcheck.mjs": 232051,
     "tools/roundhouse/labExport-selfcheck.mjs":      241111,
     "tools/roundhouse/pipeFlowKey-selfcheck.mjs":    250473,
+    // *** v3941 -- MEASURED TO COMPLETION AT LAST, AND THE MEASUREMENT IS WHY IT COULD NEVER PASS. ***
+    // valueMatch sat in UNRESOLVED on the 139.9s general default since v3924 ("exceeded a 150s cap; never
+    // timed before that"). Stopwatch-timed on this box across three runs: 471s, 468s and 477s -- THREE AND A
+    // HALF TIMES THE BUDGET IT WAS BEING KILLED AT. So on the rig it was never a slow gate, it was a gate
+    // nobody had seen the end of, and A TIMEOUT IS NOT A FAILURE: the real failure it was carrying (34 open
+    // matches on a shared small integer, the equal-one cluster outgrowing its own pairwise bookkeeping) was
+    // invisible for as long as it was over budget. Same shape as labResults at v3853, and the fourth time
+    // this table has found a hidden failure behind a missing entry rather than behind a bug.
+    //
+    // IT WILL OUTRUN THIS NUMBER, and that is recorded rather than papered over. valueMatch scans every
+    // numeric observable of every scannable device and compares them PAIRWISE, so its cost grows with the
+    // SQUARE of the lab -- the same growth corroborationCensus and labResults' entries already warn about,
+    // and steeper. This is a real completion on a real box, not a ceiling.
+    "tools/roundhouse/valueMatch-selfcheck.mjs":     477000,
     "tools/ship/labDevices-selfcheck.mjs":           253635,
     "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
     // *** v3913 -- THE EIGHTEEN THAT HAD CREPT PAST THE GENERAL LINE, PLUS TWO MEASURED THIS ROUND. ***
@@ -289,12 +303,22 @@ export const UNRESOLVED = {
         "exceeded a 150s cap at v3924. Another registry-wide census; cost grows with the device count",
     "tools/roundhouse/sensitivity-selfcheck.mjs":
         "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
-    "tools/roundhouse/valueMatch-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
     "tools/ship/orphanTriage-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It walks the whole tree, so its cost is a file count rather than a physics fixture",
     "tools/ship/shaderRefs-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It resolves every shader reference in the tree; cost is a file count",
+
+    // *** v3941 -- A DIFFERENT REASON FOR THE SAME ANSWER: THESE TWO CANNOT BE MEASURED HERE AT ALL. ***
+    // Everything above overran a cap. These two SKIP, for want of a rasteriser this box cannot supply, and
+    // until v3941 they were carrying their SKIP TIMES in gate-timings.json as though those were runtimes --
+    // 55ms and 56ms, which is how long it takes each of them to say "I did not run". selfchecks now excludes a
+    // skipped run from the record, and the two false entries were removed rather than replaced with a guess.
+    // A LOWER BOUND IS NOT A MEASUREMENT and neither is a skip; an absent entry and a skip time are different
+    // claims, and only one of them is true. They move to MEASURED when a box with a rasteriser runs them.
+    "render/holoPicture-selfcheck.mjs":
+        "skips without a rasteriser, so this box has never run it to completion. Its former 55ms entry was the SKIP time, removed at v3941",
+    "render/holoAgree-selfcheck.mjs":
+        "skips without a rasteriser, so this box has never run it to completion. Its former 56ms entry was the SKIP time, removed at v3941",
 
     // *** v3913 -- claimTrace DID NOT COMPLETE IN THIRTY MINUTES, so there is no measurement to record. ***
     // A LOWER BOUND IS NOT A MEASUREMENT. Every entry in MEASURED above is a real completion; putting a guess

@@ -20,6 +20,7 @@
 // is a genuinely different Poisson problem while remaining exactly reproducible. NO RNG ANYWHERE -- a random
 // family would put run-to-run noise back into a measurement whose whole point is that there is none.
 
+import { pathToFileURL } from "node:url";
 import { PoissonMG3D, AIR, FLUID, SOLID } from "../../fluid/multigrid3d.mjs";
 
 /**
@@ -83,7 +84,9 @@ export function floorIters(n = 24, tol = 1e-8, k = 2) {
     return { floor: Math.ceil(k * s.sd), k, why: k + " sigma of " + s.sd.toFixed(2) + " over " + s.values.length + " fixtures", spread: s };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const f = floorIters();
     const s = f.spread;
     console.log("[loopNoise] " + s.values.length + " fixtures at n=24: " + s.values.join(", "));

@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { noComments } from "./sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -126,6 +127,40 @@ console.log("\n4. THE 15 GATES ADDED THIS SESSION ARE TIMED, INDIVIDUALLY");
         "without jsdom the gate SKIPS in 39ms; with it, the gate RUNS in 7.6s. *** RECORDING THE SKIP WOULD " +
         "HAVE PUT A 39ms BUDGET ON A 7.6s CHECK, and the first timeout would have looked like a hang in a " +
         "check that is fine. *** A measurement of a thing not happening is not a measurement of the thing.");
+    // *** v3941 -- THE NUMBER WAS FIXED TWICE AND CAME BACK TWICE, SO THIS ROUND ASSERTS THE MECHANISM. ***
+    // The line above checks placementRender's recorded value. It has now been wrong three times (54ms, re-timed
+    // to 14057ms at v3925; then 43ms), and re-timing it was the fix on both previous occasions. A check on a
+    // VALUE cannot prevent a WRITER from overwriting that value tomorrow -- it can only notice afterwards, which
+    // is exactly what happened, twice. So the writer's exclusion rule is asserted here directly.
+    // *** READ THROUGH noComments, AND THE FIRST DRAFT OF THIS CHECK NEEDED IT. *** selfchecks.mjs explains
+    // this rule in a comment that uses the same words the rule is asserted by, so a raw read was satisfied by
+    // the EXPLANATION and would have stayed green with the reporting code deleted. Planted and caught: the
+    // prose-as-code trap, in the check written to stop a regression that had already recurred twice.
+    // noComments and not codeOnly: the tokens live in STRING LITERALS, and codeOnly blanks string contents.
+    const sc = noComments(fs.readFileSync(path.join(ENG, "tools", "ship", "selfchecks.mjs"), "utf8"));
+    ok("!! *** the WRITER refuses to record a gate that declined to run ***",
+        /SKIP_LINE/.test(sc) && /declinedToRun/.test(sc) && /else observedMs\[/.test(sc),
+        "*** A GATE THAT SKIPS EXITS 0, SO IT LANDS ON THE SUCCESS PATH AND ITS SKIP TIME IS MERGED OVER THE " +
+        "REAL MEASUREMENT. *** Failures are excluded and timeouts are excluded; skips were not, because a skip " +
+        "looks exactly like a fast pass from the runner. Forty gates in this tree can skip on an absent " +
+        "dependency, and the time they take to say 'I did not run' is the shortest time they can post -- so the " +
+        "budget it overwrites with is always absurdly small, and the first real timeout looks like a hang.");
+    ok("!! ...and it SAYS which gates sat out, rather than excluding them quietly",
+        /DECLINED TO RUN/.test(sc) && /budgets are UNCHANGED/.test(sc),
+        "a silent exclusion is this same bug wearing the other face: the reader sees a coverage figure and has " +
+        "no way to know which gates contributed nothing to it");
+    // *** ASSERTED IN CODE, NOT IN THE COMMENT THAT SAYS IT. *** The first draft of this line tested for the
+    // sentence "THE VERDICT IS STILL THE EXIT CODE" -- which lives in a comment, so stripping comments (which
+    // the line above must do) made it unfallible-then-unpassable in one move. The PROPERTY is that pass++ runs
+    // for a skipped gate exactly as for any other: it sits after the if/else, unguarded, on the success path.
+    ok("!! ...and the verdict is still the exit code, untouched by any of this",
+        /if \(declinedToRun\) skipped\.push[\s\S]{0,600}?\n        pass\+\+;/.test(sc) &&
+        !/declinedToRun[\s\S]{0,200}?failures\.push/.test(sc),
+        "*** THIS DECIDES TIMING ELIGIBILITY, NOT PASS OR FAIL. *** pass++ is reached by a skipped gate on the " +
+        "same path as any other, and nothing about the skip reaches failures.push. A skip is still a pass, " +
+        "exactly as before -- reading the skip line to decide the VERDICT would be the stdout-scraping this " +
+        "suite banned at v2544, and this line is what keeps the two questions apart.");
+
     ok("...and the slowest of the fifteen is named in the record",
         T.timings["physics/control/controlStateSpace-selfcheck.mjs"] > 5000,
         "8.3s, from 2800 randomised polynomials and a Nyquist sweep at two resolutions");

@@ -21,6 +21,8 @@
 // *** NONE OF THESE IS EVIDENCE OF CHEATING AND THE MODULE DOES NOT SAY IT IS. They are the things worth
 // LOOKING AT, and naming them is what a person needs in order to look. ***
 
+import { pathToFileURL } from "node:url";
+
 const _entries = [];
 
 /**
@@ -87,7 +89,9 @@ export function summarise() {
     };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     resetTrace();
     // A worked example of the shape the summary is FOR: a search circling the bar and finally clearing it.
     record("widen the smoother window", { accept: false, why: "gain 1 is inside the noise floor 3", eval: { gain: 1, floor: 3 } });

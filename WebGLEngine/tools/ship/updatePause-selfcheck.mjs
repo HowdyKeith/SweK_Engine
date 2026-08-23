@@ -95,8 +95,32 @@ const sCode = codeOnly(server), gCode = codeOnly(gates);
         /let timedOut = false;/.test(rig) && /timedOut = true;/.test(rig) && /timedOut, timeoutMs/.test(rig));
     ok("...the flag is set by the killer, so it cannot claim a timeout that did not happen",
         /setTimeout\(\(\) => \{ timedOut = true;/.test(rig));
-    ok("...and the budget it exceeded travels with it", /timeoutMs: TIMEOUT_MS/.test(rig),
+    // *** v3941 -- THIS GREPPED FOR A CONSTANT A BETTER ROUND DELETED. *** rigRunner had a hard-coded
+    // TIMEOUT_MS; it now reads budgetFor() from tools/ship/gateBudget.mjs -- the same table selfchecks.mjs
+    // uses -- because a flat 180s was BELOW twenty of the MEASURED budgets, so twenty gates could never pass
+    // on rig.html whatever they did. The property this line cares about never changed and is what is asked
+    // now. A CHECK PINNED TO A VARIABLE NAME GOES RED WHEN THE CODE IMPROVES, and the honest response to that
+    // red is to rename the variable back, which is exactly backwards.
+    ok("...and the budget it exceeded travels with it",
+        /timeoutMs: budgetMs/.test(rig),
         "'timed out' without the budget leaves the reader unable to judge whether it was close");
+    ok("!! ...and the number REPORTED is the number ENFORCED, not a second declaration of it",
+        // no /s flag on purpose: `.` cannot cross a newline, so this matches THE KILL TIMER'S OWN LINE
+        // rather than any setTimeout in the file that happens to be followed by the word budgetMs later on.
+        /setTimeout\(.*, budgetMs\)/.test(rig) && /timeoutMs: budgetMs/.test(rig),
+        "*** THE KILL TIMER AND THE REPORTED BUDGET READ THE SAME VARIABLE. *** Two numbers here would let " +
+        "the runner kill at one budget and blame another, and a reader judging 'was it close?' against the " +
+        "wrong bar cannot tell a slow gate from a hung one -- which is the whole reason the budget travels.");
+    ok("!! ...and that budget comes from the SHARED TABLE, not a constant in the runner",
+        /gateBudget\.mjs/.test(rig) && /budgetFor\(/.test(rig) && !/TIMEOUT_MS/.test(rig),
+        "a flat 180s sat BELOW twenty of the MEASURED budgets, so those twenty could never pass on rig.html " +
+        "no matter what they did -- levelClaim is budgeted 2116s and was being killed at 180. THE SECOND COPY " +
+        "IS NEVER THE ONE THAT GETS UPDATED, and here the second copy was the one doing the killing.");
+    ok("!! ...and a failure to read the table REFUSES to invent a number quietly",
+        /budgetSource[\s\S]{0,120}could not be loaded/.test(rig),
+        "*** A FALLBACK THAT DOES NOT SAY IT IS A FALLBACK IS A MEASUREMENT THAT IS NOT ONE. *** The reader " +
+        "sees the source beside the number, so 'this gate is slow' and 'this box could not read the table' " +
+        "stop looking identical.");
     ok("!! rig.html says TIMEOUT rather than 'FAIL null'", /r\.timedOut \? "TIMEOUT \(/.test(page));
     ok("!! the tally separates fail, timeout and error", /f \+ " fail"[\s\S]{0,80}timeout/.test(page));
     ok("!! and there is a FAILURE-ONLY list, which is what Keith actually asked for",

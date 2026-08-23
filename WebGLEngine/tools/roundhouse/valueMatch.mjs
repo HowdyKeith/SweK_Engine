@@ -154,6 +154,81 @@ export const conservedPair = (hit) => {
 // glass at eps_r = 2.25 giving n = 1.5, a unit pipe length that cancels out of the harmonic ratios -- are KEPT,
 // because there the roundness carries information a reader needs.
 
+/**
+ * *** THE EQUAL-ONE CLUSTER, DECLARED PER OBSERVABLE INSTEAD OF PER PAIR. ***
+ *
+ * v3941. ADJUDICATED below is keyed by PAIR, and the equal-one cluster grows QUADRATICALLY in it: seven members
+ * needed 21 pairings, and four more arriving with the lab took it to 34 UNADJUDICATED pairs and turned the gate
+ * red. Nothing was wrong with the physics -- the bookkeeping simply could not keep up with its own shape, and
+ * the file said so two hundred lines above this one:
+ *
+ *     "any observable that is normalised to unity will join this cluster on the day it is added,
+ *      and adjudicating it is bookkeeping rather than physics."
+ *
+ * Writing 34 more pair entries would have been the third round of that bookkeeping and would have set up the
+ * fourth. THE DECLARATION IS THEREFORE PER OBSERVABLE -- O(n) reasons instead of O(n^2) pairings -- and a match
+ * whose BOTH sides are declared here is the cluster, adjudicated by class.
+ *
+ * *** AND THE CHECK KEEPS ITS TEETH, WHICH IS THE WHOLE DESIGN CONSTRAINT. *** An observable that equals one and
+ * is NOT declared here still lands in the open pile and still reddens the gate. That is the signal worth having:
+ * a NEW quantity sitting on unity is either a normalisation nobody wrote down, or a real coupling, or a bug --
+ * and it has to be looked at either way. Exempting the class wholesale would have made the check vacuous, which
+ * is the trap this tree keeps naming; exempting DECLARED MEMBERS ONLY keeps the question alive for every arrival.
+ *
+ * EACH REASON BELOW IS THE DEVICE'S OWN, not this file's opinion of it -- every one is traceable to the source
+ * or the header of the device that produces it.
+ */
+export const UNITY_BY_CONSTRUCTION = {
+    // --- the seven already adjudicated pairwise before v3941 -------------------------------------------------
+    "xpbd/kernel.kernelIntegral":
+        "the poly6 kernel is NORMALISED to integrate to 1 -- an analytic identity, not a measurement that landed there",
+    "whitedwarf/limitOrder.limitR2":
+        "an R^2 against an exact power law; a perfect fit saturates at 1 by the definition of R^2",
+    "poisson/canonical.qp":
+        "the canonical bracket {q,p} = 1 -- the definition of a canonical pair",
+    "kerr/extremal.photonPrograde":
+        "extremal Kerr's prograde photon orbit sits at r = M, and the device reports it in units of M",
+    "hmc/symplectic.jacobianDet":
+        "a symplectic map is volume-preserving, so its Jacobian determinant is 1 by construction",
+    "quantum/norm.norm":
+        "unitary evolution preserves the norm; 1 is the initial condition surviving, not a coincidence",
+    "splat/integral.integralRatio":
+        "a ratio of an integral to its own normalisation",
+
+    // --- the four that arrived with the lab and turned the gate red at v3941 ----------------------------------
+    "flip2d/hydrostatic.linearityR2":
+        "hydrostatic pressure is EXACTLY linear in depth, so the R^2 of that fit is 1 analytically -- the same class as whitedwarf/limitOrder.limitR2, which was already adjudicated",
+    "flip3d/hydrostatic.linearityR2":
+        "the 3D column, same analytic reason as flip2d",
+    "freerotation/flip.factorMax":
+        "the intermediate-axis theorem: rotation about the MAXIMUM-inertia axis is stable, so its perturbation growth factor is unity. A value of 1 here is the device reporting the stable case, which is the expected physics rather than an agreement with anything",
+
+    // *** THIS ONE IS A PLANT MODE, AND IT IS DECLARED SEPARATELY BECAUSE THE REASON IS NOT NORMALISATION. ***
+    // induction's `radialdot` is a SEEDED ERROR (plantMode: "radialdot", plantFlips: "circulationWorstErr").
+    // Its own header records the measurement: dotting a purely azimuthal induced field with rhat ANNIHILATES it,
+    // circulation goes -1.162389e+1 -> -7.87e-19 against an exact that does not move, and the RELATIVE ERROR
+    // THEREFORE SATURATES AT UNITY -- "the answer is gone" expressed as a ratio. So it equals one by
+    // construction too, but for a reason that has nothing to do with the other ten.
+    //
+    // *** AND IT RAISES A QUESTION THIS ENTRY DOES NOT ANSWER: collectObservables() walks `d.modes`, which
+    // INCLUDES PLANT MODES, so the census is correlating values produced by deliberately-broken configurations.
+    // Whether a coupling census should scan plants at all is a design decision for the lab's owner, not a
+    // bookkeeping fix, and it is left open here rather than settled quietly. ***
+    "induction/radialdot.circulationWorstErr":
+        "PLANT MODE. A relative error saturating at unity because the measured circulation is annihilated to ~1e-19 against a fixed exact -- not a normalisation",
+};
+
+/**
+ * Is this match the equal-one cluster? True only when BOTH sides are declared above.
+ * A pair with one declared side and one undeclared side is NOT adjudicated -- the undeclared side is exactly
+ * the arrival this check exists to surface.
+ */
+export const unityCluster = (hit) => {
+    if (!hit || conservedPair(hit) === null) return false;
+    const k = (s) => `${s.dev}/${s.mode}.${s.key}`;
+    return !!(UNITY_BY_CONSTRUCTION[k(hit.a)] && UNITY_BY_CONSTRUCTION[k(hit.b)]);
+};
+
 export const ADJUDICATED = {
     // v3462 -- THE EQUAL-ONE CLUSTER GAINS A SIXTH MEMBER, AND THE PATTERN IS NOW THE POINT.
     // xpbd's poly6 kernel integral is 1 because the kernel is NORMALISED to integrate to 1 -- an analytic

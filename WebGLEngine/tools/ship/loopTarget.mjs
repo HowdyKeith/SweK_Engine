@@ -19,6 +19,7 @@
 // after seeing the results is not a holdout. n=32 is held out: it is the largest, the slowest, and the one
 // whose ITERATION GROWTH (31 -> 36 -> 46) a candidate tuned to n=24 would be most likely to wreck. ***
 
+import { pathToFileURL } from "node:url";
 import { measure, repeat, better } from "./loopMetric.mjs";
 import { floorIters } from "./loopNoise.mjs";
 
@@ -77,7 +78,9 @@ export function acceptable(baselineResult, candidateResult, { n = 24, tol = 1e-8
     return { ...better(baselineResult, candidateResult, f.floor), floor: f.floor, floorWhy: f.why };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = evalRun();
     for (const s of r.specs) {
         console.log("  " + s.id.padEnd(6) + (s.result.score === null ? "NO SCORE (" + s.result.reason + ")"

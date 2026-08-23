@@ -132,7 +132,12 @@ export function enforceWalls(g, { lo = 1, hi = 1, sticky = false, sides = true, 
 // *** GUARDED, BECAUSE THIS MODULE IS LOADED BY A BROWSER AND `process` IS A NODE GLOBAL. *** Unguarded,
 // this line threw ReferenceError at module scope, which kills the WHOLE import graph -- so mpm.html
 // rendered its headings and then nothing at all. VERIFIED IN A REAL CHROMIUM at v3809, before and after.
-if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- SEPARATOR-TOLERANT AND ANCHORED. `split("/")` returns THE WHOLE PATH on Windows, so this
+// guard was false and the block below never ran there. The leading "/" matters too: without it
+// `.../loopScope.mjs`.endsWith("Scope.mjs") is true, and a sibling could wake somebody else's main
+// block. THIS FILE MAY NOT IMPORT node:url -- a browser page imports it -- so a basename compare is
+// the strongest form available here, and winPathGuard re-derives that exemption rather than trusting it.
+if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith("/" + process.argv[1].split(/[\\/]/).pop())) {
     import("./transfer.mjs").then((T) => {
         const mk = () => { const g = T.makeGrid(12, 12, 1); T.p2g(T.rotatingBlock(), g, { affine: true }); return g; };
         const dt = 1 / 120, gy = -9.81;
