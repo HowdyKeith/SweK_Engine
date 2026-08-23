@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3946 — the rig page told Keith to spend an afternoon on a tool that dies in one second
+
+Asked which rig.html items could be cleared from here, the useful answer turned out to be about the list rather than the work: the `dfg` entry describes a multi-pass CPU run and its answer key does not exist. v3942 found that `simulation/lbm/dfgBenchmark.mjs` is in no commit of this repository and taught the *tool* to say LOST SOURCE instead of dying on a raw module error — and left the rig entry saying "just run it". The fix reached the thing a machine reads and not the thing a person reads.
+
+And `rigJobs-selfcheck` was green over it, for the most instructive reason: it already checks "every script an entry tells you to run actually exists", and `tools/dfg-benchmark.mjs` does exist. The entry point resolved; the answer key it imports is what was gone. "The script exists" is not "the script can run", and the gap between those two sentences is exactly one afternoon of somebody's time.
+
+This page's cost of being wrong is not a red gate, it is an afternoon — every other list in this tree is read by a machine that will simply fail, while rig.html is read by a person who then goes and does the thing. So the new check is stricter than "resolves": a tool that has diagnosed its own missing precondition and reports it must have that blocker named in the entry pointing at it. Checked without executing anything.
+
+The other thirteen entries were audited the same way and every path in them resolves. The `dfg` entry keeps all of its reasoning, because why the DFG benchmark matters is still true and still the best argument in the list — it is the one external answer key the wind tunnel could ever have. Only the instruction changed: recover the key first, and it is not a run until you have.
+
 ## Since v3945 — a gate that could not pass in a clone, one line below the check explaining why that is fatal
 
 `rootLayout-selfcheck` asserted README.md, BACKLOG.md and TODO.md were all in the root. BACKLOG.md and TODO.md are in `.gitignore` on purpose — session notes deliberately held back from the public mirror, and `.gitignore` says so in those words. So the check passed on the rig, where the files sit, and could not pass in any clone, where they can never exist: it was asserting that nobody runs this gate on a checkout, which is the first place a fresh contributor would run it.
