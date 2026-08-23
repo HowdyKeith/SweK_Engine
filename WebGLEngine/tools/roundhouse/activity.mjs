@@ -13,6 +13,13 @@
 // unattended rather than shown a green light nobody is behind.
 "use strict";
 
+// *** THE MEANING OF "GETTING WORSE" IS OWNED BY stepProgress, AND IS IMPORTED RATHER THAN RESTATED. ***
+// v3941: report.html, run-inspector.html and ui/swekRobot.js each compare against the literal
+// "worsened-overall" by hand, and the roundhouse minipanel was about to become a fourth. That is the
+// duplicated-table class this tree has paid for repeatedly -- MODES in nine files, the gate-file walk in
+// three. A reader that owns a copy of the vocabulary is a reader that can disagree with the writer.
+import { TRAJECTORY } from "./stepProgress.mjs";
+
 export const ACTIVITY = {
     IDLE: "idle",
     RUNNING: "running",
@@ -69,6 +76,19 @@ export function describe(a) {
         text: (a.device || "?") + " " + unit + " " + n + "/" + m + (a.trajectory ? " " + a.trajectory : ""),
         link: (a.transcript && a.runId) ? ("/run-inspector.html?id=" + encodeURIComponent(a.runId)) : null,
     };
+}
+
+/**
+ * *** IS THIS RUN GETTING FURTHER FROM ITS CLAIM? *** describe() folds the trajectory into its sentence, where
+ * a converging run and a diverging one read the same. This is the one fleet event worth interrupting somebody
+ * for, so it is a QUESTION A READER CAN ASK rather than a word a reader has to notice inside a string.
+ *
+ * A block with no trajectory answers FALSE, not unknown, and deliberately: an ungraded run is not a worsening
+ * one, and colouring "we could not tell" the same as "it is going backwards" would spend the alarm on nothing.
+ * @param {object|null} a  an activity block, as built by activityOf or read by readActivity
+ */
+export function worsening(a) {
+    return !!(a && a.trajectory === TRAJECTORY.WORSENED);
 }
 
 /**

@@ -7380,8 +7380,16 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
         // is a CURRICULUM run, whose phases are not rounds and which has no transcript -- so the label and the
         // link both had to stop being assumed. One place turns a block into words, and it is checkable.
         const d = A.describe(mine);
+        // *** v3941 -- A WORSENING RUN ARRIVED HERE AS PLAIN TEXT INSIDE describe()'s SENTENCE, the same
+        // colour as a converging one. The one fleet event worth interrupting somebody for was the one thing
+        // in this panel you had to READ THE WORDS to notice. The PREDICATE IS ASKED OF THE SHARED MODULE
+        // rather than compared here: three other readers already test the literal "worsened-overall" by hand,
+        // and a fourth copy living in a minipanel is exactly the second reading section 2 of the gate beside
+        // this exists to refuse.
+        const worse = A.worsening(mine);
         let html='<div>this box: <span style="color:'+col(mine.state)+'">'+esc(mine.state)+"</span>"+
           (mine.state==="running"?" &mdash; "+esc(d.text)+
+            (worse?' <span style="color:#f28b8b" title="this run is getting FURTHER from its claim each round, not closer">&#9660; worsening</span>':"")+
             (d.link?' <a href="'+d.link+'" target="_blank" rel="noopener" style="color:#9fe6c0">transcript</a>':"")
           :"")+"</div>";
         let fleetNote="";
@@ -7394,7 +7402,14 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
           else html+='<div style="margin-top:4px;color:#6f8a7c">fleet: no peers have checked in</div>';
         }catch{ html+='<div style="margin-top:4px;color:#6f8a7c">fleet: lighthouse unreachable</div>'; }
         body.innerHTML=html;
-        if(stat) stat.textContent = mine.state==="running" ? "running" : (fleetNote.includes("UNATTENDED")&&!fleetNote.startsWith("0 running, 0 idle, 0 UNATTENDED")?"check":"idle");
+        // The chip carries it too, and this is the whole point of a chip: a gauge you must open to read is
+        // not a gauge, so the state that would make somebody OPEN the drawer has to survive the collapse.
+        if(stat){
+          stat.textContent = worse ? "worsening"
+            : mine.state==="running" ? "running"
+            : (fleetNote.includes("UNATTENDED")&&!fleetNote.startsWith("0 running, 0 idle, 0 UNATTENDED")?"check":"idle");
+          stat.style.color = worse ? "#f28b8b" : "";
+        }
       }catch{ body.textContent="bridge unreachable"; }
     }
     const t=document.querySelector('[data-tab="roundhouse"]');
