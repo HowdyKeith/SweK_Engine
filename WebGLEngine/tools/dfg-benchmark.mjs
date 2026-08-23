@@ -19,8 +19,33 @@ import path from "node:path";
 const ENG = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const arg = (n, d) => { const i = process.argv.indexOf("--" + n); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 
+// *** v3941 -- THE KEY THIS TOOL EXISTS TO READ IS LOST SOURCE, AND THE TOOL SAID SO WITH A STACK TRACE. ***
+// simulation/lbm/dfgBenchmark.mjs is in no commit of this repository -- git history begins at v3842 and this
+// file is v2846, so the module predates the tree entering git and did not survive the move. Running the tool
+// produced "Cannot find module ..." with a resolved absolute path, which reads like a broken install on the
+// machine rather than a file the project no longer has.
+//
+// SAME SHAPE AS world/terrainGenWorker.js, which wasmTerrainStatus reports as LOST SOURCE rather than crashing
+// on. A missing dependency and a missing DELIVERABLE are different diagnoses, and only one of them is
+// something the reader can act on. Found by trying to ADD this tool to the REPORTING registry at v3941: it is
+// not registered, because a tool that cannot run is not a report -- and its own header already rules it out
+// twice over, at 11 to 34 minutes a case.
+const KEY = "simulation/lbm/dfgBenchmark.mjs";
+
 async function main() {
-    const D_ = await import(pathToFileURL(path.join(ENG, "simulation", "lbm", "dfgBenchmark.mjs")).href);
+    const keyPath = path.join(ENG, "simulation", "lbm", "dfgBenchmark.mjs");
+    if (!(await import("node:fs")).default.existsSync(keyPath)) {
+        console.error("[dfg-benchmark] LOST SOURCE: " + KEY + " is not in this tree.");
+        console.error("  It is the EXTERNAL ANSWER KEY this benchmark grades against -- the DFG case definitions,");
+        console.error("  latticeFor() and runPlan(). Without it there is nothing to compare a run to, so the");
+        console.error("  benchmark cannot run at all. This is not a broken install: the module is in no commit");
+        console.error("  of this repository (git begins at v3842; this tool is v2846), so it was lost when the");
+        console.error("  project moved into git and survives only in a pre-v3842 zip, if anywhere.");
+        console.error("  RECOVER IT from an old build, or re-derive the DFG 2D-1/2D-2 case data from the");
+        console.error("  published benchmark before this tool means anything.");
+        process.exit(1);
+    }
+    const D_ = await import(pathToFileURL(keyPath).href);
     const { makeLBM } = await import(pathToFileURL(path.join(ENG, "simulation", "lbm", "lbm2d.js")).href);
     const { solidForce } = await import(pathToFileURL(path.join(ENG, "simulation", "lbm", "windTunnel.mjs")).href);
 

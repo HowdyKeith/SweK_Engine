@@ -28,7 +28,51 @@ const DEFAULTS = { owner: "HowdyKeith", token: "", defaultRepo: "", engineRepo: 
 
 function loadCfg() { try { if (fs.existsSync(CFG)) return Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(CFG, "utf8"))); } catch {} return { ...DEFAULTS }; }
 function saveCfg(c) { try { fs.mkdirSync(path.dirname(CFG), { recursive: true }); fs.writeFileSync(CFG, JSON.stringify(c, null, 2), { mode: 0o600 }); } catch {} }
-function setConfig(d) { d = d || {}; const c = loadCfg(); for (const k of ["owner", "token", "defaultRepo", "engineRepo"]) if (d[k] != null) c[k] = String(d[k]).trim(); saveCfg(c); return status(); }
+// *** v3941 -- IT SAVED "Swek Engine" AND EVERY UPDATE SILENTLY STOPPED. ***
+//
+// Keith's rig ran engineUpdateSource-selfcheck and it reported engineRepo = "Swek Engine". No GitHub repo can
+// be called that -- names cannot contain a space -- so versionCheck() and fetchEngineBuild() both resolved to
+// /repos/HowdyKeith/Swek%20Engine, got a 404, and returned ok:false. THE POLLER SWALLOWS THAT IN A try/catch,
+// so the auto-update chain was dead and the panel showed nothing wrong. That gate's own note says it: the
+// error path is unobservable from outside, which is why the emptiness can only be caught before it ships.
+//
+// THE UI INVITED IT. The Account field's placeholder read "engine repo (for version alert)", which asks for a
+// NAME, and "Swek Engine" is a perfectly good answer to that question. The real repo is SweK_Engine. A free
+// text box that accepts anything and fails closed three layers down is the shape v3940's own commit message
+// named: "a feature that fails closed and silent is indistinguishable from a feature nobody turned on".
+//
+// REFUSED AT THE WRITE, which is the only place it is still cheap. A BARE NAME STAYS LEGAL -- _split falls
+// back to the configured owner for it, deliberately, and rejecting it would break a working spelling. What is
+// rejected is a value that CANNOT NAME A REPOSITORY: GitHub allows [A-Za-z0-9._-] per segment, and a space is
+// impossible in any of them. The check mirrors _split's own normalisation so the URL form somebody pastes from
+// the address bar still works.
+const REPO_SEG = /^[A-Za-z0-9._-]+$/;
+function repoShapeError(v) {
+    const s0 = String(v == null ? "" : v).trim();
+    if (!s0) return "";                                  // empty means NOT SET, which is a legitimate state
+    const cleaned = s0.replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\.git$/i, "").replace(/^\/+|\/+$/g, "");
+    const parts = cleaned.split("/").filter(Boolean);
+    if (!parts.length) return "is empty once the github.com prefix is stripped";
+    if (parts.length > 2) return "has " + parts.length + " path segments; a repo is owner/name or just name";
+    const bad = parts.find((x) => !REPO_SEG.test(x));
+    if (bad) return "the segment \"" + bad + "\" is not a possible GitHub name -- only letters, digits, dot, dash and underscore" +
+                    (/\s/.test(bad) ? " (that one contains a space, so it is probably a display name rather than the repo)" : "");
+    return "";
+}
+function setConfig(d) {
+    d = d || {};
+    const c = loadCfg();
+    for (const k of ["defaultRepo", "engineRepo"]) {
+        if (d[k] == null) continue;
+        const why = repoShapeError(d[k]);
+        if (why) return Object.assign(status(), { ok: false, error: k + " " + why + ". Got: \"" + String(d[k]).trim() + "\"" });
+    }
+    if (d.owner != null && String(d.owner).trim() && !REPO_SEG.test(String(d.owner).trim()))
+        return Object.assign(status(), { ok: false, error: "owner \"" + String(d.owner).trim() + "\" is not a possible GitHub username" });
+    for (const k of ["owner", "token", "defaultRepo", "engineRepo"]) if (d[k] != null) c[k] = String(d[k]).trim();
+    saveCfg(c);
+    return status();
+}
 function effTok() { const c = loadCfg(); return c.token || process.env.GITHUB_TOKEN || ""; }  // v1130 — env token comes from the Windows vault loader
 function status() { const c = loadCfg(); return { ok: true, owner: c.owner || "", defaultRepo: c.defaultRepo || "", engineRepo: c.engineRepo || "", hasToken: !!effTok(), tokenTail: effTok() ? effTok().slice(-4) : "", engineVersion: engineVersion() }; }
 
@@ -782,4 +826,4 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
              warnings: [pv.hasReadme ? null : "no README.md", pv.hasLicense ? null : "no LICENSE", pv.hasWorkflow ? null : "no CI workflow (.github/workflows/)"].filter(Boolean) };
 }
 
-module.exports = { _apiErrorText, _errorDetail, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _apiErrorText, _errorDetail, repoShapeError, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

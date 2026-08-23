@@ -121,7 +121,7 @@ export function mountGithubPanel() {
         },
         Account() {
             const w = E("div", "display:flex;flex-direction:column;gap:6px;");
-            const owner = IN("GitHub username"); const token = IN("personal access token (repo scope)", "password"); const eng = IN("engine repo (for version alert)");
+            const owner = IN("GitHub username"); const token = IN("personal access token (repo scope)", "password"); const eng = IN("engine repo -- owner/repo, e.g. HowdyKeith/SweK_Engine");
             w.append(E("div", "color:#9bb0c8;font-size:11px;", "Account / token"), owner, token, eng);
             // v1847 — where to get a token. GitHub has no permanent "API key"; you generate a Personal
             // Access Token (PAT) yourself. Link opens the token settings; the note explains the two kinds
@@ -144,7 +144,7 @@ export function mountGithubPanel() {
             r.append(save, who, rl); w.append(r);
             (async () => { const s = await api("config"); if (s && s.ok) { owner.value = s.owner || ""; eng.value = s.engineRepo || ""; if (s.hasToken) token.placeholder = "saved (\u2026" + s.tokenTail + ") \u2014 type to replace"; } })();
             const cfg = () => ({ owner: owner.value.trim(), engineRepo: eng.value.trim(), ...(token.value.trim() ? { token: token.value.trim() } : {}) });
-            save.onclick = async () => { const j = await api("config", cfg()); say(j.ok ? "\u2713 saved" + (j.hasToken ? " (token set)" : "") : "save failed", j.ok); token.value = ""; };
+            save.onclick = async () => { const j = await api("config", cfg()); say(j.ok ? "\u2713 saved" + (j.hasToken ? " (token set)" : "") : "\u2717 " + (j.error || "save failed"), j.ok); token.value = ""; };
             who.onclick = async () => { await api("config", cfg()); const j = await api("whoami"); say(j.ok ? `\u2713 ${j.login}${j.name ? " (" + j.name + ")" : ""}\n   public ${j.publicRepos}, private ${j.privateRepos || 0}` : "\u2717 " + j.error, j.ok); };
             rl.onclick = async () => { const j = await api("ratelimit"); say(j.ok ? `core: ${j.remaining}/${j.limit} left` : "\u2717 " + j.error, j.ok); };
             // v1130 — Windows Credential Manager
