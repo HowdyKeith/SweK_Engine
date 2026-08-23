@@ -94,15 +94,35 @@ const dev = await D.getDevice("heidler");
         "not be the Heidler function, and asserting 'has a peak' would not have noticed");
 }
 
-// ---- 4. THREE MODES, EXPORTED, AND NOTHING VENDORED -----------------------------------------------------------------
+// ---- 4. THE MODES, EXPORTED, AND NOTHING VENDORED --------------------------------------------------------------------
 {
-    ok("!! three modes, EXPORTED rather than probed",
-        Array.isArray(dev.modes) && dev.modes.length === 3 &&
-        dev.modes.every((m) => K.checkMode(dev, m).ok !== false) &&
+    // *** v3941 -- THIS PINNED dev.modes.length === 3 AND THE DEVICE GREW A FOURTH MODE ON PURPOSE. ***
+    // `noroot` is this device's declared PLANT (plantMode: "noroot", plantFlips: "peakErrFrac"), added by the
+    // round whose own comment beside it reads "THIS DEVICE NOW CARRIES BOTH HALVES ... until now this device had
+    // only the half that proves the apparatus". So the gate went red ON THE ROUND THAT COMPLETED THE DEVICE.
+    //
+    // A COUNT IS NOT A PROPERTY -- which this line's own detail text quotes v3192 as measuring, about counts
+    // being lower bounds, while asserting one. The count is REPORTED below and the structure is what is pinned:
+    // every declared mode validates, a nonsense mode is refused, and THE CONTROL AND THE PLANT ARE BOTH IN THE
+    // LIST -- which is the real requirement, because a plant mode that is not among the modes cannot be driven
+    // and a census would count a half-device as a whole one.
+    const declared = Array.isArray(dev.modes) ? dev.modes : [];
+    ok("!! the modes are EXPORTED rather than probed, and every one of them validates",
+        declared.length > 1 &&
+        declared.every((m) => K.checkMode(dev, m).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
-        dev.modes.join(", ") + " -- and a nonsense mode is REFUSED. v3192 measured that a probed count is a " +
-        "LOWER BOUND and that the lab's apparent one-moded-ness was an artefact of the candidate list; a new " +
-        "device should never join that pile");
+        declared.length + " declared (" + declared.join(", ") + ") -- and a nonsense mode is REFUSED. v3192 " +
+        "measured that a PROBED count is a LOWER BOUND and that the lab's apparent one-moded-ness was an " +
+        "artefact of the candidate list; a new device should never join that pile. THE COUNT IS REPORTED, NOT " +
+        "ASSERTED: pinning it is how this line went red when the device gained its plant.");
+
+    ok("!! ...and BOTH HALVES are in the list -- the control and the plant, named by the device itself",
+        declared.includes(dev.controlMode) && declared.includes(dev.plantMode) && dev.controlMode !== dev.plantMode,
+        `control "${dev.controlMode}" (perfects ${dev.controlPerfects}) and plant "${dev.plantMode}" (flips ` +
+        `${dev.plantFlips}) are both declared and are different modes. A PLANT MODE THAT IS NOT AMONG THE MODES ` +
+        "CANNOT BE DRIVEN, and the census would count a device that only proves its own apparatus as a whole " +
+        "one -- which is the state this device was in before noroot was added, and the state pinning the count " +
+        "at three would have locked it into.");
 
     ok("!! *** nothing is vendored, and the reason is stated ***",
         (() => {

@@ -74,7 +74,7 @@ const rel = (p) => {
 // gates included a 27s one -- honest that it was guessing, and wrong by a factor of thirty. tools/ship/
 // gate-timings.json has carried OBSERVED runtimes for 564 gates since v3212, written by every full suite run.
 // Reading it turns the plan from mostly-guess into mostly-measured without adding a second timing table.
-let OBSERVED = {};
+export let OBSERVED = {};
 try { OBSERVED = JSON.parse(fs.readFileSync(new URL("./gate-timings.json", import.meta.url), "utf8")).timings || {}; }
 catch { OBSERVED = {}; }
 

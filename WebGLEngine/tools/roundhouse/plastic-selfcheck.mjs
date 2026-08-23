@@ -124,13 +124,34 @@ const cf = await dev.build({ mode: "creepFree" });
         "plastic.js is imported unchanged");
 }
 
-// ---- 5. FOUR MODES, AND THE COUNT MOVED FOR A REASON ---------------------------------------------------------------
+// ---- 5. THE MODES, AND THE COUNT MOVED AGAIN ------------------------------------------------------------------------
 {
-    ok("!! four modes, EXPORTED, nonsense refused",
-        Array.isArray(dev.modes) && dev.modes.length === 4 &&
-        dev.modes.every((m) => K.checkMode(dev, m).ok !== false) &&
+    // *** v3941 -- THE HEADING SAID "THE COUNT MOVED FOR A REASON" AND THE LINE UNDER IT PINNED THE COUNT. ***
+    // It moved again, for a reason of exactly the same kind: v3902 added `tensiononly` as this device's declared
+    // PLANT -- plantMode: "tensiononly", plantFlips: "yieldWorstErrAbs" -- and its own comment beside it calls
+    // it "THE BLIND SPOT THIS MODE WAS BUILT TO CLOSE". So `dev.modes.length === 4` went red ON THE ROUND THAT
+    // COMPLETED THE DEVICE, which is the same thing heidler-selfcheck's `modes.length === 3` did when its plant
+    // landed. A COUNT IS NOT A PROPERTY, and a heading that says the count moves is not a reason to pin it.
+    //
+    // The count is REPORTED. What is asserted is that every declared mode validates, that a nonsense mode is
+    // refused, and that THE DECLARED PLANT IS AMONG THEM -- which is the requirement with teeth, because a
+    // plantMode absent from `modes` cannot be driven and the census would score a device that only proves its
+    // own apparatus as a whole one. (This device declares no controlMode, so unlike heidler there is no second
+    // half to pair it with, and that is said rather than quietly not checked.)
+    const declared = Array.isArray(dev.modes) ? dev.modes : [];
+    ok("!! the modes are EXPORTED and every one of them validates, nonsense refused",
+        declared.length > 1 &&
+        declared.every((m) => K.checkMode(dev, m).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
-        dev.modes.join(", "));
+        declared.length + " declared: " + declared.join(", ") + ". THE COUNT IS REPORTED, NOT ASSERTED -- " +
+        "pinning it at four is how this line went red when v3902 added the plant.");
+
+    ok("!! ...and the declared PLANT is one of them, so it can actually be driven",
+        !!dev.plantMode && declared.includes(dev.plantMode),
+        'plantMode "' + dev.plantMode + '" (flips ' + dev.plantFlips + ", kind " + dev.plantKind + ") is in the " +
+        "list. A PLANT MODE THAT IS NOT AMONG THE MODES CANNOT BE DRIVEN -- the census would count this device " +
+        "whole while the arm that catches anything was unreachable. No controlMode is declared here, so the " +
+        "control half is NOT checked, which is stated rather than silently skipped.");
 
     const cov = G.gradedCoverage(path.resolve(HERE, "..", ".."));
     ok("!! *** and physics/xpbd/plastic.js is graded because something CALLS it ***",

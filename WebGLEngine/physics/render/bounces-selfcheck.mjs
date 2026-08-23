@@ -16,7 +16,7 @@
 "use strict";
 import { rng, cosineSampleHemisphere, createCoordinateSystem, toWorld } from "./furnace.mjs";
 import { occluded } from "./occlusion.mjs";
-import { gather, seriesExact, seriesLimit } from "./bounces.mjs";
+import { gather, seriesExact, seriesLimit, rrUncompensated, rrMeanBounces } from "./bounces.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -111,6 +111,73 @@ ok("!! k comes from the GEOMETRY, not from a constant", Math.abs(K - 0.25) < 4e-
     ok("!! *** AND THE SAME FAULT IS COMPLETELY INVISIBLE AT rho = 1, WHICH IS THE FINDING OF THIS SECTION ***",
        Math.abs(blindAtOne - 1) < 1e-9,
        `${blindAtOne.toFixed(6)} -- EXACTLY 1, the right answer from broken code. With a perfect reflector the throughput never decays, so the invented energy CANCELS THE TRUNCATION DEFICIT TERM FOR TERM. *** THE STRONGEST KEY IN THIS FILE IS BLIND TO ONE OF ITS TWO FAULTS, and saying so is worth more than deleting the key: it means the albedo-1 furnace must never be the ONLY bounce check, and a suite that ran it alone would certify an energy-inventing renderer. ***`);
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 4. *** RUSSIAN ROULETTE, WHICH SHIPPED WITH TWO CLOSED FORMS AND NO GATE AT ALL ***
+ *
+ * v3941 -- v3471 added roulette to bounces.mjs: the rrQ knob, the noRrCompensation fault, the mean-path-length
+ * readout, and TWO EXACT PREDICTIONS -- rrUncompensated and rrMeanBounces. This file imported gather,
+ * seriesExact and seriesLimit and nothing else, so the whole half of the module was ungraded and its planted
+ * fault was never fired. definitionGates counted both closed forms as unmentioned; they were, and the reason
+ * was not an oversight in the naming but a feature that arrived without its keys.
+ *
+ * THE COMPENSATION IS THE WHOLE POINT AND IT HAS A PREDICTED WRONG ANSWER, WHICH IS BETTER THAN A BOUND.
+ * Killing a path with probability 1-q and dividing the survivors by q leaves the estimator unbiased, so the
+ * answer must not move at all. Forget the division and the estimator does NOT merely go dark by some amount --
+ * it lands on rho(1-k)/(1-rho k q), a different closed form, exactly. A check that only asked "is it darker"
+ * would pass on any of a hundred wrong estimators; this one names which.
+ *
+ * AND THE COST IS CHECKED ALONGSIDE THE ANSWER, because roulette is a TRADE. Continuation needs a path to be
+ * both blocked and to survive, so E[extra bounces] = kq/(1-kq) -- and k here is still the MEASURED k from
+ * section 0, so the prediction is not fed its own input.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const RHO = 0.8, DEEP = 200, limit = seriesLimit(RHO, K);
+
+    // The exact identity first, because it costs no samples and it pins the closed form's shape rather than
+    // one of its values: at q = 1 nothing is ever killed, so the uncompensated form MUST collapse onto the
+    // plain limit. Asserted with === -- this is algebra, not a Monte Carlo run.
+    ok("!! *** rrUncompensated COLLAPSES ONTO seriesLimit AT q = 1, BIT-FOR-BIT ***",
+       rrUncompensated(RHO, K, 1) === seriesLimit(RHO, K),
+       `${rrUncompensated(RHO, K, 1)} === ${seriesLimit(RHO, K)}. With survival certain there is nothing to ` +
+       "compensate for, so the two forms are the same expression. *** AND THIS LINE IS NARROW IN A WAY WORTH " +
+       "WRITING DOWN: a denominator that had drifted from 1 - rho k q to 1 - k q FAILS it, while a drift to " +
+       "1 - rho k PASSES it -- planted and confirmed both ways. q = 1 is exactly the point where the dropped " +
+       "factor cannot matter, so the identity cannot see a missing q, and the SAMPLED runs below are what " +
+       "catch that one. An exact identity beside a Monte Carlo key, each blind to what the other sees.");
+
+    const rows = [0.9, 0.7, 0.5].map((q) => {
+        const comp = gather(RHO, S, { seed: 5, maxDepth: DEEP, blocked, ...wire, rrQ: q });
+        const meanB = gather.lastMeanBounces;
+        const unc = gather(RHO, S, { seed: 5, maxDepth: DEEP, blocked, ...wire, rrQ: q, noRrCompensation: true });
+        return { q, comp, meanB, unc, wantUnc: rrUncompensated(RHO, K, q), wantB: rrMeanBounces(K, q) };
+    });
+    for (const r of rows) {
+        say(`q ${r.q}: compensated ${r.comp.toFixed(6)} (limit ${limit.toFixed(6)}) | uncompensated ` +
+            `${r.unc.toFixed(6)} (predicted ${r.wantUnc.toFixed(6)}) | mean bounces ${r.meanB.toFixed(5)} ` +
+            `(predicted ${r.wantB.toFixed(5)})`);
+    }
+
+    ok("!! *** ROULETTE IS UNBIASED: KILLING HALF THE PATHS DOES NOT MOVE THE ANSWER ***",
+       rows.every((r) => Math.abs(r.comp - limit) / limit < 5e-3),
+       `three survival probabilities down to q = 0.5, every one landing on ${limit.toFixed(6)}. THE ESTIMATOR ` +
+       "THROWS AWAY HALF ITS PATHS AND RETURNS THE SAME NUMBER, which is the only thing that makes roulette " +
+       "worth doing -- and it is a statement no amount of 'looks about right' establishes.");
+
+    ok("!! *** AND WITHOUT THE 1/q THE ESTIMATOR LANDS ON A DIFFERENT CLOSED FORM, NOT ON A VAGUE DEFICIT ***",
+       rows.every((r) => Math.abs(r.unc - r.wantUnc) / r.wantUnc < 5e-3) &&
+       rows.every((r) => r.unc < limit * (1 - 1e-3)),
+       "each uncompensated run sits on rho(1-k)/(1-rho k q) to better than 5e-3, and every one is BELOW the " +
+       "limit. *** THE FAULT IS PREDICTED RATHER THAN BOUNDED: a check that asked only 'is it darker' would " +
+       "pass on any estimator that lost energy for any reason, and this one says which energy went missing and " +
+       "how much. The gap widens as q falls -- more paths killed, more of their share never redistributed.");
+
+    ok("!! ...and the COST is predicted too, so the trade can be read rather than assumed",
+       rows.every((r) => Math.abs(r.meanB - r.wantB) / r.wantB < 2e-2),
+       "measured mean extra bounces against kq/(1-kq) at each q, with k still the ray-cast value from section " +
+       "0. AN ANSWER WITHOUT ITS COST CANNOT SHOW A TRADE AT ALL -- roulette buys shorter paths and the whole " +
+       "question is how much shorter, so the length is graded beside the radiance rather than left as prose.");
 }
 
 console.log(fails ? "\nbounces-selfcheck: " + fails + " FAILED" : "\nbounces-selfcheck: all checks pass");

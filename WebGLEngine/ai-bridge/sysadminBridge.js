@@ -515,36 +515,32 @@ async function prunePartials(opts){
 // which reads zips on Windows (bsdtar) and NOT on Linux (GNU tar) -- so on the box this was written on it fell
 // straight through to the "cannot list" branch and ACCEPTED THE FLAT ARCHIVE IT WAS WRITTEN TO REFUSE. The
 // fail-open was correct in design and hid the check completely in practice, which is worse than no check
-// because it reads as one. A zip's central directory is forty lines of buffer arithmetic and needs no process.
-function _zipTopLevel(file){
-    const B = require("fs");
-    let buf; try { buf = B.readFileSync(file); } catch (e) { return { ok: false, why: "cannot read " + file + ": " + ((e && e.code) || e) }; }
-    // End of Central Directory: scan back for 0x06054b50. The comment field is <= 64 KiB, so the signature is
-    // within the last 64 KiB + 22 bytes unless the file is truncated.
-    let eocd = -1;
-    for (let i = buf.length - 22; i >= 0 && i >= buf.length - 66000; i--){
-        if (buf.readUInt32LE(i) === 0x06054b50){ eocd = i; break; }
-    }
-    if (eocd < 0) return { ok: false, why: "no zip end-of-central-directory record (truncated or not a zip)" };
-    const count = buf.readUInt16LE(eocd + 10);
-    let off = buf.readUInt32LE(eocd + 16);
-    const names = [];
-    for (let n = 0; n < count; n++){
-        if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) break;   // ZIP64 or damaged: stop and report what we have
-        const nameLen = buf.readUInt16LE(off + 28), extraLen = buf.readUInt16LE(off + 30), cmtLen = buf.readUInt16LE(off + 32);
-        names.push(buf.toString("utf8", off + 46, off + 46 + nameLen));
-        off += 46 + nameLen + extraLen + cmtLen;
-    }
-    if (!names.length) return { ok: false, why: "the central directory listed no entries" };
-    return { ok: true, names };
+// because it reads as one.
+//
+// *** v3941 -- AND THEN IT WALKED THE CENTRAL DIRECTORY HERE, WHICH MADE IT THE FOURTH READER IN THE TREE. ***
+// "A zip's central directory is forty lines of buffer arithmetic and needs no process" is true and is not the
+// question: safeExtract already owns those forty lines, moduleHistory and patchBase both DELEGATE to them, and
+// patchBase's header states the rule -- "THE ZIP READING IS DELEGATED, NOT REIMPLEMENTED". patchScanDoor's gate
+// holds it for this file and was RIGHT: 0x02014b50 was sitting in this function, in code.
+//
+// So it delegates now, in patchBase's own idiom (try the import, convert a throw into a refusal WITH ITS
+// REASON). ONE BEHAVIOUR CHANGES AND IT IS THE RIGHT WAY ROUND: the old walk `break`-ed on a damaged entry and
+// handed back a PARTIAL list for zipShapeFor to judge, which is a verdict on an archive nobody could read.
+// safeExtract throws there, so the answer becomes "cannot list" -- and that is this function's OWN STATED
+// POLICY two comments down: fail open only when the archive cannot be read at all, and say so. The partial-list
+// judging was the deviation, not the fix.
+async function _zipTopLevel(file){
+    let mod; try { mod = await import("../tools/ship/patchBase.mjs"); }
+    catch (e) { return { ok: false, why: "patchBase did not load: " + ((e && e.message) || e) }; }
+    return mod.topLevelNames(file);
 }
 
 /**
  * Is this archive shaped like a build of version `v`? Returns { ok } or { ok:false, why }.
  * WANTED: exactly one top-level entry, matching <prefix>_v<v>, containing WebGLEngine.
  */
-function zipShapeFor(file, v){
-    const listed = _zipTopLevel(file);
+async function zipShapeFor(file, v){
+    const listed = await _zipTopLevel(file);
     // *** FAIL-OPEN ONLY WHEN THE ARCHIVE CANNOT BE READ AT ALL, and say so. *** Refusing here would break the
     // installer on any box where neither lister runs, which is a worse failure than the one being prevented --
     // and the post-extract launcher check still catches a bad archive, just later and messier.
@@ -640,7 +636,7 @@ async function updateCheck(apply, opts){
     // v3938 -- SHAPE CHECKED BEFORE ANYTHING IS WRITTEN. See zipShapeFor: listing costs milliseconds, the
     // extract costs half a minute and cannot be undone, and a flat archive empties itself into the folder that
     // holds every version. This is the last gate before the irreversible step.
-    const shape = zipShapeFor(found.file, found.v);
+    const shape = await zipShapeFor(found.file, found.v);
     if (!shape.ok){
         lastNote = "REFUSED v" + found.v + ": " + shape.why + ". Nothing was extracted. File: " + found.file;
         return { ok: false, error: lastNote, refused: "bad-zip-shape", found: found.v, current: cur };

@@ -57,18 +57,43 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // The timeout is called out separately because it is the one candidate the code itself suggests: /sync/status
 // calls listModels(root), which walks the asset tree, and a slow walk on a cold Windows filesystem would
 // produce exactly this symptom while nothing was actually broken.
-const TIMEOUT_MS = 4000;
-const get = async (p) => {
+// *** v3941 -- AND THE RIG ANSWERED: TimeoutError after 4000ms. THE INSTRUMENT WORKED AND THE CAP WAS THE BUG. ***
+//
+// The v3003 round above refused to guess and made the failure diagnosable instead. Keith's rig then reported
+// exactly what it was built to report -- not a refused connection, not a reset, a TIMEOUT -- which is the
+// candidate this file's own comment named: /sync/status walks the asset tree, and a cold Windows filesystem
+// walk is slow while nothing is broken.
+//
+// *** THE LESSON IS ALREADY IN THIS FILE, TEN LINES BELOW, WRITTEN OUT IN FULL: "a test whose timeout is
+// shorter than the thing it tests measures its own timeout. The 4s version failed for exactly that." *** That
+// was written for the peer-add call at v2545 and never applied to get(), which kept a 4000ms cap over a call
+// whose cost is a filesystem walk of unknown size on somebody else's machine.
+//
+// SO THE CLAIM IS SPLIT FROM THE LATENCY. What this gate asserts is that a fresh machine's sync surface
+// ANSWERS -- a functional claim -- and how long it took is REPORTED beside it. A budget generous enough that a
+// working server cannot be mistaken for a hung one, and the elapsed time on the page so a slow answer is
+// visible AS SLOW rather than as absent. A gate that reddens on a cold cache is a gate people learn to ignore.
+// THREE CONSTANTS, THREE MEANINGS, AND THEY ARE NOT ONE. The first draft of this fix reused one name for both
+// the default budget and the slow-reporting threshold -- two things wearing one label -- and it showed up
+// immediately: dropping it to force the slow path also starved the readiness probe, so the server never read as
+// up and the branch under test never ran at all. The fixture found it before the rig did.
+const DEFAULT_BUDGET_MS = 4000;   // per-call budget for the cheap routes (/, a 404 probe)
+const SLOW_BUDGET_MS = 30000;     // budget for the route that triggers a filesystem walk -- longer than the
+                                  // thing it tests, which is the whole of v2545's lesson
+const SLOW_REPORT_MS = 4000;      // the historic cap, kept ONLY as the threshold at which the walk is attributed
+const get = async (p, budget = DEFAULT_BUDGET_MS) => {
+    const t0 = Date.now();
     try {
-        const r = await fetch("http://127.0.0.1:" + PORT + p, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-        return { code: r.status, text: await r.text(), why: null };
+        const r = await fetch("http://127.0.0.1:" + PORT + p, { signal: AbortSignal.timeout(budget) });
+        const text = await r.text();
+        return { code: r.status, text, why: null, ms: Date.now() - t0 };
     } catch (e) {
         const name = (e && e.name) || "Error";
         const cause = e && e.cause ? (e.cause.code || e.cause.message || String(e.cause)) : null;
         const why = name === "TimeoutError"
-            ? "TIMED OUT after " + TIMEOUT_MS + "ms -- the server did not answer in time, which is different from refusing"
+            ? "TIMED OUT after " + budget + "ms -- the server did not answer in time, which is different from refusing"
             : (cause ? name + " / " + cause : name + ": " + ((e && e.message) || "no message"));
-        return { code: 0, text: "", why };
+        return { code: 0, text: "", why, ms: Date.now() - t0 };
     }
 };
 
@@ -135,10 +160,39 @@ try {
         ok("!! a failed request reports a CAUSE, not just a code", dead.code === 404 || (dead.code === 0 && !!dead.why),
            dead.code === 404 ? "404 (route missing, server healthy)" : "code 0 with: " + dead.why);
 
-        const sync = await get("/sync/status");
+        // The functional claim, on a budget longer than the walk it triggers.
+        const sync = await get("/sync/status", SLOW_BUDGET_MS);
         ok("...and the sync surface answers", sync.code === 200,
-           sync.code === 200 ? "HTTP 200" : "HTTP " + sync.code + (sync.why ? " -- " + sync.why : "") +
-           ". This passes on Linux; a bare 0 here names nothing, so the cause is now reported instead of discarded.");
+           sync.code === 200
+             ? "HTTP 200 in " + sync.ms + "ms" + (sync.ms >= SLOW_REPORT_MS
+                 ? " -- OVER THE OLD " + SLOW_REPORT_MS + "ms CAP, which is why this used to read HTTP 0. The server " +
+                   "was answering the whole time; the test was not waiting long enough to hear it."
+                 : "")
+             : "HTTP " + sync.code + (sync.why ? " -- " + sync.why : "") + " on a " + SLOW_BUDGET_MS +
+               "ms budget. That is no longer a cap being too short: the surface genuinely did not answer.");
+
+        // *** AND WHEN IT IS SLOW, ATTRIBUTE IT RATHER THAN NAMING A TIMEOUT. *** v3036 built walkProbe for
+        // precisely this question -- it drives THIS walker rather than a copy of it, walks twice to separate
+        // cold cost from per-poll cost, and is explicitly allowed to EXONERATE the walk. It has been sitting
+        // behind GET /sync/walk-probe unconsulted by the gate that raises the question it answers.
+        if (sync.code !== 200 || sync.ms >= SLOW_REPORT_MS) {
+            const wp = await get("/sync/walk-probe", SLOW_BUDGET_MS);
+            let probe = null;
+            try { probe = JSON.parse(wp.text); } catch { probe = null; }
+            ok("!! ...and when it is slow, the walk is MEASURED rather than blamed",
+                !!(probe && (probe.ok === true || probe.ok === false)),
+                probe
+                  ? (probe.ok === false
+                       ? "walkProbe refused: " + probe.error
+                       : probe.files + " files in " + probe.dirs + " dirs, cold " + probe.coldMs + "ms / warm " +
+                         probe.warmMs + "ms (readdir " + probe.readdirMs + "ms, stat " + probe.statMs + "ms). " +
+                         "VERDICT: " + probe.verdict + " *** The cold/warm gap is the part that decides what to " +
+                         "do: a large gap is a per-boot cost, a small one is paid by every poll, and peerRadar " +
+                         "and settingsHub both poll this endpoint. ***")
+                  : "GET /sync/walk-probe gave HTTP " + wp.code + (wp.why ? " -- " + wp.why : "") +
+                    ". The instrument v3036 built for this question could not be reached, so the slow answer " +
+                    "above is unattributed -- which is the state that round existed to end.");
+        }
     }
 
     // ---- what it LOSES must be said out loud, not silently skipped ------------------------------------------

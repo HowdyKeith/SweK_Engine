@@ -17,11 +17,7 @@
 // oxygen, IRON and uranium. Four correct nuclides from five constants, and the binding peak lands at A = 58 with
 // 8.86 MeV against a measured iron/nickel peak near 8.79 MeV. Nothing in the tree could have told it those.
 
-import {
-    lambdaFromHalfLife, halfLifeFromLambda, decayN, activity,
-    batemanChain, batemanIntegrated, activityRatio,
-    bindingEnergy, bindingPerNucleon, mostStableZ, bindingPeak, fissionQ, SEMF,
-} from "./decay.mjs";
+import { lambdaFromHalfLife, halfLifeFromLambda, decayN, activity, batemanChain, batemanIntegrated, activityRatio, bindingEnergy, bindingPerNucleon, mostStableZ, bindingPeak, fissionQ, SEMF, pairingTerm } from "./decay.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -109,6 +105,60 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
         `helium ${bindingPerNucleon(4, 2).toFixed(3)} and uranium ${bindingPerNucleon(238, 92).toFixed(3)} against ` +
         `the peak ${p.perNucleon.toFixed(3)}. The curve has to rise then fall, or there would be no energy in ` +
         "either fusion or fission");
+}
+
+// ---- 5b. *** THE PAIRING TERM, AND THE PARITY STRUCTURE OF THE NUCLIDE CHART IT ALONE PRODUCES *** ----------
+//
+// v3941 -- pairingTerm was reached only THROUGH bindingEnergy, so every number above already depended on it and
+// nothing named it or asked what it does. It is three lines and a sign, which is exactly the shape this tree's
+// definitionGates round is about: r_s = 2M survived five gates for the same reason.
+//
+// The algebra is exact and is asserted with === rather than a tolerance -- there is nothing here to round.
+// A % 2 === 1 gives exactly 0; even-even gives +aP/sqrt(A); even-odd gives -aP/sqrt(A).
+//
+// *** AND THE KEY THAT MATTERS IS NOT THE ALGEBRA, IT IS WHAT THE TERM DOES TO THE CHART. *** Nature's stable
+// nuclides are overwhelmingly even-even and there are only a handful of stable odd-odd ones. Run the model's
+// own argmax over Z for every even A from 20 to 240 and it picks an EVEN Z all 111 times. Subtract the pairing
+// term from the same model -- the counterfactual is bindingEnergy MINUS pairingTerm, so no second spelling of
+// the mass formula exists here -- and the structure collapses: 58 of 111, a coin flip, with the choice moving
+// in 53 cases. THE TERM IS NOT A CORRECTION TO A NUMBER, IT IS WHAT PUTS THE PARITY IN THE ANSWER, and the
+// counterfactual is what turns that from a sentence into a measurement.
+{
+    const aP = SEMF.aP;
+    ok("!! pairingTerm is EXACT in all three cases, not approximately signed",
+        pairingTerm(57, 26) === 0 &&
+        pairingTerm(56, 26) === aP / Math.sqrt(56) &&
+        pairingTerm(56, 27) === -aP / Math.sqrt(56),
+        `odd-A ${pairingTerm(57, 26)} exactly; even-even +${pairingTerm(56, 26).toFixed(6)}; even-odd ` +
+        `${pairingTerm(56, 27).toFixed(6)} -- each === aP/sqrt(A) with aP = ${aP}. Asserted with === because ` +
+        "there is no integration and no tolerance to argue about: a sign flip or a missing sqrt fails outright.");
+
+    // The model's own argmax, with and without the term. bindingEnergy - pairingTerm is the counterfactual, so
+    // the five constants are never written down a second time.
+    const noPair = (A, Z) => bindingEnergy(A, Z) - pairingTerm(A, Z);
+    const argmaxZ = (A, f) => { let bZ = 1, b = -Infinity; for (let Z = 1; Z < A; Z++) { const v = f(A, Z); if (v > b) { b = v; bZ = Z; } } return bZ; };
+    let evenA = 0, evenWith = 0, evenWithout = 0, moved = 0, oddA = 0, oddZero = 0;
+    for (let A = 20; A <= 240; A += 2) {
+        evenA++;
+        const zw = mostStableZ(A).Z, zn = argmaxZ(A, noPair);
+        if (zw % 2 === 0) evenWith++;
+        if (zn % 2 === 0) evenWithout++;
+        if (zw !== zn) moved++;
+    }
+    for (let A = 21; A <= 239; A += 2) { oddA++; if (pairingTerm(A, mostStableZ(A).Z) === 0) oddZero++; }
+
+    ok("!! *** WITH PAIRING THE MODEL PICKS AN EVEN Z FOR EVERY EVEN A, AND WITHOUT IT THE PARITY IS A COIN FLIP ***",
+        evenWith === evenA && evenWithout < evenA * 0.7 && moved > 20,
+        `${evenWith} of ${evenA} even-A nuclides land on an EVEN Z with the term, ${evenWithout} of ${evenA} ` +
+        `without it, and the choice moves in ${moved} cases. Nature's stable chart is overwhelmingly even-even ` +
+        "with a handful of odd-odd exceptions, and THIS TERM IS WHERE THAT COMES FROM -- the counterfactual is " +
+        "the model minus its own pairing term, so nothing but the term itself changed between the two columns.");
+
+    ok("...and an odd-A nuclide gets exactly no pairing at all, which is the third case rather than a small one",
+        oddZero === oddA,
+        `${oddZero} of ${oddA} odd-A mass numbers return exactly 0. An unpaired nucleon is left over either ` +
+        "way, so the term has nothing to say -- and a version that returned a small number here instead of " +
+        "zero would shift every odd-A prediction while still looking like a pairing term.");
 }
 
 // ---- 6. FISSION Q -- RIGHT ORDER, AND THE SCOPE IS STATED -------------------------------------------------------------

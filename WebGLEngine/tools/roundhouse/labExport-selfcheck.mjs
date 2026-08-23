@@ -47,10 +47,61 @@ const recs = [
         "the gate re-runs each one from what the record itself says. AN EXPORT NOBODY CAN REPLAY IS A " +
         "SPREADSHEET OF ASSERTIONS, and this is the only claim the module actually makes");
 
-    ok("!! comparison is EXACT, not tolerant",
-        /if \(now !== v\) drift\.push/.test(fsMod.readFileSync(path.join(HERE, "labExport.mjs"), "utf8")),
-        "these devices are DETERMINISTIC, so a difference is a FINDING rather than noise -- and a tolerance " +
-        "would hide the day one of them stops being deterministic, which is the thing most worth knowing");
+    // *** v3941 -- THIS GREPPED FOR `if (now !== v) drift.push` AND v3520 REPLACED THAT LINE BECAUSE IT WAS
+    // WRONG. *** The module now compares canonical(now) !== canonical(v), and its own comment beside it says
+    // why: "Two arrays with identical contents are never `!==`-equal, so the moment runRecord started keeping
+    // arrays this line would have reported drift on every replay." So the gate demanded the broken spelling and
+    // went red on the fix -- while the PROPERTY it names, exact rather than tolerant, was never in doubt:
+    // canonical() is structural equality and there is no epsilon anywhere in the compare path.
+    //
+    // Exactness is a behaviour, so it is now MEASURED rather than read off the source. A record is perturbed by
+    // ONE UNIT IN THE LAST PLACE -- the smallest difference a float can carry -- and the replay must call it
+    // drift. NO TOLERANCE OF ANY SIZE SURVIVES THAT TEST, which is more than the old grep could say even when
+    // it matched: `!==` in the source proves nothing about a value that never reaches that line.
+    const nextUp = (x) => {
+        const b = new DataView(new ArrayBuffer(8));
+        b.setFloat64(0, x);
+        let hi = b.getUint32(0), lo = b.getUint32(4);
+        if (lo === 0xffffffff) { hi += 1; lo = 0; } else { lo += 1; }
+        b.setUint32(0, hi); b.setUint32(4, lo);
+        return b.getFloat64(0);
+    };
+    const ulpProbe = await (async () => {
+        const base = recs[0];
+        const key = Object.keys(base.outputs).sort().find((k) => typeof base.outputs[k] === "number" && Number.isFinite(base.outputs[k]));
+        if (!key) return { key: null };
+        const was = base.outputs[key], now = nextUp(was);
+        const nudged = { ...base, outputs: { ...base.outputs, [key]: now } };
+        const v = await L.replay(D, nudged);
+        return { key, was, now, v, hit: (v.drift || []).find((d) => d.key === key) };
+    })();
+    ok("!! *** comparison is EXACT: ONE ULP IS DRIFT, and no tolerance survives that ***",
+        !!ulpProbe.key && ulpProbe.v.ok === false && !!ulpProbe.hit,
+        ulpProbe.key
+          ? `${ulpProbe.key} moved from ${ulpProbe.was} to ${ulpProbe.now} -- a difference of one unit in the ` +
+            `last place, ${((ulpProbe.now - ulpProbe.was) / Math.abs(ulpProbe.was || 1)).toExponential(2)} ` +
+            `relative -- and replay reports it: "${ulpProbe.hit ? ulpProbe.hit.why : "NOT REPORTED"}". These ` +
+            "devices are DETERMINISTIC, so a difference is a FINDING rather than noise, and a tolerance would " +
+            "hide the day one of them stops being deterministic -- which is the thing most worth knowing. " +
+            "MEASURED, not grepped: the old line read the source for a spelling v3520 had already replaced."
+          : "no finite numeric observable in the first record to perturb -- REPORTED, because a probe with " +
+            "nothing to probe is not a passing check");
+
+    // *** AND THE THING v3520 ACTUALLY FIXED, WHICH THE OLD GREP WAS STANDING IN FOR AND GETTING BACKWARDS. ***
+    const arrayRec = await L.runRecord(D, "acoustics", { mode: "modes" });
+    const arrayKeys = Object.keys(arrayRec.outputs || {}).filter((k) => Array.isArray(arrayRec.outputs[k]));
+    const arrayReplay = arrayKeys.length ? await L.replay(D, arrayRec) : null;
+    ok("!! ...and an ARRAY-valued observable replays CLEAN, which raw `!==` could never have managed",
+        arrayKeys.length > 0 && arrayReplay.ok === true &&
+        [1, 2, 3] !== [1, 2, 3] && L.canonical([1, 2, 3]) === L.canonical([1, 2, 3]),
+        arrayKeys.length
+          ? `${arrayKeys.join(", ")} carry arrays and the record replays with zero drift over ` +
+            `${arrayReplay.checked} observables. Two arrays with identical contents are NEVER \`!==\`-equal -- ` +
+            "asserted right here on a literal pair -- so the spelling the old line demanded would have reported " +
+            "drift on every single replay of this record. THE FIXTURE IS A DEVICE THAT ACTUALLY EMITS ONE, " +
+            "because the bug only exists where an array does."
+          : "acoustics/modes emitted no array, so the v3520 case cannot be exercised -- REPORTED rather than " +
+            "passed, since this check's whole subject would be absent");
 
     ok("...and an observable that APPEARED counts as drift too",
         /observable is new/.test(fsMod.readFileSync(path.join(HERE, "labExport.mjs"), "utf8")),

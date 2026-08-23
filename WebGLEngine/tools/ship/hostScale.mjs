@@ -31,6 +31,21 @@ const LOCAL = path.join(ENG, "tools", "ship", "host-timings.local.json");
 export const SCALE_FLOOR = 1;
 export const SCALE_CEILING = 8;
 
+// *** v3941 -- THE KEY IS A PATH, AND ON WINDOWS path.relative HANDS BACK BACKSLASHES. ***
+//
+// gateBudget.budgetFor and budgetReason each normalise the separator before their lookup. THIS MODULE DID NOT.
+// So on the one box this whole module was written for, every run was recorded under
+// `tools\roundhouse\assumptionMap-selfcheck.mjs`, every lookup into MEASURED missed, and the scale stayed at 1
+// while reporting "no local runs against a MEASURED gate yet" -- WHICH IS THE BANNER KEITH'S RIG HAS BEEN
+// PRINTING ABOVE EVERY TIMEOUT SINCE v3923. The mechanism was correct, wired, and gated, and it had never
+// learned a single thing, because the half of it that reads used a different spelling from the half that writes.
+//
+// The gate could not catch it: every case in hostScale-selfcheck types the key with forward slashes, so the
+// module was only ever fed the separator it already handled. THE PRODUCER IS path.relative IN
+// ai-bridge/rigRunner.js, and on Windows that is `\`. Normalised at BOTH ends -- on write so new records are
+// canonical, and on read so a local file already full of backslash keys is salvaged rather than thrown away.
+const norm = (p) => String(p).replace(/\\/g, "/");
+
 // *** THE DENOMINATOR IS gateBudget.MEASURED, AND gate-timings.json IS THE WRONG FILE FOR IT. ***
 //
 // The first version of this module divided by gate-timings.json, which looks like the obvious reference and is
@@ -66,17 +81,28 @@ export function recordRun(gate, ms, completed, file = LOCAL) {
     if (!gate || typeof ms !== "number" || !isFinite(ms) || ms <= 0) return false;
     const d = readLocal(file);
     d.runs = d.runs || {};
-    d.runs[gate] = { ms: Math.round(ms), completed: !!completed, at: new Date().toISOString() };
+    d.runs[norm(gate)] = { ms: Math.round(ms), completed: !!completed, at: new Date().toISOString() };
     d.note = "OBSERVED ON THIS BOX. Not shipped -- gate-timings.json is the reference and this is the local " +
              "comparison against it. Delete it and the scale returns to 1.";
     return writeLocal(d, file);
+}
+
+/** The runs map with separators canonicalised. A gate recorded under BOTH spellings -- which is what a box that
+ *  ran before this fix and after it will hold -- keeps its NEWEST entry rather than counting as two samples. */
+function canonicalRuns(file) {
+    const out = {};
+    for (const [gate, r] of Object.entries(readLocal(file).runs || {})) {
+        const k = norm(gate), prev = out[k];
+        if (!prev || String((r && r.at) || "") >= String(prev.at || "")) out[k] = r;
+    }
+    return out;
 }
 
 const median = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
 
 /** The factor this host's budgets are multiplied by, with the evidence that produced it. */
 export function hostScale(file = LOCAL) {
-    const ref = recorded(), runs = readLocal(file).runs || {};
+    const ref = recorded(), runs = canonicalRuns(file);
     const done = [], bounds = [];
     for (const [gate, r] of Object.entries(runs)) {
         const base = ref[gate];

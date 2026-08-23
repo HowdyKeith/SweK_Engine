@@ -37,11 +37,43 @@ const lens = await D.getDevice("lens");
 // ---- 1. THE REGISTER IS DERIVED, NEVER TYPED --------------------------------------------------------------------
 {
     const reg = K.declaredKnobs(lens, "deflect");
+    // *** v3941 -- THIS LINE REFUSED A TYPED LIST AND THEN TYPED THE COUNT, WHICH IS THE SAME DEFECT ONE LEVEL
+    // DOWN. *** Its own detail text is the indictment: "A TYPED LIST IS A SECOND DEFINITION that drifts the
+    // first time somebody adds a knob." Somebody added a knob. v3456 declared bSweep in lensBind's DEF, because
+    // the deflectSweep mode was reading `(h.config && h.config.bSweep) || 60` with bSweep ABSENT from the
+    // declaration -- an undeclared knob the sim actually read, which is the exact fault this whole file exists
+    // to catch. THE GATE WENT RED ON THE ROUND THAT FIXED ITS OWN SUBJECT, and it did so on `=== 13`.
+    //
+    // *** AND THE PIN WAS NOT MERELY BRITTLE, IT POINTED THE WRONG WAY. *** Measured: make declaredKnobs drop
+    // one knob and the count falls to exactly 13 -- so the old line PASSED a register that had silently lost a
+    // knob, while failing the round that correctly added one. RED ON A CORRECT ADDITION, GREEN ON A REAL LOSS.
+    //
+    // A COUNT IS NOT A PROPERTY. What "comes from the DEVICE" means is that the register IS the device's
+    // declaration -- so that is asserted directly, key for key, and the count is reported. Adding a knob now
+    // moves both sides together, which is what derived was supposed to mean.
+    //
+    // The second half is kept and widened. It used to check one hard-coded name (`"rObs"`) was absent from
+    // knobGate.mjs; it now checks that NO knob the device declares appears as a string literal there, so a typed
+    // list cannot creep back under a different name. Names shorter than three characters are excluded and said
+    // so: "b" and "M" are real knobs whose quoted forms would collide with ordinary code.
+    const fromDevice = Object.keys((lens.defaults({}) || {}).config || {}).sort();
+    const knobGateSrc = fs.readFileSync(path.join(ENG, "tools", "roundhouse", "knobGate.mjs"), "utf8")
+        .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    const typed = fromDevice.filter((k) => k.length >= 3 &&
+        (knobGateSrc.includes('"' + k + '"') || knobGateSrc.includes("'" + k + "'")));
     ok("!! the knob register comes from the DEVICE, not from a list here",
-        reg.knobs.length === 13 && reg.knobs.includes("b") && reg.knobs.includes("dphi") &&
-        !fs.readFileSync(path.join(ENG, "tools", "roundhouse", "knobGate.mjs"), "utf8").includes('"rObs"'),
-        reg.knobs.length + " knobs read out of device.defaults({}). A TYPED LIST IS A SECOND DEFINITION that " +
-        "drifts the first time somebody adds a knob, and this tree has paid for that shape enough times");
+        fromDevice.length > 0 &&
+        reg.knobs.length === fromDevice.length &&
+        [...reg.knobs].sort().every((k, i) => k === fromDevice[i]) &&
+        typed.length === 0,
+        reg.knobs.length + " knobs read out of device.defaults({}), and they ARE the device's own keys -- " +
+        "compared name for name rather than counted: " + fromDevice.join(", ") + ". A TYPED LIST IS A SECOND " +
+        "DEFINITION that drifts the first time somebody adds a knob, and this tree has paid for that shape " +
+        "enough times -- INCLUDING HERE, where this line typed `=== 13` and v3456's bSweep made it 14. " +
+        (typed.length ? "TYPED IN knobGate.mjs: " + typed.join(", ") + " -- a second definition creeping back."
+                      : "No knob name of three characters or more appears as a string literal in knobGate.mjs; " +
+                        "the two-character ones (M, b) are excluded because their quoted forms would collide " +
+                        "with ordinary code, and that limit is stated rather than hidden."));
 
     ok("...and a device with no defaults() declares nothing rather than throwing",
         K.declaredKnobs({ name: "bare" }, null) === null && K.checkKnobs({ name: "bare" }, { config: { x: 1 } }).ok === true,

@@ -119,7 +119,44 @@ say("reference for " + GATE.split("/").pop() + ": MEASURED " + REF + "ms, budget
        "worse than a smaller sample");
 }
 
-// ---- 7. AND THE LOCAL FILE MUST NEVER TRAVEL -----------------------------------------------------------------
+// ---- 7. *** THE SEPARATOR, WHICH IS WHY THIS MODULE NEVER LEARNED ANYTHING ON THE BOX IT WAS WRITTEN FOR *** --
+{
+    // EVERY CASE ABOVE TYPES THE KEY WITH FORWARD SLASHES, so for its whole life this gate fed the module the one
+    // separator it already handled. The PRODUCER is path.relative in ai-bridge/rigRunner.js, and on Windows that
+    // hands back `tools\roundhouse\assumptionMap-selfcheck.mjs`. gateBudget.budgetFor normalises before its
+    // lookup so the BUDGET was always found -- which is exactly why nothing looked wrong -- while hostScale did
+    // not, so every recorded run missed MEASURED and was skipped as "not in the table".
+    //
+    // The visible result was a rig that printed `host x1.00 (no local runs against a MEASURED gate yet)` above
+    // every timeout, run after run, on the machine whose timeouts this module exists to fix. A MECHANISM THAT
+    // CONVERGES ONLY IF ITS TWO HALVES AGREE ON A KEY, AND A GATE THAT ONLY EVER SPELLS THE KEY ONE WAY.
+    const f = tmp();
+    const WIN = GATE.replace(/\//g, "\\");
+    recordRun(WIN, 557100, false, f);           // Keith's run again, spelled the way HIS runner spells it
+    const h = hostScale(f), s = scaled(budgetFor(WIN), f);
+    ok("!! *** a WINDOWS-SHAPED key teaches the scale exactly as a POSIX one does ***",
+       h.samples === 1 && s.scale >= 2 && s.ms > budgetFor(GATE),
+       "recorded as " + WIN + " -> " + h.samples + " sample, scale " + h.scale.toFixed(2) + ", budget " +
+       budgetFor(GATE) + " -> " + s.ms + "ms. BEFORE THE FIX THIS WAS 0 SAMPLES AND 1.00x -- the same run, the " +
+       "same number, a different spelling of the same path");
+    ok("...and the key is stored CANONICALLY, so the file does not accumulate two spellings of one gate",
+       Object.keys(JSON.parse(fs.readFileSync(f, "utf8")).runs).every((k) => !k.includes("\\")),
+       "normalised on write as well as on read: on read so a box that has been recording backslashes since " +
+       "v3923 is salvaged rather than thrown away, on write so it stops happening");
+
+    // A gate recorded under BOTH spellings is ONE gate. Counting it twice would let a single machine's single
+    // run weigh double in the median -- a quiet bias in the direction of whichever spelling ran last.
+    const g = tmp();
+    recordRun(WIN, REF * 4, true, g);
+    recordRun(GATE, REF * 2, true, g);          // the same gate, after the fix, with the newer time
+    const h2 = hostScale(g);
+    ok("!! ...and a gate holding both spellings counts ONCE, keeping the NEWEST",
+       h2.samples === 1 && Math.abs(h2.scale - 2) < 1e-9,
+       "4x under the old spelling and 2x under the new -> " + h2.samples + " sample at " + h2.scale.toFixed(2) +
+       "x. The stale record is history, not a second opinion");
+}
+
+// ---- 8. AND THE LOCAL FILE MUST NEVER TRAVEL -----------------------------------------------------------------
 {
     const gi = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".gitignore"), "utf8");
     ok("!! the per-host record is gitignored -- a fast machine must not export its scale to a slow one",

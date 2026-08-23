@@ -14,7 +14,7 @@
 // INGESTS from it, becoming a durable superset that survives the registry's pruning.
 
 import { emptyCandidates, addCandidate, recordAttempt, orderedCandidates, ingestRegistry, survivingPruned } from "./tunnelCandidates.mjs";
-import { prose } from "../ship/sourceScan.mjs";
+import { prose, noComments } from "../ship/sourceScan.mjs";
 import { rotationDue, onTunnelStarted } from "./tunnelRotator.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -79,8 +79,20 @@ const U = (n) => `https://${n}.trycloudflare.com`;
 
 // ---- 4. THE SLIDER SAYS WHAT ROTATION DOES ------------------------------------------------------------------------------
 {
+    // *** v3941 -- THE PANEL DOES STATE IT, AND THIS WAS READING THE WRONG HALF OF THE FILE. ***
+    // prose() returns ONLY comment text -- it exists to read what developers wrote to each other. The sentence
+    // this line wants is in the panel's VISIBLE MARKUP, which is the whole point of the claim: server.html:506
+    // renders "a new tunnel is ADDED -- the old one is not retired and keeps serving peers that already hold
+    // it" in a <div> the operator reads. A CLAIM ABOUT WHAT THE PANEL SAYS MUST BE CHECKED AGAINST WHAT THE
+    // PANEL SHOWS. noComments() keeps the markup and drops the comments, which is the reader this needs.
+    //
+    // ITS LIMIT, MEASURED RATHER THAN ASSUMED: noComments strips // and /* */, NOT <!-- -->. Planting the
+    // sentence as an HTML comment while deleting it from the div still PASSES, so this does not prove the text
+    // is user-visible -- only that it is somewhere in the markup. Deleting it from the panel altogether does
+    // fail, which is the regression that matters. Said out loud because the obvious reading of "the panel
+    // states it" is stronger than what this line can actually check.
     ok("!! the panel states that rotation is additive",
-        /keeps serving peers that already hold it/.test(prose(page)),
+        /keeps serving peers that already hold it/.test(noComments(page)),
         "an operator dragging a rotation slider will reasonably assume the old URL is being replaced. It is not, " +
         "and the panel says so -- otherwise someone would eventually 'tidy up' the old tunnel and cut off every " +
         "peer holding it");
