@@ -65,6 +65,36 @@ const entries = blocks.map((m) => ({ id: m[1], title: m[2], body: m[0] }));
     const cmds = [...runner.matchAll(/node (tools\/[A-Za-z0-9_\-./]+\.mjs)/g)].map((m) => m[1]);
     const badCmd = [...new Set(cmds)].filter((c) => !fs.existsSync(path.join(ENG, c)));
     ok("!! every script an entry tells you to run actually exists", badCmd.length === 0, badCmd.join(", ") || cmds.length + " commands checked");
+
+    // *** v3946 -- "THE SCRIPT EXISTS" IS NOT "THE SCRIPT CAN RUN", AND dfg WENT THROUGH THAT GAP. ***
+    //
+    // The check directly above passed on the dfg entry for a hundred versions while the run it describes was
+    // impossible: tools/dfg-benchmark.mjs is present, so the ENTRY POINT resolved -- and the external answer key
+    // it grades against, simulation/lbm/dfgBenchmark.mjs, is in NO COMMIT of this repository. The tool now says
+    // LOST SOURCE and exits (v3942), but rig.html still told Keith to go and spend a multi-pass CPU run on it.
+    //
+    // THIS PAGE'S COST OF BEING WRONG IS NOT A RED GATE, IT IS AN AFTERNOON. Every other list in this tree is
+    // read by a machine that will simply fail; this one is read by a person who then goes and does the thing.
+    // An item that cannot be done is worse here than anywhere else, which is why it gets the stricter check.
+    //
+    // Checked WITHOUT EXECUTING ANYTHING: a tool that has diagnosed its own missing precondition says so in a
+    // console report, and an entry pointing at such a tool must carry the blocker in its own text. Prose linked
+    // to prose is a weak check in general -- it is the right one here because the tool's self-report IS the
+    // fact, and the failure being prevented is a person reading the entry and believing it.
+    const blocked = [];
+    for (const e of entries) {
+        for (const c of [...new Set([...e.body.matchAll(/node (tools\/[A-Za-z0-9_\-./]+\.mjs)/g)].map((m) => m[1]))]) {
+            const p = path.join(ENG, c);
+            if (!fs.existsSync(p)) continue;
+            let src = ""; try { src = fs.readFileSync(p, "utf8"); } catch { continue; }
+            const declaresLost = /console\.(error|log)\(\s*"\[[^\]]+\]\s*LOST SOURCE/.test(src);
+            if (declaresLost && !/LOST SOURCE|BLOCKED/.test(e.body)) blocked.push(`${e.id} -> ${c}`);
+        }
+    }
+    ok("!! ...and an entry whose tool has declared its OWN source lost says so, instead of reading as a run",
+       blocked.length === 0,
+       blocked.length ? "TELLS YOU TO RUN A TOOL THAT CANNOT RUN: " + blocked.join(", ")
+                      : "no entry points at a self-declared-blocked tool without naming the blocker");
 }
 
 // 4. THIS SESSION'S RIG WORK IS ON THE LIST -- the v2836 failure, not repeated
