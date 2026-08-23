@@ -8,6 +8,32 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3959 — eleven pages were accused of not existing, and the accusation was seven hundred versions old
+
+Keith read a line at the bottom of server.html's Arriving row — *"11 registry entries found no link on this page: aibrain.html, brain-3d.html, brain-fleet.html, brain-lab.html, brain-maze.html, brain-quadrants.html, brain-room.html, dock-brain.html, lbm-fluid.html, lbm3d-flow.html, lbm3d-gpu-check.html"* — and said he was pretty sure some or all of those were in the separate panels.
+
+He was right about every one of them. All eleven are linked in server.html, several of them twice. They sit in the "Brain pages" row v2507 hand-built inside the GPU Brain drawer, and in the Fluid drawer — which are precisely the drawers the registry entries name. Nothing was missing. Nothing had ever been missing.
+
+**The lookup was narrowed on purpose and the sentence describing its failure was not.** v3259 confined the anchor search to the Arriving row, because a document-wide search took the first match and had eaten the Page Index toolbar button. That was the correct fix, and the note explaining it is still there. What went with it was the report, which kept saying *"found no link on this page"* — a true description of the search that had just been removed, and never a true description of the one that replaced it. "Not in Arriving" and "nowhere on the page" are different claims, and only the false one is frightening.
+
+A stale sentence is not a cosmetic bug. It is the alarm that teaches you to ignore alarms — and this one had been going off, in orange, on the front door of the engine, for seven hundred versions.
+
+Three cases are now told apart:
+
+| what is true | what the page does |
+| --- | --- |
+| the link is in the drawer this section wants | nothing — it is filed, and saying so is noise |
+| the link is elsewhere on the page | names it: it may be in the wrong drawer |
+| there is no link anywhere | names it — the real failure the line was written for |
+
+**And the first cut of the fix was still wrong, which the browser said and I would not have guessed.** It asked `slot.contains(a)` and went on accusing all eleven, because they are not in the auto-fill slot at all — they are hand-placed further down the same panel. A link in the right drawer is filed whoever put it there; the slot is one way in, not the definition of belonging. The fix is `home.contains`, where `home` is `slot.closest('[data-panel]')`. The difference between those two lines is invisible in source and obvious in a DOM.
+
+**So the new gate is a browser gate, and it provokes its own failures.** `tools/ship/pageSectionsReport-selfcheck.mjs` loads server.html in real Chromium and reads both surfaces — the console line and the orange span — because they are two renderings of one verdict and the entire risk is that they drift apart, which is exactly what happened here. The existing `pageSections-selfcheck.mjs` is static and could not have caught this: the registry is correct, the mover is correct, and the false sentence is a perfectly good string literal. The bug only exists once a DOM does.
+
+The harder half is that **a fix which reports nothing looks identical to a fix that silenced everything.** So the gate serves a doctored copy of the registry — adding a page nothing links, and a page filed in a different drawer — and requires both to still be shouted about, by name, on both surfaces, while the eleven stay quiet in the same run. Reverting `home` back to `slot` fails 13 of the 18 checks.
+
+The eleven pages are named in the gate individually rather than recomputed from the registry, on purpose. The claim being defended is not "whatever the registry currently says is quiet" — it is *these pages*, the ones that were falsely accused.
+
 ## Since v3958 — the popup was hiding a dead token, and a public repo was failing for want of permission it does not need
 
 v3943 cleared `credential.helper` so Git Credential Manager could not interrupt the clone. It worked — and what it uncovered is what GCM had been papering over: `fatal: could not read Username for 'https://github.com': terminal prompts disabled`. That is what a rejected credential looks like once the popup is gone. GitHub answers 401 to the Authorization header, git falls back to asking for a username, and `GIT_TERMINAL_PROMPT` stops it. GCM had been quietly supplying working credentials over the top of a token that does not work.
