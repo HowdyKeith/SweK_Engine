@@ -410,12 +410,19 @@ async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
 
     // The token rides in the ENVIRONMENT, not in argv and not in the URL: a token in the remote URL is written
     // into .git/config and survives on disk, and a token in argv is visible to anything that can list processes.
+    // credential.helper is disabled for this one invocation too: GIT_TERMINAL_PROMPT only suppresses git's own
+    // in-terminal prompts, but Windows Git ships Git Credential Manager as the default credential.helper, and GCM
+    // has its own GUI/browser/device-code sign-in flow that fires independently of http.extraHeader already
+    // carrying a valid Authorization header. Clearing the helper here means the header is the only credential
+    // path git has, so GCM's popup never gets a chance to run.
     const tk = effTok();
     const env = Object.assign({}, process.env);
     if (tk) {
-        env.GIT_CONFIG_COUNT = "1";
+        env.GIT_CONFIG_COUNT = "2";
         env.GIT_CONFIG_KEY_0 = "http.extraHeader";
         env.GIT_CONFIG_VALUE_0 = "Authorization: Bearer " + tk;
+        env.GIT_CONFIG_KEY_1 = "credential.helper";
+        env.GIT_CONFIG_VALUE_1 = "";
     }
     env.GIT_TERMINAL_PROMPT = "0";   // never hang waiting for credentials nobody is there to type
 

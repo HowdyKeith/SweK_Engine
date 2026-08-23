@@ -8,6 +8,10 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3943 — Git Credential Manager outran the token, it did not need one
+
+Keith pressed the new clone-source button and got Windows Git Credential Manager's own "Connect to GitHub" sign-in dialog mid-clone, despite a working token already saved -- `GIT_TERMINAL_PROMPT=0` only silences git's IN-TERMINAL prompts, and says nothing about `credential.helper`, which Windows Git installs as GCM by default and which git consults on its own schedule, independent of whether `http.extraHeader` is already carrying a valid Authorization header. Fixed by clearing the helper for that one invocation (`GIT_CONFIG_KEY_1=credential.helper`, `VALUE_1=""`, git's documented "forget every configured helper" spelling), so the header is the only credential path left and GCM never gets a turn to ask. `cloneSource-selfcheck.mjs` gained a matching assertion, planted against its own removal before this landed.
+
 ## Since v3942 — the release path had no way back in
 
 Keith pressed "Release current engine" on a v3940 tree and got "Validation Failed" -- v3940 was already released, and the fix was sitting on GitHub, unreachable: the whole update chain is release-shaped (fetchEngineBuild carries a release asset, publishEngineBuild builds that asset from the local tree), so code pushed to GitHub could never reach an engine that did not already have it. Closed with githubBridge.cloneEngineSource() -- clones a new `<prefix>_vNNNN` folder beside the running one, named from the cloned tree's own ENGINE_VERSION, refuses outright if the destination exists. A GitHub Manager button drives it.
