@@ -48,10 +48,40 @@ console.log("1. THE SHAPE OF THE REGISTER");
 // ---------------------------------------------------------------------------
 console.log("\n2. *** THE CLAIMS ARE RE-DERIVED, NOT TRUSTED ***");
 {
+    // *** v3941: THIS RAN THE EVIDENCE THROUGH `bash -lc`, AND A WINDOWS BOX HAS NO BASH. ***
+    // Both probes below came back "ERR:Command failed: bash -lc node -e '...'", and the claim checks turned
+    // that into a plain FAIL -- so the register reported "the instrument-pages claim is no longer true" on a
+    // machine where the claim had never actually been ASKED. *** A PROBE THAT COULD NOT RUN IS NOT A
+    // REFUTATION *** -- the same rule this tree writes down for empty reports and for lower bounds, arriving
+    // here through a shell. Same family as the `tar -tf` portability bug sysadminBridge records.
+    //
+    // Every `evidence` string in todo.mjs is a `node` invocation, so the runner does not need a shell at all:
+    // it splits the command itself and execs THIS interpreter -- process.execPath, so a node found on PATH
+    // cannot differ from the one running the gate. A trailing `# note` is dropped the way a shell would.
+    // ANYTHING THAT IS NOT A BARE `node` INVOCATION IS REPORTED UNRUNNABLE RATHER THAN GUESSED AT: a shape
+    // this splitter does not understand has to be visible, not quietly handed to whatever shell exists.
+    const argvOf = (cmd) => {
+        const out = [];
+        let cur = "", quote = "", quoted = false;
+        for (const c of String(cmd)) {
+            if (quote) { if (c === quote) quote = ""; else cur += c; continue; }
+            if (c === "'" || c === '"') { quote = c; quoted = true; continue; }
+            if (c === "#") break;
+            if (/\s/.test(c)) { if (cur || quoted) { out.push(cur); cur = ""; quoted = false; } continue; }
+            cur += c;
+        }
+        if (quote) return null;                     // unbalanced -- do not guess at the author's intent
+        if (cur || quoted) out.push(cur);
+        return out;
+    };
     const run = (cmd) => {
-        try { return execFileSync("bash", ["-lc", cmd], { cwd: ENG, encoding: "utf8", timeout: 30000 }).trim(); }
+        const argv = argvOf(cmd);
+        if (!argv || argv[0] !== "node") return "UNRUNNABLE:" + cmd;
+        try { return execFileSync(process.execPath, argv.slice(1), { cwd: ENG, encoding: "utf8", timeout: 30000 }).trim(); }
         catch (e) { return "ERR:" + String((e && e.message) || e).split("\n")[0]; }
     };
+    // *** "IT RAN AND SAID NO" AND "IT NEVER RAN" ARE DIFFERENT ANSWERS AND GET DIFFERENT LINES. ***
+    const ran = (v) => !/^(ERR|UNRUNNABLE):/.test(String(v));
 
     // *** THIS CHECK WAS WRONG IN THE SAME WAY THE ITEM WAS, WHICH IS WHY IT PASSED. ***
     // It read Object.keys(timings.gates || timings).length -- there is no `gates` key, so it counted the file's
@@ -72,8 +102,12 @@ console.log("\n2. *** THE CLAIMS ARE RE-DERIVED, NOT TRUSTED ***");
     // the six instruments really do have no page
     const noPage = run("node -e 'import(\"./physics/instruments.mjs\").then(m=>console.log(m.INSTRUMENTS.filter(i=>!i.page).length))'");
     report("instruments with no page", noPage);
+    ok("!! the instruments probe RAN AT ALL",
+        ran(noPage),
+        "a probe that could not execute is not evidence either way -- v3941 found this reporting the claim " +
+        "FALSE on Windows because the runner shelled out to bash, which is not there");
     ok("the instrument-pages claim is still true",
-        Number(noPage) > 20,
+        ran(noPage) && Number(noPage) > 20,
         "33 of 103 when the item was written");
 
     // *** THIS CHECK WENT RED WHEN THE ITEM WAS FIXED, WHICH IS THE REGISTER WORKING. ***
@@ -85,8 +119,12 @@ console.log("\n2. *** THE CLAIMS ARE RE-DERIVED, NOT TRUSTED ***");
     // motivated it, which this project keeps catching in other files.
     const areas = run("node -e 'import(\"./physics/instruments.mjs\").then(m=>{const a={};for(const i of m.INSTRUMENTS)a[i.area]=(a[i.area]||0)+1;console.log((a[\"soft body\"]||0)+\",\"+(a[\"soft bodies\"]||0))})'");
     report("soft body , soft bodies", areas);
+    ok("!! the area-label probe RAN AT ALL",
+        ran(areas),
+        "same reason as above: without this line a runner that cannot start looks exactly like a duplicate " +
+        "label that came back");
     ok("!! the duplicate label is GONE, and a checker now owns the class",
-        areas.startsWith("0,") && fs.existsSync(path.join(ENG, "tools", "ship", "areaHygiene.mjs")),
+        ran(areas) && areas.startsWith("0,") && fs.existsSync(path.join(ENG, "tools", "ship", "areaHygiene.mjs")),
         "one spelling remains, and tools/ship/areaHygiene.mjs fails on ANY colliding pair. *** THE RENAME WAS " +
         "NEVER THE FIX -- the reason it survived 104 instruments is that nothing checked area labels, so the " +
         "next plural would have walked straight back in. ***");
