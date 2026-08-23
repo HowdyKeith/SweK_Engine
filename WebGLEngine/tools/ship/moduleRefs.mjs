@@ -60,18 +60,40 @@ import path from "node:path";
 export const SOURCE_EXT = /\.(js|mjs|html)$/;
 export const SHADER_EXT = /\.(glsl|wgsl|vert|frag)$/i;
 
-export const ROUTES = ["import", "dynamic", "script", "worker", "importScripts"];
+export const ROUTES = ["import", "dynamic", "side-effect", "script", "worker", "importScripts"];
 export const REF_STATES = ["referenced", "mentioned-only", "unreferenced"];
 
-const SPEC = /from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']|src\s*=\s*["']([^"']+)["']|new\s+Worker\(\s*["']([^"']+)["']|importScripts\(\s*["']([^"']+)["']/g;
+// *** v3941 -- THE SIXTH ROUTE, AND IT WAS HIDING TWELVE LIVE MODULES. ***
+//
+// A SIDE-EFFECT IMPORT HAS NO `from`. `import "./ui/confirmToast.js";` binds nothing -- it is run purely for
+// what loading it does -- and every pattern here needed either `from`, a paren, or an attribute, so this form
+// matched NONE of them. main.js imports twelve ui/ modules exactly that way, and to every census built on this
+// file all twelve looked like modules nothing loads.
+//
+// *** THAT IS HOW A SWEEP DELETES LIVE CODE. *** Auditing referenceKind's rescued population at v3941, all
+// twelve sat in the "no gate, no caller" pile -- the deletion shortlist -- and only reading main.js line 5572
+// stopped them going. v3202 deleted 61 live modules on the same shape and this file's own header records it.
+//
+// ADDING A ROUTE IS THE SAFE DIRECTION, WHICH IS WHY IT IS ALLOWED HERE WHERE fetch WAS REFUSED AT v3560. A
+// route can only ever FIND MORE CALLERS, so it can only SHRINK an orphan list, never grow one -- it cannot
+// cause a deletion, only prevent one. Measured before shipping: it resolves 17 real targets, 13 of them
+// currently mis-filed as unconsumed. The fetch route was refused because it resolved ZERO shaders and one
+// false positive; this one earns its place by the same measurement that refused that one.
+//
+// The lookbehind is load-bearing: without it `reimport "x"` and `x.import "y"` would both match.
+const SPEC = /from\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']|(?<![\w$.])import\s+["']([^"']+)["']|src\s*=\s*["']([^"']+)["']|new\s+Worker\(\s*["']([^"']+)["']|importScripts\(\s*["']([^"']+)["']/g;
 
 /** Every relative specifier in one file, with the route that produced it. */
 export function specifiers(src) {
     const out = [];
     let m; SPEC.lastIndex = 0;
     while ((m = SPEC.exec(src || ""))) {
-        const spec = m[1] || m[2] || m[3] || m[4] || m[5];
-        const route = m[1] ? "import" : m[2] ? "dynamic" : m[3] ? "script" : m[4] ? "worker" : "importScripts";
+        const spec = m[1] || m[2] || m[3] || m[4] || m[5] || m[6];
+        // THE INDICES SHIFTED WHEN THE SIXTH ROUTE WENT IN. A new alternative renumbers every group after it,
+        // so script/worker/importScripts each moved up one; getting that wrong would silently relabel routes
+        // rather than break, which is why moduleRefs-selfcheck drives one fixture per route by name.
+        const route = m[1] ? "import" : m[2] ? "dynamic" : m[3] ? "side-effect"
+                    : m[4] ? "script" : m[5] ? "worker" : "importScripts";
         if (spec && /^[./]/.test(spec)) out.push({ spec, route });
     }
     return out;
