@@ -245,8 +245,27 @@ export function edgeBiasProfile(img, {
     };
 }
 
+// v3951 -- *** TWO FIELD NAMES FOR ONE THING, AND THE LOSER PRINTS "undefined". ***
+//
+// Keith's render-qa run reported `sphere-impostor-flat` as `check: undefined` -- a FAILING check that could not
+// say why. The reporter reads `r.msg` (render-qa.mjs line 361 and again at 564); notAllBlack, notUniform and
+// their siblings return `msg`, while terminatorBow and edgeBiasProfile return `why`. Both are perfectly good
+// names and only one of them is read, so the two newest and most specific checks in the file -- the ones whose
+// reasons are worth the most, because they measure geometry rather than "is it black" -- were the two whose
+// reasons were thrown away.
+//
+// NORMALISED HERE RATHER THAN RENAMED IN NINE PLACES: runCheck is the one door every check goes through, so a
+// tenth check written next year gets the same treatment whichever name its author reaches for. AND A FAILING
+// CHECK THAT STILL HAS NO REASON NOW SAYS SO BY NAME, because "undefined" is a report nobody can act on and
+// silence would be worse -- it would read as a check that passed.
 export function runCheck(img, desc) {
   const fn = CHECKS[desc.type];
   if (!fn) return { ok: false, msg: `unknown check type "${desc.type}"` };
-  try { return fn(img, desc); } catch (e) { return { ok: false, msg: `check threw: ${e.message}` }; }
+  let r;
+  try { r = fn(img, desc) || {}; } catch (e) { return { ok: false, msg: `check threw: ${e.message}` }; }
+  const reason = r.msg != null ? r.msg : (r.why != null ? r.why : null);
+  return Object.assign({}, r, {
+    msg: reason != null ? reason
+       : (r.ok ? `${desc.type} passed` : `${desc.type} FAILED and returned no reason -- neither msg nor why`),
+  });
 }
