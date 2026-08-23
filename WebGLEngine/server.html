@@ -1872,6 +1872,20 @@ A password fetches a token from the list server; an unregistered callsign needs 
             <label id="autoPullWrap" title="When on, this engine auto-pulls a newer EngineProject zip from the newest peer on your LAN (into Downloads) so the whole fleet rolls forward. Only acts when auto-update is enabled." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--go);cursor:pointer;">
               <input type="checkbox" id="autoPull" style="cursor:pointer;" /> <span id="autoPullTxt">Auto-pull from peers</span>
             </label>
+            <!-- v3940 -- AUTO-UPDATE FROM GITHUB. The whole chain behind this box has existed since v1502
+                 (githubBridge.fetchEngineBuild -> Downloads -> the ordinary installer) and v3907 gave it a
+                 default engineRepo, but cfg.update.autoFetch HAD NO CONTROL ANYWHERE IN THE UI -- the only
+                 way to set it was to hand-edit ~/.voxelbridge/sysadmin.json. A SETTING WITH NO SWITCH IS A
+                 SETTING NOBODY HAS. Same wiring as autoPull: /sys/update/status reads it, /sys/update/config
+                 writes it. -->
+            <label id="autoGhWrap" title="When on, this engine checks the GitHub repo's newest RELEASE each poll and pulls its SweK_Engine_vNNNN.zip into Downloads, where the ordinary installer takes over. Fetching is not applying: with 'Auto-update from Downloads' off the zip lands and waits. Needs a published release newer than what you are running -- the tag IS the version." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--go);cursor:pointer;">
+              <input type="checkbox" id="autoGh" style="cursor:pointer;" /> <span id="autoGhTxt">Auto-update from GitHub</span>
+            </label>
+            <div id="autoGhLine" style="font-size:10px;color:var(--dim);margin:-2px 0 2px 20px;line-height:1.45;">
+              <span id="autoGhRepo">&mdash;</span>
+              <button id="ghPullNow" style="font-size:10px;padding:1px 7px;margin-left:6px;cursor:pointer;">Check GitHub now</button>
+              <div id="ghPullNote" style="margin-top:2px;"></div>
+            </div>
             <label id="autoRemoveWrap" title="When on, old EngineProject_vNNN folders are deleted after a successful update and reboot. Only touches sibling EngineProject folders older than the current running version — never the running folder itself." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--go);cursor:pointer;">
               <input type="checkbox" id="autoRemove" style="cursor:pointer;" /> <span>Safe Delete Old SweK on Update</span>
             </label>
@@ -3052,7 +3066,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
   var _updStatus = null;
   window._updApplying = false;
   function _fmtMMSS(s){ s = Math.max(0, s|0); var m = Math.floor(s/60), x = s%60; return m + ":" + (x<10?"0":"") + x; }
-  function refreshUpd(){ fetch("/sys/update/status", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){ _updStatus = j; auSync(j && j.autoApply, j); arSync(j && j.autoRemoveOld); apSync(j && j.autoPullPeers); _renderCountdown(); }).catch(function(){}); }   // v1802 — also syncs arCb + apCb
+  function refreshUpd(){ fetch("/sys/update/status", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){ _updStatus = j; auSync(j && j.autoApply, j); arSync(j && j.autoRemoveOld); apSync(j && j.autoPullPeers); agSync(j); _renderCountdown(); }).catch(function(){}); }   // v1802 — also syncs arCb + apCb
   function _renderCountdown(){
     var st = _updStatus;
     var cdt = document.getElementById("updBannerCountdown");
@@ -3124,6 +3138,62 @@ A password fetches a token from the list server; an unregistered callsign needs 
   setInterval(function(){ swekTick("refreshUpd", refreshUpd); }, 30000);
   fetch("/sys/update/status", { cache:"no-store" }).then(function(r){ return r.json(); }).then(function(j){ apSync(j && j.autoPullPeers); }).catch(function(){});
   if (apCb) apCb.onchange = function(){ var on = apCb.checked; fetch("/sys/update/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ update: { autoPullPeers: on } }) }).then(function(r){ return r.json(); }).then(function(){ apSync(on); push({ t:Date.now(), level:"info", msg:"[update] auto-pull from newer peers " + (on ? "ON" : "OFF") }); }).catch(function(){ apCb.checked = !on; }); };
+
+  // v3940 — auto-update FROM GITHUB (update.autoFetch). Shares /sys/update/status + /sys/update/config with
+  // the two toggles above; the manual button posts /sys/update/github/fetch, a route that has existed since
+  // v1502 with no caller in any page.
+  //
+  // *** THE ROW SAYS WHAT THE TWO BOXES MEAN TOGETHER, because they are not independent. *** autoFetch only
+  // makes a zip ARRIVE; autoApply is what INSTALLS it. Left unsaid, "Auto-update from GitHub: ON" over
+  // "Auto-update from Downloads: OFF" reads as a promise the engine will not keep — a zip lands in Downloads
+  // and sits there, and the panel would look like it was updating. Two checkboxes, one outcome, so ONE LINE
+  // STATES THE OUTCOME rather than leaving the reader to compose it.
+  var agCb = document.getElementById("autoGh"), agTxt = document.getElementById("autoGhTxt");
+  var agRepo = document.getElementById("autoGhRepo"), agNote = document.getElementById("ghPullNote");
+  function agSync(j){
+    var on = !!(j && j.autoFetch);
+    if (agCb) agCb.checked = on;
+    if (agTxt) agTxt.textContent = on ? "Auto-update from GitHub: ON" : "Auto-update from GitHub: OFF";
+    if (!agRepo) return;
+    var repo = (j && j.engineRepo) || "";
+    if (!on)               agRepo.textContent = repo ? ("source: " + repo + " (releases) \u2014 off") : "no engineRepo set (GitHub tab \u2192 Account)";
+    else if (!repo)        agRepo.textContent = "\u26a0 no engineRepo set \u2014 nothing to check (GitHub tab \u2192 Account)";
+    else if (j && j.autoApply) agRepo.textContent = "pulls newest release of " + repo + " into Downloads, then installs it";
+    else                   agRepo.textContent = "pulls newest release of " + repo + " into Downloads \u2014 Auto-update from Downloads is OFF, so it will WAIT there";
+  }
+  if (agCb) agCb.onchange = function(){
+    var on = agCb.checked;
+    agCb.disabled = true;
+    fetch("/sys/update/config", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ update: { autoFetch: on } }) })
+      .then(function(r){ return r.json(); })
+      // re-read from the bridge and paint THAT, not what we sent — same rule the Downloads toggle follows
+      .then(function(){ return fetch("/sys/update/status", { cache:"no-store" }).then(function(r){ return r.json(); }); })
+      .then(function(j){ agCb.disabled = false; agSync(j); push({ t:Date.now(), level:"info", msg:"[update] auto-update from GitHub " + (j && j.autoFetch ? "ON" : "OFF") + " (confirmed from bridge)" }); })
+      .catch(function(){ agCb.disabled = false; agCb.checked = !on; });
+  };
+  var ghBtn = document.getElementById("ghPullNow");
+  if (ghBtn) ghBtn.onclick = function(){
+    ghBtn.disabled = true; if (agNote) agNote.textContent = "checking " + ((_updStatus && _updStatus.engineRepo) || "GitHub") + "\u2026";
+    fetch("/sys/update/github/fetch", { method:"POST", headers:{ "Content-Type":"application/json" }, body: "{}" })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        ghBtn.disabled = false;
+        // EVERY ANSWER THIS ROUTE CAN GIVE IS NAMED. "no releases published" is not a failure and must not
+        // read as one; "up to date" is not the same sentence as "nothing to fetch"; and a refusal from the
+        // installer's own guards has to survive the trip to the panel instead of being flattened to "error".
+        var m;
+        if (!j || j.ok === false)  m = "\u2717 " + ((j && j.error) || "no answer from the bridge");
+        else if (j.none)           m = "no releases published on " + (j.repo || "the repo") + " yet \u2014 nothing to fetch (cut one with GitHub \u2192 Releases \u2192 Release current engine)";
+        else if (j.downloaded)     m = "\u2713 pulled " + (j.latest || "?") + " (" + Math.round((j.size || 0) / 1048576) + " MB) into Downloads";
+        else if (j.already)        m = "\u2713 " + (j.latest || "?") + " is already in Downloads";
+        else if (j.upToDate)       m = "up to date \u2014 you run " + (j.current || "?") + ", newest release is " + (j.latest || "?");
+        else                       m = JSON.stringify(j).slice(0, 200);
+        if (agNote) agNote.textContent = m;
+        push({ t:Date.now(), level:(j && j.ok === false) ? "warn" : "info", msg:"[update] github: " + m });
+        refreshUpd();
+      })
+      .catch(function(e){ ghBtn.disabled = false; if (agNote) agNote.textContent = "\u2717 " + String(e && e.message || e); });
+  };
 
   // v1781 — Safe Delete Old SweK on Update (autoRemoveOld).
   var arCb = document.getElementById("autoRemove");

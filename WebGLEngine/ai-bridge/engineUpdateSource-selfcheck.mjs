@@ -231,5 +231,81 @@ console.log("\n9. THE MESSAGE THAT NAMES WHAT YOU LACK ALSO OFFERS WHERE TO GET 
            "a non-token error (no link).");
 }
 
+console.log("\n10. *** v3940 -- THE SETTING HAD NO SWITCH, AND THE SWITCH WOULD HAVE DONE NOTHING ***");
+{
+    const ENGROOT3 = path.join(HERE, "..");
+    const html = fs.readFileSync(path.join(ENGROOT3, "server.html"), "utf8");
+
+    // (a) THE CONTROL. Keith asked whether Boot Options could include "Auto-update from GitHub"; the answer was
+    // that cfg.update.autoFetch had been readable, writable and honoured since v1502 and NO PAGE HAD EVER PAINTED
+    // IT. The only way to turn the feature on was to hand-edit ~/.voxelbridge/sysadmin.json.
+    ok("*** Boot Options carries a control for autoFetch ***", /id="autoGh"/.test(html),
+       "it did not, for 2438 versions -- v3907 fixed the ADDRESS the feature reads and left it with no switch");
+    ok("...and the control writes the key the poller reads, not a new one",
+       /JSON\.stringify\(\{ update: \{ autoFetch: on \} \}\)/.test(html),
+       "one key, one meaning: update.autoFetch");
+
+    // (b) THE READBACK. A checkbox that cannot re-read its own state paints what was CLICKED rather than what
+    // was SAVED -- which is the v3739 oneTerminal lesson in this same drawer, and the reason getConfig() reads
+    // the flag file from disk. updateStatus() is the route the row polls every 30s.
+    ok("*** updateStatus() REPORTS autoFetch, so the box shows what the bridge holds ***",
+       /autoFetch: !!u\.autoFetch/.test(sysSrc),
+       "it did not before v3940 -- the field existed in cfg and in setConfig's allowlist, and was absent from the only route the UI reads");
+    ok("...and it reports engineRepo too, so the row can NAME where 'from GitHub' points",
+       /engineRepo: engineRepoName\(\)/.test(sysSrc));
+    ok("...via peerConfig(), which is config only -- THE REPO NAME IS NOT A LOOKUP",
+       /function engineRepoName\(\)[^\n]*peerConfig\(\)\.engineRepo/.test(sysSrc),
+       "gh.status() would re-read main.js for the version on every 30s status poll, for a string that is already on disk");
+
+    // (c) *** THE HALF THAT MATTERED MORE THAN THE CHECKBOX. *** Shipping the control alone would have shipped a
+    // switch that silently does nothing in the configuration a careful user is most likely to be in.
+    const poll = (sysSrc.match(/if \(!\(isWin \|\| isMac\) \|\| !\(([^)]*)\)\)/) || [])[1] || "";
+    ok("*** startUpdatePoller RUNS when autoFetch alone is set ***", /autoFetch/.test(poll),
+       "poller condition: " + poll.trim());
+    report("WHY THAT IS THE REAL BUG AND THE CHECKBOX IS THE COSMETIC ONE", "the condition was " +
+           "(enabled || autoApply). Turn Auto-update from GitHub ON and Auto-update from Downloads OFF -- a " +
+           "combination that reads as 'fetch it, let me install it myself', and is EXACTLY WHAT KEITH DID on " +
+           "2026-08-22 when he unchecked Downloads over the phantom v9302 -- and no poller starts, so nothing " +
+           "is ever fetched, forever, with the box showing ON. *** THAT IS THE SAME FAILURE v3907 FOUND ONE " +
+           "LAYER DOWN: *** a feature that fails closed and silent is indistinguishable from a feature nobody " +
+           "turned on. A COUNT IS NOT A CONTRACT and A CHECKBOX IS NOT A BEHAVIOUR.");
+    ok("...and fetching still does not IMPLY applying", /updateCheck\(!!cfg\.update\.autoApply, \{ silent: true \}\)/.test(sysSrc),
+       "the poller passes autoApply through, so autoFetch-without-autoApply lands the zip in Downloads and stops there");
+
+    // (d) ONE FEATURE, ONE CONDITION. The boot-time pull had its own, different test.
+    const boot = (sysSrc.match(/if \(\(isWin \|\| isMac\) && cfg\.update\.autoFetch\) \{/) || [])[0];
+    ok("*** the boot pull and the poller now agree about what turns this on ***", !!boot,
+       "was `isWin && cfg.update.enabled && cfg.update.autoFetch` -- TWO DECLARATIONS ABOUT ONE THING");
+    report("BOTH HALVES OF THAT DISAGREEMENT WERE LIVE FAULTS", "macOS ran the poller from v1539 but never got " +
+           "the boot pull, so a Mac waited a full interval where a PC did not; and the shipped default is " +
+           "enabled:false with autoApply:true, so on a FRESH INSTALL the `enabled` half was false and the boot " +
+           "pull was dead even with autoFetch on. Neither was reachable by reading either line alone.");
+
+    // (e) THE MANUAL ROUTE FINALLY HAS A CALLER. It has existed since v1502 with no page calling it.
+    const srv = fs.readFileSync(path.join(HERE, "server.js"), "utf8");
+    ok("/sys/update/github/fetch is routed", /"\/sys\/update\/github\/fetch"/.test(srv));
+    // *** THE CALL FORM, NOT THE STRING. *** The first version of this check tested for the bare path and PASSED
+    // A SABOTAGE THAT RENAMED THE ONLY fetch() -- because the comment three lines above that call also spells the
+    // route out, and a comment is not a caller. THAT IS "PROSE READ AS CODE", the fault this tree has now named
+    // fourteen times, committed inside the gate written to prevent the untested-claim version of it. Matching
+    // `fetch("<path>"` cannot be satisfied by documentation.
+    ok("*** ...and something now CALLS it -- A ROUTE WITH NO CALLER IS AN UNTESTED CLAIM ***",
+       /fetch\("\/sys\/update\/github\/fetch"/.test(html),
+       "server.html's 'Check GitHub now' button, v3940. The route shipped in v1502 and no page had ever posted to it");
+
+    // (f) The panel must not flatten the route's five distinct answers into one word.
+    for (const [k, why] of [["none", "no releases published is NOT a failure"],
+                            ["upTo" + "Date", "'up to date' is a different sentence from 'nothing to fetch'"],
+                            ["downloaded", "the success case names the version and the size"],
+                            ["already", "already-in-Downloads is not a re-download"]]) {
+        ok(`the button names the "${k}" answer distinctly`, new RegExp("j\\." + k).test(html), why);
+    }
+    report("*** DRIVEN IN CHROMIUM, NOT INFERRED ***", "server.html served against a stub bridge, Boot Options " +
+           "opened by clicking its toggle, the box clicked: ONE config POST carrying {update:{autoFetch:true}} " +
+           "and nothing else, the label repainted from the bridge's reply, and the row's sentence changed from " +
+           "\"then installs it\" to \"it will WAIT there\" when autoApply went false. All five fetch answers " +
+           "rendered as their own sentence, the token error included. Zero page errors naming the new ids.");
+}
+
 console.log(fails ? `\nengineUpdateSource-selfcheck: ${fails} FAILED` : "\nengineUpdateSource-selfcheck: all checks pass");
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) process.exit(fails ? 1 : 0);

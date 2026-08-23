@@ -808,7 +808,7 @@ async function updateCheck(apply, opts){
 // separate fields instead of one field wearing both meanings, and updateAvailable follows the CURRENT scan.
 // v3937 -- TAKES AN OPTIONAL DIRECTORY, so a gate can ask "what would you see in THIS folder" without
 // writing to the live config. downloadsDir() when nothing is passed: production is unchanged.
-function updateStatus(dirArg){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(dirArg); if (f) lastFound = f.v; const _p = scanDownloadsPartial(dirArg); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const rejected = f ? [] : scanDownloadsRejects(dirArg); const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, rejected, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: dirArg || downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
+function updateStatus(dirArg){ const u = cfg.update; const cur = currentVersion(); const f = scanDownloads(dirArg); if (f) lastFound = f.v; const _p = scanDownloadsPartial(dirArg); const arriving = (_p && _p.v > cur && (!f || _p.v > f.v)) ? _p.v : null; const found = f ? f.v : null; const rejected = f ? [] : scanDownloadsRejects(dirArg); const pollActive = (isWin || isMac) && !!(u.enabled || u.autoApply || u.autoFetch); return { oneTerminal: oneTerminalOn(),  ok: true, win: isWin, mac: isMac, enabled: u.enabled, autoApply: u.autoApply, autoFetch: !!u.autoFetch, engineRepo: engineRepoName(), autoPullPeers: u.autoPullPeers !== false, bootScan: u.bootScan !== false, autoRemoveOld: !!u.autoRemoveOld, pauseOnRustdesk: u.pauseOnRustdesk !== false, lastPrune: _lastPrune, current: cur, found, lastFound, rejected, updateAvailable: (found || 0) > cur, arriving, pollActive, nextCheckAt: (pollActive && _nextCheckAt) ? _nextCheckAt : null, downloadsDir: dirArg || downloadsDir(), targetDir: u.targetDir || engineParentDir(), intervalMin: u.intervalMin, versionPrefix: u.versionPrefix || preferredPrefix(), note: lastNote }; }
 
 // ───────────────────────── one-terminal flag (v3739) ───────────────────────
 // Keith: Avast dislikes the single-terminal construction, so START_NODE_Engine.bat's self-relaunch into a
@@ -858,6 +858,10 @@ async function githubPull(force){
     try { const gh = require("./githubBridge.js"); return await gh.fetchEngineBuild({ toDir: downloadsDir(), force: !!force }); }
     catch (e){ return { ok: false, error: String((e && e.message) || e) }; }
 }
+// v3940 -- the panel has to be able to SAY where "from GitHub" points. peerConfig() is the cheap read:
+// it loads ~/.voxelbridge/github.json and nothing else, where status() would also re-read main.js for the
+// version on every 30s poll of the status route. NO NETWORK -- the repo NAME is config, not a lookup.
+function engineRepoName(){ try { return String(require("./githubBridge.js").peerConfig().engineRepo || ""); } catch { return ""; } }
 async function githubStatus(){
     try { const gh = require("./githubBridge.js"); const vc = await gh.versionCheck(); return Object.assign({ autoFetch: !!cfg.update.autoFetch }, vc); }
     catch (e){ return { ok: false, error: String((e && e.message) || e), autoFetch: !!cfg.update.autoFetch }; }
@@ -869,7 +873,13 @@ function startUpdatePoller(){
     // enabled, so the poller never started and updates only applied when the browser
     // triggered them. A newer zip only lands in Downloads deliberately (user download,
     // opt-in peer-pull, or GitHub autoFetch), so applying it autonomously is the intent.
-    if (!(isWin || isMac) || !(cfg.update.enabled || cfg.update.autoApply)) { _nextCheckAt = 0; return; }   // v1539 — run on macOS too; updateCheck() has a darwin apply path
+    // *** v3940 -- autoFetch IS ITS OWN REASON TO RUN. *** It was absent from this condition, so
+    // "Auto-update from GitHub" ON with "Auto-update from Downloads" OFF started no poller and fetched
+    // nothing, forever, silently -- the SAME SHAPE as the empty engineRepo default v3907 fixed, and the
+    // shape engineUpdateSource-selfcheck's own header refuses: A FEATURE THAT FAILS CLOSED AND SILENT IS
+    // INDISTINGUISHABLE FROM A FEATURE NOBODY TURNED ON. Fetching is not applying: with autoApply off the
+    // poller still calls updateCheck(false), which scans and reports and installs nothing.
+    if (!(isWin || isMac) || !(cfg.update.enabled || cfg.update.autoApply || cfg.update.autoFetch)) { _nextCheckAt = 0; return; }   // v1539 — run on macOS too; updateCheck() has a darwin apply path
     const ms = Math.max(2, cfg.update.intervalMin || 10) * 60000;
     _nextCheckAt = Date.now() + ms;
     updTimer = setInterval(() => {
@@ -947,7 +957,12 @@ function start(){
     if (isWin && cfg.loginAutostart) { try { loginAutostartSet(true); } catch {} }
     startUpdatePoller();
     // v1502 — a fresh boot should grab the newest published build without waiting a poll interval.
-    if (isWin && cfg.update.enabled && cfg.update.autoFetch) {
+    // *** v3940 -- WAS `isWin && cfg.update.enabled && autoFetch`, WHICH IS A DIFFERENT CONDITION FROM THE
+    // POLLER'S FOR THE SAME FEATURE -- two declarations about one thing. Two consequences, both real:
+    // macOS never got the boot pull although startUpdatePoller() has run there since v1539, and the default
+    // config (enabled:false, autoApply:true) failed the `enabled` half, so a fresh install with autoFetch on
+    // waited a full poll interval for its first look. autoFetch is the opt-in; nothing else needs to agree. ***
+    if ((isWin || isMac) && cfg.update.autoFetch) {
         setTimeout(() => { githubPull(false).then(r => { if (r && r.downloaded) { log("pulled " + (r.latest || "?") + " from GitHub into Downloads"); updateCheck(!!cfg.update.autoApply, { silent: true }).catch(() => {}); } }).catch(() => {}); }, 30000);
     }
     // v1516 — boot-time AWARENESS scan. Independent of the auto-update flags: one LOCAL scan of

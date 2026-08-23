@@ -142,11 +142,24 @@ function nodeGlobalsIn(rel) {
 // hand back the file, so ES modules resolve and the page runs. SEVENTH EXPIRED BLOCKER.
 {
     const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
+    // *** v3940 -- THE SKIP NAMED A CAUSE THAT WAS NOT TRUE. *** It printed "no chromium at <SHELL>" whenever
+    // EITHER half was missing, and on this machine SHELL EXISTS while the playwright module does not -- so the
+    // one line anybody reads to find out why the live gate did not run pointed at a file sitting right there.
+    // SKIPPING WITH A REASON IS ONLY BETTER THAN PASSING QUIETLY IF THE REASON IS THE REASON. The require path
+    // was also a single hardcoded absolute from one sandbox; it is now a list, tried in order, so a checkout
+    // with playwright installed anywhere normal runs the gate instead of skipping past it.
     let chromium = null;
-    try { ({ chromium } = require("/home/claude/.npm-global/lib/node_modules/playwright/index.js")); } catch { /* absent */ }
+    const PW = ["playwright", "playwright-core",
+                "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
+                "/usr/local/lib/node_modules/playwright/index.js"];
+    let pwFrom = "";
+    for (const m of PW) { try { ({ chromium } = require(m)); pwFrom = m; break; } catch { /* next */ } }
 
     if (!chromium || !fs.existsSync(SHELL)) {
-        console.log("  SKIP  the live page load   no chromium at " + SHELL + " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY.");
+        const why = !chromium && !fs.existsSync(SHELL) ? "neither playwright (tried: " + PW.join(", ") + ") nor a headless shell at " + SHELL
+                  : !chromium                          ? "playwright is not installed here -- tried: " + PW.join(", ") + " (the headless shell at " + SHELL + " IS present)"
+                  :                                      "playwright resolved from " + pwFrom + " but there is no headless shell at " + SHELL;
+        console.log("  SKIP  the live page load   " + why + " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY.");
     } else {
         const b = await chromium.launch({ executablePath: SHELL });
         try {
