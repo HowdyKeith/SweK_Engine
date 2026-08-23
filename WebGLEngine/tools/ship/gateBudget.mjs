@@ -296,6 +296,18 @@ export const UNRESOLVED = {
     "tools/ship/shaderRefs-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It resolves every shader reference in the tree; cost is a file count",
 
+    // *** v3941 -- A DIFFERENT REASON FOR THE SAME ANSWER: THESE TWO CANNOT BE MEASURED HERE AT ALL. ***
+    // Everything above overran a cap. These two SKIP, for want of a rasteriser this box cannot supply, and
+    // until v3941 they were carrying their SKIP TIMES in gate-timings.json as though those were runtimes --
+    // 55ms and 56ms, which is how long it takes each of them to say "I did not run". selfchecks now excludes a
+    // skipped run from the record, and the two false entries were removed rather than replaced with a guess.
+    // A LOWER BOUND IS NOT A MEASUREMENT and neither is a skip; an absent entry and a skip time are different
+    // claims, and only one of them is true. They move to MEASURED when a box with a rasteriser runs them.
+    "render/holoPicture-selfcheck.mjs":
+        "skips without a rasteriser, so this box has never run it to completion. Its former 55ms entry was the SKIP time, removed at v3941",
+    "render/holoAgree-selfcheck.mjs":
+        "skips without a rasteriser, so this box has never run it to completion. Its former 56ms entry was the SKIP time, removed at v3941",
+
     // *** v3913 -- claimTrace DID NOT COMPLETE IN THIRTY MINUTES, so there is no measurement to record. ***
     // A LOWER BOUND IS NOT A MEASUREMENT. Every entry in MEASURED above is a real completion; putting a guess
     // beside them would poison the one property that table has. This is the table for "we tried and it did not

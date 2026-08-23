@@ -183,17 +183,42 @@ const slow = [];
 // could never fail; a derivation is only checkable against an INDEPENDENT measurement, and this is it.
 const observedMs = {};
 
+// *** v3941 -- A GATE THAT DECLINED TO RUN IS NOT A MEASUREMENT OF THAT GATE. ***
+//
+// placementRender has been recorded at its SKIP time THREE TIMES: 54ms (found at v3925 and re-timed to
+// 14057ms), and 43ms again now. Re-timing it was the fix twice and the regression came back twice, because the
+// cause was never the number -- IT IS THIS LOOP. A gate that skips exits 0, so it lands on the success path
+// below, its skip time is recorded, and writeTimings MERGES that over the real measurement. Failures are
+// excluded and timeouts are excluded; SKIPS WERE NOT, because a skip looks exactly like a fast pass from here.
+//
+// AND IT IS NOT ONE GATE. Forty gates in this tree can skip on an absent dependency -- jsdom, box3d.wasm, a
+// rasteriser, a GPU -- and every one of them could silently overwrite its own budget the moment its dependency
+// went missing on the box doing the timing. The budget it overwrites with is the time it takes to say "I did
+// not run", which is the shortest possible time, so THE RESULTING BUDGET IS ALWAYS ABSURDLY SMALL and the
+// first timeout looks like a hang in a check that is fine.
+//
+// THE VERDICT IS STILL THE EXIT CODE, AND THIS DOES NOT TOUCH IT. A skip is still a pass, exactly as before.
+// What is being decided here is a DIFFERENT question -- whether this run produced a runtime worth recording --
+// and for that the gate's own declaration is the evidence. The convention already existed and was already
+// being printed by every skipping gate in the tree; nothing was reading it.
+const SKIP_LINE = /-selfcheck:\s*(SKIPPED|skipped)\b/;
+const skipped = [];
+
 for (const f of toRun) {
     const s0 = Date.now();
     const budget = OVERRIDE || budgetFor(f);
     try {
-        execFileSync(process.execPath, [f], { cwd: ROOT, encoding: "utf8", timeout: budget, stdio: ["ignore", "pipe", "pipe"] });
+        const out = execFileSync(process.execPath, [f], { cwd: ROOT, encoding: "utf8", timeout: budget, stdio: ["ignore", "pipe", "pipe"] });
         const ms = Date.now() - s0;
-        observedMs[f.replace(/\\/g, "/")] = ms;
+        const declinedToRun = SKIP_LINE.test(String(out || ""));
+        if (declinedToRun) skipped.push(f.replace(/\\/g, "/"));
+        // NOT RECORDED, and deliberately not recorded as zero either: an absent entry and an entry saying
+        // "0ms" are different claims, and gateBudget already knows how to treat a gate it has never seen.
+        else observedMs[f.replace(/\\/g, "/")] = ms;
         // v3584 -- flush so a run that dies leaves what it measured. >= rather than an exact modulo: gates
         // that FAIL are not recorded, so the count skips values and `% 25 === 0` can step straight over its
         // own trigger and never fire again.
-        const nSoFar = Object.keys(observedMs).length;
+        const nSoFar = Object.keys(observedMs).length + skipped.length;
         if (nSoFar - lastWriteCount >= WRITE_EVERY || Date.now() - lastWriteAt >= WRITE_EVERY_MS) {
             writeTimings(false); lastWriteAt = Date.now(); lastWriteCount = nSoFar;
         }
@@ -308,4 +333,14 @@ if (failures.length) {
 console.log("selfchecks: " + pass + "/" + toRun.length + " pass in " + secs + "s" +
             "  [" + ALREADY_GATED.size + " run separately by verify.mjs, " + SKIP.size + " skipped with reasons]");
 if (VERBOSE && slow.length) console.log("  slowest: " + slow.join(", "));
+// *** SAID OUT LOUD, BECAUSE A SILENT EXCLUSION IS THIS BUG WEARING THE OTHER FACE. *** These gates PASSED --
+// the verdict is untouched -- but they declined to run, so they contributed no runtime and their existing
+// budgets stand. A reader who does not know which gates sat out will read the coverage figure as if they ran.
+if (skipped.length) {
+    console.log("  [selfchecks] " + skipped.length + " gate(s) DECLINED TO RUN and were left out of the timing " +
+                "record (their dependency is absent on this box): " + skipped.slice(0, 8).join(", ") +
+                (skipped.length > 8 ? " and " + (skipped.length - 8) + " more" : ""));
+    console.log("  [selfchecks] their budgets are UNCHANGED. Recording the time a gate takes to say 'I did not " +
+                "run' would put a 40ms budget on a 14s check, which is how placementRender lost its budget twice.");
+}
 if (SKIP.size) for (const [f, why] of SKIP) console.log("  skip  " + f + "\n          " + why);
