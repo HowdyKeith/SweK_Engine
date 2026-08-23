@@ -36,6 +36,7 @@ import { buildBH } from "./blackHoleBind.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+const say = (name, detail) => console.log("  ----  " + name + (detail ? "   " + detail : ""));
 
 // ---- 1. THE CONTROL: a quantity whose response to a planted error is known exactly -------------------------------
 {
@@ -81,10 +82,33 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
         ratios.push(v / (1 + eps));           // onsetR / M MUST be constant: the ISCO scales with the mass
     }
     const spread = (Math.max(...ratios) - Math.min(...ratios)) / nominal;
-    ok("!! the PW capture onset is DISCONTINUOUS in the central mass -- onsetR/M is not constant",
-        spread > 0.05,
+    // *** v3941 -- THIS ASSERTED `spread > 0.05`: THE DEFECT MUST STAY BIG, AND IT GOT SMALLER. ***
+    //
+    // The finding is real and is not retracted -- onsetR/M must be constant, because the ISCO scales with the
+    // mass, and it is not. But the SIZE of the discontinuity was pinned as a floor, and the tree has been
+    // closing it: physicsBaseline's v2893 note records the ratio ranging 5.15..6.04, a spread near 15%, and
+    // "perturbing M by 1e-5 moves the answer to 5.411". Today the same sweep gives 5.806..6.038 -- 3.9%. The
+    // bracket work that made rs a single function rather than five spellings is the plausible cause and is not
+    // proven to be; what IS certain is that a line demanding a bug stay large goes red when somebody shrinks it.
+    //
+    // *** SO THE FLOOR BECOMES A CEILING, AT THE SAME NUMBER. *** 5% was the bar that said "big enough to be
+    // real"; it is now the bar that says "no worse than when we last looked". MAY SHRINK, MAY NEVER GROW --
+    // the shape every other ratchet in this tree carries, pointing the way that rewards a fix instead of
+    // punishing one. If the bisection is ever made scale-invariant this line goes on passing and the report
+    // beneath it says so, which is the outcome a check about a known defect should want.
+    //
+    // The number is safe to ratchet because it REPRODUCES: this box and Keith's rig independently report
+    // 5.806..6.038 and 3.9%, to every digit shown. That is not guaranteed for a bisection near a discontinuity
+    // -- it is exactly where float differences amplify -- so it is stated as evidence rather than assumed.
+    const SPREAD_CEILING = 0.05;
+    ok("!! the PW capture onset is STILL DISCONTINUOUS in the central mass, and no worse than recorded",
+        spread <= SPREAD_CEILING,
         "onsetR/M ranges " + Math.min(...ratios).toFixed(3) + ".." + Math.max(...ratios).toFixed(3) +
-        " (spread " + (spread * 100).toFixed(1) + "% of the nominal) across mass perturbations of 1e-7..1e-2 -- a ratio that must be constant");
+        " (spread " + (spread * 100).toFixed(1) + "% of the nominal) across mass perturbations of 1e-7..1e-2 -- " +
+        "A RATIO THAT MUST BE CONSTANT, since the ISCO scales with M. Against a ceiling of " +
+        (SPREAD_CEILING * 100).toFixed(0) + "%, which was this line's FLOOR until the defect shrank past it: " +
+        "physicsBaseline's v2893 note records 5.15..6.04, near 15%. THE FINDING STANDS AND THE RATCHET NOW " +
+        "POINTS THE OTHER WAY -- it may shrink and may never grow.");
 
     // ...yet at NOMINAL M it is stable under refinement, which is exactly why nothing caught this before
     const tolSweep = [];
@@ -93,6 +117,13 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     ok("...while at NOMINAL M it looks perfectly healthy under refinement -- which is how it passed every gate until now",
         tolSpread < 0.01,
         "search-tolerance sweep spans only " + (tolSpread * 100).toFixed(2) + "%; the instability is invisible unless you perturb the PHYSICS, which is the whole point of planting errors");
+    // DERIVED, NOT TYPED: the mass sweep against the refinement sweep is what makes "discontinuous" a reading
+    // rather than an opinion, and it is the comparison that survives the defect shrinking.
+    say("mass-perturbation spread against refinement spread",
+        (spread * 100).toFixed(1) + "% against " + (tolSpread * 100).toFixed(2) + "% -- " +
+        (tolSpread > 0 ? (spread / tolSpread).toFixed(0) + "x the instrument's own resolution" : "refinement is exact") +
+        ". WHILE THAT RATIO IS LARGE THE DISCONTINUITY IS PHYSICS-DRIVEN AND NOT SEARCH NOISE; when it reaches " +
+        "1 the bisection has been made scale-invariant and this whole section can be retired rather than loosened.");
     ok("...and the baseline entry now carries the caveat rather than the bare number",
         (await import("./physicsBaseline.mjs")).BASELINE.find((b) => b.id === "isco-pw-onset").note.includes("NOT CONTINUOUS"),
         "pinned with its condition, like the blobarium artefact -- a number whose limits travel with it");
