@@ -18,7 +18,14 @@ const { spawn } = require("child_process");
 const path = require("path");
 const ENG = path.join(__dirname, "..");
 
-function owns(url) { return String(url || "").split("?")[0].startsWith("/frugon"); }
+// v3951 -- *** THIS OWNED /frugon.html AND MADE A REAL PAGE UNREACHABLE. *** startsWith("/frugon") is true of
+// "/frugon.html", so every request for the PAGE was swallowed by this API front door and answered 404 -- the file
+// has been on disk the whole time. Keith's render-qa run is where it showed up: a white 404 page, meanLum 254,
+// reported as a missing page rather than as a route collision, which is the shape that makes it hard to find.
+// Every route this bridge actually serves is either the bare word or "/frugon/<something>", so matching on a PATH
+// SEGMENT BOUNDARY claims exactly those and nothing else. A prefix is not a segment, and the difference is
+// invisible until somebody names a file after a route.
+function owns(url) { const p = String(url || "").split("?")[0]; return p === "/frugon" || p.startsWith("/frugon/"); }
 
 function which() {                                  // frugon, or uvx frugon, or neither -- ask, do not assume
     return new Promise((res) => {

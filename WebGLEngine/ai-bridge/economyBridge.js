@@ -18,7 +18,14 @@ const ALLOWED = [/^\/api\/health$/, /^\/api\/ships$/, /^\/api\/sim\/(pause|resum
                  /^\/api\/admin\/markets\/[A-Za-z0-9._-]+\/supply$/, /^\/api\/debug\/agent\/[A-Za-z0-9._-]+\/trace$/];
 const MAX_ABS_DELTA = 5000, MAX_TICKS = 50;
 
-function owns(url) { return String(url || "").split("?")[0].startsWith("/economy"); }
+// v3951 -- *** THIS OWNED /economy.html AND MADE A REAL PAGE UNREACHABLE. *** startsWith("/economy") is true of
+// "/economy.html", so every request for the PAGE was swallowed by this API front door and answered 404 -- the file
+// has been on disk the whole time. Keith's render-qa run is where it showed up: a white 404 page, meanLum 254,
+// reported as a missing page rather than as a route collision, which is the shape that makes it hard to find.
+// Every route this bridge actually serves is either the bare word or "/economy/<something>", so matching on a PATH
+// SEGMENT BOUNDARY claims exactly those and nothing else. A prefix is not a segment, and the difference is
+// invisible until somebody names a file after a route.
+function owns(url) { const p = String(url || "").split("?")[0]; return p === "/economy" || p.startsWith("/economy/"); }
 
 async function call(base, path, method, body) {
     if (!ALLOWED.some((re) => re.test(path))) throw new Error("refused: " + path + " is not on the probe's allow-list. This bridge reaches exactly the five routes the measurement needs, so it cannot become a general proxy into their admin API.");

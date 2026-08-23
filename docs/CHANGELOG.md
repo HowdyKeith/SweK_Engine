@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3951 — working down the render-qa report: a Node import in a browser, and two pages the server had taken
+
+`skin-depth.html` died on `node:url`, and v3900 had already diagnosed that exact failure in that exact file: "`process` at module top level is a ReferenceError in a browser — not a caught failure, an EVALUATION failure, so the whole module fails to load and every import of it dies with it." It guarded `process` and left the import above it alone. A bare `import ... from "node:url"` resolves before a line of the module runs, so the browser never reached the guard — it reported "blocked by CORS policy", which is what a browser calls a bare specifier it cannot resolve. The import is now dynamic, inside the guard. Measured: this was the only module in the tree with a top-level `node:` import reachable from any page, so the class is closed rather than the instance.
+
+And `economy.html` and `frugon.html` were on disk the whole time, served by nothing. `economyBridge` and `frugonBridge` claim their URL space with `startsWith("/economy")` / `startsWith("/frugon")`, which is true of `/economy.html` — so the API front door swallowed the page and answered 404. render-qa reported them as missing pages (a white 404, meanLum 254), the shape that hides the cause completely: the page looks absent, you go looking for the file, and the file is right there. A prefix is not a path segment.
+
+`tools/ship/routeShadow-selfcheck.mjs` asserts the property rather than the two names — every bridge exporting `owns()` is discovered and driven against every real file in the root — and it immediately found a third: `moduleHistoryBridge` had the same shape, harmless only because nobody has yet created `modulehistory.html`. Fixed before it could be the third instance.
+
+That gate's second section, in its first form, scraped every quoted `/a/b` out of each bridge and called it a route — reporting `terrainBuildBridge` broken for not owning `/usr/local/bin`, and `ragBridge` for not owning an upstream `/api/generate`. Nine failures, none real. It now discovers each owner's segment by asking `owns()` rather than reading strings: a check that fires on correct files is the same disease as one that cannot fire at all.
+
 ## Since v3950 — half a 51-page failure report was one file that has never existed
 
 Keith ran render-qa over 377 pages: 51 failed, and 25 of those said `404 /ui/recordFloat.js` and nothing else. The file is in no commit of this repository — `git log --all` over the path is empty, no changelog names it, no module imports it. The same lost-source shape as `simulation/lbm/dfgBenchmark.mjs`, found the same week, and this one was being requested by twenty-five pages on every load.

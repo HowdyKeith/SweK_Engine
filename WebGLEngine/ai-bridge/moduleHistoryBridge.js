@@ -27,7 +27,12 @@ const fs = require("fs");
 const path = require("path");
 
 const PREFIX = "/modulehistory";
-function owns(url) { return String(url || "").split("?")[0].startsWith(PREFIX); }
+// v3951 -- SEGMENT, NOT PREFIX. There is no modulehistory.html today, so unlike economyBridge and frugonBridge
+// this one was not breaking anything -- it was the same shape waiting for a file to be named after it, and
+// routeShadow-selfcheck found it while the other two were being fixed. A prefix owner answers 404 for a page it
+// does not serve and did not know it had claimed; the page then reads as MISSING rather than as TAKEN, which is
+// the part that costs an afternoon. One line, before it can be the third instance.
+function owns(url) { const p = String(url || "").split("?")[0]; return p === PREFIX || p.startsWith(PREFIX + "/"); }
 
 // v3204 -- USE THE SERVER'S OWN DEFINITION OF "LOCAL", PASSED IN AS ctx.isLocal.
 //

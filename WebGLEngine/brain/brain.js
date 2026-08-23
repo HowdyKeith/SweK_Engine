@@ -2795,7 +2795,7 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3950";
+const BRAIN_BUILD = "v3951";
 // v2408 -- collapse the repetitive per-tick status into a single in-place spinner line (like the KPop listener), so a
 // long idle run doesn't scroll hundreds of identical lines. On a real TTY it rewrites one line; when piped/redirected
 // it falls back to plain lines so logs stay grep-able.
