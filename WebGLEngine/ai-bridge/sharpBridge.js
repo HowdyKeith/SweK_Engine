@@ -75,6 +75,52 @@ const LICENCE = {
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".bmp"]);
 
+// *** THE ENDPOINT AND ITS TOKEN LIVE OUTSIDE THE ENGINE TREE, WHICH IS githubBridge'S RULE VERBATIM: ***
+// "Token lives in ~/.voxelbridge/github.json (0600), outside the engine tree, so it never ships in a copy."
+// That is stronger than relying on packagerBridge's SKIP_FILES, because a file that is not in the tree cannot
+// be swept up by anything -- not the packer, not a hand-made zip, not somebody copying the folder to a stick.
+const CFG = process.env.SHARP_CFG || path.join(os.homedir(), ".voxelbridge", "sharp.json");
+
+function loadCfg() {
+    try { const c = JSON.parse(fs.readFileSync(CFG, "utf8")); return (c && typeof c === "object") ? c : {}; }
+    catch { return {}; }
+}
+function saveCfg(c) {
+    try { fs.mkdirSync(path.dirname(CFG), { recursive: true }); } catch {}
+    fs.writeFileSync(CFG, JSON.stringify(c, null, 2), { mode: 0o600 });
+    try { fs.chmodSync(CFG, 0o600); } catch {}   // chmod separately: an EXISTING file keeps its old mode otherwise
+}
+
+/**
+ * Endpoint shape is checked at the WRITE, the way githubBridge learned to check repo names after
+ * engineRepo = "Swek Engine" made every update 404 silently inside a try/catch nobody read. A malformed
+ * endpoint here would fail exactly as quietly, one layer further out.
+ */
+function endpointError(v) {
+    const s = String(v == null ? "" : v).trim();
+    if (!s) return "";                                    // not set is a real state
+    let u = null;
+    try { u = new URL(s); } catch { return "is not a URL"; }
+    if (u.protocol !== "https:") return "must be https (a token would otherwise cross the network in clear)";
+    if (!u.hostname) return "has no host";
+    return "";
+}
+
+function setConfig(d) {
+    d = d || {};
+    const c = loadCfg();
+    if (d.endpoint != null) {
+        const why = endpointError(d.endpoint);
+        if (why) return { ok: false, error: "endpoint " + why + '. Got: "' + String(d.endpoint).trim() + '"' };
+        c.endpoint = String(d.endpoint).trim();
+    }
+    if (d.token != null) c.token = String(d.token).trim();
+    saveCfg(c);
+    // The token is never echoed back -- only whether there is one. A status route that returned it would put a
+    // secret into every browser tab that polls.
+    return { ok: true, endpoint: c.endpoint || "", hasToken: !!c.token, path: CFG };
+}
+
 /**
  * Where a produced .ply may land. The asset library is chosen because it is ALREADY excluded from packaging for
  * a reason somebody else wrote down -- SKIP_DIRS holds "asset_library" and assetMigrate.js explains that
@@ -160,12 +206,28 @@ async function status() {
     const cand = py.resolve();
     const python = py.label(cand);
     const pythonVersion = cand ? py.version(cand) : "";
+    const cfg = loadCfg();
     const out = {
         ok: true, licence: LICENCE, outDir: defaultOutDir(),
         python: cand ? python : "", pythonVersion,
         sharpInstalled: false, sharpVersion: "", invocation: "", weightsCached: false, weightsDir: "",
-        ready: false, why: "",
+        remote: !!cfg.endpoint, remoteEndpoint: cfg.endpoint || "", remoteHasToken: !!cfg.token,
+        where: "", ready: false, why: "",
     };
+
+    // *** THE REMOTE PATH IS CHECKED FIRST BECAUSE IT IS THE ONE THAT MAKES THIS FEATURE EXIST OFF GALAXINA. ***
+    // A configured Modal endpoint means a Mac with no CUDA, or the Shield, can still turn a photo into a .ply.
+    // Local PyTorch is the fallback, not the other way round -- and `where` says which, so a caller never has to
+    // infer it from which fields happen to be filled in.
+    if (cfg.endpoint) {
+        out.where = "modal";
+        out.ready = !!cfg.token;
+        out.why = cfg.token ? "" : "a Modal endpoint is configured but no token -- the endpoint refuses " +
+                  "unauthenticated calls on purpose, because an open one is somebody else's GPU bill and " +
+                  "research-licensed weights served to the public";
+        return out;
+    }
+
     if (!cand) { out.why = "no working Python found (tried: " + py.candidates().map(py.label).join(", ") + ")"; return out; }
 
     const inv = await _resolveInvocation(cand);
@@ -180,10 +242,58 @@ async function status() {
     const wd = path.join(os.homedir(), ".cache", "torch", "hub", "checkpoints");
     out.weightsDir = wd;
     try { out.weightsCached = fs.existsSync(wd) && fs.readdirSync(wd).some((f) => /sharp/i.test(f)); } catch {}
+    out.where = "local";
     out.ready = true;
     out.why = out.weightsCached ? "" : "weights are not cached yet -- the first prediction downloads them into " + wd +
               " (torch's own cache, deliberately outside this tree)";
     return out;
+}
+
+/**
+ * The Modal path. The endpoint returns .ply BYTES rather than a path, because it has no shared disk with this
+ * machine -- which is exactly why the file is written HERE, on the side where wouldBePackaged() has already
+ * refused any destination the packer would sweep into a release. Doing the write remotely would have moved the
+ * output out from behind that rule.
+ */
+async function _predictRemote(img, dest, before) {
+    const cfg = loadCfg();
+    let raw = null;
+    try { raw = fs.readFileSync(img); } catch (e) { return { ok: false, error: "cannot read " + img + ": " + ((e && e.message) || e) }; }
+
+    let res = null, body = null;
+    try {
+        res = await fetch(cfg.endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // The token rides in the BODY rather than the URL: a query string lands in proxy logs and browser
+            // history, and this one is the only thing standing between a stranger and a rented GPU.
+            body: JSON.stringify({ token: cfg.token || "", image_b64: raw.toString("base64") }),
+            signal: AbortSignal.timeout(600000),
+        });
+        body = await res.json().catch(() => null);
+    } catch (e) {
+        return { ok: false, error: "Modal endpoint did not answer: " + String((e && e.message) || e) };
+    }
+    if (!res.ok || !body || body.ok === false) {
+        const detail = (body && (body.detail || body.error)) || ("HTTP " + (res && res.status));
+        return { ok: false, error: "Modal endpoint refused: " + String(detail).slice(0, 200) +
+                 (res && res.status === 401 ? " -- check the token matches the SHARP_TOKEN secret you deployed with" : "") };
+    }
+    if (!body.ply_b64) return { ok: false, error: "Modal endpoint answered ok but sent no ply_b64 -- treating that as a failure rather than writing an empty file" };
+
+    // Named from the source image so two photographs do not overwrite each other, and de-duplicated against
+    // what was already there rather than trusting the name to be free.
+    const base = path.basename(img).replace(/\.[^.]+$/, "").replace(/[^\w.-]/g, "_") || "splat";
+    let name = base + ".ply", n = 1;
+    while (before.has(name) || fs.existsSync(path.join(dest, name))) name = base + "_" + (++n) + ".ply";
+    const ply = path.join(dest, name);
+    try { fs.writeFileSync(ply, Buffer.from(body.ply_b64, "base64")); }
+    catch (e) { return { ok: false, error: "could not write " + ply + ": " + ((e && e.message) || e) }; }
+
+    let bytes = 0; try { bytes = fs.statSync(ply).size; } catch {}
+    if (!bytes) { try { fs.rmSync(ply, { force: true }); } catch {} return { ok: false, error: "the endpoint's .ply decoded to zero bytes; the empty file was removed rather than left looking like a build" }; }
+    return { ok: true, ply, name, bytes, mb: +(bytes / 1048576).toFixed(2), image: img, outDir: dest,
+             invocation: "modal:" + cfg.endpoint, licence: LICENCE, alsoWrote: [] };
 }
 
 /**
@@ -217,10 +327,19 @@ async function predict({ image, outDir } = {}) {
     const before = new Set();
     try { for (const f of fs.readdirSync(dest)) if (f.toLowerCase().endsWith(".ply")) before.add(f); } catch {}
 
+    // *** ONE DECISION ABOUT WHERE THIS RUNS, AND status() ALREADY MADE IT. *** predict() does not re-derive
+    // local-vs-remote from the config: it uses the `where` status() reported, so the two can never disagree.
+    // A status saying "modal" while the run shells out to a local python is the two-declarations defect with a
+    // green light in front of it -- the same shape the `-m` fix closed one layer down.
+    const t0 = Date.now();
+    if (s.where === "modal") {
+        const rr = await _predictRemote(img, dest, before);
+        return Object.assign({ ms: Date.now() - t0, where: "modal" }, rr);
+    }
+
     const cand = py.resolve();
     const inv = await _resolveInvocation(cand);
     if (!inv) return { ok: false, error: "ml-sharp went missing between the status check and the run" };
-    const t0 = Date.now();
     const r = await _run(inv.cmd, [...inv.pre, "predict", "-i", img, "-o", dest], { timeout: 600000 });
     const ms = Date.now() - t0;
     if (!r.ok) return { ok: false, error: "sharp predict failed: " + (r.err || "").trim().split("\n").slice(-3).join(" ").slice(0, 400), ms };
@@ -236,4 +355,4 @@ async function predict({ image, outDir } = {}) {
              invocation: inv.label, licence: LICENCE, alsoWrote: made.slice(1) };
 }
 
-module.exports = { status, predict, defaultOutDir, wouldBePackaged, LICENCE, PROJECT_ROOT };
+module.exports = { status, predict, setConfig, endpointError, defaultOutDir, wouldBePackaged, LICENCE, PROJECT_ROOT, CFG };

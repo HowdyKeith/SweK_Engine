@@ -16254,6 +16254,16 @@ ${text.replace(/'/g, "''")}
         catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
         return;
     }
+    // v3949 — the Modal endpoint + its token. Written to ~/.voxelbridge/sharp.json (0600), OUTSIDE the engine
+    // tree, which is githubBridge's rule for exactly the same reason: a file that is not in the tree cannot be
+    // swept into a release by anything. The token is never echoed back, only whether there is one.
+    if (req.url === "/sharp/config" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./sharpBridge.js").setConfig(d || {})); }
+            catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
     if (req.url === "/sharp/predict" && req.method === "POST") {
         readJson(d => {
             try { require("./sharpBridge.js").predict(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }

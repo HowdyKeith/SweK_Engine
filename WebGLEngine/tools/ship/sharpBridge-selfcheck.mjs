@@ -5,11 +5,19 @@
 //
 // GATES ai-bridge/sharpBridge.js -- apple/ml-sharp, one photograph to a 3D Gaussian splat.
 //
-// *** WHAT THIS FILE CAN AND CANNOT PROVE, SAID ONCE AND HONESTLY. *** No prediction has ever run in this
-// sandbox: there is no PyTorch and no weights here, so nothing below the CLI boundary is observed. Every check
-// here is about the half that does not need a model -- the refusals, the path safety, and the licence surface.
-// ONE REAL RUN ON GALAXINA is what turns the rest from a documented contract into a fact, and the bridge's own
-// header says so rather than letting a green gate imply otherwise.
+// *** WHAT THIS FILE CAN AND CANNOT PROVE, SAID ONCE AND HONESTLY, AND THE LINE MOVED ONCE ALREADY. ***
+//
+// THE LOCAL PATH IS NOT OBSERVED: there is no PyTorch and no weights on this box, so `sharp predict` is a
+// documented contract here and ONE REAL RUN ON GALAXINA is what turns it into a fact.
+//
+// THE MODAL PATH IS FULLY DRIVEN, AND THAT WAS WORTH NOTICING. The remote route needs only something that
+// speaks the endpoint's contract -- not a GPU -- so section 5b stands up a real HTTP server, sends a real
+// image, and checks the bytes that come back are the bytes written to disk. It found the collision bug on its
+// first run: two photographs with the same basename, and the second overwrote the first. That is end-to-end
+// evidence a photograph can become a .ply, on the half of the feature that can carry it.
+//
+// Everything else here is about the half that needs no model at all -- the refusals, the path safety, and the
+// licence surface -- which is the part with a consequence outside the repository.
 //
 // *** THE PROPERTY THAT MATTERS MOST IS NOT "DOES IT WORK", IT IS "WHERE DOES THE OUTPUT LAND". *** The ml-sharp
 // weights are licensed for Research Purposes only -- LICENSE_MODEL rules out "commercial exploitation, product
@@ -169,12 +177,126 @@ console.log("sharpBridge-selfcheck -- where a research-licensed splat is allowed
         PY.label(PY.resolve()) + " " + PY.version(PY.resolve()));
 }
 
+// ---- 5b. THE MODAL PATH, DRIVEN FOR REAL AGAINST A STAND-IN ENDPOINT ----------------------------------------
+//
+// *** THIS IS THE ONE PART OF THE FEATURE THAT CAN BE FULLY DRIVEN FROM HERE, SO IT IS. *** The local path needs
+// PyTorch and weights that do not exist on this box; the REMOTE path needs only something that speaks the
+// endpoint's contract, and a fifteen-line HTTP server is that. Real socket, real bytes, real file on disk --
+// which makes this the only end-to-end evidence the round has that a photograph can become a .ply at all.
+{
+    console.log("\n5b. *** THE MODAL ROUTE, END TO END, WITHOUT A GPU ***");
+    const http = await import("node:http");
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "sharpmodal-"));
+    const outDir = path.join(scratch, "out");
+    const cfgPath = path.join(scratch, "sharp.json");
+    const PLY = Buffer.from("ply\nformat binary_little_endian 1.0\nelement vertex 0\nend_header\n");
+    let sawToken = null, sawBytes = 0;
+
+    const srv = http.createServer((req, res) => {
+        let b = ""; req.on("data", (d) => { b += d; }); req.on("end", () => {
+            let j = {}; try { j = JSON.parse(b || "{}"); } catch {}
+            sawToken = j.token; sawBytes = Buffer.from(j.image_b64 || "", "base64").length;
+            if (j.token !== "s3cret") { res.writeHead(401, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ detail: "bad or missing token" })); }
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, ply_b64: PLY.toString("base64"), bytes: PLY.length }));
+        });
+    });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    const url = "http://127.0.0.1:" + srv.address().port + "/";
+    const img = path.join(scratch, "photo.png");
+    fs.writeFileSync(img, Buffer.from("89504e470d0a1a0a", "hex"));
+
+    // A fresh module instance per config, because CFG is read at require time via SHARP_CFG.
+    const load = (cfg) => {
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg));
+        process.env.SHARP_CFG = cfgPath;
+        const p = path.join(ENG, "ai-bridge", "sharpBridge.js");
+        delete require_.cache[require_.resolve(p)];
+        return require_(p);
+    };
+
+    let M = load({ endpoint: url, token: "s3cret" });
+    let st = await M.status();
+    ok("!! a configured endpoint makes status() report where=modal",
+        st.where === "modal" && st.remote === true,
+        "the remote path is checked FIRST, because it is what makes this feature exist on a box with no CUDA -- " +
+        "every Mac in the fleet, and the Shield");
+    ok("!! ...and status NEVER echoes the token back",
+        !JSON.stringify(st).includes("s3cret"),
+        "*** A STATUS ROUTE THAT RETURNED THE SECRET WOULD PUT IT IN EVERY BROWSER TAB THAT POLLS. *** Only " +
+        "whether there IS one is reported: remoteHasToken=" + st.remoteHasToken);
+
+    const r = await M.predict({ image: img, outDir });
+    ok("!! predict() reaches the endpoint and writes the .ply it returned",
+        r.ok === true && !!r.ply && fs.existsSync(r.ply),
+        r.ok ? path.basename(r.ply) : (r.error || "").slice(0, 90));
+    ok("...and the endpoint really received the image bytes", sawBytes === 8, sawBytes + " bytes");
+    ok("!! ...and the token travelled in the BODY, not the URL",
+        sawToken === "s3cret",
+        "a query string lands in proxy logs and browser history, and this token is the only thing between a " +
+        "stranger and a rented GPU");
+    ok("...and the file on disk is byte-for-byte what the endpoint sent",
+        !!r.ply && fs.readFileSync(r.ply).equals(PLY));
+    ok("...and the reply says which route ran", /^modal:/.test(r.invocation || ""), r.invocation);
+
+    const r2 = await M.predict({ image: img, outDir });
+    ok("!! a second photograph of the same name does not overwrite the first",
+        r2.ok === true && r2.ply !== r.ply && fs.existsSync(r.ply),
+        "the name is derived from the source image, so without a collision check the second run would silently " +
+        "destroy the first: " + (r2.name || r2.error));
+
+    M = load({ endpoint: url, token: "wrong" });
+    const bad = await M.predict({ image: img, outDir });
+    ok("!! a rejected token is a clear refusal that names the secret to check",
+        bad.ok === false && /token/i.test(bad.error || ""),
+        "401 from a serverless endpoint is otherwise one of the least self-explanatory failures there is: " +
+        (bad.error || "").slice(0, 80));
+
+    M = load({ endpoint: url });
+    st = await M.status();
+    ok("!! an endpoint with no token is not 'ready', and says why BEFORE any call is made",
+        st.ready === false && /token/i.test(st.why || ""),
+        (st.why || "").slice(0, 70));
+
+    srv.close();
+    delete process.env.SHARP_CFG;
+    delete require_.cache[require_.resolve(path.join(ENG, "ai-bridge", "sharpBridge.js"))];
+    fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// ---- 5c. THE RECIPE ITSELF -----------------------------------------------------------------------------------
+{
+    console.log("\n5c. THE DEPLOY RECIPE IS PRESENT AND HOLDS NO SECRETS");
+    const mp = path.join(ENG, "modal", "sharp_modal.py");
+    ok("!! the Modal app exists where the bridge's instructions say it does",
+        fs.existsSync(mp),
+        "a documented deploy command pointing at a missing file is the rig.html failure one directory over");
+    const m = fs.readFileSync(mp, "utf8");
+    ok("!! it reads its token from a Modal SECRET, never a literal",
+        /os\.environ\.get\("SHARP_TOKEN"/.test(m) && !/SHARP_TOKEN\s*=\s*["'][A-Za-z0-9_-]{8,}/.test(m),
+        "*** THIS FILE SHIPS IN THE RELEASE ZIP *** -- it is our own code and belongs there, which is precisely " +
+        "why a hardcoded token in it would be published");
+    ok("!! ...and compares it in constant time",
+        /compare_digest/.test(m),
+        "a plain == leaks the token's length through timing to anybody patient; the fix costs one import");
+    ok("!! the endpoint refuses an unauthenticated call at all",
+        /status_code=401/.test(m),
+        "an open endpoint is somebody else's GPU bill AND research-licensed weights served to the public");
+    ok("...and it carries the licence in its own reply",
+        /Research Purposes only/.test(m),
+        "the terms follow the output rather than living only where the deployer read them once");
+    ok("!! it does not hardcode a weights URL",
+        !/https?:\/\/[^\s"']*\.(pt|pth|ckpt|safetensors)/i.test(m),
+        "ml-sharp owns its own downloader; a second declaration of a checkpoint location is the kind that rots " +
+        "silently and is discovered as a 404 during a deploy");
+}
+
 // ---- 6. IT IS REACHABLE ------------------------------------------------------------------------------------
 {
     console.log("\n6. THERE IS A DOOR");
     const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
-    ok("!! both routes are dispatched",
-        /"\/sharp\/status"/.test(server) && /"\/sharp\/predict"/.test(server) && /sharpBridge\.js/.test(server),
+    ok("!! all three routes are dispatched",
+        /"\/sharp\/status"/.test(server) && /"\/sharp\/predict"/.test(server) && /"\/sharp\/config"/.test(server) && /sharpBridge\.js/.test(server),
         "a bridge with no route is the module-with-no-caller shape this tree names everywhere");
     ok("...and it is required LAZILY, so a tree without the file still boots",
         /require\("\.\/sharpBridge\.js"\)/.test(server) && !/^const sharpBridge/m.test(server),
