@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3947 — the release stopped being hand-carried, and the one opinion CI is not allowed to hold
+
+rig.html called a CI release matrix "THE HIGHEST-VALUE ITEM ON THIS PAGE" and the repository had no `.github/workflows` directory at all. Keith's own words on the entry: "You hand-carry a zip to a house in another town." It now builds, verifies and publishes on a pushed tag.
+
+The obvious workflow would have been a security bug. The natural way to build a zip in YAML is `zip -r` with an exclude list written inline — and `packagerBridge.js` already declares that list: `SKIP_FILES` holds `github.json`, `gmail.json`, `twitch-eventsub.json` and thirteen more. A YAML copy drifting by one line would publish a credential to a public downloads page, quietly, because a zip that is slightly too big looks exactly like a zip. So the workflow holds no opinion about what is in a release: it calls `tools/ship/packRelease.mjs`, which resolves `makeInstallable()` — the same call the panel's Release button makes — and contains no packing logic itself, or the defect would just have moved one file along. The secret sweep derives its names from `SKIP_FILES` rather than retyping them, with an explicit refusal to pass vacuously if that read ever comes back empty.
+
+Where it deliberately does not copy the matrix it was told to steal: Vizza ships six artifacts because a Tauri app needs six *binaries*. This engine ships one platform-independent zip, so a six-way build matrix would produce six byte-identical files and call it coverage. What the matrix actually buys is that the artifact gets opened somewhere other than where it was made — exactly what hand-carrying never did. So it builds once, then unpacks and exercises that one artifact on ubuntu, macOS and Windows, with Windows in the list on purpose.
+
+The tag is compared against `ENGINE_VERSION` and a mismatch exits; `verify_zip.py`, the ship-ritual skill's own hard-fail gate, runs against the built artifact rather than being reimplemented; publishing waits on the cross-OS verify and requires a real pushed tag, so the manual button exercises the whole path and puts nothing on the releases page.
+
 ## Since v3946 — the rig page told Keith to spend an afternoon on a tool that dies in one second
 
 Asked which rig.html items could be cleared from here, the useful answer turned out to be about the list rather than the work: the `dfg` entry describes a multi-pass CPU run and its answer key does not exist. v3942 found that `simulation/lbm/dfgBenchmark.mjs` is in no commit of this repository and taught the *tool* to say LOST SOURCE instead of dying on a raw module error — and left the rig entry saying "just run it". The fix reached the thing a machine reads and not the thing a person reads.
