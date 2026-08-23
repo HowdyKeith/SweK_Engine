@@ -34,11 +34,31 @@ function status() { const c = loadCfg(); return { ok: true, owner: c.owner || ""
 
 function _hdrs(extra) { const h = { "Accept": "application/vnd.github+json", "User-Agent": "SweK-Engine", "X-GitHub-Api-Version": "2022-11-28" }; const tk = effTok(); if (tk) h["Authorization"] = "Bearer " + tk; return Object.assign(h, extra || {}); }
 function _to(url, opts, ms = 12000) { const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), ms); return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t)); }
+// *** v3941 -- "Validation Failed" WAS THE WHOLE MESSAGE, EVERY TIME. *** Keith pressed "Release current engine"
+// and got exactly that, with no way to tell what it meant: a release already existing for the tag, a bad
+// target_commitish, an org rule blocking the tag pattern, and a dozen other 422 causes all produce the SAME
+// top-level j.message from GitHub -- "Validation Failed" is the category, not the reason. The reason lives in
+// j.errors[], an array of {resource, field, code} (sometimes with its own `message`), and this line kept only
+// the category and threw the reason away. Every caller of _api shares this formatter, not just releases --
+// createRepo, putFile, issue/create all hit the same 422 shape and were all equally silent about why.
+//
+// PULLED OUT AS A PURE FUNCTION rather than left inline, because a fetch wrapper cannot be driven by a fixture
+// and this tree's own rule is that a function nothing can call from a gate is a function nothing has checked.
+function _errorDetail(j) {
+    if (!Array.isArray(j && j.errors) || !j.errors.length) return "";
+    return j.errors.map((e) => (e && (e.message || [e.resource, e.field, e.code].filter(Boolean).join(" "))) || "")
+        .filter(Boolean).join("; ");
+}
+function _apiErrorText(status, j) {
+    const msg = (j && j.message) || ("HTTP " + status);
+    const detail = _errorDetail(j);
+    return detail ? msg + ": " + detail : msg;
+}
 async function _api(method, p, body) {
     try {
         const r = await _to("https://api.github.com" + p, { method, headers: _hdrs(body ? { "Content-Type": "application/json" } : null), body: body ? JSON.stringify(body) : undefined });
         const txt = await r.text(); let j = {}; try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
-        if (!r.ok) return { ok: false, status: r.status, error: (j && j.message) || ("HTTP " + r.status) };
+        if (!r.ok) return { ok: false, status: r.status, error: _apiErrorText(r.status, j) };
         return { ok: true, status: r.status, data: j };
     } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 }
@@ -661,4 +681,4 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
              warnings: [pv.hasReadme ? null : "no README.md", pv.hasLicense ? null : "no LICENSE", pv.hasWorkflow ? null : "no CI workflow (.github/workflows/)"].filter(Boolean) };
 }
 
-module.exports = { previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _apiErrorText, _errorDetail, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
