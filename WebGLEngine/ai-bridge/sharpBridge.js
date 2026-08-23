@@ -34,6 +34,20 @@
 // apple/ml-sharp's documented contract (`sharp predict -i <in> -o <out>`), not against an observed run. The gate
 // drives the refusals, the path safety and the licence surface, which is all that can be honestly driven from
 // here; ONE REAL RUN ON GALAXINA is what turns the rest from a contract into a fact.
+//
+// *** AND THE FIRST THING THAT REVIEW FOUND WAS A REAL BUG, FROM READING SOMEBODY ELSE'S INTEGRATION. ***
+// Sharp-ML/SHARP-ML (MIT, a Next.js app on Modal serverless GPUs) wraps this same model, and does NOT use the
+// CLI: it imports create_predictor from sharp.models and calls the predictor directly, because a web service
+// wants bytes in memory rather than a file on disk. That is evidence about the PACKAGE rather than the CLI --
+// and it is what made this bridge's `python -m sharp` spelling visible as an ASSUMPTION. The documented surface
+// is a CONSOLE SCRIPT (`sharp`), and `-m` needs a __main__.py that an entry-point-only package does not have:
+// the original spelling would have reported ml-sharp as not installed on a box where it was installed and
+// working. Both spellings are now tried, documented one first, and the one that answered is reported.
+//
+// NOT ADOPTED FROM THAT REPO: its stack. Next.js 16, Prisma/PostgreSQL, NextAuth, Vercel Blob and Three.js
+// solve MULTI-TENANT HOSTING, which this engine is not -- it has its own peers, tunnel and auth, and its own
+// WebGL2 SplatRenderer, so Three.js would be a second renderer for a format this tree already draws. Its MIT
+// licence covers the web interface only; the weights stay under LICENSE_MODEL, so nothing above relaxes.
 "use strict";
 const fs = require("fs");
 const os = require("os");
@@ -109,10 +123,39 @@ function _run(cmd, args, opts) {
 }
 
 /**
- * Is this box able to run a prediction, and if not, WHICH part is missing. Three independent facts reported on
- * their own evidence rather than collapsed into one "not available" -- the misattributed-skip failure
- * playwrightResolve.mjs was extracted to stop.
+ * *** HOW SHARP IS ACTUALLY CALLED, AND WHY THIS IS A LIST RATHER THAN A LINE. ***
+ *
+ * apple/ml-sharp's README documents `sharp predict -i <in> -o <out>` -- a CONSOLE SCRIPT, the entry point pip
+ * installs onto PATH. The first version of this bridge spelled that as `python -m sharp predict`, which is a
+ * DIFFERENT thing: `-m` needs the package to ship a __main__.py, and a console-script entry point is not one.
+ * Where a package has only the entry point, `python -m sharp` fails with "No module named sharp.__main__" and
+ * this bridge would have reported ml-sharp as not installed on a box where it was installed and working.
+ *
+ * That was caught by reading Sharp-ML/SHARP-ML, a Next.js wrapper around the same model, which does not use the
+ * CLI at all -- it imports `create_predictor` from sharp.models and calls the predictor directly, because a web
+ * service wants bytes in memory rather than a file on disk. Their code is evidence about the PACKAGE, not about
+ * the CLI, and reading it is what made the `-m` assumption visible as an assumption.
+ *
+ * So both spellings are tried, documented one first, and WHICH ONE WORKED IS REPORTED -- a bridge that cannot
+ * say how it invoked the thing cannot be re-diagnosed when the next install layout differs.
  */
+function _invocations(cand) {
+    return [
+        { label: "sharp", cmd: "sharp", pre: [] },                                  // the documented console script
+        { label: py.label(cand) + " -m sharp", cmd: cand.cmd, pre: [...cand.base, "-m", "sharp"] },
+    ];
+}
+
+async function _resolveInvocation(cand) {
+    for (const inv of _invocations(cand)) {
+        // Asked for help rather than a version flag: the documented surface is `sharp predict`, and a --version
+        // that does not exist would read as "not installed" on a working box.
+        const probe = await _run(inv.cmd, [...inv.pre, "--help"], { timeout: 60000 });
+        if (probe.ok || /predict/i.test(probe.out + probe.err)) return inv;
+    }
+    return null;
+}
+
 async function status() {
     const cand = py.resolve();
     const python = py.label(cand);
@@ -120,17 +163,17 @@ async function status() {
     const out = {
         ok: true, licence: LICENCE, outDir: defaultOutDir(),
         python: cand ? python : "", pythonVersion,
-        sharpInstalled: false, sharpVersion: "", weightsCached: false, weightsDir: "",
+        sharpInstalled: false, sharpVersion: "", invocation: "", weightsCached: false, weightsDir: "",
         ready: false, why: "",
     };
     if (!cand) { out.why = "no working Python found (tried: " + py.candidates().map(py.label).join(", ") + ")"; return out; }
 
-    // `sharp` is the CLI the project documents. Asked for its help rather than a version flag, because the
-    // documented surface is `sharp predict` and a --version that does not exist would read as "not installed".
-    const probe = await _run(cand.cmd, [...cand.base, "-m", "sharp", "--help"], { timeout: 60000 });
-    out.sharpInstalled = probe.ok || /predict/i.test(probe.out + probe.err);
+    const inv = await _resolveInvocation(cand);
+    out.sharpInstalled = !!inv;
+    out.invocation = inv ? inv.label : "";
     if (!out.sharpInstalled) {
-        out.why = "ml-sharp is not installed for " + python + " -- see " + LICENCE.url +
+        out.why = "ml-sharp is not installed for " + python + " -- tried " +
+                  _invocations(cand).map((i) => i.label).join(" and ") + ". See " + LICENCE.url +
                   " (install it into a venv; it pulls PyTorch, which is multi-GB and must not go in the engine tree)";
         return out;
     }
@@ -175,8 +218,10 @@ async function predict({ image, outDir } = {}) {
     try { for (const f of fs.readdirSync(dest)) if (f.toLowerCase().endsWith(".ply")) before.add(f); } catch {}
 
     const cand = py.resolve();
+    const inv = await _resolveInvocation(cand);
+    if (!inv) return { ok: false, error: "ml-sharp went missing between the status check and the run" };
     const t0 = Date.now();
-    const r = await _run(cand.cmd, [...cand.base, "-m", "sharp", "predict", "-i", img, "-o", dest], { timeout: 600000 });
+    const r = await _run(inv.cmd, [...inv.pre, "predict", "-i", img, "-o", dest], { timeout: 600000 });
     const ms = Date.now() - t0;
     if (!r.ok) return { ok: false, error: "sharp predict failed: " + (r.err || "").trim().split("\n").slice(-3).join(" ").slice(0, 400), ms };
 
@@ -188,7 +233,7 @@ async function predict({ image, outDir } = {}) {
     const ply = path.join(dest, made[0]);
     let bytes = 0; try { bytes = fs.statSync(ply).size; } catch {}
     return { ok: true, ply, name: made[0], bytes, mb: +(bytes / 1048576).toFixed(2), ms, image: img, outDir: dest,
-             licence: LICENCE, alsoWrote: made.slice(1) };
+             invocation: inv.label, licence: LICENCE, alsoWrote: made.slice(1) };
 }
 
 module.exports = { status, predict, defaultOutDir, wouldBePackaged, LICENCE, PROJECT_ROOT };

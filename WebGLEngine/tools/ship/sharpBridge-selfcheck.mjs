@@ -130,6 +130,26 @@ console.log("sharpBridge-selfcheck -- where a research-licensed splat is allowed
         (st.ready ? "ready" : JSON.stringify((st.why || "").slice(0, 80))));
     ok("...and a box with no model still answers rather than throwing",
         st.ok === true);
+
+    // *** THE `-m` ASSUMPTION WAS A REAL BUG, FOUND BY READING SOMEBODY ELSE'S INTEGRATION. ***
+    // apple/ml-sharp documents a CONSOLE SCRIPT (`sharp predict -i -o`). This bridge first spelled that as
+    // `python -m sharp predict`, which needs a __main__.py an entry-point-only package does not ship -- so on a
+    // box where ml-sharp was installed and working, status() would have said "not installed". Reading
+    // Sharp-ML/SHARP-ML (which skips the CLI entirely and calls create_predictor) is what made the spelling
+    // visible as an assumption rather than a fact.
+    const src = fs.readFileSync(path.join(ENG, "ai-bridge", "sharpBridge.js"), "utf8");
+    ok("!! the documented console script is tried FIRST, not just the -m spelling",
+        /cmd: "sharp"/.test(src) && /"-m", "sharp"/.test(src),
+        "both are tried because install layouts differ; the one the README documents goes first");
+    ok("!! ...and predict() uses the SAME resolution status() reported, not a second hardcoded spelling",
+        /_resolveInvocation\(cand\)/.test(src.split("async function predict")[1] || ""),
+        "*** A STATUS THAT PROBES ONE COMMAND WHILE THE RUN SPAWNS ANOTHER IS THE TWO-DECLARATIONS DEFECT WITH " +
+        "A GREEN LIGHT IN FRONT OF IT *** -- it would report ready and then fail, which is worse than reporting " +
+        "not-ready honestly.");
+    ok("...and the failure message names every spelling it tried",
+        st.ready === true || /tried .*sharp/.test(st.why || ""),
+        "a bridge that cannot say how it tried to invoke the thing cannot be re-diagnosed on the next box: " +
+        (st.why || "").slice(0, 60));
 }
 
 // ---- 5. THE PYTHON PROBE IS SHARED, AND IT PROBES ----------------------------------------------------------
