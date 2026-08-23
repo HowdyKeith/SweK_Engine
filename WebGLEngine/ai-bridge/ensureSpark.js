@@ -31,6 +31,29 @@ const SOURCES = [
 ];
 const SENTINEL = path.join(DIR, FILE);
 
+// v3956 -- *** THIS INSTALLER FETCHES SPARK AND NOT WHAT SPARK IMPORTS, SO A SUCCESSFUL INSTALL STILL 404s. ***
+//
+// Keith's render-qa: splat_viewer FAILS on `404 /vendor/three/jsm/postprocessing/Pass.js`. That is not a broken
+// path -- it is the importmap working exactly as written. splat_viewer.html maps "three/addons/" to
+// "/vendor/three/jsm/", spark imports three.js POSTPROCESSING addons through that specifier, and
+// vendor/three/jsm holds only controls, libs, loaders and utils. THE postprocessing FOLDER WAS NEVER VENDORED.
+//
+// The 404 proves the install SUCCEEDED: a box without spark never gets far enough to ask for Pass.js. From this
+// sandbox splat_viewer.html only reaches /vendor/spark/status and /vendor/spark/ensure -- spark is absent here,
+// so the page stops before its imports resolve, and the failure is invisible. It is reproducible only where the
+// install has already worked, which is why the rig found it and nothing here did.
+//
+// *** WHAT FINISHES IT, AND WHY IT IS NOT DONE HERE: *** this installer must fetch the addon files too, pinned
+// to the SAME three.js version vendor/three/three.module.js already is -- a postprocessing addon from a
+// different three build is an import error with a more confusing message than the 404 it replaced. The exact
+// list is whatever spark imports, and it takes one command ON A BOX WHERE SPARK IS INSTALLED:
+//
+//     grep -o 'three/addons/[^"]*' WebGLEngine/vendor/spark/spark.module.js | sort -u
+//
+// It is not run here because spark is not on this box and jsDelivr answers 403 through the sandbox proxy, so
+// any list written now would be a guess at somebody else's dependency graph -- and a wrong vendored addon is
+// worse than a missing one, because it fails at runtime instead of at fetch.
+
 // "present" = on disk AND big enough to be the real module rather than a truncated download or an error page
 // served with a 200. ensureThree learned this the same way: a 404 HTML body written to disk is "present" to
 // statSync and broken to the browser.
