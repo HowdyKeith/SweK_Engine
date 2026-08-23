@@ -52,6 +52,7 @@ const report = (n, d) => console.log("  ----  " + n + (d ? "   " + d : ""));
 // (the gate-file walk) and four (a mesher's liveness). THE SECOND COPY IS NEVER THE ONE THAT GETS UPDATED, so
 // tools/ship/reportingTools.mjs is the one definition and both the gate and the bridge read it.
 import { REPORTING, NO_MAIN, PAGE_DOOR, isReportingTool, ARTEFACT_TOOLS, artefactTool } from "./reportingTools.mjs";
+import { scaled } from "./hostScale.mjs";
 import { referenceGraph } from "./moduleRefs.mjs";   // v3546 -- ASK THE THING THAT WALKS, never a path prefix
 const SHOULD_REPORT = REPORTING.map((t) => t.rel);
 
@@ -66,19 +67,43 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
     // not the other, and the gate would report "prints something: PASS" beside "names itself: FAIL" with no
     // way to tell a naming defect from a flake. ONE RUN, TWO ASSERTIONS, is both cheaper and a stricter claim
     // -- the second check now grades the exact bytes the first one graded.
-    const out = new Map(), silent = [], broken = [];
+    // *** v3941 -- TWO DEFECTS IN THREE LINES, AND KEITH'S BOX FOUND BOTH.
+    //
+    // (1) THE CAP WAS A BARE 120000 MEASURED ON ONE MACHINE. physics/thermal/stefan.mjs takes 59s here and
+    // ~195s on a box a third the speed, so it was killed at the cap and REPORTED AS A BROKEN TOOL. It is not
+    // broken; it is slow, and this gate had no idea the difference existed. The cap now goes through the same
+    // hostScale the whole suite uses, so a slower box gets a longer cap instead of a false accusation.
+    //
+    // (2) *** "exit null" IS NOT AN EXIT CODE, AND THE GATE PRINTED IT AS ONE. *** A process killed by SIGTERM
+    // has status null; the report read "NONZERO EXIT: physics/thermal/stefan.mjs (exit null)", which sends the
+    // reader hunting a crash in a tool that ran perfectly and was simply cut off. A TIMEOUT AND A FAILURE ARE
+    // DIFFERENT DIAGNOSES -- the same distinction selfchecks.mjs keeps between timedOut and a failure, and
+    // rigRunner between KILLED and an exit code. Both still FAIL, because a tool that cannot finish inside the
+    // cap has not shown that it prints; they just stop being the same finding.
+    // scaled() hands back {ms, scale, why} -- the REASON travels with the number, because a cap that moved
+    // and cannot say why is the unexplained budget this suite spent a round replacing.
+    const CAP = scaled(120000), TOOL_CAP_MS = CAP.ms;
+    const out = new Map(), silent = [], broken = [], slow = [];
     for (const rel of SHOULD_REPORT) {
         let text = "";
-        try { text = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: 120000 }); }
-        catch (e) { broken.push(rel + " (exit " + (e && e.status) + ")"); continue; }
+        try { text = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: TOOL_CAP_MS }); }
+        catch (e) {
+            if (e && (e.code === "ETIMEDOUT" || e.signal)) slow.push(rel + " (killed at " + Math.round(TOOL_CAP_MS / 1000) + "s)");
+            else broken.push(rel + " (exit " + (e && e.status) + ")");
+            continue;
+        }
         out.set(rel, String(text));
         if (!String(text).trim()) silent.push(rel);
     }
     ok("!! *** every analysis tool that should report, PRINTS SOMETHING when you run it ***",
-        silent.length === 0 && broken.length === 0,
-        SHOULD_REPORT.length + " tools run directly, ONCE EACH. " +
+        silent.length === 0 && broken.length === 0 && slow.length === 0,
+        SHOULD_REPORT.length + " tools run directly, ONCE EACH, capped at " +
+        Math.round(TOOL_CAP_MS / 1000) + "s (120s x host " + CAP.scale.toFixed(2) + " -- " + CAP.why + "). " +
         (silent.length ? "SILENT: " + silent.join(", ") + ". " : "") +
         (broken.length ? "NONZERO EXIT: " + broken.join(", ") + ". " : "") +
+        (slow.length ? "KILLED AT THE CAP, WHICH IS NOT AN EXIT CODE: " + slow.join(", ") +
+                       " -- these RAN, they did not finish, and a longer cap or a faster tool is the fix " +
+                       "rather than a bug hunt. " : "") +
         "EXIT 0 WITH NO OUTPUT READS AS A CLEAN BILL -- `node tools/ship/orphanScan.mjs` saying nothing looks " +
         "exactly like a tree with no orphans, and it meant the file had defined some functions and ended");
 
@@ -90,7 +115,7 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
     const unnamed = [...out.keys()].filter((rel) =>
         !new RegExp("\\[" + path.basename(rel, ".mjs") + "\\]").test(out.get(rel)));
     ok("...and each one names ITSELF in its output, so a piped log says which tool spoke",
-        unnamed.length === 0 && broken.length === 0,
+        unnamed.length === 0 && broken.length === 0 && slow.length === 0,
         // *** v3853 -- THIS FAILED WITHOUT SAYING WHO, WHICH IS THE DEFECT THIS ROUND CAME HERE TO FIX. ***
         // The line printed only its rationale, so the red beside it was read off the check ABOVE and the
         // record recorded ONE name where there were nine. A failing check that will not name its offenders
