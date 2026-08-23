@@ -105,9 +105,21 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
     ok("!! ...and none is passed as a command-line argument",
         !/args\.push\([^)]*extraHeader/i.test(fn) && !/"-c"/.test(fn),
         "anything that can list processes can read argv. GIT_CONFIG_KEY_0/VALUE_0 keeps it in the environment.");
-    ok("...and the header is set only when a token exists",
-        /if \(tk\) \{/.test(fn) && /GIT_CONFIG_VALUE_0/.test(fn),
-        "a public repo clone should not carry an Authorization header it does not need");
+    // v3958 -- ASSERTED AS THE PROPERTY, NOT THE INDEX. This check used to read GIT_CONFIG_VALUE_0 literally and
+    // broke the moment the two entries swapped places -- the pinned-to-a-literal defect this tree fixes on a
+    // loop. What matters is that the Authorization header lives ONLY on the authenticated path.
+    // baseEnv's OWN BODY is sliced out rather than matched loosely: authedEnv legitimately calls baseEnv() and
+    // then adds the header, so the two words sit next to each other in the text and a proximity test reports a
+    // bug that is not there. (It did, on the first run of this very check.)
+    const baseBody = (fn.match(/const baseEnv = \(\) => \{[\s\S]*?\n    \};/) || [""])[0];
+    ok("!! the Authorization header exists only on the authenticated path",
+        /authedEnv/.test(fn) && /extraHeader/.test(fn) &&
+        !!baseBody && !/extraHeader/.test(baseBody) &&
+        // COUNTED ON CODE ONLY. The function's own comment explains the header, so a raw count reads 2 and the
+        // check fails on correct code -- the prose-as-code trap, caught here for the sixth time in this stretch.
+        ((fn.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n").match(/extraHeader/g) || []).length === 1),
+        "a public repo clone must not carry a header it does not need -- and the anonymous RETRY must not carry " +
+        "the header that just got rejected, or the retry is the same request twice");
     ok("!! it can never sit waiting for credentials nobody is there to type",
         /GIT_TERMINAL_PROMPT/.test(fn),
         "*** DRIVEN AT v3941: a repo the token cannot read returned 'could not read Username' and EXITED, " +
@@ -118,9 +130,12 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
     // saw GCM's "Connect to GitHub" popup mid-clone despite having a working token configured. Clearing
     // credential.helper for this one invocation (an empty value is git's documented "forget every configured
     // helper" signal) is what stops GCM from ever getting a turn.
-    ok("!! ...and the credential helper is disabled for this one invocation, so GCM never gets a turn",
-        /GIT_CONFIG_KEY_1\s*=\s*"credential\.helper"/.test(fn) && /GIT_CONFIG_VALUE_1\s*=\s*""/.test(fn) &&
-        /GIT_CONFIG_COUNT\s*=\s*"2"/.test(fn),
+    // v3958 -- AND IT IS CLEARED WHETHER OR NOT THERE IS A TOKEN. It used to sit inside `if (tk)`, so a box with
+    // no token configured got Git Credential Manager back -- the popup returning on exactly the machines least
+    // able to explain it. baseEnv() is the floor both paths are built on, so there is no path without it.
+    ok("!! ...and the credential helper is disabled on EVERY path, token or not",
+        /baseEnv[\s\S]{0,300}credential\.helper/.test(fn) && /GIT_CONFIG_VALUE_0\s*=\s*""/.test(fn) &&
+        !/if \(tk\) \{[\s\S]{0,200}credential\.helper/.test(fn),
         "*** DRIVEN BY KEITH AT v3942: the clone-source button popped Git Credential Manager's own sign-in " +
         "dialog mid-clone -- a token in http.extraHeader does not stop git from ALSO consulting a configured " +
         "credential.helper, so the helper has to be cleared, not just outrun.");

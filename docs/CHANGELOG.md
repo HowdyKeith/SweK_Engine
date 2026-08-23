@@ -8,6 +8,18 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3958 — the popup was hiding a dead token, and a public repo was failing for want of permission it does not need
+
+v3943 cleared `credential.helper` so Git Credential Manager could not interrupt the clone. It worked — and what it uncovered is what GCM had been papering over: `fatal: could not read Username for 'https://github.com': terminal prompts disabled`. That is what a rejected credential looks like once the popup is gone. GitHub answers 401 to the Authorization header, git falls back to asking for a username, and `GIT_TERMINAL_PROMPT` stops it. GCM had been quietly supplying working credentials over the top of a token that does not work.
+
+And `SweK_Engine` is public — measured, an anonymous fetch of its `info/refs` answers 200. The token is an optimisation here (private repos, rate limits) and never a requirement, so failing the whole clone on an expired PAT was refusing to do something that needs no permission at all. An auth failure now retries without the header, and the reply says which path worked.
+
+Two things the retry is careful about: the regex matches auth failures only — driven against the exact reported string (retries) and against "could not resolve host" and "repository not found" (do not) — so a real network or naming fault still fails loudly instead of being retried into a second confusing error. And the anonymous attempt drops the header entirely; a retry carrying the credential that was just rejected is the same request twice, which the gate now plants against.
+
+Also fixed, and it is the original bug coming back: `credential.helper` was only cleared **when a token existed**. It sat inside `if (tk)`, so a box with no token configured got GCM back — the popup returning on exactly the machines least able to explain it. `baseEnv()` is the floor both paths are built on now.
+
+The gate's two checks here were pinned to `GIT_CONFIG_VALUE_0` and `KEY_1` by index and broke the moment the entries swapped — the pinned-to-a-literal defect, in the file that exists to catch it. They assert the property now.
+
 ## Since v3957 — the tail of the render-qa report: two false failures, and two pages whose source is gone
 
 **The ERR_ABORTED pair is the pages working.** `settings.html` wraps its calls in an AbortController firing at 7s; `box3d-info.html` uses `AbortSignal.timeout(9000)`. Both handle the abort — settings renders "timed out after 7000ms", box3d-info falls back to null — and both drew fine (nonBlackFrac 0.9381 and 1). The routes really are slow, and `bgServicesBridge` says so about itself: "which is why /bgsvc/status still timed out at 8s". A page that refuses to hang was being marked broken for refusing to hang. Now benign, scoped by the rule that block already draws: an ERR_ABORTED on a `.js`/`.mjs`/`.wasm` is a script that did not load and **stays** a failure — exactly the shape `/ui/recordFloat.js` had when it was a real 25-page bug. Driven over eight cases including that one.
