@@ -14,6 +14,17 @@
 const http = require("http");
 const https = require("https");
 const os = require("os");
+// v3952 -- *** THIS FILE USED fs AND path IN FORTY-FOUR PLACES AND REQUIRED NEITHER. ***
+//
+// Keith's render-qa run showed it as `500 /instruments/list`, which is the one route where the failure is LOUD:
+// its body reads a file, so `path` being undefined throws a ReferenceError straight into the catch that turns
+// anything into a 500. THE OTHER FORTY-ODD USES ARE THE WORRYING ONES -- most sit inside `try { ... } catch {}`
+// blocks that swallow the ReferenceError and hand back a default, so the roundhouse roster, the device ledger,
+// the tunnel candidates and the perf ledger have all been reading as EMPTY rather than as broken. A route that
+// returns {} because a require is missing is indistinguishable from a route that returns {} because there is
+// nothing there, which is why only the one loud route ever got reported.
+const fs = require("fs");
+const path = require("path");
 
 // v3484 -- one measurement per process, shared by everyone who asks while it is running.
 let _obsCache = null, _obsInFlight = null, _obsAt = 0, _obsOffThread = null;

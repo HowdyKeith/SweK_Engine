@@ -397,7 +397,15 @@ function handle(req, res, ctx) {
     if (req.method === "GET" && req.url === "/ai/brain/console") {
         const tail = _activity.slice(-120);
         const newest = tail.length ? tail[tail.length - 1].at : null;
-        return sendJson(res, {
+        // v3952 -- *** ONE CALL SITE OUT OF THIRTY-THREE HAD THE WRONG SIGNATURE, AND IT WAS A 500. ***
+        // sendJson comes from ctx and is server.js's own: `(obj, code = 200) => { res.writeHead(code, ...);
+        // res.end(JSON.stringify(obj)); }`. It takes the BODY first. This line passed `res` first, so `obj`
+        // became the ServerResponse and `code` became the object -- writeHead got an object for a status code,
+        // JSON.stringify got a circular structure, and either one throws into the outer catch as a 500.
+        // Keith's render-qa reported `500 /ai/brain/console` three times on panel-brain; every OTHER sendJson in
+        // this file already had it right, which is exactly why it survived: nothing about the line looks odd
+        // until you know the signature, and thirty-two neighbours quietly disagree with it.
+        return sendJson({
             ok: true,
             tail,
             newestAt: newest,

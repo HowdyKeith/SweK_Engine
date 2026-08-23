@@ -8,6 +8,14 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3953 — both 500s in the render-qa report, and they are different bugs wearing the same number
+
+**`500 /instruments/list`** — `fingerprintBridge.js` used `fs` and `path` in forty-four places and required neither. That route reads a file, so `path` being undefined threw a ReferenceError into the catch that turns anything into a 500. The other forty-odd uses are the worrying ones: most sit inside `try {} catch {}` blocks that swallow it and hand back a default, so the roundhouse roster, the device ledger, the tunnel candidates and the perf ledger have been reading *empty* rather than *broken*. A route returning `{}` because of a missing require is indistinguishable from one returning `{}` because there is nothing there — which is why only the single loud route was ever reported. Two lines; 500 → 200, 68 instruments, driven.
+
+**`500 /ai/brain/console`** — one call site out of thirty-three had the wrong signature. `sendJson` arrives through `ctx` and is server.js's own `(obj, code = 200)`; it takes the body first. This one line passed `res` first, so `obj` became the ServerResponse and `code` became the object: `writeHead` got an object for a status and `JSON.stringify` got a circular structure. Either throws. Nothing about the line looks wrong until you know the signature, and its thirty-two neighbours all quietly disagreed with it.
+
+And the sweep written to find more of the first kind was wrong twice before it was right. First pass: three findings, two false — `krbnRoutes.js` binds `fs`/`path` with ESM `import` (the regex only knew `require`), and `rocketBridge`'s `os.` was Python inside a JS string. Second pass, after stripping strings and counting imports: thirty findings, all false — every one uses a multi-declarator require and the pattern only matched the first name after `const`. Third pass is clean and says `fingerprintBridge` was the only instance. The fix that mattered was never confirmed by the scanner; it was confirmed by running the route.
+
 ## Since v3952 — a failing check that could not say why, and the real failure it was hiding
 
 render-qa reported `sphere-impostor-flat` as `check: undefined`. Two field names for one thing: the reporter reads `r.msg`, `notAllBlack` and its siblings return `msg`, and `terminatorBow` and `edgeBiasProfile` return `why`. Both are good names and only one is read — so the two newest and most specific checks in the file, the ones whose reasons are worth the most because they measure geometry rather than "is it black", were the two whose reasons were discarded. Normalised in `runCheck` rather than renamed in nine places, and a check that fails with no reason at all now says so by name.
