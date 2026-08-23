@@ -16240,6 +16240,9 @@ ${text.replace(/'/g, "''")}
     if (req.method === "POST" && req.url === "/github/upload") { readJson(d => githubBridge.uploadAsset(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/publish") { readJson(d => githubBridge.publishVersion(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/publish-engine") { readJson(d => githubBridge.publishEngineBuild(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    // v3941 -- the only route from "pushed to GitHub" to "running here". See cloneEngineSource: the release
+    // path cannot deliver a version the local tree does not already have.
+    if (req.method === "POST" && req.url === "/github/clone-source") { readJson(d => githubBridge.cloneEngineSource(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 

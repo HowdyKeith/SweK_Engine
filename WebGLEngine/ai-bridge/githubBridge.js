@@ -301,7 +301,108 @@ async function publishEngineBuild({ repo, notes, draft, prerelease } = {}) {
     return Object.assign({ tag, assetPath }, pub);
 }
 
-function engineVersion() { try { const m = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8"); const x = m.match(/ENGINE_VERSION\s*=\s*"(v\d+)"/); return x ? x[1] : ""; } catch {} return ""; }
+// *** v3941 -- ONE SPELLING OF THE VERSION MARKER. *** engineVersion() reads THIS tree's main.js; the source
+// clone below has to read a DIFFERENT tree's. Two copies of the regex is how a marker quietly stops being found
+// in one of the two places, so the parse is a pure function both call and a gate can drive.
+function _parseEngineVersion(src) {
+    const x = String(src || "").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/);
+    return x ? x[1] : "";
+}
+function _versionInTree(root) {
+    try { return _parseEngineVersion(fs.readFileSync(path.join(root, "WebGLEngine", "main.js"), "utf8")); } catch {}
+    return "";
+}
+function engineVersion() { try { return _parseEngineVersion(fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8")); } catch {} return ""; }
+
+// =====================================================================================
+// v3941 -- PULL THE SOURCE, BECAUSE THERE WAS NO WAY IN.
+//
+// Keith pressed "Release current engine" on a v3940 tree and got "Validation Failed": v3940 was already
+// released. The fix was to run the newer code -- and THERE WAS NO ROUTE TO IT. The whole update chain is
+// release-shaped: fetchEngineBuild downloads a release ASSET, scanDownloads finds it, the installer applies it.
+// But publishEngineBuild builds that asset FROM THE LOCAL TREE, so a version can only be released from a box
+// that already has it. *** CODE PUSHED TO GITHUB COULD NEVER REACH THE ENGINE, BECAUSE THE ONLY DOOR WAS A
+// RELEASE AND A RELEASE NEEDED THE CODE FIRST. *** The panel had eleven buttons and not one of them could
+// close that loop; the answer was three commands in a terminal, which is the shape of a missing feature.
+//
+// SIDE BY SIDE, NEVER OVER THE TOP. It clones into a NEW <prefix>_vNNNN folder beside the running one, the
+// same layout the installer already produces, and REFUSES if that folder exists. The running engine is never
+// touched -- which matters more here than usual, because a tree that has been edited in place holds work that
+// is nowhere else, and this session already found several such differences on Keith's box.
+//
+// The folder name comes from the CLONED tree's own ENGINE_VERSION, not from a guess: clone to a temp sibling,
+// read the marker, then rename. A clone that dies half-way leaves a .tmp-named folder rather than something
+// that looks like a real build.
+function _run(cmd, args, opts) {
+    return new Promise((res) => {
+        let done = false;
+        const child = require("child_process").execFile(cmd, args, Object.assign({ windowsHide: true, timeout: 600000, maxBuffer: 8 * 1024 * 1024 }, opts || {}),
+            (err, stdout, stderr) => { if (done) return; done = true; res({ ok: !err, out: String(stdout || ""), err: String(stderr || "") + (err ? " " + ((err && err.message) || err) : "") }); });
+        child.on("error", (e) => { if (done) return; done = true; res({ ok: false, out: "", err: String((e && e.message) || e) }); });
+    });
+}
+
+async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
+    const c = loadCfg();
+    repo = (repo || c.engineRepo || c.defaultRepo || "").trim();
+    if (!repo) return { ok: false, error: "no repo (set engineRepo in Account, or pass repo)" };
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return { ok: false, error: "repo must look like owner/name, got: " + repo };
+    if (ref && !/^[\w./-]+$/.test(ref)) return { ok: false, error: "bad ref: " + ref };
+
+    const probe = await _run("git", ["--version"]);
+    if (!probe.ok) return { ok: false, error: "git is not on PATH. Install it (winget install Git.Git) and try again." };
+
+    let sysadmin = null;
+    try { sysadmin = require("./sysadminBridge.js"); } catch {}
+    const parent = (targetDir || "").trim() ||
+        (sysadmin && typeof sysadmin.engineParentDir === "function" ? sysadmin.engineParentDir() : path.resolve(__dirname, "..", "..", ".."));
+    const pfx = (prefix || "").trim() ||
+        (sysadmin && typeof sysadmin.preferredPrefix === "function" ? sysadmin.preferredPrefix() : "SweK_Engine");
+
+    try { fs.mkdirSync(parent, { recursive: true }); } catch (e) { return { ok: false, error: "cannot create " + parent + ": " + ((e && e.message) || e) }; }
+
+    const tmp = path.join(parent, "." + pfx + "_clone.tmp");
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+
+    // The token rides in the ENVIRONMENT, not in argv and not in the URL: a token in the remote URL is written
+    // into .git/config and survives on disk, and a token in argv is visible to anything that can list processes.
+    const tk = effTok();
+    const env = Object.assign({}, process.env);
+    if (tk) {
+        env.GIT_CONFIG_COUNT = "1";
+        env.GIT_CONFIG_KEY_0 = "http.extraHeader";
+        env.GIT_CONFIG_VALUE_0 = "Authorization: Bearer " + tk;
+    }
+    env.GIT_TERMINAL_PROMPT = "0";   // never hang waiting for credentials nobody is there to type
+
+    const args = ["clone", "--depth", "1"];
+    if (ref) args.push("--branch", ref);
+    args.push("https://github.com/" + repo + ".git", tmp);
+    const cl = await _run("git", args, { env });
+    if (!cl.ok) {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+        return { ok: false, error: "clone failed: " + (cl.err || "").trim().split("\n").slice(-2).join(" ").slice(0, 300) };
+    }
+
+    const ver = _versionInTree(tmp);
+    if (!ver) {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+        return { ok: false, error: "cloned, but no ENGINE_VERSION in WebGLEngine/main.js -- is " + repo + " the engine repo?" };
+    }
+
+    const dest = path.join(parent, pfx + "_" + ver);
+    if (fs.existsSync(dest)) {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+        return { ok: false, exists: true, version: ver, path: dest,
+                 error: pfx + "_" + ver + " already exists. Nothing was changed -- delete or rename it first if you want a fresh copy." };
+    }
+    try { fs.renameSync(tmp, dest); }
+    catch (e) {
+        try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+        return { ok: false, error: "could not name the clone " + dest + ": " + ((e && e.message) || e) };
+    }
+    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: engineVersion() };
+}
 function _num(v) { const m = String(v).match(/\d+/g); return m ? m.map(Number) : [0]; }
 function _verLt(a, b) { const x = _num(a), y = _num(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d < 0) return true; if (d > 0) return false; } return false; }
 
@@ -681,4 +782,4 @@ async function publishFolder({ dir, repo, message, description, topics, branch, 
              warnings: [pv.hasReadme ? null : "no README.md", pv.hasLicense ? null : "no LICENSE", pv.hasWorkflow ? null : "no CI workflow (.github/workflows/)"].filter(Boolean) };
 }
 
-module.exports = { _apiErrorText, _errorDetail, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};
+module.exports = { _apiErrorText, _errorDetail, _parseEngineVersion, _versionInTree, cloneEngineSource, previewFolder, publishFolder, setConfig, status, listRepos, repoPreview, latestRelease, versionCheck, denoVersionCheck, createRelease, uploadAsset, publishVersion, publishEngineBuild, fetchEngineBuild, engineVersion, whoami, rateLimit, createRepo, updateRepo, deleteRepo, listReleases, deleteRelease, listIssues, createIssue, closeIssue, listCommits, listBranches, getFile, putFile, peerConfig, setPeerConfig, addMonitorRepo, removeMonitorRepo, peerRepos, updates, markUpdatesSeen , pagesFor, checkPages, pagesUrl};

@@ -233,6 +233,11 @@ export function mountGithubPanel() {
             const dl = E("label", "display:flex;gap:5px;align-items:center;"); dl.append(dr, document.createTextNode("draft")); const pl = E("label", "display:flex;gap:5px;align-items:center;"); pl.append(pr, document.createTextNode("pre-release")); optR.append(dl, pl);
             const pub = BTN("Publish version"); w.append(tag, name, notes, asset, optR, pub);
             const eng = BTN("\u26A1 Release current engine (auto-tag + build zip)", "#3a2a5a", "#6a4a9a"); eng.style.marginTop = "4px"; w.append(eng);
+            // v3941 -- THE OTHER HALF OF THE LOOP. "Release current engine" pushes this tree OUT; nothing pulled
+            // newer code IN, because the update path only carries RELEASES and a release is built from the local
+            // tree. Sits beside it because that is where you find out you need it: the release fails with
+            // "already exists", and the reason is that this box is behind.
+            const src = BTN("\u2B07 Get newer source from GitHub (clone beside this one)", "#2a3a5a", "#4a6a9a"); src.style.marginTop = "4px"; w.append(src);
             (async () => { const s = await api("config"); if (s && s.ok && s.engineVersion && !tag.value) tag.value = s.engineVersion; })();
             listB.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("releases?repo=" + encodeURIComponent(repo())); if (!j.ok) return say("\u2717 " + j.error, false); if (!j.releases.length) return say("(no releases)", true); const box = E("div"); j.releases.forEach(rl => { const row = E("div", "display:flex;gap:6px;align-items:center;padding:2px 0;"); row.append(E("span", "color:#9fd;flex:1;", `${rl.tag}${rl.draft ? " (draft)" : ""}${rl.prerelease ? " (pre)" : ""} \u00B7 ${rl.assets} asset(s)`)); const d = E("span", "cursor:pointer;color:#f88;", "\u2715"); d.title = "delete release"; d.onclick = async () => { const x = await api("release/delete", { repo: repo(), id: rl.id }); if (x.ok) row.remove(); }; row.append(d); box.append(row); }); say(box, true); };
             vc.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("versioncheck?repo=" + encodeURIComponent(repo())); say(j.ok ? (j.none ? "no releases yet" : (j.behind ? "\u26A0 newer: " + j.latest + " (engine " + j.current + ")" : "\u2713 up to date (" + j.current + ")")) : "\u2717 " + j.error, j.ok && !j.behind); };
@@ -242,6 +247,16 @@ export function mountGithubPanel() {
             // it did nothing and the button read as broken. publishEngineBuild() ALREADY falls back to
             // engineRepo || defaultRepo on the server -- the UI was stricter than the backend it calls, and the
             // error text described a remedy the code did not allow. AN ERROR MESSAGE IS A CLAIM TOO.
+            src.onclick = async () => { let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) return say("pick a repo, or set engineRepo in Account", false);
+                src.disabled = true; say("cloning " + er + "\u2026 (a few hundred MB, give it a minute)");
+                const j = await api("clone-source", { repo: er });
+                src.disabled = false;
+                if (!j.ok) return say("\u2717 " + (j.error || ""), false);
+                say("\u2713 " + j.version + " cloned to\n" + j.path +
+                    "\n\nThis engine is still " + (j.running || "?") + " \u2014 the new copy is a SEPARATE folder and nothing here changed." +
+                    "\nTo use it: stop this server, start it from " + j.path + "\\WebGLEngine, and reload the page.", true); };
             eng.onclick = async () => { let er = repo();
                 if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
                 if (!er) return say("pick a repo, or set engineRepo in Account", false); eng.disabled = true; say("building the engine zip + publishing\u2026 (takes a few seconds)"); const j = await api("publish-engine", { repo: er, body: notes.value, draft: dr.checked, prerelease: pr.checked }); eng.disabled = false; const rel = j.release || {}; say(j.ok ? "\u2713 released " + (j.tag || rel.tag) + (j.asset ? (j.asset.ok ? " + engine zip uploaded" : " (asset: " + j.asset.error + ")") : "") + "\n" + (rel.url || "") : "\u2717 " + (j.error || ""), j.ok); };

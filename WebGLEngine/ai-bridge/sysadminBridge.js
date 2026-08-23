@@ -1274,7 +1274,7 @@ async function patchScan(dirArg){
     return { ok: true, dir, tree, rows };
 }
 
-module.exports = { zipShapeFor,
+module.exports = { zipShapeFor, engineParentDir, preferredPrefix,
     start, stop, setLogger, getConfig, setConfig,
     firewallStatus, firewallAllow, firewallRemove,
     go2rtcFirewallStatus, go2rtcFirewallAllow,
