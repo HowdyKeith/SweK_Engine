@@ -5602,6 +5602,18 @@
 // is now ai-bridge/pythonResolve.js, cellTrackingBridge imports it, and being right in one file has finally
 // become a fix instead of a fact.
 //
+// *** AND KEITH'S SECOND LINK FOUND A REAL BUG IN THIS ROUND'S OWN WORK. *** Sharp-ML/SHARP-ML (MIT, a Next.js
+// app on Modal serverless GPUs) wraps the same model and does NOT use the CLI: it imports create_predictor from
+// sharp.models and calls the predictor directly, because a web service wants bytes in memory rather than a file
+// on disk. That is evidence about the PACKAGE, and it made this bridge's `python -m sharp` spelling visible as
+// an ASSUMPTION -- Apple documents a CONSOLE SCRIPT, and `-m` needs a __main__.py an entry-point-only package
+// does not ship, so the original would have reported ml-sharp NOT INSTALLED on a box where it was installed and
+// working. Both spellings are tried now, documented one first, and predict() uses the resolution status()
+// reported: a status that probes one command while the run spawns another is the two-declarations defect with a
+// green light in front of it. NOT adopted from that repo: Next.js, Prisma, NextAuth, Vercel Blob and Three.js
+// solve multi-tenant hosting this engine is not, and its MIT licence covers the interface only -- the weights
+// stay under LICENSE_MODEL, so nothing above relaxes.
+//
 // WHAT IS NOT PROVEN, SAID PLAINLY: no prediction has ever run here -- no PyTorch, no weights -- so everything
 // below the CLI boundary is built against the documented contract and ONE REAL RUN ON GALAXINA is what turns it
 // into a fact. The gate drives the refusals, the path safety and the licence surface, and says so.
