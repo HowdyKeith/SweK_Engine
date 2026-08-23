@@ -72,7 +72,10 @@ export const NEXT_ROUNDS = [
 export const byBlocker = (kind) => NEXT_ROUNDS.filter((r) => r.blocker === kind);
 
 export function lines() {
-    const out = [];
+    // *** v3941 -- IT NAMES ITSELF, BECAUSE A REPORT WITH NO NAME ON IT IS UNATTRIBUTABLE THE MOMENT TWO OF
+    // THEM SHARE A TERMINAL. *** That is toolFrontDoor's rule, and the reason this tool could not be added to
+    // the REPORTING registry until now: it printed a bare "UPSTREAM (2):" and nothing said whose it was.
+    const out = ["[nextRounds] what the next rounds are, and what is blocking each"];
     for (const kind of ["OPEN", "UPSTREAM", "HARDWARE"]) {
         const rows = byBlocker(kind);
         if (!rows.length) continue;

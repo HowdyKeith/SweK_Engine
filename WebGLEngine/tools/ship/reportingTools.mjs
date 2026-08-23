@@ -14,11 +14,35 @@
 // three earlier rounds decided against. Each refusal carries the reason it was refused.
 
 /** Tools with a main block: running the file prints its report. The page offers exactly these. */
+// *** v3941 -- THREE TOOLS WITH FRONT DOORS AND NO REGISTRY ROW WERE AUDITED. ONE QUALIFIED. ***
+// Found while auditing referenceKind's rescued population: these three have main blocks, so they are runnable,
+// and no REPORTING entry, so nothing ever runs them. "Wire them up" was the obvious move and it was WRONG FOR
+// TWO OF THE THREE, which is only visible once you actually run them:
+//
+//   tools/ship/nextRounds.mjs      REGISTERED BELOW. 62ms, prints the blocked-round list, and it had to be
+//                                  taught to name itself first -- it printed a bare "UPSTREAM (2):" and this
+//                                  registry's own rule is that a report with no name on it is unattributable.
+//   tools/shedding-settle.mjs      NOT REGISTERED. An LBM settling run: 40,000 warmup steps then 16,000
+//                                  recorded. Measured at v3941 -- 214s to reach step 25,000, so ~480s total,
+//                                  FOUR TIMES toolFrontDoor's 120s per-tool cap. Registering it would
+//                                  guarantee a killed-at-the-cap report every single run. A LONG EXPERIMENT
+//                                  IS NOT A REPORT.
+//   tools/dfg-benchmark.mjs        NOT REGISTERED, and it cannot run at all: the external answer key it grades
+//                                  against, simulation/lbm/dfgBenchmark.mjs, is LOST SOURCE -- in no commit of
+//                                  this repository. Its own header rules it out twice over anyway at 11 to 34
+//                                  minutes a case. It now SAYS lost-source instead of dying on a raw module
+//                                  error, which is the wasmTerrainStatus precedent.
+//
+// THE REASONS LIVE HERE BECAUSE THIS IS WHERE SOMEBODY LOOKS when they ask why a runnable tool is not in the
+// registry -- and because "nobody got round to it" and "it was measured and refused" are opposite claims that
+// an empty registry row cannot tell apart.
 export const REPORTING = [
     // v3687 -- the door for the outside linear-algebra key. It reports ABSENT until LAPACK has actually run
     // on a Mac, which is the honest state everywhere else and is not a failure.
     // v3698 -- the curriculum. It PROPOSES and never grades; the graders it names are the only things that
     // decide. Default run ~96s (the door census is opt-in, --doors, because it walks the whole tree).
+    { rel: "tools/ship/nextRounds.mjs", label: "Next rounds (and what blocks each)",
+      blurb: "The standing list of what to do next, filed by BLOCKER rather than by priority -- open, upstream, hardware. A blocker is a fact about the world; a priority is a fact about somebody's mood last Tuesday. Registered at v3941 after being taught to name itself." },
     { rel: "tools/roundhouse/curriculum.mjs", label: "Curriculum (what to attempt next)",
       blurb: "Proposes the next task from what is already measured -- unplanted binds, ungraded physics, doorless modules. Every proposal names the gate that would decide it, and this tool cannot mark anything done." },
     { rel: "tools/roundhouse/labSkills.mjs", label: "Lab skills (code skills that run the device)",
