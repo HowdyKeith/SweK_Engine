@@ -38,6 +38,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import {fileURLToPath, pathToFileURL} from "node:url";
 
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 const require = createRequire(import.meta.url);
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -141,27 +142,24 @@ function nodeGlobalsIn(rel) {
 // HERE. But the server was never the requirement -- SERVING WAS. Playwright can intercept every request and
 // hand back the file, so ES modules resolve and the page runs. SEVENTH EXPIRED BLOCKER.
 {
-    const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
     // *** v3940 -- THE SKIP NAMED A CAUSE THAT WAS NOT TRUE. *** It printed "no chromium at <SHELL>" whenever
     // EITHER half was missing, and on this machine SHELL EXISTS while the playwright module does not -- so the
     // one line anybody reads to find out why the live gate did not run pointed at a file sitting right there.
-    // SKIPPING WITH A REASON IS ONLY BETTER THAN PASSING QUIETLY IF THE REASON IS THE REASON. The require path
-    // was also a single hardcoded absolute from one sandbox; it is now a list, tried in order, so a checkout
-    // with playwright installed anywhere normal runs the gate instead of skipping past it.
-    let chromium = null;
-    const PW = ["playwright", "playwright-core",
-                "/home/claude/.npm-global/lib/node_modules/playwright/index.js",
-                "/usr/local/lib/node_modules/playwright/index.js"];
-    let pwFrom = "";
-    for (const m of PW) { try { ({ chromium } = require(m)); pwFrom = m; break; } catch { /* next */ } }
-
-    if (!chromium || !fs.existsSync(SHELL)) {
-        const why = !chromium && !fs.existsSync(SHELL) ? "neither playwright (tried: " + PW.join(", ") + ") nor a headless shell at " + SHELL
-                  : !chromium                          ? "playwright is not installed here -- tried: " + PW.join(", ") + " (the headless shell at " + SHELL + " IS present)"
-                  :                                      "playwright resolved from " + pwFrom + " but there is no headless shell at " + SHELL;
+    // SKIPPING WITH A REASON IS ONLY BETTER THAN PASSING QUIETLY IF THE REASON IS THE REASON.
+    //
+    // *** v3941 -- THE FIX DID NOT TRAVEL, WHICH IS WHY IT NEEDED FIXING AGAIN. *** This file's own PW list
+    // went stale on a THIRD box: playwright there resolves from /opt/node22/lib/node_modules/playwright, a
+    // path in none of the four tried here, and this gate was silently skipping its live-page check again --
+    // the exact failure this comment already describes catching once. mpmGpuPage-selfcheck had the SAME bug
+    // in a narrower form (one hardcoded path, no fallback at all) and was skipping WITH THE MISATTRIBUTED
+    // MESSAGE this file had already named and fixed. The list now lives in playwrightResolve.mjs, imported
+    // rather than copied, because a fix that stays local to the file that found it is a fix that happens again.
+    const { chromium, from: pwFrom } = resolvePlaywright(require);
+    const why = browserSkipReason(chromium, pwFrom);
+    if (why) {
         console.log("  SKIP  the live page load   " + why + " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY.");
     } else {
-        const b = await chromium.launch({ executablePath: SHELL });
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL });
         try {
             const page = await b.newPage();
             await page.route("**/*", (route) => {

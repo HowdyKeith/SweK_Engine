@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/githubPanelLive-selfcheck.mjs -- v3941
 //
-// Run: node tools/ship/githubPanelLive-selfcheck.mjs   (a few seconds -- needs Chromium)
+// Run: node tools/ship/githubPanelLive-selfcheck.mjs   (~3.5s — MEASURED v3941, median of 3540/3432/3541 — needs Chromium)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** DRIVES THE REAL GITHUB PANEL IN A REAL BROWSER, BECAUSE engineUpdateSource-selfcheck ONLY EVER
