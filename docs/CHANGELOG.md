@@ -8,6 +8,49 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3961 — the white page had no background, and the error message had no error
+
+Keith: *"not sure why this page is white and the others are black background."*
+
+`magmap-bench.html` declared `color-scheme: light dark` and set **no background at all**, so the browser painted its own default behind it — measured both ways: `#ffffff` on a light-mode box, `#121212` on a dark-mode one. `join.html` and `report.html` were built the same way. Three pages out of 397 changed colour with a system preference nothing else in the tree reads, so the engine looked broken on exactly the machines whose owners had never picked a theme. All three now link the same `theme.css` the panel suite links, and paint `var(--bg)` either way.
+
+**The source could not answer this, and my first attempt proved it.** I grepped for a `body` rule setting a background and got nineteen suspects. Measured in a browser, **six of them paint dark anyway** — they set the ground on `<html>`, or on a container, or across a multi-line rule the pattern could not see. The regex was wrong on a third of its own answers. So the gate reads the *painted pixel*: `getComputedStyle` on an unset body returns `rgba(0,0,0,0)`, and "transparent" is not a colour — a check that assumed white behind it would be measuring its own guess.
+
+**The colours had to move with the ground, not after it.**
+
+| | on white | on `var(--bg)` |
+| --- | --- | --- |
+| `#1e8449` (was: win / improve) | 4.72 — AA | 4.16 — AA-large only |
+| `#c0392b` (was: bad / regress) | 5.44 — AA | 3.61 — AA-large only |
+| `var(--ok)` `#41e08a` | 1.71 — fails | **11.45 — AA** |
+| `var(--red)` `#ff6b6b` | 2.78 — fails | **7.07 — AA** |
+
+Computed *before* the swap rather than after, because changing a page's ground and keeping its ink is how a background fix turns into a readability bug.
+
+**The gate does not ban dual-theme, which would have failed a page for having a feature.** `petfbi-board.html` follows the viewer's scheme on purpose — it is the public lost-pet board, it carries a real switcher (`petfbi_theme`), and it measures 15.25 light / 15.76 dark. The rule is that a page may vary only if somebody *meant* it to, and must be legible either way. An **unchosen** ground is the defect, not a light one.
+
+The at-risk set is derived, not listed. A `color-scheme` declaration naming more than one value and a `prefers-color-scheme` query are the only two mechanisms by which a page can follow the OS, so the set is recomputed from source on every run and a new page reaching for either is pulled in automatically and has to justify itself.
+
+**The gate failed on its own prose the first time it ran** — the comment explaining the swap contains the two hexes it forbids, which is exactly the trap `sourceScan.mjs` exists for. The fix chose `noComments` over `codeOnly` deliberately: `codeOnly` blanks string literals too, and the last white-tuned red on `report.html` lived inside one (`"color:#c0392b"`, built into an inline style at runtime), so the stricter tool would have turned a real violation into a silent pass. The gate found that one.
+
+### The taichi row said "Taichi JS ERROR", and that was the whole message
+
+From Keith's bench output, the last row read `taichi.js — ERROR — Taichi JS ERROR`. The reason was never lost. It was printed somewhere the page does not read. The vendored bundle's error helper is:
+
+```js
+function s(...e){ throw console.error("FATAL ERROR: ", ...e), "Taichi JS ERROR " }
+```
+
+It **throws a bare string** and sends the detail — the assertion, the failing node — to `console.error` instead. A string has no `.message`, so `String(e && e.message || e)` fell through to the constant, and *every* taichi failure, whatever its cause, produced the same six words. That is the defect v3952 fixed in render-qa wearing different clothes, and worse: the reason was computed and thrown away.
+
+`console.error` is now captured for the duration of that lane only, forwards every call to the real one (nothing is swallowed — devtools output is unchanged), and comes off in a `finally` so a throw cannot leave the page's console permanently redirected. Driven with a stub that fails the same way the real bundle does, the row now reads:
+
+```
+Assertion failed unsupported type on node 17  [thrown: Taichi JS ERROR]
+```
+
+That does not fix whatever taichi is unhappy about — it makes the next run say what it is.
+
 ## Since v3960 — the topic row had no order, only a history
 
 Keith, reading the chip row on server.html: *"I know that the first items in SweK Engine Topics are defined to show in order, but the rest of the category topics should be alphabetized if not set to show in order."*
