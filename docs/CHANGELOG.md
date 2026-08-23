@@ -8,6 +8,14 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3952 — a failing check that could not say why, and the real failure it was hiding
+
+render-qa reported `sphere-impostor-flat` as `check: undefined`. Two field names for one thing: the reporter reads `r.msg`, `notAllBlack` and its siblings return `msg`, and `terminatorBow` and `edgeBiasProfile` return `why`. Both are good names and only one is read — so the two newest and most specific checks in the file, the ones whose reasons are worth the most because they measure geometry rather than "is it black", were the two whose reasons were discarded. Normalised in `runCheck` rather than renamed in nine places, and a check that fails with no reason at all now says so by name.
+
+With the reason restored, the actual finding is: **"boundary BOWS more than allowed: 0.4545 > 0.03 — not a flat disc"**. Fifteen times the limit, not a marginal miss. And it reproduces here under swiftshader with `nonBlackFrac` 0.7935, byte-identical to the rig — so it is real and deterministic, not a driver difference.
+
+What is *not* safe to conclude from here is whether the page or the check is wrong, and this round did not retune a threshold to make a red gate green. A bow of 0.4545 is about half the frame, which is what the first luminance crossing per row traces on a disc: its circular silhouette. A flat panel lit head-on has no terminator, so the boundary the check finds may be the outline rather than the shadow line — which would make the threshold incomplete rather than wrong, the same species `edgeBiasOracle-selfcheck` already recorded about `maxEdgeBias`. That call is Keith's; what changed is that the evidence to make it now survives the report.
+
 ## Since v3951 — working down the render-qa report: a Node import in a browser, and two pages the server had taken
 
 `skin-depth.html` died on `node:url`, and v3900 had already diagnosed that exact failure in that exact file: "`process` at module top level is a ReferenceError in a browser — not a caught failure, an EVALUATION failure, so the whole module fails to load and every import of it dies with it." It guarded `process` and left the import above it alone. A bare `import ... from "node:url"` resolves before a line of the module runs, so the browser never reached the guard — it reported "blocked by CORS policy", which is what a browser calls a bare specifier it cannot resolve. The import is now dynamic, inside the guard. Measured: this was the only module in the tree with a top-level `node:` import reachable from any page, so the class is closed rather than the instance.
