@@ -888,9 +888,9 @@ window.addEventListener("load", function () {
              the default-minimised paint). Deleting the button would unregister the panel and the new button
              would toggle nothing -- the same shape as removing a call site and keeping the caller. -->
         <button class="gtab" data-tab="physicslab" style="display:none" aria-hidden="true"><span class="gtabTog">&#9656;</span><span>&#9883; Physics Lab</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="optics"><span class="gtabTog">&#9656;</span><span>&#128301; Optics &amp; Imaging</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="cosmic"><span class="gtabTog">&#9656;</span><span>&#127756; Cosmic &amp; Relativity</span><span class="gtabState"></span></button>
-        <button class="gtab" data-tab="em"><span class="gtabTog">&#9656;</span><span>&#9889; Electromagnetism</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="optics"><span class="gtabTog">&#9656;</span><span>&#128301; PL: Optics &amp; Imaging</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="cosmic"><span class="gtabTog">&#9656;</span><span>&#127756; PL: Cosmic &amp; Relativity</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="em"><span class="gtabTog">&#9656;</span><span>&#9889; PL: Electromagnetism</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="discretise"><span class="gtabTog">&#9656;</span><span>&#9707; Discretisation &amp; Meshes</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="macsystem"><span class="gtabTog">&#9656;</span><span>&#63743; Mac System</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="smarthome"><span class="gtabTog">&#9656;</span><span>&#127968; Smart Home</span><span class="gtabState"></span></button>
@@ -1294,17 +1294,17 @@ window.addEventListener("load", function () {
           </div>
         </div>
         <div class="gpanel" data-panel="optics" hidden>
-          <div class="gpanelHdr">&#128301; Optics &amp; Imaging</div>
+          <div class="gpanelHdr">&#128301; PL: Optics &amp; Imaging</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="optics" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="cosmic" hidden>
-          <div class="gpanelHdr">&#127756; Cosmic &amp; Relativity</div>
+          <div class="gpanelHdr">&#127756; PL: Cosmic &amp; Relativity</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-panel-pages="cosmic" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="em" hidden>
-          <div class="gpanelHdr">&#9889; Electromagnetism</div>
+          <div class="gpanelHdr">&#9889; PL: Electromagnetism</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Fields, grids, boundaries, and what discretising them costs. Split out of Cosmic &amp; Relativity at v3633 when that drawer reached sixteen pages while its own note still said black holes and lensing -- the count was reporting a taxonomy drift, not a shortage of room.</div>
           <div data-panel-pages="em" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
@@ -7631,7 +7631,7 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
 // registry would put the text in two places and guarantee they drift -- the defect this session found in nine
 // files (MODES), three (the gate-file walk) and four (a mesher's liveness). Moving the node means A PAGE IS IN
 // EXACTLY ONE PLACE BECAUSE IT IS ASSIGNED, not because somebody remembered a second edit.
-import { SECTIONS, PROFILES, sectionsFor, CHIP_GROUPS } from "./tools/ship/pageSections.mjs";
+import { SECTIONS, PROFILES, sectionsFor, CHIP_GROUPS, CHIP_PINNED } from "./tools/ship/pageSections.mjs";
 
 // v3230 -- A TAILORED FRONT DOOR. The profile comes from ?profile=NAME, or from the shipped landing config, and
 // an ABSENT OR UNKNOWN NAME SHOWS EVERYTHING -- a typo in a config file must not silently hide two thirds of the
@@ -7714,6 +7714,49 @@ const arrivingRow = (() => {
   console.log("[chipGroups] moved " + movedChips + " chips into " + (CHIP_GROUPS.length - noSlot.length) + " group slot(s)" +
     (noSlot.length ? " | NO SLOT: " + noSlot.join(", ") : "") +
     (noChip.length ? " | CHIP NOT FOUND: " + noChip.join(", ") : ""));
+}
+
+// v3960 -- *** THE TOPIC ROW IS SORTED: PINNED SERVICE CHIPS IN THEIR HAND-SET ORDER, EVERY OTHER CHIP BY NAME. ***
+// Keith: "the rest of the category topics should be alphabetized if not set to show in order". They were not
+// sorted and they were not deliberately ordered either -- the row was in WRITING order, nine hundred versions
+// of append. See CHIP_PINNED in pageSections.mjs for what is pinned and why.
+//
+// *** IT RUNS AFTER THE GROUP MOVER ON PURPOSE. *** CHIP_GROUPS lifts chips OUT of this row into sub-slots
+// (Escape Velocity into Game Theory, Rig Verify into System Tools). Sorting first would order chips that are
+// about to leave, and -- worse -- a sort that ran later over a stale list could put them back. Sorting what is
+// still here, after the moves, is the only sequencing where the two cannot fight.
+//
+// THE NODES ARE MOVED, NEVER REBUILT. Every chip carries a click listener wired at load, a live gtabState span
+// the bridges write into by id, and a data-tab pairing it with its panel -- appendChild relocates all three,
+// and recreating one would drop all three silently. Same rule the page mover and the chip grouper follow.
+{
+  const bar = document.getElementById("gaugeTabBar");
+  if (bar) {
+    // The sort key is the LABEL WITH ITS LEADING ICON STRIPPED. The visible text starts with an emoji, and
+    // sorting on the raw string would order by codepoint of a picture -- which is not an order anybody can
+    // predict or check. Stripped: "Blobs", "Boundaries & Reconstruction", "Box3D". The three Physics Lab
+    // drawers renamed this round to "PL: ..." collect together under P, which is what the prefix is for.
+    const keyOf = (el) => {
+      const spans = el.querySelectorAll("span");
+      const txt = spans.length > 1 ? (spans[1].textContent || "") : (el.textContent || "");
+      return txt.replace(/^[^\p{L}\p{N}]+/u, "").trim().toLowerCase();
+    };
+    const chips = [...bar.querySelectorAll(":scope > .gtab")];
+    const pin = new Map(CHIP_PINNED.map((t, i) => [t, i]));
+    chips.sort((x, y) => {
+      const px = pin.has(x.dataset.tab) ? pin.get(x.dataset.tab) : Infinity;
+      const py = pin.has(y.dataset.tab) ? pin.get(y.dataset.tab) : Infinity;
+      if (px !== py) return px - py;                       // pinned first, in the order CHIP_PINNED lists them
+      return keyOf(x).localeCompare(keyOf(y), "en", { sensitivity: "base", numeric: true });
+    });
+    for (const c of chips) bar.appendChild(c);             // MOVES each node -- listener, state span and all
+    // A PIN THAT NAMES A CHIP THAT IS NOT HERE IS SAID OUT LOUD. It would otherwise be a line in a config that
+    // does nothing, which is how the empty PetFBI drawer survived twenty-seven rounds: silently correct-looking.
+    const absent = CHIP_PINNED.filter((t) => !chips.some((c) => c.dataset.tab === t));
+    console.log("[chipOrder] " + chips.length + " chips, " + (chips.length - absent.length >= 0 ? pin.size - absent.length : 0) +
+                " pinned in order and the rest alphabetised" +
+                (absent.length ? " | PINNED BUT NOT IN THE ROW: " + absent.join(", ") : ""));
+  }
 }
 
 let moved = 0, missing = [], elsewhere = [], placed = 0;

@@ -8,6 +8,30 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3960 — the topic row had no order, only a history
+
+Keith, reading the chip row on server.html: *"I know that the first items in SweK Engine Topics are defined to show in order, but the rest of the category topics should be alphabetized if not set to show in order."*
+
+Nothing was set to show in order. The row is static markup and the chips sat in the sequence they were **written in** — Email rules and Asset Pipeline at the front because they are the oldest, Rocket League at the back because it is the newest, nine hundred versions of append. It reads as deliberate from the front, where the operational drawers happen to come first, and as noise from the middle onward. That is how an accident looks when its first few entries are accidentally right, which is why the belief was reasonable and still wrong.
+
+So the intent is written down rather than inferred from a file's edit history. **`CHIP_PINNED`** names the fifteen *service* drawers — the ones with live state you check rather than subjects you browse: is the mail rule armed, is the pipeline draining, is RustDesk configured, how far has render-qa got. Those keep their hand-set order, because you find them by position and a row that reshuffles them whenever somebody adds a topic is a row you have to re-read. **Everything not named is alphabetised**, so a new subject drawer needs no edit to the list and lands where its name says it should — the default is the rule, not the exception. The pin list is keyed by `data-tab`, not by label, so this round's three renames cannot silently unpin anything.
+
+Keith also asked for the three Physics Lab drawers to be prefixed:
+
+| was | is |
+| --- | --- |
+| 🔭 Optics & Imaging | 🔭 PL: Optics & Imaging |
+| 🌌 Cosmic & Relativity | 🌌 PL: Cosmic & Relativity |
+| ⚡ Electromagnetism | ⚡ PL: Electromagnetism |
+
+**The rename and the sort are one claim, not two.** A prefix exists so the family reads as a family — and a prefix that did not also make them *adjacent* would be three renames and no gain. Sorted, they land at 28, 29 and 30, and the gate checks the adjacency rather than merely checking the string.
+
+**The sort runs after the chip-group mover, and that sequencing is the whole safety argument.** `CHIP_GROUPS` lifts five chips *out* of this row (Escape Velocity and the three games into Game Theory, Rig Verify into System Tools). Sorting first would order chips that are about to leave; a sort over a stale list could put them back. Sorting what is still there, after the moves, is the only sequencing where the two features cannot destroy each other — and the gate asserts that none of the five reappears.
+
+Nodes are moved, never rebuilt. Each chip carries a click listener wired at load, a live `gtabState` span the bridges write into by id, and a `data-tab` pairing it with its panel; `appendChild` relocates all three and recreating one would drop all three silently. That is the same rule the page mover and the chip grouper already follow — and because it is a claim about the DOM rather than about this page, the new gate *clicks* three chips that ended up far from where the markup put them and watches their panels open.
+
+`tools/ship/chipOrder-selfcheck.mjs` is a browser gate for the same reason v3959's was: the order is produced at runtime, and the static markup is now, on purpose, in the wrong order. Reading the source proves nothing. Two probes show it is measuring the real thing — neutering the sort turns the alphabetical clause red, and reversing three entries in `CHIP_PINNED` makes the row follow, which is how the pin list is shown to be *driving* the order rather than merely agreeing with it.
+
 ## Since v3959 — eleven pages were accused of not existing, and the accusation was seven hundred versions old
 
 Keith read a line at the bottom of server.html's Arriving row — *"11 registry entries found no link on this page: aibrain.html, brain-3d.html, brain-fleet.html, brain-lab.html, brain-maze.html, brain-quadrants.html, brain-room.html, dock-brain.html, lbm-fluid.html, lbm3d-flow.html, lbm3d-gpu-check.html"* — and said he was pretty sure some or all of those were in the separate panels.

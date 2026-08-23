@@ -70,10 +70,10 @@ export const SECTIONS = [
               "live-panel.html", "external-linalg.html", "ssim-compare.html", "curriculum.html"] },
 
     // --- the instruments, split three ways because 25 in one drawer is the flat row with a lid on it
-    { id: "optics", tab: "optics", label: "Optics & Imaging", note: "diffraction, interferometry, tomography, reconstruction",
+    { id: "optics", tab: "optics", label: "PL: Optics & Imaging", note: "diffraction, interferometry, tomography, reconstruction",
       pages: ["fresnel.html", "fresnel-join.html", "diffraction.html", "interferometer.html", "ct.html", "fanbeam.html",
               "tomography.html", "sinogram-gpu.html", "kriging.html", "spatial-agreement.html", "splat-lab.html"] },
-    { id: "cosmic", tab: "cosmic", label: "Cosmic & Relativity", note: "black holes, orbits, lensing, special functions",
+    { id: "cosmic", tab: "cosmic", label: "PL: Cosmic & Relativity", note: "black holes, orbits, lensing, special functions",
       pages: ["kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
               "kepler.html", "meijer-g.html", "elliptic.html", "rmt.html", "landau-zener.html", "hmc.html"] },
     // v3633: THE 15-PAGE RATCHET FIRED AND IT WAS RIGHT. Five electromagnetism pages had been filed under
@@ -81,7 +81,7 @@ export const SECTIONS = [
     // its own note still said "black holes, orbits, lensing, special functions". THE COUNT WAS REPORTING A
     // TAXONOMY DRIFT, not a shortage of room, and widening the cap would have hidden exactly that. They have
     // their own drawer now; cosmic falls to 11 and reads like its note again.
-    { id: "em", tab: "em", label: "Electromagnetism", note: "fields, grids, boundaries, and what discretising them costs",
+    { id: "em", tab: "em", label: "PL: Electromagnetism", note: "fields, grids, boundaries, and what discretising them costs",
       pages: ["current-loop.html", "fdtd.html", "skin-depth.html", "grid-refinement.html", "regrid-cost.html"] },
     // v3644: THE 15-PAGE RATCHET FIRED AGAIN, AND AGAIN IT WAS REPORTING A TAXONOMY DRIFT RATHER THAN A SHORTAGE
     // OF ROOM -- the same thing it caught at v3633. Eleven pages about REMAPS, LIMITERS, GRADIENTS and MESH RANK
@@ -371,6 +371,33 @@ export function sectionsFor(profile) {
  * THE MEMBER'S OWN PANEL IS UNTOUCHED and still opens where it always did. A group is a place to FIND the chip,
  * not a new home for what the chip does.
  */
+/**
+ * v3960 -- CHIP_PINNED: THE CHIPS THAT KEEP A HAND-SET ORDER. EVERY OTHER CHIP IS SORTED BY NAME.
+ *
+ * Keith, reading the topic row: "I know that the first items in SweK Engine Topics are defined to show in
+ * order, but the rest of the category topics should be alphabetized if not set to show in order."
+ *
+ * *** THEY WERE NOT DEFINED TO SHOW IN ORDER. THERE WAS NO ORDER AT ALL. *** The row is static markup and the
+ * chips sit in the sequence they were WRITTEN IN, one round at a time over nine hundred versions -- Email rules
+ * and Asset Pipeline at the front because they are the oldest, Rocket League at the back because it is the
+ * newest. It reads as deliberate from the front (the operational drawers really are first) and as nothing from
+ * the middle onward, which is exactly how an accident looks when its first few entries happen to be right.
+ *
+ * SO THE INTENT IS WRITTEN DOWN RATHER THAN INFERRED FROM A FILE'S HISTORY. These are the SERVICE drawers --
+ * the ones with live state you check rather than subjects you browse: is the mail rule armed, is the pipeline
+ * draining, is RustDesk configured, how far has render-qa got. They are worth a fixed place because you look
+ * for them by position, and a row that reshuffles them when somebody adds a topic is a row you have to re-read.
+ *
+ * EVERYTHING NOT NAMED HERE IS ALPHABETISED, which means a new subject drawer needs no edit to this list and
+ * lands where its name says it should. That is the whole point: the default is the rule, not the exception.
+ * (The pin list is by data-tab, not by label, so renaming a chip -- as v3960 renames three -- cannot silently
+ * unpin it.)
+ */
+export const CHIP_PINNED = [
+    "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "roundhouse", "rigjob",
+    "terrain", "crossarch", "policymass", "cloud", "celltrack", "renderqa", "brew",
+];
+
 export const CHIP_GROUPS = [
     { id: "gametheory", tab: "gametheory", label: "Game Theory",
       note: "the agents that play games, and the games they play",
