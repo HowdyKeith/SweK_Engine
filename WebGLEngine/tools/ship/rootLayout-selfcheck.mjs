@@ -137,9 +137,61 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
        "always red teaches everybody to stop reading it, which is how this one went unread for hundreds of " +
        "versions with a REAL finding inside it (two unprotected launchers)");
 
-    ok("...and README, BACKLOG and TODO stayed, which is not an oversight",
-       ["README.md", "BACKLOG.md", "TODO.md"].every((f) => loose.includes(f)),
-       "They are the three files a stranger opens first, BACKLOG and TODO are written by the ship ritual every round, and .gitignore only works where it is. A tidy-up that hid the changelog would be tidier and worse.");
+    // *** v3945 -- THIS CHECK WAS RED IN EVERY CLONE OF THE PUBLIC MIRROR, AND THE CHECK DIRECTLY ABOVE IT
+    // SAYS WHY THAT MATTERS: "a number that cannot be satisfied by any correct tree is not a strict check, it
+    // is a permanently red one -- and a gate that is always red teaches everybody to stop reading it." Same
+    // fault, one line down, as a NAME rather than a number.
+    //
+    // BACKLOG.md AND TODO.md ARE IN .gitignore ON PURPOSE -- session notes deliberately held back from the
+    // public mirror, in those words, at .gitignore's own line 74. So they sit in root on Keith's rig (where
+    // this check passed) and cannot exist in any clone (where it could never pass). Asserting bare presence
+    // asserted that nobody was running the gate on a checkout -- which is the first place a fresh contributor
+    // would run it, and where this gate had in fact been red the whole time.
+    //
+    // WHAT THE CHECK WAS REACHING FOR IS STILL WORTH HAVING and is now asserted directly: the regression is a
+    // tidy-up SWEEPING THEM INTO docs/ the way the three CHANGELOGs went at v3928, or into "Root Utils" the way
+    // the scripts went. That fires on the rig and on a clone alike, because a moved file is present either way.
+    // Presence in root is then required only of the files git actually carries -- and WHICH THOSE ARE IS READ
+    // FROM .gitignore rather than retyped, because a second list of what is withheld would go stale the first
+    // time one of them was published.
+    const FRONT_DOOR = ["README.md", "BACKLOG.md", "TODO.md"];
+    const withheld = new Set();
+    try {
+        for (const raw of fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8").split(/\r?\n/)) {
+            const s = raw.trim();
+            if (s && !s.startsWith("#") && !s.startsWith("!")) withheld.add(s.replace(/^\//, ""));
+        }
+    } catch { /* no .gitignore: nothing is withheld, so every name below must be in root */ }
+
+    // Scoped to the two places a tidy-up in THIS repository has actually put things, rather than a whole-tree
+    // walk: vendored subprojects legitimately carry their own README.md (HomeAssistant/ha-vbaengine-addon has
+    // one), so a walk looking for the basename anywhere would report a move that never happened.
+    const SWEPT_TO = ["docs", "Root Utils"];
+    const moved = [];
+    for (const d of SWEPT_TO)
+        for (const f of FRONT_DOOR)
+            if (fs.existsSync(path.join(ROOT, d, f))) moved.push(d + "/" + f);
+
+    ok("!! README, BACKLOG and TODO have not been swept into docs/ or Root Utils/",
+       moved.length === 0,
+       moved.length ? "MOVED OUT OF ROOT: " + moved.join(", ")
+                    : "checked " + SWEPT_TO.length + " destinations x " + FRONT_DOOR.length + " names. They are the " +
+                      "files a stranger opens first, and the three CHANGELOGs going to docs/ at v3928 is the " +
+                      "precedent -- a tidy-up that hid the front door would be tidier and worse.");
+
+    const missing = FRONT_DOOR.filter((f) => !loose.includes(f) && !withheld.has(f));
+    ok("...and every one git actually carries is IN root",
+       missing.length === 0,
+       missing.length ? "MISSING FROM ROOT: " + missing.join(", ")
+                      : FRONT_DOOR.filter((f) => withheld.has(f)).join(" + ") + " are withheld from the mirror by " +
+                        ".gitignore, so they are absent HERE and present on the rig -- both correct. " +
+                        FRONT_DOOR.filter((f) => !withheld.has(f)).join(", ") + " must be in root and is.");
+
+    ok("!! ...and the withheld list can never quietly grow to cover README.md",
+       !withheld.has("README.md"),
+       "*** THE EXEMPTION ABOVE IS READ FROM .gitignore, SO ANYTHING ADDED THERE STOPS BEING REQUIRED IN ROOT. *** " +
+       "That is right for session notes and wrong for the front page: one line in .gitignore would otherwise let " +
+       "the README leave the root with this gate still green.");
 
     // *** v3941 -- THE README IS THE README, AND IT HAD BECOME THE CHANGELOG. ***
     //
