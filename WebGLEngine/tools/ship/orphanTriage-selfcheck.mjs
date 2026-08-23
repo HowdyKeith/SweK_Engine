@@ -234,7 +234,7 @@ console.log("\n6. *** SIGNAL A: A DEDICATED GATE NAMED FOR THE CONCEPT -- AND IT
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n7. *** SIGNAL B: THE MAIN GUARD IS A PROPERTY, AND THE STRIPPER CHOICE COSTS TWELVE ***");
+console.log("\n7. *** SIGNAL B: THE MAIN GUARD IS A PROPERTY, AND SO IS THE STRIPPER CHOICE ***");   // v3941 -- the heading said COSTS TWELVE; it cost twelve when written and costs three today, because the tree migrated the guard. The claim is about the stripper, not the count.
 {
     const src = (rl) => { try { return fs.readFileSync(path.join(ENG, ...rl.split("/")), "utf8"); } catch { return ""; } };
     const SELF = /import\.meta\.url/, ENTRY = /process\.argv\[1\]|Deno\.mainModule/;
@@ -244,12 +244,40 @@ console.log("\n7. *** SIGNAL B: THE MAIN GUARD IS A PROPERTY, AND THE STRIPPER C
     report("codeOnly (comments AND strings blanked)", String(co.length));
     report("noComments (comments only) -- SHIPPED", String(nc.length));
 
-    ok("!! *** codeOnly IS THE WRONG STRIPPER HERE AND MISSES TWELVE ***", nc.length - co.length >= 10,
-        "codeOnly blanks STRING LITERALS, and this tree's commonest main guard is a TEMPLATE LITERAL -- " +
-        "`file://${process.argv[1]}` -- so the entry point VANISHES and the module reads as a library. " +
-        "*** v3526's pair from a new angle: codeOnly FOR AN IDIOM, noComments FOR TEXT THE CODE CONTAINS -- " +
-        "and a main guard is AN IDIOM WHOSE OPERAND LIVES IN A STRING. Missing: " +
-        nc.filter((f) => !co.includes(f)).slice(0, 4).join(", ") + " ...");
+    // *** v3941 -- THIS PINNED THE SIZE OF THE GAP AT TEN, AND THE TREE CLOSED THE GAP. ***
+    // The condition was `nc.length - co.length >= 10`: a MAGNITUDE standing in for a property, one assertion
+    // above the line below that says "THE PROPERTY IS ASSERTED, NOT A SPELLING" and "A REGEX FOR ONE SPELLING
+    // WOULD REPORT A STALE ANSWER ABOUT THE REST". The gap is 3 now, and the reason is the tree getting BETTER:
+    // the template-literal guard is the Windows-broken form winPathGuard-selfcheck exists to ban and
+    // runLive-selfcheck refuses by name, and it has been migrated out almost everywhere. So this line went red
+    // because the defect it measures has been fixed -- while the CLAIM it makes, that codeOnly is the wrong
+    // stripper for this idiom, is exactly as true as it ever was.
+    //
+    // THE CLAIM IS ABOUT THE STRIPPER, NOT ABOUT THE POPULATION, so it is demonstrated on two constructed guards
+    // rather than counted over the tree. The template form is ASSEMBLED from pieces for the same reason
+    // winPathGuard assembles its own pattern -- written whole it would be the banned idiom, sitting in the tree,
+    // and that gate would rightly fire on it.
+    const TEMPLATE_GUARD = "if (import.meta.url === " + "`file://${process.argv[1]}`" + ") { main(); }";
+    const PORTABLE_GUARD = "if (import.meta.url === pathToFileURL(process.argv[1]).href) { main(); }";
+    const seesGuard = (t) => t.split("\n").some((l) => SELF.test(l) && ENTRY.test(l));
+    ok("!! *** codeOnly IS THE WRONG STRIPPER FOR A MAIN GUARD -- SHOWN ON THE IDIOM, NOT COUNTED OVER THE TREE ***",
+        seesGuard(TEMPLATE_GUARD) && !seesGuard(codeOnly(TEMPLATE_GUARD)) && seesGuard(noComments(TEMPLATE_GUARD)) &&
+        seesGuard(codeOnly(PORTABLE_GUARD)),
+        "codeOnly blanks STRING LITERALS, and a template-literal guard is one -- it leaves " +
+        JSON.stringify(codeOnly(TEMPLATE_GUARD)) + ", so THE ENTRY POINT VANISHES AND THE MODULE READS AS A " +
+        "LIBRARY. The pathToFileURL spelling survives codeOnly because its operand is code. *** v3526's pair " +
+        "from a new angle: codeOnly FOR AN IDIOM, noComments FOR TEXT THE CODE CONTAINS -- and a main guard is " +
+        "AN IDIOM WHOSE OPERAND CAN LIVE IN A STRING. TRUE OF THE STRIPPER WHETHER OR NOT ANY MODULE TRIPS IT.");
+
+    // The live gap is REPORTED, because it is a fact about today's tree and it is on its way to zero.
+    const guardLine = (f) => noComments(src(f)).split("\n").find((x) => SELF.test(x) && ENTRY.test(x)) || "";
+    const stillTemplate = nc.filter((f) => /`file:\/\//.test(guardLine(f)));
+    const portable = nc.filter((f) => /pathToFileURL/.test(guardLine(f)));
+    report("codeOnly misses, TODAY", (nc.length - co.length) + "   " +
+        (nc.filter((f) => !co.includes(f)).slice(0, 4).join(", ") || "(none)") +
+        " -- was 12 when this section was written. " + stillTemplate.length + " of " + nc.length +
+        " actionable guards are still the template form and " + portable.length + " are pathToFileURL, which is " +
+        "the migration winPathGuard asks for. THE NUMBER FALLS AS THE TREE IMPROVES, so nothing depends on it.");
     ok("...and codeOnly sees nothing noComments misses, so the choice is a strict improvement here",
         co.every((f) => nc.includes(f)), "no module is lost by keeping strings");
 
