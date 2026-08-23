@@ -238,6 +238,48 @@ const rescued = [];
     ok("!! *** graveyard's actionable count is a FLOOR, not a measure, and its own header now says so ***",
        /FLOOR/.test(g) && /referenceKind/.test(g),
        "a reader who meets 22 without that sentence would take it for the debt. It is the debt THE SUBSTRING TEST CAN STILL SEE.");
+    // *** v3941 -- THE DISTINCTION THIS GATE'S HEADER ASKS FOR WAS ATTEMPTED THREE WAYS AND REFUTED THREE
+    // TIMES. *** The header names the next round on this thread: "a module named ONLY by a changelog against
+    // one named by something that might actually load it". Each attempt below looked obvious, and each one is
+    // recorded because a checked-and-failed attempt is worth more than an unwritten one -- the same reason the
+    // v3451 prediction two hundred lines above is left standing after it turned out wrong.
+    //
+    // (1) STRIP COMMENTS AND THE CHANGELOG MENTIONS GO AWAY. They do not. Measured: 191 rescued on this walk,
+    //     of which only 31 are named exclusively inside comments. THE PROSE IS IN STRING LITERALS AS OFTEN AS
+    //     IN COMMENTS -- predictions.html carries `where: "vendor/krbn (MIT, LICENSE beside it..."` and
+    //     reportingTools.mjs carries `blurb: "v3451 said READ THEM ONE AT A TIME..."`. noComments keeps strings,
+    //     so it separates prose-in-a-comment from prose-in-a-string, which is not the distinction wanted;
+    //     codeOnly blanks strings and would lose the genuine composed loads (shaderRefs measured that exact
+    //     trade at v3560 and shipped noComments for the opposite reason). NO STRIPPER SEPARATES PROSE FROM A
+    //     LOAD, because in this tree documentation is data as often as it is comment.
+    //
+    // (2) A DIRECTORY THAT REAL CODE ENUMERATES AT RUNTIME IS GENUINELY LOADED. True, and it does not help,
+    //     because of who is doing the enumerating. 128 of the 191 live under a directory some file walks with
+    //     readdirSync -- AND 92 OF THOSE 128 ARE tools/, WALKED BY artefactWriters-selfcheck AND doorKinds TO
+    //     AUDIT IT. *** A CENSUS THAT READS A DIRECTORY IN ORDER TO JUDGE IT IS NOT A CONSUMER OF IT *** --
+    //     v3223's law ("a register of orphans is not a consumer of them") arriving for a third time in a third
+    //     disguise, now wearing a filesystem call instead of a substring. Counting those as consumption would
+    //     have been this gate's own defect committed inside its own fix.
+    //
+    // (3) WHAT SURVIVES IS NARROW AND REAL: demos_code/, enumerated by tools/ship/launchIndex.mjs -- a NON-gate
+    //     tool -- served as /demos_code/list by ai-bridge/server.js and booted by showcase.html via ?go=. Ten
+    //     of the rescued modules are there, and no import-specifier resolver can ever see them, because the
+    //     reference is a directory read. That is an EARNED exemption, unlike the substring one, and it is worth
+    //     exactly ten. It is measured here and NOT wired in, because 191 - 10 does not reach the ceiling and
+    //     shipping a partial resolver change mid-ratchet would move the number for a reason unrelated to the
+    //     debt it tracks.
+    //
+    // *** SO THE THREE ATTEMPTS MOVED THIS NUMBER 196 -> 165 -> 63 -> 186 UNDER ONE AUTHOR IN ONE ROUND,
+    // WHICH IS THE SAME SIGNAL THE LINE BELOW ALREADY RECORDS ABOUT 22 -> 97 -> 228. *** The instrument is not
+    // ready and the ratchet is left exactly where it was; what this round adds is three closed doors, so the
+    // next attempt starts after them rather than at them.
+    ok("REPORTED: three routes to the changelog-vs-load distinction were measured and refused", true,
+       "(1) comment-stripping separates prose-in-a-comment from prose-in-a-string, not prose from a load: only " +
+       "31 of 191 are comment-only, the rest are blurbs and where-fields in string literals. (2) runtime " +
+       "directory enumeration is real but 92 of its 128 hits are tools/ walked BY GATES AUDITING IT -- v3223's " +
+       "law in a third disguise. (3) demos_code (10 modules, enumerated by the non-gate launchIndex.mjs and " +
+       "booted via ?go=) is the one earned case and is too small to reach the ceiling alone. NOTHING WAS " +
+       "WIRED IN: a number that moves 196 -> 165 -> 63 -> 186 under one author in one round is not a measurement.");
     ok("REPORTED: the replacement scan is NOT shipped, and that is a decision", true,
        "a first attempt moved the actionable count 22 -> 97 -> 228 depending on which routes the resolver knew about (import specifiers, then worker targets, then the directory exemption). *** A NUMBER THAT MOVES THAT FAR UNDER ITS OWN AUTHOR IS NOT YET A MEASUREMENT, and rewriting a SHARED scan on one is the v3202 sweep shape that deleted 61 live modules. *** The exposure is frozen here instead, and the rewrite is a round with a fixture rather than a guess.");
 }
