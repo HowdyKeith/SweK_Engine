@@ -112,6 +112,18 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
         /GIT_TERMINAL_PROMPT/.test(fn),
         "*** DRIVEN AT v3941: a repo the token cannot read returned 'could not read Username' and EXITED, " +
         "instead of blocking the bridge forever on a prompt in a process with no terminal attached. ***");
+    // *** GIT_TERMINAL_PROMPT ONLY SUPPRESSES GIT'S OWN IN-TERMINAL PROMPTS. *** Windows Git ships Git
+    // Credential Manager as the default credential.helper, and GCM has its own GUI/browser/device-code sign-in
+    // flow that fires independently of http.extraHeader already carrying a valid Authorization header -- Keith
+    // saw GCM's "Connect to GitHub" popup mid-clone despite having a working token configured. Clearing
+    // credential.helper for this one invocation (an empty value is git's documented "forget every configured
+    // helper" signal) is what stops GCM from ever getting a turn.
+    ok("!! ...and the credential helper is disabled for this one invocation, so GCM never gets a turn",
+        /GIT_CONFIG_KEY_1\s*=\s*"credential\.helper"/.test(fn) && /GIT_CONFIG_VALUE_1\s*=\s*""/.test(fn) &&
+        /GIT_CONFIG_COUNT\s*=\s*"2"/.test(fn),
+        "*** DRIVEN BY KEITH AT v3942: the clone-source button popped Git Credential Manager's own sign-in " +
+        "dialog mid-clone -- a token in http.extraHeader does not stop git from ALSO consulting a configured " +
+        "credential.helper, so the helper has to be cleared, not just outrun.");
 }
 
 // ---- 4b. A REPO NAME NOBODY COULD HAVE IS REFUSED AT THE WRITE ---------------------------------------------
