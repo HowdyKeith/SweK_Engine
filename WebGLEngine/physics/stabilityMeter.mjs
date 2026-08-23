@@ -38,7 +38,16 @@
 // DIFFERENT VERDICTS, AND NO SINGLE NUMBER RANKS THEM -- which is why verdict() returns a NAME and not a score.
 // ---------------------------------------------------------------------------------------------------------------
 "use strict";
-import { pathToFileURL } from "node:url";
+// v3951 -- *** THE node:url IMPORT MOVED INTO THE CLI GUARD, WHERE v3900 ALREADY PUT EVERYTHING ELSE. ***
+// v3900's own note at the bottom of this file says it: "This module is loaded by a PAGE as well as run as a
+// CLI, and `process` at module top level is a ReferenceError in a browser -- not a caught failure, an
+// EVALUATION failure, so the whole module fails to load and every import of it dies with it."
+// IT GUARDED `process` AND LEFT THE IMPORT ABOVE IT UNGUARDED. A bare `import ... from "node:url"` is resolved
+// before a line of this module runs, so the browser never reached the guard at all: skin-depth.html died on
+// "Access to script at 'node:url' ... blocked by CORS policy", which is what a browser calls a bare specifier
+// it cannot resolve. Same failure as the one that round diagnosed, one line further up, in the same file.
+// The dynamic import lives inside the guard, so a browser never evaluates it and the CLI is unchanged.
+// (Measured: this was the ONLY module in the tree with a top-level node: import reachable from any page.)
 
 export const KINDS = ["explicit", "implicit", "symplectic"];
 
@@ -191,7 +200,12 @@ export function reportLines() {
 // top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
 // whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
 // on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
-if (typeof process !== "undefined" && import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    for (const l of reportLines()) console.log(l);
-    process.exit(0);
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+    // pathToFileURL is KEPT -- it is the Windows path law this tree checks for, and a string compare against
+    // process.argv[1] is exactly the fragility it exists to avoid. Only WHEN it is loaded changed.
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+        for (const l of reportLines()) console.log(l);
+        process.exit(0);
+    }
 }
