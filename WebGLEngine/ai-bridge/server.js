@@ -4881,6 +4881,29 @@ const server = http.createServer((req, res) => {
         return;
     }
   if (blobTrainBridge.owns(req.url)) { blobTrainBridge.handle(req, res); return; }
+    // v3953 -- *** blobBrainBridge WAS REQUIRED AND NEVER CALLED. *** Its require line at the top of this file
+    // has said since v2439 that it must be "registered BEFORE gpuBrainBridge, which owns the /ai/brain prefix"
+    // -- and it was registered nowhere at all: `blobBrainBridge` appeared EXACTLY ONCE in this file, on the
+    // require itself. Neither register() nor handle() was ever reached, so /ai/brain/blob/policy 404'd for its
+    // whole life and fx/avatar/blobGravity.js fell back to its baked weights every time. Keith's render-qa
+    // reported it on blob-gravity and blob-stage.
+    //
+    // IT GOES HERE, ABOVE gpuBrainBridge, FOR THE REASON THE COMMENT ALREADY GAVE: gpuBrainBridge.owns() claims
+    // the whole /ai/brain prefix, so the more specific route has to be offered the request first or the general
+    // one eats it. handle(req, res, url) takes the url as its THIRD argument and returns false when it does not
+    // want the request, which is what makes "try the specific one first" safe rather than a hijack.
+    if (blobBrainBridge.handle(req, res, req.url)) return;
+    // v3953 -- brainCommentary was the SECOND module required here and never called, found by the gate written
+    // for the first. Its require line carries the same never-carried-out instruction ("BEFORE gpuBrainBridge").
+    //
+    // *** THIS DISPATCH ALONE DOES NOT MAKE ITS ROUTES WORK, AND SAYING SO IS THE POINT. *** handle() returns
+    // false unless a singleton exists, and nothing calls attachRoutes(), so /ai/brain/frame and
+    // /ai/brain/caption still answer 404 -- they simply reach the right module to be refused by now. Finishing
+    // it needs TWO THINGS THIS FILE CANNOT INVENT: a getSnapshot (the brain's state lives in gpuBrainBridge's
+    // module-scope `gpuBrain.snapshot`, which is not exported) and a speak (there is no narrator function in
+    // this file at all). Both are decisions about how the commentator is fed, not a wiring mistake, so they are
+    // left rather than guessed -- and recorded here instead of a dispatch that looks finished and is not.
+    if (brainCommentary.handle(req, res, req.url)) return;
     if (gpuBrainBridge.owns(req.url)) {
         try { gpuBrainBridge.handle(req, res, { sendJson, SYS_LOG, sysLogPush, _ollamaBase, _ollamaModelName }); }
         catch (e) { try { sendJson({ ok: false, error: "gpu-brain: " + String(e && e.message || e) }, 500); } catch {} }
