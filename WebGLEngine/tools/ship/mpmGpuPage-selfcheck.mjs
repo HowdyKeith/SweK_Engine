@@ -288,13 +288,21 @@ console.log("\n9. A REAL BROWSER LOADS BOTH PAGES, BECAUSE SOURCE CHECKS DID NOT
 // loading the page finds this class of defect, so the gate loads the page.
 {
     const { execFileSync } = await import("node:child_process");
-    const fs = await import("node:fs");
-    const SHELL = "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell";
-    const PW = "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
-    if (!fs.existsSync(SHELL) || !fs.existsSync(PW)) {
-        console.log("  SKIP  the live page load   no chromium at " + SHELL + " -- SKIPPING WITH A REASON " +
-            "RATHER THAN PASSING QUIETLY. A gate that reports green when it did not run is worse than one that " +
-            "reports nothing.");
+    // *** v3941 -- SAME BUG AS browserSafety-selfcheck.mjs, IN A CHILD PROCESS WEARING IT DIFFERENTLY. *** A
+    // single hardcoded PW path -- no fallback list at all -- and a message that said "no chromium at SHELL"
+    // whenever the shell was present and only playwright was the missing half. Both files independently hit
+    // this and browserSafety's own header already named the fix in v3940; this one still had the v3939 shape.
+    // RESOLVED IN THE PARENT, NOT THE CHILD: the child script cannot try a list of require() paths and report
+    // which worked back to something a human reads, so resolution happens here and the ONE path that worked is
+    // baked into the spawned script as a literal.
+    const { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } = await import("./playwrightResolve.mjs");
+    const { createRequire } = await import("node:module");
+    const { chromium: _probe, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url));
+    const SHELL = HEADLESS_SHELL;
+    const PW = pwFrom;
+    const why = browserSkipReason(_probe, pwFrom);
+    if (why) {
+        console.log("  SKIP  the live page load   " + why + " -- SKIPPING WITH A REASON RATHER THAN PASSING QUIETLY.");
     } else {
         const script = `
 import { createRequire } from "node:module";
