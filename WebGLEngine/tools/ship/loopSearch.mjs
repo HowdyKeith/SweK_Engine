@@ -25,6 +25,7 @@
 // it is the one a search is most likely to produce; reporting it as "no improvement" rather than lowering the
 // floor to manufacture one is the entire point of the four rounds that came before this. ***
 
+import { pathToFileURL } from "node:url";
 import { measure } from "./loopMetric.mjs";
 import { acceptWithHoldout } from "./loopAccept.mjs";
 import { summarise } from "./loopTrace.mjs";
@@ -85,7 +86,9 @@ export function search({ n = 24, tol = 1e-8, scope } = {}) {
     return { baseline: baseline.score, rows, trace: summarise() };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     // The CLI is the boundary: it reads the declared scope and hands it in. The module never reads the disk.
     const { currentScope } = await import("./loopScope.mjs");
     const scope = currentScope();

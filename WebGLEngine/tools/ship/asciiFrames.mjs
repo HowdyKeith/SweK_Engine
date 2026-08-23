@@ -114,7 +114,12 @@ export function flickerOnStill(frames) {
 // top level is a ReferenceError in a browser -- not a caught failure, an EVALUATION failure, so the
 // whole module fails to load and every import of it dies with it. browserSafety-selfcheck caught this
 // on Keith's rig; the guard is the tree's existing idiom (physics/mpm/step.mjs and three siblings).
-if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- SEPARATOR-TOLERANT AND ANCHORED. `split("/")` returns THE WHOLE PATH on Windows, so this
+// guard was false and the block below never ran there. The leading "/" matters too: without it
+// `.../loopScope.mjs`.endsWith("Scope.mjs") is true, and a sibling could wake somebody else's main
+// block. THIS FILE MAY NOT IMPORT node:url -- a browser page imports it -- so a basename compare is
+// the strongest form available here, and winPathGuard re-derives that exemption rather than trusting it.
+if (typeof process !== "undefined" && process.argv[1] && import.meta.url.endsWith("/" + process.argv[1].split(/[\\/]/).pop())) {
     const mk = (ch, cols, rows) => Array.from({ length: rows }, () => ch.repeat(cols)).join("\n");
     const good = importFrames({ fps: 12, cols: 8, rows: 3, frames: [mk(".", 8, 3), mk("#", 8, 3)] });
     console.log("[asciiFrames] 2 frames at 12 fps -> ok=" + good.ok + "  duration " + good.durationSec.toFixed(3) + "s");

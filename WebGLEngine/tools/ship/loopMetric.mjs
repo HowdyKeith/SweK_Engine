@@ -29,6 +29,7 @@
 // is one core and a runtime measured on it is not a runtime for the rig (v3742). ITERATIONS ARE MACHINE-
 // INDEPENDENT; seconds are not.
 
+import { pathToFileURL } from "node:url";
 import { PoissonMG3D, AIR, FLUID, SOLID } from "../../fluid/multigrid3d.mjs";
 
 /**
@@ -147,7 +148,9 @@ export function better(baseline, candidate, floor) {
         : { accept: false, gain, why: "gain " + gain + " is inside the noise floor " + floor + " (" + baseline.score + " -> " + candidate.score + ")" };
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const r = measure({ n: 24, tol: 1e-8 });
     console.log("[loopMetric] n=24 tol=1e-8 -> " + (r.score === null ? "NO SCORE (" + r.reason + ")" : r.score + " iterations")
                 + "   residual " + r.res.toExponential(3));

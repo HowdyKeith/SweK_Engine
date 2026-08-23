@@ -18,6 +18,8 @@
 // minimal declared shape and REFUSES anything else BY NAME. Mapping a real export onto it is a ten-line
 // adapter once Keith sends one file. ***
 
+import { pathToFileURL } from "node:url";
+
 /**
  * The accepted shape:
  *   { sheet: { w, h }, frames: [ { name, x, y, w, h }, ... ] }
@@ -113,7 +115,9 @@ export function gridSheet({ w, h, cellW, cellH, prefix = "f" }) {
     return importSheet({ sheet: { w, h }, frames });
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const g = gridSheet({ w: 256, h: 128, cellW: 64, cellH: 64, prefix: "walk" });
     console.log("[spriteSheetImport] 256x128 at 64x64 -> " + g.frames.length + " frames, ok=" + g.ok);
     console.log("  first: " + JSON.stringify(g.frames[0]));

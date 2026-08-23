@@ -22,6 +22,7 @@
 // can assert the accept path consults it a known number of times, and step 6's trace can show any run that
 // consulted it more. AN UNENFORCEABLE RULE THAT IS RECORDED BEATS ONE THAT IS ONLY WRITTEN DOWN. ***
 
+import { pathToFileURL } from "node:url";
 import { measure } from "./loopMetric.mjs";
 import { floorIters, fieldFor, FIXTURE_FAMILY } from "./loopNoise.mjs";
 import { acceptable } from "./loopTarget.mjs";
@@ -114,7 +115,9 @@ export function acceptWithHoldout(baselineResult, candidateResult, opts = {}) {
     return out;
 }
 
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
+// v3941 -- pathToFileURL, NOT a basename match: `argv[1].split("/")` returns THE WHOLE PATH on
+// Windows (backslashes), so this guard was false and the main block below never ran there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     resetHoldoutLedger();
     const same = acceptWithHoldout({ score: 36, tol: 1e-8 }, { score: 35, tol: 1e-8, met: true }, { what: "demo: a one-iteration change" });
     console.log("[loopAccept] 36 -> 35 (inside the eval floor): " + same.accept + " -- " + same.why);

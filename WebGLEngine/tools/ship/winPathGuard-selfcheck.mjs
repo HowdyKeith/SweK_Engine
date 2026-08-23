@@ -9,6 +9,13 @@
 //   2. `import.meta.url === `file://${process.argv[1]}`` never matches on Windows (backslashes, and file://
 //      vs file:///), so the CLI main-module block never runs -- `--save` and even the fingerprint MASTER
 //      print silently do nothing. Use pathToFileURL(process.argv[1]).href.
+//   3. `import.meta.url.endsWith(process.argv[1].split("/").pop())` -- THE SAME BUG WEARING A DIFFERENT
+//      SPELLING, and this gate did not know about it for a thousand versions. On Windows argv[1] holds
+//      backslashes, so split("/") returns a ONE-ELEMENT array and .pop() is THE WHOLE ABSOLUTE PATH; the
+//      endsWith is false and the main block never runs. TWENTY FILES carried it, and the only two anybody
+//      noticed were the two toolFrontDoor happens to run -- the other eighteen were silent on Keith's box
+//      with nothing watching. Use pathToFileURL where the file may import node:url; where it may NOT (a
+//      browser page imports it), split on BOTH separators and anchor the match with a leading "/".
 // The slash-stripping helper form `new URL(rel, import.meta.url).pathname` (report.js, brain.js _localPath)
 // is SAFE and is not flagged -- it has a rel argument and strips the leading slash itself. This gate greps the
 // tree for the two unsafe forms so they cannot come back. The sabotage below reintroduces one and this fails.
@@ -24,6 +31,20 @@ const RE_PATHNAME_ANY = new RegExp("new URL\\([^)]*import\\.meta\\.url\\s*\\)\\s
 const RE_DRIVE_STRIP = /\^\\\/\[A-Za-z\]:/;
 // The OFFENCE is the comparison, not the fragment. Every sentence about this bug contains the fragment.
 const BAD_GUARD_RE = /import\.meta\.url\s*===\s*`file:\/\/\$\{process\.argv\[1\]\}`/;
+// (3) THE BASENAME GUARD. Three patterns, because two different things can be wrong with it.
+//   - split("/") on argv[1] is unconditionally wrong: it is a PATH, and half the world spells paths with
+//     backslashes. There is no context in which this is the right split.
+//   - an UNANCHORED endsWith is wrong even once the split is fixed: `.../loopScope.mjs`.endsWith("Scope.mjs")
+//     is true, so `node tools/ship/someScope.mjs` could wake a loaded sibling's main block. The leading "/"
+//     is what makes it a basename comparison rather than a suffix comparison.
+//   - and the basename form is an EXEMPTION, not a style: it is weaker than pathToFileURL identity and is
+//     only available because the file may carry no `node:` specifier. THE EXEMPTION IS RE-DERIVED FROM THE
+//     FILE rather than trusted, the way toolFrontDoor re-derives its page-door reasons: a file that already
+//     imports node: something COULD use the strong form, so a basename guard there is unfinished, not exempt.
+const RE_ARGV_SPLIT_SLASH = /process\.argv\[1\]\.split\("\/"\)/;
+const RE_ENDSWITH_ARGV    = /import\.meta\.url\.endsWith\([^;]*process\.argv\[1\]/;
+const RE_ANCHORED_BASE    = /import\.meta\.url\.endsWith\(\s*"\/"\s*\+\s*process\.argv\[1\]\.split\(/;
+const RE_NODE_SPECIFIER   = /from\s+"node:|require\("node:/;
 // Line-wise, like v3126's stripper: a non-greedy /* */ span once ate 965,179 characters of server.js.
 const stripComments = (src) => src.split("\n")
     .filter((L) => { const t = L.trim(); return !(t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")); })
@@ -65,6 +86,13 @@ function walk(dir, hits) {
             // correctly silent; a file that takes .pathname off import.meta.url and never drive-strips is
             // flagged whatever its first argument is.
             if (RE_PATHNAME_ANY.test(s) && !RE_DRIVE_STRIP.test(s)) hits.push(rel + "  [rel .pathname, no drive-letter strip]");
+            // *** v3941 -- THE THIRD IDIOM. *** See the header: twenty files ran their main block on Linux
+            // and nowhere else, and eighteen of them had no gate looking.
+            if (RE_ARGV_SPLIT_SLASH.test(s)) hits.push(rel + "  [argv[1].split(\"/\") -- a path is not slash-only]");
+            else if (RE_ENDSWITH_ARGV.test(s)) {
+                if (!RE_ANCHORED_BASE.test(s)) hits.push(rel + "  [unanchored endsWith guard -- a suffix is not a basename]");
+                else if (RE_NODE_SPECIFIER.test(s)) hits.push(rel + "  [basename guard in a file that CAN import node:url -- use pathToFileURL]");
+            }
         }
     }
 }
@@ -74,9 +102,25 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 
 const hits = [];
 walk(ROOT, hits);
+// Counted rather than asserted at a number: this set SHRINKS when a file stops being browser-imported and
+// GROWS when a new page-side tool gains a CLI, and pinning it would make either one look like a regression.
+let baseGuards = 0;
+{
+    const count = (dir) => { for (const n of readdirSync(dir)) {
+        if (SKIP.has(n)) continue;
+        const q = path.join(dir, n);
+        if (statSync(q).isDirectory()) count(q);
+        else if (/\.(mjs|js)$/.test(n) && n !== "winPathGuard-selfcheck.mjs" &&
+                 RE_ANCHORED_BASE.test(stripComments(readFileSync(q, "utf8")))) baseGuards++;
+    } };
+    count(ROOT);
+}
 ok("!! no source file uses the Windows-fragile path idioms", hits.length === 0,
    hits.length === 0
-     ? "the tree is clean: no `new URL(import.meta.url).pathname` and no `file://${process.argv[1]}` guard -- fileURLToPath and pathToFileURL are used instead, so paths and main-module detection survive Windows."
+     ? "the tree is clean: no `new URL(import.meta.url).pathname`, no `file://${process.argv[1]}` guard, and " +
+       "no slash-only or unanchored basename guard -- fileURLToPath and pathToFileURL are used instead, so " +
+       "paths and main-module detection survive Windows. The " + baseGuards + " file(s) that DO compare " +
+       "basenames each earned it: no `node:` specifier, because a browser page imports them."
      : hits.length + " offending occurrence(s): " + hits.slice(0, 6).join(" ; "));
 
 console.log(fails ? "\nwinPathGuard-selfcheck: " + fails + " FAILED" : "\nwinPathGuard-selfcheck: all checks pass");
