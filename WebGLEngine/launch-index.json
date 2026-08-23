@@ -71,7 +71,7 @@
    "id": "aibrain.html",
    "display": "Aibrain",
    "href": "/aibrain.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -511,7 +511,7 @@
    "id": "brain-3d.html",
    "display": "Brain 3d",
    "href": "/brain-3d.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -527,7 +527,7 @@
    "id": "brain-fleet.html",
    "display": "Brain Fleet",
    "href": "/brain-fleet.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -535,7 +535,7 @@
    "id": "brain-lab.html",
    "display": "Brain Lab",
    "href": "/brain-lab.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -543,7 +543,7 @@
    "id": "brain-maze.html",
    "display": "Brain Maze",
    "href": "/brain-maze.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -551,7 +551,7 @@
    "id": "brain-quadrants.html",
    "display": "Brain Quadrants",
    "href": "/brain-quadrants.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -567,7 +567,7 @@
    "id": "brain-room.html",
    "display": "Brain Room",
    "href": "/brain-room.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -983,7 +983,7 @@
    "id": "dock-brain.html",
    "display": "Dock Brain",
    "href": "/dock-brain.html",
-   "section": null,
+   "section": "GPU Brain",
    "collision": false
   },
   {
@@ -1767,7 +1767,7 @@
    "id": "lbm-fluid.html",
    "display": "Lbm Fluid",
    "href": "/lbm-fluid.html",
-   "section": null,
+   "section": "Fluid",
    "collision": false
   },
   {
@@ -1775,7 +1775,7 @@
    "id": "lbm3d-flow.html",
    "display": "Lbm3d Flow",
    "href": "/lbm3d-flow.html",
-   "section": null,
+   "section": "Fluid",
    "collision": false
   },
   {
@@ -1783,7 +1783,7 @@
    "id": "lbm3d-gpu-check.html",
    "display": "Lbm3d Gpu Check",
    "href": "/lbm3d-gpu-check.html",
-   "section": null,
+   "section": "Fluid",
    "collision": false
   },
   {
