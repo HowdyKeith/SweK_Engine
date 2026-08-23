@@ -8,6 +8,16 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3950 — half a 51-page failure report was one file that has never existed
+
+Keith ran render-qa over 377 pages: 51 failed, and 25 of those said `404 /ui/recordFloat.js` and nothing else. The file is in no commit of this repository — `git log --all` over the path is empty, no changelog names it, no module imports it. The same lost-source shape as `simulation/lbm/dfgBenchmark.mjs`, found the same week, and this one was being requested by twenty-five pages on every load.
+
+What it was for is not a guess, because the call sites agree: all twenty-five load it identically, last tag before `</body>`, no named imports — so it self-installs and takes nothing. None of them loads `ui/canvasRecorder.js` or mentions `swekRecord`, while `canvasRecorder.js` exports exactly the API such a button needs. A floating record button that installs the recorder and drives it is the only shape that fits all three facts. It is a reconstruction, not a recovery.
+
+And it does not appear on a page it cannot record, which is the only real decision in the file. Nine of the twenty-five have no `<canvas>`, and render-qa's own output quotes this tree's rule for that case on a different page in the same run: "v2579 A flag that lies is worse than no flag." The recorder's `capabilities()` is consulted rather than assumed, and the caption is polled from `recording()` rather than from what the last click intended. The canvas often arrives late — these pages build theirs in JS — so it watches for a bounded eight seconds rather than checking once at load or observing forever.
+
+The first draft read `cap.canCapture`, which does not exist; `describeCapture` returns `canRecord`. An undefined field is never `=== false`, so that guard would have passed silently on every page and proven nothing. Caught by opening `codecProbe.mjs` instead of trusting the name.
+
 ## Since v3949 — the Modal recipe: SHARP on a rented GPU, and the first end-to-end proof the feature works
 
 v3948's bridge could only run SHARP where PyTorch and a real GPU already are — Galaxina and nothing else, since the Macs have no CUDA and a multi-GB torch install is not something to put on a box to try one feature. `WebGLEngine/modal/sharp_modal.py` is the other half: deploy once, and any box in the fleet (or anything down the tunnel) can turn a photograph into a `.ply` without owning a GPU. The shape is taken from `Sharp-ML/SHARP-ML` — A10G, weights cached in a Volume — while its Next.js/Prisma/NextAuth stack is not, because that solves multi-tenant hosting this engine is not.
