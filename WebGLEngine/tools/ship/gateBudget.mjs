@@ -167,6 +167,31 @@ export const MEASURED = {
     // EVERY DEVICE AT EVERY MODE, so it grows with the lab and will outrun any number written down; the 2x
     // headroom on the SMALLER measurement is deliberately the conservative choice, because being killed is a
     // visible failure and a budget nobody notices is not.
+    // *** v3941 -- WATCHED TO THE END ON ANOTHER BOX: 1033s, AND IT EXITS 1 WITH FIVE FAILURES NOBODY HAS SEEN. ***
+    //
+    // The entry above predicted this in as many words -- "it grows with the lab and will outrun any number
+    // written down" -- and it has. 94282ms against 1033s is ELEVEN TIMES, so the 2x headroom is nowhere near,
+    // and Keith's rig kills it at 189s every run. THE NUMBER IS NOT UPDATED HERE: that box is not this table's
+    // box (measured against MEASURED it runs 0.34x to 0.94x depending on the gate, so it is not a proxy), and a
+    // stopwatch from somewhere else is the exact defect hostScale.mjs exists to name. It wants re-timing where
+    // the table lives.
+    //
+    // WHAT THE OVERRUN ACTUALLY COST IS NOT TIME, IT IS THE VERDICT -- the same sentence the entry below this
+    // one records for reportingTools: "THE COST OF THE MISSING ENTRY WAS NOT SLOWNESS, IT WAS SILENCE." Run to
+    // completion, this gate reports FIVE failures, every one of them the frozen lab-results baseline being
+    // stale rather than anything broken:
+    //   - figureeight/period energyDriftFrac and angMomDrift moved off their -1 sentinels to 8.6e-16 and 1.3e-15
+    //   - five observables APPEARED: ct.absoluteGain, ct.absoluteOffset, windtunnel.solidFx, windtunnel.appliedFx,
+    //     eccentric.inspiralTime
+    //   - THE DEVICE ROSTER GREW BY 33 AND LOST NONE: adjoint, fft, thermostat, cfl, entropy, voxelize,
+    //     stability, the eighteen mpm* devices, nbench, hands, flip2d, freesurface, flip3d, kerrladder,
+    //     induction, multigrid3d, multigridgpu, melt, freeze, vaporize, crystallize
+    //
+    // So a budget five times too small did not merely hide a runtime -- IT HID THE GATE'S WHOLE ANSWER, and the
+    // lab has grown by a third of its device count with the record that tracks it unable to say so. The gate's
+    // own message names the fix (re-freeze with SWEK_FREEZE_LAB_RESULTS=1) and it is NOT run here: a re-freeze
+    // writes this box's numbers into that baseline, which is the same borrowed-stopwatch mistake one level up,
+    // and it is a one-way edit to a record. It belongs on the box that owns the table.
     "tools/roundhouse/labResults-selfcheck.mjs":      94282,
     // *** MEASURED AT v3853, STOPWATCH-TIMED ON AN IDLE BOX: 555s, AND IT PASSES. Its own header said
     // "~25s -- MEASURED". *** It spawns every row of reportingTools' REPORTING registry, so it grows
