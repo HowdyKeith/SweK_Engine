@@ -146,9 +146,34 @@ const signOffer = (offer, key) => ({ ...offer,
     ok("!! auto-apply after a peer pull is GATED on the trust verdict",
        /autoApply[\s\S]{0,120}?r\.applicable/.test(code),
        "autoApply is consent to install without the browser open, never consent to install what any peer claims is newer");
-    ok("!! a refused pull DELETES the zip rather than leaving it as the newest thing in Downloads",
-       /action === "refuse"[\s\S]{0,200}?unlinkSync\(dest\)/.test(code),
-       "scanDownloads offers the newest zip to the apply flow, so leaving a refused build on disk would re-offer it");
+    // *** v3941 -- THIS DEMANDED unlinkSync(dest) AND THE SHIPPING CODE IS NOW STRONGER THAN THAT. ***
+    //
+    // The line was written for a design that PLACED the zip and then deleted it on refusal -- which leaves a
+    // window, however short, in which a refused build is the newest *.zip in Downloads. v3248 removed the window
+    // instead of policing it: the transfer writes to `dest + ".part"` and is renamed only on success, and the
+    // trust decision reads the bytes while the file is STILL .part. sysadminBridge says so inline --
+    // `const bytes = fs.readFileSync(part);   // still .part: the decision precedes the placement` -- and its
+    // v3248 comment states the principle: "The failure mode does not get DETECTED here, it stops EXISTING:
+    // nothing but a completed, length-checked transfer is ever named *.zip."
+    //
+    // So a refused build is never a zip at all. scanDownloads requires \.zip$ ANCHORED (downloadScan-selfcheck
+    // asserts exactly that: "a partial is not mistaken for a complete zip by a loose suffix check"), so a .part
+    // file is invisible to the apply flow whether or not anybody unlinks it -- and it is unlinked anyway.
+    //
+    // THE PROPERTY IS AN ORDERING, NOT A CALL: refusal must come BEFORE placement. That is what is asserted, so
+    // the check cannot be satisfied by a delete that happens too late, and cannot be broken by a rename of the
+    // variable it used to spell.
+    const refuseAt = code.indexOf('trust.action === "refuse"');
+    const placeAt = code.indexOf("renameSync(part, dest)");
+    ok("!! *** a refused pull is REFUSED BEFORE PLACEMENT, so it never becomes the newest zip in Downloads ***",
+       refuseAt > 0 && placeAt > refuseAt &&
+       /trust\.action === "refuse"[\s\S]{0,200}?unlinkSync\(part\)[\s\S]{0,160}?return/.test(code) &&
+       /const part = dest \+ "\.part"/.test(code) &&
+       /createWriteStream\(part\)/.test(code),
+       "the refuse branch sits at " + refuseAt + " and the rename at " + placeAt + " -- REFUSAL FIRST, and it " +
+       "unlinks the .part and returns. scanDownloads offers the newest zip to the apply flow, so a refused " +
+       "build that reached Downloads AS A ZIP would be re-offered; under v3248 it never gets that name. " +
+       "*** ASSERTED AS AN ORDER: a delete after the placement would still leave the window this exists to shut.");
     ok("!! the trust check FAILS CLOSED if the module cannot load",
        /catch[\s\S]{0,300}?stage-only[\s\S]{0,200}?failing closed/.test(code),
        "a trust module that throws must not mean 'trusted'");
