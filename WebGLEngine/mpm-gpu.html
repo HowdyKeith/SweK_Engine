@@ -77,7 +77,7 @@ import { restBlock, centreOfMass } from "/physics/mpm/step.mjs";
 // own `if (!navigator.gpu) throw "This browser has no WebGPU"`, which is TRUE ABOUT THE FACT AND WRONG ABOUT
 // THE CAUSE over http://<lan-ip>:8787 -- and it is the exact defect webgpuProbe.mjs was written for at v3666,
 // in the words that module's header quotes as the ones to stop saying.
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 
 const cv = document.getElementById("c");
 const GY = -9.81;
@@ -151,6 +151,7 @@ async function initGPU() {
   // only one of them is about the browser: over a LAN IP on plain http the browser HAS WebGPU and simply does
   // not expose it to this origin. Naming the wrong one sends the reader to their driver.
   const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  showOriginBanner(probe);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!probe.available) throw new Error(probe.message);
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) throw new Error("WebGPU is present but this system offered no adapter. PRESENCE IS NOT " +

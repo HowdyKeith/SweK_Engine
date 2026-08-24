@@ -23,7 +23,7 @@
   <pre id="json" style="display:none;"></pre>
 </div>
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { WGSL_HMC, HMC_FIXTURE, HMC_TOL, fixtureInv, makeBatch, adjudicateDeviceRun } from "./tools/roundhouse/hmcGpu.mjs";
 
 const out = document.getElementById("out"), jsonEl = document.getElementById("json");
@@ -69,6 +69,7 @@ document.getElementById("run").onclick = async () => {
   // was never the problem: the browser has WebGPU and withholds it from an insecure origin. Ask which it is.
   {
     const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
     if (!p.available) {
       out.innerHTML = "<span class='bad'>" + (p.reason === "insecure-origin" ? p.message
         : "WebGPU unavailable — this is a rig instrument; run it on a machine with a GPU.") + "</span>";

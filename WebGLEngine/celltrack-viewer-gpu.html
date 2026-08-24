@@ -53,7 +53,7 @@
 </div>
 
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 const $ = (id) => document.getElementById(id);
 const msg = (html) => { const m = $("msg"); if (!html) { m.style.display = "none"; } else { m.style.display = "flex"; m.innerHTML = html; } };
 const params = new URLSearchParams(location.search);
@@ -224,6 +224,7 @@ async function initGPU() {
     // Over http://<lan-ip> the browser is already Chrome 140 and the Pascal cards are already there; the origin
     // is what withheld it. The WebGL2 fallback link stays in both branches -- it is useful either way.
     const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
     const cause = p.reason === "insecure-origin" ? "<b>" + p.message + "</b>"
       : "<b>WebGPU isn't available in this browser.</b><br>Use Chrome or Edge 113+ (your Pascal GPUs support it).";
     msg(cause + "<br><br>The lightweight <a href='/celltrack-viewer.html" + pq0 + "'>WebGL2 point/track viewer</a> works everywhere.");

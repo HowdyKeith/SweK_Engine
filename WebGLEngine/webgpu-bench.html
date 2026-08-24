@@ -70,7 +70,7 @@
 </main>
 
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 const $ = (id) => document.getElementById(id);
 const diag = $("diag");
 function say(html, cls) { diag.className = "diag" + (cls ? " " + cls : ""); diag.innerHTML = html; }
@@ -86,6 +86,7 @@ async function initGPU() {
     // origin is what withheld navigator.gpu. A loud checklist pointed at the wrong subsystem is worse than a
     // quiet one, so the checklist is kept for the case it was written for and the origin gets its own answer.
     const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
     say(p.reason === "insecure-origin"
       ? "<b class='bad'>" + p.message + "</b>\n\n(For a benchmark that runs everywhere, try the WASM Lab link above.)"
       : "<b class='bad'>WebGPU is not available in this browser.</b>\n\nThis benchmark needs WebGPU (there is no WebGL fallback here).\nThings to check:\n  - Use Chrome/Edge/Brave/Arc 113+ on a desktop or laptop (Safari/Firefox: partial or off).\n  - Enable hardware acceleration in the browser settings.\n  - Visit chrome://gpu and confirm 'WebGPU' is 'Hardware accelerated'.\n\n(For a benchmark that runs everywhere, try the WASM Lab link above.)", "bad");

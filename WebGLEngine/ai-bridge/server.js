@@ -5336,7 +5336,14 @@ const server = http.createServer((req, res) => {
             lanIps: list.map(x => x.address),
             interfaces: list,
             urls: list.map(x => `http://${x.address}:${PORT}/`),
+            // `recommended` answers "how does ANOTHER machine reach this box" -- it is consumed by the phone QR,
+            // connect.html, hub.html, presence.html and macrodroid.html, all of which are handing an address to
+            // a different device. It is NOT the answer to "what should a browser ON THIS BOX open", and two
+            // launchers read it as if it were, which put the machine that owns the GPU on a LAN-IP origin where
+            // WebGPU does not exist (v3981). Naming the second question separately so the two cannot be
+            // confused again: localUrl is always a secure context, and is what a local launcher wants.
             recommended: pick ? `http://${pick.address}:${PORT}/` : null,
+            localUrl: `http://localhost:${PORT}/`,
             // v680 — prefer the bonjour-published name (e.g. voxelengine.local)
             // over the raw OS hostname. mdnsAdvertise sets adSt.url when the
             // multicast publish succeeded; falls back to the legacy os.hostname
