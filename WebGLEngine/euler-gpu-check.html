@@ -38,7 +38,7 @@ import { makeEuler } from "./simulation/euler/euler2d.js";
 // v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
 // AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
 // not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { EULER_WGSL } from "./simulation/euler/eulerShader.js";
 
 const GAMMA = 1.4, EXACT = (GAMMA + 1) / (GAMMA - 1);   // 6.000 -- Rankine-Hugoniot, not a number the kernel knows
@@ -55,6 +55,7 @@ function settle(tr, text, ok) {
 const sodInit = (nx) => (i) => i < nx/2 ? { rho: 1, u: 0, p: 1000 } : { rho: 1, u: 0, p: 0.01 };
 async function gpuSod(nx, ny, tEnd) {
   const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  showOriginBanner(_p);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!_p.available) throw new Error(_p.message);
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) throw new Error("no WebGPU adapter");

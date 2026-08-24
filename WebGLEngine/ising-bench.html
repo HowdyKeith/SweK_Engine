@@ -23,7 +23,7 @@
   <pre id="json" style="display:none;"></pre>
 </div>
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { WGSL_ISING, acceptThresholds, makeLattice, mirrorSweep, adjudicateSpins } from "./tools/roundhouse/isingGpu.mjs";
 import { yangMagnetisation } from "./physics/statmech/ising.js";
 
@@ -36,6 +36,7 @@ document.getElementById("run").onclick = async () => {
   // machine is the most expensive possible wrong answer.
   {
     const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
     if (!p.available) {
       out.innerHTML = "<span class='bad'>" + (p.reason === "insecure-origin" ? p.message
         : "WebGPU unavailable — rig instrument; run on a machine with a GPU.") + "</span>";

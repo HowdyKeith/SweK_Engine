@@ -29,7 +29,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describeWebGPU } from "./webgpuProbe.mjs";
+import { describeWebGPU, originHelpHtml, showOriginBanner } from "./webgpuProbe.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -193,6 +193,92 @@ console.log("\n3. SABOTAGE");
     ok("!! ...and a page that names a STATE rather than a cause stays legal", !blamesWithoutAsking(quiet),
         "anime4k.html's line. It tells the reader what is running and sends them nowhere -- there is nothing to " +
         "be wrong about, and a rule that reddened it would be a rule about vocabulary");
+}
+
+console.log("\n5. *** THE ROUTE-(1) LINK IS THIS PAGE, ON THIS PORT -- NOT A HARDCODED GUESS ***");
+{
+    // v3981. The message used to say "open http://localhost:8787" with the port WRITTEN IN and the path THROWN
+    // AWAY. On a bridge running anywhere but 8787 that address is simply wrong, and on every bridge it dumps the
+    // reader at the site root to navigate back to whatever they had been looking at. Keith: "if we have to
+    // switch to localhost, then can a link say click this localhost link to run?" -- so it has to be a URL that
+    // lands on the SAME page, which means reading the port and pathname out of `loc` instead of assuming them.
+    const at = (host, port, pathname, search = "") => describeWebGPU({
+        navigator: {}, isSecureContext: false,
+        location: { protocol: "http:", host: host + ":" + port, hostname: host, port, pathname, search } });
+
+    const k = at("192.168.50.57", "8787", "/euler-gpu-check.html");
+    ok("!! the localhost route points at THE SAME PAGE, not the site root",
+       k.localUrl === "http://localhost:8787/euler-gpu-check.html", "localUrl=" + k.localUrl);
+    ok("...and the message actually carries that URL", k.message.includes(k.localUrl));
+
+    // THE CHECK THAT WOULD HAVE CAUGHT THE OLD BUG. A hardcoded :8787 passes every test written on a box that
+    // happens to run 8787, which is why the wrong port survived from v3771 to v3981 -- so it is driven on a
+    // DIFFERENT port, where an assumption and a reading give different answers.
+    const other = at("10.0.0.4", "9000", "/lbm3d-gpu.html", "?n=2");
+    ok("!! a bridge on a NON-DEFAULT port gets its own port back, not 8787",
+       other.localUrl === "http://localhost:9000/lbm3d-gpu.html?n=2" && !other.message.includes("localhost:8787"),
+       "localUrl=" + other.localUrl);
+
+    ok("the clickable form is a real anchor pointing at that same URL",
+       originHelpHtml(k).includes('href="' + k.localUrl + '"'));
+    ok("...and it stays silent when there is no origin problem to explain",
+       originHelpHtml(describeWebGPU({ navigator: { gpu: {} }, isSecureContext: true, location: { hostname: "x" } })) === "" &&
+       originHelpHtml(describeWebGPU({ navigator: {}, isSecureContext: true, location: { hostname: "example.com" } })) === "",
+       "a banner on a page whose GPU is simply absent would be advice that cannot help");
+
+    // `message` MUST STAY PLAIN TEXT: two of the thirteen consumers run it through an HTML escaper, so markup
+    // there would render as literal <a href=...> for those readers.
+    ok("!! the plain-text message carries NO markup", !/[<>]/.test(k.message),
+       "magmap-bench and euler-gpu-check escape it; a link smuggled into `message` breaks exactly there");
+
+    // The banner is idempotent and injects nothing when there is nothing to say. A fake document keeps this
+    // runnable on a box with no browser -- which is every box this gate runs on.
+    const mkDoc = () => { const body = { children: [], appendChild(e) { this.children.push(e); } };
+        return { body, byId: {}, getElementById(id) { return this.byId[id] || null; },
+                 createElement() { const el = { style: {}, set id(v) { el._id = v; doc.byId[v] = el; }, get id() { return el._id; } }; return el; } };
+    };
+    let doc = mkDoc();
+    showOriginBanner(k, doc); showOriginBanner(k, doc);
+    ok("!! probing twice still yields exactly ONE banner", doc.body.children.length === 1, "count=" + doc.body.children.length);
+    doc = mkDoc();
+    showOriginBanner(describeWebGPU({ navigator: { gpu: {} }, isSecureContext: true, location: { hostname: "x" } }), doc);
+    ok("...and a working page gets no banner at all", doc.body.children.length === 0, "count=" + doc.body.children.length);
+}
+
+console.log("\n6. *** EVERY PAGE THAT PROBES MUST ALSO OFFER THE LINK ***");
+{
+    // The link is worth nothing on the pages that do not call it, and the pages dispose of the probe result six
+    // different ways (throw/innerHTML, fallback(), row(), a returned `why` string, two escapers), so "it renders
+    // somewhere" is not checkable from the message alone. What IS checkable: every page that asks the question
+    // also shows the answer.
+    const pages = readdirSync(ROOT).filter((f) => f.endsWith(".html"))
+        .filter((f) => readFileSync(path.join(ROOT, f), "utf8").includes("describeWebGPU("));
+    ok("pages consulting the probe were found at all", pages.length >= 13, pages.length + " pages");
+    const missing = pages.filter((f) => !readFileSync(path.join(ROOT, f), "utf8").includes("showOriginBanner("));
+    ok("!! every page that calls describeWebGPU also calls showOriginBanner", missing.length === 0,
+       missing.length ? "NOT OFFERING THE LINK: " + missing.join(", ") : pages.length + " pages, all wired");
+}
+
+console.log("\n7. *** THE LAUNCHERS MUST NOT OPEN THE ONE ORIGIN WHERE WebGPU CANNOT EXIST ***");
+{
+    // *** THE ROOT CAUSE, AND THE REASON SECTIONS 1-6 WERE TREATING A SYMPTOM. *** Both .bat launchers opened
+    // /net/info's `recommended`, which is the LAN-IP URL -- correct for its real purpose (telling ANOTHER device
+    // how to reach this box) and exactly wrong as "what should a browser ON THIS BOX open". So the machine that
+    // owns the GPU was launched onto a non-secure origin and every WebGPU page on it was dead before it loaded.
+    // Keith met it three pages in a row and asked why server.html opens with an IP. This pins the reversal.
+    for (const bat of ["Start_Everything.bat", "Open-Engine.bat"]) {
+        const p = path.join(ROOT, bat);
+        let s; try { s = readFileSync(p, "utf8"); } catch { ok(bat + " present", false); continue; }
+        const open = s.split("\n").filter((l) => /^powershell /.test(l)).join("\n");
+        ok(bat + " opens the browser at localhost", /\$b='http:\/\/localhost:'\+\$pt/.test(open), "");
+        ok("!! ..." + bat + " no longer opens `recommended` (the LAN IP)", !/\$i\.recommended/.test(open),
+           "recommended is how OTHER machines reach this box; it is not a secure context for this one");
+        ok("..." + bat + " still follows a non-default port from /net/info", /\$i\.port/.test(open));
+    }
+    const srv = path.join(ROOT, "ai-bridge", "server.js");
+    let srvSrc = ""; try { srvSrc = readFileSync(srv, "utf8"); } catch {}
+    ok("!! /net/info names the local URL separately so the two questions cannot be confused again",
+       /localUrl: `http:\/\/localhost:\$\{PORT\}\/`/.test(srvSrc));
 }
 
 say("\nWHAT THIS DOES NOT DO: it cannot see Keith's screen. VERIFIED IN A HEADLESS CHROMIUM over a real " +

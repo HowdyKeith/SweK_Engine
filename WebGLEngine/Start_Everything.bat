@@ -123,13 +123,22 @@ REM Round 62: we always start a fresh server now, so always wait for bind.
 echo Waiting for server to bind...
 timeout /t 2 /nobreak >nul
 
-echo Opening browser to the LAN address (server.html)...
-REM v1530 - open the 192.x LAN address + server.html instead of localhost/.
-REM   The relay serves its best non-virtual LAN URL at GET /net/info (.recommended),
-REM   so we resolve it at runtime (no hardcoded IP) and open /server.html there.
-REM   All logic is in ONE powershell line on purpose: a batch if() block would
-REM   premature-close on the parens inside the powershell. Falls back to localhost.
-powershell -NoProfile -Command "$ErrorActionPreference='SilentlyContinue'; try{$i=Invoke-RestMethod -Uri 'http://localhost:8787/net/info' -TimeoutSec 5; $u=$i.recommended}catch{}; if([string]::IsNullOrWhiteSpace($u)){$u='http://localhost:8787/'}; $b=$u.TrimEnd('/'); $pg='/server.html'; try{$bm=Invoke-RestMethod -Uri ($b+'/boot/mode') -TimeoutSec 4; if($bm -and $bm.url){$pg=$bm.url}}catch{}; $u=$b+$pg; $c=(Get-Command chrome -ErrorAction SilentlyContinue).Source; if(-not $c){ foreach($p in @($env:ProgramFiles+'\Google\Chrome\Application\chrome.exe', ${env:ProgramFiles(x86)}+'\Google\Chrome\Application\chrome.exe', $env:LocalAppData+'\Google\Chrome\Application\chrome.exe')){ if(Test-Path $p){$c=$p; break} } }; Write-Host ('opening ' + $u); if($c){ Start-Process $c $u } else { Start-Process $u }"
+echo Opening browser to localhost (server.html)...
+REM v1530 opened the 192.x LAN address instead of localhost. *** v3981 REVERSES THAT,
+REM   BECAUSE IT SILENTLY DISABLED WebGPU ON EVERY PAGE THIS LAUNCHER OPENS. WebGPU is
+REM   gated on a SECURE CONTEXT: https qualifies, localhost qualifies, and
+REM   http://<lan-ip>:8787 is NEITHER -- the browser does not define navigator.gpu there
+REM   at all. So the machine holding the GPU was being launched onto the one origin that
+REM   cannot use it. Keith hit it on ising-bench, euler-gpu-check and lbm3d-gpu in a row
+REM   and asked "not sure why server.html is opening with ip, if localhost is needed?".
+REM   NOTHING DEPENDED ON THE BROWSER BEING AT THE LAN ADDRESS: connect.html, hub.html,
+REM   presence.html, macrodroid.html and phoneConnectQR all fetch /net/info for the LAN
+REM   URL rather than reading location, and the QR helper has special-cased a localhost
+REM   origin since v637 precisely so this direction would work. ***
+REM   The port comes from /net/info (.port) so a non-default port is followed; 8787 is
+REM   only the bootstrap probe and the fallback. All logic is in ONE powershell line on
+REM   purpose: a batch if() block would premature-close on the parens inside powershell.
+powershell -NoProfile -Command "$ErrorActionPreference='SilentlyContinue'; $pt=8787; try{$i=Invoke-RestMethod -Uri 'http://localhost:8787/net/info' -TimeoutSec 5; if($i -and $i.port){$pt=$i.port}}catch{}; $b='http://localhost:'+$pt; $pg='/server.html'; try{$bm=Invoke-RestMethod -Uri ($b+'/boot/mode') -TimeoutSec 4; if($bm -and $bm.url){$pg=$bm.url}}catch{}; $u=$b+$pg; $c=(Get-Command chrome -ErrorAction SilentlyContinue).Source; if(-not $c){ foreach($p in @($env:ProgramFiles+'\Google\Chrome\Application\chrome.exe', ${env:ProgramFiles(x86)}+'\Google\Chrome\Application\chrome.exe', $env:LocalAppData+'\Google\Chrome\Application\chrome.exe')){ if(Test-Path $p){$c=$p; break} } }; Write-Host ('opening ' + $u); if($c){ Start-Process $c $u } else { Start-Process $u }"
 
 REM v2909 -- BRAIN MOVED ABOVE THE PAUSE. It used to sit AFTER `pause >nul`, three lines below an echo that
 REM tells the user to close the window -- so the launcher's own instructions guaranteed the GPU Brain never

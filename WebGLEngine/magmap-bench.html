@@ -49,7 +49,7 @@ class="bad">REJECTED</span>, not celebrated.</p>
 <div id="out"></div>
 
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { magmapGpu, WGSL, MAGMAP_TOL } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
 import { VARIANTS, variantWgsl, validateVariant } from "./tools/roundhouse/magmapVariants.mjs";
@@ -88,6 +88,7 @@ $("run").onclick = async () => {
   try {
     // v3845 -- naming two browsers is a browser-version answer to what is usually an ORIGIN question.
     const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(_p);   // v3981 -- clickable localhost route, once, at the top of the page
     if (!_p.available) throw new Error(_p.reason === "insecure-origin" ? _p.message
       : "WebGPU unavailable -- needs Chrome/Android or Safari 18+");
     st("requesting adapter...");

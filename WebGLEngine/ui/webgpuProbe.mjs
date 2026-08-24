@@ -31,7 +31,16 @@ export function describeWebGPU(env = {}) {
 
     if (secure === false && !localish) {
         const https = (loc.host ? "https://" + loc.host : "https") + (loc.pathname || "");
+        // *** v3981 -- THE ROUTE-(1) URL IS NOW THIS PAGE, NOT A GUESS AT WHICH PAGE. *** It said
+        // "open http://localhost:8787" with the port HARDCODED and the path DROPPED, so a reader on any other
+        // port was told a wrong address, and every reader was landed on the site root and left to navigate back
+        // to whatever they had been looking at. Keith: "if we have to switch to localhost, then can a link say
+        // click this localhost link to run?" -- the answer needs the port and the path it is standing on, both
+        // of which are right here in `loc`. Same origin, same page, same query.
+        const port = loc.port ? ":" + loc.port : "";
+        const localUrl = "http://localhost" + port + (loc.pathname || "/") + (loc.search || "");
         return {
+            localUrl, httpsUrl: https,
             available: false, reason: "insecure-origin", actionable: true,
             // *** v3779 -- A SHORT LINE FOR THE INLINE SPOT AND THE FULL TEXT FOR ON DEMAND. v3771 and v3772
             // grew this message to three numbered routes because each addition was individually right, AND
@@ -60,8 +69,9 @@ export function describeWebGPU(env = {}) {
             // to try it. ***
             message: "WebGPU needs a secure origin \u2014 this page is " + (loc.protocol || "http:") + "//" + host +
                      ", so the browser does not expose it here. THREE WAYS ROUND IT, CHEAPEST FIRST. " +
-                     "(1) On the machine that is serving the page, open http://localhost:8787 \u2014 localhost " +
-                     "counts as secure, no certificate involved. " +
+                     "(1) ON THE MACHINE SERVING THIS PAGE, open " + localUrl + " \u2014 that is THIS SAME PAGE " +
+                     "over localhost, which counts as secure with no certificate involved. It will NOT work " +
+                     "from a different device, because localhost there is that device. " +
                      "(2) FROM ANOTHER MACHINE, start the Public tunnel in the Tunnels panel: it hands back a " +
                      "https://*.trycloudflare.com address fronting this same port, with a PUBLICLY TRUSTED " +
                      "certificate \u2014 no browser warning at all. " +
@@ -69,10 +79,65 @@ export function describeWebGPU(env = {}) {
                      "self-signed cert on first run, so the browser warns once per device.",
         };
     }
+
     return {
         available: false, reason: "no-webgpu", actionable: false,
         message: "this browser has no WebGPU \u2014 showing the SVG robot",
     };
+}
+
+const _esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * The same explanation with route (1) as a REAL CLICKABLE LINK to this same page over localhost.
+ *
+ * *** WHY THIS IS A SEPARATE FUNCTION AND NOT AN `html` FIELD ON THE RESULT. *** Pages consume `message` two
+ * different ways -- some do `el.textContent = p.message`, some do `throw new Error(p.message)` and land it in
+ * an `innerHTML` at the catch site. Putting markup in `message` would render as a link in half of them and as
+ * literal `<a href=...>` in the other half, and the half that broke would be the half that never touches this
+ * code again. `message` stays plain text and is always right; a page that wants the link asks for it.
+ *
+ * THE LINK IS HONEST ABOUT WHO IT HELPS: localhost resolves on the CLICKER'S machine, so this only works for a
+ * reader sitting at the box that serves the page. That is stated next to the link rather than discovered.
+ * @param {{reason?:string, localUrl?:string, message?:string}} probe a describeWebGPU() result
+ * @returns {string} HTML, or "" when there is no origin problem to explain
+ */
+/**
+ * Put the clickable route-(1) link ON THE PAGE, once, at the top.
+ *
+ * *** WHY A BANNER RATHER THAN ONE MORE FIELD FOR EACH PAGE TO RENDER. *** The thirteen pages that consult this
+ * probe dispose of the answer six different ways -- `throw new Error(p.message)` caught somewhere else and put
+ * through innerHTML, a `fallback()` helper, a `row()` in a table, a string returned as `why`, and two that run
+ * it through an HTML escaper. Threading a link through all six paths means six chances to render `<a href=...>`
+ * as literal text, and the page that breaks is the one nobody opens again. This touches none of them: it adds
+ * its own element and leaves each page's existing message exactly as it was.
+ *
+ * Idempotent -- a page that probes twice gets one banner. Returns false when there is nothing to say.
+ * @param {object} probe a describeWebGPU() result
+ * @param {Document} [doc] injected rather than reached for, so the module stays testable without a browser
+ */
+export function showOriginBanner(probe, doc) {
+    const d = doc || (typeof document !== "undefined" ? document : null);
+    const html = originHelpHtml(probe);
+    if (!d || !html || !d.body) return false;
+    if (d.getElementById("swek-origin-banner")) return true;
+    const el = d.createElement("div");
+    el.id = "swek-origin-banner";
+    el.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#1a1206;" +
+        "border-bottom:1px solid #6a4d12;color:#f0dfb0;font:12px/1.55 ui-monospace,Menlo,monospace;" +
+        "padding:9px 14px;box-shadow:0 2px 14px rgba(0,0,0,.5)";
+    el.innerHTML = html;
+    d.body.appendChild(el);
+    return true;
+}
+
+export function originHelpHtml(probe) {
+    if (!probe || probe.reason !== "insecure-origin" || !probe.localUrl) return "";
+    const u = _esc(probe.localUrl);
+    return '<b>WebGPU needs a secure origin</b>, and this page is not one \u2014 so the browser does not expose it here.' +
+        '<br><a href="' + u + '" style="color:#8fd1ff;font-weight:700">\u25b6 Click here to run it on localhost</a> ' +
+        '<span style="opacity:.72">\u2014 same page, same server, but over <code>localhost</code>, which counts as secure. ' +
+        'Only works if you are AT the machine serving this page; from another device use the Public tunnel instead.</span>';
 }
 
 /**

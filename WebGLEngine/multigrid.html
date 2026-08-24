@@ -89,7 +89,7 @@
 </div>
 
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { PoissonMG, FLUID } from "./fluid/multigrid.mjs";
 import { GpuMultigrid, shadowSolve } from "./fluid/multigridGPU.js";
 
@@ -116,6 +116,7 @@ async function device() {
   // wrong place entirely: the same browser exposes it on localhost.
   if (!navigator.gpu) {
     const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+    showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
     return { dev: null, why: p.reason === "insecure-origin" ? p.message
       : "this browser exposes no navigator.gpu -- WebGPU is unavailable, which is a CAPABILITY and not a failure" };
   }

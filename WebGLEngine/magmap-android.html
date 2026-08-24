@@ -78,7 +78,7 @@ The pass line is MAGMAP_TOL, set from the emulated f32 floor in v2903, before th
 </details>
 
 <script type="module">
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { magmapRun, MAGMAP_TOL, F32_FLOOR } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
 import { makeMagmapReport } from "./tools/roundhouse/magmapReport.mjs";
@@ -94,6 +94,7 @@ $("run").onclick = async () => {
       // v3845 -- a phone opening this over http://<lan-ip> has WebGPU and is being told to go turn on a flag.
       // The flags hint is right for a SECURE origin and useless otherwise, so ask which case this is first.
       const p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+      showOriginBanner(p);   // v3981 -- clickable localhost route, once, at the top of the page
       $("banner").textContent = "WebGPU unavailable"; $("banner").className = "warn";
       row("hint", p.reason === "insecure-origin" ? p.message
         : "recent Chrome-for-Android ships WebGPU; check chrome://flags/#enable-unsafe-webgpu only if chrome://gpu says it is off", "warn");

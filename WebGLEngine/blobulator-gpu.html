@@ -92,7 +92,7 @@ import { box3d } from "/physics/box3d/box3dLoader.js";
 // v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
 // AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
 // not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { createJoltBackend } from "/physics/jolt/joltLoader.js";
 let useJolt = false, joltBackend = null;
 import { makeBlobBrain } from "/brain/blobBrain.js";
@@ -289,6 +289,7 @@ struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 let device, ctx, format, pipeline, uBuf, sBuf, bind, uArr, uF32, uU32;
 async function initGPU() {
   const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  showOriginBanner(_p);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!_p.available) { fallback(_p.message); return false; }
   let adapter; try { adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" }) || await navigator.gpu.requestAdapter() || await navigator.gpu.requestAdapter({ powerPreference: "low-power" }); } catch (e) { fallback("requestAdapter threw: " + e.message); return false; }
   if (!adapter) { fallback("no GPU adapter (WebGPU disabled or blocklisted)."); return false; }

@@ -51,7 +51,7 @@ import { alphaOf } from "/physics/mpm/druckerPrager.mjs";
 import { restBlock, centreOfMass, step } from "/physics/mpm/step.mjs";
 // v3816 -- same detector as mpm-gpu.html and as server.html: ui/webgpuProbe.mjs. See that module's header for
 // why "this browser has no WebGPU" is the wrong sentence on a LAN origin.
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 
 // The fixture is mpm.html's own: restBlock's defaults on a 16x16 grid at h = 0.5, dt = 1/240. Small on
 // purpose -- the point here is AGREEMENT, and a scene the CPU can run exactly is the only kind that can
@@ -80,6 +80,7 @@ const breathe = () => new Promise((r) => setTimeout(r, 30));
 
 async function device() {
   const probe = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  showOriginBanner(probe);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!probe.available) throw new Error(probe.message);
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) throw new Error("WebGPU is present but this system offered no adapter -- presence is not capability");

@@ -38,7 +38,7 @@ import { makeLBM3D } from "./simulation/lbm/lbm3d.js";
 // v3816 -- the detector is ui/webgpuProbe.mjs (v3666). "This browser has no WebGPU" is TRUE ABOUT THE FACT
 // AND WRONG ABOUT THE CAUSE on a LAN origin: over http://<ip>:8787 the browser HAS WebGPU and simply does
 // not expose it to an insecure context, so the reader goes and checks a driver that was never involved.
-import { describeWebGPU } from "/ui/webgpuProbe.mjs";
+import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { LBM3D_WGSL } from "./simulation/lbm/lbm3dShader.js";
 import { W3, Q3 } from "./simulation/lbm/lbm3d.js";
 
@@ -60,6 +60,7 @@ function settle(tr, text, ok) {
 }
 async function gpuRun(steps) {
   const _p = describeWebGPU({ navigator, isSecureContext: window.isSecureContext, location: window.location });
+  showOriginBanner(_p);   // v3981 -- clickable localhost route, once, at the top of the page
   if (!_p.available) throw new Error(_p.message);
   const adapter = await navigator.gpu.requestAdapter();
   if (!adapter) throw new Error("no WebGPU adapter");
