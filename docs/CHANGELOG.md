@@ -8,6 +8,41 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3968 — the stub-emitter, built first and measured, which is why the read side would have been worthless
+
+Arbor's actual mechanism is **distillation, not retrieval**: after each experiment an LLM abstracts the result and writes it into the ancestor nodes, so a child hypothesis inherits context for free. SweK already has the distilled half, and better — `okf/claims/` carries 241 hand-authored Prediction / Why / Measured / Kill-condition files, and `brain/patchnotes/` has one whose whole value is the line *"Two earlier obvious fixes were tried and measured INSUFFICIENT (documented so they're not re-attempted)."*
+
+What it does not have is a corpus for this subsystem. Measured: **zero of those 241 claims name a single RL environment**, across the twenty-eight files in `brain/rl/`. So the read step was not built — retrieval against an empty corpus is theatre — and the writer went first.
+
+**It must not write into `okf/claims/`, which is generated.** `tools/okf/emitOKF.mjs` opens with `fs.rmSync(outDir, { recursive: true })` and rebuilds every claim from `predictions.html`. A stub written there would survive until the next emit and then vanish — a corpus that *looks* like it is accumulating and is not, which is the worst failure available. The machine corpus lives in `~/.voxelbridge/brain-lessons.jsonl`: outside the tree, unswept by the packer, no git churn on every training run.
+
+### Three defects, all found by running it
+
+**1. `require` does not exist in `.mjs`, and the catch blocks ate it.** Every fs call sat inside `try { require("fs") } catch { return false }`. The first real run drove the real watchdog to three stalls and a NaN revert, wrote **nothing**, and reported nothing wrong. "Never throws" is the right contract for instrumentation and it converted total failure into silence. `health()` exists now and the gate asserts through it — a recorder that cannot say whether it recorded is not instrumentation.
+
+**2. Nine rows for three plateaus.** Forty real ES steps on `dockEnv` produced nine stall records: three at bestScore `-127.7566`, three at `-60.8869`, three at `-45.2518`. The watchdog is correct — it re-kicks every `patience` steps while the score sits still — but a corpus whose row count scales with *run length* is one nobody reads twice, which would have killed the read step for a reason having nothing to do with retrieval. Consecutive events at an unchanged score now fold into one record carrying its repeat count and iteration span.
+
+**3. The browser's records claimed to be Node's.** `brain-lab.html` POSTs to `/brain/lessons`; the route re-validates through `makeRecord`; `makeRecord` recomputed `runtime` from the **server**. Three records produced by Chromium landed stamped `node 22.22.2` — the exact misattribution that field's own comment warns about. An incoming runtime is kept.
+
+### What it actually accumulates
+
+Three environments × 40 steps → **nine records, exactly three per environment**, one per genuine plateau:
+
+| env | plateaus | score range | repeat counts |
+| --- | --- | --- | --- |
+| `dockEnv` | 3 | −127.8 … −45.3 | 3, 2, 4 |
+| `dockHazardEnv` | 3 | −1901.2 … −1322.9 | 6, 1, 2 |
+| `huntEnv` | 3 | −95.8 … −31.9 | 1, 7, 3 |
+
+Two findings the read side will need, and neither was visible before measuring:
+
+- **Scores are not comparable across environments.** `dockHazardEnv` plateaus near −1901 where `huntEnv` plateaus near −31. A reader that ranked lessons by score would rank by environment.
+- **The useful signal is the repeat count, not the score.** Six kicks spanning iters 12–27 is a wall; one kick at iter 7 is a blip. They look identical without it.
+
+All nine records are `stalled-kicked` — `reverted-nan` never fired in real training, so the corpus is single-flavoured today.
+
+`brain-lab.html` is the one surface in the tree that runs `createWatchdog`, so it is wired too, via `/brain/lessons` (GET reads the corpus, optionally filtered by env; POST appends one validated record). The wrapper returns the watchdog's own verdict untouched — asserted by comparing wrapped and unwrapped verdict sequences, because the instrument must not become part of the experiment.
+
 ## Since v3967 — node-bun.html: the assessment lives on a page now, not in a changelog paragraph
 
 Keith: *"I thought something was not working when we selected Bun as default instead of Node,"* and asked for a "Node / Bun" page in System Tools with the assessment, the existing switch surfaced or linked, and the `bunSurface.mjs` comparison behind a button.

@@ -48,6 +48,9 @@
 <script type="module">
 import { createTrainer, runIdle } from "./brain/rl/idleTrainer.js";
 import { createWatchdog } from "./brain/rl/watchdog.js";
+// v3968 -- this page is the ONE surface in the tree that runs createWatchdog, so without this import the
+// stall/revert verdicts a person actually watches happen here would never reach the lesson corpus.
+import { recordingWatchdog } from "./brain/rl/lessons.mjs";
 import { evaluate, FlightPolicy } from "./brain/rl/dockPolicy.js";
 import { HuntEnv } from "./brain/rl/huntEnv.js";
 import { huntExpert, recordDemos, cloneFromDemos } from "./brain/rl/imitation.js";
@@ -67,14 +70,20 @@ const WD = { improving: "#5fe08a", ok: "#59d1ff", "stalled-kicked": "#f6a623", "
 function trainHunt() {
   document.getElementById("bHunt").disabled = true;
   const tr = createTrainer({ envFactory: flee, obsDim: OBS, hidden: HID, seed: 5, pop: 14, trainEps: 5 });
-  const wd = createWatchdog(tr, { patience: 6, minDelta: 1 });
+  // v3968 -- WRAPPED, NOT REPLACED. recordingWatchdog returns the watchdog's own verdict untouched; all it
+  // adds is a POST to /brain/lessons when the status is one worth remembering. The colour dot below still
+  // reads s.status exactly as before.
+  const cfg = { pop: 14, trainEps: 5, hidden: HID, seed: 5, patience: 6, minDelta: 1 };
+  const wd = recordingWatchdog(createWatchdog(tr, { patience: cfg.patience, minDelta: cfg.minDelta }),
+                               { env: "brain-lab/hunt", params: cfg, iters: () => tr.progress().iters });
   runIdle(tr, { maxIters: 40, itersPerSlice: 1, onProgress: (p) => {
     const s = wd.check(); const ev = p.ev || {};
     document.getElementById("wd").style.background = WD[s.status] || "#7c93b8";
     document.getElementById("wdText").textContent = s.status;
     const rate = ev.dockRate != null ? ev.dockRate : 0; document.getElementById("huntRate").textContent = (rate * 100).toFixed(0) + "%";
     document.getElementById("huntIter").textContent = p.iters; curve.push(rate); drawCurve();
-    if (p.iters >= 40) { huntPolicy = tr.best(); document.getElementById("bXfer").disabled = false; document.getElementById("wdText").textContent = "done"; document.getElementById("wd").style.background = "#5fe08a"; }
+    if (p.iters >= 40) { if (wd.flush) wd.flush();   // the last plateau is only written on flush
+      huntPolicy = tr.best(); document.getElementById("bXfer").disabled = false; document.getElementById("wdText").textContent = "done"; document.getElementById("wd").style.background = "#5fe08a"; }
   } });
 }
 window.trainHunt = trainHunt;
