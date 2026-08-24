@@ -30,11 +30,24 @@
 // could move it. Not a defect, and not something to fix by widening a tolerance; it is a ceiling on the
 // resolution of that key, and the growth-rate key does not share it.
 
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { getDevice } from "./devices.mjs";
 import { MICHALKE } from "../../simulation/lbm/khDispersion.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+
+// v3970 -- READ ONLY. This gate asserts an expected physics TREND (growth rate rises monotonically as
+// viscosity falls) rather than testing whether a swept quantity settles, so it has nothing to WRITE to the
+// corpus -- but it shares the same "kh" device as khConvergence and khMichalke, which DO write, so reading
+// their findings first is still worth the one import.
+try {
+    const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const L = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+    console.log(L.lessonsBrief("kh"));
+} catch {}
+
 const dev = await getDevice("kh");
 const run = (config = {}) => dev.build({ config });
 
