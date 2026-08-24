@@ -505,6 +505,44 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
     try { fs.rmSync(DUP, { force: true }); } catch { }
 }
 
+// ---- 18. materialKnobs (v3975) -- WRITES DERIVED FROM THE SAME BOOLEAN THE GATE'S OWN VERDICT READS ----------
+//
+// levelClaim and packingTransfer both build a `settled` value inline at the call site. materialKnobs does it
+// differently and that difference is what earns its own check: idealSettled/taitSettled are computed ONCE and
+// read by BOTH the ok() call and the recordSweepFinding() call, specifically so the antidote in section 7 --
+// "when the column starts settling, rewrite this section, do not weaken it" -- cannot leave the lesson wiring
+// stale. A hardcoded `settled: false` would look identical on every CURRENT run and only diverge the day the
+// physics changes, which is exactly the kind of drift a source check can catch before a run ever has to.
+{
+    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const p = path.join(ROOT, "physics", "sph", "materialKnobs-selfcheck.mjs");
+    const src = fs.readFileSync(p, "utf8");
+    const code = codeOnly(src), live = noComments(src), why = prose(src);
+
+    ok("!! materialKnobs READS priors under the sph-column key",
+        /lessonsBrief\("sph-column"\)/.test(live));
+
+    const calls = (code.match(/recordSweepFinding\(/g) || []).length;
+    ok("!! ...and WRITES exactly TWO verdicts, one per settle question in section 7", calls === 2, calls + " call(s)");
+
+    ok("!! *** neither write hardcodes its verdict -- both read the SAME variable the ok() line above it reads ***",
+        /ok\("!! under ideal the column is STILL COLLAPSING", !idealSettled,/.test(live) &&
+        /settled: idealSettled/.test(live) &&
+        /ok\("!! and under tait in a free box it wanders rather than settling", !taitSettled,/.test(live) &&
+        /settled: taitSettled/.test(live),
+        "a re-derived or hardcoded verdict could silently disagree with the gate's own PASS/FAIL; reading the " +
+        "identical variable makes that impossible rather than merely unlikely");
+
+    ok("   the antidote is named in the prose this wiring depends on",
+        /ANTIDOTE/.test(why) && /flips to `true`/.test(why),
+        "states the property the check above enforces: this file must never re-diverge the two verdicts");
+
+    ok("   the import and both calls are wrapped in try/catch",
+        /try \{[\s\S]{0,40}await import\(pathToFileURL/.test(code) &&
+        /try \{[\s\S]{0,2500}recordSweepFinding[\s\S]{0,2500}recordSweepFinding/.test(code),
+        "a physics gate must never go red because a lesson file could not be read or written");
+}
+
 try { fs.rmSync(TMP, { force: true }); } catch { }
 try { fs.rmSync(TMP.replace(/\.jsonl$/, "-family.jsonl"), { force: true }); } catch { }
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));

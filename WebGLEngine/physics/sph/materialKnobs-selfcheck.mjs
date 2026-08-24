@@ -16,10 +16,31 @@
 // dust. v3537 found `isKnob: rel > 1e-9` cleared by 2.995e-9 of least-squares round-off and warned that an
 // absolute floor is the wrong discriminator. IT IS NOT NEEDED HERE, and asserting the exact zero is what says
 // so -- if one of these ever becomes merely small, the parameter has started being read somewhere.
+//
+// v3975 -- WIRED INTO THE LESSON CORPUS, AND THE WRITE SITES ARE CHOSEN BY WHAT SECTION 7 ALREADY LEARNED THE
+// HARD WAY. Section 7 tried twice to say something about settling and was WRONG both times before v3542's
+// correction: it read a still-collapsing column and a wandering one as evidence the free-surface score could
+// not be applied, when the real cause was that THE SHIPPED CONFIGURATION IS UNSTABLE -- kinetic energy
+// QUADRUPLES over 2000 steps. That is exactly the kind of finding recordSweepFinding exists to keep someone
+// from re-discovering: two settle questions, each a real 230s SPH run, each already rendering a verdict this
+// gate would otherwise re-earn from nothing on the next person who wonders why a resting-column check is not
+// here.
+//
+// TWO WRITE SITES, BOTH TWO-POINT SERIES, BOTH DERIVED RATHER THAN HARDCODED. Section 7 asks "did this settle
+// between 1200 and 2400 steps" exactly twice -- once under ideal EOS, once under tait in the free box -- and
+// each already renders a PASS/FAIL for exactly that question. The wiring reads the SAME boolean the `ok(...)`
+// call reads, not a re-derived one, so the corpus and the gate's own verdict cannot diverge.
+//
+// *** THIS MAKES THE WRITE SELF-CORRECTING ACROSS THE ANTIDOTE, WHICH IS THE POINT OF NOT HARDCODING IT. ***
+// Section 7 carries its own antidote: "WHEN SOMEBODY MAKES THIS COLUMN SETTLE, THIS SECTION GOES RED AND
+// SHOULD BE REWRITTEN... NOT WEAKENED, AND NOT DELETED." Because `settled` here is read from the live
+// condition rather than typed as `false`, the day somebody fixes the instability and the column starts
+// settling, `settled` flips to `true` on its own and recordSweepFinding correctly WRITES NOTHING -- no
+// separate update is owed to the lesson-corpus wiring when the antidote fires and the check is rewritten.
 "use strict";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
 import path from "path";
+import { readFileSync } from "fs";
+import { fileURLToPath, pathToFileURL } from "url";
 import { createSphWorld } from "./sph.js";
 import { makeColumn } from "./hydrostatic.mjs";
 import { knobMoves } from "../../tools/ship/floors.mjs";
@@ -30,6 +51,14 @@ import { reportLines } from "./materialKnobs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "../..");
+
+// Lazily imported with its failure swallowed: a physics gate must never go red because a lesson file could not
+// be read. env "sph-column" shares the "sph" family token with levelClaim's "sph-level" and packingTransfer's
+// "sph-packing", so all three read each other's findings as related without blending their numbers.
+let _lessons = null;
+try { _lessons = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+      console.log(_lessons.lessonsBrief("sph-column")); } catch {}
+
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l, n) => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
@@ -193,14 +222,40 @@ console.log("\n7. WHY THE FREE-SURFACE SCORE IS NOT USED HERE, AND IT IS NOT THE
     // A free surface is only LEVEL if the liquid is AT REST. Ask whether either law produces a resting column.
     const idealSpec = columnSpec({ eos: "ideal", lidY: SHIPPED_LID });
     const a = idealSpec.measure({ steps: 1200 }), b = idealSpec.measure({ steps: 2400 });
-    ok("!! under ideal the column is STILL COLLAPSING", b < a * 0.9,
+    const idealSettled = !(b < a * 0.9);
+    ok("!! under ideal the column is STILL COLLAPSING", !idealSettled,
         "retained " + a.toFixed(4) + " at 1200 steps and " + b.toFixed(4) + " at 2400 -- monotone falling, so " +
         "any number read off it is a snapshot of a transient");
     const taitSpec = columnSpec({ eos: "tait", lidY: FREE_LID });
     const c1 = taitSpec.measure({ steps: 1200 }), c2 = taitSpec.measure({ steps: 2400 });
-    ok("!! and under tait in a free box it wanders rather than settling", Math.abs(c2 - c1) / c1 > 0.05,
+    const taitSettled = !(Math.abs(c2 - c1) / c1 > 0.05);
+    ok("!! and under tait in a free box it wanders rather than settling", !taitSettled,
         "retained " + c1.toFixed(4) + " at 1200 steps and " + c2.toFixed(4) + " at 2400 -- and at the SHIPPED " +
         "lid it looks stationary only because it is against the ceiling");
+
+    // v3975 -- BOTH VERDICTS ABOVE, READ FROM THE SAME idealSettled/taitSettled THE ok() CALLS JUST READ. See
+    // the note at the head of this file for why that matters: the day the shipped instability is fixed and the
+    // column starts settling, these booleans flip on their own and recordSweepFinding correctly writes nothing.
+    if (_lessons) {
+        try {
+            _lessons.recordSweepFinding({
+                env: "sph-column", axis: "steps (ideal, shipped lid)",
+                series: [{ x: 1200, y: a, settled: true }, { x: 2400, y: b, settled: idealSettled }],
+                params: { eos: "ideal", lidY: SHIPPED_LID },
+                note: "column retained-fraction vs settle time under ideal EOS (materialKnobs section 7). " +
+                      "UNSETTLED IS THE FINDING: the shipped configuration is unstable, not merely slow to " +
+                      "settle -- kinetic energy rises rather than drains, per v3542's correction",
+            });
+            _lessons.recordSweepFinding({
+                env: "sph-column", axis: "steps (tait, free lid)",
+                series: [{ x: 1200, y: c1, settled: true }, { x: 2400, y: c2, settled: taitSettled }],
+                params: { eos: "tait", lidY: FREE_LID },
+                note: "column retained-fraction vs settle time under tait EOS in the free box (materialKnobs " +
+                      "section 7). Looks stationary at the SHIPPED lid only because it is pressed against the " +
+                      "ceiling; in the free box the same instability is visible as wander rather than a floor",
+            });
+        } catch {}
+    }
     report("*** ANSWERED AT v3542, AND THE CAUSE WAS THE OPPOSITE OF WHAT THIS SECTION ASSUMED ***",
         "THE ANTIDOTE BELOW SAID THIS SECTION WOULD GO RED WHEN SOMEBODY MADE THE COLUMN SETTLE. IT DOES " +
         "SETTLE -- at viscosity 10 the kinetic energy drains to 4.5e-5 and the energy ratio falls monotonically " +
