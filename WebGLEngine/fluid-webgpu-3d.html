@@ -385,7 +385,30 @@ async function init() {
       glass = glass*(0.55+0.45*diff) + fres*vec3<f32>(0.6,0.85,1.0)*0.8 + spec*1.2;
       return vec4<f32>(glass,1.0); }`;
 
-  function comp(code) { return device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } }); }
+  // v3980 -- DERIVE THE COMPUTE LAYOUT FROM THE DECLARATIONS, BECAUSE `layout: "auto"` DERIVES IT FROM USAGE.
+  // An auto layout holds only what the entry point STATICALLY ACCESSES through its call graph, not what the
+  // source declares. COMMON declares binding 0 and reads pm inside ui()/vi()/wi()/ci(), so every stage calling
+  // one of those keeps the slot -- but `w.norm` calls none of them: it walks u/v/ww with arrayLength() and
+  // never mentions pm, so binding 0 vanished from its layout while bg() still filled entries from index 0.
+  // The 2D sibling, fluid-webgpu.html, threw exactly this on every frame ("binding index 0 not present in the
+  // bind group layout") from the very same stage, for the very same reason; this file had it latent.
+  // Building the layout from the declarations bg() counts through makes the two agree by construction.
+  function computeLayout(code) {
+    const entries = [];
+    for (const m of code.matchAll(/@group\(0\)\s*@binding\((\d+)\)\s*var<([^>]*)>/g)) {
+      const sp = m[2].replace(/\s+/g, "").split(",");
+      const type = sp[0] === "uniform" ? "uniform" : ((sp[1] || "read") === "read" ? "read-only-storage" : "storage");
+      entries.push({ binding: +m[1], visibility: GPUShaderStage.COMPUTE, buffer: { type } });
+    }
+    entries.sort((a, b) => a.binding - b.binding);
+    return device.createBindGroupLayout({ entries });
+  }
+  function comp(code) {
+    return device.createComputePipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [computeLayout(code)] }),
+      compute: { module: device.createShaderModule({ code }), entryPoint: "main" },
+    });
+  }
   const pClear = comp(w.clear), pP2G = comp(w.p2g), pNorm = comp(w.norm), pMark = comp(w.mark),
         pStamp = comp(w.stamp), pBodyForce = comp(w.bodyForce),
         pSolid = comp(w.solid), pDiv = comp(w.div), pJac = comp(w.jac), pApply = comp(w.applyP), pG2P = comp(g2pSrc);
