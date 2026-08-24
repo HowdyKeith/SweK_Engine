@@ -19,7 +19,9 @@ import { hangingLink, iterationIndependence, stiffnessIndependence, hookeStretch
 import { volumeConvergence, pressureRun, baseSolid, meshVolume } from "../../physics/xpbd/volumeKey.mjs";
 import { dampingSweep, reducesToUndamped } from "../../physics/xpbd/dampingKey.mjs";
 import { thresholdSweep, offsetConvergence, criticalAngle, coulombExact } from "../../physics/xpbd/frictionKey.mjs";
-import { kernelIntegral, latticeRestDensity, compressionRecovery } from "../../physics/xpbd/pbfKey.mjs";
+// v3973 -- latticeRestDensity dropped from this import: the `kernel` mode was its only caller here and it was
+// calling it with no arguments, at an h the caller never passed. See the note in that mode.
+import { kernelIntegral, compressionRecovery } from "../../physics/xpbd/pbfKey.mjs";
 import { volumeConstraintEffect, ellipsoidGirthRatio } from "../../physics/xpbd/muscleKey.mjs";
 import { weaveAnisotropy, tearRun } from "../../physics/xpbd/weaveKey.mjs";
 import { modulateKeys } from "../../physics/xpbd/modulateKey.mjs";
@@ -186,10 +188,22 @@ function buildXpbd({ mode = "hooke", config = {} } = {}) {
             muscleGirthVsEllipsoid: Math.abs(e.on.girthRatio - pred) / pred };
     }
     if (mode === "kernel") {
+        // v3973 -- *** restDensity WAS A STOWAWAY HERE, AT AN h THE CALLER NEVER PASSED. *** This returned
+        // `restDensity: latticeRestDensity()` -- called with NO ARGUMENTS, so it always used that function's own
+        // default h of 0.25, while kernelIntegral beside it reflected the caller's c.h. Two numbers in one
+        // object keyed to two different smoothing lengths, with nothing saying so: build at h = 4 and you were
+        // handed a rest density for h = 0.25 and no way to tell. Measured, it is not a small difference --
+        // latticeRestDensity reads 232.4 at h = 0.2 and 75.9 at h = 1.0.
+        // It is REMOVED rather than wired to c.h, because the two h's are not the same quantity: c.h is the
+        // KERNEL SUPPORT RADIUS this mode integrates over, and latticeRestDensity's is the smoothing length of a
+        // lattice at spacing 0.16 -- at c.h = 1.0 every particle in the 6^3 lattice is a neighbour and the
+        // "rest density of a packing" degenerates into an all-pairs sum. Passing it through would have made the
+        // number MOVE while making it MEAN LESS. The `density` mode below reports restDensity properly.
+        // Found by sensitivity-selfcheck, which is the second advertised-and-unread key it has caught after
+        // nuclear:A/Z -- and it could not be seen for as long as that gate was dying at its budget.
         const h = Number.isFinite(c.h) ? c.h : 1.0;
         const I = kernelIntegral(h);
-        return { ...blank, kernelIntegral: I, kernelIntegralErr: Math.abs(I - 1),
-                 restDensity: latticeRestDensity() };
+        return { ...blank, kernelIntegral: I, kernelIntegralErr: Math.abs(I - 1) };
     }
     if (mode === "density") {
         const r = compressionRecovery();
