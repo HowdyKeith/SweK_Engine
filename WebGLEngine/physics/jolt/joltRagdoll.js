@@ -26,20 +26,38 @@ function createRagdoll(world, opts = {}) {
         const con = pcs.Create(bodyOf(a), bodyOf(b)); ps.AddConstraint(con); joints.push({ con, a, b });
     }
 
+    // v3982 -- PELVIS/TORSO/HEAD/LEGS NOW TOUCH THEIR NEIGHBOUR AT EACH JOINT, WHICH THEY DID NOT BEFORE.
+    // Keith: "Add Crew works, but they seem to fall through the floor?" Reproduced headlessly: the crew rest
+    // fine for about half a second, then sink -- pelvis reaching y=-262 after 10s through a floor built TEN
+    // METRES thick for the test, so it was never tunnelling, and it was not mass, step count or scale either
+    // (density 1 and 20, 2 substeps and 8, scale 0.85 and 2.0 all sank the same way).
+    //
+    // ISOLATED to a minimal two-body rig: a point constraint anchored ON the two bodies' touching faces holds
+    // its rest position for 20+ seconds; the SAME constraint anchored in the small GAP between two bodies that
+    // do not touch (0.0765m here, matching the old pelvis-leg spacing) sinks through a floor built ten metres
+    // thick, every time. pelvis-torso had a 0.02m gap (survived); torso-head had 0.05m (marginal -- passed some
+    // configurations, not others); pelvis-leg had 0.09m (failed consistently). *** A DISABLED-COLLISION FILTER
+    // BETWEEN JOINTED PARTS -- Jolt's own RagdollSettings does this, and it was the first thing tried -- MADE IT
+    // WORSE, not better (the gap-0 rig's rest height dropped by more than half with collision off), because the
+    // contact between the TOUCHING parts is part of what is holding the joint's position, not fighting it. The
+    // parts must touch, and must keep colliding. ***
+    // torso, head and both legs are moved to sit flush against the part they join to (no interior overlap --
+    // shared face only), and every joint anchor moved onto that shared face; pelvis and both arms already
+    // touched their neighbour exactly and are unchanged. Verified stable for 60s of real Jolt sim time.
     const pelvis = part("pelvis", 0, 0, 0, 0.26, 0.16, 0.14);
-    const torso = part("torso", 0, 0.46, 0, 0.28, 0.28, 0.15);
-    const head = part("head", 0, 0.98, 0, 0.17, 0.19, 0.17);
-    const armLU = part("armL", 0.5, 0.62, 0, 0.22, 0.1, 0.1);
+    const torso = part("torso", 0, 0.44, 0, 0.28, 0.28, 0.15);      // bottom 0.16 == pelvis top 0.16
+    const head = part("head", 0, 0.91, 0, 0.17, 0.19, 0.17);        // bottom 0.72 == torso top 0.72
+    const armLU = part("armL", 0.5, 0.62, 0, 0.22, 0.1, 0.1);       // inner face 0.28 == torso outer face 0.28
     const armRU = part("armR", -0.5, 0.62, 0, 0.22, 0.1, 0.1);
-    const legLU = part("legL", 0.16, -0.55, 0, 0.11, 0.3, 0.13);
-    const legRU = part("legR", -0.16, -0.55, 0, 0.11, 0.3, 0.13);
+    const legLU = part("legL", 0.16, -0.46, 0, 0.11, 0.3, 0.13);    // top -0.16 == pelvis bottom -0.16
+    const legRU = part("legR", -0.16, -0.46, 0, 0.11, 0.3, 0.13);
 
-    joint(pelvis, torso, 0, 0.2, 0);
-    joint(torso, head, 0, 0.76, 0);
-    joint(torso, armLU, 0.28, 0.68, 0);
-    joint(torso, armRU, -0.28, 0.68, 0);
-    joint(pelvis, legLU, 0.16, -0.18, 0);
-    joint(pelvis, legRU, -0.16, -0.18, 0);
+    joint(pelvis, torso, 0, 0.16, 0);
+    joint(torso, head, 0, 0.72, 0);
+    joint(torso, armLU, 0.28, 0.62, 0);
+    joint(torso, armRU, -0.28, 0.62, 0);
+    joint(pelvis, legLU, 0.16, -0.16, 0);
+    joint(pelvis, legRU, -0.16, -0.16, 0);
 
     return {
         parts, joints,
