@@ -15,6 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import { withheldFromMirror } from "./withheld.mjs";
 
 function arg(name) { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : null; }
 const version = arg("--version");
@@ -327,17 +328,43 @@ function findAtRoot(name) {
   for (let i = 0; i < 5; i++) { const p = path.join(dir, name); if (fs.existsSync(p)) return p; const up = path.dirname(dir); if (up === dir) break; dir = up; }
   return name;
 }
+// v3964 -- *** THIS COULD NEVER PASS ON A CLONE, AND THE CHAIN THAT CLONES IS WHAT FOUND IT. ***
+// BACKLOG.md and TODO.md are in .gitignore -- withheld from the public mirror on purpose, as .gitignore's own
+// comment says -- so `git ls-files` carries neither and NO CLONE OF THIS REPOSITORY HAS EVER CONTAINED THEM.
+// On the rig they exist as untracked working files and this passed; on a fresh clone it failed permanently,
+// for doing exactly what it was told. It stayed invisible for as long as verify only ran where the files
+// happened to be, which is the shape of an assumption that has only ever been tested on one machine.
+//
+// The rule is READ FROM .gitignore via tools/ship/withheld.mjs rather than restated here, because
+// rootLayout-selfcheck.mjs already derived it at v3945 and said why: "a second list of what is withheld would
+// go stale the first time one of them was published." This file held that second list -- not as a list but as
+// an unconditional requirement, the same defect with the opposite sign.
+//
+// WITHHELD IS NOT THE SAME AS ABSENT, AND THE CHECK STILL FIRES ON THE SECOND. A file git does carry must be
+// present and non-empty exactly as before; only a deliberately-withheld one is excused, and it is excused OUT
+// LOUD so the line never reads as a silent pass.
+const _withheld = withheldFromMirror(path.dirname(findAtRoot("WebGLEngine")));
 for (const f of ["BACKLOG.md", "TODO.md"]) {
   const p = findAtRoot(f);
   let sz = -1; try { sz = fs.statSync(p).size; } catch {}
-  check(`${f} present + non-empty`, sz > 0, sz <= 0 ? "MISSING OR BLANK" : `${sz} bytes`);
+  if (sz <= 0 && _withheld.has(f)) {
+    check(`${f} withheld from the mirror by .gitignore (not required in a clone)`, true,
+          "absent HERE and present on the rig -- both correct");
+  } else {
+    check(`${f} present + non-empty`, sz > 0, sz <= 0 ? "MISSING OR BLANK" : `${sz} bytes`);
+  }
 }
 
 // v2210 -- `.py` and `.txt` are searched too. cell-tracking/ is Python, and a gate that cannot see half the
 // tree is a gate that teaches you to put your markers where it can look rather than where they belong.
 // 6. optional feature markers present somewhere in the tree (search code + docs, from the project root
 // so markers in root-level files like SESSION_START.md are found too).
-const rootDir = (function () { let d = process.cwd(); for (let i = 0; i < 5; i++) { if (fs.existsSync(path.join(d, "BACKLOG.md"))) return d; const up = path.dirname(d); if (up === d) break; d = up; } return "."; })();
+// v3964 -- THE SAME CAUSE, ONE LINE LOWER AND MUCH QUIETER. This walked up looking for BACKLOG.md to find the
+// project root; on a clone it never found one and fell back to ".", so every marker search below ran against
+// the WebGLEngine directory instead of the project, and a marker in a root-level file read as MISSING. A
+// landmark that is deliberately absent from half the places the tool runs is not a landmark. WebGLEngine/ is
+// the one directory this project is DEFINED by -- verify.mjs is run from inside it.
+const rootDir = path.dirname(findAtRoot("WebGLEngine"));
 for (const m of markers) {
   let hit = false;
   // v2204 -- `-F`. Without it a marker is a regex, so `iterCap: W * H` means "W, zero or more spaces" and a

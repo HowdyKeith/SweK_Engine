@@ -238,6 +238,68 @@ export function mountGithubPanel() {
             // tree. Sits beside it because that is where you find out you need it: the release fails with
             // "already exists", and the reason is that this box is behind.
             const src = BTN("\u2B07 Get newer source from GitHub (clone beside this one)", "#2a3a5a", "#4a6a9a"); src.style.marginTop = "4px"; w.append(src);
+            // v3964 -- *** THE CHAIN, AND IT STOPS SHORT OF THE RELEASE ON PURPOSE. *** Keith: "clone, then run
+            // and auto export github version? so one button would start that chain?" One button starts it; the
+            // chain runs clone -> verify and then STOPS with a verdict, because the middle step is the one that
+            // fails quietly. A clone that fails says so and an upload that fails says so, but A SUBTLY BROKEN
+            // TREE BOOTS FINE AND PACKAGES FINE -- and a release is the hardest action here to take back.
+            // So Publish is a SECOND press, and it is disabled until the verdict is green.
+            const chainB = BTN("\u26D3 Clone \u2192 verify (stops before publishing)", "#2a4a4a", "#4a7a7a"); chainB.style.marginTop = "8px"; w.append(chainB);
+            const chainPub = BTN("\u2191 Publish the verified clone", "#3a2a5a", "#6a4a9a"); chainPub.style.marginTop = "4px";
+            // *** DISABLED IS THE STARTING STATE, NOT A STATE IT FALLS INTO. *** A button that starts enabled and
+            // is switched off by a later poll is publishable during the gap; this one has to be EARNED.
+            chainPub.disabled = true; chainPub.style.opacity = ".45"; chainPub.title = "needs a green verify first";
+            w.append(chainPub);
+            const chainLog = E("div", "margin-top:5px;font:10px ui-monospace,monospace;color:#9bb0c8;white-space:pre-wrap;max-height:220px;overflow:auto;background:#080b10;border:1px solid #1a222e;border-radius:6px;padding:6px 8px;display:none;");
+            w.append(chainLog);
+
+            // The button's enabled state is READ FROM THE SERVER'S canPublish, never recomputed here. The bridge
+            // refuses on the same predicate, so the UI and the guard cannot drift into disagreeing about whether
+            // a tree earned a release -- and a front-end-only guard is a guard that lasts until somebody curls.
+            const chainSync = (st) => {
+                const may = !!(st && st.canPublish);
+                chainPub.disabled = !may;
+                chainPub.style.opacity = may ? "1" : ".45";
+                chainPub.title = may ? "publish " + ((st.clone && st.clone.version) || "") + " from the tree that just passed"
+                                     : ((st && st.whyNotPublish) || "needs a green verify first");
+            };
+            const chainPoll = async () => {
+                const st = await fetch("/source-chain/status", { cache: "no-store" }).then(r => r.json()).catch(() => null);
+                if (st) chainSync(st);
+                const lg = await fetch("/source-chain/log", { cache: "no-store" }).then(r => r.json()).catch(() => null);
+                if (lg && lg.log) { chainLog.style.display = "block"; chainLog.textContent = lg.log.slice(-6000); chainLog.scrollTop = chainLog.scrollHeight; }
+                return st;
+            };
+            chainB.onclick = async () => {
+                let er = repo();
+                if (!er) { try { const s0 = await api("config"); er = ((s0 && s0.engineRepo) || "").trim(); } catch {} }
+                if (!er) return say("pick a repo, or set engineRepo in Account", false);
+                chainB.disabled = true; chainSync(null);
+                say("cloning " + er + ", then verifying THE CLONE\u2026 nothing is published by this button.");
+                const poll = setInterval(chainPoll, 1200);
+                const j = await fetch("/source-chain/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: er }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+                clearInterval(poll);
+                const st = await chainPoll();
+                chainB.disabled = false;
+                if (!j.ok) return say("\u2717 " + (j.error || "chain failed"), false);
+                say(j.verified
+                    ? "\u2713 " + j.version + " cloned to\n" + j.path + "\n\nVERIFY: GREEN \u2014 Publish is now unlocked.\nNothing has been published yet."
+                    : "\u26A0 " + j.version + " cloned to\n" + j.path + "\n\nVERIFY: RED (exit " + j.verifyExit + ") \u2014 Publish stays locked.\nThe checklist above says which line failed.",
+                    !!j.verified);
+                if (st) chainSync(st);
+            };
+            chainPub.onclick = async () => {
+                if (chainPub.disabled) return;
+                chainPub.disabled = true; say("packing the VERIFIED clone with its own packer, then uploading\u2026");
+                const j = await fetch("/source-chain/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: repo() || undefined, body: notes.value, draft: dr.checked, prerelease: pr.checked }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+                await chainPoll();
+                const rel = j.release || {};
+                say(j.ok ? "\u2713 published " + (j.tag || rel.tag) + "\nbuilt from the verified tree at " + (j.fromVerifiedTree || "?") + "\n" + (rel.url || "")
+                         : "\u2717 " + (j.error || ""), !!j.ok);
+            };
+            // Reflect whatever the server already thinks when the tab is opened -- a chain that ran before this
+            // panel was rendered should not present a locked button over a green verdict.
+            chainPoll();
             (async () => { const s = await api("config"); if (s && s.ok && s.engineVersion && !tag.value) tag.value = s.engineVersion; })();
             listB.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("releases?repo=" + encodeURIComponent(repo())); if (!j.ok) return say("\u2717 " + j.error, false); if (!j.releases.length) return say("(no releases)", true); const box = E("div"); j.releases.forEach(rl => { const row = E("div", "display:flex;gap:6px;align-items:center;padding:2px 0;"); row.append(E("span", "color:#9fd;flex:1;", `${rl.tag}${rl.draft ? " (draft)" : ""}${rl.prerelease ? " (pre)" : ""} \u00B7 ${rl.assets} asset(s)`)); const d = E("span", "cursor:pointer;color:#f88;", "\u2715"); d.title = "delete release"; d.onclick = async () => { const x = await api("release/delete", { repo: repo(), id: rl.id }); if (x.ok) row.remove(); }; row.append(d); box.append(row); }); say(box, true); };
             vc.onclick = async () => { if (!repo()) return say("pick a repo", false); const j = await api("versioncheck?repo=" + encodeURIComponent(repo())); say(j.ok ? (j.none ? "no releases yet" : (j.behind ? "\u26A0 newer: " + j.latest + " (engine " + j.current + ")" : "\u2713 up to date (" + j.current + ")")) : "\u2717 " + j.error, j.ok && !j.behind); };

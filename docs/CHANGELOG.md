@@ -8,6 +8,72 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3964 — one button starts the chain, stops before the release, and the first tree it graded proved why
+
+Keith: *"a natural follow on to Github clone repo to new version dir, would be to clone, then run and auto export github version? so one button would start that chain?"*
+
+The chain is right. The **auto** is not, for one reason: the middle step is the one that fails quietly. A clone that fails says so. An upload that fails says so. A subtly broken tree **boots fine and packages fine** — and a release is the hardest action in this tree to take back: a tag, an asset, and a thing other boxes fetch and install.
+
+So `/source-chain` runs clone → verify and **stops with a verdict**. Publish is a second press that unlocks only on green.
+
+### The first real run came back RED, on a bug that made the feature impossible
+
+A real clone of v3963 failed verify on exactly two lines: `BACKLOG.md` and `TODO.md`, *MISSING OR BLANK*.
+
+Both are in `.gitignore` — withheld from the public mirror on purpose, as `.gitignore`'s own comment says — so `git ls-files` carries neither, and **no clone of this repository has ever contained them or ever could**. `verify.mjs` had hard-required them since it was written and always passed, because it had only ever run on the rig, where they exist as untracked working files.
+
+A check whose environment has only ever been one machine is a check with an untested assumption in it. Here it was *"the working copy and the repository contain the same files."* Left alone, the chain could never have gone green and the Publish button could never have unlocked.
+
+The rule already existed one file away. `rootLayout-selfcheck.mjs` has derived it from `.gitignore` since v3945, and its own comment says why: *"a second list of what is withheld would go stale the first time one of them was published."* `verify.mjs` held that second list — not as a list but as an unconditional requirement, the same defect with the opposite sign.
+
+`tools/ship/withheld.mjs` is now the one home and both read it. The fence that stops the exemption quietly growing to cover `README.md` moved **with** it, because a helper that hands out a loophole and leaves the guard behind is worse than no helper.
+
+| tree | verify |
+| --- | --- |
+| real clone of v3963, its own `verify.mjs` | **RED** — 2 failures |
+| same clone, v3964's `verify.mjs` | **ALL GREEN** |
+
+Same cause one line lower and much quieter: the marker search walked up looking for `BACKLOG.md` to *find the project root*. On a clone it found none and fell back to `"."`, so every marker search ran against `WebGLEngine/` instead of the project, and a marker in a root-level file read as missing.
+
+### Two things the chain must not do, both of which look correct
+
+**Verify runs inside the clone.** Running this box's gates would grade the tree already serving the page you clicked from — a check that *cannot fail*, sitting in front of a release button.
+
+**The zip is built by the clone's own `packRelease.mjs`.** `packagerBridge` computes `PROJECT_ROOT` from its own location, so calling `makeInstallable()` from the running tree would publish the tree that was never verified, with a green tick in front of it. The clone zips itself; this box only uploads, because the token lives here.
+
+### The guard
+
+`canPublish()` takes its state as an argument so every branch is *driven* rather than described:
+
+| state | verdict |
+| --- | --- |
+| a run still in flight | refused |
+| nothing cloned yet | refused |
+| **a clone that FAILED verify** | **refused** |
+| a clone never verified at all | refused |
+| a green clone that has vanished | refused |
+| a green clone, still there | allowed |
+
+The gate asserts the *count* — exactly one of six may publish — because a guard that started allowing two would pass every line read one at a time. The UI reads that same boolean rather than recomputing it, and `publish()` enforces it server-side, so a front-end-only guard cannot be stepped around with curl.
+
+### Three files, one assumption
+
+`verify.mjs` was not the only place that assumed the working copy and the repository hold the same files. The chain's first run flushed out three, each breaking differently — which is why none of them had ever been connected:
+
+| file | how it broke on a clone |
+| --- | --- |
+| `verify.mjs` | **FAILED** — two red lines |
+| `verify.mjs` root-finder | **silently wrong** — no landmark found, fell back to `"."`, so marker searches ran against `WebGLEngine/` instead of the project |
+| `changelogCurrency-selfcheck.mjs` | **CRASHED** — `ENOENT`, stack trace, whole gate down |
+
+A crash is worse than the failure it replaced: a red line says which claim broke, a stack trace says the gate is broken, and those send you to different places. All three now read `withheld.mjs`, and the chain's gate pins that they do.
+
+Also fixed this round: `bridgeCensus` reported the new bridge as *"IMPORTED BUT NEVER ROUTED — dead code carrying a route table"*, because the first cut dispatched it through a local alias inside a lazy require and the census looks for `<bridgeName>.owns(`. A convention a census cannot see is not a convention, so it is required at the top and dispatched by its own name. And the census's reachability hop followed only `.html` links, so a route behind a **panel module** (`server.html` imports `ui/githubPanel.js`) read as *"findable only by knowing the URL"* while sitting behind a labelled button — the same narrower-lookup-than-sentence shape as v3959. It follows imported panel modules now, still one hop, still not transitive.
+
+The thirteen gates added across v3944–v3964 were each timed individually, median of three, and recorded. `sourceChain` exited 1 on its first timing pass — the run before it had rewired the dispatch, and that gate's own check still named the old alias. It caught its author. Fixed and re-timed rather than recorded red: a failing run's elapsed time is not a budget.
+
+Four probes: weaken the guard and three refusals turn into allows; pack with the wrong packer, auto-publish from `start()`, or enable the button at construction, and each goes red. That last probe **failed to bite at first**, and found a weak assertion in my own gate: `chainPub.disabled = true` appears twice — at construction, and in the click handler that disables it while it works — and the check was reading the wrong one. It is pinned to the construction now.
+
 ## Since v3963 — "what page is SHARP-ML on?" — none, for fifteen rounds
 
 `ai-bridge/sharpBridge.js` went in at v3948 with a working API, three routes wired into `server.js`, a selfcheck, a Modal deployment recipe and a licence surface. **Nothing on any page ever called it.** Keith found it by asking a question that presumed a page existed.

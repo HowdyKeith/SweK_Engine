@@ -170,6 +170,14 @@ for (const f of files) {
     // version of this regex required the name to start with a letter -- so it matched nothing and the hop found
     // no pages at all, leaving the false positive exactly where it was. The scan looked like it worked.
     for (const m of ui.matchAll(/["']\/?([A-Za-z0-9._-]+\.html)["']/g)) hop.add(m[1]);
+    // v3964 -- *** A PANEL MODULE IS A HOP TOO, AND MISSING IT MADE THIS LINE SAY SOMETHING FALSE. ***
+    // server.html `import { mountGithubPanel } from "./ui/githubPanel.js"` -- the GitHub drawer's entire UI
+    // lives in that module, and v3964 put the clone->verify chain's two buttons in it. The scan followed only
+    // .html links, so the route read as "findable only by knowing the URL" while sitting behind a labelled
+    // button on the front door. That is the same shape as the eleven pages v3959 accused of not existing: a
+    // lookup narrower than the sentence describing it. A module server.html IMPORTS is reachable in one hop by
+    // exactly the argument the .html hop already makes -- still one hop, still not transitive.
+    for (const m of ui.matchAll(/from\s+["']\.?\/?((?:ui|engine|render)\/[A-Za-z0-9._\/-]+\.m?js)["']/g)) hop.add(m[1]);
     const linkedPages = [...hop].filter((f) => fs.existsSync(path.join(ENG, f)))
                                 .map((f) => { try { return fs.readFileSync(path.join(ENG, f), "utf8"); } catch { return ""; } });
     const reachable = (prefix) => new RegExp(prefix.slice(1), "i").test(ui) ||

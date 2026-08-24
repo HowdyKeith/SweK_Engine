@@ -1987,6 +1987,7 @@ function _fireHookOnOk(event, p, pick, when) { return Promise.resolve(p).then(r 
 const workbookBridge = require("./workbookBridge.js");     // v1124 — assemble VBA folders into .xlsm/.xlsb workbooks
 const packagerBridge = require("./packagerBridge.js");     // v1125 — Gmail-safe copy of the whole engine
 const githubBridge = require("./githubBridge.js");         // v1126 — manage your GitHub repos + publish releases
+const sourceChainBridge = require("./sourceChainBridge.js"); // v3964 — clone -> verify -> STOP; publish is a second, gated press
 const rustdeskBridge = require("./rustdeskBridge.js");
 const crossdeskBridge = require("./crossdeskBridge.js");   // v2980 - a SECOND remote-desktop option beside RustDesk, not instead of it: browser web client, LGPL, higher OS floor.
 const nearShareBridge = require("./nearShareBridge.js");
@@ -16266,6 +16267,17 @@ ${text.replace(/'/g, "''")}
     // v3941 -- the only route from "pushed to GitHub" to "running here". See cloneEngineSource: the release
     // path cannot deliver a version the local tree does not already have.
     if (req.method === "POST" && req.url === "/github/clone-source") { readJson(d => githubBridge.cloneEngineSource(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    // v3964 -- clone -> verify -> STOP, with publish behind the verdict. Keith asked for one button to start the
+    // chain; the chain deliberately does NOT reach the release. See sourceChainBridge.js for why the middle step
+    // is the one that has to be looked at: a subtly broken tree boots fine and packages fine, and a release is
+    // the hardest action here to take back.
+    //
+    // *** REQUIRED AT THE TOP AND DISPATCHED BY ITS OWN NAME, WHICH IS NOT COSMETIC. *** The first cut lazily
+    // required it into a local `_chain` inside a try/catch, and bridgeCensus went red: "IMPORTED BUT NEVER
+    // ROUTED -- dead code carrying a route table". It looks for `<bridgeName>.owns(` in this file, and an alias
+    // hides the wiring from the one gate whose entire job is noticing a bridge nobody reaches -- which is the
+    // v3963 defect this round is still cleaning up after. A convention a census cannot see is not a convention.
+    if (sourceChainBridge.owns(req.url) && sourceChainBridge.handle(req, res, sendJson)) return;
     // v3948 — apple/ml-sharp: one photograph -> a 3D Gaussian splat .ply, which engine/splatParser.js and
     // SplatRenderer.js already read. Lazily required so a box without the bridge file still boots, and so the
     // python probe in status() only runs when somebody actually asks.
