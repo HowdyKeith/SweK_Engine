@@ -29,11 +29,48 @@
 // the DEPTH lever costs 126s on its own and its row is REPORTED from MEASURED_V3546 rather than re-driven,
 // which is stated here rather than hidden -- a gate that quietly reports a number it did not take is the
 // thing this arc keeps finding.
+//
+// v3974 -- WIRED INTO THE LESSON CORPUS, AND THIS IS THE FIRST GATE WHOSE SWEEPS ACTUALLY WRITE ONE.
+//
+// kh's three gates and levelClaim all record a "did it settle" verdict; levelClaim is GREEN, so its sweeps are
+// correctly silent and the write path had to be proven by replay. THIS FILE IS THE OTHER CASE. Section 5 asserts
+// NON-SETTLEMENT as its finding -- "the value keeps FALLING ... and never settles" and "the cross-pool
+// disagreement does NOT shrink monotonically either" -- so a PASSING run is exactly the run that has something
+// to record. The lesson is worth 187 seconds: THERE IS NO BULK VALUE TO CALIBRATE ON AT THIS POOL SIZE, so a
+// future round that re-sweeps the margin looking for a plateau is re-buying a negative already paid for.
+//
+// *** BOTH RECORDS ENCODE THIS GATE'S OWN VERDICT AND NEITHER RECOMPUTES IT, WHICH DECIDED THEIR SHAPE. ***
+// The two sweeps render their verdicts at DIFFERENT GRANULARITIES and the records follow that exactly:
+//
+//   the cross-pool spread is judged PER TRANSITION -- the file hand-rolls `if (seq[i] > seq[i-1]) monotone =
+//   false`, which is precisely recordSweepFinding's per-step boolean, so the full series is recorded.
+//
+//   the margin sweep is judged as ONE COMPARISON, first against last at 3% -- there is no per-step verdict in
+//   this file to observe. It is therefore recorded as a TWO-POINT series carrying that single transition, the
+//   same encoding levelClaim's stationarity check uses. Manufacturing per-step booleans for it would be the
+//   "second-guessing physics judgment a domain expert already encoded" that recordSweepFinding's own header
+//   forbids -- the granularity of the record is set by the granularity of the verdict, never by convenience.
+//
+// NOTHING IN SECTION 4 IS TOUCHED. That section carries this file's ANTIDOTE clause -- if the calibration ever
+// transfers it goes red and must be DELETED rather than weakened -- and a lesson record has no business
+// straddling a check whose correct future is deletion.
 "use strict";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { slabDensityAt, probe, marginSweep, spreadAt, transferMiss,
          MEASURED_V3546, CONFIRMS_V3543 } from "./packingTransfer.mjs";
 import { interiorNumberDensity, SHIPPED_FLOOR } from "./poolFixture.mjs";
 import { reportLines } from "./packingTransfer.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ENG = path.resolve(HERE, "..", "..");
+
+// Lazily imported with its failure swallowed: a physics gate must never go red because a lesson file could not
+// be read. env "sph-packing" shares the "sph" family token with levelClaim's "sph-level", so each reads the
+// other's findings as related without either being folded into the other's numbers.
+let _lessons = null;
+try { _lessons = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+      console.log(_lessons.lessonsBrief("sph-packing")); } catch {}
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -148,6 +185,50 @@ console.log("\n5. *** THERE IS NO BULK HERE TO CALIBRATE ON -- THE SLAB HAS NO P
         sweeps[0][sweeps[0].length - 1][1] === null,
         "the pool is not deep enough to have a 3h interior and the instrument says so. A REFUSAL AND A " +
         "SMALL NUMBER ARE OPPOSITE NEWS");
+
+    // v3974 -- BOTH VERDICTS ABOVE, OBSERVED RATHER THAN RECOMPUTED. See the note at the head of this file for
+    // why the two records have different lengths: the spread is judged per transition and is recorded in full,
+    // the margin sweep is judged as one first-against-last comparison and is recorded as that one transition.
+    // A REFUSED margin (null) is dropped from the series rather than passed as a value -- a refusal and a small
+    // number are opposite news, and feeding a null in as a y would turn one into the other.
+    if (_lessons) {
+        try {
+            const askable = MEASURED_V3546.margins
+                .map((m, i) => [m, sweeps[0][i][1]])
+                .filter(([, v]) => v != null);
+            if (askable.length >= 2) {
+                const [m0, v0] = askable[0], [mN, vN] = askable[askable.length - 1];
+                _lessons.recordSweepFinding({
+                    env: "sph-packing", axis: "margin",
+                    series: [{ x: m0 + "h", y: v0, settled: true },
+                             { x: mN + "h", y: vN, settled: !(vN < v0 * 0.97) }],
+                    params: { W: base.W, targetN: 2800, c: 15, margins: askable.map(([m]) => m) },
+                    note: "slab density vs sampling margin (packingTransfer section 5). UNSETTLED IS THE " +
+                          "FINDING, not a fault: the value is still falling at the deepest margin the pool can " +
+                          "be asked, so there is NO BULK VALUE TO CALIBRATE ON at this size. Do not re-sweep " +
+                          "this fixture looking for a plateau -- it was already paid for and there is none",
+                });
+            }
+
+            const spreadSeries = MEASURED_V3546.margins
+                .map((m, i) => [m, spreadAt(sweeps, i).spread])
+                .filter(([, s]) => s != null);
+            if (spreadSeries.length >= 2) {
+                _lessons.recordSweepFinding({
+                    env: "sph-packing", axis: "margin (cross-pool spread)",
+                    series: spreadSeries.map(([m, s], i) => ({
+                        x: m + "h", y: s,
+                        settled: i === 0 ? true : !(s > spreadSeries[i - 1][1]),
+                    })),
+                    params: { pools: [base.W, wide.W], targetN: 2800, c: 15 },
+                    note: "cross-pool disagreement vs margin (packingTransfer section 5). A step counts as " +
+                          "unsettled where the spread ROSE, which is this gate's own monotone test. If widening " +
+                          "the margin were removing a wall effect the pools would converge; they do not, so the " +
+                          "disagreement is STRUCTURAL and more margin will not average it away",
+                });
+            }
+        } catch {}
+    }
 }
 
 // ---------------------------------------------------------------------------

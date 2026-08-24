@@ -399,6 +399,21 @@ export function recordSweepFinding({ env, params, axis, series, note }) {
     const bad = series.slice(1).filter((p) => p.settled === false);
     if (!bad.length) return false;   // converged -- not a lesson
 
+    // *** v3974 -- AN UNCHANGED FINDING IS NOT A NEW LESSON, AND WITHOUT THIS THE CORPUS BECOMES A RUN LOG. ***
+    // recordLesson APPENDS unconditionally, which was invisible for as long as every wired gate was green and
+    // therefore silent. packingTransfer is the first gate that writes on every PASSING run -- its section 5
+    // asserts non-settlement as its finding -- so in CI it would have added the same two records every round:
+    // a hundred identical lines after fifty rounds, which is precisely the "noise that stops anybody reading
+    // it" this function's own header refuses one case earlier. The rule is the same one, applied one level up:
+    // NOTHING IS WRITTEN WHEN NOTHING WAS LEARNED. A finding whose series has MOVED is new information and is
+    // recorded; a byte-identical repeat is not.
+    const fresh = series.map((p) => ({ x: p.x, y: Number.isFinite(p.y) ? +p.y.toPrecision(6) : p.y }));
+    try {
+        const prior = readLessons().filter((r) => r.env === env && r.event === "sweep-unsettled" &&
+                                                  r.stats && r.stats.axis === axis).pop();
+        if (prior && JSON.stringify(prior.stats.series) === JSON.stringify(fresh)) return false;
+    } catch { /* an unreadable corpus must never stop a write -- worst case is the duplicate this avoids */ }
+
     return recordLesson({
         env, event: "sweep-unsettled",
         params: Object.assign({ axis }, params || {}),
@@ -407,7 +422,9 @@ export function recordSweepFinding({ env, params, axis, series, note }) {
         stats: {
             repeats: bad.length, firstIters: 1, source: "sweep",
             axis, points: series.length,
-            series: series.map((p) => ({ x: p.x, y: Number.isFinite(p.y) ? +p.y.toPrecision(6) : p.y })),
+            // ONE declaration, used both for the duplicate comparison above and for the record itself: two
+            // copies of this rounding would let the check and the write disagree about what "identical" means.
+            series: fresh,
         },
         note: note || (bad.length + " of " + (series.length - 1) + " step(s) along " + axis + " did not settle"),
     });
