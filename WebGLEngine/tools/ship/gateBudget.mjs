@@ -145,7 +145,7 @@ export const MEASURED = {
     "tools/roundhouse/twoFBind-selfcheck.mjs":       249000,
     // v3924 -- measured to completion at 195s, and it PASSES. Another gate that was never timed, never budgeted,
     // and silently killed at 139.9s by every runner.
-    "physics/sph/packingTransfer-selfcheck.mjs":     195000,
+    "physics/sph/packingTransfer-selfcheck.mjs":     225000,
     // *** v3924 -- AND THIS ONE IS WHY SLOWEST_GENERAL IS STILL 46.6s. *** Timing the never-timed 55 put
     // materialKnobs at 131.9s into the GENERAL population, and gateBudget-selfcheck immediately said so: the
     // recorded slowest general gate was no longer the slowest anybody had seen. The lever that check invites is

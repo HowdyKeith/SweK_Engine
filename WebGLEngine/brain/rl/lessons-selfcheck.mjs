@@ -389,6 +389,123 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
               rec.stats.axis : "no record written");
 }
 
+// ---- 16. packingTransfer (v3974) -- THE FIRST WIRED GATE WHOSE SWEEPS ACTUALLY WRITE -------------------------
+//
+// levelClaim is green, so its sweeps are correctly silent and check 15 had to prove the write path by replay.
+// packingTransfer is the opposite case and the more important one: section 5 ASSERTS NON-SETTLEMENT as its
+// finding, so a PASSING run is exactly the run with something to record. That makes this the first gate where
+// the corpus fills from real physics rather than from a planted series.
+//
+// *** THE TWO RECORDS HAVE DIFFERENT LENGTHS ON PURPOSE, AND THAT IS WHAT IS GRADED HERE. *** The gate renders
+// its two verdicts at different granularities -- the cross-pool spread per transition, the margin sweep as one
+// first-against-last comparison -- and the records follow the VERDICT, not convenience. A full series for the
+// margin sweep would mean inventing per-step booleans the file never computed.
+{
+    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const p = path.join(ROOT, "physics", "sph", "packingTransfer-selfcheck.mjs");
+    const src = fs.readFileSync(p, "utf8");
+    const code = codeOnly(src), live = noComments(src), why = prose(src);
+
+    ok("!! packingTransfer READS priors under the sph-packing key",
+        /lessonsBrief\("sph-packing"\)/.test(live));
+
+    // DRIVEN, and in ITS OWN corpus, because two earlier mistakes were made writing this one line.
+    //   FIRST it could not fail at all: lessonsFor always returns an object, so asserting it was truthy asserted
+    //   nothing -- section 6 of the very file under test names that exact defect species.
+    //   THEN, driven but sharing TMP, it still could not fail: check 15 had already written an sph-level record,
+    //   so the related-arm stayed populated no matter what this check put in. A test whose subject is supplied
+    //   by an earlier test is not testing what it names. Verified by breaking it: renaming the record here left
+    //   the check green on check 15's leftovers.
+    const FAM = TMP.replace(/\.jsonl$/, "-family.jsonl");
+    try { fs.rmSync(FAM, { force: true }); } catch { }
+    const prevSink = process.env.SWEK_BRAIN_LESSONS;
+    process.env.SWEK_BRAIN_LESSONS = FAM;
+    recordSweepFinding({ env: "sph-level", axis: "steps", params: {},
+        series: [{ x: 1, y: 1, settled: true }, { x: 2, y: 9, settled: false }] });
+    recordSweepFinding({ env: "sph-packing", axis: "margin", params: {},
+        series: [{ x: 1, y: 1, settled: true }, { x: 2, y: 9, settled: false }] });
+    process.env.SWEK_BRAIN_LESSONS = prevSink;
+    const fromPacking = lessonsFor("sph-packing", { file: FAM });
+    ok("!! ...and the 'sph' family token relates it to levelClaim WITHOUT blending the two",
+        fromPacking.exact.some((r) => r.env === "sph-packing") &&
+        fromPacking.related.some((r) => r.env === "sph-level") &&
+        !fromPacking.exact.some((r) => r.env === "sph-level"),
+        "sph-packing reads its own record as EXACT and levelClaim's as RELATED. Two sph gates share a fixture " +
+        "family, not a scale, so a related finding must stay marked rather than be folded into the numbers");
+
+    const calls = (code.match(/recordSweepFinding\(/g) || []).length;
+    ok("!! ...and WRITES exactly TWO verdicts, one per sweep in section 5", calls === 2,
+        calls + " call(s)");
+
+    ok("!! *** the margin sweep is recorded as ONE transition because that is how the gate judges it ***",
+        /settled:\s*!\(vN < v0 \* 0\.97\)/.test(live),
+        "the file compares FIRST against LAST at 3% and renders no per-step verdict, so the record carries that " +
+        "single comparison. Inventing per-step booleans would be recomputing a judgment the gate never made");
+
+    ok("!! ...while the cross-pool spread IS per-transition, matching its own monotone loop",
+        /settled:\s*i === 0 \? true : !\(s > spreadSeries\[i - 1\]\[1\]\)/.test(live),
+        "the gate hand-rolls `if (seq[i] > seq[i-1]) monotone = false`, which is exactly the per-step boolean");
+
+    ok("!! *** a REFUSED margin is dropped, never passed through as a value ***",
+        /filter\(\(\[, v\]\) => v != null\)/.test(live) && /filter\(\(\[, s\]\) => s != null\)/.test(live),
+        "the deepest margin REFUSES on the shallower pool. A refusal and a small number are opposite news, and " +
+        "feeding a null in as a y would turn one into the other");
+
+    ok("   section 4's antidote clause is left alone",
+        /ANTIDOTE/.test(why) && /NOTHING IN SECTION 4 IS TOUCHED/.test(why),
+        "that section must be DELETED rather than weakened if the calibration ever transfers, so no lesson " +
+        "record straddles it");
+
+    ok("   the import and both calls are wrapped in try/catch",
+        /try \{[\s\S]{0,40}await import\(pathToFileURL/.test(code) &&
+        /try \{[\s\S]{0,3000}recordSweepFinding[\s\S]{0,3000}recordSweepFinding/.test(code),
+        "a physics gate must never go red because a lesson file could not be read or written");
+}
+
+// ---- 17. AN UNCHANGED FINDING IS NOT A NEW LESSON (v3974) ----------------------------------------------------
+//
+// *** THIS DEFECT WAS INVISIBLE FOR AS LONG AS EVERY WIRED GATE WAS GREEN. *** recordLesson APPENDS, full stop.
+// kh's gates and levelClaim all settle, so they write nothing and nothing accumulated. packingTransfer is the
+// first gate that writes on every PASSING run -- non-settlement is its finding -- so in CI it would have added
+// the same two records every round, a hundred identical lines after fifty rounds. That is exactly the "noise
+// that stops anybody reading it" that recordSweepFinding already refuses one case earlier, and the fix is the
+// same rule one level up: NOTHING IS WRITTEN WHEN NOTHING WAS LEARNED.
+{
+    const DUP = TMP.replace(/\.jsonl$/, "-dup.jsonl");
+    try { fs.rmSync(DUP, { force: true }); } catch { }
+    const prevSink = process.env.SWEK_BRAIN_LESSONS;
+    process.env.SWEK_BRAIN_LESSONS = DUP;
+
+    const call = (y2) => recordSweepFinding({ env: "dupEnv", axis: "margin", params: {},
+        series: [{ x: 1, y: 1, settled: true }, { x: 2, y: y2, settled: false }] });
+
+    const first = call(9);
+    const second = call(9);
+    ok("!! *** the same finding twice writes ONCE -- a repeated CI run must not grow the corpus ***",
+        first === true && second === false && readLessons(DUP).length === 1,
+        "first=" + first + " second=" + second + " rows=" + readLessons(DUP).length);
+
+    const moved = call(11);
+    ok("!! ...but a finding whose SERIES MOVED is new information and IS recorded",
+        moved !== false && readLessons(DUP).length === 2,
+        "rows=" + readLessons(DUP).length + " -- a changed measurement is the one thing worth appending, and " +
+        "suppressing it would trade a run log for a corpus that goes stale silently");
+
+    // THE SERIES MUST BE IDENTICAL TO THE ONE JUST WRITTEN, or this proves nothing: with a different series the
+    // record would be written whatever the key was, and the check would pass for the wrong reason. Verified by
+    // breaking it -- keying on env alone left the first version of this line green, because its series differed.
+    const otherAxis = recordSweepFinding({ env: "dupEnv", axis: "steps", params: {},
+        series: [{ x: 1, y: 1, settled: true }, { x: 2, y: 11, settled: false }] });
+    ok("   and the key is env+event+AXIS, so one gate's two sweeps never suppress each other",
+        otherAxis !== false && readLessons(DUP).length === 3,
+        "the SAME series under a different axis must still be recorded. packingTransfer writes two findings from " +
+        "one file; keying on env alone would silently have lost one of them");
+
+    process.env.SWEK_BRAIN_LESSONS = prevSink;
+    try { fs.rmSync(DUP, { force: true }); } catch { }
+}
+
 try { fs.rmSync(TMP, { force: true }); } catch { }
+try { fs.rmSync(TMP.replace(/\.jsonl$/, "-family.jsonl"), { force: true }); } catch { }
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 process.exit(fails ? 1 : 0);
