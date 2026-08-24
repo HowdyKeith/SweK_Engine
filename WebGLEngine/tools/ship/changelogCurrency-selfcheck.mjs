@@ -11,6 +11,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { withheldFromMirror } from "./withheld.mjs";
 import { fileURLToPath } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECT = path.resolve(ENG, "..");
@@ -62,9 +63,29 @@ const names = (text, v) => new RegExp("^(## |- )" + v + "\\b", "m").test(text);
 // ---- 4. THE LIVE TREE ------------------------------------------------------------------------------------------
 {
     const v = (fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1];
-    const bl = fs.readFileSync(path.join(PROJECT, "BACKLOG.md"), "utf8");
-    const td = fs.readFileSync(path.join(PROJECT, "TODO.md"), "utf8");
-    ok("!! this tree's own marker is named in BOTH records", names(bl, v) && names(td, v),
+    // v3964 -- *** THIS DID NOT FAIL ON A CLONE, IT CRASHED. *** readFileSync threw ENOENT on BACKLOG.md and
+    // took the whole gate down with a stack trace -- the THIRD file this round found making the same assumption
+    // (verify.mjs required these two, and its root-finder used one as a landmark). BACKLOG.md and TODO.md are
+    // in .gitignore, withheld from the public mirror on purpose, so no clone of this repository contains them.
+    // A crash is worse than the failure it replaced: a red line says which claim broke, a stack trace says the
+    // gate is broken, and the two send you to different places.
+    //
+    // WITHHELD IS NOT ABSENT, AND THE CHECK STILL FIRES ON THE SECOND. A record git actually carries must name
+    // this version exactly as before; one deliberately withheld is skipped OUT LOUD, in the spelling
+    // selfchecks.mjs recognises, so a clone leaves this gate out of the run rather than recording a pass it
+    // did not earn.
+    const withheld = withheldFromMirror(PROJECT);
+    const read = (f) => { try { return fs.readFileSync(path.join(PROJECT, f), "utf8"); } catch { return null; } };
+    const bl = read("BACKLOG.md"), td = read("TODO.md");
+    const gone = [["BACKLOG.md", bl], ["TODO.md", td]].filter(([f, c]) => c === null);
+    if (gone.length && gone.every(([f]) => withheld.has(f))) {
+        console.log("changelogCurrency-selfcheck: SKIPPED -- " + gone.map(([f]) => f).join(" + ") +
+                    " are withheld from the mirror by .gitignore, so this tree is a clone and has neither. " +
+                    "The records exist on the rig and are checked there; asserting on a file that CANNOT be " +
+                    "here would be a check that only ever fails.");
+        process.exit(0);
+    }
+    ok("!! this tree's own marker is named in BOTH records", names(bl || "", v) && names(td || "", v),
        "marker " + v + " -- if this is red, the ritual is about to ship a version nothing describes, which is exactly what happened forty times");
 }
 

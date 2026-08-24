@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withheldFromMirror, FRONT_DOOR, neverWithheld } from "./withheld.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const UTILS = path.join(ROOT, "Root Utils");
@@ -154,14 +155,12 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
     // Presence in root is then required only of the files git actually carries -- and WHICH THOSE ARE IS READ
     // FROM .gitignore rather than retyped, because a second list of what is withheld would go stale the first
     // time one of them was published.
-    const FRONT_DOOR = ["README.md", "BACKLOG.md", "TODO.md"];
-    const withheld = new Set();
-    try {
-        for (const raw of fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8").split(/\r?\n/)) {
-            const s = raw.trim();
-            if (s && !s.startsWith("#") && !s.startsWith("!")) withheld.add(s.replace(/^\//, ""));
-        }
-    } catch { /* no .gitignore: nothing is withheld, so every name below must be in root */ }
+    // v3964 -- THE DERIVATION MOVED TO tools/ship/withheld.mjs AND THIS READS IT. The comment above asked for
+    // exactly that ("a second list of what is withheld would go stale"), and then a second list appeared
+    // anyway -- in verify.mjs, which hard-required BACKLOG.md and TODO.md and therefore COULD NEVER PASS ON A
+    // CLONE. Neither file is tracked by git. That went unseen until v3964 wired clone -> verify into one chain
+    // and the first tree it verified was one that could not pass. One home now, and both callers read it.
+    const withheld = withheldFromMirror(ROOT);
 
     // Scoped to the two places a tidy-up in THIS repository has actually put things, rather than a whole-tree
     // walk: vendored subprojects legitimately carry their own README.md (HomeAssistant/ha-vbaengine-addon has
@@ -188,7 +187,7 @@ ok("!! and _SETUP.bat is in ROOT, because it is the half of the workflow SOMEBOD
                         FRONT_DOOR.filter((f) => !withheld.has(f)).join(", ") + " must be in root and is.");
 
     ok("!! ...and the withheld list can never quietly grow to cover README.md",
-       !withheld.has("README.md"),
+       neverWithheld(withheld),
        "*** THE EXEMPTION ABOVE IS READ FROM .gitignore, SO ANYTHING ADDED THERE STOPS BEING REQUIRED IN ROOT. *** " +
        "That is right for session notes and wrong for the front page: one line in .gitignore would otherwise let " +
        "the README leave the root with this gate still green.");
