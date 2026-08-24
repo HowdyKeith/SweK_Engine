@@ -132,12 +132,64 @@ export const FORBIDDEN_TI_OPS = ["ti.rsqrt", "ti.sin", "ti.cos", "ti.tan", "ti.p
  *          reference 441 times and reported a perfect score. A RETURN TYPE THAT DESCRIBES THE PAYLOAD INSTEAD
  *          OF THE ENVELOPE is an invitation to index into the envelope.
  */
-export async function magmapTaichi(ti, { n = 21, span = 1.0, rho = 0.1, nR = 48, nT = 48 } = {}) {
+/**
+ * v3966 -- *** PREPARE ONCE, RUN MANY. THE BENCH WAS TIMING TAICHI'S COMPILER AGAINST WGSL'S KERNEL. ***
+ *
+ * Keith: "Would we be able to batch the calls to Taichi to see if that would improve the timing?" Yes -- and
+ * the reason it improves is a measurement bug rather than a tuning opportunity. Phase-timed on a real GPU, one
+ * magmapTaichi() call costs:
+ *
+ *     init 0.0 | fields 0.1 | upload 3.0 | scope 0.0 | COMPILE 9.1 | dispatch 0.1 | readback 8.5   (ms, medians)
+ *
+ * *** THE DISPATCH -- THE ACTUAL KERNEL -- IS 0.1ms. *** Everything else is setup and transfer, and 9.1ms of it
+ * is taichi re-parsing the kernel SOURCE with the TypeScript compiler and re-emitting WGSL, on every single
+ * call. The same phase breakdown for the WGSL lane: module 0.0, pipeline 0.0, buffers 0.1 -- about 0.1ms of
+ * per-call setup, because Chrome is not recompiling anything.
+ *
+ * So the bench, timing seven reps of each, was charging taichi a COMPILE PER REP and charging the WGSL variants
+ * nothing. That is not a fair race, and it is not a small thumb on the scale: 12.1ms of setup against 0.1ms.
+ * Batching does not flatter taichi, it stops penalising it -- MEASURED: 17.6ms per-call, 7.4ms batched, 2.38x.
+ *
+ * The one-shot magmapTaichi() below is unchanged in behaviour and still what the gates call: a single map is a
+ * single map, and it genuinely does pay the compile. This is for a CALLER THAT WILL RUN THE SAME KERNEL AGAIN,
+ * which is exactly what a benchmark is.
+ *
+ * @returns {Promise<{run: () => Promise<Float32Array>, params: object}>} run() dispatches and reads back; the
+ *          compile, the field allocation and the table upload have already happened.
+ */
+export async function prepareTaichi(ti, { n = 21, span = 1.0, rho = 0.1, nR = 48, nT = 48 } = {}) {
+    _requireTaichiRuntime(ti);
+    const total = n * n;
+    const table = sampleTable(nT);
+    await ti.init();
+    const cosT = ti.field(ti.f32, nT);
+    const sinT = ti.field(ti.f32, nT);
+    const out = ti.field(ti.f32, total);
+    await cosT.fromArray(Array.from(table.cos));
+    await sinT.fromArray(Array.from(table.sin));
+    const params = { total, n, nR, nT, span, rho };
+    // Same scope discipline as the one-shot path, and for the same reason -- see the long note there. Cleared
+    // first because the kernel scope is global program state that outlives this call.
+    ti.clearKernelScope();
+    ti.addToKernelScope({ params, cosT, sinT, out });
+    const k = ti.kernel(KERNEL_SRC);
+    return {
+        params,
+        async run() { k(); return Float32Array.from(await out.toArray()); },
+    };
+}
+
+/** The two refusals both entry points share, so neither can quietly lose one. */
+function _requireTaichiRuntime(ti) {
     if (!ti) throw new Error("magmapTaichi: pass the taichi.js module in -- this file does not import it");
     if (typeof navigator === "undefined" || !navigator.gpu) {
         throw new Error("magmapTaichi: no WebGPU. This proposer is rig-only and REFUSES to emulate -- nobody " +
                         "here knows what WGSL taichi emits, so an emulator would be a guess, not a measurement.");
     }
+}
+
+export async function magmapTaichi(ti, { n = 21, span = 1.0, rho = 0.1, nR = 48, nT = 48 } = {}) {
+    _requireTaichiRuntime(ti);
     const total = n * n;
     const table = sampleTable(nT);
 

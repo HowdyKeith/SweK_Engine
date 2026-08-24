@@ -53,7 +53,7 @@ import { describeWebGPU } from "/ui/webgpuProbe.mjs";
 import { magmapGpu, WGSL, MAGMAP_TOL } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
 import { VARIANTS, variantWgsl, validateVariant } from "./tools/roundhouse/magmapVariants.mjs";
-import { magmapTaichi, TAICHI_URL } from "./tools/roundhouse/magmapTaichi.mjs";
+import { magmapTaichi, prepareTaichi, TAICHI_URL } from "./tools/roundhouse/magmapTaichi.mjs";
 import { unwrapGpu } from "./tools/roundhouse/gpuProvenance.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -168,8 +168,20 @@ $("run").onclick = async () => {
       try {
         const ti = await import(TAICHI_URL);
         st("compiling + timing the taichi kernel...");
-        const warm = await magmapTaichi(ti.default || ti, CFG);
-        const vals = cells(warm);
+        // v3966 -- *** PREPARED ONCE, THEN TIMED. THE OLD LOOP CHARGED TAICHI A COMPILE PER REP AND CHARGED
+        // THE WGSL VARIANTS NOTHING. *** Phase-timed on a real GPU, one magmapTaichi() call is: upload 3.0ms,
+        // COMPILE 9.1ms, dispatch 0.1ms, readback 8.5ms. The same breakdown for a WGSL variant is module 0.0,
+        // pipeline 0.0, buffers 0.1 -- Chrome is not recompiling anything between reps. So seven reps of the
+        // old loop timed taichi's TypeScript parser seven times and the hand-written kernels' compiler zero
+        // times. Batching does not flatter taichi; it stops penalising it. Measured: 17.6ms -> 7.4ms, 2.38x.
+        //
+        // THE COMPILE IS STILL REPORTED rather than hidden -- it is a real cost of this codegen, just not a
+        // per-run one, and a row that quietly dropped it would be the opposite error to the one being fixed.
+        const tPrep0 = performance.now();
+        const prep = await prepareTaichi(ti.default || ti, CFG);
+        const prepMs = performance.now() - tPrep0;
+
+        const vals = await prep.run();          // the warm run IS the correctness run, as in the variant lane
         let worst = 0;
         for (let k = 0; k < ref.length; k++) {
           const d = Math.abs(vals[k] - ref[k]) / Math.max(Math.abs(ref[k]), 1e-30);
@@ -178,14 +190,15 @@ $("run").onclick = async () => {
         const times = [];
         for (let r = 0; r < REPS; r++) {
           const t0 = performance.now();
-          await magmapTaichi(ti.default || ti, CFG);
+          await prep.run();
           times.push(performance.now() - t0);
         }
         taichiResult = { id: "taichi.js", ms: median(times), all: times.map((t) => +t.toFixed(2)),
+                         prepareMs: +prepMs.toFixed(2), batched: true,
                          worstRelDiff: worst,
                          status: worst <= MAGMAP_TOL ? "ok" : "REJECTED",
                          why: worst <= MAGMAP_TOL
-                              ? "a second codegen landing inside the SAME tolerance the hand-written kernel earned"
+                              ? `a second codegen landing inside the SAME tolerance the hand-written kernel earned (+${prepMs.toFixed(0)}ms one-off compile, not counted per run)`
                               : `worst ${worst.toExponential(2)} exceeds tol ${MAGMAP_TOL} -- taichi's WGSL does not land inside the floor this map is graded against` };
       } catch (e) {
         // A FAILURE HERE IS A RESULT, NOT A CRASH, and it must not take the variant bench down with it.

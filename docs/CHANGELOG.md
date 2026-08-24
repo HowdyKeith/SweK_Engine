@@ -8,6 +8,57 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3966 — the bench was timing taichi's compiler against WGSL's kernel, and Bun turns out to run everything
+
+### Batching taichi: 2.38×, and it is a fairness fix rather than a tuning trick
+
+Keith: *"Would we be able to batch the calls to Taichi to see if that would improve the timing?"* Yes — 17.6 ms per-call to 7.4 ms batched, and its bench row goes 1.33× → **3.21×**. *Why* it improves is the finding.
+
+Phase-timed on a real GPU, one `magmapTaichi()` call:
+
+| phase | ms |
+| --- | --- |
+| init | 0.0 |
+| fields | 0.1 |
+| upload | 3.0 |
+| scope | 0.0 |
+| **compile** | **9.1** |
+| dispatch *(the kernel itself)* | **0.1** |
+| readback | 8.5 |
+
+The dispatch is a tenth of a millisecond. 9.1 ms of every call was taichi re-parsing the kernel **source** with the TypeScript compiler and re-emitting WGSL. The same breakdown for a WGSL variant is module 0.0, pipeline 0.0, buffers 0.1 — Chrome recompiles nothing between reps.
+
+So seven reps charged taichi seven compiles and the hand-written kernels zero: **12.1 ms of per-call setup against 0.1 ms.** Batching does not flatter taichi, it stops penalising it. The one-off compile is still reported in the row rather than hidden, because dropping it would be the opposite error.
+
+### The phase timing said something about v3965 that had to be checked
+
+The WGSL lane is **99% readback** (base-wg64: 23.7 of 23.9 ms). That looks alarming until you see why: `dispatchWorkgroups` returns immediately and `mapAsync` is where you block for the GPU, so readback *includes* execution — the measurement is right. And both kernels move an identical 441 floats through an identical path, so the only thing that differs between them is the kernel. **The 10.7-vs-8.1 comparison remains attributable; v3965 stands.**
+
+### Batching is only valid if repeated runs stay correct
+
+One compiled kernel, one output buffer, reused. A second dispatch that accumulated instead of overwriting would make the *first* run right and every later one wrong — and the bench grades only the warm run, which is a measurement that certifies itself. The gate now runs it four times and grades **every** run: 4.42e-6 each, byte-identical between runs.
+
+### The Bun question, answered by running it
+
+There was no list. `bun-audit.mjs` covers **one** entry point (`brain/esPilot.mjs`, the cell manager that must survive `bun build --compile`) by grepping its import graph — a real check, and a different question. A grep cannot tell you whether `dgram.createSocket` actually binds.
+
+`tools/ship/bunSurface.mjs` tries things instead. Measured on Linux with **bun 1.3.11**:
+
+| | result |
+| --- | --- |
+| all 134 `ai-bridge/*Bridge.js` load | ✅ 134/134 |
+| `ai-bridge/server.js` boots and serves `/health` | ✅ |
+| `tools/ship/verify.mjs` | ✅ ALL GREEN |
+| 14 capability probes (child_process, dgram, worker_threads, cluster, vm, fs.watch, zlib, …) | ✅ identical to Node |
+
+**The list of things that do not work is, here, empty.**
+
+### The one real bug the survey found: /health lied about its runtime
+
+Bun emulates `process.version` and answers `v24.3.0` on a box whose actual Node is `v22.22.2` — so under Bun the endpoint named **a Node newer than any installed**. server.js's own line 143 contemplates *"run Node on 8788 alongside Bun on 8787"*, which is precisely the situation where you ask a health endpoint who answered and it tells you something false. `typeof Bun` is the reliable discriminator; there is a `runtime` field now.
+
+**The caveat matters more than the result: this is Linux.** Keith's rig is Windows, where Bun's process, socket and native-module surfaces are weakest, and a green run here is evidence about this box only. `bunSurface` is a *report*, not a gate — it exits 0 either way, because a verdict that differs by who invoked it is not a gate — so it can be run on the Windows box and the Mac and compared.
+
 ## Since v3965 — wg128-shared is the shipped magmap kernel: 1.32x, and bit-identical
 
 Keith's rig, Intel gen-9, medians of 7 runs:
