@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3962 — the taichi lane had never run, and chasing that found the bench had never checked anything
+
+Keith's row: `taichi.js — ERROR — Error: unresolved identifier: params at: for (let k of ti.range(params.total))`.
+
+`magmapTaichi.mjs`'s own header already explained why: taichi compiles by calling `.toString()` on what you hand it and re-parsing *that text*, so a kernel body captures nothing. The implementation then did the opposite — it built a closure with `new Function("ti", "params", ...)`. A closure is the one thing taichi never looks at. It bound five names perfectly and the compiler saw a free identifier.
+
+**The closure is why it survived review.** A wrong mechanism that looks like the right one reads as correct however carefully you read it. The host values are visibly right there being passed in; the only thing you cannot see is that the receiver is not the resolver. Fixed with `ti.addToKernelScope` — taichi's real channel, and `ti.kernel` *clones that scope at call time*, so it must be filled first — and the closure deleted rather than left standing beside the fix. Measured: 441 cells, worst `4.42e-6` against the CPU f64 reference, inside `MAGMAP_TOL`.
+
+**The header's "it cannot run where the gates run" was false, and that is what cost the lane its only defence.** It claimed `navigator.gpu` is absent in headless Chromium "under every documented enabling flag". It is present in this tree's own headless shell given `--enable-unsafe-webgpu --enable-features=Vulkan,WebGPU`. A documented impossibility is a gate nobody writes — more expensive than a bug, because it does not fail, it removes the thing that would have failed. The lane shipped at v3941 and its first execution was Keith clicking the button.
+
+### Then the real finding: the correctness check had never compared a number
+
+Both lanes read their GPU result as `warm.values || warm`. `markGpu` returns `{ kernel, adapter, value }` — **value, singular** — so `.values` was undefined, `|| warm` handed the *envelope* to the comparison loop, every `vals[k]` was `undefined`, every `d` was `NaN`, and `NaN > worst` is always false. `worst` could never leave 0. The loop ran its full 441 iterations and measured nothing.
+
+The page says, in bold, that a variant which disagrees with the reference is marked `REJECTED`. **`REJECTED` was unreachable** — for every variant, on every device, since the lane was written.
+
+**Zero is exactly what a good result looks like here, which is the whole reason it lasted.** The variants are bit-identical by construction, so a column of `0.0e+0` reads as the answer everyone wanted. The tell was available and needed someone to want it: the reference is CPU f64 and the kernels are f32, so the honest worst is the f32 floor — `4.42e-6` — and never 0.
+
+### And it hid a second, independent bug exactly
+
+`magmapGpu` dispatched `ceil(total / 64)` with **64 as a literal**, while `magmapVariants` exists to rewrite `@workgroup_size(N)`.
+
+| | dispatch | threads | 441 cells covered? |
+| --- | --- | --- | --- |
+| `wg32` | `ceil(441/64)` = 7 groups × 32 | 224 | **no — 217 left at 0** |
+| `wg64` | 7 × 64 | 448 | yes |
+| `wg128` / `wg256` | 7 × 128 / 256 | over-dispatch | yes (bounds-checked) |
+
+So it was invisible in three variants and fatal in the fourth. Keith's table read `wg32  6.40  1.14x  0.0e+0  ok` — **the fastest correct variant on the page**, and a candidate for a real tuning decision. It was not faster. It was doing half the work. Corrected, it measures `0.93x` — *slower* than the incumbent, the opposite conclusion.
+
+The dispatch now reads the shader it is actually running, and throws rather than defaulting: a default of 64 is precisely the assumption that cost 217 cells, and a wrong dispatch does not fail loudly — it returns a partly-filled buffer that looks like an answer.
+
+### Two gates, and three probes that reproduce each bug
+
+`magmapTaichiRun-selfcheck.mjs` compiles and runs the real kernel and grades it against the f64 reference. `magmapBenchVerdict-selfcheck.mjs` (~4s) drives the actual page with a **planted wrong variant** — arithmetically wrong, not structurally broken, one constant changed in the closed form — and asserts both halves from one run: the plant is `REJECTED`, and no honest variant reports exactly `0.0e+0`, because that is the signature of a comparison that never ran rather than of a perfect kernel.
+
+| probe | result |
+| --- | --- |
+| restore the envelope read | the **planted wrong kernel reports `ok`, `0.0e+0`** |
+| restore the literal `64` | `wg32` → `REJECTED`, worst `1.0e+0` |
+| remove `addToKernelScope` | Keith's exact error returns |
+
+Recorded because it is the same lesson: I made the envelope mistake *inside the gate written to catch it* — `Array.from(tagged)` on the wrapper gave `[]`, so the gate's own agreement check passed over zero cells. The length assertion caught it, which is why it is checked before the agreement and not after.
+
 ## Since v3961 — the white page had no background, and the error message had no error
 
 Keith: *"not sure why this page is white and the others are black background."*
