@@ -23,10 +23,13 @@
 // AND IT IS A RATCHET. Every 2D lab page must be responsive, so the next page cannot ship as a postage stamp.
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
+const require_ = createRequire(import.meta.url);
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -179,6 +182,105 @@ const ALL = FIELD.concat(PLOT);
                         : "swept the whole tree; " + WEBGL_EXEMPT.length + " WebGL pages exempt by design");
     ok("...and the WebGL exemption is NAMED, not silent", WEBGL_EXEMPT.length > 0 && WEBGL_EXEMPT.every((f) => fs.existsSync(path.join(ENG, f))),
        "a small drawing buffer on a GPU page is a deliberate resolution/perf tradeoff, not a layout bug");
+}
+
+// ---- 7. THE OPPOSITE BUG SHAPE: A CANVAS TOO VAGUE TO SIZE ITSELF, NOT TOO RIGID TO GROW. v3979 ------------------
+//
+// Section 6's sweep only flags a <canvas> carrying explicit width="N" height="N" HTML ATTRIBUTES -- the
+// "postage stamp" shape, where a page pins pixel dimensions and nothing lets it grow. Keith hit the mirror
+// image: graph_viewer.html's `<canvas id="c"></canvas>` carries NO width/height attributes at all, so section
+// 6's `sized` filter is empty for it and `if (!sized.length) continue;` skips the page entirely -- correctly,
+// for what section 6 checks, and silently wrong for what actually broke.
+//
+// A CANVAS IS A REPLACED ELEMENT (same family as <img>, <video>), and `position:absolute;inset:0` alone does
+// NOT stretch one the way it stretches an ordinary <div>. When width and height are both `auto`, a replaced
+// element's used size comes from its OWN INTRINSIC DIMENSIONS -- the canvas width/height HTML attributes,
+// which default to 300x150 -- not from the inset edges. `inset:0` still positions the box correctly at the
+// container's origin (confirmed live: top/left computed to 0px), so the graph rendered inside a real, wrong-
+// sized 300x150 box pinned to the top-left corner of a much larger viewport. graph_viewer.html and
+// glb_viewer.html both carried the identical `#c{position:absolute;inset:0;display:block}` rule -- a genuine
+// second instance, not a one-off -- so this is a tree-wide sweep, not two hardcoded page names.
+{
+    const walkHtml = (d, out = []) => {
+        for (const f of fs.readdirSync(d)) {
+            if (f === "node_modules" || f === ".git" || f === "vendor" || f === ".venv") continue;
+            const p = path.join(d, f);
+            let st; try { st = fs.statSync(p); } catch { continue; }
+            if (st.isDirectory()) walkHtml(p, out);
+            else if (/\.html$/.test(f)) out.push(p);
+        }
+        return out;
+    };
+    const offenders = [];
+    for (const f of walkHtml(ENG)) {
+        const src = fs.readFileSync(f, "utf8");
+        const canvasIds = [...src.matchAll(/<canvas[^>]*\bid=["']([\w-]+)["']/g)].map((m) => m[1]);
+        for (const id of canvasIds) {
+            const re = new RegExp("#" + id.replace(/-/g, "\\-") + "\\s*\\{([^}]*)\\}");
+            const m = src.match(re);
+            if (!m) continue;
+            const rule = m[1];
+            const absolute = /position\s*:\s*absolute/.test(rule);
+            // inset:0 shorthand OR the four longhand sides spelled out -- both mean "stretch", both hit the trap.
+            const inset = /inset\s*:/.test(rule) ||
+                (/\btop\s*:\s*0\b/.test(rule) && /\bleft\s*:\s*0\b/.test(rule) &&
+                 (/\bright\s*:\s*0\b/.test(rule) || /\bbottom\s*:\s*0\b/.test(rule)));
+            const hasExplicitSize = /\bwidth\s*:/.test(rule) || /\bheight\s*:/.test(rule);
+            if (absolute && inset && !hasExplicitSize) {
+                offenders.push(path.relative(ENG, f) + " -> #" + id + " {" + rule.trim() + "}");
+            }
+        }
+    }
+    ok("!! *** no canvas is stretched with position:absolute + inset alone, with no explicit width/height ***",
+        offenders.length === 0,
+        offenders.length ? "OFFENDERS: " + offenders.join(" | ") +
+            " -- a replaced element with width/height both auto uses its OWN intrinsic size (300x150), not the " +
+            "container's. Add width:100%;height:100% alongside the inset."
+            : "every <canvas> that stretches via inset also declares an explicit width and height");
+
+    for (const page of ["graph_viewer.html", "glb_viewer.html"]) {
+        const src = read(page);
+        ok("!! " + page + "'s #c rule explicitly sizes the canvas, not just insets it",
+            /#c\{position:absolute;inset:0;width:100%;height:100%;display:block\}/.test(src));
+    }
+}
+
+// ---- 8. THE REAL BROWSER, DRIVEN -- SOURCE TEXT PROVES THE RULE EXISTS, NOT THAT IT WORKS. v3979 -----------------
+{
+    const { chromium, from: pwFrom } = resolvePlaywright(require_);
+    const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    if (skip) {
+        console.log("  ----  browser half of the section-7 fix SKIPPED -- " + skip);
+    } else {
+        const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        for (const page of ["graph_viewer.html", "glb_viewer.html"]) {
+            const ctx = await b.newContext();
+            const pg = await ctx.newPage();
+            await pg.route("**/*", (route) => {
+                const u = new URL(route.request().url());
+                const p = path.join(ENG, decodeURIComponent(u.pathname));
+                if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+                    const ext = path.extname(p);
+                    const type = ext === ".mjs" || ext === ".js" ? "text/javascript" : ext === ".html" ? "text/html" : "text/plain";
+                    return route.fulfill({ status: 200, contentType: type, body: fs.readFileSync(p) });
+                }
+                return route.fulfill({ status: 404, body: "not found" });
+            });
+            await pg.setViewportSize({ width: 1000, height: 700 });
+            await pg.goto("http://localhost:8787/" + page, { waitUntil: "load" }).catch(() => {});
+            await pg.waitForTimeout(200);
+            const r = await pg.evaluate(() => {
+                const c = document.getElementById("c"), host = document.getElementById("host");
+                if (!c || !host) return null;
+                return { c: [c.clientWidth, c.clientHeight], host: [host.clientWidth, host.clientHeight] };
+            });
+            await ctx.close();
+            ok("!! " + page + ": the LIVE canvas.clientWidth/Height actually matches #host, not 300x150",
+                r && r.c[0] === r.host[0] && r.c[1] === r.host[1] && r.c[0] !== 300,
+                r ? "canvas=" + JSON.stringify(r.c) + " host=" + JSON.stringify(r.host) : "page missing #c or #host");
+        }
+        await b.close();
+    }
 }
 
 console.log(fails ? "\ncanvasFill-selfcheck: " + fails + " FAILED" : "\ncanvasFill-selfcheck: all checks pass");
