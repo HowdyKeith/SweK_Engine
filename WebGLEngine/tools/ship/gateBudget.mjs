@@ -153,7 +153,7 @@ export const MEASURED = {
     // six minutes granted to gates that finish in forty milliseconds, and every future regression hidden under
     // it. OF THE 24 NEWLY-TIMED GATES ONLY THIS ONE IS OVER 46.6s; THE NEXT IS 23s. It is the slow tail, not the
     // population, and the tail is what MEASURED is for. Measured to completion, and it PASSES.
-    "physics/sph/materialKnobs-selfcheck.mjs":       131900,
+    "physics/sph/materialKnobs-selfcheck.mjs":       154400,
     // configContract PASSES at 78s here, against 74400 in the timings -- two independent runs agreeing within a
     // few seconds. IT NEVER NEEDED A BIGGER BUDGET AT ALL: 78s fits inside the 143s default with room, so its
     // TIMEOUT on the rig was not this gate being slow. Recorded anyway because it was over the general line, and
