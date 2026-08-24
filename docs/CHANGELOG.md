@@ -8,6 +8,37 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3967 — node-bun.html: the assessment lives on a page now, not in a changelog paragraph
+
+Keith: *"I thought something was not working when we selected Bun as default instead of Node,"* and asked for a "Node / Bun" page in System Tools with the assessment, the existing switch surfaced or linked, and the `bunSurface.mjs` comparison behind a button.
+
+Filed by what it drives — reads `/runtime`, writes `use_bun.flag`, spawns `bunSurface.mjs` — the same rule `settings.html` was filed by. `runtimes.html` (the *fleet* picker: which box, which runtime) stays separate; this page answers *this* box, which runtime, and what changes.
+
+### The dependency question, answered by measuring
+
+`/runtime` already probes eleven optional packages. Isolated one at a time so a hang in one couldn't take the census down:
+
+| | standalone probe | through the real route |
+| --- | --- | --- |
+| Node | 0 of 11 resolve | 11 missing |
+| Bun | 11 of 11 resolve | 10 missing |
+
+The gap between the two Bun numbers is the tell: the standalone probe has no local `node_modules` at all, so Bun was reaching further than the route ever does. Diffed feature-by-feature through the real route: **exactly one** package differs. `ws`, and Bun ships it **built in** — `Bun.resolveSync("ws")` returns a bare name rather than a file path, and a real `WebSocketServer` **listens** under Bun with zero packages installed, confirmed even with `--install=disable` and no `ws` anywhere on disk.
+
+That difference is not cosmetic. `server.js` line 116 does `try { require("ws") } catch` and falls back to a **null-object** WebSocket server — the bridge boots either way, and without `ws`, live push is *silently* off. So on a box with no `ws` package, switching to Bun turns live updates **on** — plausibly the exact thing Keith noticed running in reverse: Node without `ws` installed would have been the degraded state, not Bun.
+
+### The page asks the box rather than telling it
+
+The runtime readout, the dependency table and the surface comparison all read live from `/runtime` and a new `/runtime/surface` route, so the page is never wrong about the *next* box it runs on. The Bun button is disabled when `bun` is not on PATH, because preferring an absent runtime **fails by doing nothing** — the launcher falls back to Node and the setting looks like it worked, which is exactly the shape of "I switched it and something was off."
+
+### The safety line
+
+`/runtime/surface` takes a runtime from an **allowlist**, never a command from the query string. Two fixed spellings, one fixed script. A route that ran what it was told would be a remote shell wearing a diagnostic's clothes, and this box exposes a tunnel. Three probes: let the query string choose the runtime name, enable the Bun button unconditionally, or drop the page from the registry — each goes red.
+
+### My own gate hit the trap this tree already knows, inverted
+
+The page's prose originally read `ai-bridge/*Bridge.js` — plain text, a glob spelled in a sentence — and `noComments`'s lexer read that `/*` as a block-comment **opener** regardless of context, swallowing 6KB of the file and failing every check on a page that was correct. Fixed twice: the prose was reworded so no future tool inherits the landmine, and the gate is scoped to the `<script>` block rather than the whole HTML document.
+
 ## Since v3966 — the bench was timing taichi's compiler against WGSL's kernel, and Bun turns out to run everything
 
 ### Batching taichi: 2.38×, and it is a fairness fix rather than a tuning trick
