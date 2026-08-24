@@ -57,6 +57,11 @@ function rebuild() {
   const wall = S.addWall({ x: 0, y: 0, z: 0, cols: 7, rows: 6, half: 0.5 });
   wallIdx = wall.idxs; boulders = []; shots = 0; ragdolls = [];
 }
+// v3982 -- addCrew/flingCrew both did this (line 64/68 below); rebuild() never had, so its own onclick="rebuild()"
+// (line 26) threw ReferenceError before rebuild() ever ran. Keith: "Uncaught ReferenceError: rebuild is not
+// defined at HTMLButtonElement.onclick (jolt-arena.html:26:48)" -- an inline onclick resolves against the GLOBAL
+// scope, not this module's, and a `type="module"` script's top-level declarations are module-scoped by default.
+window.rebuild = rebuild;
 function addCrew() {
   if (!world) return;
   for (let k = 0; k < 3; k++) ragdolls.push(createRagdoll(world, { x: 3.5 + k * 1.4, y: 1.6, z: 0, scale: 0.85 }));
@@ -66,8 +71,14 @@ function flingCrew() {
   for (const rag of ragdolls) { const c = rag.center(); const dir = c[0] >= 0 ? -1 : 1; rag.fling(dir * 30, 7, 0, 5); }
 }
 window.flingCrew = flingCrew;
+const hud = document.getElementById("hud");
 addEventListener("pointerdown", (e) => {
-  if (!world) return;
+  // v3982 -- Keith: "when i click on the buttons at the top, it fires a bullet." This is a WINDOW-LEVEL
+  // listener, so it fires for EVERY pointerdown in the document -- including one that lands on a HUD button,
+  // whose own onclick="" runs but does not stop the event from bubbling up to here too. Skip the boulder when
+  // the click originated inside #hud (avatarstage.html's menu-dismiss listener uses the same contains() guard
+  // for the equivalent problem: telling "click landed on this overlay" from "click landed on the canvas below it").
+  if (!world || (hud && hud.contains(e.target))) return;
   const tx = sx(e.clientX), ty = sy(e.clientY);
   // launch a boulder from the lower-left toward the click, fast enough to arc in
   const px = -9, py = 1.2, dx = tx - px, dy = ty - py, d = Math.hypot(dx, dy) || 1;
