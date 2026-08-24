@@ -17881,6 +17881,44 @@ ${text.replace(/'/g, "''")}
         }));
         return;
     }
+    // v3968 -- THE BROWSER HALF OF THE BRAIN LESSON CORPUS.
+    //
+    // brain/rl/lessons.mjs writes straight to disk under Node, and a browser cannot. brain-lab.html is the ONE
+    // place in this tree that runs createWatchdog today, so without this route the only surface that currently
+    // produces stall/revert verdicts could not contribute a single record -- the corpus would accumulate only
+    // from Node drivers, and the page that actually trains policies in front of a person would be silent.
+    //
+    // ONE FILE, ONE OWNER. The path comes from lessons.mjs rather than being re-spelled here, so the browser
+    // and Node halves cannot drift into writing two corpora that each look complete.
+    if (req.url.split("?")[0] === "/brain/lessons") {
+        const lessons = () => import(require("url").pathToFileURL(path.join(ENGINE_ROOT, "brain", "rl", "lessons.mjs")).href);
+        if (req.method === "GET") {
+            lessons().then((L) => {
+                const all = L.readLessons();
+                const u = new URL(req.url, "http://x");
+                const env = (u.searchParams.get("env") || "").trim().toLowerCase();
+                const rows = env ? all.filter((r) => String(r.env || "").toLowerCase().includes(env)) : all;
+                sendJson({ ok: true, path: L.lessonsPath(), total: all.length, count: rows.length,
+                           lessons: rows.slice(-500) });
+            }).catch((e) => sendJson({ ok: false, error: String((e && e.message) || e) }));
+            return;
+        }
+        if (req.method === "POST") {
+            // The body is ONE JSON record, exactly what recordLesson() built browser-side. It is re-validated
+            // through makeRecord rather than appended raw: a route that appends whatever arrives is a way to
+            // write arbitrary lines into a file the engine later reads back and trusts.
+            let body = ""; req.on("data", (c) => { body += c; if (body.length > 8192) req.destroy(); });
+            req.on("end", () => {
+                lessons().then((L) => {
+                    let d = null; try { d = JSON.parse(body || "{}"); } catch { }
+                    if (!d || typeof d !== "object") { sendJson({ ok: false, error: "not a JSON record" }); return; }
+                    const wrote = L.recordLesson(d);
+                    sendJson({ ok: !!wrote, written: !!wrote, health: L.health() });
+                }).catch((e) => sendJson({ ok: false, error: String((e && e.message) || e) }));
+            });
+            return;
+        }
+    }
     // v3967 -- RUN tools/ship/bunSurface.mjs UNDER A NAMED RUNTIME AND HAND BACK ITS JSON.
     //
     // The point of that tool is COMPARISON: the same probes under Node and under Bun, where a difference is the
