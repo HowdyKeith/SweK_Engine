@@ -90,6 +90,19 @@ export const MEASURED = {
     // SQUARE of the lab -- the same growth corroborationCensus and labResults' entries already warn about,
     // and steeper. This is a real completion on a real box, not a ceiling.
     "tools/roundhouse/valueMatch-selfcheck.mjs":     477000,
+    // *** v3973 -- THE FIFTH TIME THIS TABLE HAS HIDDEN A FAILURE BEHIND A MISSING ENTRY, AND THE SAME SHAPE
+    // AS valueMatch DIRECTLY ABOVE. *** sensitivity sat in UNRESOLVED on the 139.9s general default since v3924
+    // ("exceeded a 150s cap; never timed before that"). Stopwatch-timed on this box across three runs at v3973:
+    // 176873ms, 170384ms and 156443ms -- median 170384ms, every run GREEN. So it was never a gate that could not
+    // finish; it was a gate nobody had seen the end of, and for as long as it was over budget the REAL failure
+    // it was carrying was invisible: its last check was failing 11 dead knobs against a cap of 8, and TEN OF
+    // THOSE ELEVEN TURNED OUT TO BE ALIVE (tolerances and caps that a 1.1x nudge cannot move by construction).
+    // A TIMEOUT IS NOT A FAILURE, which is exactly why an untimed slow gate can sit red for fifty rounds.
+    //
+    // THE SPREAD IS WIDE AND IS RECORDED AS SUCH: 156s to 177s, 13% across three runs on a quiet box, because
+    // the cost is 30 devices x every mode x every knob and a few of those devices are themselves iterative. The
+    // MEDIAN is what is written down; the 2x tail headroom this table applies covers the rest.
+    "tools/roundhouse/sensitivity-selfcheck.mjs":    170384,
     "tools/ship/labDevices-selfcheck.mjs":           253635,
     "tools/roundhouse/rayleighOnset-selfcheck.mjs":  279845,
     // *** v3913 -- THE EIGHTEEN THAT HAD CREPT PAST THE GENERAL LINE, PLUS TWO MEASURED THIS ROUND. ***
@@ -301,8 +314,6 @@ export const UNRESOLVED = {
         "exceeded a 150s cap at v3924. It builds two arms of every declared plant across the whole registry, so its cost tracks the plant census rather than any fixture of its own",
     "tools/roundhouse/responseCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. Another registry-wide census; cost grows with the device count",
-    "tools/roundhouse/sensitivity-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
     "tools/ship/orphanTriage-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It walks the whole tree, so its cost is a file count rather than a physics fixture",
     "tools/ship/shaderRefs-selfcheck.mjs":
