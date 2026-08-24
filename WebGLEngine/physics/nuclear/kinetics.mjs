@@ -97,9 +97,15 @@ export function inhourRoots(rho, gen = GEN_LWR, groups = KEEPIN_U235, iters = 40
     const out = [];
     const brackets = [[-1 / gen * 1e3, poles[0] - 1e-12]];
     for (let i = 0; i < poles.length - 1; i++) brackets.push([poles[i] + 1e-12, poles[i + 1] - 1e-12]);
-    // the last branch runs to +infinity; above prompt critical the root is O((rho-beta)/gen), so the upper
-    // bound has to scale with 1/gen rather than being a fixed number
-    brackets.push([poles[poles.length - 1] + 1e-12, Math.max(1e6, 1e3 / gen)]);
+    // The last branch runs to +infinity; above prompt critical the root is O((rho-beta)/gen), so the upper bound
+    // has to scale with 1/gen rather than being a fixed number.
+    //
+    // gen = 0 IS A LEGITIMATE INPUT, NOT A GUARD AGAINST NONSENSE: it is the prompt-jump approximation, the
+    // standard simplification that the generation time is negligible beside the delayed groups. With gen = 0 the
+    // curve's supremum is exactly beta, so this branch has a root below prompt critical and NONE above it -- the
+    // bracket simply fails to straddle and no root is returned, which is the correct answer rather than an error.
+    const top = gen > 0 ? Math.max(1e6, 1e3 / gen) : 1e12;
+    brackets.push([poles[poles.length - 1] + 1e-12, top]);
     for (const [lo, hi] of brackets) {
         let a = lo, b = hi, fa = f(a), fb = f(b);
         if (!Number.isFinite(fa) || !Number.isFinite(fb) || fa * fb > 0) continue;
