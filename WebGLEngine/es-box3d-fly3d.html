@@ -423,6 +423,12 @@ function makeWorld() { return ready ? box3d.createWorld({ gravity: [0, 0, 0] }) 
 // placed in the vertex shader from the texture -- the placement is an exact mirror of sweptSpine.placeVertex,
 // which is gated in render/sweptSpine-selfcheck.mjs; only this GL plumbing is unverifiable here (no GPU).
 const TRAIL_SAMPLES = 24, TRAIL_RING = 6, TRAIL_PATH = 48;
+// v3977 -- HOW FAR BEHIND THE SHIP'S PIVOT THE TRAIL HEAD SITS, MEASURED FROM THE HULL, NOT GUESSED. makeHull's
+// own engine-glow mesh sits at local x=-1.35 (nose cone is at +1.6), group-scaled 0.9 -> 1.215 Three units
+// behind the pivot along -forward. Assigned .glb models are normalized to the same ~2.2-unit maxDim span
+// centred on their own bounding box (esShipModels.js), so this one constant is a reasonable fit for both rather
+// than a value special-cased to the procedural hull alone.
+const ENGINE_TRAIL_OFFSET = 1.2;
 function makeTrails(strandCount) {
   const rows = 3 * strandCount, data = new Float32Array(TRAIL_SAMPLES * rows * 4);
   const tex = new THREE.DataTexture(data, TRAIL_SAMPLES, rows, THREE.RGBAFormat, THREE.FloatType);
@@ -474,7 +480,14 @@ function makeTrails(strandCount) {
       for (const e of ships) {
         const s = e._strand; if (s == null || s >= strandCount) continue;
         const base = s * 3 * TRAIL_SAMPLES * 4;
-        if (!e.dead) { const p = [(e.x||0)*S, (e.alt||0)*S, (e.y||0)*S]; (e._path || (e._path = [])).push(p); if (e._path.length > TRAIL_PATH) e._path.shift(); }
+        // v3977 -- anchored at the ENGINE, not the flight-model pivot. Rotated by the ship's OWN current
+        // heading/pitch every frame via the same forward3d() the hull orientation already uses -- a static
+        // world-space offset would point the wrong way the instant the ship banks or pitches.
+        if (!e.dead) {
+          const f = forward3d(e.heading, e.pitch || 0);
+          const p = [(e.x||0)*S - f.x*ENGINE_TRAIL_OFFSET, (e.alt||0)*S - f.alt*ENGINE_TRAIL_OFFSET, (e.y||0)*S - f.y*ENGINE_TRAIL_OFFSET];
+          (e._path || (e._path = [])).push(p); if (e._path.length > TRAIL_PATH) e._path.shift();
+        }
         if (e.dead || !e._path || e._path.length < 2 || pathLength(e._path) < 0.05) { data.fill(0, base, base + 3 * TRAIL_SAMPLES * 4); continue; }
         const samples = resampleByArcLength(e._path, TRAIL_SAMPLES), frames = rotationMinimizingFrames(samples);
         const radii = [], ages = [];
