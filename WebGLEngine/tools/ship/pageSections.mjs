@@ -180,7 +180,15 @@ export const SECTIONS = [
               // was added in server.html so there is an <a> to move. FILED BY WHAT IT DRIVES: its controls POST to
               // the engine, cloud, tunnel, brain and hosting subsystems -- operating the rig, which is this
               // drawer's note, not a physical subject of its own.
-              "settings.html"] },
+              "settings.html",
+              // v3967 -- node-bun.html JOINS. Keith: "In System Tools on Server.html lets have a page called
+              // 'Node / Bun' with the assessment." FILED BY WHAT IT DRIVES, which is this drawer's rule: it
+              // reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under
+              // each runtime -- operating the rig, not a physical subject. runtimes.html stays where it is and
+              // this page links to it; that one is the FLEET picker (every service, every box), this one is the
+              // assessment of the two runtimes on THIS box, and merging them would make one page answer two
+              // questions.
+              "node-bun.html"] },
 
     // v3229 -- sphere-impostor and raymarch-live MOVED HERE OUT OF THE RENDER QA DRAWER. They are not QA
     // TOOLING, they are two of the 315 SUBJECTS render-qa opens, and filing them beside the QA control surface

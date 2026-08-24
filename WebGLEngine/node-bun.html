@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="stylesheet" href="/theme.css" />
+<title>SweK Engine &mdash; Node / Bun</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.5 ui-rounded,system-ui,sans-serif; }
+  header { padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .title { font-weight:700; font-size:18px; } .title .g { color:var(--go); }
+  header .sp { flex:1; }
+  .meta { color:var(--dim); font-size:12px; }
+  main { padding:14px 16px; max-width:1000px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:11px 13px; margin-bottom:12px; background:var(--panel); }
+  .card h2 { margin:0 0 7px; font-size:14px; color:var(--go); }
+  .now { display:flex; gap:10px; flex-wrap:wrap; align-items:center; font:13px ui-monospace,monospace; }
+  .pill { padding:3px 10px; border-radius:20px; border:1px solid var(--line); font:12px ui-monospace,monospace; }
+  .pill.on { background:#12261e; color:#9fe6c0; border-color:#2a6a4a; }
+  .pill.off { background:#1a1414; color:#f0a0a0; border-color:#5a2a2a; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; margin-top:4px; }
+  th,td { text-align:left; padding:4px 7px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  td.ok { color:#7fe0a4; } td.bad { color:#ff9b9b; } td.dim { color:var(--dim); }
+  button { padding:5px 12px; font:12px ui-monospace,monospace; cursor:pointer; background:#1a2438; color:#b0c4ff;
+           border:1px solid #3a4a6a; border-radius:6px; }
+  button:disabled { opacity:.45; cursor:default; }
+  a { color:#9fd5ff; }
+  pre { background:#06090a; border:1px solid var(--line); border-radius:6px; padding:7px 9px;
+        font:11px ui-monospace,monospace; max-height:300px; overflow:auto; white-space:pre-wrap; margin:6px 0 0; }
+  .note { font-size:12px; color:var(--dim); margin:5px 0 0; }
+  .warn { color:#e8c07a; }
+  code { font:12px ui-monospace,monospace; color:#cfe6ff; }
+</style>
+</head>
+<body>
+<header>
+  <span class="title"><span class="g">&#9881;</span> Node / Bun</span>
+  <span class="sp"></span>
+  <span class="meta" id="hdrNow">reading&hellip;</span>
+</header>
+<main>
+
+  <div class="card">
+    <h2>What is serving this page right now</h2>
+    <div class="now" id="nowRow">reading&hellip;</div>
+    <p class="note" id="nowNote"></p>
+  </div>
+
+  <div class="card">
+    <h2>Switch the runtime</h2>
+    <div class="now">
+      <button id="setNode">Use Node</button>
+      <button id="setBun">Use Bun</button>
+      <span id="prefState" class="meta"></span>
+    </div>
+    <p class="note">
+      This writes (or removes) <code>~/.voxelbridge/use_bun.flag</code>, which the launcher reads on the NEXT
+      boot &mdash; it does not restart anything now. The full runtime picker with the rest of the fleet is on
+      <a href="/runtimes.html" target="_blank" rel="noopener">runtimes.html</a>.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>The one dependency Bun lets you skip</h2>
+    <p class="note" style="color:var(--ink)">
+      Measured on this tree: of the eleven optional packages <code>/runtime</code> probes, exactly
+      <b>one</b> resolves under Bun and not under Node &mdash; <code>ws</code>, and <b>Bun ships it built in</b>
+      (<code>Bun.resolveSync("ws")</code> returns a bare name, not a file path, and a real
+      <code>WebSocketServer</code> listens).
+    </p>
+    <p class="note">
+      That is not cosmetic. <code>ai-bridge/server.js</code> line 116 does
+      <code>try { require("ws") } catch</code> and falls back to a <b>null-object</b> WebSocket server &mdash;
+      the bridge boots, and <b>live push is silently off</b>. So on a box with no <code>ws</code> installed,
+      running under Bun turns live updates ON. Every other one of the eleven is missing under both.
+    </p>
+    <div id="depBox">reading <code>/runtime</code>&hellip;</div>
+  </div>
+
+  <div class="card">
+    <h2>Capability surface &mdash; run it on THIS box</h2>
+    <p class="note">
+      Runs <code>tools/ship/bunSurface.mjs</code> under each runtime and compares. A difference is the answer;
+      a failure in both columns is the box, not Bun. Equivalent to running by hand:
+      <code>bun tools/ship/bunSurface.mjs</code> and <code>node tools/ship/bunSurface.mjs</code>.
+    </p>
+    <div class="now">
+      <button id="runBoth">Run both</button>
+      <button id="runNode">Node only</button>
+      <button id="runBun">Bun only</button>
+      <span id="surfState" class="meta"></span>
+    </div>
+    <div id="surfBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>What was measured, and what was not</h2>
+    <p class="note" style="color:var(--ink)">
+      On <b>Linux with Bun 1.3.11</b>: all 134 <code>ai-bridge</code> bridge modules load,
+      <code>ai-bridge/server.js</code> boots and serves <code>/health</code>,
+      <code>tools/ship/verify.mjs</code> runs ALL GREEN, and every capability probe matches Node &mdash;
+      <code>child_process</code>, <code>dgram</code>, <code>worker_threads</code>, <code>cluster</code> included.
+    </p>
+    <p class="note warn">
+      <b>That was Linux.</b> The rig is Windows, where Bun's process, socket and native-module surfaces are its
+      weakest, and a green run in a Linux sandbox is evidence about that sandbox. The buttons above exist so the
+      question can be answered <i>here</i> instead of inherited from somewhere else.
+    </p>
+    <p class="note">
+      One bug the survey did find and fix: <code>/health</code> reported <code>process.version</code>, which Bun
+      <b>emulates</b> &mdash; under Bun it answered <code>v24.3.0</code> on a box whose real Node was
+      <code>v22.22.2</code>, naming a Node newer than any installed. There is a <code>runtime</code> field now.
+    </p>
+  </div>
+
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const get = (u) => fetch(u, { cache:"no-store" }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+let bunAvail = false;
+
+async function loadNow() {
+  const rt = await get("/runtime");
+  if (!rt) { $("nowRow").textContent = "bridge unreachable"; return; }
+  bunAvail = !!rt.bunAvailable;
+  const isBun = rt.runtime === "bun";
+  $("nowRow").innerHTML =
+    '<span class="pill ' + (isBun ? "on" : "") + '">serving now: <b>' + esc((isBun ? "Bun " : "Node ") + (rt.version || "?")) + '</b></span>' +
+    '<span class="pill ' + (bunAvail ? "on" : "off") + '">bun on PATH: ' + (bunAvail ? "yes" : "no") + '</span>' +
+    '<span class="pill">next boot prefers: <b>' + (rt.useBun ? "Bun" : "Node") + '</b></span>';
+  $("hdrNow").textContent = (isBun ? "Bun " : "Node ") + (rt.version || "");
+  // *** THE CASE WORTH CALLING OUT, BECAUSE IT LOOKS LIKE NOTHING. *** A box whose next boot prefers Bun while
+  // Bun is not installed does not fail loudly -- the launcher falls back to Node and the preference silently
+  // does nothing. That is exactly the shape of "I switched it and something was off".
+  $("nowNote").innerHTML = (rt.useBun && !bunAvail)
+    ? '<span class="warn">The preference says Bun but bun is not on PATH &mdash; the launcher will fall back to Node and the setting will appear to do nothing.</span>'
+    : (rt.useBun !== isBun
+        ? "The preference and what is running differ &mdash; that is expected until the next restart."
+        : "");
+  $("setBun").disabled = !bunAvail;
+  $("setBun").title = bunAvail ? "" : "bun is not on PATH on this box";
+  $("prefState").textContent = "flag: " + (rt.useBun ? "use_bun.flag present" : "absent (Node)");
+  renderDeps(rt);
+}
+
+function renderDeps(rt) {
+  const f = rt.features || {};
+  const names = Object.keys(f);
+  if (!names.length) { $("depBox").textContent = "no feature list in /runtime"; return; }
+  $("depBox").innerHTML =
+    '<table><thead><tr><th>optional package</th><th>on this runtime</th><th></th></tr></thead><tbody>' +
+    names.map(n => '<tr><td><code>' + esc(n) + '</code></td>' +
+      '<td class="' + (f[n].ok ? "ok" : "bad") + '">' + (f[n].ok ? "resolves" : "missing") + '</td>' +
+      '<td class="dim">' + (n === "ws" ? "built into Bun &mdash; without it the bridge runs with live push OFF" : "") + '</td></tr>').join("") +
+    '</tbody></table>' +
+    '<p class="note">' + (rt.degraded || []).length + ' of ' + names.length +
+    ' degraded on the runtime serving this page. Switch runtime and reload to compare.</p>';
+}
+
+async function setPref(useBun) {
+  if (useBun && !bunAvail) return;
+  $("prefState").textContent = "saving…";
+  const r = await fetch("/runtime/prefer", { method:"POST", headers:{ "Content-Type":"application/json" },
+                                             body: JSON.stringify({ useBun }) }).then(x => x.json()).catch(() => null);
+  $("prefState").textContent = r ? ("saved — takes effect on the next bridge restart") : "save failed";
+  loadNow();
+}
+$("setNode").onclick = () => setPref(false);
+$("setBun").onclick  = () => setPref(true);
+
+// ---- the surface runner -------------------------------------------------------------------------------
+const surfaces = {};
+function renderSurfaces() {
+  const cols = Object.keys(surfaces);
+  if (!cols.length) { $("surfBox").innerHTML = ""; return; }
+  // Union of row names across whichever columns have run, so a one-column run still renders.
+  const names = [];
+  for (const c of cols) for (const r of (surfaces[c].rows || [])) if (!names.includes(r.name)) names.push(r.name);
+  const cell = (c, n) => {
+    const s = surfaces[c]; if (!s) return '<td class="dim">&mdash;</td>';
+    if (s.error) return '<td class="bad">' + esc(s.error.slice(0, 40)) + '</td>';
+    const r = (s.rows || []).find(x => x.name === n);
+    if (!r) return '<td class="dim">&mdash;</td>';
+    return '<td class="' + (r.ok ? "ok" : "bad") + '">' + (r.ok ? "OK" : "FAIL") + ' <span class="dim">' + esc(r.detail || "") + '</span></td>';
+  };
+  $("surfBox").innerHTML =
+    '<table><thead><tr><th>probe</th>' + cols.map(c => '<th>' + esc(surfaces[c].runtime || c) + '</th>').join("") + '</tr></thead><tbody>' +
+    names.map(n => '<tr><td>' + esc(n) + '</td>' + cols.map(c => cell(c, n)).join("") + '</tr>').join("") +
+    '</tbody></table>';
+}
+async function runSurface(rt) {
+  $("surfState").textContent = "running " + rt + "…";
+  const j = await get("/runtime/surface?rt=" + rt);
+  surfaces[rt] = j && j.ok ? j : { runtime: rt, error: (j && j.error) || "no response", rows: [] };
+  renderSurfaces();
+  $("surfState").textContent = "";
+}
+$("runNode").onclick = () => runSurface("node");
+$("runBun").onclick  = () => runSurface("bun");
+$("runBoth").onclick = async () => { await runSurface("node"); await runSurface("bun"); };
+
+loadNow();
+</script>
+</body>
+</html>

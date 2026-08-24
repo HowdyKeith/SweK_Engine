@@ -17881,6 +17881,38 @@ ${text.replace(/'/g, "''")}
         }));
         return;
     }
+    // v3967 -- RUN tools/ship/bunSurface.mjs UNDER A NAMED RUNTIME AND HAND BACK ITS JSON.
+    //
+    // The point of that tool is COMPARISON: the same probes under Node and under Bun, where a difference is the
+    // answer and a shared failure is the box. Doing that by hand means two terminals and a diff, on a rig that
+    // is usually being driven from a browser -- so the page gets a button and this is what it calls.
+    //
+    // *** THE RUNTIME IS AN ALLOWLIST, NOT A PARAMETER. *** It picks between two fixed spellings and spawns one
+    // fixed script. A route that took a command, or an interpreter path, from the query string would be a
+    // remote shell wearing a diagnostic's clothes -- and this box exposes a tunnel.
+    if (req.method === "GET" && req.url.split("?")[0] === "/runtime/surface") {
+        const want = new URL(req.url, "http://x").searchParams.get("rt") === "bun" ? "bun" : "node";
+        const script = path.join(ENGINE_ROOT, "tools", "ship", "bunSurface.mjs");
+        if (!fs.existsSync(script)) { sendJson({ ok: false, error: "tools/ship/bunSurface.mjs is not in this tree" }); return; }
+        // `node` is THIS process's own executable rather than the name "node": a box can be running the bridge
+        // under a Node that is not the one on PATH, and the surface of the runtime serving this page is the one
+        // the page is asking about. For bun there is no such handle, so the PATH name is all there is -- and a
+        // box without bun gets a clean "not installed" instead of a spawn error nobody can read.
+        const cmd = want === "bun" ? "bun" : process.execPath;
+        require("child_process").execFile(cmd, [script, "--json"], { timeout: 120000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+            (err, stdout, stderr) => {
+                if (err && !stdout) {
+                    sendJson({ ok: false, runtime: want,
+                               error: want === "bun" && /ENOENT|not found/i.test(String(err.message || ""))
+                                   ? "bun is not on PATH on this box -- install it, or run the Node column only"
+                                   : String((err && err.message) || err).slice(0, 300) });
+                    return;
+                }
+                try { sendJson(Object.assign({ ok: true }, JSON.parse(stdout))); }
+                catch (e) { sendJson({ ok: false, runtime: want, error: "bunSurface did not return JSON", out: String(stdout).slice(0, 400), err: String(stderr).slice(0, 200) }); }
+            });
+        return;
+    }
     if (req.method === "GET" && req.url === "/runtime/prefer") {
         res.writeHead(200, JSONH);
         res.end(JSON.stringify({ useBun: (fs.existsSync(path.join(os.homedir(), ".voxelbridge", "use_bun.flag")) || fs.existsSync(path.join(__dirname, "use_bun.flag"))) }));
