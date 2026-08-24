@@ -27,6 +27,9 @@
 
 import { markGpu, proposeAndVerify } from "./gpuProvenance.mjs";
 import { sampleTable, cellMag, cellOffset, referenceCell, muPoint } from "./magmapKernel.mjs";
+// v3965 -- the SHIPPED kernel is now DERIVED from the base below by the same function the bench uses. See
+// SHIPPED_VARIANT. magmapVariants.mjs imports nothing, so this direction cannot make a cycle.
+import { variantWgsl, SHARED_CAP } from "./magmapVariants.mjs";
 
 /**
  * MEASURED f32 FLOOR: 4.385e-6 worst relative error over a 9x9 grid at rho=0.1 with the 48x48 quadrature,
@@ -105,6 +108,40 @@ fn k_magmap(@builtin(global_invocation_id) gid : vec3<u32>) {
 `;
 
 /**
+ * v3965 -- *** THE DEFAULT IS NOW wg128-shared, AND IT IS DERIVED RATHER THAN REWRITTEN. ***
+ *
+ * Keith's rig, Intel gen-9, medians of 7: base-wg64 10.7ms, wg128-shared 8.1ms -- 1.32x, the fastest of the
+ * seven variants, all seven agreeing with the CPU f64 reference to the same 3.79e-6. So the incumbent is
+ * replaced by the variant that beat it.
+ *
+ * *** WGSL ABOVE STAYS PRISTINE, AND THAT IS THE WHOLE DESIGN. *** The obvious way to do this is to edit the
+ * source above -- change 64 to 128 and paste the workgroup-memory code in. That would have broken the bench
+ * that MEASURED the win, silently and in the direction that looks fine: magmap-bench does
+ * `variantWgsl(WGSL, v)` for every row, so a base that already carried shared trig would make the four
+ * "non-shared" variants shared too (step 4's cosT->cosW replace has nothing left to do), and the three shared
+ * ones would declare `var<workgroup> cosW` TWICE. Half the table would be mislabelled and the other half would
+ * not compile. THE THING THAT PROVED THE CHANGE WOULD HAVE STOPPED BEING ABLE TO PROVE ANYTHING.
+ *
+ * So the base is left exactly as it was, and the shipped kernel is `variantWgsl(WGSL, SHIPPED_VARIANT)` -- one
+ * transformation, one declaration, and "the shipped kernel is wg128-shared" is a fact the code computes rather
+ * than a second hand-written copy that can drift from the variant it claims to be.
+ */
+// *** THE WIN IS ARCHITECTURE-DEPENDENT, AND A SECOND DEVICE SAID SO IN THE OPPOSITE DIRECTION. ***
+// Intel gen-9 (Keith's rig, real silicon): 1.32x. SwiftShader (Google's software rasteriser, which is what the
+// sandbox running the gates has): 0.45x -- MORE THAN TWICE AS SLOW. That is not a contradiction to resolve, it
+// is the mechanism showing through: SwiftShader has no on-chip shared memory, so `var<workgroup>` is ordinary
+// system RAM and the cooperative load plus barrier buy nothing while costing a synchronisation. Shared-trig is
+// a win exactly where workgroup memory is real, and a loss where it is emulated.
+//
+// Recorded rather than dropped, because it is the fact that decides how much this default is worth: it is a
+// measurement on ONE real GPU, and the bench exists to be re-run. Correctness is unaffected either way -- both
+// devices grade at the same 4.4e-6 and the kernels are bit-identical.
+export const SHIPPED_VARIANT = { id: "wg128-shared", workgroup: 128, sharedTrig: true,
+                                 note: "the shipped default since v3965 -- 1.32x the old wg64 on Intel gen-9 " +
+                                       "(but 0.45x on SwiftShader, which has no real workgroup memory)" };
+export const SHIPPED_WGSL = variantWgsl(WGSL, SHIPPED_VARIANT);
+
+/**
  * Run the kernel. Returns a GPU-TAGGED Float32Array, so anything downstream that reads it while a portability
  * measurement is armed trips the v2899 guard rather than being stamped portable for free.
  */
@@ -112,7 +149,25 @@ export async function magmapGpu(device, { n = 21, span = 1.0, rho = 0.1, nR = 48
     // v2948: `wgsl` lets the A/B bench drive a VARIANT of the kernel (different workgroup size, or trig tables
     // cached in workgroup memory) without touching the default path -- null means the shipped kernel, exactly as
     // before. Variants are bit-identical by construction; the bench verifies that on the device before timing.
-    const SRC = wgsl || WGSL;
+    // *** THE SHARED-TRIG KERNEL IS ONLY CORRECT UP TO SHARED_CAP, AND THAT IS A SILENT FAILURE IF UNGUARDED. ***
+    // cosW/sinW are `array<f32, SHARED_CAP>` and the cooperative load writes cosW[t] for t < P.nT. At nT > 64
+    // that is an OUT-OF-BOUNDS WORKGROUP WRITE: no error, no crash, just wrong numbers from a kernel that looks
+    // like it ran. magmap-bench already knew this and SKIPS its shared rows above the cap -- but the bench is
+    // not the only caller, and a default that is wrong outside a range nothing enforces is worse than a slower
+    // default. Every GPU caller in this tree uses nT=48 today; magmapGpu's own signature accepts any nT, and
+    // lensBind's finiteSourceMag runs 240 on the CPU, so "nobody passes more than 64" is a fact about today
+    // rather than a property. Above the cap it falls back to the pristine base, and `kernel` in the returned
+    // tag says which one ran, because a fallback nobody can see is a fallback nobody can debug.
+    //
+    // *** ONE DECISION, TWO OUTPUTS. *** The first cut chose SRC with one expression and built the provenance
+    // label with a second one that re-tested the same conditions. They agreed -- and a probe that removed the
+    // cap guard showed what the shape costs: the kernel changed and THE LABEL DID NOT, so the run reported
+    // "base-wg64(nT>cap)" while executing the shared kernel. A tag that can disagree with the thing it names is
+    // worse than no tag, because it is believed. Deciding once makes the disagreement unrepresentable.
+    const pick = wgsl ? { src: wgsl, label: "custom" }
+        : nT <= SHARED_CAP ? { src: SHIPPED_WGSL, label: SHIPPED_VARIANT.id }
+            : { src: WGSL, label: "base-wg64(nT>cap)" };
+    const SRC = pick.src;
     const table = sampleTable(nT);
     const total = n * n;
 
@@ -184,7 +239,10 @@ export async function magmapGpu(device, { n = 21, span = 1.0, rho = 0.1, nR = 48
     for (const b of [uni, bCos, bSin, bOut, bStage]) b.destroy?.();
 
     const adapter = device.__adapterLabel || "unknown";
-    return markGpu(cells, { kernel: "magmap.wgsl", adapter });
+    // v3965 -- the tag names WHICH kernel produced these numbers. Two kernels can now serve this call, and a
+    // provenance record that said only "magmap.wgsl" would make the fallback invisible in exactly the logs
+    // somebody would be reading to find out why a run differed.
+    return markGpu(cells, { kernel: "magmap.wgsl/" + pick.label, adapter });
 }
 
 /**
