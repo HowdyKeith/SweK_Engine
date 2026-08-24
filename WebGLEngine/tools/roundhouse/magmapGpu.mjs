@@ -145,7 +145,35 @@ export async function magmapGpu(device, { n = 21, span = 1.0, rho = 0.1, nR = 48
     const enc = device.createCommandEncoder();
     const pass = enc.beginComputePass();
     pass.setPipeline(pipe); pass.setBindGroup(0, bg);
-    pass.dispatchWorkgroups(Math.ceil(total / 64));
+    // v3962 -- *** THE DIVISOR WAS THE LITERAL 64 WHILE THE VARIANT REWRITES @workgroup_size(N). ***
+    //
+    // magmapVariants exists to change exactly that number, so this line was wrong for every variant that is not
+    // the incumbent -- and wrong in the one direction that produces a PLAUSIBLE result. wg32 dispatched
+    // ceil(441/64) = 7 groups of 32 = 224 threads for 441 cells: 217 cells were never written, stayed 0, and the
+    // kernel returned in a bit over half the time. On Keith's rig it read "wg32  6.40  1.14x  0.0e+0  ok" -- the
+    // fastest correct variant on the page. IT WAS NOT FASTER, IT WAS DOING HALF THE WORK, and the only thing
+    // standing between that and a tuning decision was the correctness check that (v3962, same round) had never
+    // compared anything. Two independent bugs, and the second one hid the first exactly.
+    //
+    // wg128 and wg256 were unaffected and that is the trap, not the consolation: ceil(441/64) = 7 groups of 128
+    // OVER-dispatches, and over-dispatch is harmless because the kernel bounds-checks. So the defect was
+    // invisible in three of four variants and fatal in the fourth, which is how it read as a device quirk.
+    //
+    // THE COUNT IS NOW DERIVED FROM THE SHADER THAT IS ACTUALLY BEING RUN rather than from a constant that
+    // happens to match one of them. Parsed from the WGSL because the WGSL is the authority -- a caller-supplied
+    // width could disagree with the source and would reintroduce the same class of bug one level up.
+    const wgSize = (() => {
+        // SRC, not `wgsl`: `wgsl` is the optional OVERRIDE and is null on the default path, so parsing it
+        // would have thrown for the shipped kernel and worked only for variants -- the same "reads the wrong
+        // source of truth" mistake this block is fixing, made once more while fixing it.
+        const m = /@workgroup_size\(\s*(\d+)/.exec(SRC);
+        // No match means the shader is not the shape this function knows how to dispatch. THROWING IS THE POINT:
+        // a default of 64 here is precisely the assumption that cost 217 cells, and a wrong dispatch does not
+        // fail loudly -- it returns a partly-filled buffer that looks like an answer.
+        if (!m) throw new Error("magmapGpu: no @workgroup_size(N) in the WGSL -- refusing to guess the dispatch");
+        return parseInt(m[1], 10);
+    })();
+    pass.dispatchWorkgroups(Math.ceil(total / wgSize));
     pass.end();
     enc.copyBufferToBuffer(bOut, 0, bStage, 0, total * 4);
     device.queue.submit([enc.finish()]);

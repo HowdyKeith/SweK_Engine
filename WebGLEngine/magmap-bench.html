@@ -54,11 +54,31 @@ import { magmapGpu, WGSL, MAGMAP_TOL } from "./tools/roundhouse/magmapGpu.mjs";
 import { sampleTable, referenceCell } from "./tools/roundhouse/magmapKernel.mjs";
 import { VARIANTS, variantWgsl, validateVariant } from "./tools/roundhouse/magmapVariants.mjs";
 import { magmapTaichi, TAICHI_URL } from "./tools/roundhouse/magmapTaichi.mjs";
+import { unwrapGpu } from "./tools/roundhouse/gpuProvenance.mjs";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
+// v3962 -- *** THE CORRECTNESS CHECK ON THIS PAGE HAD NEVER COMPARED ANYTHING. ***
+//
+// Both lanes read their result as `warm.values || warm`. markGpu returns `{ kernel, adapter, value }` -- VALUE,
+// SINGULAR -- so `.values` is undefined, `|| warm` handed the WRAPPER to the comparison loop, and every
+// `vals[k]` was undefined. The loop then ran its full 441 iterations computing `Math.abs(undefined - ref[k])`,
+// which is NaN, and `NaN > worst` IS ALWAYS FALSE. So `worst` could never leave 0.
+//
+// *** AND ZERO IS EXACTLY WHAT A GOOD RESULT LOOKS LIKE HERE, WHICH IS WHY IT SURVIVED. *** The variants are
+// bit-identical by construction, so a column of 0.0e+0 reads as the answer everyone hoped for. The tell was
+// available and nobody had reason to look for it: the reference is CPU f64 and the kernel is f32, so the honest
+// worst is the f32 floor -- 4.42e-6, measured -- and never 0. A PLAUSIBLE VACUOUS RESULT IS WORSE THAN A CRASH.
+//
+// The page says, in bold: "a variant that is faster but disagrees with the reference is marked REJECTED". It
+// could not have been. `worst <= MAGMAP_TOL` was `0 <= 1e-5` on every row, so REJECTED was unreachable for
+// every variant, every device, since the lane was written.
+//
+// unwrapGpu is the documented reader and it is also the one that COUNTS the read for the provenance tripwire --
+// so the old line was not merely wrong, it was invisible to the guard that exists to notice GPU-sourced numbers.
+const cells = (r) => unwrapGpu(r);
 const CFG = { n: 21, span: 1.0, rho: 0.1, nR: 48, nT: 48 };
 const REPS = 7;   // medians, not single samples -- GPU timing is noisy for the same reasons CPU timing is
 
@@ -92,7 +112,7 @@ $("run").onclick = async () => {
       try {
         // one warm run, which is also the correctness run
         const warm = await magmapGpu(device, { ...CFG, wgsl: src });
-        const vals = warm.values || warm;
+        const vals = cells(warm);
         let worst = 0;
         for (let k = 0; k < ref.length; k++) {
           const d = Math.abs(vals[k] - ref[k]) / Math.max(Math.abs(ref[k]), 1e-30);
@@ -149,7 +169,7 @@ $("run").onclick = async () => {
         const ti = await import(TAICHI_URL);
         st("compiling + timing the taichi kernel...");
         const warm = await magmapTaichi(ti.default || ti, CFG);
-        const vals = warm.values || warm;
+        const vals = cells(warm);
         let worst = 0;
         for (let k = 0; k < ref.length; k++) {
           const d = Math.abs(vals[k] - ref[k]) / Math.max(Math.abs(ref[k]), 1e-30);

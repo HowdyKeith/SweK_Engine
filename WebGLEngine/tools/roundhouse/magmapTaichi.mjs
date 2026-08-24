@@ -36,17 +36,23 @@
 //
 // ---- WHAT THIS FILE CANNOT DO, SAID OUT LOUD ------------------------------------------------------------------
 //
-// *** IT CANNOT RUN ANYWHERE THIS TREE'S GATES RUN. *** taichi's WgslCodegen imports Runtime, and Runtime
-// requires navigator.gpu before anything compiles, so there is no headless path that even EMITS the generated
-// WGSL, let alone runs it. The desktop that writes this code has no WebGPU (checked: navigator.gpu is absent in
-// headless Chromium here under every documented enabling flag).
+// *** v3962 -- THIS PARAGRAPH USED TO SAY IT CANNOT RUN WHERE THE GATES RUN. THAT WAS WRONG, AND IT COST THE
+// LANE ITS ONLY CHANCE OF BEING CAUGHT. *** It read: "there is no headless path that even EMITS the generated
+// WGSL... checked: navigator.gpu is absent in headless Chromium here under every documented enabling flag."
+// navigator.gpu IS present in the headless shell this tree already uses for its browser gates, given
+// --enable-unsafe-webgpu --enable-features=Vulkan,WebGPU. ti.init() succeeds, the kernel compiles, and it runs:
+// 441 cells, worst relative difference 4.42e-6 against the CPU f64 reference, inside MAGMAP_TOL (1e-5) and a
+// hair under the measured f32 floor this map is graded against.
 //
-// That is the same split magmapVariants already lives with -- "the phone times the variants; the desktop
-// adjudicates" -- and it is handled the same way: this module REFUSES rather than emulating. There is
-// deliberately no magmapTaichiEmulated(). magmapGpu.mjs has an emulator because it is reproducing arithmetic
-// this tree wrote and can therefore model; NOBODY HERE KNOWS WHAT WGSL TAICHI WILL EMIT, so an "emulator" for
-// it would be a guess wearing a measurement's clothes -- precisely the thing magmapGpu's own header warns
-// about ("a test that passes because the experiment did not run").
+// A DOCUMENTED "IMPOSSIBLE" IS A GATE NOBODY WRITES. This lane shipped at v3941 having never once executed --
+// its first run was Keith clicking the button, and it failed on its first line. The claim was the reason no
+// gate existed to notice; magmapTaichiRun-selfcheck.mjs now runs the whole thing every round.
+//
+// What remains true, and is NOT weakened by any of the above: this module REFUSES rather than emulating when
+// there is no WebGPU. There is deliberately no magmapTaichiEmulated(). magmapGpu.mjs has an emulator because it
+// is reproducing arithmetic this tree wrote and can therefore model; NOBODY HERE KNOWS WHAT WGSL TAICHI WILL
+// EMIT, so an "emulator" for it would be a guess wearing a measurement's clothes -- precisely the thing
+// magmapGpu's own header warns about ("a test that passes because the experiment did not run").
 "use strict";
 
 import { markGpu } from "./gpuProvenance.mjs";
@@ -118,7 +124,13 @@ export const FORBIDDEN_TI_OPS = ["ti.rsqrt", "ti.sin", "ti.cos", "ti.tan", "ti.p
  *                     so this module stays loadable (and greppable, and gateable) on a machine with no WebGPU --
  *                     importing a 3.5 MB bundle that calls navigator.gpu at init is not something a node gate
  *                     should do as a side effect of reading this file.
- * @returns {Promise<Float32Array>} GPU-tagged, so the provenance guard sees it exactly like magmapGpu's output.
+ * @returns {Promise<{kernel: string, adapter: string, value: Float32Array}>} the markGpu WRAPPER, exactly like
+ *          magmapGpu's output -- READ IT WITH unwrapGpu(), which is also what counts the read for the
+ *          provenance tripwire. v3962: this said `Promise<Float32Array>`, which is what the object CONTAINS and
+ *          not what it IS, and magmap-bench.html believed it -- reaching for `.values` (plural; the field is
+ *          `value`) and falling back to the wrapper, so its correctness loop compared undefined against the
+ *          reference 441 times and reported a perfect score. A RETURN TYPE THAT DESCRIBES THE PAYLOAD INSTEAD
+ *          OF THE ENVELOPE is an invitation to index into the envelope.
  */
 export async function magmapTaichi(ti, { n = 21, span = 1.0, rho = 0.1, nR = 48, nT = 48 } = {}) {
     if (!ti) throw new Error("magmapTaichi: pass the taichi.js module in -- this file does not import it");
@@ -139,9 +151,29 @@ export async function magmapTaichi(ti, { n = 21, span = 1.0, rho = 0.1, nR = 48,
 
     const params = { total, n, nR, nT, span, rho };
 
-    // eslint-disable-next-line no-new-func -- taichi's own model: the kernel body is SOURCE it re-parses.
-    const body = new Function("ti", "params", "cosT", "sinT", "out", `return (${KERNEL_SRC});`)(ti, params, cosT, sinT, out);
-    const k = ti.kernel(body);
+    // v3962 -- *** THIS LANE HAD NEVER RUN. "unresolved identifier: params". ***
+    //
+    // The header above says it, correctly, and then the code did the opposite: taichi compiles by calling
+    // .toString() on what you hand it and RE-PARSING THAT TEXT, so the kernel body cannot capture anything.
+    // What was here was `new Function("ti","params",...)(ti, params, ...)` -- a closure. A closure is exactly
+    // the thing taichi never looks at. It bound five names beautifully and taichi saw none of them, because
+    // what reaches the compiler is the SOURCE, in which `params` is a free identifier that resolves nowhere.
+    //
+    // *** AND THE CLOSURE IS WHY THE BUG SURVIVED REVIEW. *** It made the wiring LOOK done. Reading it, the
+    // host values are plainly right there being passed in; the one thing you cannot see is that the mechanism
+    // receiving them is not the mechanism doing the resolving. A WRONG MECHANISM THAT LOOKS LIKE THE RIGHT ONE
+    // reads as correct however carefully you read it -- so the closure is gone rather than fixed alongside, and
+    // the source string is handed to ti.kernel directly (it accepts a string; measured byte-identical). Now
+    // there is nothing in this function that implies a binding it does not make.
+    //
+    // taichi's actual channel is the KERNEL SCOPE, and ti.kernel CLONES IT AT CALL TIME
+    // (`sr.kernel(ne.getCurrentProgram().kernelScope.clone(), ...)` in the vendored bundle) -- so the scope must
+    // be populated BEFORE the kernel is built, not after. Cleared first because the scope is global program
+    // state that outlives this call: a second run at a different CFG would otherwise inherit the first run's
+    // fields, and a stale field is the kind of wrong answer that still looks like an answer.
+    ti.clearKernelScope();
+    ti.addToKernelScope({ params, cosT, sinT, out });
+    const k = ti.kernel(KERNEL_SRC);
 
     const t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
     k();
