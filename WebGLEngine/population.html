@@ -142,7 +142,7 @@ $("drawBtn").addEventListener("click", async () => {
     if (!gl.getExtension("EXT_color_buffer_float")) { out.textContent = "UNSUPPORTED: EXT_color_buffer_float missing -- the field needs float targets"; return; }
     const G = await import("./sim/populationGPU.js");
     const side = 256, field = P.fieldPlan({ side });
-    const sim = G.makePopulationGPU(gl, { side, tile: 32 });
+    const sim = G.createPopulationGPU(gl, { side, tile: 32 });
     // SEED A POPULATION ON PURPOSE, so that an empty canvas is never the expected answer. v3122's lesson: a
     // system whose checks pass because it does nothing is the quietest failure here, and a blank screen that
     // could mean "nothing spawned yet" would be exactly that failure wearing a picture.
