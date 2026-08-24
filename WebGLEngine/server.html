@@ -878,6 +878,11 @@ window.addEventListener("load", function () {
         <!-- v3030 -- policyMassBridge was built at v2856 SPECIFICALLY to give a CLI-only tool a front door, and
              then never got one itself. Last entry on the bridge-census UI debt list, sitting since v3011. -->
         <button class="gtab" data-tab="policymass"><span class="gtabTog">&#9656;</span><span>&#127919; Policy Mass</span><span class="gtabState" id="pmStat"></span></button>
+        <!-- v3963 -- ai-bridge/sharpBridge.js (apple/ml-sharp: one photograph -> a 3D Gaussian splat) shipped at
+             v3948 with a working status/config/predict API on the server and NO PAGE ANYWHERE THAT CALLS IT --
+             the same "11 registry entries" shape Keith caught elsewhere on this page, just for a bridge instead
+             of a link: a route that exists and a route that is REACHABLE are not the same claim. -->
+        <button class="gtab" data-tab="sharp"><span class="gtabTog">&#9656;</span><span>&#128247; ml-sharp</span><span class="gtabState" id="sharpStat"></span></button>
         <button class="gtab" data-tab="cloud"><span class="gtabTog">&#9656;</span><span>&#9729;&#65039; Cloud &amp; Hosting</span><span class="gtabState" id="cloudSummary"></span></button>
         <button class="gtab" data-tab="celltrack"><span class="gtabTog">&#9656;</span><span>&#129516; Cell Tracking</span><span class="gtabState" id="ctState"></span></button>
         <button class="gtab" data-tab="renderqa"><span class="gtabTog">&#9656;</span><span>&#128444;&#65039; Render QA</span><span class="gtabState" id="rqState"></span></button>
@@ -1678,6 +1683,46 @@ A password fetches a token from the list server; an unregistered callsign needs 
             that fail, and those are <i>identical in a ratio</i>. Ranking mass against merit tells them apart.
           </div>
           <div id="pmBody" style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;">checking&hellip;</div>
+        </div>
+        <div class="gpanel" data-panel="sharp" hidden>
+          <div data-panel-pages="sharp" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0 8px;"></div>
+          <div class="gpanelHdr">&#128247; ml-sharp &mdash; one photograph &rarr; a 3D Gaussian splat</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">
+            Wraps <a href="https://github.com/apple/ml-sharp" target="_blank" rel="noopener" style="color:#9fd5ff;">apple/ml-sharp</a>.
+            The output is a standard <code>.ply</code> Gaussian splat &mdash; <code>engine/splatParser.js</code> and
+            <code>SplatRenderer.js</code> already read the format this produces; this panel only runs the model and
+            writes the file. Runs locally if ml-sharp + PyTorch are installed on this box, or on a Modal serverless GPU deployed from
+            <code>modal/sharp_modal.py</code> in this tree and pointed at below.
+          </div>
+          <div id="sharpLicence" style="font-size:11px;color:#e8c07a;background:#1e1704;border:1px solid #5a4520;border-radius:6px;padding:6px 9px;margin-bottom:8px;">checking&hellip;</div>
+          <div id="sharpStatus" style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;margin-bottom:8px;">checking&hellip;</div>
+
+          <div style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
+            <div style="font-size:11px;color:#b0c4ff;margin-bottom:5px;">&#9729;&#65039; Modal endpoint (optional &mdash; lets a box with no GPU still predict)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <input id="sharpEndpoint" type="text" placeholder="https://yourname--sharp-predict.modal.run"
+                     style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 6px;width:280px;">
+              <form onsubmit="return false" style="display:contents" autocomplete="off">
+                <input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value="">
+                <input id="sharpToken" type="password" placeholder="token" title="the SHARP_TOKEN secret the endpoint was deployed with"
+                       style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 6px;width:120px;" autocomplete="current-password">
+              </form>
+              <button id="sharpCfgSave" style="font-size:11px;padding:3px 10px;background:#1a2438;color:#b0c4ff;border:1px solid #3a4a6a;border-radius:5px;cursor:pointer;">Save</button>
+              <span id="sharpCfgState" style="font-size:11px;color:var(--dim);"></span>
+            </div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px;">Leave blank to run locally. The token is written to <code>~/.voxelbridge/sharp.json</code> on this box, outside the engine tree &mdash; never shipped, never echoed back.</div>
+          </div>
+
+          <div style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
+            <div style="font-size:11px;color:#9fe0ff;margin-bottom:5px;">&#128248; Predict</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <input id="sharpImage" type="text" placeholder="path to a .jpg / .png on this box"
+                     style="background:#0c1410;color:var(--ink);border:1px solid var(--line);border-radius:5px;font:11px ui-monospace,monospace;padding:3px 6px;flex:1 1 260px;">
+              <button id="sharpRun" style="font-size:11px;padding:3px 12px;background:#14241a;color:#9fe;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;">&#9654; Predict</button>
+            </div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px;">A server-side path, not an upload &mdash; this bridge reads the file from disk on whichever box runs it, the way the rig and roundhouse panels already do. Output lands in the asset library (never a path the release packer would sweep up).</div>
+            <div id="sharpResult" style="font-size:11px;margin-top:6px;"></div>
+          </div>
         </div>
         <div class="gpanel" data-panel="crossarch" hidden>
           <div data-panel-pages="crossarch" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0 8px;"></div>
@@ -7621,6 +7666,93 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
     }
     const t=document.querySelector('[data-tab="policymass"]');
     if(t) t.addEventListener("click", () => setTimeout(pmLoad, 30));
+  })();
+
+
+  // v3963 -- ml-sharp FRONT DOOR. sharpBridge.js has shipped a working status/config/predict API since v3948
+  // and NOTHING ON ANY PAGE CALLED IT -- the bridge census this tree runs after every new bridge would have
+  // caught this if it had been run; it was not, and the gap sat for fifteen rounds. Load-on-click, same as
+  // Policy Mass above: the status call runs a python probe and (on the local path) a `sharp --help` spawn, so
+  // it should not fire on every page load for a panel nobody has opened.
+  (function(){
+    const esc=(x)=>String(x==null?"":x).replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    let lastStatus = null;
+
+    async function sharpLoad(){
+      const lic=document.getElementById("sharpLicence"), body=document.getElementById("sharpStatus"),
+            stat=document.getElementById("sharpStat"), ep=document.getElementById("sharpEndpoint");
+      if(!body) return;
+      try{
+        const j = await (await fetch("/sharp/status",{cache:"no-store"})).json();
+        lastStatus = j;
+        if(lic) lic.innerHTML = "&#9888;&#65039; <b>Research use only.</b> " + esc((j.licence&&j.licence.summary)||"");
+        // Prefill the endpoint field from the saved config ONLY if the user has not started typing one --
+        // overwriting a half-typed value on every tab-reopen would be the kind of thing that loses work quietly.
+        if(ep && !ep.dataset.touched) ep.value = j.remoteEndpoint || "";
+
+        const rows = [];
+        rows.push("where: <b style=\"color:" + (j.ready?"#7fe0a4":"#e0a37f") + "\">" + esc(j.where || "not configured") + "</b>" +
+                   (j.ready ? "" : "  " + esc(j.why||"")));
+        if(j.where === "modal"){
+          rows.push("endpoint: " + esc(j.remoteEndpoint||"") + "   token: " + (j.remoteHasToken?"set":"<span style=\"color:#e0a37f\">not set</span>"));
+        } else {
+          rows.push("python: " + esc(j.python||"(none found)") + (j.pythonVersion?" ("+esc(j.pythonVersion)+")":""));
+          rows.push("ml-sharp: " + (j.sharpInstalled ? "installed &mdash; "+esc(j.invocation) : "<span style=\"color:#e0a37f\">not installed</span>"));
+          if(j.sharpInstalled) rows.push("weights: " + (j.weightsCached ? "cached" : "<span style=\"color:#caa05a\">not cached yet &mdash; first run downloads them</span>"));
+        }
+        rows.push("writes to: <span style=\"color:#6f8a7c\">" + esc(j.outDir||"") + "</span>");
+        body.innerHTML = rows.map(r=>"<div>"+r+"</div>").join("");
+        if(stat) stat.textContent = j.ready ? j.where : "not ready";
+      }catch(e){ body.textContent = "bridge unreachable"; }
+    }
+
+    const epIn=document.getElementById("sharpEndpoint");
+    if(epIn) epIn.addEventListener("input", ()=>{ epIn.dataset.touched = "1"; });
+
+    const cfgBtn=document.getElementById("sharpCfgSave");
+    if(cfgBtn) cfgBtn.addEventListener("click", async ()=>{
+      const st=document.getElementById("sharpCfgState");
+      const endpoint=(document.getElementById("sharpEndpoint")||{}).value||"";
+      const token=(document.getElementById("sharpToken")||{}).value||"";
+      cfgBtn.disabled = true; if(st) st.textContent = "saving…";
+      try{
+        const j = await (await fetch("/sharp/config",{method:"POST",headers:{"Content-Type":"application/json"},
+                   body:JSON.stringify({endpoint, token})})).json();
+        if(!j.ok){ if(st){ st.textContent = "error: " + (j.error||"?"); st.style.color = "#f88"; } }
+        else {
+          if(st){ st.textContent = "saved ✓" + (j.hasToken?" (token set)":""); st.style.color = "var(--dim)"; }
+          const tokIn=document.getElementById("sharpToken"); if(tokIn) tokIn.value = "";   // never linger client-side
+          await sharpLoad();
+        }
+      }catch(e){ if(st){ st.textContent = "unreachable"; st.style.color = "#f88"; } }
+      finally{ cfgBtn.disabled = false; }
+    });
+
+    const runBtn=document.getElementById("sharpRun");
+    if(runBtn) runBtn.addEventListener("click", async ()=>{
+      const res=document.getElementById("sharpResult"), imgIn=document.getElementById("sharpImage");
+      const image=(imgIn&&imgIn.value||"").trim();
+      if(!image){ if(res){ res.innerHTML = "<span style=\"color:#e0a37f\">enter a path to an image on this box first</span>"; } return; }
+      runBtn.disabled = true;
+      if(res) res.innerHTML = "<span style=\"color:var(--dim)\">predicting… (first run downloads weights, can take a while)</span>";
+      try{
+        const j = await (await fetch("/sharp/predict",{method:"POST",headers:{"Content-Type":"application/json"},
+                   body:JSON.stringify({image})})).json();
+        if(!j.ok){ if(res) res.innerHTML = "<span style=\"color:#f88\">" + esc(j.error||"predict failed") + "</span>"; }
+        else if(res){
+          res.innerHTML =
+            "<div style=\"color:#7fe0a4\">&#10003; " + esc(j.name) + "  (" + esc(j.mb) + " MB, " + esc(Math.round(j.ms/1000*10)/10) + "s, " + esc(j.invocation) + ")</div>" +
+            "<div style=\"color:#6f8a7c;font-size:10px;word-break:break-all;\">" + esc(j.ply) + "</div>" +
+            "<button id=\"sharpCopyPath\" style=\"font-size:10px;padding:2px 8px;margin-top:3px;background:#0c1410;color:var(--dim);border:1px solid var(--line);border-radius:4px;cursor:pointer;\">Copy path</button>";
+          const cp=document.getElementById("sharpCopyPath");
+          if(cp) cp.onclick = function(){ try{ navigator.clipboard.writeText(j.ply); cp.textContent="copied ✓"; setTimeout(()=>{cp.textContent="Copy path";},1500);}catch(e){} };
+        }
+      }catch(e){ if(res) res.innerHTML = "<span style=\"color:#f88\">bridge unreachable</span>"; }
+      finally{ runBtn.disabled = false; }
+    });
+
+    const t=document.querySelector('[data-tab="sharp"]');
+    if(t) t.addEventListener("click", () => setTimeout(sharpLoad, 30));
   })();
 </script>
 

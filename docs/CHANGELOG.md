@@ -8,6 +8,34 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3963 — "what page is SHARP-ML on?" — none, for fifteen rounds
+
+`ai-bridge/sharpBridge.js` went in at v3948 with a working API, three routes wired into `server.js`, a selfcheck, a Modal deployment recipe and a licence surface. **Nothing on any page ever called it.** Keith found it by asking a question that presumed a page existed.
+
+A route that *exists* and a route that is *reachable* are not the same claim — which is exactly the shape v3959 fixed for eleven page links four rounds ago. There it was a link the registry could not see; here a bridge no page could reach. Both stayed invisible for the same reason: everything on the producing side was green. The bridge census this tree runs after every new bridge would have caught it. It was not run, so the gap sat.
+
+v3963 gives it a drawer — `📷 ml-sharp`, between Policy Mass and Cloud & Hosting:
+
+| control | what it does |
+| --- | --- |
+| status readout | where it would run (`local` / `modal`), python + invocation, whether weights are cached, and the output directory |
+| Modal endpoint + token | writes to `~/.voxelbridge/sharp.json`, outside the tree |
+| Predict | server-side image path in, `.ply` out, with size, elapsed and the invocation that produced it |
+
+**Load-on-click, and that is not a performance preference.** `status()` runs a Python probe and, on the local path, spawns `sharp --help`. Doing that on every `server.html` load — for a drawer nobody opened — puts a subprocess behind a page paint. Policy Mass established the pattern; the gate now pins it by asserting `/sharp/status` is *not* requested before the tab is clicked.
+
+Two rules carried in from `githubBridge` rather than re-derived: the token posts but is never echoed back, and **the input clears itself after a successful save** — a saved secret sitting in a text input is a secret in every screenshot of that panel. The endpoint field prefills from the saved config but marks itself touched on the first keystroke, so a later status load cannot overwrite what somebody is mid-typing. That is `hostingPanel`'s "the drawer renamed itself" defect one field over, and cheaper to prevent than to diagnose.
+
+The licence banner renders unconditionally rather than behind a link, because `sharpBridge`'s own header already settled that: the person who needs to read *research only, non-commercial* is whoever is about to press Predict.
+
+`tools/ship/sharpPanel-selfcheck.mjs` drives nine checks in a real browser with the routes stubbed — markup can show the fields exist, only a DOM can show that a failed predict renders the bridge's reason instead of a blank div. Three probes confirm it bites:
+
+| probe | result |
+| --- | --- |
+| fire the status load on page-load | the load-on-click clause goes red |
+| stop clearing the token field | the secrets clause goes red |
+| delete the empty-path guard | the panel POSTs a predict for nothing |
+
 ## Since v3962 — the taichi lane had never run, and chasing that found the bench had never checked anything
 
 Keith's row: `taichi.js — ERROR — Error: unresolved identifier: params at: for (let k of ti.range(params.total))`.
