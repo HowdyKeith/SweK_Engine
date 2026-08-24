@@ -16,15 +16,48 @@
 // spread of zero, and that is exact by construction rather than chosen -- the floor is flat because the wall
 // clamps every particle to the same coordinate, which v3540 discovered by shipping a statistic that measured
 // it. That bug is this file's control.
+//
+// v3972 -- WIRED INTO THE LESSON CORPUS, AND *** ONE OF THIS FILE'S THREE SWEEPS IS DELIBERATELY LEFT OUT. ***
+//
+// This is the most expensive gate in the tree (646.9s recorded; the header above measured over 1200s on one
+// core), and two of its sections spend that time asking a question the corpus was built to remember: does a
+// swept quantity SETTLE. Section 2 sweeps settle time and hand-rolls a reversal test; section 4's last check
+// sweeps 3000 against 6000 steps and hand-rolls a 5%-drift test. Both verdicts already exist here, in this
+// file, and until now died with the process -- so re-asking cost eleven minutes and the answer was already
+// known.
+//
+// *** THE TILT SWEEP IS NOT WIRED, AND THAT IS THE POINT OF READING THIS COMMENT. *** Section 4's tilt rows
+// look like the best candidate in the file -- four points, its own monotone loop, the same shape as the other
+// two. IT HAS THE OPPOSITE SEMANTICS. The tilt sweep is a LOAD-BEARING NEGATIVE: the spread is SUPPOSED to
+// rise with the angle, and the finding worth remembering is when it STOPS discriminating, not when it moves.
+// recordSweepFinding writes the event "sweep-unsettled" and the reader renders it as "did not settle over
+// <axis>: N step(s) jumped". Filing a statistic that went DEAF under that sentence would send the next reader
+// hunting for a convergence failure that never happened. v3970 already learned this one size down -- wording a
+// scatter as a plateau "would send whoever reads it looking for the wrong failure" -- and the same rule says
+// the corpus has no word for this sweep yet, so it gets no record rather than the wrong one.
+//
+// A THIRD SWEEP THE CORPUS FITS IS STILL A SWEEP THE CORPUS SHOULD REFUSE.
 "use strict";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { settlePool, SHIPPED_FLOOR } from "./poolFixture.mjs";
 import { surfaceHeights, heightsOverBox, spread, surfaceSlope, levellingSeries, fullSensitivity,
          MEASURED_V3544, CORRECTS_V3543 } from "./levelClaim.mjs";
 import { reportLines } from "./levelClaim.mjs";
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ENG = path.resolve(HERE, "..", "..");
+
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l, n) => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
+
+// v3972 -- READ FIRST, and lazily, with its failure swallowed: a physics gate must never go red because a
+// lesson file could not be read. env "sph-level" rather than a registry device name because levelClaim is not
+// a roundhouse device; the "sph" token is what puts it in one family with the next sph gate to be wired.
+let _lessons = null;
+try { _lessons = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+      console.log(_lessons.lessonsBrief("sph-level")); } catch {}
 
 console.log("levelClaim-selfcheck -- a settled liquid's surface is level\n");
 
@@ -57,6 +90,24 @@ const series = levellingSeries();
     ok("...and it falls monotonically rather than wandering", monotone,
         "no reversal across " + series.length + " marks -- ASSERTED AS AN ORDERING, so it cannot pass on a " +
         "fixture whose absolute numbers drift");
+
+    // v3972 -- THE ORDERING TEST ABOVE, OBSERVED RATHER THAN RECOMPUTED. This gate already decided what a
+    // failure to settle looks like for the levelling spread: the spread must fall, so a step where it ROSE is
+    // the reversal the check forbids. recordSweepFinding is handed that same per-step boolean, so the corpus
+    // and this file's own PASS/FAIL can never disagree about which steps counted. Nothing is written when the
+    // series falls cleanly -- a corpus that logged every good sweep is a run log nobody reads.
+    if (_lessons) {
+        try {
+            _lessons.recordSweepFinding({
+                env: "sph-level", axis: "steps",
+                series: series.map((r, i) => ({ x: r.steps, y: r.sd,
+                                                settled: i === 0 ? true : !(r.sd > series[i - 1].sd) })),
+                params: { targetN: 2800, damColumns: 5, viscosity: 3, steps: series.map((r) => r.steps) },
+                note: "surface spread vs settle time (levelClaim section 2) -- a step counts as unsettled when " +
+                      "the spread ROSE, which is the reversal the ordering check forbids",
+            });
+        } catch {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +159,23 @@ console.log("\n4. THE LOAD-BEARING NEGATIVE: A STATE THAT IS SETTLED AND NOT LEV
         "sd " + a.sd.toFixed(3) + " at 3000 steps against " + b.sd.toFixed(3) + " at 6000 -- within 5%. " +
         "*** WITHOUT THIS THE NEGATIVE IS A TRANSIENT WEARING A VERDICT, and this arc has already read one " +
         "transient as an equilibrium (v3542's lid). ***");
+
+    // v3972 -- THE STATIONARITY CHECK, RECORDED FOR THE SAME REASON AND ON THE SAME TERMS. Two points is the
+    // shortest series recordSweepFinding accepts, and it is the right length here: the question is whether
+    // doubling the settle time moved the answer, which is exactly one transition. The 5% verdict is the one
+    // the line above already rendered, not a second opinion computed here.
+    if (_lessons) {
+        try {
+            _lessons.recordSweepFinding({
+                env: "sph-level", axis: "steps@tilt20",
+                series: [{ x: 3000, y: a.sd, settled: true },
+                         { x: 6000, y: b.sd, settled: Math.abs(b.sd - a.sd) / a.sd < 0.05 }],
+                params: { targetN: 2800, damColumns: 5, viscosity: 3, tiltDeg: 20 },
+                note: "tilted-state stationarity (levelClaim section 4) -- unsettled means doubling the settle " +
+                      "time moved the spread by more than 5%, which would make the tilt negative a transient",
+            });
+        } catch {}
+    }
     report("*** AND THE CLOSED FORM DOES NOT HOLD, WHICH IS REPORTED RATHER THAN ASSERTED ***",
         "The obvious key is that a settled surface is perpendicular to gravity, so its slope should be " +
         "tan(theta). Measured: " + MEASURED_V3544.tiltSlopeOverTan.map(([d, r]) => d + "deg " + r.toFixed(2) + "x").join(", ") +
