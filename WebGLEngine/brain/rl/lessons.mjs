@@ -327,9 +327,17 @@ export function lessonsBrief(env, opts = {}) {
     const { exact, related, total, corpus } = lessonsFor(env, opts);
     if (!total) return "[lessons] corpus is empty (" + corpus + ") -- nothing has recorded a stall yet, so this run has no priors to read.";
     if (!exact.length && !related.length) return "[lessons] " + total + " record(s) on file, none matching " + env + " -- this environment has no recorded stalls.";
+    // *** THE WORDING IS EVENT-AWARE, WHICH v3970 FOUND WAS NOT OPTIONAL. *** The first version of this line
+    // hardcoded "plateau ... N stall window(s)" for every event, and a khConvergence finding is the OPPOSITE
+    // shape -- a sequence that SCATTERED as the sweep refined, not one that sat still. Reading a scatter
+    // described as a plateau is not cosmetic; it would send whoever reads it looking for the wrong failure.
+    const isSweep = (r) => r.event === "sweep-unsettled";
     const line = (r, tag) => "[lessons]   " + tag + " " + String(r.env).padEnd(15) +
-        "plateau " + String(r.score) + " for " + (r.stats?.repeats || 1) + " stall window(s)" +
-        " (iters " + (r.stats?.firstIters ?? "?") + "-" + (r.iters ?? "?") + ")" +
+        (isSweep(r)
+            ? "did not settle over " + (r.stats?.axis || "?") + ": " + (r.stats?.repeats || 1) + " of " +
+              ((r.stats?.points || 1) - 1) + " step(s) jumped -- " + (r.stats?.series ? JSON.stringify(r.stats.series) : "")
+            : "plateau " + String(r.score) + " for " + (r.stats?.repeats || 1) + " stall window(s)" +
+              " (iters " + (r.stats?.firstIters ?? "?") + "-" + (r.iters ?? "?") + ")") +
         (r.params && Object.keys(r.params).length ? "  params " + JSON.stringify(r.params) : "");
     const out = ["[lessons] " + exact.length + " prior stall(s) for " + env +
                  (related.length ? " and " + related.length + " from related environments" : "") +
@@ -339,3 +347,71 @@ export function lessonsBrief(env, opts = {}) {
     for (const r of related) out.push(line(r, "~ "));
     return out.join("\n");
 }
+
+
+// =====================================================================================================
+// PARAMETER-SWEEP FINDINGS (v3970) -- FOR A DEVICE THAT DOES NOT TRAIN
+// =====================================================================================================
+//
+// *** THIS MODULE LIVES IN brain/rl/ AND THE PHYSICS LAB'S kh DEVICE IS NOT AN RL ENVIRONMENT. *** The name
+// stays because the corpus is one file and one shape regardless of what produced a record -- a reader asking
+// "what has stalled" should not have to know whether the answer came from an ES trainer or a Kelvin-Helmholtz
+// sweep. Moving the corpus format to its own file was considered and rejected: it would be a second declaration
+// of the record shape, health-tracking and folding rules the RL half already has, which is the exact defect
+// this whole file exists to avoid one layer down (verify.mjs's second BACKLOG.md list, v3964).
+//
+// *** WHY THIS IS NOT A watchTraining CALL. *** watchTraining folds MANY iterations of ONE continuously-scored
+// run into plateaus. kh's gates do the opposite shape: a SHORT sweep (4-9 points) of independent, expensive
+// simulations, each taking tens of seconds, where the finding is "does the sequence settle as the parameter is
+// refined" -- and khConvergence.mjs and khMichalke-selfcheck.mjs had ALREADY WRITTEN that exact test, by hand,
+// as a boolean per point, before this file existed. Building a second convergence detector here would have
+// second-guessed physics judgment a domain expert already encoded; wrapping their existing test is instead all
+// this does.
+//
+// *** THE GATE DECIDES WHAT "SETTLED" MEANS; THIS ONLY RECORDS THE VERDICT. *** Same rule recordingWatchdog
+// follows for the RL side: the caller supplies `settled` per point (already true for khConvergence's
+// ratio-near-1 test and khMichalke's error-not-growing test), and this function is not shown the raw physics,
+// only the boolean and the value that produced it. A generic "is this converging" heuristic guessed here would
+// be exactly the mistake v3092's own header warns against three separate times -- a number that looks like a
+// verdict standing in for one nobody actually rendered.
+
+/**
+ * Record ONE sweep as a single lesson, keyed by how many of its points did NOT settle.
+ *
+ * @param {object} o
+ * @param {string} o.env      the device/subject, e.g. "kh"
+ * @param {object} o.params   the FIXED configuration the swept axis varied around
+ * @param {string} o.axis     the name of the swept parameter, e.g. "steps" or "nx/ny/delta"
+ * @param {Array<{x:*, y:number, settled:boolean}>} o.series   one entry per sweep point, in sweep order.
+ *        `settled` is the CALLER's verdict for the transition INTO this point -- true if the observed value
+ *        stayed close to where the previous point left it, by whatever comparison the gate already makes.
+ *        The first point has no "previous" and is never itself evidence of a jump; a caller passing settled
+ *        for it is ignored on purpose (see the loop below).
+ * @param {string} [o.note]
+ *
+ * *** NOTHING IS WRITTEN WHEN THE SWEEP CONVERGED. *** Same rule as RECORDED_EVENTS: a corpus that logged every
+ * clean sweep would be a run log, not a lesson, and the noise is what stops anybody reading it.
+ */
+export function recordSweepFinding({ env, params, axis, series, note }) {
+    if (!Array.isArray(series) || series.length < 2) return false;
+    // The first point cannot have "jumped" -- there is nothing before it to jump from. Only transitions from
+    // the second point on count, so a 4-point series has at most 3 chances to be unsettled, not 4.
+    const bad = series.slice(1).filter((p) => p.settled === false);
+    if (!bad.length) return false;   // converged -- not a lesson
+
+    return recordLesson({
+        env, event: "sweep-unsettled",
+        params: Object.assign({ axis }, params || {}),
+        score: bad[bad.length - 1].y,
+        iters: series.length,
+        stats: {
+            repeats: bad.length, firstIters: 1, source: "sweep",
+            axis, points: series.length,
+            series: series.map((p) => ({ x: p.x, y: Number.isFinite(p.y) ? +p.y.toPrecision(6) : p.y })),
+        },
+        note: note || (bad.length + " of " + (series.length - 1) + " step(s) along " + axis + " did not settle"),
+    });
+}
+// "sweep-unsettled" is a THIRD recorded event, alongside the watchdog's two. It is not added to RECORDED_EVENTS
+// because that set gates watchdog.js's own verdict vocabulary; this is a different producer with its own word,
+// and the reader below treats event names generically rather than assuming there are only two.

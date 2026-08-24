@@ -35,7 +35,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createWatchdog } from "./watchdog.js";
 import { recordingWatchdog, recordLesson, readLessons, makeRecord, health, lessonsPath, RECORDED_EVENTS,
-         lessonsFor, lessonsBrief, watchTraining } from "./lessons.mjs";
+         lessonsFor, lessonsBrief, watchTraining, recordSweepFinding } from "./lessons.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -239,6 +239,82 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
         const src = fs.readFileSync(path.join(HERE, g), "utf8");
         ok("   " + g + " both READS priors and WRITES its own",
             /lessonsBrief\(/.test(src) && /watchTraining\(/.test(src) && /onIter: _watch\.onIter/.test(src));
+    }
+}
+
+// ---- 12. recordSweepFinding (v3970) -- FOR A DEVICE THAT DOES NOT TRAIN --------------------------------------
+// The kh gate family sweeps expensive independent simulations (steps, box size) rather than training one
+// continuously-scored policy, so watchTraining does not fit -- this exists for that shape, and khConvergence /
+// khMichalke ALREADY hand-compute the "did it settle" verdict per point; the function must not recompute it.
+{
+    try { fs.rmSync(TMP, { force: true }); } catch { }
+
+    // khConvergence's own real numbers, from its source header: steps 1000/2000/4000/8000, one ratio (2000/1000
+    // = 3.931) exceeds the gate's own 2x/0.5x band.
+    const series = [
+        { x: 1000, y: 0.03340, settled: true },     // no "previous" -- never itself a jump
+        { x: 2000, y: 0.13131, settled: false },    // ratio 3.931 vs the gate's own threshold
+        { x: 4000, y: 0.13985, settled: true },     // ratio 1.065
+        { x: 8000, y: 0.10788, settled: true },     // ratio 0.771
+    ];
+    const wrote = recordSweepFinding({ env: "kh", axis: "steps", series, params: { steps: [1000, 2000, 4000, 8000] } });
+    ok("!! an UNSETTLED sweep is recorded", wrote === true);
+    const rows = readLessons(TMP);
+    ok("   as ONE record for the whole sweep, not one per point",
+        rows.length === 1, rows.length + " record(s) for a 4-point sweep");
+    ok("   ...with repeats counting the JUMPS, not the points",
+        rows[0] && rows[0].stats.repeats === 1, "1 of 3 transitions failed the gate's own band; repeats=" + (rows[0] && rows[0].stats.repeats));
+    ok("!! it is filed under a THIRD event name, not folded into the watchdog's two",
+        rows[0] && rows[0].event === "sweep-unsettled", rows[0] && rows[0].event);
+
+    // *** A SWEEP THAT SETTLES WRITES NOTHING. *** Same rule as RECORDED_EVENTS: a corpus that logged every
+    // clean sweep would be a run log, not a lesson.
+    try { fs.rmSync(TMP, { force: true }); } catch { }
+    const clean = [
+        { x: 1, y: 1.00, settled: true },
+        { x: 2, y: 1.02, settled: true },
+        { x: 3, y: 0.99, settled: true },
+    ];
+    const wroteClean = recordSweepFinding({ env: "kh", axis: "steps", series: clean, params: {} });
+    ok("!! a sweep where EVERY point settled writes NOTHING",
+        wroteClean === false && readLessons(TMP).length === 0,
+        "a corpus that logged every clean sweep would be a run log, not a lesson");
+}
+
+// ---- 13. THE BRIEF'S WORDING IS EVENT-AWARE -------------------------------------------------------------------
+// The first cut of lessonsBrief hardcoded "plateau ... stall window(s)" for every record. A sweep finding is
+// the OPPOSITE shape -- a sequence that SCATTERED, not one that sat still -- and describing a scatter as a
+// plateau would send a reader looking for the wrong failure.
+{
+    try { fs.rmSync(TMP, { force: true }); } catch { }
+    const series = [{ x: 1, y: 1, settled: true }, { x: 2, y: 9, settled: false }];
+    recordSweepFinding({ env: "kh", axis: "box", series, params: {} });
+    const brief = lessonsBrief("kh", { file: TMP });
+    ok("!! a sweep finding reads as 'did not settle', never as 'plateau'",
+        /did not settle/.test(brief) && !/plateau/.test(brief), brief.slice(0, 120));
+    ok("...and names the axis that was swept, so a reader knows which knob to avoid re-sweeping",
+        /over box/.test(brief), brief.slice(0, 120));
+}
+
+// ---- 14. THE THREE kh GATES ACTUALLY WIRE THIS IN --------------------------------------------------------------
+{
+    const ROUNDHOUSE = path.join(ROOT, "tools", "roundhouse");
+    const conv = fs.readFileSync(path.join(ROUNDHOUSE, "khConvergence-selfcheck.mjs"), "utf8");
+    const mich = fs.readFileSync(path.join(ROUNDHOUSE, "khMichalke-selfcheck.mjs"), "utf8");
+    const grow = fs.readFileSync(path.join(ROUNDHOUSE, "khGrowthKey-selfcheck.mjs"), "utf8");
+    ok("!! khConvergence both READS priors and WRITES its own ratio-test verdict",
+        /lessonsBrief\("kh"\)/.test(conv) && /recordSweepFinding\(/.test(conv));
+    ok("!! khMichalke both READS priors and WRITES its own box-refinement verdict",
+        /lessonsBrief\("kh"\)/.test(mich) && /recordSweepFinding\(/.test(mich));
+    ok("!! khGrowthKey READS priors but writes NOTHING -- it asserts an expected trend, not a stall",
+        /lessonsBrief\("kh"\)/.test(grow) && !/recordSweepFinding\(/.test(grow),
+        "a trend assertion has no 'did it settle' verdict to record");
+    // Both writers must be resilient the same way the RL side is: a physics gate must never go red because a
+    // lesson file could not be imported or written.
+    for (const [name, src] of [["khConvergence", conv], ["khMichalke", mich]]) {
+        ok("   " + name + "'s import AND its recordSweepFinding call are both wrapped in try/catch",
+            (src.match(/try \{[\s\S]{0,40}await import\(pathToFileURL/g) || []).length >= 1 &&
+            /try \{[\s\S]{0,300}recordSweepFinding/.test(src));
     }
 }
 

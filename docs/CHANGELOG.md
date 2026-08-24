@@ -8,6 +8,35 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3970 — the lesson pattern, wired into the physics lab's most expensive gate family
+
+Seven separate gate files build the "kh" (Kelvin-Helmholtz instability) device with their own independent parameter sweeps — run length (`khConvergence`, ~5min), viscosity (`khGrowthKey`, ~6.5min), box resolution (`khMichalke`, ~5.5min) — and none of them could see what another had already found didn't settle.
+
+Two of the three already hand-compute a "did this settle" verdict in their own headers:
+
+- **`khConvergence`**'s ratio test: a converged quantity has every step-to-step ratio near 1; theirs jumps 3.9× going from 1000 to 2000 steps.
+- **`khMichalke`**'s non-monotone test: refinement moves the mode ladder rather than densifying it, so the error against Michalke *scatters* — 11.7%, 33.8%, 64.7%, 64.7% — rather than shrinking.
+
+So the gate's own verdict is observed, not recomputed — the same rule `recordingWatchdog` follows on the RL side. `brain/rl/lessons.mjs` gains `recordSweepFinding()`: a caller hands it a short series of `{x, y, settled}` points — `settled` already decided by the gate's own comparison — and it writes one lesson per sweep, keyed by how many transitions failed to settle, under event `sweep-unsettled` (a third event name, not folded into the watchdog's vocabulary, because a different producer deserves its own word). A sweep where every point settles writes nothing.
+
+**The brief's wording had to become event-aware, and only building it surfaced that.** `lessonsBrief` hardcoded *"plateau … N stall window(s)"* for every record; a sweep finding is the opposite shape — a sequence that scattered, never one that sat still — and describing a scatter as a plateau would send a reader looking for the wrong failure. It now reads *"did not settle over `<axis>`: N of M step(s) jumped"* for `sweep-unsettled` records.
+
+`khConvergence` and `khMichalke` now print the kh brief before spending their four-to-six minutes, and record their own verdict after. `khGrowthKey` reads but writes nothing — its own check is a *trend assertion* (growth rate must rise as viscosity falls), not a stall; there's no "did it settle" verdict for a gate testing whether physics behaved as expected.
+
+### Verified with real, complete runs — not assumed
+
+All three gates were run in full, unwired and wired, and diffed:
+
+| gate | runtime | verdicts |
+| --- | --- | --- |
+| `khConvergence` | ~4m50s both times | byte-identical, 4/4 PASS |
+| `khMichalke` | ~5m20s both times | byte-identical, 5/5 PASS |
+| `khGrowthKey` | ~6m24s both times | byte-identical, 9/9 PASS |
+
+And the cross-gate retrieval this exists for actually happened: `khMichalke`, run second, printed `khConvergence`'s finding before running a single simulation. `khGrowthKey`, run third and read-only, printed both — correctly ranked by repeat count, box-refinement's 2 jumps above run-length's 1.
+
+`recordSweepFinding`'s converged-sweep guard was probed by *deleting* it rather than merely disabling the write: the function doesn't degrade, it crashes on `bad[bad.length-1]` against an empty array — stronger evidence the guard is load-bearing than a graceful failure would have been.
+
 ## Since v3969 — the read side, and the cadence gap was never about a timer
 
 `loop-engineering` documents seven scheduled loops. Six SweK already covers, several more rigorously — gate-driven runtime verification against their CI-log reading, a changelog written *at* the bump against their lagging daily scan. The one that looked like a genuine gap was *"nothing runs on a cadence."*

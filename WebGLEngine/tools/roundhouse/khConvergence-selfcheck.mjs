@@ -33,6 +33,15 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+
+// v3970 -- READ FIRST. Seven separate gate files build the "kh" device with their own independent sweeps
+// (this file: run length; khGrowthKey: viscosity; khMichalke: box resolution), each costing minutes, with no
+// way for one sweep to know what an earlier one already found did not settle. Lazily imported and its failure
+// swallowed: a physics gate must never go red because a lesson file could not be read.
+let _lessons = null;
+try { _lessons = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+      console.log(_lessons.lessonsBrief("kh")); } catch {}
+
 const D = await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "devices.mjs")).href);
 const kh = await D.getDevice("kh");
 
@@ -40,6 +49,23 @@ const sweep = [];
 for (const steps of [1000, 2000, 4000, 8000]) {
     const o = await kh.build({ mode: "sweep", config: { steps } });
     sweep.push({ steps, sigma: o.peakSigmaNorm, err: o.peakSigmaErrFrac });
+}
+
+// v3970 -- THE SAME RATIO TEST THE FIRST CHECK BELOW MAKES, OBSERVED RATHER THAN RECOMPUTED. This gate already
+// decided what "settled" means for peakSigmaNorm (a converged quantity has every ratio near 1; the check below
+// calls anything past 2x or under 0.5x a jump) -- recordSweepFinding is handed exactly that verdict, per point,
+// so the lesson corpus and the gate's own PASS/FAIL can never disagree about what counts as unsettled.
+if (_lessons) {
+    try {
+        const series = sweep.map((s, i) => {
+            if (i === 0) return { x: s.steps, y: s.sigma, settled: true };
+            const r = s.sigma / sweep[i - 1].sigma;
+            return { x: s.steps, y: s.sigma, settled: !(r > 2 || r < 0.5) };
+        });
+        _lessons.recordSweepFinding({ env: "kh", axis: "steps", series,
+            params: { steps: sweep.map((s) => s.steps) },
+            note: "peakSigmaNorm vs run length (khConvergence)" });
+    } catch {}
 }
 
 ok("!! peakSigmaNorm is NOT CONVERGED in run length",

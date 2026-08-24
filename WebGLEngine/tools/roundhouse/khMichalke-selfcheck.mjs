@@ -34,6 +34,12 @@ const ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
+// v3970 -- READ FIRST, same reasoning as khConvergence-selfcheck: this device is swept by seven separate
+// files and none of them could see what another had already found. Lazily imported and its failure swallowed.
+let _lessons = null;
+try { _lessons = await import(pathToFileURL(path.join(ENG, "brain", "rl", "lessons.mjs")).href);
+      console.log(_lessons.lessonsBrief("kh")); } catch {}
+
 const D = await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "devices.mjs")).href);
 const kh = await D.getDevice("kh");
 const at = (cfg) => kh.build({ mode: "sweep", config: { ny: 96, tau: 0.52, U0: 0.04, mode: 1, steps: 1500, ...cfg } });
@@ -58,6 +64,22 @@ ok("!! delta does NOT move the wavenumber -- the box does",
     const errs = [];
     for (const b of boxes) { const o = await at(b); errs.push({ kd: o.peakKDErrFrac, s: o.peakSigmaErrFrac }); }
     const monotone = errs.every((e, i) => i === 0 || e.kd <= errs[i - 1].kd);
+
+    // v3970 -- THE SAME NON-MONOTONE TEST THE CHECK BELOW MAKES, OBSERVED RATHER THAN RECOMPUTED. This device
+    // does not converge with box refinement, and that finding is DIFFERENT from khConvergence's (that one was
+    // about run length; this is spatial resolution) -- both go in the same corpus under the same env because a
+    // reader asking "has kh ever failed to settle" needs both axes, not one.
+    if (_lessons) {
+        try {
+            const series = errs.map((e, i) => ({
+                x: boxes[i].nx + "/" + (boxes[i].ny || boxes[i].nx) + "/" + boxes[i].delta, y: e.kd,
+                settled: i === 0 ? true : e.kd <= errs[i - 1].kd,
+            }));
+            _lessons.recordSweepFinding({ env: "kh", axis: "box (nx/ny/delta)", series,
+                params: { boxes: boxes.map((b) => b.nx + "/" + (b.ny || b.nx) + "/" + b.delta) },
+                note: "peakKDErrFrac vs box refinement (khMichalke) -- refinement moves the mode ladder rather than densifying it" });
+        } catch {}
+    }
     ok("!! and the error does NOT shrink with a bigger box -- it SCATTERS",
         !monotone,
         "kD " + errs.map((e) => (e.kd * 100).toFixed(1) + "%").join(", ") + " and sigma " +
