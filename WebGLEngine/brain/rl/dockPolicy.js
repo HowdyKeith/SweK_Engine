@@ -76,6 +76,15 @@ function trainDockES(opts = {}) {
         const ev = evaluate(theta, { ...evOpts, episodes: 24 });
         const score = ev.dockRate * 1000 - ev.avgDist - (ev.avgCrashes || 0) * 200;   // docks, then closeness, penalize crashes
         if (score > best.score) best = { params: theta.slice(), score, ev };
+        // v3969 -- AN OPTIONAL PER-ITERATION OBSERVER, AND IT IS OPTIONAL SO THAT NOTHING CHANGES WITHOUT ONE.
+        //
+        // The gates that actually train every ship round (dock, dock-hazard) call THIS trainer, not the
+        // createTrainer/watchdog pair -- so wrapping the watchdog alone left them contributing nothing to the
+        // lesson corpus. `history` is sampled only ~6 times per run, which is too coarse to see a plateau, and
+        // the loop had no other way out. onIter is the smallest opening that fixes it: called AFTER best is
+        // updated, given read-only numbers, and its return value is ignored. With no hook this line is a
+        // branch that is never taken, and the gate verdicts are byte-identical -- asserted, not assumed.
+        if (opts.onIter) { try { opts.onIter({ it, score, ev, bestScore: best.score }); } catch { /* an observer must never take the run down */ } }
         if (it % Math.max(1, (iters / 6) | 0) === 0 || it === iters - 1) history.push({ it, ...ev });
     }
     return { params: best.params, history, best: best.ev };

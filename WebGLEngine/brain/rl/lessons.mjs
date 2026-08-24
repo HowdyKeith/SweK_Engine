@@ -214,3 +214,128 @@ export function recordingWatchdog(wd, { env, params, iters } = {}) {
         flush() { try { write(pending); pending = null; } catch { } },
     });
 }
+
+
+/**
+ * v3969 -- OBSERVE A TRAINER THAT HAS NO WATCHDOG, WHICH IS MOST OF THEM.
+ *
+ * *** THE CADENCE GAP WAS NOT "NOTHING RUNS ON A TIMER", IT WAS "THE THINGS THAT RUN CONTRIBUTE NOTHING". ***
+ * createWatchdog is used in exactly ONE place in this tree -- brain-lab.html, a page a person has to open. The
+ * gates that train on every ship round (dock, dock-hazard) call dockPolicy.trainDockES, which has no watchdog
+ * at all, so the corpus only grew when somebody happened to open a page. Wiring a scheduler would have been
+ * the wrong fix for that: the runs were already happening.
+ *
+ * This adapts a plain per-iteration callback to the SAME plateau folding recordingWatchdog uses, so a lesson
+ * written by a gate and a lesson written by the lab are the same shape and a reader cannot tell which loop
+ * produced it. `patience` and `minDelta` mirror watchdog.js's defaults ON PURPOSE -- two definitions of "this
+ * has stopped improving" would make the corpus mean two things.
+ *
+ * @returns {{ onIter: Function, flush: Function }} pass onIter straight to the trainer.
+ */
+export function watchTraining({ env, params, patience = 8, minDelta = 0.5 } = {}) {
+    let bestSeen = -Infinity, since = 0, pending = null;
+    const SAME = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 1e-9;
+
+    function write(p) {
+        if (!p) return;
+        recordLesson({
+            env, event: "stalled-kicked", params, score: p.score, iters: p.lastIt,
+            stats: { repeats: p.repeats, firstIters: p.firstIt, source: "trainer-observer" },
+            note: "no improvement for " + patience + " iterations at this score" +
+                  (p.repeats > 1 ? " -- " + p.repeats + " consecutive stall windows at this plateau" : ""),
+        });
+    }
+
+    return {
+        onIter({ it, bestScore }) {
+            const b = Number.isFinite(bestScore) ? bestScore : -Infinity;
+            if (b > bestSeen + minDelta) {
+                bestSeen = b; since = 0;
+                if (pending) { write(pending); pending = null; }   // the plateau genuinely ended
+                return;
+            }
+            since++;
+            if (since < patience) return;
+            since = 0;
+            if (pending && SAME(pending.score, b)) { pending.repeats++; pending.lastIt = it; }
+            else { write(pending); pending = { score: b, repeats: 1, firstIt: it, lastIt: it }; }
+        },
+        flush() { try { write(pending); pending = null; } catch { } },
+    };
+}
+
+
+// =====================================================================================================
+// THE READ SIDE (v3969)
+// =====================================================================================================
+//
+// *** IT RANKS BY REPEAT COUNT, NOT BY SCORE, AND THAT IS A MEASUREMENT RATHER THAN A PREFERENCE. ***
+// v3968 ran three environments and recorded what they produced:
+//     dockEnv        plateaus at   -127.8 ..   -45.3
+//     dockHazardEnv  plateaus at  -1901.2 .. -1322.9
+//     huntEnv        plateaus at    -95.8 ..   -31.9
+// The scores are environment-specific reward sums with no shared zero. A reader that sorted lessons by score
+// would put every dockHazard lesson above every hunt lesson forever and call it relevance -- IT WOULD BE
+// RANKING BY ENVIRONMENT AND REPORTING IT AS IMPORTANCE. The repeat count has no such problem: it counts how
+// many consecutive stall windows sat at one plateau, which means the same thing in every environment. Six
+// kicks over iters 12-27 is a wall; one kick at iter 7 is a blip; they are indistinguishable by score.
+//
+// *** AND A LESSON FROM A DIFFERENT ENVIRONMENT IS LABELLED AS SUCH RATHER THAN BLENDED IN. *** Matching
+// "dock" against dockEnv and dockHazardEnv is useful -- they share a policy shape and most hyperparameters --
+// but a hazard-field stall is not a plain-dock stall, and presenting them as the same finding is how a
+// retrieval step starts producing confident nonsense. Exact matches come first and cross-env matches are
+// marked.
+
+/** Split an env name into the tokens a related run would match on: dockHazardEnv -> ["dock","hazard"]. */
+function _familyTokens(env) {
+    return String(env || "").replace(/Env$/, "").replace(/[-_/]/g, " ")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+}
+
+/**
+ * Lessons relevant to `env`, most instructive first.
+ *
+ * @returns {{exact: object[], related: object[], total: number, corpus: string}}
+ */
+export function lessonsFor(env, { limit = 5, minRepeats = 1, file } = {}) {
+    const all = readLessons(file);
+    const want = String(env || "").toLowerCase();
+    const toks = _familyTokens(env);
+    const rank = (a, b) => (b.stats?.repeats || 1) - (a.stats?.repeats || 1)
+        || (b.stats?.lastIters || b.iters || 0) - (a.stats?.lastIters || a.iters || 0);
+
+    const exact = [], related = [];
+    for (const r of all) {
+        const e = String(r.env || "").toLowerCase();
+        if ((r.stats?.repeats || 1) < minRepeats) continue;
+        if (e === want) exact.push(r);
+        else if (toks.length && toks.some((t) => e.includes(t))) related.push(r);
+    }
+    exact.sort(rank); related.sort(rank);
+    return { exact: exact.slice(0, limit), related: related.slice(0, limit),
+             total: all.length, corpus: file || lessonsPath() };
+}
+
+/**
+ * One short block a training run can print before its first step.
+ *
+ * *** AN EMPTY CORPUS SAYS SO, LOUDLY. *** The whole reason the writer was built before the reader is that
+ * retrieval against nothing looks identical to retrieval that found nothing relevant, and both look identical
+ * to a broken reader. Each of those wants a different response, so each gets a different sentence.
+ */
+export function lessonsBrief(env, opts = {}) {
+    const { exact, related, total, corpus } = lessonsFor(env, opts);
+    if (!total) return "[lessons] corpus is empty (" + corpus + ") -- nothing has recorded a stall yet, so this run has no priors to read.";
+    if (!exact.length && !related.length) return "[lessons] " + total + " record(s) on file, none matching " + env + " -- this environment has no recorded stalls.";
+    const line = (r, tag) => "[lessons]   " + tag + " " + String(r.env).padEnd(15) +
+        "plateau " + String(r.score) + " for " + (r.stats?.repeats || 1) + " stall window(s)" +
+        " (iters " + (r.stats?.firstIters ?? "?") + "-" + (r.iters ?? "?") + ")" +
+        (r.params && Object.keys(r.params).length ? "  params " + JSON.stringify(r.params) : "");
+    const out = ["[lessons] " + exact.length + " prior stall(s) for " + env +
+                 (related.length ? " and " + related.length + " from related environments" : "") +
+                 ", worst-first by how long they held:"];
+    for (const r of exact) out.push(line(r, "  "));
+    // Marked, never blended: a related environment shares a policy shape, not a reward scale.
+    for (const r of related) out.push(line(r, "~ "));
+    return out.join("\n");
+}
