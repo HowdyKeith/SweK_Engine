@@ -147,6 +147,73 @@ ok("!! the host values reach the kernel through addToKernelScope, which is the o
 ok("!! ...and no closure pretends to bind them -- `new Function` bound five names taichi never looked at",
     !/new Function\(/.test(src));
 
+// ---- THE BATCHED PATH (v3966) --------------------------------------------------------------------------------
+// The bench now PREPARES once and runs many, because the old loop charged taichi a 9.1ms compile per rep and
+// charged the WGSL variants 0.1ms of setup -- it was timing taichi's TypeScript parser against WGSL's kernel.
+//
+// *** BATCHING IS ONLY VALID IF REPEATED RUNS STAY CORRECT, AND THAT IS NOT FREE TO ASSUME. *** run() reuses
+// one compiled kernel, one set of fields and one output buffer. If a second dispatch accumulated into `out`
+// instead of overwriting it, or if the kernel scope went stale between calls, the FIRST run would be right and
+// every later one wrong -- and the bench only grades the first. That is the exact shape of a measurement that
+// certifies itself. So the gate runs it repeatedly and grades EVERY run, not just the warm one.
+{
+    const rr = await page.evaluate(async (CFG) => {
+        const realErr = console.error, caught = [];
+        console.error = (...a) => { caught.push(a.map((x) => (x && x.message) ? x.message : String(x)).join(" ")); return realErr.apply(console, a); };
+        try {
+            const m = await import("/vendor/taichi-js/taichi.js");
+            const ti = m.default || m;
+            const { prepareTaichi } = await import("/tools/roundhouse/magmapTaichi.mjs");
+            const { sampleTable, referenceCell } = await import("/tools/roundhouse/magmapKernel.mjs");
+            const { MAGMAP_TOL } = await import("/tools/roundhouse/magmapGpu.mjs");
+            const table = sampleTable(CFG.nT), total = CFG.n * CFG.n;
+            const ref = []; for (let k = 0; k < total; k++) ref.push(referenceCell(k, { ...CFG, table }));
+
+            const prep = await prepareTaichi(ti, CFG);
+            const worsts = [], firsts = [];
+            let identical = true, first = null;
+            for (let r = 0; r < 4; r++) {
+                const v = await prep.run();
+                if (v.length !== total) return { ran: false, why: "run " + r + " returned " + v.length + " of " + total };
+                let worst = 0;
+                for (let k = 0; k < total; k++) {
+                    const d = Math.abs(v[k] - ref[k]) / Math.max(Math.abs(ref[k]), 1e-30);
+                    if (d > worst) worst = d;
+                }
+                worsts.push(worst); firsts.push(v[0]);
+                if (first === null) first = v; else for (let k = 0; k < total; k++) if (v[k] !== first[k]) { identical = false; break; }
+            }
+            return { ran: true, worsts, identical, tol: MAGMAP_TOL, runs: worsts.length };
+        } catch (e) {
+            return { ran: false, why: (caught.join(" | ") || "-") + "  [thrown: " + String((e && e.message) || e).trim() + "]" };
+        } finally { console.error = realErr; }
+    }, CFG);
+
+    ok("!! *** the batched path runs, and runs REPEATEDLY ***", rr.ran === true, rr.ran ? rr.runs + " runs" : rr.why);
+    if (rr.ran) {
+        // Grading only the first run is how a reused-buffer bug survives: the bench's warm run would pass and
+        // every timed run after it could be garbage.
+        const allGood = rr.worsts.every((w) => w <= rr.tol);
+        ok("!! *** EVERY run agrees with the CPU f64 reference, not just the first ***", allGood,
+            "worsts " + rr.worsts.map((w) => w.toExponential(2)).join(", ") + " vs tol " + rr.tol.toExponential(0));
+        ok("!! ...and successive runs are IDENTICAL -- no accumulation into the reused output buffer",
+            rr.identical === true,
+            "a second dispatch that added instead of overwriting would drift, and only the untimed warm run is graded");
+    }
+}
+
+// The bench must actually USE the batched path -- otherwise the fairness fix is a function nobody calls, which
+// is the v3963 defect in miniature.
+{
+    const bench = noComments(fs.readFileSync(path.join(ROOT, "magmap-bench.html"), "utf8"));
+    ok("!! the bench's timing loop calls the PREPARED kernel, not a fresh compile per rep",
+        /prepareTaichi\(/.test(bench) && /prep\.run\(\)/.test(bench));
+    ok("!! ...and it still REPORTS the one-off compile rather than hiding it",
+        /prepareMs/.test(bench),
+        "the compile is a real cost of this codegen, just not a per-run one; dropping it would be the opposite error");
+}
+
+
 await b.close();
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 process.exit(fails ? 1 : 0);

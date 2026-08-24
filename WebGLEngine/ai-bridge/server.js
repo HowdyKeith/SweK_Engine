@@ -5042,6 +5042,13 @@ const server = http.createServer((req, res) => {
             eventsRelayed,
             engineRoot: ENGINE_ROOT,
             uptimeSec: Math.round(process.uptime()),
+            // v3966 -- *** UNDER BUN THIS FIELD REPORTED A NODE THAT IS NOT INSTALLED. *** Bun emulates
+            // process.version, and on this box it answers "v24.3.0" while the actual Node beside it is
+            // v22.22.2 -- so /health did not merely fail to mention Bun, it named a NEWER Node than exists
+            // here. Line 143's own comment contemplates "run Node on 8788 alongside Bun on 8787", which is
+            // exactly the situation where you ask a health endpoint which runtime answered and it tells you
+            // something false. `typeof Bun` is the reliable discriminator; process.version is not.
+            runtime: (typeof Bun !== "undefined" && Bun.version) ? "bun " + Bun.version : "node " + process.version,
             node: process.version,
             platform: process.platform,
             ts: Date.now(),
