@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Point Reactor Kinetics">
+<meta name="demo:desc" content="Pull the control rods and watch the reactor period. Delayed neutrons are 0.65% of the total and they are the only reason a reactor can be controlled at all: past $1.00 the period collapses and no operator can follow it. Scram it and watch the flux refuse to fall faster than the 56-second precursor floor, then watch xenon-135 poison the core for half a day afterwards.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Point Reactor Kinetics</title>
+<!--
+     v3985 -- ROUND 3 OF THE REACTOR BUILD: the front door. v3983 shipped physics/nuclear/kinetics.mjs and its
+     gate, v3984 bound it as a roundhouse device, and this page drives the SAME modules -- it derives no physics
+     of its own. Every number on screen comes from kinetics.mjs or xenon.mjs.
+
+     *** THE TIME ACCELERATION IS CAPPED FOR A STATED REASON RATHER THAN BECAUSE IT FELT FAST ENOUGH. ***
+     Point kinetics is stiff: with a prompt generation time of 2e-5 s the fastest mode at zero reactivity sits
+     near -325 s^-1, and RK4 is stable only while dt*|w| < 2.78 -- so dt must stay under about 8.5e-3 s. At
+     dt = 1e-3 and a 400-substep budget per frame, the honest ceiling is 0.4 simulated seconds per frame, or
+     roughly 24x real time. The speed control stops at 20x. IT DOES NOT SILENTLY COARSEN THE STEP, because a
+     reactor page that quietly went unstable would look like physics.
+
+     Xenon is the opposite problem -- half-lives of 6.57 h and 9.14 h -- so it gets its OWN clock and its own
+     integrator, which is legitimate precisely because the two timescales do not interact on the seconds scale.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --red:#ff6b6b; --dim:#7c93b8; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:200px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:5px 12px;
+           font:600 11px ui-monospace,monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  button.scram { color:var(--red); border-color:#4a1f1f; background:#1a0c0c; }
+  button.on { background:#1b3a33; color:#bff5e8; }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .big { font-size:15px; }
+  .warn { color:var(--red); font-weight:700; }
+  .ok { color:var(--green); }
+  /* v3979 -- a canvas is a REPLACED element: position+inset alone leaves it at its intrinsic 300x150.
+     The explicit width/height is what actually stretches it, and the JS sets the backing store to match. */
+  #plotwrap { position:relative; min-height:0; }
+  #c { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(760px,92vw);
+          background:rgba(5,7,14,.72); border:1px solid #16203a; border-radius:8px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Point Reactor Kinetics &mdash; six delayed groups, U-235</h1>
+  <div class="row">
+    <label>control rod <input id="rod" type="range" min="-300" max="120" value="0" step="1"></label>
+    <span class="stat big">&rho; <b id="rho">$0.000</b></span>
+    <span class="stat big">period <b id="per">&infin;</b></span>
+    <span class="stat big">power <b id="pow">100.0%</b></span>
+    <button id="scram" class="scram">Scram</button>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="row">
+    <label>speed <input id="speed" type="range" min="1" max="20" value="1" step="1"></label>
+    <span class="stat"><b id="spd">1</b>&times;</span>
+    <span class="stat">t <b id="clock">0.0 s</b></span>
+    <button id="xe">Xenon: off</button>
+    <span class="stat" id="xestat"></span>
+    <span class="stat" id="verdict"></span>
+  </div>
+</header>
+<div id="plotwrap"><canvas id="c"></canvas>
+  <div id="note">Rod reactivity is shown in <b>dollars</b>: $1.00 is &beta;, the delayed-neutron fraction, where the reactor goes <b>prompt critical</b> and the period stops being something a human can follow. Scram and the flux will not fall faster than &minus;&lambda;<sub>1</sub> = &minus;0.0124&nbsp;s<sup>&minus;1</sup> &mdash; a 56-second floor set by the longest-lived precursor. Physics from <b>physics/nuclear/kinetics.mjs</b> and <b>xenon.mjs</b>, both gated.</div>
+</div>
+</div>
+<script type="module">
+import { KEEPIN_U235, GEN_LWR, totalBeta, dollars, fromDollars,
+         steadyState, derivative, dominantRoot, period } from "./physics/nuclear/kinetics.mjs";
+import { XENON_U235, SIGMA_F_LWR, FLUX_LWR, equilibrium, xenonReactivity,
+         peakTimeLimit, pitThreshold } from "./physics/nuclear/xenon.mjs";
+
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+const $ = (id) => document.getElementById(id);
+const BETA = totalBeta(), GROUPS = KEEPIN_U235;
+
+// ---- state -------------------------------------------------------------------------------------------------
+// The neutron state is the module's own exact steady state, so the reactor starts genuinely critical rather
+// than nearly so -- at rho = 0 the derivative is identically zero and the trace is flat until a rod moves.
+let st = steadyState(1, GEN_LWR, GROUPS);
+let rodDollars = 0, t = 0, speed = 1, xenonOn = false, scrammed = false;
+let xe = equilibrium(FLUX_LWR).Xe, iod = equilibrium(FLUX_LWR).I;
+const XE_EQ = xe;
+const hist = [];            // [t, power] on the seconds clock
+const xeHist = [];          // [hours, xenonDollars]
+
+// *** THE STIFFNESS CEILING, DERIVED RATHER THAN GUESSED. *** RK4 is stable while dt*|w_fast| < 2.78, and the
+// fast mode is about beta/GEN = 325 s^-1 at zero reactivity, so dt < 8.5e-3. 1e-3 leaves a wide margin and
+// 400 substeps per frame is the budget that keeps a frame under a millisecond of arithmetic.
+const DT = 1e-3, MAX_SUB = 400;
+
+function rodRho() { return fromDollars(rodDollars, GROUPS); }
+function xenonRho() { return xenonOn ? xenonReactivity(xe) : 0; }
+function totalRho() { return rodRho() + xenonRho(); }
+
+function stepKinetics(seconds) {
+  const n = Math.min(MAX_SUB, Math.max(1, Math.round(seconds / DT)));
+  const dt = seconds / n, rho = totalRho();
+  const add = (a, k, h) => ({ n: a.n + h * k.n, C: a.C.map((c, i) => c + h * k.C[i]) });
+  for (let s = 0; s < n; s++) {
+    const k1 = derivative(st, rho, GEN_LWR, GROUPS);
+    const k2 = derivative(add(st, k1, dt / 2), rho, GEN_LWR, GROUPS);
+    const k3 = derivative(add(st, k2, dt / 2), rho, GEN_LWR, GROUPS);
+    const k4 = derivative(add(st, k3, dt), rho, GEN_LWR, GROUPS);
+    st = { n: st.n + dt / 6 * (k1.n + 2 * k2.n + 2 * k3.n + k4.n),
+           C: st.C.map((c, i) => c + dt / 6 * (k1.C[i] + 2 * k2.C[i] + 2 * k3.C[i] + k4.C[i])) };
+  }
+  if (!Number.isFinite(st.n) || st.n <= 0) st.n = 1e-12;   // a scram can drive power below float resolution
+}
+
+// Xenon runs on its OWN clock: half-lives of hours mean its ODEs are smooth and a coarse step is exact enough,
+// which is why it can be advanced far faster than the neutron solve without any of the stiffness argument.
+const XE_ACCEL = 1200;      // simulated xenon-seconds per simulated neutron-second
+function stepXenon(seconds) {
+  const X = XENON_U235, dt = seconds * XE_ACCEL;
+  const phi = FLUX_LWR * Math.max(0, Math.min(4, st.n));   // flux tracks power
+  const dI = X.yieldI * SIGMA_F_LWR * phi - X.lambdaI * iod;
+  const dX = X.yieldXe * SIGMA_F_LWR * phi + X.lambdaI * iod - X.lambdaXe * xe - X.sigmaXe * phi * xe;
+  iod = Math.max(0, iod + dI * dt);
+  xe = Math.max(0, xe + dX * dt);
+}
+
+// ---- drawing -----------------------------------------------------------------------------------------------
+function resize() {
+  const r = cvs.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cvs.width = Math.max(1, Math.round(r.width * d));
+  cvs.height = Math.max(1, Math.round(r.height * d));
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", resize);
+
+function plot() {
+  const w = cvs.width / (window.devicePixelRatio || 1), h = cvs.height / (window.devicePixelRatio || 1);
+  ctx.fillStyle = "#05070e"; ctx.fillRect(0, 0, w, h);
+  const split = xenonOn ? Math.round(h * 0.58) : h;
+  drawPower(0, 0, w, split - 8);
+  if (xenonOn) drawXenon(0, split, w, h - split);
+}
+
+function axes(x, y, w, h, title) {
+  ctx.strokeStyle = "#16203a"; ctx.lineWidth = 1;
+  ctx.strokeRect(x + 46, y + 18, w - 60, h - 40);
+  ctx.fillStyle = "#7c93b8"; ctx.font = "11px ui-monospace,monospace";
+  ctx.fillText(title, x + 50, y + 12);
+}
+
+function drawPower(x, y, w, h) {
+  axes(x, y, w, h, "POWER  (log scale, fraction of nominal)");
+  if (hist.length < 2) return;
+  const L = x + 46, R = x + w - 14, T = y + 18, B = y + h - 22;
+  const t0 = hist[0][0], t1 = Math.max(hist[hist.length - 1][0], t0 + 1);
+  // fixed decades so the eye can read a slope as a period rather than an autoscaled squiggle
+  const LO = -6, HI = 3;
+  const px = (tt) => L + (R - L) * (tt - t0) / (t1 - t0);
+  const py = (p) => B - (B - T) * (Math.log10(Math.max(1e-30, p)) - LO) / (HI - LO);
+  ctx.strokeStyle = "#101a30";
+  for (let d = LO; d <= HI; d++) {
+    const yy = py(Math.pow(10, d));
+    ctx.beginPath(); ctx.moveTo(L, yy); ctx.lineTo(R, yy); ctx.stroke();
+    ctx.fillStyle = "#3d4e68";
+    ctx.fillText("1e" + d, x + 8, yy + 3);
+  }
+  ctx.strokeStyle = "#59d1ff"; ctx.lineWidth = 1.6; ctx.beginPath();
+  for (let i = 0; i < hist.length; i++) {
+    const X = px(hist[i][0]), Y = py(hist[i][1]);
+    i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = "#7c93b8";
+  ctx.fillText(t0.toFixed(0) + "s", L, B + 14);
+  ctx.fillText(t1.toFixed(0) + "s", R - 30, B + 14);
+}
+
+function drawXenon(x, y, w, h) {
+  axes(x, y, w, h, "XENON-135 REACTIVITY WORTH  (dollars, negative)");
+  if (xeHist.length < 2) return;
+  const L = x + 46, R = x + w - 14, T = y + 18, B = y + h - 22;
+  const h0 = xeHist[0][0], h1 = Math.max(xeHist[xeHist.length - 1][0], h0 + 0.1);
+  let lo = 0, hi = 0;
+  for (const [, v] of xeHist) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  lo = Math.min(lo, -0.1); hi = Math.max(hi, 0);
+  const px = (hh) => L + (R - L) * (hh - h0) / (h1 - h0);
+  const py = (v) => B - (B - T) * (v - lo) / (hi - lo);
+  ctx.strokeStyle = "#101a30"; ctx.beginPath(); ctx.moveTo(L, py(0)); ctx.lineTo(R, py(0)); ctx.stroke();
+  ctx.strokeStyle = "#f6a623"; ctx.lineWidth = 1.6; ctx.beginPath();
+  for (let i = 0; i < xeHist.length; i++) {
+    const X = px(xeHist[i][0]), Y = py(xeHist[i][1]);
+    i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = "#7c93b8";
+  ctx.fillText(h0.toFixed(1) + "h", L, B + 14);
+  ctx.fillText(h1.toFixed(1) + "h", R - 34, B + 14);
+  ctx.fillText(lo.toFixed(2) + "$", x + 8, py(lo) - 2);
+}
+
+// ---- readouts ----------------------------------------------------------------------------------------------
+function readouts() {
+  const rho = totalRho(), d = dollars(rho, GROUPS);
+  $("rho").textContent = (d >= 0 ? "$" : "-$") + Math.abs(d).toFixed(3);
+  $("rho").className = d >= 1 ? "warn" : "";
+  // The period comes from the MODULE's inhour solve, not from differencing the trace -- the page is a front
+  // door onto the physics, and a second derivation here would be a second thing to keep right.
+  const w = dominantRoot(rho, GEN_LWR, GROUPS);
+  if (Math.abs(rho) < 1e-12) $("per").textContent = "∞";
+  else if (!Number.isFinite(w) || w === 0) $("per").textContent = "--";
+  else {
+    const P = 1 / w;
+    $("per").textContent = (Math.abs(P) >= 1000 ? (P / 1000).toFixed(1) + "ks" : P.toFixed(2) + "s");
+  }
+  const pw = st.n * 100;
+  $("pow").textContent = pw >= 0.01 ? pw.toFixed(1) + "%" : pw.toExponential(1) + "%";
+  $("clock").textContent = t < 120 ? t.toFixed(1) + " s" : (t / 60).toFixed(1) + " min";
+  $("spd").textContent = speed;
+
+  let v = "";
+  if (d >= 1) v = '<span class="warn">PROMPT CRITICAL &mdash; the period is now set by the 2e-5 s generation time, not by the delayed groups</span>';
+  else if (scrammed) v = '<span class="ok">scrammed &mdash; the flux cannot fall faster than the 56 s precursor floor</span>';
+  else if (d > 0.4) v = "well above the controllable band";
+  $("verdict").innerHTML = v;
+
+  if (xenonOn) {
+    const xd = dollars(xenonRho(), GROUPS);
+    $("xestat").innerHTML = "xenon <b>" + xd.toFixed(2) + "$</b> &middot; " +
+      (xe / XE_EQ).toFixed(2) + "&times; operating &middot; peak limit " + peakTimeLimit().toFixed(1) + "h";
+  } else $("xestat").textContent = "";
+}
+
+// ---- loop --------------------------------------------------------------------------------------------------
+let last = 0;
+function frame(ts) {
+  if (!last) last = ts;
+  const real = Math.min(0.05, (ts - last) / 1000); last = ts;
+  const simSeconds = real * speed;
+  stepKinetics(simSeconds);
+  if (xenonOn) stepXenon(simSeconds);
+  t += simSeconds;
+  hist.push([t, st.n]); if (hist.length > 1400) hist.shift();
+  if (xenonOn) { xeHist.push([t * XE_ACCEL / 3600, dollars(xenonRho(), GROUPS)]); if (xeHist.length > 1400) xeHist.shift(); }
+  readouts(); plot();
+  requestAnimationFrame(frame);
+}
+
+// ---- controls ----------------------------------------------------------------------------------------------
+$("rod").oninput = (e) => { rodDollars = +e.target.value / 100; scrammed = false; };
+$("speed").oninput = (e) => { speed = +e.target.value; };
+$("scram").onclick = () => { rodDollars = -3; $("rod").value = -300; scrammed = true; };
+$("reset").onclick = () => {
+  st = steadyState(1, GEN_LWR, GROUPS); t = 0; rodDollars = 0; scrammed = false;
+  $("rod").value = 0; hist.length = 0; xeHist.length = 0;
+  xe = equilibrium(FLUX_LWR).Xe; iod = equilibrium(FLUX_LWR).I;
+};
+$("xe").onclick = () => {
+  xenonOn = !xenonOn;
+  $("xe").textContent = "Xenon: " + (xenonOn ? "on" : "off");
+  $("xe").className = xenonOn ? "on" : "";
+  if (!xenonOn) xeHist.length = 0;
+};
+
+resize(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
