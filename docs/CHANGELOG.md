@@ -8,6 +8,36 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3969 — the read side, and the cadence gap was never about a timer
+
+`loop-engineering` documents seven scheduled loops. Six SweK already covers, several more rigorously — gate-driven runtime verification against their CI-log reading, a changelog written *at* the bump against their lagging daily scan. The one that looked like a genuine gap was *"nothing runs on a cadence."*
+
+The actual defect was narrower and worse: **the things that already run contributed nothing.** `createWatchdog` is used in exactly one place in the tree — `brain-lab.html`, a page a person has to open. The gates that train on every ship round (`dock`, `dock-hazard`) call `dockPolicy.trainDockES`, which has no watchdog at all. A scheduler would have been the wrong fix for runs that were already happening.
+
+`trainDockES` gets an **opt-in `onIter` observer** instead. With no hook the branch is never taken, and both gate verdicts are byte-identical before and after — checked, not assumed. One ship round now writes six lesson records without anybody opening a page.
+
+### The reader ranks by repeat count, not score
+
+v3968 measured the plateaus, and the numbers decide this:
+
+| env | plateau range |
+| --- | --- |
+| `dockEnv` | −127.8 … −45.3 |
+| `dockHazardEnv` | −1901.2 … −1322.9 |
+| `huntEnv` | −95.8 … −31.9 |
+
+These are environment-specific reward sums with no shared zero. A reader sorting by score would put every `dockHazard` lesson above every `hunt` lesson forever **and call that relevance** — ranking by environment while reporting importance. The repeat count means the same thing everywhere: six kicks over iters 12–27 is a wall, one kick at iter 7 is a blip, and they are indistinguishable by score.
+
+A related environment is offered **separately and marked**, never blended. `dockEnv` shares a policy shape with `dockHazardEnv` and not a reward scale; merging them is how retrieval starts producing confident nonsense. An unrelated environment is not offered at all, even when it holds the highest repeat count in the corpus.
+
+### The gate's own fixture was the last thing wrong
+
+It put the worst score on the longest hold — so score-ranking and repeat-ranking produced the *same* list, and swapping the comparator for a score sort passed cleanly **twice**. A fixture where the wrong answer looks like the right one tests nothing. The longest-held plateau now carries the better score, and the probe goes red.
+
+Three outcomes that all read as "no lessons" are kept distinct on purpose — an empty corpus, a corpus with no match, and a hit — because each wants a different response and only one of them means the reader is working.
+
+The brief is **printed, never fed back into the trainer**. A retrieval step that silently changed hyperparameters would make every run un-reproducible from its own source.
+
 ## Since v3968 — the stub-emitter, built first and measured, which is why the read side would have been worthless
 
 Arbor's actual mechanism is **distillation, not retrieval**: after each experiment an LLM abstracts the result and writes it into the ancestor nodes, so a child hypothesis inherits context for free. SweK already has the distilled half, and better — `okf/claims/` carries 241 hand-authored Prediction / Why / Measured / Kill-condition files, and `brain/patchnotes/` has one whose whole value is the line *"Two earlier obvious fixes were tried and measured INSUFFICIENT (documented so they're not re-attempted)."*

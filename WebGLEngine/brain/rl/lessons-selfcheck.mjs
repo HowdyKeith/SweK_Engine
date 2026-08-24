@@ -34,7 +34,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createWatchdog } from "./watchdog.js";
-import { recordingWatchdog, recordLesson, readLessons, makeRecord, health, lessonsPath, RECORDED_EVENTS } from "./lessons.mjs";
+import { recordingWatchdog, recordLesson, readLessons, makeRecord, health, lessonsPath, RECORDED_EVENTS,
+         lessonsFor, lessonsBrief, watchTraining } from "./lessons.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -153,6 +154,92 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
     ok("!! ...so the DEFAULT corpus path is outside the engine tree and outside okf/claims/",
         !!p && !p.includes(path.join("okf", "claims")) && !p.startsWith(ROOT + path.sep),
         p + "  (engine tree: " + ROOT + ")");
+}
+
+// ---- 8. THE READ SIDE: RANKING (v3969) ---------------------------------------------------------------------
+// *** RANKED BY REPEAT COUNT, NOT SCORE, BECAUSE SCORES ARE NOT COMPARABLE. *** Measured at v3968: dockEnv
+// plateaus near -127..-45, dockHazardEnv near -1901..-1323, huntEnv near -96..-32. Sorting by score would put
+// every dockHazard lesson above every hunt lesson forever and call that relevance. The fixture below is built
+// so score order and repeat order DISAGREE -- a reader that quietly sorted by score would pass a fixture where
+// they happened to agree.
+{
+    try { fs.rmSync(TMP, { force: true }); } catch { }
+    const rows = [
+        // *** THE TWO ORDERINGS MUST DISAGREE OR THE CHECK CANNOT SEE THE DIFFERENCE. *** The first version of
+        // this fixture put the worst score (-900) on the longest hold (repeats 5), so ranking by score and
+        // ranking by repeats produced the SAME list -- and a probe that swapped the comparator for a score sort
+        // passed cleanly. A fixture where the wrong answer looks like the right one tests nothing. Here the
+        // longest-held plateau has the BETTER score, so only a repeat-ranked reader puts it first.
+        { env: "dockHazardEnv", event: "stalled-kicked", score: -900, iters: 20, stats: { repeats: 1, firstIters: 19 } },
+        { env: "dockHazardEnv", event: "stalled-kicked", score: -100, iters: 60, stats: { repeats: 5, firstIters: 40 } },
+        { env: "dockEnv",       event: "stalled-kicked", score: -50,  iters: 30, stats: { repeats: 3, firstIters: 25 } },
+        { env: "huntEnv",       event: "stalled-kicked", score: -10,  iters: 15, stats: { repeats: 9, firstIters: 5 } },
+    ];
+    for (const r of rows) fs.appendFileSync(TMP, JSON.stringify(makeRecord(r)) + "\n");
+
+    const got = lessonsFor("dockHazardEnv", { file: TMP });
+    ok("!! *** the top lesson is the one that HELD LONGEST, not the worst-scoring one ***",
+        got.exact[0] && got.exact[0].stats.repeats === 5 && got.exact[0].score === -100,
+        "top repeats=" + (got.exact[0] && got.exact[0].stats.repeats) + " score=" + (got.exact[0] && got.exact[0].score) +
+        "  (a score-ranked reader would put -900 first)");
+    ok("   ...and the ranking is strictly repeats-descending",
+        got.exact.map((r) => r.stats.repeats).join(",") === "5,1",
+        got.exact.map((r) => r.stats.repeats).join(","));
+
+    // *** A RELATED ENVIRONMENT IS SEPARATED, NOT BLENDED. *** dockEnv shares a policy shape with
+    // dockHazardEnv and NOT a reward scale; presenting them as one list is how retrieval starts producing
+    // confident nonsense. huntEnv shares neither and must not appear at all.
+    ok("!! *** a related env (dockEnv) is offered SEPARATELY, never merged into the exact list ***",
+        got.exact.every((r) => r.env === "dockHazardEnv") && got.related.some((r) => r.env === "dockEnv"),
+        "exact=" + got.exact.map((r) => r.env).join(",") + "  related=" + got.related.map((r) => r.env).join(","));
+    ok("   ...and an unrelated env (huntEnv) is not offered at all, despite having the highest repeat count",
+        !got.related.some((r) => r.env === "huntEnv") && !got.exact.some((r) => r.env === "huntEnv"),
+        "huntEnv has repeats=9 -- ranking must not reach across an unrelated environment to find it");
+}
+
+// ---- 9. THE READ SIDE: THREE OUTCOMES THAT MUST NOT LOOK ALIKE ----------------------------------------------
+// Retrieval against an empty corpus, retrieval that found nothing relevant, and a broken reader all produce
+// "no lessons" -- and each wants a different response from whoever reads the gate output.
+{
+    const empty = lessonsBrief("dockEnv", { file: path.join(os.tmpdir(), "swek-no-such-corpus.jsonl") });
+    ok("!! an EMPTY corpus says so", /corpus is empty/.test(empty), empty.slice(0, 80));
+    const none = lessonsBrief("zzzNoSuchEnv", { file: TMP });
+    ok("!! ...and a corpus with NO MATCH says something different", /none matching/.test(none) && !/corpus is empty/.test(none), none.slice(0, 80));
+    const hit = lessonsBrief("dockHazardEnv", { file: TMP });
+    ok("...and a hit names the environment and the plateaus", /prior stall\(s\) for dockHazardEnv/.test(hit));
+}
+
+// ---- 10. THE TRAINER OBSERVER (v3969) ------------------------------------------------------------------------
+// dock/dock-hazard train on every ship round through dockPolicy.trainDockES, which has no watchdog -- so
+// wrapping createWatchdog alone left the gates contributing nothing. watchTraining adapts a plain per-iteration
+// callback to the SAME plateau folding, so a gate lesson and a lab lesson are indistinguishable in the corpus.
+{
+    try { fs.rmSync(TMP, { force: true }); } catch { }
+    const w = watchTraining({ env: "obsEnv", params: { pop: 4 }, patience: 3, minDelta: 0.5 });
+    // best score climbs, then sits flat long enough to stall twice at one value, then climbs again
+    const seq = [10, 20, 30, 30, 30, 30, 30, 30, 30, 99];
+    seq.forEach((bestScore, it) => w.onIter({ it, bestScore }));
+    w.flush();
+    const rows = readLessons(TMP);
+    ok("!! the observer records a plateau from a plain iteration callback", rows.length >= 1, rows.length + " record(s)");
+    ok("   ...folded into ONE record for the one flat stretch, with a repeat count",
+        rows.length === 1 && rows[0].stats.repeats >= 2,
+        rows.length + " record(s), repeats=" + (rows[0] && rows[0].stats.repeats));
+    ok("   ...and it is tagged as coming from the trainer observer, not a watchdog",
+        rows[0] && rows[0].stats.source === "trainer-observer");
+}
+
+// ---- 11. THE HOOK IS OPTIONAL, AND THE GATES USE IT ----------------------------------------------------------
+{
+    const dp = fs.readFileSync(path.join(HERE, "dockPolicy.js"), "utf8");
+    ok("!! *** trainDockES's observer is OPT-IN -- with no hook the branch is never taken ***",
+        /if \(opts\.onIter\)/.test(dp) && /catch \{ \/\* an observer must never take the run down/.test(dp),
+        "dock and dock-hazard verdicts were byte-identical before and after the hook was added");
+    for (const g of ["dock-selfcheck.mjs", "dock-hazard-selfcheck.mjs"]) {
+        const src = fs.readFileSync(path.join(HERE, g), "utf8");
+        ok("   " + g + " both READS priors and WRITES its own",
+            /lessonsBrief\(/.test(src) && /watchTraining\(/.test(src) && /onIter: _watch\.onIter/.test(src));
+    }
 }
 
 try { fs.rmSync(TMP, { force: true }); } catch { }
