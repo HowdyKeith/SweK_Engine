@@ -21,7 +21,8 @@
 //   [188.65, 377.3, 565.95] and the scan could not see it. A scan blind to a value TYPE reports absence of
 //   response where there is response, which is the most misleading result a sensitivity analysis can give.
 
-import { deviceSensitivity, labSensitivity, changed, perturb, pairedSensitivity, ENABLING_FLAGS } from "./sensitivity.mjs";
+import { deviceSensitivity, labSensitivity, changed, perturb, pairedSensitivity, ENABLING_FLAGS,
+         escalatedSensitivity, escalations } from "./sensitivity.mjs";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { SLOW_DEVICES } from "./valueMatch.mjs";
 
@@ -123,6 +124,9 @@ const lab = await labSensitivity(DEVICE_NAMES.slice(0, 30), getDevice, SLOW_DEVI
 }
 
 
+// v3973 -- hoisted out of section 6's block so section 7 can escalate what it could not rescue.
+let paired;
+
 // ---- 6. THE TWO-AT-A-TIME SWEEP, AND THE THIRD LIMITATION IT EXPOSED --------------------------------------------
 //
 // Pairs over all 188 declared keys would be quadratic and pointless. It does not need to be: only a small set of
@@ -145,7 +149,7 @@ const lab = await labSensitivity(DEVICE_NAMES.slice(0, 30), getDevice, SLOW_DEVI
         "8 * 1.1 = 8.8 floors back to 8 and the knob looks dead. A count needs a step it can actually take, and " +
         "the fix is to the INSTRUMENT -- whitedwarf:points was always live");
 
-    const paired = await pairedSensitivity(lab.dead, getDevice);
+    paired = await pairedSensitivity(lab.dead, getDevice);
     ok("!! the paired sweep rescues knobs that are GATED rather than unused",
         paired.rescued.length >= 2 && paired.flagsTried >= 3,
         `${paired.rescued.length} rescued against ${paired.flagsTried} registered flags: ` +
@@ -157,12 +161,73 @@ const lab = await labSensitivity(DEVICE_NAMES.slice(0, 30), getDevice, SLOW_DEVI
         `${Object.keys(ENABLING_FLAGS).length} flags, each with why it is a switch rather than a setting. ` +
         "Guessing which keys gate others from their names would put this back where the name-match census was");
 
-    ok("!! what survives all three corrections is a short list worth reading",
-        paired.stillDead.length < lab.dead.length && paired.stillDead.length <= 8,
-        `${paired.stillDead.length} knobs move nothing under any flag, with integer stepping, comparing every ` +
-        `value type: ${paired.stillDead.map((x) => x.entry).join(", ")}. Several are search tolerances on a path ` +
-        "the defaults never take, and acoustics:N is a grid size the propagation error is DESIGNED to be " +
-        "independent of. A legitimately dead knob is still a real category");
+    ok("!! the paired sweep narrows the list rather than leaving it where it was",
+        paired.stillDead.length < lab.dead.length,
+        `${paired.stillDead.length} of ${lab.dead.length} survive the flag sweep`);
+}
+
+// ---- 7. THE FOURTH LIMITATION (v3973) -- AND WHY A COUNT WAS THE WRONG THING TO GRADE ---------------------------
+//
+// *** THIS CHECK USED TO READ `paired.stillDead.length <= 8` AND IT HAD BEEN RED FOR AN UNKNOWN NUMBER OF ROUNDS
+// WITHOUT ANYBODY SEEING IT. *** The gate runs ~155s against selfchecks' ~140s default budget, so the suite
+// SIGTERMed it before it could print its own verdict. A red gate that dies before it reports is indistinguishable
+// from a slow one, which is why its runtime is now MEASURED in gateBudget rather than left in UNRESOLVED.
+//
+// AND THE COUNT WAS THE WRONG INSTRUMENT ANYWAY. Three separate checks above -- and this file's own header --
+// argue that a dead knob is A LEAD, NOT A DEFECT, and that "failing on the list would condemn both kinds". Then
+// the last check failed on a bare tally of that same list: a number nobody can audit, that says nothing about
+// WHICH knob is dead or why, and that goes stale the moment the lab grows. 8 was a number-of-the-day.
+//
+// What replaces it is a NAMED BASELINE with a measured reason per entry, and it ratchets in BOTH directions: a
+// NEW dead knob is a regression and fails, and a NAMED one that comes back to life also fails, because a
+// baseline entry whose reason has expired is a ratchet holding nothing.
+const KNOWN_DEAD = {
+    "xpbd:h": "the kernel-support radius. It drives kernelIntegral, which is 1.0000000000000153 at h = 0.25, " +
+              "1.0 and 4.0 alike -- A NORMALISED KERNEL INTEGRATES TO UNITY AT EVERY SUPPORT RADIUS, so being " +
+              "invariant IS the property this mode exists to grade, and kernelIntegralErr grades it. Dead here " +
+              "is CORRECT and permanent. It looked like it had a second, live observable until v3973: the same " +
+              "return object carried restDensity from latticeRestDensity() called with NO ARGUMENTS, fixed at " +
+              "h = 0.25 while kernelIntegral tracked the caller's h. That stowaway is removed.",
+};
+{
+    const escalated = await escalatedSensitivity(paired.stillDead, getDevice);
+
+    ok("!! *** TEN OF THE ELEVEN 'DEAD' KNOBS WERE ALIVE, AND A 1.1x NUDGE COULD NEVER HAVE SEEN THEM ***",
+        escalated.rescued.length >= 9,
+        `${escalated.rescued.length} rescued at magnitude: ` +
+        escalated.rescued.map((r) => r.entry + "@" + r.value).join(", ") +
+        ". Every one is a TOLERANCE, a CAP or a THRESHOLD -- knobs whose local derivative is zero BY DESIGN. " +
+        "perturb() asks for a slope; their response is a cliff. FOURTH limitation of the same shape: array " +
+        "blindness, one-at-a-time, integer stepping, and now step SIZE");
+
+    ok("...and the escalation cannot run away with the cost",
+        escalations(200000).every((v) => v < 200000) && escalations(1e-8).some((v) => v === 1),
+        "integers go strictly DOWN, so a cap probe always costs LESS than the baseline run and a 200000-step " +
+        "device can never be escalated into a 200-million-step one. Floats span three orders each way, plus " +
+        "O(1) for a sub-unit tolerance -- galaxy:zeroTol turns at the Fiedler value 0.0564, 5.6 MILLION times " +
+        "its 1e-8 default, which no fixed order-of-magnitude ladder reaches");
+
+    const survivors = escalated.stillDead.map((x) => x.entry).sort();
+    const named = Object.keys(KNOWN_DEAD).sort();
+    const unexplained = survivors.filter((e) => !(e in KNOWN_DEAD));
+    const revived = named.filter((e) => !survivors.includes(e));
+
+    ok("!! *** every genuinely dead knob is NAMED WITH A REASON, not counted ***",
+        unexplained.length === 0,
+        unexplained.length
+            ? "UNEXPLAINED: " + unexplained.join(", ") + " -- a new dead knob is a lead nobody has read yet. " +
+              "Read it, then either fix the device or add it to KNOWN_DEAD with what you measured"
+            : `${survivors.length} survive all four corrections, every one named: ${survivors.join(", ")}`);
+
+    ok("...and a named entry that came back to life fails too, so the baseline cannot hold nothing",
+        revived.length === 0,
+        revived.length
+            ? "REVIVED: " + revived.join(", ") + " -- these now respond. DELETE the entry, do not widen it"
+            : "all " + named.length + " named entries are still genuinely dead, so none is stale");
+
+    ok("   and each reason is a SENTENCE that names what was measured",
+        Object.values(KNOWN_DEAD).every((r) => r.length > 120),
+        "a one-word reason is a suppression wearing a justification");
 }
 
 console.log();

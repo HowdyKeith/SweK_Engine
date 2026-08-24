@@ -187,3 +187,89 @@ export async function pairedSensitivity(deadList, getDevice, { factor = 1.1 } = 
     }
     return { rescued, stillDead, flagsTried: Object.keys(ENABLING_FLAGS).length };
 }
+
+// =====================================================================================================================
+// v3973 -- *** THE FOURTH LIMITATION, AND THE LARGEST: A 1.1x NUDGE MEASURES A DERIVATIVE THAT IS ZERO BY DESIGN. ***
+// =====================================================================================================================
+//
+// The dead list had ELEVEN entries and TEN OF THEM WERE FALSE POSITIVES. Measured, not argued: every one of the
+// ten moves real observables the moment it is perturbed past its own scale.
+//
+//     blackhole:onsetTol   a bisection tolerance   moves captureOnsetR at 0.00002
+//     blackhole:escSteps   an integration cap      moves escapeV at 600000
+//     xpbd:tearStrain      a discrete threshold    moves tearEnd at 0.00106
+//     acoustics:N          a grid size             moves propagationError at 200
+//     freerotation:steps   an integration cap      moves driftWorldL at 30000
+//     refscan:maxDepth     a bounce cap            moves worstAlbedoErrFrac at 1
+//     sdfmarch:epsilon     a march tolerance       moves worstAgainstClosedForm at 1e-10
+//     sdfmarch:maxSteps    a march cap             moves raysTraced at 1
+//     galaxy:zeroTol       an eigenvalue tolerance moves zeroMultiplicity at 1
+//     galaxy:maxHops       a walk cap              moves mismatches at 2
+//
+// THEY ARE ALL THE SAME KIND OF KNOB: tolerances, caps and thresholds, whose entire job is to do NOTHING until
+// they are crossed. perturb() moves a knob by 1.1x, which asks for the LOCAL DERIVATIVE -- and for this whole
+// family the local derivative is zero BY DESIGN. A cap that is not binding does not begin to bind because it
+// rose ten percent; a tolerance already converged does not change its answer because it loosened ten percent.
+// The scan was not measuring these knobs badly, it was measuring the wrong thing about them entirely.
+//
+// That is the FOURTH time this instrument has reported no response where there was one, and every one of the
+// four had the same shape -- a limit of HOW IT LOOKED, not of what was there. Numeric-only comparison missed an
+// array; one-at-a-time missed a gated knob; a multiplicative step missed an integer; and a small step misses
+// everything whose response is a cliff rather than a slope.
+//
+// *** THE LADDER IS SAFE BY CONSTRUCTION, WHICH IS NOT A DETAIL. *** Integers go strictly DOWN. A slack cap only
+// binds when lowered, and lowering a step count strictly REDUCES the work -- so escalation can never turn a
+// 200000-step run into a 200-million-step one. Raising an integer would be both the wrong probe and an
+// unbounded cost. Floats go three orders each way, which is cheap because a tolerance does not drive a loop.
+//
+// *** AND ONE RUNG WAS ADDED AFTER A MEASUREMENT, WHICH IS RECORDED RATHER THAN SMOOTHED OVER. *** galaxy:zeroTol
+// survived the +/-3-order ladder. Its default is 1e-8 and the answer turns at the FIEDLER VALUE, 0.0564 --
+// 5.6 MILLION times the default, further than any fixed order-of-magnitude ladder reaches. The rung added is
+// not "whatever makes galaxy pass": a DIMENSIONLESS TOLERANCE BELOW ONE IS MEANINGFUL OVER (0, 1], so a probe
+// that does not reach O(1) has not spanned the knob's range at all. It is stated as a property of that kind of
+// knob, and it was found by measuring where this one actually turns rather than by widening until green.
+
+/** The values a knob is retried at once a 1.1x nudge has found nothing. Integers strictly downward. */
+export function escalations(v) {
+    if (!Number.isFinite(v) || v === 0) return [];
+    if (Number.isInteger(v)) {
+        // Strictly down: cost falls, and a cap that never binds is exactly the thing lowering exposes.
+        return [...new Set([Math.floor(v / 2), Math.floor(v / 10), 1])].filter((x) => x >= 1 && x !== v);
+    }
+    const out = [v * 1e-3, v * 1e3];
+    if (Math.abs(v) < 1) out.push(1);   // span the whole meaningful range of a sub-unit tolerance
+    return [...new Set(out)].filter((x) => Number.isFinite(x) && x !== v);
+}
+
+/**
+ * Re-test knobs that STILL look dead after the flag sweep, at magnitudes rather than nudges.
+ * A knob rescued here was never dead -- it is a tolerance, a cap or a threshold, and the scan was asking it
+ * for a slope when its response is a cliff.
+ */
+export async function escalatedSensitivity(stillDeadList, getDevice) {
+    const rescued = [], stillDead = [];
+    for (const item of stillDeadList) {
+        const entry = typeof item === "string" ? item : item.entry;
+        const [device, knob] = entry.split(":");
+        let d; try { d = await getDevice(device); } catch { stillDead.push({ entry, reason: "device would not build" }); continue; }
+        const cfg = ((d.defaults ? d.defaults({}) : null) || {}).config || {};
+        if (!(knob in cfg)) { stillDead.push({ entry, reason: "knob not in defaults" }); continue; }
+
+        let found = null;
+        outer:
+        for (const val of escalations(cfg[knob])) {
+            for (const mode of (d.modes || [null])) {
+                let a, b;
+                try {
+                    a = await d.build({ mode, config: { ...cfg } });
+                    b = await d.build({ mode, config: { ...cfg, [knob]: val } });
+                } catch { continue; }
+                const moved = Object.keys(a || {}).filter((o) => changed(a[o], b[o]));
+                if (moved.length) { found = { value: val, mode, moved }; break outer; }
+            }
+        }
+        if (found) rescued.push({ entry, ...found });
+        else stillDead.push({ entry, reason: "moves nothing at three orders either way, or down to a binding cap" });
+    }
+    return { rescued, stillDead };
+}
