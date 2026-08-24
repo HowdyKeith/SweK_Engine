@@ -318,6 +318,77 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
     }
 }
 
+// ---- 15. levelClaim (v3972) -- THE TREE'S MOST EXPENSIVE GATE, AND THE SWEEP IT REFUSES ------------------------
+//
+// *** THE REFUSAL IS THE PART THAT NEEDS A CHECK. *** levelClaim runs THREE sweeps and wires TWO. The third --
+// section 4's spread-against-tilt rows -- has the same shape and the OPPOSITE semantics: the spread is meant to
+// RISE with the angle, so its failure is "the statistic went deaf", not "the value would not settle". Writing
+// that under the event name "sweep-unsettled" would file a discrimination failure as a convergence failure.
+// A DOCUMENTED REFUSAL THAT NOTHING ENFORCES IS A COMMENT, so the count is pinned here: the day somebody adds
+// a third call, this goes red and they have to read the reasoning before widening it.
+{
+    // THREE DIFFERENT VIEWS OF THE SAME FILE, AND PICKING THE WRONG ONE IS THIS SESSION'S RECURRING BUG.
+    // codeOnly() blanks comments AND the CONTENTS of string literals -- right for counting calls, useless for
+    // reading a key name, which is exactly what it is for. noComments() keeps strings and drops prose -- right
+    // for "is this literal present". prose() is the inverse, for grading the comment itself.
+    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const lvlPath = path.join(ROOT, "physics", "sph", "levelClaim-selfcheck.mjs");
+    const lvl = fs.readFileSync(lvlPath, "utf8");
+    const code = codeOnly(lvl), live = noComments(lvl), why = prose(lvl);
+
+    ok("!! levelClaim READS priors under the sph-level key",
+        /lessonsBrief\("sph-level"\)/.test(live));
+
+    const calls = (code.match(/recordSweepFinding\(/g) || []).length;
+    ok("!! ...and WRITES exactly TWO verdicts -- the levelling series and the tilt stationarity", calls === 2,
+        calls + " call(s). Both are settle questions the gate already answers in its own PASS lines");
+
+    ok("!! *** and the TILT-ANGLE sweep is NOT among them ***",
+        !/axis:\s*["']tiltDeg["']/.test(live),
+        "the spread RISING with tilt is the load-bearing negative; a sweep that is supposed to move has no " +
+        "'did it settle' verdict to record, and 'sweep-unsettled' is the wrong word for one that went deaf");
+
+    ok("   the refusal is written down where the next editor will hit it",
+        /OPPOSITE SEMANTICS/.test(why) && /LOAD-BEARING NEGATIVE/.test(why),
+        "the count check above is the enforcement; this is the explanation it points at");
+
+    ok("   levelClaim's import AND both recordSweepFinding calls are wrapped in try/catch",
+        /try \{[\s\S]{0,40}await import\(pathToFileURL/.test(code) &&
+        (code.match(/try \{[\s\S]{0,200}recordSweepFinding/g) || []).length === 2,
+        "a physics gate must never go red because a lesson file could not be read or written");
+
+    // *** AND THE SEMANTICS ARE DRIVEN, NOT INSPECTED. *** Source inspection proves the call is THERE; it
+    // cannot prove the boolean handed to it means what the gate means. levelClaim is green, so its real sweep
+    // writes NOTHING -- which makes a silent wiring bug indistinguishable from a correct one at run time. So
+    // the mapping is replayed here against levelClaim's OWN MEASURED SERIES (v3972, from the section 2 line:
+    // 300:11.045 -> 900:1.980 -> 1800:0.000 -> 3000:0.000) with and without a planted reversal.
+    //
+    // STATED LIMIT, BECAUSE IT WOULD OTHERWISE READ AS AIRTIGHT: the mapping below is a COPY of levelClaim's,
+    // not an import of it, so this replay grades the intended semantics rather than the live expression. If
+    // somebody edits levelClaim's ternary the count and try/catch checks above still bite but this one does
+    // not. Extracting the mapping into levelClaim.mjs so both sides share one declaration is the fix, and it
+    // is a refactor of a 646s gate rather than a line here -- named so the next reader can do it deliberately.
+    const MEASURED = [[300, 11.045], [900, 1.980], [1800, 0.000], [3000, 0.000]];
+    const asSeries = (rows) => rows.map(([steps, sd], i) =>
+        ({ x: steps, y: sd, settled: i === 0 ? true : !(sd > rows[i - 1][1]) }));
+
+    const before = readLessons(TMP).length;
+    const cleanWrote = recordSweepFinding({ env: "sph-level", axis: "steps", series: asSeries(MEASURED), params: {} });
+    ok("!! levelClaim's REAL series is silent -- including the 0.000 -> 0.000 tail",
+        cleanWrote === false && readLessons(TMP).length === before,
+        "a flat tail is SETTLED, not a reversal: `!(0 > 0)` is true. Getting that backwards would file the " +
+        "tree's most expensive gate as failing every run, which is the failure mode this replay exists to catch");
+
+    const bent = MEASURED.map((r, i) => (i === 2 ? [1800, 3.5] : r));   // the spread climbs back mid-settle
+    const bentWrote = recordSweepFinding({ env: "sph-level", axis: "steps", series: asSeries(bent), params: {} });
+    const rec = readLessons(TMP).filter((r) => r.env === "sph-level").pop();
+    ok("!! *** and a planted reversal DOES land, so the write path is live rather than merely present ***",
+        bentWrote !== false && rec && rec.event === "sweep-unsettled" && rec.stats.repeats === 1 &&
+        rec.stats.axis === "steps" && rec.stats.points === 4,
+        rec ? "repeats=" + rec.stats.repeats + " of " + (rec.stats.points - 1) + " transitions, axis " +
+              rec.stats.axis : "no record written");
+}
+
 try { fs.rmSync(TMP, { force: true }); } catch { }
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 process.exit(fails ? 1 : 0);
