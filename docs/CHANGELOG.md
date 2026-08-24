@@ -8,6 +8,72 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v3965 — wg128-shared is the shipped magmap kernel: 1.32x, and bit-identical
+
+Keith's rig, Intel gen-9, medians of 7 runs:
+
+| variant | median | vs base | worst err |
+| --- | --- | --- | --- |
+| base-wg64 *(was the default)* | 10.7 ms | 1.00× | 3.79e-6 |
+| **wg128-shared** | **8.1 ms** | **1.32×** | 3.79e-6 |
+| wg64-shared | 8.3 ms | 1.29× | 3.79e-6 |
+| wg128 | 8.3 ms | 1.29× | 3.79e-6 |
+| wg256 | 8.7 ms | 1.23× | 3.79e-6 |
+
+All seven agree with the CPU f64 reference to the *same* 3.79e-6. The kernel whose own header said it "has never been tuned" is now tuned by a measurement on the hardware that runs it — which is what `magmap-bench` was built for two rounds ago, and it could not have been trusted to say this until v3962 fixed the correctness check that had never compared a number.
+
+### The obvious way to bake it in would have broken the instrument that measured it
+
+Editing the base WGSL — change `64` to `128`, paste the workgroup-memory code in — is tidier and silently wrong. `magmap-bench` derives all seven rows with `variantWgsl(WGSL, v)`, so a base already carrying shared trig would:
+
+- make the four **non-shared** variants shared too (step 4's `cosT`→`cosW` replace finds nothing left to do), and
+- make the three shared ones declare `var<workgroup> cosW` **twice**.
+
+Half the table mislabelled, half not compiling. The thing that proved the change would have stopped being able to prove anything.
+
+So the base stays **pristine** and the shipped kernel is derived: `SHIPPED_WGSL = variantWgsl(WGSL, SHIPPED_VARIANT)`. One transformation, one declaration, and *"the shipped kernel is wg128-shared"* is a fact the code computes rather than a second hand-written copy that drifts from the variant it claims to be.
+
+`base-wg64` stays in `VARIANTS`, relabelled **"the FORMER default"** — it had read *"the shipped kernel, unchanged"* for seventeen rounds and was true the whole time, which is exactly how a label becomes a lie. A bench without the thing it replaced measures nothing, and keeping it timed is the only way to learn that 128-shared has stopped being right on some future device.
+
+### The shared kernel is only correct up to SHARED_CAP, and past it it does not fail — it lies
+
+`cosW`/`sinW` are `array<f32, 64>`; the cooperative load writes `cosW[t]` for `t < P.nT`. Measured on a real GPU at `nT=96` with the guard removed:
+
+| | worst relative error |
+| --- | --- |
+| tolerance | 1e-5 |
+| guarded fallback | 4.44e-6 ✓ |
+| **forced past the cap** | **3.86e-2 — 3,864× tolerance** |
+
+No crash. No validation error. Numbers that look like numbers. An out-of-bounds workgroup write does not announce itself.
+
+Every GPU caller in this tree passes `nT=48`, which is a fact about *today* — `magmapGpu`'s signature accepts any `nT`, and `lensBind`'s `finiteSourceMag` runs 240 on the CPU. So above the cap the default falls back to the base kernel, and the provenance tag says which one ran.
+
+### One decision, two outputs — and a probe found the shape
+
+The first cut chose the source with one expression and built the provenance label with a second that re-tested the same conditions. They agreed, so nothing looked wrong. Then a probe removed the cap guard: the kernel changed and **the label did not**, so the run reported `base-wg64(nT>cap)` while executing the shared kernel. A tag that can disagree with the thing it names is worse than no tag, because it is believed.
+
+Deciding once makes that unrepresentable — and the probe now trips *both* lines instead of one.
+
+### Verified on the GPU, not asserted from the source
+
+`magmapVariants` claims variants change only where numbers are read from, never the arithmetic. That is a claim about what a GPU does with the code, so `magmapDefault-selfcheck.mjs` runs it: the new default is **bit-identical to the kernel it replaced — 0 differing cells of 441**. Three probes: remove the cap guard, hand-edit the base, or drop `base-wg64` from the bench, and each goes red.
+
+### A second device disagreed, hard — and it explains the mechanism
+
+Running the full bench in the sandbox that hosts the gates gave the *opposite* answer:
+
+| device | base-wg64 | wg128-shared | verdict |
+| --- | --- | --- | --- |
+| Intel gen-9 (real silicon) | 10.7 ms | 8.1 ms | **1.32× faster** |
+| SwiftShader (software rasteriser) | 24.3 ms | 53.6 ms | **0.45× — 2.2× slower** |
+
+That is not a contradiction to resolve; it is the mechanism showing through. SwiftShader has no on-chip shared memory, so `var<workgroup>` is ordinary system RAM — the cooperative load and the barrier buy nothing and cost a synchronisation. **Shared-trig is a win exactly where workgroup memory is real, and a loss where it is emulated.**
+
+Correctness is unaffected on both: same 4.4e-6, bit-identical kernels. The measurement is recorded in `SHIPPED_VARIANT`'s own note rather than dropped, because it is the fact that decides how much this default is worth.
+
+**One device is a data point, not a law.** Re-run the bench on the Mac and the Shield before treating this as settled everywhere; the fallback and the baseline are both in place so a different answer there is a one-line change.
+
 ## Since v3964 — one button starts the chain, stops before the release, and the first tree it graded proved why
 
 Keith: *"a natural follow on to Github clone repo to new version dir, would be to clone, then run and auto export github version? so one button would start that chain?"*

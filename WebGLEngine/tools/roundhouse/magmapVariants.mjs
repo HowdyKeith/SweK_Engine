@@ -36,12 +36,21 @@ export const SHARED_CAP = 64;   // compile-time size of the workgroup trig array
  * benchmark without the incumbent measures nothing.
  */
 export const VARIANTS = [
-    { id: "base-wg64", workgroup: 64, sharedTrig: false, note: "the shipped kernel, unchanged -- the incumbent" },
+    // v3965 -- *** THIS IS NO LONGER THE SHIPPED KERNEL, AND SAYING SO WAS THE FIRST THING TO FIX. *** It read
+    // "the shipped kernel, unchanged -- the incumbent" for seventeen rounds and was true the whole time; the
+    // moment magmapGpu's default became wg128-shared it became a sentence describing the previous world, which
+    // is the exact defect v3959 spent a round on (a message that outlived the thing it described). It stays in
+    // the list, and it MUST: a benchmark without the thing it replaced measures nothing, and the only way to
+    // find out that 128-shared has stopped being the right default on some future device is to keep timing the
+    // one it beat.
+    { id: "base-wg64", workgroup: 64, sharedTrig: false, note: "the FORMER default (pre-v3965) -- kept as the baseline every speedup is measured against" },
     { id: "wg32", workgroup: 32, sharedTrig: false, note: "narrower groups; some mobile GPUs prefer 32" },
     { id: "wg128", workgroup: 128, sharedTrig: false, note: "wider groups" },
     { id: "wg256", workgroup: 256, sharedTrig: false, note: "widest commonly supported" },
     { id: "wg64-shared", workgroup: 64, sharedTrig: true, note: "incumbent width + trig tables in workgroup memory" },
-    { id: "wg128-shared", workgroup: 128, sharedTrig: true, note: "wider + shared trig" },
+    // v3965 -- THE SHIPPED DEFAULT. magmapGpu derives its kernel from this same entry via variantWgsl, so this
+    // row is not "a variant that happens to match what ships" -- it is the definition, timed against the rest.
+    { id: "wg128-shared", workgroup: 128, sharedTrig: true, note: "wider + shared trig -- THE SHIPPED DEFAULT since v3965" },
     { id: "wg256-shared", workgroup: 256, sharedTrig: true, note: "widest + shared trig" },
 ];
 
