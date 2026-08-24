@@ -167,6 +167,35 @@ const toHalf = (v) => {
         "a planner that never made a context could describe the design forever without ever discovering the " +
         "shader did not compile");
 
+    // v3978 -- "THE PATTERN EXISTS SOMEWHERE" IS NOT "EVERY CALL SITE USES IT". Keith clicked the draw button
+    // and hit `G.makePopulationGPU is not a function` -- a typo the check above could not have caught, because
+    // it passes the instant createPopulationGPU appears ANYWHERE, and two of this page's three GPU-call sites
+    // (verBtn's compare and the on-load benchmark) already had it right. The third, drawBtn's handler, imports
+    // the module as a NAMESPACE object (`const G = await import(...)`) rather than destructuring, so the wrong
+    // property name is not a parse error or a missing-export error -- it is a dead property access that only
+    // throws once a human actually presses the button, which render-qa's page-load pass never does (this
+    // file's own NOTE above already says so: "first run on the rig is the real test"). No automated pass was
+    // ever going to notice a typo behind a click nobody simulated.
+    //
+    // THE FIX IS A COUNT, NOT ANOTHER "DOES IT APPEAR" CHECK, because that is the exact shape that just missed
+    // one bad site out of three good-looking ones. Every known GPU-call site is enumerated by name here so a
+    // FOURTH one added later without updating this list fails loudly rather than silently joining the ones
+    // that were never counted.
+    {
+        const GPU_CALL_SITES = ["runBtn benchmark", "drawBtn draw", "verBtn compare"];
+        const realCalls = (page.match(/createPopulationGPU\(gl,/g) || []).length;
+        ok("!! every known GPU-call site uses the REAL export name -- a count, not merely a match",
+            realCalls === GPU_CALL_SITES.length,
+            realCalls + " of " + GPU_CALL_SITES.length + " expected sites (" + GPU_CALL_SITES.join(", ") + "). " +
+            "Two correct call sites were never the evidence that the third was; only a full count is");
+
+        ok("!! *** and the wrong name from this exact bug is asserted ABSENT, not merely 'not required' ***",
+            !/makePopulationGPU/.test(page),
+            "the page must never reference a function this module does not export, under any name it has ever " +
+            "been mistyped as -- an absence check survives even if the real name changes again later, which a " +
+            "positive count of the CURRENT name alone would not");
+    }
+
     ok("!! and it is in the render-qa manifest, so it happens every run",
         manifest.pages.some((p) => p.name === "population" && p.url === "/population.html"),
         manifest.pages.length + " pages. render-qa already captures pageerror, so a compile failure surfaces " +
