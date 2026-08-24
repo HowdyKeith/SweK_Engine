@@ -388,10 +388,36 @@ async function init() {
     }
     if (firstErr) { gpuErr("Shader compile error", firstErr); return; }
   }
-  function comp(code) { return device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } }); }
+  // v3980 -- DERIVE THE COMPUTE LAYOUT FROM THE DECLARATIONS, BECAUSE `layout: "auto"` DERIVES IT FROM USAGE.
+  // An auto layout contains only the resources the entry point STATICALLY ACCESSES -- reachable through its
+  // call graph -- not the ones the source declares. COMMON declares binding 0 and reads P inside ui()/vi()/ci(),
+  // so every stage that calls one of those helpers keeps the slot. `normalize` calls none of them: it walks u
+  // and v with arrayLength() and plain arithmetic and never mentions P. Binding 0 therefore left ITS layout
+  // alone, while bg() below still filled entries from index 0, and the page threw on every single frame:
+  // "In entries[0], binding index 0 not present in the bind group layout. Expected layout: [{ binding: 1, ... }
+  // ... { binding: 8, ... }]" -- 1 through 8 being exactly normalize's other bindings, with 0 the hole.
+  // Reading the shader could not show this; the declaration is right there at the top and looks used.
+  // Building the layout from the same declarations bg() counts through makes the two agree by construction, so
+  // a stage that stops calling a helper can no longer silently punch a hole in its own interface.
+  function computeLayout(code) {
+    const entries = [];
+    for (const m of code.matchAll(/@group\(0\)\s*@binding\((\d+)\)\s*var<([^>]*)>/g)) {
+      const sp = m[2].replace(/\s+/g, "").split(",");
+      const type = sp[0] === "uniform" ? "uniform" : ((sp[1] || "read") === "read" ? "read-only-storage" : "storage");
+      entries.push({ binding: +m[1], visibility: GPUShaderStage.COMPUTE, buffer: { type } });
+    }
+    entries.sort((a, b) => a.binding - b.binding);
+    return device.createBindGroupLayout({ entries });
+  }
+  function comp(code) {
+    return device.createComputePipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [computeLayout(code)] }),
+      compute: { module: device.createShaderModule({ code }), entryPoint: "main" },
+    });
+  }
   const pClear = comp(wgsl.clear), pP2G = comp(wgsl.p2g), pNorm = comp(wgsl.normalize),
         pMark = comp(wgsl.markForces), pSolid = comp(wgsl.solidVel), pDiv = comp(wgsl.divergence),
-        pJac = comp(wgsl.jacobi), pRBGS = comp(wgsl.rbgs), pApply = comp(wgsl.applyP), pG2P = comp(wgsl.g2p);
+        pJac = comp(wgsl.jacobi), pApply = comp(wgsl.applyP), pG2P = comp(wgsl.g2p);
   // red-black color+omega uniform: two 256-aligned slots (color 0 / color 1), addressed by dynamic offset
   const RB_STRIDE = 256;
   const bufRB = device.createBuffer({ size: RB_STRIDE * 2, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
