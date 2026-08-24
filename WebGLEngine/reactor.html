@@ -64,6 +64,9 @@
     <label>speed <input id="speed" type="range" min="1" max="20" value="1" step="1"></label>
     <span class="stat"><b id="spd">1</b>&times;</span>
     <span class="stat">t <b id="clock">0.0 s</b></span>
+    <button id="auto">Auto rods: off</button>
+    <label>gain <input id="gain" type="range" min="5" max="250" value="50" step="1"></label>
+    <span class="stat" id="gstat"></span>
     <button id="xe">Xenon: off</button>
     <span class="stat" id="xestat"></span>
     <span class="stat" id="verdict"></span>
@@ -78,6 +81,7 @@ import { KEEPIN_U235, GEN_LWR, totalBeta, dollars, fromDollars,
          steadyState, derivative, dominantRoot, period } from "./physics/nuclear/kinetics.mjs";
 import { XENON_U235, SIGMA_F_LWR, FLUX_LWR, equilibrium, xenonReactivity,
          peakTimeLimit, pitThreshold } from "./physics/nuclear/xenon.mjs";
+import { criticalGain, gainDollars } from "./physics/nuclear/reactorControl.mjs";
 
 const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
 const $ = (id) => document.getElementById(id);
@@ -88,6 +92,15 @@ const BETA = totalBeta(), GROUPS = KEEPIN_U235;
 // than nearly so -- at rho = 0 the derivative is identically zero and the trace is flat until a rod moves.
 let st = steadyState(1, GEN_LWR, GROUPS);
 let rodDollars = 0, t = 0, speed = 1, xenonOn = false, scrammed = false;
+// v3986 -- THE GRADED CONTROLLER. K_CRIT and the delay come from physics/nuclear/reactorControl.mjs, which
+// derives them two independent ways (exact frequency domain against a nonlinear delay-line simulation). The
+// page does not compute a stability boundary of its own -- it reads the module's and shows where you are.
+const LOOP_DELAY = 1.0;                       // seconds of detector + rod-drive transport delay
+const KCRIT = criticalGain(LOOP_DELAY).K;     // the gain above which this loop oscillates
+const KCRIT_PERIOD = criticalGain(LOOP_DELAY).periodSeconds;
+let autoOn = false, gainFrac = 0.5;           // gain as a fraction of critical
+const delayBuf = new Array(Math.max(1, Math.round(LOOP_DELAY / 1e-3))).fill(0);
+let delayIdx = 0, autoRho = 0;
 let xe = equilibrium(FLUX_LWR).Xe, iod = equilibrium(FLUX_LWR).I;
 const XE_EQ = xe;
 const hist = [];            // [t, power] on the seconds clock
@@ -100,13 +113,22 @@ const DT = 1e-3, MAX_SUB = 400;
 
 function rodRho() { return fromDollars(rodDollars, GROUPS); }
 function xenonRho() { return xenonOn ? xenonReactivity(xe) : 0; }
-function totalRho() { return rodRho() + xenonRho(); }
+function totalRho() { return rodRho() + xenonRho() + (autoOn ? autoRho : 0); }
 
 function stepKinetics(seconds) {
   const n = Math.min(MAX_SUB, Math.max(1, Math.round(seconds / DT)));
-  const dt = seconds / n, rho = totalRho();
+  const dt = seconds / n;
   const add = (a, k, h) => ({ n: a.n + h * k.n, C: a.C.map((c, i) => c + h * k.C[i]) });
   for (let s = 0; s < n; s++) {
+    if (autoOn) {
+      // proportional feedback on the DELAYED power error -- the delay is what makes a critical gain exist at
+      // all, and it is why the page can show the loop tipping over instead of just settling faster.
+      const delayed = delayBuf[delayIdx];
+      delayBuf[delayIdx] = st.n - 1;
+      delayIdx = (delayIdx + 1) % delayBuf.length;
+      autoRho = -(gainFrac * KCRIT) * delayed;
+    } else autoRho = 0;
+    const rho = totalRho();
     const k1 = derivative(st, rho, GEN_LWR, GROUPS);
     const k2 = derivative(add(st, k1, dt / 2), rho, GEN_LWR, GROUPS);
     const k3 = derivative(add(st, k2, dt / 2), rho, GEN_LWR, GROUPS);
@@ -233,6 +255,13 @@ function readouts() {
     $("xestat").innerHTML = "xenon <b>" + xd.toFixed(2) + "$</b> &middot; " +
       (xe / XE_EQ).toFixed(2) + "&times; operating &middot; peak limit " + peakTimeLimit().toFixed(1) + "h";
   } else $("xestat").textContent = "";
+  if (autoOn) {
+    const K = gainFrac * KCRIT;
+    $("gstat").innerHTML = "K = " + gainDollars(K).toFixed(3) + "$ &middot; " + (gainFrac * 100).toFixed(0) +
+      "% of critical" + (gainFrac >= 1
+        ? ' <span class="warn">&mdash; ABOVE CRITICAL, the loop will ring at ' + KCRIT_PERIOD.toFixed(1) + 's</span>'
+        : ' <span class="ok">&mdash; stable</span>');
+  } else $("gstat").textContent = "";
 }
 
 // ---- loop --------------------------------------------------------------------------------------------------
@@ -259,6 +288,13 @@ $("reset").onclick = () => {
   $("rod").value = 0; hist.length = 0; xeHist.length = 0;
   xe = equilibrium(FLUX_LWR).Xe; iod = equilibrium(FLUX_LWR).I;
 };
+$("auto").onclick = () => {
+  autoOn = !autoOn;
+  $("auto").textContent = "Auto rods: " + (autoOn ? "on" : "off");
+  $("auto").className = autoOn ? "on" : "";
+  delayBuf.fill(0);
+};
+$("gain").oninput = (e) => { gainFrac = +e.target.value / 100; };
 $("xe").onclick = () => {
   xenonOn = !xenonOn;
   $("xe").textContent = "Xenon: " + (xenonOn ? "on" : "off");
