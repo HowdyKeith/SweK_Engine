@@ -140,7 +140,18 @@ export function verdictFor(facts, model) {
     const blockers = [], unknowns = [];
     if (facts.adapter === false) blockers.push("no WebGPU adapter (the namespace may exist and still hand back null)");
     else if (facts.adapter === null) unknowns.push("WebGPU adapter could not be queried");
-    if (facts.secureContext === false) blockers.push("not a secure context, so storage and WebGPU are restricted");
+    // v4016 -- *** THE REMEDY, NOT JUST THE REFUSAL. *** This said only "restricted", which is true and leaves a
+    // reader stuck: Keith hit it twice in a row on http://<lan-ip>:8787 and then http://galaxina:8787 and read
+    // the second as the page being broken. It is not a page bug and no code change can lift it -- a browser
+    // grants WebGPU and persistent storage only to a POTENTIALLY TRUSTWORTHY ORIGIN, which means https, or
+    // localhost / 127.0.0.1, and NOTHING else. A LAN IP and a plain hostname both fail that test even though
+    // they reach the same server on the same machine. Naming the two origins that DO work turns a dead end into
+    // one click. (Open-Engine.bat learned this at v3981 and switched to localhost for exactly this reason.)
+    if (facts.secureContext === false) {
+        blockers.push("not a secure context, so WebGPU and persistent storage are withheld by the browser -- " +
+            "reach this page at http://localhost:PORT or http://127.0.0.1:PORT (or over https) instead. A LAN " +
+            "IP or a bare hostname is not a trustworthy origin, even though it reaches the same server");
+    }
     if (facts.quotaBytes !== null && facts.quotaBytes < model.bytes) {
         blockers.push("storage quota " + gb(facts.quotaBytes) + " is smaller than the model's " + gb(model.bytes));
     } else if (facts.quotaBytes === null) unknowns.push("storage quota unreadable");

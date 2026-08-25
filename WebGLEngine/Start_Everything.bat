@@ -108,7 +108,23 @@ if exist "..\KPop Listener\KPopListener.ps1" (
     set "LISTENER_PATH=KPopupListener\KPopListener.ps1"
 )
 
-if defined LISTENER_PATH (
+REM --- v4016: THE "if not already running" IN THIS FILE'S OWN HEADER WAS NEVER IMPLEMENTED. ---
+REM Line 8 has advertised that guard since this block was written and nothing ever checked, so every run of
+REM this launcher started ANOTHER listener on top of the one already there. Keith: "START_NODE_Engine.bat left
+REM the old kpoplistener running, so there were 2 running." (That launcher is rig-local and not in this repo;
+REM this is the same defect in the tracked one, found by reading the claim next to the code.)
+REM
+REM THE TEST ALREADY EXISTED AND THIS FILE JUST NEVER ASKED IT. server.js has probed a sentinel since v1576 --
+REM %TEMP%\KPopListener\Listener_Alive.txt, counted alive when its mtime is under 45s old (_kpopAlive) -- and
+REM v3527 deliberately made that ONE declaration, registered rather than copied, "because the second copy is
+REM never the one that gets updated". So this reads the same file with the same 45-second window rather than
+REM inventing a second answer to the same question.
+set "KPOP_ALIVE=0"
+for /f %%A in ('powershell -NoProfile -Command "$f = Join-Path $env:TEMP 'KPopListener\Listener_Alive.txt'; if ((Test-Path $f) -and ((((Get-Date) - (Get-Item $f).LastWriteTime).TotalSeconds) -lt 45)) { '1' } else { '0' }"') do set "KPOP_ALIVE=%%A"
+
+if "%KPOP_ALIVE%"=="1" (
+    echo KPopListener is already running -- not starting a second one.
+) else if defined LISTENER_PATH (
     echo Starting KPopListener from: %LISTENER_PATH%
     REM v1536 - launch MINIMIZED (visible in the taskbar so you can tell it's running)
     REM and -NoExit so the window persists even if the script returns/errors instead of

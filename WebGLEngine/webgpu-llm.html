@@ -72,7 +72,14 @@ const mark = (v) => v === true ? '<span class="yes">yes</span>'
 
 function row(k, v) { return "<tr><td class=k>" + k + "</td><td>" + v + "</td></tr>"; }
 
-async function go() {
+// v4016 -- `finalState` exists because go() USED TO OWN THE LAST WORD UNCONDITIONALLY, and that silently ate
+// the persist result. doPersist() set a correct, detailed status (granted/denied, quota before and after) and
+// then called go() to re-render the verdicts -- and go()'s closing line overwrote it with "done -- nothing was
+// downloaded" a few milliseconds later. Keith: "when i click Request more storage it quickly says nothing
+// downloaded." The word QUICKLY is the whole diagnosis: the real message was there and got clobbered. Reordering
+// doPersist's two lines would fix this one call site and leave the trap armed for the next one, so the status
+// text is a PARAMETER now -- go() states the default, a caller with something better to say passes it.
+async function go(finalState) {
   $("state").textContent = " probing…";
   const f = await probeLocalModel();
   let t = "<table>";
@@ -136,7 +143,7 @@ async function go() {
   } else if (f.persistAvailable === false) {
     pb.innerHTML = '<span class="note">this browser has no navigator.storage.persist()</span>';
   }
-  $("state").textContent = " done — nothing was downloaded";
+  $("state").textContent = finalState || " done — nothing was downloaded";
 }
 async function doPersist() {
   $("state").textContent = " asking the browser…";
@@ -144,11 +151,14 @@ async function doPersist() {
   if (!r.available) { $("state").textContent = " storage.persist() is not available here"; return; }
   const before = r.quotaBeforeBytes != null ? gb(r.quotaBeforeBytes) : "unknown";
   const after = r.quotaAfterBytes != null ? gb(r.quotaAfterBytes) : "unknown";
-  $("state").textContent = r.granted
+  const msg = r.granted
     ? " granted — quota was " + before + ", now reads " + after +
       (r.quotaAfterBytes > (r.quotaBeforeBytes || 0) ? " (the browser raised it)" : " (unchanged on this browser)")
     : " denied or dismissed — quota unchanged at " + before;
-  await go();   // re-probe and re-render the verdicts against whatever the quota now is
+  $("state").textContent = msg;
+  // re-probe and re-render the verdicts against whatever the quota now is, and KEEP the persist result on
+  // screen -- it is the only report of what the click actually did, and re-probing is not news that outranks it.
+  await go(msg);
 }
 $("run").onclick = go;
 go();

@@ -132,7 +132,30 @@ function preferBun(){
 let _kpopProbe = null;
 function setKpopProbe(fn){ _kpopProbe = (typeof fn === "function") ? fn : null; return !!_kpopProbe; }
 
-function launcherName(){ return preferBun() ? "START_BUN_Full.bat" : "START_NODE_Engine.bat"; }
+// v4016 -- *** THE PREFERRED NAME IS NOT ALWAYS A FILE THAT EXISTS, AND A CLONE IS WHERE THAT BITES. ***
+// launcherName() named START_NODE_Engine.bat / START_BUN_Full.bat by CONVENTION and never looked. On Keith's rig
+// both exist, so every caller that ran against the LIVE tree was right by luck for the whole life of this
+// function. NEITHER IS GIT-TRACKED -- they are rig-local files -- and cloneEngineSource() builds a clone with
+// `git clone`, so a fresh clone contains exactly the tracked tree and NOT those two. v4014's launch() therefore
+// refused on every clone it was ever pointed at ("launcher not found at <clone>\START_NODE_Engine.bat"), which
+// is the one place the feature exists to work. THE SAME SPECIES AS v3976's fictional codemap ceiling: a name
+// asserted rather than read, true on the box that wrote it and false everywhere else.
+//
+// The preferred name STILL WINS when it is really there, so the autostart registry entry on a rig keeps pointing
+// at exactly what it always did. The fallback only decides what happens when it is not.
+const LAUNCHERS_BUN  = ["START_BUN_Full.bat", "START_BUN.bat", "SweK_Run.bat", "Start_Everything.bat"];
+const LAUNCHERS_NODE = ["START_NODE_Engine.bat", "SweK_Run.bat", "Start_Everything.bat", "START_BUN.bat"];
+function launcherCandidates(){ return (preferBun() ? LAUNCHERS_BUN : LAUNCHERS_NODE).slice(); }
+// `root` is injectable so a gate can drive every branch against a fixture directory rather than whatever this
+// box happens to have on disk -- canPublish(st)'s own shape, for the same reason.
+function launcherName(root){
+    const dir = root || engineRootDir();
+    const cands = launcherCandidates();
+    for (const n of cands) {
+        try { if (fs.existsSync(path.join(dir, n))) return n; } catch {}
+    }
+    return cands[0];   // nothing found: name what was EXPECTED, so the caller's error says the useful thing
+}
 function launcherPath(){ return path.join(engineRootDir(), launcherName()); }
 async function loginAutostartStatus(){
     if (isWin) {
@@ -1321,7 +1344,7 @@ async function patchScan(dirArg){
     return { ok: true, dir, tree, rows };
 }
 
-module.exports = { zipShapeFor, engineParentDir, preferredPrefix, launcherName,
+module.exports = { zipShapeFor, engineParentDir, preferredPrefix, launcherName, launcherCandidates,
     start, stop, setLogger, getConfig, setConfig,
     firewallStatus, firewallAllow, firewallRemove,
     go2rtcFirewallStatus, go2rtcFirewallAllow,

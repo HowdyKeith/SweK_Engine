@@ -21,6 +21,7 @@
 // ever contain them) and GREEN once v3964's verify.mjs read that rule. That is what the chain is FOR, and it
 // found it on its first run.
 import fs from "node:fs";
+import os from "node:os";   // v4016 -- section 8b builds real fixture trees to resolve a launcher name against
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -134,9 +135,26 @@ ok("!! ...and its enabled state is read from the server's canPublish, never reco
 {
     const withheldSrc = fs.readFileSync(path.join(ROOT, "tools", "ship", "withheld.mjs"), "utf8");
     ok("!! the withheld rule has ONE home", /export function withheldFromMirror/.test(withheldSrc));
+    // *** v4016 -- THIS ASSERTED A FROZEN LIST OF THREE IMPORTERS AND ONE OF THEM CORRECTLY STOPPED BEING ONE. ***
+    // v3964 wrote the list when all three genuinely handled a withheld file. v4003 then DELIBERATELY removed
+    // withheldFromMirror from changelogCurrency-selfcheck.mjs -- the changelog record became tracked, so its
+    // absence means a broken tree rather than a clone, and the withheld-skip was firing everywhere and silently
+    // switching the guard off (forty rounds shipped undescribed while it "passed"). Removing it was the fix.
+    // The gate kept demanding the import anyway and had been red ever since. *** THE SAME SPECIES AS v3140's
+    // module count and v4013's rescue threshold: a true statement frozen into a law that outlived the thing it
+    // described. *** The load-bearing property was never "everyone imports it" -- a file with no withheld file to
+    // reason about needs nothing. It is "NOBODY KEEPS A SECOND COPY": reason about .gitignore, and you must read
+    // the one home rather than restate it. changelogCurrency does neither now and passes; the day anyone puts
+    // that reasoning back without the import, this goes red again, which is the thing worth catching.
     for (const f of ["verify.mjs", "changelogCurrency-selfcheck.mjs", "rootLayout-selfcheck.mjs"]) {
         const src = noComments(fs.readFileSync(path.join(ROOT, "tools", "ship", f), "utf8"));
-        ok("   " + f + " reads it rather than restating it", /withheldFromMirror/.test(src));
+        const imports = /withheldFromMirror/.test(src);
+        const restates = /\.gitignore/.test(src);
+        ok("   " + f + (imports ? " reads the one home" : " has no withheld rule of its own to keep"),
+            imports || !restates,
+            imports ? "" : (restates ? "*** RESTATES the .gitignore rule instead of importing withheld.mjs ***"
+                                     : "reasons about no withheld file, so it needs nothing -- v4003 removed its " +
+                                       "import on purpose when the changelog record became tracked"));
     }
     // The loophole and its guard travel together: a caller taking the exemption must also take the limit.
     ok("!! ...and the fence that stops the exemption covering README.md ships WITH the rule",
@@ -184,6 +202,48 @@ ok("!! ...and its enabled state is read from the server's canPublish, never reco
     ok("!! ...and REFUSES to call nothing listening 'healthy'", unhealthy === false);
     ok("!! *** AND IT IS TIME-BOXED, NOT INDEFINITE *** -- v4006's rule for this exact shape",
         elapsed < 5000, elapsed + "ms against a 1200ms budget; a launch nobody can tell has hung is worse than one that reports it");
+}
+
+// ---- 8b. THE LAUNCHER NAME IS READ FROM THE TREE, NOT ASSERTED ABOUT IT -------------------------------------
+// v4016 -- *** THE BUG THIS SECTION EXISTS FOR SHIPPED IN v4014 AND WOULD HAVE FAILED ON EVERY CLONE. ***
+// launcherName() named START_NODE_Engine.bat / START_BUN_Full.bat by convention and never checked. Both are
+// RIG-LOCAL AND UNTRACKED; cloneEngineSource() builds its clone with `git clone`, so a clone has exactly the
+// tracked tree and neither of those. launch() then looked for a file that could not be there -- correct on the
+// box that wrote the name, wrong in the only place the feature runs.
+{
+    const sysadmin = require_("../../ai-bridge/sysadminBridge.js");
+    const cands = sysadmin.launcherCandidates();
+    ok("!! launcherCandidates() offers more than one name", Array.isArray(cands) && cands.length > 1, cands.join(", "));
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "swek-launcher-"));
+    try {
+        // *** THE CASE THAT ACTUALLY BROKE: a git-clone-shaped tree, holding only TRACKED launchers. ***
+        for (const n of ["SweK_Run.bat", "Start_Everything.bat"]) fs.writeFileSync(path.join(tmp, n), "");
+        const picked = sysadmin.launcherName(tmp);
+        ok("!! *** A CLONE-SHAPED TREE RESOLVES TO A LAUNCHER THAT IS REALLY THERE ***",
+            fs.existsSync(path.join(tmp, picked)), "picked " + picked +
+            " -- v4014 picked START_NODE_Engine.bat here and refused to launch");
+
+        // THE RIG'S OWN PREFERENCE MUST STILL WIN WHERE THE FILE GENUINELY EXISTS -- the autostart registry
+        // entry points at launcherPath() and must not start naming something else on a box that has the real one.
+        fs.writeFileSync(path.join(tmp, cands[0]), "");
+        ok("!! ...and the PREFERRED name still wins when it is genuinely present",
+            sysadmin.launcherName(tmp) === cands[0], "so a rig that has " + cands[0] + " keeps using it");
+
+        // AN EMPTY TREE NAMES WHAT WAS EXPECTED rather than returning nothing -- the caller's error message is
+        // the only thing a person sees, and "no launcher found" with no name in it is not actionable.
+        const bare = fs.mkdtempSync(path.join(os.tmpdir(), "swek-bare-"));
+        ok("!! an empty tree still reports the EXPECTED name, so the refusal can say what it wanted",
+            sysadmin.launcherName(bare) === cands[0]);
+        fs.rmSync(bare, { recursive: true, force: true });
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+
+    // AND launch() MUST ASK ABOUT THE CLONE, NOT ABOUT ITSELF. The v4014 line called launcherName() with no
+    // argument -- resolving against the RUNNING tree -- and then looked for that answer inside the clone.
+    ok("!! *** launch() resolves the launcher against the CLONE's root, not the running tree ***",
+        /launcherName\(root\)/.test(src),
+        "two directories and one name is how v4014 got this wrong");
+    ok("...and a refusal lists what it looked for", /looked for: /.test(src));
 }
 
 // ---- 9. LAUNCH IS ROUTED, AND THE PANEL HAS A BUTTON FOR IT --------------------------------------------------
