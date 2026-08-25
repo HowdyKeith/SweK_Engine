@@ -170,8 +170,27 @@ console.log("\n4. THE LOAD-BEARING NEGATIVE: A STATE THAT IS SETTLED AND NOT LEV
         below.length > 0 && below.every((r) => cellsOf(r.deg) < 1),
         below.map((r) => r.deg + "deg rises " + cellsOf(r.deg).toFixed(2) + " cells end to end").join("; ") +
         " -- so a cell-quantised spread MUST read zero for these, and reading zero is the instrument working");
-    ok("!! ...and each of them DOES read zero rather than some small wrong number",
-        below.every((r) => r.sd === 0), below.map((r) => r.deg + "deg:" + r.sd.toFixed(4)).join("  "));
+    // *** AND IT IS NOT EXACTLY ZERO ON EVERY BOX, WHICH THE FIRST VERSION OF THIS LINE ASSERTED. ***
+    // Keith's rig reads 5deg:0.0000; this one reads 5deg:0.0455. DETERMINISTIC PER MACHINE -- two runs here
+    // give 0.045542 both times -- and DIFFERENT BETWEEN MACHINES, which is the libm-sensitivity story this
+    // tree already has an arc about, arriving in a physics fixture. A settled surface leaves the odd particle
+    // in the cell above, the sub-cell term picks it up, and whether it does is decided by the last bits of a
+    // float. `sd === 0` was therefore a claim about one box.
+    //
+    // THE DERIVED CLAIM THAT SURVIVES BOTH: below the resolution floor the reading must be NEGLIGIBLE AGAINST
+    // THE FIRST RESOLVABLE TILT -- that is what makes the zero a measurement rather than furniture, and it is
+    // the same argument section 3 makes about the floor. An order of magnitude is the bar, and the measured
+    // separation is 18x here and unbounded on the rig.
+    const firstResolvable = above.length ? above[0].sd : NaN;
+    const worstBelow = below.length ? Math.max(...below.map((r) => r.sd)) : 0;
+    ok("!! ...and each of them reads NEGLIGIBLE against the first tilt the grid CAN resolve",
+        Number.isFinite(firstResolvable) && worstBelow * 10 < firstResolvable,
+        below.map((r) => r.deg + "deg:" + r.sd.toFixed(4)).join("  ") + " against " +
+        above[0].deg + "deg:" + firstResolvable.toFixed(4) + " -- " +
+        (worstBelow > 0 ? (firstResolvable / worstBelow).toFixed(0) + "x separation" : "exactly zero on this box") +
+        ". NOT `=== 0`: that reads 0.0000 on Keith's rig and 0.0455 here, deterministic on each and different " +
+        "between them, because a settled surface leaves the odd particle in the cell above and the last bits " +
+        "of a float decide whether the sub-cell term sees it.");
     let rising = above.length > 1;
     for (let i = 1; i < above.length; i++) if (!(above[i].sd > above[i - 1].sd)) rising = false;
     ok("!! *** THE SPREAD RISES MONOTONICALLY WITH THE TILT, OVER THE RANGE THE GRID CAN RESOLVE ***", rising,

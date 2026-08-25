@@ -61,7 +61,18 @@ for (const n of D.DEVICE_NAMES) {
     const dev = await D.getDevice(n);
     const modes = (Array.isArray(dev.modes) && dev.modes.length) ? dev.modes : [];
     for (const m of modes) {
-        const rr = await L.runRecord(D, n, { mode: m });
+        // *** v4007 -- THE DEFAULT MODE WAS BEING RUN TWICE, AND IT IS THE EXPENSIVE ONE. ***
+        // `r` above is already the run for the device's DEFAULT mode, and the default is always a member of
+        // `modes`, so every device paid for it a second time here. That would be a 20% saving if the cost were
+        // spread evenly -- and it is not: THIS FILE'S OWN HEADER SAYS "Every expensive pair was ALREADY the
+        // frozen default -- twof/inlet, kh/sweep, blobbodies/roundtrip", and that twof/inlet alone is 63% of
+        // the gate. So the three runs that dominate the runtime were each being done twice.
+        //
+        // VERIFIED BEFORE RELYING ON IT rather than assumed from the signature: runRecord(D, n) and
+        // runRecord(D, n, {mode: default}) were driven on kepler, lotkavolterra and ising and returned
+        // byte-identical outputs. A reuse that skipped a genuinely different run would silently freeze the
+        // wrong row into the baseline, which is worse than the time it saves.
+        const rr = (m === r.mode && r.ok) ? r : await L.runRecord(D, n, { mode: m });
         pairs[n + "/" + m] = rr.ok ? { outputs: rr.outputs } : { unavailable: rr.error };
     }
 }
