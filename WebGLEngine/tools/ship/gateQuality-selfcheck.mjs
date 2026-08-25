@@ -95,6 +95,24 @@ function regexLiterals(src) {
         // rather than a guess about naming.
         const fromFile = new Set();
         for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\n]*readFileSync/g)) fromFile.add(m[1]);
+        // *** v4000 -- UNWRAPPING AT THE READ IS THE BEST DISCIPLINE THERE IS, AND THIS COUNTED IT AS DEBT. ***
+        // nodeBunPage-selfcheck writes `const server = noComments(fs.readFileSync(...))` -- ONE unwrap, at the
+        // source, so every use site downstream is clean by construction. The trace above matched the line
+        // (it contains readFileSync) and the per-site test then saw a bare `server` and indicted it. So a gate
+        // that unwraps ONCE was penalised while one that re-wraps at forty call sites passed.
+        //
+        // The site-scoped rule from v3677 is right and stays: what was missing is that a variable can be
+        // unwrapped AT ITS ASSIGNMENT, and then every site using it is already unwrapped. Those variables are
+        // tracked apart -- NOT removed from fromFile, because whether they hold file content is a separate fact
+        // from whether that content is still wrapped.
+        //
+        // codeOnly(src) is the reader, for the reason v3676 established on this very line: a COMMENT saying
+        // noComments( must not count as calling it. Sixth-plus instance of the defect landing on the file
+        // studying it, and the first where the file was punishing the correct form rather than excusing a wrong one.
+        const unwrappedAtRead = new Set();
+        for (const m of codeOnly(src).matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]*readFileSync[^;\n]*)/g)) {
+            if (UNWRAP_IDIOM.test(m[2])) unwrappedAtRead.add(m[1]);
+        }
         for (const { body } of regexLiterals(src)) {
             // a "prose phrase": >=5 plain words separated by literal spaces, no regex metacharacters between them
             const words = body.match(/^[A-Za-z][A-Za-z'-]*(?: [A-Za-z][A-Za-z'-]*){4,}$/);
@@ -133,7 +151,9 @@ function regexLiterals(src) {
             // list may still only shrink, and a site whose argument becomes readable rejoins whichever answer
             // it actually deserves.
             const argUnreadable = !arg;
-            const scansSource = !siteUnwraps && !argUnreadable && fromFile.has((arg[1] || "").split(".")[0]);
+            const rootVar = (arg ? (arg[1] || "") : "").split(".")[0];
+            const scansSource = !siteUnwraps && !argUnreadable &&
+                fromFile.has(rootVar) && !unwrappedAtRead.has(rootVar);
             // TWO DIFFERENT UNKNOWNS, AND LUMPING THEM WOULD HAVE HIDDEN THE MORE INTERESTING ONE. If there is
             // no `.test(` after the literal at all, IT IS PROBABLY NOT A REGEX: the scan reads noComments, which
             // keeps STRINGS, so a check NAME containing two slashes is lexed as one. syncWalkProbe's entry is

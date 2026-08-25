@@ -137,6 +137,16 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          sph +1, statmech +1, thermal +7, fluid +1, mpm +13. A population that only grew, in areas that
     //          are obviously live work, is the case this pin is designed to WAVE THROUGH ONCE COUNTED; a
     //          removal or a failure to reconcile would have been the other kind and is what the check is for.
+    //   471 -> v4000. Counted the same way, and the answer is the small clean one: populationCensus.compare()
+    //          reports GREW, 7 ADDED, 0 REMOVED, reconciles:true. Every one named, and every one a module a
+    //          recent round built -- physics/control/cartPole.mjs (v3995, LQR), physics/ecology/
+    //          lotkaVolterra.mjs (v3994, predator-prey), physics/nuclear/{kinetics,reactorControl,xenon}.mjs,
+    //          physics/quantum/bell.mjs, physics/stellar/laneEmden.mjs. A population that ONLY GREW, in areas
+    //          that are obviously live work, is what this pin exists to wave through once somebody has looked.
+    //          THE RECORD IS NOT EDITED UNTIL IT PASSES: population-census.json was RE-RECORDED with
+    //          writeCensus() after compare() had been read, and the diff is reproducible by anyone who doubts
+    //          this line. The number lives in data rather than in source precisely so that updating it is an
+    //          act somebody has to perform on purpose.
     ok("!! the default population is ACCOUNTED FOR -- it may grow, but not silently",
         p.roots.join(",") === "physics,simulation,fluid" && p.total === EXPECTED_POPULATION,
         "expected " + EXPECTED_POPULATION + " (from the recorded census) and found " + p.total + ". A tool that silently changed what it counts would make every " +

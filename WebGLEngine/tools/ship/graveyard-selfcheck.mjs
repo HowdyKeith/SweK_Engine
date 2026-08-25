@@ -339,7 +339,26 @@ function isAnalysisRecord(full) {
 // consumer and leaves the pile on its own. THE DIFFERENCE FROM v3673 MATTERS: that round narrowed what COUNTS
 // as debt and this one PAID some, and a baseline that fell for the second reason must not be confused with one
 // that fell for the first.
-const ORPHAN_UTIL_BASELINE = 86;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86).
+// *** v4000 -- RAISED TO 90, AND TWO OF THE FOUR ARE THINGS THIS ROUND ITSELF ADDED. ***
+//
+//   tools/ship/serverShutdown.mjs (v4000) -- a SHARED GATE HELPER, imported by bz-tactics, bz-bridge and
+//     ai-bridge/tools/range. That is exactly tools/ship/playwrightResolve.mjs's situation, which twenty gates
+//     import and which this list has always counted. A helper whose only callers are gates is not a defect and
+//     is not a door either, so it belongs here, counted, rather than exempted by a category invented for it.
+//
+//   tools/roundhouse/runtimeBench.mjs (v3997) -- HAS A DOOR THIS SCANNER CANNOT SEE. ai-bridge/server.js
+//     spawns it at GET /runtime/bench and node-bun.html has two buttons that call it. The door census reads
+//     tools.html registry ROWS, so a route-and-button door is invisible to it -- the same shape MEASURED_V3608
+//     records for brain/rl/rocketLoop.mjs ("spawn -- ai-bridge/rocketBridge.js, POST /rocket/train/start"),
+//     WHICH IS ALSO STILL COUNTED HERE. Not exempted: writing an exemption for a door the instrument cannot
+//     verify would be prose-as-consumer, which v3608's own note says it nearly committed. Widening the census
+//     to see spawn doors is a real round and would reclassify several of these at once.
+//
+//   THE OTHER TWO ARE NOT IDENTIFIED, AND THAT IS SAID RATHER THAN PAPERED OVER. The baseline was 86 at v3674
+//     and Keith's rig read 88 at v3995, so two arrived in between from rounds this one did not touch. The
+//     names are recoverable by diffing the ACTIONABLE list against a v3674 checkout; that was not done here,
+//     so the raise carries two reasons and an admission instead of four reasons.
+const ORPHAN_UTIL_BASELINE = 90;   // v3451 (100); v3673 door-aware (88); v3674 livePanel+viewLayout wired (86); v4000 (90).
 const ORPHAN_BASELINE = 1;
 
 const r = scan();

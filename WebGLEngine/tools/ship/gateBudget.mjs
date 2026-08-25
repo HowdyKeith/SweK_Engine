@@ -49,12 +49,29 @@
 // default 396s for all 1019. This file's own header refuses that in advance: raising everything "turns a
 // genuinely hung gate into a five-minute stall". TWO POPULATIONS, TWO BUDGETS -- so the fix is to put the tail
 // gates in the tail, not to widen the budget for gates that never needed it.
-export const SLOWEST_GENERAL = { gate: "tools/roundhouse/flip3dBind-selfcheck.mjs", ms: 46639 };
+//
+// *** v4000 -- RE-PINNED AGAIN, AND THIS TIME THE RECORD WAS STALE IN BOTH DIRECTIONS AT ONCE. ***
+// The independent check below went red: the observed worst in the general population is
+// physics/nuclear/reactorControl-selfcheck.mjs at 60.6s, against a recorded 46.6s. And the gate this line
+// NAMED had moved too -- flip3dBind now records 38.8s, not the 46639 written here. So the constant was
+// carrying a number that no longer described the gate it named, AND naming a gate that was no longer the
+// slowest. Both halves wrong, and only the second was visible.
+//
+// THE RE-PIN IS DERIVED, NOT CHOSEN, exactly as v3913's was: the value is read straight out of
+// gate-timings.json, which selfchecks.mjs writes on a full run. That check's own instruction is followed to
+// the letter -- "WHEN IT GOES RED THE ANSWER IS TO RAISE SLOWEST_GENERAL FROM THE NEW MEASUREMENT, NOT TO
+// LOWER THIS LINE."
+//
+// The default moves 139.9s -> 181.9s. That is a real cost and it is the smaller one: reactorControl is
+// genuinely in the general population, so the alternative is a gate that gets killed for being what it is.
+// The tail table below is still where a gate belongs once it outgrows this, and v3913's rule stands --
+// TWO POPULATIONS, TWO BUDGETS, rather than widening the budget for the 1100 gates that never needed it.
+export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 60634 };
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
 
-/** 3 x 47.7s. NOT typed: computed, so the two halves cannot drift apart. */
+/** 3 x 60.6s. NOT typed: computed, so the two halves cannot drift apart. */
 export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
 
 /**
