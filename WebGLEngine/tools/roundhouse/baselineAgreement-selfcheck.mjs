@@ -20,8 +20,21 @@
 //
 // ARCHIVED, NOT rm -- Keith's standing rule and removeCluster's own accounting: a deletion without an archive
 // cost 43 versions of not noticing, two zip diffs, three convergence passes and a 203-archive sweep across two
-// drives. All three files are in tools/ship/deleted/ and this gate ASSERTS THE RECEIPT IS STILL THERE, because
-// a later cleanup that binned the archive would leave the retirement unverifiable.
+// drives.
+//
+// *** v4000 -- SECTION 3 DEMANDED A ZIP THAT COULD NOT EXIST, AND THIS WAS THE THIRD GATE TO DO IT. ***
+// v3920 diagnosed the red exactly right and left it standing: .gitignore line 40 excludes *.zip and line 47
+// names these tombstones specifically, so the receipt NEVER TRAVELS and the check can only pass on the one
+// machine that performed the deletion, until that machine is reimaged. v3936 then solved it properly -- move
+// the record to a TRACKED file, tools/ship/deleted/RETIRED.md -- and converted markerSingleSource and
+// deadImportScan. THIS GATE WAS MISSED BY THAT SWEEP and has been red on every clone since.
+//
+// AND THE HONEST ANSWER HERE IS BETTER THAN THE ONE RETIRED.md GIVES FOR brain.js. That one records a real
+// loss. This one records a retirement THE ARCHIVE RULE WAS WRITTEN TO PERMIT: v3524 MEASURED result-baseline
+// a strict subset of the survivor (245 keys, ZERO unique, 0 of 1734 fields missing, 0 differing), so its every
+// value is still in the tree; and the one check its gate uniquely owned was PORTED BEFORE the archive, which
+// section 2 below still asserts fires. A zip would restore nothing that is not already here. So section 3 now
+// asserts THE TRACKED RECORD, and section 2 -- the ported plant -- is what actually certifies the retirement.
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -65,41 +78,36 @@ console.log("\n2. THE PROOF MOVED BEFORE THE FILE WENT, AND THAT ORDER IS THE RO
         "without it every assertion there would pass on a comparator reporting differences it invented");
 }
 
-console.log("\n3. THE RECEIPT IS STILL THERE");
+console.log("\n3. THE RECEIPT IS A TRACKED RECORD, BECAUSE A ZIP COULD NEVER TRAVEL");
 {
+    const rec = path.join(HERE, "..", "ship", "deleted", "RETIRED.md");
+    const txt = fs.existsSync(rec) ? fs.readFileSync(rec, "utf8") : "";
+    const named = ["result-baseline.json", "resultBaseline.mjs", "resultBaseline-selfcheck.mjs"]
+        .filter((f) => txt.includes(f));
+    ok("!! *** THE RETIREMENT RECORD EXISTS AND NAMES ALL THREE RETIRED FILES ***", named.length === 3,
+        txt ? named.length + "/3 named: " + named.join(", ")
+            : "NO RETIREMENT RECORD -- tools/ship/deleted/RETIRED.md is missing, so nothing in the tree " +
+              "remembers what was deleted. That is the 43-version failure shape, and deleting the record is " +
+              "now the only way to reach it.");
+    // THE RECORD MUST SAY WHICH KIND OF LOSS IT IS. "Archived" and "provably redundant" are different claims
+    // and a record that blurred them would let a real loss hide behind this one's good standing.
+    ok("!! ...and it states that the data was a MEASURED subset rather than merely assumed redundant",
+        /RECONSTRUCTIBLE/.test(txt) && /1734/.test(txt) && /zero\*{0,2} unique/i.test(txt),
+        "v3524's numbers -- 245 keys, zero unique, 0 of 1734 fields missing, 0 differing -- are what make " +
+        "this retirement safe. A record saying only 'it was redundant' would be a memory, not a measurement.");
+    ok("!! ...and that the one irreplaceable check was PORTED BEFORE the file went, not after",
+        /ported/i.test(txt) && /planted|plant/i.test(txt),
+        "section 2 above is the live half of that claim: the plant still fires. This is the written half, " +
+        "for a reader who finds the record before they find the gate.");
+    // AND NO ZIP IS SYNTHESISED. Creating one would turn this green in seconds and certify a way back that
+    // nobody needs and nobody verified -- the precise failure the archive rule exists to prevent.
     let zips = [];
     try { zips = fs.readdirSync(DELETED).filter((f) => /\.zip$/.test(f)); } catch {}
-    // *** v3920 -- THE RED IS REAL AND ITS CAUSE IS NOT WHAT IT LOOKS LIKE, SO THE MESSAGE NOW SAYS WHICH. ***
-    //
-    // This gate asserts a .zip exists. The repo's .gitignore excludes *.zip and its own comment names these
-    // files specifically: "The tools/ship/deleted/deleted_*.zip tombstones stay out." *** SO THE RECEIPT CANNOT
-    // TRAVEL, BY DESIGN, AND THIS CHECK IS UNSATISFIABLE IN ANY CLONE OR ANY UNZIPPED DELIVERY. *** It can only
-    // pass on the machine where the archive was made, and only until that machine is reimaged.
-    //
-    // THE CHECK IS NOT WEAKENED, because the two causes are not the same thing and neither is harmless: an empty
-    // directory in a clone is the ship policy showing through, and an empty directory in the authoring tree is a
-    // lost receipt -- the 43-version failure this gate exists for. A gate that reported one number for both would
-    // send the reader to the wrong place. The retired files predate this repo carrying the full engine, so their
-    // hashes are not recoverable from history and NO MANIFEST IS SYNTHESISED HERE: inventing a receipt for a
-    // deletion nobody can verify is worse than reporting that the receipt is missing.
-    let ignored = false;
-    try {
-        const gi = fs.readFileSync(path.join(HERE, "..", "..", "..", ".gitignore"), "utf8");
-        ignored = /^\*\.zip\s*$/m.test(gi);
-    } catch { /* no .gitignore reachable: leave the plain reading */ }
-    const dirExists = fs.existsSync(DELETED);
-    ok("!! the deletion archive exists and holds the retired files", zips.length > 0,
-        zips.length + " archives in tools/ship/deleted/" +
-        (zips.length ? "" : " -- directory " + (dirExists ? "EXISTS BUT IS EMPTY" : "IS ABSENT") +
-            (ignored ? ", and .gitignore excludes *.zip, so IN A CLONE OR AN UNZIPPED DELIVERY THIS CANNOT PASS " +
-                       "and the red says nothing about the authoring tree. CHECK THE AUTHORING TREE: if it is " +
-                       "empty THERE, the receipt is genuinely lost and that is the 43-version failure."
-                     : ". Nothing excludes zips here, so this is the authoring tree and the receipt is GONE.")) +
-        " -- ARCHIVED, NOT rm. A deletion without an archive " +
-        "once cost 43 versions of not noticing, two zip diffs and a 203-archive sweep across two drives.");
-    ok("...and this gate asserts the receipt rather than trusting it", true,
-        "a later cleanup that binned the archive would leave the retirement unverifiable, which is the same " +
-        "shape as a stale suppression: nobody audits a record they believe is working");
+    report("what is NOT asserted, and why",
+        "that a .zip sits in tools/ship/deleted/ (" + zips.length + " there now). It cannot: .gitignore " +
+        "excludes *.zip and names these tombstones, so the receipt never leaves the authoring machine. " +
+        "DEMANDING IT MADE THIS GATE PERMANENTLY RED IN EVERY CLONE FOR A REASON NO ROUND COULD ACT ON. " +
+        "If a copy ever turns up, put it back and re-add the assertion -- RETIRED.md says so too.");
 }
 
 report("THE ANTIDOTE, RESTATED FOR WHOEVER COMES NEXT",

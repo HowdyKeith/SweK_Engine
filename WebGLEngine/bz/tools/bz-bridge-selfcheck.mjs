@@ -12,6 +12,7 @@
 // hands it `isTrusted`, and an untrusted request gets 403 before the body is even read.
 
 import { createServer } from "http";
+import { shutdownServer, liveHandles } from "../../tools/ship/serverShutdown.mjs";
 import { prose } from "../../tools/ship/sourceScan.mjs";
 import { setTimeout as sleep } from "timers/promises";
 import { createRequire } from "module";
@@ -340,7 +341,18 @@ const post = async (p, body) => (await (await fetch(base + p, { method: "POST", 
 }
 
 bridge.shutdown();
-await new Promise((r) => srv.close(r));
+// v4000 -- the same teardown that fast-failed bz-tactics on Keith's Windows rig with libuv's
+// UV_HANDLE_CLOSING assert. srv.close() resolves while its handles are still mid-close, and
+// process.exit() inside that window is the crash. This gate has the identical shape and simply had
+// not been the one run that day. See tools/ship/serverShutdown.mjs for the measurement.
+await shutdownServer(srv);
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
+{
+    // THE TEARDOWN IS A CHECK. The crash it guards produced a PERFECT SCORELINE followed by a fast-fail,
+    // so a passing count was never going to catch it coming back.
+    const live = liveHandles();
+    ok("nothing is still holding the event loop open at exit", live.length === 0,
+        live.length ? "STILL LIVE: " + live.join(", ") : "no sockets, no server, no timers");
+}
 process.exit(fail ? 1 : 0);

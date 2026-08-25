@@ -19,7 +19,7 @@
 // failure explicitly rather than hoping nobody asks.
 "use strict";
 import { DEFAULTS, fixedPoint, firstIntegral, smallOscillationPeriod, INTEGRATORS, SYMPLECTIC, ORDER,
-         stepSymplectic, integrate, timeAverages, volterraPrinciple, amplitudeDecay, PLANT_SIGMA }
+         stepEuler, stepSymplectic, stepRK4, integrate, timeAverages, volterraPrinciple, amplitudeDecay, PLANT_SIGMA }
     from "./lotkaVolterra.mjs";
 
 let fails = 0;
@@ -52,6 +52,42 @@ console.log("\n2. *** THE FIRST INTEGRAL IS CONSERVED, AND EACH INTEGRATOR FAILS
     ok("all three integrators are registered and declared in both tables",
         Object.keys(INTEGRATORS).sort().join(",") === "euler,rk4,symplectic" &&
         Object.keys(INTEGRATORS).every((k) => k in SYMPLECTIC && k in ORDER));
+
+    // *** v4000 -- stepEuler AND stepRK4 WERE EXPORTED AND NAMED BY NO GATE. *** definitionGates-selfcheck
+    // found them among 84 such symbols; these two are v3994's own debt, so they are paid here rather than
+    // left on a list. A MENTION IS NOT A CHECK, so what is asserted is the claim the ORDER table makes.
+    //
+    // MEASURED ON THE STATE, NOT ON THE FIRST INTEGRAL, and the sibling check in kepler-selfcheck is why:
+    // there the energy error under RK4 converged at order FIVE, repeatably across four decades of dt, because
+    // the leading state error is nearly tangent to the energy surface. An INVARIANT'S error order is not the
+    // METHOD'S order, and ORDER is a claim about the state. The reference is 512 RK4 substeps, which is ~5e8
+    // times more accurate than the single step being graded.
+    {
+        const p_ = DEFAULTS, fp = fixedPoint(p_);
+        const x0 = fp.x * 1.5, y0 = fp.y;
+        const ref = (dt, n = 512) => {
+            let x = x0, y = y0;
+            for (let i = 0; i < n; i++) [x, y] = stepRK4(x, y, dt / n, p_, 0);
+            return [x, y];
+        };
+        const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+        const orderOf = (step) => {
+            const e1 = dist(step(x0, y0, 0.1, p_, 0), ref(0.1));
+            const e2 = dist(step(x0, y0, 0.05, p_, 0), ref(0.05));
+            return Math.log2(e1 / Math.max(1e-300, e2)) - 1;
+        };
+        const measured = {};
+        for (const [k, step] of Object.entries({ euler: stepEuler, symplectic: stepSymplectic, rk4: stepRK4 }))
+            measured[k] = orderOf(step);
+        const wrong = Object.keys(measured).filter((k) => Math.abs(measured[k] - ORDER[k]) > 0.3);
+        ok("!! *** EVERY INTEGRATOR CONVERGES AT THE ORDER THE TABLE CLAIMS FOR IT ***", wrong.length === 0,
+            Object.entries(measured).map(([k, v]) => `${k} ${v.toFixed(2)} (ORDER ${ORDER[k]})`).join(", ") +
+            (wrong.length ? "  <- DISAGREES: " + wrong.join(", ") : ""));
+        ok("!! ...so the ORDER table is a MEASUREMENT rather than a label typed beside the functions",
+            Object.keys(ORDER).every((k) => k in measured),
+            "every key in ORDER was graded; a method added to the table without being graded here would " +
+            "leave that entry a claim nobody had checked");
+    }
 
     const runs = {};
     for (const k of Object.keys(INTEGRATORS)) runs[k] = integrate({ integrator: k, cycles: 200 });

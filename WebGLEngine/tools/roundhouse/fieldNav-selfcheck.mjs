@@ -99,9 +99,23 @@ const dev = await getDevice("fieldnav");
 {
     const { modesOf } = await import("./deviceModes.mjs");
     const m = modesOf(dev, null);
-    ok("fieldnav declares its modes",
-        m.source === "exported" && m.declared.length === 3,
-        `source "${m.source}", modes ${JSON.stringify(m.declared)}`);
+    // *** v4000 -- THE SAME STALE-COUNT DEFECT AS figureEight'S, IN THE SAME ROUND. *** This pinned THREE and
+    // the device now declares four; `crowflight` was added and the gate was not. A count typed beside a list
+    // is a second declaration of that list, and it goes stale the first time somebody edits the real one.
+    //
+    // WHAT v3192 ACTUALLY CARED ABOUT WAS `source`, NOT THE NUMBER: a device whose modes are EXPORTED can be
+    // asked; one that has to be PROBED is only ever known to a candidate list, and the lab's apparent
+    // one-moded-ness turned out to be that list rather than the devices. So `source` is the assertion, every
+    // declared mode has to actually run, a nonsense one has to be refused, and the count is REPORTED.
+    const { checkMode } = await import("./knobGate.mjs");
+    const runs = m.declared.filter((x) => checkMode(dev, x).ok !== false);
+    ok("!! fieldnav's modes are EXPORTED rather than probed, and every one of them is accepted",
+        m.source === "exported" && m.declared.length > 0 && runs.length === m.declared.length,
+        `source "${m.source}", ${m.declared.length} modes ${JSON.stringify(m.declared)}` +
+        (runs.length === m.declared.length ? "" : "  <- REFUSED ITS OWN: " +
+         m.declared.filter((x) => !runs.includes(x)).join(", ")));
+    ok("!! ...and a mode it never declared is refused", checkMode(dev, "zzz_no_mode").ok === false,
+        "a device that accepts a name it does not declare runs something else and says nothing");
 }
 
 console.log();

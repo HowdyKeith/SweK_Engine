@@ -10,6 +10,7 @@
 // out from the spec and written down.
 
 import { createServer } from "http";
+import { shutdownServer, liveHandles } from "../../tools/ship/serverShutdown.mjs";
 import { createRequire } from "module";
 import fs from "fs";
 import os from "os";
@@ -159,7 +160,11 @@ const R = (h, size) => parseRange(h, size);
     const seek = await get("bytes=2048-2559");
     ok("SEEKING WORKS: a player jumps to the middle and gets the middle", seek.buf.equals(body.subarray(2048, 2560)));
 
-    await new Promise((r) => srv.close(r));
+    // v4000 -- the same teardown that fast-failed bz-tactics on Keith's Windows rig with libuv's
+    // UV_HANDLE_CLOSING assert. srv.close() resolves while its handles are still mid-close, and
+    // process.exit() inside that window is the crash. This gate has the identical shape and simply had
+    // not been the one run that day. See tools/ship/serverShutdown.mjs for the measurement.
+    await shutdownServer(srv);
     fs.unlinkSync(tmp);
 }
 
@@ -175,4 +180,11 @@ const R = (h, size) => parseRange(h, size);
 
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
+{
+    // THE TEARDOWN IS A CHECK. The crash it guards produced a PERFECT SCORELINE followed by a fast-fail,
+    // so a passing count was never going to catch it coming back.
+    const live = liveHandles();
+    ok("nothing is still holding the event loop open at exit", live.length === 0,
+        live.length ? "STILL LIVE: " + live.join(", ") : "no sockets, no server, no timers");
+}
 process.exit(fail ? 1 : 0);

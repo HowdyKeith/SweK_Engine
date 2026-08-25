@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3999";   // v3999 -- the avatar panel on server.html loses its camera and keeps its
+const BRAIN_BUILD = "v4000";   // v4000 -- fourteen rig reds triaged, eight fixed. The recurring shape was
+// a NUMBER TYPED BESIDE A LIST THAT LEGITIMATELY GREW (five of them), now derived from the thing it
+// describes. Also: a browser-safety gate that knew one spelling of a guard, a deletion receipt that could
+// never survive a clone, a libuv teardown crash shared by three gates, and one real physics defect --
+// laneemden scalingErr was exact-and-blind at its own default index. Previously v3999 --   // v3999 -- the avatar panel on server.html loses its camera and keeps its
 // face: ui/faceMoves.js is a second producer for the snapshot() interface ui/faceExpression.js and
 // ui/faceRig.js already consumed, turning the engine's own swek:move events into MediaPipe-shaped
 // blendshapes. Sabotage found the consumer-side check pointed the wrong way round, which found three

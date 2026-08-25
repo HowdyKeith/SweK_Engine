@@ -47,9 +47,25 @@ import {
     DEFAULTS, fixedPoint, smallOscillationPeriod, INTEGRATORS,
     integrate, timeAverages, volterraPrinciple, amplitudeDecay, PLANT_SIGMA,
 } from "../../physics/ecology/lotkaVolterra.mjs";
+// v4000 -- THE SHARED CRITERION, IMPORTED RATHER THAN RE-DECLARED.
+//
+// *** conservationReach-selfcheck WENT RED ONE ROUND AFTER v3994 SHIPPED, AND IT WAS RIGHT. *** That gate
+// counts binds which compute a first-half-versus-second-half comparison BY HAND, and asserts each one imports
+// the shared module so the two answers are compared every run rather than merely coexisting. keplerBind has
+// been wired since v3526. v3994 wrote the same algorithm again, here, and the count went from ONE to TWO --
+// the exact shape v3525 was built to find, found in the round after it was created rather than 500 versions
+// later, which is the whole value of a gate that counts instead of naming.
+//
+// The hand-rolled fields are FROZEN IN THE BASELINE and do not move. This is a second opinion beside them.
+import { auditConservation } from "./conservation.mjs";
 
 export const LOTKA_VOLTERRA_OBSERVABLES = [
     "firstIntegralDrift", "amplitudeRatio",
+    // the shared module's verdict on the same orbit, beside the hand-rolled one rather than instead of it
+    // firstIntegralSeries is the ARRAY itself, declared because v3520 taught the baseline to keep arrays and
+    // conservationReach can only ask its question of a series that survives the bind uncollapsed.
+    "firstIntegralSeries",
+    "firstIntegralGrowthShared", "firstIntegralVerdictBounded", "firstIntegralSamples", "growthGapFrac",
     "driftGrowthRatio", "driftFirstHalf", "measuredPeriod", "theoryPeriod", "periodErrFrac",
     "cyclesCompleted", "blewUpAtCycle",
     "meanPrey", "meanPredator", "exactPrey", "exactPredator", "meanPreyErr", "meanPredatorErr",
@@ -98,9 +114,27 @@ export async function buildLotkaVolterra(hyp, base = {}) {
     // question, and both are what the plant moves -- so every declared mode is gradeable.
     const base_ = integrate(runOpts);
     const amp = amplitudeDecay(runOpts);
+    // *** THE SAME QUESTION ASKED BY THE SHARED MODULE, BESIDE THE HAND-ROLLED ANSWER. *** growthGapFrac is
+    // THE COST OF SAMPLING, measured: the shared verdict reads 64 samples of the FIRST INTEGRAL while
+    // driftGrowthRatio reads every one of ~24,000 steps of its ERROR, so the two are not the same measurement
+    // and the gap says by how much (symplectic: hand 1.000 against shared 0.963).
+    //
+    // AND ON explicit Euler THE SHARED VERDICT IS STRICTLY MORE INFORMATIVE, which is worth stating because it
+    // was not the expected result. driftGrowthRatio is NaN there on purpose -- the v3993 saturation trap, where
+    // a run that dies in the first half scores a perfect 0.000 -- while auditConservation reads the 29 samples
+    // that did happen and returns `secular 18.63`. The guard that had to blank one field does not blank the other.
+    const audit = auditConservation(base_.firstIntegralSeries || []);
+    const sharedGrowth = Number.isFinite(audit.growth) ? audit.growth : -1;
+    const handGrowth = base_.driftGrowthRatio;
     const blank = {
         firstIntegralDrift: base_.driftSecondHalf,
         amplitudeRatio: amp.ratio === null ? -1 : amp.ratio,
+        firstIntegralSeries: base_.firstIntegralSeries || [],
+        firstIntegralGrowthShared: sharedGrowth,
+        firstIntegralVerdictBounded: audit.verdict === "bounded" || audit.verdict === "exact" ? 1 : 0,
+        firstIntegralSamples: (base_.firstIntegralSeries || []).length,
+        growthGapFrac: (Number.isFinite(handGrowth) && handGrowth > 0 && sharedGrowth > 0)
+            ? Math.abs(sharedGrowth - handGrowth) / handGrowth : -1,
         planted,
     };
 

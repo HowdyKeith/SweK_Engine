@@ -19,6 +19,7 @@
 // gradient is AVERAGED, not summed, so eighty identical samples do not drive a weight into its clamp.
 
 import { createServer } from "http";
+import { shutdownServer, liveHandles } from "../../tools/ship/serverShutdown.mjs";
 import { setTimeout as sleep } from "timers/promises";
 import fs from "fs";
 import os from "os";
@@ -211,10 +212,29 @@ const ESF = (reach, weakness, threat, isPlayer, focus) => ({ reach, weakness, th
     ok("...and the tank bridge does not own the ship's", !bridge.owns("/ai/brain/tactics"));
     ok("they are different files", esBridge._file() !== bridge._file());
 
-    await new Promise((r2) => srv.close(r2));
+    // v4000 -- srv.close() ALONE LEAVES THE KEEP-ALIVE SOCKETS UP, and this gate's own fetch client is what
+    // holds them. Measured here immediately before process.exit(): five live Sockets and the Server, after
+    // close() had already resolved. On Keith's rig that tore libuv down mid-close and fast-failed with
+    // `!(handle->flags & UV_HANDLE_CLOSING)` -- 65 checks passed and the gate still reported a crash.
+    // See tools/ship/serverShutdown.mjs for the measurement and the order the three steps have to happen in.
+    await shutdownServer(srv);
 }
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {}
+
+// *** THE TEARDOWN IS A CHECK, NOT A HOPE. *** The crash this fixed produced a PERFECT SCORELINE followed by a
+// fast-fail, so "65 passed" was never going to catch it coming back. This asserts the thing that was actually
+// wrong -- that nothing is still holding the loop open when we exit -- and it fails on THIS platform rather
+// than waiting for a Windows box to fast-fail again.
+{
+    const live = liveHandles();
+    ok("nothing is still holding the event loop open at exit", live.length === 0,
+        live.length ? "STILL LIVE: " + live.join(", ") + " -- srv.close() resolves without destroying " +
+                      "keep-alive sockets, and process.exit() on top of those is what tripped libuv's " +
+                      "UV_HANDLE_CLOSING assert on the rig (exit 0xC0000409, after every check had passed)"
+                    : "no sockets, no server, no timers");
+}
+
 console.log("");
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
