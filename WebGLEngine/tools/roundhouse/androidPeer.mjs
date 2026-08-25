@@ -119,7 +119,27 @@ export function classifyDeps(pkg) {
 // only bites the code path that awaits it (the live rig caller). The scanner distinguishes the two.
 const STATIC_IMPORT_RE = /^\s*import\s[^"'(]*["']([^"']+)["']/gm;
 const DYNAMIC_IMPORT_RE = /import\(\s*["']([^"']+)["']\s*\)/g;
-const okSpecifier = (s) => s.startsWith("./") || s.startsWith("../") || s.startsWith("node:");
+// *** AN ABSOLUTE PATH IS NOT A BARE SPECIFIER, AND CALLING IT ONE MADE THIS GATE RED FOR 33 VERSIONS. ***
+// Only a BARE specifier -- one that is neither relative, absolute, a URL, nor a node: builtin -- can resolve
+// into node_modules, and node_modules is the entire subject of this scan. A leading "/" resolves against the
+// filesystem root under Node and against the server root in a browser; either way it never reaches a package.
+//
+// v3962 put `await import("/tools/roundhouse/magmapGpu.mjs")` into the magmap GPU gates and this scanner has
+// called it a bare specifier ever since. Those five specifiers sit INSIDE page.evaluate() bodies, so they are
+// browser URLs that Node never evaluates at all -- rig.html serves the tree from the web root and they resolve
+// exactly as written. The gate was reporting a portability blocker that did not exist.
+//
+// *** WHAT THIS SCANNER STILL CANNOT DO IS STATED RATHER THAN QUIETLY WIDENED: *** it is a regex over source
+// text, so it cannot tell a specifier Node will resolve from one that only ever runs inside page.evaluate().
+// That is deliberate and it fails in the SAFE direction -- a browser cannot resolve a bare specifier either,
+// without an import map, so a genuinely bare one inside page.evaluate() is still a defect and still flagged.
+export const okSpecifier = (s) =>
+    s.startsWith("./") || s.startsWith("../") || s.startsWith("/") || s.startsWith("node:") ||
+    /^[a-z][a-z0-9+.-]*:/i.test(s);            // any URL scheme -- a URL is not a package either.
+// *** THE SCHEME TEST DOES NOT REQUIRE "//", AND THE GATE'S OWN TABLE CAUGHT THAT. *** A first version
+// matched /^[a-z][a-z0-9+.-]*:\/\//, which admits http:// and file:// and REJECTS data:text/javascript,0 --
+// a data: URL has a scheme and no authority. Requiring the colon alone is still safe: an npm package name
+// cannot contain a colon at all, scoped or not, so nothing that reaches node_modules can match this.
 
 export function scanRoundhousePurity(root = ENGINE_ROOT) {
     const dir = path.join(root, "tools", "roundhouse");
