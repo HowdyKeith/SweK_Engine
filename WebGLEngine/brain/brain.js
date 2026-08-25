@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4014";   // v4014 -- sourceChainBridge.launch(): starts the freshly-cloned engine for
+const BRAIN_BUILD = "v4015";   // v4015 -- localModelProbe.js's verdictFor() compares maxBufferSize against a
+// model's OWN stated vramBytes, not just the flat 128MB floor -- an unknowns line naming both numbers
+// (Keith's own wording) when the proxy reads under a model's stated requirement. Stays an unknown, never a
+// blocker: maxBufferSize is a proxy for VRAM, not a measurement of it. Prompted by a real run on an Intel
+// UHD 620 (2.15 GB proxy) reading "maybe" for both Gemma builds. Previously v4014 --   // v4014 -- sourceChainBridge.launch(): starts the freshly-cloned engine for
 // real (its own START_NODE_Engine.bat/START_BUN_Full.bat, whichever this box already prefers) on a fresh port
 // found with listen(0), side by side with whatever is running, and does not open a tab until /health answers
 // -- time-boxed at 25s, reporting "launched but not yet answering" as its own outcome. Keith asked for this
