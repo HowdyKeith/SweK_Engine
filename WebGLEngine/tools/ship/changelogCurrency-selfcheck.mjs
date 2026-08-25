@@ -8,10 +8,22 @@
 // that stage cannot quietly go away again, and -- more importantly -- so the MATCHING RULE is tested. A regex
 // that accepted a passing mention of "v3081" inside some other round's prose would pass on a frozen file and
 // reproduce the original hole with a green tick on top.
+//
+// *** v4003 -- AND THEN THIS GATE SWITCHED ITSELF OFF, WHICH IS THE FAILURE IT WAS BUILT TO PREVENT, HAPPENING
+// TO THE PREVENTION. *** v3964 taught it to SKIP on a clone, with a message saying "The records exist on the rig
+// and are checked there." That was an ASSUMPTION, and corpusText's live read on Keith's rig disproved it:
+// BACKLOG.md and TODO.md are on NO machine and tracked in NO commit. The skip therefore fired EVERYWHERE, so the
+// guard ran nowhere -- switched off by the .gitignore rule it cited as its reason for skipping. Measured
+// consequence: the record's newest entry was `## Since v3970` while the tree was at v4002. THIRTY-ONE ROUNDS,
+// against the forty this file was written about.
+//
+// The skip is GONE rather than narrowed, because the record it needs -- docs/CHANGELOG.md, 327 entries -- is
+// TRACKED and therefore present in every clone. There is nothing left for it to be absent for. A GATE THAT
+// SKIPS ON EVERY MACHINE IS SWITCHED OFF, and "skipping loudly" is not a defence when nobody reads the skip.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { withheldFromMirror } from "./withheld.mjs";
+import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 import { fileURLToPath } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PROJECT = path.resolve(ENG, "..");
@@ -21,13 +33,23 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const ship = fs.readFileSync(path.join(ENG, "tools", "ship", "ship.mjs"), "utf8");
 
 // The rule the stage uses, restated here so the SABOTAGE below can exercise it directly.
-const names = (text, v) => new RegExp("^(## |- )" + v + "\\b", "m").test(text);
+// v4003 -- IMPORTED, NOT RESTATED. This line was a second copy of the ship stage's regex, which is the
+// "two declarations about one thing that nobody ever compared" defect sitting inside the file whose whole
+// subject is a rule going stale. The sabotage below now exercises the SHIPPING rule rather than a twin of it.
+const names = namesVersion;
 
 // ---- 1. THE STAGE EXISTS AND IS A HARD FAIL -------------------------------------------------------------------
 {
     ok("!! ship.mjs has a changelog-currency stage", /stage\("the changelog names this version"/.test(ship),
        "without it, non-empty is the only bar and a forty-version-old file clears it");
-    ok("it checks BOTH records", /BACKLOG\.md", "TODO\.md"/.test(ship) || /\["BACKLOG\.md", "TODO\.md"\]/.test(ship));
+    // v4003 -- it checked BOTH records, and both were gone. What it must do now is read the record's address
+    // from the ONE place that declares it, rather than spelling it a fifth time.
+    ok("!! it reads the changelog's address from changelogSource, not a spelling of its own",
+       /readChangelog|CHANGELOG_REL/.test(ship) && !/"BACKLOG\.md"/.test(ship),
+       "four tools with four spellings of BACKLOG.md is what let the record move without any of them noticing");
+    ok("...and it uses the SHARED matching rule rather than a second copy of the regex",
+       /namesVersion\(/.test(ship),
+       "a private regex here and another there is the shape this file's own subject keeps producing");
     ok("!! it THROWS rather than warning", /throw new Error\(\s*\n?\s*"no entry for "/.test(ship),
        "a warning in a ritual whose whole purpose is doing this from memory every time is a warning nobody reads");
     ok("the error names the command that fixes it", /changelog\.mjs --backlog/.test(ship),
@@ -63,30 +85,32 @@ const names = (text, v) => new RegExp("^(## |- )" + v + "\\b", "m").test(text);
 // ---- 4. THE LIVE TREE ------------------------------------------------------------------------------------------
 {
     const v = (fs.readFileSync(path.join(ENG, "main.js"), "utf8").match(/ENGINE_VERSION\s*=\s*"(v\d+)"/) || [])[1];
-    // v3964 -- *** THIS DID NOT FAIL ON A CLONE, IT CRASHED. *** readFileSync threw ENOENT on BACKLOG.md and
-    // took the whole gate down with a stack trace -- the THIRD file this round found making the same assumption
-    // (verify.mjs required these two, and its root-finder used one as a landmark). BACKLOG.md and TODO.md are
-    // in .gitignore, withheld from the public mirror on purpose, so no clone of this repository contains them.
-    // A crash is worse than the failure it replaced: a red line says which claim broke, a stack trace says the
-    // gate is broken, and the two send you to different places.
-    //
-    // WITHHELD IS NOT ABSENT, AND THE CHECK STILL FIRES ON THE SECOND. A record git actually carries must name
-    // this version exactly as before; one deliberately withheld is skipped OUT LOUD, in the spelling
-    // selfchecks.mjs recognises, so a clone leaves this gate out of the run rather than recording a pass it
-    // did not earn.
-    const withheld = withheldFromMirror(PROJECT);
-    const read = (f) => { try { return fs.readFileSync(path.join(PROJECT, f), "utf8"); } catch { return null; } };
-    const bl = read("BACKLOG.md"), td = read("TODO.md");
-    const gone = [["BACKLOG.md", bl], ["TODO.md", td]].filter(([f, c]) => c === null);
-    if (gone.length && gone.every(([f]) => withheld.has(f))) {
-        console.log("changelogCurrency-selfcheck: SKIPPED -- " + gone.map(([f]) => f).join(" + ") +
-                    " are withheld from the mirror by .gitignore, so this tree is a clone and has neither. " +
-                    "The records exist on the rig and are checked there; asserting on a file that CANNOT be " +
-                    "here would be a check that only ever fails.");
-        process.exit(0);
-    }
-    ok("!! this tree's own marker is named in BOTH records", names(bl || "", v) && names(td || "", v),
-       "marker " + v + " -- if this is red, the ritual is about to ship a version nothing describes, which is exactly what happened forty times");
+    // v3964 taught this to SKIP when BACKLOG.md was absent, which was right about the CRASH it replaced (a
+    // stack trace says the gate is broken; a red line says which claim broke) and wrong about the remedy. The
+    // record is TRACKED now, so absence is a broken tree rather than a clone, and it is reported as one.
+    const text = readChangelog(PROJECT);
+    ok("!! *** THE RECORD IS PRESENT -- no skip, on any machine ***", text !== null,
+       text === null ? CHANGELOG_REL + " is UNREADABLE at " + PROJECT + ". It is tracked, so this is a broken " +
+       "tree rather than a clone missing a withheld file -- and the previous version of this gate would have " +
+       "called that a clean skip."
+       : CHANGELOG_REL + ", " + text.length.toLocaleString() + " bytes, newest entry v" + newestVersion(text));
+    ok("!! *** this tree's own marker is named in the record ***", names(text || "", v),
+       "marker " + v + ", newest entry v" + newestVersion(text || "") + " -- if this is red, the ritual is " +
+       "about to ship a version nothing describes, which is exactly what happened forty times at v3041..v3080 " +
+       "and thirty-one more times at v3971..v4002 while this gate was skipping");
+    // AND THE GAP IS REPORTED RATHER THAN ASSERTED. This is a CURRENCY check: it asks whether the version being
+    // shipped is described, not whether every version ever shipped is. v3971..v3991 are missing from the record
+    // and were NOT backfilled at v4003 -- reconstructing somebody else's rounds is not a thing to do unasked.
+    const newest = newestVersion(text || "");
+    const cur = Number(String(v).slice(1));
+    const named = new Set((String(text || "").match(/^## (?:Since )?v(\d+)/gm) || [])
+        .map((h) => Number(h.replace(/^## (?:Since )?v/, ""))));
+    const gaps = [];
+    for (let n = 3971; n < cur; n++) if (!named.has(n)) gaps.push(n);
+    console.log("  ----  REPORTED, not asserted: " + gaps.length + " version(s) between v3971 and " + v +
+        " have no entry" + (gaps.length ? " (v" + gaps[0] + "..v" + gaps[gaps.length - 1] + ")" : "") +
+        ". A CURRENCY check asks about the version being shipped; completeness is a different claim and " +
+        "backfilling rounds one did not do would be inventing the record rather than keeping it.");
 }
 
 console.log("\nchangelogCurrency-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));

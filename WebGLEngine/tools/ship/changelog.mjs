@@ -13,9 +13,24 @@
 // Run from the WebGLEngine root (where BACKLOG.md / TODO.md live). Exits non-zero on failure.
 import fs from "node:fs";
 import path from "node:path";
+import { changelogPath, CHANGELOG_REL, ENTRY_HEAD } from "./changelogSource.mjs";
 
-// BACKLOG.md / TODO.md live at the PROJECT ROOT (EngineProject_vNNNN/), which is the parent of WebGLEngine.
-// Resolve them by walking up from cwd until we find one (works whether invoked from WebGLEngine or root).
+// v4003 -- THE PROJECT ROOT IS FOUND BY THE FILE THAT IS ACTUALLY THERE. The old walk looked for BACKLOG.md,
+// which exists on no machine, so it fell through to its cwd-relative fallback every time -- a landmark search
+// keyed on a missing landmark, which is the same defect verify.mjs had at v3964 and for the same reason.
+// docs/CHANGELOG.md is TRACKED, so it is a landmark that survives a clone.
+function findRoot() {
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(dir, CHANGELOG_REL))) return dir;
+    const up = path.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return process.cwd();   // errors clearly below rather than creating anything
+}
+
+// kept for the ASCII/atomic tests that still name it; no caller writes through it any more
 function findAtRoot(name) {
   let dir = process.cwd();
   for (let i = 0; i < 5; i++) {
@@ -56,8 +71,16 @@ function prependAtomic(file, entry) {
   const bak = file + ".bak";
   fs.writeFileSync(bak, old);                       // backup BEFORE touching the original
   const next = entry.endsWith("\n") ? entry : entry + "\n";
+  // *** v4003 -- "PREPEND" MEANT THE TOP OF THE FILE, AND docs/CHANGELOG.md HAS A HEADER. ***
+  // BACKLOG.md began with its newest entry, so writing at offset 0 was right for it. This changelog opens with
+  // `# SweK_Engine -- changelog` and four paragraphs explaining the split from README.md, and an entry written
+  // above that would put one round's prose in front of the document's own title. The insertion point is the
+  // FIRST ENTRY HEADING, so the header stays put and entries stay newest-first; a file with no heading yet
+  // falls back to the top, which is the old behaviour and the right one for an empty record.
+  const at = old.search(ENTRY_HEAD);
+  const merged = at < 0 ? next + old : old.slice(0, at) + next + old.slice(at);
   try {
-    fs.writeFileSync(file, next + old);
+    fs.writeFileSync(file, merged);
     const after = fs.readFileSync(file, "utf8");
     if (after.length < old.length) throw new Error(`file shrank (${after.length} < ${old.length}) — truncation guard tripped`);
     console.log(`[changelog] ${path.basename(file)} prepended: +${next.length} chars, now ${after.length} (backup at ${path.basename(bak)})`);
@@ -79,8 +102,11 @@ if (!backlogFile && !todoFile) { console.error("usage: changelog.mjs --backlog <
 //
 // The header of this file has always claimed "atomically prepend ... to BACKLOG.md + TODO.md". Now it is true.
 const _pending = [];
-if (backlogFile) _pending.push([findAtRoot("BACKLOG.md"), fs.readFileSync(backlogFile, "utf8")]);
-if (todoFile) _pending.push([findAtRoot("TODO.md"), fs.readFileSync(todoFile, "utf8")]);
+// v4003 -- --backlog now means THE CHANGELOG, whose address lives in changelogSource.mjs. The flag keeps its
+// name because it is what the ritual's error message tells people to type; renaming a flag to match a moved
+// file would break the one instruction anybody has memorised.
+if (backlogFile) _pending.push([changelogPath(findRoot()), fs.readFileSync(backlogFile, "utf8")]);
+if (todoFile) { console.error("[changelog] --todo is RETIRED: TODO.md is on no machine and has no successor. Ignored."); }
 for (const [file, entry] of _pending) {
   if (!fs.existsSync(file)) { console.error(`[changelog] ${file} not found -- refusing to create it blank. Nothing was written.`); process.exit(3); }
   const bad = firstNonAscii(entry);

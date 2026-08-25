@@ -27,6 +27,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readChangelog, namesVersion, newestVersion, CHANGELOG_REL } from "./changelogSource.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.resolve(HERE, "..", "..");        // .../SweK_Engine_vNNNN/WebGLEngine
@@ -140,26 +141,31 @@ stage("no changelog backups left behind", () => {
 //
 // "A CHECK NOT IN THE GATE IS NOT BEING RUN." This is that law collecting on itself, in the very tool whose
 // stated purpose is to do the ritual correctly, from memory, every time.
+// *** v4003 -- THIS STAGE READ BACKLOG.md AND TODO.md, WHICH ARE ON NO MACHINE AND IN NO COMMIT. *** It threw
+// "unreadable" rather than "no entry", so the ritual could not complete at all on a tree that has the record --
+// and the record it has is docs/CHANGELOG.md, 327 entries and TRACKED. The address is read from
+// changelogSource.mjs now, which is the one declaration of it; four tools had four spellings, and that is what
+// produced this. TODO.md is not replaced: it has no successor anywhere, and asserting on a file nobody has is
+// the check that only ever fails.
 stage("the changelog names this version", () => {
-    const missing = [];
-    for (const f of ["BACKLOG.md", "TODO.md"]) {
-        let text = "";
-        try { text = fs.readFileSync(path.join(PROJECT, f), "utf8"); }
-        catch (e) { throw new Error(f + " is unreadable at " + PROJECT + " -- " + (e && e.message)); }
-        // BACKLOG headings are "## vNNNN -- ...", TODO lines are "- vNNNN: ...". Match the version as a whole
-        // token either way, anchored to line start, so a passing MENTION of the version inside some other
-        // round's prose cannot satisfy this.
-        const re = new RegExp("^(## |- )" + version + "\\b", "m");
-        if (!re.test(text)) missing.push(f);
+    const text = readChangelog(PROJECT);
+    if (text === null) {
+        throw new Error(CHANGELOG_REL + " is unreadable at " + PROJECT + " -- the changelog is TRACKED, so " +
+            "this is a broken tree rather than a clone missing a withheld file.");
     }
-    if (missing.length) {
+    // Anchored to line start and \b-terminated, so a passing MENTION of the version inside another round's
+    // prose cannot satisfy it and v3081 is not satisfied by v30811.
+    if (!namesVersion(text, version)) {
+        const newest = newestVersion(text);
         throw new Error(
-            "no entry for " + version + " in " + missing.join(" or ") + ". Run changelog.mjs BEFORE shipping:\n" +
-            "    node tools/ship/changelog.mjs --backlog <file> [--todo <file>]\n" +
+            "no entry for " + version + " in " + CHANGELOG_REL + " (newest entry: v" + newest + "). " +
+            "Run changelog.mjs BEFORE shipping:\n" +
+            "    node tools/ship/changelog.mjs --backlog <file>\n" +
             "NON-EMPTY IS NOT THE SAME AS CURRENT -- this exact gap is how v3041..v3080 shipped green with the " +
-            "record frozen at v3040.");
+            "record frozen at v3040, and the gate written to prevent it then SKIPPED ITS WAY OFF every machine " +
+            "until v4003.");
     }
-    return version + " present in BACKLOG.md and TODO.md";
+    return version + " present in " + CHANGELOG_REL;
 });
 
 // THE GATE. Unpiped, and its exit code is the whole point -- this is the step v2509 skipped.
