@@ -33,6 +33,7 @@
   "ai-bridge/tools/kpop-handoff-selfcheck.mjs": 69,
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 374,
   "ai-bridge/tools/launch-guard-selfcheck.mjs": 118,
+  "ai-bridge/tools/localModelResolve-selfcheck.mjs": 227,
   "ai-bridge/tools/peer-selfhost-selfcheck.mjs": 55,
   "ai-bridge/tools/port-handoff-selfcheck.mjs": 1308,
   "ai-bridge/tools/puppeteer-bridge-selfcheck.mjs": 45,

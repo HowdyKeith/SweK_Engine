@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4015";   // v4015 -- localModelProbe.js's verdictFor() compares maxBufferSize against a
+const BRAIN_BUILD = "v4016";   // v4016 -- aiProviders.resolveLocalModel(): asks a local OpenAI-compatible
+// server what it serves instead of sending the placeholder "default", which TurboFieldfare (the Apple-Silicon
+// Gemma 4 26B runtime Keith asked to wire in) rejects outright -- its validator compares the model name
+// exactly. Used only when nothing is configured, falling back to the placeholder if the probe fails.
+// TurboFieldfare added to the local-server catalog as its first source-build (not package) entry.
+// Previously v4015 --   // v4015 -- localModelProbe.js's verdictFor() compares maxBufferSize against a
 // model's OWN stated vramBytes, not just the flat 128MB floor -- an unknowns line naming both numbers
 // (Keith's own wording) when the proxy reads under a model's stated requirement. Stays an unknown, never a
 // blocker: maxBufferSize is a proxy for VRAM, not a measurement of it. Prompted by a real run on an Intel
