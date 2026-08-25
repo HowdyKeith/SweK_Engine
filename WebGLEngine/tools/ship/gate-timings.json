@@ -926,6 +926,7 @@
   "tools/ship/hookupState-selfcheck.mjs": 113,
   "tools/ship/hostScale-selfcheck.mjs": 41,
   "tools/ship/hostingPanel-selfcheck.mjs": 51,
+  "tools/ship/hostingControls-selfcheck.mjs": 2248,
   "tools/ship/inlineHelpers-selfcheck.mjs": 125,
   "tools/ship/installHistoryReadout-selfcheck.mjs": 59,
   "tools/ship/installTiming-selfcheck.mjs": 44,
