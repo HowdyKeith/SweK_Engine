@@ -96,6 +96,37 @@
   </div>
 
   <div class="card">
+    <h2>Bun's native APIs &mdash; and whether any of them would save us a dependency</h2>
+    <p class="note">
+      Bun 1.4 was announced with native replacements for Playwright, Sharp, marked, node-pty, node-cron and
+      others &mdash; "the update that kills your dependencies". <b>This runs
+      <code>tools/ship/bunNative.mjs</code> on THIS box and reports what is actually there</b>, because a
+      release note is a claim about a version and the only version that matters is the one installed.
+    </p>
+    <p class="note">
+      <b>Each row says what the API would replace AND whether <code>ai-bridge/package.json</code> lists it</b>,
+      read from the manifest rather than remembered. That column is the whole question: a replacement for a
+      package we never installed saves nothing, and most of the announced list &mdash; Knex, pg, Sharp, marked,
+      node-pty, node-cron &mdash; is of packages this project does not use.
+    </p>
+    <p class="note">
+      <b><code>Bun.WebView</code> is the one that would matter here</b>, because 20 gates import
+      <code>tools/ship/playwrightResolve.mjs</code> and the live half of every page gate is Chromium. It is
+      <b>driven, not merely detected</b>: if the API is present the probe opens a <code>data:</code> URL and
+      reads the title back, because "the global exists" and "it can open a page" are different claims and only
+      the second would let anything here stop depending on a browser. When it is missing the probe says
+      <b>ABSENT</b> and never "failed" &mdash; a box that has not got a feature has not got a broken one.
+    </p>
+    <div class="now">
+      <button id="natBoth">Run both</button>
+      <button id="natNode">Node only</button>
+      <button id="natBun">Bun only</button>
+      <span id="natState" class="meta"></span>
+    </div>
+    <div id="natBox"></div>
+  </div>
+
+  <div class="card">
     <h2>Speed &mdash; and whether the two runtimes even agree on the answer</h2>
     <p class="note">
       Runs <code>tools/roundhouse/runtimeBench.mjs</code> under each runtime. <b>One number would be false in
@@ -267,6 +298,44 @@ async function runBench(rt) {
 $("benchNode").onclick = () => runBench("node");
 $("benchBun").onclick  = () => runBench("bun");
 $("benchBoth").onclick = async () => { await runBench("node"); await runBench("bun"); };
+
+const natRuns = {};
+function renderNat() {
+  const box = $("natBox");
+  box.innerHTML = "";
+  for (const rt of ["node", "bun"]) {
+    const r = natRuns[rt];
+    if (!r) continue;
+    const h = document.createElement("div");
+    let rows = r.rows.map(function (x) {
+      // THE USED-HERE COLUMN IS THE POINT. "Present" alone would read as a saving.
+      var used = x.usedHere === null ? "?" : x.usedHere.length ? "<b>we use " + x.usedHere.join(", ") + "</b>" : "not used here";
+      return "<tr><td>" + (x.present ? "<b>present</b>" : "absent") + "</td><td><code>" + x.api + "</code></td><td>" + used + "</td></tr>";
+    }).join("");
+    var w = r.webview;
+    h.innerHTML = "<p class=\"note\" style=\"color:var(--ink)\"><b>" + r.runtime + "</b> &mdash; " +
+      r.presentCount + " of " + r.claimedCount + " announced natives present. " +
+      "<b>Packages this would let us drop: " +
+      (r.packagesThisWouldRemove.length ? r.packagesThisWouldRemove.join(", ") : "NONE") + "</b></p>" +
+      "<table style=\"border-collapse:collapse;font-size:12px\">" + rows + "</table>" +
+      "<p class=\"note\"><b>Bun.WebView: " + w.state + "</b> &mdash; " + w.detail +
+      (w.title ? " Title read back: <code>" + w.title + "</code>." : "") + "</p>";
+    box.appendChild(h);
+  }
+}
+async function runNative(rt) {
+  $("natState").textContent = " probing " + rt + "\u2026";
+  try {
+    const r = await (await fetch("/runtime/native?rt=" + rt)).json();
+    if (!r.ok) { $("natState").textContent = " " + rt + ": " + (r.error || "failed"); return; }
+    natRuns[rt === "bun" ? "bun" : "node"] = r;
+    renderNat();
+    $("natState").textContent = " " + r.runtime + " done";
+  } catch (e) { $("natState").textContent = " " + rt + ": " + e.message; }
+}
+$("natNode").onclick = () => runNative("node");
+$("natBun").onclick  = () => runNative("bun");
+$("natBoth").onclick = async () => { await runNative("node"); await runNative("bun"); };
 
 loadNow();
 </script>

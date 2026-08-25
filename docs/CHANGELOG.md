@@ -8,6 +8,49 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4006 -- the Bun fallback is time-boxed on /health, and the Bun.WebView "page" is a probe
+
+Two requests. "make that fallback time-boxed on /health instead of exit code", and "can we make a test
+Bun.WebView page?"
+
+**The fallback.** `bun server.js` BLOCKS, and START_BUN_Full.bat only fell back on `if errorlevel 1` -- after
+Bun had exited. That costs a full wait on a Bun that fails slowly, and it has a worse mode: *** A BUN THAT
+STARTS AND HANGS NEVER EXITS, SO THE FALLBACK NEVER FIRED AT ALL. *** The window sits there, /health never
+answers, and the KPop listener (120s of polling) and the opener (60 tries) both give up against a bridge that
+is running and not serving. An exit code can only answer "did it stop"; the question worth asking is "is it
+SERVING", and /health is the tree's existing answer -- the same endpoint the opener and listener already wait
+on, so this adds no second definition of "up".
+
+Batch cannot poll while a foreground process blocks, so the poller runs beside it: a watchdog window polls
+/health for BUN_HEALTH_SECS, and on timeout kills bun.exe, which makes the blocking call return non-zero and
+the existing fallback fire -- now driven by SERVING rather than by STOPPING. It leaves a marker so the message
+can say WHICH happened, because "Bun exited with an error" and "Bun never answered /health" send you to
+different places. The watchdog is hoisted ABOVE the if/else rather than written inside the Bun branch:
+launcherLint reads a .bat line by line and cannot see that the branches are exclusive, so a `start` after the
+Node branch's blocking `node server.js` reads as R2-after-foreground. That is a false positive here and a true
+one everywhere else, and the rule is worth more than the convenience.
+
+**The WebView page is a probe, and that is the honest form of it.** On the bun this tree has -- 1.3.11 --
+`Bun.WebView` is UNDEFINED. A page that "used" it would either be a mock, demonstrating a feature nobody has,
+or would throw on load and teach the reader the feature is BROKEN rather than ABSENT. Those are different facts.
+`tools/ship/bunNative.mjs` reports four named states -- not-bun, absent, worked, threw -- and when the API IS
+present it DRIVES it, opening a `data:` URL and reading the title back, because "the global exists" and "it can
+open a page" are different claims and only the second would let anything here stop depending on Chromium.
+
+**And each row says whether we actually use what it replaces, read from `ai-bridge/package.json`.** That column
+is the whole question. MEASURED under bun 1.3.11: **7 of 10 announced natives are already present** -- SQL,
+Terminal, cron, redis, Glob, YAML, semver -- and they would let us drop **ZERO** packages, because what they
+replace (Knex, pg, Sharp, marked, node-pty, node-cron) is not what this project installs. The one that would
+matter, `Bun.WebView` against `puppeteer-core` and the 20 gates importing `playwrightResolve.mjs`, is the one
+that is absent. A replacement for a package we never installed saves nothing.
+
+Three instrument errors in the new gate, found by running it. Two were `codeOnly()` used where `noComments()`
+was needed: `data:text/html` is a STRING LITERAL and codeOnly blanks strings, so the check for it could never
+match -- THE IDENTICAL TRAP patchScanDoor-selfcheck was fixed for earlier in this same session, committed again
+in a new file hours later. The third asserted an ordering with a bare `indexOf`, which found the word
+`bun server.js` in the COMMENT explaining it rather than the command -- prose-as-code, inside the check
+asserting an order.
+
 ## Since v4005 -- claimTrace was building every device with every device's modes, and three landmark bugs
 
 `claimTrace-selfcheck` timed out at 3000s with ZERO bytes of output. Staged instrumentation put the whole cost

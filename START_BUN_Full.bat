@@ -82,16 +82,57 @@ ping -n 4 127.0.0.1 >nul 2>nul
 
 REM v1574 - open server.html only AFTER the bridge is LISTENING (was opening before bind -> dead :8787).
 if not defined SUPERSEDE start "SweK opener" /MIN powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; $ok=$false; for($i=0;$i -lt 60;$i++){ try{ $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8787/health' -TimeoutSec 2 -UseBasicParsing; if($r.StatusCode -eq 200){$ok=$true; break} }catch{}; Start-Sleep -Milliseconds 500 }; if(-not $ok){ return }; try{$ni=Invoke-RestMethod -Uri 'http://localhost:8787/net/info' -TimeoutSec 5; $u=$ni.recommended}catch{}; if([string]::IsNullOrWhiteSpace($u)){$u='http://localhost:8787/'}; $b=$u.TrimEnd('/'); $pg='/server.html'; try{$bm=Invoke-RestMethod -Uri ($b+'/boot/mode') -TimeoutSec 4; if($bm -and $bm.url){$pg=$bm.url}}catch{}; Start-Process ($b+$pg)"
+REM v4006 -- *** THE FALLBACK IS TIME-BOXED ON /health, NOT ON BUN'S EXIT CODE. ***
+REM
+REM Keith remembered "some delays incurred when Bun was tried and relied on the Node fallback", and the shape
+REM was still here. `bun server.js` BLOCKS, and the fallback below only fired on `if errorlevel 1` -- i.e.
+REM AFTER Bun had exited. That has two costs, and the second is the one that matters:
+REM
+REM   1. a Bun that fails slowly is waited on in full before Node is even tried;
+REM   2. *** A BUN THAT STARTS AND HANGS NEVER EXITS, SO THE FALLBACK NEVER FIRES AT ALL. *** The window sits
+REM      there, /health never answers, and the KPop listener (which polls /health for 120s) and the opener
+REM      (60 tries at 500ms) both give up against a bridge that is running and not serving.
+REM
+REM An exit code can only answer "did it stop". The question worth asking is "is it SERVING", and /health is
+REM the tree's existing answer to that -- the same endpoint the opener and the listener already wait on, so
+REM this adds no second definition of what "up" means.
+REM
+REM THE WATCHDOG IS A SEPARATE WINDOW ON PURPOSE. Batch cannot poll while a foreground process blocks, so the
+REM poller runs beside it: if /health does not answer within BUN_HEALTH_SECS it kills bun.exe, which makes the
+REM blocking call return non-zero and the existing fallback path fire -- now driven by SERVING rather than by
+REM STOPPING. If /health does answer, the watchdog exits and never touches anything.
+REM
+REM It leaves a marker so the fallback can say WHICH of the two happened. "Bun exited with an error" and "Bun
+REM never answered /health" send you to different places, and one message for both would be the two-things-
+REM one-label defect this tree keeps finding.
+set "BUN_HEALTH_SECS=25"
+set "BUN_UNHEALTHY=%TEMP%\swek_bun_unhealthy.flag"
+del "%BUN_UNHEALTHY%" >nul 2>nul
+
+REM THE WATCHDOG STARTS BEFORE THE if/else, NOT INSIDE THE else. launcherLint reads a .bat LINE BY LINE
+REM -- it cannot see that the two branches are exclusive -- so a `start` written after the Node branch's
+REM blocking `node server.js` reads as R2-after-foreground: code placed after something that never
+REM returns. That is a false positive HERE and a true one everywhere else, and the rule is worth more
+REM than the convenience: a lint with exceptions carved into it stops being read. Guarded rather than
+REM moved into the branch, so it still only runs when Bun is the one being tried.
+if not defined USE_NODE start "SweK bun health watchdog" /MIN powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='SilentlyContinue'; $deadline=(Get-Date).AddSeconds(%BUN_HEALTH_SECS%); $ok=$false; while((Get-Date) -lt $deadline){ try{ $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8787/health' -TimeoutSec 2 -UseBasicParsing; if($r.StatusCode -eq 200){$ok=$true; break} }catch{}; Start-Sleep -Milliseconds 500 }; if($ok){ return }; if(Test-Path $env:TEMP\swek_superseded.flag){ return }; Set-Content -Path '%BUN_UNHEALTHY%' -Value 'no /health within %BUN_HEALTH_SECS%s'; taskkill /IM bun.exe /F | Out-Null"
+
 if defined USE_NODE (
     echo Starting ai-bridge under Node on http://127.0.0.1:8787/ ...
     node server.js
 ) else (
     echo Starting ai-bridge under Bun on http://127.0.0.1:8787/ ...
+    echo   ^(falling back to Node if /health has not answered in %BUN_HEALTH_SECS%s^)
     bun server.js
     if errorlevel 1 (
         if exist "%TEMP%\swek_superseded.flag" goto _swek_superseded
         echo.
-        echo Bun exited with an error - falling back to Node...
+        if exist "%BUN_UNHEALTHY%" (
+            echo Bun did not answer /health within %BUN_HEALTH_SECS%s and was stopped - falling back to Node...
+            del "%BUN_UNHEALTHY%" >nul 2>nul
+        ) else (
+            echo Bun exited with an error - falling back to Node...
+        )
         where node >nul 2>nul && (node server.js) || (echo Node not found either. Install Node.js from https://nodejs.org & pause)
     )
 )
