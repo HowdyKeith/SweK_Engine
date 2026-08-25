@@ -8,6 +8,46 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4007 -- a page that answers "can this box run a model" before anything downloads
+
+Keith, on kessler/gemma-gem: "a page that reports whether this box can actually run it (WebGPU adapter,
+reported VRAM, model cache present) before anything downloads a gigabyte."
+
+**The hardest property is that the page must never say yes.** VRAM is not exposed to a page by any browser --
+WebGPU withholds it deliberately, a fingerprinting surface -- so the ceiling on an honest answer is "nothing
+measurable rules it out", never a green tick. `ui/localModelProbe.js` reports three states (no / unknown /
+maybe), and across every combination driven, the verdict is only ever no or maybe.
+
+Three false greens found writing it, each caught by driving the probe rather than reading it:
+
+* `navigator.gpu` existing is not an adapter. MEASURED on this tree's own headless Chromium: the namespace is
+  true and `requestAdapter()` returns null -- the identical Bun.WebView distinction from the round before,
+  met again a day later.
+* An adapter existing is not a GPU. The first draft reported MAYBE for a 4GB model on SwiftShader, a software
+  rasteriser. `adapter.info` is pattern-matched against known software renderer names, with the spec's
+  `isFallbackAdapter` preferred where the browser implements it.
+* An unreadable limit is not a pass. Unknown lands in `unknowns`, never in the yes column.
+
+What CAN decide for free: a storage quota smaller than the model is a hard no that costs nothing. MEASURED on
+this box: ~1.01GB, below gemma-gem's stated 1.5GB E4B build. `webgpu-llm.html` fetches zero bytes of model
+weight, asserted by watching the network in a real browser.
+
+**Two physics gates corrected, the first being my own previous round's mistake.**
+`levelClaim-selfcheck`'s tilt negative asserted `sd === 0` below the grid's resolution floor, which is a claim
+about ONE BOX -- Keith's rig reads 5deg:0.0000, this one reads 5deg:0.0455, deterministic on each machine and
+different between them, because a settled surface leaves the odd particle in the cell above and the last bits
+of a float decide whether the sub-cell term sees it. Rewritten to NEGLIGIBLE AGAINST THE FIRST RESOLVABLE
+TILT, which holds on both.
+
+`labResults-selfcheck`'s default-mode row was being computed twice -- once directly, once again inside the
+per-mode loop, because the default mode is always a declared one -- verified byte-identical on three devices
+before being reused. The gate now completes instead of timing out at 754s, and completing revealed real,
+pre-existing staleness in the frozen lab-results baseline that the timeout had been hiding: 36 devices added
+since the freeze, several observables appeared/vanished, and a handful of values moved (figureeight's
+energyDriftFrac -1 -> 8.6e-16, matching its own v3852 comment for the correct integrator; blackhole's
+captureOnsetR by ~0.18%). NOT RE-FROZEN HERE: which of those moves are intended improvements and which
+deserve a closer look is a physics call, and it is Keith's.
+
 ## Since v4006 -- the Bun fallback is time-boxed on /health, and the Bun.WebView "page" is a probe
 
 Two requests. "make that fallback time-boxed on /health instead of exit code", and "can we make a test
