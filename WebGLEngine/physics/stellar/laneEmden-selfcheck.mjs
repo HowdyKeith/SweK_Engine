@@ -1,6 +1,11 @@
 // physics/stellar/laneEmden-selfcheck.mjs
 //
 // Run: node physics/stellar/laneEmden-selfcheck.mjs
+// RUNTIME 7.56s MEASURED (median of 3 -- 7837/7489/7557 -- with date(1) around the run), against 8354ms before
+// section 5 was added: the new section costs almost nothing because its two n=5 solves deliberately run at a
+// COARSE step. Written naively they ran at the default dxi=2e-5 out to xi=200 -- 10 million RK4 steps each --
+// and took this gate to 16.4s to answer a question that is a yes/no. See section 5 for the verification that
+// the coarse step gives the identical verdict.
 "use strict";
 import {
     EXACT, EXACT_XI1, solve, massFromBoundary, massFromQuadrature, starAt, measuredMassRadiusExponent,
@@ -102,7 +107,49 @@ console.log("\n4. *** n=3: MASS STOPS DEPENDING ON CENTRAL DENSITY -- THE CHANDR
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n5. *** SABOTAGE ***");
+console.log("\n5. *** THE GEOMETRY IS A PARAMETER, AND CHANGING IT GIVES A DIFFERENT REAL EQUATION ***");
+{
+    // The equation generalises to d dimensions as theta'' + ((d-1)/xi) theta' + theta^n = 0. This matters for
+    // two reasons: it is what the device's planted error perturbs, and a plant is only worth having if the
+    // planted physics is INTERNALLY CONSISTENT rather than garbage -- otherwise anything would catch it.
+    ok("!! d=3 is unchanged by the generalisation -- sqrt(6) and pi still come out",
+        rel(solve(0).xi1, Math.sqrt(6)) < 1e-9 && rel(solve(1).xi1, Math.PI) < 1e-9,
+        `n=0 -> ${solve(0).xi1.toFixed(9)}, n=1 -> ${solve(1).xi1.toFixed(9)}`);
+
+    // *** THE CYLINDRICAL n=1 CASE IS BESSEL'S EQUATION, AND ITS SURFACE IS THE FIRST ZERO OF J0. ***
+    // That is an answer key the spherical device never had, and it is computed here by series + Newton
+    // rather than looked up, so the check is against mathematics rather than against a remembered constant.
+    const J0 = (x) => { let s = 0, t = 1; for (let k = 0; k < 60; k++) { if (k > 0) t *= -(x * x / 4) / (k * k); s += t; } return s; };
+    const J1 = (x) => { let s = 0, t = x / 2; for (let k = 0; k < 60; k++) { if (k > 0) t *= -(x * x / 4) / (k * (k + 1)); s += t; } return s; };
+    let z = 2.4;
+    for (let i = 0; i < 80; i++) z = z + J0(z) / J1(z);   // J0' = -J1, so Newton on J0 steps with +J0/J1
+    const cyl1 = solve(1, { dim: 2 }).xi1;
+    ok("!! *** CYLINDRICAL n=1 LANDS ON THE FIRST ZERO OF THE BESSEL FUNCTION J0 ***",
+        rel(cyl1, z) < 1e-9, `solver ${cyl1.toFixed(10)} vs J0's first zero ${z.toFixed(10)}`);
+    ok("...and that zero really is a zero of J0", Math.abs(J0(z)) < 1e-10, "J0(z) = " + J0(z).toExponential(2));
+    report("the cylindrical case is a genuinely different, genuinely correct equation -- which is what makes " +
+           "it a dangerous plant rather than an obvious one: the profile still looks exactly like a star");
+
+    // cylindrical n=0 has its own closed form theta = 1 - xi^2/4, so xi1 = 2 exactly
+    ok("cylindrical n=0 gives xi1 = 2 exactly, its own closed form", rel(solve(0, { dim: 2 }).xi1, 2) < 1e-9,
+        solve(0, { dim: 2 }).xi1.toFixed(10));
+
+    // *** AND HERE IS WHAT THE GEOMETRY COSTS: THE n=5 RESULT DOES NOT SURVIVE IT. ***
+    // *** A COARSER STEP ON PURPOSE, AND THE REASON IS THAT THIS IS A YES/NO. *** Whether an n=5 profile ever
+    // reaches zero out to xi=200 does not need dxi=2e-5; at the default step these two solves are 10 million RK4
+    // steps EACH and cost this gate 8 seconds. Verified rather than assumed: dxi of 2e-5, 2e-4 and 1e-3 all give
+    // the same verdict and the same cylindrical surface to six figures (5.427575), so the fine step buys
+    // nothing a coarse one does not already say.
+    const COARSE = { maxXi: 200, dxi: 1e-3 };
+    const sph5 = solve(5, COARSE).xi1, cyl5 = solve(5, { ...COARSE, dim: 2 }).xi1;
+    ok("!! *** n=5 HAS NO SURFACE IN SPHERICAL GEOMETRY BUT GAINS ONE IN CYLINDRICAL ***",
+        sph5 === null && cyl5 !== null && cyl5 > 1,
+        `spherical: none (infinite radius)   cylindrical: xi1 = ${cyl5.toFixed(6)}`);
+    report("that is the whole reason this makes a good planted error: it produces plausible stars at every " +
+           "index anybody normally looks at, and destroys the one famous limiting result");
+}
+
+console.log("\n6. *** SABOTAGE ***");
 {
     // A wrong exponent in the density power (theta^n mis-typed as theta^(n) with an off-by-something) should
     // move the surface radius away from the exact value. Simulate by solving the WRONG n against the RIGHT

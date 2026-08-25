@@ -69,14 +69,21 @@ export const EXACT_XI1 = { 0: Math.sqrt(6), 1: Math.PI, 5: null };
  * "found a surface". That distinction is the whole content of the n=5 case.
  * @returns {{xi1: number|null, dthetaAtXi1: number|null, trace: Array<[xi,theta,dtheta]>}}
  */
-export function solve(n, { dxi = 2e-5, maxXi = 40 } = {}) {
+export function solve(n, { dxi = 2e-5, maxXi = 40, dim = 3 } = {}) {
+    // *** THE GEOMETRY IS A PARAMETER, AND THE SERIES START MOVES WITH IT. *** In d dimensions the equation is
+    // theta'' + ((d-1)/xi) theta' + theta^n = 0, and matching powers near the origin gives
+    //     theta ~ 1 - xi^2/(2d) + n xi^4 / (8 d (d+2))
+    // which reduces to the familiar 1 - xi^2/6 + n xi^4/120 at d = 3. Derived rather than copied: substituting
+    // the ansatz gives 2a*d = -1 for the quadratic coefficient and b(8+4d) = n/(2d) for the quartic. The gate
+    // checks that d=3 still reproduces sqrt(6) and pi, so the generalisation cannot have broken the real case.
+    const d = dim;
     let xi = dxi;
-    let theta = 1 - (xi * xi) / 6 + (n * Math.pow(xi, 4)) / 120;
-    let dtheta = -xi / 3 + (n * Math.pow(xi, 3)) / 30;
+    let theta = 1 - (xi * xi) / (2 * d) + (n * Math.pow(xi, 4)) / (8 * d * (d + 2));
+    let dtheta = -xi / d + (n * Math.pow(xi, 3)) / (2 * d * (d + 2));
     const trace = [[0, 1, 0]];
     const deriv = (xi, theta, dtheta) => {
         const positive = Math.max(theta, 0);   // theta^n undefined below the surface; physically density stops at 0
-        const d2 = -Math.pow(positive, n) - (xi > 1e-12 ? (2 / xi) * dtheta : 0);
+        const d2 = -Math.pow(positive, n) - (xi > 1e-12 ? ((d - 1) / xi) * dtheta : 0);
         return [dtheta, d2];
     };
     let xi1 = null, dthetaAtXi1 = null;
