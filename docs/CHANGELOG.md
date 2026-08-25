@@ -8,6 +8,185 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4003 -- the changelog currency guard is back on, and eleven rounds were backfilled to turn it green honestly
+
+v4002 established that `changelogCurrency-selfcheck` had switched itself off: it skips on a clone saying "The
+records exist on the rig and are checked there", and the rig's own `corpusText` read disproves that -- BACKLOG.md
+and TODO.md are on no machine and in no commit. The skip fired everywhere, so the gate written after v3041..v3080
+shipped forty undocumented rounds had itself been running nowhere. Keith's call: guard back on.
+
+`tools/ship/changelog.mjs`, `ship.mjs`'s currency stage and `changelogCurrency-selfcheck.mjs` now all read
+`tools/ship/changelogSource.mjs`, the single declaration v4002 added. Two things had to change beyond the path.
+`prependAtomic` wrote to the very top of the file, which on this changelog would put an entry ABOVE the
+`# SweK_Engine` header -- it inserts at the first entry boundary now. And the skip is gone rather than narrowed:
+the record it needs is TRACKED, so a clone has it and there is nothing left to be absent for.
+
+The guard is a CURRENCY check, not a completeness one -- it asks whether the version about to ship is described.
+Turning it on with the record at `## Since v3970` would have meant shipping red, so the eleven rounds this
+session shipped (v3992..v4002) are written below from their own commit bodies. v3971..v3991 remain a gap and are
+named as one here rather than reconstructed by somebody who did not do the work.
+
+## Since v4002 -- the changelog was never lost; its address changed
+
+Keith's rig reported `corpusText-selfcheck` red with `missing: changelog, todo`. A file search settled what a red
+line could not: BACKLOG.md and TODO.md are on no machine and tracked in no commit, while the reasoning they held
+lives in `docs/CHANGELOG.md` -- 691,902 bytes, 315 entries, TRACKED, split out of README.md at v3941 because it
+was 99.1% of the front page. THE TEXT WAS NEVER LOST; ITS ADDRESS CHANGED, and four tools were still reading the
+old one.
+
+`tools/ship/changelogSource.mjs` becomes the one declaration of where the record lives, because four spellings of
+BACKLOG.md is what produced this. `claimCheck` had TWO bugs stacked -- a dead path AND a private
+`split(/^## v/m)` that could not have matched `## Since vNNNN` even after the path was fixed -- so repairing
+either alone would have hidden the other. The corpus goes 281,100 readable bytes to 967,090, 34x the dashboard.
+
+Two of `corpusText`'s own checks were wrong. Its floor was 50x with a note citing "BACKLOG.md alone is 2.1 MB", a
+number about a file nobody has; the floor is re-argued from the CLAIM rather than set just under today's reading.
+And "a missing source is SKIPPED and NAMED, never faked" asserted `missing.length === 0` -- the label describes
+the BUILDER handling an absence, the code demanded there be no absence, and it went red for a source that was
+correctly skipped and correctly named. Two things wearing one label, so they are two checks now.
+
+## Since v4001 -- a Windows-only path bug, green on Linux since v3441
+
+`gateSelection` reported seven failures on the rig and passed in the sandbox. One cause. `rel()` normalises every
+INPUT to forward slashes, then compares it against `ENG_ROOT`, which `path.resolve()` builds with the platform's
+own separators -- so on Windows `x.startsWith(ENG_ROOT + "/")` is false for every path in the tree, nothing is
+stripped to engine-relative, and the selector compares absolutes against relatives. The rig read 0 of 102
+reachable gates in the plan, 0 direct importers, and 45 of 45 costs "guessed": the cost table is keyed relative
+too, so an un-normalised name misses every entry and THE PLAN REPORTS ITS OWN BLINDNESS AS HONESTY ABOUT A GUESS.
+
+That is the defect its own header describes, committed in the fix for it. v3441 wrote "everything is normalised
+to engine-relative here, once, at the boundary" -- and normalised one side of the boundary. A CONSTANT IS AN
+INPUT. The gate now drives the normaliser on a Windows-shaped path from any box; forcing `ENG_ROOT` to
+backslashes on Linux reproduces the rig's failure exactly. The first sabotage attempt did NOT catch it, because
+deleting the `.replace()` changes nothing on Linux.
+
+Six more were the stale-count family: `inference` pinned two modes against three and carried "38 graded of 113"
+in its LABEL; `gateReach` pinned a population of 464 against 471 (7 added, 0 removed, reconciles, all named);
+`gateActivity` went red because `never-timed` reached ZERO, which is the timing arc SUCCEEDING; `gateBudget`'s
+SLOWEST_GENERAL was stale in both directions at once. `gateQuality` was punishing the best form of the thing it
+enforces -- one unwrap at the read, with every downstream site clean by construction, counted as debt while a
+gate re-wrapping at forty call sites passed.
+
+## Since v4000 -- fourteen rig reds triaged, eight fixed; half were gates that could not pass
+
+The recurring shape across five of them: A NUMBER TYPED BESIDE A LIST THAT LEGITIMATELY GREW. `figureEight`
+pinned "four modes" and v3852 had added a fifth -- `euler`, which is that device's PLANT, so a typed count sat in
+the way of the device's own error injection. Each is DERIVED now from the module's own export or the device's own
+declaration.
+
+`browserSafety` flagged the most browser-safe line in its file: `lessons.mjs:106` is the INVERTED guard, where
+the short circuit protects the second term exactly as `!==` does. A GATE THAT ONLY RECOGNISES THE IDIOM ITS
+AUTHOR HAPPENED TO WRITE IS A STYLE RULE WEARING A SAFETY RULE'S CLOTHES. It also reported line 95 for a defect
+on line 106, because it numbered comment-stripped text.
+
+`bz-tactics` reported "65 passed, 0 failed" and then fast-failed -- the worst result a gate can produce, because
+a reader cannot tell whether the subject or the harness broke. Measured before `process.exit()`: five live
+Sockets and the Server, AFTER `close()` had resolved. `close()` only REQUESTS a close; libuv finishes a turn or
+two later. Three gates had the shape, so `tools/ship/serverShutdown.mjs` is shared.
+
+The one real physics defect: `laneemden.scaling.scalingErr` was not merely an exact zero, it was BLIND. Three
+typos planted in `starAt` and at the default n=1 the error stayed 0.000e+0 through all three, because
+alpha = rhoC^0 kills the radius dependence and both sides collapse to zero for the same reason.
+
+## Since v3999 -- the avatar panel on server.html loses its camera and keeps its face
+
+Keith: "we want to hide camera when it is shown on server.html. server.html is self driven avatars", then "Would
+we be able to generate the animations that the other avatars show, but with the face expressions?" Yes, and
+nothing new had to be invented: `ui/faceExpression.js` and `ui/faceRig.js` both consume "anything with
+`snapshot()` -> `{ active, blendShapes }`" and neither has ever known it was talking to a camera. `ui/faceMoves.js`
+is a SECOND PRODUCER for that one interface, and the moves were already on the wire -- `swek:move` has been
+dispatched on window since v1690.
+
+HIDING THE CAMERA ALONE WOULD HAVE LEFT AN EMPTY PANEL: `face-mirror.html` builds its robot inside `start()`, and
+`start()` is on the button the embed CSS now hides. Measured 0x0 before, 120x180 after.
+
+Sabotage found a check that could not fail, which found a defect in the shipping module. The first gate asked "is
+every name faceMoves emits one faceRig reads?" -- the easy direction, true of any subset. It passed while
+`eyeWideLeft`, `eyeWideRight` and `mouthFunnel` were absent, so the wireframe head would have read 0 for three of
+its fourteen channels forever.
+
+## Since v3998 -- face muscles next after the talking head, and the gallery pill off the avatar's forehead
+
+Keith: "we added the Google face muscles api ability, can we rotate that as the next choice after Wireframe?" and
+"it shows the title 'wirefame head Show' at the top, and that should not be seen on Server.html". Both are the
+same corner of the tree.
+
+The pill: `ui/showcaseNav.js` injects a gallery nav top-centre, and thead.html has hidden its own chrome on
+`?embed=1` since v3656 -- the pill went straight through it because THAT HIDE LIST NAMES ELEMENTS IN THE PAGE'S
+MARKUP AND THIS ONE IS INJECTED BY A SCRIPT AFTERWARDS. A hide list cannot name an element that does not exist
+yet, so the guard belongs in the injector.
+
+Adding the view exposed something else: `avatar-server.html`'s picker appends `?embed=1` to every src it mounts
+and was NEVER IN SCOPE of the gate that states the rule, so `pipboy-models.html` and `shipavatar.html` had been
+receiving that flag and ignoring it for their whole lives. A RULE WITH ONE ENFORCER COVERS ONE CALLER.
+
+## Since v3997 -- bun vs node, benchmarked: one number would be false in both directions
+
+Keith asked whether the two runtimes could be compared for this engine. They trade places by a factor of ~75
+depending on the shape of the inner loop, so a page printing a single winner would be false in both directions.
+`tools/roundhouse/runtimeBench.mjs` runs seven workloads and reports each.
+
+Three hypotheses were rejected by measurement before the real one was found -- Math.pow, allocation in general,
+and plain arithmetic. The finding is array-return-and-destructure: `const [a, b] = f()` is where the runtimes
+diverge hardest. A ten-point probe first reported sin/exp/log/tan/atan2 as matching between V8 and JSC; the
+200k-point sweep overturned it.
+
+## Since v3996 -- androidPeer: a leading slash is not a bare specifier
+
+The specifier classifier rejected `/abs/path` as a bare package name. Fixed, and my own first regex required
+`://` and so rejected `data:text/javascript,0` -- the colon alone suffices. Any URL scheme is not a package
+either.
+
+## Since v3995 -- cart-pole with LQR: a controller that passes every check it can run on itself, and drops the pole
+
+`physics/control/cartPole.mjs` imports the v3572 control layer rather than re-declaring it; a first draft carried
+its own matMul, Cholesky, Faddeev and Routh in the same directory as the originals, and was found only because a
+`cd` slip revealed the directory. A gate now forbids their return.
+
+Four separate errors were caught by measurement rather than review: the Riccati sign (integrated to -1.3e154);
+a missing quadratic P (`P B R^-1 B^T` instead of `P B R^-1 B^T P`, exposed by the scalar closed form as 5/22
+against 0.4275); a wrong cost diagnosis (called it horizon truncation, got three identical numbers at T=10/30/90
+-- it was first-order Riemann quadrature under RK4, and trapezoid took 2.9e-4 to 8.7e-8); and the page's own
+explicit integrator dropping the pole at kappa=100 on four fixed RK4 substeps.
+
+Both `controlStability.mjs` and `controlStateSpace.mjs` carried top-level `node:url` imports -- the v3951
+browser-safety defect, sitting outside that gate's page-reachable scope.
+
+## Since v3994 -- Lotka-Volterra predator-prey: the time-average theorem, and Volterra's principle
+
+The time average of each population over a closed orbit is EXACTLY the fixed point, at any amplitude -- so a
+device that only ran near equilibrium would be testing the linearisation instead of the theorem. Volterra's
+principle follows: harvesting both species RAISES the average prey population, monotonically.
+
+The saturation trap recurred and is now named in the field itself: `driftGrowthRatio` came out 0.000 for explicit
+Euler -- the most perfectly-bounded score the metric can produce -- because Euler died at cycle 89 of a 200-cycle
+run and the second half never executed. It is NaN when the run dies early, because a number that ranks a
+catastrophe first is worse than no number.
+
+A 55x-wrong plant estimate was corrected by the closed form: holding y* fixed gave the wrong period shift, and
+the real one is 0.933%.
+
+## Since v3993 -- kepler: the explicit-Euler companion, as a matched pair
+
+`stepEuler` and `stepEulerSymplectic` are the same order and the same cost, one line apart -- velocity first,
+then position on the NEW velocity -- and only one of them keeps the planet. That is what makes the pair a control
+rather than a demonstration.
+
+`unboundAtOrbit` is the fact `energyGrowthRatio` cannot hold: |(E-E0)/E0| saturates at 1, so an integrator that
+loses the planet in the first half scores BETTER than one that merely drifts (measured: explicit Euler 1.071
+against RK4 1.981 over 200 orbits).
+
+The page was measuring with a stroboscope: `kepler.html` sampled |dE/E| once per orbit at fixed phase, giving
+0.119 where the module reports 1.000. Per-orbit maximum now.
+
+## Since v3992 -- a stop that was ASKED for now says so: exit code 20
+
+`/sys/exit` shut the server down and left every reader unable to tell a requested stop from a crash. The boundary
+is now explicit: the `swek_superseded.flag` means somebody else has the baton (exit 0), and code 20 means nobody
+has it. Three readers were taught the difference, each as an ORDER check -- the 20 branch must precede the
+catch-all -- and the sabotage for that had to anchor the re-insertion BELOW the catch-all, because the first
+version re-inserted the branch exactly where it already sat and proved nothing.
+
 ## Since v3970 — the lesson pattern, wired into the physics lab's most expensive gate family
 
 Seven separate gate files build the "kh" (Kelvin-Helmholtz instability) device with their own independent parameter sweeps — run length (`khConvergence`, ~5min), viscosity (`khGrowthKey`, ~6.5min), box resolution (`khMichalke`, ~5.5min) — and none of them could see what another had already found didn't settle.

@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4002";   // v4002 -- BACKLOG.md is on no machine and in no commit; the reasoning lives
+const BRAIN_BUILD = "v4003";   // v4003 -- the changelog currency guard is back on. It had skipped its way off
+// every machine, so the record froze at v3970 while the tree reached v4002 -- the forty-round failure it was
+// built to prevent, recurring inside the prevention. Eleven rounds backfilled; the 21-version gap before
+// them is REPORTED rather than invented. Previously v4002 --   // v4002 -- BACKLOG.md is on no machine and in no commit; the reasoning lives
 // in docs/CHANGELOG.md, which is tracked. Four tools read the dead address, and changelogCurrency -- the
 // gate built after forty undocumented rounds -- skips on every machine citing records that are not there.
 // One declaration now, in changelogSource.mjs. Previously v4001 --   // v4001 -- gateSelection had a Windows-only path bug, green on Linux since
