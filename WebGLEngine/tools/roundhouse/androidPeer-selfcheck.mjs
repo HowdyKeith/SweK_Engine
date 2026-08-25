@@ -16,13 +16,14 @@
 
 import {
     readBridgeManifest, classifyDeps, DEP_CLASSIFICATION,
-    scanRoundhousePurity, wgslBannedCalls, downloadsPathFacts, wontPortInventory,
+    scanRoundhousePurity, okSpecifier, wgslBannedCalls, downloadsPathFacts, wontPortInventory,
     ANDROID_REGISTRATION, androidLines, ENGINE_ROOT,
 } from "./androidPeer.mjs";
 import { MAGMAP_TOL, F32_FLOOR, WGSL } from "./magmapGpu.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+const report = (line) => console.log("  ----  " + line);
 
 // ---- ITEM 1. TERMUX PATH: the manifest has no native blocker -------------------------------------------------------
 const pkg = readBridgeManifest();
@@ -58,9 +59,34 @@ const purity = scanRoundhousePurity();
             : purity.files + " modules import only node: builtins and relative paths -- the suite runs from a bare checkout");
 
     const bareSpecs = [...new Set(purity.dynamicBare.map((b) => b.spec))];
+    const strays = bareSpecs.filter((s) => s !== "@anthropic-ai/sdk");
     ok("bare specifiers appear only as LAZY dynamic imports (the rig-only model caller)",
-        bareSpecs.every((s) => s === "@anthropic-ai/sdk"),
-        "lazy: " + (bareSpecs.join(", ") || "none") + " -- no selfcheck path awaits it, so an empty node_modules stays green");
+        strays.length === 0,
+        strays.length
+            ? "UNEXPECTED BARE SPECIFIER(S): " + strays.join(", ") + " -- each one makes a bare checkout need npm install"
+            : "lazy: " + (bareSpecs.join(", ") || "none") + " -- no selfcheck path awaits it, so an empty node_modules stays green");
+
+    // *** THE CLASSIFIER IS TESTED DIRECTLY, BECAUSE IT WAS THE THING THAT WAS WRONG. *** okSpecifier used to
+    // allow only ./ ../ and node:, so every `await import("/tools/roundhouse/...")` inside a page.evaluate()
+    // body counted as a bare specifier and this check has been RED SINCE v3962 over five browser URLs that
+    // cannot reach node_modules. Widening a classifier is exactly the change that can silently stop catching
+    // anything, so the widening is bracketed from both sides here rather than trusted.
+    const shouldPass = ["./x.mjs", "../y.mjs", "node:fs", "/tools/roundhouse/magmapGpu.mjs",
+                        "/vendor/taichi-js/taichi.js", "https://example.com/m.js", "data:text/javascript,0"];
+    const shouldFail = ["@anthropic-ai/sdk", "lodash", "playwright", "@scope/pkg/sub", "jolt-physics"];
+    const wrongPass = shouldPass.filter((s) => !okSpecifier(s));
+    const wrongFail = shouldFail.filter((s) => okSpecifier(s));
+    ok("!! the classifier admits relative, absolute and URL specifiers -- none of which is a package",
+        wrongPass.length === 0, wrongPass.length ? "WRONGLY FLAGGED: " + wrongPass.join(", ") : shouldPass.length + " forms");
+    ok("!! SABOTAGE: ...and still catches every genuinely BARE specifier, which is what node_modules means",
+        wrongFail.length === 0,
+        wrongFail.length ? "WRONGLY ADMITTED: " + wrongFail.join(", ")
+                         : shouldFail.length + " package names, all still flagged -- the widening did not blind it");
+    report("the five that were being reported sit INSIDE page.evaluate() bodies, so Node never evaluates them " +
+           "at all: rig.html serves the tree from the web root and /tools/... resolves exactly as written. " +
+           "This scanner is a regex over source text and cannot tell those apart, which is stated in " +
+           "androidPeer.mjs rather than quietly widened -- and it fails SAFE, since a browser cannot resolve a " +
+           "bare specifier either without an import map");
 }
 
 // ---- ITEM 3. SECOND GPU VENDOR: the WGSL is portable by construction, and the tolerance predates the vendor --------
