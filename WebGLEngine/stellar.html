@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Lane-Emden Polytropes">
+<meta name="demo:desc" content="Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Lane-Emden Polytropes</title>
+<!--
+     v3991 -- THE FRONT DOOR FOR physics/stellar/laneEmden.mjs. The page derives no physics: the ODE solve, the
+     surface radius, the mass integral and the closed forms all come from the module. Same rule reactor.html,
+     lensing.html and bell.html are held to, and their gates enforce.
+
+     *** THE ONE THING THIS PAGE HAS TO GET RIGHT IS THE n=5 CASE, AND IT IS THE EASIEST TO FAKE. ***
+     An n=5 polytrope has INFINITE RADIUS -- its density approaches zero without ever reaching it. The
+     comfortable way to draw that is to run the integration to some large xi, stop, and draw a curve that
+     happens to end at the right edge of the plot: it looks identical to a star with a surface, and it is a lie.
+     So the page asks the module for xi1 and, when it comes back null, says so in words and draws the profile
+     running OFF the axis rather than terminating. The gate checks the page reports no surface at n=5 while
+     reporting one either side of it.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --violet:#b088ff; --dim:#7c93b8; --red:#ff6b6b; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:210px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:5px 12px;
+           font:600 11px ui-monospace,monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .big { font-size:15px; }
+  .warn { color:var(--red); font-weight:700; } .ok { color:var(--green); font-weight:700; }
+  .grid { position:relative; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+  #profwrap, #starwrap { position:relative; min-height:0; border-right:1px solid #16203a; }
+  #starwrap { border-right:none; }
+  /* v3979 -- a canvas is a REPLACED element: position+inset alone leaves it at its intrinsic 300x150. */
+  #prof, #star { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(560px,44vw);
+          background:rgba(5,7,14,.78); border:1px solid #16203a; border-radius:8px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Lane-Emden Polytropes &mdash; where a star stops, and where it doesn't</h1>
+  <div class="row">
+    <label>polytropic index n <input id="n" type="range" min="0" max="600" value="150" step="1"></label>
+    <span class="stat big">n = <b id="nv">1.50</b></span>
+    <button id="p0">n=0</button><button id="p1">n=1</button><button id="p15">n=1.5</button>
+    <button id="p3">n=3</button><button id="p5">n=5</button>
+  </div>
+  <div class="row">
+    <span class="stat big">surface &xi;<sub>1</sub> <b id="xi1">3.654</b></span>
+    <span class="stat">mass integral <b id="mass">2.714</b></span>
+    <span class="stat">exact closed form <b id="exact">&mdash;</b></span>
+    <span class="stat big" id="verdict"></span>
+  </div>
+</header>
+<div class="grid">
+  <div id="profwrap"><canvas id="prof"></canvas>
+    <div id="note">&theta;(&xi;) is the normalised density profile; the star's surface is its first zero. Where a
+    closed form exists (n=0, 1, 5) it is drawn dashed over the integration &mdash; the solver never sees it.
+    Everything here comes from <b>physics/stellar/laneEmden.mjs</b>; the page solves nothing itself.</div>
+  </div>
+  <div id="starwrap"><canvas id="star"></canvas></div>
+</div>
+</div>
+<script type="module">
+import { solve, massFromBoundary, EXACT, EXACT_XI1 } from "./physics/stellar/laneEmden.mjs";
+
+const $ = (id) => document.getElementById(id);
+const prof = $("prof"), pCtx = prof.getContext("2d");
+const star = $("star"), sCtx = star.getContext("2d");
+
+// A coarser step than the gate's: the page redraws on every slider tick and must stay responsive. The module
+// owns the integration either way -- this only chooses how finely to ask for it.
+const PAGE_DXI = 1e-3;
+const MAX_XI = 24;          // how far to integrate when there is no surface to stop at
+let n = 1.5, current = null;
+
+function recompute() {
+  current = solve(n, { dxi: PAGE_DXI, maxXi: MAX_XI });
+  const { xi1, dthetaAtXi1 } = current;
+  $("nv").textContent = n.toFixed(2);
+  $("xi1").textContent = xi1 === null ? "none" : xi1.toFixed(4);
+  const mi = xi1 === null ? null : massFromBoundary(xi1, dthetaAtXi1);
+  $("mass").textContent = mi === null ? "—" : mi.toFixed(4);
+
+  // the closed form, where the module says one exists
+  const key = Number.isInteger(n) ? n : null;
+  const hasExact = key !== null && Object.prototype.hasOwnProperty.call(EXACT, key);
+  $("exact").textContent = hasExact
+    ? (EXACT_XI1[key] === null ? "no surface" : EXACT_XI1[key].toFixed(6))
+    : "—";
+
+  // *** THE HONEST STATEMENT ABOUT n=5, WHICH IS THE WHOLE POINT OF THE PAGE ***
+  if (xi1 === null) {
+    $("verdict").innerHTML = '<span class="warn">NO SURFACE &mdash; the density never reaches zero, so this star has INFINITE RADIUS</span>';
+  } else if (hasExact && EXACT_XI1[key] !== null) {
+    const err = Math.abs(xi1 - EXACT_XI1[key]) / EXACT_XI1[key];
+    $("verdict").innerHTML = '<span class="ok">matches the closed form to ' + err.toExponential(1) + '</span>';
+  } else {
+    $("verdict").innerHTML = '<span class="dim">no closed form at this index &mdash; the integration is the answer</span>';
+  }
+}
+
+function resize(cvs) {
+  const r = cvs.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cvs.width = Math.max(1, Math.round(r.width * d));
+  cvs.height = Math.max(1, Math.round(r.height * d));
+  cvs.getContext("2d").setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", () => { resize(prof); resize(star); draw(); });
+
+function drawProfile() {
+  const w = prof.width / (window.devicePixelRatio || 1), h = prof.height / (window.devicePixelRatio || 1);
+  pCtx.fillStyle = "#05070e"; pCtx.fillRect(0, 0, w, h);
+  const L = 46, R = w - 16, T = 20, B = h - 28;
+  pCtx.strokeStyle = "#16203a"; pCtx.strokeRect(L, T, R - L, B - T);
+  pCtx.fillStyle = "#7c93b8"; pCtx.font = "11px ui-monospace,monospace";
+  pCtx.fillText("θ(ξ) — normalised density", L, 12);
+
+  const { xi1, trace } = current;
+  const xiMax = xi1 === null ? MAX_XI : Math.max(xi1 * 1.12, 1);
+  const px = (xi) => L + (R - L) * Math.min(xi / xiMax, 1);
+  const py = (th) => B - (B - T) * Math.max(0, Math.min(th, 1));
+
+  pCtx.strokeStyle = "#101a30";
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+    pCtx.beginPath(); pCtx.moveTo(L, py(t)); pCtx.lineTo(R, py(t)); pCtx.stroke();
+    pCtx.fillStyle = "#3d4e68"; pCtx.fillText(t.toFixed(2), 12, py(t) + 3);
+  }
+
+  // the integrated profile
+  pCtx.strokeStyle = "#59d1ff"; pCtx.lineWidth = 1.9; pCtx.beginPath();
+  let started = false;
+  for (const [xi, th] of trace) {
+    if (th < 0) break;
+    const X = px(xi), Y = py(th);
+    started ? pCtx.lineTo(X, Y) : (pCtx.moveTo(X, Y), started = true);
+  }
+  pCtx.stroke();
+
+  // the closed form, dashed over it, where one exists
+  const key = Number.isInteger(n) ? n : null;
+  if (key !== null && Object.prototype.hasOwnProperty.call(EXACT, key)) {
+    pCtx.strokeStyle = "#f6a623"; pCtx.lineWidth = 1.3; pCtx.setLineDash([5, 4]); pCtx.beginPath();
+    let s2 = false;
+    for (let i = 0; i <= 400; i++) {
+      const xi = (i / 400) * xiMax, th = EXACT[key](xi);
+      if (th < 0) break;
+      const X = px(xi), Y = py(th);
+      s2 ? pCtx.lineTo(X, Y) : (pCtx.moveTo(X, Y), s2 = true);
+    }
+    pCtx.stroke(); pCtx.setLineDash([]);
+    pCtx.fillStyle = "#f6a623"; pCtx.fillText("closed form (dashed)", R - 132, T + 14);
+  }
+
+  // the surface marker -- or an explicit statement that there isn't one
+  if (xi1 !== null) {
+    pCtx.strokeStyle = "#5fe08a"; pCtx.setLineDash([3, 3]);
+    pCtx.beginPath(); pCtx.moveTo(px(xi1), T); pCtx.lineTo(px(xi1), B); pCtx.stroke(); pCtx.setLineDash([]);
+    pCtx.fillStyle = "#5fe08a"; pCtx.fillText("ξ₁ = " + xi1.toFixed(4), px(xi1) - 30, B + 14);
+  } else {
+    pCtx.fillStyle = "#ff6b6b";
+    pCtx.fillText("→ runs on without ever reaching zero", R - 236, py(0.06));
+  }
+  pCtx.fillStyle = "#7c93b8";
+  pCtx.fillText("0", L, B + 14);
+  pCtx.fillText("ξ = " + xiMax.toFixed(1) + (xi1 === null ? " (truncated)" : ""), R - 96, B + 14);
+}
+
+function drawStar() {
+  const w = star.width / (window.devicePixelRatio || 1), h = star.height / (window.devicePixelRatio || 1);
+  sCtx.fillStyle = "#05070e"; sCtx.fillRect(0, 0, w, h);
+  sCtx.fillStyle = "#7c93b8"; sCtx.font = "11px ui-monospace,monospace";
+  sCtx.fillText("the star in cross-section — density by brightness", 14, 14);
+
+  const { xi1, trace } = current;
+  const cx = w / 2, cy = h / 2, RAD = Math.min(w, h) * 0.36;
+  const xiMax = xi1 === null ? MAX_XI : xi1;
+
+  // sample the profile onto rings, outside in, so the core is drawn last and on top
+  const RINGS = 90;
+  for (let i = RINGS; i >= 1; i--) {
+    const frac = i / RINGS, xi = frac * xiMax;
+    // nearest sample from the module's own trace -- the page does not re-integrate
+    const idx = Math.min(trace.length - 1, Math.round((xi / PAGE_DXI)));
+    const th = Math.max(0, trace[idx] ? trace[idx][1] : 0);
+    const dens = Math.pow(th, Math.max(n, 0.01));         // rho = rho_c * theta^n
+    const shade = Math.min(1, Math.pow(dens, 0.45));
+    sCtx.fillStyle = `rgba(${Math.round(120 + 135 * shade)},${Math.round(90 + 120 * shade)},${Math.round(40 + 60 * shade)},1)`;
+    sCtx.beginPath(); sCtx.arc(cx, cy, RAD * frac, 0, Math.PI * 2); sCtx.fill();
+  }
+  if (xi1 === null) {
+    sCtx.strokeStyle = "#ff6b6b"; sCtx.setLineDash([4, 4]);
+    sCtx.beginPath(); sCtx.arc(cx, cy, RAD, 0, Math.PI * 2); sCtx.stroke(); sCtx.setLineDash([]);
+    sCtx.fillStyle = "#ff6b6b";
+    sCtx.fillText("edge shown is the TRUNCATION, not a surface", cx - 132, cy + RAD + 20);
+  } else {
+    sCtx.strokeStyle = "#5fe08a";
+    sCtx.beginPath(); sCtx.arc(cx, cy, RAD, 0, Math.PI * 2); sCtx.stroke();
+    sCtx.fillStyle = "#5fe08a";
+    sCtx.fillText("surface", cx - 20, cy + RAD + 20);
+  }
+}
+
+function draw() { drawProfile(); drawStar(); }
+function update() { recompute(); draw(); }
+
+$("n").oninput = (e) => { n = +e.target.value / 100; update(); };
+const preset = (v) => () => { n = v; $("n").value = Math.round(v * 100); update(); };
+$("p0").onclick = preset(0); $("p1").onclick = preset(1); $("p15").onclick = preset(1.5);
+$("p3").onclick = preset(3); $("p5").onclick = preset(5);
+
+resize(prof); resize(star); update();
+</script>
+</body>
+</html>

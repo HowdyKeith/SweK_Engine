@@ -112,6 +112,7 @@ import { geostatsDevice } from "./geostatsBind.mjs";        // v3382 - device 59
 import { nuclearDevice } from "./nuclearBind.mjs";          // v3383 - nuclear decay and binding
 import { kineticsDevice } from "./kineticsBind.mjs";        // v3984 - point reactor kinetics: inhour vs RK4, the scram floor
 import { bellDevice } from "./bellBind.mjs";              // v3990 - CHSH Bell inequality: two bounds, both proven by search
+import { laneEmdenDevice } from "./laneEmdenBind.mjs";    // v3991 - stellar structure: polytropes, and a geometry plant
 import { astroparticleDevice } from "./astroparticleBind.mjs";  // v3501 - astroparticle: neutrino oscillation (cosmology modes follow)
 import { csgDevice } from "./csgBind.mjs";                       // v3519 - csg: exact signed-distance primitives and set algebra
 import { bonefieldDevice } from "./bonefieldBind.mjs";          // v3522 - bonefield: capsule distance field (soft-body skeleton)
@@ -159,6 +160,7 @@ const REGISTRY = {
     nuclear: async () => nuclearDevice,
     kinetics: async () => kineticsDevice,        // v3984 -- point reactor kinetics; beta located by a change in character, never typed in
     bell: () => bellDevice,                      // v3990 -- CHSH: the plant still violates Bell, only Tsirelson catches it
+    laneemden: () => laneEmdenDevice,           // v3991 -- the plant is a dimensionality slip that still makes stars
     astroparticle: () => astroparticleDevice,   // v3501 -- opens the astroparticle field with neutrino oscillation
     csg: () => csgDevice,                        // v3519 -- exact SDF primitives, gradients, edge crossings, set algebra
     bonefield: () => bonefieldDevice,            // v3522 -- capsule distance field: segment clamp, union, determinism
