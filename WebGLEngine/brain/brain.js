@@ -2795,7 +2795,9 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3991";
+const BRAIN_BUILD = "v3992";   // v3992 -- requested-stop exit code. exitNow() exits 20 instead of 0 so a shutdown
+// the server was ASKED for stops landing in swek_exit_report.bat's RC==0 "this window should have kept serving"
+// box. Nothing in the brain reads the bridge's exit code; this bump is the ritual marker.
 // v2408 -- collapse the repetitive per-tick status into a single in-place spinner line (like the KPop listener), so a
 // long idle run doesn't scroll hundreds of identical lines. On a real TTY it rewrites one line; when piped/redirected
 // it falls back to plain lines so logs stay grep-able.

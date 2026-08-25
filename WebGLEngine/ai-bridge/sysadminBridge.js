@@ -848,10 +848,42 @@ function restart(){
         setTimeout(() => process.exit(0), 1200);
         return { ok: true, note: "relaunching via Start Mac SweK Engine.command — this server exits to free the port" };
     }
-    setTimeout(() => process.exit(0), 300);
-    return { ok: true, note: "exiting (no relauncher for this OS)" };
+    setTimeout(() => process.exit(EXIT_REQUESTED), 300);
+    return { ok: true, code: EXIT_REQUESTED, note: "exiting (no relauncher for this OS)" };
 }
-function exitNow(){ setTimeout(() => process.exit(0), 250); return { ok: true, note: "server exiting" }; }
+
+// ───────────────────────── v3992 -- a stop that was ASKED FOR has to say so ─────────────────────────
+// *** exitNow() EXITED 0, AND EXIT 0 IS THE ONE CODE swek_exit_report.bat STOPS THE WINDOW OVER. ***
+//
+// That file's RC==0 branch prints a nine-line box -- "It started, then chose to stop. That is not a crash, and
+// it is not success either -- this window should have kept serving." -- lists three suspects, and PAUSES. It was
+// written at v3085 on a premise that was true then: THE DAEMON NEVER EXITS 0 ON ITS OWN, so an exit 0 is
+// unexplained and worth holding the window for. POST /sys/exit makes that premise false.
+//
+// AND v3251 WIRED THE LAUNCHER ITSELF TO USE THAT ROUTE. swek_ask_exit.bat asks a running server to stand down
+// before reaching for taskkill -- the right change, and it turned a routine handoff into the exact shape the box
+// exists to flag. THE POLITE PATH LEAVES THE DEAD WINDOW THAT THE KILL DID NOT: a reap exits -1 with a fresh
+// supersede flag and closes silently, while an ask exits 0 with no flag and sits on "Press any key".
+//
+// *** WRITING swek_superseded.flag HERE WOULD HAVE BEEN THE WRONG FIX, AND IT IS THE ONE I REACHED FOR FIRST. ***
+// That flag says exactly one thing -- "an auto-update replaced this instance" -- and the report reads it out in
+// those words. Nothing replaces the instance here. It would also put a file in %TEMP% that outlives the process,
+// which is the v3250 shape: a flag nobody consumed silenced every later launch until freshness was added.
+//
+// The boundary between the two mechanisms is A SUCCESSOR, and it is disjoint:
+//     flag     -- someone else has the baton (applyUpdate, restart() on Win/Mac). Exit code stays 0.
+//     code 20  -- NOBODY has the baton, and that is what was asked for (here, and restart()'s no-relauncher
+//                 fallback above, which says so in its own note).
+// So exit 0 gets its meaning back: "it stopped and we cannot say why", which is precisely what the box describes.
+//
+// 20 is not arbitrary: node reserves 1-13 for its own fatal conditions and 128+n for signals, 64-78 are the BSD
+// sysexits and this is not an error, and 42 is already spoken for one file over (kpop-guard's documented
+// "0 launch / 42 skip", the idiom this borrows -- an exit code as a stated signal is not a new mechanism here).
+const EXIT_REQUESTED = 20;
+function exitNow(){
+    setTimeout(() => process.exit(EXIT_REQUESTED), 250);
+    return { ok: true, code: EXIT_REQUESTED, note: "server exiting (code " + EXIT_REQUESTED + " -- a requested stop, not a crash)" };
+}
 // v1502 — GitHub "installer": pull the newest published release zip into Downloads so the
 // scan/apply chain below can land it. Reuses githubBridge (token-aware, private repos ok).
 async function githubPull(force){
