@@ -76,15 +76,51 @@ function writeLocal(data, file = LOCAL) {
     try { fs.writeFileSync(file, JSON.stringify(data, null, 1)); return true; } catch { return false; }
 }
 
+/**
+ * v4004 -- THE HASH OF THE GATE FILE AT ITS LAST PASS, AND WHAT IT DOES *NOT* MEAN.
+ *
+ * Keith asked whether rig.html could show "whether the hash is already matched". It can, and the honest version
+ * of that answer is narrower than it sounds, so the narrowing is built into the name and carried to the page
+ * rather than left for a reader to infer.
+ *
+ * WHAT IS HASHED: the bytes of the -selfcheck.mjs file itself, nothing else.
+ * WHAT IT TELLS YOU: this gate FILE has not been edited since the last time it passed on this box.
+ * WHAT IT DOES NOT TELL YOU: whether it would still pass. A gate's verdict depends on THE CODE IT CHECKS, on
+ *   data files, on the tree around it -- none of which is in this hash. An unchanged gate over changed physics
+ *   is exactly the case where re-running matters most.
+ *
+ * SO IT NEVER SKIPS ANYTHING. It is shown, never acted on. A cache key that decided what to run would be the
+ * stale-suppression shape this tree keeps finding -- "nobody audits a record they believe is working" -- and it
+ * would be that shape at the one place where being wrong means a defect ships green.
+ */
 /** Record one finished run. `completed` false means the gate was killed at `ms`, which is a LOWER BOUND. */
-export function recordRun(gate, ms, completed, file = LOCAL) {
+export function recordRun(gate, ms, completed, file = LOCAL, hash = null) {
     if (!gate || typeof ms !== "number" || !isFinite(ms) || ms <= 0) return false;
     const d = readLocal(file);
     d.runs = d.runs || {};
-    d.runs[norm(gate)] = { ms: Math.round(ms), completed: !!completed, at: new Date().toISOString() };
+    const prev = d.runs[norm(gate)] || {};
+    d.runs[norm(gate)] = { ms: Math.round(ms), completed: !!completed, at: new Date().toISOString(),
+        // the hash is kept ONLY for a run that actually PASSED. A failing run's hash would answer
+        // "unchanged since it last failed", which nobody asked and which reads like the opposite.
+        passHash: (completed && hash) ? String(hash) : (prev.passHash || null),
+        passAt: (completed && hash) ? new Date().toISOString() : (prev.passAt || null) };
     d.note = "OBSERVED ON THIS BOX. Not shipped -- gate-timings.json is the reference and this is the local " +
              "comparison against it. Delete it and the scale returns to 1.";
     return writeLocal(d, file);
+}
+
+/**
+ * Has this gate FILE changed since it last passed here? Three answers, and the third is not the first.
+ *   "unchanged"  -- same bytes as the last passing run
+ *   "changed"    -- edited since
+ *   "unknown"    -- never passed here, or the file cannot be read. UNKNOWN IS NOT THE DEFAULT (v3103) and it
+ *                   is certainly not "unchanged": a box with no history would otherwise report every gate as
+ *                   settled, which is the most flattering possible reading of no information at all.
+ */
+export function passState(gate, currentHash, file = LOCAL) {
+    const r = canonicalRuns(file)[norm(gate)];
+    if (!r || !r.passHash || !currentHash) return { state: "unknown", passAt: (r && r.passAt) || null };
+    return { state: r.passHash === String(currentHash) ? "unchanged" : "changed", passAt: r.passAt || null };
 }
 
 /** The runs map with separators canonicalised. A gate recorded under BOTH spellings -- which is what a box that
