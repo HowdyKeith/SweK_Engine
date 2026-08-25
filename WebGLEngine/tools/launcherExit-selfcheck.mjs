@@ -100,9 +100,21 @@ const src = fs.readFileSync(BAT, "utf8");
     // SLICE THE BRANCH AND LOOK AT IT. My first attempt here was a lookahead regex so clever it failed on a
     // file that was CORRECT -- the gate said FAIL while the batch script was right. A CHECK TOO CLEVER TO DEBUG
     // IS A CHECK THAT GETS DELETED, and a gate that cries wolf on good code teaches you to ignore it.
-    const supStart = src.indexOf('if "%SUPERSEDED%"=="1"');
-    const supEnd = src.indexOf('if not "%RC%"=="0"', supStart);
-    const supBranch = supStart >= 0 && supEnd > supStart ? src.slice(supStart, supEnd) : "";
+    // v3992 -- *** THIS SCANNED A REGION FOR THE LITERAL WORD `pause` AND COUNTED IT INSIDE A REM COMMENT. ***
+    // v3992 inserted a code-20 branch between the supersede branch and the crash branch, with a REM header that
+    // explains what the RC==0 box does -- and that explanation contains the word "pause". The slice below runs
+    // between those two markers, so the new comment landed inside it and this check went RED against a batch
+    // file that was entirely correct, for the second time in its own history (line 100 records the first).
+    //
+    // A CHECK ABOUT WHAT A BRANCH *DOES* MUST NOT READ WHAT ITS COMMENTS *SAY*. This is the same shape as the
+    // v3990 slip one gate over, where a gate's own <!-- --> header failed the check the header was describing.
+    // Only this one check needs it: every other assertion in this file tests for a specific code marker rather
+    // than sweeping a region for a common English word.
+    const codeOnlyBat = (t) => t.split(/\r?\n/).filter((l) => !/^\s*REM\b/i.test(l)).join("\n");
+    const code = codeOnlyBat(src);
+    const supStart = code.indexOf('if "%SUPERSEDED%"=="1"');
+    const supEnd = code.indexOf('if not "%RC%"=="0"', supStart);
+    const supBranch = supStart >= 0 && supEnd > supStart ? code.slice(supStart, supEnd) : "";
     ok("!! a superseded instance does not pause", supBranch.length > 0 && !supBranch.includes("pause") && supBranch.includes("EXPECTED, not a crash"),
        "the supersede branch is " + supBranch.length + " chars and contains no `pause`. Keith: 'the only error is that the dos window did not exit without pressing a key.' THE WINDOW NOW CLOSES ON ITS OWN when the exit was an update. A PROMPT THAT FIRES ON A NORMAL EVENT TRAINS YOU TO DISMISS IT -- and then it is there when it matters and you dismiss that one too.");
 }

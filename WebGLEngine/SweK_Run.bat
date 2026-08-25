@@ -53,6 +53,15 @@ if "%FRESH%"=="1" (
     echo [SweK] handoff -- the new build has the baton. Closing this window.
     exit /b 0
 )
+REM v3992 -- a REQUESTED stop (POST /sys/exit -> sysadminBridge.exitNow) exits 20, not 0. It is not a handoff --
+REM nobody has the baton -- so the flag above cannot speak for it, and it is not a crash either, so the pause
+REM below must not catch it. This branch is the difference between the two, and it has to sit ABOVE the crash
+REM message because 20 is nonzero and that message tests only "not 0".
+if "%CODE%"=="20" (
+    echo.
+    echo [SweK] the ai-bridge was asked to stop ^(code 20^) and did. Closing this window.
+    exit /b 0
+)
 if "%CODE%"=="0" exit /b 0
 
 echo.

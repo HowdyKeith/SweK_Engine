@@ -41,6 +41,12 @@ if [ -f "$FLAG" ]; then
     echo "[SweK] handoff flagged but no runnable script at $NEXT_SH -- staying put."
 fi
 
+# v3992 -- a REQUESTED stop (POST /sys/exit -> sysadminBridge.exitNow) exits 20. Not a handoff, so the flag
+# branch above cannot speak for it; not a crash, so it must not reach the "press return to close" below.
+if [ "$CODE" = "20" ]; then
+    echo "[SweK] the ai-bridge was asked to stop (code 20) and did. Closing this window."
+    exit 0
+fi
 [ "$CODE" = "0" ] && exit 0
 echo ""
 echo "[SweK] the ai-bridge exited with code $CODE. The reason is above this line."

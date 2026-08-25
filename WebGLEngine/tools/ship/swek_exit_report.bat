@@ -38,6 +38,26 @@ if "%SUPERSEDED%"=="1" (
     exit /b 0
 )
 
+REM v3992 -- *** A STOP THAT WAS ASKED FOR IS NOT AN EVENT, AND UNTIL NOW IT LOOKED LIKE THE WORST KIND. ***
+REM
+REM exitNow() -- what POST /sys/exit calls -- used to exit 0, and 0 falls into the box at the bottom of this
+REM file: "this window should have kept serving", three suspects, and a pause. So the server.html Shut Down
+REM button, and swek_ask_exit.bat (v3251, which asks a running server to stand down before reaching for
+REM taskkill), both ended on a diagnostic that describes something going wrong.
+REM
+REM THE POLITE PATH LEFT THE DEAD WINDOW THAT THE KILL DID NOT: a reap exits -1 with a fresh supersede flag and
+REM closes silently above; an ask exited 0 with no flag and sat on "Press any key" forever.
+REM
+REM The flag is NOT the answer here -- it says "an auto-update replaced this instance" and nothing replaced it.
+REM sysadminBridge.exitNow() now exits 20 instead, so the fact travels in the one channel this file already
+REM reads: %1. Exit 0 keeps its box, and keeps its meaning -- "it stopped and we cannot say why".
+if "%RC%"=="20" (
+    echo.
+    echo [SweK] the ai-bridge was ASKED to stop ^(exit code 20^) and did. That is not a crash.
+    echo [SweK] nothing took over the port -- relaunch when you want it back. This window is closing on its own.
+    endlocal
+    exit /b 0
+)
 if not "%RC%"=="0" (
     echo.
     echo [SweK] the ai-bridge exited with code %RC%. The reason is above this line.
@@ -58,8 +78,9 @@ echo  The usual causes, most likely first:
 echo    1. An auto-update replaced this instance but did not leave
 echo       its marker. The NEW build is probably already serving --
 echo       check http://127.0.0.1:8787/health before relaunching.
-echo    2. Something asked it to stop (a /restart or shutdown route,
-echo       or Ctrl+C in this window).
+echo    2. Ctrl+C in this window. ^(A shutdown ASKED for through
+echo       /sys/exit says so itself since v3992 -- it exits 20, and
+echo       the branch above catches it. So it is not this.^)
 echo    3. It bound the port, then had nothing left keeping it alive.
 echo.
 echo  Scroll UP: the last lines before this box are the server's own
