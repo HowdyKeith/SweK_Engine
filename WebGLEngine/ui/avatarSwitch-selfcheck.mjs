@@ -49,16 +49,29 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
 
 // ---- 1. THREE MODES, CYCLING, WRAPPING ------------------------------------------------------------------------
 {
-    ok("!! five surfaces, cheapest first: SVG robot, rigged GLB, Blobulator, WebGPU Blobulator, talking head",
-       MODES.length === 5 && MODES.map((m) => m.id).join(",") === "svg,rigged,blob,blobgpu,thead",
-       MODES.map((m) => m.id).join(" -> ") + " — the two heavy ones are LAST on purpose, so a stray click lands " +
+    ok("!! six surfaces, cheapest first: SVG robot, rigged GLB, Blobulator, WebGPU Blobulator, talking head, face muscles",
+       MODES.length === 6 && MODES.map((m) => m.id).join(",") === "svg,rigged,blob,blobgpu,thead,facemuscles",
+       MODES.map((m) => m.id).join(" -> ") + " — the HEAVY ones are LAST on purpose, so a stray click lands " +
        "on something cheap rather than starting a 12 MB download");
     ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
        nextMode("svg") === "rigged" && nextMode("rigged") === "blob" && nextMode("blob") === "blobgpu"
-       && nextMode("blobgpu") === "thead" && nextMode("thead") === "svg");
-    ok("!! the two expensive modes DECLARE their cost, so the button can say it before the click",
-       MODES.filter((m) => m.heavy).length === 2 &&
+       && nextMode("blobgpu") === "thead" && nextMode("thead") === "facemuscles" && nextMode("facemuscles") === "svg");
+    // v3998 -- Keith: "we added the Google face muscles api ability, can we rotate that as the next choice after
+    // Wireframe?" The POSITION is the request, so a later reorder that kept both modes but separated them would
+    // be a silent undo of it. Asserted as ADJACENCY rather than as an index, so inserting a cheap mode earlier
+    // in the list stays free.
+    ok("!! *** the face-muscles surface is the NEXT CHOICE AFTER the talking head ***",
+       MODES.findIndex((m) => m.id === "facemuscles") === MODES.findIndex((m) => m.id === "thead") + 1,
+       "audio amplitude drives one and MediaPipe blendshapes -- Google's own word for muscle activations -- " +
+       "drive the other: same idea, opposite input, and they belong one click apart");
+    // ...and the cheap-first principle above has to SURVIVE the addition, or the note explaining it is decoration
+    ok("!! ...and every heavy surface is still at the END, which is what makes a stray click safe",
+       MODES.map((m) => !!m.heavy).lastIndexOf(false) < MODES.findIndex((m) => !!m.heavy),
+       MODES.map((m) => m.id + (m.heavy ? "*" : "")).join(" -> ") + "   (* = declares a download cost)");
+    ok("!! the three expensive modes DECLARE their cost, so the button can say it before the click",
+       MODES.filter((m) => m.heavy).length === 3 &&
        /12 MB/.test(MODES.find((m) => m.id === "thead").heavy) &&
+       /12 MB/.test(MODES.find((m) => m.id === "facemuscles").heavy) &&
        /WebGPU/.test(MODES.find((m) => m.id === "blobgpu").heavy),
        "MediaPipe is ~12 MB on first use and WebGPU is not everywhere — a cost discovered after the click is a " +
        "cost the reader never agreed to");
@@ -103,9 +116,9 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // navigator is getter-only on Node 22, so it is REDEFINED rather than assigned
     Object.defineProperty(globalThis, "navigator", { value: { gpu: {} }, configurable: true, writable: true });
     await sw.set("blobgpu");
-    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across five modes",
+    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across six modes",
        iframes(host).length === 1 && /blobulator-gpu/.test(iframes(host)[0].src),
-       "five surfaces and one context: with two WebGL frames and a WebGPU one in the list, an accumulating panel " +
+       "six surfaces and one context: with two WebGL frames and a WebGPU one in the list, an accumulating panel " +
        "would be running three renderers behind a gauge row");
     await sw.set("blob");
     ok("!! ...and switching again REPLACES it rather than adding a second",

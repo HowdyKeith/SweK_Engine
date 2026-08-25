@@ -131,6 +131,38 @@
 </style>
 </head>
 <body>
+<script>
+/* v3998 -- ?embed=1, READ BECAUSE THE CALLER SENDS IT.
+   avatar-server.html mounts this page as an avatar view and appends ?embed=1, and
+   ui/avatarSwitch-embed-selfcheck.mjs's rule is the class rather than the incident: "every mode whose src
+   carries a query flag must be a page that reads that flag". blob-avatar.html went a hundred versions
+   receiving that flag and containing zero occurrences of the word, rendering every local control on top of
+   the avatar inside a 143x210 panel. Adding this page to a picker without this block would have reproduced
+   that defect knowingly.
+
+   WHAT SURVIVES IN THE PANEL IS THE ROBOT, because that is the face-muscles avatar: MediaPipe's blendshapes
+   -- the Google API's own name for muscle activations -- driving a face. The webcam feed with its 478
+   landmarks and the metrics grid are DIAGNOSTICS for the full page; in a small panel they would crowd out the
+   thing the panel is for. The start button stays: a camera that opened itself on load would be a permission
+   prompt nobody asked for. */
+(function () {
+  if (new URLSearchParams(location.search).get("embed") !== "1") return;
+  document.documentElement.setAttribute("data-embed", "1");
+  var st = document.createElement("style");
+  st.textContent =
+    'html[data-embed="1"] .header h1, html[data-embed="1"] .header .sub,' +
+    'html[data-embed="1"] #metrics, html[data-embed="1"] .status { display: none !important; }' +
+    /* the webcam and the metrics-driven mirror are the other two panels; the robot is the second */
+    'html[data-embed="1"] .panels { display: block !important; }' +
+    'html[data-embed="1"] .panels > .panel:nth-child(1),' +
+    'html[data-embed="1"] .panels > .panel:nth-child(3) { display: none !important; }' +
+    'html[data-embed="1"] .panels > .panel:nth-child(2) h2 { font-size: 11px; opacity: .75; }' +
+    'html[data-embed="1"] .wrap { padding: 4px !important; }' +
+    'html[data-embed="1"] .header { padding: 0 0 4px !important; border: 0 !important; }' +
+    'html[data-embed="1"] body { overflow: hidden; }';
+  document.head.appendChild(st);
+})();
+</script>
 <div class="wrap">
 
   <div class="header">

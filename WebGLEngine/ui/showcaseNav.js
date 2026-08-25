@@ -12,8 +12,33 @@
     { id: "head",       name: "Wireframe Head",  href: "/thead.html",        tag: "show + drive" },
     { id: "battleship", name: "ABYSS Battleship",href: "/index.html?forceEngine=1&go=battleship&clean=1", tag: "flagship client" },
   ];
+  // *** v3998 -- NOT WHEN EMBEDDED. Keith: "it shows the title 'wireframe head Show' at the top, and that
+  // should not be seen on Server.html." ***
+  //
+  // This pill is a GALLERY nav: back to the front door, prev/next through the five curated pieces. Inside an
+  // iframe there is no gallery to navigate -- avatar-server.html hosts thead.html in a small panel and its own
+  // View picker is the navigation -- so the pill is a floating title bar sitting on top of the avatar's head,
+  // with two arrows that would navigate the PANEL to a full-page showcase.
+  //
+  // *** thead.html ALREADY HIDES ITS OWN CHROME ON ?embed=1 (v3656) AND THIS PILL SURVIVED IT, because that
+  // hide list names elements in the page's markup -- #tag, #mood, #cap, #navpad, #bar -- and this one is
+  // INJECTED BY A SCRIPT AFTER THE FACT. A hide list cannot name an element that does not exist yet. *** So the
+  // guard belongs here, in the thing doing the injecting, rather than as a sixth id in a list on every page
+  // that ever loads this file.
+  //
+  // TWO TESTS, BECAUSE THEY CATCH DIFFERENT HOSTS: ?embed=1 is this tree's stated convention and is what
+  // avatar-server.html and ui/avatarSwitch.js send; the frame test catches any other embedder that never got
+  // the memo. Either one is enough to stay silent, and staying silent is the safe direction -- a missing nav
+  // pill on a full-page showcase is a nuisance, while one welded over an avatar is what Keith is looking at.
+  function isEmbedded() {
+    try { if (new URLSearchParams(location.search).get("embed") === "1") return true; } catch (e) {}
+    try { if (window.top !== window.self) return true; } catch (e) { return true; }  // cross-origin frame throws
+    return false;
+  }
+
   function boot() {
     try {
+      if (isEmbedded()) return;
       var id = window.SHOWCASE_ID || "";
       var i = PIECES.findIndex(function (p) { return p.id === id; });
       var prev = i >= 0 ? PIECES[(i - 1 + PIECES.length) % PIECES.length] : null;
