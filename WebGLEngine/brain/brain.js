@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4009";   // v4009 -- orphanScan.mjs's rule 3 (path-substring) was satisfied by a
+const BRAIN_BUILD = "v4010";   // v4010 -- Keith's overnight /loop, pointed at curriculum.mjs (already in this
+// tree, proposes ungraded physics and doorless modules, never grades). First proposal built: blobVitalsBind.mjs
+// wires physics/blobVitals.js's four gauges to the roundhouse, graded against the four real bugs that shipped
+// them, not a fabricated failure. No plant declared -- three gauges are UI/wiring-bug detectors and the fourth
+// is a proven bound, so plantRefused carries a measured reason (beam's/compose's convention). Sabotage-tested.
+// Previously v4009 --   // v4009 -- orphanScan.mjs's rule 3 (path-substring) was satisfied by a
 // hand-written report module's own inert data table, un-orphaning render/SSAOPass.js by accident and
 // getting it deleted from the baseline as false "progress" -- REPORT_MODULE list + general HTML
 // title-attribute stripping, restored to the baseline, sabotage-tested. Also: patchBase-selfcheck read raw
