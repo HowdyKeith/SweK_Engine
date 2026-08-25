@@ -51,6 +51,13 @@ import { langevinDevice } from "./langevinBind.mjs";        // v3290 - stochasti
 import { rmtDevice } from "./rmtBind.mjs";                  // v3291 - random matrix theory
 import { percolationDevice } from "./percolationBind.mjs";  // v3292 - bond percolation
 import { diffusionDevice } from "./diffusionBind.mjs";      // v3293 - self-diffusion, two routes
+import { blackbodyDevice } from "./blackbodyBind.mjs";      // v4017 - Wien peaks, the Gamma(s)zeta(s) identity
+import { debyeDevice } from "./debyeBind.mjs";              // v4017 - Debye vs Einstein; the low-T slope is blackbody's integral
+import { sackurTetrodeDevice } from "./sackurTetrodeBind.mjs";  // v4017 - the classical limit bec and fermi collapse onto; Gibbs paradox
+import { fermiDevice } from "./fermiBind.mjs";              // v4017 - degenerate gas; the one-sign mirror of the Bose integral
+import { paramagnetDevice } from "./paramagnetBind.mjs";    // v4017 - Brillouin + Schottky; the plant is exact at spin-half
+import { chemicalPotentialDevice } from "./chemicalPotentialBind.mjs";  // v4017 - three gases, one constraint; the ordering IS the statistics
+import { becDevice } from "./becBind.mjs";                  // v4017 - condensation, and no BEC in 2D because zeta(1) diverges
 import { hydrostaticDevice } from "./hydrostaticBind.mjs";  // v3294 - SPH hydrostatic column
 import { wolffDevice } from "./wolffBind.mjs";              // v3295 - Wolff cluster algorithm
 import { spatialAgreementDevice } from "./spatialAgreementBind.mjs";  // v3296 - five spatial structures
@@ -212,6 +219,13 @@ const REGISTRY = {
     rmt: async () => rmtDevice,
     percolation: async () => percolationDevice,
     diffusion: async () => diffusionDevice,
+    blackbody: async () => blackbodyDevice,
+    debye: async () => debyeDevice,
+    sackurTetrode: async () => sackurTetrodeDevice,
+    fermi: async () => fermiDevice,
+    paramagnet: async () => paramagnetDevice,
+    chemicalPotential: async () => chemicalPotentialDevice,
+    bec: async () => becDevice,
     hydrostatic: async () => hydrostaticDevice,
     wolff: async () => wolffDevice,
     spatial: async () => spatialAgreementDevice,
