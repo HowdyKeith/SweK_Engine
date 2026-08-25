@@ -100,6 +100,43 @@ ok("the tool it runs is actually in the tree", fs.existsSync(path.join(ROOT, "to
     ok("a box without bun gets an explanation rather than a spawn error", /not on PATH on this box/.test(server));
 }
 
+// ---- 4b. THE BENCHMARK HALF (v3997) ---------------------------------------------------------------------------
+//
+// *** A SECOND FIXED ROUTE, NOT A SCRIPT PARAMETER ON THE FIRST ONE. *** The obvious way to add a second tool to
+// this page is `&script=` on /runtime/surface, and that is precisely the remote shell the section above exists to
+// forbid. So /runtime/bench hardcodes its own script and allowlists only the runtime, and every assertion above
+// is repeated here rather than assumed to carry over.
+{
+    const route = (server.match(/\/runtime\/bench[\s\S]{0,1600}/) || [""])[0];
+    ok("!! the bench buttons call the route that spawns tools/roundhouse/runtimeBench.mjs",
+        /\/runtime\/bench\?rt=/.test(pageCode) && /runBench\("node"\)/.test(pageCode) && /runBench\("bun"\)/.test(pageCode));
+    ok("the tool it runs is actually in the tree",
+        fs.existsSync(path.join(ROOT, "tools", "roundhouse", "runtimeBench.mjs")));
+    ok("!! *** the bench route picks the runtime from an ALLOWLIST too ***",
+        /=== "bun" \? "bun" : "node"/.test(route),
+        "adding &script= to the surface route would have been the remote shell section 4 forbids");
+    ok("!! ...and ITS script is fixed as well, not supplied by the caller",
+        /runtimeBench\.mjs/.test(route) && !/searchParams\.get\("(cmd|script|exec|path)"\)/.test(route));
+    ok("Node is spawned as process.execPath here as well", /process\.execPath/.test(route));
+    ok("...and a box without bun gets the same explanation", /not on PATH on this box/.test(route));
+
+    // *** THE HONESTY PROPERTY: THIS PAGE MUST NOT PICK A WINNER. *** The measured result is that the two
+    // runtimes trade places by a factor of ~75 depending on the shape of the inner loop, so a page that printed
+    // "Bun is faster" would be wrong about half its own table.
+    ok("!! the page states the NOISE FLOOR and calls anything inside it a tie",
+        /1\.35/.test(page) && /tie/.test(pageCode),
+        "perfLedger measured this tree's timing noise at 13% CV and a 1.35x worst-case spread; a ratio inside " +
+        "that is not a result, and a page that rendered it as one would be manufacturing findings");
+    ok("!! ...and it names BOTH directions rather than declaring a winner",
+        /faster/.test(pageCode) && /slower/.test(pageCode) && /15&times; faster/.test(page) && /5&times; slower/.test(page));
+    ok("!! ...and it flags a DECLARED-STABLE workload whose answers differ, which is the only real defect here",
+        /DECLARED STABLE/.test(pageCode),
+        "a speed comparison between two runtimes computing different numbers is a comparison of two programs");
+    ok("the page's noise floor is the one runtimeBench exports, not a second copy of the number",
+        /const BENCH_NOISE = 1\.35/.test(pageCode) &&
+        /NOISE_FLOOR = 1\.35/.test(fs.readFileSync(path.join(ROOT, "tools", "roundhouse", "runtimeBench.mjs"), "utf8")));
+}
+
 // ---- 5. the claim the page makes about ws, which is the one dependency finding --------------------------------
 // Pinned because it is the actionable half of the whole survey: eleven optional packages were probed and exactly
 // one behaves differently, and the difference is not cosmetic -- server.js falls back to a null-object wss.
