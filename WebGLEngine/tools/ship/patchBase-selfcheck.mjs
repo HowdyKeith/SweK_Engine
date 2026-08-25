@@ -2,6 +2,7 @@
 // *** UNSTATED IS NOT A WORSE MISMATCH. IT IS AN ABSENCE OF EVIDENCE, and collapsing the two is how v3373's
 // overreach happened: I judged an unstated-base patch against my tree and published "those claims were WRONG". ***
 import { statedBase, inspectPatch, auditable, treeVersionOf, UNSTATED, MATCHES, DIFFERS } from "./patchBase.mjs";
+import { noComments } from "./sourceScan.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -95,7 +96,14 @@ ok("!! ...and the three verdicts are genuinely distinct values",
     }
 
     // *** THE READER IS DELEGATED AND THAT IS THE POINT. ***
-    const src = fs.readFileSync(path.join(ENG, "tools", "ship", "patchBase.mjs"), "utf8");
+    // v4009 -- noComments(), NOT THE RAW TEXT. v3941's own JSDoc block explains, in prose, why the top-level
+    // shape lives here rather than in sysadminBridge -- "had grown its OWN central-directory walk to get it --
+    // 0x02014b50 in the bridge" -- and that HISTORY, quoted for a reader, is not a second reader. Testing raw
+    // text against a magic-byte literal cannot tell a comment describing a fixed bug from a comment BEING one;
+    // this is the same codeOnly/noComments pair this tree keeps re-deriving (v3526, and twice already this
+    // session in patchScanDoor-selfcheck.mjs and bunNative-selfcheck.mjs) -- comments stripped, strings kept,
+    // because a real second reader would still show up as CODE.
+    const src = noComments(fs.readFileSync(path.join(ENG, "tools", "ship", "patchBase.mjs"), "utf8"));
     ok("!! *** zip reading is DELEGATED, never reimplemented here ***",
         /readCentralDirectory/.test(src) && /inflateEntry/.test(src) && !/0x02014b50|endOfCentralDir/.test(src),
         "safeExtract owns readCentralDirectory and moduleHistory owns inflateEntry, whose header says reading a " +

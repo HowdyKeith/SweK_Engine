@@ -2795,7 +2795,13 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4008";   // v4008 -- storage-quota escalation via navigator.storage.persist(),
+const BRAIN_BUILD = "v4009";   // v4009 -- orphanScan.mjs's rule 3 (path-substring) was satisfied by a
+// hand-written report module's own inert data table, un-orphaning render/SSAOPass.js by accident and
+// getting it deleted from the baseline as false "progress" -- REPORT_MODULE list + general HTML
+// title-attribute stripping, restored to the baseline, sabotage-tested. Also: patchBase-selfcheck read raw
+// text and tripped on its own comment quoting a magic byte as history (noComments, not raw). Also: six
+// front-door pages (five physics, one my own v4007 page) shipped with no link from server.html -- linked.
+// Previously v4008 --   // v4008 -- storage-quota escalation via navigator.storage.persist(),
 // confirmed real (permissions.query reports "prompt") and bounded to never promise a number -- it reports
 // what the browser actually granted. Also: codeOnly() silently mangles raw HTML, same defect class as
 // patchScanDoor/bunNative this session, on the HTML side this time. Previously v4007 --   // v4007 -- a page that answers whether this box can run a generative model
