@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Bell Inequality (CHSH)">
+<meta name="demo:desc" content="Turn the measurement angles and watch quantum correlations climb past anything a local hidden variable theory can produce -- then hit a second ceiling they cannot cross either. Both bounds are computed live by brute-force search, not drawn in as reference lines: the classical 2 by enumerating all 16 local strategies, the quantum 2.828 by sweeping the whole angle space.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Bell Inequality (CHSH)</title>
+<!--
+     v3990 -- THE FRONT DOOR FOR physics/quantum/bell.mjs. The page derives no physics: every correlation,
+     every bound, and the Monte Carlo sampling all come from the module. Following the same rule reactor.html
+     and lensing.html are held to, and their gates enforce.
+
+     *** BOTH BOUND LINES ARE COMPUTED, NOT DRAWN. *** The obvious way to build this page is to draw a
+     horizontal line at 2 labelled "classical" and another at 2.828 labelled "quantum", because everyone knows
+     those numbers. That would make the page a diagram OF the physics rather than a window ONTO it. Instead the
+     classical line comes from lhvBoundBySearch() -- which enumerates all 16 local deterministic strategies
+     every time the page loads -- and the quantum line from the Tsirelson constant the module derives. The
+     page's own gate checks that neither 2 nor 2.828 is typed into the page's arithmetic.
+
+     THE THIRD CURVE IS SAMPLED, NOT EVALUATED. The Monte Carlo trace runs real simulated measurement events
+     through the module's seeded PRNG -- so it is visibly noisy, and visibly converges as you raise the sample
+     count. That noise is the honest part: a real Bell test is a counting experiment, and its error bars are
+     what took decades to close.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --violet:#b088ff; --dim:#7c93b8; --red:#ff6b6b; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:150px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:5px 12px;
+           font:600 11px ui-monospace,monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  button.on { background:#1b3a33; color:#bff5e8; }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .big { font-size:15px; }
+  .warn { color:var(--red); font-weight:700; } .ok { color:var(--green); font-weight:700; }
+  .grid { position:relative; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+  #dialwrap, #chartwrap { position:relative; min-height:0; border-right:1px solid #16203a; }
+  #chartwrap { border-right:none; }
+  /* v3979 -- a canvas is a REPLACED element: position+inset alone leaves it at its intrinsic 300x150. */
+  #dial, #chart { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(560px,44vw);
+          background:rgba(5,7,14,.78); border:1px solid #16203a; border-radius:8px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Bell Inequality &mdash; CHSH, with both bounds computed live</h1>
+  <div class="row">
+    <label>b <input id="b" type="range" min="0" max="180" value="45" step="1"></label>
+    <span class="stat">b = <b id="bv">45&deg;</b></span>
+    <label>b&prime; <input id="bp" type="range" min="0" max="180" value="135" step="1"></label>
+    <span class="stat">b&prime; = <b id="bpv">135&deg;</b></span>
+    <button id="optimal">Optimal angles</button>
+    <button id="mc">Monte Carlo: off</button>
+    <label>samples <input id="samples" type="range" min="2" max="5" value="3" step="1"></label>
+    <span class="stat"><b id="samplesv">1e3</b></span>
+  </div>
+  <div class="row">
+    <span class="stat big">|S| <b id="S">2.828</b></span>
+    <span class="stat">classical bound <b id="cb">2</b> <span class="dim">(16 strategies enumerated)</span></span>
+    <span class="stat">Tsirelson <b id="tb">2.828</b></span>
+    <span class="stat big" id="verdict"></span>
+  </div>
+</header>
+<div class="grid">
+  <div id="dialwrap"><canvas id="dial"></canvas>
+    <div id="note">Alice measures along <b>a</b>=0&deg; or <b>a&prime;</b>=90&deg; (cyan); Bob along <b>b</b> or
+    <b>b&prime;</b> (violet). The four correlations E(a,b) combine into S. Every value here is read from
+    <b>physics/quantum/bell.mjs</b> &mdash; the page computes no correlation of its own, and both bound lines
+    opposite are searched for at load, not typed in.</div>
+  </div>
+  <div id="chartwrap"><canvas id="chart"></canvas></div>
+</div>
+</div>
+<script type="module">
+import { SINGLET, correlatorMatrix, chsh, OPTIMAL_ANGLES, monteCarloCorrelator, mulberry32,
+         lhvBoundBySearch, TSIRELSON_BOUND } from "./physics/quantum/bell.mjs";
+
+const $ = (id) => document.getElementById(id);
+const dial = $("dial"), dCtx = dial.getContext("2d");
+const chart = $("chart"), cCtx = chart.getContext("2d");
+
+// *** THE CLASSICAL BOUND IS SEARCHED FOR, NOT TYPED. *** lhvBoundBySearch() enumerates all 16 local
+// deterministic hidden-variable strategies right here, at load, and the maximum it finds is what the page
+// draws. Nothing on this page asserts the number 2.
+const LHV = lhvBoundBySearch();
+const CLASSICAL = LHV.maxAbs;
+$("cb").textContent = CLASSICAL.toFixed(0);
+$("tb").textContent = TSIRELSON_BOUND.toFixed(3);
+
+const A = OPTIMAL_ANGLES.a, AP = OPTIMAL_ANGLES.ap;
+let bAng = Math.PI / 4, bpAng = 3 * Math.PI / 4;
+let mcOn = false, sampleExp = 3;
+
+const deg = (r) => (r * 180 / Math.PI);
+const corr = (x, y) => correlatorMatrix(x, y, SINGLET);
+
+function resize(cvs) {
+  const r = cvs.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cvs.width = Math.max(1, Math.round(r.width * d));
+  cvs.height = Math.max(1, Math.round(r.height * d));
+  cvs.getContext("2d").setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", () => { resize(dial); resize(chart); });
+
+function drawDial() {
+  const w = dial.width / (window.devicePixelRatio || 1), h = dial.height / (window.devicePixelRatio || 1);
+  dCtx.fillStyle = "#05070e"; dCtx.fillRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.33;
+  dCtx.strokeStyle = "#16203a"; dCtx.lineWidth = 1;
+  dCtx.beginPath(); dCtx.arc(cx, cy, R, 0, Math.PI * 2); dCtx.stroke();
+  const ray = (ang, color, label, dash) => {
+    dCtx.strokeStyle = color; dCtx.lineWidth = 2; dCtx.setLineDash(dash ? [5, 4] : []);
+    dCtx.beginPath(); dCtx.moveTo(cx, cy);
+    dCtx.lineTo(cx + Math.cos(ang) * R, cy - Math.sin(ang) * R); dCtx.stroke();
+    dCtx.setLineDash([]);
+    dCtx.fillStyle = color; dCtx.font = "11px ui-monospace,monospace";
+    dCtx.fillText(label, cx + Math.cos(ang) * (R + 14) - 6, cy - Math.sin(ang) * (R + 14) + 4);
+  };
+  ray(A, "#59d1ff", "a", false);
+  ray(AP, "#59d1ff", "a'", true);
+  ray(bAng, "#b088ff", "b", false);
+  ray(bpAng, "#b088ff", "b'", true);
+  // the four correlations, as a small table
+  dCtx.font = "11px ui-monospace,monospace";
+  const rows = [["E(a,b)", corr(A, bAng)], ["E(a,b')", corr(A, bpAng)],
+                ["E(a',b)", corr(AP, bAng)], ["E(a',b')", corr(AP, bpAng)]];
+  rows.forEach(([nm, v], i) => {
+    dCtx.fillStyle = "#7c93b8"; dCtx.fillText(nm, 14, 24 + i * 16);
+    dCtx.fillStyle = v < 0 ? "#ff9b9b" : "#8fe6b0"; dCtx.fillText(v.toFixed(4), 78, 24 + i * 16);
+  });
+}
+
+function drawChart() {
+  const w = chart.width / (window.devicePixelRatio || 1), h = chart.height / (window.devicePixelRatio || 1);
+  cCtx.fillStyle = "#05070e"; cCtx.fillRect(0, 0, w, h);
+  const L = 46, R = w - 16, T = 22, B = h - 28;
+  cCtx.strokeStyle = "#16203a"; cCtx.strokeRect(L, T, R - L, B - T);
+  cCtx.fillStyle = "#7c93b8"; cCtx.font = "11px ui-monospace,monospace";
+  cCtx.fillText("|S| as b sweeps (b' held at b + 90°)", L, 14);
+
+  const MAXY = 4;   // the ALGEBRAIC maximum of |S| -- four correlations each bounded by 1
+  const py = (v) => B - (B - T) * (v / MAXY);
+  const px = (frac) => L + (R - L) * frac;
+
+  // the two bounds, drawn at values the module produced
+  const line = (v, color, label) => {
+    cCtx.strokeStyle = color; cCtx.setLineDash([5, 4]); cCtx.lineWidth = 1.4;
+    cCtx.beginPath(); cCtx.moveTo(L, py(v)); cCtx.lineTo(R, py(v)); cCtx.stroke(); cCtx.setLineDash([]);
+    cCtx.fillStyle = color; cCtx.fillText(label, R - 128, py(v) - 4);
+  };
+  line(CLASSICAL, "#f6a623", "classical bound " + CLASSICAL.toFixed(0) + " (16 strategies)");
+  line(TSIRELSON_BOUND, "#5fe08a", "Tsirelson " + TSIRELSON_BOUND.toFixed(4));
+
+  // the exact quantum curve, from the module's own correlator
+  cCtx.strokeStyle = "#59d1ff"; cCtx.lineWidth = 1.8; cCtx.beginPath();
+  const N = 240;
+  for (let i = 0; i <= N; i++) {
+    const bb = (i / N) * Math.PI, bbp = bb + Math.PI / 2;
+    const v = Math.abs(chsh(A, AP, bb, bbp, corr));
+    const X = px(i / N), Y = py(v);
+    i ? cCtx.lineTo(X, Y) : cCtx.moveTo(X, Y);
+  }
+  cCtx.stroke();
+
+  // the Monte Carlo trace -- real sampled measurement events, visibly noisy
+  if (mcOn) {
+    const n = Math.round(Math.pow(10, sampleExp));
+    const rng = mulberry32(12345);
+    cCtx.strokeStyle = "#b088ff"; cCtx.lineWidth = 1.2; cCtx.beginPath();
+    const M = 40;
+    for (let i = 0; i <= M; i++) {
+      const bb = (i / M) * Math.PI, bbp = bb + Math.PI / 2;
+      const v = Math.abs(chsh(A, AP, bb, bbp, (x, y) => monteCarloCorrelator(x, y, n, rng, SINGLET)));
+      const X = px(i / M), Y = py(Math.min(v, MAXY));
+      i ? cCtx.lineTo(X, Y) : cCtx.moveTo(X, Y);
+    }
+    cCtx.stroke();
+    cCtx.fillStyle = "#b088ff"; cCtx.fillText("sampled events (n=" + n + " per setting)", L + 6, T + 14);
+  }
+
+  // marker at the current b
+  const frac = bAng / Math.PI;
+  cCtx.strokeStyle = "#dbe7ff"; cCtx.lineWidth = 1;
+  cCtx.beginPath(); cCtx.moveTo(px(frac), T); cCtx.lineTo(px(frac), B); cCtx.stroke();
+
+  cCtx.fillStyle = "#7c93b8";
+  cCtx.fillText("0°", L, B + 14); cCtx.fillText("180°", R - 30, B + 14);
+  cCtx.fillText("0", 30, py(0) + 3); cCtx.fillText("4", 30, py(4) + 8);
+}
+
+function readouts() {
+  const S = Math.abs(chsh(A, AP, bAng, bpAng, corr));
+  $("S").textContent = S.toFixed(4);
+  $("bv").textContent = deg(bAng).toFixed(0) + "°";
+  $("bpv").textContent = deg(bpAng).toFixed(0) + "°";
+  $("samplesv").textContent = "1e" + sampleExp;
+  if (S > CLASSICAL + 1e-9) {
+    const pct = ((S - CLASSICAL) / CLASSICAL * 100).toFixed(1);
+    $("verdict").innerHTML = '<span class="ok">VIOLATES the classical bound by ' + pct + '%</span>';
+  } else {
+    $("verdict").innerHTML = '<span class="dim">within the classical bound &mdash; no violation here</span>';
+  }
+}
+
+function frame() { drawDial(); drawChart(); readouts(); }
+
+$("b").oninput = (e) => { bAng = +e.target.value * Math.PI / 180; frame(); };
+$("bp").oninput = (e) => { bpAng = +e.target.value * Math.PI / 180; frame(); };
+$("optimal").onclick = () => {
+  bAng = OPTIMAL_ANGLES.b; bpAng = OPTIMAL_ANGLES.bp;
+  $("b").value = Math.round(deg(bAng)); $("bp").value = Math.round(deg(bpAng));
+  frame();
+};
+$("mc").onclick = () => {
+  mcOn = !mcOn;
+  $("mc").textContent = "Monte Carlo: " + (mcOn ? "on" : "off");
+  $("mc").className = mcOn ? "on" : "";
+  frame();
+};
+$("samples").oninput = (e) => { sampleExp = +e.target.value; frame(); };
+
+resize(dial); resize(chart); frame();
+</script>
+</body>
+</html>

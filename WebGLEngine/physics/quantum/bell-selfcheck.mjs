@@ -1,11 +1,15 @@
 // physics/quantum/bell-selfcheck.mjs
 //
 // Run: node physics/quantum/bell-selfcheck.mjs
+// RUNTIME 3.84s MEASURED (median of 3 -- 3747/3880/3843 -- with date(1) around the run), up from 1815ms before
+// section 5 was added. Section 5's two-parameter angle sweeps at 400x400 per state dominate; the rest is the
+// 24^4 four-angle sweep in section 4 and two Monte Carlo runs in section 2.
 "use strict";
 import {
     SINGLET, sigma, eigvec, kron,
     correlatorExact, correlatorMatrix, jointProbabilities, mulberry32, sampleMeasurement, monteCarloCorrelator,
     chsh, OPTIMAL_ANGLES, CLASSICAL_BOUND, TSIRELSON_BOUND, lhvBoundBySearch, chshMaxByAngleSweep,
+    partialSinglet, maxCHSHPartial,
 } from "./bell.mjs";
 
 let fails = 0;
@@ -110,7 +114,44 @@ console.log("\n4. *** THE QUANTUM BOUND IS FOUND, NOT ASSUMED -- A BRUTE-FORCE S
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n5. *** SABOTAGE ***");
+console.log("\n5. *** TSIRELSON GENERALISED: ANY ENTANGLEMENT VIOLATES BELL, ONLY MAXIMAL ENTANGLEMENT SATURATES ***");
+{
+    // The maximum CHSH for cos(t)|01> - sin(t)|10> is 2*sqrt(1+sin^2(2t)) -- the Horodecki criterion for this
+    // family, with Tsirelson as its t=pi/4 case. Checked against an INDEPENDENT 2D angle sweep at each t, so
+    // the closed form is graded rather than asserted.
+    ok("!! the generalised bound reduces to Tsirelson exactly at t=pi/4",
+        rel(maxCHSHPartial(Math.PI / 4), TSIRELSON_BOUND) < 1e-15,
+        maxCHSHPartial(Math.PI / 4) + " vs " + TSIRELSON_BOUND);
+
+    const sweep2D = (state, N) => {
+        let best = 0;
+        for (let i = 0; i < N; i++) { const b = (i / N) * Math.PI;
+            for (let j = 0; j < N; j++) { const bp = (j / N) * Math.PI;
+                const v = Math.abs(chsh(0, Math.PI / 2, b, bp, (x, y) => correlatorMatrix(x, y, state)));
+                if (v > best) best = v; } }
+        return best;
+    };
+    for (const t of [Math.PI / 4, 0.65, 0.5]) {
+        const swept = sweep2D(partialSinglet(t), 400);
+        ok(`t=${t.toFixed(4)}: the swept maximum matches 2*sqrt(1+sin^2 2t)`,
+            rel(swept, maxCHSHPartial(t)) < 1e-4,
+            `swept ${swept.toFixed(8)} vs closed form ${maxCHSHPartial(t).toFixed(8)}`);
+    }
+    ok("!! *** ANY entanglement at all violates the classical bound -- even barely-entangled states ***",
+        [0.05, 0.2, 0.5, 1.3].every((t) => maxCHSHPartial(t) > CLASSICAL_BOUND),
+        [0.05, 0.2, 0.5].map((t) => maxCHSHPartial(t).toFixed(4)).join(", "));
+    ok("...and the two SEPARABLE endpoints t=0 and t=pi/2 do NOT",
+        Math.abs(maxCHSHPartial(0) - CLASSICAL_BOUND) < 1e-15 && Math.abs(maxCHSHPartial(Math.PI / 2) - CLASSICAL_BOUND) < 1e-14,
+        "t=0 -> " + maxCHSHPartial(0) + ", t=pi/2 -> " + maxCHSHPartial(Math.PI / 2));
+    ok("!! ...so ONLY maximal entanglement saturates Tsirelson -- the sharp test is the bound, not the violation",
+        [0.6, 0.65, 0.7, 0.9].every((t) => maxCHSHPartial(t) < TSIRELSON_BOUND),
+        "t=0.65 falls short by " + (TSIRELSON_BOUND - maxCHSHPartial(0.65)).toFixed(6));
+    report("this is why the device's planted error is PARTIAL ENTANGLEMENT: it still violates Bell, so every " +
+           "'does it violate?' check passes it, and only the Tsirelson comparison catches it");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n6. *** SABOTAGE ***");
 {
     // A separable (product) state should give NO violation at all -- E(a,b) should not depend on the RELATIVE
     // angle the way the singlet's does, and CHSH must stay within the classical bound.
