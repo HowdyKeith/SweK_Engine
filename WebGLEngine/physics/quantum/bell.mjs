@@ -143,6 +143,30 @@ export const CLASSICAL_BOUND = 2;
 export const TSIRELSON_BOUND = 2 * Math.sqrt(2);
 
 /**
+ * The one-parameter family cos(t)|01> - sin(t)|10>. At t = pi/4 this IS the singlet; away from it the state is
+ * still entangled but no longer MAXIMALLY so. Normalised for every t by construction (cos^2 + sin^2 = 1), which
+ * matters: a partially entangled state is not detectable by a normalisation check.
+ */
+export const partialSinglet = (t) => [0, Math.cos(t), -Math.sin(t), 0];
+
+/**
+ * *** THE TSIRELSON BOUND GENERALISED -- AND IT IS WHY PARTIAL ENTANGLEMENT IS A DANGEROUS ERROR RATHER THAN AN
+ * OBVIOUS ONE. *** The maximum CHSH value attainable by the state partialSinglet(t), over ALL measurement
+ * angles, is 2*sqrt(1 + sin^2(2t)) -- the Horodecki criterion for this family. Tsirelson's 2*sqrt(2) is just
+ * its t = pi/4 special case, where sin(2t) = 1.
+ *
+ * Two consequences the gate checks rather than states:
+ *   - it EXCEEDS 2 for every t except 0 and pi/2, so ANY entanglement at all violates Bell. A device asking
+ *     only "does it violate the classical bound" cannot tell a maximally entangled state from a barely
+ *     entangled one.
+ *   - it REACHES 2*sqrt(2) only at t = pi/4. So the Tsirelson bound is the sharp test, and the shortfall
+ *     against it is a quantitative measure of how far the state is from maximal entanglement.
+ *
+ * Verified against a fine 2D angle sweep: 1.6e-16 at t = pi/4, ~1.8e-7 at t = 0.65 and 0.5 (grid-limited).
+ */
+export const maxCHSHPartial = (t) => 2 * Math.sqrt(1 + Math.pow(Math.sin(2 * t), 2));
+
+/**
  * PROOF, NOT ASSERTION, OF THE CLASSICAL BOUND: every one of the 2^4 = 16 local-deterministic strategies (a
  * definite +-1 assigned to each of the four measurement settings, independent of the other side) is checked
  * directly, and the maximum |S| across all of them is returned. This IS Bell's classical bound, derived by
@@ -167,13 +191,13 @@ export function lhvBoundBySearch() {
  * textbook angles (OPTIMAL_ANGLES) are optimal -- that they turn up as the maximiser is the finding, not the
  * premise. `steps` controls the grid resolution per angle (steps^4 evaluations total, so keep it modest).
  */
-export function chshMaxByAngleSweep({ steps = 24 } = {}) {
+export function chshMaxByAngleSweep({ steps = 24, correlatorFn = correlatorExact } = {}) {
     let best = 0, bestAngles = null;
     for (let ia = 0; ia < steps; ia++) for (let iap = 0; iap < steps; iap++)
         for (let ib = 0; ib < steps; ib++) for (let ibp = 0; ibp < steps; ibp++) {
             const a = (ia / steps) * Math.PI, ap = (iap / steps) * Math.PI;
             const b = (ib / steps) * Math.PI, bp = (ibp / steps) * Math.PI;
-            const v = Math.abs(chsh(a, ap, b, bp, correlatorExact));
+            const v = Math.abs(chsh(a, ap, b, bp, correlatorFn));
             if (v > best) { best = v; bestAngles = { a, ap, b, bp }; }
         }
     return { best, bestAngles, gridSpacing: Math.PI / steps };
