@@ -151,6 +151,11 @@
   var st = document.createElement("style");
   st.textContent =
     'html[data-embed="1"] .header h1, html[data-embed="1"] .header .sub,' +
+    /* v3999 -- THE CAMERA CONTROLS GO TOO. Keith: "we want to hide camera when it is shown on server.html.
+       server.html is self driven avatars." An embedded surface there is driven by what the MACHINE is doing --
+       see the self-drive block at the bottom of this file -- so a camera button would be offering an input the
+       host does not want and cannot use. The full page still has it. */
+    'html[data-embed="1"] .controls, html[data-embed="1"] #btn-start, html[data-embed="1"] #btn-stop,' +
     'html[data-embed="1"] #metrics, html[data-embed="1"] .status { display: none !important; }' +
     /* the webcam and the metrics-driven mirror are the other two panels; the robot is the second */
     'html[data-embed="1"] .panels { display: block !important; }' +
@@ -477,5 +482,49 @@ function updateReadouts(m) {
 </script>
 <!-- v883 demo chrome (self-mount; idempotent) -->
 <script type="module" src="/ui/demoChrome.js"></script>
+
+<script type="module">
+/* v3999 -- SELF-DRIVEN WHEN EMBEDDED: the engine's own moves, read as a face.
+   ------------------------------------------------------------------------------------------------------------
+   Keith asked whether the animations the other avatars show could be generated with the face expressions, and
+   the answer was already in the shape of the code: ui/faceExpression.js consumes "anything with snapshot() ->
+   { active, blendShapes }" and has never known whether that was a camera. ui/faceMoves.js is a SECOND PRODUCER
+   for that one interface, generating MediaPipe-shaped coefficients from the SweK robot's moves.
+
+   *** THE MOVES WERE ALREADY ON THE WIRE. *** ui/swekRobot.js has dispatched `swek:move` on window since v1690
+   and ui/pipboyWireframe.js has mirrored it onto a stick figure ever since. This subscribes to the same event
+   -- plus a postMessage relay, because in an iframe `window` is the FRAME'S window and the host's events never
+   arrive on their own. ui/avatarSwitch.js does the relaying.
+
+   The camera path above is untouched and still runs on the full page: this block only fires under ?embed=1. */
+(function () {
+  if (new URLSearchParams(location.search).get("embed") !== "1") return;
+  Promise.all([
+    import("/ui/swekRobot.js"), import("/ui/faceExpression.js"), import("/ui/faceMoves.js"),
+  ]).then(([{ createSwekRobot }, { attachFaceExpression }, { createMoveFaceSource }]) => {
+    const host = document.getElementById("robot-host");
+    if (!host) return;
+    // THE ROBOT IS BUILT NOW, NOT ON A BUTTON. In the camera path it is created inside start(); with the
+    // controls hidden that path can never run, and an empty 0x0 host was exactly what the panel showed before.
+    const bot = createSwekRobot({ width: 120, height: 176 });
+    host.appendChild(bot.el);
+    host.style.display = "flex";
+    host.style.justifyContent = "center";
+    host.style.minHeight = "180px";
+
+    const src = createMoveFaceSource();
+    // the relay: the host posts {type:"swek:move"} in, because a frame cannot hear its parent's window events
+    addEventListener("message", (e) => {
+      const d = e && e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "swek:move" && typeof d.move === "string") src.setMove(d.move);
+      else if (d.type === "swek:talking") src.setTalking(!!d.on);
+    });
+    attachFaceExpression(bot, src, { onState: () => {} });
+    const st = document.getElementById("face-state");
+    if (st) st.textContent = "self-driven \u2014 following the engine's own events";
+  }).catch(() => {});
+})();
+</script>
 </body>
 </html>
