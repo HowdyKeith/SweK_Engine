@@ -1,6 +1,10 @@
 // WebGLEngine/physics/orbits/kepler-selfcheck.mjs -- v2820
 //
-// Run: node physics/orbits/kepler-selfcheck.mjs   (~0.2s)
+// Run: node physics/orbits/kepler-selfcheck.mjs
+// RUNTIME 0.43s MEASURED (median of 3 -- 434/485/431 -- with date(1) around the run). It was 0.21s before v3993;
+// the new sections 10-12 add ~30 full 200-orbit integrations (four integrators x several run lengths, plus a
+// four-point dt sweep), which is where the extra 0.22s goes. Measured, not guessed -- a runtime line in this
+// tree has been wrong by 13x before.
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // GATES physics/orbits/kepler.js -- two-body orbits, and the sharpest demonstration in the lab that HOW YOU
@@ -19,7 +23,7 @@
 //   6.6e-4 whether you run 50 orbits or 800.
 // Both halves are gated. A gate that only proved "symplectic is better" would be teaching the wrong lesson.
 
-import { period, visViva, specificEnergy, angularMomentum, semiMajorFromEnergy, eccentricityVector, atPerihelion, integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, INTEGRATORS } from "./kepler.js";
+import { period, visViva, specificEnergy, angularMomentum, semiMajorFromEnergy, eccentricityVector, atPerihelion, integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, INTEGRATORS, SYMPLECTIC, ORDER, stepEuler, stepEulerSymplectic, stepVerlet } from "./kepler.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -111,10 +115,163 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     let threw = false;
     try { integrate({ integrator: "nope" }); } catch { threw = true; }
     ok("an unknown integrator is refused rather than silently defaulted", threw);
-    ok("both integrators are registered", Object.keys(INTEGRATORS).sort().join(",") === "rk4,verlet");
+    ok("all four integrators are registered", Object.keys(INTEGRATORS).sort().join(",") === "euler,eulerSymplectic,rk4,verlet",
+        Object.keys(INTEGRATORS).join(", "));
+    ok("...and every one of them is declared in BOTH tables the comparisons rest on",
+        Object.keys(INTEGRATORS).every((k) => k in SYMPLECTIC && k in ORDER),
+        "SYMPLECTIC and ORDER are the premise of sections 10-12; an integrator missing from either would be compared against nothing");
 }
 
-// 10. browser-safe
+// 10. *** THE MATCHED PAIR: SAME ORDER, SAME COST, ONE LINE APART, AND ONLY ONE OF THEM KEEPS THE PLANET ***
+//
+// This is the section the explicit-Euler companion exists for. verlet-vs-rk4 varies ORDER and SYMPLECTICITY at
+// once, so it cannot say which one is responsible. euler-vs-eulerSymplectic holds the order fixed at 1 and
+// varies only whether the position step uses the new velocity.
+{
+    ok("!! the pair really is matched on order -- that is what makes it a control",
+        ORDER.euler === ORDER.eulerSymplectic && SYMPLECTIC.euler !== SYMPLECTIC.eulerSymplectic,
+        `order ${ORDER.euler} vs ${ORDER.eulerSymplectic}, symplectic ${SYMPLECTIC.euler} vs ${SYMPLECTIC.eulerSymplectic}`);
+
+    // ...and they had better not have been quietly collapsed into one function.
+    const s0 = atPerihelion(1, 0.5, 1);
+    const a1 = stepEuler(s0, 0.01, 1), b1 = stepEulerSymplectic(s0, 0.01, 1);
+    ok("!! the two steppers are genuinely different code paths, not an alias",
+        a1.x !== b1.x || a1.y !== b1.y, `euler x=${a1.x} symplectic x=${b1.x}`);
+    // The velocity update is IDENTICAL in both -- only the position differs. If that stopped being true, the
+    // pair would no longer be controlled and the comparison below would be measuring something else.
+    ok("...and they differ ONLY in the position step -- the velocities are bit-identical",
+        a1.vx === b1.vx && a1.vy === b1.vy);
+
+    const OPTS = { a: 1, e: 0.5, mu: 1, stepsPerOrbit: 400, orbits: 200 };
+    const ex = integrate({ ...OPTS, integrator: "euler" });
+    const sy = integrate({ ...OPTS, integrator: "eulerSymplectic" });
+    ok("!! *** EXPLICIT EULER LOSES THE ORBIT ENTIRELY -- it goes UNBOUND partway through the run ***",
+        ex.unboundAtOrbit !== null && !Number.isFinite(ex.semiMajorDrift),
+        `unbound at orbit ${ex.unboundAtOrbit === null ? "never" : ex.unboundAtOrbit.toFixed(2)}, semiMajorDrift ${ex.semiMajorDrift}`);
+    ok("!! ...while its symplectic twin is STILL ON THE ELLIPSE after the same 200 orbits",
+        sy.unboundAtOrbit === null && sy.semiMajorDrift < 1e-2,
+        `semiMajorDrift ${sy.semiMajorDrift.toExponential(3)}`);
+    ok("...and the symplectic twin's energy error is BOUNDED, not merely small",
+        Math.abs(sy.energyGrowthRatio - 1) < 1e-3, `growth ratio ${sy.energyGrowthRatio.toFixed(6)}`);
+}
+
+// 11. *** ANGULAR MOMENTUM: AN EXACT ALGEBRAIC IDENTITY, NOT A TOLERANCE ***
+//
+// For a central force a is parallel to x, so x cross a = 0. One step of each method then gives
+//     symplectic Euler / velocity Verlet   L' = L                    exactly
+//     explicit Euler                       L' = L + dt^2 (v cross a) exactly
+// Both halves are checked: the prediction for the one that fails, and machine zero for the two that do not.
+{
+    const s0 = atPerihelion(1, 0.5, 1), L0 = angularMomentum(s0);
+    const r2 = s0.x * s0.x + s0.y * s0.y, r = Math.sqrt(r2), k = -1 / (r2 * r);
+    const ax = k * s0.x, ay = k * s0.y;
+
+    // *** THE TOLERANCE IS SET BY CANCELLATION, NOT CHOSEN BY EYE. *** dL is a difference of two numbers of
+    // size |L0| ~ 0.87, so it cannot be more accurate than an ulp of L0 no matter how right the formula is.
+    // A first draft used a 1e-12 RELATIVE tolerance and failed at dt=1e-4 on a dL of 6.9e-8 -- eight digits of
+    // cancellation -- while the identity was exactly correct. Same lesson as v3990's rel() near zero.
+    const ULP = 8 * Number.EPSILON * Math.abs(L0);
+    for (const dt of [1e-2, 1e-3, 1e-4]) {
+        const predicted = dt * dt * (s0.vx * ay - s0.vy * ax);
+        const actual = angularMomentum(stepEuler(s0, dt, 1)) - L0;
+        ok(`!! explicit Euler's one-step dL matches dt^2 (v x a) at dt=${dt}`,
+            Math.abs(actual - predicted) <= ULP,
+            `predicted ${predicted.toExponential(9)} actual ${actual.toExponential(9)} diff ${Math.abs(actual - predicted).toExponential(2)} <= ${ULP.toExponential(2)}`);
+        ok(`...and BOTH symplectic methods move L by less than one ulp at dt=${dt}`,
+            Math.abs(angularMomentum(stepEulerSymplectic(s0, dt, 1)) - L0) <= ULP &&
+            Math.abs(angularMomentum(stepVerlet(s0, dt, 1)) - L0) <= ULP);
+    }
+
+    // *** FLAT IN dt IS THE SIGNATURE OF A STRUCTURAL PROPERTY. *** An approximated quantity gets better as the
+    // step shrinks; a preserved one is already exact and only accumulates round-off. Run the same physical time
+    // at four step sizes and look at how the angular-momentum error responds.
+    const sweep = {};
+    for (const k2 of Object.keys(INTEGRATORS)) {
+        sweep[k2] = [400, 800, 1600, 3200].map((spo) =>
+            integrate({ a: 1, e: 0.5, mu: 1, integrator: k2, stepsPerOrbit: spo, orbits: 10 }).angularMomentumErr);
+    }
+    for (const k2 of Object.keys(INTEGRATORS)) {
+        const v = sweep[k2], span = Math.max(...v) / Math.max(1e-300, Math.min(...v));
+        if (SYMPLECTIC[k2]) {
+            ok(`!! ${k2} (symplectic): L error is at round-off and FLAT across an 8x change in dt`,
+                Math.max(...v) < 1e-12 && span < 20,
+                `${v.map((x) => x.toExponential(1)).join(" -> ")}  (span ${span.toFixed(1)}x)`);
+        } else {
+            // TWO WAYS TO FAIL "preserved at round-off", AND THEY FIRE ON DIFFERENT INTEGRATORS -- so the
+            // detail names which one, rather than letting the reader assume it was the span. RK4 is caught by
+            // the SPAN (3.3e4x: its L error is a genuine dt-dependent approximation, converging fast).
+            // Explicit Euler is caught by MAGNITUDE: its span is only ~3x, because by then the orbit itself has
+            // been destroyed and the error is no longer tracking dt at all -- it sits 13 orders above round-off.
+            const bySpan = span > 20, byMag = Math.max(...v) > 1e-9;
+            ok(`!! ${k2} (not symplectic): L error is NOT preserved at round-off`,
+                bySpan || byMag,
+                `${v.map((x) => x.toExponential(1)).join(" -> ")}  (span ${span.toExponential(1)}x) -- caught by ` +
+                (bySpan && byMag ? "SPAN and MAGNITUDE" : bySpan ? "SPAN (dt-dependent approximation)" : "MAGNITUDE (orbit already wrecked; span alone would not catch it)"));
+        }
+    }
+}
+
+// 12. *** THE COMPANION EXPOSED A BLIND SPOT IN THIS FILE'S OWN HEADLINE DETECTOR ***
+//
+// energyGrowthRatio = maxErr(second half)/maxErr(first half) SATURATES: |(E-E0)/E0| cannot exceed 1 while the
+// orbit is bound, so an integrator bad enough to wreck the orbit in the first half has nothing left to grow in
+// the second. The check below asserts the INVERSION as a fact about the metric, so that nobody later reads the
+// ratio as a quality score. It is not a bug to fix -- the ratio answers a different question correctly.
+{
+    const OPTS = { a: 1, e: 0.5, mu: 1, stepsPerOrbit: 400 };
+    const inversions = [];
+    for (const orbits of [5, 20, 200]) {
+        const ex = integrate({ ...OPTS, orbits, integrator: "euler" });
+        const rk = integrate({ ...OPTS, orbits, integrator: "rk4" });
+        if (ex.energyGrowthRatio < rk.energyGrowthRatio) inversions.push(`${orbits}orb: euler ${ex.energyGrowthRatio.toFixed(3)} < rk4 ${rk.energyGrowthRatio.toFixed(3)}`);
+    }
+    ok("!! *** energyGrowthRatio RANKS EXPLICIT EULER AHEAD OF RK4 -- at every run length tested ***",
+        inversions.length === 3, inversions.join(" | ") || "no inversion found -- the saturation claim in the header would then be wrong");
+
+    // ...and the two non-saturating companions get it right, which is why they exist.
+    const ex = integrate({ ...OPTS, orbits: 200, integrator: "euler" });
+    const rk = integrate({ ...OPTS, orbits: 200, integrator: "rk4" });
+    ok("!! ...while semiMajorDrift does NOT invert -- it is Infinity for the one that lost the planet",
+        !Number.isFinite(ex.semiMajorDrift) && rk.semiMajorDrift < 1e-4,
+        `euler ${ex.semiMajorDrift} vs rk4 ${rk.semiMajorDrift.toExponential(2)}`);
+    ok("...and unboundAtOrbit names the moment, which a ratio cannot",
+        ex.unboundAtOrbit !== null && rk.unboundAtOrbit === null,
+        `euler left at orbit ${ex.unboundAtOrbit.toFixed(2)}, rk4 never`);
+}
+
+// 12b. SABOTAGE: swapping the two lines of symplectic Euler turns it back into explicit Euler, and section 11
+// must notice. This is the sharpest sabotage available here -- the "broken" version is not invented, it is the
+// other shipped integrator, so a check that survived it would be reading the NAME rather than the arithmetic.
+{
+    const accel = (x, y, mu) => { const r2 = x * x + y * y, r = Math.sqrt(r2), k = -mu / (r2 * r); return [k * x, k * y]; };
+    const sabotaged = (s, dt, mu = 1) => {           // velocity updated LAST -- i.e. plain explicit Euler
+        const [ax, ay] = accel(s.x, s.y, mu);
+        return { x: s.x + s.vx * dt, y: s.y + s.vy * dt, vx: s.vx + ax * dt, vy: s.vy + ay * dt };
+    };
+    const s0 = atPerihelion(1, 0.5, 1), L0 = angularMomentum(s0), ULP = 8 * Number.EPSILON * Math.abs(L0);
+    const dL = Math.abs(angularMomentum(sabotaged(s0, 1e-2, 1)) - L0);
+    ok("!! SABOTAGE: a symplectic Euler with its two lines swapped fails the one-ulp angular-momentum check",
+        dL > ULP, `moved L by ${dL.toExponential(3)}, ulp floor ${ULP.toExponential(2)}`);
+    const real = stepEulerSymplectic(s0, 1e-2, 1), fake = sabotaged(s0, 1e-2, 1);
+    ok("...and the sabotage is exactly the shipped explicit stepper, bit for bit",
+        fake.x === stepEuler(s0, 1e-2, 1).x && fake.vx === stepEuler(s0, 1e-2, 1).vx && real.x !== fake.x);
+}
+
+// 12c. THE BOUNDARY WITH physics/stabilityMeter.mjs IS DECLARED, SO IT CAN BE ENFORCED.
+// That module already owns explicit / implicit / symplectic Euler on the harmonic oscillator. This one adds the
+// nonlinear central-force fixture and the angular-momentum identity. IMPLICIT Euler belongs to stabilityMeter
+// and must not sprout a second implementation here -- that is how three definitions of one judgement end up
+// disagreeing, which this tree has paid for before.
+{
+    const src = (await import("node:fs")).readFileSync(new URL("./kepler.js", import.meta.url), "utf8");
+    ok("!! kepler.js does NOT carry a second implicit-Euler implementation",
+        !/stepImplicit|implicitEuler|backwardEuler/.test(src) && !("implicit" in INTEGRATORS),
+        "stabilityMeter.mjs owns that one, with the reciprocity identity as its answer key");
+    ok("...and the header says so, rather than leaving the reader to discover the overlap",
+        /stabilityMeter\.mjs/.test(src));
+}
+
+// 13. browser-safe
 {
     const src = (await import("node:fs")).readFileSync(new URL("./kepler.js", import.meta.url), "utf8");
     ok("kepler.js imports nothing and uses no DOM", !/^\s*import\s/m.test(src) && !/\bwindow\.|\bdocument\./.test(src));

@@ -23,6 +23,61 @@
 //
 // That is also exactly the physics a space game needs: ships in gravity wells integrated for hours of play.
 //
+// ================================================================================================================
+// v3993 -- THE EXPLICIT-EULER COMPANION, AND WHY IT COMES AS A MATCHED PAIR
+// ================================================================================================================
+//
+// *** verlet-vs-rk4 CONFOUNDS TWO VARIABLES AND HAS SINCE v2820. *** Verlet is 2nd order AND symplectic; RK4 is
+// 4th order AND not. The claim being made is about SYMPLECTICITY, but the two methods differ in ORDER as well,
+// so a reader is entitled to ask which property is doing the work. The answer needs a controlled comparison,
+// and first-order Euler supplies exactly one:
+//
+//   EXPLICIT (forward) Euler    x' = x + v dt        then    v' = v + a(x) dt
+//   SYMPLECTIC (semi-implicit)  v' = v + a(x) dt     then    x' = x + v' dt
+//
+// SAME ORDER. SAME COST -- one force evaluation each. The ONLY difference is whether the position step uses the
+// old velocity or the new one. Measured at a=1, e=0.5, 400 steps/orbit, 200 orbits:
+//
+//     explicit Euler       semi-major axis -> INFINITE; the orbit goes UNBOUND at orbit 108
+//     symplectic Euler     semi-major axis 1.0016, energy error bounded at 1.6e-3, still orbiting
+//
+// One line apart, and one of them loses the planet. THAT is symplecticity isolated from accuracy -- which the
+// verlet/rk4 pair alone cannot show, because there the better structure also has the worse order.
+//
+//   ANGULAR MOMENTUM IS THE CLEANEST WITNESS, AND IT IS AN EXACT IDENTITY RATHER THAN A TOLERANCE. For a
+//   CENTRAL force a is parallel to x, so x cross a = 0, and one step of each method gives (writing u cross w
+//   for u_x w_y - u_y w_x):
+//
+//       symplectic Euler   L' = x' cross v' = (x + v' dt) cross v' = x cross v' = L + dt (x cross a) = L
+//       velocity Verlet    L' = L + (dt^2/2)(a cross v) + (dt^2/2)(v cross a) = L        (the two cancel)
+//       explicit Euler     L' = (x + v dt) cross (v + a dt) = L + dt(x cross a) + dt^2 (v cross a)
+//                             = L + dt^2 (v cross a)                                     <-- NOT zero
+//
+//   So the two symplectic methods conserve angular momentum TO MACHINE PRECISION AT EVERY STEP SIZE -- not
+//   approximately, exactly, as an algebraic identity -- while the two non-symplectic ones do not. Measured over
+//   10 orbits: verlet and symplectic Euler sit at 1e-14 and DO NOT MOVE as dt is cut eightfold (that residue is
+//   float round-off, not method error), while explicit Euler runs 3.8e-1 -> 1.3e-1 and RK4 4.5e-8 -> 1.4e-12.
+//   A quantity whose error is FLAT IN dt is being preserved by structure; one that shrinks with dt is being
+//   approximated. The single-step prediction dt^2 (v cross a) is checked against the real thing in the gate.
+//
+//   *** AND THE COMPANION EXPOSED A BLIND SPOT IN THIS FILE'S OWN HEADLINE DETECTOR. *** energyGrowthRatio is
+//   maxErr(second half) / maxErr(first half): ~1 bounded, >1 still climbing. It SATURATES. |(E-E0)/E0| cannot
+//   exceed 1 while the orbit is bound, so an integrator bad enough to destroy the orbit in the FIRST half has
+//   nothing left to grow in the second. Measured over 200 orbits: explicit Euler scores 1.071 and RK4 1.981 --
+//   SO BY THIS FILE'S OWN HEADLINE NUMBER, THE INTEGRATOR THAT LOST THE PLANET RANKS AHEAD OF THE ONE THAT KEPT
+//   IT TO SIX DIGITS. The inversion is not a corner case; it holds at 5 orbits (1.364 vs 1.406) and 20 (1.128 vs
+//   1.838) too. The ratio is still the right question for two integrators that both survive; it is simply not a
+//   quality score, and semiMajorDrift (Infinity when unbound) and unboundAtOrbit are the non-saturating
+//   companions. A metric that cannot fail on the worst input is not measuring what its name suggests.
+//
+// NOT A DUPLICATE OF physics/stabilityMeter.mjs, WHICH ALREADY OWNS THESE THREE NAMES. That module runs
+// explicit / implicit / symplectic Euler on the HARMONIC OSCILLATOR, where the answer key is a per-step
+// amplification factor in closed form and the finding is a reciprocity identity (explicit and implicit
+// amplitudes multiply to exactly 1). This is the NONLINEAR 1/r^2 fixture with a second conserved quantity, so
+// what it can show that a linear oscillator cannot is the angular-momentum identity above and the loss of a
+// bound orbit. Implicit Euler is deliberately NOT added here: it is stabilityMeter's half of the story, and a
+// second implementation of it in a second file is how three definitions of one judgement end up disagreeing.
+//
 // Pure, no imports, browser-safe. Units: G = 1, central mass mu, planar motion.
 
 // ---- exact orbital mechanics -------------------------------------------------------------------------
@@ -66,7 +121,7 @@ export function atPerihelion(a, e, mu = 1, speedAt = "perihelion") {
     return { x: rp, y: 0, vx: 0, vy: visViva(rSpeed, a, mu) };
 }
 
-// ---- the two integrators -----------------------------------------------------------------------------
+// ---- the four integrators -----------------------------------------------------------------------------
 const accel = (x, y, mu) => { const r2 = x * x + y * y; const r = Math.sqrt(r2); const k = -mu / (r2 * r); return [k * x, k * y]; };
 
 // Velocity Verlet -- SYMPLECTIC. Second order, cheap, and it conserves a nearby "shadow" energy exactly, which
@@ -92,7 +147,34 @@ export function stepRK4(s, dt, mu = 1) {
     };
 }
 
-export const INTEGRATORS = { verlet: stepVerlet, rk4: stepRK4 };
+// EXPLICIT (forward) Euler -- 1st order, NOT symplectic. The one everybody writes first. Position advances on
+// the OLD velocity, then velocity advances on the force at the OLD position; nothing in the step ever sees an
+// updated value. Kept here not as an option anybody should choose but as the CONTROL for stepEulerSymplectic
+// below, which differs from it by one line and behaves qualitatively differently forever.
+export function stepEuler(s, dt, mu = 1) {
+    const [ax, ay] = accel(s.x, s.y, mu);
+    return { x: s.x + s.vx * dt, y: s.y + s.vy * dt, vx: s.vx + ax * dt, vy: s.vy + ay * dt };
+}
+
+// SYMPLECTIC (semi-implicit) Euler -- 1st order, and symplectic. *** THE ENTIRE DIFFERENCE FROM stepEuler IS
+// THAT THE VELOCITY IS UPDATED FIRST AND THE POSITION THEN USES THE NEW ONE. *** Same order, same single force
+// evaluation, same arithmetic operation count. It conserves angular momentum exactly for a central force (see
+// the identity in the header) and keeps the energy error bounded, where its explicit twin goes unbound.
+export function stepEulerSymplectic(s, dt, mu = 1) {
+    const [ax, ay] = accel(s.x, s.y, mu);
+    const vx = s.vx + ax * dt, vy = s.vy + ay * dt;      // velocity FIRST...
+    return { x: s.x + vx * dt, y: s.y + vy * dt, vx, vy };   // ...then position on the NEW velocity
+}
+
+export const INTEGRATORS = { euler: stepEuler, eulerSymplectic: stepEulerSymplectic, verlet: stepVerlet, rk4: stepRK4 };
+
+// DECLARED, so the gate can test the claim per integrator instead of matching on names. This table is the
+// PREMISE of every comparison in this file: it says which methods are supposed to preserve phase-space
+// structure, and the angular-momentum check is what holds it to account.
+export const SYMPLECTIC = { euler: false, eulerSymplectic: true, verlet: true, rk4: false };
+// Order of accuracy, likewise declared rather than inferred. The point of the euler/eulerSymplectic pair is
+// that these two agree while SYMPLECTIC disagrees -- order held fixed, structure varied.
+export const ORDER = { euler: 1, eulerSymplectic: 1, verlet: 2, rk4: 4 };
 
 // ---- integrate and measure ---------------------------------------------------------------------------
 // Runs `orbits` orbital periods and reports how well each conserved quantity survived, plus the WORST energy
@@ -121,9 +203,16 @@ export function integrate({ a = 1, e = 0.3, mu = 1, integrator = "verlet", steps
     const energySeries = [];
     const seriesEvery = Math.max(1, Math.floor(total / 64));
     const half = Math.floor(total / 2);
+    // v3993 -- THE NON-SATURATING COMPANION TO energyGrowthRatio. A bound orbit has E < 0; the moment E reaches
+    // zero the ellipse has become a parabola and the body is leaving. energyGrowthRatio cannot report this --
+    // |(E-E0)/E0| saturates at 1 on the way, so an integrator that loses the planet in the first half scores
+    // BETTER than one that merely drifts (measured: explicit Euler 1.071 against RK4 1.981 over 200 orbits).
+    // This field is the fact that ratio cannot hold: null means the orbit stayed bound for the whole run.
+    let unboundAtOrbit = null;
     for (let i = 0; i < total; i++) {
         s = step(s, dt, mu);
         const Ei = specificEnergy(s, mu);
+        if (unboundAtOrbit === null && Ei >= 0) unboundAtOrbit = i / stepsPerOrbit;
         if (i % seriesEvery === 0) energySeries.push(Ei);
         const eErr = Math.abs((Ei - E0) / E0);
         const lErr = Math.abs((angularMomentum(s) - L0) / L0);
@@ -141,6 +230,7 @@ export function integrate({ a = 1, e = 0.3, mu = 1, integrator = "verlet", steps
         energyErrFinal: Math.abs((Efinal - E0) / E0),
         angularMomentumErr: maxLErr,
         semiMajorDrift: Math.abs(semiMajorFromEnergy(Efinal, mu) - a) / a,
+        unboundAtOrbit,
         finalState: s, path,
         energySeries, energySeriesEvery: seriesEvery, energyStart: E0,
     };
