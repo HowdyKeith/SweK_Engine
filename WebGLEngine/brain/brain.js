@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3993";   // v3993 -- kepler gains the explicit-Euler companion: a matched first-order
+const BRAIN_BUILD = "v3994";   // v3994 -- Lotka-Volterra predator-prey device: the time-average theorem
+// and Volterra's principle (harvesting BOTH species raises the average prey). Nothing in the brain models
+// ecology; this bump is the ritual marker.
+// v3993 -- kepler gains the explicit-Euler companion: a matched first-order
 // pair (explicit vs semi-implicit Euler) that isolates SYMPLECTICITY from ORDER, which verlet-vs-rk4 cannot.
 // Nothing in the brain integrates orbits; this bump is the ritual marker.
 // v3992 -- requested-stop exit code. exitNow() exits 20 instead of 0 so a shutdown

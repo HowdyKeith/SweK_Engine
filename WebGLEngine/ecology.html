@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Lotka-Volterra Predator and Prey">
+<meta name="demo:desc" content="Predator and prey chase each other round a closed loop forever. Drag the harvest slider -- which kills BOTH species at once, a pesticide or a fishing fleet -- and watch the average PREY population go UP. That is Volterra's principle, it is exact, and it is the answer to why the fraction of predatory fish in the Adriatic rose when the First World War stopped the fishing.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Predator and Prey</title>
+<!--
+     v3994 -- THE FRONT DOOR FOR physics/ecology/lotkaVolterra.mjs. The page derives no ecology: the steppers,
+     the first integral, the fixed point, the time averages and Volterra's principle all come from the module.
+     Same rule stellar.html, bell.html and reactor.html are held to, and their gates enforce.
+
+     *** THE THING THIS PAGE MUST NOT DO IS LET A DECAYING SPIRAL PASS FOR PHYSICS. ***
+     The orbits are CLOSED -- the first integral V is exactly conserved, so the populations cycle forever with
+     no damping. A dissipative integrator draws a spiral that looks entirely plausible and is a lie about the
+     model. The page therefore reports the drift in V beside the picture, and offers explicit Euler as a
+     selectable stepper so the failure is visible rather than described: it does not merely spiral, it BLOWS UP.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --violet:#b088ff; --dim:#7c93b8; --red:#ff6b6b; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:200px; }
+  select { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:4px 8px;
+           font:600 11px ui-monospace,monospace; }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .big { font-size:15px; }
+  .warn { color:var(--red); font-weight:700; } .ok { color:var(--green); font-weight:700; }
+  .prey { color:var(--green); } .pred { color:var(--amber); }
+  .grid { position:relative; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+  #phasewrap, #timewrap { position:relative; min-height:0; border-right:1px solid #16203a; }
+  #timewrap { border-right:none; }
+  /* v3979 -- a canvas is a REPLACED element: position+inset alone leaves it at its intrinsic 300x150. */
+  #phase, #series { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(560px,44vw);
+          background:rgba(5,7,14,.78); border:1px solid #16203a; border-radius:8px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Predator and Prey &mdash; and why killing both of them helps the prey</h1>
+  <div class="row">
+    <label>harvest rate h <input id="h" type="range" min="0" max="90" value="0" step="1"></label>
+    <span class="stat big">h = <b id="hv">0.00</b></span>
+    <label>amplitude <input id="amp" type="range" min="1010" max="3000" value="1500" step="10"></label>
+    <span class="stat">x<sub>0</sub> = <b id="ampv">1.50</b>&times; equilibrium</span>
+    <label>stepper <select id="int"></select></label>
+  </div>
+  <div class="row">
+    <span class="stat big">&lang;prey&rang; <b class="prey" id="mx">4.0000</b> &nbsp;vs exact <b id="ex">4</b></span>
+    <span class="stat big">&lang;predator&rang; <b class="pred" id="my">2.7500</b> &nbsp;vs exact <b id="ey">2.75</b></span>
+    <span class="stat">first integral drift <b id="drift">3.5e-4</b></span>
+    <span class="stat" id="verdict">&mdash;</span>
+  </div>
+</header>
+<div class="grid">
+  <div id="phasewrap"><canvas id="phase"></canvas>
+    <div id="note">The loop is CLOSED: the first integral <b>V = &delta;x &minus; &gamma;ln x + &beta;y &minus; &alpha;ln y</b>
+      is exactly conserved, so these populations cycle forever without damping. The cross is the fixed point &mdash;
+      and it is also, exactly, the <i>time average</i> of the cycle.</div>
+  </div>
+  <div id="timewrap"><canvas id="series"></canvas></div>
+</div>
+</div>
+<script type="module">
+import { DEFAULTS, fixedPoint, firstIntegral, smallOscillationPeriod, INTEGRATORS,
+         integrate, timeAverages } from "/physics/ecology/lotkaVolterra.mjs";
+
+const $ = (id) => document.getElementById(id);
+const sel = $("int");
+for (const k of Object.keys(INTEGRATORS)) {
+  const o = document.createElement("option");
+  o.value = k; o.textContent = k === "symplectic" ? "symplectic (log)" : k;
+  if (k === "symplectic") o.selected = true;
+  sel.appendChild(o);
+}
+
+function fit(c) { const r = c.getBoundingClientRect(), d = devicePixelRatio || 1;
+  c.width = Math.max(1, Math.round(r.width * d)); c.height = Math.max(1, Math.round(r.height * d));
+  const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); return [x, r.width, r.height]; }
+
+function draw() {
+  const h = parseInt($("h").value) / 100;
+  const amp = parseInt($("amp").value) / 1000;
+  const integrator = sel.value;
+  $("hv").textContent = h.toFixed(2);
+  $("ampv").textContent = amp.toFixed(2);
+
+  // *** HARVESTING KILLS BOTH SPECIES: alpha -> alpha-h AND gamma -> gamma+h. ***
+  const p = { ...DEFAULTS, alpha: DEFAULTS.alpha - h, gamma: DEFAULTS.gamma + h };
+  const collapsed = p.alpha <= 0;
+  const fp = fixedPoint(p);
+  // *** 200 CYCLES, AND THE NUMBER IS SET BY WHEN EXPLICIT EULER ACTUALLY DIES. *** At 60 cycles the page could
+  // never show the blow-up: measured, Euler leaves the positive quadrant at cycle 71 (amplitude 3.0) through 173
+  // (amplitude 1.01), so a short run reports "still climbing" and prints averages for an orbit that is doomed.
+  // 200 covers the whole amplitude slider. This page's own gate caught the 60 and named the cycle numbers.
+  const cycles = 200;
+  const r = collapsed ? null : integrate({ p, x0: fp.x * amp, y0: fp.y, integrator,
+                                           stepsPerCycle: 400, cycles, sample: 4 });
+  const m = collapsed || r.blewUpAtCycle !== null ? null
+          : timeAverages({ p, x0: fp.x * amp, y0: fp.y, integrator, stepsPerCycle: 400, cycles: 40 });
+
+  // ---- readouts -------------------------------------------------------------------------------------
+  $("ex").textContent = collapsed ? "—" : fp.x.toFixed(4);
+  $("ey").textContent = collapsed ? "—" : fp.y.toFixed(4);
+  $("mx").textContent = m ? m.meanX.toFixed(4) : "—";
+  $("my").textContent = m ? m.meanY.toFixed(4) : "—";
+  $("drift").textContent = r && r.blewUpAtCycle === null ? r.driftSecondHalf.toExponential(2) : "—";
+  if (collapsed) {
+    $("verdict").innerHTML = `<span class="warn">HARVEST EXCEEDS THE PREY GROWTH RATE &mdash; the system collapses and there is no cycle to average.</span>`;
+  } else if (r.blewUpAtCycle !== null) {
+    // *** NOT A SPIRAL. NOT A DRIFT. THE POPULATIONS LEAVE THE POSITIVE QUADRANT. ***
+    $("verdict").innerHTML = `<span class="warn">THE INTEGRATOR BLEW UP at cycle ${r.blewUpAtCycle.toFixed(1)}</span>
+      <span class="stat"> &mdash; explicit Euler does not merely drift on this system; the populations go negative and it is over.</span>`;
+  } else {
+    const bounded = Math.abs(r.driftGrowthRatio - 1) < 0.05;
+    $("verdict").innerHTML = `<span class="stat">drift ratio <b>${r.driftGrowthRatio.toFixed(3)}</b> &mdash; </span>` +
+      (bounded ? `<span class="ok">BOUNDED</span><span class="stat">, the orbit closes</span>`
+               : `<span class="warn">STILL CLIMBING</span><span class="stat">, this stepper drifts secularly</span>`);
+  }
+
+  // ---- phase portrait -------------------------------------------------------------------------------
+  const [cx, W, H] = fit($("phase"));
+  cx.fillStyle = "#05070e"; cx.fillRect(0, 0, W, H);
+  if (r && r.path.length > 1) {
+    let xh = 0, yh = 0;
+    for (const q of r.path) { xh = Math.max(xh, q[0]); yh = Math.max(yh, q[1]); }
+    xh = Math.max(xh, fp.x) * 1.12; yh = Math.max(yh, fp.y) * 1.12;
+    const pad = 46;
+    const PX = (v) => pad + (W - pad - 18) * (v / xh);
+    const PY = (v) => H - pad - (H - pad - 18) * (v / yh);
+    cx.strokeStyle = "#16203a"; cx.beginPath();
+    cx.moveTo(pad, 8); cx.lineTo(pad, H - pad); cx.lineTo(W - 10, H - pad); cx.stroke();
+    cx.strokeStyle = "#59d1ff"; cx.lineWidth = 1.4; cx.beginPath();
+    r.path.forEach((q, i) => { const X = PX(q[0]), Y = PY(q[1]); i ? cx.lineTo(X, Y) : cx.moveTo(X, Y); });
+    cx.stroke();
+    // the fixed point, which is also the time average
+    cx.strokeStyle = "#ff6b6b"; cx.lineWidth = 1.6; const fx = PX(fp.x), fy = PY(fp.y);
+    cx.beginPath(); cx.moveTo(fx - 7, fy); cx.lineTo(fx + 7, fy); cx.moveTo(fx, fy - 7); cx.lineTo(fx, fy + 7); cx.stroke();
+    cx.fillStyle = "#7c93b8"; cx.font = "11px ui-monospace,monospace";
+    cx.fillText("prey →", W / 2 - 20, H - pad + 22);
+    cx.save(); cx.translate(14, H / 2 + 22); cx.rotate(-Math.PI / 2); cx.fillText("predator →", 0, 0); cx.restore();
+  }
+
+  // ---- time series ----------------------------------------------------------------------------------
+  const [sx2, SW, SH] = fit($("series"));
+  sx2.fillStyle = "#05070e"; sx2.fillRect(0, 0, SW, SH);
+  if (r && r.path.length > 1) {
+    const show = r.path.slice(0, Math.min(r.path.length, Math.round(r.path.length * 6 / cycles)));
+    let hi = 0; for (const q of show) hi = Math.max(hi, q[0], q[1]);
+    hi = Math.max(hi, fp.x, fp.y) * 1.1;
+    const pad = 42;
+    const TX = (i) => pad + (SW - pad - 14) * i / Math.max(1, show.length - 1);
+    const TY = (v) => SH - pad - (SH - pad - 18) * (v / hi);
+    sx2.strokeStyle = "#16203a"; sx2.beginPath();
+    sx2.moveTo(pad, 8); sx2.lineTo(pad, SH - pad); sx2.lineTo(SW - 10, SH - pad); sx2.stroke();
+    const curve = (idx, col) => { sx2.strokeStyle = col; sx2.lineWidth = 1.5; sx2.beginPath();
+      show.forEach((q, i) => { const X = TX(i), Y = TY(q[idx]); i ? sx2.lineTo(X, Y) : sx2.moveTo(X, Y); }); sx2.stroke(); };
+    curve(0, "#5fe08a"); curve(1, "#f6a623");
+    // the two time-average lines -- the whole point of the harvest slider
+    if (m) {
+      const dash = (v, col) => { sx2.strokeStyle = col; sx2.setLineDash([5, 4]); sx2.lineWidth = 1;
+        sx2.beginPath(); sx2.moveTo(pad, TY(v)); sx2.lineTo(SW - 10, TY(v)); sx2.stroke(); sx2.setLineDash([]); };
+      dash(m.meanX, "#5fe08a"); dash(m.meanY, "#f6a623");
+    }
+    sx2.fillStyle = "#7c93b8"; sx2.font = "11px ui-monospace,monospace";
+    sx2.fillText("time → (6 cycles)", SW / 2 - 40, SH - pad + 22);
+    sx2.fillStyle = "#5fe08a"; sx2.fillText("prey", SW - 96, 20);
+    sx2.fillStyle = "#f6a623"; sx2.fillText("predator", SW - 96, 36);
+    sx2.fillStyle = "#5c7088";
+    sx2.fillText("dashed = time average over whole cycles", pad + 6, 20);
+  }
+}
+
+for (const id of ["h", "amp"]) $(id).oninput = draw;
+sel.onchange = draw;
+addEventListener("resize", draw);
+draw();
+</script>
+</body>
+</html>
