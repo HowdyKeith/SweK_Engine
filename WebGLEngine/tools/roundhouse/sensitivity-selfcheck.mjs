@@ -192,9 +192,18 @@ const KNOWN_DEAD = {
 {
     const escalated = await escalatedSensitivity(paired.stillDead, getDevice);
 
-    ok("!! *** TEN OF THE ELEVEN 'DEAD' KNOBS WERE ALIVE, AND A 1.1x NUDGE COULD NEVER HAVE SEEN THEM ***",
-        escalated.rescued.length >= 9,
-        `${escalated.rescued.length} rescued at magnitude: ` +
+    // v4013 -- *** "9" WAS A MEASUREMENT THAT BECAME AN INVARIANT THE MOMENT AN EARLIER STAGE STARTED EATING
+    // ITS INPUT. *** This threshold was set when paired.stillDead fed escalation directly -- eleven dead knobs
+    // in, ten rescued at magnitude. Since then the PAIRED SWEEP (section 6, above) was added in FRONT of this
+    // one and now rescues some of them first (3 of the original set, on this box), so escalation only ever
+    // SEES what paired left behind -- structurally fewer than eleven, sometimes fewer than nine, with no code
+    // path back to the old number. THE SAME SPECIES v3140 NAMED FOR engine/'s module count: a true observation
+    // frozen into a law, and the law stayed true right up until the pipeline it described gained a stage.
+    // What survives is the actual claim -- escalation rescues everything paired left behind EXCEPT the entries
+    // KNOWN_DEAD names with a reason, derived from paired.stillDead.length rather than a count typed here.
+    ok("!! *** EVERY 'DEAD' KNOB PAIRED DID NOT ALREADY RESCUE WAS ALIVE, AND A 1.1x NUDGE COULD NEVER HAVE SEEN THEM ***",
+        escalated.rescued.length >= paired.stillDead.length - Object.keys(KNOWN_DEAD).length,
+        `${escalated.rescued.length} of ${paired.stillDead.length} rescued at magnitude: ` +
         escalated.rescued.map((r) => r.entry + "@" + r.value).join(", ") +
         ". Every one is a TOLERANCE, a CAP or a THRESHOLD -- knobs whose local derivative is zero BY DESIGN. " +
         "perturb() asks for a slope; their response is a cliff. FOURTH limitation of the same shape: array " +

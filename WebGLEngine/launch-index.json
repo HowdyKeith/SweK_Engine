@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 404,
+  "page": 405,
   "demo": 49,
   "builtin": 54
  },
@@ -3175,6 +3175,14 @@
    "id": "webgpu-bench.html",
    "display": "Webgpu Bench",
    "href": "/webgpu-bench.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "webgpu-llm.html",
+   "display": "Webgpu Llm",
+   "href": "/webgpu-llm.html",
    "section": null,
    "collision": false
   },
