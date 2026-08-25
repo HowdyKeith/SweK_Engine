@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4012";   // v4012 -- /self/zip picked the highest-numbered zip in ~/Downloads with no
+const BRAIN_BUILD = "v4013";   // v4013 -- sensitivity-selfcheck.mjs's magnitude-escalation threshold ("at
+// least 9 rescued") was measured before a paired-sweep stage was added in front of it; that stage now eats some
+// of the same knobs first, so the frozen number became structurally unreachable. Re-derived from
+// paired.stillDead.length minus the named KNOWN_DEAD baseline. Also: shipRitual's stale launch-index.json
+// regenerated (508 launchables, was 500); statedRuntime's two "~1s" headers corrected to their measured times
+// (75ms, 162ms). Previously v4012 --   // v4012 -- /self/zip picked the highest-numbered zip in ~/Downloads with no
 // comparison against the live running version -- Keith caught it live on Galaxina, running v3995, downloading
 // v3940. Extracted to packagerBridge.selfZipCandidate(): matches Downloads against the LIVE version exactly,
 // falls back to a fresh build via makeInstallable() when nothing matches. Caught before shipping: a first draft

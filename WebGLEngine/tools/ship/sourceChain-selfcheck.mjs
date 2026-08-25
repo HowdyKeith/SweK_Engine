@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/sourceChain-selfcheck.mjs -- v3964
 //
-// Run: node tools/ship/sourceChain-selfcheck.mjs   (~1s MEASURED; no network, no clone)
+// Run: node tools/ship/sourceChain-selfcheck.mjs   (162ms MEASURED, from gate-timings.json; no network, no clone)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** WHAT THIS DEFENDS IS A REFUSAL, WHICH IS THE ONLY KIND OF CHECK WORTH HAVING HERE. ***

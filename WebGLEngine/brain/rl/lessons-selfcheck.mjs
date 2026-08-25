@@ -1,6 +1,6 @@
 // WebGLEngine/brain/rl/lessons-selfcheck.mjs -- v3968
 //
-// Run: node brain/rl/lessons-selfcheck.mjs   (~1s MEASURED; no browser, no GPU)
+// Run: node brain/rl/lessons-selfcheck.mjs   (75ms MEASURED, from gate-timings.json; no browser, no GPU)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** THE STUB-EMITTER, DRIVEN -- INCLUDING THE THREE WAYS IT WAS ALREADY WRONG. ***
