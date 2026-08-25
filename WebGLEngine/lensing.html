@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Gravitational Microlensing">
+<meta name="demo:desc" content="A point mass passing in front of a background star splits it into two images and brightens it -- watch the images move and the light curve rise as the alignment tightens. Every number is read straight from physics/astroparticle/lensing.js: nothing on this page is a second copy of the physics.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Gravitational Microlensing</title>
+<!--
+     v3988 -- A FRONT DOOR FOR PHYSICS THAT WAS ALREADY COMPLETE. physics/astroparticle/lensing.js has the
+     Einstein radius, the two image positions, their independently-derived magnifications, the mu+ - mu- = 1
+     invariant, and the Paczynski light curve -- gated (lensing-selfcheck.mjs) and bound to the roundhouse
+     (astroparticleBind.mjs's "lensing" mode, with a planted wrong-Einstein-radius knob already proven to bite)
+     since v3428/v3501. What did not exist was anywhere to SEE it. This page derives nothing: every physical
+     quantity it shows is imported and called, never recomputed, following the same rule reactor.html's gate
+     enforces for kinetics.mjs.
+
+     THE TWO IMAGES ARE PLACED IN 2D BY ORDINARY TRIGONOMETRY, WHICH IS NOT A PHYSICAL CLAIM NEEDING ITS OWN KEY.
+     imagePositions(u) already returns two SIGNED radii along the line from lens to source -- "plus" on the same
+     side as the source, "minus" negative, meaning the opposite side. Multiplying each signed radius by the same
+     unit direction vector places both images correctly with no extra logic: a negative scalar times a direction
+     vector already points the other way. That is geometry, the same category as reactor.html's own screen-space
+     axis placement, not a second physics module.
+
+     THE PAGE IS HONEST ABOUT WHAT A POINT SOURCE ACTUALLY SHOWS. Popular images of "an Einstein ring" are a
+     FINITE, EXTENDED source effect -- lensing.js models a point source, so at perfect alignment the true picture
+     is two point images, each at exactly the Einstein radius, on OPPOSITE sides of the lens, both magnified
+     without bound. The dashed circle at theta_E is drawn as a labelled REFERENCE, not claimed to be what the two
+     rendered points form.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --dim:#7c93b8; --red:#ff6b6b; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:170px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:5px 12px;
+           font:600 11px ui-monospace,monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  button.on { background:#1b3a33; color:#bff5e8; }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .grid { position:relative; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+  #sky, #curve { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #skywrap, #curvewrap { position:relative; min-height:0; border-right:1px solid #16203a; }
+  #curvewrap { border-right:none; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(600px,44vw);
+          background:rgba(5,7,14,.72); border:1px solid #16203a; border-radius:8px; padding:6px 10px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Gravitational Microlensing &mdash; two images, one invariant</h1>
+  <div class="row">
+    <label>impact parameter u0 <input id="u0" type="range" min="1" max="100" value="15" step="1"></label>
+    <span class="stat">u0 = <b id="u0v">0.15</b></span>
+    <button id="play">Pause</button>
+    <label>speed <input id="speed" type="range" min="1" max="10" value="3" step="1"></label>
+  </div>
+  <div class="row">
+    <span class="stat">u(t) <b id="ut">0.150</b></span>
+    <span class="stat">image+ <b id="ip">0.000</b></span>
+    <span class="stat">image&minus; <b id="im">0.000</b></span>
+    <span class="stat">&mu;total <b id="mut">0.00</b></span>
+    <span class="stat">&mu;+&minus;&mu;&minus; <b id="inv">1.000000</b></span>
+    <span class="stat">&theta;<sub>E</sub> <b id="thetae">553 &micro;as</b></span>
+  </div>
+</header>
+<div class="grid">
+  <div id="skywrap"><canvas id="sky"></canvas>
+    <div id="note">The lens sits at the centre. The dim dot is the true (unlensed) source position; the two bright
+    dots are the images imagePositions(u) actually produces, placed along the source direction by their own
+    signed radii. The dashed ring marks &theta;<sub>E</sub> -- the classic "Einstein ring" picture needs an
+    EXTENDED source; a point source shows two points, both approaching that ring from opposite sides as
+    u&nbsp;&rarr;&nbsp;0.</div>
+  </div>
+  <div id="curvewrap"><canvas id="curve"></canvas></div>
+</div>
+</div>
+<script type="module">
+import { einsteinRadius, imagePositions, magnifications, totalMagnification, magnificationDifference,
+         uOfTime, lightCurve, G_SI, C_LIGHT, M_SUN, PARSEC } from "./physics/astroparticle/lensing.js";
+
+const $ = (id) => document.getElementById(id);
+const sky = $("sky"), skyCtx = sky.getContext("2d");
+const curve = $("curve"), curveCtx = curve.getContext("2d");
+
+// A representative real microlensing geometry -- 0.3 solar masses at 4 kpc, source at 8 kpc -- imported
+// constants only, no physics of its own. theta_E ~ 553 microarcseconds, in the observed range of real events.
+const LENS = { M: 0.3 * M_SUN, dL: 4000 * PARSEC, dS: 8000 * PARSEC };
+const THETA_E_RAD = einsteinRadius(LENS);
+$("thetae").textContent = (THETA_E_RAD * 206265 * 1e6).toFixed(0) + " µas";
+
+let u0 = 0.15, playing = true, speed = 3, t = -60;
+const T0 = 0, TE = 25;   // Einstein-radius crossing time, days (typical galactic-bulge event scale)
+
+function resize(cvs) {
+  const r = cvs.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cvs.width = Math.max(1, Math.round(r.width * d));
+  cvs.height = Math.max(1, Math.round(r.height * d));
+  cvs.getContext("2d").setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener("resize", () => { resize(sky); resize(curve); });
+
+function drawSky() {
+  const w = sky.width / (window.devicePixelRatio || 1), h = sky.height / (window.devicePixelRatio || 1);
+  skyCtx.fillStyle = "#05070e"; skyCtx.fillRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2;
+  const u = uOfTime(t, { u0, t0: T0, tE: TE });
+  const scale = Math.min(w, h) * 0.32 / Math.max(u0 * 1.4, 1.6);   // pixels per theta_E, fits the whole event
+
+  // lens
+  skyCtx.fillStyle = "#f6a623"; skyCtx.beginPath(); skyCtx.arc(cx, cy, 5, 0, Math.PI * 2); skyCtx.fill();
+  // theta_E reference ring
+  skyCtx.strokeStyle = "#2a3550"; skyCtx.setLineDash([4, 4]); skyCtx.lineWidth = 1;
+  skyCtx.beginPath(); skyCtx.arc(cx, cy, scale, 0, Math.PI * 2); skyCtx.stroke(); skyCtx.setLineDash([]);
+
+  // source direction: the source sits at (x(t), u0) in theta_E units -- x(t) = (t-t0)/tE, matching uOfTime's
+  // own parametrisation exactly, so u = hypot(u0, x) is the SAME u the module computes.
+  const x = (t - T0) / TE;
+  const phi = Math.atan2(u0, x);
+  const dirX = Math.cos(phi), dirY = Math.sin(phi);
+  // true (unlensed) source, dim
+  const sx = cx + x * scale, sy = cy - u0 * scale;
+  skyCtx.fillStyle = "#3a4560"; skyCtx.beginPath(); skyCtx.arc(sx, sy, 3, 0, Math.PI * 2); skyCtx.fill();
+
+  const pos = imagePositions(u), mag = magnifications(u);
+  const draw = (radiusThetaE, magnification, color) => {
+    // the SIGNED radius times the direction vector places both images with no branching -- a negative radius
+    // (the "minus" image) lands on the opposite side automatically.
+    const ix = cx + radiusThetaE * scale * dirX, iy = cy - radiusThetaE * scale * dirY;
+    const m = Number.isFinite(magnification) ? Math.min(4, Math.sqrt(magnification)) : 4;
+    skyCtx.fillStyle = color;
+    skyCtx.globalAlpha = Number.isFinite(magnification) ? Math.min(1, 0.35 + magnification / 8) : 1;
+    skyCtx.beginPath(); skyCtx.arc(ix, iy, 2.5 + m * 2.2, 0, Math.PI * 2); skyCtx.fill();
+    skyCtx.globalAlpha = 1;
+  };
+  draw(pos.plus, mag.plus, "#59d1ff");
+  draw(pos.minus, mag.minus, "#5fe08a");
+
+  return { u, pos, mag };
+}
+
+function drawCurve() {
+  const w = curve.width / (window.devicePixelRatio || 1), h = curve.height / (window.devicePixelRatio || 1);
+  curveCtx.fillStyle = "#05070e"; curveCtx.fillRect(0, 0, w, h);
+  const L = 46, R = w - 14, TOP = 18, BOT = h - 26;
+  curveCtx.strokeStyle = "#16203a"; curveCtx.strokeRect(L, TOP, R - L, BOT - TOP);
+  curveCtx.fillStyle = "#7c93b8"; curveCtx.font = "11px ui-monospace,monospace";
+  curveCtx.fillText("MAGNIFICATION (Paczynski curve, from lightCurve())", L, 12);
+
+  const lc = lightCurve({ u0, t0: T0, tE: TE, from: -80, to: 80, samples: 321 });
+  const muMax = Math.max(2, ...lc.map((p) => (Number.isFinite(p.mu) ? p.mu : 0))) * 1.08;
+  const px = (tt) => L + (R - L) * (tt + 80) / 160;
+  const py = (mu) => BOT - (BOT - TOP) * Math.min(mu, muMax) / muMax;
+
+  curveCtx.strokeStyle = "#59d1ff"; curveCtx.lineWidth = 1.6; curveCtx.beginPath();
+  lc.forEach((p, i) => { const X = px(p.t), Y = py(Number.isFinite(p.mu) ? p.mu : muMax);
+    i ? curveCtx.lineTo(X, Y) : curveCtx.moveTo(X, Y); });
+  curveCtx.stroke();
+
+  // "now" marker
+  const nowX = px(t);
+  curveCtx.strokeStyle = "#f6a623"; curveCtx.beginPath(); curveCtx.moveTo(nowX, TOP); curveCtx.lineTo(nowX, BOT); curveCtx.stroke();
+
+  curveCtx.fillStyle = "#7c93b8";
+  curveCtx.fillText("-80d", L, BOT + 14); curveCtx.fillText("+80d", R - 28, BOT + 14);
+  curveCtx.fillText("μ=1", 4, py(1) + 3); curveCtx.fillText("μ=" + muMax.toFixed(1), 4, TOP + 8);
+}
+
+function readouts(state) {
+  $("ut").textContent = state.u.toFixed(3);
+  $("ip").textContent = state.pos.plus.toFixed(3);
+  $("im").textContent = state.pos.minus.toFixed(3);
+  $("mut").textContent = Number.isFinite(state.u) && state.u > 0 ? totalMagnification(state.u).toFixed(2) : "∞";
+  // THE INVARIANT, READ DIRECTLY FROM THE MODULE -- not recomputed here. Should read 1.000000 always.
+  const inv = magnificationDifference(state.u);
+  $("inv").textContent = Number.isFinite(inv) ? inv.toFixed(6) : "1 (limit)";
+}
+
+function frame() {
+  if (playing) t += speed * 0.35;
+  if (t > 80) t = -80;
+  const state = drawSky();
+  drawCurve();
+  readouts(state);
+  requestAnimationFrame(frame);
+}
+
+$("u0").oninput = (e) => { u0 = +e.target.value / 100; $("u0v").textContent = u0.toFixed(2); };
+$("play").onclick = () => { playing = !playing; $("play").textContent = playing ? "Pause" : "Play"; $("play").className = playing ? "" : "on"; };
+$("speed").oninput = (e) => { speed = +e.target.value; };
+
+resize(sky); resize(curve);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
