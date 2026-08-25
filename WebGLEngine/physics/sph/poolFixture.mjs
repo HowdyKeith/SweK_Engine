@@ -90,6 +90,22 @@ export const G = 9.81, TALL_LID = 6.0;
 export const SHIPPED_FLOOR = 0.6;
 
 /**
+ * v4007 -- THE SMOOTHING LENGTH, WHICH IS ALSO THE CELL SIZE, AS ONE DECLARATION.
+ *
+ * It was typed as a default parameter in three places -- settlePool, perCellFullDeclared and fullCellSplit --
+ * and levelClaim-selfcheck was about to type a FOURTH copy in order to compute the grid's resolution floor.
+ * Four spellings of one number is this tree's most repeated defect, and the fourth would have been the worst
+ * kind: a constant restated inside the gate that grades the module, so the two could disagree and the gate
+ * would report the disagreement as physics.
+ *
+ * The floor it buys: a tilt of theta across a box of width W raises the surface by tan(theta)*W end to end,
+ * which is tan(theta)*W/CELL_H cells. BELOW ONE CELL A GRID-QUANTISED STATISTIC MUST READ ZERO. At the shipped
+ * W of 0.6 that boundary sits between 5 degrees (0.53 cells) and 10 degrees (1.06 cells) -- which is exactly
+ * where the measured tilt series stops reading zero, so the derivation predicts the data rather than excusing it.
+ */
+export const CELL_H = 0.1;
+
+/**
  * A fixture parameterised by FLOOR WIDTH and PARTICLE COUNT, reusing materialKnobs' spacing so there is one
  * declaration of the lattice pitch. The fill is CENTRED, and its height is chosen to hold the requested count,
  * so a width sweep changes THE CONTAINER and leaves the solver untouched.
@@ -108,12 +124,12 @@ export function makeFixture({ W = SHIPPED_FLOOR, targetN = 686, spacing = LATTIC
  */
 export function cellIndex(v, W, h) { return Math.min(Math.floor(v / h), Math.ceil(W / h) - 1); }
 
-export function perCellFullDeclared(h = 0.1, mass = 0.02) { return packedDensity(h, mass) * h * h * h / mass; }
+export function perCellFullDeclared(h = CELL_H, mass = 0.02) { return packedDensity(h, mass) * h * h * h / mass; }
 export function perCellFullLattice(h = 0.1, spacing = LATTICE.spacing) { return (h / spacing) ** 3; }
 
 /** Settle a fixture and hand back the world plus the energy ratio (v3542's stability bound). */
 export function settlePool({ W = SHIPPED_FLOOR, targetN = 686, viscosity = 3, steps = 3000,
-                             h = 0.1, mass = 0.02, c = 15, dt = 1 / 1000,
+                             h = CELL_H, mass = 0.02, c = 15, dt = 1 / 1000,
                              tiltDeg = 0, damColumns = null, eos = "tait", stiffness = 8 } = {}) {
     const F = makeFixture({ W, targetN, spacing: LATTICE.spacing });
     const rho0 = packedDensity(h, mass);
@@ -213,7 +229,7 @@ export function interiorNumberDensity(pool) {
  * that is the statistic's own bias -- which is what v3540 and v3542 both called quantisation, and it turns out
  * to be about a third of the total rather than all of it.
  */
-export function fullCellSplit({ h = 0.1, mass = 0.02, spacing = LATTICE.spacing, slabPerCell, surfaceErrFrac } = {}) {
+export function fullCellSplit({ h = CELL_H, mass = 0.02, spacing = LATTICE.spacing, slabPerCell, surfaceErrFrac } = {}) {
     const declared = perCellFullDeclared(h, mass), lattice = perCellFullLattice(h, spacing);
     const definitionErr = 1 - declared / slabPerCell;
     return {
