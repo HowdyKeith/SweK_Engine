@@ -250,6 +250,16 @@ export function mountGithubPanel() {
             // is switched off by a later poll is publishable during the gap; this one has to be EARNED.
             chainPub.disabled = true; chainPub.style.opacity = ".45"; chainPub.title = "needs a green verify first";
             w.append(chainPub);
+            // v4014 -- *** THE CLONE HAD A FOLDER AND NO WAY TO RUN IT. *** Keith, right after seeing "published
+            // vNNNN, built from the verified tree at <path>": "I would want to next see the button to launch
+            // new version that we just cloned" -- and then, naming the mechanism directly: "START_NODE_Engine.bat
+            // or bun to then start, not just open folder." /source-chain/launch spawns that launcher for real
+            // (cmd /c start on Windows, the same route restart() uses to relaunch) on a FRESH PORT, side by side
+            // with whatever is already running, and does not open a tab until /health answers on it.
+            const chainLaunch = BTN("\u25b6 Launch this build (side by side)", "#1a3a2a", "#3a7a5a"); chainLaunch.style.marginTop = "4px";
+            chainLaunch.disabled = true; chainLaunch.style.opacity = ".45"; chainLaunch.title = "needs a clone first";
+            chainLaunch.style.display = "none";
+            w.append(chainLaunch);
             const chainLog = E("div", "margin-top:5px;font:10px ui-monospace,monospace;color:#9bb0c8;white-space:pre-wrap;max-height:220px;overflow:auto;background:#080b10;border:1px solid #1a222e;border-radius:6px;padding:6px 8px;display:none;");
             w.append(chainLog);
 
@@ -262,6 +272,15 @@ export function mountGithubPanel() {
                 chainPub.style.opacity = may ? "1" : ".45";
                 chainPub.title = may ? "publish " + ((st.clone && st.clone.version) || "") + " from the tree that just passed"
                                      : ((st && st.whyNotPublish) || "needs a green verify first");
+                // Launch does NOT require verified === true -- running the build IS a way of looking at it, and
+                // gating it on a green verify would make "just start it and see" wait on a check that already
+                // ran once this same panel could report as red without stopping anybody from launching anyway.
+                const cloned = !!(st && st.clone && st.clone.path);
+                chainLaunch.style.display = cloned ? "" : "none";
+                chainLaunch.disabled = !cloned;
+                chainLaunch.style.opacity = cloned ? "1" : ".45";
+                chainLaunch.title = cloned ? "start " + ((st.clone && st.clone.version) || "") + " from " + st.clone.path + ", on its own port"
+                                           : "needs a clone first";
             };
             const chainPoll = async () => {
                 const st = await fetch("/source-chain/status", { cache: "no-store" }).then(r => r.json()).catch(() => null);
@@ -296,6 +315,25 @@ export function mountGithubPanel() {
                 const rel = j.release || {};
                 say(j.ok ? "\u2713 published " + (j.tag || rel.tag) + "\nbuilt from the verified tree at " + (j.fromVerifiedTree || "?") + "\n" + (rel.url || "")
                          : "\u2717 " + (j.error || ""), !!j.ok);
+            };
+            chainLaunch.onclick = async () => {
+                if (chainLaunch.disabled) return;
+                chainLaunch.disabled = true;
+                say("starting the launcher inside the clone\u2026 waiting for it to answer /health (up to 25s)");
+                const j = await fetch("/source-chain/launch", { method: "POST" }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+                await chainPoll();  // launch never changes clone/verified state, but keeps the button styling in sync
+                if (!j.ok) { say("\u2717 " + (j.error || ""), false); return; }
+                if (j.healthy) {
+                    say("\u2713 " + j.version + " is answering on :" + j.port + " -- opening it now, in a new tab.", true);
+                    window.open(j.url, "_blank", "noopener");
+                } else {
+                    // *** STILL A SUCCESS, NOT SILENTLY ONE. *** The launcher started -- spawn did not throw --
+                    // but /health never answered inside the wait. That is a real, different outcome from a
+                    // launcher that never started at all, and collapsing them would hide a slow-booting box
+                    // behind the same message as one that is not running at all.
+                    say("\u26a0 launched " + j.version + " on :" + j.port + ", but it did not answer /health within the wait.\n" +
+                        "It may still be starting -- try " + j.url + " in a moment.", null);
+                }
             };
             // Reflect whatever the server already thinks when the tab is opened -- a chain that ran before this
             // panel was rendered should not present a locked button over a green verdict.

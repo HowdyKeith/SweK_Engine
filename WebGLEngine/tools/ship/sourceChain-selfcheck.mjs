@@ -1,6 +1,8 @@
 // WebGLEngine/tools/ship/sourceChain-selfcheck.mjs -- v3964
 //
-// Run: node tools/ship/sourceChain-selfcheck.mjs   (162ms MEASURED, from gate-timings.json; no network, no clone)
+// Run: node tools/ship/sourceChain-selfcheck.mjs   (1678ms MEASURED, from gate-timings.json; no network, no
+// clone -- v4014's launch section spins up two real short-lived HTTP servers on ephemeral ports, which is
+// where the added time goes)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // *** WHAT THIS DEFENDS IS A REFUSAL, WHICH IS THE ONLY KIND OF CHECK WORTH HAVING HERE. ***
@@ -144,6 +146,52 @@ ok("!! ...and its enabled state is read from the server's canPublish, never reco
     ok("!! verify no longer uses a WITHHELD file as the landmark for finding the project root",
         !/existsSync\(path\.join\(d, "BACKLOG\.md"\)\)/.test(vsrc),
         "it fell back to '.' on a clone, so every marker search ran against WebGLEngine instead of the project");
+}
+
+// ---- 8. LAUNCH: THE CLONE HAD A FOLDER AND NO WAY TO RUN IT ------------------------------------------------
+// v4014 -- Keith, right after publishing a verified clone: "I would want to next see the button to launch new
+// version that we just cloned." canPublish() and _launchGuard() are the SAME SHAPE ON PURPOSE -- a pure
+// predicate over an injectable clone record, so every refusal is DRIVEN here rather than described, without a
+// network clone and without spawning a real process.
+{
+    const g1 = chain._launchGuard(null);
+    ok("!! REFUSES nothing has been cloned", g1.ok === false && /nothing has been cloned/.test(g1.why));
+
+    const g2 = chain._launchGuard({ path: "/no/such/dir/at/all" });
+    ok("!! REFUSES a clone that has vanished from disk", g2.ok === false && /no longer at/.test(g2.why));
+
+    const g3 = chain._launchGuard({ path: ROOT });
+    ok("!! ALLOWS a clone that is genuinely still there", g3.ok === true);
+
+    // *** THE TWO PLUMBING PRIMITIVES, DRIVEN FOR REAL RATHER THAN ASSUMED CORRECT. *** No real launcher is
+    // spawned by this gate -- that part is Windows/Mac-only and this box may be neither -- but the port-finder
+    // and the health-poller are pure Node APIs this box genuinely has, so they are run against a real ephemeral
+    // server rather than mocked.
+    const port = await chain._freePort();
+    ok("!! _freePort() returns a real, currently-unused port", Number.isInteger(port) && port > 0 && port < 65536);
+
+    const http = await import("node:http");
+    const srv = http.createServer((req, res) => { res.writeHead(200); res.end("ok"); });
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    const healthyPort = srv.address().port;
+    const healthy = await chain._waitHealthy(healthyPort, 3000);
+    ok("!! *** _waitHealthy sees a real server that answers /health with anything under 500 ***", healthy === true);
+    await new Promise((r) => srv.close(r));
+
+    const t0 = Date.now();
+    const unhealthy = await chain._waitHealthy(port, 1200);
+    const elapsed = Date.now() - t0;
+    ok("!! ...and REFUSES to call nothing listening 'healthy'", unhealthy === false);
+    ok("!! *** AND IT IS TIME-BOXED, NOT INDEFINITE *** -- v4006's rule for this exact shape",
+        elapsed < 5000, elapsed + "ms against a 1200ms budget; a launch nobody can tell has hung is worse than one that reports it");
+}
+
+// ---- 9. LAUNCH IS ROUTED, AND THE PANEL HAS A BUTTON FOR IT --------------------------------------------------
+ok("!! /source-chain/launch is dispatched by handle()", /route === "\/launch"/.test(src));
+{
+    const panel2 = noComments(fs.readFileSync(path.join(ROOT, "ui", "githubPanel.js"), "utf8"));
+    ok("!! the panel has a launch button wired to /source-chain/launch",
+        /source-chain\/launch/.test(panel2), "a route with no caller is the v3963 defect this same file already gates for Publish");
 }
 
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));

@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4013";   // v4013 -- sensitivity-selfcheck.mjs's magnitude-escalation threshold ("at
+const BRAIN_BUILD = "v4014";   // v4014 -- sourceChainBridge.launch(): starts the freshly-cloned engine for
+// real (its own START_NODE_Engine.bat/START_BUN_Full.bat, whichever this box already prefers) on a fresh port
+// found with listen(0), side by side with whatever is running, and does not open a tab until /health answers
+// -- time-boxed at 25s, reporting "launched but not yet answering" as its own outcome. Keith asked for this
+// right after publishing a clone, then named the mechanism directly: run the launcher, don't just open the
+// folder. Previously v4013 --   // v4013 -- sensitivity-selfcheck.mjs's magnitude-escalation threshold ("at
 // least 9 rescued") was measured before a paired-sweep stage was added in front of it; that stage now eats some
 // of the same knobs first, so the frozen number became structurally unreachable. Re-derived from
 // paired.stillDead.length minus the named KNOWN_DEAD baseline. Also: shipRitual's stale launch-index.json
