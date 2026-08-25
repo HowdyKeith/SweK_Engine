@@ -74,6 +74,34 @@ const SKIP = /orphan-baseline\.json|node_modules|(^|[\\/])vendor[\\/]|\.git|rend
 /** A JSON file that declares it was generated is a RECORD of references, never a maker of them. */
 const isGeneratedRecord = (file, text) =>
     /\.json$/.test(file) && /^\s*[{[]/.test(text) && /"(?:generatedFrom|generated|captured)"\s*:/.test(text.slice(0, 4096));
+
+// v4009 -- A THIRD FILE WALKED IN, AND THIS TIME THE PROPERTY DID NOT EXIST TO ASK FOR.
+// render/ssaoCompare.mjs is a hand-written report comparing two SSAO implementations. Its data table stores
+// each one's path as documentation -- `file: "render/SSAOPass.js"` -- and that bare string satisfied rule 3
+// (path-substring), un-orphaning SSAOPass.js by accident. A later baselineHygiene run read the disappearance
+// from the candidate list as PROGRESS and deleted its baseline entry, exactly the outcome v3900 warned about.
+//
+// isGeneratedRecord() does not cover it: that check is JSON-only, keyed on a provenance property
+// (generatedFrom/generated/captured) that GENERATED files carry for reasons that predate the gate. A
+// hand-written report has no such property to ask for -- ssaoCompare.mjs's own key is `file:`, and grepping the
+// corpus for that exact property turns up 60+ unrelated hits (URLs, Python paths, log strings, .uvtt map names)
+// in ui/installPanel.js, tools/mutate/mutate.mjs and elsewhere. Keying the exclusion on that property name would
+// silently blind the scanner to real references far past this one file.
+//
+// No safe PROPERTY exists here, so this follows DIRECTORY_LOADED below instead of forcing one: a short LIST,
+// with a reason each, that costs a deliberate and reviewable edit to grow -- the same trade DIRECTORY_LOADED
+// already made when its two general heuristics both turned out worse than useless.
+// NOTE: this reason string deliberately avoids spelling out either implementation's literal path -- doing so
+// would recreate the exact bug being excluded, this time inside orphanScan.mjs's own corpus text.
+const REPORT_MODULE = {
+    "render/ssaoCompare.mjs": "compares the two render/ SSAO implementations named in its own header from " +
+        "source; its data table names each by path as documentation and loads neither -- the live one stays " +
+        "reached on its own via main.js's real import",
+    "ssao-compare.html": "the human-readable rendering of the same report -- imports ssaoCompare.mjs for real " +
+        "(that import stands on its own) but its page text also NAMES both implementations by path in prose, " +
+        "which is the same documentation-not-a-load-path shape as the .mjs table it renders",
+};
+const isReportModule = (rel) => Object.prototype.hasOwnProperty.call(REPORT_MODULE, rel);
 const CODE = /\.(js|mjs)$/;
 // v3126 -- PROSE IS NOT REACHABILITY, and this cost a round to learn. The corpus first included .md and .txt,
 // and this scanner's OWN header names the orphans it was written for -- so documenting SSAOPass and SpatialHash
@@ -103,6 +131,17 @@ const stripComments = (t) => {
     return out.join("\n");
 };
 
+// v4009 -- A FOURTH FACE OF THE SAME DEFECT, THIS TIME A TOOLTIP. server.html's link to ssao-compare.html
+// carries a `title="..."` naming both implementations by path, for a human hovering the link -- and that
+// attribute value is neither a comment nor a load path, so stripComments() left it alone and rule 1 (basename)
+// matched it. A `title` attribute is NEVER a load path in any runtime that reads HTML -- it exists solely for a
+// tooltip -- so blanking it is a PROPERTY of the attribute, general across the whole corpus rather than a fact
+// about this one page. Checked against the full corpus before shipping: the only candidate this newly reveals
+// is render/SSAOPass.js: nothing that was reached only via a title attribute elsewhere loses its reason.
+// `.title = "..."` (the JS-side assignment of the same tooltip text) is blanked for the identical reason;
+// `title: "..."` (a colon, an ordinary object property that is sometimes real data) is deliberately left alone.
+const stripTitleAttrs = (t) => t.replace(/\btitle\s*=\s*"[^"]*"/g, 'title=""').replace(/\btitle\s*=\s*'[^']*'/g, "title=''");
+
 export function walk(root, test, acc = []) {
     for (const e of fs.readdirSync(root, { withFileTypes: true })) {
         const p = path.join(root, e.name);
@@ -126,9 +165,11 @@ export function orphanScan(root) {
     for (const f of corpusFiles) {
         try {
             const raw = fs.readFileSync(f, "utf8");
+            const relF = path.relative(root, f).replace(/\\/g, "/");
             // v3900 -- a generated record is dropped from the corpus entirely rather than stripped, because
             // EVERY path in it is a mention and none of them is a call.
-            texts.set(f, isGeneratedRecord(f, raw) ? "" : stripComments(raw));
+            // v4009 -- a listed report module gets the same treatment, for the same reason.
+            texts.set(f, (isGeneratedRecord(f, raw) || isReportModule(relF)) ? "" : stripTitleAttrs(stripComments(raw)));
         } catch { texts.set(f, ""); }
     }
 
