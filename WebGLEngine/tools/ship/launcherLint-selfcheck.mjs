@@ -6,6 +6,7 @@
 // v2909 -- OPEN ITEM 10, CLOSED, AND THE CLASS OF BUG BEHIND IT GATED.
 
 import fs from "fs";
+import { fileURLToPath } from "node:url";
 import os from "os";
 import path from "path";
 import { lintLauncher, lintAll, lintLines } from "./launcherLint.mjs";
@@ -13,7 +14,16 @@ import { lintLauncher, lintAll, lintLines } from "./launcherLint.mjs";
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 
-const ROOT = path.resolve(process.cwd(), "..");
+// v4005 -- *** THE PROJECT ROOT WAS DERIVED FROM THE WORKING DIRECTORY, so this gate crashed with ENOENT
+// on /home/user/START_NODE_Engine.bat when run from anywhere but WebGLEngine/. *** A cwd is not a
+// landmark: it is a fact about how somebody invoked you. THIRD INSTANCE OF THIS FAMILY THIS SESSION --
+// gateSelection compared paths against an un-normalised ENG_ROOT, and changelog.mjs searched for
+// BACKLOG.md as its landmark when no machine has one. Derived from this file's OWN location now,
+// which is the pattern every other gate here already uses.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+// ...and WebGLEngine itself, for the launchers that live INSIDE it. process.cwd() was standing in for this
+// and only agreed when the gate happened to be invoked from there.
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lintprobe-"));
 const write = (n, s) => { const p = path.join(tmp, n); fs.writeFileSync(p, s); return p; };
 
@@ -70,7 +80,7 @@ const write = (n, s) => { const p = path.join(tmp, n); fs.writeFileSync(p, s); r
 
 // ---- 3. OPEN ITEM 10, CLOSED ------------------------------------------------------------------------------------------
 {
-    const reports = lintAll([ROOT, process.cwd()]);
+    const reports = lintAll([ROOT, ENG]);
     const stranded = reports.reduce((a, r) => a + r.findings.length, 0);
     console.log();
     lintLines(reports).forEach((l) => console.log(l));
@@ -81,7 +91,7 @@ const write = (n, s) => { const p = path.join(tmp, n); fs.writeFileSync(p, s); r
         reports.length + " .bat files scanned, 0 stranded. Before this round Start_Everything.bat had three: the " +
         "stale-brain reaper, the window-title taskkill, and the brain start itself -- all below `pause >nul`");
 
-    const se = fs.readFileSync(path.join(process.cwd(), "Start_Everything.bat"), "utf8").replace(/\r/g, "");
+    const se = fs.readFileSync(path.join(ENG, "Start_Everything.bat"), "utf8").replace(/\r/g, "");
     // ANCHOR TO COMMANDS, NOT TEXT. This check first used indexOf("pause >nul") and FAILED -- because the
     // v2909 comment added directly above the moved block contains the words `pause >nul` while explaining the
     // fix, and indexOf found the explanation before the command. The comment describing the fix broke the check

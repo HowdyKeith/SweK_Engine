@@ -38,9 +38,16 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 //   "Check this Mac matches the fleet.command" -- its own SECOND LINE reads "DOUBLE-CLICK THIS ON THE MAC".
 //   START_SweK_LATEST.bat -- a launcher whose header explains why it exists beside START_NODE_Engine.bat.
 // Read, not guessed: both were opened before being added.
+//
+// v4005 -- START_BUN_Full.bat JOINS THEM, BY REQUEST: "lets move the bun bat START_BUN_Full.bat start file
+// into the root too." It is the Bun equivalent of Start_Everything.bat -- bridge plus KPop listener, with a
+// Node fallback -- so it belongs beside START_NODE_Engine.bat for exactly the reason that one is here: it is
+// a thing Keith double-clicks. THE MOVE WAS NOT A RENAME: the file located everything through %~dp0.., which
+// pointed above the project the moment it left "Root Utils", and three paths inside it were corrected. This
+// gate is what forced the reason to be written down rather than the file merely appearing.
 const KEITHS = ["START_NODE_Engine.bat", "MAKE_GMAIL_SAFE.bat", "Start Mac SweK Engine.command",
                 "make_Mac_SweK_Runnable.sh", "make_gmail_safe.sh", "make Gmail safe zip run again.sh",
-                "Check this Mac matches the fleet.command", "START_SweK_LATEST.bat"];
+                "Check this Mac matches the fleet.command", "START_SweK_LATEST.bat", "START_BUN_Full.bat"];
 const missing = KEITHS.filter((f) => !fs.existsSync(path.join(ROOT, f)));
 ok("!! *** every launcher Keith actually uses is still in the ROOT, checked by name ***", missing.length === 0,
    missing.length ? "MISSING: " + missing.join(", ") : KEITHS.length + " named launchers present. THE NAMES ARE THE CHECK, NOT THE COUNT: a tidy-up that left the right NUMBER of files while moving the one he double-clicks would pass a count and fail him on the first use.");
