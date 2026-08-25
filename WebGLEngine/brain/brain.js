@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4006";   // v4006 -- the Bun launcher falls back on /health rather than an exit code, so
+const BRAIN_BUILD = "v4007";   // v4007 -- a page that answers whether this box can run a generative model
+// before downloading it: VRAM is not exposed by any browser, so the verdict is only ever no/maybe, never
+// yes. levelClaim's zero-below-floor was a claim about one box, now negligible-against-signal instead.
+// labResults now completes instead of timing out, revealing real pre-freeze staleness. Previously v4006 --   // v4006 -- the Bun launcher falls back on /health rather than an exit code, so
 // a Bun that HANGS is caught (the old test could not fire at all). And the Bun.WebView "page" is a probe:
 // 7 of 10 announced natives are already in 1.3.11 and would drop ZERO of our packages; the one that would
 // matter is the one absent. Previously v4005 --   // v4005 -- claimTrace swept 394 modes against every device because 18 of them
