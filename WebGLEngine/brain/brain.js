@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3998";   // v3998 -- the face-muscles avatar surface lands next after the talking
+const BRAIN_BUILD = "v3999";   // v3999 -- the avatar panel on server.html loses its camera and keeps its
+// face: ui/faceMoves.js is a second producer for the snapshot() interface ui/faceExpression.js and
+// ui/faceRig.js already consumed, turning the engine's own swek:move events into MediaPipe-shaped
+// blendshapes. Sabotage found the consumer-side check pointed the wrong way round, which found three
+// coefficients faceRig reads and nothing was emitting. Previously v3998 -- the face-muscles avatar
+// surface lands next after the talking
 // head, and the showcase gallery pill stops rendering inside an embed. Nothing in the brain mounts avatars;
 // this bump is the ritual marker.
 // v3997 -- bun vs node benchmarked: they trade places by ~75x depending

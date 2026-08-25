@@ -55,7 +55,20 @@ export const MODES = [
     // already been opened this session the model is cached, so the second of the pair is usually instant. The
     // warning is still stated rather than guessed: a button that promises "instant" and then downloads 12 MB is
     // worse than one that over-warns.
-    { id: "facemuscles", label: "\ud83d\ude2e", title: "Face muscles \u2014 MediaPipe blendshapes driving a face from your camera (~12 MB on first use)", kind: "frame",
+    //
+    // v3999 -- *** THE TITLE SAID "FROM YOUR CAMERA" AND THAT STOPPED BEING TRUE THE ROUND AFTER IT WAS
+    // WRITTEN. *** Keith: "we want to hide camera when it is shown on server.html. server.html is self driven
+    // avatars." Embedded, this surface now takes its blendshapes from ui/faceMoves.js -- the engine's own
+    // `swek:move` events -- and never opens a webcam. The description is the thing a user reads before
+    // clicking, so a description of the removed input is worse than no description at all.
+    //
+    // The `heavy` note is left standing, and it is now MEASURED rather than guessed: with the camera controls
+    // hidden, a headless load of /face-mirror.html?embed=1 requests ZERO bytes from cdn.jsdelivr.net (and so
+    // does /thead.html?embed=1, whose camera button has been inside the hidden #mood since v3656). Section 5
+    // of tools/ship/avatarServerViews-selfcheck.mjs asserts that. The warning therefore over-warns for the
+    // embedded mount -- which is the safe direction, and is its own round to change, because `heavy` also
+    // drives the heavy-last ORDERING invariant that v3556 built the list around.
+    { id: "facemuscles", label: "\ud83d\ude2e", title: "Face muscles \u2014 the engine's own moves read as a face: MediaPipe blendshape coefficients, no camera", kind: "frame",
       src: "/face-mirror.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
 ];
 
@@ -139,6 +152,33 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
         surface = f;
         host.appendChild(f);
     }
+
+    // *** v3999 -- THE HOST'S MOVES, RELAYED INTO THE FRAME. ***
+    //
+    // ui/swekRobot.js has dispatched `swek:move` on window since v1690, and ui/pipboyWireframe.js has mirrored
+    // it onto a stick figure ever since -- but that works because the pip-boy runs in the SAME window. Inside an
+    // iframe `window` is the FRAME'S window, so a framed surface never hears the host's events at all.
+    //
+    // THE RELAY IS ONE-WAY AND CARRIES ONLY A MOVE NAME FROM A CLOSED SET. It is deliberately not "forward every
+    // event to the child": a postMessage bridge that passed arbitrary payloads into a frame would be a channel
+    // somebody could put anything in, and this needs to carry six words. targetOrigin is the page's own origin
+    // rather than "*", because the frames are same-origin pages out of this tree and there is no reason to
+    // broadcast to any other.
+    const MOVE_NAMES = ["idle", "nod", "wave", "cheer", "spin", "dance", "error"];
+    function relay(msg) {
+        try {
+            if (!surface || surface.tagName !== "IFRAME" || !surface.contentWindow) return;
+            surface.contentWindow.postMessage(msg, location.origin);
+        } catch (e) {}
+    }
+    try {
+        window.addEventListener("swek:move", (e) => {
+            const mv = (e && e.detail && e.detail.move) || "";
+            if (MOVE_NAMES.includes(mv)) relay({ type: "swek:move", move: mv });
+        });
+        // the spoken ticker drives the jaw the same way it drives the SVG robot's setTalking()
+        window.addEventListener("swek:talking", (e) => relay({ type: "swek:talking", on: !!(e && e.detail && e.detail.on) }));
+    } catch (e) {}
 
     async function set(id, { announce = true } = {}) {
         const mode = modeById(id);
