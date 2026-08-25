@@ -89,10 +89,31 @@ const dev = await getDevice("inference");
 {
     const { modesOf } = await import("./deviceModes.mjs");
     const m = modesOf(dev, null);
-    ok("inference declares its modes -- 38 graded of 113 proven",
-        m.source === "exported" && m.declared.length === 2,
-        `source "${m.source}", modes ${JSON.stringify(m.declared)}. This is the last ungraded module carrying a ` +
-        "ready-made closed form; the next promotion has to build a key rather than find one");
+    // *** v4000 -- THE FOURTH STALE COUNT PIN THIS ROUND, AND THE FAMILY IS THE FINDING. *** This pinned TWO
+    // modes; the device declares three -- posterior, calibration, overconfident. Same shape as figureEight's
+    // "four modes" (a fifth had been added, and it was that device's PLANT), fieldNav's "three" and
+    // conservationReach's "the count is ONE". A NUMBER TYPED BESIDE A LIST IS A SECOND DECLARATION OF THAT
+    // LIST, and it goes stale the first time somebody edits the real one.
+    //
+    // The "38 graded of 113" in the label was a second one in the same line, a progress figure true when
+    // written and checked by nothing. It is gone rather than updated: this check is about whether the DEVICE
+    // declares its modes, and a lab-wide statistic riding in its label could only ever rot.
+    //
+    // What v3192 actually cared about is `source`: a device whose modes are EXPORTED can be asked, while one
+    // that must be PROBED is only ever known to a candidate list -- and the lab's apparent one-moded-ness
+    // turned out to be that list rather than the devices. So that is the assertion, every declared mode must
+    // run, a nonsense one must be refused, and the count is REPORTED.
+    const { checkMode } = await import("./knobGate.mjs");
+    const runs = m.declared.filter((x) => checkMode(dev, x).ok !== false);
+    ok("!! inference's modes are EXPORTED rather than probed, and every one of them is accepted",
+        m.source === "exported" && m.declared.length > 0 && runs.length === m.declared.length,
+        `source "${m.source}", ${m.declared.length} modes ${JSON.stringify(m.declared)}` +
+        (runs.length === m.declared.length ? "" : "  <- REFUSED ITS OWN: " +
+         m.declared.filter((x) => !runs.includes(x)).join(", ")) +
+        ". This module carries a ready-made closed form; the next promotion has to build a key rather than find one");
+    ok("!! ...and a mode it never declared is refused", checkMode(dev, "zzz_no_mode").ok === false,
+        "a mode selects WHICH PHYSICS RUNS, so a device that accepts a name it does not declare runs " +
+        "something else and says nothing");
 }
 
 console.log();

@@ -57,12 +57,28 @@ export const ASSUMED_CHEAP_MS = 1000;
 // Everything is normalised to engine-relative here, once, at the boundary.
 // v3937 -- fileURLToPath, NOT .pathname. On Windows `new URL(...).pathname` yields "/C:/dir" and
 // path.join then prepends the current drive, giving "C:\\C:\\dir" -- every read fails ENOENT.
-const ENG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+// *** v4000 -- THE NORMALISER NORMALISED ITS INPUT AND NOT THE CONSTANT IT COMPARED AGAINST. ***
+// path.resolve() returns the platform's own separators, so on Windows ENG_ROOT is "C:\\Users\\...\\WebGLEngine"
+// while the line below has just turned every input into forward slashes. `x.startsWith(ENG_ROOT + "/")` is then
+// FALSE FOR EVERY PATH, nothing is ever stripped to engine-relative, and the whole selector compares absolute
+// paths on one side against relative ones on the other.
+//
+// THAT IS THE SAME DEFECT THE HEADER ABOVE DESCRIBES, IN THE FIX FOR IT. v3441 found gateFiles() returning
+// absolute paths and affectedGates() relative ones, wrote "everything is normalised to engine-relative here,
+// once, at the boundary" -- and normalised one side of the boundary. It has been green on Linux and silently
+// broken on Windows ever since, which is exactly what Keith's rig reported: 0 of 102 reachable gates in the
+// plan, 0 direct importers, and 45 of 45 costs "guessed" because the OBSERVED lookup keys are relative too.
+//
+// A CONSTANT IS AN INPUT. It gets the same treatment as one.
+const ENG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..").replace(/\\/g, "/");
 const rel = (p) => {
     let x = String(p).replace(/\\/g, "/").replace(/^\.\//, "");
     if (x.startsWith(ENG_ROOT + "/")) x = x.slice(ENG_ROOT.length + 1);
     return x;
 };
+/** Exported ONLY so a gate can drive it on a Windows-shaped path from a Linux box. */
+export const _relForTest = rel;
+export const _engRootForTest = () => ENG_ROOT;
 
 /**
  * Cost per gate in ms. Priority: the perf ledger's median for THIS host (real, recent, local) > the v3211

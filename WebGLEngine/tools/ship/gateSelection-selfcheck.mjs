@@ -12,7 +12,8 @@
 // adjudicator does not ask "did it finish in time" -- it names a break, names the gate that catches it, and asks
 // whether the plan contains that gate. Fast and wrong is the failure being measured.
 
-import { selectGates, adjudicateSelection, selectionLines, costsFor, ASSUMED_CHEAP_MS, OBSERVED } from "./gateSelection.mjs";
+import { selectGates, adjudicateSelection, selectionLines, costsFor, ASSUMED_CHEAP_MS, OBSERVED,
+         _relForTest, _engRootForTest } from "./gateSelection.mjs";
 import { gateFiles } from "./staleness.mjs";
 import { MEASURED } from "./gateBudget.mjs";
 import { registerProposer, runProposer, getProposer, grantLicence, applyKnobs } from "../../physics/proposers.mjs";
@@ -21,6 +22,45 @@ let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
 const CHANGED = ["physics/statmech/ising.js"];
+
+// ---- 0. THE BOUNDARY NORMALISES BOTH SIDES, NOT JUST THE INPUT ---------------------------------------------------------
+//
+// *** THIS FILE'S SUBJECT IS TWO PATH CONVENTIONS MEETING, AND THE FIX FOR IT HAD THE BUG. *** v3441 found
+// gateFiles() returning absolute paths and affectedGates() relative ones, and wrote a `rel()` that turned every
+// INPUT into forward slashes -- then compared it against ENG_ROOT, which path.resolve() had built with the
+// PLATFORM'S separators. On Windows that startsWith() is false for every path in the tree, so nothing is ever
+// stripped and the selector compares absolutes against relatives. Keith's rig: 0 of 102 reachable gates in the
+// plan, 0 direct importers, 45 of 45 costs "guessed" because the OBSERVED keys are relative too. Seven
+// failures, one cause, INVISIBLE ON LINUX -- where ENG_ROOT already has forward slashes and it all works.
+//
+// The checks below drive the normaliser on a WINDOWS-SHAPED path from whatever box this runs on, so the bug is
+// reachable without a Windows box. A DEFECT ONLY ONE PLATFORM CAN SEE IS ONE NOBODY WILL SEE UNTIL IT SHIPS.
+{
+    const root = _engRootForTest();
+    ok("!! *** ENG_ROOT carries NO platform separators -- the constant is normalised like an input ***",
+       !/\\/.test(root), root + " -- if this holds a backslash on Windows, every startsWith below is false " +
+       "and the whole selector silently compares absolute paths against relative ones");
+    // the exact shape a Windows path.resolve() hands in, driven from here
+    const winAbs = root.replace(/\//g, "\\") + "\\tools\\ship\\gateSelection-selfcheck.mjs";
+    ok("!! ...so a backslash-separated absolute path still normalises to engine-relative",
+       _relForTest(winAbs) === "tools/ship/gateSelection-selfcheck.mjs",
+       JSON.stringify(winAbs) + " -> " + JSON.stringify(_relForTest(winAbs)));
+    const posixAbs = root + "/tools/ship/gateSelection-selfcheck.mjs";
+    ok("...and so does a forward-slash one, so the fix did not break the platform it worked on",
+       _relForTest(posixAbs) === "tools/ship/gateSelection-selfcheck.mjs");
+    ok("...and an ALREADY-relative path is left alone rather than mangled",
+       _relForTest("tools/ship/gateSelection-selfcheck.mjs") === "tools/ship/gateSelection-selfcheck.mjs" &&
+       _relForTest("./physics/statmech/ising.js") === "physics/statmech/ising.js",
+       "the boundary is crossed once; a normaliser that only worked on absolutes would move the bug rather " +
+       "than fix it");
+    // AND THE CONSEQUENCE, ASSERTED WHERE IT BITES: the cost table is keyed on relative paths, so an
+    // un-normalised name misses every entry and the plan reports itself as a guess.
+    ok("!! ...and a normalised name really does hit the OBSERVED cost table",
+       Object.keys(OBSERVED).length > 100 &&
+       Object.keys(OBSERVED).some((k) => k === _relForTest(root + "/" + k)),
+       Object.keys(OBSERVED).length + " observed timings, keyed relative -- '45 of 45 guessed' on the rig was " +
+       "this same un-normalised name missing every one of them, reported as honesty about a guess");
+}
 
 // ---- 1. REACHABILITY IS REAL, AND IT LEADS THE PLAN ----------------------------------------------------------------
 {

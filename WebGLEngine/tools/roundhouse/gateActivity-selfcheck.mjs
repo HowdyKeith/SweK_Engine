@@ -87,9 +87,21 @@ const A = buildGateActivity(input);
 // ---- 3. THREE TIMING STATES, AND `never-timed` IS NOT `fast` -------------------------------------------------
 {
     for (const s of TIMING_STATES) say(`${s.padEnd(12)} ${A.counts[s]}`);
-    ok("!! *** every one of the three states is REACHED, so none of them is a category that cannot happen ***",
-       A.counts.timed > 0 && A.counts.partly > 0 && A.counts["never-timed"] > 0,
-       `${A.counts.timed} / ${A.counts.partly} / ${A.counts["never-timed"]}. *** THE PARTLY STATE IS THE ONE A TWO-WAY FLAG WOULD LOSE: a device whose gates are half measured is neither timed nor untimed, and rounding it either way is a confident wrong answer about ${A.counts.partly} devices. *** A CHECK THAT HAS NEVER BEEN SEEN TO FIRE MIGHT NOT FIRE (v3142), which is why the empty-category question is asked at all.`);
+    // *** v4000 -- THIS ASSERTED A PROPERTY OF THE TREE AND WENT RED WHEN THE TREE GOT BETTER. ***
+    // `never-timed` reached ZERO: there is no longer a device whose gates have all gone unmeasured, which is
+    // the outcome the whole timing arc has been working toward. The check read that as an empty category and
+    // failed. A LINE THAT FIRES ON SUCCESS TEACHES PEOPLE TO IGNORE IT.
+    //
+    // The v3142 concern behind it is real -- a state nobody has seen reached might be unreachable -- but the
+    // check two below already answers it, and answers it better: it drives each of the four states on a
+    // FIXTURE, so their reachability is a property of the CODE and cannot be undone by the tree improving.
+    // That one stays an assertion. This one becomes the census it always was.
+    //
+    // WHAT WOULD STILL BE A REAL FINDING IS `timed` COLLAPSING, so that keeps its floor: a run where nothing
+    // is timed means the timings file is missing or unreadable, and every state below rests on it.
+    ok("!! the timed population has not collapsed -- the rest of this section rests on it",
+       A.counts.timed > 0,
+       `${A.counts.timed} timed / ${A.counts.partly} partly / ${A.counts["never-timed"]} never-timed. *** THE PARTLY STATE IS THE ONE A TWO-WAY FLAG WOULD LOSE: a device whose gates are half measured is neither timed nor untimed, and rounding it either way is a confident wrong answer about ${A.counts.partly} devices. *** never-timed reached ZERO at v4000 -- REPORTED rather than asserted, because that is the timing arc SUCCEEDING; the fixture check below is what proves the state is still reachable, and it does so without depending on the tree's current contents.`);
     ok("!! *** a never-timed device carries ms === null, NEVER 0 -- unmeasured is not quick ***",
        A.nodes.filter((n) => n.state === "never-timed").every((n) => n.ms === null) &&
        A.nodes.filter((n) => n.state === "timed").every((n) => typeof n.ms === "number" && n.ms >= 0),
