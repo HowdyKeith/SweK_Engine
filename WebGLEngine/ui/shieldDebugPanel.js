@@ -76,7 +76,7 @@ export function mountShieldDebugPanel() {
     root.appendChild(ipRow);
 
     // v734 — saved/named device list. Shares the localStorage key
-    // `voxelengine.devices.shield` with the phone control.html so
+    // `voxelengine.devices.shield` with the phone phone.html so
     // devices saved on the phone show up here too and vice versa.
     const devKey = "voxelengine.devices.shield";
     const devRow = el("div", { display: "flex", gap: "4px", marginTop: "4px", alignItems: "center" });
@@ -384,7 +384,7 @@ export function mountShieldDebugPanel() {
     // has the old remote with just buttons... the old button view should be left as a panel view choice, but it
     // doesn't have the smooth virtual joystick pad that the phone version does."
     //
-    // NOT A PORT -- A MOUNT. v3263 pulled the geometry out of control.html into ui/joystickCore.js precisely so
+    // NOT A PORT -- A MOUNT. v3263 pulled the geometry out of phone.html into ui/joystickCore.js precisely so
     // this could be four lines of DOM plus one function call, with ONE definition of what a stick does. A second
     // copy of that arithmetic here would be the defect this project has spent its life removing.
     //

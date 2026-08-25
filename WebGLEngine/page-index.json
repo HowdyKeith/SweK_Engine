@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 397,
+ "count": 406,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -231,6 +231,13 @@
    "f": "beam.html",
    "t": "SweK Physics — the cantilever beam",
    "d": "Two exact keys from one discretisation that fail in different ways. Static: the tip deflection is exactly FL^3/3EI. Dynamic: the vibration frequencies are roots of cos(b)cosh(b) = -1, so the ratios 6.2669 and 17.5475 are irrational numbers no plausible bug produces by accident. A tenfold stiffness change moves the deflection tenfold and leaves every ratio bit-identical, which is why one key cannot replace the other.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "bell.html",
+   "t": "SweK &middot; Bell Inequality (CHSH)",
+   "d": "Turn the measurement angles and watch quantum correlations climb past anything a local hidden variable theory can produce -- then hit a second ceiling they cannot cross either. Both bounds are computed live by brute-force search, not drawn in as reference lines: the classical 2 by enumerating all 16 local strategies, the quantum 2.828 by sweeping the whole angle space.",
    "g": "",
    "p": 0
   },
@@ -522,6 +529,13 @@
    "p": 0
   },
   {
+   "f": "cartpole.html",
+   "t": "SweK &middot; Cart-Pole with LQR",
+   "d": "An inverted pendulum held upright by an optimal regulator, live. Crank the gain multiplier to a hundred times and it still balances -- LQR guarantees an INFINITE gain margin, and you can watch the guarantee hold. Then switch the controller to one designed on the hanging equilibrium: every self-consistency check it can run still passes, and it drops the pole in under two seconds.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "case-study.html",
    "t": "SweK Engine &mdash; a physics engine you can prove",
    "d": "",
@@ -684,8 +698,8 @@
   },
   {
    "f": "control.html",
-   "t": "Control",
-   "d": "",
+   "t": "Control moved to Phone",
+   "d": "Redirect stub. This page was renamed to phone.html at v4019; the stub exists because paired phones already hold this URL.",
    "g": "",
    "p": 0
   },
@@ -869,6 +883,13 @@
    "t": "Show on Echo",
    "d": "",
    "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "ecology.html",
+   "t": "SweK &middot; Predator and Prey",
+   "d": "Predator and prey chase each other round a closed loop forever. Drag the harvest slider -- which kills BOTH species at once, a pesticide or a fishing fleet -- and watch the average PREY population go UP. That is Volterra's principle, it is exact, and it is the answer to why the fraction of predatory fish in the Adriatic rose when the First World War stopped the fishing.",
+   "g": "",
    "p": 0
   },
   {
@@ -1440,7 +1461,7 @@
   },
   {
    "f": "kepler.html",
-   "t": "Kepler orbits - symplectic vs RK4",
+   "t": "Kepler orbits - four integrators, one matched pair",
    "d": "",
    "g": "cosmic",
    "p": 0
@@ -1548,6 +1569,13 @@
    "t": "Torrent",
    "d": "The same D3Q19 lattice that earned Hagen-Poiseuille to half a percent, running on the GPU at a scale the CPU cannot touch: 655,360 cells, 12.5 million populations, where the CPU manages 22,400 cells at 16 ms a step and would need almost half a second for this one. Every number underneath this was earned before the page existed -- the kernel was adjudicated against the verified CPU solver on real hardware, cell by cell, and made to reproduce Hagen-Poiseuille by itself, and the check that says so was watched failing under deliberate sabotage first. The GPU does the physics; the isosurface and the tracers are the same proven code the small CPU version uses. Colour reads SPEED, not heat: this lattice is isothermal by construction and has no temperature in it at all.",
    "g": "fluidgpu",
+   "p": 0
+  },
+  {
+   "f": "lensing.html",
+   "t": "SweK &middot; Gravitational Microlensing",
+   "d": "A point mass passing in front of a background star splits it into two images and brightens it -- watch the images move and the light curve rise as the alignment tightens. Every number is read straight from physics/astroparticle/lensing.js: nothing on this page is a second copy of the physics.",
+   "g": "",
    "p": 0
   },
   {
@@ -1761,6 +1789,13 @@
    "p": 0
   },
   {
+   "f": "node-bun.html",
+   "t": "SweK Engine &mdash; Node / Bun",
+   "d": "",
+   "g": "systools",
+   "p": 0
+  },
+  {
    "f": "node-gradient.html",
    "t": "The third declaration, and the fourth hiding inside it (v3639)",
    "d": "Node-based Green-Gauss is supposed to be the linearity-preserving one - and it is, but only with a linearity-preserving node interpolation. With inverse-distance node values it is 15x better and still not exact, and at a boundary it reads 32% on a mesh with no shear at all.",
@@ -1884,6 +1919,13 @@
    "t": "Phase change - four transitions, four keys nothing here is told (v3669)",
    "d": "Melting, freezing, gasification and crystallisation, each graded against a closed form the solver never sees - a Stefan front, an asymmetry predicted from material properties, an expansion ratio that is exactly 1 at the critical point, and an Avrami exponent set by counting dimensions.",
    "g": "matter",
+   "p": 0
+  },
+  {
+   "f": "phone.html",
+   "t": "Phone",
+   "d": "",
+   "g": "",
    "p": 0
   },
   {
@@ -2058,6 +2100,13 @@
    "f": "raymarch-options.html",
    "t": "Ray-march options (v3351)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "reactor.html",
+   "t": "SweK &middot; Point Reactor Kinetics",
+   "d": "Pull the control rods and watch the reactor period. Delayed neutrons are 0.65% of the total and they are the only reason a reactor can be controlled at all: past $1.00 the period collapses and no operator can follow it. Scram it and watch the flux refuse to fall faster than the 56-second precursor floor, then watch xenon-135 poison the core for half a day afterwards.",
    "g": "",
    "p": 0
   },
@@ -2412,6 +2461,13 @@
    "p": 0
   },
   {
+   "f": "stellar.html",
+   "t": "SweK &middot; Lane-Emden Polytropes",
+   "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "svg-forge.html",
    "t": "SweK &middot; SVG forge",
    "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
@@ -2708,6 +2764,13 @@
   {
    "f": "webgpu-bench.html",
    "t": "WebGPU Lab",
+   "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "webgpu-llm.html",
+   "t": "Can this box run a model in the page?",
    "d": "",
    "g": "",
    "p": 0

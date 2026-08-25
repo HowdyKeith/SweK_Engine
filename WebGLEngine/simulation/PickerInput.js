@@ -3,7 +3,7 @@
 //
 // Owns "where is the cursor right now in NDC, and who last touched it" plus a
 // click event bus. Two input sources feed it: the mouse (via canvas listeners
-// in SandboxMode) and the phone (via WS messages from control.html, routed in
+// in SandboxMode) and the phone (via WS messages from phone.html, routed in
 // by main.js — see the phone:picker:* handlers there).
 //
 // Why this abstraction: SandboxMode previously tracked the cursor itself from
@@ -85,7 +85,7 @@ export class PickerInput {
         this._fireClick("phone");
     }
     // v618 — right-click parity. Mouse path fires from contextmenu; phone path
-    // fires from the long-press WS message (control.html holds the threshold).
+    // fires from the long-press WS message (phone.html holds the threshold).
     fireMouseRightClick() { this._fireRightClick("mouse"); }
     firePhoneRightClick() { this._fireRightClick("phone"); }
     recalibrate() { this._phoneBase = null; }

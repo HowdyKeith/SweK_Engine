@@ -48,7 +48,7 @@ const VOICE_EXPRESSION = {
 };
 
 const LISTENER_VIEW_URL = {
-    // v970 — the phone-style diorama stage (matches control.html): rigged avatar
+    // v970 — the phone-style diorama stage (matches phone.html): rigged avatar
     // wandering among 3D gauges + ticker. Default. ?glb2= adds a 2nd avatar.
     stage: "/avatarstage.html?voice=M1&scene=diorama&camdock=1&orb=1",   // v1003 diorama + v1005 camera in the panel dock
     // v972 — shared DUO stage: two avatars approach + dance/highfive/spar/hug
@@ -1420,7 +1420,7 @@ export class PipAvatar {
         });
         wrap.appendChild(heartbeatCanvas);
 
-        // Circle gauges row (v846) — parity with phone control.html
+        // Circle gauges row (v846) — parity with phone phone.html
         // tama-meter row. Horizontal layout, conic-gradient donuts at
         // 36×36 (matched to phone), click-to-fire with emoji burst.
         // Same color schemes + same action routing as phone:

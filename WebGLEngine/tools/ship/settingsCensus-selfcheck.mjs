@@ -77,7 +77,7 @@ const k = censusConsumers(ROOT);
 // ---- 3. THE PHONE PATH EXISTS, AND v3262 SAID IT DID NOT (v3268) ---------------------------------------------------------
 {
     const main = fs.readFileSync(path.join(ROOT, "main.js"), "utf8");
-    const phone = fs.readFileSync(path.join(ROOT, "control.html"), "utf8");
+    const phone = fs.readFileSync(path.join(ROOT, "phone.html"), "utf8");
 
     ok("!! *** the phone can read the schema and set a value, over the WS channel ***",
         /settings:describe/.test(main) && /settings:schema/.test(main) &&
@@ -106,7 +106,7 @@ console.log("  ----  ANSWERED AT v3268 AND THE ANSWER WAS ALREADY YES: each of t
 console.log("  ----  from the phone over the WS channel (settings:describe / settings:set, v850+v851).");
 console.log("  ----  WHAT REMAINS TRUE: settings.html is a SEPARATE hand-built page that does not use the");
 console.log("  ----  schema -- so the PHONE has two settings surfaces of its own, one schema-driven in");
-console.log("  ----  control.html and one hand-built in settings.html. THAT is the real duplication.");
+console.log("  ----  phone.html and one hand-built in settings.html. THAT is the real duplication.");
 console.log("  ----  Merging them is a design round; knowing which is which is no longer guesswork.");
 if (fails) { console.log("settingsCensus-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("settingsCensus-selfcheck: all checks pass");

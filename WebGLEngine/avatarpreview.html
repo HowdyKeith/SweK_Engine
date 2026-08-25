@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1256 (#12) — Animation preview for imported rigs. Opened from the control.html
+<!-- v1256 (#12) — Animation preview for imported rigs. Opened from the phone.html
      Mesh2Motion picker as avatarpreview.html?glb=<url>. Loads the GLB with the
      vendored three GLTFLoader, lists its animation clips, and plays the selected clip
      through an AnimationMixer so you can audition a rig BEFORE setting it as the avatar.
@@ -155,7 +155,7 @@ clipSel.addEventListener("change", ()=>{ const i = parseInt(clipSel.value,10); i
 speedEl.addEventListener("input", ()=>{ if (action) action.setEffectiveTimeScale(parseFloat(speedEl.value)||1); });
 playBtn.addEventListener("click", ()=>{ if (!mixer) return; playing = !playing; mixer.timeScale = playing ? 1 : 0; playBtn.textContent = playing ? "⏸" : "▶"; playBtn.classList.toggle("accent", playing); });
 spinBtn.addEventListener("click", ()=>{ autoSpin = !autoSpin; spinBtn.classList.toggle("accent", autoSpin); });
-closeBtn.addEventListener("click", ()=>{ try{ window.close(); }catch{} history.length>1 ? history.back() : (location.href="./control.html"); });
+closeBtn.addEventListener("click", ()=>{ try{ window.close(); }catch{} history.length>1 ? history.back() : (location.href="./phone.html"); });
 useBtn.addEventListener("click", ()=>{
   if (!glbUrl) return;
   useBtn.textContent = "switching …";

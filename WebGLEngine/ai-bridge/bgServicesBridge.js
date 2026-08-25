@@ -161,7 +161,7 @@ const SERVICES = {
     ai_website_cloner: {
         label: "AI Website Cloner (Claude Code skill)", bin: "", winget: "",
         serve: [], probe: { type: "none" },
-        note: "A Claude Code / Codex SKILL (JCodesMore/ai-website-cloner-template, TS) that reverse-engineers a website: screenshots it (via the Chrome MCP), extracts its design system (colors, type, components), then spins up parallel agents to rebuild it in Next.js/React/Tailwind and diffs the result against the original. USEFUL HERE: point it at your OWN SweK pages (server.html, control.html, the LCARS UI) to get a clean modern React rebuild or a design-system audit of your own front-end - the author tested it on their own site. (Author's note: not for phishing or copying others' designs.) Install into Claude Code and run /clone-website <url>.",
+        note: "A Claude Code / Codex SKILL (JCodesMore/ai-website-cloner-template, TS) that reverse-engineers a website: screenshots it (via the Chrome MCP), extracts its design system (colors, type, components), then spins up parallel agents to rebuild it in Next.js/React/Tailwind and diffs the result against the original. USEFUL HERE: point it at your OWN SweK pages (server.html, phone.html, the LCARS UI) to get a clean modern React rebuild or a design-system audit of your own front-end - the author tested it on their own site. (Author's note: not for phishing or copying others' designs.) Install into Claude Code and run /clone-website <url>.",
         url: "https://github.com/JCodesMore/ai-website-cloner-template",
         github: "JCodesMore/ai-website-cloner-template",
         paths: [],

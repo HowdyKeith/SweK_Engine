@@ -3335,7 +3335,7 @@ function serveStaticFile(req, res) {
     { const _dh = _delegateHost(req); if (_dh) { _proxyToHost(req, res, _dh); return; } }
 
     // v519 — phones get the touch control panel at the root; desktops get the
-    // engine. Either device can still reach the other by URL (/control.html for
+    // engine. Either device can still reach the other by URL (/phone.html for
     // the panel, /index.html for the engine demos), so this is just the default.
     // v649 — bypass with ?engine=1 (or any value) so a phone can force the
     //   desktop engine without a UA spoof. Persists for the session via a
@@ -3346,11 +3346,11 @@ function serveStaticFile(req, res) {
     const queryHasEngine = /(^|&)engine=/.test(qs);
     const cookieHasEngine = /(^|;\s*)engine=1/.test(req.headers["cookie"] || "");
     const forceEngine = queryHasEngine || cookieHasEngine;
-    if (isMobile && urlPath === "/index.html" && !forceEngine) urlPath = "/control.html";
+    if (isMobile && urlPath === "/index.html" && !forceEngine) urlPath = "/phone.html";
     if (urlPath === "/server.html") _lastConsoleHit = Date.now();   // v2330 -- a console tab is loading (counts even before its SSE connects)
     // v649 — if the phone arrived with ?engine=1 in the URL, set a session
     // cookie so subsequent in-app navigations (which won't carry the query)
-    // stay on the engine instead of bouncing back to control.html. The cookie
+    // stay on the engine instead of bouncing back to phone.html. The cookie
     // is session-scoped (no Max-Age) so it clears when the user closes the
     // browser tab — re-opening goes back to the phone-default.
     if (queryHasEngine && !cookieHasEngine) {
@@ -14781,7 +14781,7 @@ ${text.replace(/'/g, "''")}
     const _RAY_MAKE_APPS = [
         { id: "main-engine",   title: "Main Engine",        path: "/index.html",            hint: "the WebGL engine" },
         { id: "server-panel",  title: "Server Panel",       path: "/server.html",           hint: "boot modes, demos, hosting" },
-        { id: "control",       title: "Phone Control",      path: "/control.html",          hint: "the phone UI" },
+        { id: "control",       title: "Phone Control",      path: "/phone.html",          hint: "the phone UI" },
         { id: "settings",      title: "Settings",           path: "/settings.html",         hint: "engine settings" },
         { id: "raycast-panel", title: "Raycast LLM Panel",  path: "/raycast.html",          hint: "this integration" },
         { id: "hosting",       title: "Hosting / LAN",      path: "/hosting.html",          hint: "tunnel + peers" },
@@ -16803,7 +16803,7 @@ ${text.replace(/'/g, "''")}
         return;
     }
     // v927 — current avatar URL channel: the engine publishes its resolved avatar
-    // (POST /avatar/set) so the phone control.html mini-avatar mirrors the PC's
+    // (POST /avatar/set) so the phone phone.html mini-avatar mirrors the PC's
     // current view (GET /avatar/current). Plain in-memory KV, like the gauge bag.
     if (req.method === "GET" && req.url === "/avatar/current") {
         sendJson({ ok: true, url: currentAvatarUrl || null, ts: avatarTs });
@@ -20999,7 +20999,7 @@ appServer.listen(PORT, () => {
     // v1569 — tab-aware relaunch. The launcher skips opening a tab after a restart/auto-update on the
     // ASSUMPTION that an existing page reconnects onto the new build. But on an auto-update from a
     // download there may be no live tab, so nothing appeared. A few seconds after boot, if NO browser
-    // is connected — neither the engine (WebSocket: index.html/control.html) nor the server console
+    // is connected — neither the engine (WebSocket: index.html/phone.html) nor the server console
     // (SSE on /sys/logs/stream: server.html) — open server.html ourselves. If one reconnected, leave it
     // (no duplicate tab). This is the real "is a tab open?" check the blunt flag never did.
     // v1599 — ALWAYS run this check-and-open (was gated on _WAS_RELAUNCH). The wsN+sseN===0 test below is

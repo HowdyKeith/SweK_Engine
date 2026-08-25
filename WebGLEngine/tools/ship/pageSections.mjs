@@ -109,7 +109,7 @@ export const SECTIONS = [
     // (/ha, /doorbell, /arrival, /presence, /alexa, /shield, /nest, /solar). That is 25 unclaimed pages.
     //
     // THE SECOND CUT IS THE ONE THAT NEEDED JUDGEMENT AND IT IS REPORTED RATHER THAN HIDDEN: of those 25, the
-    // share of each page's endpoints that are house endpoints separates them. control.html reads 9 house
+    // share of each page's endpoints that are house endpoints separates them. phone.html reads 9 house
     // endpoints OUT OF 60 -- it is a dashboard that happens to show the house, not a house page -- and
     // index.html (2/5), hub.html (1/2), board.html (2/3), pipboy-models.html (3/28), clients.html, connect.html
     // and avatar-push.html are the same shape: they call /shield/exec or read a sensor while being about
