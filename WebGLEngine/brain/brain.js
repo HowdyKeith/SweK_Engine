@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4011";   // v4011 -- requestedExit-selfcheck.mjs asserted a branch of restart() that is
+const BRAIN_BUILD = "v4012";   // v4012 -- /self/zip picked the highest-numbered zip in ~/Downloads with no
+// comparison against the live running version -- Keith caught it live on Galaxina, running v3995, downloading
+// v3940. Extracted to packagerBridge.selfZipCandidate(): matches Downloads against the LIVE version exactly,
+// falls back to a fresh build via makeInstallable() when nothing matches. Caught before shipping: a first draft
+// compared a "vNNNN" string against a bare number with ===, never true regardless of digits. Sabotage-tested
+// against Keith's exact bug shape. Previously v4011 --   // v4011 -- requestedExit-selfcheck.mjs asserted a branch of restart() that is
 // unreachable on Windows: isWin/isMac are real process.platform checks, so a Windows child always takes its own
 // relaunch branch (exit 0 by design, flag written) and can never reach the "no relauncher" fallback the gate
 // was checking. Not a server bug -- confirmed by simulating process.platform="win32" here. Gate now checks the

@@ -14,6 +14,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const buildName = require("./buildName.js");
 
 const ENGINE_ROOT = path.resolve(__dirname, "..");      // WebGLEngine/
 const PROJECT_ROOT = path.resolve(ENGINE_ROOT, "..");   // EngineProject_vNNN/
@@ -243,4 +244,46 @@ async function makeGmailSafeFromZip(opts = {}) {
 // of that check used "is it under PROJECT_ROOT" as a proxy and was WRONG IN THE SAFE DIRECTION-LOOKING WAY --
 // it refused ai-bridge/asset_library, which is inside the project and skipped right here, so the bridge would
 // have refused its own default destination. A proxy for the real rule is not the real rule.
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES };
+// v4012 -- *** "SELF" NAMED A BUTTON, NOT WHAT IT SERVED. *** server.js's /self/zip route picked the
+// HIGHEST-numbered SweK_Engine_vNNNN.zip (or legacy EngineProject_vNNN.zip, buildName's v2871 fix) sitting in
+// the user's Downloads folder -- on the unstated assumption that whatever is currently running arrived there as
+// a zip and that zip is still sitting where it landed. Both can be false at once: an install can happen by
+// extraction, patch or in-place git pull with no zip left behind, or an older zip can simply be the only one
+// still there after the newer one was moved or deleted post-install. Keith caught it directly: on a box whose
+// own header read "running v3995", the download route served v3940 -- correctly named v3940 in the
+// Content-Disposition, so the mismatch was never HIDDEN, only unnoticed next to a big "download" button beside
+// a version number that reads as "get what this box is running". v2871 widened the FILENAME pattern and never
+// touched the actual defect: nothing compared the candidate's version against the LIVE one, so "the biggest
+// number found" and "what is running" were silently allowed to be two different claims.
+//
+// So the live version is read first, Downloads is searched for a zip matching THAT version EXACTLY -- not "the
+// highest version present": a stale build that happens to be newer than some OTHER stale build is still stale
+// -- and only when nothing there matches does this build one fresh via makeInstallable(), the same function
+// githubBridge's release path already uses. The fast path (an already-current zip sitting in Downloads, the
+// common case right after an update) costs nothing new; the guarantee is that what downloads now always
+// matches what "running" says, never a best-effort search of a folder nothing here was watching.
+//
+// dlDir/liveVersion are overridable so a gate can drive this against a scratch directory and a fixed version
+// rather than the real ~/Downloads and the real running engine -- the same reason makeInstallable takes opts.
+//
+// *** engineVersion() RETURNS "vNNNN" (WITH THE LETTER) AND parseBuildZip() RETURNS A BARE NUMBER -- CAUGHT
+// BEFORE SHIPPING, NOT AFTER. *** A first draft compared them with `===` directly, which is never true: a
+// string and a number are never triple-equal regardless of digits, so every Downloads zip would have silently
+// missed the fast path and this would have rebuilt on EVERY download. Both are normalised to numbers here.
+async function selfZipCandidate({ dlDir, liveVersion } = {}) {
+    const liveRaw = liveVersion != null ? liveVersion : engineVersion();
+    const liveNum = typeof liveRaw === "number" ? liveRaw : parseInt(String(liveRaw).replace(/^v/i, ""), 10);
+    const home = os.homedir();
+    const dir = dlDir || (home ? path.join(home, "Downloads") : null);
+    let best = null;
+    if (dir) {
+        let files = []; try { files = fs.readdirSync(dir); } catch {}
+        for (const f of files) { const p2 = buildName.parseBuildZip(f); if (p2 && p2.version === liveNum) best = { path: path.join(dir, f), name: f, version: p2.version }; }
+    }
+    if (best) return { ok: true, path: best.path, name: best.name, version: best.version, built: false };
+    const built = await makeInstallable({});
+    if (!built.ok) return { ok: false, error: "no Downloads zip matches the running build (v" + liveNum + ") and building one fresh failed: " + built.error };
+    return { ok: true, path: built.path, name: path.basename(built.path), version: built.version, built: true };
+}
+
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES };
