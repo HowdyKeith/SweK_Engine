@@ -17988,6 +17988,34 @@ ${text.replace(/'/g, "''")}
             });
         return;
     }
+    // v4006 -- WHICH OF BUN'S ADVERTISED NATIVE APIS ARE ACTUALLY ON THIS BOX, AND WOULD ANY OF THEM SAVE US
+    // A DEPENDENCY. A THIRD FIXED ROUTE, for the same reason /runtime/bench is one: /runtime/surface's header
+    // forbids taking a script from the query string, so each probe gets its own route and the caller's only
+    // choice remains which of two allowlisted spellings to spawn.
+    //
+    // Keith asked for "a test Bun.WebView page" after reading that Bun 1.4 ships a native Playwright
+    // replacement. THE HONEST PAGE IS A PROBE: on the bun this tree has, Bun.WebView is UNDEFINED, and a page
+    // that "used" it would either be a mock or would throw on load and teach the reader the feature is BROKEN
+    // rather than ABSENT. Those are different facts and this tree has a standing rule about the pair.
+    if (req.method === "GET" && req.url.split("?")[0] === "/runtime/native") {
+        const want = new URL(req.url, "http://x").searchParams.get("rt") === "bun" ? "bun" : "node";
+        const script = path.join(ENGINE_ROOT, "tools", "ship", "bunNative.mjs");
+        if (!fs.existsSync(script)) { sendJson({ ok: false, error: "tools/ship/bunNative.mjs is not in this tree" }); return; }
+        const cmd = want === "bun" ? "bun" : process.execPath;
+        require("child_process").execFile(cmd, [script, "--json"], { timeout: 60000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+            (err, stdout, stderr) => {
+                if (err && !stdout) {
+                    sendJson({ ok: false, runtime: want,
+                               error: want === "bun" && /ENOENT|not found/i.test(String(err.message || ""))
+                                   ? "bun is not on PATH on this box -- install it, or read the Node column only"
+                                   : String((err && err.message) || err).slice(0, 300) });
+                    return;
+                }
+                try { sendJson(Object.assign({ ok: true }, JSON.parse(stdout))); }
+                catch (e) { sendJson({ ok: false, runtime: want, error: "bunNative did not return JSON", out: String(stdout).slice(0, 400), err: String(stderr).slice(0, 200) }); }
+            });
+        return;
+    }
     if (req.method === "GET" && req.url === "/runtime/prefer") {
         res.writeHead(200, JSONH);
         res.end(JSON.stringify({ useBun: (fs.existsSync(path.join(os.homedir(), ".voxelbridge", "use_bun.flag")) || fs.existsSync(path.join(__dirname, "use_bun.flag"))) }));

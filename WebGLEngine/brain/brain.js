@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4005";   // v4005 -- claimTrace swept 394 modes against every device because 18 of them
+const BRAIN_BUILD = "v4006";   // v4006 -- the Bun launcher falls back on /health rather than an exit code, so
+// a Bun that HANGS is caught (the old test could not fire at all). And the Bun.WebView "page" is a probe:
+// 7 of 10 announced natives are already in 1.3.11 and would drop ZERO of our packages; the one that would
+// matter is the one absent. Previously v4005 --   // v4005 -- claimTrace swept 394 modes against every device because 18 of them
 // accept any string: 7,499 builds instead of 461, 3000s+ to 518s. Three landmark bugs beside it, all the
 // same shape -- a root derived from a cwd, a bare path handed to import(). Previously v4004 --   // v4004 -- rig.html shows each step's expected time beside its kill budget,
 // whether the gate file changed since it last passed (shown, never acted on), and which numbered section a
