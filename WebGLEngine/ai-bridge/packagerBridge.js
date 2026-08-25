@@ -286,4 +286,11 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
     return { ok: true, path: built.path, name: path.basename(built.path), version: built.version, built: true };
 }
 
-module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES };
+// v4019 -- _skipFile JOINS THE EXPORTS, AND THE REASON IS THE BUG IT ALREADY CAUSED ONCE, IMMEDIATELY.
+// v3948 exported SKIP_DIRS and SKIP_FILES "so that a caller asking 'would this path end up in a release?'"
+// could ask. tools/ship/artifactCensus.mjs is that caller -- and asking with the two SETS ALONE gave the wrong
+// answer on its first run: 4797 files against the real copy's 4792. The sets are only half the rule. The other
+// half is the five PATTERN skips in _skipFile (*.zip, petfbi-*.json, *-seen.json, ha-*.json), which a caller
+// cannot see and would have to re-type -- and a re-typed rule is the second copy that never gets updated.
+// Exporting the PREDICATE means there is one answer to "does this file ship", not two that agree today.
+module.exports = { makeGmailSafe, makeGmailSafeFromZip, makeInstallable, selfZipCandidate, progress, engineVersion, externalAssetsDir, PROJECT_ROOT, SKIP_DIRS, SKIP_FILES, _skipFile };

@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4019";   // v4019 -- control.html renamed to phone.html (46 files, boundary-anchored
+const BRAIN_BUILD = "v4020";   // v4020 -- the shipped ARTIFACT is measured now, not just the source.
+// artifactCensus.mjs answers "what would end up in the zip" from the packager's own rules (exact: 4795
+// predicted, 4795 copied by a real build) without building one, and artifactSize-selfcheck records it per
+// version -- shrinking past 3% is red, growing is reported. Prompted by Keith noticing a newer zip was
+// 1.6 MB smaller; it turned out fine, and nothing would have said so either way. swekPage-selfcheck also
+// added: six of twelve services pointed at a page that never names them. Previously v4019 --   // v4019 -- control.html renamed to phone.html (46 files, boundary-anchored
 // so the separate fpscontrol.html was not caught by the substring), with a redirect stub left at the old name
 // for phones already paired to it. server.html's portfolio "Coolify CI/CD" button became "Phone Mode" ->
 // /phone.html: it pointed at hosting.html, which never mentions Coolify. Previously v4018 --   // v4018 -- ai-bridge/gateWalk.js: ONE *-selfcheck.mjs walk, read by both

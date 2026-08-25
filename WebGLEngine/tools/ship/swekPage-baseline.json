@@ -1,0 +1,13 @@
+{
+ "note": "v4019 -- swekPage DEBT AS FOUND. A baseline, not an approval. Every service in githubBridge.js's catalog may declare `swekPage`, the SweK page a reader is sent to for that service. NOTHING EVER CHECKED THAT THE PAGE MENTIONS THE SERVICE, and half of them do not. Keith found it from the user's end: server.html's portfolio row carried a '\\ud83d\\ude80 Coolify CI/CD' button pointing at /hosting.html, he clicked through to see Coolify and asked 'so i wonder what the true Coolify page is so i can look at that?' -- hosting.html says 'coolify' ZERO times. The link was not broken, which is why it survived: it resolved, it rendered, and it simply did not contain the subject it promised. THE SAME SPECIES AS v4018's TWO GATE WALKS AND v4016's LAUNCHER NAME -- a declared target that nothing verifies, correct-looking right up until somebody follows it. These six are recorded rather than guessed at: choosing the right page for each is a decision about where a service's controls BELONG, which is Keith's call, not a rename to be done quietly by a gate. Coolify is the clearest case and even it is not obvious -- it has no SweK page at all, because its real UI is its own dashboard on port 8000 after a Docker install, so the honest target is wherever SweK manages the install (Settings -> GitHub Repos & Services) rather than any page 'about' it. FIXING ONE MEANS DELETING ITS ENTRY HERE: baselineHygiene's rule (v3202) is that a stale suppression is an active blind spot, and this gate enforces it in both directions -- a NEW mismatch reddens it, and so does an entry that no longer describes one.",
+ "captured": "2026-08-25",
+ "count": 6,
+ "entries": [
+  { "label": "vLLM",            "swekPage": "/aibrain.html" },
+  { "label": "QDrant",          "swekPage": "/asset-library.html" },
+  { "label": "Crawl4AI",        "swekPage": "/scrape.html" },
+  { "label": "RustDesk Server", "swekPage": "/settings.html" },
+  { "label": "Coolify",         "swekPage": "/hosting.html" },
+  { "label": "FluidVoice",      "swekPage": "/tts.html" }
+ ]
+}
