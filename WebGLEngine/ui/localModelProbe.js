@@ -157,6 +157,15 @@ export function verdictFor(facts, model) {
     }
     // *** THE VRAM LINE IS ALWAYS AN UNKNOWN, AND THAT IS THE POINT OF THE THIRD STATE. ***
     unknowns.push("VRAM is not exposed to a page, so the model's stated " + gb(model.vramBytes) + " requirement cannot be checked here");
+    // v4015 -- *** A SECOND SIGNAL THIS FILE ALREADY COLLECTED AND WAS DISCARDING. *** maxBufferSize was only
+    // ever compared against a flat 128MB floor (the "too small for ANY tensor" blocker above); it was never
+    // compared against THIS model's own stated requirement, even though both numbers are sitting right here.
+    // A proxy reading well under the stated requirement cannot become a "no" -- it is still a proxy, not a
+    // measurement of VRAM -- but staying silent about the gap discards a real hint the page already has.
+    if (facts.limits && facts.limits.maxBufferSize !== undefined && facts.limits.maxBufferSize < model.vramBytes) {
+        unknowns.push("the closest available proxy (" + gb(facts.limits.maxBufferSize) + ") is smaller than " +
+            "this model's stated requirement (" + gb(model.vramBytes) + ") -- not conclusive, but worth knowing");
+    }
     return {
         model: model.id,
         state: blockers.length ? "no" : "maybe",

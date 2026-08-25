@@ -214,6 +214,43 @@ console.log("\n4. *** VRAM IS NOT EXPOSED, AND THE PROBE NEVER PRETENDS OTHERWIS
 }
 
 // ---------------------------------------------------------------------------
+console.log("\n4b. *** v4015: THE PROXY AGAINST THE MODEL'S OWN NUMBER, NOT JUST THE 128MB FLOOR ***");
+{
+    // Keith's own reported facts from a real box (an Intel UHD 620): maxBufferSize 2.15 GB, well clear of the
+    // 128MB floor above but under either Gemma build's stated VRAM requirement.
+    const keith = await probeLocalModel(nav({ gpu: gpuWith(adapter({ info: { vendor: "intel", architecture: "gen-9" }, maxBuf: 2.15e9 })), quota: 900e9 }), win);
+    const e2b = verdictFor(keith, MODELS.find((m) => m.id === "E2B"));
+    ok("!! *** a 2.15 GB proxy against E2B's 4 GB requirement lands in unknowns with both numbers named ***",
+        e2b.unknowns.includes("the closest available proxy (2.15 GB) is smaller than this model's stated " +
+            "requirement (4.00 GB) -- not conclusive, but worth knowing"),
+        e2b.unknowns.join(" | "));
+    ok("...and it does NOT become a blocker -- a proxy is not a measurement of VRAM",
+        e2b.state === "maybe" && e2b.blockers.length === 0);
+
+    // THE SAME MACHINE, THE OTHER MODEL: the proxy is the same number, but the requirement named is E4B's own.
+    const e4b = verdictFor(keith, MODELS.find((m) => m.id === "E4B"));
+    ok("!! ...and against E4B's 6 GB requirement the SAME proxy names the SAME proxy but the OTHER number",
+        e4b.unknowns.includes("the closest available proxy (2.15 GB) is smaller than this model's stated " +
+            "requirement (6.00 GB) -- not conclusive, but worth knowing"),
+        e4b.unknowns.join(" | "));
+
+    // A PROXY AT OR ABOVE THE MODEL'S OWN REQUIREMENT EARNS NO SUCH LINE -- the comparison is per-model, not a
+    // single flat verdict reused across both.
+    const roomy = await probeLocalModel(nav({ gpu: gpuWith(adapter({ info: { vendor: "nvidia", architecture: "ada" }, maxBuf: 8e9 })), quota: 900e9 }), win);
+    const roomyVerdicts = summarise(roomy);
+    ok("!! a proxy AT OR ABOVE every model's requirement adds no proxy-gap line for either model",
+        roomyVerdicts.every((v) => !v.unknowns.some((u) => /closest available proxy/.test(u))),
+        roomyVerdicts.map((v) => v.unknowns.join(";")).join(" || "));
+
+    // NO ADAPTER MEANS NO limits OBJECT -- the comparison must be SKIPPED, not false-triggered against an
+    // absent number read as zero.
+    const noAdapter = await probeLocalModel(nav({ gpu: gpuWith(null), quota: 900e9 }), win);
+    ok("!! no adapter means no limits object, so the proxy-gap comparison is skipped rather than misfiring",
+        noAdapter.limits === null &&
+        !verdictFor(noAdapter, MODELS[0]).unknowns.some((u) => /closest available proxy/.test(u)));
+}
+
+// ---------------------------------------------------------------------------
 console.log("\n5. *** AND IT DOWNLOADS NOTHING -- WHICH IS THE WHOLE POINT ***");
 {
     ok("!! the module fetches nothing at all", !/\bfetch\s*\(|XMLHttpRequest|import\s*\(/.test(SRC),
