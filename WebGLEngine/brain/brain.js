@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4017";   // v4017 -- sysadminBridge.launcherName(root) reads the tree instead of naming a
+const BRAIN_BUILD = "v4018";   // v4018 -- ai-bridge/gateWalk.js: ONE *-selfcheck.mjs walk, read by both
+// gatesBridge.js (gates.html) and rigRunner.js (rig.html) instead of a copy each. rigRunner capped recursion
+// at depth 2 and so hid five real gates from the page that exists to run all of them -- the drift its own
+// comment predicted. The twin mirrors tools/ship/selfchecks.mjs, the ship gate's own walk, and
+// gateWalk-selfcheck.mjs reddens if the two ever return different sets or if the two pages stop reconciling.
+// Previously v4017 --   // v4017 -- sysadminBridge.launcherName(root) reads the tree instead of naming a
 // launcher by convention: the two names it always returned are rig-local and untracked, so a `git clone` never
 // had either and v4014's click-to-launch refused on every clone. launch() now resolves against the CLONE's root
 // rather than the running tree. Also: the persist button's result is no longer overwritten by the re-probe that
