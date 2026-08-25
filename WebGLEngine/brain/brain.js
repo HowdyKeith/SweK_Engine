@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4010";   // v4010 -- Keith's overnight /loop, pointed at curriculum.mjs (already in this
+const BRAIN_BUILD = "v4011";   // v4011 -- requestedExit-selfcheck.mjs asserted a branch of restart() that is
+// unreachable on Windows: isWin/isMac are real process.platform checks, so a Windows child always takes its own
+// relaunch branch (exit 0 by design, flag written) and can never reach the "no relauncher" fallback the gate
+// was checking. Not a server bug -- confirmed by simulating process.platform="win32" here. Gate now checks the
+// boundary the code actually promises on that platform instead. Previously v4010 --   // v4010 -- Keith's overnight /loop, pointed at curriculum.mjs (already in this
 // tree, proposes ungraded physics and doorless modules, never grades). First proposal built: blobVitalsBind.mjs
 // wires physics/blobVitals.js's four gauges to the roundhouse, graded against the four real bugs that shipped
 // them, not a fabricated failure. No plant declared -- three gauges are UI/wiring-bug detectors and the fourth

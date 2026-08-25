@@ -76,9 +76,27 @@ console.log("1. *** THE REAL FUNCTION, IN A REAL PROCESS: WHAT EXIT CODE DOES IT
         !e.wrote.some((f) => /swek_superseded/.test(f)),
         e.wrote.length ? "tmpdir received: " + e.wrote.join(", ") : "tmpdir untouched");
 
+    // v4011 -- *** THE FALLBACK BRANCH IS UNREACHABLE ON THE ONE OS THIS FILE MOST NEEDS TO BE RIGHT ON. ***
+    // isWin/isMac are `process.platform === "win32"/"darwin"`, real checks against the box this CHILD actually
+    // runs on -- not something a test can steer. So a child spawned on Windows ALWAYS takes restart()'s Windows
+    // branch, and the no-relauncher fallback (EXIT_REQUESTED) can never fire there at all: this assertion was
+    // checking a code path Windows cannot reach, and failed on Keith's rig for exactly that reason -- not
+    // because restart() is broken, but because the Windows branch correctly took its OWN path and exited 0,
+    // which is what "someone else has the baton" is SUPPOSED to do (see the boundary rule above this function).
     const r = runCall("restart()");
-    ok("!! restart()'s no-relauncher fallback exits " + EXPECTED + " too -- nobody has the baton there either",
-        r.code === EXPECTED, `child exited ${r.code}`);
+    if (process.platform === "win32" || process.platform === "darwin") {
+        let parsed = null; try { parsed = JSON.parse(r.out); } catch {}
+        const flagged = r.wrote.some((f) => /swek_superseded/.test(f));
+        ok("!! restart() on " + process.platform + " either hands off to a real launcher (flag written, ok) " +
+           "or reports one is missing -- never silently exits claiming nothing",
+            (parsed && parsed.ok === true && flagged) || (parsed && parsed.ok === false && /launcher not found/.test(parsed.error || "")),
+            JSON.stringify(parsed) + " flag=" + flagged);
+        report("the no-relauncher fallback (exit " + EXPECTED + ") is unreachable on this platform by " +
+               "construction -- asserting it here would be checking a branch this OS's restart() can never take");
+    } else {
+        ok("!! restart()'s no-relauncher fallback exits " + EXPECTED + " too -- nobody has the baton there either",
+            r.code === EXPECTED, `child exited ${r.code}`);
+    }
     report("both are run as the real module in a real child; the code read here is the code a launcher reads");
 }
 
