@@ -27,10 +27,20 @@ import { guardedTick } from "/ui/poller.js";   // v2771 — gauge poll routes th
 
 const LS_SETTINGS = "voxelEngine.demoChrome";
 const RING_COLORS = { cyan: "#5ac8ff", amber: "#ffa84c", green: "#5fd886", red: "#ff6b6b", violet: "#b07bff", white: "#e8eefc" };
-const COUNT_SOURCES = new Set(["email", "swekpeers", "swekremotepeers", "chunks"]);   // render as N, not N%
+// v4020 -- brains/solving join the COUNT sources: "3 BRAINS" is a headcount, and rendering it as "3%" would be
+// a number that looks like a reading and means nothing.
+const COUNT_SOURCES = new Set(["email", "swekpeers", "swekremotepeers", "chunks", "brains", "solving"]);   // render as N, not N%
 const COUNT_RING_SCALE = 12;                // count → ring%: min(100, n*scale)
 const NS = "http://www.w3.org/2000/svg";
-const SOURCE_LABELS = { battery: "BATTERY", cpu: "CPU", ram: "RAM", gpu: "GPU", swekpeers: "SweK PEERS", swekremotepeers: "SweK REMOTES", email: "EMAIL", fps: "FPS", chunks: "CHUNKS" };
+const SOURCE_LABELS = { battery: "BATTERY", cpu: "CPU", ram: "RAM", gpu: "GPU", swekpeers: "SweK PEERS", swekremotepeers: "SweK REMOTES", email: "EMAIL", fps: "FPS", chunks: "CHUNKS",
+    // v4020 -- row 3. Keith: "we want a 3rd row available to list the brains available in fleet and how many
+    // are working." BOTH NUMBERS ALREADY EXISTED and only server.html could see them: /ai/brain/health has
+    // published registeredBrains (brains seen in the last 60s) and brainsBusy (brains that posted a solve
+    // inside the census window) for rounds, and server.html read them through a brainValues() of its own --
+    // as a MORPHABLE CONTENDER for slot 2, competing with the peers row, on ONE page. So the row Keith
+    // remembered was real, was live, and was invisible everywhere else. Here it is a source like any other,
+    // so every docked page gets it.
+    brains: "BRAINS", solving: "SOLVING" };
 
 // v1666 — packaged 6-gauge default order: CPU, RAM, GPU, SweK Peers, SweK Remote Peers, BATTERY.
 const DEFAULT_GAUGES = [
@@ -43,6 +53,19 @@ const DEFAULT_GAUGES = [
     { source: "fps",             color: "cyan",   showPct: false },
     { source: "chunks",          color: "green",  showPct: false },
     { source: "swekpeers",       color: "white",  showPct: true  },
+    // v4020 -- ROW 3: the fleet. showPct TRUE is what draws the NUMBER at all -- it is not a percent switch
+    // (server.html's brains-row comment learned this the hard way and its first version rendered two dials with
+    // nothing in them). BRAINS is how many are registered, SOLVING is how many are actually working.
+    { source: "brains",          color: "violet", showPct: true  },
+    { source: "solving",         color: "cyan",   showPct: true  },
+    { source: "swekremotepeers", color: "green",  showPct: true  },
+    // v4020 -- ROW 4: actions, not readings. Keith: "the record video button row, so any page that has that
+    // dock can be recorded." These are CELLS IN THE SAME GRID rather than a parallel structure bolted beside
+    // it, which is what lets the existing ▲/▼ scroll, the row measuring and the auto-revert all keep working
+    // untouched -- _rows is ceil(cells/3) and does not care what a cell contains.
+    { action: "record", label: "RECORD",  color: "amber"  },
+    { action: "mp4",    label: "MP4",     color: "green"  },
+    { action: "clip",   label: "CLIP",    color: "violet" },
 ];
 
 function _lighten(hex, amt) {
@@ -62,8 +85,15 @@ export function readGaugeConfig() {
             const g = raw.gauges;
             const isLegacyDefault = g.length === 3 && g[0] && g[0].source === "battery" && g[1] && g[1].source === "cpu" && g[2] && g[2].source === "ram";
             if (isLegacyDefault) return DEFAULT_GAUGES.map((x) => Object.assign({}, x));
-            const out = g.slice(0, 6);
-            for (let i = out.length; i < 6; i++) out.push(Object.assign({}, DEFAULT_GAUGES[i]));
+            // v4020 -- WAS HARDCODED 6, WHICH IS WHY THE DOCK COULD NEVER HAVE A THIRD ROW. The grid is 3
+            // columns and dockedGauges derives _rows from ceil(cells/3), so the SCROLL mechanism has always
+            // handled any number of rows -- Keith's ▲/▼ buttons were already generic. The cap was the only
+            // thing pinning it at two, and it was a typed number rather than a consequence of the list it
+            // guards. Derived from DEFAULT_GAUGES.length now, so adding a row is a one-place edit and this
+            // never has to be remembered again.
+            const MAX = DEFAULT_GAUGES.length;
+            const out = g.slice(0, MAX);
+            for (let i = out.length; i < MAX; i++) out.push(Object.assign({}, DEFAULT_GAUGES[i]));
             return out;
         }
     } catch {}
@@ -191,7 +221,97 @@ function _makeWeatherGauge(cfg, scale) {
     return { cell, handle };
 }
 
+// v4020 -- ROW 4'S CELLS. Keith: "the record video button row, so any page that has that dock can be recorded."
+//
+// An ACTION cell is the same box as a dial -- same width, same caption position -- so the grid stays uniform
+// and dockedGauges' row measuring, ▲/▼ scroll and auto-revert keep working with no change at all: _rows is
+// ceil(cells/3) and has never cared what a cell contains.
+//
+// *** IT REFUSES ON A PAGE IT CANNOT SERVE, WHICH IS THE ONE REAL DESIGN DECISION HERE. *** ui/recordFloat.js
+// (v3950) settled this for the floating button and its reasoning holds identically: a record button on a page
+// with no <canvas> is decoration that fails on click, and this tree's own claim is "v2579 A flag that lies is
+// worse than no flag." So the cell renders DISABLED with a reason in its tooltip rather than inviting a click
+// that cannot work -- and the recorder's own capabilities() is asked rather than assumed, because
+// captureStream + MediaRecorder are not secure-context gated but the codecs can still be missing.
+function _makeActionCell(cfg, scale) {
+    scale = scale || 1;
+    const color = RING_COLORS[cfg.color] || RING_COLORS.cyan;
+    const cell = document.createElement("div");
+    try { cell.setAttribute("data-action", cfg.action); } catch {}
+    Object.assign(cell.style, { display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", minWidth: "0" });
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    Object.assign(btn.style, {
+        width: (42 * scale) + "px", height: (42 * scale) + "px", borderRadius: "50%",
+        background: "radial-gradient(circle at 50% 38%, #1b2430, #0d1219)",
+        border: "1.5px solid " + color, color: color, cursor: "pointer",
+        font: (11 * scale) + "px/1 ui-monospace, Menlo, Consolas, monospace",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 2px 2.5px rgba(0,0,0,0.55)", padding: "0",
+    });
+    btn.textContent = { record: "●", mp4: "▶", clip: "✂" }[cfg.action] || "●";
+
+    const cap = document.createElement("div");
+    Object.assign(cap.style, { font: (7.5 * scale) + "px ui-monospace, Menlo, Consolas, monospace",
+                               letterSpacing: "0.08em", color: "#7f93a8", whiteSpace: "nowrap" });
+    cap.textContent = cfg.label || String(cfg.action || "").toUpperCase();
+
+    const disable = (why) => {
+        btn.disabled = true; btn.style.opacity = "0.35"; btn.style.cursor = "default"; btn.title = why;
+    };
+    const setLabel = (t) => { cap.textContent = t; };
+
+    // Wiring is LAZY and per-action: importing the recorder on every docked page would install a MediaRecorder
+    // on pages that will never record. The import happens on the click that needs it.
+    if (cfg.action === "record") {
+        btn.title = "Record this page's canvas to a .webm";
+        if (typeof document !== "undefined" && !document.querySelector("canvas")) {
+            disable("nothing to record: this page has no <canvas>");
+        } else {
+            btn.onclick = async () => {
+                try {
+                    if (!window.swekRecord) { const m = await import("./canvasRecorder.js"); m.installRecorder(); }
+                    const rec = window.swekRecord;
+                    if (!rec) { disable("the recorder did not install on this page"); return; }
+                    const c = rec.capabilities && rec.capabilities();
+                    if (c && c.ok === false) { disable(c.message || "recording is unavailable here"); return; }
+                    if (rec.recording()) { rec.stop(); setLabel(cfg.label || "RECORD"); btn.style.background = "radial-gradient(circle at 50% 38%, #1b2430, #0d1219)"; }
+                    else if (rec.start()) { setLabel("STOP"); btn.style.background = "radial-gradient(circle at 50% 38%, #5a2020, #2a0d0d)"; }
+                } catch (e) { disable("recorder failed to load: " + ((e && e.message) || e)); }
+            };
+        }
+    } else if (cfg.action === "mp4") {
+        // /export/mp4 turns the recorded webm into a YouTube-ready mp4 with a description sidecar. It is a
+        // BRIDGE route, so it only works where the bridge is reachable -- and the honest failure is a message,
+        // not a silent no-op.
+        btn.title = "Convert the last recorded clip to a YouTube-ready .mp4 (needs the bridge)";
+        btn.onclick = async () => {
+            setLabel("...");
+            try {
+                const r = await fetch("/export/mp4", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                const j = await r.json().catch(() => ({}));
+                setLabel(r.ok && j && j.ok !== false ? "DONE" : "FAILED");
+                if (!(r.ok && j && j.ok !== false)) btn.title = "export failed: " + ((j && j.error) || ("HTTP " + r.status));
+            } catch (e) { setLabel("FAILED"); btn.title = "export failed: " + ((e && e.message) || e); }
+            setTimeout(() => setLabel(cfg.label || "MP4"), 2500);
+        };
+    } else if (cfg.action === "clip") {
+        btn.title = "Open the clip editor to trim what you just recorded";
+        btn.onclick = async () => {
+            try { const m = await import("./clipEditorDialog.js"); await m.openClipEditor(null, null); }
+            catch (e) { disable("the clip editor did not load: " + ((e && e.message) || e)); }
+        };
+    }
+
+    cell.appendChild(btn); cell.appendChild(cap);
+    // The handle contract the set expects. An action has nothing to refresh, so update() is a no-op rather
+    // than absent -- refresh() must never have to ask whether a handle is real.
+    return { cell, handle: { source: null, action: cfg.action, update() {} } };
+}
+
 function _makeGauge(cfg, scale) {
+    if (cfg && cfg.action) return _makeActionCell(cfg, scale);
     if (cfg && cfg.source === "weather") return _makeWeatherGauge(cfg, scale);
     scale = scale || 1;
     const color = RING_COLORS[cfg.color] || RING_COLORS.cyan;
@@ -284,7 +404,7 @@ export function mountSvgGaugeSet(host, opts = {}) {
     if (host) host.appendChild(root);
 
     let handles = [];
-    const providerValues = { battery: null, cpu: null, ram: null, gpu: null, swekpeers: null, swekremotepeers: null, batteryNA: false, fps: null, chunks: null };
+    const providerValues = { battery: null, cpu: null, ram: null, gpu: null, swekpeers: null, swekremotepeers: null, batteryNA: false, fps: null, chunks: null, brains: null, solving: null };
     const gaugeBag = {};
     let _timer = null, _batBound = false;
     const _pollKey = "svgGaugeSet#" + (mountSvgGaugeSet._n = (mountSvgGaugeSet._n || 0) + 1);   // v2771 — unique per mounted set
@@ -302,6 +422,7 @@ export function mountSvgGaugeSet(host, opts = {}) {
     }
     function refresh() {
         for (const h of handles) {
+            if (h.action) continue;   // v4020 -- an action cell is a button, not a reading; nothing to refresh
             const s = h.source;
             if (s === "none") { h.update(0, "–", true); continue; }
             if (s === "weather") { _weatherEnsure(); continue; }   // v3770 -- weather cell paints itself from the shared store
@@ -332,6 +453,15 @@ export function mountSvgGaugeSet(host, opts = {}) {
                 if (v == null) h.update(0, "–", false); else h.update(Math.min(100, v * 0.15), v, true);
                 continue;
             }
+            // v4020 -- the fleet dials. Counts, so the ring scales gently and the READOUT is the headcount.
+            // A null reads "–", never 0: the bridge being unreachable and the fleet being empty are different
+            // facts, and only one of them should look alarming (v3237's named-absence rule, third time here).
+            if (s === "brains" || s === "solving") {
+                const v = providerValues[s];
+                if (v == null) h.update(0, "–", false);
+                else h.update(Math.min(100, v * COUNT_RING_SCALE), v, true);
+                continue;
+            }
             const g = gaugeBag[s];
             if (!g) { h.update(0, "–", false); continue; }
             const isCount = g.isCount || COUNT_SOURCES.has(s);
@@ -344,7 +474,26 @@ export function mountSvgGaugeSet(host, opts = {}) {
         const needsSystem = handles.some(h => ["cpu", "ram", "gpu"].includes(h.source));
         const needsPeers = handles.some(h => h.source === "swekpeers");
         const needsRemote = handles.some(h => h.source === "swekremotepeers");
-        const needsBag = handles.some(h => !["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "none", "weather"].includes(h.source));
+        const needsBrains = handles.some(h => h.source === "brains" || h.source === "solving");
+        const needsBag = handles.some(h => !["battery", "cpu", "ram", "gpu", "swekpeers", "swekremotepeers", "none", "weather", "brains", "solving"].includes(h.source));
+        if (needsBrains) {
+            // v4020 -- ONE fetch feeding both dials, and only when a brain dial is actually mounted. Named
+            // absence rather than a convincing zero (v3237/v3258, the rule this file already learned twice):
+            // if the bridge does not answer, the dials read "-" instead of "0 brains", because a fleet that is
+            // unreachable and a fleet that is empty are different facts and only one of them is alarming.
+            try {
+                const r = await fetch("/ai/brain/health", { cache: "no-store" });
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const j = await r.json();
+                providerValues.brains = Number.isFinite(j && j.registeredBrains) ? j.registeredBrains : null;
+                // brainsBusy is OBSERVED (a brain that posted a solve inside the census window). The fallback
+                // is the HUB's own solving flag, which answers a NARROWER question -- server.html's v3664 note
+                // makes the same choice for the same reason: a dial reading 0 on a working fleet is worse than
+                // one reading a narrower truth.
+                providerValues.solving = Number.isFinite(j && j.brainsBusy) ? j.brainsBusy
+                                       : ((j && j.solving) ? 1 : null);
+            } catch (e) { providerValues.brains = null; providerValues.solving = null; }
+        }
         if (needsSystem) {
             // v3258 -- *** THIS catch {} MADE "THE GAUGES ARE BROKEN" AND "EVERYTHING IS AT ZERO" THE SAME
             // PICTURE. *** Keith, from a clean boot: "still no gauges working" -- and there was nothing in the

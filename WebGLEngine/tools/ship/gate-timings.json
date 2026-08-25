@@ -885,6 +885,7 @@
   "tools/ship/deviceInstrumentMap-selfcheck.mjs": 312,
   "tools/ship/deviceKind-selfcheck.mjs": 49,
   "tools/ship/doorKinds-selfcheck.mjs": 61926,
+  "tools/ship/dockRows-selfcheck.mjs": 4255,
   "tools/ship/downloadScan-selfcheck.mjs": 105,
   "tools/ship/drawIntent-selfcheck.mjs": 125,
   "tools/ship/duplicateFiles-selfcheck.mjs": 348,

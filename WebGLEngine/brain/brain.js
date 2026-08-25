@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4020";   // v4020 -- the shipped ARTIFACT is measured now, not just the source.
+const BRAIN_BUILD = "v4021";   // v4021 -- the dock has four rows. Row 3 is the FLEET (brains registered /
+// how many solving) read from /ai/brain/health, the endpoint that already published both numbers and that
+// only server.html could see; row 4 is RECORD / MP4 / CLIP as cells in the same grid. An unreachable brain
+// bridge reads "-", never 0. The scroll mechanism was always generic -- readGaugeConfig's hardcoded 6-gauge
+// cap was the only thing pinning the dock at two rows. Previously v4020 --   // v4020 -- the shipped ARTIFACT is measured now, not just the source.
 // artifactCensus.mjs answers "what would end up in the zip" from the packager's own rules (exact: 4795
 // predicted, 4795 copied by a real build) without building one, and artifactSize-selfcheck records it per
 // version -- shrinking past 3% is red, growing is reported. Prompted by Keith noticing a newer zip was
