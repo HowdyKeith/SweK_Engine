@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4021";   // v4021 -- the dock has four rows. Row 3 is the FLEET (brains registered /
+const BRAIN_BUILD = "v4022";   // v4022 -- ui/hostingControls.js: the tunnel/Tailscale/NetBird controls as
+// ONE module both hosting.html and server.html's Tunnels drawer mount, instead of two copies. server.html
+// gains the permanent tunnel, Drive URL-pointer, Tailscale and NetBird it never had; its existing quick
+// tunnel is finally labelled one. The module mints no global ids because server.html already owns them.
+// Previously v4021 --   // v4021 -- the dock has four rows. Row 3 is the FLEET (brains registered /
 // how many solving) read from /ai/brain/health, the endpoint that already published both numbers and that
 // only server.html could see; row 4 is RECORD / MP4 / CLIP as cells in the same grid. An unreachable brain
 // bridge reads "-", never 0. The scroll mechanism was always generic -- readGaugeConfig's hardcoded 6-gauge
