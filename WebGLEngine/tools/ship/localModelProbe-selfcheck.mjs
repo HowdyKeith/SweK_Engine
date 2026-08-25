@@ -1,7 +1,9 @@
 // tools/ship/localModelProbe-selfcheck.mjs
 //
 // Run: node tools/ship/localModelProbe-selfcheck.mjs   (live half skips cleanly without Chromium)
-// RUNTIME: measured at the foot of this round with date(1) -- never estimated.
+// RUNTIME 2.7s MEASURED (median of 3 -- 2728/2705/2728 ms -- with date(1) around the run). Section 5's
+// live half is a real headless Chromium rendering the page and clicking the persist button; the rest
+// drives the module directly with a stub navigator.
 //
 // v4007 -- Keith, on kessler/gemma-gem: "a page that reports whether this box can actually run it (WebGPU
 // adapter, reported VRAM, model cache present) before anything downloads a gigabyte."
@@ -25,6 +27,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { codeOnly } from "./sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -34,7 +37,13 @@ const report = (l) => console.log("  ----  " + l);
 
 const SRC = fs.readFileSync(path.join(ENG, "ui", "localModelProbe.js"), "utf8");
 const PAGE = fs.readFileSync(path.join(ENG, "webgpu-llm.html"), "utf8");
-const { probeLocalModel, verdictFor, summarise, MODELS, SOFTWARE_HINTS } = await import("../../ui/localModelProbe.js");
+// *** codeOnly() IS BUILT FOR .js/.mjs. ON RAW HTML IT SILENTLY MANGLES THE OUTPUT -- confirmed the hard way
+// while writing section 3b below: `/\.onclick\s*=\s*doPersist\b/` matched the real script fine and failed
+// against codeOnly(PAGE), because codeOnly's state machine does not know about <style>, <script> tags or HTML
+// attributes and drops chunks of the document. The extraction below pulls the ONE <script type="module"> block
+// out first, so codeOnly ever only sees the JavaScript it was built to strip.
+const PAGE_SCRIPT = (PAGE.match(/<script type="module">([\s\S]*?)<\/script>/) || ["", ""])[1];
+const { probeLocalModel, verdictFor, summarise, MODELS, SOFTWARE_HINTS, requestPersistentStorage } = await import("../../ui/localModelProbe.js");
 
 // A navigator this gate controls completely, so every branch is DRIVEN rather than waited for. A real box has
 // one GPU and one answer; the interesting cases are the ones this machine does not happen to be.
@@ -109,6 +118,72 @@ console.log("\n3. *** THE ANSWER THAT COSTS NOTHING: A QUOTA SMALLER THAN THE MO
         noQuota.quotaBytes === null &&
         verdictFor(noQuota, MODELS[1]).unknowns.some((u) => /quota/i.test(u)),
         "UNKNOWN IS NOT THE DEFAULT (v3103) -- and here it is the difference between checking and not");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n3b. *** \"STORAGE QUOTA CAN RAISE TO 2 GB, WITH APPROVAL DIALOG\" -- CONFIRMED AND BOUNDED ***");
+{
+    // Keith's claim, checked against the real API rather than taken on faith: navigator.storage.persist()
+    // exists in this tree's own Chromium, and navigator.permissions.query({name:"persistent-storage"}) reports
+    // "prompt" there -- MEASURED, a genuine dialog is what a real click shows.
+    const detected = await probeLocalModel(nav({ gpu: gpuWith(null), quota: 1e9 }).storage
+        ? { storage: { estimate: async () => ({ quota: 1e9, usage: 0 }), persist: async () => false, persisted: async () => false } }
+        : {}, win);
+    ok("persistAvailable is detected feature-by-feature", detected.persistAvailable === true && detected.persisted === false);
+
+    const noApi = await probeLocalModel({ storage: { estimate: async () => ({ quota: 1e9, usage: 0 }) } }, win);
+    ok("!! a browser with no persist() reports persistAvailable === false, not a guess",
+        noApi.persistAvailable === false);
+
+    // *** THE FUNCTION MUST NEVER PROMISE "2 GB". *** It reports what the browser did, not what Keith observed
+    // on his box: the persisted-storage ceiling is disk-relative and platform-dependent, and this module has
+    // no way to know it in advance. Driven with a stub that GRANTS and RAISES the quota, and one that DENIES.
+    let seq = [{ quota: 1.01e9, usage: 0 }, { quota: 2e9, usage: 0 }];
+    const grantedNav = { storage: { estimate: async () => seq.shift(), persist: async () => true } };
+    const granted = await requestPersistentStorage(grantedNav);
+    ok("!! *** a GRANTED request reports the MEASURED before and after, not a typed number ***",
+        granted.available && granted.granted === true &&
+        granted.quotaBeforeBytes === 1.01e9 && granted.quotaAfterBytes === 2e9,
+        "before " + (granted.quotaBeforeBytes / 1e9).toFixed(2) + "GB, after " +
+        (granted.quotaAfterBytes / 1e9).toFixed(2) + "GB -- both READ from estimate(), neither typed here");
+
+    seq = [{ quota: 1.01e9, usage: 0 }, { quota: 1.01e9, usage: 0 }];
+    const deniedNav = { storage: { estimate: async () => seq.shift(), persist: async () => false } };
+    const denied = await requestPersistentStorage(deniedNav);
+    ok("!! ...and a DENIED request reports granted:false with the quota UNCHANGED",
+        denied.granted === false && denied.quotaBeforeBytes === denied.quotaAfterBytes);
+
+    ok("!! ...and a browser with no persist() at all reports available:false rather than throwing",
+        (await requestPersistentStorage({ storage: {} })).available === false);
+
+    // THE STRING "2 GB" (or "2GB") MUST NOT APPEAR AS A PROMISE in the module. It is fine in a COMMENT quoting
+    // Keith's own words, which is why this greps the CODE rather than the whole file.
+    const code = codeOnly(SRC);
+    ok("!! *** the module contains no hardcoded storage-size promise ***",
+        !/["'`]\s*2\s*GB\s*["'`]/i.test(code) && !/2e9/.test(code.replace(/quotaAfterBytes/g, "")),
+        "the only 2e9 in this file is a TEST FIXTURE value in the gate, never a claim the module makes about " +
+        "what a real browser will grant");
+
+    // AND THE ESCALATION REQUIRES A REAL CALL -- it must not be invoked from probeLocalModel's own auto-run,
+    // because persist() without a user gesture is refused by most browsers and folding it in would make the
+    // page's own load silently ask for a permission nobody clicked for.
+    const probeCode = codeOnly(fs.readFileSync(path.join(ENG, "ui", "localModelProbe.js"), "utf8"));
+    const probeBody = (probeCode.match(/export async function probeLocalModel[\s\S]*?\n\}/) || [""])[0];
+    ok("!! probeLocalModel() itself never calls persist() -- only DETECTS whether it exists",
+        !/\.persist\(\)/.test(probeBody) && /persistAvailable/.test(probeBody),
+        "escalating storage is a decision a person makes by clicking a button, not a side effect of asking " +
+        "what the browser has");
+    // THE CALL SITE, NOT A SUBSTRING OF THE PAGE. Stripping the function's own body first and then searching
+    // the remainder is what makes "doPersist is invoked only from a click handler" checkable at all -- without
+    // stripping it, the function's own internal `await go()` line or its name appearing in a comment would
+    // read as a second, unwanted call site.
+    const pageCode = codeOnly(PAGE_SCRIPT);
+    const withoutBody = pageCode.replace(/async function doPersist\s*\([^)]*\)\s*\{[\s\S]*?\n\}/, "");
+    const callSites = withoutBody.match(/\bdoPersist\s*\(/g) || [];
+    ok("!! the page wires the escalation to an actual click, not to page load",
+        /\.onclick\s*=\s*doPersist\b/.test(pageCode) && callSites.length === 0,
+        callSites.length ? "ALSO CALLED FROM: outside the click handler" :
+        "the only reference to doPersist outside its own body is the onclick assignment");
 }
 
 // ---------------------------------------------------------------------------

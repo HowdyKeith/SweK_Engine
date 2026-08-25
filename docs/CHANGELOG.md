@@ -8,6 +8,32 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4008 -- "storage quota can raise to 2 GB, with approval dialog": confirmed, and bounded to never promise a number
+
+Keith's claim was checked against the real API rather than taken on faith. `navigator.storage.persist()`
+exists in this tree's own Chromium, and `navigator.permissions.query({name:"persistent-storage"})` reports
+`"prompt"` there -- MEASURED, a real dialog is what a click shows.
+
+What is NOT confirmed, and what the new code refuses to claim, is any specific number: the persisted-storage
+ceiling is disk-relative and platform-dependent, so `requestPersistentStorage()` reports the MEASURED quota
+before and after a grant rather than asserting "2 GB". A gate check greps the module's own source to prove no
+"2GB" string exists as a promise anywhere in it -- the only `2e9` in the file is the gate's own test fixture.
+
+Three ways this could have gone dishonest, each sabotaged and caught: hardcoding the after-quota to 2e9 on a
+grant; calling `persist()` from inside `probeLocalModel`'s own auto-run, which would silently ask a browser
+permission nobody clicked for the moment the page loaded; and skipping the before-estimate, which would make
+"the browser raised it" unfalsifiable.
+
+And one more instance of this session's own recurring defect, found writing its own gate: `codeOnly()` is
+built for `.js`/`.mjs`, and running it on the raw HTML of `webgpu-llm.html` silently mangled the page -- the
+state machine does not know about `<style>`, `<script>` tags or attributes, so a working regex against the
+real script matched nothing against `codeOnly(PAGE)`. Fixed by extracting the `<script type="module">` block
+first. The identical class of bug as `patchScanDoor` and `bunNative` earlier this session, this time on the
+HTML side of the pair rather than the string-literal side.
+
+`webgpu-llm.html` now shows persisted-storage state and offers a real "Request more storage" button, requiring
+an actual click, and re-probes after the browser answers rather than assuming the grant.
+
 ## Since v4007 -- a page that answers "can this box run a model" before anything downloads
 
 Keith, on kessler/gemma-gem: "a page that reports whether this box can actually run it (WebGPU adapter,
