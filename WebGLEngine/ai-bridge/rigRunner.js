@@ -25,6 +25,7 @@
 const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
+const crypto = require("crypto");
 
 const ENGINE = path.join(__dirname, "..");
 
@@ -168,6 +169,49 @@ function runOne(rel, cb) {
     loadBudgets().then(({ gb, hs }) => spawnOne(rel, file, gb, hs, cb));
 }
 
+// *** v4004 -- WHAT IS RUNNING, AND HOW FAR IN. ***
+//
+// Keith: "can rig.html for each step show how much time is expected? whether the hash is already matched? what
+// step each rig step is on, unless that would slow down a test."
+//
+// THE LAST CLAUSE IS THE DESIGN CONSTRAINT AND IT IS SATISFIED BY CONSTRUCTION. spawnOne ALREADY receives the
+// child's stdout incrementally and concatenates it into `out` -- that work happens whether anybody looks or
+// not. This registry hands out a VIEW of that same buffer. The child is never signalled, never paused, and
+// never asked anything; a poll reads a string this process was already holding. The measurement is in
+// tools/ship/rigProgress-selfcheck.mjs rather than in this sentence.
+const LIVE = new Map();   // rel -> { t0, out, done }
+
+// gate-timings.json is the OBSERVED record every full suite run writes. Read once and memoised: this is the
+// "how long does it usually take" half, and it is a different question from the budget.
+let OBSERVED_MS = null;
+function observedMs(rel) {
+    if (OBSERVED_MS === null) {
+        try { OBSERVED_MS = JSON.parse(fs.readFileSync(path.join(ENGINE, "tools", "ship", "gate-timings.json"), "utf8")).timings || {}; }
+        catch { OBSERVED_MS = {}; }
+    }
+    return OBSERVED_MS[String(rel).replace(/\\/g, "/")] ?? null;
+}
+
+/** The last line that looks like a gate's own section header, which is what "what step is it on" means here. */
+function progressOf(rel) {
+    const r = LIVE.get(rel);
+    if (!r) return { running: false };
+    const lines = r.out.split("\n").filter((l) => l.trim());
+    // Gates in this tree print numbered sections ("3. THE RECEIPT IS STILL THERE") and PASS/FAIL rows. The
+    // SECTION is the useful one -- a row scrolls past, a section says which third of the gate you are in.
+    let section = null;
+    for (const l of lines) if (/^\s*\d+[.)]\s+\S/.test(l)) section = l.trim();
+    const checks = lines.filter((l) => /^\s*(PASS|FAIL|ok|not ok)\b/.test(l.trim())).length;
+    return { running: !r.done, ms: Date.now() - r.t0, section, checks, lastLine: lines[lines.length - 1] || null,
+             bytes: r.out.length };
+}
+
+/** sha256 of the gate FILE. See hostScale.passState for what this does and does not mean. */
+function fileHash(file) {
+    try { return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex").slice(0, 16); }
+    catch { return null; }
+}
+
 let BUDGETS = null;
 function loadBudgets() {
     if (!BUDGETS) BUDGETS = Promise.all([
@@ -200,7 +244,11 @@ function spawnOne(rel, file, gb, hs, cb) {
     let out = "";
     const t0 = Date.now();
     const p = spawn(process.execPath, [file], { cwd: ENGINE, env: { ...process.env } });
-    const grab = (d) => { out += d.toString(); if (out.length > 200000) out = out.slice(-200000); };
+    // The SAME buffer the result is built from -- not a copy, and not a second stream off the child. A poll
+    // reads this object; the child is untouched.
+    const live = { t0, out: "", done: false };
+    LIVE.set(rel, live);
+    const grab = (d) => { out += d.toString(); if (out.length > 200000) out = out.slice(-200000); live.out = out; };
     p.stdout.on("data", grab);
     p.stderr.on("data", grab);
     // v3076 -- A TIMEOUT IS NOT A FAILURE, and reporting them identically is what makes a suite untrustworthy.
@@ -226,17 +274,47 @@ function spawnOne(rel, file, gb, hs, cb) {
         // Record what this box actually did, so the next budget is measured rather than assumed. A killed run is
         // recorded as a LOWER BOUND -- without it a badly-mismatched box that times out on everything would
         // never produce a completed run to learn from, which is exactly the box that needs the scale.
-        try { if (hs && typeof hs.recordRun === "function") hs.recordRun(rel, took, code === 0 && !timedOut); } catch {}
+        live.done = true;
+        try { if (hs && typeof hs.recordRun === "function") hs.recordRun(rel, took, code === 0 && !timedOut, undefined, fileHash(file)); } catch {}
         cb({ ok: code === 0, code, timedOut, timeoutMs: budgetMs, budgetSource, out, ms: took });
     });
-    p.on("error", (e) => { clearTimeout(kill); cb({ ok: false, code: -1, out: String(e && e.message) }); });
+    p.on("error", (e) => { clearTimeout(kill); live.done = true; cb({ ok: false, code: -1, out: String(e && e.message) }); });
 }
 
 function handle(req, res) {
     const url = req.url.split("?")[0];
     if (req.method === "GET" && url === "/rig/list") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ checks: discover(), rigOnly: RIG_ONLY }));
+        // v4004 -- THE EXPECTATION TRAVELS WITH THE LIST, AND COSTS A TEST NOTHING: it is read once here,
+        // before anything is spawned, out of tables that already exist. `expectedMs` is what this gate HAS
+        // TAKEN (gate-timings.json, host-scaled); `budgetMs` is when it gets killed. Those are different
+        // numbers and the page shows both, because "usually 47s, killed at 182s" tells you what a run at 90s
+        // means and either number alone does not.
+        loadBudgets().then(({ gb, hs }) => {
+            const checks = discover().map((c) => {
+                const file = path.join(ENGINE, c.rel);
+                let budgetMs = null, expectedMs = null;
+                try { if (gb && gb.budgetFor) budgetMs = gb.budgetFor(c.rel); } catch {}
+                try { if (gb && gb.OBSERVED) expectedMs = gb.OBSERVED[c.rel.replace(/\\/g, "/")] ?? null; } catch {}
+                if (expectedMs == null) { try { expectedMs = observedMs(c.rel); } catch {} }
+                try { if (hs && hs.scaled) { if (budgetMs != null) budgetMs = hs.scaled(budgetMs).ms;
+                                             if (expectedMs != null) expectedMs = hs.scaled(expectedMs).ms; } } catch {}
+                let pass = { state: "unknown", passAt: null };
+                try { if (hs && hs.passState) pass = hs.passState(c.rel, fileHash(file)); } catch {}
+                return { ...c, budgetMs, expectedMs, passState: pass.state, passAt: pass.passAt };
+            });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ checks, rigOnly: RIG_ONLY }));
+        }).catch(() => {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ checks: discover(), rigOnly: RIG_ONLY }));
+        });
+        return true;
+    }
+    // v4004 -- WHAT STEP IS IT ON. Reads the buffer this process is already filling; the child is not touched.
+    if (req.method === "GET" && url === "/rig/progress") {
+        const rel = decodeURIComponent((req.url.split("?")[1] || "").replace(/^rel=/, ""));
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify(progressOf(rel)));
         return true;
     }
     if (req.method === "POST" && url === "/rig/run") {

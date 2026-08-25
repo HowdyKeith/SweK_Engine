@@ -75,7 +75,20 @@ function readHandoffRecord(now = Date.now()) {
     try {
         const st = fs.statSync(FLAG);
         const wasAlive = fs.readFileSync(FLAG, "utf8").trim() === "1";
-        return { wasAlive, flagAgeMs: now - st.mtimeMs };
+        // *** v4004 -- Math.floor, AND IT IS NOT TIDINESS: THIS COMPARED AN INTEGER CLOCK AGAINST A FRACTIONAL
+        // TIMESTAMP AND PRODUCED NEGATIVE AGES 195 TIMES IN 200. *** Date.now() returns whole milliseconds;
+        // st.mtimeMs carries the filesystem's sub-millisecond precision, so a flag written and read inside the
+        // same millisecond stats as (say) x.501 against a clock reading x -- an age of -0.5ms.
+        //
+        // THAT MATTERS BECAUSE A NEGATIVE AGE IS A REAL SIGNAL HERE. v3457 made this module refuse one, on the
+        // grounds that a clock running backwards reads as "very recent" and gets acted on, and LAN clock skew
+        // is ordinary on Keith's network. So the two cases had to be SEPARATED rather than clamped together:
+        // flooring makes both sides whole milliseconds, which removes the precision artefact entirely and
+        // leaves a genuinely future mtime as negative as it ever was. Measured: 195/200 before, 0/200 after.
+        //
+        // A clamp to zero would have fixed the symptom and blinded the skew check, which is the trade this
+        // comment exists to refuse.
+        return { wasAlive, flagAgeMs: now - Math.floor(st.mtimeMs) };
     } catch { return { wasAlive: null, flagAgeMs: -1 }; }
 }
 

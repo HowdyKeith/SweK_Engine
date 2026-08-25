@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4004 -- rig.html says what each step costs, whether the gate changed, and where it has got to
+
+Keith: "can rig.html for each step show how much time is expected? whether the hash is already matched? what
+step each rig step is on, unless that would slow down a test."
+
+All three, and the last clause is the design constraint rather than a caveat.
+
+**How long it takes** is TWO numbers and the page shows both: `expectedMs`, what this gate has actually taken
+(gate-timings.json, host-scaled), beside `budgetMs`, when it gets killed. "Usually 47s, killed at 182s" tells
+you what a run sitting at 90s means and neither number alone does. Both are computed once when `/rig/list` is
+built, before anything is spawned, so they cost a test nothing. A gate nobody has timed reports `null`, never
+0 -- UNMEASURED IS NOT QUICK, and on a page that colours by duration a zero is the fastest thing on screen.
+The page invents no fallback: v3919's `|| 180000` went on printing "180s budget" for seven hundred versions
+after the server had moved to 568s, so a missing budget is now reported as unknown and said out loud.
+
+**Whether the hash matched** is useful to SEE and dangerous to ACT ON, so the narrowing is built into the name.
+It compares the bytes of the gate FILE against the ones recorded when it last passed on this box. It says
+nothing about whether it would still pass -- a gate's verdict depends on the code it checks, and an unchanged
+gate over changed physics is exactly the case where running it matters most. Nothing skips on the strength of
+it, and a gate asserts that nothing does. A box with no history reads `unknown`, never `unchanged`: a fresh
+machine reporting the whole suite as settled would be the most flattering possible reading of no information.
+A FAILED run does not stamp the hash, because "unchanged since it last failed" reads like the opposite of what
+the chip means.
+
+**What step it is on** is free by construction: rigRunner ALREADY receives the child's stdout incrementally and
+concatenates it, whether anybody looks or not. `/rig/progress` hands back a view of that same buffer -- the
+child is never signalled, never paused, never asked anything. MEASURED ANYWAY, because "by construction" is an
+argument and this tree grades arguments: alternated A/B, four runs each way on a real 6s gate with 38 polls at
+150ms, median 6075ms unpolled against 5976ms polled -- -1.6%, against 4.2% spread inside the unpolled arm
+alone. The effect is smaller than the noise it sits in.
+
+It reports the numbered SECTION rather than the last line. A PASS row scrolls past several times a second and
+tells a watcher nothing; a heading says which third of the gate they are in.
+
+Two defects found while building it. My own gate's first version hunted budget DIGITS and caught its own
+formatter -- the two 60000s in secs() are a milliseconds-to-minutes conversion, and a regex over magnitudes
+cannot tell a duration constant from a unit constant. It hunts the FALLBACK SHAPE now, which is what v3919
+actually was. And `kpop-handoff` was failing on `age -0.0703125ms`: readHandoffRecord compared an integer
+Date.now() against a fractional st.mtimeMs, so a flag written and read inside the same millisecond stats as
+x.501 against a clock reading x. Measured at 195 negative ages in 200 writes -- systematic, not a race, and it
+would have read as flaky forever. Flooring makes both sides whole milliseconds and leaves a genuinely future
+mtime as negative as it ever was, which matters because v3457 made this module refuse a negative age
+deliberately: a clamp would have fixed the symptom and blinded the clock-skew check.
+
 ## Since v4003 -- the changelog currency guard is back on, and eleven rounds were backfilled to turn it green honestly
 
 v4002 established that `changelogCurrency-selfcheck` had switched itself off: it skips on a clone saying "The

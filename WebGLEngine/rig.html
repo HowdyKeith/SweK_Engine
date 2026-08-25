@@ -35,6 +35,15 @@
   .dot { width:9px; height:9px; border-radius:50%; background:#1d3450; flex:none; }
   .st { font-size:11px; min-width:74px; text-align:right; }
   .st.pass { color:var(--ok); } .st.fail { color:var(--hot); } .st.run { color:var(--warn); } .st.idle { color:#2c445e; }
+  /* v4004 -- the expectation, the hash chip, and the live step */
+  .exp { color:#5f7ea0; font-size:10.5px; min-width:104px; text-align:right; flex:none; white-space:nowrap; }
+  .exp b { color:#86a6c8; font-weight:600; }
+  .chip { font-size:9.5px; padding:1px 6px; border-radius:9px; border:1px solid var(--line); color:var(--dim);
+          flex:none; letter-spacing:.02em; }
+  .chip.same { border-color:#1f4a34; color:#4e9e78; }
+  .chip.diff { border-color:#4a3a1f; color:#b28f4e; }
+  .step { color:var(--warn); font-size:10.5px; margin:-2px 0 8px 46px; opacity:.9;
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   pre { margin:6px 0 10px; padding:10px; background:#020509; border:1px solid var(--line); border-radius:7px; color:#9fb8d4; font-size:11px; line-height:1.55; max-height:280px; overflow:auto; white-space:pre-wrap; }
   .rig { border:1px solid #3a2c14; border-radius:9px; padding:12px; margin-bottom:9px; background:#0c0a06; }
   .rig .t { color:var(--warn); font-weight:600; margin-bottom:5px; }
@@ -122,20 +131,105 @@
       var nm = el("div", "nm"); nm.textContent = c.name;
       var p = el("span", "pth", "  " + c.rel); nm.appendChild(p);
       var st = el("div", "st idle", "not run");
-      row.appendChild(b); row.appendChild(nm); row.appendChild(st);
+
+      // v4004 -- HOW LONG THIS USUALLY TAKES, AND WHEN IT GETS KILLED. Two different numbers, both shown,
+      // because "usually 47s, killed at 182s" tells you what a run sitting at 90s means and neither alone does.
+      // Both come from the server on /rig/list; the page owns NEITHER, which is v3919's rule -- a budget the
+      // page keeps its own copy of is a budget that goes on printing 180s after the server moved to 568s.
+      var exp = el("div", "exp");
+      if (c.expectedMs != null) {
+        var eb = el("b", null, secs(c.expectedMs)); exp.appendChild(eb);
+        exp.appendChild(document.createTextNode(c.budgetMs != null ? " / " + secs(c.budgetMs) : ""));
+        exp.title = "usually " + secs(c.expectedMs) + " (observed, host-scaled); killed at " +
+                    (c.budgetMs != null ? secs(c.budgetMs) : "an unknown budget");
+      } else {
+        exp.textContent = c.budgetMs != null ? "? / " + secs(c.budgetMs) : "?";
+        exp.title = "NEVER TIMED. Unmeasured is not quick -- a blank here is missing evidence, not a fast gate.";
+      }
+
+      // THE HASH CHIP, AND ITS LIMIT IS IN THE TOOLTIP RATHER THAN LEFT TO BE INFERRED. It compares the bytes
+      // of THIS GATE FILE against the ones recorded when it last passed on this box. It says nothing about
+      // whether it would still pass: a gate's verdict depends on the code it checks, and an unchanged gate over
+      // changed physics is exactly the case where running it matters most. It never skips anything.
+      var chip = null;
+      if (c.passState === "unchanged" || c.passState === "changed") {
+        chip = el("span", "chip " + (c.passState === "unchanged" ? "same" : "diff"),
+                  c.passState === "unchanged" ? "gate unchanged" : "gate edited");
+        chip.title = c.passState === "unchanged"
+          ? "This gate FILE is byte-identical to the one that last passed here" +
+            (c.passAt ? " (" + c.passAt.slice(0, 16).replace("T", " ") + ")" : "") +
+            ". IT DOES NOT MEAN IT WOULD STILL PASS -- the code it checks is not in this hash."
+          : "This gate file has been edited since it last passed here.";
+      }
+
+      row.appendChild(b); row.appendChild(nm);
+      if (chip) row.appendChild(chip);
+      row.appendChild(exp); row.appendChild(st);
+      var step = el("div", "step"); step.style.display = "none";
       var out = el("pre"); out.style.display = "none";
-      list.appendChild(row); list.appendChild(out);
-      c._st = st; c._out = out; c._btn = b;
+      list.appendChild(row); list.appendChild(step); list.appendChild(out);
+      c._st = st; c._out = out; c._btn = b; c._step = step;
     });
+  }
+
+  function secs(ms) {
+    if (ms == null) return "?";
+    return ms < 1000 ? Math.round(ms) + "ms"
+         : ms < 60000 ? (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + "s"
+         : Math.round(ms / 60000) + "m";
+  }
+
+  // v4004 -- WHAT STEP IT IS ON, AND WHY THIS DOES NOT SLOW THE TEST.
+  //
+  // Keith asked for this "unless that would slow down a test", and the constraint is met BY CONSTRUCTION rather
+  // than by care: the bridge already receives the child's stdout incrementally and concatenates it, whether
+  // anybody looks or not. /rig/progress hands back a view of THAT BUFFER. The child is never signalled, never
+  // paused, never asked anything -- a poll reads a string the server was already holding.
+  //
+  // MEASURED ANYWAY, because "by construction" is an argument and this tree grades arguments. Alternated A/B,
+  // four runs each way on a 6s gate with 38 polls at 150ms: median 6075ms unpolled against 5976ms polled,
+  // -1.6%, while the UNPOLLED arm's own spread was 4.2%. The effect is smaller than the noise it sits in.
+  // tools/ship/rigProgress-selfcheck.mjs holds that measurement and re-derives it.
+  function watch(c) {
+    var stop = false;
+    (function tick() {
+      if (stop) return;
+      fetch("/rig/progress?rel=" + encodeURIComponent(c.rel), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (p) {
+          if (stop || !p.running) return;
+          // THE SECTION, NOT THE LAST LINE. A PASS row scrolls past four times a second and tells you nothing;
+          // a section heading says which third of the gate you are in, which is the question that was asked.
+          var where = p.section || p.lastLine;
+          if (where) {
+            c._step.textContent = "-> " + where.slice(0, 150) +
+              (p.checks ? "    (" + p.checks + " checks so far)" : "");
+            c._step.style.display = "block";
+          }
+          if (c.expectedMs && p.ms) {
+            // OVER ITS USUAL TIME IS A FACT WORTH SEEING while it is still running, because that is the moment
+            // you can still decide to stop it rather than after it has been killed.
+            c._st.textContent = "running " + secs(p.ms) +
+              (p.ms > c.expectedMs * 1.5 ? "  (over " + secs(c.expectedMs) + ")" : "");
+          }
+        })
+        .catch(function () {})
+        .then(function () { if (!stop) setTimeout(tick, 400); });
+    })();
+    return function () { stop = true; };
   }
 
   function runOne(i) {
     var c = checks[i];
     c._st.className = "st run"; c._st.textContent = "running";
+    c._step.textContent = ""; c._step.style.display = "none";
     c._btn.disabled = true;
+    var unwatch = watch(c);
     return fetch("/rig/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rel: c.rel }) })
       .then(function (r) { return r.json(); })
       .then(function (r) {
+        unwatch();
+        c._step.style.display = "none";
         // THE EXIT CODE IS THE VERDICT. Not a regex over stdout.
         c._st.className = "st " + (r.ok ? "pass" : "fail");
         // v3076 -- a killed gate says TIMEOUT, not "FAIL null". null is the exit code of a process that never
@@ -158,6 +252,8 @@
         return r.ok;
       })
       .catch(function (e) {
+        unwatch();
+        c._step.style.display = "none";
         c._st.className = "st fail"; c._st.textContent = "error";
         c._out.textContent = String(e); c._out.style.display = "block";
         c._btn.disabled = false;
