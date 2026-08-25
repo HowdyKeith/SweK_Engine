@@ -11,11 +11,18 @@
 //                  MEASURED from perihelion passages by a detector that knows no formula.
 //   "closure"   -- apsidal precession per orbit. A 1/r^2 force closes exactly, so any rotation is the
 //                  integrator, not the physics.
-//   "compare"   -- both integrators over the same run, reporting the ratio between their drifts. This is where
+//   "compare"   -- verlet against rk4 over the same run, reporting the ratio between their drifts. This is where
 //                  the honest nuance lives: RK4 is MORE accurate per step and WORSE over time.
+//
+// v3993 -- kepler.js registers FOUR integrators now; `compare` still reports the verlet/rk4 pair only, and
+// deliberately: its five output fields are FROZEN IN lab-results-baseline.json under a strict-subset check with
+// zero unique keys, so adding fields here would be a baseline change dressed up as a feature. The two
+// first-order methods reach every other mode through the `integrator` config instead, and the matched-pair
+// finding they exist for -- same order, one line apart, one of them loses the planet -- is gated where it
+// belongs, in physics/orbits/kepler-selfcheck.mjs sections 10-12.
 
 import { auditConservation } from "./conservation.mjs";
-import { integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, period, visViva, eccentricityVector, atPerihelion } from "../../physics/orbits/kepler.js";
+import { integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, period, visViva, eccentricityVector, atPerihelion, INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { ELEMENTS, period as ssPeriod, specificEnergy, specificAngMom, planetState } from "../../physics/solarSystem.js";
 
 // v3421 -- *** THE MODE LIST WAS DECLARED TWICE HERE TOO, AND THE TWO COPIES ALREADY DISAGREED: the guard below
@@ -59,7 +66,12 @@ export function keplerDefaults(hyp) {
     c.e = Math.min(0.95, Math.max(0, num(c.e, DEF.e)));
     c.stepsPerOrbit = Math.min(4000, Math.max(20, num(c.stepsPerOrbit, DEF.stepsPerOrbit) | 0));
     c.orbits = Math.min(2000, Math.max(5, num(c.orbits, DEF.orbits) | 0));
-    if (!["verlet", "rk4"].includes(c.integrator)) c.integrator = DEF.integrator;
+    // v3993 -- *** THE WHITELIST WAS THE REASON THE TWO NEW INTEGRATORS WOULD HAVE BEEN A DEAD OPTION. ***
+    // kepler.js now registers four (euler, eulerSymplectic, verlet, rk4) and this list named two, so a caller
+    // asking for either first-order method was silently handed verlet back -- an advertised knob value that
+    // moves no observable, which is the v3436 nuclearBind defect exactly. Read from INTEGRATORS rather than
+    // retyped, so the next one registered cannot fall out of sync with the guard.
+    if (!Object.prototype.hasOwnProperty.call(INTEGRATORS, c.integrator)) c.integrator = DEF.integrator;
     h.config = c;
     if (!KEPLER_MODES.includes(h.mode)) h.mode = "conserve";
     return h;
