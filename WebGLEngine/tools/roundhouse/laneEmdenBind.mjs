@@ -43,6 +43,9 @@ export const LANE_EMDEN_OBSERVABLES = [
     "xi1", "hasSurface", "massIntegral", "surfaceVsExact",
     "massBoundary", "massQuadrature", "massRouteSpread",
     "scalingExponent", "scalingExpected", "scalingErr",
+    // v4000 -- scalingErr is null at a degenerate index rather than 0, and scalingProbeErr grades the scaling
+    // algebra at an index where it can actually fail. See the block in the "scaling" mode below.
+    "scalingDegenerate", "scalingProbeIndex", "scalingProbeErr",
     "massAtLowDensity", "massAtHighDensity", "massInvariance",
     "radiusAtLowDensity", "radiusAtHighDensity", "radiusRatio",
     "planted",
@@ -76,6 +79,7 @@ function buildLaneEmden({ mode = "profile", config = {} } = {}) {
         xi1: null, hasSurface: null, massIntegral: null, surfaceVsExact: null,
         massBoundary: null, massQuadrature: null, massRouteSpread: null,
         scalingExponent: null, scalingExpected: null, scalingErr: null,
+        scalingDegenerate: null, scalingProbeIndex: null, scalingProbeErr: null,
         massAtLowDensity: null, massAtHighDensity: null, massInvariance: null,
         radiusAtLowDensity: null, radiusAtHighDensity: null, radiusRatio: null,
         planted: !!config.planted,
@@ -115,12 +119,36 @@ function buildLaneEmden({ mode = "profile", config = {} } = {}) {
         // not move it -- which is why xi1 and massIntegral ride along in this mode too.
         const exponent = measuredMassRadiusExponent(c.n, { rhoLo: c.rhoLo, rhoHi: c.rhoHi, solveOpts });
         const expected = (1 - c.n) / (3 - c.n);
+        // *** v4000 -- scalingErr WAS EXACTLY 0 AT THIS DEVICE'S DEFAULT INDEX, AND MEASUREMENT SHOWED IT WAS
+        // NOT MERELY EXACT -- IT WAS BLIND. *** census-selfcheck flagged it as a new unexplained exact zero and
+        // the honest answer turned out to be worse than "exact by construction". Three separate typos were
+        // planted in starAt -- the alpha exponent (1-n)/(2n), the mass power alpha^3, and a constant on R --
+        // and at n=1 scalingErr stayed 0.000e+0 THROUGH ALL THREE. At n=1.5 and n=2 the first two are caught
+        // (3.3e-3, 1.96e-2), so the check is live; it is the DEFAULT INDEX that is degenerate.
+        //
+        // WHY n=1 KILLS IT: alpha = rhoC^((1-n)/(2n)) becomes rhoC^0 = 1, so the radius stops depending on
+        // central density at all -- a real and well-known property of the n=1 polytrope, not a bug. Both the
+        // measured exponent and the closed form then collapse to zero for the SAME reason, and their difference
+        // is zero no matter what either of them is computing. A zero that cannot be anything else is not a pass.
+        //
+        // So the degenerate case REPORTS ITSELF instead of reporting a zero, and a probe at a non-degenerate
+        // index rides along so the scaling algebra is graded on EVERY run rather than only on the runs somebody
+        // happened to configure away from the default.
+        const degenerate = !Number.isFinite(expected) || !Number.isFinite(exponent) || c.n === 1;
+        // The probe index is NOT the configured one and NOT 1 or 3: those are the two indices where this
+        // comparison loses its content (n=1 kills the radius dependence, n=3 kills the mass dependence and
+        // sends both sides to -Infinity). 1.5 is the other classical polytrope and is degenerate in neither.
+        const PROBE_N = 1.5;
+        const probeExp = measuredMassRadiusExponent(PROBE_N, { rhoLo: c.rhoLo, rhoHi: c.rhoHi, solveOpts });
         return {
             ...blank,
             xi1, hasSurface: xi1 !== null, massIntegral,
             scalingExponent: exponent,
             scalingExpected: Number.isFinite(expected) ? expected : null,
-            scalingErr: Number.isFinite(expected) ? Math.abs(exponent - expected) : null,
+            scalingErr: degenerate ? null : Math.abs(exponent - expected),
+            scalingDegenerate: degenerate ? 1 : 0,
+            scalingProbeIndex: PROBE_N,
+            scalingProbeErr: Math.abs(probeExp - (1 - PROBE_N) / (3 - PROBE_N)),
             massAtLowDensity: lo, massAtHighDensity: hi,
             massInvariance: (lo == null || hi == null) ? null
                 : Math.abs(hi - lo) / Math.max(1e-300, Math.abs(lo)),
@@ -140,11 +168,23 @@ function buildLaneEmden({ mode = "profile", config = {} } = {}) {
     };
 }
 
+
+// v4000 -- *** ONE DECLARATION SITE FOR THE MODES, SO defaults() CAN REFUSE WHAT THE DEVICE DOES NOT OFFER. ***
+// deviceModes-selfcheck's ratchet caught this device newly accepting ANY mode string: `mode: mode || "profile"`
+// echoes back whatever it is handed, and checkMode reads that echo as "the device offers this". A mode selects
+// WHICH PHYSICS RUNS, so a device that accepts a name it does not declare runs something else and says nothing.
+//
+// The gate declined to fix it -- "making one validate means knowing WHICH modes it means to offer, and guessing
+// that would declare an interface on somebody else's behalf" -- and that caution was right in general and
+// unnecessary here: THE DEVICE ALREADY SAID. The list below was sitting inline in the device object all along,
+// so nothing is being guessed; the two halves are simply being made to read from the same place.
+export const LANE_EMDEN_MODES = ["profile", "mass", "scaling"];
+
 export const laneEmdenDevice = {
     // KNOB PLANT: the perturbation replaces the GEOMETRY upstream of every observable, so the whole path from a
     // wrong number of dimensions to the reported numbers is graded.
     plantKind: "knob",
-    modes: ["profile", "mass", "scaling"],
+    modes: LANE_EMDEN_MODES,
     name: "lane-emden-polytrope", observables: LANE_EMDEN_OBSERVABLES, build: buildLaneEmden,
-    defaults: ({ mode } = {}) => ({ mode: mode || "profile", config: { ...DEF } }),
+    defaults: ({ mode } = {}) => ({ mode: LANE_EMDEN_MODES.includes(mode) ? mode : "profile", config: { ...DEF } }),
 };

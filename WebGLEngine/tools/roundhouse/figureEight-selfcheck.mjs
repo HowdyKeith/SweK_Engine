@@ -78,11 +78,22 @@ const cons = await dev.build({ mode: "conserve" });
 
 // ---- 3. FOUR MODES, EXPORTED, ONE RUNNER -------------------------------------------------------------------------
 {
-    ok("!! four modes, EXPORTED, and a nonsense mode refused",
-        Array.isArray(dev.modes) && dev.modes.length === 4 &&
+    // *** v4000 -- THIS PINNED THE COUNT AT FOUR AND v3852 ADDED A FIFTH, SO IT HAS BEEN RED EVER SINCE. ***
+    // The fifth is `euler`, and it is not an afterthought: v3852 made it THE PLANT for this device, because
+    // plantedCoverage read figureeight as ungraded while `perturbed` was pretending to be one. So a typed
+    // count was sitting in the way of the device's own plant.
+    //
+    // NEVER TYPE A NUMBER THE DEVICE OWNS. The declared list is compared against the module's OWN export, so
+    // adding or removing a mode updates both halves at once and a mode that vanishes still fails loudly.
+    const { FIG8_MODES } = await import(pathToFileURL(path.join(HERE, "figureEightBind.mjs")).href);
+    const sameSet = Array.isArray(dev.modes) && dev.modes.length === FIG8_MODES.length &&
+        FIG8_MODES.every((m) => dev.modes.includes(m));
+    ok("!! every mode the module declares is the mode the device offers, EXPORTED, and a nonsense mode refused",
+        sameSet &&
         dev.modes.every((m) => K.checkMode(dev, m).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
-        dev.modes.join(", ") + ". v3192 found the lab's apparent one-moded-ness was an artefact of a probe's " +
+        dev.modes.length + ": " + dev.modes.join(", ") + (sameSet ? "" : "  <- DIVERGED from FIG8_MODES: " +
+        FIG8_MODES.join(", ")) + ". v3192 found the lab's apparent one-moded-ness was an artefact of a probe's " +
         "candidate list; a NEW device declares its own");
 
     ok("...and every mode runs through ONE integrator",

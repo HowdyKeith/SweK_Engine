@@ -23,7 +23,7 @@
 //   6.6e-4 whether you run 50 orbits or 800.
 // Both halves are gated. A gate that only proved "symplectic is better" would be teaching the wrong lesson.
 
-import { period, visViva, specificEnergy, angularMomentum, semiMajorFromEnergy, eccentricityVector, atPerihelion, integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, INTEGRATORS, SYMPLECTIC, ORDER, stepEuler, stepEulerSymplectic, stepVerlet } from "./kepler.js";
+import { period, visViva, specificEnergy, angularMomentum, semiMajorFromEnergy, eccentricityVector, atPerihelion, integrate, measurePeriod, keplerThirdLaw, apsidalPrecession, INTEGRATORS, SYMPLECTIC, ORDER, stepEuler, stepEulerSymplectic, stepVerlet, stepRK4 } from "./kepler.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -120,6 +120,39 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     ok("...and every one of them is declared in BOTH tables the comparisons rest on",
         Object.keys(INTEGRATORS).every((k) => k in SYMPLECTIC && k in ORDER),
         "SYMPLECTIC and ORDER are the premise of sections 10-12; an integrator missing from either would be compared against nothing");
+
+    // *** v4000 -- stepRK4 WAS EXPORTED AND NAMED BY NO GATE, while its three siblings all were. ***
+    // definitionGates-selfcheck found it among 84 such symbols. A MENTION IS NOT A CHECK, so what is asserted
+    // is the claim the ORDER table makes -- and once the instrument was right it graded ALL FOUR, which is a
+    // better answer than closing one name.
+    //
+    // *** THE FIRST VERSION MEASURED THE ENERGY AND GOT ORDER 5 FOR RK4, REPEATABLY. *** Not noise: the ratio
+    // was 62.85, 63.74, 63.94, 63.97 across four decades of dt -- a rock-solid 2^6. The energy error of a
+    // Kepler orbit under RK4 converges ONE ORDER FASTER than the state error, because the leading state error
+    // is very nearly tangent to the energy surface and the first-order term cancels. That is a real property
+    // and an interesting one, and it is the WRONG INSTRUMENT for grading a method's order: ORDER is a claim
+    // about the STATE. Measured against a 512-substep RK4 reference, every integrator lands on its declared
+    // order exactly -- euler 1.00, eulerSymplectic 1.00, verlet 2.00, rk4 4.00.
+    {
+        const s0 = atPerihelion(1, 0.3, 1);
+        const ref = (dt, n = 512) => { let s = { ...s0 }; for (let i = 0; i < n; i++) s = stepRK4(s, dt / n, 1); return s; };
+        const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.vx - b.vx, a.vy - b.vy);
+        const orderOf = (step) => {
+            const e1 = dist(step(s0, 0.02, 1), ref(0.02)), e2 = dist(step(s0, 0.01, 1), ref(0.01));
+            return Math.log2(e1 / Math.max(1e-300, e2)) - 1;
+        };
+        const measured = {};
+        for (const [k, step] of Object.entries({ euler: stepEuler, eulerSymplectic: stepEulerSymplectic,
+                                                 verlet: stepVerlet, rk4: stepRK4 })) measured[k] = orderOf(step);
+        const wrong = Object.keys(measured).filter((k) => Math.abs(measured[k] - ORDER[k]) > 0.25);
+        ok("!! *** EVERY INTEGRATOR CONVERGES AT THE ORDER THE TABLE CLAIMS FOR IT ***", wrong.length === 0,
+            Object.entries(measured).map(([k, v]) => `${k} ${v.toFixed(2)} (ORDER ${ORDER[k]})`).join(", ") +
+            (wrong.length ? "  <- DISAGREES: " + wrong.join(", ") : ""));
+        ok("!! ...and stepRK4 really does buy two more orders than verlet for its four evaluations",
+            measured.rk4 - measured.verlet > 1.7,
+            `rk4 ${measured.rk4.toFixed(2)} against verlet ${measured.verlet.toFixed(2)} -- the whole reason ` +
+            "a four-evaluation method is ever worth a two-evaluation one");
+    }
 }
 
 // 10. *** THE MATCHED PAIR: SAME ORDER, SAME COST, ONE LINE APART, AND ONLY ONE OF THEM KEEPS THE PLANET ***

@@ -167,6 +167,20 @@ export function integrate({ p = DEFAULTS, x0 = null, y0 = null, integrator = "sy
     const V0 = firstIntegral(x, y, p);
     const half = total >> 1;
     let maxFirst = 0, maxSecond = 0, sumX = 0, sumY = 0, blewUp = null;
+    // v4000 -- THE FIRST INTEGRAL AS A SERIES, so tools/roundhouse/conservation.mjs can audit it.
+    //
+    // *** THIS MODULE WAS A SECOND DECLARATION OF AN ALGORITHM THE TREE ALREADY OWNED, AND conservationReach
+    // CAUGHT IT ONE ROUND AFTER IT SHIPPED. *** maxFirst/maxSecond below is a first-half-versus-second-half
+    // comparison -- exactly what auditConservation does -- and v3994 wrote it by hand without noticing that
+    // keplerBind had been wired to the shared module since v3526. Two implementations of one idea, agreeing by
+    // luck rather than by construction, is the shape v3525 exists to find. It now emits the series so the
+    // shared verdict can be reported BESIDE the hand-rolled one rather than instead of it: the hand-rolled
+    // fields are frozen in the baseline and must not move, so this is a second opinion, not a replacement.
+    //
+    // SAMPLED, not kept: 200 cycles at 400 steps is 80,000 numbers and no baseline should carry that. 64 to
+    // match kepler's, which is what makes the two devices' shared verdicts comparable at all.
+    const firstIntegralSeries = [];
+    const seriesEvery = Math.max(1, Math.floor(total / 64));
     // Upward crossings of x = x*, linearly interpolated, are the cycle markers. The detector knows no formula.
     const crossings = [];
     const path = [];
@@ -178,7 +192,9 @@ export function integrate({ p = DEFAULTS, x0 = null, y0 = null, integrator = "sy
             const frac = (fp.x - xPrev) / (x - xPrev);
             crossings.push({ t: (i + frac) * dt, i });
         }
-        const e = Math.abs(firstIntegral(x, y, p) - V0);
+        const Vi = firstIntegral(x, y, p);
+        if (i % seriesEvery === 0) firstIntegralSeries.push(Vi);
+        const e = Math.abs(Vi - V0);
         if (i < half) maxFirst = Math.max(maxFirst, e); else maxSecond = Math.max(maxSecond, e);
         sumX += x; sumY += y;
         if (sample && i % sample === 0) path.push([x, y]);
@@ -189,6 +205,7 @@ export function integrate({ p = DEFAULTS, x0 = null, y0 = null, integrator = "sy
         integrator, p, sigma, dt, cycles, stepsPerCycle,
         finalX: x, finalY: y, blewUpAtCycle: blewUp,
         firstIntegralStart: V0,
+        firstIntegralSeries, firstIntegralSeriesEvery: seriesEvery,
         driftFirstHalf: maxFirst, driftSecondHalf: maxSecond,
         // ~1 means BOUNDED and merely oscillating; >1 means still climbing.
         //

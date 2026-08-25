@@ -115,12 +115,24 @@ function buildBell({ mode = "chsh", config = {} } = {}) {
     };
 }
 
+
+// v4000 -- *** ONE DECLARATION SITE FOR THE MODES, SO defaults() CAN REFUSE WHAT THE DEVICE DOES NOT OFFER. ***
+// deviceModes-selfcheck's ratchet caught this device newly accepting ANY mode string: `mode: mode || "chsh"`
+// echoes back whatever it is handed, and checkMode reads that echo as "the device offers this". A mode selects
+// WHICH PHYSICS RUNS, so a device that accepts a name it does not declare runs something else and says nothing.
+//
+// The gate declined to fix it -- "making one validate means knowing WHICH modes it means to offer, and guessing
+// that would declare an interface on somebody else's behalf" -- and that caution was right in general and
+// unnecessary here: THE DEVICE ALREADY SAID. The list below was sitting inline in the device object all along,
+// so nothing is being guessed; the two halves are simply being made to read from the same place.
+export const BELL_MODES = ["chsh", "routes", "bounds"];
+
 export const bellDevice = {
     // KNOB PLANT: the perturbation replaces the QUANTUM STATE upstream of every observable, so the whole path
     // from a wrong state to the reported numbers is graded -- plantedError's "perturb the physics, not the
     // number" in its ordinary form.
     plantKind: "knob",
-    modes: ["chsh", "routes", "bounds"],
+    modes: BELL_MODES,
     name: "chsh-bell-inequality", observables: BELL_OBSERVABLES, build: buildBell,
-    defaults: ({ mode } = {}) => ({ mode: mode || "chsh", config: { ...DEF } }),
+    defaults: ({ mode } = {}) => ({ mode: BELL_MODES.includes(mode) ? mode : "chsh", config: { ...DEF } }),
 };

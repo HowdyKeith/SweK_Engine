@@ -129,12 +129,24 @@ function buildKinetics({ mode = "period", config = {} } = {}) {
     };
 }
 
+
+// v4000 -- *** ONE DECLARATION SITE FOR THE MODES, SO defaults() CAN REFUSE WHAT THE DEVICE DOES NOT OFFER. ***
+// deviceModes-selfcheck's ratchet caught this device newly accepting ANY mode string: `mode: mode || "period"`
+// echoes back whatever it is handed, and checkMode reads that echo as "the device offers this". A mode selects
+// WHICH PHYSICS RUNS, so a device that accepts a name it does not declare runs something else and says nothing.
+//
+// The gate declined to fix it -- "making one validate means knowing WHICH modes it means to offer, and guessing
+// that would declare an interface on somebody else's behalf" -- and that caution was right in general and
+// unnecessary here: THE DEVICE ALREADY SAID. The list below was sitting inline in the device object all along,
+// so nothing is being guessed; the two halves are simply being made to read from the same place.
+export const KINETICS_MODES = ["period", "scram", "prompt"];
+
 export const kineticsDevice = {
     // KNOB PLANT: the perturbation replaces a physical constant upstream of every observable, so the whole path
     // from the wrong assumption to the reported number is graded -- plantedError's "perturb the physics, not the
     // number" in its ordinary form.
     plantKind: "knob",
-    modes: ["period", "scram", "prompt"],
+    modes: KINETICS_MODES,
     name: "point-reactor-kinetics", observables: KINETICS_OBSERVABLES, build: buildKinetics,
-    defaults: ({ mode } = {}) => ({ mode: mode || "period", config: { ...DEF } }),
+    defaults: ({ mode } = {}) => ({ mode: KINETICS_MODES.includes(mode) ? mode : "period", config: { ...DEF } }),
 };

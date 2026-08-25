@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { codeOnly, noComments } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const require_ = createRequire(import.meta.url);
@@ -60,17 +61,35 @@ ok("!! *** an unreadable directory REFUSES BY NAME rather than returning an empt
 
 // ---- WHAT THE BRIDGE MUST NOT CONTAIN -----------------------------------------------------------------------
 const bsrc = fs.readFileSync(path.join(ENG, "ai-bridge", "sysadminBridge.js"), "utf8");
+// *** v4000 -- THIS READ RAW SOURCE FOR BOTH HALVES, AND EACH HALF WANTED A DIFFERENT INSTRUMENT. ***
+// commentFalsePass-selfcheck's census flagged it as the one GENUINE case in twenty: a gate asserting a code
+// idiom against text that includes comments. Both halves were wrong, in OPPOSITE directions:
+//
+//   the NEGATIVE half (no zip magic here) would go RED on a comment that merely NAMED 0x02014b50 -- a false
+//   alarm on prose, and this file's own header now discusses those constants;
+//   the POSITIVE half (the bridge imports patchBase.mjs) would go GREEN on a comment saying it should -- the
+//   v3138 false pass, which is the shape the census exists to hunt.
+//
+// AND THEY CANNOT SHARE ONE FIX, which is the part worth writing down. codeOnly() blanks comments AND STRING
+// LITERALS, so it is right for the idiom and FATAL for the import: `patchBase.mjs` only ever appears inside
+// quotes. conservationReach-selfcheck hit both halves of that pair inside one round and left the rule --
+// *** codeOnly FOR AN IDIOM, noComments FOR TEXT THE CODE CONTAINS *** -- and this is that rule being spent.
+const bcode = codeOnly(bsrc);        // comments AND strings gone: for the zip idiom
+const bnostr = noComments(bsrc);     // comments gone, strings KEPT: for the import path
 ok("!! *** NO ZIP LOGIC LIVES IN THE BRIDGE ***",
-    !/0x02014b50|0x04034b50|readCentralDirectory\s*\(|inflateRawSync/.test(bsrc) && /patchBase\.mjs/.test(bsrc),
+    !/0x02014b50|0x04034b50|readCentralDirectory\s*\(|inflateRawSync/.test(bcode) && /patchBase\.mjs/.test(bnostr),
     "moduleHistory's own gate asserts this bridge holds no zip reading, and THAT assertion is why the import " +
     "is here rather than a fourth reader. safeExtract owns readCentralDirectory; moduleHistory owns inflateEntry");
 
+// the same treatment: `applyStaged` is an IDENTIFIER, so the comment-and-string-free text is the right reader.
+// Slicing bcode rather than bsrc keeps the window aligned, because codeOnly preserves newlines and offsets move.
 ok("!! ...and the scanner cannot APPLY anything",
-    !/applyStaged|extractTo|unzipTo/.test(bsrc.slice(bsrc.indexOf("async function patchScan"), bsrc.indexOf("module.exports"))),
+    !/applyStaged|extractTo|unzipTo/.test(bcode.slice(bcode.indexOf("async function patchScan"), bcode.indexOf("module.exports"))),
     "reporting whether a patch declares a base is a READ. The apply path is applyStaged's, with its own " +
     "signature check -- a scanner that could also install would be two capabilities wearing one route");
 
-const ssrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
+// noComments, not codeOnly: "/sys/patchbase" is a STRING LITERAL and codeOnly would blank the route away.
+const ssrc = noComments(fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8"));
 ok("!! the route is registered and awaited",
     /"\/sys\/patchbase"/.test(ssrc) && /patchScan\(\)\.then\(sendJson\)/.test(ssrc) && /\.catch\(/.test(ssrc),
     "an unawaited async handler sends nothing and the page hangs; a missing catch turns a bad directory into " +

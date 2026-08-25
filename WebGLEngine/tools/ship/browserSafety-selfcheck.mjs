@@ -72,8 +72,14 @@ function nodeGlobalsIn(rel) {
     // BRACE -- so the depth tracker never saw the guard open, and it flagged the two SAFE lines inside it.
     // v2573 coined "A REGEX THAT GREPS PROSE WILL FIND PROSE"; this is its sibling. Only strip `//` when it is
     // not preceded by a colon, which is exactly what a protocol looks like.
+    //
+    // v4000 -- AND THE STRIPPER MUST NOT MOVE THE LINES IT REPORTS. Deleting a block comment outright shortens
+    // the file, so every number after it points at the wrong line. The rig said `brain/rl/lessons.mjs [95:
+    // process]` and line 95 of that file is a sentence in a JSDoc block; the real line was 106. A gate that
+    // names the wrong line sends its reader looking at innocent code and teaches them the gate is noise.
+    // Block comments are therefore replaced by AS MANY BLANK LINES AS THEY OCCUPIED.
     const src = fs.readFileSync(path.join(ROOT, rel), "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat((m.match(/\n/g) || []).length))
         .split("\n").map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1")).join("\n");
     // A LINE-BASED GATE CANNOT SEE A BLOCK, AND THAT IS NOT A DETAIL.
     //
@@ -91,8 +97,20 @@ function nodeGlobalsIn(rel) {
         const opensGuard = /if\s*\(\s*IS_NODE\s*&&/.test(line) || /if\s*\(\s*typeof process\s*!==?\s*["']undefined["']/.test(line);
         const inGuard = guardDepth >= 0 && depth > guardDepth;
         if (!inGuard && !opensGuard) {
-            // the guard's own definition line is not a use
-            if (!/typeof process\s*!==?\s*["']undefined["']/.test(line)) {
+            // THE GUARD'S OWN DEFINITION LINE IS NOT A USE, AND IT HAS TWO SPELLINGS.
+            //
+            // v4000 -- the rig flagged brain/rl/lessons.mjs:106, which is:
+            //     if (typeof process === "undefined" || !process.versions || !process.versions.node) {
+            // THE MOST BROWSER-SAFE LINE IN THE FILE. It is the INVERTED guard -- the early-out that OPENS the
+            // browser branch -- and `!process.versions` is only ever evaluated when the first term was false,
+            // so the short circuit protects it exactly the way `typeof process !== "undefined" &&` does.
+            // This gate knew one spelling of a guard and called the other one a bug. A GATE THAT ONLY
+            // RECOGNISES THE IDIOM ITS AUTHOR HAPPENED TO WRITE IS A STYLE RULE WEARING A SAFETY RULE'S CLOTHES.
+            //
+            // Only the TEST LINE is excused, never the block it opens: everything inside `if (typeof process
+            // === "undefined") { ... }` is the browser branch, where a node global really would throw. The
+            // positive control below plants one there and requires it to still be caught.
+            if (!/typeof process\s*[!=]==?\s*["']undefined["']/.test(line)) {
                 if (/(^|[^.\w])process\.(argv|env|exit|stdout|versions)/.test(line)) bad.push((i + 1) + ": process");
                 if (/(^|[^.\w])require\s*\(/.test(line)) bad.push((i + 1) + ": require");
                 if (/(^|[^.\w])__dirname/.test(line)) bad.push((i + 1) + ": __dirname");

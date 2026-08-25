@@ -40,17 +40,30 @@ console.log("1. THE SERIES CENSUS IS DERIVED, AND IT IS THE EXACT HALF");
     // `energySeries`. IT DID NOT FIRE, because SHAPED matches `energyErr` and not `energySeries`. A NAME SCAN
     // CANNOT WATCH FOR SOMETHING IT CANNOT SPELL. So the property moved to where it cannot be missed: WHICH
     // BINDS ACTUALLY PASS A SERIES TO auditConservation, derived from code rather than from a name.
+    // *** v4000 -- A SECOND DEVICE IS WIRED, SO THE ANTIDOTE BELOW FIRES AND THIS IS THE REWRITE IT ASKED FOR.
+    // *** v3525 wrote it in advance: "WHEN A SECOND DEVICE IS WIRED, `audited.length >= 1` STOPS BEING
+    // INTERESTING AND SHOULD BE REWRITTEN TO COUNT AGAINST THE 30 CANDIDATES -- NOT WEAKENED, NOT DELETED."
+    // v3994's lotkaVolterra is that second device, wired at v4000 when conservationReach caught it hand-rolling
+    // the algorithm. FIFTH COLLECTION OF v3196's IDIOM, and the second in this file where the line named its
+    // own successor rather than merely its own death.
+    //
+    // The number to watch is audited AGAINST THE CANDIDATE POOL, because `>= 1` would stay green through 28
+    // more devices doing it by hand. A RATCHET THAT CANNOT TIGHTEN IS A FLOOR NOBODY WILL EVER RAISE.
     const audited = auditedSeries();
-    ok("!! *** A SERIES IS NOW AUDITED BY THE SHARED MODULE -- IT WAS ZERO AT v3525 ***", audited.length >= 1,
-        audited.map((a) => a.device).join(", ") + ". THE FIRST DEVICE CRITERION FIVE COULD BE ASKED OF.");
+    const CANDIDATES = R.devicesShaped.length;   // the same pool section 2 reports: devices with a conservation-shaped field
+    ok("!! *** SERIES AUDITED BY THE SHARED MODULE, AGAINST THE POOL THAT COULD BE ***", audited.length >= 2,
+        audited.length + " of " + CANDIDATES + " candidate devices: " + audited.map((a) => a.device).join(", ") +
+        ". Was ZERO at v3525 and ONE at v3526. RAISE THIS FLOOR WHEN A THIRD IS WIRED -- that is what makes it " +
+        "a ratchet rather than a plaque.");
     const both = R.series.filter((x) => SHAPED.test(x.field));
     ok("the NAME scan still reports none, which is the correction rather than the finding", both.length === 0,
         "SHAPED cannot spell `energySeries`, so the keyword half stayed silent through the very event it was " +
         "written to catch. THE KEYWORD PROBE HAS MISLED THIS PROJECT FOUR TIMES NOW.");
-    report("THE ANTIDOTE, RESTATED SO IT CAN FIRE NEXT TIME",
-        "*** WHEN A SECOND DEVICE IS WIRED, `audited.length >= 1` STOPS BEING INTERESTING AND SHOULD BE " +
-        "REWRITTEN TO COUNT AGAINST THE 30 CANDIDATES -- NOT WEAKENED, NOT DELETED. The number to watch is " +
-        "audited/30, and it is 1/30 today. ***");
+    report("THE ANTIDOTE, COLLECTED AND RE-ARMED",
+        "*** v3525's version of this line FIRED at v4000 and the check above is its rewrite. THE NEXT ONE: " +
+        "when a THIRD device is wired, raise the floor from 2 to 3 -- NOT WEAKENED, NOT DELETED. The number to " +
+        "watch is audited against the candidate pool, and it is " + audited.length + "/" + CANDIDATES +
+        " today. A floor that never rises is a plaque commemorating the day somebody did the work once. ***");
 }
 
 // ---------------------------------------------------------------------------
@@ -83,12 +96,32 @@ console.log("\n3. TWO DECLARATIONS OF ONE ALGORITHM, AND THE SHARED ONE ARRIVED 
     ok("!! *** THE HAND-ROLLED BIND NOW IMPORTS THE SHARED MODULE ***", hr.every((h) => h.importsSharedModule),
         hr.map((h) => h.file + (h.importsSharedModule ? " (wired)" : " (NOT WIRED)")).join(", ") +
         " -- the second declaration is now compared against the first every run rather than merely coexisting");
-    ok("!! and the count is ONE, not the TWO v3525 reported", hr.length === 1,
-        "*** v3525's detector ran over RAW SOURCE and matched discoveryBind's line 6, A COMMENT explaining " +
-        "kepler's observable. PROSE-AS-CODE, in the round whose subject is second declarations. codeOnly() now " +
-        "blanks it -- AND MY FIRST FIX BROKE THE IMPORT CHECK THE SAME WAY IN REVERSE, because codeOnly ALSO " +
-        "blanks STRING LITERALS and an import path is a string. codeOnly FOR AN IDIOM, noComments FOR TEXT THE " +
-        "CODE CONTAINS: I hit both halves of that pair inside one round. ***");
+    // *** v4000 -- THIS PINNED THE COUNT AT ONE AND WENT RED THE MOMENT A SECOND REAL BIND ARRIVED. ***
+    // v3994's lotkaVolterraBind is a GENUINE second hand-rolled declaration -- not the prose false positive
+    // this line was written about -- so the pin was failing on the thing it wanted to happen: a new device
+    // wired to the shared criterion. REWRITTEN TO THE PROPERTY, NOT WEAKENED, which is what the antidote note
+    // at the foot of this file has been asking for since v3525.
+    //
+    // The property worth keeping is that the DETECTOR IS ACCURATE, not that the count is small. v3525's
+    // detector ran over RAW SOURCE and matched discoveryBind's line 6 -- A COMMENT explaining kepler's
+    // observable. PROSE-AS-CODE, in the round whose subject was second declarations. codeOnly() blanks it now
+    // -- AND THE FIRST FIX BROKE THE IMPORT CHECK THE SAME WAY IN REVERSE, because codeOnly ALSO blanks STRING
+    // LITERALS and an import path is a string. codeOnly FOR AN IDIOM, noComments FOR TEXT THE CODE CONTAINS.
+    //
+    // So the false positive is named directly. It cannot come back without this going red, and a legitimate
+    // third bind does not have to fight the gate to be added.
+    const prose = hr.filter((h) => /discoveryBind/.test(h.file));
+    ok("!! *** EVERY hand-rolled declaration found is a REAL one -- no prose counted as code ***",
+        prose.length === 0,
+        prose.length ? "PROSE COUNTED AS CODE: " + prose.map((h) => h.file).join(", ") +
+                       " -- codeOnly() has stopped blanking comments, which is the v3525 defect returning"
+                     : hr.length + " genuine: " + hr.map((h) => h.file).join(", ") +
+                       "  (discoveryBind, the v3525 false positive, is correctly absent)");
+    report("the number to watch",
+        hr.length + " hand-rolled declarations, " + hr.filter((h) => h.importsSharedModule).length +
+        " of them wired to the shared module. THE COUNT IS REPORTED RATHER THAN PINNED: pinning it at ONE made " +
+        "this line fail the moment v3994 added a second REAL bind, which is the outcome the gate wants. What " +
+        "must stay true is the assertion above it -- every one of them is wired.");
 
     // *** THE LOAD-BEARING NEGATIVE: they are the SAME algorithm, shown by driving both on one series. ***
     // kepler/conserve reports energyErrFirstHalf, energyErrSecondHalf and energyGrowthRatio. That IS
