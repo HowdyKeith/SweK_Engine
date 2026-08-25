@@ -316,11 +316,21 @@ async function launch() {
 
     if (isWin) {
         let sysadmin = null; try { sysadmin = require("./sysadminBridge.js"); } catch {}
-        const launcherName = (sysadmin && typeof sysadmin.launcherName === "function") ? sysadmin.launcherName() : "START_NODE_Engine.bat";
-        const bat = path.join(root, launcherName);
-        if (!fs.existsSync(bat)) return { ok: false, error: "launcher not found at " + bat };
+        // *** v4016 -- RESOLVE THE NAME AGAINST THE CLONE, NOT AGAINST THE TREE DOING THE LAUNCHING. *** This
+        // called launcherName() with no argument, so it answered for the RUNNING tree and the answer was then
+        // looked for inside the clone -- two different directories, one name. On Keith's rig the running tree
+        // has START_NODE_Engine.bat (rig-local, untracked) and a git clone never does, so the check below failed
+        // on every clone this feature was built for.
+        const name = (sysadmin && typeof sysadmin.launcherName === "function")
+            ? sysadmin.launcherName(root) : "START_NODE_Engine.bat";
+        const bat = path.join(root, name);
+        if (!fs.existsSync(bat)) {
+            const tried = (sysadmin && typeof sysadmin.launcherCandidates === "function")
+                ? sysadmin.launcherCandidates() : [name];
+            return { ok: false, error: "no launcher found in " + root + " -- looked for: " + tried.join(", ") };
+        }
         try {
-            const c = spawn("cmd", ["/c", "start", "", "/d", root, launcherName], { detached: true, windowsHide: false, stdio: "ignore", env });
+            const c = spawn("cmd", ["/c", "start", "", "/d", root, name], { detached: true, windowsHide: false, stdio: "ignore", env });
             c.unref();
         } catch (e) { return { ok: false, error: "launch failed: " + String((e && e.message) || e) }; }
     } else if (isMac) {
