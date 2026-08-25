@@ -21,20 +21,10 @@ const SUITE = path.join(ENGINE, "tools", "ship", "selfchecks.mjs");
 const PREFIX = "/gates";
 function owns(url) { return typeof url === "string" && (url === PREFIX || url.startsWith(PREFIX + "/") || url.startsWith(PREFIX + "?")); }
 
-// same rules as tools/ship/selfchecks.mjs walk()
-function walk(dir, out = []) {
-    let entries;
-    try { entries = fs.readdirSync(dir); } catch { return out; }
-    for (const f of entries) {
-        if (f === "node_modules" || f === ".git" || f === "vendor" || f === ".venv") continue;
-        const p = path.join(dir, f);
-        let st;
-        try { st = fs.statSync(p); } catch { continue; }
-        if (st.isDirectory()) walk(p, out);
-        else if (/selfcheck.*\.mjs$/.test(f)) out.push(path.relative(ENGINE, p).split(path.sep).join("/"));
-    }
-    return out;
-}
+// v4018 -- the walk that used to live here (a faithful copy of tools/ship/selfchecks.mjs's) moved to
+// ./gateWalk.js so rigRunner.js reads the SAME one. This file's copy was the correct one; rig.html's was not,
+// and two correct-looking copies is how that stayed invisible. See gateWalk.js for the whole finding.
+const gateWalk = require("./gateWalk.js");
 
 // Pull the suite's own exclusion lists out of its source so this bridge cannot disagree with the ship gate.
 function suiteExclusions() {
@@ -58,8 +48,8 @@ function suiteExclusions() {
 
 function listGates() {
     const ex = suiteExclusions();
-    const self = "tools/ship/selfchecks.mjs";
-    const all = walk(ENGINE).sort();
+    const self = gateWalk.SELF;
+    const all = gateWalk.walk().sort();
     const runnable = all.filter((f) => f !== self && !ex.alreadyGated.includes(f) && !ex.skip.includes(f));
     return {
         runnable,

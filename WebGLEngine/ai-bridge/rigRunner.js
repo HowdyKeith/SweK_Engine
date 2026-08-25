@@ -26,6 +26,7 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 const crypto = require("crypto");
+const gateWalk = require("./gateWalk.js");   // v4018 -- ONE walk, shared with gatesBridge.js (gates.html)
 
 const ENGINE = path.join(__dirname, "..");
 
@@ -35,23 +36,17 @@ const ENGINE = path.join(__dirname, "..");
  * page rather than an error -- which is the failure mode this engine keeps finding in other people's code.
  */
 function discover() {
-    const out = [];
-    const walk = (dir, depth) => {
-        if (depth > 2) return;
-        let ents = [];
-        try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-        for (const e of ents) {
-            if (e.name === "node_modules" || e.name.startsWith(".")) continue;
-            const p = path.join(dir, e.name);
-            if (e.isDirectory()) walk(p, depth + 1);
-            else if (e.name.endsWith("-selfcheck.mjs")) {
-                const rel = path.relative(ENGINE, p);
-                out.push({ id: rel, name: e.name.replace("-selfcheck.mjs", ""), rel });
-            }
-        }
-    };
-    walk(ENGINE, 0);
-    return out.sort((a, b) => a.name.localeCompare(b.name));
+    // *** v4018 -- THIS WALKED THE TREE ITSELF AND WENT SHORT BY FIVE, WHICH IS THE FAILURE THE COMMENT ABOVE
+    // PREDICTED. *** The old body capped recursion at `depth > 2`, so every gate at depth 3 was invisible here
+    // while gates.html offered it: brain/cs/tools, brain/fleet/tools, brain/rl/tools, brain/room/tools and
+    // cell-tracking/drift/tools. Discovering from disk was never the problem -- the DEPTH CAP is a hand-written
+    // rule wearing a walk's clothes, and it drifted into "a shorter page rather than an error" exactly as
+    // written above. It also excluded any dot-prefixed directory, which is broader than the ship suite's four
+    // named ones. Both rules are gone: ./gateWalk.js is the single home, mirroring tools/ship/selfchecks.mjs --
+    // the walk the ship gate itself uses -- and gateWalk-selfcheck.mjs fails if the two ever disagree.
+    return gateWalk.allGates()
+        .map((rel) => ({ id: rel, name: path.basename(rel).replace(/-?selfcheck.*\.mjs$/, ""), rel }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**

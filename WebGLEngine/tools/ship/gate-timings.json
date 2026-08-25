@@ -913,6 +913,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": 183,
   "tools/ship/gateReach-selfcheck.mjs": 5767,
   "tools/ship/gateSelection-selfcheck.mjs": 7077,
+  "tools/ship/gateWalk-selfcheck.mjs": 232,
   "tools/ship/gatesBridge-selfcheck.mjs": 436,
   "tools/ship/gauges3000-selfcheck.mjs": 40,
   "tools/ship/geminiRoleCaller-selfcheck.mjs": 218,
