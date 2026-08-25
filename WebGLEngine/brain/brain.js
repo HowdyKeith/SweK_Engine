@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4001";   // v4001 -- gateSelection had a Windows-only path bug, green on Linux since
+const BRAIN_BUILD = "v4002";   // v4002 -- BACKLOG.md is on no machine and in no commit; the reasoning lives
+// in docs/CHANGELOG.md, which is tracked. Four tools read the dead address, and changelogCurrency -- the
+// gate built after forty undocumented rounds -- skips on every machine citing records that are not there.
+// One declaration now, in changelogSource.mjs. Previously v4001 --   // v4001 -- gateSelection had a Windows-only path bug, green on Linux since
 // v3441: rel() normalised its input and not the ENG_ROOT it compared against, so the selector matched
 // absolute paths against relative ones and reported its own blindness as honesty about a guess. Six more
 // stale count pins, now derived. Previously v4000 --   // v4000 -- fourteen rig reds triaged, eight fixed. The recurring shape was

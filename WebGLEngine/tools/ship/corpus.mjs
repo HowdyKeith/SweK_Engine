@@ -31,6 +31,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
 const ROOT = path.resolve(ENG, "..");
+import { changelogPath } from "./changelogSource.mjs";   // ONE declaration of where the record lives
 
 const readOr = (p, fallback = "") => { try { return fs.readFileSync(p, "utf8"); } catch { return fallback; } };
 
@@ -87,11 +88,20 @@ function firstThatExists(paths) {
 /** The sources, each with WHY it is in here. A block with no stated reason is a block nobody can prune later. */
 export function corpusSources() {
     return [
-        { id: "changelog", file: path.join(ROOT, "BACKLOG.md"),
+        // *** v4002 -- THIS POINTED AT BACKLOG.md, WHICH IS ON NO MACHINE AND IN NO COMMIT. *** Keith's rig
+        // reported `missing: changelog, todo` and a file search settled it: the reasoning lives in
+        // docs/CHANGELOG.md, 691,902 bytes across 315 entries, TRACKED and therefore present in every clone.
+        // Split out of README.md at v3941 because it was 99.1% of the front page. THE TEXT WAS NEVER LOST;
+        // ITS ADDRESS CHANGED, and four tools were still reading the old one.
+        { id: "changelog", file: changelogPath(ROOT),
           why: "the reasoning behind every version -- what was tried, what it measured, and what was rejected. " +
                "The largest body of prose in the project and the only place the NEGATIVE results live." },
+        // TODO.md HAS NO SUCCESSOR AND IS NOT REPLACED WITH ONE. It is left declared so its absence is REPORTED
+        // by name on every run rather than quietly dropped from the source list -- "a missing source is SKIPPED
+        // AND NAMED, never faked" is this corpus's own rule, and deleting the row would be the faking.
         { id: "todo", file: path.join(ROOT, "TODO.md"),
-          why: "one line per version saying what the next person needs to know, which is the index into the above." },
+          why: "one line per version saying what the next person needs to know, which is the index into the above. " +
+               "RETIRED: no file at this address on any machine, and no successor -- reported absent, not replaced." },
         { id: "knowledge-index", file: path.join(ENG, "knowledge-index.json"),
           why: "the derived map of gates and claims -- what the tree checks and what it asserts, machine-built." },
         { id: "status", file: path.join(ROOT, "STATUS.md"),

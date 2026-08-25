@@ -32,6 +32,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gateFiles } from "./staleness.mjs";
+import { head, CHANGELOG_REL } from "./changelogSource.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -181,11 +182,12 @@ export function isPresentTense(entryIndex) { return entryIndex === 0; }
 
 /** The changelog is the notes that live IN the tree, so it is the corpus this tool can reach. */
 export function backlogHead(entries = 1) {
-    const p = path.join(ROOT, "BACKLOG.md");
-    if (!fs.existsSync(p)) return null;
-    const src = fs.readFileSync(p, "utf8");
-    const parts = src.split(/^## v/m).filter(Boolean);
-    return parts.slice(0, entries).map((s) => "## v" + s).join("\n");
+    // *** v4002 -- READ docs/CHANGELOG.md, NOT BACKLOG.md. *** The latter is on no machine and in no commit;
+    // this tool has been returning null and exiting 1 with "nothing to check" for as long as that has been
+    // true. The split is shared now rather than spelled here: entries are `## Since vNNNN`, and the private
+    // `src.split(/^## v/m)` above could not have matched one even after the path was fixed -- TWO bugs, one
+    // of which would have hidden the fix for the other.
+    return head(ROOT, entries);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
@@ -193,7 +195,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     // contradictions happened. `--history N` is a SEPARATE, DIFFERENTLY-LABELLED report. ***
     const histArg = process.argv.indexOf("--history");
     const text = backlogHead(1);
-    if (!text) { console.log("[claimCheck] BACKLOG.md not found -- nothing to check, and that is UNCHECKABLE, not clean"); process.exit(1); }
+    if (!text) { console.log("[claimCheck] " + CHANGELOG_REL + " not found or has no entries -- nothing to check, and that is UNCHECKABLE, not clean"); process.exit(1); }
     checkText(text).then(async (r) => {
         console.log("[claimCheck] the NEWEST changelog entry, read as a claim about THIS build:");
         for (const c of r.agrees) console.log("  AGREES        " + c.text + "   (tree says " + c.actual + ")");
