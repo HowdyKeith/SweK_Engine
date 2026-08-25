@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3997";   // v3997 -- bun vs node benchmarked: they trade places by ~75x depending
+const BRAIN_BUILD = "v3998";   // v3998 -- the face-muscles avatar surface lands next after the talking
+// head, and the showcase gallery pill stops rendering inside an embed. Nothing in the brain mounts avatars;
+// this bump is the ritual marker.
+// v3997 -- bun vs node benchmarked: they trade places by ~75x depending
 // on the shape of the inner loop, so the harness reports a table and refuses to name a winner. Nothing in the
 // brain is timed by it; this bump is the ritual marker.
 // v3996 -- androidPeer's import-purity scanner called a LEADING SLASH a

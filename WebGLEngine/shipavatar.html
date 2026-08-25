@@ -16,6 +16,21 @@
 </style>
 </head>
 <body>
+<script>
+/* v3998 -- ?embed=1, READ BECAUSE THE CALLER SENDS IT. avatar-server.html mounts this page as an avatar view
+   and appends ?embed=1 to every src. ui/avatarSwitch-embed-selfcheck.mjs states the rule as a CLASS rather
+   than an incident -- "every mode whose src carries a query flag must be a page that reads that flag" -- but
+   its reach is ui/avatarSwitch.js's MODES, and avatar-server.html's View picker was never covered by it. So
+   this page received the flag and ignored it for its whole life, rendering its HUD line on top of the
+   avatar inside a small panel: the blob-avatar defect of v3656, in a picker nobody had gated. */
+(function () {
+  if (new URLSearchParams(location.search).get("embed") !== "1") return;
+  document.documentElement.setAttribute("data-embed", "1");
+  var st = document.createElement("style");
+  st.textContent = 'html[data-embed="1"] #hud { display: none !important; }html[data-embed="1"] body { overflow: hidden; }';
+  document.head.appendChild(st);
+})();
+</script>
 <div id="view"></div>
 <div id="hud"><b>SHIP AVATAR</b> · <span id="alert">nominal</span> · energy <span id="energy">50%</span></div>
 <script type="module">

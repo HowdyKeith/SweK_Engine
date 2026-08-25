@@ -52,6 +52,21 @@
 <body>
 <div id="view"></div>
 <div id="screenOverlay"><div id="ovHead"><span>SCREEN OVERLAY \u00b7 drag \u00b7 resize \u2727</span><span class="x" id="ovClose">\u2715</span></div><div id="ovBody"></div></div>
+<script>
+/* v3998 -- ?embed=1, READ BECAUSE THE CALLER SENDS IT. avatar-server.html mounts this page as an avatar view
+   and appends ?embed=1 to every src. ui/avatarSwitch-embed-selfcheck.mjs states the rule as a CLASS rather
+   than an incident -- "every mode whose src carries a query flag must be a page that reads that flag" -- but
+   its reach is ui/avatarSwitch.js's MODES, and avatar-server.html's View picker was never covered by it. So
+   this page received the flag and ignored it for its whole life, rendering a full control panel, a back link and a corner-pin canvas on top of the
+   avatar inside a small panel: the blob-avatar defect of v3656, in a picker nobody had gated. */
+(function () {
+  if (new URLSearchParams(location.search).get("embed") !== "1") return;
+  document.documentElement.setAttribute("data-embed", "1");
+  var st = document.createElement("style");
+  st.textContent = 'html[data-embed="1"] .panel, html[data-embed="1"] .back, html[data-embed="1"] #panelTab,html[data-embed="1"] #cornerPin { display: none !important; }html[data-embed="1"] body { overflow: hidden; }';
+  document.head.appendChild(st);
+})();
+</script>
 <div id="cornerPin"><canvas id="cpCanvas" width="512" height="320"></canvas><div class="cpHandle" id="cpH0"></div><div class="cpHandle" id="cpH1"></div><div class="cpHandle" id="cpH2"></div><div class="cpHandle" id="cpH3"></div></div>
 <a class="back" href="/">&larr; back to engine</a>
 

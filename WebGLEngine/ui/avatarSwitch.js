@@ -45,6 +45,18 @@ export const MODES = [
       src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",
       src: "/thead.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
+    // v3998 -- THE FACE-MUSCLES SURFACE, PLACED DELIBERATELY AS THE NEXT STOP AFTER THE TALKING HEAD.
+    // Keith: "we added the Google face muscles api ability, can we rotate that as the next choice after
+    // Wireframe?" -- the POSITION is the request, and the two belong adjacent for a reason: the talking head is
+    // driven by AUDIO AMPLITUDE and this one by MediaPipe FaceLandmarker BLENDSHAPES, which is Google's own name
+    // for muscle activations. Same idea, opposite input, one click apart on the switch.
+    //
+    // It carries the SAME ~12 MB warning because it is the SAME MediaPipe bundle -- and if the talking head has
+    // already been opened this session the model is cached, so the second of the pair is usually instant. The
+    // warning is still stated rather than guessed: a button that promises "instant" and then downloads 12 MB is
+    // worse than one that over-warns.
+    { id: "facemuscles", label: "\ud83d\ude2e", title: "Face muscles \u2014 MediaPipe blendshapes driving a face from your camera (~12 MB on first use)", kind: "frame",
+      src: "/face-mirror.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
 ];
 
 // v3557 -- THE ROTATION IS NOW BASE MODES PLUS PROMOTED FAVOURITES, and the favourites come from the SANDBOX'S
