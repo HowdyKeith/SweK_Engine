@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Cart-Pole with LQR">
+<meta name="demo:desc" content="An inverted pendulum held upright by an optimal regulator, live. Crank the gain multiplier to a hundred times and it still balances -- LQR guarantees an INFINITE gain margin, and you can watch the guarantee hold. Then switch the controller to one designed on the hanging equilibrium: every self-consistency check it can run still passes, and it drops the pole in under two seconds.">
+<meta name="demo:category" content="physics">
+<title>SweK &middot; Cart-Pole with LQR</title>
+<!--
+     v3995 -- THE FRONT DOOR FOR physics/control/cartPole.mjs. The page derives no control theory: the
+     linearisation, the Riccati solve, the gain, the stability verdicts and the Kalman minimum all come from the
+     module. Same rule ecology.html, stellar.html and bell.html are held to, and their gates enforce.
+
+     *** THE TWO THINGS THIS PAGE EXISTS TO SHOW ARE BOTH COUNTERINTUITIVE AND BOTH LIVE. ***
+     1. The gain multiplier goes to 1000x and the pole stays up. That is not robustness by luck: |1+L(jw)| >= 1
+        at every frequency, so the Nyquist plot cannot enter the unit disc around -1 and no amount of extra gain
+        can destabilise the loop. Wind it DOWN instead and it falls at about 0.36 -- the guarantee is 0.5, and a
+        guarantee is a lower bound.
+     2. The "designed on the hanging pendulum" toggle. That controller's own numbers are all fine -- residual,
+        stability, Kalman minimum -- and the page shows them being fine while the pole falls over.
+-->
+<style>
+  :root { --bg:#05070e; --amber:#f6a623; --cyan:#59d1ff; --green:#5fe08a; --violet:#b088ff; --dim:#7c93b8; --red:#ff6b6b; }
+  html,body { margin:0; height:100%; background:var(--bg); color:#dbe7ff; font:13px ui-monospace,Menlo,monospace; overflow:hidden; }
+  #wrap { position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr; }
+  header { padding:10px 16px 6px; border-bottom:1px solid #16203a; }
+  h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin:0 0 8px; }
+  .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  label { color:var(--dim); }
+  input[type=range] { vertical-align:middle; width:190px; }
+  button { background:#0c1526; color:var(--cyan); border:1px solid #1c2942; border-radius:7px; padding:5px 12px;
+           font:600 11px ui-monospace,monospace; letter-spacing:.05em; text-transform:uppercase; cursor:pointer; }
+  button:hover { border-color:var(--cyan); }
+  button.on { background:#2a1420; color:var(--red); border-color:var(--red); }
+  .stat { color:var(--dim); } .stat b { color:#dbe7ff; font-weight:600; }
+  .big { font-size:15px; }
+  .warn { color:var(--red); font-weight:700; } .ok { color:var(--green); font-weight:700; }
+  #stagewrap { position:relative; min-height:0; }
+  /* v3979 -- a canvas is a REPLACED element: position+inset alone leaves it at its intrinsic 300x150. */
+  #stage { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #note { position:absolute; left:14px; bottom:10px; color:#5c7088; font-size:11px; max-width:min(620px,52vw);
+          background:rgba(5,7,14,.8); border:1px solid #16203a; border-radius:8px; padding:7px 11px; }
+  #design { position:absolute; right:14px; top:12px; color:#7c93b8; font-size:11px; line-height:1.55;
+            background:rgba(5,7,14,.8); border:1px solid #16203a; border-radius:8px; padding:8px 12px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+  <h1>&#9670; Cart-Pole with LQR &mdash; and a guarantee you can wind up</h1>
+  <div class="row">
+    <label>gain multiple &kappa; <input id="k" type="range" min="0" max="300" value="100" step="1"></label>
+    <span class="stat big">&kappa; = <b id="kv">1.00</b></span>
+    <label>angle weight <input id="qt" type="range" min="1" max="200" value="10" step="1"></label>
+    <span class="stat">Q<sub>&theta;&theta;</sub> = <b id="qtv">10</b></span>
+    <button id="nudge">Nudge the pole</button>
+    <button id="plant">Design on the HANGING pendulum</button>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="row">
+    <span class="stat big" id="verdict">&mdash;</span>
+    <span class="stat">min |1+L(j&omega;)| <b id="kal">&mdash;</b></span>
+    <span class="stat">ARE residual <b id="res">&mdash;</b></span>
+    <span class="stat">lower gain margin <b id="gm">&mdash;</b></span>
+  </div>
+</header>
+<div id="stagewrap">
+  <canvas id="stage"></canvas>
+  <div id="design"></div>
+  <div id="note">LQR guarantees <b>|1 + L(j&omega;)| &ge; 1</b> at every frequency, so the Nyquist plot cannot
+    enter the unit disc around &minus;1 &mdash; which means <b>no amount of extra gain can destabilise this
+    loop</b>. Wind &kappa; up to 1000 and the pole stays up. Wind it <i>down</i> and it falls at about 0.36;
+    the guarantee is 0.5, and a guarantee is a lower bound.</div>
+</div>
+</div>
+<script type="module">
+import { PARAMS, linearize, lqrGain, nonlinearDerivative, lyapunovStable, closedLoop,
+         returnDifferenceMin, gainMarginLower } from "/physics/control/cartPole.mjs";
+
+const $ = (id) => document.getElementById(id);
+let planted = false, state = [0, 0, 0.06, 0], design = null, K = null;
+
+// *** THE COARSE RICCATI STEP IS DELIBERATE AND THE MODULE HEADER CARRIES THE MEASUREMENT. *** The answer is a
+// FIXED POINT of the Riccati ODE, so path accuracy is irrelevant: dt = 5e-3 gives a gain identical to nine
+// decimals in a tenth of the time, with a SMALLER residual because fewer steps accumulate less round-off.
+const RICCATI_DT = 5e-3;
+
+function redesign() {
+  const qt = parseInt($("qt").value);
+  const Q = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, qt, 0], [0, 0, 0, 1]], R = [[0.1]];
+  design = linearize(PARAMS, planted);
+  const g = lqrGain(design.A, design.B, Q, R, { dt: RICCATI_DT });
+  K = g.K;
+  const truth = linearize(PARAMS, false);
+  const rd = returnDifferenceMin(design.A, design.B, K, { per: 120 });
+  const gm = gainMarginLower(design.A, design.B, K);
+  $("res").textContent = g.residual.toExponential(2);
+  $("kal").textContent = rd.min.toFixed(9);
+  $("gm").textContent = gm === null ? "—" : gm.toFixed(4);
+  $("qtv").textContent = qt;
+  // *** THE DESIGN PANEL REPORTS THE CONTROLLER'S OWN NUMBERS, WHICH IS THE POINT WHEN IT IS PLANTED. ***
+  $("design").innerHTML =
+    `<b style="color:${planted ? "#ff6b6b" : "#59d1ff"}">designed on the ${planted ? "HANGING" : "UPRIGHT"} equilibrium</b><br>` +
+    `K = [${K[0].map((v) => v.toFixed(3)).join(", ")}]<br>` +
+    `stable on its OWN model: <b class="${lyapunovStable(closedLoop(design.A, design.B, K)) ? "ok" : "warn"}">` +
+    `${lyapunovStable(closedLoop(design.A, design.B, K)) ? "yes" : "no"}</b><br>` +
+    `Kalman inequality on its own loop: <b class="${rd.satisfiesKalman ? "ok" : "warn"}">${rd.satisfiesKalman ? "holds" : "fails"}</b><br>` +
+    `<span style="color:#5c7088">stable on the TRUE upright plant:</span> ` +
+    `<b class="${lyapunovStable(closedLoop(truth.A, truth.B, K)) ? "ok" : "warn"}">` +
+    `${lyapunovStable(closedLoop(truth.A, truth.B, K)) ? "yes" : "NO"}</b>`;
+}
+
+// The simulated plant is ALWAYS the true upright cart-pole. Only the DESIGN moves.
+//
+// *** THE SUBSTEP COUNT SCALES WITH THE GAIN, AND THAT IS NOT A FUDGE -- IT IS THE WHOLE POINT OF v3993. ***
+// A fixed 4 substeps (dt = 1/240) balanced fine at kappa = 1 and DROPPED THE POLE AT t = 0.02 s at kappa = 100.
+// The physical loop is stable at every kappa; that is the guarantee this page exists to show. What failed was
+// the PAGE'S OWN EXPLICIT INTEGRATOR: L(s) = K(sI-A)^-1 B has relative degree one here (K.B = 13.04 is not
+// zero), so exactly one closed-loop pole runs off to infinity LINEARLY in kappa, and by kappa = 100 it sits
+// near -1300 while RK4's stability region needs |lambda*dt| below about 2.8. An explicit method's stability
+// limit wearing the costume of the system's -- which is the failure kepler.js and lotkaVolterra.mjs are both
+// built to make visible, met here for real rather than in a fixture. So the substeps track kappa, and the page
+// SAYS how many it is taking rather than hiding the cost.
+const subFor = (kappa) => Math.max(4, Math.min(2400, Math.ceil(4 * kappa)));
+let fell = null, t = 0, lastSub = 4;
+function step() {
+  const kappa = Math.pow(10, (parseInt($("k").value) - 100) / 50);   // 0.01x .. 100x, log
+  $("kv").textContent = kappa < 1 ? kappa.toFixed(3) : kappa.toFixed(2);
+  const SUB = subFor(kappa), DT = 1 / (60 * SUB);
+  lastSub = SUB;
+  if (fell !== null) return;
+  for (let i = 0; i < SUB; i++) {
+    const f = (s) => nonlinearDerivative(s, -kappa * K[0].reduce((a, k, j) => a + k * s[j], 0), PARAMS, false);
+    const k1 = f(state), k2 = f(state.map((v, i2) => v + DT / 2 * k1[i2])),
+          k3 = f(state.map((v, i2) => v + DT / 2 * k2[i2])), k4 = f(state.map((v, i2) => v + DT * k3[i2]));
+    state = state.map((v, i2) => v + DT / 6 * (k1[i2] + 2 * k2[i2] + 2 * k3[i2] + k4[i2]));
+    t += DT;
+    if (!state.every(Number.isFinite) || Math.abs(state[2]) > Math.PI / 2) { fell = t; break; }
+    if (Math.abs(state[0]) > 6) { fell = t; break; }   // ran off the track: also a failure, and a different one
+  }
+}
+
+function draw() {
+  const c = $("stage"), r = c.getBoundingClientRect(), d = devicePixelRatio || 1;
+  c.width = Math.round(r.width * d); c.height = Math.round(r.height * d);
+  const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0);
+  const W = r.width, H = r.height, PX = Math.min(90, W / 14), GY = H * 0.66;
+  x.fillStyle = "#05070e"; x.fillRect(0, 0, W, H);
+  x.strokeStyle = "#16203a"; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(0, GY); x.lineTo(W, GY); x.stroke();
+  for (let m = -6; m <= 6; m++) { const px = W / 2 + m * PX;
+    x.strokeStyle = m === 0 ? "#26375c" : "#101a2e"; x.beginPath(); x.moveTo(px, GY - 6); x.lineTo(px, GY + 6); x.stroke(); }
+  const cx = W / 2 + state[0] * PX;
+  // cart
+  x.fillStyle = fell === null ? "#1c2942" : "#3a1620";
+  x.strokeStyle = fell === null ? "#59d1ff" : "#ff6b6b"; x.lineWidth = 1.6;
+  x.fillRect(cx - 34, GY - 20, 68, 20); x.strokeRect(cx - 34, GY - 20, 68, 20);
+  // pole (2*l long, drawn from the pivot on top of the cart)
+  const L = 2 * PARAMS.l * PX;
+  const tipX = cx + Math.sin(state[2]) * L, tipY = GY - 20 - Math.cos(state[2]) * L;
+  x.strokeStyle = fell === null ? "#f6a623" : "#ff6b6b"; x.lineWidth = 5; x.lineCap = "round";
+  x.beginPath(); x.moveTo(cx, GY - 20); x.lineTo(tipX, tipY); x.stroke();
+  x.fillStyle = fell === null ? "#f6a623" : "#ff6b6b";
+  x.beginPath(); x.arc(tipX, tipY, 8, 0, 7); x.fill();
+  x.fillStyle = "#5c7088"; x.font = "11px ui-monospace,monospace";
+  x.fillText(`x = ${state[0].toFixed(3)} m    theta = ${(state[2] * 180 / Math.PI).toFixed(2)} deg    t = ${t.toFixed(1)} s    ${lastSub} RK4 substeps/frame`, 14, 22);
+
+  $("verdict").innerHTML = fell === null
+    ? `<span class="ok">BALANCED</span><span class="stat"> &mdash; upright for ${t.toFixed(1)} s</span>`
+    : `<span class="warn">THE POLE FELL at t = ${fell.toFixed(2)} s</span>`;
+}
+
+function loop() { step(); draw(); requestAnimationFrame(loop); }
+
+$("k").oninput = () => {};
+$("qt").oninput = () => { redesign(); };
+$("nudge").onclick = () => { if (fell === null) state[3] += 1.2; };
+$("reset").onclick = () => { state = [0, 0, 0.06, 0]; fell = null; t = 0; };
+$("plant").onclick = () => {
+  planted = !planted;
+  $("plant").classList.toggle("on", planted);
+  $("plant").textContent = planted ? "Designed on the HANGING pendulum" : "Design on the HANGING pendulum";
+  redesign(); $("reset").onclick();
+};
+redesign(); loop();
+</script>
+</body>
+</html>
