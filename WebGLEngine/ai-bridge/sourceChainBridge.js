@@ -34,10 +34,14 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
+const http = require("http");
 const { spawn } = require("child_process");
 
 const ENGINE_ROOT = path.resolve(__dirname, "..");
 const PREFIX = "/source-chain";
+const isWin = process.platform === "win32";
+const isMac = process.platform === "darwin";
 
 // One run at a time. Two clones into the same parent would race on the same `.tmp` directory, and two verifies
 // would halve each other on a box that is also serving this page.
@@ -237,6 +241,110 @@ async function publish({ repo, notes, draft, prerelease } = {}) {
     return R.publish;
 }
 
+// v4014 -- *** THE CLONE HAD A FOLDER AND NO WAY TO RUN IT. *** Keith, right after publishing a verified clone:
+// "I would want to next see the button to launch new version that we just cloned." cloneEngineSource() already
+// puts the new tree in its own SEPARATE folder and touches nothing running (v3941's "side by side, never over
+// the top") -- the missing half was starting it.
+//
+// *** A NEW PORT, NOT THIS ONE. *** The running server already holds whatever PORT it was given (8787 by
+// default); spawning the clone's launcher with the SAME port would either fail to bind or race for it, and
+// either failure reads as "nothing happened" -- exactly the confusing state a look-at-the-new-build button must
+// not produce. So this asks the OS for an unused port with listen(0) and hands it to the child via PORT.
+function _freePort() {
+    return new Promise((resolve, reject) => {
+        const srv = net.createServer();
+        srv.unref();
+        srv.once("error", reject);
+        srv.listen(0, "127.0.0.1", () => {
+            const port = srv.address().port;
+            srv.close(() => resolve(port));
+        });
+    });
+}
+
+// *** TIME-BOXED, NOT INDEFINITE -- v4006's rule for exactly this shape: a launch nobody can tell has hung is
+// worse than one that reports it is still booting. *** Polls /health rather than trusting the spawn succeeded;
+// spawn only proves the LAUNCHER started, not that the server inside it bound the port.
+function _waitHealthy(port, budgetMs = 25000) {
+    const deadline = Date.now() + budgetMs;
+    return new Promise((resolve) => {
+        const tryOnce = () => {
+            const req = http.get({ host: "127.0.0.1", port, path: "/health", timeout: 1500 }, (res) => {
+                res.resume();
+                if (res.statusCode && res.statusCode < 500) return resolve(true);
+                retry();
+            });
+            req.on("error", retry);
+            req.on("timeout", () => { req.destroy(); retry(); });
+        };
+        const retry = () => { if (Date.now() >= deadline) return resolve(false); setTimeout(tryOnce, 700); };
+        tryOnce();
+    });
+}
+
+/**
+ * Launch the cloned tree at R.clone.path on its own port, side by side with whatever is already running.
+ * Returns the URL to open rather than opening it -- the caller (the panel) decides when to switch tabs, and it
+ * has already learned from /health whether there is anything there to switch to.
+ *
+ * *** UNPROVEN ON MAC. *** The `open` command is what restart() already uses to relaunch on macOS, but `open`
+ * hands off through LaunchServices and env vars passed to IT are not guaranteed to reach the .command script it
+ * opens the way a direct spawn's env reaches a direct child -- this box cannot test that path at all. Windows
+ * spawns `cmd /c start` directly, which does inherit the env it is given, and is the platform this was verified
+ * against.
+ */
+/**
+ * The refusals, as a pure predicate over an injectable clone record -- canPublish()'s own shape, so the same
+ * gate technique that drives every branch of THAT guard without a network clone can drive this one too.
+ */
+function _launchGuard(clone) {
+    if (!clone || !clone.path) return { ok: false, why: "nothing has been cloned yet" };
+    if (!fs.existsSync(clone.path)) return { ok: false, why: "the clone is no longer at " + clone.path };
+    return { ok: true, why: "" };
+}
+
+async function launch() {
+    const guard = _launchGuard(R.clone);
+    if (!guard.ok) return { ok: false, error: guard.why };
+    const root = R.clone.path;
+
+    let port;
+    try { port = await _freePort(); }
+    catch (e) { return { ok: false, error: "could not find a free port: " + String((e && e.message) || e) }; }
+
+    const env = Object.assign({}, process.env, { PORT: String(port) });
+
+    if (isWin) {
+        let sysadmin = null; try { sysadmin = require("./sysadminBridge.js"); } catch {}
+        const launcherName = (sysadmin && typeof sysadmin.launcherName === "function") ? sysadmin.launcherName() : "START_NODE_Engine.bat";
+        const bat = path.join(root, launcherName);
+        if (!fs.existsSync(bat)) return { ok: false, error: "launcher not found at " + bat };
+        try {
+            const c = spawn("cmd", ["/c", "start", "", "/d", root, launcherName], { detached: true, windowsHide: false, stdio: "ignore", env });
+            c.unref();
+        } catch (e) { return { ok: false, error: "launch failed: " + String((e && e.message) || e) }; }
+    } else if (isMac) {
+        const cmd = path.join(root, "Start Mac SweK Engine.command");
+        if (!fs.existsSync(cmd)) return { ok: false, error: "launcher not found at " + cmd };
+        try { fs.chmodSync(cmd, 0o755); } catch {}
+        try {
+            const c = spawn("open", [cmd], { detached: true, stdio: "ignore", env });
+            c.unref();
+        } catch (e) { return { ok: false, error: "launch failed: " + String((e && e.message) || e) }; }
+    } else {
+        return { ok: false, error: "no launcher known for " + process.platform + " -- this feature is Windows/Mac only, same as restart()" };
+    }
+
+    const healthy = await _waitHealthy(port);
+    return {
+        ok: true, port, path: root, version: R.clone.version,
+        url: "http://127.0.0.1:" + port + "/server.html",
+        healthy,
+        note: healthy ? "answered /health on :" + port
+                       : "spawned, but it did not answer /health within the wait -- it may still be starting; try :" + port + " in a moment",
+    };
+}
+
 function owns(url) {
     const p = String(url || "").split("?")[0];
     return p === PREFIX || p.startsWith(PREFIX + "/");
@@ -264,8 +372,13 @@ function handle(req, res, sendJson) {
         _readJson(req).then((d) => publish(d || {}).then(sendJson).catch((e) => sendJson({ ok: false, error: String((e && e.message) || e) })));
         return true;
     }
+    if (req.method === "POST" && route === "/launch") {
+        launch().then(sendJson).catch((e) => sendJson({ ok: false, error: String((e && e.message) || e) }));
+        return true;
+    }
     sendJson({ ok: false, error: "unknown source-chain route: " + route });
     return true;
 }
 
-module.exports = { status, start, publish, canPublish, owns, handle, PREFIX, ENGINE_ROOT };
+module.exports = { status, start, publish, launch, canPublish, owns, handle, PREFIX, ENGINE_ROOT,
+    _launchGuard, _freePort, _waitHealthy };
