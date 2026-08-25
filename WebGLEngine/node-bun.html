@@ -96,6 +96,26 @@
   </div>
 
   <div class="card">
+    <h2>Speed &mdash; and whether the two runtimes even agree on the answer</h2>
+    <p class="note">
+      Runs <code>tools/roundhouse/runtimeBench.mjs</code> under each runtime. <b>One number would be false in
+      both directions:</b> measured on Linux x64, Bun runs <code>Math.pow</code> about 15&times; faster and the
+      identical RK4 loop about 5&times; slower, because the derivative returns an array that is destructured four
+      times per step &mdash; Node eliminates that allocation and Bun does not. Anything inside
+      <b>1.35&times;</b> is a tie: that is <code>perfLedger</code>'s measured noise range on this tree, not a
+      number chosen for this page. Equivalent by hand:
+      <code>node tools/roundhouse/runtimeBench.mjs --compare</code>.
+    </p>
+    <div class="now">
+      <button id="benchBoth">Run both</button>
+      <button id="benchNode">Node only</button>
+      <button id="benchBun">Bun only</button>
+      <span id="benchState" class="meta"></span>
+    </div>
+    <div id="benchBox"></div>
+  </div>
+
+  <div class="card">
     <h2>What was measured, and what was not</h2>
     <p class="note" style="color:var(--ink)">
       On <b>Linux with Bun 1.3.11</b>: all 134 <code>ai-bridge</code> bridge modules load,
@@ -202,6 +222,51 @@ async function runSurface(rt) {
 $("runNode").onclick = () => runSurface("node");
 $("runBun").onclick  = () => runSurface("bun");
 $("runBoth").onclick = async () => { await runSurface("node"); await runSurface("bun"); };
+
+// ---- the benchmark half -----------------------------------------------------------------------------------
+// NOISE_FLOOR is perfLedger's MEASURED worst-case noise range (coefficient of variation 13%, 35% spread across
+// five identical runs), and runtimeBench.mjs exports the same 1.35. A ratio inside it is reported as a TIE in
+// words, so a 1.1x that means nothing cannot be read off this page as if it did.
+const BENCH_NOISE = 1.35;
+const benchRuns = {};
+function renderBench() {
+  const n = benchRuns.node, b = benchRuns.bun;
+  const names = [...new Set([...(n ? Object.keys(n.results) : []), ...(b ? Object.keys(b.results) : [])])];
+  if (!names.length) { $("benchBox").innerHTML = ""; return; }
+  const cell = (r, k) => r && r.results[k] ? r.results[k].median.toFixed(2) : "&mdash;";
+  const rows = names.map((k) => {
+    const N = n && n.results[k], B = b && b.results[k];
+    let verdict = "&mdash;", answers = "&mdash;";
+    if (N && B) {
+      const noisy = N.spread > BENCH_NOISE || B.spread > BENCH_NOISE;
+      const ratio = B.median / N.median;
+      verdict = noisy ? '<span class="meta">too noisy to call</span>'
+        : ratio > BENCH_NOISE ? '<b style="color:#ff6b6b">bun ' + ratio.toFixed(2) + '&times; slower</b>'
+        : ratio < 1 / BENCH_NOISE ? '<b style="color:#5fe08a">bun ' + (1 / ratio).toFixed(2) + '&times; faster</b>'
+        : '<span class="meta">tie (' + ratio.toFixed(2) + '&times;)</span>';
+      answers = N.bits === B.bits ? '<span style="color:#5fe08a">identical</span>'
+        : '<span style="color:#f6a623">differ</span>' + (N.bitStable ? ' <b style="color:#ff6b6b">(DECLARED STABLE)</b>' : ' <span class="meta">(permitted)</span>');
+    }
+    return "<tr><td>" + k + "</td><td class=\"meta\">" + ((N || B || {}).axis || "") + "</td><td>" +
+      cell(n, k) + "</td><td>" + cell(b, k) + "</td><td>" + verdict + "</td><td>" + answers + "</td></tr>";
+  }).join("");
+  $("benchBox").innerHTML =
+    "<table><tr><th>workload</th><th>axis</th><th>node ms</th><th>bun ms</th><th>verdict</th><th>answers</th></tr>" +
+    rows + "</table>";
+}
+async function runBench(rt) {
+  $("benchState").textContent = " running " + rt + "\u2026";
+  try {
+    const r = await (await fetch("/runtime/bench?rt=" + rt)).json();
+    if (!r.ok) { $("benchState").textContent = " " + rt + ": " + (r.error || "failed"); return; }
+    benchRuns[rt === "bun" ? "bun" : "node"] = r;
+    renderBench();
+    $("benchState").textContent = " " + r.runtime + " done (" + r.reps + " reps, " + r.warm + " warm)";
+  } catch (e) { $("benchState").textContent = " " + rt + ": " + e.message; }
+}
+$("benchNode").onclick = () => runBench("node");
+$("benchBun").onclick  = () => runBench("bun");
+$("benchBoth").onclick = async () => { await runBench("node"); await runBench("bun"); };
 
 loadNow();
 </script>

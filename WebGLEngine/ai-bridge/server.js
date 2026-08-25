@@ -17958,6 +17958,36 @@ ${text.replace(/'/g, "''")}
             });
         return;
     }
+    // v3997 -- RUN tools/roundhouse/runtimeBench.mjs UNDER A NAMED RUNTIME AND HAND BACK ITS JSON.
+    //
+    // A SECOND FIXED ROUTE RATHER THAN A SCRIPT PARAMETER ON THE FIRST ONE, and that is the whole design note.
+    // /runtime/surface's own header says "THE RUNTIME IS AN ALLOWLIST, NOT A PARAMETER... a route that took a
+    // command, or an interpreter path, from the query string would be a remote shell wearing a diagnostic's
+    // clothes". Adding `&script=` to it would have been exactly that, so the script stays hardcoded here too and
+    // the only thing the caller chooses is which of two spellings to spawn.
+    //
+    // WHAT IT MEASURES IS NOT WHAT bunSurface MEASURES. That tool asks "does this work"; this one asks "how
+    // fast, and do the two runtimes agree on the answer" -- and the measured result is that they trade places
+    // depending on the shape of the inner loop, so a single number would be false in both directions.
+    if (req.method === "GET" && req.url.split("?")[0] === "/runtime/bench") {
+        const want = new URL(req.url, "http://x").searchParams.get("rt") === "bun" ? "bun" : "node";
+        const script = path.join(ENGINE_ROOT, "tools", "roundhouse", "runtimeBench.mjs");
+        if (!fs.existsSync(script)) { sendJson({ ok: false, error: "tools/roundhouse/runtimeBench.mjs is not in this tree" }); return; }
+        const cmd = want === "bun" ? "bun" : process.execPath;
+        require("child_process").execFile(cmd, [script, "--json"], { timeout: 300000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 },
+            (err, stdout, stderr) => {
+                if (err && !stdout) {
+                    sendJson({ ok: false, runtime: want,
+                               error: want === "bun" && /ENOENT|not found/i.test(String(err.message || ""))
+                                   ? "bun is not on PATH on this box -- install it, or run the Node column only"
+                                   : String((err && err.message) || err).slice(0, 300) });
+                    return;
+                }
+                try { sendJson(Object.assign({ ok: true }, JSON.parse(stdout))); }
+                catch (e) { sendJson({ ok: false, runtime: want, error: "runtimeBench did not return JSON", out: String(stdout).slice(0, 400), err: String(stderr).slice(0, 200) }); }
+            });
+        return;
+    }
     if (req.method === "GET" && req.url === "/runtime/prefer") {
         res.writeHead(200, JSONH);
         res.end(JSON.stringify({ useBun: (fs.existsSync(path.join(os.homedir(), ".voxelbridge", "use_bun.flag")) || fs.existsSync(path.join(__dirname, "use_bun.flag"))) }));
