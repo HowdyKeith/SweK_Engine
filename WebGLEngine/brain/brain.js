@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v3994";   // v3994 -- Lotka-Volterra predator-prey device: the time-average theorem
+const BRAIN_BUILD = "v3995";   // v3995 -- cart-pole LQR device: the first whose subject is a CONTROLLER,
+// and whose plant passes every self-consistent check while dropping the pole. Nothing in the brain designs
+// regulators; this bump is the ritual marker.
+// v3994 -- Lotka-Volterra predator-prey device: the time-average theorem
 // and Volterra's principle (harvesting BOTH species raises the average prey). Nothing in the brain models
 // ecology; this bump is the ritual marker.
 // v3993 -- kepler gains the explicit-Euler companion: a matched first-order

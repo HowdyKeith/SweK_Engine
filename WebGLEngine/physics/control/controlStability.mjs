@@ -56,7 +56,6 @@
 // *** A ROUTH THAT DIVIDES BY ZERO ON THE MARGINAL CASE IS BROKEN PRECISELY WHERE IT MATTERS MOST, and an
 // implementation that never met one would look perfect. ***
 "use strict";
-import { pathToFileURL } from "node:url";
 
 // =================================================================================================================
 // ROUTE 1 -- THE ROUTH TABLE. NO ROOT IS EVER COMPUTED.
@@ -334,7 +333,18 @@ export async function reportLines() {
     return L;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    for (const l of await reportLines()) console.log(l);
-    process.exit(0);
+// v3995 -- *** THE node:url IMPORT MOVED INTO THIS GUARD, WHICH IS THE v3951 FIX APPLIED A SECOND TIME. ***
+// A bare `import ... from "node:url"` is resolved BEFORE a line of this module runs, so a browser that
+// imports it dies on "blocked by CORS policy" -- not a caught failure, an EVALUATION failure that takes
+// every importer down with it. physics/stabilityMeter.mjs fixed exactly this at v3951 and its header
+// claimed it was "the ONLY module in the tree with a top-level node: import reachable from any page".
+// THAT WAS TRUE ONLY BECAUSE NO PAGE REACHED HERE: browserSafety-selfcheck walks the import graph FROM
+// PAGES, and physics/control/ had no front door until v3995 gave the cart-pole one. The defect was not
+// absent, it was out of view -- so the claim was about the checker's reach, not about the tree.
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+        for (const l of await reportLines()) console.log(l);
+        process.exit(0);
+    }
 }
