@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 397,
+  "page": 404,
   "demo": 49,
   "builtin": 54
  },
@@ -287,6 +287,14 @@
    "id": "beam.html",
    "display": "Beam",
    "href": "/beam.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "bell.html",
+   "display": "Bell",
+   "href": "/bell.html",
    "section": null,
    "collision": false
   },
@@ -620,6 +628,14 @@
   },
   {
    "kind": "page",
+   "id": "cartpole.html",
+   "display": "Cartpole",
+   "href": "/cartpole.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "case-study.html",
    "display": "Case Study",
    "href": "/case-study.html",
@@ -815,7 +831,7 @@
    "id": "cosmic-map.html",
    "display": "Cosmic Map",
    "href": "/cosmic-map.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -863,7 +879,7 @@
    "id": "ct.html",
    "display": "Ct",
    "href": "/ct.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -879,7 +895,7 @@
    "id": "current-loop.html",
    "display": "Current Loop",
    "href": "/current-loop.html",
-   "section": "Electromagnetism",
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -935,7 +951,7 @@
    "id": "diffraction.html",
    "display": "Diffraction",
    "href": "/diffraction.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1020,6 +1036,14 @@
   },
   {
    "kind": "page",
+   "id": "ecology.html",
+   "display": "Ecology",
+   "href": "/ecology.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "economy.html",
    "display": "Economy",
    "href": "/economy.html",
@@ -1031,7 +1055,7 @@
    "id": "elliptic.html",
    "display": "Elliptic",
    "href": "/elliptic.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1191,7 +1215,7 @@
    "id": "fanbeam.html",
    "display": "Fanbeam",
    "href": "/fanbeam.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1199,7 +1223,7 @@
    "id": "fdtd.html",
    "display": "Fdtd",
    "href": "/fdtd.html",
-   "section": "Electromagnetism",
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -1343,7 +1367,7 @@
    "id": "fresnel-join.html",
    "display": "Fresnel Join",
    "href": "/fresnel-join.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1351,7 +1375,7 @@
    "id": "fresnel.html",
    "display": "Fresnel",
    "href": "/fresnel.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1407,7 +1431,7 @@
    "id": "geodesic.html",
    "display": "Geodesic",
    "href": "/geodesic.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1479,7 +1503,7 @@
    "id": "grid-refinement.html",
    "display": "Grid Refinement",
    "href": "/grid-refinement.html",
-   "section": "Electromagnetism",
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -1535,7 +1559,7 @@
    "id": "hmc.html",
    "display": "Hmc",
    "href": "/hmc.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1615,7 +1639,7 @@
    "id": "interferometer.html",
    "display": "Interferometer",
    "href": "/interferometer.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1671,7 +1695,7 @@
    "id": "kepler.html",
    "display": "Kepler",
    "href": "/kepler.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1679,7 +1703,7 @@
    "id": "kerr.html",
    "display": "Kerr",
    "href": "/kerr.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1711,7 +1735,7 @@
    "id": "kriging.html",
    "display": "Kriging",
    "href": "/kriging.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -1751,7 +1775,7 @@
    "id": "landau-zener.html",
    "display": "Landau Zener",
    "href": "/landau-zener.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1792,6 +1816,14 @@
    "display": "Lbm3d Gpu",
    "href": "/lbm3d-gpu.html",
    "section": "Fluid",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "lensing.html",
+   "display": "Lensing",
+   "href": "/lensing.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1911,7 +1943,7 @@
    "id": "meijer-g.html",
    "display": "Meijer G",
    "href": "/meijer-g.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -2032,6 +2064,14 @@
    "display": "Netcheck",
    "href": "/netcheck.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "node-bun.html",
+   "display": "Node Bun",
+   "href": "/node-bun.html",
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -2287,7 +2327,7 @@
    "id": "pulsar.html",
    "display": "Pulsar",
    "href": "/pulsar.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -2380,6 +2420,14 @@
   },
   {
    "kind": "page",
+   "id": "reactor.html",
+   "display": "Reactor",
+   "href": "/reactor.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "realterrain.html",
    "display": "Realterrain",
    "href": "/realterrain.html",
@@ -2391,7 +2439,7 @@
    "id": "regrid-cost.html",
    "display": "Regrid Cost",
    "href": "/regrid-cost.html",
-   "section": "Electromagnetism",
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -2455,7 +2503,7 @@
    "id": "rmt.html",
    "display": "Rmt",
    "href": "/rmt.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -2607,7 +2655,7 @@
    "id": "sinogram-gpu.html",
    "display": "Sinogram Gpu",
    "href": "/sinogram-gpu.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -2623,7 +2671,7 @@
    "id": "skin-depth.html",
    "display": "Skin Depth",
    "href": "/skin-depth.html",
-   "section": "Electromagnetism",
+   "section": "PL: Electromagnetism",
    "collision": false
   },
   {
@@ -2687,7 +2735,7 @@
    "id": "spatial-agreement.html",
    "display": "Spatial Agreement",
    "href": "/spatial-agreement.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -2711,7 +2759,7 @@
    "id": "splat-lab.html",
    "display": "Splat Lab",
    "href": "/splat-lab.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -2776,6 +2824,14 @@
    "display": "Statistical Mechanics",
    "href": "/statistical-mechanics.html",
    "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "stellar.html",
+   "display": "Stellar",
+   "href": "/stellar.html",
+   "section": null,
    "collision": false
   },
   {
@@ -2847,7 +2903,7 @@
    "id": "tomography.html",
    "display": "Tomography",
    "href": "/tomography.html",
-   "section": "Optics & Imaging",
+   "section": "PL: Optics & Imaging",
    "collision": false
   },
   {
@@ -3055,7 +3111,7 @@
    "id": "warp-map.html",
    "display": "Warp Map",
    "href": "/warp-map.html",
-   "section": "Cosmic & Relativity",
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {

@@ -3,7 +3,13 @@ REM START_BUN_Full.bat - Bun start that ALSO launches the KPop Listener, with an
 REM automatic Node fallback if Bun can't run the bridge. The Bun equivalent of
 REM Start_Everything.bat.
 
-cd /d "%~dp0.."
+REM v4005 -- MOVED FROM "Root Utils" TO THE PROJECT ROOT, at Keith's request, and A MOVE IS NOT A RENAME.
+REM This file located everything relative to its own folder's PARENT (%~dp0..), which was right in
+REM "Root Utils" and points ABOVE the project the moment the file moves up one level. Three paths were
+REM affected -- this cd, swek_free_port.bat and swek_exit_report.bat -- and all three now resolve from
+REM %~dp0 itself, because that IS the project root here. Moving the other Root Utils launchers means
+REM doing the same for each: START_BOTH.bat and START_BUN.bat carry the same %~dp0.. assumption.
+cd /d "%~dp0"
 
 if not exist "WebGLEngine\ai-bridge\server.js" (
     echo ERROR: WebGLEngine\ai-bridge\server.js not found. Run from the project root.
@@ -71,7 +77,7 @@ set "SUPERSEDE="
 if exist "%TEMP%\swek_superseded.flag" set "SUPERSEDE=1"
 taskkill /IM bun.exe /F >nul 2>nul
 REM v3097 -- one of six hand-rolled copies of this job; extracted to swek_free_port.bat.
-call "%~dp0..\\WebGLEngine\tools\ship\swek_free_port.bat"
+call "%~dp0WebGLEngine\tools\ship\swek_free_port.bat"
 ping -n 4 127.0.0.1 >nul 2>nul
 
 REM v1574 - open server.html only AFTER the bridge is LISTENING (was opening before bind -> dead :8787).
@@ -93,7 +99,7 @@ REM v3088 -- the two runners above sit inside an if/else and the tail just did p
 REM clean stop and a crash closed the window with nothing said. The `exit /b 0` below is on the SUPERSEDE
 REM label and is correct there -- an auto-update really did succeed. This is the other path.
 set "NODE_RC=%ERRORLEVEL%"
-call "%~dp0..\\WebGLEngine\tools\ship\swek_exit_report.bat" %NODE_RC%
+call "%~dp0WebGLEngine\tools\ship\swek_exit_report.bat" %NODE_RC%
 popd
 exit /b %NODE_RC%
 :_swek_superseded

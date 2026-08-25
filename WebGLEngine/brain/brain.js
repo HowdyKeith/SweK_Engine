@@ -2795,7 +2795,9 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4004";   // v4004 -- rig.html shows each step's expected time beside its kill budget,
+const BRAIN_BUILD = "v4005";   // v4005 -- claimTrace swept 394 modes against every device because 18 of them
+// accept any string: 7,499 builds instead of 461, 3000s+ to 518s. Three landmark bugs beside it, all the
+// same shape -- a root derived from a cwd, a bare path handed to import(). Previously v4004 --   // v4004 -- rig.html shows each step's expected time beside its kill budget,
 // whether the gate file changed since it last passed (shown, never acted on), and which numbered section a
 // running gate is in. Polling costs -1.6% against 4.2% noise, measured. Previously v4003 --   // v4003 -- the changelog currency guard is back on. It had skipped its way off
 // every machine, so the record froze at v3970 while the tree reached v4002 -- the forty-round failure it was

@@ -32,7 +32,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createWatchdog } from "./watchdog.js";
 import { recordingWatchdog, recordLesson, readLessons, makeRecord, health, lessonsPath, RECORDED_EVENTS,
          lessonsFor, lessonsBrief, watchTraining, recordSweepFinding } from "./lessons.mjs";
@@ -331,7 +331,7 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
     // codeOnly() blanks comments AND the CONTENTS of string literals -- right for counting calls, useless for
     // reading a key name, which is exactly what it is for. noComments() keeps strings and drops prose -- right
     // for "is this literal present". prose() is the inverse, for grading the comment itself.
-    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const { codeOnly, noComments, prose } = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "sourceScan.mjs")).href);
     const lvlPath = path.join(ROOT, "physics", "sph", "levelClaim-selfcheck.mjs");
     const lvl = fs.readFileSync(lvlPath, "utf8");
     const code = codeOnly(lvl), live = noComments(lvl), why = prose(lvl);
@@ -401,7 +401,7 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
 // first-against-last comparison -- and the records follow the VERDICT, not convenience. A full series for the
 // margin sweep would mean inventing per-step booleans the file never computed.
 {
-    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const { codeOnly, noComments, prose } = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "sourceScan.mjs")).href);
     const p = path.join(ROOT, "physics", "sph", "packingTransfer-selfcheck.mjs");
     const src = fs.readFileSync(p, "utf8");
     const code = codeOnly(src), live = noComments(src), why = prose(src);
@@ -514,7 +514,7 @@ try { fs.rmSync(TMP, { force: true }); } catch { }
 // stale. A hardcoded `settled: false` would look identical on every CURRENT run and only diverge the day the
 // physics changes, which is exactly the kind of drift a source check can catch before a run ever has to.
 {
-    const { codeOnly, noComments, prose } = await import(path.join(ROOT, "tools", "ship", "sourceScan.mjs"));
+    const { codeOnly, noComments, prose } = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "sourceScan.mjs")).href);
     const p = path.join(ROOT, "physics", "sph", "materialKnobs-selfcheck.mjs");
     const src = fs.readFileSync(p, "utf8");
     const code = codeOnly(src), live = noComments(src), why = prose(src);

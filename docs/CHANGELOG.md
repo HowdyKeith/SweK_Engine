@@ -8,6 +8,48 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4005 -- claimTrace was building every device with every device's modes, and three landmark bugs
+
+`claimTrace-selfcheck` timed out at 3000s with ZERO bytes of output. Staged instrumentation put the whole cost
+in one call: `deviceModeTable()` returns in under a second, and everything after it is `claimTrace()` sweeping
+394 modes.
+
+**394 is the union of every mode any device declares**, derived at v3216 to replace a hand-typed list of 25 --
+correctly, because the typed list had gone stale. claimTrace then kept whichever of those 394 a device's
+`checkMode` accepted. For a device with a validating `defaults()` that is its own handful. FOR THE EIGHTEEN
+THAT ACCEPT ANY STRING it is all 394, and each one is a full physics build.
+
+MEASURED: 7,499 builds under the union filter against 461 when each device runs its own modes -- 16.3x, with
+7,092 of the 7,499 coming from the eighteen. And the extra seven thousand are not merely slow: an unguarded
+device handed a foreign mode name runs its DEFAULT physics, so they return values the default build already
+contributed. `deviceModeTable()` is the tree's one declaration of which modes a device has, and passing it in
+uses that answer instead of re-deriving a worse one by interrogating a guard that does not guard. 3000s+ ->
+518s, and the gate now produces output instead of dying silently.
+
+**It also goes red, and that red is the point.** Twenty gates now have claims that were only ever traceable
+through modes their device does not declare. That is a REAL finding about those devices rather than a
+regression, and re-baselining it silently would be the suppression this ratchet exists to prevent -- so it is
+reported and left for Keith.
+
+**Three landmark bugs, all the same shape: a root derived from something that is not a landmark.**
+
+* `brain/rl/lessons-selfcheck.mjs` called `await import(path.join(...))` with a bare absolute path at three
+  sites. On Linux that happens to work; on Windows it throws `ERR_UNSUPPORTED_ESM_URL_SCHEME ... protocol 'c:'`,
+  which is what Keith's rig reported. THE GATE ALREADY ASSERTED `await import(pathToFileURL(` ON ITS SUBJECTS
+  while breaking the rule itself, two functions further down its own file.
+* `launcherLint-selfcheck.mjs` computed the project root as `process.cwd()/..` and read `Start_Everything.bat`
+  relative to the cwd, so it crashed with ENOENT from any directory but `WebGLEngine/`. A cwd is not a
+  landmark; it is a fact about how somebody invoked you. Both paths derive from `import.meta.url` now, and it
+  passes from three different directories.
+* `launch-index.json` shipped 500 entries against 507 computed -- a generated artefact nobody had regenerated.
+
+**START_BUN_Full.bat moved to the project root**, at Keith's request, and A MOVE IS NOT A RENAME: the file
+located everything through `%~dp0..`, which points ABOVE the project the moment it leaves "Root Utils". Three
+paths were corrected -- the `cd`, `swek_free_port.bat` and `swek_exit_report.bat`. `rootLayout-selfcheck` then
+refused it as an unjustified root file until the reason was written down, which is that gate working exactly as
+intended. Its LF line endings were preserved byte-for-byte; v3992's CRLF corruption came from a read that
+normalised newlines, so this one compared the CR count before and after.
+
 ## Since v4004 -- rig.html says what each step costs, whether the gate changed, and where it has got to
 
 Keith: "can rig.html for each step show how much time is expected? whether the hash is already matched? what

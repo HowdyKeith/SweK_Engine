@@ -40,14 +40,39 @@ export function headerOf(src) { return src.split(/\nimport /)[0]; }
  * DECLARED, via checkMode -- build() silently defaults an unknown mode (v3144, 26 of 26 devices), so asking
  * build() which modes exist returns every string you try. That mistake cost a whole measurement at v3174.
  */
-export async function claimTrace(engRoot, D, K, { modes = [], tol = 0.02 } = {}) {
+/**
+ * *** v4005 -- THIS SWEPT EVERY MODE IN THE LAB AGAINST EVERY DEVICE, AND 18 DEVICES ACCEPT EVERY STRING. ***
+ *
+ * The gate timed out at 3000s with ZERO bytes of output on Keith's rig, and the whole cost is here. `modes` is
+ * the UNION of every mode any device declares -- 394 of them since v3216 derived it instead of typing a list of
+ * 25 -- and line 50 kept whichever ones `checkMode` accepted. For a device with a validating defaults() that is
+ * its own handful. For the 18 that accept ANY string (deviceModes-selfcheck reports them by name every run) it
+ * is ALL THREE HUNDRED AND NINETY-FOUR, and each one is a full physics build.
+ *
+ * MEASURED: 7,499 builds under the union filter against 461 when each device runs its own modes. 16.3x, and
+ * 7,092 of those 7,499 come from the eighteen.
+ *
+ * *** AND THE EXTRA SEVEN THOUSAND ARE NOT MERELY SLOW, THEY ARE EMPTY. *** An unguarded device handed a
+ * foreign mode name runs its DEFAULT physics, so every one of those builds returns values the default-mode
+ * build below already contributed. The sweep was paying sixteen times over for duplicates.
+ *
+ * THE TABLE IS THE ANSWER AND IT ALREADY EXISTED. deviceModeTable() is the tree's one declaration of which
+ * modes a device actually has -- the same source v3216 correctly reached for -- and passing it here uses that
+ * answer per device instead of re-deriving a worse one by interrogating a guard that does not guard.
+ * `modes` stays supported as the fallback for a caller that has no table, so this is not a signature break.
+ */
+export async function claimTrace(engRoot, D, K, { modes = [], table = null, tol = 0.02 } = {}) {
     const dir = path.join(engRoot, "tools", "roundhouse");
     const gates = fs.readdirSync(dir).filter((f) => /-selfcheck\.mjs$/.test(f));
     const cache = {};
     const outsOf = async (n) => {
         if (cache[n]) return cache[n];
         const d = await D.getDevice(n);
-        const declared = modes.filter((m) => { try { return K.checkMode(d, m).ok !== false; } catch { return false; } });
+        // THE DEVICE'S OWN MODES when the table has them; the union-and-filter only when it does not. An
+        // unguarded device would otherwise report the entire lab's mode list as its own.
+        const declared = (table && Array.isArray(table[n]) && table[n].length)
+            ? table[n]
+            : modes.filter((m) => { try { return K.checkMode(d, m).ok !== false; } catch { return false; } });
         const vals = [];
         for (const m of [...new Set([d.defaults({}).mode, ...declared])]) {
             try { for (const v of Object.values(await d.build({ mode: m }))) if (typeof v === "number" && isFinite(v)) vals.push(v); } catch {}

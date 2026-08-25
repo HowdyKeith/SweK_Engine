@@ -54,7 +54,11 @@ const K = await import(pathToFileURL(path.join(HERE, "knobGate.mjs")).href);
 // v3211 spent a round removing. deviceModeTable() is the tree's one answer; this asks it.
 const TABLE = await (await import(pathToFileURL(path.join(HERE, "deviceModes.mjs")).href)).deviceModeTable(D, K.checkMode);
 const MODES = [...new Set(Object.values(TABLE).flat())].sort();
-const r = await C.claimTrace(ENG, D, K, { modes: MODES });
+// v4005 -- THE TABLE GOES IN, not just the flattened union. Passing only MODES made claimTrace re-derive each
+// device's modes by asking checkMode, which answers "yes" to everything for the 18 devices that do not
+// validate -- 7,499 builds instead of 461, and the gate timed out at 3000s with no output at all. The union is
+// still passed because claimTrace keeps it as the fallback for a caller with no table.
+const r = await C.claimTrace(ENG, D, K, { modes: MODES, table: TABLE });
 
 // ---- 1. THE TRACE RUNS AND SPLITS ------------------------------------------------------------------------------
 {
