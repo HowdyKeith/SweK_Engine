@@ -61,6 +61,7 @@ export async function probeLocalModel(nav = typeof navigator !== "undefined" ? n
         adapter: null, adapterInfo: null, features: null, limits: null, hasF16: null,
         softwareRenderer: null,   // an adapter that is CPU emulation is not a GPU -- see SOFTWARE_HINTS
         quotaBytes: null, usageBytes: null, cacheNames: null, modelCached: null,
+        persistAvailable: null, persisted: null,
         vramBytes: null,          // *** ALWAYS NULL. There is no API. Kept as a field so its absence is VISIBLE. ***
         vramNote: "NOT EXPOSED BY ANY BROWSER. WebGPU withholds device memory deliberately (fingerprinting), " +
                   "so maxBufferSize below is the closest thing there is and it is a PROXY, not the VRAM.",
@@ -102,6 +103,18 @@ export async function probeLocalModel(nav = typeof navigator !== "undefined" ? n
             out.usageBytes = typeof e.usage === "number" ? e.usage : null;
         }
     } catch (e) { out.errors.push("storage.estimate: " + String(e).slice(0, 60)); }
+    // v4008 -- Keith: "storage quota can raise to 2 GB, with approval dialog". CONFIRMED against the real API
+    // rather than taken on faith: navigator.storage.persist() exists in this tree's Chromium and
+    // navigator.permissions.query({name:"persistent-storage"}) reports "prompt" -- a genuine dialog is what
+    // shows. What it is NOT confirmed to do is land on any specific number: the persisted-storage ceiling is
+    // disk-relative and platform-dependent, so requestPersistentStorage() below reports the MEASURED before
+    // and after rather than promising "2 GB". This file just records whether the escalation is even possible.
+    try {
+        if (nav && nav.storage) {
+            out.persistAvailable = typeof nav.storage.persist === "function";
+            if (typeof nav.storage.persisted === "function") out.persisted = await nav.storage.persisted();
+        }
+    } catch (e) { out.errors.push("storage.persist detection: " + String(e).slice(0, 60)); }
 
     // IS ANYTHING ALREADY DOWNLOADED. Read-only: caches.keys() opens no cache and fetches nothing.
     try {
@@ -154,4 +167,35 @@ export function verdictFor(facts, model) {
 
 export function summarise(facts) {
     return MODELS.map((m) => verdictFor(facts, m));
+}
+
+/**
+ * *** THE ESCALATION, AND WHAT IT DOES AND DOES NOT PROMISE. ***
+ *
+ * Calling navigator.storage.persist() asks the browser to stop treating this origin's storage as evictable
+ * under disk pressure. THAT IS THE SPEC'S CLAIM. Whether the browser ALSO raises the numeric quota
+ * estimate() reports is an OBSERVED BEHAVIOUR on some platforms, not a guarantee the spec makes -- so this
+ * function reports the measured quota before and after rather than asserting a number. "2 GB" is something a
+ * browser might do, not something this code claims it will do.
+ *
+ * REQUIRES A USER GESTURE. Called from a click handler it can show the real dialog; called from anywhere
+ * else -- including this probe's own auto-run on page load -- most browsers refuse it silently, which is why
+ * this is a SEPARATE function the page wires to a button rather than folded into probeLocalModel().
+ */
+export async function requestPersistentStorage(nav = typeof navigator !== "undefined" ? navigator : null) {
+    const out = { available: false, granted: null, quotaBeforeBytes: null, quotaAfterBytes: null, error: null };
+    if (!nav || !nav.storage || typeof nav.storage.persist !== "function") return out;
+    out.available = true;
+    try {
+        const before = await nav.storage.estimate();
+        out.quotaBeforeBytes = typeof before.quota === "number" ? before.quota : null;
+    } catch (e) { out.error = "estimate before: " + String(e).slice(0, 60); }
+    try {
+        out.granted = await nav.storage.persist();
+    } catch (e) { out.error = "persist(): " + String(e).slice(0, 80); return out; }
+    try {
+        const after = await nav.storage.estimate();
+        out.quotaAfterBytes = typeof after.quota === "number" ? after.quota : null;
+    } catch (e) { out.error = (out.error ? out.error + "; " : "") + "estimate after: " + String(e).slice(0, 60); }
+    return out;
 }

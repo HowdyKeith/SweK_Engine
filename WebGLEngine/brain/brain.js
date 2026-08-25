@@ -2795,7 +2795,10 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4007";   // v4007 -- a page that answers whether this box can run a generative model
+const BRAIN_BUILD = "v4008";   // v4008 -- storage-quota escalation via navigator.storage.persist(),
+// confirmed real (permissions.query reports "prompt") and bounded to never promise a number -- it reports
+// what the browser actually granted. Also: codeOnly() silently mangles raw HTML, same defect class as
+// patchScanDoor/bunNative this session, on the HTML side this time. Previously v4007 --   // v4007 -- a page that answers whether this box can run a generative model
 // before downloading it: VRAM is not exposed by any browser, so the verdict is only ever no/maybe, never
 // yes. levelClaim's zero-below-floor was a claim about one box, now negligible-against-signal instead.
 // labResults now completes instead of timing out, revealing real pre-freeze staleness. Previously v4006 --   // v4006 -- the Bun launcher falls back on /health rather than an exit code, so
