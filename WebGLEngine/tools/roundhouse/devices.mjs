@@ -114,6 +114,7 @@ import { kineticsDevice } from "./kineticsBind.mjs";        // v3984 - point rea
 import { bellDevice } from "./bellBind.mjs";              // v3990 - CHSH Bell inequality: two bounds, both proven by search
 import { laneEmdenDevice } from "./laneEmdenBind.mjs";    // v3991 - stellar structure: polytropes, and a geometry plant
 import { lotkaVolterraDevice } from "./lotkaVolterraBind.mjs"; // v3994 - predator-prey: harvesting both species helps the prey
+import { blobVitalsDevice } from "./blobVitalsBind.mjs";   // v4009 - the aquarium's own gauges, graded against its four real deaths
 import { cartPoleDevice } from "./cartPoleBind.mjs";       // v3995 - cart-pole LQR: the first device whose subject is a CONTROLLER
 import { astroparticleDevice } from "./astroparticleBind.mjs";  // v3501 - astroparticle: neutrino oscillation (cosmology modes follow)
 import { csgDevice } from "./csgBind.mjs";                       // v3519 - csg: exact signed-distance primitives and set algebra
@@ -164,6 +165,7 @@ const REGISTRY = {
     bell: () => bellDevice,                      // v3990 -- CHSH: the plant still violates Bell, only Tsirelson catches it
     laneemden: () => laneEmdenDevice,           // v3991 -- the plant is a dimensionality slip that still makes stars
     lotkavolterra: () => lotkaVolterraDevice,   // v3994 -- the plant is the STANDARD textbook refinement of this model
+    blobvitals: () => blobVitalsDevice,          // v4009 -- three of the aquarium's four real deaths, reproduced and diagnosed
     cartpole: () => cartPoleDevice,             // v3995 -- the plant passes every self-consistent check and drops the pole
     astroparticle: () => astroparticleDevice,   // v3501 -- opens the astroparticle field with neutrino oscillation
     csg: () => csgDevice,                        // v3519 -- exact SDF primitives, gradients, edge crossings, set algebra

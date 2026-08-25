@@ -564,6 +564,7 @@
   "tools/roundhouse/blobBodies-selfcheck.mjs": 2577,
   "tools/roundhouse/blobKelvinBind-selfcheck.mjs": 137,
   "tools/roundhouse/blobThermalBind-selfcheck.mjs": 657,
+  "tools/roundhouse/blobVitalsBind-selfcheck.mjs": 190,
   "tools/roundhouse/bonefieldBind-selfcheck.mjs": 45,
   "tools/roundhouse/boundKeys-selfcheck.mjs": 3877,
   "tools/roundhouse/box3dBind-selfcheck.mjs": 339,
