@@ -39,6 +39,7 @@
   "ai-bridge/tools/range-selfcheck.mjs": 199,
   "ai-bridge/tools/robust-remove-selfcheck.mjs": 80,
   "ai-bridge/tools/rocket-bridge-selfcheck.mjs": 357,
+  "ai-bridge/tools/self-zip-selfcheck.mjs": 9804,
   "ai-bridge/tools/tunnel-email-selfcheck.mjs": 46,
   "ai-bridge/tunnel-health-selfcheck.mjs": 48,
   "ai-bridge/tunnelUrlScan-selfcheck.mjs": 52,

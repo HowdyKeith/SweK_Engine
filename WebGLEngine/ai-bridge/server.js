@@ -17092,16 +17092,19 @@ ${text.replace(/'/g, "''")}
     // v1682 — download THIS build's zip (newest EngineProject_vNNN.zip sitting in the user's Downloads).
     if (androidPeerBridge.handle(req, res)) return;   /* v2922 android-peer (install) */
     if (req.method === "GET" && req.url.split("?")[0] === "/self/zip") {
-        try {
-            let best = null; const home = os.homedir(); const dirs = home ? [path.join(home, "Downloads")] : [];
-            for (const d of dirs) { let files = []; try { files = fs.readdirSync(d); } catch { continue; }
-                // v2871 -- accepts BOTH names. This line is why Download served a 143-version-stale zip.
-                for (const f of files) { const p2 = buildName.parseBuildZip(f); if (p2) { if (!best || p2.version > best.v) best = { v: p2.version, path: path.join(d, f), name: f }; } } }
-            if (!best) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("no SweK_Engine_vNNNN.zip (or legacy EngineProject_vNNN.zip) found in your Downloads folder"); return; }
-            const stt = fs.statSync(best.path);
-            res.writeHead(200, { "Content-Type": "application/zip", "Content-Length": stt.size, "Content-Disposition": 'attachment; filename="' + best.name + '"' });
-            fs.createReadStream(best.path).pipe(res);
-        } catch (e) { try { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(String((e && e.message) || e)); } catch {} }
+        // v4012 -- *** "SELF" NAMED A BUTTON, NOT WHAT IT SERVED. *** See packagerBridge.selfZipCandidate()'s
+        // header for why: this used to pick the HIGHEST-numbered zip in Downloads regardless of whether it
+        // matched what was actually running. Keith caught it live -- a box whose own header read "running
+        // v3995" served v3940 from this route, correctly named in the Content-Disposition and unnoticed anyway.
+        (async () => {
+            try {
+                const r = await packagerBridge.selfZipCandidate();
+                if (!r.ok) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(r.error); return; }
+                const stt = fs.statSync(r.path);
+                res.writeHead(200, { "Content-Type": "application/zip", "Content-Length": stt.size, "Content-Disposition": 'attachment; filename="' + r.name + '"' });
+                fs.createReadStream(r.path).pipe(res);
+            } catch (e) { try { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(String((e && e.message) || e)); } catch {} }
+        })();
         return;
     }
     // v1682 — is THIS request arriving via the remote tunnel? (for the "(Remote)" header tag)
