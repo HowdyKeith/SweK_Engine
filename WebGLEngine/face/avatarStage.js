@@ -389,8 +389,8 @@ function mulV4(M,x,y,z,w){ return [ M[0]*x+M[4]*y+M[8]*z+M[12]*w, M[1]*x+M[5]*y+
 // v966 — restore the lost mountStage() declaration. A prior edit dropped the
 // function header, leaving the entire body at module top level → "Illegal
 // return statement" at parse time, which broke the avatar stage on EVERY page
-// that imports it (phone control.html, the KPop avatar window, the PC mini
-// stamp). Named export (control.html does `const { mountStage } = await import`)
+// that imports it (phone phone.html, the KPop avatar window, the PC mini
+// stamp). Named export (phone.html does `const { mountStage } = await import`)
 // plus the existing `export default mountStage` at the bottom.
 export function mountStage(canvas, opts = {}){
   const url = opts.url || "RobotExpressive";

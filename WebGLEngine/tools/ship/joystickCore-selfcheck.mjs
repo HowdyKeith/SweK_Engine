@@ -9,7 +9,7 @@
 // the old remote with just buttons... the old button view should be left as a panel view choice, but it doesn't
 // have the smooth virtual joystick pad that the phone version does."
 //
-// *** THE STICK LIVED INLINE IN control.html AND COULD NOT BE MOUNTED ANYWHERE ELSE. *** Sixty lines of pointer
+// *** THE STICK LIVED INLINE IN phone.html AND COULD NOT BE MOUNTED ANYWHERE ELSE. *** Sixty lines of pointer
 // handling with the geometry braided through: element rect, knob transform, pointer capture, a 10Hz emit loop,
 // and -- in the middle -- the actual decision, which is four lines of vector arithmetic.
 //
@@ -33,7 +33,7 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const { joystickSample, knobTransform, DEADZONE, KNOB_R } =
     await import(pathToFileURL(path.join(ROOT, "ui", "joystickCore.js")).href);
 const modRaw = fs.readFileSync(path.join(ROOT, "ui", "joystickCore.js"), "utf8");
-const pageRaw = fs.readFileSync(path.join(ROOT, "control.html"), "utf8");
+const pageRaw = fs.readFileSync(path.join(ROOT, "phone.html"), "utf8");
 
 const box = { left: 0, top: 0, width: 200, height: 200 };   // maxR = 100 - 33 = 67
 const at = (x, y) => joystickSample({ x, y }, box);
@@ -75,7 +75,7 @@ const at = (x, y) => joystickSample({ x, y }, box);
 // ---- 2. THE PAGE ASKS FOR IT, AND THE SEAM IS STATED ------------------------------------------------------------------------
 {
     const code = codeOnly(pageRaw);
-    ok("!! *** control.html calls the module instead of carrying its own copy ***",
+    ok("!! *** phone.html calls the module instead of carrying its own copy ***",
         /__swekJoy\.sample/.test(code) && /joystickCore\.js/.test(pageRaw) &&
         !/Math\.abs\(dx\) > Math\.abs\(dy\)/.test(code),
         "THE EXTRACTION IS PROVEN BY THE PAGE STILL WORKING. An extraction nobody consumes is a copy with a " +
@@ -96,7 +96,7 @@ const at = (x, y) => joystickSample({ x, y }, box);
     ok("!! *** the full render window MOUNTS the stick rather than carrying a second copy ***",
         /from "\.\/joystickCore\.js"/.test(panel) && /joystickSample\(/.test(code) &&
         !/Math\.abs\(dx\) > Math\.abs\(dy\)/.test(code),
-        "NOT A PORT -- A MOUNT. v3263 pulled the geometry out of control.html precisely so this could be four " +
+        "NOT A PORT -- A MOUNT. v3263 pulled the geometry out of phone.html precisely so this could be four " +
         "lines of DOM and one function call. A SECOND COPY OF THAT ARITHMETIC HERE would be the defect this " +
         "project has spent its life removing, arriving in the round that was supposed to prevent it");
 

@@ -224,7 +224,7 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
             { id: "padInvertY", label: "Invert look Y", hint: "Flip vertical aim on the right stick.", type: "toggle",
               get: () => { try { return !!window.gamepadInput?._state?.invertY; } catch { return false; } },
               set: (v) => { try { window.gamepad?.invertY?.(v); } catch {} } },
-            { id: "phoneAim", label: "Phone aim speed", hint: "Sensitivity of the phone look stick (control.html).", type: "slider", min: 0.01, max: 0.2, step: 0.01,
+            { id: "phoneAim", label: "Phone aim speed", hint: "Sensitivity of the phone look stick (phone.html).", type: "slider", min: 0.01, max: 0.2, step: 0.01,
               get: () => { try { return window._phoneAimAmt ?? 0.05; } catch { return 0.05; } },
               set: (v) => { try { window._phoneAimAmt = +v || 0.05; } catch {} } },
         ] },

@@ -8,7 +8,7 @@
 // index.html's first-run overlay offers to open inbound TCP 8787 so phones / Shield / TV can reach the PC.
 // /boot/mode DEFAULTS TO "server", and both launchers read it and open server.html -- so on a fresh box in the
 // default mode that offer is never made, the LAN silently cannot reach the engine, and no page says why. The
-// tree's only other firewall control is on control.html, which server.html does not link to.
+// tree's only other firewall control is on phone.html, which server.html does not link to.
 //
 // WHAT THIS FILE REFUSES TO LET REGRESS is not "a banner exists" -- it is WHEN the banner appears, which is the
 // entire design. A reachability warning has two opposite failure modes and only one of them is visible: shown

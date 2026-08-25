@@ -13,7 +13,7 @@ import { mountKaggleDatasetCache }  from "./kaggleDatasetCache.js";  // v696 —
 //
 // The user's mental model: submit one image to multiple models, compare
 // the results side by side in the engine. Same panel renders on the
-// phone via control.html's Kaggle Lab tab — both surfaces read the same
+// phone via phone.html's Kaggle Lab tab — both surfaces read the same
 // /kaggle/jobs list, so a phone-submitted job appears on PC and vice
 // versa.
 //

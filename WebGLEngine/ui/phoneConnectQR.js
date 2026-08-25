@@ -1,5 +1,5 @@
 // ui/phoneConnectQR.js — v525 — "scan to connect" QR for the phone control panel.
-// Renders a QR of <origin>/control.html so a phone on the same Wi-Fi joins
+// Renders a QR of <origin>/phone.html so a phone on the same Wi-Fi joins
 // without typing the IP. Uses the vendored qrcode-generator (MIT). The QR only
 // resolves to a reachable address if the engine itself is served by the relay
 // (which it must be, since the WS bridge connects to location.host).
@@ -12,7 +12,7 @@ async function loadQR() {
     return _qrcode;
 }
 function controlURL() {
-    try { return location.origin + "/control.html"; } catch { return "/control.html"; }
+    try { return location.origin + "/phone.html"; } catch { return "/phone.html"; }
 }
 
 // v637 — when the engine page is opened via http://localhost:<port>/ the bare
@@ -39,7 +39,7 @@ async function controlURLForPhone() {
                 ? `${location.protocol}//${info.lanIps[0]}:${info.port || location.port}/`
                 : null);
         if (!lanUrl) return base;
-        return lanUrl.replace(/\/+$/, "") + "/control.html";
+        return lanUrl.replace(/\/+$/, "") + "/phone.html";
     } catch { return base; }
 }
 
@@ -112,5 +112,5 @@ export async function initPhoneConnectQR() {
         fb.addEventListener("click", toggle);
         document.body.appendChild(fb);
     }
-    console.log("[phoneQR] '📱 LINK PHONE' button ready in the left rail — scan-to-connect QR for control.html");
+    console.log("[phoneQR] '📱 LINK PHONE' button ready in the left rail — scan-to-connect QR for phone.html");
 }

@@ -56,7 +56,7 @@ import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
 
 const $ = (id) => document.getElementById(id);
 const msg = (t) => { $("msg").textContent = t || ""; };
-$("btnBack").addEventListener("click", () => location.href = "/control.html");
+$("btnBack").addEventListener("click", () => location.href = "/phone.html");
 
 const canvas = $("c");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });

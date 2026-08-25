@@ -248,7 +248,7 @@ export function macPages() {
         { file: "raycast.html",        why: "drives a Mac peer -- /raycast/launch, /raycast/ext/dev, /install/exec" },
         { file: "hosting.html",        why: "calls /hosting/tunnel/status, the tunnel the Mac fronts" },
         { file: "settings.html",       why: "same tunnel status route" },
-        { file: "control.html",        why: "launches a .command from its own script" },
+        { file: "phone.html",        why: "launches a .command from its own script" },
         { file: "bzflag.html",         why: "launches a .command from its own script" },
         { file: "rocket-league.html",  why: "launches a .command from its own script" },
     ];

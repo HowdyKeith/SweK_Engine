@@ -162,7 +162,7 @@ export function getFavorites() {
 }
 
 // Auto-install on window so non-module consumers (RobotExpressive.html
-// inline script, control.html cycle) can use it without importing.
+// inline script, phone.html cycle) can use it without importing.
 if (typeof window !== "undefined") {
     try { window.kpopFavorites = getFavorites(); } catch {}
 }

@@ -1,6 +1,6 @@
 // FILE: ui/avatarPublish.js
 // v927 — publishes the engine's current avatar URL to the bridge so the phone
-// control.html mini-avatar mirrors the PC's current view. Resolves the same way
+// phone.html mini-avatar mirrors the PC's current view. Resolves the same way
 // demoChrome does (the demoChrome 'avatar' setting → first kpop favorite →
 // RobotExpressive fallback). Cheap: re-checks every 8s, POSTs only on change.
 

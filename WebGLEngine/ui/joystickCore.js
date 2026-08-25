@@ -8,7 +8,7 @@
 // pc/mac full render, same as the phone. The old button view should be left as a panel view choice, but it
 // doesn't have the smooth virtual joystick pad that the phone version does."
 //
-// *** THE STICK LIVES INLINE IN control.html AND CANNOT BE MOUNTED ANYWHERE ELSE. *** About sixty lines of
+// *** THE STICK LIVES INLINE IN phone.html AND CANNOT BE MOUNTED ANYWHERE ELSE. *** About sixty lines of
 // pointer handling with the geometry braided through it: element rect, knob transform, pointer capture, a 10Hz
 // emit loop, and -- buried in the middle -- the actual decision, which is four lines of vector arithmetic.
 //
@@ -23,7 +23,7 @@
 /** Below this fraction of the base radius the stick reads as centred and emits nothing. */
 export const DEADZONE = 0.18;
 
-/** Knob radius in px, matching control.html's .joyknob. Named because the original had it as a bare 33. */
+/** Knob radius in px, matching phone.html's .joyknob. Named because the original had it as a bare 33. */
 export const KNOB_R = 33;
 
 /**

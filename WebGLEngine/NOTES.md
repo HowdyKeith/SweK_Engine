@@ -7057,7 +7057,7 @@ stall while skips climb, exactly as logged.
 
 Fix (two parts):
  (1) KaijuManager.summon(): no civs is now a FALLBACK, not a dead end. It spawns at the
-     camera -- which is literally what control.html offers ("Summon kaiju (at camera)").
+     camera -- which is literally what phone.html offers ("Summon kaiju (at camera)").
      Safe + precedented: a kaiju with targetCivId: null is an existing supported spawn
      path in this file, and _defaultPickSpawnPos only reads target.center.{x,z}, so a
      synthetic camera-centred target suffices. Guarded: no camera / NaN coords -> honest

@@ -1,7 +1,7 @@
 // waterTank.js (v1311) — shared "watering tank" overlay for any avatar surface.
 // Creates a 2D canvas over (or behind) a host element, polls /water/status, and animates a
 // sloshing water fill whose height scales to the watering duration. Used by avatarstage.html
-// (behind the transparent avatar canvas) and control.html's diorama (front, translucent, so the
+// (behind the transparent avatar canvas) and phone.html's diorama (front, translucent, so the
 // avatar reads as submerged because that canvas has its own opaque CSS background).
 //
 // window.initWaterTank({ mount, behind, insetBottom, z }) -> { destroy() }
