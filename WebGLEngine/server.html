@@ -1349,6 +1349,18 @@ window.addEventListener("load", function () {
         <div class="gpanel" data-panel="macsystem" hidden>
           <div class="gpanelHdr">&#63743; Mac System</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Everything that needs a Mac. <b>This is a VIEW, not a second home</b> &mdash; every page below stays claimed by the drawer it already lives in, and these links are built here rather than moved. Membership is by what a page CALLS (a .command launcher, a Mac-side route) rather than by what it mentions: a text scan for &quot;mac&quot; also caught this very page and the predictions ledger, which only discuss one.</div>
+          <!-- v4036 -- Keith, after asking about "the Mac qwen run option": "and that option page would want to
+               be in the Mac System panel on Server.html too." It isn't a page -- it's the engine's own "Local
+               MLX" settings tab (main.js's _schema, id "mlx"), reachable before this only from index.html's
+               Settings. Its own on-screen text already makes the Mac-side-route case this panel's own rule asks
+               for: "Install buttons are macOS-only (run this on the Apple-Silicon Mac)", and /mlx/install and
+               /mlx/detect are Mac-side routes exactly like raycast.html's and hosting.html's below. SAME MOVE AS
+               v3908's GitHub Manager button: this mounts ui/localMlxPanel.js, THE SAME MODULE main.js's schema
+               now also calls, so the two never drift. See that module's own header. -->
+          <div style="border:1px solid #4a5a7a;background:#0e1522;border-radius:6px;margin-bottom:8px;padding:8px 10px;">
+            <button id="mlxPanelBtn" style="padding:7px 12px;background:#3a2a5a;color:#cfe;border:1px solid #6a4a9a;border-radius:6px;cursor:pointer;font:12px system-ui;">&#127814; Local MLX &mdash; point the brain at a local Mac model server</button>
+            <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;">Rapid-MLX, Osaurus, vMLX, mlx-omni-server &mdash; the same config as the engine page's Local MLX settings tab, including the macOS-only Detect/Install buttons.</div>
+          </div>
           <div data-panel-pages="macsystem" style="display:flex;flex-direction:column;gap:3px;"></div>
         </div>
         <div class="gpanel" data-panel="smarthome" hidden>
@@ -8303,6 +8315,24 @@ import { mountGithubPanel } from "./ui/githubPanel.js";
         if (typeof swekOverlay !== "function") { console.warn("swekOverlay missing -- cannot host the panel"); return; }
         var o = swekOverlay("ghManagerDlg", "\uD83D\uDC19 GITHUB MANAGER", "Publish \u00b7 Account \u00b7 Repos \u00b7 Releases \u00b7 Issues \u00b7 Code \u2014 click outside to close");
         o.card.appendChild(ghRoot);
+    };
+})();
+</script>
+<script type="module">
+// v4036 -- the Mac System panel's Local MLX button. UNLIKE ghManagerBtn above, no root is cached across opens:
+// mountLocalMlxPanel(host) renders directly into whatever host it is given (settingsHub.js's own _row() hands it
+// a FRESH box every open, on index.html), and its last line re-fetches the SAVED /ai/mlx-config on every mount --
+// so a fresh host here means the fields always show what is actually saved, never a stale copy from a prior open.
+import { mountLocalMlxPanel } from "./ui/localMlxPanel.js";
+(function () {
+    var btn = document.getElementById("mlxPanelBtn");
+    if (!btn) return;
+    btn.onclick = function () {
+        if (typeof swekOverlay !== "function") { console.warn("swekOverlay missing -- cannot host the panel"); return; }
+        var o = swekOverlay("mlxPanelDlg", "\ud83c\udf4e Local MLX", "Point the engine\u2019s brain at a local OpenAI-compatible server \u2014 click outside to close");
+        var host = document.createElement("div");
+        o.card.appendChild(host);
+        try { mountLocalMlxPanel(host); } catch (e) { host.textContent = "(failed to render: " + (e && e.message || e) + ")"; console.warn("local mlx panel:", e); }
     };
 })();
 </script>

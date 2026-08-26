@@ -19,11 +19,18 @@
 //
 // *** THE MODEL REPO IS SUPPLIED BY THE READER AND IS NOT SHIPPED AS A CONSTANT, AND THAT IS A REFUSAL RATHER
 // THAN AN OMISSION. *** MODELS in localModelProbe.js carries gemma-gem's README sizes under ids "E2B"/"E4B" --
-// which are NOT HuggingFace repo ids, and nothing in this tree has ever named one. This round could not reach
+// which are NOT HuggingFace repo ids, and this file still names none as a default. This round could not reach
 // huggingface.co to check whether any candidate exists (the container's proxy answers 403 for it), so shipping
 // a plausible-looking `onnx-community/...` string would be A GUESS THAT 404s ON SOMEBODY ELSE'S MACHINE AND
 // READS AS A BUG IN THIS CODE. Naming the absence and taking the id as input is the honest shape -- the same
 // call localModelProbe.js makes about VRAM one level up.
+//
+// v4036 -- ui/modelRepoCandidates.js now names several real repos, found through web search rather than a
+// direct fetch (still no route to huggingface.co from here), and webgpu-llm.html offers them as CLICKABLE
+// SUGGESTIONS that fill the same free-text field this file already exposes. That is a UI-layer convenience,
+// not a change to this file's contract -- load()'s repo argument is still reader-supplied, this module still
+// ships no default, and preflightRepo() below still resolves every id, typed or clicked, before any weight
+// byte moves.
 //
 // So preflightRepo() exists: it resolves the repo's config.json BEFORE a single weight byte is requested, and
 // turns a mistyped or non-existent id into an immediate, named error instead of a confusing failure partway
