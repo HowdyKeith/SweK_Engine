@@ -833,6 +833,8 @@
   "tools/ship/bridgeCensus-selfcheck.mjs": 189,
   "tools/ship/bridgeWiring-selfcheck.mjs": 470,
   "tools/ship/browserNodeGuard-selfcheck.mjs": 143,
+  "brain/rl/attribution-selfcheck.mjs": 60,
+  "tools/ship/brainTrail-selfcheck.mjs": 1942,
   "tools/ship/browserSafety-selfcheck.mjs": 243,
   "tools/ship/budgetEvidence-selfcheck.mjs": 70,
   "tools/ship/buildName-selfcheck.mjs": 60,

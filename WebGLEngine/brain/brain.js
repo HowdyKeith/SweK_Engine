@@ -2795,7 +2795,13 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4026";   // v4026 -- the doorless six: knobliveness, renderbounce, reconquality,
+const BRAIN_BUILD = "v4027";   // v4027 -- brain/rl/attribution.mjs: Integrated Gradients, so a trained
+// policy can finally be asked WHY. The completeness axiom (attributions sum to F(x)-F(baseline)) is an
+// identity rather than a score, so it is gateable -- and saliency, the obvious alternative, misses a
+// saturated feature by 100% where IG lands at 3e-15. Reimplemented from the paper: the reference repo has no
+// LICENSE. bpttEpisode already computed this input gradient and discarded the observation half.
+// Also ui/brainTrail.js: the brain has no thoughts to draw, but its pipeline is fully instrumented, so the
+// diagram is a data-flow map built only from counters the bridge already serves. Previously v4026 --   // v4026 -- the doorless six: knobliveness, renderbounce, reconquality,
 // manifoldcensus and strokemorph built, knobRegistry refused as registry code rather than physics.
 // DEVICE_NAMES 125 -> 129, coverage 141 of 266, physicsReach 32 -> 27 doorless. And v3852: hands.span was the
 // lab's only knob moving nothing anywhere -- a fixedAnchor defect knob makes the translation negative fire,
