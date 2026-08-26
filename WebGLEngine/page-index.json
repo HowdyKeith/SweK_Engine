@@ -12,8 +12,8 @@
   },
   {
    "f": "RobotExpressive.html",
-   "t": "Robot Avatar",
-   "d": "Generated robot face — grey-robot-man with expressions.",
+   "t": "RobotExpressive Avatar",
+   "d": "RobotExpressive.glb — a rigged, animated robot avatar with expressions and idle/walk/dance clips.",
    "g": "",
    "p": 0
   },

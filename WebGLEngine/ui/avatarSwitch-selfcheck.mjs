@@ -49,29 +49,43 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
 
 // ---- 1. THREE MODES, CYCLING, WRAPPING ------------------------------------------------------------------------
 {
-    ok("!! six surfaces, cheapest first: SVG robot, rigged GLB, Blobulator, WebGPU Blobulator, talking head, face muscles",
-       MODES.length === 6 && MODES.map((m) => m.id).join(",") === "svg,rigged,blob,blobgpu,thead,facemuscles",
-       MODES.map((m) => m.id).join(" -> ") + " — the HEAVY ones are LAST on purpose, so a stray click lands " +
-       "on something cheap rather than starting a 12 MB download");
+    // v4033 -- Keith: "RobotExpressive can be choice 4 on Server.html. and we can have StickWoman be choice 3."
+    // Two named avatar slots (stickwoman, robotexpressive2) inserted between "rigged" (the favorite-of-the-
+    // moment slot, unchanged) and "blob", eight surfaces now, cheapest still first.
+    ok("!! eight surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Gauges 3000",
+       MODES.length === 8 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,gauges3000",
+       MODES.map((m) => m.id).join(" -> ") + " — the two DOWNLOAD-COST modes sit before the tail, so a stray " +
+       "click lands on something cheap rather than starting a 12 MB download");
     ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
-       nextMode("svg") === "rigged" && nextMode("rigged") === "blob" && nextMode("blob") === "blobgpu"
-       && nextMode("blobgpu") === "thead" && nextMode("thead") === "facemuscles" && nextMode("facemuscles") === "svg");
-    // v3998 -- Keith: "we added the Google face muscles api ability, can we rotate that as the next choice after
-    // Wireframe?" The POSITION is the request, so a later reorder that kept both modes but separated them would
-    // be a silent undo of it. Asserted as ADJACENCY rather than as an index, so inserting a cheap mode earlier
-    // in the list stays free.
-    ok("!! *** the face-muscles surface is the NEXT CHOICE AFTER the talking head ***",
-       MODES.findIndex((m) => m.id === "facemuscles") === MODES.findIndex((m) => m.id === "thead") + 1,
-       "audio amplitude drives one and MediaPipe blendshapes -- Google's own word for muscle activations -- " +
-       "drive the other: same idea, opposite input, and they belong one click apart");
-    // ...and the cheap-first principle above has to SURVIVE the addition, or the note explaining it is decoration
-    ok("!! ...and every heavy surface is still at the END, which is what makes a stray click safe",
-       MODES.map((m) => !!m.heavy).lastIndexOf(false) < MODES.findIndex((m) => !!m.heavy),
+       nextMode("svg") === "rigged" && nextMode("rigged") === "stickwoman" && nextMode("stickwoman") === "robotexpressive2"
+       && nextMode("robotexpressive2") === "blob" && nextMode("blob") === "blobgpu"
+       && nextMode("blobgpu") === "thead" && nextMode("thead") === "gauges3000" && nextMode("gauges3000") === "svg");
+    ok("!! StickWoman is choice 3 and RobotExpressive is choice 4, as asked",
+       MODES.findIndex((m) => m.id === "stickwoman") === 2 && MODES.findIndex((m) => m.id === "robotexpressive2") === 3,
+       "1-indexed: " + MODES.map((m, i) => (i + 1) + ":" + m.id).join(" "));
+    ok("!! the new avatar slots point at their own named GLBs, framed the same way as the rigged slot",
+       /glb=RobotWoman/.test(modeById("stickwoman").src) && /camdock=1/.test(modeById("stickwoman").src) &&
+       /glb=RobotExpressive/.test(modeById("robotexpressive2").src) && /camdock=1/.test(modeById("robotexpressive2").src),
+       modeById("stickwoman").src + " | " + modeById("robotexpressive2").src);
+    // v4033 -- Keith: "the last avatar choice, can we swap out the gauges and avatar scene, and swap in the
+    // WebGPU gauges and avatar we already made? I think that is called Avatar3000." "swap out ... swap in" is a
+    // replacement, not an addition: facemuscles (~12 MB MediaPipe bundle) is gone from THIS rotation, and its
+    // v3998/v3999 adjacency-to-thead invariant goes with it -- gauges3000 has no MediaPipe pairing to keep
+    // adjacent to anything. face-mirror.html itself is untouched; only this switch stopped naming it.
+    ok("!! gauges3000 is the explicit LAST choice, as asked, and it is what it claims to be",
+       MODES[MODES.length - 1].id === "gauges3000" && /gauges3000\.html/.test(modeById("gauges3000").src) &&
+       /embed=1/.test(modeById("gauges3000").src),
+       modeById("gauges3000").src);
+    // ...and the download-cost-declared principle above has to SURVIVE the swap: gauges3000 carries no `heavy`
+    // (its own page falls back to Canvas2D without ever fetching anything), so it is fine trailing the two that
+    // do -- the invariant that matters is that NEITHER heavy mode sits before the cheap avatar slots.
+    ok("!! ...and neither download-cost mode sits before the cheap avatar slots (svg/rigged/stickwoman/robotexpressive2/blob)",
+       ["blobgpu", "thead"].every((id) => MODES.findIndex((m) => m.id === id) >
+           Math.max(...["svg", "rigged", "stickwoman", "robotexpressive2", "blob"].map((c) => MODES.findIndex((m) => m.id === c)))),
        MODES.map((m) => m.id + (m.heavy ? "*" : "")).join(" -> ") + "   (* = declares a download cost)");
-    ok("!! the three expensive modes DECLARE their cost, so the button can say it before the click",
-       MODES.filter((m) => m.heavy).length === 3 &&
+    ok("!! the two expensive modes DECLARE their cost, so the button can say it before the click",
+       MODES.filter((m) => m.heavy).length === 2 &&
        /12 MB/.test(MODES.find((m) => m.id === "thead").heavy) &&
-       /12 MB/.test(MODES.find((m) => m.id === "facemuscles").heavy) &&
        /WebGPU/.test(MODES.find((m) => m.id === "blobgpu").heavy),
        "MediaPipe is ~12 MB on first use and WebGPU is not everywhere — a cost discovered after the click is a " +
        "cost the reader never agreed to");
@@ -116,10 +130,10 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // navigator is getter-only on Node 22, so it is REDEFINED rather than assigned
     Object.defineProperty(globalThis, "navigator", { value: { gpu: {} }, configurable: true, writable: true });
     await sw.set("blobgpu");
-    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across six modes",
+    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across eight modes",
        iframes(host).length === 1 && /blobulator-gpu/.test(iframes(host)[0].src),
-       "six surfaces and one context: with two WebGL frames and a WebGPU one in the list, an accumulating panel " +
-       "would be running three renderers behind a gauge row");
+       "eight surfaces and one context: with four WebGL frames and a WebGPU one in the list, an accumulating panel " +
+       "would be running five renderers behind a gauge row");
     await sw.set("blob");
     ok("!! ...and switching again REPLACES it rather than adding a second",
        iframes(host).length === 1 && /blob-avatar/.test(iframes(host)[0].src),

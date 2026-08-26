@@ -1011,10 +1011,25 @@ export function mountStage(canvas, opts = {}){
   }
 
   // avatar model: normalize height, stand at A.x/A.z facing A.yaw (+ orientation).
+  //
+  // *** v4033 -- THE SECOND HALF OF THE v4032 CANDIDATE, NOW VERIFIED ON A REAL RENDER. *** v4032 measured a
+  // ~172x gap between rawBBox (bind pose, unskinned) and posedBBox (the idle clip's own first frame, skinned
+  // through animator.jointMatrices -- the SAME transform the GPU applies every frame, per the A_VERT shader:
+  // `p=skin(aPos)` runs BEFORE `wp=uModel*vec4(p,1)`) and fixed camera framing (avatarNormExtents, above) to use
+  // it, but left this function on rawBBox because no render existed to check the guess against. One now does:
+  // headless Chromium + --use-gl=swiftshader renders this scene correctly (confirmed: RobotExpressive's face-mode
+  // view and its GLBParser/bbox console lines all come back real), which the WebGPU-based probe used for v4032
+  // could not do. Screenshotting avatarstage.html?glb=RobotExpressive BEFORE this fix shows the diorama's pet
+  // llama alone, correctly scaled, with NO ROBOT VISIBLE AT ALL -- s=1.5/rawBBox_h≈57 applied on TOP of a mesh
+  // the GPU already skinned to ~4.5 units tall compounds to ~257 world units, so the camera (framed by
+  // avatarNormExtents for a properly-scaled ~1.5-unit figure) sits inside solid, back-face-culled geometry.
+  // posedBBox is in the SAME un-rotated local space rawBBox occupies (skinning runs before the orientation
+  // matrix, exactly like avatarNormExtents' src), so it drops in here unchanged through the same rotation-
+  // projection loop below -- no second copy of the centering math, matching v3527's rule.
   function avatarModel(){
     if(!rawBBox) return mIdent();
     let rot; try{ rot=avatarOrientation.buildMatrix(avatarOrientation.get(url)); }catch{ rot=mIdent(); }
-    const b=rawBBox, cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
+    const b=posedBBox||rawBBox, cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
     let mnY=Infinity,mxY=-Infinity;
     for(const[x,y,z]of cs){ const ry=rot[1]*x+rot[5]*y+rot[9]*z; if(ry<mnY)mnY=ry; if(ry>mxY)mxY=ry; }
     const h=(mxY-mnY)||1; const s=1.5/h;
