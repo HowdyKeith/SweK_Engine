@@ -1092,8 +1092,8 @@
   "tools/ship/settingsCensus-selfcheck.mjs": 300,
   "tools/ship/shaderCensus-selfcheck.mjs": 292,
   "tools/ship/sharpBridge-selfcheck.mjs": 507,
-  "tools/ship/sharpPanel-selfcheck.mjs": 11433,
-  "tools/ship/sheddingSpectrum-selfcheck.mjs": 29221,
+  "tools/ship/sharpPanel-selfcheck.mjs": 13927,
+  "tools/ship/sheddingSpectrum-selfcheck.mjs": 61643,
   "tools/ship/shipBridge-selfcheck.mjs": 88,
   "tools/ship/shipRitual-selfcheck.mjs": 270,
   "tools/ship/singleSource-selfcheck.mjs": 156,
@@ -1178,9 +1178,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 1061,
+  "timedThisRun": 1063,
   "totalInRecord": 1173,
-  "at": "2026-08-26T20:03:00Z"
+  "at": "2026-08-26T20:04:15Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
