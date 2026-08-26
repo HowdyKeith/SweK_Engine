@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4022";   // v4022 -- ui/hostingControls.js: the tunnel/Tailscale/NetBird controls as
+const BRAIN_BUILD = "v4023";   // v4023 -- Keith's patch round: nine devices (the thermal family, xenon-135,
+// fracture fragments) taking DEVICE_NAMES 114 -> 123 and gradedCoverage to 132 of 266, plus the refusal-expiry
+// gate -- four devices that decline to declare a plant now export plantRefusedExpiry() as a PREDICATE, so a
+// correct refusal can no longer become a stale one silently. Three of four zips applied; swekphysicsround is a
+// superset of swekxenonquantum. registryOrphans caught the one gap: refusalExpiry had no instrument entry.
+// Previously v4022 --   // v4022 -- ui/hostingControls.js: the tunnel/Tailscale/NetBird controls as
 // ONE module both hosting.html and server.html's Tunnels drawer mount, instead of two copies. server.html
 // gains the permanent tunnel, Drive URL-pointer, Tailscale and NetBird it never had; its existing quick
 // tunnel is finally labelled one. The module mints no global ids because server.html already owns them.
