@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="demo:title" content="Settings">
-<meta name="demo:desc" content="One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, PetFBI board backend + mailer, plus tool readiness.">
+<meta name="demo:desc" content="One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, plus tool readiness.">
 <meta name="demo:cats" content="tool">
 <title>Settings</title>
 <style>
@@ -58,27 +58,10 @@
     </div>
   </div>
 
-  <div class="sec">
-    <h2>PetFBI — board backend</h2>
-    <div class="row">
-      <label class="f">mode<select id="p_mode"><option value="local">local (this bridge)</option><option value="sheet">Google Sheet</option><option value="sharepoint">SharePoint / Power Automate</option></select></label>
-      <label class="f">sheet / flow URL<input id="p_url" placeholder="web-app or flow URL"></label>
-    </div>
-    <div class="row">
-      <label class="f">secret<input id="p_secret" placeholder="leave blank to keep"></label>
-      <button class="btn go" id="p_save">Save</button><span class="st" id="p_st"></span>
-    </div>
-  </div>
-
-  <div class="sec">
-    <h2>PetFBI — email sending</h2>
-    <div class="row">
-      <label class="f">transport<select id="m_mode"><option value="draft">Draft (mailto)</option><option value="smtp">Gmail SMTP</option><option value="outlook">Outlook</option></select></label>
-      <label class="f">Gmail address<input id="m_user" placeholder="you@gmail.com"></label>
-      <label class="f">app password<input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="m_pass" type="password" placeholder="leave blank to keep"></label>
-      <button class="btn go" id="m_save">Save</button><span class="st" id="m_st"></span>
-    </div>
-  </div>
+  <!-- v4039 -- PetFBI board-backend + email-sending sections REMOVED from here, at Keith's request: "the
+       petfbi settings should be moved to petfbi-setup.html if they are not already on that page. and removed
+       from Settings page." They were not already there; added as petfbi-setup.html's own "Board backend" and
+       "Email sending" cards, same /petfbi/config and /petfbi/mailer routes, styled to match that page. -->
 
   <div class="sec">
     <h2>Tool readiness</h2>
@@ -92,34 +75,24 @@
       <span class="st" id="gsecTimeoutVal">2 min</span>
     </div>
   </div>
+  <!-- v4039 -- Keith: "this page has tunnel/hosting settings. most or all exist in the tunnel/hosting panel
+       on Server.html. lets move all of those tunnel/hosting settings so they only exist on the server.html
+       hosting panel." Confirmed: this whole section's own note already said "Same controls as ... the Server
+       console's Cloud & Hosting tab" -- a genuine third copy (standalone hosting.html, the Server console, and
+       here), and Keith's ask was to collapse it to the one on server.html. Removed: Public tunnel, Tailscale,
+       Remote landing page, Remote-access password, Cloud rendezvous, Cloud AI/compute host, GCP instances --
+       s_cfTunnel/s_cfStart/s_cfStop/s_cfInstall/s_cfUrl/s_ts/s_tsInstall/s_cfLanding/s_authStat/s_authPw/
+       s_authSet/s_cloudRz/s_cloudAi/s_gcp and their loadCloud() wiring below all went with it.
+       KEPT: "Start SweK on login" -- it has no equivalent on server.html at all (it is a boot-time setting, not
+       a tunnel/hosting one), so removing it would have deleted a feature nobody asked to lose, not de-duplicated
+       one. It gets its own small section instead of the "Remote Hosting & Cloud" heading, which no longer fits
+       what remains under it. -->
   <div class="sec">
-    <h2>&#128225; Remote Hosting &amp; Cloud</h2>
-    <p class="note" style="margin:0 0 8px">Same controls as the standalone <a href="/hosting.html" style="color:var(--amber)">Remote Hosting page</a> and the Server console's Cloud &amp; Hosting tab. Set a password before you expose a tunnel to the internet.</p>
+    <h2>&#9654; Start on login</h2>
     <div class="row">
       <label class="f">Start SweK on login <span class="st" id="s_bootStat">checking...</span></label>
       <button class="btn" id="s_bootToggle">toggle</button>
     </div>
-    <div class="row">
-      <label class="f">Public tunnel (Cloudflare) <span class="st" id="s_cfTunnel">checking...</span></label>
-      <button class="btn go" id="s_cfStart">Start tunnel</button>
-      <button class="btn" id="s_cfStop">Stop</button>
-      <button class="btn" id="s_cfInstall" style="display:none">Install cloudflared</button>
-    </div>
-    <div class="row"><span class="st" id="s_cfUrl" style="word-break:break-all"></span></div>
-    <div class="row">
-      <label class="f">Tailscale <span class="st" id="s_ts">checking...</span></label>
-      <button class="btn" id="s_tsInstall">Install Tailscale</button>
-    </div>
-    <div class="row">
-      <label class="f">Remote landing page (served at the tunnel root)<select id="s_cfLanding"><option value="server.html">Server console</option><option value="index.html">Render (full engine)</option><option value="avatar-server.html">Avatar server</option><option value="phone.html">Phone (touch)</option><option value="comics.html">Comics</option><option value="universal-viewer.html">Universal Viewer</option></select></label>
-    </div>
-    <div class="row">
-      <label class="f">Remote-access password (min 6 chars) <span class="st" id="s_authStat"></span><input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="s_authPw" type="password" placeholder="set from this host"></label>
-      <button class="btn go" id="s_authSet">Set</button>
-    </div>
-    <div class="row"><label class="f">Cloud rendezvous <span class="st" id="s_cloudRz">checking...</span></label></div>
-    <div class="row"><label class="f">Cloud AI / compute host <span class="st" id="s_cloudAi">checking...</span></label></div>
-    <div class="row"><label class="f">GCP instances <span class="st" id="s_gcp">checking...</span></label></div>
   </div>
   <div class="sec" id="fileaccess">
     <h2>&#128193; File Access &mdash; self-hosted file/cloud storage</h2>
@@ -208,8 +181,7 @@ async function loadAll(){
     const t = await getJSON("/trader/config"); const c=t.config||{}; $("t_source").value=c.source||"senate"; $("t_st").textContent=c.apiKey==="set"?"key ✓":"no key"; $("status").textContent="ready";
   }catch{ $("status").textContent="bridge offline"; }
   try{ const v=await getJSON("/tts/status"); $("v_engine").value=v.engine||"sapi"; if(v.piperBin)$("v_bin").value=v.piperBin; if(v.piperModel)$("v_model").value=v.piperModel; if(v.rate!=null)$("v_rate").value=v.rate; }catch{}
-  try{ const p=await getJSON("/petfbi/config"); $("p_mode").value=p.mode||"local"; if(p.sheetUrl)$("p_url").value=p.sheetUrl; $("p_st").textContent=p.sheetConfigured?"sheet set":"local"; }catch{}
-  try{ const m=await getJSON("/petfbi/mailer"); $("m_mode").value=m.mode||"draft"; if(m.smtpUser)$("m_user").value=m.smtpUser; $("m_st").textContent=m.mode==="smtp"?(m.smtpReady?"SMTP ✓":"needs app pw"):(m.mode||"draft"); }catch{}
+  // v4039 -- PetFBI config/mailer loads REMOVED from here; moved to petfbi-setup.html (Keith's request -- see the removed HTML sections' own v4039 note).
   loadReady();
 }
 async function loadReady(){
@@ -230,8 +202,6 @@ async function loadReady(){
 
 $("t_save").onclick=async()=>{ const b={source:$("t_source").value}; const k=$("t_key").value.trim(); if(k)b.apiKey=k; const r=await postJSON("/trader/config",b); $("t_st").textContent=(r.config&&r.config.apiKey==="set")?"saved · key ✓":"saved"; $("t_key").value=""; };
 $("v_save").onclick=async()=>{ const r=await postJSON("/tts/config",{engine:$("v_engine").value,piperBin:$("v_bin").value.trim(),piperModel:$("v_model").value.trim(),rate:$("v_rate").value}); $("v_st").textContent="saved ("+(r.engine||"")+")"; };
-$("p_save").onclick=async()=>{ const b={mode:$("p_mode").value}; const u=$("p_url").value.trim(); if(u)b.sheetUrl=u; const s=$("p_secret").value; if(s)b.secret=s; const r=await postJSON("/petfbi/config",b); $("p_st").textContent="saved ("+(r.mode||"")+")"; $("p_secret").value=""; };
-$("m_save").onclick=async()=>{ const b={mode:$("m_mode").value}; const u=$("m_user").value.trim(); if(u)b.user=u; const p=$("m_pass").value; if(p)b.pass=p; const r=await postJSON("/petfbi/mailer",b); $("m_st").textContent=r.mode==="smtp"?(r.smtpReady?"saved · SMTP ✓":"saved · needs app pw"):("saved · "+(r.mode||"")); $("m_pass").value=""; };
 
 loadAll();
 
@@ -639,11 +609,19 @@ loadDrive();
 })();
 </script>
 <script>
-// v1770 - Remote Hosting & Cloud (mirrors the Server-console Cloud & Hosting tab; same endpoints, settings-page styling)
+// v1770 - Start on login (v1912's boot-autostart toggle; WAS bundled with "Remote Hosting & Cloud", which mirrored
+// the Server-console Cloud & Hosting tab endpoint-for-endpoint).
+// v4039 -- everything BUT loadBoot() removed here, at Keith's request (see this section's own HTML comment for
+// the full reasoning): Public tunnel, Tailscale, remote landing page, remote-access password, cloud rendezvous,
+// cloud AI host and GCP instance status all duplicated the Server console's Cloud & Hosting tab and now live
+// there ONLY. The guard below used to read `if(!$("s_cfTunnel")) return;` -- an element THIS EDIT REMOVES FROM
+// THE PAGE -- which would have silently killed loadBoot() too (it never even reached the loadBoot() call). Fixed
+// to guard on `s_bootToggle`, the one control this script still owns.
 (function(){
   var $=function(id){return document.getElementById(id);};
-  if(!$("s_cfTunnel")) return;
+  if(!$("s_bootToggle")) return;
   var gj=function(u){return fetch(u,{cache:"no-store"}).then(function(r){return r.json();}).catch(function(){return null;});};
+  var pj=function(u,b){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(function(r){return r.json();}).catch(function(){return null;});};
   // v1912 — Start-on-login (run SweK on boot). Route already existed; this adds the toggle.
   function loadBoot(){
     gj("/sys/autostart").then(function(s){
@@ -656,37 +634,6 @@ loadDrive();
     });
   }
   loadBoot();
-  var pj=function(u,b){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(function(r){return r.json();}).catch(function(){return null;});};
-  function loadCloud(){
-    gj("/hosting/tunnel/status").then(function(st){
-      if(st&&st.running&&st.url){ $("s_cfTunnel").textContent="live"; $("s_cfUrl").innerHTML="<a href='"+st.url+"' target='_blank' rel='noopener' style='color:#7fd0ff'>"+st.url+"</a>"; $("s_cfStart").style.display="none"; $("s_cfStop").style.display=""; }
-      else if(st&&st.running){ $("s_cfTunnel").textContent="starting..."; $("s_cfStart").style.display="none"; $("s_cfStop").style.display=""; setTimeout(loadCloud,2500); }
-      else{
-        // v3809 -- PARITY WITH THE SERVER CONSOLE. This page's tunnel status had exactly one thing to say when
-        // a start failed -- "no tunnel running" -- even though the reason (cloudflared missing, wrong PATH,
-        // non-zero exit) was sitting in the same status object the console already renders. So "the start tunnel
-        // option did not work on this page either" was the console bug reproduced on a page that never got the
-        // fix: a control reporting a flat idle state for a real failure. Say why; the install hint below (s_cfInstall,
-        // toggled by /hosting/detect) covers the not-installed case.
-        if(st&&st.reason){ $("s_cfTunnel").innerHTML="<span style='color:#f2b8b8'>could not start</span> \u2014 "+String(st.reason).replace(/[<>&]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[c];}); }
-        else{ $("s_cfTunnel").textContent="no tunnel running"; }
-        $("s_cfStart").style.display=""; $("s_cfStop").style.display="none"; $("s_cfUrl").textContent="";
-      }
-    });
-    gj("/hosting/detect").then(function(d){ if(!d)return; $("s_cfInstall").style.display=(d.cloudflared&&d.cloudflared.installed)?"none":""; var tsOk=d.tailscale&&d.tailscale.installed; $("s_ts").textContent=tsOk?"installed":"not installed"; $("s_tsInstall").style.display=tsOk?"none":""; });
-    gj("/hosting/landing").then(function(l){ if(l&&l.page)$("s_cfLanding").value=l.page; });
-    gj("/auth/status").then(function(a){ $("s_authStat").textContent=(a&&a.enabled)?"set (remote login required)":"not set"; });
-    gj("/cloud/status").then(function(c){ $("s_cloudRz").textContent=(c&&c.enabled)?("on"+(c.id?(" - "+c.id):"")):"off (enable in the engine Cloud settings)"; });
-    gj("/compute/status").then(function(ai){ $("s_cloudAi").textContent=(ai&&ai.configured)?(ai.host||"configured"):"none configured"; });
-    gj("/gcloud/instances").then(function(g){ if(!g){$("s_gcp").textContent="unavailable";return;} if(g.error||g.installed===false){$("s_gcp").textContent="gcloud CLI not installed";} else if(g.instances){$("s_gcp").textContent=g.instances.length+" instance(s)";} else $("s_gcp").textContent="-"; });
-  }
-  $("s_cfStart").onclick=function(){ $("s_cfTunnel").textContent="starting..."; pj("/hosting/tunnel",{action:"start"}).then(function(){ setTimeout(loadCloud,1500); }); };
-  $("s_cfStop").onclick=function(){ pj("/hosting/tunnel",{action:"stop"}).then(function(){ setTimeout(loadCloud,800); }); };
-  $("s_cfInstall").onclick=function(){ $("s_cfInstall").textContent="installing..."; pj("/hosting/install",{tool:"cloudflare"}).then(function(){ setTimeout(loadCloud,3000); }); };
-  $("s_tsInstall").onclick=function(){ $("s_tsInstall").textContent="installing..."; pj("/hosting/install",{tool:"tailscale"}).then(function(){ setTimeout(loadCloud,3000); }); };
-  $("s_cfLanding").onchange=function(){ pj("/hosting/landing",{page:$("s_cfLanding").value}); };
-  $("s_authSet").onclick=function(){ var pw=$("s_authPw").value||""; if(pw.length<6){ $("s_authStat").textContent="needs 6+ chars"; return; } pj("/auth/setup",{password:pw}).then(function(j){ $("s_authStat").textContent=(j&&j.ok)?"set (remote login required)":("failed: "+((j&&j.error)||"set it from the host machine")); if(j&&j.ok)$("s_authPw").value=""; }); };
-  loadCloud(); setInterval(loadCloud,30000);
 })();
 </script>
 </body>

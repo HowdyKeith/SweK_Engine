@@ -302,6 +302,25 @@ export const SECTIONS = [
       pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
+
+    // v4039 -- THREE MORE "appended to panels that ALREADY EXIST" entries, all from one round of Keith sorting
+    // the alphabetical holding panels into real homes. "endlesssky" and "ev" are the SAME data-tab ids CHIP_GROUPS
+    // already lifts into the Game Theory panel below -- exactly the systools/brain precedent above ("the systools
+    // chip already exists and already holds the system-tool PAGES, so the group and the drawer are the same
+    // chip"), applied to the two game-engine chips instead of one system-tool chip.
+    { id: "endlesssky", tab: "endlesssky", label: "Game: Endless Sky", note: "appended to the existing chip -- renamed \"Game: Endless Sky\" per Keith's ask",
+      pages: ["endless-sky.html", "es-away-mission.html", "es-box3d-3d.html", "es-box3d-fly3d.html", "es-box3d.html", "flight-gpu.html"] },
+    { id: "ev", tab: "ev", label: "Game: Escape Velocity", note: "appended to the existing chip -- renamed \"Game: Escape Velocity\" per Keith's ask",
+      pages: ["es-hull-combat.html", "ev-admin.html", "ev-loader.html", "ev-mission-creator.html", "ev-sprites.html", "ev.html"] },
+    // Keith: "this W item on server.html should be in Game Theory" (the alphabetical holding panel these eleven
+    // pages had fallen into) -- eleven pages that ARE game-adjacent (a game engine's companion tools, three
+    // arcade demos, three Pip-Boy/Fallout surfaces, an EVE page, and the FPS bridge pair) but have no chip of
+    // their own to be lifted by CHIP_GROUPS. Game Theory's own gpanel already carries BOTH a chip row
+    // (data-group-chips) and, now, a plain page-mover row (data-panel-pages) for exactly this case -- pages that
+    // belong under the subject without being a whole second panel each.
+    { id: "gametheory", tab: "gametheory", label: "Game Theory", note: "appended -- pages with no chip of their own",
+      pages: ["wadmap.html", "uvtt.html", "skyrim.html", "slotmachine.html", "pachinko.html", "pipboy-models.html",
+              "fallout.html", "flight.html", "fpscontrol.html", "fpsmirror.html", "eve.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -430,9 +449,12 @@ export function sectionsFor(profile) {
  * (The pin list is by data-tab, not by label, so renaming a chip -- as v3960 renames three -- cannot silently
  * unpin it.)
  */
+// v4039 -- "cloud" REMOVED, at Keith's request: "this button on the right of server.html needs to be
+// completely removed." Its gtab/gpanel is gone (see server.html's own v4039 note), so a pin naming it would be
+// exactly the "config line that does nothing" chipOrder-selfcheck.mjs already checks for on every OTHER pin.
 export const CHIP_PINNED = [
     "rules", "render", "github", "rustdesk", "crossdesk", "nearshare", "roundhouse", "rigjob",
-    "terrain", "crossarch", "policymass", "cloud", "celltrack", "renderqa", "brew",
+    "terrain", "crossarch", "policymass", "celltrack", "renderqa", "brew",
 ];
 
 export const CHIP_GROUPS = [

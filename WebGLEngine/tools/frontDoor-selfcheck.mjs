@@ -49,17 +49,30 @@ const html = fs.readFileSync(path.join(ROOT, "server.html"), "utf8");
        "GROUPS DID NOT PARSE. A STRAY COMMA OR BRACKET IN THIS ARRAY BREAKS THE WHOLE FRONT DOOR -- the grid renders from it. Deleting two entries from the middle of a hand-written array literal is exactly the edit that leaves a dangling comma, so this parses it rather than trusting the diff.");
 
     const flat = groups ? groups.flatMap((g) => g[1].map((i) => i[0])) : [];
-    ok("!! fabric and showcase are OUT of the directory", groups && !flat.includes("fabric.html") && !flat.includes("showcase.html"),
-       "Keith: 'already buttons on front, so we can DELETE the links.' Removed from the GROUPS array.");
+    // v4039 -- *** FABRIC CAME BACK IN, BECAUSE THE ASSUMPTION THAT LET IT LEAVE STOPPED BEING TRUE. *** Keith,
+    // on a later round: "The Fabric button, not sure what we do with that. that is an old concept... not sure
+    // where best to put it... moved to the alphabetical link buttons for now" -- and removed pfFabric, the very
+    // button check 2 below used to require. This gate's OWN rule (a directory entry may only be deleted while
+    // its button is real) says what follows: no button, no exclusion. fabric.html is back in GROUPS so an iPad
+    // reader (this directory's whole reason to exist) is not left with zero paths to it, only showcase.html --
+    // whose button (bShowcase) is untouched -- stays out.
+    ok("!! fabric.html is BACK IN the directory (its button is gone)", groups && flat.includes("fabric.html"),
+       "no pfFabric button any more (see check 2 below) -- an iPad reader has no other route to this page now, so leaving it out would be a genuine dead end, not a tidy-up");
+    ok("!! showcase.html is still OUT (its button is still real)", groups && !flat.includes("showcase.html"),
+       "bShowcase's onclick still opens /showcase.html -- see check 2 -- so the original exclusion still holds");
 }
 
-// ---- 2. ...BUT THEIR BUTTONS SURVIVED, WHICH IS THE ONLY REASON DELETING WAS SAFE ----------------------------------
+// ---- 2. SHOWCASE'S BUTTON SURVIVED; FABRIC'S DID NOT, ON PURPOSE ----------------------------------------------------
 {
     ok("!! the Showcase FRONT BUTTON still exists", /window\.open\("\/showcase\.html"/.test(html),
        "the onclick handler that opens /showcase.html. IF I MOVED A FILE, I MOVED ITS ASSUMPTIONS AND IT DOESN'T KNOW -- deleting the directory link ASSUMED this button exists. This checks the assumption. If a later edit removes the button, showcase becomes UNREACHABLE and this fails, which is when I want to know.");
 
-    ok("!! the Fabric FRONT BUTTON still exists", /pfFabric:\s*"\/fabric\.html"/.test(html),
-       "the pf-map reference that opens /fabric.html. Same rule: the delete was only safe BECAUSE the button is here. Prove it, do not trust it.");
+    // v4039 -- WAS "the Fabric FRONT BUTTON still exists" -- inverted, because Keith asked for the opposite of
+    // what it used to assert. pfFabric is intentionally gone now (see check 1's v4039 note); this stays as the
+    // mirror-image guard so a FUTURE re-add of that button without also re-excluding fabric.html from GROUPS
+    // would at least be a conscious choice, not a silent duplicate landing back in this file.
+    ok("!! pfFabric is gone (fabric.html's front button, on purpose)", !/pfFabric:\s*"\/fabric\.html"/.test(html),
+       "Keith: 'that is an old concept... not sure where best to put it... moved to the alphabetical link buttons for now' -- fabric.html now relies on GROUPS (check 1) and pagePlacements.mjs's alpha-bucket fallback, not a big button");
 }
 
 // ---- 3. AND THE HONEST STATE OF THE BIG REQUEST -------------------------------------------------------------------

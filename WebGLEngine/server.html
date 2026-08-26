@@ -853,6 +853,32 @@ window.addEventListener("load", function () {
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#0e1a26;color:#9fd7c7;border:1px solid #1f4a5e;border-radius:5px;text-decoration:none;">🌊 LBM 3D</a>
             <a href="/celltrack.html" target="_blank" rel="noopener" title="generate and track, end to end"
                style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;background:#0e1a26;color:#9fd7c7;border:1px solid #1f4a5e;border-radius:5px;text-decoration:none;">🧫 Cell Tracking</a>
+            <!-- v4039 -- ONE ROUND'S WORTH OF PAGES THAT pageSections.mjs NOW CLAIMS FOR GAME THEORY / GAME:
+                 ENDLESS SKY / GAME: ESCAPE VELOCITY, ADDED HERE SO THE MOVER HAS AN ANCHOR TO MOVE. The mover
+                 relocates an EXISTING <a>, it cannot invent one -- pageSections-selfcheck.mjs's "every claimed
+                 page has an ANCHOR" check named these 19 by exact filename as missing one. They render here for
+                 a moment at load, then the mover carries each into its real drawer; nothing about their styling
+                 matters past that point, so plain unstyled anchors (paramecium's own convention, just above)
+                 are enough. -->
+            <a href="/es-away-mission.html" target="_blank" rel="noopener">ES Away Mission</a>
+            <a href="/es-box3d.html" target="_blank" rel="noopener">SweK &middot; Endless Sky on Box3D</a>
+            <a href="/flight-gpu.html" target="_blank" rel="noopener">SweK &middot; Flight GPU (Endless Sky on Box3D, WebGPU 3D)</a>
+            <a href="/es-hull-combat.html" target="_blank" rel="noopener">EV Hull Combat</a>
+            <a href="/ev-admin.html" target="_blank" rel="noopener">EV Admin &mdash; Live Pilots</a>
+            <a href="/ev-loader.html" target="_blank" rel="noopener">EV Loader</a>
+            <a href="/ev-mission-creator.html" target="_blank" rel="noopener">Mission Authoring Console &middot; SweK EV Engine</a>
+            <a href="/ev-sprites.html" target="_blank" rel="noopener">EV Sprite Viewer</a>
+            <a href="/wadmap.html" target="_blank" rel="noopener">WAD Map &mdash; Engine Companion</a>
+            <a href="/uvtt.html" target="_blank" rel="noopener">UVTT dungeon loader</a>
+            <a href="/skyrim.html" target="_blank" rel="noopener">&#128009; Skyrim &mdash; SweK Engine</a>
+            <a href="/slotmachine.html" target="_blank" rel="noopener">SweK Slots</a>
+            <a href="/pachinko.html" target="_blank" rel="noopener">SweK Pachinko</a>
+            <a href="/pipboy-models.html" target="_blank" rel="noopener">SweK Pip-Boy Models</a>
+            <a href="/fallout.html" target="_blank" rel="noopener">&#9762; Pip-Boy &mdash; SweK Engine</a>
+            <a href="/flight.html" target="_blank" rel="noopener">SweK &middot; Flight sandbox</a>
+            <a href="/fpscontrol.html" target="_blank" rel="noopener">FPS control &mdash; engine &rarr; bridge &rarr; VBA</a>
+            <a href="/fpsmirror.html" target="_blank" rel="noopener">FPS mirror &mdash; bridge &rarr; this screen</a>
+            <a href="/eve.html" target="_blank" rel="noopener">&#128752;&#65039; EVE &mdash; SweK Engine</a>
           </div>
         </div>
 
@@ -884,7 +910,11 @@ window.addEventListener("load", function () {
       <div id="gaugeTabBar">
         <button class="gtab" data-tab="rules"><span class="gtabTog">&#9656;</span><span>&#9993; Email rules</span><span class="gtabState" id="rulesState">checking&#8230;</span></button>
         <button class="gtab" data-tab="render"><span class="gtabTog">&#9656;</span><span>&#127912; Asset Pipeline</span><span class="gtabState" id="renderState">checking&#8230;</span></button>
-        <button class="gtab" data-tab="ev"><span class="gtabTog">&#9656;</span><span>&#9729;&#65039; Escape Velocity</span><span class="gtabState" id="cgHost"></span></button>
+        <!-- v4039 -- renamed "Game: Escape Velocity", at Keith's request: "We have Game Theory section. let's
+             make a 'Game:  Endless Sky', and a 'Game:  Escape Velocity'." Same chip, same panel, same everything
+             -- CHIP_GROUPS moves this node by data-tab (see tools/ship/pageSections.mjs), never by its label
+             text, so renaming here cannot break that. -->
+        <button class="gtab" data-tab="ev"><span class="gtabTog">&#9656;</span><span>&#9729;&#65039; Game: Escape Velocity</span><span class="gtabState" id="cgHost"></span></button>
         <button class="gtab" data-tab="github"><span class="gtabTog">&#9656;</span><span>&#128025; GitHub</span></button>
         <button class="gtab" data-tab="rustdesk"><span class="gtabTog">&#9656;</span><span>&#128421; RustDesk</span><span class="gtabState" id="rdStat"></span></button>
         <button class="gtab" data-tab="crossdesk"><span class="gtabTog">&#9656;</span><span>&#127760; CrossDesk</span><span class="gtabState" id="cdStat"></span></button>
@@ -911,7 +941,12 @@ window.addEventListener("load", function () {
              the same "11 registry entries" shape Keith caught elsewhere on this page, just for a bridge instead
              of a link: a route that exists and a route that is REACHABLE are not the same claim. -->
         <button class="gtab" data-tab="sharp"><span class="gtabTog">&#9656;</span><span>&#128247; ml-sharp</span><span class="gtabState" id="sharpStat"></span></button>
-        <button class="gtab" data-tab="cloud"><span class="gtabTog">&#9656;</span><span>&#9729;&#65039; Cloud &amp; Hosting</span><span class="gtabState" id="cloudSummary"></span></button>
+        <!-- v4039 -- the "Cloud & Hosting" gtab REMOVED, at Keith's request (see the matching note beside the
+             gpanel this used to open, further down): its panel had been reduced to a one-line "look left" note
+             since the real controls live in the left-column Tunnels/Clouds/Hosting drawer, so the tab itself was
+             the second, now-empty half of that redirect. cloudSummary's "N active" chip went with it; the same
+             loadCloudCount() still runs for #cloudQuickLinks, which lives IN that left drawer -- see its v4039
+             note where the id="cloudSummary" lookup used to gate the whole function. -->
         <button class="gtab" data-tab="celltrack"><span class="gtabTog">&#9656;</span><span>&#129516; Cell Tracking</span><span class="gtabState" id="ctState"></span></button>
         <button class="gtab" data-tab="renderqa"><span class="gtabTog">&#9656;</span><span>&#128444;&#65039; Render QA</span><span class="gtabState" id="rqState"></span></button>
         <button class="gtab" data-tab="verify"><span class="gtabTog">&#9656;</span><span>&#128737;&#65039; Rig Verify</span><span class="gtabState" id="rvState"></span></button>
@@ -938,7 +973,8 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="petfbi"><span class="gtabTog">&#9656;</span><span>&#128062; PetFBI</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="brain"><span class="gtabTog">&#9656;</span><span>&#129504; GPU Brain</span><span class="gtabState" id="brainTabState"></span></button>
         <button class="gtab" data-tab="fluidgpu"><span class="gtabTog">&#9656;</span><span>&#127754; Fluid &mdash; verify the GPU</span><span class="gtabState" id="fluidTabState"></span></button>
-        <button class="gtab" data-tab="endlesssky"><span class="gtabTog">&#9656;</span><span>&#128640; Endless Sky</span><span class="gtabState" id="esTabState"></span></button>
+        <!-- v4039 -- renamed "Game: Endless Sky", same reasoning as "ev"'s rename beside it -- see that comment. -->
+        <button class="gtab" data-tab="endlesssky"><span class="gtabTog">&#9656;</span><span>&#128640; Game: Endless Sky</span><span class="gtabState" id="esTabState"></span></button>
         <button class="gtab" data-tab="bzflag"><span class="gtabTog">&#9656;</span><span>&#128737; BZFlag</span><span class="gtabState" id="bzTabState"></span></button>
         <button class="gtab" data-tab="rocketleague"><span class="gtabTog">&#9656;</span><span>&#128663; Rocket League RL</span><span class="gtabState" id="rlTabState"></span></button>
       </div>
@@ -1038,7 +1074,12 @@ window.addEventListener("load", function () {
         </div>
       </section>
       <section class="gpanel" data-panel="ev" hidden>
-        <div class="gpanelHdr">&#9729;&#65039; Escape Velocity</div>
+        <div class="gpanelHdr">&#9729;&#65039; Game: Escape Velocity</div>
+        <!-- v4039 -- same move as the Endless Sky panel beside it: the related pages tools/ship/pageSections.mjs
+             now assigns to "ev" (ev-admin.html and ev-loader.html are already one click away via the Live
+             pilots / Play buttons below -- this mover div adds them too, same coexistence GPU Brain's
+             brain-bench.html already has, not a conflict with those buttons). -->
+        <div data-panel-pages="ev" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0;"></div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line);">
           <button id="cgPlay" title="Launch Stellar Atlas — the local, offline-capable flight engine. Bring your own EV data file." style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(180deg,#2b6fd6,#1f56ad);border:1px solid #3f86e6;color:#fff;font-weight:700;font-size:14px;padding:9px 18px;border-radius:9px;cursor:pointer;">&#128640; Play &mdash; Stellar Atlas</button>
           <span style="font-size:11px;color:var(--dim);flex:1;min-width:220px;">Runs locally &mdash; no internet needed once your EV data file is on this box. Launch, then drag your <code style="font-size:10px;">nova.ndat</code> / <code style="font-size:10px;">.rez</code> onto the window and fly. The controls below are the optional cloud/multiplayer server.</span>
@@ -1053,7 +1094,10 @@ window.addEventListener("load", function () {
               <button id="cgStop" style="display:none;font-size:11px;padding:2px 10px;background:#3a1c1c;color:#f99;border:1px solid #6a3a3a;border-radius:5px;cursor:pointer;">&#9209; Stop</button>
               <button id="cgRefresh" title="re-check the cloud server now" style="font-size:11px;padding:2px 10px;background:#23303a;color:#cfe;border:1px solid #3a5a6a;border-radius:5px;cursor:pointer;">&#8635; Re-check</button>
               <button id="cgPilots" title="open the live EV pilots admin map" style="font-size:11px;padding:2px 10px;background:#14283a;color:#9fd6ff;border:1px solid #2a4a6a;border-radius:5px;cursor:pointer;">&#128752; Live pilots</button>
-              <button id="cgDetails" title="open the full Cloud &amp; Hosting panel below" style="font-size:11px;padding:2px 10px;background:#2a2440;color:#cbb0ff;border:1px solid #4a4070;border-radius:5px;cursor:pointer;">Details &#9662;</button>
+              <!-- v4039 -- title/target updated: this used to open the right-side "Cloud & Hosting" gpanel,
+                   which is now removed (see that panel's own v4039 note). Repointed to the left-column Tunnels,
+                   Clouds, & Hosting drawer instead of a panel that no longer exists. -->
+              <button id="cgDetails" title="open the Tunnels, Clouds &amp; Hosting drawer (left column)" style="font-size:11px;padding:2px 10px;background:#2a2440;color:#cbb0ff;border:1px solid #4a4070;border-radius:5px;cursor:pointer;">Details &#9662;</button>
             </div>
             <div id="cgUsers" style="font-size:11px;color:var(--dim);">no off-LAN users connected &#183; a live view of a peer&#39;s screen comes from the RustDesk In button, not the relay</div>
             <div id="evbotRow" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -1437,8 +1481,14 @@ window.addEventListener("load", function () {
         </div>
         <div class="gpanel" data-panel="gametheory" hidden>
           <div class="gpanelHdr">&#127918; Game Theory</div>
-          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The agents that play games, and the games they play. Each chip below opens its own panel exactly as it did before &mdash; this is a place to FIND them, not a new home for what they do.</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">The agents that play games, and the games they play. Each CHIP below opens its own panel exactly as it did before &mdash; this is a place to FIND them, not a new home for what they do. The PAGES below the chips are different: eleven game-adjacent pages that have no chip of their own (an EVE page, three arcade demos, three Pip-Boy/Fallout surfaces, the FPS bridge pair, and the game engine's companion tools) -- for THESE, Game Theory really is the home, moved here from the alphabetical holding panel they had fallen into.</div>
           <div data-group-chips="gametheory" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          <!-- v4039 -- Keith: "this W item on server.html should be in Game Theory: [WAD Map, UVTT, Skyrim,
+               SweK Slots, SweK Pachinko, SweK Pip-Boy Models, Pip-Boy/Fallout, Flight sandbox, FPS control, FPS
+               mirror, EVE]." None of these eleven have a chip of their own for CHIP_GROUPS to lift, so they get
+               the same plain page-mover every other topic drawer uses instead -- see tools/ship/pageSections.mjs's
+               new "gametheory" SECTIONS entry. -->
+          <div data-panel-pages="gametheory" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);"></div>
         </div>
         <div class="gpanel" data-panel="petfbi" hidden>
           <div class="gpanelHdr">&#128062; PetFBI</div>
@@ -1552,7 +1602,11 @@ window.addEventListener("load", function () {
                   style="width:100%;height:340px;border:1px solid var(--line);border-radius:6px;background:#06090a;"></iframe>
         </div>
         <div class="gpanel" data-panel="endlesssky" hidden>
-          <div class="gpanelHdr">&#128640; Endless Sky &mdash; flown by the clean-room EV engine</div>
+          <div class="gpanelHdr">&#128640; Game: Endless Sky &mdash; flown by the clean-room EV engine</div>
+          <!-- v4039 -- the related pages tools/ship/pageSections.mjs now assigns to "endlesssky" (same mover
+               every other topic drawer uses), moved in alongside the two hand-written quick-actions below rather
+               than instead of them -- same coexistence the GPU Brain panel already has for brain-bench.html. -->
+          <div data-panel-pages="endlesssky" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin:6px 0;"></div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;line-height:1.6;">
             ES data loaded through the same engine that flies Escape Velocity. Status is read live from
             <code>/es/status</code>; the full page has the installer, the baker, and the coverage report.
@@ -1869,11 +1923,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
       </details>
     
         </div>
-        <div class="gpanel" data-panel="cloud" hidden>
-          <div class="gpanelHdr">&#9729;&#65039; Cloud &amp; Hosting</div>
-      <div style="font-size:11px;color:var(--dim)">Moved to the <b>Tunnels, Clouds, &amp; Hosting</b> drawer in the left column, beside the peers it is about. <span style="color:#8fc">&larr; look left</span></div>
-    
-        </div>
+        <!-- v4039 -- the "Cloud & Hosting" gpanel that lived here is REMOVED entirely, at Keith's request: "this
+             button on the right of server.html needs to be completely removed. we have the Tunnels panel on the
+             left side of Server.html which points to the correct panel and that link just says look at new
+             panel." Its whole content had been reduced to exactly that redirect note since the real controls
+             moved into the left-column "Tunnels, Clouds, & Hosting" drawer (#tunnelDrawer) -- a panel whose only
+             job was pointing at a different panel was the thing to delete, not keep pointing. See the matching
+             v4039 note beside the removed gtab button, and beside cgDetails' retargeted click handler (it used
+             to open this panel; it opens #tunnelDrawer directly now). -->
       </div>
         <!-- v3623 -- MOVED HERE FROM ABOVE #gaugeSections. Keith: when Topics is open, Unsorted should read
              AFTER the topic drawers (through Fluid), not before them -- it is the pile of what none of those
@@ -1937,8 +1994,13 @@ A password fetches a token from the list server; an unregistered callsign needs 
              only by opening that one dropdown, which is the "built and then nobody can find it" failure the
              Arriving comments above record four separate times.
              One list now, and EVERY ENTRY CARRIES ITS KIND, because a page survives without the engine running
-             and a mode does not. Flattening them would have lost the only distinction that matters. -->
-        <button id="bLaunch" class="demospill" title="every launchable in one list: pages you can open, demos the engine boots into, and the engine's own built-in modes — each labelled with which it is">🚀 Launch ▾</button>
+             and a mode does not. Flattening them would have lost the only distinction that matters.
+             v4039 -- THE BUTTON ITSELF IS REMOVED, at Keith's request: "That 'Launch' big button can be
+             deleted. we have that page index listed on the left side of Server.html." bLaunch's own onclick
+             (see the v3552/v3575 history a few lines below, where the wiring used to live) just opened
+             /page-index.html -- already one click away from the "☰ Page Index" pill in the Arriving row above.
+             The history below is left as the record of why the three old Demos/Built-ins/Applications pills
+             were merged into page-index.html in the first place; only the now-redundant button is gone. -->
         <!-- v4034 -- the standalone Raycast pill (v3740) is REMOVED here, at Keith's request: "'Raycast' big
              button on Server.html can be reduced to a link on the 'Mac System' link bucket. It is already on
              the Mac System panel." Confirmed before removing: tools/ship/pagePlacements.mjs's macPages() lists
@@ -1950,8 +2012,6 @@ A password fetches a token from the list server; an unregistered callsign needs 
         <!-- v1945 — Portfolio row: quick-launch buttons for the portfolio-worthy pieces we've built,
              so a remote viewer (family / an employer) can jump straight to the showcase demos. -->
         <span style="font-size:11px;color:var(--dim);align-self:center;">🎖️ Portfolio:</span>
-        <button id="pfFabric" title="The Fabric — one computation running across box, peer, remote viewer, another device, and the sandbox: the architecture made visible">🕸️ The Fabric</button>
-        <button id="pfWasm" title="WASM: the sandbox (locked imports, memory cap, hard timeout), a portable SHA-256 binary that runs byte-identically everywhere, and the lab that benchmarks WASM against JS on real engine work">&#128737;&#65039; WASM</button>
         <!-- v4019 -- WAS "🚀 Coolify CI/CD", LINKING TO hosting.html. Keith: "there is the '🚀 Coolify CI/CD'
              button, but that links to hosting.html which it should not." The button was not wrong about
              Coolify -- bgServicesBridge.js carries a real install entry and githubBridge.js declares
@@ -1962,9 +2022,22 @@ A password fetches a token from the list server; an unregistered callsign needs 
              label on purpose: pfCoolify pointing at the phone view would be a name lying about its target. -->
         <button id="pfPhone" title="Phone Mode — the phone/tablet UI for this engine: touch sticks, buttons and the picker, paired over the LAN">📱 Phone Mode</button>
         <button id="pfResumeFx" title="Resume FX — a VBA Developer's resume rendered in the OpenGL engine they built in VBA (spin / scroll / burn / hologram)">📄 Resume FX</button>
-        <button id="pfGpuBrain" title="GPU Brain — the browser runs enemy AI as a visible simulation. Which half belongs on a GPU is measured, not assumed">&#129504; GPU Brain</button>
-        <button id="pfBox3d" title="Box3D — deterministic rigid-body physics in WASM: cross-machine hash sync, replay scrubbing, and the exact frame a divergence started">&#129513; Box3D</button>
-        
+        <!-- v4039 -- FOUR PORTFOLIO BUTTONS REMOVED HERE, on four separate asks in one pass:
+             pfGpuBrain (brain-bench.html) and pfBox3d (box3d-info.html) -- Keith: "it should not have it's own
+             button, but instead be a link on the GPU Brain panel that already exists on Server.html" / "should
+             only be a link on the Box3d panel on Server.html". Neither needed a new link: brain-bench.html is
+             already the "Bench" entry in the GPU Brain panel's own curated list (search this file for
+             `href="/brain-bench.html"` inside `data-panel="brain"`), and box3d-info.html is already assigned to
+             the "box3d" topic in tools/ship/pageSections.mjs, so pageSections' own mover already places it into
+             `data-panel-pages="box3d"` at runtime -- removing the redundant big button is the whole fix.
+             pfFabric (fabric.html) and pfWasm (wasm-sandbox.html) -- Keith: "that is an old concept... not sure
+             where best to put it... moved to the alphabetical link buttons for now" / "not sure where best to
+             put it, but not a big button. so into alphabet buckets is okay." Neither page carries a
+             pageSections.mjs topic assignment, so removing the button does not strand them: pagePlacements.mjs's
+             alphaBuckets() already gives every unclaimed page an A-Z holding panel (rendered in the Arriving
+             section above, `#unsortedBuckets`) precisely so a page nothing has decided a home for yet is still
+             one click away rather than unreachable. -->
+
       </div>
       
         <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px;">
@@ -2082,7 +2155,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
     var GROUPS = [
       ["Control & status", [["gallery.html","\uD83E\uDDE6 Demo Gallery"],["home.html","Home"],["hub.html","Devices hub"],["panels.html","Panels"],["clients.html","Connected devices"],["connect.html","Connect a device"],["spectator.html","Spectator"],["health.html","Bridge health"],["doctor.html","Doctor (machine check)"],["devtools.html","\uD83D\uDC41 Engine DevTools (screenshot/console/perf)"],["ai/brain/mind","\uD83E\uDDE0 GPU Brain mind"],["brain-maze.html","\uD83E\uDDE9 Brain Maze (obstacle room)"],["brain-3d.html","\uD83E\uDDE0 Brain 3D (the mechanism)"],["brain-quadrants.html","\u25A6 Brain Quadrants (multi-task)"],["brain-room.html","\uD83E\uDDE0 Brain Room (clean 3D test)"],["brain-fleet.html","\uD83E\uDDE0 Brain Fleet (training pool)"],["bzflag-test.html","\uD83D\uDCA3 BZFlag network test"],["rocket-league.html","\uD83C\uDFCE\uFE0F Rocket League RL"],["counter-strike.html","\uD83C\uDFAF Counter-Strike tactics"],["water.html","\uD83C\uDF0A WebGL2 Water (ripples + caustics)"],["hosting.html","Hosting"],["settings.html","Settings"],["settings.html#fileaccess","File Access (Nextcloud)"],["settings.html#assetsdir","GPU Assets folder"]]],
       ["Smart home", [["ha-switches.html","Lights & switches"],["ha-capabilities.html","HA capabilities"],["presence.html","Presence"],["doorbell.html","Doorbell"],["arrival.html","Arrival"],["alexa.html","Alexa"],["echo-show.html","Echo Show"],["cams.html","Cameras"],["cloudedge.html","CloudEdge"],["govee.html","Govee"],["nest-protect.html","Nest Protect"],["ac.html","AC"],["air-quality.html","Air quality"],["solar.html","Solar"],["ball-alerts.html","Ball alerts"],["wall.html","Wall switchboard"],["board.html","Entity board"]]],
-      ["Tools", [["petfbi.html","PetFBI"],["petfbi-board.html","Lost Pet Board"],["ev-sprites.html","EV Sprites"],["endless-sky.html","\uD83D\uDE80 Endless Sky"],["bzflag-info.html","\uD83D\uDEE1 BZFlag"],["box3d-info.html","\uD83E\uDDF1 Box3D"],["box3d-replay.html","\uD83C\uDF9E\uFE0F Box3D Replay (scrub + find the frame)"],["ragdoll.html","\uD83E\uDDCD Ragdoll (a rig is a joint graph)"],["predictions.html","\uD83C\uDFAF Open Predictions (written down before the measurement)"],["codemap.html","\uD83C\uDFD9\uFE0F Codemap (the tree as a city)"],["flesh.html","\uD83E\uDEC0 Flesh (skin that follows the skeleton)"],["wallpaper.html","\uD83D\uDDA5 Wallpaper (Lively-aware desktop blob)"],["brain-replay.html","\uD83E\uDDE0 Brain Replay (watch it learn from decision 0)"],["fire-demo.html","\uD83D\uDD25 Fire Demo"],["blobulator.html","\uD83E\uDDEA Blobulator"],["celltrack.html","\uD83E\uDDEB Cell Tracking"],["outlook-rules.html","Outlook Rules"],["markdown-tools.html","Markdown"],["immich.html","Immich"],["huly.html","Huly"],["librechat.html","LibreChat"],["opengen.html","Gen AI"],["social.html","Social"],["grammar.html","Grammar"],["asset-library.html","Asset Library"],["weather.html","Weather"],["agenda.html","Agenda"],["doc.html","Doc"],["scrape.html","Scrape"],["terminal.html","Terminal"],["tts.html","TTS"],["trader.html","Trader"],["tradingfloor.html","Trading floor"],["trading.html","Trading apps"],["comics.html","Comics"],["kaggle-config.html","Kaggle"],["maigret.html","Maigret"],["ev-admin.html","EV Admin"],["voxel-photo-cube.html","Photo Cube"],["asset2voxels.html","Photo → 3D"],["wasm-demo.html","WASM SHA-256"],["wasm-sandbox.html","WASM sandbox"],["wasm-bench.html","WASM Lab"],["clients.html","\u26a1 htmx devices"],["aibrain.html","\uD83E\uDDE0 AI brain (VBA bridge)"],["index.html?forceEngine=1&go=battleship","\uD83D\uDEA2 ABYSS Battleship"],["thead.html","Wireframe Head"]]],
+      ["Tools", [["petfbi.html","PetFBI"],["petfbi-board.html","Lost Pet Board"],["ev-sprites.html","EV Sprites"],["endless-sky.html","\uD83D\uDE80 Endless Sky"],["bzflag-info.html","\uD83D\uDEE1 BZFlag"],["box3d-info.html","\uD83E\uDDF1 Box3D"],["box3d-replay.html","\uD83C\uDF9E\uFE0F Box3D Replay (scrub + find the frame)"],["ragdoll.html","\uD83E\uDDCD Ragdoll (a rig is a joint graph)"],["predictions.html","\uD83C\uDFAF Open Predictions (written down before the measurement)"],["codemap.html","\uD83C\uDFD9\uFE0F Codemap (the tree as a city)"],["flesh.html","\uD83E\uDEC0 Flesh (skin that follows the skeleton)"],["wallpaper.html","\uD83D\uDDA5 Wallpaper (Lively-aware desktop blob)"],["brain-replay.html","\uD83E\uDDE0 Brain Replay (watch it learn from decision 0)"],["fire-demo.html","\uD83D\uDD25 Fire Demo"],["blobulator.html","\uD83E\uDDEA Blobulator"],["celltrack.html","\uD83E\uDDEB Cell Tracking"],["outlook-rules.html","Outlook Rules"],["markdown-tools.html","Markdown"],["immich.html","Immich"],["huly.html","Huly"],["librechat.html","LibreChat"],["opengen.html","Gen AI"],["social.html","Social"],["grammar.html","Grammar"],["asset-library.html","Asset Library"],["weather.html","Weather"],["agenda.html","Agenda"],["doc.html","Doc"],["scrape.html","Scrape"],["terminal.html","Terminal"],["tts.html","TTS"],["trader.html","Trader"],["tradingfloor.html","Trading floor"],["trading.html","Trading apps"],["comics.html","Comics"],["kaggle-config.html","Kaggle"],["maigret.html","Maigret"],["ev-admin.html","EV Admin"],["voxel-photo-cube.html","Photo Cube"],["asset2voxels.html","Photo → 3D"],["wasm-demo.html","WASM SHA-256"],["wasm-sandbox.html","WASM sandbox"],["wasm-bench.html","WASM Lab"],["clients.html","\u26a1 htmx devices"],["aibrain.html","\uD83E\uDDE0 AI brain (VBA bridge)"],["index.html?forceEngine=1&go=battleship","\uD83D\uDEA2 ABYSS Battleship"],["thead.html","Wireframe Head"],["fabric.html","🕸️ The Fabric"]]],
       ["Light demos", [["boids.html","Boids"],["cellular-automata.html","Cellular automata"],["gray-scott.html","Gray-Scott"],["slime-mold.html","Slime mold"],["starfield.html","Starfield"],["pachinko.html","Pachinko"],["slotmachine.html","Slot machine"],["asteroids.html","Asteroids"]]]
     ];
     var grid = document.getElementById("ipadGrid");
@@ -2923,19 +2996,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
   // v3740 gave the Raycast pill an onclick (`bRaycast` had been a dead button -- see git history for that
   // story); v4034 removed the pill itself at Keith's request, since raycast.html is already one click away
   // from the Mac System panel (macPages() in tools/ship/pagePlacements.mjs). Nothing to wire here now.
-
-  (function(){
-    var btn = document.getElementById("bLaunch");
-    if (!btn) return;
-    btn.textContent = "\uD83D\uDE80 Launch";
-    btn.title = "Every page, demo and built-in in one searchable list \u2014 opens the Page Index, which now "
-              + "carries the launch entries too. There is no second list.";
-    btn.onclick = function(){ window.open("/page-index.html", "_blank"); };
-  })();
+  // v4039 -- bLaunch's own wiring (it just opened /page-index.html) was removed from here along with the
+  // button, at Keith's request -- see the v4039 comment beside the button's old markup, a few lines above.
 
   // v1945 — Portfolio row quick-launch buttons (open the showcase pieces in a new tab)
   (function(){
-    var pf = { pfFabric:"/fabric.html", pfWasm:"/wasm-sandbox.html", pfPhone:"/phone.html", pfGpuBrain:"/brain-bench.html", pfBox3d:"/box3d-info.html" };
+    // v4039 -- pfFabric/pfWasm/pfGpuBrain/pfBox3d REMOVED from this map along with their buttons above; see the
+    // v4039 comment there for why each one's link still exists elsewhere rather than being lost.
+    var pf = { pfPhone:"/phone.html" };
     Object.keys(pf).forEach(function(id){ var b = document.getElementById(id); if (b) b.onclick = function(){ window.open(pf[id], "_blank"); }; });
     // Resume FX + ABYSS Battleship are engine DEMO MODES, launched via the ?go=<id> deep-link (index.html
     // boots straight into that demo). Open in a new tab so the server console stays put.
@@ -5384,7 +5452,13 @@ t:Date.now(),level:"info",msg:"📡 RustDesk view request sent — accept the in
     // minitab (e.g. "3 active"). Each source is polled in parallel; a source counts when it's live/enabled/
     // configured/reachable (not merely installed). oCIS uses the live /status.php health probe.
     function loadCloudCount(){
-      var sum=$("cloudSummary"); if(!sum) return;
+      // v4039 -- WAS `var sum=$("cloudSummary"); if(!sum) return;` -- an early-exit guard that made sense while
+      // this whole function existed only to feed that one gtab chip. cloudSummary's gtab is gone now (Keith:
+      // "this button on the right of server.html needs to be completely removed"), but #cloudQuickLinks below
+      // -- which lives in the LEFT Tunnels/Clouds/Hosting drawer, not the removed panel -- still needs this
+      // same data, so the function keeps running rather than bailing; `sum` is null now, and every write to it
+      // is behind its own `if(sum)` a few lines down instead of the blanket early-return this used to be.
+      var sum=$("cloudSummary");
       function g(u){ return fetch(u,{cache:"no-store"}).then(function(r){return r.json();}).catch(function(){return null;}); }
       Promise.all([
         g("/hosting/tunnel/status"),  // Cloudflare tunnel (this box)
@@ -5407,9 +5481,12 @@ t:Date.now(),level:"info",msg:"📡 RustDesk view request sent — accept the in
         if(ocis&&(ocis.serving||ocis.running)) active.push("oCIS");
         if(det&&det.tailscale&&det.tailscale.installed) active.push("Tailscale");
         var n=active.length;
-        sum.textContent = n ? (n+" active") : "none active";
-        sum.title = n ? ("Active cloud/hosts: "+active.join(", ")) : "No cloud/host services running";
-        sum.style.color = n ? "#9fe88f" : "";
+        if(sum){   // v4039 -- guarded now that sum can genuinely be null (its gtab chip is gone); see this
+                   // function's top-of-function v4039 note.
+          sum.textContent = n ? (n+" active") : "none active";
+          sum.title = n ? ("Active cloud/hosts: "+active.join(", ")) : "No cloud/host services running";
+          sum.style.color = n ? "#9fe88f" : "";
+        }
         // v1848 — build clickable links for whatever's active/available, so you can open them here too.
         var ql=$("cloudQuickLinks"); if(ql){
           var links=[];
@@ -5497,7 +5574,11 @@ t:Date.now(),level:"info",msg:"📡 RustDesk view request sent — accept the in
       if(bs)bs.onclick=function(){act("start");};
       if(bt)bt.onclick=function(){act("stop");};
       if(br)br.onclick=function(){load();};
-      if(bd)bd.onclick=function(){if(window._openGsec)window._openGsec("cloud");};
+      // v4039 -- WAS `if(window._openGsec)window._openGsec("cloud");`, opening the right-side "Cloud & Hosting"
+      // gtab -- removed at Keith's request (see that panel's own v4039 note). Repointed at the left-column
+      // Tunnels/Clouds/Hosting <details> drawer directly: open it, then scroll it into view, since it is not a
+      // gtab and _openGsec has nothing to do with it.
+      if(bd)bd.onclick=function(){var d=document.getElementById("tunnelDrawer"); if(d){d.open=true; d.scrollIntoView({behavior:"smooth",block:"start"});}};
       var bp=$c("cgPilots");if(bp)bp.onclick=function(){window.open("ev-admin.html","_blank");};
       var pl=$c("cgPlay");if(pl)pl.onclick=function(){window.open("ev-loader.html","_blank");};
       (function(){
@@ -5964,10 +6045,13 @@ try{const r=await fetch("/self/whoami",{cache:"no-store"});const j=await r.json(
 // v1758 - minimize/expand the gauge sections; auto-minimize inactive ones; remember manual choices (localStorage).
 (function gtabCtrl(){
   // Two groups of minitabs. A = activity panels (open on a count change, auto-minimize after a timeout of no change).
-  // B = detail panels (GitHub / RustDesk / Cloud) - single view: opening one closes Group A (remembering it) and any
+  // B = detail panels (GitHub / RustDesk) - single view: opening one closes Group A (remembering it) and any
   // other B; closing it restores Group A. Default: everything minimized.
+  // v4039 -- "cloud" removed from GROUPB along with its gtab/gpanel (Keith: "this button on the right of
+  // server.html needs to be completely removed") -- nothing calls _openGsec("cloud") any more either (cgDetails
+  // was repointed at the left-column Tunnels drawer), so this id had nothing left to look up.
   var TOKEY="swek.gsecTimeoutMs";
-  var GROUPA=["rules","render","ev"], GROUPB=["github","rustdesk","cloud"];
+  var GROUPA=["rules","render","ev"], GROUPB=["github","rustdesk"];
   var tabs={}, panels={}, lastSig={}, lastChange={}, savedA=null, bOpen=null;
   function isA(k){ return GROUPA.indexOf(k)>=0; }
   function isB(k){ return GROUPB.indexOf(k)>=0; }
