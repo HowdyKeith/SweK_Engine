@@ -108,6 +108,28 @@ console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
     report(Object.keys(STILL_OK).length === 0
         ? "the register is EMPTY, and that is the claim -- xenon.highFlux was FIXED rather than registered."
         : Object.keys(STILL_OK).join(", "));
+
+    // *** AND NO ENTRY MAY OUTLIVE ITS REASON. *** census-selfcheck applies exactly this to
+    // EXACT_ZERO_BACKLOG -- "a stale suppression is an ACTIVE BLIND SPOT, because if the zero came back the
+    // entry would silently swallow it" -- and this register had no such check until an entry actually expired.
+    // hands.span was registered because translationDisagreements was a load-bearing negative no plant could
+    // make fire; v4026 gave handsBind a second declared defect knob, the negative fires, and the knob went
+    // live. The entry was DELETED, not loosened, and this is what makes the next one impossible to forget.
+    const stale = [];
+    for (const key of Object.keys(STILL_OK)) {
+        const [dev, knob] = key.split(".");
+        const { rows } = await knobLiveness({ only: [dev], budgetMs: 90000 });
+        await widenStill(rows, { budgetMs: 60000 });
+        const r = rows.find((x) => x.knob === knob);
+        if (!r) { stale.push(key + " (knob no longer declared)"); continue; }
+        if (r.live.length || r.wideLive) stale.push(key + " (now live in " + (r.live.join(", ") || r.wideLive) + ")");
+    }
+    ok("!! *** NO ENTRY HAS OUTLIVED ITS REASON ***", stale.length === 0,
+        stale.length === 0
+            ? Object.keys(STILL_OK).length + " entries, every one still still. A register that kept an expired "
+              + "entry would silently swallow the knob going still again."
+            : "STALE, DELETE THESE: " + stale.join("; ") + " -- an entry whose reason has expired is an ACTIVE "
+              + "BLIND SPOT. THE RIGHT RESPONSE IS DELETION, NOT LOOSENING (v3195).");
 }
 
 console.log("\n" + (fails ? "knobLiveness-selfcheck: " + fails + " FAILED" : "knobLiveness-selfcheck: all checks pass"));

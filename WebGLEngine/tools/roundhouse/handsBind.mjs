@@ -66,6 +66,44 @@
 //     uniform scale (fold family)      0/32        0/32       BLIND -- both distances scale together
 //     mirror involution                0           0          BLIND -- a reflection is an isometry in 2D too
 //
+// ================================================================================================================
+// v4026 -- THE SECOND PLANT, BECAUSE THE FIRST ONE LEFT translationDisagreements UNABLE TO FIRE
+// ================================================================================================================
+//
+// The row above is correct and it is also an admission: translation reads 0/64 under BOTH arms, so the observable
+// was a LOAD-BEARING NEGATIVE THAT NOTHING HAD SHOWN COULD FIRE -- knobGate's "an untested branch with a licence
+// attached", one level up. `hands.span`, the knob that widens that sweep, was the only knob in the lab that moved
+// no observable at any value in any mode, and the reason was this and not the knob.
+//
+// *** fixedAnchor IS THE EDIT THAT MAKES A CLASSIFICATION DEPEND ON WHERE THE HAND IS. *** The fold test
+// references every finger to THE WRIST, and this file's own comment calls that "rotation-tolerant" -- it is also
+// what makes it translation-invariant. Anchoring to a fixed point in the image instead is the same shape of
+// tempting edit as flatDistance ("the wrist is the jitteriest joint in the chain, use the image centre"), and it
+// leaves every metric returning a plausible number.
+//
+//     mode                         rigid   rotation   translation
+//     honest                         0         0           0
+//     flatdistance                  20        20           0        <- rotation only
+//     fixedanchor (0.5, 0.5)        24         0          24        <- TRANSLATION ONLY
+//
+// *** THE TWO PLANTS ARE COMPLEMENTARY AT THE SHIPPED ANCHOR, AND THAT IS A PROPERTY OF THE ANCHOR RATHER THAN
+// A STRUCTURAL FACT -- WHICH IS WHY THE ANCHOR IS A KNOB. *** Measured across positions:
+//
+//     anchor (0.5, 0.5)  near the hand      rotation  0    translation 24
+//     anchor (0.5, 0.6)  ON the wrist       rotation  0    translation  8
+//     anchor (0, 0)      image corner       rotation 15    translation  0
+//     anchor (5, 5)      far away           rotation  1    translation  0
+//
+// A NEAR ANCHOR REACHES TRANSLATION AND IS BLIND TO ROTATION; A FAR ONE DOES THE OPPOSITE. Far away the anchor
+// acts like a fixed DIRECTION rather than a point, and an ordering by distance along a nearly-parallel field
+// survives a shift -- while the fingers sweeping through a large angle against it does not. Reported rather
+// than tidied into one number, because "the plant reaches translation" is true of one anchor and false of
+// another, and a census that stated only the shipped row would be claiming coverage it does not have.
+//
+// AND THE ROW AT (0.5, 0.6) IS THE ONE THAT ISOLATES THE MECHANISM: that is exactly where the wrist is placed,
+// so the anchor STARTS at the wrist and still breaks translation invariance 8 times. IT IS THE FIXEDNESS AND
+// NOT THE POSITION.
+//
 // *** FOUR OF THE FIVE TRANSFORM FAMILIES CANNOT SEE IT, AND THE BLIND ONE IS THE OBVIOUS ONE TO TEST WITH. ***
 // A 2D metric is EXACTLY invariant under rotation in the image plane, so rolling your hand at the camera -- the
 // first thing anyone does to check a hand tracker, and the motion barehands' two-hand rotate is built on --
@@ -97,7 +135,7 @@
 import { computeHandMetrics } from "../../face/MediaPipeHandTracker.js";
 
 import { pathToFileURL } from "node:url";
-export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance"];
+export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance", "fixedanchor"];
 
 export const HANDS_OBSERVABLES = [
     "rigidDisagreements", "rotationDisagreements", "translationDisagreements",
@@ -107,7 +145,7 @@ export const HANDS_OBSERVABLES = [
     "poses", "kind",
 ];
 
-const DEF = { rotDeg: 40, rotStep: 5, span: 0.2, pinchThreshold: 0.06 };
+const DEF = { rotDeg: 40, rotStep: 5, span: 0.2, pinchThreshold: 0.06, anchorX: 0.5, anchorY: 0.5 };
 
 const D = Math.PI / 180;
 
@@ -198,6 +236,11 @@ export function handsDefaults(hyp) {
     c.rotStep = Math.min(20, Math.max(1, num(c.rotStep, DEF.rotStep)));
     c.span = Math.min(0.4, Math.max(0.02, num(c.span, DEF.span)));
     c.pinchThreshold = Math.min(0.5, Math.max(1e-3, num(c.pinchThreshold, DEF.pinchThreshold)));
+    // *** THE ANCHOR IS A KNOB BECAUSE WHICH INVARIANCE THE PLANT REACHES DEPENDS ON IT, and that is a
+    // measurement rather than a preference. Deliberately unclamped in range: a far anchor is the interesting
+    // case, not an invalid one. ***
+    c.anchorX = num(c.anchorX, DEF.anchorX);
+    c.anchorY = num(c.anchorY, DEF.anchorY);
     h.config = c;
     // *** THE VALIDATOR MUST LIST THE PLANT MODE. *** If `flatdistance` silently reverted to `rigid`, both arms
     // would read an identical number and the plant would fire at nothing -- v3806's lesson on flip2d, repeated
@@ -206,7 +249,8 @@ export function handsDefaults(hyp) {
     if (!HANDS_MODES.includes(h.mode)) h.mode = "rigid";
     if (!h.claim || !h.claim.observable) {
         h.claim =
-            (h.mode === "rigid" || h.mode === "flatdistance") ? { observable: "rigidDisagreements", max: 0 } :
+            (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor")
+                ? { observable: "rigidDisagreements", max: 0 } :
             h.mode === "scale" ? { observable: "foldScaleDisagreements", max: 0 } :
                                  { observable: "mirrorMaxDelta", max: 0 };
     }
@@ -219,11 +263,19 @@ export async function buildHands(hyp, base = {}) {
     // BOTH ARMS SHARE EVERY OTHER SETTING. The plant is one flag on the metric function; the fixture, the
     // sweep and the reference are byte-for-byte the same, which is what makes the comparison about the module.
     const flat = h.mode === "flatdistance";
+    // v4026 -- THE SECOND PLANT, AND IT EXISTS BECAUSE THE FIRST ONE COULD NOT REACH translationDisagreements.
+    // flatdistance drops the z term, and the census above records translation as 0/64 under BOTH arms with the
+    // reason: "a shift changes no distance at all". That is correct and it leaves the observable a
+    // LOAD-BEARING NEGATIVE THAT NOTHING HAD SHOWN COULD FIRE. fixedanchor references the fold test to a point
+    // in the image instead of to the wrist, which is the one edit that makes a classification depend on WHERE
+    // THE HAND IS.
+    const anchored = h.mode === "fixedanchor";
     const opts = flat ? { flatDistance: true, pinchThreshold: c.pinchThreshold }
-                      : { pinchThreshold: c.pinchThreshold };
+               : anchored ? { fixedAnchor: { x: c.anchorX, y: c.anchorY, z: 0 }, pinchThreshold: c.pinchThreshold }
+                          : { pinchThreshold: c.pinchThreshold };
     const metrics = (lm) => computeHandMetrics([lm], null, opts);
 
-    if (h.mode === "rigid" || h.mode === "flatdistance") {
+    if (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor") {
         let rotDis = 0, transDis = 0, outDis = 0, inDis = 0, n = 0;
         for (const name of POSE_NAMES) {
             const pose = handPose(POSES[name]);

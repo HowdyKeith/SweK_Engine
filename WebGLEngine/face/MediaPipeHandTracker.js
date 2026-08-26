@@ -38,6 +38,14 @@ const DEFAULT_OPTS = {
     // coordinate, and every metric here would still "work"), so it is the defect the gate should be able to
     // prove it would catch. NOTHING SHIPS WITH THIS ON -- see _dist3D for why it branches the long way.
     flatDistance: false,
+    // v4026 -- A SECOND DECLARED DEFECT KNOB, OFF BY DEFAULT, for tools/roundhouse/handsBind.mjs.
+    // The fold test below references every finger to THE WRIST, and this file's own comment says that is what
+    // makes it rotation-tolerant. It is also what makes it TRANSLATION-invariant: move the whole hand and every
+    // wrist-relative distance is unchanged. Anchoring to a fixed point in the image instead is the same shape of
+    // tempting edit as flatDistance -- "the wrist landmark is the jitteriest joint in the chain, use the image
+    // centre as a stable reference" -- and it leaves every metric returning a plausible number while making the
+    // classification depend on WHERE THE HAND IS. False, or a { x, y, z } point. NOTHING SHIPS WITH THIS ON.
+    fixedAnchor: false,
 };
 
 // MediaPipe hand landmark indices (21 points per hand).
@@ -313,6 +321,11 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     // three-argument path character for character, which is what makes the default verifiable.
     const flat = opts.flatDistance ?? DEFAULT_OPTS.flatDistance;
     const dist = (a, b) => _dist3D(a, b, flat);
+    // v4026 -- the second declared defect knob; see DEFAULT_OPTS. When it is false the fold reference below is
+    // THE WRIST OBJECT ITSELF, so the default path is not merely equivalent to the old one, it is the same call
+    // on the same operand -- the discipline _dist3D's comment sets out, applied to an operand instead of an
+    // argument count.
+    const anchorOpt = opts.fixedAnchor ?? DEFAULT_OPTS.fixedAnchor;
 
     const hands = [];
     for (let i = 0; i < landmarksArray.length && i < 2; i++) {
@@ -337,8 +350,9 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         // Finger curl via wrist distance (rotation-tolerant): a finger is
         // folded when its tip is closer to the wrist than its PIP joint.
         const folded = {};
+        const foldRef = anchorOpt || wrist;      // the wrist itself when the knob is off
         for (const f of FINGERS) {
-            folded[f.name] = dist(wrist, lm[f.tip]) < dist(wrist, lm[f.pip]);
+            folded[f.name] = dist(foldRef, lm[f.tip]) < dist(foldRef, lm[f.pip]);
         }
         const fist = folded.index && folded.middle && folded.ring && folded.pinky;
         const openPalm = !folded.index && !folded.middle && !folded.ring && !folded.pinky;
