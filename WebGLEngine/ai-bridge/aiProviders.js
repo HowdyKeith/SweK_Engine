@@ -5,6 +5,7 @@
 
 const aiCreds = require("./aiCreds.js");
 const fs = require("fs"), os = require("os"), path = require("path");
+const mlxInstallBridge = require("./mlxInstallBridge.js");   // v4037 — ensureRunning()/touch() for run-on-demand + idle-exit
 
 const MODELS = {
     grok:   "grok-2-latest",
@@ -132,6 +133,12 @@ async function mlxChat(prompt, opts = {}) {
     const url = /\/v\d+$/.test(base) ? base + "/chat/completions" : base + "/v1/chat/completions";
     const key = opts.mlxKey || c.key || process.env.MLX_API_KEY || "";
     let model = opts.model || c.model || process.env.MLX_MODEL || "";
+    // v4037 -- RUN ON DEMAND. A no-op everywhere this cannot help (not the Mac itself, or `base` names one
+    // reached over the LAN): see mlxInstallBridge.js's own header for why a remote base is deliberately left
+    // untouched. Awaited but never allowed to fail this call -- on every branch where it cannot bring a server
+    // up, the existing fetch below still runs and fails exactly as it did before this round, with the same
+    // "is a local OpenAI-compatible server running at ${base}?" message a reader already knows.
+    try { await mlxInstallBridge.ensureRunning(base, model); } catch {}
     // NOTHING CONFIGURED -> ASK, and fall back to the old placeholder only if the ask itself fails, so a
     // server too old or too minimal to serve /v1/models behaves exactly as it did before this change.
     let resolved = null;
@@ -152,6 +159,7 @@ async function mlxChat(prompt, opts = {}) {
         }
         const d = await r.json();
         const text = (d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || "";
+        mlxInstallBridge.touch();   // v4037 -- a real reply through this base means a bridge-managed server (if any) just did work
         return { ok: true, text: String(text).trim(), model };
     } catch (e) { return { ok: false, error: "mlx_unreachable:" + (e?.message || String(e)) }; }
 }

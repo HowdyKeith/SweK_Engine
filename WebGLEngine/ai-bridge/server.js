@@ -12191,6 +12191,13 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/mlx/catalog" && req.method === "GET") { sendJson(mlxInstallBridge.catalog()); return; }
     if (req.url.split("?")[0] === "/mlx/detect" && req.method === "GET") { const q = new URLSearchParams(req.url.split("?")[1] || ""); mlxInstallBridge.detect(q.get("base") || aiProviders.mlxConfig().baseUrl).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.url === "/mlx/install" && req.method === "POST") { readJson(d => mlxInstallBridge.install((d || {}).id).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    // v4038 -- Keith: "if we install it, can we also have an uninstall button?"
+    if (req.url === "/mlx/uninstall" && req.method === "POST") { readJson(d => mlxInstallBridge.uninstall((d || {}).id).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    // v4037 -- pull the actual weights (not just the server), report the managed process's own lifecycle, and
+    // let a person stop it early rather than waiting out the idle reaper. See mlxInstallBridge.js's own header.
+    if (req.url === "/mlx/pull" && req.method === "POST") { readJson(d => mlxInstallBridge.pullModel((d || {}).model).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.url === "/mlx/status" && req.method === "GET") { sendJson(mlxInstallBridge.managedStatus()); return; }
+    if (req.url === "/mlx/stop" && req.method === "POST") { sendJson(mlxInstallBridge.stopManaged("manual")); return; }
     if (req.url === "/keepawake/status" && req.method === "GET") { sendJson(keepAwakeBridge.status()); return; }
     if (req.url === "/keepawake/config" && req.method === "POST") { readJson(d => sendJson(keepAwakeBridge.setEnabled(!!(d && d.enabled)))); return; }
     if (req.url === "/terminal/status" && req.method === "GET") { sendJson(terminalBridge.status()); return; }
