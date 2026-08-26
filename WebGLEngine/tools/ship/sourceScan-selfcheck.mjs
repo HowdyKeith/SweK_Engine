@@ -108,16 +108,99 @@ console.log("sourceScan-selfcheck -- the two strippers 101 files depend on, driv
         "every fixture anybody wrote for it and still failed here");
 }
 
-// ---- 4. WHAT THIS CANNOT SAY -------------------------------------------------------------------------------
+// ---- 4. v4031 -- THE REGEX-QUOTE DESYNC IS CLOSED, NOT MERELY DOCUMENTED -----------------------------------
+//
+// This section used to be titled "WHAT THIS CANNOT SAY" and asserted only that the limit was NAMED. Leaving
+// that assertion standing after the fix would have been the stale-claim trap this tree names elsewhere by a
+// different mechanism (v3202/v3195: a suppression nobody revisits is an ACTIVE BLIND SPOT) -- a gate that
+// still reports "known limit" once the limit is gone is not honest about the file it is testing.
 {
-    // sourceScan's own header records this and it is repeated here rather than left in one file: the lexer
-    // DESYNCS on a regex literal containing a quote, so proseAudit.mjs's main block is unreadable to both
-    // strippers. A KNOWN LIMIT REPORTED BY NAME is not the same as a limit nobody has met.
+    // THE EXACT FIXTURE THIS SECTION USED TO SHOW BROKEN. `["]` is a regex literal containing a quote inside a
+    // character class -- the precise shape that desynced the lexer for the rest of the file.
     const tricky = 'const re = /["]/; const c = os.arch();';
-    say("known limit -- a regex literal containing a quote desyncs the lexer: " + JSON.stringify(codeOnly(tricky)));
-    ok("...and the limit is DECLARED in sourceScan itself, not only here",
-        proseHas(fs.readFileSync(path.join(HERE, "sourceScan.mjs"), "utf8"), /regex|desync|lexer/i),
+    ok("!! *** the fixture that used to desync now survives whole ***",
+        /os\.arch\(\)/.test(codeOnly(tricky)) && /os\.arch\(\)/.test(noComments(tricky)),
+        "codeOnly: " + JSON.stringify(codeOnly(tricky)));
+
+    // THE REAL TRIGGER, VERBATIM: ai-bridge/gpuBrainBridge.js's actual line, which desynced BOTH strippers for
+    // 676 lines (from line 269 of 1998) until this. A synthetic fixture proves the mechanism; this proves the
+    // mechanism against the exact text that broke it in a real file.
+    const real = 'x.push("brain/*.json (dir unreadable)"); const c = a.replace(/^["\']|["\']$/g, ""); const after = os.arch();';
+    ok("!! *** the ACTUAL trigger line survives, both strippers ***",
+        codeHas(real, /os\.arch\(\)/) && noComments(real).includes("os.arch()"),
+        "this is ai-bridge/gpuBrainBridge.js's real source, not an invented case");
+
+    // CHARACTER-CLASS AWARENESS: a `/` inside `[...]` must not end the literal early -- stripToComment()'s own
+    // prior inline version did not have this, and was narrower than what codeOnly/noComments now need.
+    //
+    // *** EXACT-STRING, NOT "does os.arch() survive". *** Without char-class tracking, `/[/]/ ` mis-parses
+    // LOCALLY: the scanner reads `/[/` as a complete (wrong) literal, resumes at `]`, and resyncs mode===null
+    // again well before reaching os.arch() later in the string -- so a loose "the trailing code survives" check
+    // passes even with char-class awareness DELETED. MEASURED: this exact sabotage produced zero gate failures
+    // against the first draft of this test. Only an exact-output comparison catches a local mis-parse that
+    // resyncs before the next checkpoint.
+    ok("!! a `/` INSIDE a character class does not end the regex literal",
+        codeOnly("const re = /[/]/; const c = os.arch();") === "const re = //; const c = os.arch();",
+        "codeOnly: " + JSON.stringify(codeOnly("const re = /[/]/; const c = os.arch();")));
+
+    // KEYWORD-PRECEDED REGEX, THE NEW HALF OF THE HEURISTIC. stripToComment's punctuation-only version would
+    // miss this; MEASURED across this tree, "return /" occurs as literal text in 46 files.
+    ok("!! *** \"return /regex/\" is recognised, not just \"(/regex/\" ***",
+        codeHas('function f(s){ return /^["]/.test(s); } const c = os.arch();', /os\.arch\(\)/),
+        "punctuation-only would treat this /^[\"]/ as division-then-a-string-open and desync exactly as before");
+    ok("!! ...and other expression-starting keywords too (typeof, case, new, throw)",
+        codeHas('const t = typeof /x/; const c = os.arch();', /os\.arch\(\)/) &&
+        codeHas('switch(s){ case /x/.test(s): break; } const c = os.arch();', /os\.arch\(\)/));
+
+    // codeOnly BLANKS REGEX CONTENT, mirroring section 1's string-content assertion. A gate hunting for a
+    // forbidden word in codeOnly() output must not false-positive because that word happened to appear as TEXT
+    // inside an unrelated regex pattern (e.g. a regex that matches the literal string "eval").
+    ok("!! *** codeOnly blanks a regex literal's CONTENT, not just the code around it ***",
+        !codeOnly('const re = /os\\.homedir\\(\\)/;').includes("homedir") &&
+        /\/\/;/.test(codeOnly('const re = /os\\.homedir\\(\\)/;')),
+        "codeOnly: " + JSON.stringify(codeOnly('const re = /os\\.homedir\\(\\)/;')) +
+        " -- a regex pattern MENTIONING os.homedir is not a USE of it, same reasoning as a comment mentioning it");
+    // noComments keeps a regex literal VERBATIM including its own backslash escapes -- \\. in the source stays
+    // \\. in the output, so the check is for that literal text, not the unescaped word it would match.
+    ok("!! ...while noComments KEEPS it, same reasoning as it keeps string content",
+        noComments('const re = /os\\.homedir\\(\\)/;').includes("os\\.homedir"));
+
+    // THE SAFETY VALVE: real division must still read as division, not get swallowed hunting for a regex
+    // close. Checked by IDENTITY, not just survival -- a `/` that goes through the regex path uses regexBody's
+    // char-class/escape scanning and could still "survive" by accident; codeOnly() must actually LEAVE THE `/`
+    // ALONE for real division, so its output for a division expression should be byte-identical to the input.
+    const div = "const q = a / b; const r = arr[0] / 2; const s = fn() / 3;";
+    ok("!! *** real division text is UNCHANGED, not routed through the regex path ***",
+        codeOnly(div) === div, "codeOnly(div): " + JSON.stringify(codeOnly(div)));
+
+    // THE RESIDUAL LIMIT, NARROWED AND STILL NAMED. Not a full parser: a regex-literal STATEMENT immediately
+    // after a bare numeric literal with no semicolon (relying on automatic semicolon insertion) still misreads
+    // as division. Demonstrated so the gap is measured rather than assumed, and searched for across the real
+    // tree so the limit is not left as a guess.
+    const asiGap = "x = 5\n/foo/.test(a)";
+    say("residual limit (ASI, not tracked) -- " + JSON.stringify(codeOnly(asiGap)));
+    ok("...and the residual limit is DECLARED in sourceScan itself, narrower than before",
+        proseHas(fs.readFileSync(path.join(HERE, "sourceScan.mjs"), "utf8"), /semicolon insertion/i),
         "a limit recorded only in the gate is a limit the file's own readers never meet");
+
+    // THE TREE-WIDE CLAIM, MEASURED RATHER THAN TAKEN ON FAITH: line count preserved end-to-end is what a
+    // desync looks like breaking (codeOnly stops emitting real newlines once stuck in a phantom string/comment
+    // that never closes). A mismatch anywhere means something still desyncs.
+    let mismatched = 0, filesChecked = 0;
+    (function walk(d) {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+            if (/node_modules|\.git/.test(e.name)) continue;
+            const p = path.join(d, e.name);
+            if (e.isDirectory()) { walk(p); continue; }
+            if (!/\.(js|mjs)$/.test(e.name)) continue;
+            filesChecked++;
+            const src = fs.readFileSync(p, "utf8");
+            const rawLines = src.split("\n").length;
+            if (codeOnly(src).split("\n").length !== rawLines || noComments(src).split("\n").length !== rawLines) mismatched++;
+        }
+    })(ENG);
+    say("files checked for a line-count desync: " + filesChecked + "   mismatched: " + mismatched);
+    ok("!! *** ZERO files desync tree-wide, down from 180 measured before this fix ***", mismatched === 0);
 }
 
 if (fails) { console.log("\nsourceScan-selfcheck: " + fails + " FAILURES"); process.exit(1); }

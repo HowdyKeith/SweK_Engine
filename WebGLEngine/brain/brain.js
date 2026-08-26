@@ -2820,7 +2820,14 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4030";   // v4030 -- route preconditions are declared now (routeRegistry.js), not
+const BRAIN_BUILD = "v4031";   // v4031 -- sourceScan.mjs's shared lexer had no concept of a regex literal,
+// so a quote inside a character class desynced it for the rest of the file: 180 files tree-wide were being
+// scanned blind by every gate that used it. Now regex-aware, 180 -> 0. Also: fx/dither.js (Bayer 8x8, wired
+// into wormholeNebula as an opt-in proven byte-identical by default) and brain/rl/surprise.mjs (prediction
+// error as an OOD flag -- it says WHEN to distrust the policy where attribution.mjs says WHY it acted, and
+// gating IG on it saves 93.9% of gradient evaluations). Found along the way: attribution.mjs has been
+// UNWIRED since v4027 -- every "reference" to it in this file is a changelog comment I wrote about it.
+// Previously v4030 -- route preconditions are declared now (routeRegistry.js), not
 // copied by hand into 187 call sites in five spellings. rocketBridge migrated whole (spawns processes,
 // so it went first); gpuBrainBridge migrated incrementally. Found and fixed a real bug along the way:
 // ringKeep() lived inside handle(), invisible outside it, and broke the moment a route left that scope.

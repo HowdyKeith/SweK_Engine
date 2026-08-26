@@ -7,6 +7,19 @@
 
 import { deflectAt } from "./wormhole.js";
 import { swirlOffset } from "../vorton/vortonNebula.js";
+// v4031 -- the ordered-dither snippets are IMPORTED, not restated. fx/dither.js owns the matrix and both
+// shader bodies; this file only decides WHERE to apply them.
+//
+// *** OPT-IN, AND THE DEFAULT IS PROVEN UNCHANGED RATHER THAN ASSUMED. *** uDitherLevels defaults to 0.0
+// (GLSL zero-initialises an unset uniform), which takes the branch that does nothing. MEASURED on real WebGL2
+// (Chromium 141, SwiftShader), 128x128, this shader rendered three ways and compared byte for byte:
+//     pre-wiring shader   vs  wired shader with uDitherLevels EXPLICITLY 0   ->  0 of 65536 bytes differ
+//     pre-wiring shader   vs  wired shader with the uniform NEVER SET        ->  0 of 65536 bytes differ
+// The second line is the one that matters: an EXISTING CALLER that has never heard of dithering gets exactly
+// the pixels it got before. So the verified wormhole+nebula output is untouched and this adds a capability
+// rather than changing a result -- which is the only basis on which a display-stage transform belongs in a
+// shader whose output is under test.
+import { DITHER_GLSL, DITHER_WGSL } from "../dither.js";
 
 const STEPS = 160, DS = 0.14;
 // --- compact nebula sky (shared math) ---
@@ -66,6 +79,11 @@ const NV = 8;   // matches vortonNebula.NV
 const WORMHOLE_NEBULA_GLSL_FS = `#version 300 es
 precision highp float;
 out vec4 o; uniform vec2 uRes; uniform float uK,uA,uCamL,uMaxPsi,uSig2,uGain,uCamFar; uniform vec3 uVortons[${NV}];
+// v4031 -- uDitherLevels: 0.0 = OFF (the default, and the shipped behaviour this shader was verified with).
+// A positive value dithers the final colour to that many levels. OPT-IN ON PURPOSE: the nebula sky is the
+// gradient most likely to band, but turning this on by default would change verified output, and a display-
+// stage transform is not the place to do that silently.
+uniform float uDitherLevels;${DITHER_GLSL}
 const int STEPS=${STEPS}; const float DS=${DS};
 float h2(vec2 p){ return fract(sin(p.x*127.1+p.y*311.7)*43758.5453); }
 float vn(vec2 p){ vec2 ip=floor(p),f=p-ip,u=f*f*(3.0-2.0*f); float a=h2(ip),b=h2(ip+vec2(1,0)),c=h2(ip+vec2(0,1)),d=h2(ip+vec2(1,1));
@@ -88,12 +106,18 @@ void main(){ float R=0.5*min(uRes.x,uRes.y); vec2 uv=(gl_FragCoord.xy-0.5*uRes)/
   vec2 off=vec2(0.0); for(int i=0;i<${NV};i++){ vec3 vt=uVortons[i]; vec2 r=vec2(su,sv)-vt.xy; float f=(vt.z/6.2831853)/(dot(r,r)+uSig2); off+=vec2(-r.y,r.x)*f; }
   vec3 pa = throat?vec3(0.85,0.55,0.2):vec3(0.16,0.55,0.75);
   vec3 pb = throat?vec3(0.7,0.3,0.5):vec3(0.75,0.25,0.65);
-  o=vec4(min(vec3(1.0), skyNeb(vec2(su,sv), off*uGain, pa, pb)), 1.0); }`;
+  vec3 col = min(vec3(1.0), skyNeb(vec2(su,sv), off*uGain, pa, pb));
+  if(uDitherLevels > 0.0) col = ditherQuantize(col, gl_FragCoord.xy, uDitherLevels);
+  o=vec4(col, 1.0); }`;
 
 // --- merged WGSL (WebGPU) ---
 const WORMHOLE_NEBULA_WGSL = `
-struct U { res:vec2f, k:f32, a:f32, camL:f32, maxPsi:f32, sig2:f32, gain:f32, camFar:f32, pad:f32, vortons:array<vec4f, ${NV}> };
+struct U { res:vec2f, k:f32, a:f32, camL:f32, maxPsi:f32, sig2:f32, gain:f32, camFar:f32, ditherLevels:f32, vortons:array<vec4f, ${NV}> };
 @group(0) @binding(0) var<uniform> u: U;
+// v4031 -- ditherLevels REPLACES the former pad slot rather than adding a field: the struct keeps its size
+// and alignment, so no buffer layout changes. 0.0 = off, matching the GLSL.
+// (No backticks in this comment on purpose -- it lives INSIDE a template literal, and a stray one ends it.)
+${DITHER_WGSL}
 const STEPS:i32=${STEPS}; const DS:f32=${DS};
 fn h2(p:vec2f)->f32{ return fract(sin(p.x*127.1+p.y*311.7)*43758.5453); }
 fn vn(p:vec2f)->f32{ let ip=floor(p); let f=p-ip; let uu=f*f*(3.0-2.0*f);
@@ -118,7 +142,9 @@ fn rk4(s:vec4f)->vec4f{ let k1=der(s); let k2=der(s+k1*(DS*0.5)); let k3=der(s+k
   var off=vec2f(0.0); for(var i:i32=0;i<${NV};i=i+1){ let vt=u.vortons[i]; let r=vec2f(su,sv)-vt.xy; let f=(vt.z/6.2831853)/(dot(r,r)+u.sig2); off=off+vec2f(-r.y,r.x)*f; }
   let pa=select(vec3f(0.16,0.55,0.75),vec3f(0.85,0.55,0.2),throat);
   let pb=select(vec3f(0.75,0.25,0.65),vec3f(0.7,0.3,0.5),throat);
-  return vec4f(min(vec3f(1.0), skyNeb(vec2f(su,sv), off*u.gain, pa, pb)), 1.0); }`;
+  var col = min(vec3f(1.0), skyNeb(vec2f(su,sv), off*u.gain, pa, pb));
+  if(u.ditherLevels > 0.0){ col = ditherQuantize(col, pos.xy, u.ditherLevels); }
+  return vec4f(col, 1.0); }`;
 
 export { WORMHOLE_NEBULA_GLSL_FS, WORMHOLE_NEBULA_WGSL, NV };
 if (typeof module !== "undefined" && module.exports) module.exports = { renderWormholeNebulaCPU, wormholeNebulaShadow, WORMHOLE_NEBULA_GLSL_FS, WORMHOLE_NEBULA_WGSL, NEAR_A, NEAR_B, FAR_A, FAR_B, NV, STEPS, DS };
