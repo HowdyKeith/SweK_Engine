@@ -53,6 +53,19 @@ console.log("\n3. THREE KEYS, EACH TWO ROUTES THAT SHARE NO LINE");
         + v.peakTimeLimitH.toFixed(4) + " h = ln(lambdaI/lambdaXe)/(lambdaI - lambdaXe), rel "
         + v.limitApproachRel.toExponential(3) + ". The familiar 'about half a day' IS this asymptote, and the "
         + "limit shares no line with the search that finds the peak.");
+    // *** AND THE APPROACH IS GRADED, NOT JUST THE ARRIVAL. *** limitApproachRel alone is satisfied by SITTING
+    // ON the asymptote, and that is exactly what `highFlux` was doing: knobLiveness measured it as the only
+    // knob in the lab that moved no observable at any value, because the peak time saturates by phi ~ 5e17 and
+    // peakAfterScram's own dt = 2 s grid quantises everything above that onto one float. The knob was read and
+    // had nowhere to go. The ladder is what gives it somewhere.
+    ok("!! *** the approach is MONOTONE FROM BELOW, which is what an asymptote means ***", v.approachMonotone === 1,
+        "peak time at phi/1e4, phi/1e2 and phi climbs and never passes the limit. Proximity alone would be "
+        + "satisfied by a route that OVERSHOT and came back, and that is not the same statement.");
+    ok("!! ...and the climb is a real span rather than three copies of the asymptote", v.approachSpanH > 0.5,
+        "span " + v.approachSpanH.toFixed(6) + " h across four decades of flux. THIS IS THE OBSERVABLE THAT "
+        + "MAKES highFlux A KNOB: raise it 8x and the span falls to 0.1339 h, because the bottom of the ladder "
+        + "climbs while the top cannot. A knob whose observable cannot move is worse than an undeclared one -- "
+        + "v3129 names an invented knob back at the agent, and this one was in the register.");
     ok("!! *** the pit threshold BISECTED FROM THE SIMULATION meets the closed form ***", v.thresholdRel < 1e-10,
         "bisected " + v.pitThresholdBisected.toExponential(6) + " against phi* = lambdaXe*yieldXe/(yieldI*sigmaXe) = "
         + v.pitThresholdClosed.toExponential(6) + ", rel " + v.thresholdRel.toExponential(3)

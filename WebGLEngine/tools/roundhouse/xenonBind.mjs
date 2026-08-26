@@ -49,7 +49,7 @@ export const XENON_OBSERVABLES = [
     "eqIodine", "eqXenon",
     "batemanXe", "rk4Xe", "batemanVsRk4Rel",
     "peakHours", "peakRatio",
-    "peakTimeLimitH", "peakAtHighFlux", "limitApproachRel",
+    "peakTimeLimitH", "peakAtHighFlux", "limitApproachRel", "approachSpanH", "approachMonotone",
     "pitRisingSign", "pitThresholdClosed", "pitThresholdBisected", "thresholdRel",
 ];
 
@@ -86,7 +86,21 @@ function buildXenon({ mode = "pit", config = {} } = {}) {
     const numeric = afterScramIntegrated(c.phi, t, X, sf).Xe;
     const pk = peakAfterScram(c.phi, X, sf);
     const limit = peakTimeLimit(X);
-    const high = peakAfterScram(c.highFlux, X, sf).hours;
+    // *** THE APPROACH, NOT THE ASYMPTOTE. *** peakAtHighFlux alone made `highFlux` THE ONLY KNOB IN THE LAB
+    // THAT MOVED NO OBSERVABLE AT ANY VALUE -- knobLiveness measured it flat over multipliers from 0.5x to 8x.
+    // It was never dead: peakAfterScram reads it. It was SATURATED AND THEN QUANTISED. The peak time reaches
+    // its limit by phi ~ 5e17, and peakAfterScram's own search grid is dt = 2 s = 5.556e-4 h, so 5e17 and 1e25
+    // both land on the identical float 11.12888888888889. A knob whose observable sits ON the asymptote reports
+    // the asymptote, and the agent turning it gets a number and a causal story about nothing.
+    //
+    // This file's own header already claimed the right thing and nothing graded it: "the peak approaches
+    // 11.1291 h MONOTONICALLY". So the observable becomes the CLIMB rather than the top of it -- a ladder at
+    // phi/1e4, phi/1e2 and phi, which the knob slides bodily. MEASURED at the default: 10.1383 -> 11.1183 ->
+    // 11.1289, a span of 0.9906 h that shrinks to 0.1339 h when highFlux is raised 8x, because the bottom of
+    // the ladder climbs while the top cannot. THE KNOB NOW HAS SOMEWHERE TO MOVE, and what it moves is the
+    // statement the header was making.
+    const ladder = [c.highFlux / 1e4, c.highFlux / 1e2, c.highFlux].map((p) => peakAfterScram(p, X, sf).hours);
+    const high = ladder[2];
     const closedThr = pitThreshold(X);
     const bisected = bisectThreshold(X, sf);
 
@@ -95,6 +109,11 @@ function buildXenon({ mode = "pit", config = {} } = {}) {
         batemanXe: closed, rk4Xe: numeric, batemanVsRk4Rel: rel(closed, numeric),
         peakHours: pk.hours, peakRatio: pk.ratio,
         peakTimeLimitH: limit, peakAtHighFlux: high, limitApproachRel: rel(high, limit),
+        // The size of the climb the knob controls, and that it is a climb at all. Monotone approach from below
+        // is a stronger statement than proximity: a route that overshot the limit and came back would satisfy
+        // limitApproachRel and is not what an asymptote means.
+        approachSpanH: ladder[2] - ladder[0],
+        approachMonotone: (ladder[0] < ladder[1] && ladder[1] <= ladder[2] && ladder[2] <= limit) ? 1 : 0,
         pitRisingSign: Math.sign(pitRising(c.phi, X, sf)),
         pitThresholdClosed: closedThr,
         // null when the simulation has no sign change anywhere -- i.e. no pit at any flux, which is the plant.
