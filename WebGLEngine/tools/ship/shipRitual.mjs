@@ -87,6 +87,27 @@ export const STEPS = [
         verify: () => { const s = currentState(); return { ok: s.gates !== null && s.gates > 0, detail: `${s.gates} gates indexed` }; },
     },
     {
+        id: "engine-catalog",
+        what: "Rebuild engine-catalog.json's builtinDemos from main.js's live DEMO_MODES array.",
+        command: "node tools/ship/buildEngineCatalog.mjs",
+        why: "NOTHING WROTE THIS FILE BEFORE v4040. Keith asked how many demos the orange Demo: pill lists; the " +
+             "count turned up engine-catalog.json three days stale against main.js (58 builtinDemos claimed, 42 " +
+             "actually in DEMO_MODES) with no script anywhere in the tree that ever regenerated it. MUST RUN " +
+             "BEFORE launch-index, which reads this file as one of its three sources.",
+        verify: () => {
+            try {
+                const cat = JSON.parse(fs.readFileSync(path.join(ENG, "engine-catalog.json"), "utf8"));
+                const mainJs = read("main.js");
+                const marker = "const DEMO_MODES = [";
+                // a light liveness check (does main.js still have as many `id:` fields at this rough density as
+                // the catalog claims) -- the real, exact cross-check lives in buildEngineCatalog-selfcheck.mjs,
+                // which parses both with the same lexer this step's own command runs.
+                const has = mainJs.includes(marker) && Array.isArray(cat.builtinDemos) && cat.builtinDemos.length > 0;
+                return { ok: has, detail: `${cat.builtinDemos?.length ?? 0} builtinDemos in the catalog` };
+            } catch { return { ok: false, detail: "engine-catalog.json missing or unreadable" }; }
+        },
+    },
+    {
         id: "launch-index",
         what: "Rebuild the launch index so every page, demo and built-in on disk is in it.",
         command: "node tools/ship/launchIndex.mjs --write",

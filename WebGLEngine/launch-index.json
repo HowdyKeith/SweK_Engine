@@ -21,9 +21,9 @@
   }
  },
  "counts": {
-  "page": 406,
+  "page": 407,
   "demo": 49,
-  "builtin": 54
+  "builtin": 34
  },
  "entries": [
   {
@@ -455,7 +455,7 @@
    "id": "boundary-rank.html",
    "display": "Boundary Rank",
    "href": "/boundary-rank.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -631,7 +631,7 @@
    "id": "cartpole.html",
    "display": "Cartpole",
    "href": "/cartpole.html",
-   "section": null,
+   "section": "Physics Lab",
    "collision": false
   },
   {
@@ -868,6 +868,14 @@
   },
   {
    "kind": "page",
+   "id": "crystal-diffraction.html",
+   "display": "Crystal Diffraction",
+   "href": "/crystal-diffraction.html",
+   "section": "Physics Lab",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "csg.html",
    "display": "Csg",
    "href": "/csg.html",
@@ -911,7 +919,7 @@
    "id": "curved-wall.html",
    "display": "Curved Wall",
    "href": "/curved-wall.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -975,7 +983,7 @@
    "id": "discontinuity.html",
    "display": "Discontinuity",
    "href": "/discontinuity.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -1039,7 +1047,7 @@
    "id": "ecology.html",
    "display": "Ecology",
    "href": "/ecology.html",
-   "section": null,
+   "section": "Matter & Chaos",
    "collision": false
   },
   {
@@ -1063,7 +1071,7 @@
    "id": "endless-sky.html",
    "display": "Endless Sky",
    "href": "/endless-sky.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1071,7 +1079,7 @@
    "id": "es-away-mission.html",
    "display": "Es Away Mission",
    "href": "/es-away-mission.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1079,7 +1087,7 @@
    "id": "es-box3d-3d.html",
    "display": "Es Box3d 3d",
    "href": "/es-box3d-3d.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1087,7 +1095,7 @@
    "id": "es-box3d-fly3d.html",
    "display": "Es Box3d Fly3d",
    "href": "/es-box3d-fly3d.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1095,7 +1103,7 @@
    "id": "es-box3d.html",
    "display": "Es Box3d",
    "href": "/es-box3d.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1103,7 +1111,7 @@
    "id": "es-hull-combat.html",
    "display": "Es Hull Combat",
    "href": "/es-hull-combat.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1127,7 +1135,7 @@
    "id": "ev-admin.html",
    "display": "Ev Admin",
    "href": "/ev-admin.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1135,7 +1143,7 @@
    "id": "ev-loader.html",
    "display": "Ev Loader",
    "href": "/ev-loader.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1143,7 +1151,7 @@
    "id": "ev-mission-creator.html",
    "display": "Ev Mission Creator",
    "href": "/ev-mission-creator.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1151,7 +1159,7 @@
    "id": "ev-sprites.html",
    "display": "Ev Sprites",
    "href": "/ev-sprites.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1159,7 +1167,7 @@
    "id": "ev.html",
    "display": "Ev",
    "href": "/ev.html",
-   "section": null,
+   "section": "Game: Escape Velocity",
    "collision": false
   },
   {
@@ -1167,7 +1175,7 @@
    "id": "eve.html",
    "display": "Eve",
    "href": "/eve.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -1207,7 +1215,7 @@
    "id": "fallout.html",
    "display": "Fallout",
    "href": "/fallout.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -1279,7 +1287,7 @@
    "id": "flight-gpu.html",
    "display": "Flight Gpu",
    "href": "/flight-gpu.html",
-   "section": null,
+   "section": "Game: Endless Sky",
    "collision": false
   },
   {
@@ -1287,7 +1295,7 @@
    "id": "flight.html",
    "display": "Flight",
    "href": "/flight.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -1351,7 +1359,7 @@
    "id": "fpscontrol.html",
    "display": "Fpscontrol",
    "href": "/fpscontrol.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -1359,7 +1367,7 @@
    "id": "fpsmirror.html",
    "display": "Fpsmirror",
    "href": "/fpsmirror.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -1463,7 +1471,7 @@
    "id": "gradient-join.html",
    "display": "Gradient Join",
    "href": "/gradient-join.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -1823,7 +1831,7 @@
    "id": "lensing.html",
    "display": "Lensing",
    "href": "/lensing.html",
-   "section": null,
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -1839,7 +1847,7 @@
    "id": "limiter-seam.html",
    "display": "Limiter Seam",
    "href": "/limiter-seam.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -2079,7 +2087,7 @@
    "id": "node-gradient.html",
    "display": "Node Gradient",
    "href": "/node-gradient.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -2127,7 +2135,7 @@
    "id": "pachinko.html",
    "display": "Pachinko",
    "href": "/pachinko.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -2263,7 +2271,7 @@
    "id": "pipboy-models.html",
    "display": "Pipboy Models",
    "href": "/pipboy-models.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -2351,7 +2359,7 @@
    "id": "quadratic-recon.html",
    "display": "Quadratic Recon",
    "href": "/quadratic-recon.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2359,7 +2367,7 @@
    "id": "quadratic-wall.html",
    "display": "Quadratic Wall",
    "href": "/quadratic-wall.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2375,7 +2383,7 @@
    "id": "rank-repair-3d.html",
    "display": "Rank Repair 3d",
    "href": "/rank-repair-3d.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2383,7 +2391,7 @@
    "id": "rank-repair.html",
    "display": "Rank Repair",
    "href": "/rank-repair.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2431,7 +2439,7 @@
    "id": "reactor.html",
    "display": "Reactor",
    "href": "/reactor.html",
-   "section": null,
+   "section": "Physics Lab",
    "collision": false
   },
   {
@@ -2455,7 +2463,7 @@
    "id": "remap-2d.html",
    "display": "Remap 2d",
    "href": "/remap-2d.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -2463,7 +2471,7 @@
    "id": "remap-order.html",
    "display": "Remap Order",
    "href": "/remap-order.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -2535,7 +2543,7 @@
    "id": "row-weight.html",
    "display": "Row Weight",
    "href": "/row-weight.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2687,7 +2695,7 @@
    "id": "skyrim.html",
    "display": "Skyrim",
    "href": "/skyrim.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -2703,7 +2711,7 @@
    "id": "slotmachine.html",
    "display": "Slotmachine",
    "href": "/slotmachine.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -2839,7 +2847,7 @@
    "id": "stellar.html",
    "display": "Stellar",
    "href": "/stellar.html",
-   "section": null,
+   "section": "PL: Cosmic & Relativity",
    "collision": false
   },
   {
@@ -2879,7 +2887,7 @@
    "id": "tet-rank.html",
    "display": "Tet Rank",
    "href": "/tet-rank.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -2983,7 +2991,7 @@
    "id": "tri-limiter.html",
    "display": "Tri Limiter",
    "href": "/tri-limiter.html",
-   "section": "Discretisation & Meshes",
+   "section": "PL: Discretisation & Meshes",
    "collision": false
   },
   {
@@ -3023,7 +3031,7 @@
    "id": "uvtt.html",
    "display": "Uvtt",
    "href": "/uvtt.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -3087,7 +3095,7 @@
    "id": "wadmap.html",
    "display": "Wadmap",
    "href": "/wadmap.html",
-   "section": null,
+   "section": "Game Theory",
    "collision": false
   },
   {
@@ -3095,7 +3103,7 @@
    "id": "wall-condition.html",
    "display": "Wall Condition",
    "href": "/wall-condition.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -3191,7 +3199,7 @@
    "id": "webgpu-llm.html",
    "display": "Webgpu Llm",
    "href": "/webgpu-llm.html",
-   "section": null,
+   "section": "System Tools",
    "collision": false
   },
   {
@@ -3215,7 +3223,7 @@
    "id": "weight-scaling.html",
    "display": "Weight Scaling",
    "href": "/weight-scaling.html",
-   "section": "Boundaries & Reconstruction",
+   "section": "PL: Boundaries & Reconstruction",
    "collision": false
   },
   {
@@ -3676,96 +3684,24 @@
   },
   {
    "kind": "builtin",
-   "id": "sky",
-   "display": "Sky",
-   "href": "/?go=sky",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "space",
-   "display": "Space",
-   "href": "/?go=space",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "hell",
-   "display": "Hell",
-   "href": "/?go=hell",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "tech",
-   "display": "Tech",
-   "href": "/?go=tech",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "people",
-   "display": "People",
-   "href": "/?go=people",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "trees",
-   "display": "Trees",
-   "href": "/?go=trees",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "defenders",
-   "display": "Defenders",
-   "href": "/?go=defenders",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
    "id": "ogre",
-   "display": "Defenders 2",
+   "display": "OGRE SCENARIO",
    "href": "/?go=ogre",
    "section": null,
-   "collision": true
-  },
-  {
-   "kind": "builtin",
-   "id": "gather",
-   "display": "Gather",
-   "href": "/?go=gather",
-   "section": null,
    "collision": false
   },
   {
    "kind": "builtin",
-   "id": "more",
-   "display": "More",
-   "href": "/?go=more",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "reset",
-   "display": "Reset",
-   "href": "/?go=reset",
+   "id": "architecture",
+   "display": "ARCHITECTURE — System Diagram",
+   "href": "/?go=architecture",
    "section": null,
    "collision": false
   },
   {
    "kind": "builtin",
    "id": "maze",
-   "display": "New Maze",
+   "display": "MAZE — Mouse & Cheese",
    "href": "/?go=maze",
    "section": null,
    "collision": false
@@ -3775,78 +3711,6 @@
    "id": "dungeon",
    "display": "DUNGEON — Explorer & Treasure",
    "href": "/?go=dungeon",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "walk",
-   "display": "Enter",
-   "href": "/?go=walk",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "attack",
-   "display": "Attack",
-   "href": "/?go=attack",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "throw",
-   "display": "Throw",
-   "href": "/?go=throw",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "swap",
-   "display": "Swap",
-   "href": "/?go=swap",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "arrow",
-   "display": "Arrow",
-   "href": "/?go=arrow",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "grenade",
-   "display": "Grenade",
-   "href": "/?go=grenade",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "block",
-   "display": "Block",
-   "href": "/?go=block",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "auto",
-   "display": "Auto",
-   "href": "/?go=auto",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "exit",
-   "display": "Exit",
-   "href": "/?go=exit",
    "section": null,
    "collision": false
   },
@@ -3869,7 +3733,7 @@
   {
    "kind": "builtin",
    "id": "opensea",
-   "display": "Dive In",
+   "display": "OPEN SEA — Reef Without Walls",
    "href": "/?go=opensea",
    "section": null,
    "collision": false
@@ -3877,32 +3741,8 @@
   {
    "kind": "builtin",
    "id": "life",
-   "display": "Step",
+   "display": "CONWAY'S LIFE 3D",
    "href": "/?go=life",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "random",
-   "display": "Randomize",
-   "href": "/?go=random",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "clear",
-   "display": "Clear",
-   "href": "/?go=clear",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "pause",
-   "display": "Pause / Run",
-   "href": "/?go=pause",
    "section": null,
    "collision": false
   },
@@ -3916,65 +3756,41 @@
   },
   {
    "kind": "builtin",
-   "id": "props",
-   "display": "Props",
-   "href": "/?go=props",
+   "id": "cruise",
+   "display": "CRUISE (Overhead Chase)",
+   "href": "/?go=cruise",
    "section": null,
    "collision": false
   },
   {
    "kind": "builtin",
-   "id": "car",
-   "display": "Car",
-   "href": "/?go=car",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "horse",
-   "display": "Horse",
-   "href": "/?go=horse",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "demon",
-   "display": "Demon",
-   "href": "/?go=demon",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "restart",
-   "display": "Restart",
-   "href": "/?go=restart",
+   "id": "missile_command",
+   "display": "MISSILE COMMAND 3D",
+   "href": "/?go=missile_command",
    "section": null,
    "collision": false
   },
   {
    "kind": "builtin",
    "id": "lorenz",
-   "display": "Reset 2",
+   "display": "LORENZ ATTRACTOR",
    "href": "/?go=lorenz",
-   "section": null,
-   "collision": true
-  },
-  {
-   "kind": "builtin",
-   "id": "spawn",
-   "display": "Spawn",
-   "href": "/?go=spawn",
    "section": null,
    "collision": false
   },
   {
    "kind": "builtin",
-   "id": "wander",
-   "display": "Wander",
-   "href": "/?go=wander",
+   "id": "centipede",
+   "display": "CENTIPEDE CHAIN",
+   "href": "/?go=centipede",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "rigtest",
+   "display": "RIG TEST (Skeletal)",
+   "href": "/?go=rigtest",
    "section": null,
    "collision": false
   },
@@ -3983,6 +3799,46 @@
    "id": "robot",
    "display": "ROBOT (Animated GLB)",
    "href": "/?go=robot",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "dealer_choice",
+   "display": "Dealer'S Choice (Random Demo)",
+   "href": "/?go=dealer_choice",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "build_viewer",
+   "display": "BUILD VIEWER (Minecraft / LEGO)",
+   "href": "/?go=build_viewer",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "fps",
+   "display": "FPS — AI GENERATED DUNGEON SHOOTER",
+   "href": "/?go=fps",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "fp_control",
+   "display": "First Person CONTROL — Your World (Round 31)",
+   "href": "/?go=fp_control",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "builtin",
+   "id": "voice_lab",
+   "display": "VOICE LAB — VOICE → ENGINE COMMANDS",
+   "href": "/?go=voice_lab",
    "section": null,
    "collision": false
   },
@@ -4061,15 +3917,15 @@
   {
    "kind": "builtin",
    "id": "battleship",
-   "display": "BATTLESHIP 3D 2",
+   "display": "BATTLESHIP 3D  ↗ (New Tab)",
    "href": "/?go=battleship",
    "section": null,
-   "collision": true
+   "collision": false
   },
   {
    "kind": "builtin",
    "id": "slots",
-   "display": "SLOTS",
+   "display": "SLOTS  ↗ (New Tab)",
    "href": "/?go=slots",
    "section": null,
    "collision": false
@@ -4087,14 +3943,6 @@
    "id": "tron",
    "display": "TRON — Light Cycles",
    "href": "/?go=tron",
-   "section": null,
-   "collision": false
-  },
-  {
-   "kind": "builtin",
-   "id": "spectator_cast_toggle",
-   "display": "Cast",
-   "href": "/?go=spectator_cast_toggle",
    "section": null,
    "collision": false
   }
