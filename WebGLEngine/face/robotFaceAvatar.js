@@ -1833,9 +1833,23 @@ function _currentLookY(nowMs) {
 // v765 — smoothed root-joint follow target. Avatars with root motion
 // (CesiumMan's walking clip translates the root joint through space)
 // otherwise march out of frame because the camera looked at a fixed
-// origin. RobotExpressive has in-place clips, so its rootJoint stays
-// near (0,0,0) and this code is a no-op for it.
+// origin.
+//
+// *** v4033 -- "STAYS NEAR (0,0,0)" WAS NEVER MEASURED. *** RobotExpressive's joint 0 sits at world
+// (-0.003, 2.370, -0.021) even in its in-place idle clip -- nowhere near the origin. This function eased
+// toward that ABSOLUTE position, so _rootFollowY locked onto 2.37 and never returned to zero; makeViewProj
+// then does `lookY = _currentLookY() + _rootFollowY`, adding it on top of BODY_LOOK_Y (2.21, already the
+// robot's own vertical mid) and pointing the camera at y=4.58 -- ABOVE the robot's own head (top 4.44). The
+// result is a robot with headroom above and everything from the chest down cropped out -- Keith's report,
+// reproduced exactly by reading this value on a real render rather than trusting the comment above it.
+// FIX: track the joint's DISPLACEMENT from wherever it sat when this animator started, not its absolute
+// position. An in-place clip's joint 0 never moves from that baseline, so the delta -- and therefore this
+// whole mechanism's contribution -- stays at zero regardless of where in world space the bone happens to
+// live, which is what "no-op for in-place clips" was always supposed to mean. Genuine root motion (the
+// CesiumMan case this was built for) still accumulates normally, since it's measured as movement AWAY from
+// where the clip began rather than distance from a coordinate nothing established as meaningful.
 let _rootFollowX = 0, _rootFollowY = 0, _rootFollowZ = 0;
+let _rootFollowBaseX = null, _rootFollowBaseY = null, _rootFollowBaseZ = null, _rootFollowAnimatorRef = null;
 function _updateRootFollow(animator, alpha = 0.15) {
     if (!animator?.jointMatrices || animator.jointMatrices.length < 16) return;
     // Joint 0 in jointMatrices is typically the root. The matrix is 4×4
@@ -1844,9 +1858,18 @@ function _updateRootFollow(animator, alpha = 0.15) {
     const ty = animator.jointMatrices[13];
     const tz = animator.jointMatrices[14];
     if (!Number.isFinite(tx) || !Number.isFinite(ty) || !Number.isFinite(tz)) return;
-    _rootFollowX += (tx - _rootFollowX) * alpha;
-    _rootFollowY += (ty - _rootFollowY) * alpha;
-    _rootFollowZ += (tz - _rootFollowZ) * alpha;
+    if (animator !== _rootFollowAnimatorRef) {
+        // A (re)loaded avatar: rebaseline to THIS joint's starting position instead of assuming it is the
+        // origin, and report zero displacement for this frame rather than one large first-frame jump.
+        _rootFollowAnimatorRef = animator;
+        _rootFollowBaseX = tx; _rootFollowBaseY = ty; _rootFollowBaseZ = tz;
+        _rootFollowX = 0; _rootFollowY = 0; _rootFollowZ = 0;
+        return;
+    }
+    const dx = tx - _rootFollowBaseX, dy = ty - _rootFollowBaseY, dz = tz - _rootFollowBaseZ;
+    _rootFollowX += (dx - _rootFollowX) * alpha;
+    _rootFollowY += (dy - _rootFollowY) * alpha;
+    _rootFollowZ += (dz - _rootFollowZ) * alpha;
 }
 
 function makeViewProj(dt) {

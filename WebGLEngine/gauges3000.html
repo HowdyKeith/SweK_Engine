@@ -21,6 +21,20 @@
 <canvas id="ovl"></canvas>
 <div id="cap">&#9670; Gauges 3000</div>
 <div id="eng"></div>
+<script>
+/* v4033 -- ?embed=1, same pattern as blob-avatar.html's v3656 fix: a caller that sends a flag this page never
+   reads is two files that never met. ui/avatarSwitch.js mounts this as "/gauges3000.html?embed=1" in server.html's
+   small avatar panel, where the caption + engine-mode text would otherwise sit on top of the gauge ring. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("embed") !== "1") return;
+    document.documentElement.setAttribute("data-embed", "1");
+    var st = document.createElement("style");
+    st.textContent = 'html[data-embed="1"] #cap, html[data-embed="1"] #eng { display: none !important; }';
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+</script>
 <script type="module">
 const gpuCanvas = document.getElementById("gpu"), ovl = document.getElementById("ovl"), ctx = ovl.getContext("2d");
 let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);

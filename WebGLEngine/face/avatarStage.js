@@ -426,7 +426,7 @@ export function mountStage(canvas, opts = {}){
   const getScreenCanvas = (typeof opts.getScreenCanvas==="function") ? opts.getScreenCanvas : null;
   let _t0 = performance.now();
 
-  let raf=0, destroyed=false, paused=false, extPaused=false, mesh=null, animator=null, rawBBox=null, lastT=0, lastDraw=0;
+  let raf=0, destroyed=false, paused=false, extPaused=false, mesh=null, animator=null, rawBBox=null, posedBBox=null, lastT=0, lastDraw=0;
   let _visorMode=false, _visorEl=null, _visorCfg={ color:"#7fe9ff", eyeColor:"#bff3ff", eyes:true, reticle:true, scan:true, cy:38 };   // v1364 — visor HUD
   let _vocBars=null, _jawIdx=-1, _jawLevel=0, _extTalkLevel=-1, _extTalkT=0;   // v1366 — talking: vocoder bars + jaw drive
   // v1386 — per-model jaw open axis/sign/amplitude (the X axis was a guess). Overridable
@@ -716,6 +716,60 @@ export function mountStage(canvas, opts = {}){
     rawBBox={ minX:mnX,minY:mnY,minZ:mnZ,maxX:mxX,maxY:mxY,maxZ:mxZ };
 
     try{ animator=new SkeletalAnimator(parsed); if(animator.animations&&animator.animations.length){ let idx=animator.animations.findIndex(a=>/idle|breath|stand/i.test(a.name||"")); idleIdx = idx>=0?idx:0; walkIdx = animator.animations.findIndex(a=>/walk/i.test(a.name||"")); cheerIdx = animator.animations.findIndex(a=>/dance|wave|cheer|jump|excit|celebrat|hooray|yes/i.test(a.name||"")); animator.setClip(idleIdx,0); A.clip=idleIdx; } }catch(e){ animator=null; }
+    // *** v4032 CANDIDATE -- Keith reported the RobotExpressive avatar tiny and pushed to the bottom of the
+    // panel. rawBBox (just above) is the mesh's BIND POSE -- parsed.positions with no joint transform applied
+    // at all -- and avatarNormExtents() (below) used it to size the camera frame. MEASURED: for
+    // RobotExpressive that bind pose reports normW=3.79 against normH=1.50, a standing figure 2.5x WIDER than
+    // tall. The idle clip that actually plays holds the arms down; the camera was framing for an arm-span
+    // nobody ever sees, so it pulled back much further than the rendered figure needed.
+    //
+    // posedBBox CPU-skins the SAME vertices through the idle clip's own joint matrices -- the exact transform
+    // the GPU applies every frame (see the A_VERT shader: `p = (sk*vec4(aPos,1)).xyz` before `uModel*vec4(p,1)`
+    // is applied), run once here on the CPU instead. An unskinned primitive (RobotExpressive ships 15 of them,
+    // rigid parts bone-parented rather than deformed) still skins correctly with no special case: the parser
+    // gives it weight 1.0 to a synthetic joint bound to its owning node with an identity inverse-bind matrix,
+    // so the same weighted-sum loop below handles it.
+    //
+    // *** THIS IS SCOPED TO CAMERA FRAMING ONLY, ON PURPOSE. *** avatarModel() (below, unchanged) still derives
+    // the avatar's ON-SCREEN SIZE AND PLACEMENT from rawBBox exactly as it always has -- how big the avatar
+    // actually renders is NOT touched by this candidate. That is deliberate: investigating this bug found a
+    // second, separate, unresolved question (rawBBox's raw height measures ~0.026 in whatever units the mesh
+    // is authored in; the same vertices skinned through the idle pose measure ~4.5 -- a ~172x gap between the
+    // bind-pose and posed coordinate spaces for this specific asset) that could not be verified without a
+    // working visual render, which this sandbox does not have -- even the UNMODIFIED, shipped code renders a
+    // blank canvas here under headless SwiftShader, on the real ai-bridge server, with no page errors. So
+    // avatarModel()'s own scale is left completely alone rather than guessed at, and this candidate changes
+    // ONLY the number the "focus" scene's camera uses to decide how far back to stand.
+    //
+    // avatarNormExtents() ALSO uses posedBBox for its height-normalization scale now, not rawBBox -- both hw
+    // and hh come from the SAME box, because the earlier draft of this fix reused rawBBox's scale on
+    // posedBBox's width and produced a nonsense normW=245 by mixing two different coordinate spaces. Sourcing
+    // everything from one consistent space is what fixed that.
+    if(hasSkin && animator && animator.jointMatrices && parsed.joints && parsed.weights){
+      try{
+        animator.update(0);   // populate jointMatrices for the idle clip's own first frame -- the pose that plays
+        const pp=parsed.positions, pj=parsed.joints, pw=parsed.weights, jm=animator.jointMatrices;
+        let pnX=Infinity,pnY=Infinity,pnZ=Infinity,pxX=-Infinity,pxY=-Infinity,pxZ=-Infinity;
+        for(let vp=0,vj=0;vp<pp.length;vp+=3,vj+=4){
+          const x=pp[vp],y=pp[vp+1],z=pp[vp+2];
+          let sx=0,sy=0,sz=0;
+          for(let k=0;k<4;k++){
+            const w=pw[vj+k]; if(!w) continue;
+            const j=pj[vj+k]*16;
+            sx+=w*(jm[j]*x+jm[j+4]*y+jm[j+8]*z+jm[j+12]);
+            sy+=w*(jm[j+1]*x+jm[j+5]*y+jm[j+9]*z+jm[j+13]);
+            sz+=w*(jm[j+2]*x+jm[j+6]*y+jm[j+10]*z+jm[j+14]);
+          }
+          if(sx<pnX)pnX=sx; if(sx>pxX)pxX=sx; if(sy<pnY)pnY=sy; if(sy>pxY)pxY=sy; if(sz<pnZ)pnZ=sz; if(sz>pxZ)pxZ=sz;
+        }
+        if(Number.isFinite(pnX)&&Number.isFinite(pxX)){
+          posedBBox={ minX:pnX,minY:pnY,minZ:pnZ,maxX:pxX,maxY:pxY,maxZ:pxZ };
+          console.info(`[avatarStage] v4032 candidate: posed bbox for ${url} -- raw W=${(pxX-pnX).toFixed(3)} H=${(pxY-pnY).toFixed(3)} `+
+            `(ratio ${((pxX-pnX)/((pxY-pnY)||1)).toFixed(2)}), vs bind-pose rawBBox raw W=${(rawBBox.maxX-rawBBox.minX).toFixed(4)} `+
+            `H=${(rawBBox.maxY-rawBBox.minY).toFixed(4)} (ratio ${((rawBBox.maxX-rawBBox.minX)/((rawBBox.maxY-rawBBox.minY)||1)).toFixed(2)})`);
+        }
+      }catch(e){ posedBBox=null; console.warn("[avatarStage] v4032 candidate: posed-pose bbox failed, framing stays on the bind pose:",e?.message); }
+    }
     try{ _wireJaw(); }catch(e){}   // v1366 — detect a jaw bone on the main avatar
 
     lastT=performance.now(); raf=requestAnimationFrame(frame);
@@ -928,25 +982,54 @@ export function mountStage(canvas, opts = {}){
   // animation that exceeds the rest pose (a wave throws an arm out; a jump
   // adds height) so we don't frame out the action. Cached; recomputed on swap.
   let _normExtents = null;
+  // v4032 CANDIDATE -- factored out so avatarNormExtents() runs the SAME 8-corner rotation once, against
+  // whichever single box it is given, rather than a hand-written second copy risking drift from this one.
+  function _rotatedExtentXY(b, rot){
+    const cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
+    let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
+    for(const[x,y,z]of cs){ const rx=rot[0]*x+rot[4]*y+rot[8]*z, ry=rot[1]*x+rot[5]*y+rot[9]*z; if(rx<mnX)mnX=rx;if(rx>mxX)mxX=rx;if(ry<mnY)mnY=ry;if(ry>mxY)mxY=ry; }
+    return { mnX, mxX, mnY, mxY };
+  }
   function avatarNormExtents(){
     if(_normExtents) return _normExtents;
     if(!rawBBox) return { hw:0.55, hh:0.78, cy:0.78 };
     let rot; try{ rot=avatarOrientation.buildMatrix(avatarOrientation.get(url)); }catch{ rot=mIdent(); }
-    const b=rawBBox, cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
-    let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
-    for(const[x,y,z]of cs){ const rx=rot[0]*x+rot[4]*y+rot[8]*z, ry=rot[1]*x+rot[5]*y+rot[9]*z; if(rx<mnX)mnX=rx;if(rx>mxX)mxX=rx;if(ry<mnY)mnY=ry;if(ry>mxY)mxY=ry; }
-    const h=(mxY-mnY)||1, s=1.5/h;            // avatarModel normalizes height → 1.5
-    const hw=s*(mxX-mnX)/2, hh=s*(mxY-mnY)/2; // hh ≈ 0.75
+    // v4032 CANDIDATE -- posedBBox, WHEN AVAILABLE, REPLACES rawBBox HERE ENTIRELY: width, height AND the
+    // height-normalization scale all come from the SAME box. Mixing rawBBox's scale with posedBBox's width (an
+    // earlier draft of this fix did exactly that) produced a nonsense normW=245 -- rawBBox is the UNSKINNED
+    // bind pose and posedBBox is the fully-skinned pose, two DIFFERENT coordinate spaces for this asset
+    // (MEASURED ~172x apart in raw scale), and a scale factor derived from one is not valid applied to the
+    // other. avatarModel() (elsewhere in this file, UNCHANGED by this candidate) still derives the avatar's
+    // actual on-screen size from rawBBox exactly as before -- this function decides camera framing only.
+    const src = posedBBox || rawBBox;
+    const e = _rotatedExtentXY(src, rot);
+    const h=(e.mxY-e.mnY)||1, s=1.5/h;            // avatarModel normalizes height → 1.5
+    const hw=s*(e.mxX-e.mnX)/2, hh=s*(e.mxY-e.mnY)/2; // hh ≈ 0.75
     _normExtents={ hw, hh, cy:hh };
-    try{ console.info(`[avatarStage] framing ${url}: normW=${(hw*2).toFixed(2)} normH=${(hh*2).toFixed(2)} (height-normalized to 1.5)`); }catch{}
+    try{ console.info(`[avatarStage] framing ${url}: normW=${(hw*2).toFixed(2)} normH=${(hh*2).toFixed(2)} (height-normalized to 1.5${posedBBox?", from the posed idle figure -- v4032 candidate":", from the bind pose"})`); }catch{}
     return _normExtents;
   }
 
   // avatar model: normalize height, stand at A.x/A.z facing A.yaw (+ orientation).
+  //
+  // *** v4033 -- THE SECOND HALF OF THE v4032 CANDIDATE, NOW VERIFIED ON A REAL RENDER. *** v4032 measured a
+  // ~172x gap between rawBBox (bind pose, unskinned) and posedBBox (the idle clip's own first frame, skinned
+  // through animator.jointMatrices -- the SAME transform the GPU applies every frame, per the A_VERT shader:
+  // `p=skin(aPos)` runs BEFORE `wp=uModel*vec4(p,1)`) and fixed camera framing (avatarNormExtents, above) to use
+  // it, but left this function on rawBBox because no render existed to check the guess against. One now does:
+  // headless Chromium + --use-gl=swiftshader renders this scene correctly (confirmed: RobotExpressive's face-mode
+  // view and its GLBParser/bbox console lines all come back real), which the WebGPU-based probe used for v4032
+  // could not do. Screenshotting avatarstage.html?glb=RobotExpressive BEFORE this fix shows the diorama's pet
+  // llama alone, correctly scaled, with NO ROBOT VISIBLE AT ALL -- s=1.5/rawBBox_h≈57 applied on TOP of a mesh
+  // the GPU already skinned to ~4.5 units tall compounds to ~257 world units, so the camera (framed by
+  // avatarNormExtents for a properly-scaled ~1.5-unit figure) sits inside solid, back-face-culled geometry.
+  // posedBBox is in the SAME un-rotated local space rawBBox occupies (skinning runs before the orientation
+  // matrix, exactly like avatarNormExtents' src), so it drops in here unchanged through the same rotation-
+  // projection loop below -- no second copy of the centering math, matching v3527's rule.
   function avatarModel(){
     if(!rawBBox) return mIdent();
     let rot; try{ rot=avatarOrientation.buildMatrix(avatarOrientation.get(url)); }catch{ rot=mIdent(); }
-    const b=rawBBox, cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
+    const b=posedBBox||rawBBox, cs=[[b.minX,b.minY,b.minZ],[b.maxX,b.minY,b.minZ],[b.minX,b.maxY,b.minZ],[b.maxX,b.maxY,b.minZ],[b.minX,b.minY,b.maxZ],[b.maxX,b.minY,b.maxZ],[b.minX,b.maxY,b.maxZ],[b.maxX,b.maxY,b.maxZ]];
     let mnY=Infinity,mxY=-Infinity;
     for(const[x,y,z]of cs){ const ry=rot[1]*x+rot[5]*y+rot[9]*z; if(ry<mnY)mnY=ry; if(ry>mxY)mxY=ry; }
     const h=(mxY-mnY)||1; const s=1.5/h;

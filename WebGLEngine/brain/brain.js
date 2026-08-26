@@ -2820,7 +2820,43 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4032";   // v4032 -- floor-atlas.html and tools/render-qa/deviceOwed.mjs both read from
+const BRAIN_BUILD = "v4033";   // v4033 -- three avatar cameras that had never had a rendered frame checked, all
+// found by chasing a real bug report. Keith: universal-viewer.html#robotface showed a robot "cut off at the
+// waist... no legs." face/avatarStage.js's avatarModel() scaled the mesh from rawBBox -- RobotExpressive's
+// UNSKINNED bind pose, ~0.026 units tall -- while the GPU had already skinned it to its true ~4.5-unit pose
+// BEFORE uModel applies (v4032's own candidate fix had scoped itself to camera framing only, on the record,
+// because no working render existed yet to check the second half against). MEASURED: a headless render of
+// avatarstage.html?glb=RobotExpressive before this fix shows the diorama's pet llama alone, correctly scaled,
+// with NO ROBOT VISIBLE AT ALL -- fixed to source scale from posedBBox, same as the framing half already did.
+// face/robotFaceAvatar.js's _updateRootFollow() eased the camera toward joint 0's ABSOLUTE world position on
+// the assumption -- never measured -- that RobotExpressive's in-place clips keep it near the origin. It does
+// not: joint 0 sits at (-0.003, 2.370, -0.021). Fixed to track DISPLACEMENT from a captured baseline instead,
+// so an in-place clip contributes zero regardless of where its root bone happens to live, and genuine
+// locomotion (the CesiumMan case this was built for) still accumulates normally. blob-avatar.html's orbit
+// camera shipped at dist:3.0 against a figure whose balls span roughly +-1.5 world units -- so close the
+// metaball surface filled the whole canvas; raised to 6.5 (verified across idle/wave/dance poses). NEW gate,
+// tools/ship/avatarFraming-selfcheck.mjs: renders all three headlessly and measures non-background pixel
+// coverage against an ADAPTIVE per-page background colour (three pages, three different backgrounds) -- a
+// coverage RANGE, not a pixel-exact baseline, because animation timing and autonomous reactions make an exact
+// match the wrong tool. Caught its own gap live: the robotFaceAvatar render check's first threshold (0.08) was
+// too loose to catch the root-follow sabotage on its own (broken renders measured 0.13, comfortably above it)
+// -- only the paired source check caught it, and the threshold was tightened to 0.17 using the measured
+// broken/fixed ranges rather than left as a guess. All three sabotaged live and confirmed caught, then restored
+// byte-identical. Also this round: ui/avatarSwitch.js's server.html avatar-corner cycle gained two named
+// slots -- Keith: "RobotExpressive can be choice 4 on Server.html. and we can have StickWoman be choice 3" --
+// and swapped facemuscles for gauges3000.html (Keith: "swap out the gauges and avatar scene, and swap in the
+// WebGPU gauges and avatar we already made") at the explicit last position, which gauges3000.html did not
+// support embedding for until now (?embed=1, same pattern as blob-avatar.html's v3656 fix). universal-
+// viewer.html's #robotface catalog id -- and RobotExpressive.html's own demo:title meta, which would have
+// overwritten a CATALOG-only rename on the next auto-discovery pass -- were both years-stale ("Robot Avatar" /
+// "Generated robot face"): renamed to #robotexpressive and "RobotExpressive Avatar" in both places at once, the
+// two-copy trap this tree keeps finding avoided by fixing the writer AND the thing that reads it back. The
+// test_rig and RobotWoman avatar-list labels ("test_rig (Robot Man)", "RobotWoman") were renamed to match this
+// tree's own existing convention elsewhere (avatarstage.html's orientation-map and simulation/PipAvatar.js
+// already call these "Stick Man" / "Stick Woman") -- StickMan (test rig) and StickWoman. And server.html gained
+// a "Pipeline Routes" button (universal-viewer.html's Pipeline mode gained a ?mode=pipeline deep-link so the
+// button can open straight into it), positioned exactly where asked: right after "Open SweK Engine", then a
+// forced line break, so "Avatar mode" is always first on the next row.
 // a directory the fleet's real submit path never writes to. androidPeerBridge.js's /android/submit drops every
 // bench report in tools/roundhouse (CFG.roundhouseDir); floor-atlas.html fetched "/roundhouse/" + name instead,
 // a URL prefix ai-bridge/roundhouseBridge.js's owns() claims for its agent API and 404s on anything it does not

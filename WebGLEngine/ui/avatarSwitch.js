@@ -1,18 +1,22 @@
 // WebGLEngine/ui/avatarSwitch.js — v3555
 // ---------------------------------------------------------------------------------------------------------------
-// THE AVATAR CORNER BUTTON — three surfaces in one box, and only ever ONE of them alive.
+// THE AVATAR CORNER BUTTON — eight surfaces in one box, and only ever ONE of them alive.
 //
 // server.html shows the SVG robot beside the gauges. This adds a small button at the TOP RIGHT OF THE AVATAR
-// PANEL that rotates it through three, all framed in the same box so the layout never moves:
+// PANEL that rotates it through eight, all framed in the same box so the layout never moves:
 //
-//     svg    -- ui/swekRobot.js, the procedural robot with the brain. Cheap, always available, turns red on errors.
-//     rigged -- RobotExpressive, the real rigged GLB, through avatarstage with camdock=1 so the panel owns the
-//               camera and the in-iframe selfie button is hidden. Framed identically to the avatar view.
-//     blob   -- blob-avatar.html, the Blobulator kept as an avatar (Avataro / Avatarina).
+//     svg              -- ui/swekRobot.js, the procedural robot with the brain. Cheap, always available, turns red on errors.
+//     rigged           -- avatarstage's rigged GLB, whichever avatar is starred (RobotExpressive by default),
+//                          through avatarstage with camdock=1 so the panel owns the camera and the in-iframe
+//                          selfie button is hidden. Framed identically to the avatar view.
+//     stickwoman       -- v4033. RobotWoman.glb by name, not by favorite -- one click to this exact avatar.
+//     robotexpressive2 -- v4033. RobotExpressive.glb by name, same reason. Named "2" because "rigged" already
+//                          shows this GLB by default; the id says so is unambiguous rather than colliding on "robotexpressive".
+//     blob             -- blob-avatar.html, the Blobulator kept as an avatar (Avataro / Avatarina).
 //
 // *** THIS IS DELIBERATELY NOT THE SANDBOX'S AVATAR ROTATION. *** The main render window already cycles avatars,
 // and Keith asked specifically that it not be swapped in here. Two rotations that look alike and mean different
-// things is worse than one -- so this carries its OWN three-entry list, and touching the sandbox's is out of
+// things is worse than one -- so this carries its OWN list, and touching the sandbox's is out of
 // scope by design rather than by omission.
 //
 // *** ONLY ONE SURFACE IS MOUNTED AT A TIME, AND THAT IS THE LOAD-BEARING PART. *** The two heavy modes are
@@ -37,6 +41,13 @@ export const MODES = [
     // all" until you moved the pointer. saver=0 holds the focus scene; the avatar stays put.
     { id: "rigged", label: "\ud83e\uddcd", title: "RobotExpressive — the rigged GLB, framed as the avatar view", kind: "frame",
       src: "/avatarstage.html?voice=M1&glb=RobotExpressive&camdock=1&embed=1&pet=0&saver=0", frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
+    // v4033 -- Keith: "RobotExpressive can be choice 4 on Server.html. and we can have StickWoman be choice 3."
+    // Named slots, so each named avatar is one click away instead of routed through the "rigged" slot's
+    // favorite-of-the-moment (which shows whatever GLB is starred, RobotExpressive by default -- unchanged above).
+    { id: "stickwoman", label: "\ud83d\udc57", title: "StickWoman — RobotWoman.glb, framed as the avatar view", kind: "frame",
+      src: "/avatarstage.html?voice=M1&glb=RobotWoman&camdock=1&embed=1&pet=0&saver=0", frameFromBox: true, needs: "/GPU_Assets/RobotWoman.glb" },
+    { id: "robotexpressive2", label: "\ud83e\udd16", title: "RobotExpressive — RobotExpressive.glb, framed as the avatar view", kind: "frame",
+      src: "/avatarstage.html?voice=M1&glb=RobotExpressive&camdock=1&embed=1&pet=0&saver=0", frameFromBox: true, needs: "/GPU_Assets/RobotExpressive.glb" },
     { id: "blob", label: "\ud83e\udee7", title: "Blobulator avatar — Avataro / Avatarina, the reactive metaball avatar", kind: "frame",
       src: "/blob-avatar.html?embed=1" },
     // v3556 -- the two heavy ones, added last on purpose. Each carries a `heavy` note so the button can say what
@@ -45,31 +56,16 @@ export const MODES = [
       src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",
       src: "/thead.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
-    // v3998 -- THE FACE-MUSCLES SURFACE, PLACED DELIBERATELY AS THE NEXT STOP AFTER THE TALKING HEAD.
-    // Keith: "we added the Google face muscles api ability, can we rotate that as the next choice after
-    // Wireframe?" -- the POSITION is the request, and the two belong adjacent for a reason: the talking head is
-    // driven by AUDIO AMPLITUDE and this one by MediaPipe FaceLandmarker BLENDSHAPES, which is Google's own name
-    // for muscle activations. Same idea, opposite input, one click apart on the switch.
-    //
-    // It carries the SAME ~12 MB warning because it is the SAME MediaPipe bundle -- and if the talking head has
-    // already been opened this session the model is cached, so the second of the pair is usually instant. The
-    // warning is still stated rather than guessed: a button that promises "instant" and then downloads 12 MB is
-    // worse than one that over-warns.
-    //
-    // v3999 -- *** THE TITLE SAID "FROM YOUR CAMERA" AND THAT STOPPED BEING TRUE THE ROUND AFTER IT WAS
-    // WRITTEN. *** Keith: "we want to hide camera when it is shown on server.html. server.html is self driven
-    // avatars." Embedded, this surface now takes its blendshapes from ui/faceMoves.js -- the engine's own
-    // `swek:move` events -- and never opens a webcam. The description is the thing a user reads before
-    // clicking, so a description of the removed input is worse than no description at all.
-    //
-    // The `heavy` note is left standing, and it is now MEASURED rather than guessed: with the camera controls
-    // hidden, a headless load of /face-mirror.html?embed=1 requests ZERO bytes from cdn.jsdelivr.net (and so
-    // does /thead.html?embed=1, whose camera button has been inside the hidden #mood since v3656). Section 5
-    // of tools/ship/avatarServerViews-selfcheck.mjs asserts that. The warning therefore over-warns for the
-    // embedded mount -- which is the safe direction, and is its own round to change, because `heavy` also
-    // drives the heavy-last ORDERING invariant that v3556 built the list around.
-    { id: "facemuscles", label: "\ud83d\ude2e", title: "Face muscles \u2014 the engine's own moves read as a face: MediaPipe blendshape coefficients, no camera", kind: "frame",
-      src: "/face-mirror.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
+    // v4033 -- Keith: "the last avatar choice, can we swap out the gauges and avatar scene, and swap in the
+    // WebGPU gauges and avatar we already made? I think that is called Avatar3000." The page is gauges3000.html
+    // ("Gauges 3000" in its own demo:title -- close enough a name that the swap is unambiguous): a WebGPU
+    // fragment-shader energy core ringed by an LCARS gauge cluster, with a Canvas2D fallback when WebGPU is
+    // unavailable so it never needs a `needsWebGPU` gate of its own the way blobgpu does. facemuscles (Google's
+    // MediaPipe blendshape face, ~12 MB on first use) is REMOVED from this rotation rather than kept alongside --
+    // "swap out ... swap in" was the request, not "add"; face-mirror.html itself is untouched and still reachable
+    // elsewhere (the universal viewer, direct URL), only this switch's rotation drops it.
+    { id: "gauges3000", label: "\ud83c\udf00", title: "Gauges 3000 \u2014 WebGPU energy-core avatar ringed by an LCARS gauge cluster (Canvas2D fallback)", kind: "frame",
+      src: "/gauges3000.html?embed=1" },
 ];
 
 // v3557 -- THE ROTATION IS NOW BASE MODES PLUS PROMOTED FAVOURITES, and the favourites come from the SANDBOX'S

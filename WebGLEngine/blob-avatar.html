@@ -61,7 +61,7 @@ const cv = document.getElementById("c"), ctx = cv.getContext("2d");
 function resize() { cv.width = innerWidth; cv.height = innerHeight; } addEventListener("resize", resize); resize();
 
 const av = makeAvatar({ persona: "both" });
-const orbit = makeOrbitControls({ az: 0.5, el: 0.2, dist: 3.0, minDist: 1.8, maxDist: 7 }); attachOrbit(cv, orbit);
+const orbit = makeOrbitControls({ az: 0.5, el: 0.2, dist: 6.5, minDist: 1.8, maxDist: 9 }); attachOrbit(cv, orbit);
 const personas = ["both", "avataro", "avatarina"], pname = { both: "both", avataro: "Avataro", avatarina: "Avatarina" };
 let pIdx = 0;
 document.getElementById("persona").onclick = () => { pIdx = (pIdx + 1) % 3; av.persona = personas[pIdx]; document.getElementById("persona").textContent = "persona: " + personas[pIdx]; document.getElementById("who").textContent = pname[personas[pIdx]] === "both" ? "Avataro / Avatarina" : pname[personas[pIdx]]; };

@@ -295,7 +295,7 @@ const CATALOG = [
   { id: "aibrain",          file: "aibrain.html",          title: "AI Brain",              desc: "VBA-bridge visualizer for engine AI state.",                    cats: ["ai"],               swatch: "A" },
   { id: "face",             file: "face.html",             title: "Face Avatar",           desc: "Procedural face avatar — expressions.",                         cats: ["ai", "face"],       swatch: "F" },
   { id: "face-mirror",      file: "face-mirror.html",      title: "Face Mirror",           desc: "MediaPipe face tracking → live mirror.",                        cats: ["ai", "face"],       swatch: "M" },
-  { id: "robotface",        file: "RobotExpressive.html",        title: "Robot Avatar",          desc: "Generated robot face — grey-robot-man + expressions.",          cats: ["ai", "face"],       swatch: "🤖" },
+  { id: "robotexpressive",  file: "RobotExpressive.html",        title: "RobotExpressive Avatar", desc: "RobotExpressive.glb — a rigged, animated robot avatar with expressions.", cats: ["ai", "face"],       swatch: "🤖" },
   { id: "AudioLab",         file: "AudioLab.html",         title: "Audio Lab",             desc: "Web Audio synthesis explorer.",                                 cats: ["audio"],            swatch: "♪" },
   { id: "benchmark",        file: "benchmark.html",        title: "Device Benchmark",      desc: "GPU + CPU benchmark suite.",                                    cats: ["debug"],            swatch: "⚙" },
   { id: "cube",             file: "cube.html",             title: "Cube Debug",            desc: "Minimal WebGL2 cube — context smoke test.",                     cats: ["debug"],            swatch: "□" },
@@ -490,9 +490,9 @@ async function fetchAvatars() {
   const builtIns = [
     { key: "RobotExpressive",  label: "RobotExpressive",      url: "RobotExpressive", source: "built-in",
       previewUrl: "/RobotExpressive.html?asset=RobotExpressive" },
-    { key: "RobotWoman",       label: "RobotWoman",           url: "RobotWoman",      source: "built-in",
+    { key: "RobotWoman",       label: "StickWoman",           url: "RobotWoman",      source: "built-in",
       previewUrl: "/RobotExpressive.html?asset=RobotWoman" },
-    { key: "test_rig",         label: "test_rig (Robot Man)", url: "test_rig",        source: "built-in",
+    { key: "test_rig",         label: "StickMan (test rig)",  url: "test_rig",        source: "built-in",
       previewUrl: "/RobotExpressive.html?asset=test_rig" },
   ];
 
@@ -1891,6 +1891,9 @@ const initial = location.hash.replace(/^#/, "");
 if (initial && state.demos.some(d => d.id === initial)) {
   select(initial);
 }
+// v4033 -- ?mode=pipeline deep-link, so server.html's new "Pipeline Routes" button can open straight into it
+// instead of landing on the demo grid and making the visitor find the toggle themselves.
+if (new URLSearchParams(location.search).get("mode") === "pipeline") setViewMode("pipeline");
 window.addEventListener("hashchange", () => {
   const id = location.hash.replace(/^#/, "");
   if (id && state.demos.some(d => d.id === id)) select(id);

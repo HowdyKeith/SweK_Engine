@@ -1902,6 +1902,13 @@ A password fetches a token from the list server; an unregistered callsign needs 
         <button id="bPhysLab" title="show or hide the Physics Lab drawer (opens above)">&#9883; Physics Lab</button>
         <button id="bOpen" title="open the full WebGL render in a new tab">↗ SweK Engine New Tab</button>
         <button id="bShow" title="switch THIS window to the full render">🖥 Open SweK Engine</button>
+        <!-- v4033 -- Keith: "we also have a 'Pipeline Routes' page in the universal viewer. let's make that a
+             big button item on the right side of Server.html. that button can go after the 'Open SweK Engine'
+             button, and then end the line, so 'Avatar mode' always is the first button on the next line." The
+             break below is the same flex-basis:100% idiom already used to start the Portfolio row further
+             down -- one line-break idiom, not a new one. -->
+        <button id="bPipeline" title="open the Universal Viewer's Pipeline Routes builder directly">🧩 Pipeline Routes</button>
+        <div style="flex-basis:100%;height:0;margin:0;padding:0;"></div>
         <button id="bAvatar" title="switch THIS window to avatar-server mode (engine through the avatar window)">🧍 Avatar mode</button>
         <button id="bPipboy" title="switch THIS window to Pip-Boy mode (SweK Pip-Boy models)">📟 Pip-Boy mode</button>
         <button id="bHead" title="switch THIS window to HEAD mode (torso/head avatar models shown as the avatar)">👤 HEAD mode</button>
@@ -2866,6 +2873,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
   document.getElementById("bPipboy").onclick = function(){ try { localStorage.setItem("voxelengine.bootMode", "pipboy"); } catch(e){} location.href = "/pipboy-models.html"; };
   document.getElementById("bHead").onclick = function(){ try { localStorage.setItem("voxelengine.bootMode","avatar"); localStorage.setItem("voxelengine.avatarHost","thead.html"); } catch(e){} location.href = "/avatar-server.html"; };
   document.getElementById("bUniversal").onclick = function(){ location.href = "/universal-viewer.html"; };
+  document.getElementById("bPipeline").onclick = function(){ location.href = "/universal-viewer.html?mode=pipeline"; };
   document.getElementById("bComics").onclick = function(){ try { localStorage.setItem("voxelengine.bootMode", "comics"); } catch(e){} location.href = "/comics.html"; };
   var _sc = document.getElementById("bShowcase"); if (_sc) _sc.onclick = function(){ window.open("/showcase.html", "_blank"); };
   // v3552 — ONE INDEX, THREE KINDS. Replaces the three pills (Demos / Built-In Demos / Applications) that
@@ -2929,6 +2937,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
     var PAGES = [
       { id:"bOpen",      label:"↗ Engine",    href:"/index.html?forceEngine=1",    newTab:true  },
       { id:"bShow",      label:"🖥 SweK Engine",href:"/index.html?forceEngine=1",   newTab:false },
+      { id:"bPipeline",  label:"🧩 Pipeline",   href:"/universal-viewer.html?mode=pipeline", newTab:false },
       { id:"bAvatar",    label:"🧍 Avatar",     href:"/avatar-server.html",         newTab:false },
       { id:"bPipboy",    label:"📟 Pip-Boy",    href:"/pipboy-models.html",         newTab:false },
       { id:"bHead",      label:"👤 HEAD",       href:"/avatar-server.html",         newTab:false },
