@@ -59,11 +59,15 @@
       nobody can read.
     </p>
     <div id="verdicts"></div>
+  <div id="runBox"></div>
   </div>
 </div>
 <script type="module">
 import { probeLocalModel, summarise, MODELS, requestPersistentStorage,
          persistExplain, PERSIST_BEHAVIOUR, engineHint } from "/ui/localModelProbe.js";
+// v4032 -- the flight, after the pre-flight. localModelRun.js owns the download and the run; this page owns
+// only WHERE the door appears, and the door is downloadGate()'s answer rather than this file's opinion.
+import { downloadGate, createRunner, progressLine } from "/ui/localModelRun.js";
 
 const $ = (id) => document.getElementById(id);
 const gb = (n) => n == null ? null : (n / 1e9).toFixed(2) + " GB";
@@ -125,6 +129,7 @@ async function go(finalState) {
       (v.unknowns.length ? "<ul>" + v.unknowns.map((u) => "<li>cannot check: " + u + "</li>").join("") + "</ul>" : "") +
       "</div>";
   }).join("");
+  renderRun(f);
   // v4008 -- Keith: "storage quota can raise to 2 GB, with approval dialog". renderPersist() shows the button
   // when the API exists AND storage is not already persisted; clicking it is the real dialog, not a simulation.
   const pb = $("persistBox");
@@ -172,6 +177,87 @@ async function doPersist() {
   // screen -- it is the only report of what the click actually did, and re-probing is not news that outranks it.
   await go(msg);
 }
+// ---------------------------------------------------------------------------------------------------------
+// v4032 -- THE DOWNLOAD DOOR. Keith: "i do not see a option to download/install." He was right: this page was
+// built to fetch nothing, on purpose, and the run was never built. It is built now, and it opens ONLY where
+// downloadGate() -- which is verdictFor()'s verdict, not a second opinion -- allows it.
+//
+// THE REPO IS TYPED IN RATHER THAN SHIPPED. MODELS carries gemma-gem's README sizes under ids "E2B"/"E4B",
+// which are not HuggingFace repos, and this round could not reach huggingface.co to check any candidate --
+// so a hardcoded `owner/model` string would be a guess that 404s on somebody else's machine and reads as a
+// bug in this page. See ui/localModelRun.js's header.
+//
+// *** VERIFIED IN A REAL BROWSER, BOTH BRANCHES (Chromium 141, v4032). *** Rendered against this container's
+// OWN facts -- no WebGPU adapter -- the door REFUSES and names the blocker per model, with no input and no
+// button. Rendered with Keith's facts injected (Intel UHD 620, real adapter, f16, 10.74 GB quota, 2.15 GB
+// maxBufferSize) the door OPENS: the repo input and the button appear, the huggingface warning and the
+// unknowns are on screen, the generate box stays display:none until a load reaches ready, and typing a
+// malformed id is refused by parseRepoId with a sentence BEFORE any request leaves the page. No JS errors in
+// either render. What is still unexercised anywhere is the real CDN import and the real weight download --
+// no network reaches jsdelivr or huggingface.co from here, and that is said rather than papered over.
+let runner = null;
+function renderRun(f) {
+  const box = $("runBox");
+  if (!box) return;
+  const gates = MODELS.map((m) => ({ m, g: downloadGate(f, m) }));
+  const open = gates.filter((x) => x.g.allowed);
+  if (!open.length) {
+    box.innerHTML = '<div class="verdict"><b>Download is not offered on this box.</b>' +
+      '<div class="note" style="margin-top:6px">Not a missing button &mdash; the probe above ruled it out, and ' +
+      'a gigabyte spent on a certain failure is worse than no button at all.</div><ul>' +
+      gates.map((x) => '<li class="no">' + x.m.label + ": " + x.g.blockers.join("; ") + "</li>").join("") +
+      "</ul></div>";
+    return;
+  }
+  box.innerHTML =
+    '<div class="verdict"><b>Download and run one in this page</b>' +
+    '<div class="note" style="margin-top:6px">Nothing above ruled these out. The <i>unknowns</i> are still ' +
+    'unknown &mdash; on this box the largest single allocation the driver will grant is smaller than both ' +
+    'models&rsquo; stated VRAM, so an out-of-memory here is the likely failure and it is not predictable from ' +
+    'anything a page can read. <b>This downloads weights from huggingface.co</b> &mdash; hundreds of megabytes ' +
+    'to gigabytes, on your connection and your disk.</div>' +
+    '<div class="note" style="margin-top:6px">No model id ships with this page: the sizes above come from ' +
+    'gemma-gem&rsquo;s README and its <code>E2B</code>/<code>E4B</code> names are not HuggingFace repos. Paste ' +
+    'a repo that has an ONNX / transformers.js build, as <code>owner/name</code>.</div>' +
+    '<div style="margin-top:8px"><input id="repoId" placeholder="owner/name" style="min-width:22em" ' +
+    'autocomplete="off" spellcheck="false"> <button id="dl">Check id, then download</button></div>' +
+    '<div id="runState" class="note" style="margin-top:6px"></div>' +
+    '<div id="genBox" style="margin-top:8px;display:none"><input id="prompt" placeholder="a prompt" ' +
+    'style="min-width:22em"> <button id="gen">Generate</button><pre id="genOut" style="white-space:pre-wrap"></pre></div>' +
+    "</div>";
+  const st = (msg, cls) => { const e = $("runState"); if (e) e.innerHTML = cls ? '<span class="' + cls + '">' + msg + "</span>" : msg; };
+  $("dl").onclick = async () => {
+    const repo = ($("repoId").value || "").trim();
+    if (!runner) {
+      runner = createRunner({});
+      runner.on((ev) => {
+        if (ev.type === "progress") st(ev.text);
+        else if (ev.type === "state" && ev.state === "preflight") st("checking that " + repo + " exists\u2026");
+        else if (ev.type === "state" && ev.state === "loading") st("id resolves. Loading the library and the weights\u2026");
+      });
+    }
+    $("dl").disabled = true;
+    const r = await runner.load(repo);
+    $("dl").disabled = false;
+    if (!r.ok) {
+      // THE OOM SUSPICION IS SAID OUT LOUD, because the probe already showed the gap that predicts it.
+      st(r.error + (r.likelyOom
+        ? " \u2014 this looks like an out-of-memory, which is the failure the maxBufferSize gap above predicted. " +
+          "A smaller or more heavily quantised build is the thing to try."
+        : ""), "no");
+      return;
+    }
+    st("ready \u2014 " + r.repo + " on " + r.device + " (" + r.dtype + ")", "yes");
+    $("genBox").style.display = "";
+    $("gen").onclick = async () => {
+      $("gen").disabled = true; $("genOut").textContent = "generating\u2026";
+      const g = await runner.generate($("prompt").value || "");
+      $("gen").disabled = false;
+      $("genOut").textContent = g.ok ? g.text : "FAILED: " + g.error;
+    };
+  };
+}
+
 $("run").onclick = go;
 go();
 </script>
