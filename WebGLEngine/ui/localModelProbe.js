@@ -49,6 +49,116 @@ export const SOFTWARE_HINTS = /swiftshader|llvmpipe|softwarerasterizer|microsoft
 const gb = (n) => (n / 1e9).toFixed(2) + " GB";
 
 /**
+ * *** WHICH ENGINE, BECAUSE persist() MEANS THREE DIFFERENT THINGS AND THE CALL WILL NOT SAY WHICH. ***
+ *
+ * `navigator.userAgentData.brands` is the structured answer and is preferred -- it is a list of brands, not a
+ * string to pattern-match. IT IS SECURE-CONTEXT ONLY, WHICH IS EXACTLY WHERE THIS TREE KEEPS LANDING.
+ *
+ * MEASURED v4029, one browser, one session, two origins:
+ *     http://localhost:34719/    isSecureContext true   userAgentData PRESENT  brands ["Chromium","Not?A_Brand"]
+ *     http://192.0.2.2:34719/    isSecureContext false  userAgentData ABSENT   brands null
+ *
+ * So on the LAN-IP origin Keith opens by default, the good instrument is simply gone and the UA string is all
+ * there is. That is why the fallback exists and why it is not dead code.
+ *
+ * ORDER MATTERS IN THE FALLBACK AND THE MEASURED UA IS WHY. Chromium's own UA reads:
+ *     Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36
+ * It contains BOTH "AppleWebKit" AND "Safari". Testing for Safari first would call Chromium "webkit" and hand
+ * back the wrong story with total confidence. Chromium is therefore ruled in before WebKit is considered.
+ *
+ * Returns null -- never a guess -- when nothing matches. An engine this cannot name is an engine whose persist()
+ * behaviour it must not narrate (v3103: unknown is not yes, and here unknown is not "probably Chrome").
+ */
+export function engineHint(nav = typeof navigator !== "undefined" ? navigator : null) {
+    if (!nav) return null;
+    try {
+        const brands = nav.userAgentData && nav.userAgentData.brands;
+        if (Array.isArray(brands) && brands.length) {
+            const names = brands.map((b) => String(b && b.brand || "")).join(" ");
+            if (/chromium|google chrome|microsoft edge/i.test(names)) return "chromium";
+        }
+    } catch { /* userAgentData is not universal; the UA below is the fallback */ }
+    const ua = String(nav.userAgent || "");
+    if (!ua) return null;
+    if (/firefox\/|\bfxios\b/i.test(ua)) return "firefox";
+    if (/edg\/|edga\/|edgios\/|chrome\/|chromium\/|crios\//i.test(ua)) return "chromium";   // BEFORE webkit
+    if (/safari\//i.test(ua) && /applewebkit/i.test(ua)) return "webkit";
+    return null;
+}
+
+/**
+ * What persist() does on each engine, WITH EACH LINE MARKED MEASURED OR DOCUMENTED. The distinction is the
+ * point: this table is the thing that decides what a button promises a user, so a reader has to be able to see
+ * which rows this tree actually drove and which it is repeating from a spec it did not run.
+ *
+ *   prompts  -- does a permission dialog get DRAWN on a persist() call from a user gesture?
+ *   basis    -- what decides the answer instead, when nothing is drawn.
+ *   remedy   -- what a user can actually DO after a denial. A denial with no remedy is a dead end, and the
+ *               old message ("denied or dismissed") was exactly that.
+ */
+export const PERSIST_BEHAVIOUR = {
+    chromium: {
+        prompts: false,
+        measured: true,   // v4029, Chromium 141 headed under Xvfb, trusted click: false in 1 ms, no UI drawn
+        basis: "decided automatically from how established this site is to the browser, with no dialog at any point",
+        remedy: [
+            "bookmark this page, then reload and click again",
+            "grant this origin notification permission, or install it as an app, if you would use it that way",
+            "revisit it a few times -- Chromium's measure of an established site is built from real use over time",
+        ],
+    },
+    firefox: {
+        prompts: true,
+        measured: false,  // DOCUMENTED, NOT DRIVEN HERE. No Firefox in this container -- said plainly, not implied.
+        basis: "a real permission prompt, which is why an answer can take as long as a person takes",
+        remedy: ["answer Allow on the prompt", "if it never appeared, this origin may already be blocked in Firefox's site permissions"],
+    },
+    webkit: {
+        prompts: false,
+        measured: false,  // DOCUMENTED, NOT DRIVEN HERE.
+        basis: "decided by Safari's own rules for the origin, with no dialog",
+        remedy: ["add this page to favourites or the home screen, then reload and click again"],
+    },
+};
+
+/**
+ * The honest sentence for a persist() result, given the engine. NEVER says "dismissed" on an engine that draws
+ * nothing to dismiss -- that word invents a user action that did not happen and cannot happen.
+ *
+ * Pure: takes the result and the engine, returns a string. Kept out of the page so a gate can drive every
+ * branch without a browser.
+ */
+export function persistExplain(result, engine) {
+    const r = result || {};
+    const b = engine ? PERSIST_BEHAVIOUR[engine] : null;
+    const before = r.quotaBeforeBytes != null ? gb(r.quotaBeforeBytes) : "unknown";
+    const after = r.quotaAfterBytes != null ? gb(r.quotaAfterBytes) : "unknown";
+    if (r.available === false) return "storage.persist() is not available here";
+    if (r.granted) {
+        const raised = r.quotaAfterBytes != null && r.quotaBeforeBytes != null && r.quotaAfterBytes > r.quotaBeforeBytes;
+        return "granted -- this origin's storage is no longer evictable. Quota was " + before + ", now reads " + after +
+            (raised ? " (the browser raised it)"
+                    : " (UNCHANGED -- persistence and quota size are separate things, and only the first was asked for)");
+    }
+    // *** THE BRANCH THAT WAS LYING. ***
+    if (b && b.prompts === false) {
+        // The word "dismissed" is deliberately absent, not merely negated. Telling someone who saw no dialog
+        // that they did not dismiss one raises a question they did not have; "the click did register" is the
+        // reassurance that was actually wanted.
+        return "declined by the browser, and NO DIALOG WAS EVER SHOWN -- on this browser persist() is " + b.basis +
+            ". The click did register. Quota stays at " + before +
+            ". To change the answer: " + b.remedy.join("; ") + ".";
+    }
+    if (b && b.prompts === true) {
+        return "declined -- " + b.basis + ", so this was either answered no or already blocked for this origin. " +
+            "Quota stays at " + before + ". " + b.remedy.join("; ") + ".";
+    }
+    // Engine unknown: describe ONLY what was observed and name the absence rather than filling it in.
+    return "declined by the browser. Quota stays at " + before +
+        ". This browser could not be identified, so whether it shows a dialog for this is not known here.";
+}
+
+/**
  * Everything knowable without downloading. Every field is either a fact or null -- NEVER a default that reads
  * like a fact. `null` means "this browser did not tell us", which the verdict below treats as unknown.
  */
@@ -103,18 +213,41 @@ export async function probeLocalModel(nav = typeof navigator !== "undefined" ? n
             out.usageBytes = typeof e.usage === "number" ? e.usage : null;
         }
     } catch (e) { out.errors.push("storage.estimate: " + String(e).slice(0, 60)); }
-    // v4008 -- Keith: "storage quota can raise to 2 GB, with approval dialog". CONFIRMED against the real API
-    // rather than taken on faith: navigator.storage.persist() exists in this tree's Chromium and
-    // navigator.permissions.query({name:"persistent-storage"}) reports "prompt" -- a genuine dialog is what
-    // shows. What it is NOT confirmed to do is land on any specific number: the persisted-storage ceiling is
-    // disk-relative and platform-dependent, so requestPersistentStorage() below reports the MEASURED before
-    // and after rather than promising "2 GB". This file just records whether the escalation is even possible.
+    // *** v4029 -- v4008's COMMENT HERE STATED AN INFERENCE AS A CONFIRMED FACT, AND IT REACHED A BUTTON. ***
+    //
+    // It said: permissions.query({name:"persistent-storage"}) reports "prompt", THEREFORE "a genuine dialog is
+    // what shows". The first half is true. The second half does not follow, and it is FALSE on Chromium. The
+    // word "prompt" is that permission's default state, not a promise that anything will ever be drawn.
+    //
+    // MEASURED v4029, real Chromium 141, over http://localhost, HEADED under Xvfb, from a REAL TRUSTED CLICK
+    // (a genuine user gesture, not page load, not an untrusted dispatch):
+    //
+    //     permissions.query state : prompt
+    //     persist() returned      : false in 1 ms      <- NOTHING WAS SHOWN. Nobody answers a dialog in 1 ms.
+    //     quota before / after    : UNCHANGED
+    //
+    // Headless was checked first and ruled out as the cause by re-running headed with a display attached; a
+    // CDP Browser.grantPermissions of "durableStorage" was also tried and the answer did not move. Keith saw
+    // this from the other side: "when i click Request more storage (shows a real browser dialog) it quickly
+    // says nothing downloaded". THE WORD "QUICKLY" WAS THE WHOLE REPORT and v4017 read it as a message being
+    // clobbered. That was a real bug and fixing it was right, but it was not this one.
+    //
+    // So the button that said "shows a real browser dialog" promised UI THAT THIS ENGINE NEVER DRAWS. That is
+    // this tree's "a flag that lies is worse than no flag" (v2579) wearing a label instead of a flag: a user
+    // who is told to expect a dialog and sees none concludes the click did not register, and clicks again.
+    //
+    // Hence `engine` below. persist() is one call with THREE different user-visible stories behind it, and
+    // which one is true is not knowable from the call -- only from who implemented it.
     try {
         if (nav && nav.storage) {
             out.persistAvailable = typeof nav.storage.persist === "function";
             if (typeof nav.storage.persisted === "function") out.persisted = await nav.storage.persisted();
         }
     } catch (e) { out.errors.push("storage.persist detection: " + String(e).slice(0, 60)); }
+    out.engine = engineHint(nav);
+    // NOT a fact about this run -- a documented-behaviour lookup keyed on the engine, and null when the engine
+    // is unknown rather than a guess. See PERSIST_BEHAVIOUR for what is measured and what is merely documented.
+    out.persistPromptExpected = out.engine ? PERSIST_BEHAVIOUR[out.engine].prompts : null;
 
     // IS ANYTHING ALREADY DOWNLOADED. Read-only: caches.keys() opens no cache and fetches nothing.
     try {

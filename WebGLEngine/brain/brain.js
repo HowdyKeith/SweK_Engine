@@ -2820,7 +2820,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4028";   // v4028 -- the brain can find an engine that did not take port 8787. v4014's
+const BRAIN_BUILD = "v4029";   // v4029 -- webgpu-llm.html's storage button promised "a real browser dialog"
+// that Chromium never draws: MEASURED headed, from a trusted click, persist() returns false in 1 ms with no UI.
+// The claim traced to v4008 recording an inference ("permissions says prompt, so a dialog shows") as a fact. New
+// engineHint() + PERSIST_BEHAVIOUR marks each row measured-here or documented-only, and a denial now names a
+// remedy instead of saying "dismissed" about a dialog that was never shown.
+// Previously v4028 -- the brain can find an engine that did not take port 8787. v4014's
 // launch() starts a clone on a fresh free port on purpose, and nothing told the brain -- so it logged
 // "errors=168 and climbing" against a healthy bridge on 54026. The bridge now writes its port on a SUCCESSFUL
 // bind and the brain reads that beacon when BRAIN_BRIDGE is unset, refusing a record over an hour old.
