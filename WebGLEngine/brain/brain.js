@@ -2820,13 +2820,44 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4031";   // v4031 -- sourceScan.mjs's shared lexer had no concept of a regex literal,
+const BRAIN_BUILD = "v4032";   // v4032 -- floor-atlas.html and tools/render-qa/deviceOwed.mjs both read from
+// a directory the fleet's real submit path never writes to. androidPeerBridge.js's /android/submit drops every
+// bench report in tools/roundhouse (CFG.roundhouseDir); floor-atlas.html fetched "/roundhouse/" + name instead,
+// a URL prefix ai-bridge/roundhouseBridge.js's owns() claims for its agent API and 404s on anything it does not
+// recognise as a route -- CONFIRMED LIVE against the real server (404 unknown-route on /roundhouse/magmap-bench.json,
+// 200 on the same file at /tools/roundhouse/magmap-bench.json). deviceOwed.mjs's receivedKinds() defaulted to
+// ai-bridge/fleet, a directory nothing has ever written a report to (it does not even exist; ai-bridge/fleetBridge.js
+// owns /fleet/announce, an unrelated peer join/leave broadcast with no JSON files). Both bugs made the exact same
+// claim look true for free: "no device reports have been folded yet" / "received kinds: NONE" -- which was ALWAYS
+// going to be true no matter what any device submitted, so the accountability machinery this tree built specifically
+// to stop "rendered" from reading as "verified" was itself unreachable the whole time it existed.
+// FOUND because Keith pasted a real swek-magmap-bench report from a Mac (Intel gen-8), the FIRST real device
+// submission this atlas has ever received: wg128-shared confirmed fastest (1.21x) on a second, different Intel
+// generation from the gen-9 rig that set the v3965 default, and the measured floor (3.79e-6) lands at 2.64x margin
+// under the shipped 1e-5 tolerance -- comfortable, not tight. Folded into tools/roundhouse/floor-atlas.json exactly
+// as the live endpoint would have (same foldReport() call, same persisted shape); magmap-bench.html now correctly
+// reads VERDICT-IN instead of VERDICT-OWED. renderAccountability-selfcheck's "no verdict received" case moved off
+// the real repo tree (a sandboxed tmpdir) so a future real submission landing there cannot flip that assertion by
+// accident the way this one nearly did unnoticed, and a NEW check there plants a marker directly in the real default
+// directory with no dir override at all, so a regression of the default itself -- not just the reading mechanism --
+// fails loudly. floorAtlas-selfcheck gained the fetch-path check that did not exist before this: source-level proof
+// that the page's fetch prefix cannot collide with roundhouseBridge's PREFIX. Both sabotaged and restored clean.
+// Previously v4031 -- sourceScan.mjs's shared lexer had no concept of a regex literal,
 // so a quote inside a character class desynced it for the rest of the file: 180 files tree-wide were being
 // scanned blind by every gate that used it. Now regex-aware, 180 -> 0. Also: fx/dither.js (Bayer 8x8, wired
 // into wormholeNebula as an opt-in proven byte-identical by default) and brain/rl/surprise.mjs (prediction
 // error as an OOD flag -- it says WHEN to distrust the policy where attribution.mjs says WHY it acted, and
 // gating IG on it saves 93.9% of gradient evaluations). Found along the way: attribution.mjs has been
 // UNWIRED since v4027 -- every "reference" to it in this file is a changelog comment I wrote about it.
+// Also this round (unversioned patches folded in here): knobLiveness.mjs got a main block over its own
+// reportLines() and a reportingTools.mjs row -- graveyard-selfcheck 90 vs 90, green, without touching the
+// baseline. Six pages created after the v3936 residue ceiling (lensing/stellar->cosmic, ecology->matter,
+// cartpole/reactor->physicslab, webgpu-llm->systools) placed by MECHANISM, not filename -- registerResidue-
+// selfcheck 47 -> 41, back on the ceiling exactly. And webgpu-llm.html's download door (ui/localModelRun.js):
+// downloadGate() calls verdictFor() rather than restating it, opens on MAYBE with unknowns shown rather than
+// hidden (v3103 runs both ways: unknown is not yes, unknown is not no), and preflightRepo() resolves config.json
+// before one weight byte downloads. Hit this tree's codeOnly/noComments trap a seventh time ($("genBox") blanks
+// to $("") under codeOnly).
 // Previously v4030 -- route preconditions are declared now (routeRegistry.js), not
 // copied by hand into 187 call sites in five spellings. rocketBridge migrated whole (spawns processes,
 // so it went first); gpuBrainBridge migrated incrementally. Found and fixed a real bug along the way:

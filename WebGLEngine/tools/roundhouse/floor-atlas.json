@@ -1,0 +1,17 @@
+{
+  "kind": "swek-floor-atlas",
+  "entries": {
+    "magmap :: intel/gen-8": {
+      "kernel": "magmap",
+      "adapter": "intel/gen-8",
+      "metric": "float-gap",
+      "worst": 0.0000037883217260518795,
+      "latest": 0.0000037883217260518795,
+      "runs": 1,
+      "tol": 0.00001,
+      "lastAt": "2026-08-26T18:27:15.787Z",
+      "version": 2948
+    }
+  },
+  "skipped": []
+}
