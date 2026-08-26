@@ -28,6 +28,17 @@
 // reported rather than collapsed, because "live in bands and stencil, dead in the other five" is the shape a
 // reader needs to know which run a knob applies to.
 //
+// *** AND THE SAME MISTAKE HAPPENED A SECOND TIME, ONE AXIS ALONG: THE PLANT. *** The corrected per-mode probe
+// still built only the HONEST config, so a knob read solely on the planted branch read as dead. inspiral's
+// `plantedPower` is exactly that -- `const ratePower = c.planted ? c.plantedPower : 3` -- and moving it under
+// the honest build moves nothing BY CONSTRUCTION, while under the plant it moves eight observables. Reporting
+// that as a dead knob would have been reporting a healthy plant as a defect, and the obvious "fix" would have
+// been to delete the knob that makes the plant adjustable.
+//
+// Twice now the reading was entirely an artefact of the question. Liveness is therefore asked across
+// (mode x plant state), and the axes are named in the row so a future third axis is a visible omission rather
+// than a silent one.
+//
 // ================================================================================================================
 // THREE THINGS THIS REPORTS SEPARATELY, BECAUSE COLLAPSING THEM WOULD LOSE THE ANSWER
 // ================================================================================================================
@@ -35,7 +46,20 @@
 //   LIVE       some observable moved. The knob is a cause.
 //   REFUSED    the build threw. *** THIS IS LIVE. *** A knob that rejects a value is read by the code -- a
 //              refusal is a response, and counting it as dead would mark the best-behaved knobs in the lab.
-//   MOVES NOTHING   no observable moved at any probed value, in any probed mode.
+//   MOVES NOTHING   no observable moved at any probed value, in any probed mode or plant state -- INCLUDING a
+//                   wide ladder of 1e-6x to 1e6x, run only for knobs the near ladder left still.
+//
+// *** THE WIDE LADDER EXISTS BECAUSE "FLAT NEARBY" AND "READ BY NOBODY" ARE NOT THE SAME CLAIM, AND THE NEAR
+// LADDER CANNOT TELL THEM APART. *** galaxy.zeroTol feeds `Math.abs(v) < zeroTol` over a spectrum whose zero
+// modes sit at 1e-16 and whose next eigenvalue is order 1: moving the tolerance by 50% cannot change the count
+// and SHOULD NOT -- that gap is the same property structureFactor's absences are graded on, where any threshold
+// between 1e-14 and 1 gives the identical verdict. A knob flat across fifteen orders of magnitude of margin is
+// evidence the answer does not depend on it, which is the opposite of a defect. galaxy.maxHops (a loop bound
+// past the graph's diameter) and box3d.hashTicks (a step count past settling) are the same shape.
+//
+// So a knob is reported still only when it survives BOTH ladders, and the report says which one it survived --
+// because "insensitive over a measured margin" is a finding worth keeping and "moves nothing anywhere" is a
+// different one.
 //
 // AND THE THIRD IS A MEASUREMENT, NEVER A DIAGNOSIS. Dead, saturated at an asymptote, and quantised below the
 // step are three different conditions with the same reading, and this file reports the reading. xenon.highFlux
@@ -69,15 +93,24 @@ export function probeValues(v) {
  *   `refused` IS live -- see the header. `moved` names the observables that changed, because a knob that moves
  *   one observable and a knob that moves twenty are different facts about the same yes.
  */
-export async function probeKnob(device, mode, cfg, knob, base) {
+export async function probeKnob(device, mode, cfg, knob, base, extra = {}) {
     for (const alt of probeValues(cfg[knob])) {
         let out;
-        try { out = await device.build({ mode, config: { ...cfg, [knob]: alt } }); }
+        try { out = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt } }); }
         catch { return { state: "refused", moved: [] }; }
         const moved = Object.keys(base).filter((o) => base[o] !== out[o]);
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };
+}
+
+/** The axes liveness is asked along. Named rather than implicit, so adding a third is a visible change. */
+export const PLANT_STATES = [{ label: "", extra: {} }, { label: "planted", extra: { planted: true } }];
+
+/** Values far outside the working range, tried ONLY for a knob the near ladder left still. */
+export function wideValues(v) {
+    if (typeof v !== "number" || !Number.isFinite(v) || v === 0) return [];
+    return [v * 1e6, v * 1e-6, -v];
 }
 
 /**
@@ -109,19 +142,25 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
             let def; try { def = dev.defaults({ mode }); } catch { continue; }
             const cfg = (def && def.config) || {};
             const m = (def && def.mode) || mode;
-            let base; try { base = await dev.build({ mode: m, config: { ...cfg } }); } catch { continue; }
+            for (const ps of PLANT_STATES) {
+                if (overBudget) break;
+                const where = ps.label ? m + "/" + ps.label : m;
+                let base;
+                try { base = await dev.build({ mode: m, config: { ...cfg, ...ps.extra } }); } catch { continue; }
 
-            for (const knob of Object.keys(cfg)) {
-                if (Date.now() - devStart > budgetMs) { overBudget = true; break; }
-                const v = cfg[knob];
-                const kind = typeof v;
-                if (!acc.has(knob)) acc.set(knob, { kind, probed: [], live: [], still: [], movedMost: 0 });
-                const a = acc.get(knob);
-                if (!probeValues(v).length) { a.kind = Array.isArray(v) ? "array" : kind; continue; }  // strings/arrays: no ordering to perturb along
-                a.probed.push(m);
-                const r = await probeKnob(dev, m, cfg, knob, base);
-                if (r.state === "still") a.still.push(m);
-                else { a.live.push(r.state === "refused" ? m + " (refused)" : m); a.movedMost = Math.max(a.movedMost, r.moved.length); }
+                for (const knob of Object.keys(cfg)) {
+                    if (Date.now() - devStart > budgetMs) { overBudget = true; break; }
+                    const v = cfg[knob];
+                    const kind = typeof v;
+                    if (!acc.has(knob)) acc.set(knob, { kind, probed: [], live: [], still: [], movedMost: 0 });
+                    const a = acc.get(knob);
+                    if (!probeValues(v).length) { a.kind = Array.isArray(v) ? "array" : kind; continue; }  // strings/arrays: no ordering to perturb along
+                    if (a.live.length) continue;                       // already answered yes; the rest is cost
+                    a.probed.push(where);
+                    const r = await probeKnob(dev, m, cfg, knob, base, ps.extra);
+                    if (r.state === "still") a.still.push(where);
+                    else { a.live.push(r.state === "refused" ? where + " (refused)" : where); a.movedMost = Math.max(a.movedMost, r.moved.length); }
+                }
             }
         }
         // A device the budget cut short is REPORTED, never counted as clean. A census that silently dropped its
@@ -134,9 +173,44 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
     return { rows, notes };
 }
 
+/**
+ * Second pass over the knobs the near ladder left still, at 1e-6x to 1e6x. A knob that wakes up out here is
+ * INSENSITIVE over its working range rather than unread, and the margin is the finding.
+ */
+export async function widenStill(rows, { budgetMs = 20000 } = {}) {
+    const MODES = await deviceModeTable();
+    for (const r of rows) {
+        if (!r.probed.length || r.live.length) continue;
+        let dev; try { dev = await getDevice(r.device); } catch { continue; }
+        const t0 = Date.now();
+        for (const mode of (MODES[r.device] || [])) {
+            if (Date.now() - t0 > budgetMs || r.wideLive) break;
+            let def; try { def = dev.defaults({ mode }); } catch { continue; }
+            const cfg = (def && def.config) || {};
+            if (!(r.knob in cfg)) continue;
+            const m = (def && def.mode) || mode;
+            for (const ps of PLANT_STATES) {
+                let base; try { base = await dev.build({ mode: m, config: { ...cfg, ...ps.extra } }); } catch { continue; }
+                for (const alt of wideValues(cfg[r.knob])) {
+                    let out;
+                    try { out = await dev.build({ mode: m, config: { ...cfg, ...ps.extra, [r.knob]: alt } }); }
+                    catch { r.wideLive = "refused at " + alt; break; }
+                    if (Object.keys(base).some((o) => base[o] !== out[o])) { r.wideLive = "moves at " + alt; break; }
+                }
+                if (r.wideLive) break;
+            }
+        }
+    }
+    return rows;
+}
+
 /** Knobs that moved nothing in any mode they were probed in. THE READING, not the diagnosis. */
-export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length)
+export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive)
     .map((r) => r.device + "." + r.knob).sort();
+
+/** Read, but flat across its working range -- and the wide ladder proves the code reaches it. */
+export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive)
+    .map((r) => r.device + "." + r.knob + " (" + r.wideLive + ")").sort();
 
 /**
  * v4025 -- KNOBS THAT MOVE NOTHING AND HAVE AN EXAMINED REASON.
