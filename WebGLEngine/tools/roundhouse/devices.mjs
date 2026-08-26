@@ -15,6 +15,7 @@ import { fragmentRotationDevice } from "./fragmentRotationBind.mjs";  // fractur
 import { structureFactorDevice } from "./structureFactorBind.mjs";    // systematic absences: an answer key that is an exact zero BY LAW
 import { powderDevice } from "./powderBind.mjs";                      // Friedel, and the one cell of the 2x2 that can fire
 import { renderBounceDevice } from "./renderBounceBind.mjs";          // the same solid angle, blocking and emitting
+import { reconQualityDevice } from "./reconQualityBind.mjs";          // the CT score is affine-invariant BY CONSTRUCTION
 import { box3dDevice } from "./box3dBind.mjs";
 import { blobThermalDevice } from "./blobThermalBind.mjs";
 import { meltDevice } from "./meltBind.mjs";                // v3618 - melting, graded against the exact Stefan solution
@@ -173,6 +174,7 @@ const REGISTRY = {
     structureFactor: async () => structureFactorDevice,
     powder: async () => powderDevice,
     renderBounce: async () => renderBounceDevice,
+    reconQuality: async () => reconQualityDevice,
     xpbd: async () => xpbdDevice,
     em: async () => emDevice,
     acoustics: async () => acousticsDevice,
