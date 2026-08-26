@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4024";   // v4024 -- Reactive Resume (MIT, amruthpillai) added to the service catalog
+const BRAIN_BUILD = "v4025";   // v4025 -- crystal diffraction: structurefactor + powder join the roundhouse
+// (DEVICE_NAMES 123 -> 125, coverage 134 of 266) and a new /crystal-diffraction.html front door. The round also
+// fixes a browser defect the existing door could not reach: both physics/crystal modules had a top-level
+// `import ... from "node:url"` wanted only by their CLI guard, so neither loaded in a browser at all --
+// instrument-bench runs them in NODE, the one place it cannot fire. Previously v4024 --   // v4024 -- Reactive Resume (MIT, amruthpillai) added to the service catalog
 // and installer registry. Read from the clone, not from memory: it is a FOUR-container compose stack (app +
 // postgres + redis + seaweedfs), it ships a placeholder AUTH_SECRET that must be changed, and its port 3000
 // is already claimed twice in the same catalog. swekPage omitted on purpose -- no page here is about it, and

@@ -35,7 +35,11 @@ export const SECTIONS = [
               // v3818 -- THE STATISTICAL-MECHANICS DOOR BELONGS WITH THE LAB, not in a thermal drawer of its
               // own. It exists because seven graded modules had no way in at all, which is a LAB problem
               // rather than a physics-topic problem -- the same reasoning that put instrument-bench.html here.
-              "statistical-mechanics.html"] },
+              "statistical-mechanics.html",
+              // v3818's reasoning, arriving a second time. structureFactor.mjs and powder.mjs were graded and
+              // reachable only by typing a selfcheck path -- A LAB PROBLEM rather than a physics-topic problem,
+              // so the door goes with the lab and not into a crystallography drawer of one.
+              "crystal-diffraction.html"] },
     // v3328 -- SAMPLING & METHODS, named by Keith. Eleven instruments that are ABOUT HOW YOU MEASURE rather
     // than about a physical system -- samplers, Langevin, HMC benches, consistency, Binder budgets. They filled
     // cosmic, matter and systools to their ten-page cap at v3324 and sat in Arriving with a reason recorded,
