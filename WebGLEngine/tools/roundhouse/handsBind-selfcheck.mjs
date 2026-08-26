@@ -247,5 +247,59 @@ report("AND WHAT IT DOES NOT CLAIM ABOUT barehands",
     "GESTURE CONTRACT -- tap, pinch-drag, hold-to-rotate, two-hand scale, claw -- which is what named the " +
     "invariances worth grading; its AGPL-3.0 code and its Python/three.js architecture stay on its own side.");
 
+// ---- v4026: THE SECOND PLANT, AND THE NEGATIVE IT WAS BUILT TO MAKE FIRE ------------------------------------
+console.log("\n" + "6. *** v4026 -- THE LOAD-BEARING NEGATIVE THAT NOTHING HAD SHOWN COULD FIRE ***");
+{
+    const anch = await buildHands({ mode: "fixedanchor" });
+    const flat2 = await buildHands({ mode: "flatdistance" });
+
+    ok("!! translationDisagreements was 0 under BOTH arms of the first plant",
+        rigid.translationDisagreements === 0 && flat2.translationDisagreements === 0,
+        "0 and 0 of " + flat2.posesSwept + ". Correct, and an ADMISSION: flatDistance drops the z term and a "
+        + "shift changes no distance at all, so the observable was an untested branch with a licence attached "
+        + "-- knobGate's own phrase, one level up. hands.span, the knob that widens that sweep, was the only "
+        + "knob in the lab that moved no observable at any value in any mode, and THE REASON WAS THIS AND NOT "
+        + "THE KNOB.");
+    ok("!! *** AND NOW IT FIRES: 0 -> 24 ***",
+        rigid.translationDisagreements === 0 && anch.translationDisagreements > 0,
+        "translationDisagreements " + rigid.translationDisagreements + " -> " + anch.translationDisagreements
+        + " of " + anch.posesSwept + ". fixedAnchor references the fold test to a point in the image instead "
+        + "of to the wrist, which is the one edit that makes a classification depend on WHERE THE HAND IS.");
+    ok("!! the second plant is a DECLARED knob in the shipped module, not a bind-level simulation",
+        handsDevice.modes.includes("fixedanchor"),
+        "face/MediaPipeHandTracker.js carries `fixedAnchor: false` in DEFAULT_OPTS beside `flatDistance: false`, "
+        + "and when it is off the fold reference is THE WRIST OBJECT ITSELF -- the same call on the same "
+        + "operand, which is _dist3D's own discipline applied to an operand instead of an argument count.");
+
+    ok("!! *** THE TWO PLANTS ARE COMPLEMENTARY AT THE SHIPPED ANCHOR ***",
+        flat2.rotationDisagreements > 0 && flat2.translationDisagreements === 0 &&
+        anch.rotationDisagreements === 0 && anch.translationDisagreements > 0,
+        "flatdistance rotation " + flat2.rotationDisagreements + " translation " + flat2.translationDisagreements
+        + "  |  fixedanchor rotation " + anch.rotationDisagreements + " translation "
+        + anch.translationDisagreements + ". Neither plant alone shows both invariances can fire.");
+
+    // *** AND THE COMPLEMENTARITY IS A PROPERTY OF THE ANCHOR, NOT A STRUCTURAL FACT. *** Asserted here so the
+    // sentence above cannot be read as more than it is.
+    const far = await buildHands({ mode: "fixedanchor", config: { anchorX: 0, anchorY: 0 } });
+    const onWrist = await buildHands({ mode: "fixedanchor", config: { anchorX: 0.5, anchorY: 0.6 } });
+    ok("!! ...but that is a property of the ANCHOR and the trade reverses, which is why it is a knob",
+        far.rotationDisagreements > 0 && far.translationDisagreements === 0,
+        "at the image corner: rotation " + far.rotationDisagreements + ", translation "
+        + far.translationDisagreements + " -- THE OPPOSITE SPLIT. Far away the anchor acts like a fixed "
+        + "DIRECTION rather than a point, and an ordering by distance along a nearly-parallel field survives a "
+        + "shift while a large angular sweep against it does not. A census stating only the shipped row would "
+        + "be claiming coverage it does not have.");
+    ok("!! *** AND AN ANCHOR PLACED EXACTLY WHERE THE WRIST IS STILL BREAKS IT -- so it is the FIXEDNESS ***",
+        onWrist.translationDisagreements > 0,
+        "anchor (0.5, 0.6) is precisely where place() puts the wrist, so the two coincide before the hand "
+        + "moves, and translation still disagrees " + onWrist.translationDisagreements + " times. NOT THE "
+        + "POSITION, THE FIXEDNESS.");
+    report("WHAT THE SECOND PLANT STILL CANNOT REACH",
+        "in-plane roll and the mirror involution stay at 0 under both plants -- a 2D metric is exactly "
+        + "invariant under rotation in the image plane and a reflection is an isometry, and no anchor changes "
+        + "either. Those two remain load-bearing negatives with no plant, and this round does not pretend "
+        + "otherwise: it closes ONE of the six, and names which.");
+}
+
 console.log("\nhandsBind-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

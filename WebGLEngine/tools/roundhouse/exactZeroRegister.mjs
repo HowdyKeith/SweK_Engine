@@ -303,6 +303,12 @@ export const EXACT_OK = {
     // the bind carries the TRICLINIC cell beside it, which reads 8.882e-16 and is the one that can fail: a
     // cubic-only check would pass an implementation that simply handed back its input scaled.
     "structureFactor.absences.reciprocalResidualCubic": "the identity basis makes every cross product and the cell volume exact on 0/1 operands, so a_i . b_j is 2 pi or 0 with no rounding available. The triclinic cell beside it reads 8.882e-16 and is the one carrying the check",
+    // The MIS balance heuristic is w_i = p_i / (p_light + p_bsdf). The two weights are p/(p+q) and q/(p+q) over
+    // the SAME denominator, so their sum is (p+q)/(p+q) -- one division of one sum, exact for any finite
+    // positive p and q with no cancellation available. It is the only line in that device with no sampling in
+    // it, and it is carried precisely BECAUSE it is exact: it is the reason combining two estimators does not
+    // double-count, and an approximate version would be a silent bias rather than a visible error.
+    "renderBounce.series.misWeightSumErr": "p/(p+q) + q/(p+q) is one division of one sum, exact for any finite positive p and q. An invariance rather than an estimate -- the only part of the device with no sampling in it, and the reason MIS does not double-count",
 };
 
 /**
