@@ -1359,7 +1359,11 @@ window.addEventListener("load", function () {
         <div class="gpanel" data-panel="boundaries" hidden>
           <div class="gpanelHdr">&#9636; PL: Boundaries &amp; Reconstruction</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">What a boundary can and cannot determine, and what a boundary row is worth. Split out of Discretisation &amp; Meshes at v3649 when that drawer reached sixteen -- the third time the 15-page ratchet has caught a subject drifting rather than a shelf running out of room.</div>
-          <div data-panel-pages="boundaries" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          <!-- v4035 -- column layout, not the usual flex-wrap row: this drawer gets an inline one-line
+               descriptor under each link (see BOUNDARY_DESCS below), which needs its own row per page to read
+               cleanly. Keith, reading the panel: "it's like there are a lot of things in boundaries and
+               reconstruction, not sure what those each are as i read carefully." -->
+          <div data-panel-pages="boundaries" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
         <div class="gpanel" data-panel="matter" hidden>
           <div class="gpanelHdr">&#9883;&#65039; Matter &amp; Chaos</div>
@@ -7984,6 +7988,45 @@ for (const sec of shownSections) {
   }
 }
 
+// v4035 -- INLINE DESCRIPTORS for the Boundaries & Reconstruction drawer, and ONLY this one. Keith read all
+// eleven links and could not tell what each was without hovering each in turn: "it's like there are a lot of
+// things in boundaries and reconstruction, not sure what those each are as i read carefully." The real
+// one-line finding was already sitting in the anchor's own `title` -- just invisible without a hover.
+// BOUNDARY_DESCS is HAND-WRITTEN, not a truncation of the title: these are dense technical sentences and an
+// automatic cut mid-clause reads worse than no summary at all. Runs after the mover above, on the anchors it
+// already placed -- no second copy of which pages belong here, only a description for the ones that do.
+{
+  const BOUNDARY_DESCS = {
+    "boundary-rank.html": "Which boundary cells have an undetermined gradient — exactly 2 per mesh, not the 30-254 “boundary cells” guess.",
+    "tet-rank.html": "The same rank-deficiency count, carried into 3D.",
+    "rank-repair.html": "What actually fixes an undetermined gradient: vertex stencils, checked against Dirichlet/Neumann alternatives.",
+    "rank-repair-3d.html": "The same repairs in 3D — where a false zero-Neumann now reads as a real signal.",
+    "discontinuity.html": "The same vertex-stencil fix, applied across a shock or discontinuity.",
+    "wall-condition.html": "Where the standard “zero-Neumann wall” assumption silently produces a wrong answer.",
+    "curved-wall.html": "The zero-flux wall condition holds pointwise on a curve, but one boundary row can't represent it.",
+    "quadratic-recon.html": "A higher-order boundary-row fix, and the three ways it falls short of what was hoped.",
+    "quadratic-wall.html": "The quadratic fix in practice: a steady ~40% improvement, not a better convergence order.",
+    "row-weight.html": "Moving the boundary row onto the wall satisfies the constraint exactly — and makes the answer worse.",
+    "weight-scaling.html": "Does the boundary row's best weight change as the mesh refines? Converges to about 0.218.",
+  };
+  const bSlot = document.querySelector('[data-panel-pages="boundaries"]');
+  if (bSlot) {
+    for (const a of [...bSlot.querySelectorAll(":scope > a")]) {
+      const href = (a.getAttribute("href") || "").replace(/^\//, "");
+      const desc = BOUNDARY_DESCS[href];
+      if (!desc) continue;   // a page the registry moved in later, with no descriptor yet -- shown plain, not blocked
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:6px;align-items:baseline;";
+      a.parentNode.insertBefore(row, a);
+      row.appendChild(a);
+      const why = document.createElement("span");
+      why.textContent = desc;
+      why.style.cssText = "font-size:10px;color:var(--dim);";
+      row.appendChild(why);
+    }
+  }
+}
+
 // WHAT DID NOT MOVE IS SAID OUT LOUD RATHER THAN LEFT AS A GAP. A registry naming a page that has no anchor
 // would quietly render one fewer link, and a missing page and a page nobody assigned look identical from here.
 if ((missing.length || elsewhere.length) && arrivingRow) {
@@ -8018,7 +8061,18 @@ window.swekMarkPanelLinks = function () {
   // stays -- it covers the other ordering -- and this pass covers this one. TWO ORDERINGS, TWO DEFENCES.
   let removed = 0;
   for (const panel of document.querySelectorAll('.gpanel')) {
-    const owned = new Set([...panel.querySelectorAll('[data-panel-pages] > a[href]')].map((a) => a.getAttribute("href")));
+    // v4035 -- WAS `[data-panel-pages] > a[href]` (direct children only). The Boundaries & Reconstruction
+    // drawer's inline descriptors (BOUNDARY_DESCS, above) wrap each mover-placed anchor one level deeper, in
+    // its own row div, so the direct-child selector stopped matching THOSE anchors -- "owned" read empty for
+    // that drawer, the guard below found nothing to protect, and every one of its eleven links got a bare-slug
+    // .placedPages duplicate underneath it, re-creating exactly the wall-of-unlabelled-names problem the
+    // descriptors were built to fix. CONFIRMED live: this exact duplication was already present on the
+    // shipped v4034 build too (checked out and reloaded before touching this file), so the bug is not new --
+    // only now visible, because the drawer that surfaces it is the one just made readable. Descendant selector,
+    // not direct-child: the intent is "does this drawer already link to this href", which does not care how
+    // deep the anchor sits, and .placedPages lives as a SIBLING of [data-panel-pages] (not inside it), so this
+    // widening cannot match a .placedPages anchor against itself.
+    const owned = new Set([...panel.querySelectorAll('[data-panel-pages] a[href]')].map((a) => a.getAttribute("href")));
     if (!owned.size) continue;
     // ONLY a placements-added anchor is ever removed, and only when the drawer already owns that exact href.
     // The mover's anchors are authoritative -- they carry the icon and the title -- and nothing here can touch
