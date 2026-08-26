@@ -1,0 +1,97 @@
+// tools/roundhouse/structureFactorBind.mjs
+//
+// DIFFRACTION FROM A LATTICE -- THE ONLY SUBJECT IN THIS LAB WHOSE ANSWER KEY IS AN EXACT ZERO BY LAW.
+//
+// Every other instrument here hunts for agreements with no tolerance in them: integer root counts, flip counts,
+// rank equalities. *** CRYSTALLOGRAPHY HANDS THEM OVER FOR FREE. A SYSTEMATIC ABSENCE IS NOT A SMALL NUMBER, IT
+// IS A REFLECTION THAT CANNOT EXIST. *** An FCC lattice produces NO signal at mixed-parity hkl; BCC none where
+// h+k+l is odd; diamond kills a further class. The sum over the basis is ALGEBRAICALLY zero, and a structure
+// returning anything there is wrong about the crystal rather than imprecise about the arithmetic.
+//
+// MEASURED, AND THE SEPARATION IS THE WHOLE POINT:
+//
+//     FCC, 540 mixed-parity reflections     worst |F| = 9.797e-16
+//     smallest ALLOWED |F| anywhere         4.000000
+//     *** A GAP OF 4.1e15 ***
+//
+// There is no epsilon to argue about: any tolerance between 1e-14 and 1 gives the identical verdict, which is
+// what it means for a key to be EXACT rather than tight. BCC's odd class comes in at 4.900e-15 and diamond's at
+// 6.432e-15, all against a floor of 4, 2 and 5.657 respectively.
+//
+// *** THE PLANT IS THE ERROR THAT MAKES ABSENCES INTO PEAKS: one basis atom off its site. *** Displace the FCC
+// face-centre at [0, 0.5, 0.5] by a fraction of a cell and the destructive interference stops being exact --
+// forbidden reflections light up, which is a crystal that is not the crystal you named. plantKind KNOB: the
+// displacement is a config value, and the census can see it.
+//
+// AND TWO OF THE FOUR ROUTES ARE BLIND TO IT, WHICH IS HOW THE DISAGREEMENT IS LOCALISED.
+//
+//   THE DIRECT SUM      adds phasors over atom positions and knows nothing about parity -- IT MOVES.
+//   THE CLOSED FORM     is the parity rule and never touches an atom -- BLIND.
+//   THE RECIPROCAL IDENTITIES  a_i . b_j = 2 pi delta_ij, a fact about the LATTICE VECTORS -- BLIND, because
+//                       moving an atom inside the cell does not move the cell.
+//
+// So the plant is caught as a DISAGREEMENT BETWEEN TWO ROUTES rather than by either alone, and the reciprocal
+// residual stays at its exact zero throughout -- a reference that moved with the thing it grades would not be
+// one. A device carrying only the closed form would report a perfect crystal while the atoms were in the wrong
+// places.
+
+import {
+    BASES, structureFactorSum, structureFactorClosed, isAbsent, absenceSweep, reciprocalResidual,
+} from "../../physics/crystal/structureFactor.mjs";
+
+export const SF_OBSERVABLES = [
+    "nAbsent", "nAllowed", "worstAbsent", "minAllowed", "absenceGap",
+    "closedVsSumWorst", "reciprocalResidualCubic", "reciprocalResidualTriclinic",
+    "forbiddenLitUp",
+];
+
+const DEF = { lattice: "fcc", hklMax: 4, displace: 0 };
+
+// reciprocalResidual reports the two ways a_i . b_j can be wrong SEPARATELY -- a diagonal that missed 2 pi and an
+// off-diagonal that failed to vanish. Neither alone is the residual; the worse of them is.
+function recipWorst(a1, a2, a3) {
+    const r = reciprocalResidual(a1, a2, a3);
+    return r.ok ? Math.max(r.diagonal, r.offDiagonal) : Infinity;
+}
+
+function buildSF({ mode = "absences", config = {} } = {}) {
+    const c = { ...DEF, ...config };
+    // THE PLANT: one basis atom off its site. `displace` is a real knob -- 0 is the true crystal.
+    const d = config.planted ? (c.displace || 0.05) : c.displace;
+    const basis = BASES[c.lattice].map((p, i) => (i === 1 ? [p[0] + d, p[1], p[2]] : p));
+
+    const sweep = absenceSweep(c.lattice, { hklMax: c.hklMax });
+
+    // Walk the same hkl range the sweep does, comparing the two routes on the PLANTED basis.
+    let closedVsSumWorst = 0, forbiddenLitUp = 0;
+    const M = c.hklMax;
+    for (let h = -M; h <= M; h++) for (let k = -M; k <= M; k++) for (let l = -M; l <= M; l++) {
+        if (h === 0 && k === 0 && l === 0) continue;
+        const sum = structureFactorSum(basis, h, k, l).mag;
+        const closed = Math.abs(structureFactorClosed(c.lattice, h, k, l));
+        closedVsSumWorst = Math.max(closedVsSumWorst, Math.abs(sum - closed));
+        // A reflection the law forbids that is nevertheless producing signal.
+        if (isAbsent(c.lattice, h, k, l) && sum > 1e-9) forbiddenLitUp++;
+    }
+
+    return {
+        nAbsent: sweep.nAbsent, nAllowed: sweep.nAllowed,
+        worstAbsent: sweep.worstAbsent, minAllowed: sweep.minAllowed,
+        // The separation, as one number. null when a lattice has no absences at all (sc).
+        absenceGap: sweep.worstAbsent > 0 ? sweep.minAllowed / sweep.worstAbsent : Infinity,
+        closedVsSumWorst,
+        // The lattice is untouched by a basis displacement, so these are the reference that must not move.
+        reciprocalResidualCubic: recipWorst([1, 0, 0], [0, 1, 0], [0, 0, 1]),
+        reciprocalResidualTriclinic: recipWorst([1, 0, 0], [0.3, 1.1, 0], [0.2, 0.4, 0.9]),
+        forbiddenLitUp,
+    };
+}
+
+export const structureFactorDevice = {
+    plantKind: "knob",
+    modes: ["absences"],
+    name: "systematic-absences-exact-zero-by-law",
+    observables: SF_OBSERVABLES,
+    build: buildSF,
+    defaults: ({ mode } = {}) => ({ mode: mode || "absences", config: { ...DEF } }),
+};

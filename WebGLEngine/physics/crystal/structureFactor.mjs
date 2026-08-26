@@ -48,7 +48,6 @@
 // is REAL, so its zeros are SIGN CHANGES, and a sign change needs no threshold and cannot be missed between two
 // samples that straddle it. Exact for N = 2, 3, 4, 5, 6, 8 and 12.
 "use strict";
-import { pathToFileURL } from "node:url";
 
 const TAU = 2 * Math.PI;
 export const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -235,7 +234,13 @@ export function reportLines() {
     return L;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+// THE CLI GUARD, WITH ITS node: IMPORT DEFERRED INTO IT. *** A STATIC `import "node:url"` AT THE TOP OF
+// THIS FILE MADE THE MODULE UNIMPORTABLE FROM A BROWSER -- the specifier does not resolve there, so the
+// whole file fails to load and every export with it. *** That cost this arc its front door: the physics was
+// graded and reachable only by typing a selfcheck path. The guard short-circuits before the import runs, so
+// nothing changes for node, and the browser never reaches it. buildPageIndex.mjs already used this form.
+if (typeof process !== "undefined" && Array.isArray(process.argv) &&
+    import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1] || "").href) {
     for (const l of reportLines()) console.log(l);
     process.exit(0);
 }

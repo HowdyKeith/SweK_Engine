@@ -288,6 +288,21 @@ export const EXACT_OK = {
     // blobKelvin's two conversions are exact linear inverses of one another, which the blobKelvin selfcheck already
     // asserts deliberately ("inverse functions, not approximate ones").
     "blobkelvin.convert.roundTripErrFrac": "kelvinOfWarmth and warmthOfKelvin are exact linear inverses; the round trip returns the same float by construction",
+
+    // --- v4023/v4025: the two the crystal and fracture rounds brought in. Both examined against the number.
+    // The rotated box: an orthogonal similarity preserves the diagonal sum, and MEASURED, both sides land on
+    // the same float -- sum(eigenvalues) = 15.000000000000004 and tr(I) = 15.000000000000004, bit for bit --
+    // so the residual is exactly zero rather than at 1e-15. It is NOT a mirror: tred2 + tql never sees tr(I) as
+    // a target, and the same invariance measured over real fracture fragments (censusWorstTraceResidual) comes
+    // back at 3.193e-16, which is what the check reads when the two floats are merely close. What makes THIS
+    // one exact is that a single conjugation of a diagonal by one rotation accumulates the same rounding twice.
+    "fragmentRotation.fragments.traceResidual": "an orthogonal similarity preserves the diagonal sum; on this one tensor sum(eigs) and tr(I) land on the identical float (15.000000000000004), so the invariance reads exactly zero. The eigensolver never targets the trace, and the same check over real fragments reads 3.193e-16",
+    // The cubic cell is the degenerate case of the reciprocal identities BY CONSTRUCTION: b_i = 2 pi (a_j x a_k)/V
+    // on the identity basis gives cross products and a volume made only of 0s and 1s, so every b_i is exactly
+    // (2 pi, 0, 0) and its permutations and every a_i . b_j is 2 pi or 0 with no rounding to make. That is why
+    // the bind carries the TRICLINIC cell beside it, which reads 8.882e-16 and is the one that can fail: a
+    // cubic-only check would pass an implementation that simply handed back its input scaled.
+    "structureFactor.absences.reciprocalResidualCubic": "the identity basis makes every cross product and the cell volume exact on 0/1 operands, so a_i . b_j is 2 pi or 0 with no rounding available. The triclinic cell beside it reads 8.882e-16 and is the one carrying the check",
 };
 
 /**
