@@ -73,6 +73,8 @@
 // modes were READ from one whose modes were GUESSED. A census that hid that distinction would be claiming
 // coverage it does not have.
 "use strict";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";
 
@@ -272,4 +274,32 @@ export async function reportLines(opts = {}) {
     L.push("  step are three different conditions that produce this same one.");
     for (const n of notes) L.push("  note: " + n);
     return L;
+}
+
+// *** v4031 -- THE MAIN BLOCK, WHICH IS WHAT MAKES THIS A TOOL RATHER THAN A LIBRARY NOBODY CALLS. ***
+//
+// This module shipped with a page and a gate declared in physics/instruments.mjs and NO WAY TO RUN IT: the
+// only importer in the tree was its own selfcheck, so graveyard-selfcheck counted it an ORPHANED UTILITY and
+// said the right thing -- "wire it, or delete it". The tree has settled this exact shape before and recorded
+// how: v3219-v3220 gave five analysis tools a main block and a page, and eight modules came off the list,
+// "because A TOOL YOU CAN RUN IS A TOOL WITH A CALLER".
+//
+// IT PRINTS AND CHANGES NOTHING -- no writeFileSync, no exit(1). That is the REPORTING contract this tree
+// draws a hard line on (capabilityCard-selfcheck: "a report prints and exits zero; a gate that fails exits
+// nonzero", and v3327 was correctly refused for conflating them). The verdicts here are a READING, and the
+// module's own closing lines say so: dead, saturated at an asymptote, and quantised below the search step are
+// three different conditions that produce the same MOVES NOTHING.
+//
+// --only <a,b> narrows to named devices and --budget <ms> bounds the per-knob probe, because the full census
+// walks every declared knob across (mode x plant state) and a reader chasing one device should not pay for
+// all of them.
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+    const argv = process.argv.slice(2);
+    const valueOf = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : null; };
+    const only = (valueOf("--only") || "").split(",").map((s2) => s2.trim()).filter(Boolean);
+    const budget = parseInt(valueOf("--budget") || "", 10);
+    reportLines({
+        only: only.length ? only : null,
+        ...(Number.isFinite(budget) && budget > 0 ? { budgetMs: budget } : {}),
+    }).then((L) => console.log(L.join("\n")));
 }
