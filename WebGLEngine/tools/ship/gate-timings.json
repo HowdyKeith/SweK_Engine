@@ -137,9 +137,9 @@
   "face/skinnedFit-selfcheck.mjs": 92,
   "fluid/flip2d-selfcheck.mjs": 2112,
   "fluid/flip3d-selfcheck.mjs": 63574,
-  "fluid/freeSurface-selfcheck.mjs": 4516,
-  "fluid/multigrid-falsyzero-selfcheck.mjs": 604,
-  "fluid/multigrid3d-selfcheck.mjs": 30153,
+  "fluid/freeSurface-selfcheck.mjs": 4460,
+  "fluid/multigrid-falsyzero-selfcheck.mjs": 602,
+  "fluid/multigrid3d-selfcheck.mjs": 29746,
   "fluid/multigridGPU-selfcheck.mjs": 488,
   "fx/anime4k/anime4k-selfcheck.mjs": 185,
   "fx/avatar/studioCast-selfcheck.mjs": 186,
@@ -1181,9 +1181,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 130,
+  "timedThisRun": 133,
   "totalInRecord": 1176,
-  "at": "2026-08-26T23:47:19Z"
+  "at": "2026-08-26T23:47:54Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
