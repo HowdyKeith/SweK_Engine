@@ -221,7 +221,31 @@ export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && 
  * exists for the case where the right answer is a sentence instead of a fix; adding to it before trying the fix
  * is how a ratchet grows back (v3211's rule, collected here).
  */
-export const STILL_OK = {};
+export const STILL_OK = {
+    // Young's modulus, read through `lame(c.E, c.nu)` into every mode -- and MEASURED FLAT over four orders of
+    // magnitude in all four modes, both plant states, and negative. That is not insensitivity over a margin
+    // like galaxy.zeroTol; it is EXACT INVARIANCE, and it is the property the device is for. Drucker-Prager's
+    // keys are statements about the YIELD SURFACE: below yield the return mapping is the identity, above it the
+    // projection lands the yield function at exactly zero, cohesionless material collapses to the apex, and the
+    // shear observables are functions of the friction angle alone. Every one is homogeneous in the elastic
+    // moduli, because a friction angle is not a stiffness. *** THE HONEST CONSEQUENCE IS THAT NO KEY THIS
+    // DEVICE CARRIES CAN GRADE E OR nu *** -- they are real inputs to the material and the yield surface is
+    // blind to them by construction, which is worth knowing rather than worth silencing.
+    "mpmdrucker.E": "the Drucker-Prager keys are exactly homogeneous in the elastic moduli -- a friction angle is not a stiffness -- so E is flat over four decades, in all four modes, both plant states, and negative. No key this device carries can grade it",
+
+    // The width of the translation sweep in the dislocation test: `for (const dx of [-c.span, -c.span/2,
+    // c.span/2, c.span])`. It is read, and it makes the test STRONGER -- a wider translation is a harder
+    // invariance to satisfy. But the observable it feeds, translationDisagreements, is a LOAD-BEARING NEGATIVE
+    // pinned at 0: classification must not change when a hand pose moves. MEASURED 0 at every span in
+    // [0.02, 0.4], in all four modes, honest AND planted -- so the knob has nothing to move while the property
+    // holds, which is exactly when it should have nothing to move.
+    //
+    // *** WHAT IS ACTUALLY MISSING IS A PLANT THAT BREAKS TRANSLATION INVARIANCE. *** Without one, the test
+    // this knob strengthens has never been shown to be ABLE to fail -- knobGate's own phrase, "an untested
+    // branch with a licence attached", one level up. Registered here rather than fixed because the fix belongs
+    // to handsBind's plant, not to the knob.
+    "hands.span": "widens a translation sweep whose observable is a load-bearing negative pinned at 0; flat at every span because the invariance holds. The gap is a PLANT that breaks translation invariance -- until one exists, the test this knob strengthens has never been shown able to fail",
+};
 
 /** v3327's split: this half PRINTS, and knobLiveness-selfcheck beside it is what exits nonzero. */
 export async function reportLines(opts = {}) {
