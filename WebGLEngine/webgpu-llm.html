@@ -68,6 +68,10 @@ import { probeLocalModel, summarise, MODELS, requestPersistentStorage,
 // v4032 -- the flight, after the pre-flight. localModelRun.js owns the download and the run; this page owns
 // only WHERE the door appears, and the door is downloadGate()'s answer rather than this file's opinion.
 import { downloadGate, createRunner, progressLine } from "/ui/localModelRun.js";
+// v4036 -- Keith: "can we add the possible repos that will work for this webgpu llm page? do they indicate why
+// there are differences, and if they would matter to which one i would pick to download?" See this module's
+// header for what CORROBORATED means here and why it is not the same claim as MEASURED.
+import { MODEL_REPO_CANDIDATES, CONFIDENCE_NOTE } from "/ui/modelRepoCandidates.js";
 
 const $ = (id) => document.getElementById(id);
 const gb = (n) => n == null ? null : (n / 1e9).toFixed(2) + " GB";
@@ -183,9 +187,17 @@ async function doPersist() {
 // downloadGate() -- which is verdictFor()'s verdict, not a second opinion -- allows it.
 //
 // THE REPO IS TYPED IN RATHER THAN SHIPPED. MODELS carries gemma-gem's README sizes under ids "E2B"/"E4B",
-// which are not HuggingFace repos, and this round could not reach huggingface.co to check any candidate --
-// so a hardcoded `owner/model` string would be a guess that 404s on somebody else's machine and reads as a
-// bug in this page. See ui/localModelRun.js's header.
+// which are not HuggingFace repos, and no `owner/model` string is hardcoded as a default here even now -- an
+// empty #repoId is still the honest starting state. See ui/localModelRun.js's header.
+//
+// v4036 -- WHAT CHANGED IS ui/modelRepoCandidates.js, NOT THIS STANCE. Keith asked for candidate repos and
+// whether their differences would matter to a choice; this round had WebSearch/WebFetch (still no direct
+// route to huggingface.co -- the egress proxy blocks the domain outright, so nothing was fetched and
+// byte-checked live). Every id in that module was cross-checked across multiple independent sources reached
+// through search rather than typed from memory, and is labelled CORROBORATED rather than MEASURED for exactly
+// that reason -- see that module's own header. The "Use this repo" buttons below fill #repoId AND #dtype from
+// that data; nothing here decides for the reader, and preflightRepo() still resolves config.json for whatever
+// ends up in the field before a single weight byte moves, whether typed or clicked.
 //
 // *** VERIFIED IN A REAL BROWSER, BOTH BRANCHES (Chromium 141, v4032). *** Rendered against this container's
 // OWN facts -- no WebGPU adapter -- the door REFUSES and names the blocker per model, with no input and no
@@ -218,16 +230,45 @@ function renderRun(f) {
     'to gigabytes, on your connection and your disk.</div>' +
     '<div class="note" style="margin-top:6px">No model id ships with this page: the sizes above come from ' +
     'gemma-gem&rsquo;s README and its <code>E2B</code>/<code>E4B</code> names are not HuggingFace repos. Paste ' +
-    'a repo that has an ONNX / transformers.js build, as <code>owner/name</code>.</div>' +
+    'a repo that has an ONNX / transformers.js build, as <code>owner/name</code> &mdash; or pick one of the ' +
+    'candidates below, which fills both fields for you.</div>' +
+    '<div id="repoCandidates" style="margin-top:8px"></div>' +
     '<div style="margin-top:8px"><input id="repoId" placeholder="owner/name" style="min-width:22em" ' +
-    'autocomplete="off" spellcheck="false"> <button id="dl">Check id, then download</button></div>' +
+    'autocomplete="off" spellcheck="false"> ' +
+    '<select id="dtype" title="quantization to load"><option>q4</option><option>q4f16</option>' +
+    '<option>fp16</option><option>int8</option><option>bnb4</option><option value="">(unset)</option></select> ' +
+    '<button id="dl">Check id, then download</button></div>' +
     '<div id="runState" class="note" style="margin-top:6px"></div>' +
     '<div id="genBox" style="margin-top:8px;display:none"><input id="prompt" placeholder="a prompt" ' +
     'style="min-width:22em"> <button id="gen">Generate</button><pre id="genOut" style="white-space:pre-wrap"></pre></div>' +
     "</div>";
+  // v4036 -- the candidate list. Every fact printed here comes from ui/modelRepoCandidates.js, not this
+  // function, so a stale or wrong size is one file to fix rather than a string to hunt down in markup.
+  const cbox = $("repoCandidates");
+  if (cbox) {
+    const fmtSizes = (sizes) => Object.entries(sizes || {}).filter(([, v]) => v)
+      .map(([k, v]) => k + ": " + (v / 1e6).toFixed(0) + " MB").join(", ") || "sizes not found this round";
+    cbox.innerHTML = MODEL_REPO_CANDIDATES.map((c, i) =>
+      '<div class="verdict" style="margin-top:6px"><b>' + c.label + "</b> &mdash; <code>" + c.repo + "</code>" +
+      '<div class="note" style="margin-top:4px">' + c.params + ". " + c.license + "</div>" +
+      '<div class="note" style="margin-top:4px">' + fmtSizes(c.sizes) +
+      (c.dtypeSelectable ? "" : " (this repo bakes one dtype into its own name; the dtype field is a hint, not a choice)") +
+      "</div>" +
+      '<div class="note" style="margin-top:4px">' + c.note + "</div>" +
+      '<button data-cand="' + i + '" style="margin-top:6px">Use this repo</button></div>'
+    ).join("") + '<p class="note" style="margin-top:6px">' + CONFIDENCE_NOTE + "</p>";
+    cbox.querySelectorAll("button[data-cand]").forEach((b) => {
+      b.onclick = () => {
+        const c = MODEL_REPO_CANDIDATES[+b.dataset.cand];
+        $("repoId").value = c.repo;
+        $("dtype").value = c.recommendedDtype;
+      };
+    });
+  }
   const st = (msg, cls) => { const e = $("runState"); if (e) e.innerHTML = cls ? '<span class="' + cls + '">' + msg + "</span>" : msg; };
   $("dl").onclick = async () => {
     const repo = ($("repoId").value || "").trim();
+    const dtype = ($("dtype").value || "").trim();
     if (!runner) {
       runner = createRunner({});
       runner.on((ev) => {
@@ -237,7 +278,7 @@ function renderRun(f) {
       });
     }
     $("dl").disabled = true;
-    const r = await runner.load(repo);
+    const r = await runner.load(repo, dtype ? { dtype } : {});
     $("dl").disabled = false;
     if (!r.ok) {
       // THE OOM SUSPICION IS SAID OUT LOUD, because the probe already showed the gap that predicts it.
@@ -261,3 +302,10 @@ function renderRun(f) {
 $("run").onclick = go;
 go();
 </script>
+<!-- v4036 -- Keith: "this page needs the top center docked gauges/avatar. the only pages that should not
+     have it are ones that might conflict with the dock somehow, or are a full render and may have it's own
+     dock." This page is a static probe + form (no WebGL/WebGPU canvas of its own to fight the dock for
+     space), so it is exactly the case the carve-out does not apply to. Same self-mount idiom as boids.html
+     and every other standalone demo: idempotent (window.__demoChromeMounted guards double-mount), so this is
+     additive even if a future embedder (universal-viewer.html) also injects it. -->
+<script type="module" src="/ui/demoChrome.js"></script>
