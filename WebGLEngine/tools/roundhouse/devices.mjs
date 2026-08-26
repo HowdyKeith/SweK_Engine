@@ -14,6 +14,7 @@ import { xenonDevice } from "./xenonBind.mjs";                // xenon-135: the 
 import { fragmentRotationDevice } from "./fragmentRotationBind.mjs";  // fracture fragments: the rotated box is the only independent answer
 import { structureFactorDevice } from "./structureFactorBind.mjs";    // systematic absences: an answer key that is an exact zero BY LAW
 import { powderDevice } from "./powderBind.mjs";                      // Friedel, and the one cell of the 2x2 that can fire
+import { renderBounceDevice } from "./renderBounceBind.mjs";          // the same solid angle, blocking and emitting
 import { box3dDevice } from "./box3dBind.mjs";
 import { blobThermalDevice } from "./blobThermalBind.mjs";
 import { meltDevice } from "./meltBind.mjs";                // v3618 - melting, graded against the exact Stefan solution
@@ -171,6 +172,7 @@ const REGISTRY = {
     fragmentRotation: async () => fragmentRotationDevice,
     structureFactor: async () => structureFactorDevice,
     powder: async () => powderDevice,
+    renderBounce: async () => renderBounceDevice,
     xpbd: async () => xpbdDevice,
     em: async () => emDevice,
     acoustics: async () => acousticsDevice,
