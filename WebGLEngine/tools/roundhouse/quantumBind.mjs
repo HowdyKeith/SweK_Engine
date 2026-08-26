@@ -18,7 +18,7 @@ import { wellLevel, oscillatorLevel, barrierTransmission, squareWellLevels, osci
 // module-scope import of the same name puts the whole function in the temporal dead zone -- build() threw
 // "Cannot access 'gaps' before initialization" from a line that never runs in that mode. A COLLISION THAT ONLY
 // FIRES IN THE BRANCH THAT DOES NOT USE EITHER ONE.
-import { bandEdges, gaps as kpGaps, kpRhs, numericEdges } from "../../physics/quantum/kronigPenney.js";
+import { bandEdges, gaps as kpGaps, kpRhs, numericEdges, blochSpectrum } from "../../physics/quantum/kronigPenney.js";
 
 export const QUANTUM_OBSERVABLES = [
     "levelErrWorst", "ratio21", "ratio31", "gapWidens",
@@ -26,7 +26,7 @@ export const QUANTUM_OBSERVABLES = [
     "transmission", "energyOverBarrier", "barrierWidth",
     "norm", "normDrift", "steps", "gridN",
     "bandCount", "gapCount", "widestGap", "edgeRhsWorst", "insideGapWorst", "insideBandWorst",
-    "numericEdgeWorst", "bandGridN",
+    "numericEdgeWorst", "bandGridN", "edgeSymmetryMismatches",
 ];
 
 const DEF = {
@@ -117,7 +117,30 @@ export async function buildQuantum(hyp, base = {}) {
         for (let i = 0; i < nEdges; i++) {
             numericEdgeWorst = Math.max(numericEdgeWorst, Math.abs(edges[i] - numeric.all[i]) / Math.abs(edges[i]));
         }
+        // *** THE THIRD ROUTE, AND THE ONE THE GAP CHECKS ABOVE ARE BLIND TO. *** numericEdges MERGES the
+        // periodic and antiperiodic spectra into one sorted list, so every check built on `all` is invariant
+        // under EXCHANGING THE TWO -- the union does not change. But that exchange is exactly the fault this
+        // module's own header names: "the wrap element carries the sign ... that single sign is the whole of
+        // Bloch's theorem at these two special points, and getting it wrong SWAPS EVERY BAND EDGE WITH ITS
+        // NEIGHBOUR." A band structure with Bloch's theorem inverted passes edgeRhsWorst, insideGapWorst,
+        // insideBandWorst AND numericEdgeWorst without a mark.
+        //
+        // So each analytic edge is asked which symmetry it belongs to, two ways that share no code: kpRhs's SIGN
+        // there (+1 at k = 0, -1 at k = pi/L -- exact, since |rhs| = 1 at an edge by construction), against
+        // which of the two spectra actually contains it. Measured 0 mismatches of 7 honestly; swapping the two
+        // spectra makes it 7 of 7, and NOTHING ELSE IN THIS RETURN MOVES.
+        const perSpec = blochSpectrum({ ...p, n: c.bandGridN, count: 8, antiperiodic: false });
+        const antiSpec = blochSpectrum({ ...p, n: c.bandGridN, count: 8, antiperiodic: true });
+        const nearest = (E, set) => (set.length ? Math.min(...set.map((x) => Math.abs(x - E))) : Infinity);
+        let edgeSymmetryMismatches = 0;
+        for (const E of edges.slice(0, nEdges)) {
+            const solverSaysPeriodic = nearest(E, perSpec) < nearest(E, antiSpec);
+            const theorySaysPeriodic = kpRhs(E, p) >= 0;
+            if (solverSaysPeriodic !== theorySaysPeriodic) edgeSymmetryMismatches++;
+        }
+
         return {
+            edgeSymmetryMismatches,
             bandCount: Math.floor(edges.length / 2), gapCount: g.length,
             widestGap: g.reduce((m, [lo, hi]) => Math.max(m, hi - lo), 0),
             edgeRhsWorst, insideGapWorst, insideBandWorst,
