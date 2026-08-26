@@ -897,7 +897,7 @@
   "tools/ship/crossdesk-selfcheck.mjs": 87,
   "tools/ship/crossdeskProxy-selfcheck.mjs": 71,
   "tools/ship/ddaPrecision-selfcheck.mjs": 1668,
-  "tools/ship/ddaPrecisionReport-selfcheck.mjs": 60804,
+  "tools/ship/ddaPrecisionReport-selfcheck.mjs": 100310,
   "tools/ship/deadImportScan-selfcheck.mjs": 1426,
   "tools/ship/decisionIndex-selfcheck.mjs": 119,
   "tools/ship/deferralAudit-selfcheck.mjs": 187,
@@ -1176,9 +1176,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 874,
+  "timedThisRun": 875,
   "totalInRecord": 1171,
-  "at": "2026-08-26T19:35:50Z"
+  "at": "2026-08-26T19:37:30Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
