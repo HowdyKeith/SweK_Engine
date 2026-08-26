@@ -2820,7 +2820,28 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4033";   // v4033 -- three avatar cameras that had never had a rendered frame checked, all
+const BRAIN_BUILD = "v4034";   // v4034 -- server.html housekeeping, all Keith's direct asks while reviewing the
+// panel. The standalone "Raycast" pill button is REMOVED: "'Raycast' big button on Server.html can be reduced
+// to a link on the 'Mac System' link bucket. It is already on the Mac System panel." Confirmed before removing
+// -- tools/ship/pagePlacements.mjs's macPages() lists raycast.html, and server.html actually renders that list
+// into the Mac System panel from /pages/placements, not just declares the slot and leaves it empty. The two
+// discovery-selfcheck checks that used to assert the pill existed and was wired now assert the opposite (pill
+// gone) plus the two facts that make removing it safe (raycast.html still in macPages(), the panel slot still
+// actually filled) -- both sabotaged live (re-added a stray bRaycast, dropped raycast.html from the list,
+// broke the render call) and caught, then restored byte-identical.
+// Also removed from macPages(): bzflag.html and rocket-league.html. Keith: "these need to be removed from Mac
+// System panel. they are in Game Theory panel and that is where they should be." Both stay claimed by Game
+// Theory (pageSections.mjs's gametheory chips) exactly as before -- macPages() is a VIEW, never a second claim,
+// and carrying them in both places was the two-copy pattern this tree keeps finding, just wearing a UI list
+// instead of a code path this time.
+// "Discretisation & Meshes" and "Boundaries & Reconstruction" (the last two panels in the cosmic->em->
+// discretise->boundaries split lineage, v3633 through v3649) gained the "PL: " prefix the other three physics-
+// lab drawers already carry. Keith spotted the gap himself on the second one ("the boundaries and
+// reconstruction is probably PL: too, but i am not sure, as. i see Wall condition") -- confirmed against the
+// prefix's OWN stated purpose, in a server.html comment: it groups the physics-lab split family together
+// alphabetically under P, and boundaries is the last split in that exact lineage. The comment's own example
+// list, which had used "Boundaries & Reconstruction" as a case that DOESN'T sort under P, was rewritten so it
+// no longer contradicts the code three lines below it.
 // found by chasing a real bug report. Keith: universal-viewer.html#robotface showed a robot "cut off at the
 // waist... no legs." face/avatarStage.js's avatarModel() scaled the mesh from rawBBox -- RobotExpressive's
 // UNSKINNED bind pose, ~0.026 units tall -- while the GPU had already skinned it to its true ~4.5-unit pose
