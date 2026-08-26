@@ -2820,7 +2820,25 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4034";   // v4034 -- server.html housekeeping, all Keith's direct asks while reviewing the
+const BRAIN_BUILD = "v4035";   // v4035 -- inline descriptors for the Boundaries & Reconstruction drawer, and a
+// real duplicate-links bug found while building them. Keith: "it's like there are a lot of things in boundaries
+// and reconstruction, not sure what those each are as i read carefully" -- eleven links, each carrying its real
+// one-line finding only in an unreadable hover title. BOUNDARY_DESCS is hand-written (not a truncation of the
+// title -- these are dense sentences and an automatic cut mid-clause reads worse than none) and shows one line
+// per link, in a column layout only this drawer uses. WHICH SURFACED A PRE-EXISTING BUG: wrapping each anchor
+// in its own row div broke swekMarkPanelLinks' duplicate-removal, which looked for `[data-panel-pages] > a`
+// (direct children only) -- the descriptors' anchors sat one level deeper, "owned" read empty for this drawer,
+// and every one of the eleven links grew a bare-slug .placedPages twin underneath it, reproducing exactly the
+// unreadable-wall problem the descriptors exist to fix. CONFIRMED this was already true on the shipped v4034
+// build, not something the descriptors introduced -- only made visible, because the drawer that surfaces it is
+// the one just made readable. Fixed to a descendant selector, which cannot start matching a .placedPages anchor
+// by accident (.placedPages is a sibling of [data-panel-pages], never nested inside it). New regression check
+// in tools/ship/panelLinks-selfcheck.mjs, sabotaged (reverted to the direct-child selector) and confirmed to
+// fail, then restored. Also: research for Keith's "who uses the boundaries and reconstruction items in their
+// code?" -- all eleven pages import only from physics/mesh/*.mjs; none of those modules are wired into a
+// roundhouse DEVICE or an INSTRUMENT row (zero references in either registry), each has its own *-selfcheck.mjs
+// gate, and three (rankRepair3, discontinuity, wallCondition) are used ONLY by their own page and gate -- real,
+// graded, but reachable no other way. No code change from this; the answer was the finding.
 // panel. The standalone "Raycast" pill button is REMOVED: "'Raycast' big button on Server.html can be reduced
 // to a link on the 'Mac System' link bucket. It is already on the Mac System panel." Confirmed before removing
 // -- tools/ship/pagePlacements.mjs's macPages() lists raycast.html, and server.html actually renders that list

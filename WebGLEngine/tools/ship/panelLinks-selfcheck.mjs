@@ -67,6 +67,21 @@ console.log("\n2. THE DUPLICATE CANNOT COME BACK, IN EITHER ORDER");
     ok("...so placements keeps its adds-and-never-removes property",
        /ADDS AND NEVER REMOVES/.test(s) && !/placedPages[\s\S]{0,200}innerHTML = ""/.test(s),
        "declining a duplicate of a link already present is the same decision its own guard makes");
+    // v4035 -- *** "OWNED" MUST FIND AN ANCHOR AT ANY DEPTH, NOT JUST A DIRECT CHILD. *** Both guards above
+    // assume `owned` (the set of hrefs the drawer already links to) is complete. It silently was not: the
+    // Boundaries & Reconstruction drawer's inline descriptors wrap each mover-placed anchor one level deeper,
+    // in its own row div, and the direct-child selector `[data-panel-pages] > a[href]` stopped seeing those
+    // eleven anchors -- owned read empty for that drawer, both duplicate-guards found nothing to defend, and
+    // all eleven links grew a bare-slug .placedPages twin underneath them. CONFIRMED live: present on the
+    // shipped v4034 build too, so this was not a regression the descriptors introduced -- only surfaced.
+    // A descendant selector has no such assumption, and it cannot start matching a .placedPages anchor by
+    // accident: .placedPages is a SIBLING of [data-panel-pages], not nested inside it, so widening the
+    // combinator only ever adds anchors that are genuinely inside a mover-owned slot.
+    ok("!! the owned-hrefs set is built with a DESCENDANT selector, not a direct-child one",
+       /const owned = new Set\(\[\.\.\.panel\.querySelectorAll\('\[data-panel-pages\] a\[href\]'\)\]/.test(s) &&
+       !/const owned = new Set\(\[\.\.\.panel\.querySelectorAll\('\[data-panel-pages\] > a\[href\]'\)\]/.test(s),
+       "a direct-child selector silently stops covering a drawer the moment one of its anchors gets wrapped, " +
+       "and nothing else here would notice -- the guards would just find an empty 'owned' set and do nothing");
 }
 
 console.log("\n3. WHAT WAS MEASURED IN A REAL BROWSER, RATHER THAN INFERRED FROM THIS FILE");
