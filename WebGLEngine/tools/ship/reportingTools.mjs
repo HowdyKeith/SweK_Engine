@@ -68,6 +68,12 @@ export const REPORTING = [
       blurb: "The lab's own rank and det against Accelerate's LAPACK -- an answer key nobody here wrote. Reports ABSENT until the Mac-side reference has run." },
     { rel: "tools/ship/decisionIndex.mjs", label: "Closed questions",
       blurb: "Every selfcheck header that records a DECISION NOT TO DO SOMETHING, with the file and the sentence. A decision looks exactly like an absence from outside the file that records it -- read this before proposing a round." },
+    // v4031 -- REGISTERED WHEN IT WAS GIVEN A MAIN BLOCK, not before. It shipped with a page and a gate
+    // declared in physics/instruments.mjs and no way to run it, so its only importer was its own selfcheck and
+    // graveyard-selfcheck correctly called it an orphaned utility. A row here without a runnable tool would
+    // have been a front door onto a locked room.
+    { rel: "tools/roundhouse/knobLiveness.mjs", label: "Knob liveness (a declared knob vs one that DOES something)",
+      blurb: "Perturbs every knob every device declares and reports LIVE, INSENSITIVE over a measured margin, or MOVES NOTHING. *** ITS FIRST TWO VERSIONS BOTH REPORTED LIVE KNOBS AS DEAD AND BOTH READINGS WERE ARTEFACTS OF THE QUESTION. *** Asked per DEVICE rather than per MODE it called eight of quantum's eleven knobs dead -- every one live in a mode it never entered. Corrected, but building only the HONEST config, it called inspiral.plantedPower dead -- a knob whose entire job is the planted branch, where it moves eight observables; reporting that would have called a healthy plant a defect and invited deleting the knob that makes the plant adjustable. So liveness is asked across (mode x plant state) and the axes are NAMED in the row, so a future third axis is a visible omission rather than a silent one. A READING, NEVER A DIAGNOSIS: dead, saturated at an asymptote, and quantised below the search step are three different conditions producing the same verdict. --only <a,b> narrows to named devices, --budget <ms> bounds the per-knob probe." },
     { rel: "tools/roundhouse/gradedCoverage.mjs", label: "Graded coverage",
       blurb: "Which physics modules carrying a selfcheck are reachable from a lab device bind, and which are not. Reachability is exact, read from the import specifier. It does NOT claim the ungraded deserve devices -- many are solvers, and a solver needs self-consistency rather than an answer key." },
     { rel: "tools/ship/orphanScan.mjs", label: "Orphan modules",
