@@ -39,6 +39,24 @@ export const UNWIRED_REGISTRATION = new Map([
     // open is whether backendVisualDiff or render-qa should GRADE on the worst window, which would re-fail
     // renders that pass today. That decision lives in the open list, beside the page that makes it visible,
     // which is a better home for it than a register of things nobody calls.
+    // v4031 -- TWO ENTRIES ADDED, AND THE FIRST ONE IS A CORRECTION OF MY OWN v4027 SHIP.
+    //
+    // *** brain/rl/attribution.mjs WAS SHIPPED UNWIRED AT v4027 AND I DID NOT NOTICE FOR FOUR VERSIONS. ***
+    // Worse, when v4031 went looking, a grep for "attribution.mjs" returned hits in brain/brain.js AND main.js
+    // and I read that as "it is wired". IT IS NOT: every one of those hits is a CHANGELOG COMMENT I wrote about
+    // the module. The only real import in the tree is its own selfcheck's. That is this register's own header
+    // warning -- "written from the import graph and the file's name rather than from RUNNING THE THING" --
+    // reproduced exactly, by the person who had just read the warning.
+    ["brain/rl/attribution.mjs", {
+        what: "Integrated Gradients (Sundararajan/Taly/Yan ICML 2017) over a trained policy: which input feature moved the action, with COMPLETENESS (attributions sum to F(x)-F(baseline)) as the identity its gate holds -- 4.00x/doubling convergence measured, saliency's saturated-tanh failure measured at 8.2e-8 vs IG's 0.9999",
+        blocker: "*** IT NEEDS A CALLER THAT WANTS AN EXPLANATION, AND NOTHING IN THE LIVE PATH ASKS FOR ONE. *** The gated capability is real and complete; what is missing is a decision point. brain.js's solve loop publishes counters and fields, not per-decision diagnostics, and dockPolicy/memoryPolicy are called by evaluate() which scores EPISODES rather than inspecting single steps. Wiring it means choosing WHERE an explanation is surfaced -- a bridge route, a panel, or a training-time log -- and that is a product decision about who reads it, not a mechanical import.",
+        needs: "ONE NAMED CONSUMER AND ITS BASELINE. IG is defined relative to a BASELINE and the answer changes with it (attribution.mjs's baselineNote says so); a zero vector is the default and is not obviously the right zero for a docking observation whose features have different natural rest values. So the consumer has to state what 'no input' means for its own observation before the numbers mean anything. surprise.mjs (v4031) is built to be that consumer's trigger -- explainIfSurprising() spends IG only where prediction error says the state is worth explaining -- but it is blocked on its own missing piece, below.",
+    }],
+    ["brain/rl/surprise.mjs", {
+        what: "prediction-error-as-anomaly-flag, lifted as an IDEA from lucas-maes/le-wm: calibrate a threshold from the empirical quantile of in-distribution residuals, then flag transitions the forward model did not predict. MEASURED: a 0.99-quantile threshold gives a 1.10% held-out false-positive rate, detection rises monotonically 0.9% -> 100% with the size of a physics change, and gating IG on it saves 93.9% of gradient evaluations",
+        blocker: "*** THERE IS NO FORWARD MODEL IN THIS TREE, AND THAT IS VERIFIED RATHER THAN ASSUMED. *** surprise needs predictFn(observation, action) -> next observation. A grep across brain/ for predictNext, nextState, forwardModel and dynamicsModel returns NOTHING; the brain trains POLICIES (action selection), not dynamics. The envs' step() is the TRUE dynamics rather than a learned model, and a model that IS the system is never surprised by it -- surprise against its own env is identically zero and detects nothing. So the missing piece is a trained next-state predictor, which is a round of work, not a wiring line.",
+        needs: "A TRAINED FORWARD MODEL, OR A SECOND SOURCE OF TRANSITIONS TO COMPARE THE SIMULATOR AGAINST. The second is the cheaper and arguably more useful one: with env.step() as predictFn and REAL transitions from elsewhere (rig telemetry, a modified sim, a recorded episode from a different build) as the actual, surprise measures 'the physics stopped behaving the way this simulator expects' -- which is a question this tree already cares about and does not currently have an instrument for. Either path gives the module a caller; neither is a line of glue.",
+    }],
     ["brain/policyCache.mjs", {
         what: "generalises the proven brain/flowfieldCache.mjs -- which IS live, used by esPilot.mjs -- from flow fields to policy and tactics decisions",
         blocker: "*** IT IS LOSSY BY CONSTRUCTION AND ITS OWN GATE SAYS SO: it quantises continuous state into buckets, so a hit returns the answer computed for a NEARBY state rather than the one asked about. *** Whether that trade is acceptable is a judgement about the decisions being cached, not about the cache.",

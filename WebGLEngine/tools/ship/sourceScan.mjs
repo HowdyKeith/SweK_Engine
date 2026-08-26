@@ -1,4 +1,4 @@
-// WebGLEngine/tools/ship/sourceScan.mjs -- v3045
+// WebGLEngine/tools/ship/sourceScan.mjs -- v3045, regex-literal-aware since v4031
 //
 // READ CODE, NOT PROSE. One helper, because I have now made the same mistake four times in one session:
 //
@@ -12,11 +12,93 @@
 // to be maintainable, so its own source is guaranteed to contain the thing it looks for. Any gate that greps
 // shipping source should strip comments and string literals first, and now there is one place that does it.
 //
-// Deliberately NOT a parser. It is a lexical strip that handles the three JS string forms and both comment
-// forms; it will mangle a regex literal containing a quote, which is why it returns text for GREPPING and must
-// never be used to reconstruct runnable code.
+// Deliberately NOT a parser. It is a lexical strip that handles the three JS string forms, both comment forms,
+// and (since v4031) regex literals well enough not to desync on one.
+//
+// *** v4031 -- "IT WILL MANGLE A REGEX LITERAL CONTAINING A QUOTE" WAS NOT A CORNER CASE. IT WAS THE WHOLE FILE,
+// AND 179 OTHERS. *** ai-bridge/gpuBrainBridge.js has, at what was then line 269, `.replace(/^["']|["']$/g, "")`.
+// The old lexer had no notion of a regex literal at all: it saw a bare `/` that was neither `//` nor `/*` and
+// fell through as a plain character, so when it reached the `'` sitting inside the character class `["']` it
+// spuriously OPENED STRING MODE -- and then hunted for the next matching quote ANYWHERE LATER IN THE FILE. From
+// that point every codeOnly()/noComments() caller was reading garbage for the rest of the file, silently: a
+// gate hunting a FORBIDDEN pattern past that point would find nothing, not because nothing was there but
+// because the lexer had stopped looking at real code at all. Measured across this tree: 180 files mis-lexed the
+// same way, including tools/ship/proseAudit.mjs, whose own main block sourceScan-selfcheck.mjs's v3681 test
+// already named as a casualty by number rather than fixing.
+//
+// THE HEURISTIC, LIFTED FROM prose()'S OWN stripToComment() BELOW RATHER THAN INVENTED FRESH: a bare `/` starts
+// a regex literal, not division, when the code immediately before it ends with one of `= ( , : [ ! & | ? { ;`
+// (an operator or opener -- the position after those can only be the START of an expression) OR with one of a
+// short list of keywords that also start an expression (return/typeof/instanceof/in/of/new/delete/void/throw/
+// yield/case/do/else/default/await). That second half is NEW here: stripToComment's punctuation-only version
+// would miss `return /^x/.test(s)`, and MEASURED across this tree, "return /" appears as literal text in 46
+// files -- common enough that punctuation alone was not going to be enough for the general case, even though
+// it happened to be enough for THIS bug's one trigger (which sits right after `.replace(`).
+//
+// NOT A FULL PARSER, AND SAID SO: `x = 5\n/foo/.test(a)` -- a regex-literal STATEMENT immediately after a bare
+// numeric literal with no semicolon -- will still misread as division, because nothing here tracks automatic
+// semicolon insertion. That pattern does not occur searched for across this tree; the old, total failure on
+// ANY quote-bearing regex was categorically worse and is what this closes.
+const REGEX_ALLOWED_KEYWORDS = new Set([
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw",
+    "yield", "case", "do", "else", "default", "await",
+]);
 
-/** Source with comments and string/template literals blanked out, line structure preserved. */
+/**
+ * Would a bare `/` at the current position start a REGEX LITERAL rather than mean division/an operator, judged
+ * from `out` -- the text already emitted by the scanner up to (not including) this `/`. Looks only at the
+ * trailing run of non-whitespace in `out`, mirroring stripToComment()'s line-local version but over the whole
+ * stream rather than one line, and extended with the keyword list above.
+ */
+function regexAllowedHere(out) {
+    let j = out.length - 1;
+    while (j >= 0 && /\s/.test(out[j])) j--;
+    if (j < 0) return true;                              // start of file/expression: nothing to divide
+    const c = out[j];
+    if (/[A-Za-z0-9_$]/.test(c)) {
+        let k = j;
+        while (k >= 0 && /[A-Za-z0-9_$]/.test(out[k])) k--;
+        const word = out.slice(k + 1, j + 1);
+        if (/^[0-9]/.test(word)) return false;             // a NUMBER just ended: division
+        return REGEX_ALLOWED_KEYWORDS.has(word);           // an IDENTIFIER ended: regex only after a keyword that starts an expression
+    }
+    if (c === ")" || c === "]") return false;              // a grouped or indexed VALUE just ended: division
+    return true;                                            // an operator/opener (or `}` closing a block): regex allowed
+}
+
+/**
+ * Given `src` and the index of a `/` already judged a regex start, locate its closing `/` and the end of its
+ * trailing flags. CHARACTER-CLASS AWARE: a `/` inside `[...]` (e.g. `/[/]/`) does not end the literal, which
+ * stripToComment()'s own inline version below was NOT, before this became the one place both live.
+ *
+ * Returns null when no legitimate close is found before a literal newline -- a regex literal cannot contain
+ * one unescaped, so hitting one means the `/` was misjudged as a regex start. THAT IS THE SAFETY VALVE: a
+ * caller that gets null falls back to treating the `/` as a plain character, so a wrong "yes" here can never
+ * cost more than the one `/` it was wrong about -- never a cascade through the rest of the file.
+ *
+ * @returns {{closeAt:number, end:number}|null} closeAt is the index OF the closing `/`; end is just past the
+ *          trailing flags (so `src.slice(i, end)` is the whole literal, and `src.slice(closeAt, end)` is just
+ *          "/" + flags, which is what a caller blanking the body wants to keep).
+ */
+function regexBody(src, i) {
+    let j = i + 1, inClass = false;
+    for (; j < src.length; j++) {
+        const c = src[j];
+        if (c === "\n") return null;
+        if (c === "\\") { j++; continue; }
+        if (c === "[") { inClass = true; continue; }
+        if (c === "]") { inClass = false; continue; }
+        if (c === "/" && !inClass) break;
+    }
+    if (j >= src.length || src[j] !== "/") return null;
+    const closeAt = j;
+    let end = j + 1;
+    while (end < src.length && /[a-zA-Z]/.test(src[end])) end++;   // trailing flags: g, i, m, s, u, y...
+    return { closeAt, end };
+}
+
+/** Source with comments, string/template literals, and regex literal BODIES blanked out (delimiters and flags
+ *  kept, as with a string's quotes), line structure preserved. */
 export function codeOnly(src) {
     let out = "";
     let i = 0;
@@ -28,6 +110,16 @@ export function codeOnly(src) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
             if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
+            if (c === "/" && regexAllowedHere(out)) {
+                const r = regexBody(src, i);
+                if (r) {
+                    // BLANKED LIKE A STRING'S CONTENT: keep the opening "/", the closing "/", and any flags --
+                    // drop the pattern between them. "/" + (closing "/" through end of flags) does exactly that.
+                    out += "/" + src.slice(r.closeAt, r.end);
+                    i = r.end;
+                    continue;
+                }
+            }
             out += c; i++; continue;
         }
         if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
@@ -87,6 +179,13 @@ export function noComments(src) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
             if (c === "'" || c === '"' || c === "`") { mode = c; out += c; i++; continue; }
+            if (c === "/" && regexAllowedHere(out)) {
+                const r = regexBody(src, i);
+                // KEPT VERBATIM, unlike codeOnly: this function only strips comments, never content -- a
+                // regex literal's pattern is TEXT the code contains, the same reasoning that keeps string
+                // contents here (v3052, in this function's own docstring below).
+                if (r) { out += src.slice(i, r.end); i = r.end; continue; }
+            }
             out += c; i++; continue;
         }
         if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
@@ -130,6 +229,12 @@ export function noComments(src) {
 // and `const re = /a\/\/b/` both contain `//` and neither is a comment. So the scan walks the line tracking
 // quote and regex-literal state instead of reaching for a regex, because the thing being parsed is exactly the
 // thing regexes are bad at.
+//
+// v4031 -- USES THE SHARED regexAllowedHere/regexBody NOW, not its own weaker inline version. The inline
+// version's punctuation-only heuristic (no keywords, so `return /x\/y/` would misjudge the `/` after "return"
+// as division) and its char-class-blind scan (a `/` inside `[...]` would end the literal early) were BOTH
+// narrower than what codeOnly()/noComments() now need, and a prior version of this file carried three
+// independently-drifting regex-literal heuristics for the same question. One is enough.
 function stripToComment(line) {
     let inS = null, esc = false;
     for (let i = 0; i < line.length; i++) {
@@ -139,15 +244,9 @@ function stripToComment(line) {
         if (inS) { if (c === inS) inS = null; continue; }
         if (c === '"' || c === "'" || c === "`") { inS = c; continue; }
         if (c === "/" && line[i + 1] === "/") return line.slice(i + 2);
-        // a regex literal: skip to its close so a `//` inside it is not read as a comment
-        if (c === "/" && /[=(,:[!&|?{;]\s*$/.test(line.slice(0, i))) {
-            let j = i + 1, e = false;
-            for (; j < line.length; j++) {
-                if (e) { e = false; continue; }
-                if (line[j] === "\\") { e = true; continue; }
-                if (line[j] === "/") break;
-            }
-            i = j;
+        if (c === "/" && regexAllowedHere(line.slice(0, i))) {
+            const r = regexBody(line, i);
+            if (r) i = r.end - 1;   // -1: the for-loop's own i++ lands exactly at end
         }
     }
     return null;
