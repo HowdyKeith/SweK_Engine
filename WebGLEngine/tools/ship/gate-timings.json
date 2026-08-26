@@ -1003,6 +1003,7 @@
   "tools/ship/poller-selfcheck.mjs": 57,
   "tools/ship/populationCensus-selfcheck.mjs": 92,
   "tools/ship/populationField-selfcheck.mjs": 63,
+  "tools/ship/portBeacon-selfcheck.mjs": 572,
   "tools/ship/populationGPU-selfcheck.mjs": 55,
   "tools/ship/populationRender-selfcheck.mjs": 44,
   "tools/ship/populationUpdate-selfcheck.mjs": 117,

@@ -84,7 +84,32 @@ function _statePath(name) {
 let _fetchWarned = false;   // v2150 -- one-shot warn for the snapshot-fetch catch (declared at module top: no TDZ)
 
 
-const BRIDGE = (Deno.env.get("BRAIN_BRIDGE") || "http://127.0.0.1:8787").replace(/\/+$/, "");
+// *** v4028 -- THE DEFAULT PORT STOPPED BEING A SAFE ASSUMPTION AT v4014, AND THIS IS THE OTHER HALF OF THAT. ***
+// v4014's launch() starts a CLONE on a fresh free port on purpose -- side by side, never over the top -- so on
+// Keith's rig the engine came up on 54026 while this defaulted to 8787 and logged "errors=168 and climbing"
+// against a bridge that was perfectly healthy at an address nobody had told it about.
+//
+// ORDER OF TRUST, MOST EXPLICIT FIRST: BRAIN_BRIDGE always wins, because a person who typed an address meant it.
+// Otherwise the beacon the bridge writes on a successful bind (swek_bridge_port.json) names where an engine
+// ACTUALLY IS, which beats a literal that describes where one USUALLY is. The 8787 default is the last resort
+// and stays, because a brain started before any engine has nothing better to try.
+//
+// THE BEACON IS READ, NEVER TRUSTED BLINDLY: a stale file from a dead engine is worse than no file, so a record
+// older than an hour is ignored rather than dialled. Read failures are silent by design -- no beacon is the
+// ordinary case on a box that has never run one.
+function _beaconBridge() {
+    try {
+        const tmp = Deno.env.get("TEMP") || Deno.env.get("TMP") || "/tmp";
+        const j = JSON.parse(Deno.readTextFileSync(tmp.replace(/[\\/]+$/, "") + "/swek_bridge_port.json"));
+        if (!j || !Number.isFinite(j.port)) return null;
+        if (j.at && (Date.now() - j.at) > 3600000) return null;   // an hour-old beacon is a memory, not a fact
+        return "http://127.0.0.1:" + j.port;
+    } catch { return null; }
+}
+const _envBridge = Deno.env.get("BRAIN_BRIDGE");
+const _beacon = _envBridge ? null : _beaconBridge();
+if (_beacon) console.log("[brain] no BRAIN_BRIDGE set -- using the bridge's own port beacon: " + _beacon);
+const BRIDGE = (_envBridge || _beacon || "http://127.0.0.1:8787").replace(/\/+$/, "");
 const HZ = Math.max(0.5, Number(Deno.env.get("BRAIN_HZ") || 4));
 const TICK_MS = 1000 / HZ;
 
@@ -2795,7 +2820,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4027";   // v4027 -- brain/rl/attribution.mjs: Integrated Gradients, so a trained
+const BRAIN_BUILD = "v4028";   // v4028 -- the brain can find an engine that did not take port 8787. v4014's
+// launch() starts a clone on a fresh free port on purpose, and nothing told the brain -- so it logged
+// "errors=168 and climbing" against a healthy bridge on 54026. The bridge now writes its port on a SUCCESSFUL
+// bind and the brain reads that beacon when BRAIN_BRIDGE is unset, refusing a record over an hour old.
+// Also: KPopCommon's Write-Log could kill the listener from inside its own logger on a hostless run.
+// Previously v4027 --   // v4027 -- brain/rl/attribution.mjs: Integrated Gradients, so a trained
 // policy can finally be asked WHY. The completeness axiom (attributions sum to F(x)-F(baseline)) is an
 // identity rather than a score, so it is gateable -- and saliency, the obvious alternative, misses a
 // saturated feature by 100% where IG lands at 3e-15. Reimplemented from the paper: the reference repo has no
