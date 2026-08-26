@@ -33,8 +33,22 @@
 
 <div class="wrap">
   <div class="row" id="chips"></div>
+  <!-- v4027 -- THE PIPELINE, DRAWN FROM THE COUNTERS THIS PAGE WAS ALREADY FETCHING AND NOT SHOWING.
+       Keith: "what visual diagram could we give our physics ai as it is thinking?" The honest answer was NOT a
+       reasoning trace -- the activity ring below carries exactly three kinds (hello/narrate/solve), and drawing
+       an inner life richer than that would be an invention on a panel an operator believes at a glance. But
+       /ai/brain/health has been publishing the whole data path all along (snapPosts, snapGets, fieldPosts,
+       hasSnapshot, hasField, solverBackend, the replay ring) and this page rendered none of it. Same two
+       fetches, one more thing drawn with them. -->
+  <div id="trail" style="margin-bottom:8px"></div>
   <div id="tail"><div class="empty">connecting&hellip;</div></div>
 </div>
+<script type="module">
+  try {
+    const { mountBrainTrail } = await import("./ui/brainTrail.js");
+    mountBrainTrail(document.getElementById("trail"), { pollMs: 3000 });
+  } catch (e) { console.warn("brain trail:", e); }
+</script>
 
 <script type="module">
 import { mountBrainSvg } from "./ui/brainSvg.js";
