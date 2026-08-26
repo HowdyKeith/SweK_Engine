@@ -62,7 +62,8 @@
   </div>
 </div>
 <script type="module">
-import { probeLocalModel, summarise, MODELS, requestPersistentStorage } from "/ui/localModelProbe.js";
+import { probeLocalModel, summarise, MODELS, requestPersistentStorage,
+         persistExplain, PERSIST_BEHAVIOUR, engineHint } from "/ui/localModelProbe.js";
 
 const $ = (id) => document.getElementById(id);
 const gb = (n) => n == null ? null : (n / 1e9).toFixed(2) + " GB";
@@ -130,13 +131,22 @@ async function go(finalState) {
   pb.innerHTML = "";
   if (f.persistAvailable && f.persisted !== true) {
     const b = document.createElement("button");
-    b.textContent = "Request more storage (shows a real browser dialog)";
+    // *** v4029 -- THE LABEL USED TO READ "(shows a real browser dialog)" AND ON CHROMIUM THAT IS FALSE. ***
+    // MEASURED: persist() returns in ~1 ms having drawn nothing. A user promised a dialog who sees none
+    // concludes the click missed, and clicks again -- the label caused the confusion it was meant to prevent.
+    // So it now says what THIS engine does, and stays vague only where the engine is genuinely unknown.
+    const beh = f.engine ? PERSIST_BEHAVIOUR[f.engine] : null;
+    b.textContent = beh ? (beh.prompts ? "Request persistent storage (your browser will ask you)"
+                                       : "Request persistent storage (answered instantly, no dialog)")
+                        : "Request persistent storage";
     b.onclick = doPersist;
     pb.appendChild(b);
     const n = document.createElement("span");
     n.className = "note";
     n.style.marginLeft = "8px";
-    n.textContent = "requires you to click it — a probe running unattended cannot trigger the dialog on its own";
+    n.textContent = beh && !beh.prompts
+        ? "no dialog on this browser — persist() is " + beh.basis
+        : "requires you to click it — a probe running unattended cannot trigger the dialog on its own";
     pb.appendChild(n);
   } else if (f.persisted === true) {
     pb.innerHTML = '<span class="note yes">already persisted — the quota above already reflects it</span>';
@@ -149,12 +159,14 @@ async function doPersist() {
   $("state").textContent = " asking the browser…";
   const r = await requestPersistentStorage();
   if (!r.available) { $("state").textContent = " storage.persist() is not available here"; return; }
-  const before = r.quotaBeforeBytes != null ? gb(r.quotaBeforeBytes) : "unknown";
-  const after = r.quotaAfterBytes != null ? gb(r.quotaAfterBytes) : "unknown";
-  const msg = r.granted
-    ? " granted — quota was " + before + ", now reads " + after +
-      (r.quotaAfterBytes > (r.quotaBeforeBytes || 0) ? " (the browser raised it)" : " (unchanged on this browser)")
-    : " denied or dismissed — quota unchanged at " + before;
+  // v4029 -- the wording is persistExplain's, not this page's, so a gate can drive every branch of it without
+  // a browser. "denied or dismissed" used to be printed on an engine that draws nothing to dismiss.
+  //
+  // engineHint() IS CALLED DIRECTLY RATHER THAN READ OFF THE LAST PROBE. go()'s facts are local to go(), so
+  // reaching for them here is a ReferenceError -- and hoisting them to a module-level `lastFacts` would buy a
+  // second copy of state to keep in sync for a value that is pure, synchronous and free to recompute (v3527:
+  // the second copy is never the one that gets updated).
+  const msg = " " + persistExplain(r, engineHint());
   $("state").textContent = msg;
   // re-probe and re-render the verdicts against whatever the quota now is, and KEEP the persist result on
   // screen -- it is the only report of what the click actually did, and re-probing is not news that outranks it.
