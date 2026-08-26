@@ -249,7 +249,12 @@ export function macPages() {
         { file: "hosting.html",        why: "calls /hosting/tunnel/status, the tunnel the Mac fronts" },
         { file: "settings.html",       why: "same tunnel status route" },
         { file: "phone.html",        why: "launches a .command from its own script" },
-        { file: "bzflag.html",         why: "launches a .command from its own script" },
-        { file: "rocket-league.html",  why: "launches a .command from its own script" },
+        // v4034 -- bzflag.html and rocket-league.html LEAVE this view, at Keith's request: "these need to be
+        // removed from Mac System panel. they are in Game Theory panel and that is where they should be." They
+        // still launch a .command from their own script -- that fact did not change -- but this view's whole
+        // point was never to duplicate a page's real home, only to surface pages that would otherwise be
+        // Mac-only and easy to lose. Both are already anchored in Game Theory (pageSections.mjs's gametheory
+        // chips: bzflag, rocketleague), findable there, so carrying them here too was the second-copy pattern
+        // this tree keeps finding: one page, one real home, and a view is not another claim.
     ];
 }

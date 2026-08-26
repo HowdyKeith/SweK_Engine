@@ -106,7 +106,7 @@ export const SECTIONS = [
     // in EM, while its own note still said "fields, grids, boundaries". NONE OF THEM IS ABOUT ELECTROMAGNETISM.
     // They have their own drawer; em falls to 5 and reads like its note again. SECOND TIME THIS RATCHET HAS
     // CAUGHT THE SAME DRIFT IN ELEVEN ROUNDS, WHICH IS THE ARGUMENT FOR KEEPING IT AT 15.
-    { id: "discretise", tab: "discretise", label: "Discretisation & Meshes", note: "remaps, limiters, and the gradients a mesh gives you",
+    { id: "discretise", tab: "discretise", label: "PL: Discretisation & Meshes", note: "remaps, limiters, and the gradients a mesh gives you",
       pages: ["remap-order.html", "remap-2d.html", "limiter-seam.html", "tri-limiter.html",
               "gradient-join.html", "node-gradient.html"] },
     // v3649: THE 15-PAGE RATCHET, THIRD TIME (v3633 EM out of Cosmic, v3644 meshes out of EM, now this). The
@@ -114,7 +114,7 @@ export const SECTIONS = [
     // above are about MOVING AND LIMITING DATA ON A MESH, and the ten below are about WHAT A BOUNDARY CAN AND
     // CANNOT TELL YOU -- rank, repairs, wall conditions, reconstruction order. THREE FIRES IN SEVENTEEN ROUNDS,
     // EACH ONE A DRIFT RATHER THAN A SHORTAGE OF ROOM, WHICH IS THE ARGUMENT FOR KEEPING THE CAP AT 15.
-    { id: "boundaries", tab: "boundaries", label: "Boundaries & Reconstruction", note: "what a boundary can and cannot determine, and what a row is worth",
+    { id: "boundaries", tab: "boundaries", label: "PL: Boundaries & Reconstruction", note: "what a boundary can and cannot determine, and what a row is worth",
       pages: ["boundary-rank.html", "tet-rank.html", "rank-repair.html", "rank-repair-3d.html",
               "discontinuity.html", "wall-condition.html", "curved-wall.html", "quadratic-recon.html",
               "quadratic-wall.html", "row-weight.html", "weight-scaling.html"] },

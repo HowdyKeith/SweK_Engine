@@ -215,21 +215,27 @@ ok("pairing endpoint is trusted-only", /net\/peer\/external"\) \{\s*\n\s*if \(!_
     const mainJs = readFileSync(path.join(ROOT, "WebGLEngine", "main.js"), "utf8");
     ok("main.js: Raycast LLM in the Applications panel", mainJs.includes('label: "Raycast LLM"') && mainJs.includes('url: "/raycast.html"'));
     const svHtml = readFileSync(path.join(ROOT, "WebGLEngine", "server.html"), "utf8");
-    ok("server.html: Raycast pill button present", svHtml.includes('id="bRaycast"'));
-    // *** v3740 -- THIS CHECK WAS RIGHT AND HAD BEEN RED FOR A REAL REASON: `bRaycast` appeared in exactly TWO
-    // places in the whole tree -- the <button> in server.html and this line -- so NOTHING CLICKED IT. The pill
-    // was dead. It is wired now.
-    // BUT THE CHECK WAS PINNED TO ONE SPELLING, `getElementById("bRaycast").onclick` ALL ON ONE LINE, and the
-    // fix follows its own neighbour bLaunch's idiom instead (var btn = getElementById(...); btn.onclick = ...).
-    // A CORRECT FIX WOULD HAVE LEFT THIS RED. So it asserts the PROPERTY -- the button is REACHED BY CODE AND
-    // GIVEN A HANDLER -- across either spelling, within a short window so an unrelated later reference cannot
-    // satisfy it. *** THE WIDENING IS NOT WHAT MADE THE RED GO AWAY, AND THAT WAS SHOWN RATHER THAN ASSERTED:
-    // with the handler removed and this wider check in place, IT STILL FAILS. A gate widened in the same round
-    // its subject was fixed has to prove it did not simply stop looking. ***
-    // WHEN THIS GOES RED AGAIN: wire the button, do not widen the window.
-    ok("server.html: Raycast pill is reached by code and given a handler",
-        /getElementById\(\s*["']bRaycast["']\s*\)[\s\S]{0,200}?\.onclick\s*=/.test(svHtml),
-        "the pill opens /raycast.html; raycast.html is filed under systools (v3672)");
+    // v3740 gave the standalone Raycast pill (`bRaycast`) an onclick after it shipped dead for a round; v4034
+    // removed the pill itself at Keith's request ("that button can be reduced to a link on the Mac System link
+    // bucket -- it is already on the Mac System panel"), so the two checks that used to live here (button
+    // present, button wired) would now fail on purpose -- the button is gone by design. What still has to be
+    // true is the CLAIM Keith made when asking for the removal: raycast.html really is reachable from the Mac
+    // System panel without the pill. That is two facts, not one: the page has to be IN macPages() (the list
+    // the panel renders from), and server.html has to actually RENDER that list into the panel rather than
+    // just importing it and doing nothing -- the same "declared but never called" failure v3740 found the
+    // pill itself in.
+    ok("!! server.html no longer carries the standalone Raycast pill (removed v4034, not simply broken)",
+        !svHtml.includes('id="bRaycast"'),
+        "raycast.html is reached via the Mac System panel now; a stray bRaycast button reappearing here would " +
+        "mean the removal was undone rather than intentionally reverted");
+    const placementsSrc = readFileSync(path.join(ROOT, "WebGLEngine", "tools", "ship", "pagePlacements.mjs"), "utf8");
+    ok("tools/ship/pagePlacements.mjs: macPages() still lists raycast.html",
+        /file:\s*["']raycast\.html["']/.test(placementsSrc),
+        "this is the list server.html's Mac System panel actually renders -- removing the pill without this " +
+        "entry would leave raycast.html reachable from nowhere in server.html at all");
+    ok("!! server.html: the Mac System panel slot is actually FILLED from macPages(), not just declared",
+        /data-panel-pages="macsystem"/.test(svHtml) && /j\.macPages/.test(svHtml) && /macHost\.appendChild/.test(svHtml),
+        "a slot that exists in markup but nothing ever populates is the exact shape of bug this file exists to catch");
     const ecat = JSON.parse(readFileSync(path.join(ROOT, "WebGLEngine", "engine-catalog.json"), "utf8"));
     ok("engine-catalog: Raycast LLM app listed (Applications pill)", (ecat.apps || []).some(a => a.label === "Raycast LLM" && a.url === "/raycast.html"));
     const page = readFileSync(path.join(ROOT, "WebGLEngine", "raycast.html"), "utf8");
