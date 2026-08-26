@@ -56,6 +56,38 @@
     <div class="msg" id="wbMsg"></div>
   </div>
 
+  <!-- v4039 -- moved from settings.html, at Keith's request: "the petfbi settings should be moved to
+       petfbi-setup.html if they are not already on that page. and removed from Settings page." They were not
+       already here -- this is the same /petfbi/config and /petfbi/mailer bridge routes settings.html used,
+       styled to match this page's own cards/rows rather than settings.html's. -->
+  <div class="card">
+    <h2>Board backend</h2>
+    <div class="hint">Where the lost-pet board reads and writes from. <b>local</b> uses this bridge's own workbook above; a Google Sheet or SharePoint/Power Automate flow can front it instead.</div>
+    <div class="row">
+      <div style="max-width:180px;"><label>Mode</label><select id="pbMode"><option value="local">local (this bridge)</option><option value="sheet">Google Sheet</option><option value="sharepoint">SharePoint / Power Automate</option></select></div>
+      <div style="flex:2;"><label>Sheet / flow URL</label><input id="pbUrl" placeholder="web-app or flow URL" /></div>
+    </div>
+    <div class="row">
+      <div style="flex:1;"><label>Secret</label><input id="pbSecret" placeholder="leave blank to keep" /></div>
+      <button id="pbSave" class="go">Save</button>
+    </div>
+    <div class="msg" id="pbMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Email sending</h2>
+    <div class="hint">How the assembled report reaches an admin: a draft they send themselves, or sent directly via Gmail/Outlook.</div>
+    <div class="row">
+      <div style="max-width:180px;"><label>Transport</label><select id="peMode"><option value="draft">Draft (mailto)</option><option value="smtp">Gmail SMTP</option><option value="outlook">Outlook</option></select></div>
+      <div style="flex:1;"><label>Gmail address</label><input id="peUser" placeholder="you@gmail.com" /></div>
+    </div>
+    <div class="row">
+      <div style="flex:1;"><label>App password</label><input type="text" autocomplete="username" aria-hidden="true" tabindex="-1" style="display:none" value=""><input id="pePass" type="password" placeholder="leave blank to keep" /></div>
+      <button id="peSave" class="go">Save</button>
+    </div>
+    <div class="msg" id="peMsg"></div>
+  </div>
+
   <!-- Setup wizard: pages -->
   <div class="card">
     <h2>Add a Facebook page</h2>
