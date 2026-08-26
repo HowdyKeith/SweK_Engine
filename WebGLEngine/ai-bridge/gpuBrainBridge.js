@@ -158,13 +158,50 @@ function _liveSibling(gpu, role, selfId) {
     return best;
 }
 
+// *** v4030 -- THE REGISTRY, AND WHY THIS BRIDGE MIGRATES ROUTE-AT-A-TIME RATHER THAN ALL AT ONCE. ***
+//
+// This file is ~1950 lines and owns the whole /ai/brain prefix plus /ev. Rewriting every route in one commit
+// would be a diff nobody can review against a surface Keith's rig actually depends on. So: the registry holds
+// the MIGRATED routes, handle() offers it the request FIRST, and anything unregistered falls through to the
+// original hand-written chain untouched. owns() is deliberately NOT changed -- this bridge still claims the
+// same namespace it always did, so server.js's dispatch is unaffected either way.
+//
+// MIGRATED SO FAR: GET + POST /ai/brain/experience. Two of the seven hand-clamped bodies in this file.
+//
+// The registry's registrations live at the FOOT of this file, after the handlers they call are defined.
+const { createRegistry, checks } = require("./routeRegistry.js");
+const registry = createRegistry("/ai/brain");
+
 function owns(url) {
     const u = String(url || "").split("?")[0];
     return u === "/ev" || u.startsWith("/ai/brain");
 }
 
+/**
+ * Keep a ring array at or under `cap`. Pure: closes over nothing, which is why it belongs at module scope.
+ * With no plotFn it splices the oldest away; with one, it thins the older half (keeping anything plotFn
+ * marks, plus every other entry) and preserves the newer half intact.
+ *
+ * v4030 -- hoisted out of handle(). Same body, byte for byte; only its scope changed.
+ */
+function ringKeep(arr, cap, plotFn) {
+    if (arr.length <= cap) return arr;
+    if (!plotFn) { arr.splice(0, arr.length - cap); return arr; }
+    const half = Math.floor(arr.length / 2);
+    const kept = [];
+    for (let i = 0; i < half; i++) if (plotFn(arr[i], i, arr) || i % 2 === 0) kept.push(arr[i]);
+    const tail = arr.slice(half);
+    arr.length = 0;
+    Array.prototype.push.apply(arr, kept);
+    Array.prototype.push.apply(arr, tail);
+    return arr;
+}
+
 function handle(req, res, ctx) {
     const { sendJson, SYS_LOG, sysLogPush, _ollamaBase, _ollamaModelName } = ctx;
+    // THE REGISTRY GETS FIRST REFUSAL, and only for routes it actually registered -- its owns() is exact-match,
+    // never a prefix wildcard, so an unmigrated /ai/brain/* route reaches the chain below exactly as before.
+    if (registry.owns(req.url)) { registry.handle(req, res, ctx); return; }
     if (req.method === "POST" && req.url === "/ai/brain/hello") {
         note("hello", "a brain said hello");
         // v2088 -- sibling handshake. A brain says hello on boot BEFORE it
@@ -204,39 +241,9 @@ function handle(req, res, ctx) {
         });
         return;
     }
-    if (req.method === "POST" && req.url === "/ai/brain/experience") {
-        let body = "";
-        req.on("data", c => { body += c; if (body.length > 1024 * 1024) body = body.slice(0, 1024 * 1024); });
-        req.on("end", () => {
-            try {
-                const d = JSON.parse(body || "{}");
-                if (d && Array.isArray(d.samples) && typeof d.from === "string") {
-                    for (const s of d.samples.slice(0, 256)) {
-                        gpuBrain.experience.push({ seq: ++gpuBrain.expSeq, from: d.from,
-                            pol: String(s.pol || ""), x: s.x, r: s.r });
-                    }
-                    // v31 -- the last manual splice migrates. The v10 read
-                    // confirmed safety: seq stays monotonic under a hard ring
-                    // (warm-start consumers order by seq) and hard mode is
-                    // splice, element-for-element. ringKeep is declared later
-                    // in this same function -- declaration hoisting makes the
-                    // call legal; node --check agrees.
-                    ringKeep(gpuBrain.experience, 2048);
-                    _gpuExpDirty = true;                              // PATCH-B1e
-                }
-            } catch {}
-            sendJson({ ok: true, seq: gpuBrain.expSeq });
-        });
-        return;
-    }
-    if (req.method === "GET" && req.url.split("?")[0] === "/ai/brain/experience") {
-        const u = new URL(req.url, "http://x");
-        const after = Number(u.searchParams.get("after") || 0);
-        const exclude = u.searchParams.get("exclude") || "";
-        const samples = gpuBrain.experience.filter(s => s.seq > after && s.from !== exclude).slice(0, 512);
-        sendJson({ ok: true, seq: gpuBrain.expSeq, samples });
-        return;
-    }
+    // v4030 -- POST and GET /ai/brain/experience MOVED to the registry (see registry.post/registry.get near the
+    // foot of this file). They are dispatched by handle()'s registry branch BEFORE this chain is reached, so
+    // deleting them from here is what makes the move real rather than leaving two copies of one route.
     // PATCH-B1d -- milestone narration: rewrites a template line as one
     // dramatic kaiju-documentary sentence via the local Ollama (same
     // _ollamaBase + timeout pattern as the mascot quips). Fails soft.
@@ -495,18 +502,12 @@ function handle(req, res, ctx) {
     // v30 -- node twin of the brain's ringKeep (same contract, same
     // two modes; the runtimes cannot share a module, the policy they
     // share is this comment and the tests).
-    function ringKeep(arr, cap, plotFn) {
-        if (arr.length <= cap) return arr;
-        if (!plotFn) { arr.splice(0, arr.length - cap); return arr; }
-        const half = Math.floor(arr.length / 2);
-        const kept = [];
-        for (let i = 0; i < half; i++) if (plotFn(arr[i], i, arr) || i % 2 === 0) kept.push(arr[i]);
-        const tail = arr.slice(half);
-        arr.length = 0;
-        Array.prototype.push.apply(arr, kept);
-        Array.prototype.push.apply(arr, tail);
-        return arr;
-    }
+    // ringKeep MOVED TO MODULE SCOPE at v4030 -- see the declaration above handle(). It was declared HERE,
+    // inside the request handler, and the original code carried a comment noting the call above it was legal
+    // "because declaration hoisting". That was true and it was also a trap: the function was re-allocated on
+    // EVERY REQUEST, and it was invisible to anything outside handle() -- which is exactly what broke when
+    // /ai/brain/experience moved to a module-scope registry registration. THE GATE CAUGHT IT BY RUNNING THE
+    // ROUTE, not by reading the diff: "ringKeep is not defined", on a migration that looked clean.
     // PATCH-B1g -- duel scoreboard history: the engine POSTs tallies every
     // 30s (PATCH-B2m); report.js reads the persisted file to chart the
     // kill curves. Same lazy-save pattern as the experience ring.
@@ -1958,4 +1959,39 @@ function fleetSpeeds() {
     }
     return out;
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// v4030 REGISTRY REGISTRATIONS. Declared here, at the foot, because a registration references the handler it
+// calls and this file defines its state (gpuBrain, ringKeep, _gpuExpDirty) above.
+//
+// *** BOTH ROUTES DECLARE checks.none, AND THAT IS A STATEMENT, NOT AN OVERSIGHT. *** Neither route checked
+// trust before v4030 -- the experience ring is how a fleet of brains shares samples with each other, and
+// gating it would break that. Migrating a route is not the moment to quietly widen or narrow who may call it,
+// so the precondition recorded is the one that was already in force. The difference is that it is now
+// DECLARED rather than merely absent: a reader sees checks.none and knows nobody forgot.
+registry.post("/ai/brain/experience", {
+    check: checks.none,
+    maxBodyBytes: 1024 * 1024,        // was typed inline at the call site; now declared with the route it bounds
+    schema: (d) => (d && Array.isArray(d.samples) && typeof d.from === "string")
+        ? null : "expected {samples: array, from: string}",
+    handler: (d, req, res, ctx) => {
+        for (const s of d.samples.slice(0, 256)) {
+            gpuBrain.experience.push({ seq: ++gpuBrain.expSeq, from: d.from, pol: String(s.pol || ""), x: s.x, r: s.r });
+        }
+        ringKeep(gpuBrain.experience, 2048);
+        _gpuExpDirty = true;
+        ctx.sendJson({ ok: true, seq: gpuBrain.expSeq });
+    },
+});
+
+registry.get("/ai/brain/experience", {
+    check: checks.none,
+    handler: (params, req, res, ctx) => {
+        const after = Number(params.get("after") || 0);
+        const exclude = params.get("exclude") || "";
+        const samples = gpuBrain.experience.filter((s) => s.seq > after && s.from !== exclude).slice(0, 512);
+        ctx.sendJson({ ok: true, seq: gpuBrain.expSeq, samples });
+    },
+});
+
 module.exports = { owns, handle, gpuBrain, fleetSpeeds };

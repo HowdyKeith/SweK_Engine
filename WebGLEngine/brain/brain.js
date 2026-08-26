@@ -2820,7 +2820,13 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4029";   // v4029 -- webgpu-llm.html's storage button promised "a real browser dialog"
+const BRAIN_BUILD = "v4030";   // v4030 -- route preconditions are declared now (routeRegistry.js), not
+// copied by hand into 187 call sites in five spellings. rocketBridge migrated whole (spawns processes,
+// so it went first); gpuBrainBridge migrated incrementally. Found and fixed a real bug along the way:
+// ringKeep() lived inside handle(), invisible outside it, and broke the moment a route left that scope.
+// Scoped MCP exposure first and decided against it for now -- an MCP server is localhost by definition
+// and would inherit trust on 278 spawn sites unattended; the registry is the reusable prerequisite either way.
+// Previously v4029 -- webgpu-llm.html's storage button promised "a real browser dialog"
 // that Chromium never draws: MEASURED headed, from a trusted click, persist() returns false in 1 ms with no UI.
 // The claim traced to v4008 recording an inference ("permissions says prompt, so a dialog shows") as a fact. New
 // engineHint() + PERSIST_BEHAVIOUR marks each row measured-here or documented-only, and a denial now names a

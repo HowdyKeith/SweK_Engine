@@ -48,13 +48,13 @@ function capture(child, sink) {
     if (child.stdout) child.stdout.on("data", feed);
     if (child.stderr) child.stderr.on("data", feed);
 }
-function readBody(req) {
-    return new Promise((resolve) => {
-        let b = "";
-        req.on("data", (c) => { b += c; if (b.length > 65536) b = b.slice(0, 65536); });
-        req.on("end", () => { try { resolve(JSON.parse(b || "{}")); } catch { resolve({}); } });
-    });
-}
+// readBody() lived here and is GONE at v4030, not left behind "in case": the registry reads and parses the
+// body now, so this was a declaration with no caller -- which is precisely what this tree's orphan gates
+// exist to catch. Its 65536 clamp survives as routeRegistry's maxBodyBytes default, so no limit was lost.
+//
+// IT ALSO SWALLOWED BAD JSON: `catch { resolve({}) }` meant a malformed body arrived at the handler as an
+// empty object and the caller was told nothing. The registry answers 400 "bad-json" instead. THAT IS A REAL
+// BEHAVIOUR CHANGE on these six routes and it is called out here rather than filed under "just a refactor".
 function pyExe() { return process.platform === "win32" ? "python" : "python3"; }
 
 // --- validate + remember a meshes folder ----------------------------------------------------------------
@@ -190,30 +190,57 @@ function status() {
 function output() { return { ok: true, running: train ? alive(train.child) : false, exited: train ? train.exited : null, log: train ? train.log.slice() : [] }; }
 
 // --- routing --------------------------------------------------------------------------------------------
+//
+// *** v4030 -- FIRST BRIDGE ON routeRegistry. *** Chosen to go first precisely BECAUSE it is the one that
+// spawns node/python/pip: if a declared precondition cannot be trusted to hold on this bridge, it should not
+// be used on a safer one either. EVERY ROUTE HERE DECLARES checks.trusted -- there is no route on this bridge
+// that does not spawn or control a process, so there is no route that may answer an untrusted caller.
+//
+// WHAT CHANGED, EXACTLY, AND WHAT DID NOT:
+//   - The trust gate was ONE check at the top of handle(). It is now declared per route. That is not the same
+//     statement twice: the old shape meant a route added below the gate was trusted-only BY POSITION, and a
+//     route added above it silently was not. Position is not a security model. Now a new route with no
+//     `check:` gets checks.none and MUST say so, rather than inheriting protection by where it was typed.
+//   - The refusal was `{ok:false, error:"not trusted: /rocket/* controls processes and is host, session or
+//     LAN only"}`. The sentence survives VERBATIM as `denyDetail`; what changes is that `error` is now the
+//     stable code "trusted-only", the same string every trusted route in the tree will answer with. A client
+//     branching on the refusal gets one token to test instead of a prose sentence that differed per bridge.
+//   - validateTrain() is UNCHANGED and is now also the registered schema for /rocket/train/start. It was
+//     always exactly a schema function -- named, hoisted, returning a reason -- which is what made this
+//     bridge the honest first migration rather than a flattering one.
+//   - 405-on-non-POST is gone as a distinct answer: an unregistered METHOD+path is a 404 now. GET
+//     /rocket/train/start was a 405 and is a 404. Both say "not here"; nothing that worked stops working.
+const { createRegistry, checks } = require("./routeRegistry.js");
+const DENY = "/rocket/* controls processes and is host, session or LAN only";
+const registry = createRegistry("/rocket");
+const guarded = (spec) => Object.assign({ check: checks.trusted, denyDetail: DENY }, spec);
+
+registry.get("/rocket/status", guarded({ handler: (_q, _rq, _rs, ctx) => ctx.sendJson(status()) }));
+registry.get("/rocket/output", guarded({ handler: (_q, _rq, _rs, ctx) => ctx.sendJson(output()) }));
+registry.post("/rocket/prepare", guarded({ handler: (d, _rq, _rs, ctx) => prepare(d).then((r) => ctx.sendJson(r)) }));
+registry.post("/rocket/install", guarded({ handler: (_d, _rq, _rs, ctx) => ctx.sendJson(startInstall()) }));
+registry.post("/rocket/train/start", guarded({
+    // THE SCHEMA IS validateTrain ITSELF, not a second description of it. A separate shape declaration here
+    // would be a copy of the rules startTrain enforces, and the copy is never the one that gets updated
+    // (v3527). validateTrain returns {ok:false,error} on refusal, so the adapter is one line and startTrain
+    // still re-runs it -- belt and braces on the route that spawns a training process.
+    schema: (d) => { const v = validateTrain(d || {}); return v.ok ? null : v.error; },
+    handler: (d, _rq, _rs, ctx) => ctx.sendJson(startTrain(d)),
+}));
+registry.post("/rocket/train/stop", guarded({ handler: (_d, _rq, _rs, ctx) => ctx.sendJson(stopTrain()) }));
+
 const ROUTES = new Set(["/rocket/status", "/rocket/output", "/rocket/prepare", "/rocket/install", "/rocket/train/start", "/rocket/train/stop"]);
 function owns(url) { return ROUTES.has((url || "").split("?")[0]); }
 
-async function handle(req, res, ctx = {}) {
-    const sendJson = ctx.sendJson || ((o, code = 200) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(o)); });
-    const p = (req.url || "").split("?")[0];
-
-    const trusted = ctx.isTrusted ? !!ctx.isTrusted(req) : false;
-    if (!trusted) return sendJson({ ok: false, error: "not trusted: /rocket/* controls processes and is host, session or LAN only" }, 403);
-
-    if (req.method === "GET" && p === "/rocket/status") return sendJson(status());
-    if (req.method === "GET" && p === "/rocket/output") return sendJson(output());
-
-    if (req.method !== "POST") return sendJson({ ok: false, error: "POST" }, 405);
-    const body = await readBody(req);
-
-    if (p === "/rocket/prepare") return sendJson(await prepare(body));
-    if (p === "/rocket/install") return sendJson(startInstall());
-    if (p === "/rocket/train/start") return sendJson(startTrain(body));
-    if (p === "/rocket/train/stop") return sendJson(stopTrain());
-
-    return sendJson({ ok: false, error: "no such route" }, 404);
+function handle(req, res, ctx = {}) {
+    // sendJson stays defaulted here rather than being required from ctx: server.js always supplies one, but
+    // this bridge's own tests and shutdown paths call handle() directly and the fallback is what lets them.
+    const c = Object.assign({}, ctx, {
+        sendJson: ctx.sendJson || ((o, code = 200) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(o)); }),
+    });
+    registry.handle(req, res, c);
 }
 
 function shutdown() { try { if (train) train.child.kill(); } catch {} try { if (install) install.child.kill(); } catch {} }
 
-module.exports = { owns, handle, status, output, prepare, setMeshes, probeSim, startInstall, startTrain, stopTrain, validateTrain, shutdown, _routes: ROUTES };
+module.exports = { owns, handle, status, output, prepare, setMeshes, probeSim, startInstall, startTrain, stopTrain, validateTrain, shutdown, _routes: ROUTES, _registry: registry };
