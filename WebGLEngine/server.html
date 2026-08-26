@@ -114,6 +114,19 @@ window.addEventListener("load", function () {
   button.warn { color:var(--warn); border-color:#5a4a1f; background:#231d10; }
   button.demospill { color:#ffb454; border-color:#6a4a1a; background:#2a1d0c; border-radius:999px; font-weight:600; }
   button.demospill.open { background:#3a2810; }
+  /* v4041 -- Keith: "let's make the link boxes around the ?go=id to appear different. maybe have a flash over
+     effect on those buttons." Only two ?go= launchers live on this page today (pfResumeFx below, and the
+     ABYSS Battleship entry inside the Tools GROUPS directory a few hundred lines down) -- a `?go=id` link has
+     no file behind it, it is a STATE the running engine enters, so it needs to read differently from every
+     real .html link sitting beside it. Shares page-index.html's warm-amber palette and its sheen (a gradient
+     sweeping across ::before on hover, i.e. "flash over" read literally rather than a constant pulse) so the
+     same visual language means the same thing everywhere it appears. */
+  .go-link { position:relative; overflow:hidden; }
+  .go-link::before { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+                      background:linear-gradient(100deg, transparent 30%, rgba(255,180,84,.5) 50%, transparent 70%);
+                      background-size:250% 100%; background-position:150% 0; transition:background-position .6s ease; }
+  .go-link:hover::before { background-position:-50% 0; }
+  a.go-link { border-color:#6a4a1a !important; color:#ffb454 !important; background:#2a1d0c !important; }
   #launchPanel, #demoPanel { background:var(--panel); border:1px solid #5a4a1f; border-radius:12px; padding:12px 14px; margin-top:6px; }
   #launchPanel .dh, #demoPanel .dh { font-size:12px; color:#ffb454; font-weight:600; margin-bottom:4px; }
   #launchPanel .dsub, #demoPanel .dsub { font-size:11.5px; color:var(--dim); margin-bottom:9px; }
@@ -2021,7 +2034,7 @@ A password fetches a token from the list server; an unregistered callsign needs 
              -- it stays reachable from the services list that actually installs it. The id changed with the
              label on purpose: pfCoolify pointing at the phone view would be a name lying about its target. -->
         <button id="pfPhone" title="Phone Mode — the phone/tablet UI for this engine: touch sticks, buttons and the picker, paired over the LAN">📱 Phone Mode</button>
-        <button id="pfResumeFx" title="Resume FX — a VBA Developer's resume rendered in the OpenGL engine they built in VBA (spin / scroll / burn / hologram)">📄 Resume FX</button>
+        <button id="pfResumeFx" class="go-link" title="Resume FX — a VBA Developer's resume rendered in the OpenGL engine they built in VBA (spin / scroll / burn / hologram). This is an engine DEMO MODE (?go=resume_fx), not a page — it exists only while the engine is running.">📄 Resume FX</button>
         <!-- v4039 -- FOUR PORTFOLIO BUTTONS REMOVED HERE, on four separate asks in one pass:
              pfGpuBrain (brain-bench.html) and pfBox3d (box3d-info.html) -- Keith: "it should not have it's own
              button, but instead be a link on the GPU Brain panel that already exists on Server.html" / "should
@@ -2170,6 +2183,10 @@ A password fetches a token from the list server; an unregistered callsign needs 
         g[1].forEach(function (p) {
           var a = document.createElement("a"); a.href = p[0]; a.textContent = p[1];
           a.style.cssText = "text-decoration:none;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;color:var(--ink);background:rgba(255,255,255,0.02);";
+          // v4041 -- a "?go=" href is an engine DEMO MODE, not a file (see the .go-link rule above); flagged
+          // here rather than hand-listed a second time, so a future GROUPS entry that happens to be one gets
+          // the same treatment for free instead of needing to be remembered.
+          if (/[?&]go=/.test(p[0])) { a.classList.add("go-link"); a.title = (p[1] + " — engine demo mode, not a page (exists only while the engine runs)"); }
           // v1786 — track in Recent so any app/demo click surfaces in the quick-launch row
           a.addEventListener("click", function(){ window._swekPushRecent && window._swekPushRecent({ label: p[1], href: p[0], newTab: false }); });
           wrap.appendChild(a);

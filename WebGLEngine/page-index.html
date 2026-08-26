@@ -36,6 +36,21 @@
   .item a { color:var(--green); text-decoration:none; font-weight:600; } .item a:hover { text-decoration:underline; }
   .item.panel a { color:var(--amber); }
   .item .d { color:var(--dim); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* v4041 -- Keith: "let's make the link boxes around the ?go=id to appear different. maybe have a flash over
+   effect on those buttons." A demo/built-in link has no file behind it -- it is a STATE the running engine
+   enters, not a page -- and a reader could not tell that from a plain green link sitting beside real pages.
+   .go-link wraps it in its own pill (border + tinted fill, distinct from .item's plain text link) and adds a
+   sheen that sweeps across ON HOVER via a ::before gradient sliding through background-position -- "flash
+   over" read literally, not a constant pulse, so it does not fight for attention on a page listing hundreds
+   of entries. Kept transform/opacity-only elsewhere in this file's existing hover rules; this is the one
+   attention effect on the page, reserved for the one distinction that matters (KINDS.PAGE.survives vs not). */
+.go-link { position:relative; overflow:hidden; display:inline-block; padding:1px 7px; border-radius:4px;
+           border:1px solid #6a4a1c; background:#241a0a; color:var(--amber) !important; font-weight:700 !important; }
+.go-link::before { content:""; position:absolute; inset:0; pointer-events:none;
+                    background:linear-gradient(100deg, transparent 30%, rgba(255,204,102,.55) 50%, transparent 70%);
+                    background-size:250% 100%; background-position:150% 0; transition:background-position .6s ease; }
+.go-link:hover::before { background-position:-50% 0; }
+.go-link:hover { text-decoration:none !important; border-color:var(--amber); }
 .place { display:flex; flex-wrap:wrap; gap:3px; align-items:center; margin-left:auto; padding-left:10px; }
 .place.dim { opacity:.35; }
 .tchip { display:inline-flex; align-items:center; gap:2px; font-size:9.5px; line-height:1.4; padding:0 4px;
@@ -102,8 +117,10 @@ function renderList() {
           (p.kind === "demo" ? "a demo" : "a built-in") + " — exists only while the engine runs, so it cannot be a dashboard tile'></span>"
         : "<input type='checkbox' data-f='" + p.f + "'" + (sel.has(p.f) ? " checked" : "") + " />";
       const tag = p.kind === "demo" ? " \ud83c\udfac" : p.kind === "builtin" ? " \ud83c\udfa1" : "";
+      const isGo = p.kind === "demo" || p.kind === "builtin";
       h += "<div class='item" + (p.p?" panel":"") + "'>" + box +
-           "<div class='body'><a href='/" + p.f + "' target='_blank' rel='noopener'>" + p.t + "</a>" + tag +
+           "<div class='body'><a class='" + (isGo?"go-link":"") + "' href='/" + p.f + "' target='_blank' rel='noopener'" +
+           (isGo ? " title='engine " + p.kind + " -- a state the running engine enters, not a file'" : "") + ">" + p.t + "</a>" + tag +
            (p.d ? " <span class='d'>" + p.d + "</span>" : "") + "</div>" + placeCells(p) + "</div>";
     }
   }
