@@ -18,6 +18,9 @@
 // below ("Install buttons are macOS-only (run this on the Apple-Silicon Mac)") -- it is exactly the Mac-side-route
 // test that panel already applies to everything else in it.
 //
+// v4037 -- weights download (/mlx/pull), on-demand start, and idle auto-exit added -- see the inline comments
+// at the bottom of mountLocalMlxPanel() and ai-bridge/mlxInstallBridge.js's own header for the mechanism.
+//
 // mountLocalMlxPanel(host) RENDERS DIRECTLY INTO THE HOST PASSED IN, the same shape the settings schema's
 // `render(host)` contract already expected -- no floating root, no idempotency guard, because settingsHub.js's
 // _row() hands `render()` a FRESH box every time a category is opened (confirmed by reading it: _showCategory
@@ -60,7 +63,22 @@ export function mountLocalMlxPanel(host) {
             t.innerHTML = '<b style="color:#cfe;">' + it.label + '</b> <span style="color:' + (ok ? "#7fd1a0" : "#6a7585") + ';font-size:10px;">' + (ok ? "✓ installed" : "not detected") + '</span><div style="color:#7a8290;font-size:10px;margin-top:2px;">' + (it.note || "") + '</div>';
             const b = document.createElement("button"); b.textContent = ok ? "Reinstall" : "Install"; b.disabled = !cat.supported; b.style.cssText = "padding:5px 10px;background:" + (cat.supported ? "#2a4d3a" : "#222a33") + ";color:#cfe;border:1px solid #4a7d5a;border-radius:6px;cursor:" + (cat.supported ? "pointer" : "not-allowed") + ";font-size:11px;opacity:" + (cat.supported ? "1" : ".5") + ";";
             b.addEventListener("click", async () => { log.style.display = "block"; log.textContent = "installing " + it.id + "… (this can take a while)"; b.disabled = true; const j = await fetch("/mlx/install", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message })); b.disabled = false; log.textContent = (j.ok ? "✓ installed " + it.id + "\n\nstart it with:\n  " + (j.run || "") + "\n\n" : "✗ " + (j.error || "failed") + "\n\n") + (j.out || ""); detB.click(); });
-            r.append(t, b); tools.appendChild(r);
+            r.append(t, b);
+            // v4038 -- Keith: "if we install it, can we also have an uninstall button?" Only shown once Detect has
+            // actually found it installed (an Uninstall button on something not present would just error), and
+            // only when the catalog says the entry HAS a single command to reverse (it.uninstallable) -- an
+            // entry built from source (TurboFieldfare) gets its removal step in the tooltip instead of a button
+            // that would spawn a package manager the install never went through either.
+            if (ok) {
+                const u = document.createElement("button");
+                u.textContent = "Uninstall";
+                u.disabled = !cat.supported || !it.uninstallable;
+                u.title = it.uninstallable ? "" : (it.uninstallNote || "no single uninstall command for this entry");
+                u.style.cssText = "padding:5px 10px;background:" + (u.disabled ? "#2a1414" : "#3a1c1c") + ";color:#f99;border:1px solid #6a3a3a;border-radius:6px;cursor:" + (u.disabled ? "not-allowed" : "pointer") + ";font-size:11px;opacity:" + (u.disabled ? ".5" : "1") + ";";
+                u.addEventListener("click", async () => { log.style.display = "block"; log.textContent = "uninstalling " + it.id + "…"; u.disabled = true; const j = await fetch("/mlx/uninstall", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: it.id }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message })); u.disabled = false; log.textContent = (j.ok ? "✓ uninstalled " + it.id : "✗ " + (j.error || "failed")) + "\n\n" + (j.out || ""); detB.click(); });
+                r.appendChild(u);
+            }
+            tools.appendChild(r);
         }
     }
     detB.addEventListener("click", async () => {
@@ -78,4 +96,50 @@ export function mountLocalMlxPanel(host) {
     saveB.addEventListener("click", async () => { const j = await fetch("/ai/mlx-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(get()) }).then(r => r.json()).catch(() => null); msg.textContent = j && j.ok ? "✓ saved" : "failed"; msg.style.color = "#9fe88f"; key.value = ""; if (j && j.hasKey) key.placeholder = "key saved — type to replace"; });
     testB.addEventListener("click", async () => { msg.textContent = "testing…"; msg.style.color = "#8b97a8"; await fetch("/ai/mlx-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(get()) }); const j = await fetch("/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: "mlx", prompt: "Reply with the single word: ready" }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message })); msg.textContent = j && j.ok ? ("✓ " + (j.text || "responded").slice(0, 40)) : "✗ " + (j.error || "no response"); msg.style.color = j && j.ok ? "#9fe88f" : "#f88"; });
     (async () => { const c = await fetch("/ai/mlx-config").then(r => r.json()).catch(() => null); if (c && c.ok) { url.value = c.baseUrl || ""; model.value = c.model || ""; if (c.hasKey) key.placeholder = "key saved — type to replace"; } })();
+
+    // v4037 -- Keith: "can we fill in the qwen weights download for the mac too? so it will auto install as
+    // much as possible, and then be able to run." /mlx/pull installs mlx-lm (reusing the Install button's own
+    // pip step above) if it is not already on PATH, then triggers mlx-lm's own HuggingFace fetch for whatever
+    // is in the model field. ONLY mlx-lm can be driven this way -- Rapid-MLX, Osaurus and vMLX are apps with
+    // their own model managers this bridge has no documented, scriptable way to reach.
+    const pull = document.createElement("div"); pull.style.cssText = "border-top:1px solid #141c28; margin-top:6px; padding-top:8px; display:flex; flex-direction:column; gap:7px;";
+    const pullNote = document.createElement("div"); pullNote.style.cssText = "font-size:11px;color:#7a8290;line-height:1.5;";
+    pullNote.innerHTML = "Fetches the weights for whatever HuggingFace repo id is in the <b>model</b> field above (e.g. <code>mlx-community/Qwen2.5-7B-Instruct-4bit</code>) — blank defaults to a small Qwen2.5 build. Pre-fetching here means the on-demand start below doesn't have to eat a cold multi-gigabyte download inside one chat request's patience window.";
+    const pullRow = document.createElement("div"); pullRow.style.cssText = "display:flex; gap:6px; align-items:center;";
+    const pullB = document.createElement("button"); pullB.textContent = "Download / preload model weights"; pullB.style.cssText = "padding:6px 12px;background:#2a4d3a;color:#cfe;border:1px solid #4a7d5a;border-radius:6px;cursor:pointer;font-size:11px;";
+    const pullMsg = document.createElement("span"); pullMsg.style.cssText = "font-size:11px;color:#8b97a8;";
+    pullRow.append(pullB, pullMsg);
+    const pullLog = document.createElement("pre"); pullLog.style.cssText = "margin:0;max-height:160px;overflow:auto;background:#06080c;border:1px solid #1a222e;border-radius:6px;padding:7px;font:10px ui-monospace,monospace;color:#bcd;white-space:pre-wrap;display:none;";
+    pull.append(pullNote, pullRow, pullLog);
+    host.appendChild(pull);
+    pullB.addEventListener("click", async () => {
+        pullLog.style.display = "block";
+        pullLog.textContent = "downloading… (a multi-gigabyte model over a slow connection can take a while — this can run up to 30 minutes before giving up)";
+        pullB.disabled = true; pullMsg.textContent = "";
+        const j = await fetch("/mlx/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: model.value.trim() }) }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+        pullB.disabled = false;
+        pullMsg.textContent = j.ok ? "✓ ready" : "✗ " + (j.error || "failed");
+        pullMsg.style.color = j.ok ? "#9fe88f" : "#f88";
+        pullLog.textContent = (j.installLog && j.installLog.out ? "[installing mlx-lm]\n" + j.installLog.out + "\n\n" : "") + (j.out || "");
+    });
+
+    // v4037 -- Keith: "would we be able to have the SweK engine report [this] is available, and then run on
+    // demand? and then exit when idle?" The on-demand start itself is wired into every chat call through this
+    // provider (ai-bridge/aiProviders.js's mlxChat -> mlxInstallBridge.ensureRunning), not a button here — this
+    // block only REPORTS what that machinery is doing, since nothing else on this page could otherwise see it,
+    // and offers Stop rather than making a person wait out the idle timer.
+    const stat = document.createElement("div"); stat.style.cssText = "border-top:1px solid #141c28; margin-top:6px; padding-top:8px; display:flex; flex-direction:column; gap:6px;";
+    const statLine = document.createElement("div"); statLine.style.cssText = "font-size:11px;color:#8b97a8;line-height:1.5;";
+    const stopB = document.createElement("button"); stopB.textContent = "Stop now"; stopB.style.cssText = "padding:5px 10px;background:#3a1c1c;color:#f99;border:1px solid #6a3a3a;border-radius:6px;cursor:pointer;font-size:11px;align-self:flex-start;display:none;";
+    stat.append(statLine, stopB); host.appendChild(stat);
+    async function refreshStatus() {
+        const s = await fetch("/mlx/status").then(r => r.json()).catch(() => null);
+        if (!s || !s.ok) { statLine.textContent = "on-demand status unavailable (not running on the Mac itself?)"; stopB.style.display = "none"; return; }
+        const limitMin = Math.round((s.idleLimitMs || 0) / 60000);
+        if (!s.managed) { statLine.textContent = "nothing started by this panel right now — a server starts automatically on the first chat request through this provider, and stops after " + limitMin + " minute(s) idle."; stopB.style.display = "none"; return; }
+        statLine.textContent = "running " + s.model + " on port " + s.port + " (pid " + s.pid + ") — idle " + (s.idleMs / 60000).toFixed(1) + " of " + limitMin + " min before auto-stop.";
+        stopB.style.display = "";
+    }
+    stopB.addEventListener("click", async () => { stopB.disabled = true; await fetch("/mlx/stop", { method: "POST" }).catch(() => null); stopB.disabled = false; refreshStatus(); });
+    refreshStatus();
 }
