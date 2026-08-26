@@ -20969,6 +20969,28 @@ try { require("./portHandoff.js").installHandoff(appServer, PORT, { log: console
 appServer.listen(PORT, () => {
     // v3522 -- the bind SUCCEEDED, which is the one outcome the old server cannot infer from anywhere else.
     try { require("./bootTrace.js").record("bind-ok", { root: require("path").join(__dirname, ".."), port: PORT }); } catch {}
+    // *** v4028 -- THE PORT BEACON, AND IT EXISTS BECAUSE v4014 BROKE THE BRAIN WITHOUT NOTICING. ***
+    // Keith's rig: the GPU Brain sat at "errors=168 and climbing", every request refused, while the engine was
+    // healthy -- because he had launched a CLONE and v4014's launch() deliberately starts it on a FRESH FREE
+    // PORT ("side by side, never over the top"). The engine came up on 54026; brain.js defaults to 8787 and
+    // nothing had ever needed to tell it otherwise. THE FEATURE THAT AVOIDS A PORT COLLISION CREATED A
+    // DISCOVERY PROBLEM AND SHIPPED WITHOUT THE OTHER HALF.
+    //
+    // /net/info already serves the port and is useless here: reaching it means already knowing the port. So the
+    // bridge writes where it is, at the one moment it is certain -- the bind callback, after success.
+    //
+    // ONE FILE, LAST WRITER WINS, AND THAT LIMIT IS THE REASON BRAIN_BRIDGE STILL EXISTS. Two engines side by
+    // side (exactly what v4014 makes easy) leave the newer one named here. That is the honest answer for a
+    // process with no other information, and it is NOT a guess dressed as a fact: the record carries the pid
+    // and root that wrote it, so a reader can tell WHICH engine it found, and an explicit BRAIN_BRIDGE always
+    // wins over it.
+    try {
+        const os = require("os"), fs2 = require("fs"), p2 = require("path");
+        fs2.writeFileSync(p2.join(os.tmpdir(), "swek_bridge_port.json"), JSON.stringify({
+            port: PORT, pid: process.pid, root: p2.resolve(__dirname, ".."), at: Date.now(),
+            note: "written by the bridge on a SUCCESSFUL bind. Last writer wins; set BRAIN_BRIDGE to override.",
+        }));
+    } catch {}
     // v3527 -- RESTORE THE KPOP LISTENER, BUT ONLY IF THIS MACHINE ALREADY HAD IT.
     // An auto-update starts THE ENGINE ONLY (launcherName), so the listener has never come back on its own;
     // the two things that start it are a double-click and a button. The old server recorded whether it was
