@@ -665,7 +665,7 @@
   "tools/roundhouse/kerrIscoKey-selfcheck.mjs": 260,
   "tools/roundhouse/kerrLadderBind-selfcheck.mjs": 142,
   "tools/roundhouse/khBind-selfcheck.mjs": 70860,
-  "tools/roundhouse/khConvergence-selfcheck.mjs": 244299,
+  "tools/roundhouse/khConvergence-selfcheck.mjs": 681104,
   "tools/roundhouse/khGrowthKey-selfcheck.mjs": 327500,
   "tools/roundhouse/khMichalke-selfcheck.mjs": 273445,
   "tools/roundhouse/kineticsBind-selfcheck.mjs": 2572,
@@ -1164,9 +1164,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 654,
+  "timedThisRun": 655,
   "totalInRecord": 1159,
-  "at": "2026-08-26T17:36:28Z"
+  "at": "2026-08-26T17:47:49Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
