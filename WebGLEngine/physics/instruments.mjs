@@ -986,6 +986,17 @@ export const INSTRUMENTS = [
         key: "dL/dt = tau, so a torque applied sideways to a large spin angular momentum moves the axis AT RIGHT ANGLES rather than tipping it toward the ground. The closed form is precession = tau/(I*omega), and v3591 recovered exactly that FROM THE TRAJECTORY: rate*omega came back 11.808, 11.938, 11.970, 11.977, 11.979 across omega 10 to 160 against an applied torque of 12 -- A CONSTANT THE MEASUREMENT NEVER SEES, because the rate is unwrapped out of the axis angle. The law is the FAST-TOP APPROXIMATION and it fails where precession is comparable to spin, giving 80%, 61%, 33% and 6.3% error at omega 0.5, 1, 2 and 5 -- which is what lets its knob adjudicator refuse a perfectly well-formed value rather than only refusing nonsense.",
     },
     {
+        // v4023 -- registered when registryOrphans went red on it: the refusal-expiry patch added a module
+        // following the v3327 split (a reportLines() beside the gate) and no entry, which is the exact shape
+        // this registry exists to catch. The key below is LIFTED from the module's own header, not authored
+        // here -- registryOrphans' own note is that writing a key for a module you have not studied would be
+        // fabrication, and the key field is a claim about what an instrument ESTABLISHES.
+        id: "refusal-expiry", area: "method", name: "Nothing watched the refusals for their own expiry",
+        page: "instrument-bench.html", gate: "tools/roundhouse/refusalExpiry-selfcheck.mjs",
+        measures: "Every declared plant refusal, re-asked against the tree as it is today: stands / expired / unwatched / broken.",
+        key: "*** NOTHING WATCHED THE REFUSALS FOR THEIR OWN EXPIRY CONDITIONS COMING TRUE. *** A device may decline to declare a plant, and that is a legitimate, valuable answer. But a refusal is a claim about the tree AS IT IS TODAY, and the tree moves. composeBind's own words: \"EXPIRES IF a comparison pair with sample counts on both sides is added\". That sentence was written down and nothing ever evaluated it, so the day somebody adds such a pair the refusal goes on standing -- A CORRECT REFUSAL QUIETLY BECOMING A STALE ONE, which is the same species as a suppression nobody audits and the same species as the v3195 hilbert.mjs entry that sat stale for seven rounds. *** THE EXPIRY IS A PREDICATE, NOT A SENTENCE, AND THAT IS THE WHOLE DESIGN DECISION. *** An expiry parsed out of the sentence stating it would inherit exactly the mention-test flaw this tree has got wrong three times. So each refusing device exports plantRefusedExpiry(), a function returning { expired, evidence }. AND A REFUSAL WITH NO PREDICATE IS REPORTED AS ITS OWN STATE rather than folded into \"not expired\": one has been asked and answered no, the other has never been asked.",
+    },
+    {
         id: "registry-orphans", area: "ship", name: "The direction nobody checked",
         page: "instrument-bench.html", gate: "tools/ship/registryOrphans-selfcheck.mjs",
         measures: "Gates that should have an instrument entry and have none -- the mirror of the check that was already there.",

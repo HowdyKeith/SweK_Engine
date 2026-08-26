@@ -132,7 +132,37 @@ export function build({ mode = "exponent", config = {} } = {}) {
 export const BEAM_OBSERVABLES = ["exponent", "points", "exponentError", "closedFormAtUnitL", "worstResidual",
     "relative", "nodes", "dij", "dji", "relGap", "reciprocityIsFiner",
     "pcr", "pcrExact", "pcrRelErr", "closedFormPcr", "oddSquare2", "oddSquare3", "refineRatio", "buckleNodes"];
+// *** THE EXPIRY, AS A PREDICATE RATHER THAN AN ABSENCE. *** The refusal above says reciprocity does not
+// SELECTIVELY catch the free-end asymmetry, and points at the `conditioning` mode for the data. What it never
+// said is what would change its mind -- and a refusal with no stated expiry is PERMANENT BY DEFAULT, which is
+// how a measured "not today" becomes an unexamined "never".
+//
+// The condition needs no prose and no new measurement, because the conditioning mode ALREADY COMPUTES IT as a
+// field: reciprocityIsFiner. That boolean is the whole question -- it asks whether the reciprocity residual
+// separates the asymmetric case more sharply than the tip-drift does. Measured false today across every eps in
+// the sweep. If a change to the beam, the solver or the residual ever makes it true, a key exists, the plant
+// becomes available, and this refusal is done.
+async function beamRefusalExpired() {
+    const v = await build({ mode: "conditioning", config: {} });
+    const expired = v.reciprocityIsFiner === true;
+    const rows = Array.isArray(v.rows) ? v.rows : [];
+    const best = rows.reduce((acc, r) => (r && r.relGap > (acc ? acc.relGap : -Infinity) ? r : acc), null);
+    return {
+        expired,
+        observable: "reciprocityIsFiner", measured: v.reciprocityIsFiner,
+        evidence: expired
+            ? "reciprocityIsFiner = true across the conditioning sweep: RECIPROCITY NOW SEPARATES the free-end "
+              + "asymmetry, so a key exists and the plant this refusal measured to be unavailable is available. "
+              + "THE REFUSAL HAS EXPIRED: build it."
+            : "reciprocityIsFiner = " + String(v.reciprocityIsFiner) + " over " + rows.length + " eps values"
+              + (best ? "; widest relGap " + best.relGap.toExponential(3) + " at eps " + best.eps
+                        + ", against tipDriftFrac " + best.tipDriftFrac.toExponential(3) : "")
+              + ". No key separates it, so declaring a plant would MANUFACTURE coverage.",
+    };
+}
+
 export const beamDevice = {
+    plantRefusedExpiry: beamRefusalExpired,
     // THE REFUSAL TRAVELS ON THE DEVICE, because the registry hands out devices and a proposer reading the
     // registry is the thing that needs to see it. A module-level export would have been invisible to it.
     plantRefused: PLANT_REFUSED, modes: MODES, name: "cantilever-elasticity", observables: BEAM_OBSERVABLES, build, defaults };

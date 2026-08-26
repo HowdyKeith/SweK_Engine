@@ -104,7 +104,32 @@ export async function buildSpacefill(args = {}) {
     return { ...measure(hilbertPath(order), order, 0, 1), bijectionMismatches: mismatches, orderRatio: -1, rasterTracksN: -1 };
 }
 
+// *** THE EXPIRY, AS A PREDICATE. *** The refusal below rests on one measured fact: breakErrAbs -- the ERROR
+// observable -- is exactly zero in BOTH arms, because the raster path has exactly the n-1 breaks its analytic
+// key predicts. That is what makes `raster` a LOAD-BEARING NEGATIVE rather than a plant: `breaks` moves 0 -> 63
+// and so satisfies probeModePlant, WHICH CHECKS SEPARATION AND NOT WRONGNESS, and a negative control separates
+// just as well as a plant does.
+//
+// So the condition is exact and needs no new measurement: if breakErrAbs ever leaves zero in the raster arm, the
+// raster path has stopped matching its own analytic key, there IS wrongness to catch, and the refusal is done.
+// Read as a FIELD off the device's own build, never grepped from the sentence above it.
+async function spacefillRefusalExpired() {
+    const v = await buildSpacefill({ mode: "raster" });
+    const expired = v.breakErrAbs !== 0;
+    return {
+        expired, observable: "breakErrAbs(raster)", measured: v.breakErrAbs,
+        evidence: expired
+            ? "breakErrAbs = " + v.breakErrAbs + " in the raster arm: the raster path NO LONGER matches the n-1 "
+              + "breaks its analytic key predicts, so there is wrongness to catch and not merely separation. "
+              + "THE REFUSAL HAS EXPIRED: raster is a real plant now."
+            : "breakErrAbs = " + v.breakErrAbs + " in the raster arm (breaks " + v.breaks + " against breaksExpected "
+              + v.breaksExpected + "): exactly its analytic key, so raster SEPARATES without being WRONG -- a "
+              + "negative control, and declaring it a plant would manufacture coverage.",
+    };
+}
+
 export const spacefillDevice = {
+    plantRefusedExpiry: spacefillRefusalExpired,
     // v3190 -- EXPORTED so the census does not have to GUESS. A probed list is a LOWER BOUND: you can only
     // ask about a mode you already thought of, and this device's own names were not in anyone's candidate
     // list, so it under-reported as one-moded until it said so itself.

@@ -14,7 +14,7 @@
 // ROUTE, THEN PLANT IT. ***
 
 import { quantumDevice, QUANTUM_OBSERVABLES, QUANTUM_MODES } from "./quantumBind.mjs";
-import { bandEdges, numericEdges } from "../../physics/quantum/kronigPenney.js";
+import { bandEdges, gaps as kpGaps, kpRhs, numericEdges, blochSpectrum } from "../../physics/quantum/kronigPenney.js";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -82,6 +82,39 @@ report("WHAT THIS DOES NOT CLAIM",
     "coefficient would leave them exactly right. ONE PLANT TESTS ONE CLAIM. Nor is the matrix route claimed " +
     "ACCURATE: it is first order and 3.6e-3 off at n=400. Its value is that it is INDEPENDENT, not that it is " +
     "better -- the analytic route remains the reference.");
+
+// ---- THE ATTRIBUTION FALSIFIER, AND THE FAULT EVERY OTHER BAND CHECK IS BLIND TO --------------------------
+// numericEdges MERGES the periodic and antiperiodic spectra, so edgeRhsWorst, insideGapWorst, insideBandWorst
+// and numericEdgeWorst are ALL INVARIANT under exchanging the two -- the union does not change. That exchange is
+// the fault kronigPenney.js's own header names: the wrap sign is "the whole of Bloch's theorem at these two
+// special points, and getting it wrong swaps every band edge with its neighbour."
+//
+// The swap is constructed HERE rather than added as a second device plant, because a device declares ONE plant
+// and quantum's is the stencil. Measured: the stencil plant moves numericEdgeWorst 3.573e-3 -> 5.446e+4 and
+// leaves the attribution at 0, while the swap does the exact opposite. Two faults, two observables, neither
+// standing in for the other.
+{
+    const p = { V0: 20, a: 1, b: 0.2 };
+    const edges = bandEdges({ ...p, eMax: 60, samples: 8000, iters: 60 }).slice(0, 6);
+    const per = blochSpectrum({ ...p, n: 400, count: 8, antiperiodic: false });
+    const anti = blochSpectrum({ ...p, n: 400, count: 8, antiperiodic: true });
+    const nearest = (E, set) => Math.min(...set.map((x) => Math.abs(x - E)));
+    const mismatches = (a, b) => edges.filter((E) =>
+        (nearest(E, a) < nearest(E, b)) !== (kpRhs(E, p) >= 0)).length;
+
+    ok("!! every band edge belongs to the symmetry the transcendental says it does",
+        mismatches(per, anti) === 0,
+        "0 of " + edges.length + " mismatched. cos(kL) = +1 at k = 0 and -1 at k = pi/L, and |rhs| = 1 at an edge "
+        + "by construction, so the SIGN of kpRhs there is exact -- no tolerance enters this.");
+    ok("!! *** SABOTAGE: the wrap sign inverted swaps EVERY edge, not some ***",
+        mismatches(anti, per) === edges.length,
+        mismatches(anti, per) + " of " + edges.length + " mismatched with the two spectra exchanged");
+    ok("!! *** ...and the union is UNCHANGED, which is why every other band check is blind to it ***",
+        JSON.stringify([...per, ...anti].sort((x, y) => x - y))
+        === JSON.stringify([...anti, ...per].sort((x, y) => x - y)),
+        "edgeRhsWorst, insideGapWorst, insideBandWorst and numericEdgeWorst all read the merged list. A BAND "
+        + "STRUCTURE WITH BLOCH'S THEOREM INVERTED WOULD PASS EVERY ONE OF THEM WITHOUT A MARK.");
+}
 
 console.log("\nquantumBind-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);
