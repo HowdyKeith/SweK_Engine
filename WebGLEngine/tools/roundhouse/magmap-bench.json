@@ -1,0 +1,178 @@
+{
+  "kind": "swek-magmap-bench",
+  "version": 2948,
+  "at": "2026-08-26T18:27:15.787Z",
+  "adapter": {
+    "vendor": "intel",
+    "architecture": "gen-8"
+  },
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "cfg": {
+    "n": 21,
+    "span": 1,
+    "rho": 0.1,
+    "nR": 48,
+    "nT": 48
+  },
+  "reps": 7,
+  "tol": 0.00001,
+  "baselineMs": 5.200000047683716,
+  "best": {
+    "id": "wg128-shared",
+    "ms": 4.300000190734863,
+    "speedup": 1.2093022830296767
+  },
+  "results": [
+    {
+      "id": "base-wg64",
+      "workgroup": 64,
+      "sharedTrig": false,
+      "note": "the FORMER default (pre-v3965) -- kept as the baseline every speedup is measured against",
+      "ms": 5.200000047683716,
+      "all": [
+        11.8,
+        4.5,
+        5.9,
+        5.3,
+        5,
+        4.5,
+        5.2
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg32",
+      "workgroup": 32,
+      "sharedTrig": false,
+      "note": "narrower groups; some mobile GPUs prefer 32",
+      "ms": 4.799999952316284,
+      "all": [
+        5.1,
+        4.8,
+        4.6,
+        5.4,
+        4.4,
+        6.4,
+        4.5
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg128",
+      "workgroup": 128,
+      "sharedTrig": false,
+      "note": "wider groups",
+      "ms": 4.700000047683716,
+      "all": [
+        6,
+        4.3,
+        5.6,
+        4.7,
+        4.7,
+        4.5,
+        5.8
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg256",
+      "workgroup": 256,
+      "sharedTrig": false,
+      "note": "widest commonly supported",
+      "ms": 4.6000001430511475,
+      "all": [
+        6.5,
+        4.4,
+        4.6,
+        4.4,
+        5.3,
+        4.6,
+        5
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg64-shared",
+      "workgroup": 64,
+      "sharedTrig": true,
+      "note": "incumbent width + trig tables in workgroup memory",
+      "ms": 4.5,
+      "all": [
+        4.2,
+        6.3,
+        4.5,
+        5.5,
+        4.1,
+        5.1,
+        3.9
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg128-shared",
+      "workgroup": 128,
+      "sharedTrig": true,
+      "note": "wider + shared trig -- THE SHIPPED DEFAULT since v3965",
+      "ms": 4.300000190734863,
+      "all": [
+        4,
+        4.4,
+        4.1,
+        5.4,
+        4.1,
+        6.9,
+        4.3
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    },
+    {
+      "id": "wg256-shared",
+      "workgroup": 256,
+      "sharedTrig": true,
+      "note": "widest + shared trig",
+      "ms": 5,
+      "all": [
+        4.6,
+        6.7,
+        5.3,
+        4.1,
+        4.3,
+        6.1,
+        5
+      ],
+      "worstRelDiff": 0.0000037883217260518795,
+      "status": "ok",
+      "why": ""
+    }
+  ],
+  "taichi": {
+    "id": "taichi.js",
+    "ms": 4.200000047683716,
+    "all": [
+      4.7,
+      4.5,
+      5,
+      4.2,
+      4,
+      3.9,
+      3.8
+    ],
+    "prepareMs": 71.4,
+    "batched": true,
+    "worstRelDiff": 0.0000037883217260518795,
+    "status": "ok",
+    "why": "a second codegen landing inside the SAME tolerance the hand-written kernel earned (+71ms one-off compile, not counted per run)"
+  }
+}

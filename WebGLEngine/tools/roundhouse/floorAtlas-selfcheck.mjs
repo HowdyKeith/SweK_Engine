@@ -134,5 +134,30 @@ let atlas = null;
        "a submission that silently changes a fleet-wide grading is a thing to find out about now, not next month");
 }
 
+// ---- 8. THE PAGE CAN ACTUALLY REACH WHAT IT READS -----------------------------------------------------------------
+// floor-atlas.html fetched "/roundhouse/" + name for every version before this check existed. That URL is CLAIMED
+// by ai-bridge/roundhouseBridge.js, whose owns() matches ANY path starting with its PREFIX -- so every request for
+// a raw report was swallowed by the agent API router and answered "unknown-route", 404, before serveStaticFile
+// ever got a turn. Confirmed live: a real server returns 404/unknown-route for /roundhouse/magmap-bench.json and
+// 200 for the same file at /tools/roundhouse/magmap-bench.json (where ai-bridge/androidPeerBridge.js actually
+// writes it). The page rendered, the button worked, and it silently told every visitor "no device reports have
+// been folded yet" regardless of what was on disk -- exactly the failure mode the "middle state" in deviceOwed.mjs
+// exists to name, reached here by a URL instead of a missing directory.
+{
+    const fs = await import("node:fs");
+    const htmlSrc = fs.readFileSync(new URL("../../floor-atlas.html", import.meta.url), "utf8");
+    const bridgeSrc = fs.readFileSync(new URL("../../ai-bridge/roundhouseBridge.js", import.meta.url), "utf8");
+    const fetchLine = (htmlSrc.match(/fetch\(\s*"([^"]*roundhouse[^"]*)"\s*\+\s*name/) || [])[1];
+    ok("!! the page fetches from the directory the bridge actually writes to, not the URL an unrelated router owns",
+       fetchLine === "/tools/roundhouse/",
+       "fetch prefix is " + JSON.stringify(fetchLine) + " -- androidPeerBridge.js writes to tools/roundhouse, " +
+       "and ai-bridge/roundhouseBridge.js's PREFIX (below) swallows anything under plain /roundhouse/ first");
+    ok("...and that PREFIX really would have intercepted the old URL, so this was not a hypothetical collision",
+       /const PREFIX = "\/roundhouse"/.test(bridgeSrc) &&
+       /owns\(url\)[\s\S]{0,80}url\.startsWith\(PREFIX \+ "\/"\)/.test(bridgeSrc),
+       "roundhouseBridge.owns() matches any /roundhouse/* path, and its handle() 404s anything it does not " +
+       "recognise as a route -- a raw JSON filename never matches, so the request never reached a static file");
+}
+
 console.log(fails ? ("[floorAtlas-selfcheck] FAILED " + fails) : "[floorAtlas-selfcheck] all passed");
 process.exit(fails ? 1 : 0);

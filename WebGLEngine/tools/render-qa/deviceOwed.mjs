@@ -42,9 +42,17 @@ export const OWES_VERDICT = {
     "floor-atlas.html": { kind: null, what: "aggregates submitted floors; it is a READER, so it owes nothing itself and is listed to say so" },
 };
 
-/** Which submission kinds have ever been received, read from the fleet directory the bridge writes. */
+/**
+ * Which submission kinds have ever been received, read from the directory ai-bridge/androidPeerBridge.js's
+ * /android/submit endpoint actually writes to (CFG.roundhouseDir there) -- tools/roundhouse, not ai-bridge/fleet.
+ * v3339 pointed this at ai-bridge/fleet, a directory nothing has ever written a bench report to (it does not even
+ * exist); ai-bridge/fleetBridge.js owns /fleet/announce, an unrelated peer-join/leave broadcast with no JSON files
+ * of its own. Every real submission landed in tools/roundhouse and this reader never looked there, so
+ * receivedKinds() returned empty forever regardless of what the fleet had actually confirmed -- the exact
+ * writer/reader mismatch this file's own header warns "rendering harder" cannot fix.
+ */
 export function receivedKinds({ dir = null } = {}) {
-    const d = dir || path.join(ENG, "ai-bridge", "fleet");
+    const d = dir || path.join(ENG, "tools", "roundhouse");
     const seen = new Set();
     const add = (obj) => { if (obj && typeof obj.kind === "string") seen.add(obj.kind); };
     try {
@@ -57,7 +65,7 @@ export function receivedKinds({ dir = null } = {}) {
             if (!f.endsWith(".json")) continue;
             try { add(JSON.parse(fs.readFileSync(path.join(sub, f), "utf8"))); } catch { /* ditto */ }
         }
-    } catch { /* no fleet directory yet is a legitimate state and is reported, not thrown */ }
+    } catch { /* no roundhouse directory yet is a legitimate state and is reported, not thrown */ }
     return seen;
 }
 

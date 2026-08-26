@@ -34,7 +34,7 @@ document.getElementById("load").onclick = async () => {
   let atlas = null; const found = [], missing = [];
   for (const name of SOURCES) {
     try {
-      const r = await fetch("/roundhouse/" + name, { cache: "no-store" });
+      const r = await fetch("/tools/roundhouse/" + name, { cache: "no-store" });
       if (!r.ok) { missing.push(name); continue; }
       const j = await r.json();
       atlas = foldReport(atlas, j);

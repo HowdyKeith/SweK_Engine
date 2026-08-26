@@ -12,6 +12,7 @@
 //   4. "no baseline" stops meaning "nothing can be said".
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ssim, pHash, hamming, edgeOverlap, dims } from "./perceptual.mjs";
@@ -59,8 +60,15 @@ const offset = mk((x, y) => (x > 2 && x < 26 && y > 2 && y < 26) ? 200 : 0);
 }
 
 // ---- 3. THE MIDDLE STATE: RENDERED IS NOT VERIFIED ---------------------------------------------------------------------
+// v3339 called audit({}) here with no dir override, which walked the REAL ai-bridge/fleet directory -- a directory
+// nothing has ever written to (deviceOwed's default was pointed there by mistake; the real writer is
+// ai-bridge/androidPeerBridge.js's /android/submit, which drops reports in tools/roundhouse). That made "received
+// kinds: NONE" true by ACCIDENT, not by the mechanism working, and it would have silently started asserting a
+// false negative the moment any real tools/roundhouse submission landed. Sandboxed dirs below test the mechanism
+// on purpose, the same discipline androidPeerBridge-selfcheck.mjs already uses via configure().
 {
-    const a = audit({});
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), "deviceOwed-empty-"));
+    const a = audit({ dir: emptyDir });
     ok("!! the pages that owe a DEVICE VERDICT are named, and rendering cannot settle them",
        a.owed.length === 4 && a.owed.every((r) => r.kind && r.state === "VERDICT-OWED"),
        a.owed.map((r) => r.page).join(", ") + " — each names the submission kind that settles it, so 'has this been done' is answered by looking rather than remembering");
@@ -71,13 +79,44 @@ const offset = mk((x, y) => (x > 2 && x < 26 && y > 2 && y < 26) ? 200 : 0);
        a.rows.every((r) => r.exists), a.rows.filter((r) => !r.exists).map((r) => r.page).join(", ") || "5 of 5");
     ok("no verdict of any kind has been received yet, and the register says so plainly",
        a.receivedKinds.length === 0 && owedLines(a).some((l) => /NONE/.test(l)),
-       "received kinds: NONE — which is the true state, and reads differently from an empty list with no comment");
+       "received kinds: NONE — which is the true state of an empty directory, and reads differently from an empty list with no comment");
     // and the trap that makes this necessary
     ok("!! none of these pages is in the render-qa manifest, which is WHY the middle state was needed",
        (() => { const m = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "render-qa", "manifest.json"), "utf8"));
                 const s = JSON.stringify(m); return Object.keys(OWES_VERDICT).every((p) => !s.includes(p.replace(".html", ""))); })(),
        "adding them to the manifest would show 'never run' then 'pass' after a rig run -- but render-QA proves the " +
        "page RENDERED, not that the kernel was VERIFIED, and a green pass meaning the wrong thing is worse than silence");
+    fs.rmSync(emptyDir, { recursive: true, force: true });
+
+    // *** THE MECHANISM ITSELF: a report actually lands where the bridge writes it, and the register notices. ***
+    const filledDir = fs.mkdtempSync(path.join(os.tmpdir(), "deviceOwed-filled-"));
+    fs.writeFileSync(path.join(filledDir, "magmap-bench.json"), JSON.stringify({ kind: "swek-magmap-bench" }));
+    const b = audit({ dir: filledDir });
+    ok("!! a report dropped in the SAME shape androidPeerBridge writes it flips the page's state to VERDICT-IN",
+       b.rows.find((r) => r.page === "magmap-bench.html").state === "VERDICT-IN" &&
+       b.owed.length === 3 && !b.owed.some((r) => r.page === "magmap-bench.html"),
+       "the other three pages still owe their own kinds; only the one with a matching report on disk clears — " +
+       "proving receivedKinds() actually reads the directory the bridge writes to, not a directory nothing does");
+    fs.rmSync(filledDir, { recursive: true, force: true });
+
+    // *** THE DEFAULT ITSELF, NOT JUST AN OVERRIDE. *** Every check above passes an explicit dir, which proves the
+    // reading logic works but says nothing about where receivedKinds() looks when nobody overrides it -- and that
+    // default is exactly where the v3339 bug lived (pointed at ai-bridge/fleet, which nothing has ever written to).
+    // This drops a marker directly where audit({}) with NO dir looks by default, so a regression of the default
+    // itself -- not just the mechanism -- fails here. Cleaned up in finally so a crash mid-test cannot leave a
+    // stray file for the next run of this gate, or for floorAtlas/deviceOwed, to trip over.
+    const REAL_ROUNDHOUSE = path.join(ENG, "tools", "roundhouse");
+    const marker = path.join(REAL_ROUNDHOUSE, ".renderAccountability-selfcheck-marker.json");
+    try {
+        fs.writeFileSync(marker, JSON.stringify({ kind: "swek-ising-bench" }));
+        const c = audit({});
+        ok("!! audit({}) with NO dir override reads the REAL default directory the bridge actually writes to",
+           c.rows.find((r) => r.page === "ising-bench.html").state === "VERDICT-IN",
+           "a marker dropped in tools/roundhouse (the real CFG.roundhouseDir) was picked up with no dir argument at all -- " +
+           "the v3339 default (ai-bridge/fleet) would have missed this and reported VERDICT-OWED regardless");
+    } finally {
+        try { fs.rmSync(marker, { force: true }); } catch {}
+    }
 }
 
 // ---- 4. THE IMAGE PAIR, DECLARED INCOMPLETE ----------------------------------------------------------------------------
