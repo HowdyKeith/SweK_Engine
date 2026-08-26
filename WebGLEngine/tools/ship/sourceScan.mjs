@@ -50,7 +50,12 @@ const REGEX_ALLOWED_KEYWORDS = new Set([
  * trailing run of non-whitespace in `out`, mirroring stripToComment()'s line-local version but over the whole
  * stream rather than one line, and extended with the keyword list above.
  */
-function regexAllowedHere(out) {
+// v4040 -- EXPORTED, at buildEngineCatalog.mjs's need: it walks main.js char-by-char to split DEMO_MODES into
+// top-level entries and has to skip a regex literal inside a demo's start()/stop()/tick() body without
+// corrupting its own brace-depth count (a bracket inside `/[{]/` is not a brace). Rewriting this heuristic a
+// second time would be exactly the "179 files mis-lexed the same way" defect this file's own header is about;
+// exporting the two pieces codeOnly() already built is the fix once rather than a fix invented twice.
+export function regexAllowedHere(out) {
     let j = out.length - 1;
     while (j >= 0 && /\s/.test(out[j])) j--;
     if (j < 0) return true;                              // start of file/expression: nothing to divide
@@ -80,7 +85,7 @@ function regexAllowedHere(out) {
  *          trailing flags (so `src.slice(i, end)` is the whole literal, and `src.slice(closeAt, end)` is just
  *          "/" + flags, which is what a caller blanking the body wants to keep).
  */
-function regexBody(src, i) {
+export function regexBody(src, i) {
     let j = i + 1, inClass = false;
     for (; j < src.length; j++) {
         const c = src[j];

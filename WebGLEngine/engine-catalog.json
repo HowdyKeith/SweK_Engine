@@ -1,299 +1,235 @@
 {
- "generatedFrom": "main.js",
- "builtinDemos": [
-  {
-   "id": "kaiju",
-   "label": "KAIJU + TERRAIN"
-  },
-  {
-   "id": "sky",
-   "label": "Sky"
-  },
-  {
-   "id": "space",
-   "label": "Space"
-  },
-  {
-   "id": "hell",
-   "label": "Hell"
-  },
-  {
-   "id": "tech",
-   "label": "Tech"
-  },
-  {
-   "id": "real_terrain",
-   "label": "Houses"
-  },
-  {
-   "id": "people",
-   "label": "People"
-  },
-  {
-   "id": "trees",
-   "label": "Trees"
-  },
-  {
-   "id": "defenders",
-   "label": "Defenders"
-  },
-  {
-   "id": "ogre",
-   "label": "Defenders"
-  },
-  {
-   "id": "gather",
-   "label": "Gather"
-  },
-  {
-   "id": "more",
-   "label": "More"
-  },
-  {
-   "id": "reset",
-   "label": "Reset"
-  },
-  {
-   "id": "maze",
-   "label": "New Maze"
-  },
-  {
-   "id": "dungeon",
-   "label": "DUNGEON \u2014 explorer & treasure"
-  },
-  {
-   "id": "walk",
-   "label": "Enter"
-  },
-  {
-   "id": "attack",
-   "label": "Attack"
-  },
-  {
-   "id": "throw",
-   "label": "Throw"
-  },
-  {
-   "id": "swap",
-   "label": "Swap"
-  },
-  {
-   "id": "arrow",
-   "label": "Arrow"
-  },
-  {
-   "id": "grenade",
-   "label": "Grenade"
-  },
-  {
-   "id": "block",
-   "label": "Block"
-  },
-  {
-   "id": "auto",
-   "label": "Auto"
-  },
-  {
-   "id": "exit",
-   "label": "Exit"
-  },
-  {
-   "id": "dungeonwalk",
-   "label": "DUNGEON \u2014 walk it yourself (first-person)"
-  },
-  {
-   "id": "wildlife",
-   "label": "WILDLIFE \u2014 ambient critters"
-  },
-  {
-   "id": "opensea",
-   "label": "Dive in"
-  },
-  {
-   "id": "life",
-   "label": "Step"
-  },
-  {
-   "id": "random",
-   "label": "Randomize"
-  },
-  {
-   "id": "clear",
-   "label": "Clear"
-  },
-  {
-   "id": "pause",
-   "label": "Pause / Run"
-  },
-  {
-   "id": "lander",
-   "label": "LUNAR LANDER"
-  },
-  {
-   "id": "props",
-   "label": "Props"
-  },
-  {
-   "id": "car",
-   "label": "Car"
-  },
-  {
-   "id": "horse",
-   "label": "Horse"
-  },
-  {
-   "id": "demon",
-   "label": "Demon"
-  },
-  {
-   "id": "restart",
-   "label": "Restart"
-  },
-  {
-   "id": "lorenz",
-   "label": "Reset"
-  },
-  {
-   "id": "spawn",
-   "label": "Spawn"
-  },
-  {
-   "id": "wander",
-   "label": "Wander"
-  },
-  {
-   "id": "robot",
-   "label": "ROBOT (animated GLB)"
-  },
-  {
-   "id": "engine_saga",
-   "label": "\u2b50 ENGINE: A SAGA (auto-rotating feature crawl)"
-  },
-  {
-   "id": "resume_fx",
-   "label": "\ud83d\udcc4 RESUME FX (portfolio piece)"
-  },
-  {
-   "id": "nrc",
-   "label": "NEURAL RADIANCE CACHE"
-  },
-  {
-   "id": "flow",
-   "label": "FLOW MATCHING SAMPLER"
-  },
-  {
-   "id": "ovm",
-   "label": "O-VOXEL \u00b7 AO \u00b7 PCF SHADOWS (.ovm)"
-  },
-  {
-   "id": "p3d",
-   "label": "PIXAL3D MESH (.p3d)"
-  },
-  {
-   "id": "mol",
-   "label": "MOLECULAR FIELD (.mol / .pdb)"
-  },
-  {
-   "id": "mto",
-   "label": "MEDICAL TOMOGRAPHY (.mto)"
-  },
-  {
-   "id": "wnd",
-   "label": "FLUID FIELD (.wnd)"
-  },
-  {
-   "id": "showcase",
-   "label": "FORMAT SHOWCASE \u2014 all 5 in one scene"
-  },
-  {
-   "id": "battleship",
-   "label": "BATTLESHIP 3D"
-  },
-  {
-   "id": "slots",
-   "label": "SLOTS"
-  },
-  {
-   "id": "pachinko",
-   "label": "PACHINKO"
-  },
-  {
-   "id": "pipboy_models",
-   "label": "PIP-BOY MODELS"
-  },
-  {
-   "id": "snake",
-   "label": "SNAKE \u2014 centipede extension"
-  },
-  {
-   "id": "tron",
-   "label": "TRON \u2014 light cycles"
-  },
-  {
-   "id": "spectator_cast_toggle",
-   "label": "Cast"
-  }
- ],
- "apps": [
-  {
-   "label": "Universal Viewer",
-   "url": "/universal-viewer.html"
-  },
-  {
-   "label": "Comic Reader",
-   "url": "/comics.html"
-  },
-  {
-   "label": "Asset Library",
-   "url": "/asset-library.html"
-  },
-  {
-   "label": "EV Loader",
-   "url": "/ev-loader.html"
-  },
-  {
-   "label": "Outlook Rules",
-   "url": "/outlook-rules.html"
-  },
-  {
-   "label": "Asset 2 Voxels",
-   "url": "/asset2voxels.html"
-  },
-  {
-   "label": "Markdown",
-   "url": "/markdown-tools.html"
-  },
-  {
-   "label": "Immich",
-   "url": "/immich.html"
-  },
-  {
-   "label": "Home Control",
-   "url": "/home.html"
-  },
-  {
-   "label": "Raycast LLM",
-   "url": "/raycast.html"
-  },
-  {
-   "label": "Photo Cube",
-   "url": "/voxel-photo-cube.html"
-  },
-  {
-   "label": "Lineage",
-   "url": "/lineage.html"
-  },
-  {
-   "label": "Brain Fleet",
-   "url": "/brain-fleet.html"
-  },
-  {
-   "label": "Box3D",
-   "url": "/box3d-info.html"
-  },
-  {
-   "label": "Cell Tracking",
-   "url": "/celltrack.html"
-  }
- ]
+  "generatedFrom": "main.js",
+  "builtinDemos": [
+    {
+      "id": "kaiju",
+      "label": "KAIJU + TERRAIN"
+    },
+    {
+      "id": "real_terrain",
+      "label": "REAL TERRAIN"
+    },
+    {
+      "id": "ogre",
+      "label": "OGRE SCENARIO"
+    },
+    {
+      "id": "architecture",
+      "label": "ARCHITECTURE — system diagram"
+    },
+    {
+      "id": "boids",
+      "label": "BOIDS FLOCKING"
+    },
+    {
+      "id": "maze",
+      "label": "MAZE — mouse & cheese"
+    },
+    {
+      "id": "dungeon",
+      "label": "DUNGEON — explorer & treasure"
+    },
+    {
+      "id": "dungeonwalk",
+      "label": "DUNGEON — walk it yourself (first-person)"
+    },
+    {
+      "id": "wildlife",
+      "label": "WILDLIFE — ambient critters"
+    },
+    {
+      "id": "aquarium",
+      "label": "AQUARIUM — sea floor & swimmers"
+    },
+    {
+      "id": "opensea",
+      "label": "OPEN SEA — reef without walls"
+    },
+    {
+      "id": "life",
+      "label": "CONWAY'S LIFE 3D"
+    },
+    {
+      "id": "lander",
+      "label": "LUNAR LANDER"
+    },
+    {
+      "id": "cruise",
+      "label": "CRUISE (overhead chase)"
+    },
+    {
+      "id": "asteroids",
+      "label": "ASTEROIDS 3D"
+    },
+    {
+      "id": "missile_command",
+      "label": "MISSILE COMMAND 3D"
+    },
+    {
+      "id": "lorenz",
+      "label": "LORENZ ATTRACTOR"
+    },
+    {
+      "id": "centipede",
+      "label": "CENTIPEDE CHAIN"
+    },
+    {
+      "id": "rigtest",
+      "label": "RIG TEST (skeletal)"
+    },
+    {
+      "id": "robot",
+      "label": "ROBOT (animated GLB)"
+    },
+    {
+      "id": "dealer_choice",
+      "label": "Dealer's Choice (random demo)"
+    },
+    {
+      "id": "build_viewer",
+      "label": "BUILD VIEWER (Minecraft / LEGO)"
+    },
+    {
+      "id": "fps",
+      "label": "FPS — AI-GENERATED DUNGEON SHOOTER"
+    },
+    {
+      "id": "fp_control",
+      "label": "First-person CONTROL — your world (Round 31)"
+    },
+    {
+      "id": "voice_lab",
+      "label": "VOICE LAB — VOICE → ENGINE COMMANDS"
+    },
+    {
+      "id": "engine_saga",
+      "label": "⭐ ENGINE: A SAGA (auto-rotating feature crawl)"
+    },
+    {
+      "id": "resume_fx",
+      "label": "📄 RESUME FX (portfolio piece)"
+    },
+    {
+      "id": "nrc",
+      "label": "NEURAL RADIANCE CACHE"
+    },
+    {
+      "id": "flow",
+      "label": "FLOW MATCHING SAMPLER"
+    },
+    {
+      "id": "ovm",
+      "label": "O-VOXEL · AO · PCF SHADOWS (.ovm)"
+    },
+    {
+      "id": "p3d",
+      "label": "PIXAL3D MESH (.p3d)"
+    },
+    {
+      "id": "mol",
+      "label": "MOLECULAR FIELD (.mol / .pdb)"
+    },
+    {
+      "id": "mto",
+      "label": "MEDICAL TOMOGRAPHY (.mto)"
+    },
+    {
+      "id": "wnd",
+      "label": "FLUID FIELD (.wnd)"
+    },
+    {
+      "id": "showcase",
+      "label": "FORMAT SHOWCASE — all 5 in one scene"
+    },
+    {
+      "id": "battleship",
+      "label": "BATTLESHIP 3D  ↗ (new tab)"
+    },
+    {
+      "id": "slots",
+      "label": "SLOTS  ↗ (new tab)"
+    },
+    {
+      "id": "pachinko",
+      "label": "PACHINKO  ↗ (new tab)"
+    },
+    {
+      "id": "pipboy_models",
+      "label": "PIP-BOY MODELS  ↗ (new tab)"
+    },
+    {
+      "id": "credits",
+      "label": "END CREDITS  ↗ (new tab)"
+    },
+    {
+      "id": "snake",
+      "label": "SNAKE — centipede extension"
+    },
+    {
+      "id": "tron",
+      "label": "TRON — light cycles"
+    }
+  ],
+  "apps": [
+    {
+      "label": "Universal Viewer",
+      "url": "/universal-viewer.html"
+    },
+    {
+      "label": "Comic Reader",
+      "url": "/comics.html"
+    },
+    {
+      "label": "Asset Library",
+      "url": "/asset-library.html"
+    },
+    {
+      "label": "EV Loader",
+      "url": "/ev-loader.html"
+    },
+    {
+      "label": "Outlook Rules",
+      "url": "/outlook-rules.html"
+    },
+    {
+      "label": "Asset 2 Voxels",
+      "url": "/asset2voxels.html"
+    },
+    {
+      "label": "Markdown",
+      "url": "/markdown-tools.html"
+    },
+    {
+      "label": "Immich",
+      "url": "/immich.html"
+    },
+    {
+      "label": "Home Control",
+      "url": "/home.html"
+    },
+    {
+      "label": "Raycast LLM",
+      "url": "/raycast.html"
+    },
+    {
+      "label": "Photo Cube",
+      "url": "/voxel-photo-cube.html"
+    },
+    {
+      "label": "Lineage",
+      "url": "/lineage.html"
+    },
+    {
+      "label": "Brain Fleet",
+      "url": "/brain-fleet.html"
+    },
+    {
+      "label": "Box3D",
+      "url": "/box3d-info.html"
+    },
+    {
+      "label": "Cell Tracking",
+      "url": "/celltrack.html"
+    }
+  ]
 }

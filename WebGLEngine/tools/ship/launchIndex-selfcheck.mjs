@@ -31,8 +31,13 @@ const ix = buildIndex();
        KINDS.PAGE.survives === true && KINDS.DEMO.survives === false && KINDS.BUILTIN.survives === false,
        "a page is a file; a demo and a built-in are states the engine enters. That is the distinction a flat " +
        "'things you can launch' list would have thrown away");
+    // v4040 -- the built-in floor DROPPED from 40 to 20: engine-catalog.json's builtinDemos, which this number
+    // comes from, was THREE DAYS STALE against main.js's real DEMO_MODES (58 claimed, 42 actually there) and had
+    // no regenerator anywhere in the tree -- tools/ship/buildEngineCatalog.mjs is that regenerator now, wired
+    // into the ship ritual before this step. 40 was a sanity floor calibrated against the wrong number; 20 is
+    // the same KIND of floor (loose, not a pin) calibrated against the real one.
     ok("...and all three are populated",
-       ix.byKind.page > 300 && ix.byKind.demo > 40 && ix.byKind.builtin > 40,
+       ix.byKind.page > 300 && ix.byKind.demo > 40 && ix.byKind.builtin > 20,
        ix.byKind.page + " pages, " + ix.byKind.demo + " demos, " + ix.byKind.builtin + " built-ins");
 }
 
@@ -61,15 +66,38 @@ const ix = buildIndex();
        ix.multiSurface.every((e) => e.routes.length >= 2 && new Set(e.kinds).size >= 2),
        "keying a map by label would have silently kept the last one, which is how a page vanishes from an index " +
        "while still existing on disk");
-    ok("!! the remaining collisions are GENUINE -- different things wearing one name -- and are DATA BUGS",
-       ix.needsRename.length === 3,
-       ix.needsRename.map((e) => e.display + " [" + e.id + "]").join(", ") +
-       " — engine-catalog.json labels BOTH 'defenders' and 'ogre' as 'Defenders', and BOTH 'reset' and 'lorenz' " +
-       "as 'Reset', so the Built-In pill has been showing two identical entries and clicking one was a coin flip");
-    ok("!! ...suffixed so they are clickable, AND flagged so the suffix is not mistaken for a fix",
-       ix.needsRename.every((e) => e.needsRename === true && /\s\d+$/.test(e.display)),
-       "a suffix makes them reachable; it does not make them correct. Renaming is Keith's call and the flag is " +
-       "how it stays visible until he makes it");
+    // v4040 -- *** THE THREE "GENUINE" COLLISIONS WERE THE STALENESS BUG WEARING A DIFFERENT SYMPTOM. *** They
+    // were never a main.js labelling mistake: 'ogre' has always been "OGRE SCENARIO" and 'lorenz' has always
+    // been "LORENZ ATTRACTOR" in DEMO_MODES. engine-catalog.json's OWN stale copy is what said 'ogre' and
+    // 'defenders' were both "Defenders" -- a coin-flip nobody could have fixed by renaming anything in main.js,
+    // because main.js was never wrong. tools/ship/buildEngineCatalog.mjs regenerates the catalog from the real
+    // array now, and the collision is simply gone -- 0, not 3, checked live against the tree below. The
+    // FLAGGING MECHANISM ITSELF (suffix + needsRename on a true collision) still needs proving even though the
+    // live tree no longer HAS a naturally-occurring one, so it gets the same treatment check 3's own
+    // "Box3d/Box3d 2/Box3d 3" case above gives a collision the live tree lacks: a small constructed fixture.
+    ok("!! the live tree now has ZERO genuine collisions -- the fix was regenerating the catalog, not a rename",
+       ix.needsRename.length === 0,
+       ix.needsRename.length + " (was 3, all three artifacts of the stale engine-catalog.json this round fixed)");
+    {
+        const fixture = [
+            { kind: "page", id: "widget.html", label: "Widget", href: "/widget.html" },
+            { kind: "builtin", id: "widget_mode", label: "Widget", href: "/?go=widget_mode" },
+            { kind: "demo", id: "gizmo", label: "Gizmo", href: "/?go=gizmo" },
+        ];
+        const got = disambiguate(fixture);
+        const widgets = got.filter((e) => e.id === "widget.html" || e.id === "widget_mode");
+        // v4040 -- WAS asserting BOTH occurrences carry a numeric suffix and needsRename:true. The real mechanism
+        // (proven by the "Box3d, Box3d 2, Box3d 3" case just above) only flags the SECOND-and-later occurrence --
+        // the first one to claim a name is not itself wrong, so it keeps its bare label and needsRename:false;
+        // it is the later arrival colliding with it that gets suffixed and flagged. The old assertion could never
+        // have passed against the real disambiguate() and was only ever exercising the fixture, not the code.
+        ok("!! ...and the mechanism that flags a REAL collision still works, on a constructed one",
+           widgets.length === 2 && widgets.map((e) => e.display).join(", ") === "Widget, Widget 2" &&
+           widgets[0].needsRename === false && widgets[1].needsRename === true &&
+           !got.find((e) => e.id === "gizmo").needsRename,
+           widgets.map((e) => e.display).join(", ") + " -- a suffix makes a genuine collision clickable; it does " +
+           "not make it correct, which is what needsRename keeps visible until a human renames one");
+    }
 }
 
 // ---- 4. THE SUFFIX MECHANISM IS EXERCISED, NOT JUST PRESENT -------------------------------------------------------
@@ -111,9 +139,14 @@ const ix = buildIndex();
 {
     const h = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
     const pi = fs.readFileSync(path.join(ENG, "page-index.html"), "utf8");
-    ok("!! the three pills are gone and one Launch button remains",
-       h.includes('id="bLaunch"') && !h.includes('id="bDemos"') && !h.includes('id="bBuiltins"') && !h.includes('id="bApps"'),
-       "Demos, Built-In Demos and Applications replaced by a single Launch pill at v3552");
+    // v4040 -- WAS "the three pills are gone and one Launch button remains", requiring id="bLaunch" to exist.
+    // Keith, later than v3552: "we have that page index listed on the left side of Server.html" -- and the
+    // Launch pill itself just called `window.open("/page-index.html", "_blank")`, a second door to the exact
+    // same page the "Page Index" pill in the Arriving row already opens. v4039 removed the redundant button (and
+    // its wiring); the three OLDER pills it replaced must still never come back either.
+    ok("!! bLaunch is gone (redundant with the Page Index pill already in Arriving), and the three older pills never came back",
+       !h.includes('id="bLaunch"') && !h.includes('id="bDemos"') && !h.includes('id="bBuiltins"') && !h.includes('id="bApps"'),
+       "Demos, Built-In Demos and Applications were replaced by a single Launch pill at v3552; that pill itself was removed at v4039");
 
     // v3575 -- *** THIS CHECK MOVED BECAUSE THE THING IT GUARDS MOVED, AND IT IS REWRITTEN RATHER THAN DELETED. ***
     // The launch PANEL is gone from server.html: two lists both claiming to be the whole engine, disagreeing by
