@@ -29,7 +29,14 @@ export const SECTIONS = [
       // FOR DOZENS OF ROUNDS. It belongs here by MECHANISM and not by name: it fetches /instruments/list and
       // /instruments/report, which is instruments.html's own pair, and it exists because 34 of 104 instruments
       // carried page: null -- runnable only by typing a selfcheck path. A FRONT DOOR THAT WAS ITSELF UNREACHABLE.
-      pages: ["physics-lab.html", "roundhouse.html", "device.html", "models.html", "gates.html",
+      // v4031 -- reactor.html JOINS, on the SAME PRECEDENT this section already records for
+      // statistical-mechanics.html: an arc's FRONT DOOR belongs with the lab rather than in a drawer of its own.
+      // Point reactor kinetics (reactivity, delayed precursors, xenon, scram) is the door onto the nuclear
+      // modules, exactly as crystal-diffraction.html is the door onto the diffraction ones. cartpole.html joins
+      // on the same reading: LQR/Riccati control, the door onto physics/control/cartPole.mjs, and NOT the GPU
+      // Brain drawer the name suggests -- the page mentions no policy, no brain and no /ai/ route at all.
+      pages: ["reactor.html", "cartpole.html",
+              "physics-lab.html", "roundhouse.html", "device.html", "models.html", "gates.html",
               "instruments.html", "instrument-bench.html", "catalog.html", "lab-export.html",
               "run-inspector.html", "frugon.html",
               // v3818 -- THE STATISTICAL-MECHANICS DOOR BELONGS WITH THE LAB, not in a thermal drawer of its
@@ -78,7 +85,13 @@ export const SECTIONS = [
       pages: ["fresnel.html", "fresnel-join.html", "diffraction.html", "interferometer.html", "ct.html", "fanbeam.html",
               "tomography.html", "sinogram-gpu.html", "kriging.html", "spatial-agreement.html", "splat-lab.html"] },
     { id: "cosmic", tab: "cosmic", label: "PL: Cosmic & Relativity", note: "black holes, orbits, lensing, special functions",
-      pages: ["kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
+      // v4031 -- lensing.html and stellar.html JOIN, both by SUBJECT rather than by name. Gravitational
+      // MICROLENSING is general relativity, so it sits with kerr/geodesic/pulsar and NOT with optics, whose
+      // fresnel/diffraction/tomography pages are wave and imaging optics -- a page called "lensing" filed by its
+      // name would have landed in exactly the wrong drawer. Lane-Emden POLYTROPES are stellar structure, the
+      // same arc as kepler and pulsar.
+      pages: ["lensing.html", "stellar.html",
+              "kerr.html", "geodesic.html", "cosmic-map.html", "warp-map.html", "pulsar.html",
               "kepler.html", "meijer-g.html", "elliptic.html", "rmt.html", "landau-zener.html", "hmc.html"] },
     // v3633: THE 15-PAGE RATCHET FIRED AND IT WAS RIGHT. Five electromagnetism pages had been filed under
     // "Cosmic & Relativity" one round at a time -- each defensible on its own, and the drawer reached 16 while
@@ -162,7 +175,14 @@ export const SECTIONS = [
       // statistical/thermal physics and this drawer's own note already says so. Matter goes to 14 of 15 --
       // AT THE CAP'S EDGE, and the next arrival here should be read as the ratchet asking whether a
       // "Phase & Thermal" drawer has arrived rather than as a shortage of room (v3633, v3644, v3649).
-      pages: ["phase-change.html", "angle-of-repose.html", "ising.html", "schrodinger.html", "logistic.html", "md-demo.html", "probe-lab.html",
+      // v4031 -- ecology.html JOINS: Lotka-Volterra is the DIRECT SIBLING of logistic.html already in this
+      // drawer, both being the nonlinear-dynamics half of "Matter & Chaos".
+      // cartpole.html was placed here FIRST and moved to physicslab when the 15-page drawer cap caught it at
+      // 16 -- and the cap was right about more than the count. Rereading it against reactor.html, both are an
+      // ARC'S FRONT DOOR (physics/control/cartPole.mjs, physics/nuclear/reactorControl.mjs) and both carry an
+      // instruments.mjs row, which is the statistical-mechanics precedent rather than a mechanics page.
+      pages: ["ecology.html",
+              "phase-change.html", "angle-of-repose.html", "ising.html", "schrodinger.html", "logistic.html", "md-demo.html", "probe-lab.html",
               "discovery-lab.html", "kinematic.html", "physics-showcase.html", "percolation.html",
               "gravity-waves.html", "normal-modes.html", "torsion-modes.html"] },
 
@@ -175,7 +195,12 @@ export const SECTIONS = [
       // -- but the ask overrides the taxonomy. Dropping them from `pages` un-claims them, and the Unsorted
       // drawer builds its own anchors from every unclaimed page, so they land there with no other change. Their
       // hover-link <a>s already exist in server.html for the mover to find.
-      pages: ["rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
+      // v4031 -- webgpu-llm.html JOINS. It is NOT a physics page despite living beside them: it asks whether
+      // THIS MACHINE can run a generative model in the browser (WebGPU adapter, storage quota, persistent-storage
+      // permission), which is a question about the box rather than about the world -- the same kind rig.html and
+      // settings.html answer. Filed by what it MEASURES, not by what it is about.
+      pages: ["webgpu-llm.html",
+              "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
               // page to the sort list ... most of the settings are connected to other things." It had a TOOLBAR

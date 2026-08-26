@@ -532,7 +532,7 @@
    "f": "cartpole.html",
    "t": "SweK &middot; Cart-Pole with LQR",
    "d": "An inverted pendulum held upright by an optimal regulator, live. Crank the gain multiplier to a hundred times and it still balances -- LQR guarantees an INFINITE gain margin, and you can watch the guarantee hold. Then switch the controller to one designed on the hanging equilibrium: every self-consistency check it can run still passes, and it drops the pole in under two seconds.",
-   "g": "",
+   "g": "physicslab",
    "p": 0
   },
   {
@@ -896,7 +896,7 @@
    "f": "ecology.html",
    "t": "SweK &middot; Predator and Prey",
    "d": "Predator and prey chase each other round a closed loop forever. Drag the harvest slider -- which kills BOTH species at once, a pesticide or a fishing fleet -- and watch the average PREY population go UP. That is Volterra's principle, it is exact, and it is the answer to why the fraction of predatory fish in the Adriatic rose when the First World War stopped the fishing.",
-   "g": "",
+   "g": "matter",
    "p": 0
   },
   {
@@ -1582,7 +1582,7 @@
    "f": "lensing.html",
    "t": "SweK &middot; Gravitational Microlensing",
    "d": "A point mass passing in front of a background star splits it into two images and brightens it -- watch the images move and the light curve rise as the alignment tightens. Every number is read straight from physics/astroparticle/lensing.js: nothing on this page is a second copy of the physics.",
-   "g": "",
+   "g": "cosmic",
    "p": 0
   },
   {
@@ -2114,7 +2114,7 @@
    "f": "reactor.html",
    "t": "SweK &middot; Point Reactor Kinetics",
    "d": "Pull the control rods and watch the reactor period. Delayed neutrons are 0.65% of the total and they are the only reason a reactor can be controlled at all: past $1.00 the period collapses and no operator can follow it. Scram it and watch the flux refuse to fall faster than the 56-second precursor floor, then watch xenon-135 poison the core for half a day afterwards.",
-   "g": "",
+   "g": "physicslab",
    "p": 0
   },
   {
@@ -2471,7 +2471,7 @@
    "f": "stellar.html",
    "t": "SweK &middot; Lane-Emden Polytropes",
    "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
-   "g": "",
+   "g": "cosmic",
    "p": 0
   },
   {
@@ -2779,7 +2779,7 @@
    "f": "webgpu-llm.html",
    "t": "Can this box run a model in the page?",
    "d": "",
-   "g": "",
+   "g": "systools",
    "p": 0
   },
   {
