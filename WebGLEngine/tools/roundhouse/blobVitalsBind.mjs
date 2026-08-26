@@ -109,7 +109,35 @@ const PLANT_REFUSED =
     "v2596's proven bound, algebraically incapable of failing while the field is built from lumps. Declaring a " +
     "plant here would MANUFACTURE coverage the way beam's and compose's refusals already named.";
 
+// *** THE EXPIRY, AS A PREDICATE. *** The refusal below says every gauge here DETECTS A SHIPPED BUG -- a NaN
+// coordinate, an out-of-tank position, a solver separating lumps -- rather than expressing a physics law with a
+// knob to perturb. That is a statement about the SHAPE of the observables, and the shape is checkable: a gauge
+// is a BOOLEAN, and a boolean has nothing a knob can move continuously. A plant needs a number.
+//
+// So the condition is: if any gauge stops being 0/1, this device has acquired a continuous quantity, there is
+// something for a knob to perturb, and the refusal is done. Read off the device's own build, never grepped.
+const VITAL_GAUGES = ["real", "home", "together", "himself", "healthy"];
+
+async function blobVitalsRefusalExpired() {
+    const v = await buildBlobVitals({}, {});
+    const continuous = VITAL_GAUGES.filter((k) => k in v && v[k] !== 0 && v[k] !== 1);
+    const expired = continuous.length > 0;
+    return {
+        expired, observable: "gauges(" + VITAL_GAUGES.join("/") + ")",
+        measured: VITAL_GAUGES.filter((k) => k in v).length,
+        evidence: expired
+            ? "these gauges are no longer boolean: " + continuous.map((k) => k + " = " + v[k]).join(", ")
+              + ". A CONTINUOUS quantity is something a knob can move, so a plant is now available. THE REFUSAL "
+              + "HAS EXPIRED."
+            : "all " + VITAL_GAUGES.filter((k) => k in v).length + " gauges are boolean (" 
+              + VITAL_GAUGES.filter((k) => k in v).map((k) => k + "=" + v[k]).join(", ")
+              + "): each DETECTS a shipped bug rather than expressing a law with a knob, and a boolean has "
+              + "nothing for a knob to move.",
+    };
+}
+
 export const blobVitalsDevice = {
+    plantRefusedExpiry: blobVitalsRefusalExpired,
     plantRefused: PLANT_REFUSED,
     modes: BLOB_VITALS_MODES,
     name: "blob-vitals",

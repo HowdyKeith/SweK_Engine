@@ -140,7 +140,38 @@ const PLANT_REFUSED =
     "1/sqrt(N) from standardError turns a genuine disagreement into a reported agreement, which is a clean " +
     "numeric plant on this device's own arithmetic.";
 
+// *** THE EXPIRY, AS A PREDICATE RATHER THAN A SENTENCE. *** PLANT_REFUSED above ends "EXPIRES IF a comparison
+// pair with sample counts on both sides is added: then sigmaApart is real". That condition was written down and
+// nothing ever evaluated it, so the day somebody adds such a pair this refusal would go on standing -- a correct
+// refusal quietly becoming a stale one, which is the same species as a suppression nobody audits.
+//
+// It is a FIELD and a FUNCTION, never a grep. curriculum.mjs's own note says why: "the refusal is read as A
+// FIELD, never grepped out of prose -- a mention test is the species of claim this tree has got wrong three
+// times". An expiry parsed out of the sentence that states it would inherit exactly that flaw.
+//
+// The test is the device's own arithmetic: sigmaApart is null precisely when neither side carries an error bar,
+// which is the whole reason there is no number of its own to plant on. Non-null means there now is one.
+async function composeRefusalExpired() {
+    const v = await buildCompose({ mode: "compare", config: {} });
+    const expired = v.sigmaApart !== null && Number.isFinite(v.sigmaApart);
+    return {
+        expired,
+        // The VALUE the condition turned on, handed back as a field. null is a measurement -- it is precisely
+        // "neither side carries an error bar" -- and a caller must not have to find that in a sentence.
+        observable: "sigmaApart", measured: v.sigmaApart,
+        evidence: expired
+            ? "sigmaApart = " + v.sigmaApart + " on the default pair (" + DEF.devA + "." + DEF.keyA + " vs "
+              + DEF.devB + "." + DEF.keyB + "). BOTH SIDES NOW CARRY AN ERROR BAR, so this device finally reports "
+              + "a number of its own -- and dropping the 1/sqrt(N) from standardError is the plant the refusal "
+              + "said would become available. THE REFUSAL HAS EXPIRED: build it."
+            : "sigmaApart = null on the default pair (" + DEF.devA + "." + DEF.keyA + " vs " + DEF.devB + "."
+              + DEF.keyB + "): " + v.reason + ". No error bar on either side, so there is still no number of "
+              + "this device's own to move.",
+    };
+}
+
 export const composeDevice = {
+    plantRefusedExpiry: composeRefusalExpired,
     modes: ["compare"],
     name: "cross-device-comparison", observables: COMPOSE_OBSERVABLES, build: buildCompose,
     defaults: ({ mode } = {}) => ({ mode: mode || "compare", config: { ...DEF } }),
