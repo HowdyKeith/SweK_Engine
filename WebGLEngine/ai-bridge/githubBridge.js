@@ -598,6 +598,21 @@ const SUGGESTED_REPOS = [
     { repo: "zhulinsen/daily_stock_analysis", label: "Daily Stock Analysis",  cat: "Finance",  desc: "Python daily stock analysis automation",         svcId: null,         svcPort: null,  swekPage: "/tradingfloor.html",     installCmd: "git clone https://github.com/zhulinsen/daily_stock_analysis" },
     // Voice & audio
     { repo: "altic-dev/FluidVoice",           label: "FluidVoice",            cat: "Voice",    desc: "macOS offline voice-to-text with AI enhancement",svcId: "fluidvoice", svcPort: null,  swekPage: "/tts.html",              installCmd: "brew install --cask fluidvoice" },
+    // Portfolio / documents
+    // v4024 -- Keith: "lets add https://github.com/amruthpillai/reactive-resume". MIT (Amruth Pillai), a
+    // self-hostable resume builder; the author also runs it free at rxresu.me, so self-hosting buys privacy
+    // and your own data rather than a feature the hosted one lacks.
+    // *** swekPage IS DELIBERATELY OMITTED, AND THAT IS THE v4019 GATE WORKING ON ITS AUTHOR. *** No page in
+    // this tree is about Reactive Resume, and swekPage-selfcheck fails any entry pointing at a page that never
+    // names its service -- six of twelve already do, which is why that gate exists. Pointing this at
+    // /portfolio.html or /settings.html to fill the field would have made it seven, and the field is optional
+    // (five of seventeen entries omit it). An empty field is honest; a wrong one is the Coolify button.
+    // *** AND IT IS NOT A `docker run` ONE-LINER, WHICH THE installCmd HAS TO SAY. *** compose.yml brings up
+    // FOUR containers -- postgres, redis, seaweedfs (S3-compatible object storage) and the app -- so the
+    // command is a clone plus `docker compose up -d`, not the single-container shape most rows here carry.
+    // PORT 3000 IS ALREADY CLAIMED TWICE in this very list (Open WebUI, Fermyon Spin): whichever starts second
+    // fails to bind, and that is a real conflict on a box running more than one of them.
+    { repo: "amruthpillai/reactive-resume",   label: "Reactive Resume",       cat: "Portfolio", desc: "self-hosted resume builder (MIT): multi-page editor, PDF export, public share links - a 4-container compose stack (app + postgres + redis + seaweedfs), NOT a single docker run", svcId: "reactive_resume", svcPort: 3000, installCmd: "git clone https://github.com/amruthpillai/reactive-resume && cd reactive-resume && cp .env.example .env && docker compose up -d" },
     // P2P / infra
     { repo: "Azure/peerd",                    label: "Peerd",                 cat: "Infra",    desc: "P2P container image distribution for AKS",       svcId: null,         svcPort: null,  swekPage: null,                     installCmd: "helm install peerd ./build/package/peerd-helm" },
 ];

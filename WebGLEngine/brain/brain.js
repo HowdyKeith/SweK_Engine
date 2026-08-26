@@ -2795,7 +2795,11 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4023";   // v4023 -- Keith's patch round: nine devices (the thermal family, xenon-135,
+const BRAIN_BUILD = "v4024";   // v4024 -- Reactive Resume (MIT, amruthpillai) added to the service catalog
+// and installer registry. Read from the clone, not from memory: it is a FOUR-container compose stack (app +
+// postgres + redis + seaweedfs), it ships a placeholder AUTH_SECRET that must be changed, and its port 3000
+// is already claimed twice in the same catalog. swekPage omitted on purpose -- no page here is about it, and
+// v4019's gate fails an entry pointing at a page that never names its service. Previously v4023 --   // v4023 -- Keith's patch round: nine devices (the thermal family, xenon-135,
 // fracture fragments) taking DEVICE_NAMES 114 -> 123 and gradedCoverage to 132 of 266, plus the refusal-expiry
 // gate -- four devices that decline to declare a plant now export plantRefusedExpiry() as a PREDICATE, so a
 // correct refusal can no longer become a stale one silently. Three of four zips applied; swekphysicsround is a

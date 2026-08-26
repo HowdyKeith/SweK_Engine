@@ -265,6 +265,18 @@ const SERVICES = {
         dockerImage: "",
         binaryNote: "Install is one command (it sets up Docker, Traefik, and the dashboard) on a Linux box; then open http://<box>:8000, connect GitHub, and point it at a repo. NOT a per-box install — put it on ONE box (PurtyGF) and deploy to the others over SSH. Podman is NOT supported as a drop-in (community has a patched workaround only); Kubernetes is not a supported target either. If you want lighter, Dokploy/CapRover/Kamal are Docker-based alternatives; none of them do WASM.",
     },
+    // v4024 -- Keith: "lets add https://github.com/amruthpillai/reactive-resume".
+    reactive_resume: {
+        label: "Reactive Resume (self-hosted resume builder)", bin: "docker", winget: "",
+        serve: [], probe: { type: "tcp", host: "127.0.0.1", port: 3000 },
+        url: "http://localhost:3000",
+        github: "amruthpillai/reactive-resume",
+        paths: [],
+        installCmd: "git clone https://github.com/amruthpillai/reactive-resume && cd reactive-resume && cp .env.example .env && docker compose up -d",
+        dockerImage: "ghcr.io/amruthpillai/reactive-resume:latest",
+        note: "MIT-licensed resume builder by Amruth Pillai: a multi-section editor, live preview, PDF export and public share links, with your data on your own box. HONEST SCOPE: the author ALSO RUNS IT FREE at rxresu.me, so self-hosting buys privacy and ownership rather than any feature the hosted one lacks -- worth knowing before spending a box on it. NOT A SINGLE CONTAINER: compose.yml brings up FOUR services -- the app, postgres (5432), redis, and seaweedfs (8333) for S3-compatible object storage -- so `docker run` will not do, and the app alone will not boot without the other three (its healthcheck waits on all of them). *** IT SHIPS WITH AUTH_SECRET SET TO A PLACEHOLDER AND YOU MUST CHANGE IT: .env.example carries AUTH_SECRET=\"change-me-to-a-secure-secret-key-in-production\", and leaving it is a signing key every reader of the public repo already knows. *** PORT CONFLICT: it binds 3000, which Open WebUI and Fermyon Spin in this same catalog also claim -- whichever starts second fails to bind. Google/GitHub/LinkedIn OAuth are optional (blank env = email sign-in only). Health: GET /api/health on 3000.",
+        binaryNote: "Docker + docker compose only; there is no native binary and no winget/brew package. Runs anywhere Docker does. Set APP_URL to the address people will actually reach it on -- share links are generated from it, so leaving it at http://localhost:3000 produces links that only work on the host."
+    },
     wasmtime: {
         label: "Wasmtime (portable WASM runtime)", bin: "wasmtime", winget: "BytecodeAlliance.Wasmtime",
         serve: [], probe: { type: "none" },
