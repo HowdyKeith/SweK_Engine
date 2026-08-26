@@ -2795,7 +2795,12 @@ const brainGpu = desc;
 // from an OLD extracted folder looked identical to a fresh one while the server
 // window announced the new version. Print the build AND the absolute file path
 // Deno actually loaded, so "which brain am I running" is never a guess again.
-const BRAIN_BUILD = "v4025";   // v4025 -- crystal diffraction: structurefactor + powder join the roundhouse
+const BRAIN_BUILD = "v4026";   // v4026 -- the doorless six: knobliveness, renderbounce, reconquality,
+// manifoldcensus and strokemorph built, knobRegistry refused as registry code rather than physics.
+// DEVICE_NAMES 125 -> 129, coverage 141 of 266, physicsReach 32 -> 27 doorless. And v3852: hands.span was the
+// lab's only knob moving nothing anywhere -- a fixedAnchor defect knob makes the translation negative fire,
+// so its still-knob entry is deleted, and the register now re-probes for entries that have outlived their
+// reason. Two patches arrived; one applied -- the other was an exact subset. Previously v4025 --   // v4025 -- crystal diffraction: structurefactor + powder join the roundhouse
 // (DEVICE_NAMES 123 -> 125, coverage 134 of 266) and a new /crystal-diffraction.html front door. The round also
 // fixes a browser defect the existing door could not reach: both physics/crystal modules had a top-level
 // `import ... from "node:url"` wanted only by their CLI guard, so neither loaded in a browser at all --
