@@ -29,6 +29,7 @@
 // question remains exactly as open as it was, with one fewer wrong explanation.
 
 import { runTwoF, RUNS_V2862, nuOf, reOf, DEFAULT_RIG } from "../../simulation/lbm/twoFExperiment.mjs";
+import { costFor } from "./costRecord.mjs";
 
 export const TWOF_OBSERVABLES = [
     "inletDriftFrac", "driftImprovementVsFeedback", "liftAmplitude", "liftSustained",
@@ -127,10 +128,19 @@ export const twoFDevice = {
     // (the recorded series is spectrally analysed), which pushes the same way.
     //
     // `envelope` returns numbers recorded at v2862 and runs no lattice at all, so its honest hint is nil.
+    // *** v4041 -- THE ANCHOR IS THE MEASURED RECORD, NOT A TYPED 4.8 ms/step. *** v4038 calibrated that
+    // constant by hand and it was the weakest thing in that commit: a number measured once, on one machine,
+    // that nothing would ever re-measure. corroborationCensus already times every build it runs, so the
+    // freeze writes what this device ACTUALLY cost and the hint scales that by the only thing that moves it.
+    // *** WITH NO RECORD THERE IS NO HINT, AND THAT IS CORRECT: null means unknown, never free. *** A fresh
+    // checkout simply schedules the way it did before any of this existed.
     costHint: ({ mode = "inlet", config = {} } = {}) => {
-        if (mode === "envelope") return 0;
+        if (mode === "envelope") return 0;             // replays v2862's numbers; runs no lattice
+        const base = costFor("twof", mode);
+        if (base == null) return null;
         const c = { ...DEF, ...config };
-        return (Number(c.settle) + Number(c.record)) * 4.8;
+        const steps = Number(c.settle) + Number(c.record);
+        return base * (steps / (DEF.settle + DEF.record));
     },
 };
 

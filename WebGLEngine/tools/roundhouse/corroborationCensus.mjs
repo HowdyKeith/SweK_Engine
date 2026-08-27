@@ -32,6 +32,7 @@
 import { getDevice, DEVICE_NAMES } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";   // v3211: DERIVED. MODES never existed here -- see deviceModes.mjs
 import { preRegister } from "./corroborate.mjs";
+import { readCostRecord, costFor } from "./costRecord.mjs";
 
 /**
  * WHY THIS CENSUS DOES NOT USE measurePortabilityAsync, AND WHAT THAT COST TO FIND OUT.
@@ -205,6 +206,9 @@ export async function corroborationCensus({ modes = null, verbose = false,
     for (const name of DEVICE_NAMES) for (const mode of (modes[name] || [])) planned.push(name + "." + mode);
     const plannedDeviceModes = planned.length;
 
+    // Read once, not per build. A missing file is normal and yields an empty record, so every device simply
+    // has no prior and the sweep behaves exactly as it did before this existed.
+    const costRec = readCostRecord();
     const started = Date.now();
     const deadline = started + budgetMs;
     const skipped = [];      // never started: the deadline had passed
@@ -234,9 +238,18 @@ export async function corroborationCensus({ modes = null, verbose = false,
             // and can never change a reported number, and a device that declares none behaves exactly as
             // before. What it must not do is silently drop the build: an over-cost skip is recorded in
             // `skipped` beside the budget skips, so coverage still counts it as not swept.
-            if (typeof dev.costHint === "function") {
+            {
+                // *** v4041 -- A DECLARED HINT FIRST, THEN WHAT THE DEVICE ACTUALLY COST LAST TIME. ***
+                // The two are complementary rather than redundant. A costHint is a function of the config, so
+                // it knows that twof at settle 300 / record 900 costs a fortieth of twof at its default; the
+                // record cannot, because it holds one number per device/mode at the DEFAULT config. What the
+                // record has instead is COVERAGE: it prices every device that declares nothing, which is all
+                // but one of them, and it does it without anyone calibrating a constant.
                 let hint = null;
-                try { hint = dev.costHint({ mode, config: {} }); } catch { hint = null; }
+                if (typeof dev.costHint === "function") {
+                    try { hint = dev.costHint({ mode, config: {} }); } catch { hint = null; }
+                }
+                if (!Number.isFinite(hint)) hint = costFor(name, mode, costRec);
                 const remaining = deadline - Date.now();
                 //
                 // *** AND A DECLINE DOES NOT END THE SWEEP, WHICH THE FIRST DRAFT OF THIS GOT WRONG. ***

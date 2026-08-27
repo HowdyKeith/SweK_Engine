@@ -21,6 +21,7 @@
 
 import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS,
          measurePortabilitySampled } from "./corroborationCensus.mjs";
+import { writeCostRecord, readCostRecord, dearest, COST_BASELINE } from "./costRecord.mjs";
 import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
@@ -283,6 +284,51 @@ console.log("\n3c. *** rawCalls MEASURES A KIND OF WORK, NOT AN AMOUNT OF TIME *
         "to live, and it must not be here -- a gate that wrote a cost cache would be a report and a gate at " +
         "once, which capabilityCard-selfcheck records a round being refused for. The census returns the " +
         "timings; persisting them is a caller's job and a round of its own.");
+}
+
+// ---- 3d. v4041 -- THE MEASURED RECORD -------------------------------------------------------------------------------
+console.log("\n3d. *** WHAT EACH BUILD COST, KEPT, BECAUSE THE PROXY DID NOT WORK ***");
+{
+    // *** THE FREEZE IS OPT-IN AND THE GATE READS BY DEFAULT, WHICH IS corroborationReach's CONVENTION
+    // (SWEK_FREEZE_CORROBORATION_REACH=1) AND NOT AN INVENTION HERE. *** A gate that wrote on every run would
+    // be a gate and a report at once, which capabilityCard-selfcheck records a round being refused for.
+    //
+    // *** AND ONLY A COMPLETE SWEEP MAY FREEZE. *** A budgeted run measures a prefix of the lab; writing that
+    // would record the cheap devices and silently drop every expensive one -- which is exactly the population
+    // a cost record exists to describe. The refusal is louder than the write.
+    if (process.env.SWEK_FREEZE_DEVICE_COST === "1") {
+        if (!c.complete) {
+            report("REFUSED TO FREEZE", "the sweep was PARTIAL (" + sweptSoFar + "). A record written from a " +
+                "budgeted run would hold the cheap devices and omit every expensive one, which is the " +
+                "population it exists to describe. Re-run without --budget.");
+        } else {
+            const w = writeCostRecord(costPairs, { note: "measured by corroborationCensus-selfcheck" });
+            report("FROZE " + w.entries + " device/mode costs into device-cost-baseline.json",
+                "dearest: " + dearest(w).slice(0, 5).join(", "));
+        }
+    }
+
+    const rec = readCostRecord();
+    const have = Object.keys(rec.costs || {}).length;
+    if (!have) {
+        report("no cost record on this machine, which is a normal state and not a failure",
+            "every consumer treats a missing entry as UNKNOWN and schedules exactly as it did before this " +
+            "existed -- null never means free, or the most expensive unmeasured device would be attempted " +
+            "first. Freeze one with SWEK_FREEZE_DEVICE_COST=1 on a complete run.");
+    } else {
+        ok("!! the record prices device/modes that declare no hint of their own",
+            have > 100,
+            have + " entries, frozen " + rec.frozenOn + ". *** THIS IS THE COVERAGE A DECLARED HINT CANNOT " +
+            "REACH: exactly one device in the lab declares costHint, and the record prices all the rest " +
+            "without anyone calibrating a constant. *** dearest: " + dearest(rec, 4).join(", "));
+        ok("...and it is milliseconds on the machine that froze it, so nothing asserts a value",
+            typeof rec.frozenOn === "string" && !("expected" in rec),
+            "the same twof build measured 115.7 s idle and 205.0 s under load in one session, a 1.8x spread " +
+            "from contention. A record frozen on a busy machine OVER-states, which declines work that would " +
+            "have fitted -- the wrong direction -- so this carries provenance and no assertion. " +
+            "corroboration-reach-baseline.json ratchets because a number falling there is a regression; a " +
+            "device getting slower is news about the device.");
+    }
 }
 
 // ---- 4. WHAT THIS CENSUS DOES NOT ESTABLISH ------------------------------------------------------------------------
