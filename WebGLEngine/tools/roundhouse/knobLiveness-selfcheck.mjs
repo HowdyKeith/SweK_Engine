@@ -19,7 +19,8 @@
 // refusal is a response. Counting it dead would mark the best-behaved knobs in the lab as the broken ones.
 "use strict";
 import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
-         PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob, choicesFor } from "./knobLiveness.mjs";
+         PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob, choicesFor,
+         partialDeafness, deafnessUnanswered } from "./knobLiveness.mjs";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { kuramotoDevice } from "./kuramotoBind.mjs";
 import { COMPOSE_KNOB_CHOICES } from "./composeBind.mjs";
@@ -426,6 +427,79 @@ console.log("\n3h. *** v4035 -- A LIST OF NUMBERS HAS A SCALING, AND THREE QUANT
         named.join(", ") + " -- the last full sweep reported every one of them as 'not probed (array)'. " +
         "Eleven of the fifteen came free from the elementwise ladder; these four each needed the device to " +
         "say what a real alternative looks like, and two of them needed it BECAUSE THEY WERE RIGHT.");
+}
+
+console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN THE SEVENTH ***");
+{
+    // *** THE LAB CONTAINS A PLANTED DEAD KNOB AND THIS CENSUS COULD NOT SEE IT. *** stability's `deafknob`
+    // mode hands every run the shipped viscosity whatever the caller asked for, and its own comment names the
+    // shape: "a control that does nothing ... nothing throws, every run completes, every number is finite, and
+    // the ONLY tell is that the answer stops depending on the input." Two separate defects hid it, and the
+    // first was fixed a round earlier for an unrelated reason.
+    //
+    //   1. AN ARRAY OBSERVABLE COMPARED BY REFERENCE. stability reports `ratioLadder`, rebuilt per call, so
+    //      Object.is called it moved every time and EVERY knob on the device read live. MEASURED: visc moved
+    //      [viscosity, ratioLadder] by reference and only [viscosity] by value.
+    //   2. THE SWEEP STOPPED AT THE FIRST RESPONDING MODE, and `deafknob` is last in the list.
+    //
+    // AND WITHOUT v4031's ECHO RULE IT WOULD STILL BE INVISIBLE: the plant reaches the OUTPUT (the bind copies
+    // the knob to out.viscosity) while never reaching the solver, so the one thing that moves in that mode is
+    // the knob's own echo. The rule written to stop mpmstep.nx reading live off itself is what makes a
+    // deliberately deaf knob findable.
+    const deaf = {
+        modes: ["hears", "deaf"], name: "synthetic-deaf",
+        defaults: ({ mode } = {}) => ({ mode: mode || "hears", config: { gain: 2, other: 5 } }),
+        // `ladder` is an ARRAY rebuilt every call -- the reference-comparison trap, on purpose.
+        // `gain` is echoed and then IGNORED in `deaf`, which is the deafknob shape exactly.
+        build: async ({ mode = "hears", config = {} } = {}) => {
+            const c = { gain: 2, other: 5, ...config };
+            const used = mode === "deaf" ? 2 : c.gain;
+            return { gain: c.gain, ladder: [{ a: 1 }, { a: 2 }], answer: used * c.other };
+        },
+    };
+    const cfg = { gain: 2, other: 5 };
+    const base = await deaf.build({ mode: "deaf", config: cfg });
+    ok("!! *** AN ARRAY OBSERVABLE MUST NOT READ AS MOVED JUST FOR BEING A NEW OBJECT ***",
+        sameValue(base.ladder, (await deaf.build({ mode: "deaf", config: { ...cfg, gain: 9 } })).ladder),
+        "a device that rebuilds an array per call compares unequal TO ITSELF under Object.is, and every knob " +
+        "on it reads live whatever it does. This is the mirror of the v4031 echo bug and the worse direction " +
+        "of the two: a dead reading invites a look, a live one closes the question.");
+    ok("!! ...and Object.is stays at the LEAVES, because NaN is a real observable",
+        sameValue(NaN, NaN) && !sameValue(NaN, Infinity) && !sameValue({ a: 1 }, { a: 1, b: 2 }),
+        "NaN === NaN is false, so === at the leaves would call an unchanged NaN a move. JSON.stringify would " +
+        "have been shorter and wrong the other way: it renders NaN and Infinity BOTH as null, so a value that " +
+        "changed from one to the other would compare EQUAL.");
+
+    const rHears = await probeKnob(deaf, "hears", cfg, "gain", await deaf.build({ mode: "hears", config: cfg }));
+    const rDeaf = await probeKnob(deaf, "deaf", cfg, "gain", base);
+    ok("!! *** THE SAME KNOB READS LIVE IN ONE MODE AND STILL IN THE OTHER ***",
+        rHears.state === "live" && rDeaf.state === "still",
+        "hears: " + rHears.state + ", deaf: " + rDeaf.state + ". In `deaf` the only thing the knob moves is " +
+        "its own echo, which is discarded -- so the mode that ignores it is the mode that reads still.");
+
+    const rows = [
+        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], probed: ["hears", "deaf"], incomplete: false },
+        { device: "d", knob: "clean", live: ["hears", "deaf"], still: [], probed: ["hears", "deaf"], incomplete: false },
+        { device: "d", knob: "cut", live: ["hears"], still: [], probed: ["hears"], incomplete: true, unenteredModes: ["deaf"] },
+    ];
+    ok("!! partialDeafness names the split knob and leaves the one that works everywhere alone",
+        partialDeafness(rows).length === 1 && partialDeafness(rows)[0].startsWith("d.k "),
+        partialDeafness(rows).join(" | ") + " -- a knob live in every mode is not deaf anywhere.");
+    ok("!! *** AND A ZERO MEANS 'NONE FOUND IN WHAT WAS OPENED', NEVER 'NONE' ***",
+        deafnessUnanswered(rows).length === 1 && deafnessUnanswered(rows)[0].includes("NEVER ENTERED: deaf"),
+        deafnessUnanswered(rows).join(" | ") + ". *** THE FIRST EXHAUSTIVE RUN OF stability REPORTED ZERO " +
+        "DEAF KNOBS HAVING NEVER OPENED THE PLANT -- over budget at 90 s, modes never entered: direction, " +
+        "horizon, deafknob. incompleteKnobs cannot catch that either: it requires the knob to be STILL so " +
+        "far, and this one is live. Same measurement-versus-admission line v4030 and v4031 drew, walked into " +
+        "a third time. ***");
+
+    report("*** AND ON THE REAL PLANT, MEASURED RATHER THAN ASSERTED HERE, BECAUSE IT COSTS MINUTES ***",
+        "knobLiveness --only stability --exhaustive, with a budget it can finish inside, reports EXACTLY ONE " +
+        "entry: `stability.visc -- live in response, response/planted, direction, direction/planted, horizon, " +
+        "horizon/planted; STILL in deafknob, deafknob/planted`. And it discriminates -- c, dt and T are live " +
+        "in ALL EIGHT mode/plant combinations INCLUDING deafknob, because the plant overrides viscosity and " +
+        "nothing else. One stability build is ~19 s and exhaustive is four knobs across eight combinations, " +
+        "so the real run is minutes; the synthetic above proves the mechanism on every run instead.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
