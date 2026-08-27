@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4070 -- CI verifies the archive people actually download
+
+Item (3) of Keith's two-part CI fix, after v4068 stopped the workflow racing the rig to publish.
+
+**The three-platform verify had been exercising an artifact nobody would ever download.** This workflow's
+founding line is *"the artifact gets exercised somewhere other than the machine that made it"* -- and it was
+only ever half true. CI ran `packRelease`, vetted **that** zip, and unpacked **that** zip on ubuntu, macOS and
+Windows, while the copy on the releases page was touched by nothing. Once v4068 established the rig as the
+publisher, CI's zip had no users at all.
+
+**The half that matters is the credential sweep** -- whose own note calls it *"the one claim in this workflow
+worth checking twice, because it is the only one whose failure cannot be taken back once a release is public"*
+-- **and it was reading the wrong file.** If the rig's packer ever drifted from `SKIP_FILES`, CI would have gone
+green on its own clean archive while the public download carried the secret. The sweep, `verify_zip.py` and all
+three unpacks now read the downloaded release. CI still packs nothing, so v4068's finding holds: there is no
+local build to be tempted into uploading over the rig's.
+
+**Fetching what somebody else published introduces three states that packing your own never had**, and each is
+handled separately because each means something different:
+
+- **Not there yet.** The rig pushes the tag *as part of* publishing, so this workflow starts while the upload is
+  still finishing -- on v4067 the run began at 17:13:36Z against an asset whose `updated_at` was 17:13:37Z.
+  Reading once would be a flake generator, so it polls.
+- **Never there.** The rig did not publish -- a real finding about the release. The wait is **bounded** at five
+  minutes and fails loudly rather than hanging.
+- **Half-uploaded.** An asset that *exists* and a *complete* archive are different facts, and a size check
+  passes a truncated one. Integrity is disproved with `unzip -t`.
+
+All three were driven against a mock `gh` before shipping, including a deliberately truncated zip: caught,
+exit 1.
+
+**The workflow's own gate went three-red on the edit** -- it asserted that CI called `packRelease`, the old
+refusal wording, and `needs: build` -- and was re-pointed at what replaced each: CI packs nothing, the archive
+is the published one, the matrix gates on the fetch. New section 6 covers the three new states plus the sweep's
+source. Four sabotages bite (dropping `unzip -t`, collapsing the wait loop, pointing the sweep back at a
+self-packed zip, re-introducing `packRelease`), each reddening exactly one check, all restored byte-identical.
+
+**And the first sabotage run reported 0 fails for all four** -- which was the harness running the gate from the
+wrong directory, not four dead checks. A baseline green run is asserted before the counts now, because *"0
+fails" from a gate that never executed looks exactly like "0 fails" from a gate that passed.*
+
+Permissions stay `contents: read`: fetching an asset is a read, so the coverage grew without the reach growing.
+No gate file added or removed, so this build still carries 1207 gates. verify.mjs ALL GREEN.
+
 ## Since v4069 -- four knobs the census called dead, and not one of them was
 
 Keith's patch closes the four dead-knob candidates the earlier sweeps left unresolved -- probed surgically,

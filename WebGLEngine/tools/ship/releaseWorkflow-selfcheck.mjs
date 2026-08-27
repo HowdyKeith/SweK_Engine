@@ -41,10 +41,13 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
 // ---- 1. IT OWNS NO OPINION ABOUT WHAT IS IN A RELEASE ------------------------------------------------------
 {
     console.log("1. *** THE EXCLUDE LIST LIVES IN ONE PLACE, AND IT IS NOT THIS FILE ***");
-    ok("!! the workflow calls the shared packer",
-        /tools\/ship\/packRelease\.mjs/.test(code),
-        "packRelease.mjs resolves makeInstallable() -- the same call the GitHub panel's Release button makes, so " +
-        "CI and the button cannot produce different archives");
+    // v4070 -- THIS USED TO ASSERT THAT CI CALLED packRelease, SO CI AND THE BUTTON COULD NOT DIVERGE. CI does
+    // not pack at all now: it takes the PUBLISHED archive, so there is no second build to diverge FROM, which
+    // is a stronger form of the same property than agreeing with the packer ever was.
+    ok("!! *** CI PACKS NOTHING -- IT VERIFIES THE ARCHIVE THE PUBLIC ACTUALLY DOWNLOADS ***",
+        !/packRelease\.mjs/.test(code) && /gh release download/.test(code),
+        "a zip CI built is a zip with no users: since v4068 the rig publishes, so vetting CI's own copy proved " +
+        "something about a file nobody would ever fetch while the released one was checked by nothing");
     ok("!! ...and does NOT roll its own archive",
         !/\bzip\s+-r/.test(code) && !/Compress-Archive/.test(code) && !/tar\s+-c/.test(code),
         "*** THE FAILURE MODE OF A DRIFTED COPY IS PUBLISHING A CREDENTIAL, NOT A BROKEN BUILD. *** A second " +
@@ -66,7 +69,7 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
         "the tag is what everybody downloads BY, so a tag saying one thing while main.js says another ships a " +
         "build under a name that is not its own -- the exact failure the ship ritual was written for");
     ok("!! ...and the mismatch EXITS rather than warning",
-        /refusing to publish a mislabeled build/.test(code) && /exit 1/.test(code),
+        /the published build is mislabeled/.test(code) && /exit 1/.test(code),
         "a warning in a log nobody reads after the release is already published is not a gate");
     ok("!! ...and a tree with no marker at all is refused too, not defaulted",
         /no ENGINE_VERSION marker/.test(code) && /exit 2/.test(code),
@@ -157,10 +160,39 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
         "dry_run was declared 'Build and verify, but publish nothing' and referenced NOWHERE: publish already " +
         "gated on push+tag, which is false for a manual run, so the button was a dry run whether the toggle " +
         "said true or false. A control that reads as a choice and is wired to nothing is worse than no control");
-    ok("...and the cross-OS verify still gates on the build, so the artifact tested is the one built",
-        /needs:\s*build/.test(code),
-        "verify must consume the build's uploaded artifact rather than packing its own, or three machines " +
-        "would each be opening a different zip");
+    ok("...and the cross-OS verify gates on the fetch, so all three open THE PUBLISHED bytes",
+        /needs:\s*fetch/.test(code) && !/needs:\s*build/.test(code),
+        "the archive is downloaded ONCE and handed to the matrix: re-downloading per job would let a mid-run " +
+        "re-upload split the three, and packing per job would have them opening three different zips");
+}
+
+// ---- 6. THE PUBLISHED ARCHIVE IS TAKEN CAREFULLY, NOT ASSUMED --------------------------------------------
+{
+    console.log("\n6. *** VERIFYING THE PUBLISHED ARCHIVE MEANS WAITING FOR IT AND DISTRUSTING IT ***");
+    // v4070 -- fetching what the rig published introduces three states that packing your own never had: the
+    // asset may not exist YET, may never exist, and may be half-uploaded. Each is checked, because each fails
+    // differently and only one of them is a real problem with the release.
+    ok("!! the asset is WAITED for rather than read once -- the race is real and measured",
+        /for i in \$\(seq 1 \d+\)/.test(code) && /sleep \d+/.test(code),
+        "the rig pushes the tag AS PART of publishing, so this workflow starts while the upload is still " +
+        "finishing: on v4067 the run began at 17:13:36Z against an asset whose updated_at was 17:13:37Z. " +
+        "Reading once and failing would be a flake generator");
+    ok("!! ...and the wait is BOUNDED, so a release that never got a build fails loudly instead of hanging",
+        /carries no \.zip after/.test(code) && /exit 1/.test(code),
+        "'the rig did not publish' is a real finding about the release -- an unbounded wait would turn it into " +
+        "a job that never reports");
+    ok("!! *** A PARTIAL UPLOAD IS DISPROVED WITH unzip -t, NOT WITH A SIZE CHECK ***",
+        /unzip -t/.test(code) && /not a complete zip/.test(code),
+        "an asset that EXISTS and a COMPLETE archive are different facts, and a size check passes a truncated " +
+        "one. Driven against a deliberately truncated zip before shipping: caught, exit 1");
+    ok("!! the credential sweep and the ship gate both read the DOWNLOADED archive, not a packed one",
+        /unzip -Z1 "\$ZIP"/.test(code) && /dl\/\$\{\{ steps\.get\.outputs\.zipname \}\}/.test(code),
+        "*** THIS IS THE GAP v4070 CLOSED. *** The sweep's own note calls it the one claim whose failure cannot " +
+        "be taken back once a release is public -- and it was reading a file CI packed itself. If the rig's " +
+        "packer ever drifted from SKIP_FILES, CI would have gone green while the public archive carried the secret");
+    ok("...and the token still asks only for read, since downloading a public release needs nothing more",
+        /contents:\s*read/.test(code) && !/contents:\s*write/.test(code),
+        "fetching an asset is a read; the reach did not have to grow to gain the coverage");
 }
 
 console.log(fails ? `\nreleaseWorkflow-selfcheck: ${fails} FAILED` : "\nreleaseWorkflow-selfcheck: all checks pass");
