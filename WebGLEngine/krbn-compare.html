@@ -75,7 +75,8 @@ import { sceneMesh, SCENES, KRBN_NATIVE } from "./tools/krbn/sceneMeshes.js";
 // fit moved to tools/krbn/glbMesh.js when krbn-avatar.html needed the identical thing. Every one of
 // those corrections is invisible when wrong, so a second copy would not crash -- it would quietly
 // draw a bind pose, or a figure on its back, on ONE of the two pages.
-import { gltfToMeshInput, dropDegenerate, computeFit, fitDistance } from "./tools/krbn/glbMesh.js";
+import { gltfToMeshInput, dropDegenerate, computeFit, fitDistance, loadGLTF } from "./tools/krbn/glbMesh.js";
+import { mountModelPicker } from "./ui/modelPicker.js";
 
 const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
 const cv = document.getElementById("cv"), g = cv.getContext("2d");
@@ -337,10 +338,10 @@ function tick() { if(!playing) return; elT.value = (+elT.value+3)%1001; render()
 elP.onclick = () => { playing = !playing; elP.innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9658; Play"; if(playing) tick(); };
 [elT,elW,elL].forEach(e => e.oninput = render);
 elScene.onchange = () => {
-  // a "url:..." option is a preset/favourite -- fetched and parsed, not a registry lookup (loadPresetUrl and
-  // the two functions below it are declared later in this module; this handler only runs on a user click, so
-  // they are initialised long before it can fire)
-  if (elScene.value.startsWith("url:")) { loadPresetUrl(elScene.value.slice(4)); return; }
+  // a "url:..." option is a preset/favourite -- ui/modelPicker.js's OWN "change" listener (registered by
+  // mountModelPicker below) handles the fetch; this handler owns only the built-in scene names and must not
+  // also try to setScene() a "url:..." value, which is not one of them
+  if (elScene.value.startsWith("url:")) return;
   setScene(elScene.value);
   status.textContent = "Scene: " + elScene.value + " -- " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles.";
   render();
@@ -378,27 +379,14 @@ window.addEventListener("resize", render);
 //
 // A preset is fetched over HTTP and handed to the SAME loadMesh path a picked file uses -- no second parser,
 // no second cache-invalidation to keep in step with the first.
-const FAV_KEY = "voxelEngine.kpopFavorites";
-function readAvatarFavorites() {
-  try {
-    const raw = localStorage.getItem(FAV_KEY);
-    const a = raw ? JSON.parse(raw) : [];
-    return Array.isArray(a) ? a.filter((x) => x && typeof x.url === "string" && /\.(glb|gltf)(\?|#|$)/i.test(x.url)) : [];
-  } catch { return []; }
-}
+//
+// v4049 -- THE PICKER ITSELF (favourites, the shipped preset, the file input) IS NOW ui/modelPicker.js,
+// EXTRACTED RATHER THAN LEFT HERE TO BE COPIED A SECOND TIME. krbn-avatar.html and the new ascii-avatar.html
+// both want the identical control, and this is the exact shape v4046's own header warned about: a second copy
+// is not a tidiness problem, it is a wrong-favourite-does-nothing problem waiting to happen twice. This page
+// is refactored to call the shared module too, so there is one implementation with three callers rather than
+// an original and two drifting copies.
 const PRESETS = [{ url: "/GPU_Assets/RobotExpressive.glb", label: "RobotExpressive (shipped)" }];
-function addPresetOptions() {
-  const seen = new Set();
-  const add = (url, label) => {
-    if (seen.has(url) || [...elScene.options].some((o) => o.value === "url:" + url)) return;
-    seen.add(url);
-    elScene.add(new Option(label, "url:" + url));
-  };
-  for (const p of PRESETS) add(p.url, p.label);
-  for (const f of readAvatarFavorites()) add(f.url, "★ " + (f.label || f.url.split("/").pop()));
-}
-addPresetOptions();
-
 const elFile = document.getElementById("file"), elLoad = document.getElementById("load");
 elLoad.onclick = () => elFile.click();
 
@@ -421,8 +409,7 @@ async function loadModel(src) {
         import("./vendor/three/jsm/loaders/GLTFLoader.js"),
         import("three"),
       ]);
-      const buf = await src.arrayBuffer();
-      const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
+      const gltf = await loadGLTF(src, GLTFLoader);
       m = gltfToMeshInput(gltf, THREE);   // skinning + Y-up->Z-up + degenerate drop, one copy
     } else throw new Error("unsupported extension ." + ext + " -- expected .glb, .gltf, .obj or .stl");
     if (!m.positions.length || !m.triangles.length) throw new Error("parsed to an empty mesh (0 vertices or 0 triangles)");
@@ -464,25 +451,11 @@ async function loadModel(src) {
   render();
 }
 
-elFile.onchange = () => {
-  const f = elFile.files && elFile.files[0];
-  if (!f) return;
-  elFile.value = "";                                    // so re-picking the SAME file fires change again
-  loadModel(f);                                          // a File already IS {name, text, arrayBuffer}
-};
-
-// A preset/favourite: fetch it and hand the Response straight to the same loader. A 404 (a starred avatar
-// whose GLB has since moved) is REPORTED against its URL rather than leaving the picker on a scene it never
-// managed to load -- the favourites list is not this page's to prune, so a dead entry stays visible and says
-// what happened instead of silently doing nothing.
-async function loadPresetUrl(url) {
-  const name = url.split("/").pop() || url;
-  status.textContent = "Fetching " + name + "…";
-  let r;
-  try { r = await fetch(url); } catch (e) { status.textContent = "Could not fetch " + url + ": " + e.message; return; }
-  if (!r.ok) { status.textContent = "Could not fetch " + url + " -- HTTP " + r.status; return; }
-  await loadModel({ name, text: () => r.clone().text(), arrayBuffer: () => r.clone().arrayBuffer() });
-}
+mountModelPicker({
+  select: elScene, file: elFile, presets: PRESETS,
+  onPick: (src) => loadModel(src),
+  onError: (msg) => { status.textContent = msg; },
+});
 
 // EXPORT: lift the current drawing to 3D polylines and download as OBJ
 elX.onclick = () => {

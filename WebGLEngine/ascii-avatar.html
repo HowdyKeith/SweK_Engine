@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK &middot; ASCII Avatar</title>
+<meta name="demo:title" content="ASCII Avatar" />
+<meta name="demo:desc" content="The loaded avatar GLB rendered live and sampled into a character ramp, real frame rate -- monochrome by default, with an in-panel toggle to color." />
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  html,body { margin:0; height:100%; background:#0a0e0c; overflow:hidden; }
+  #wrap { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  #out { margin:0; font:6px/0.95 ui-monospace,Menlo,Consolas,monospace; color:#8fffb0; white-space:pre;
+         letter-spacing:0; }
+  #gl { display:none; }
+  #msg { position:absolute; left:0; right:0; bottom:0; font:10px ui-monospace,Menlo,monospace;
+         color:#6f8a7c; background:#0a0e0ccc; padding:2px 4px; text-align:center; }
+  #msg.err { color:#ff8a70; }
+  /* v4050 -- TOP-LEFT, matching krbn-avatar.html's own note: ui/avatarSwitch.js's mode-switch button sits at
+     top:2px;right:2px OVER this whole box (host document, this iframe just fills the box beneath it). */
+  #ctl { position:absolute; top:2px; left:2px; z-index:3; display:flex; gap:2px; align-items:center; }
+  #ctl select, #ctl button { font:9px ui-monospace,Menlo,monospace; background:#13201acc; color:#8fffb0;
+    border:1px solid #2a4a3a; border-radius:4px; padding:1px 2px; max-width:58px; cursor:pointer; }
+  #ctl button { max-width:20px; padding:1px 3px; }
+  #ctl label { font:9px ui-monospace,Menlo,monospace; color:#6f8a7c; display:flex; align-items:center; gap:1px; }
+</style>
+</head>
+<body>
+<div id="wrap"><pre id="out">loading…</pre></div>
+<div id="ctl">
+  <select id="modelSel" title="Load a different avatar"><option value="">(default)</option></select>
+  <button id="modelFileBtn" title="Load a .glb/.gltf file">&#128193;</button>
+  <label title="Color each character by the surface it sampled, instead of one flat ink"><input type="checkbox" id="colorToggle" />color</label>
+</div>
+<div id="msg"></div>
+<input type="file" id="modelFile" accept=".glb,.gltf" style="display:none" />
+<canvas id="gl"></canvas>
+
+<script type="module">
+// ascii-avatar.html -- v4050
+// -----------------------------------------------------------------------------------------------------------
+// Keith: "so we could have the next avatar choice after live krbn avatar, to be a loaded model converted to
+// krbn" -- then, revising -- "adding a button on the live krbn, to convert and load live, instead of the next
+// choice" (which is what krbn-avatar.html gained) -- and then, in the SAME breath: "instead of Krbn, we could
+// also have the ascii version. ascii-object.html."
+//
+// So this is a SIBLING to krbn-avatar.html, not the same page with a different sampler: krbn-avatar draws a
+// still every ~2.6s because a Krbn frame costs ~0.5s of CPU and cannot be helped; asciify() is pure arithmetic
+// over pixels already sitting in a WebGL framebuffer, so THIS one runs at real frame rate, animates the loaded
+// clip for real (not frozen at t=0 the way a pinned Krbn drawing must be), and is NOT declared `heavy` in
+// ui/avatarSwitch.js -- there is no cost here worth a warning before the click.
+//
+// *** THE SOURCE IS A REAL WEBGL RENDER OF THE ACTUAL LOADED glTF SCENE, THE SAME TECHNIQUE ascii-object.html
+// ALREADY PROVED ON face/wireframeHead.js. *** tools/render-qa/asciify.mjs (RGBA in, text out, no GPU needed to
+// gate it) is reused UNCHANGED for the glyph choice -- this page is what generalises the SOURCE from one fixed
+// procedural head to any loaded GLB, not a second sampler.
+//
+// COLOR IS THE ONE NEW THING asciify.mjs GAINED THIS ROUND, AND IT DEFAULTS OFF. Keith: "monochrome by default,
+// but we would want to be able to switch to color." The glyph a cell gets never depends on the toggle -- color
+// is a second fact reported about a cell (its average RGB), not a second scheme for choosing what to draw --
+// so flipping the toggle mid-spin never changes the SHAPE, only whether it is rendered in SweK's flat green ink
+// or the model's own sampled surface color.
+import * as THREE from "three";
+import { loadGLTF } from "./tools/krbn/glbMesh.js";
+import { mountModelPicker } from "./ui/modelPicker.js";
+import { asciify, toColoredHTML } from "./tools/render-qa/asciify.mjs";
+
+const q = new URLSearchParams(location.search);
+let GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");   // no traversal into GPU_Assets
+const out = document.getElementById("out"), msg = document.getElementById("msg"), cv = document.getElementById("gl");
+const say = (t, err) => { msg.textContent = t; msg.className = err ? "err" : ""; };
+
+let GLTFLoader = null;
+let renderer = null, scene = null, cam = null, clock = null;
+let group = null, mixer = null;         // the CURRENT loaded model's turntable group and its own mixer
+let raf = 0, dead = false;
+let colorOn = false;
+
+const wrap = document.getElementById("wrap");
+const view = () => ({ width: Math.max(64, wrap.clientWidth | 0), height: Math.max(64, wrap.clientHeight | 0) });
+
+// The offscreen render is capped WELL BELOW the panel's own pixel size -- asciify's sampler throws most of it
+// away on the very next line (a 143px-wide panel becomes ~30-something ASCII columns), and this frame is redrawn
+// every rAF tick rather than once every 2.6s the way krbn-avatar's pencil frame is, so the resolution this page
+// picks costs real, continuous fill rate rather than a one-off.
+function renderSize(v) {
+    const MAX = 220;
+    const ar = v.width / Math.max(1, v.height);
+    const w = ar >= 1 ? MAX : Math.max(32, Math.round(MAX * ar));
+    const h = ar >= 1 ? Math.max(32, Math.round(MAX / ar)) : MAX;
+    return { w, h };
+}
+
+/** Free GPU resources a swapped-out model was holding. A live-load control that never disposes the OLD model
+ *  is a slow leak that only shows up after several picks -- exactly the "second GPU context nobody is looking
+ *  at" shape this tree's teardown rule already names, just for geometry/texture memory instead of a whole context. */
+function disposeObject3D(obj) {
+    obj.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        for (const m of mats) {
+            for (const key of ["map", "normalMap", "roughnessMap", "metalnessMap", "emissiveMap", "aoMap"]) {
+                if (m[key]) m[key].dispose();
+            }
+            m.dispose();
+        }
+    });
+}
+
+function pickClip(animations) {
+    return animations.find((a) => /idle|breath|stand/i.test(a.name || "")) || animations[0];
+}
+
+/**
+ * Load a source into the rendered scene -- shared by the default boot fetch AND the live picker, exactly the
+ * shape krbn-avatar.html's loadAvatar() already established (one loader, not an original path and a copy).
+ * @param src   {name, arrayBuffer()} -- a File, or the {name,text,arrayBuffer} shape mountModelPicker hands a preset
+ * @param label what to call it in the status line
+ */
+async function loadAvatar(src, label) {
+    say("loading " + label + "…");
+    let gltf;
+    try {
+        gltf = await loadGLTF(src, GLTFLoader);
+    } catch (e) { say("could not load " + label + ": " + (e && e.message ? e.message : e), true); return; }
+    if (!gltf.scene) { say(label + " has no scene to render", true); return; }
+
+    const oldGroup = group;
+    const newGroup = new THREE.Group();
+    newGroup.add(gltf.scene);
+    scene.add(newGroup);
+    if (oldGroup) { scene.remove(oldGroup); disposeObject3D(oldGroup); }
+    group = newGroup;
+    GLB = label;
+
+    mixer = null;
+    if (gltf.animations && gltf.animations.length) {
+        const clip = pickClip(gltf.animations);
+        if (clip) { mixer = new THREE.AnimationMixer(gltf.scene); mixer.clipAction(clip).play(); mixer.update(0); }
+    }
+    // *** THE SAME FACT tools/krbn/glbMesh.js's poseFromClip DOCUMENTS, AND THE BUG THIS PAGE HIT FIRST TRY. ***
+    // A fresh Object3D's matrixWorld is IDENTITY until updateMatrixWorld runs -- GLTFLoader.parse() never calls
+    // it, and neither does three's own Box3.setFromObject. Measuring the box before this line reads every
+    // node as if parented at the origin with no chained transform at all, which is neither the bind pose nor
+    // the posed scale glbMesh.js already measured -- it is bytes that happen to parse as coordinates. MEASURED:
+    // radius 194.6 (should be a few units) before this call existed.
+    gltf.scene.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const center = sphere.center, radius = sphere.radius || 1;
+    // frustum-derived distance, the same reasoning tools/krbn/glbMesh.js's fitDistance uses (a bounding sphere
+    // of radius r subtends asin(r/d), so it fits when d >= r/sin(halfFov)) -- reimplemented here in DEGREES
+    // against three's own PerspectiveCamera.fov rather than imported, because glbMesh.fitDistance takes a
+    // MeshInput's positions and this page never builds one: the loaded scene is rendered AS ITSELF, through
+    // three's native SkinnedMesh path, not converted to Krbn's flat position/triangle arrays.
+    const v = view(), halfV = THREE.MathUtils.degToRad(cam.fov) / 2;
+    const halfH = Math.atan(Math.tan(halfV) * (v.width / v.height));
+    const dist = (radius / Math.sin(Math.min(halfV, halfH))) * 1.15;
+    cam.position.set(center.x, center.y + radius * 0.15, center.z + dist);
+    cam.lookAt(center);
+    cam.updateProjectionMatrix();
+
+    clock = new THREE.Clock();
+    say(GLB + " · ASCII" + (mixer ? " · " + (pickClip(gltf.animations).name || "clip") : ""));
+}
+
+function frame() {
+    raf = requestAnimationFrame(frame);
+    if (dead || !renderer || !scene || !cam) return;
+    // *** NO STICKY loadErr CHECK HERE, AND THAT IS A DELIBERATE DIFFERENCE FROM krbn-avatar.html, NOT AN
+    // OVERSIGHT. *** krbn-avatar.html's draw() re-asserted a ROUTINE status every tick ("GLB · Krbn pencil"),
+    // so a failed load's error message got overwritten by the very next ordinary redraw -- within one cycle,
+    // MEASURED. This frame() never does that: the status line is written exactly once per load EVENT (success
+    // in loadAvatar, failure in loadAvatar's catches or the picker's onError), and nowhere else. A failed PICK
+    // never touches `group` at all, so the LAST successfully loaded model just keeps animating under the error
+    // banner rather than freezing -- which is also the better UX: the error is about the NEW pick, not about
+    // what is already correctly on screen. loadErr from krbn-avatar's fix was copied here FIRST and then
+    // REMOVED once testing showed it only ever froze a still-good display without protecting anything: nothing
+    // in this function ever overwrites `#msg`, so there was nothing for it to guard against.
+    if (!group) return;
+
+    const dt = clock ? clock.getDelta() : 0;
+    if (mixer) mixer.update(dt);
+    group.rotation.y += 0.008;   // a slow turntable on the SUBJECT, not an orbiting camera -- cheaper, and it
+                                  // does not fight whatever local animation the loaded clip is already playing
+
+    const v = view(), size = renderSize(v);
+    if (cv.width !== size.w || cv.height !== size.h) {
+        cv.width = size.w; cv.height = size.h;
+        renderer.setSize(size.w, size.h, false);
+        cam.aspect = size.w / size.h; cam.updateProjectionMatrix();
+    }
+    renderer.render(scene, cam);
+
+    const gl = renderer.getContext();
+    const buf = new Uint8Array(size.w * size.h * 4);
+    gl.readPixels(0, 0, size.w, size.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    // readPixels is BOTTOM-UP; asciify walks top-down -- ascii-object.html's own note, the identical flip.
+    const flipped = new Uint8ClampedArray(size.w * size.h * 4);
+    for (let y = 0; y < size.h; y++) flipped.set(buf.subarray((size.h - 1 - y) * size.w * 4, (size.h - y) * size.w * 4), y * size.w * 4);
+
+    const cols = Math.max(16, Math.round(v.width / 4.2));
+    try {
+        const r = asciify(flipped, size.w, size.h, { cols, color: colorOn });
+        if (colorOn) out.innerHTML = toColoredHTML(r); else out.textContent = r.text;
+    } catch (e) {
+        say("could not sample the frame: " + (e && e.message ? e.message : e), true);
+    }
+}
+
+(async function boot() {
+    try {
+        const gl = await import("./vendor/three/jsm/loaders/GLTFLoader.js");
+        GLTFLoader = gl.GLTFLoader;
+    } catch (e) { say("could not load GLTFLoader: " + (e && e.message ? e.message : e), true); return; }
+
+    renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false });
+    renderer.setClearColor(0x000000, 0);   // TRANSPARENT: asciify turns that into spaces, not a filled block
+    scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-2, 3, 2.5); scene.add(sun);
+    cam = new THREE.PerspectiveCamera(38, 1, 0.05, 100);
+
+    const r = await fetch("/GPU_Assets/" + GLB + ".glb").catch(() => null);
+    if (!r || !r.ok) { say(GLB + ".glb not found" + (r ? " (HTTP " + r.status + ")" : ""), true); return; }
+    await loadAvatar(r, GLB);
+    if (!group) return;   // loadAvatar already said why
+
+    mountModelPicker({
+        select: document.getElementById("modelSel"),
+        file: document.getElementById("modelFile"),
+        presets: [{ url: "/GPU_Assets/RobotExpressive.glb", label: "RobotExpressive" }],
+        onPick: (picked) => loadAvatar(picked, picked.name.replace(/\.(glb|gltf)$/i, "")),
+        // a preset fetch failing (a starred favourite whose file has moved) never reaches loadAvatar, so it
+        // has to say so itself -- nothing sticky needed here, see frame()'s own note on why
+        onError: (msg2) => say(msg2, true),
+    });
+    document.getElementById("modelFileBtn").onclick = () => document.getElementById("modelFile").click();
+    document.getElementById("colorToggle").onchange = (e) => { colorOn = !!e.target.checked; };
+
+    frame();
+})();
+
+// *** TEARDOWN. *** ui/avatarSwitch.js removes the iframe rather than hiding it, but the rAF loop and the GPU
+// context it drives do not know that until told -- the same "second GPU context burning frames behind a panel
+// nobody is looking at" this tree already refuses elsewhere.
+addEventListener("pagehide", () => { dead = true; cancelAnimationFrame(raf); if (group) disposeObject3D(group); if (renderer) renderer.dispose(); });
+addEventListener("unload",   () => { dead = true; cancelAnimationFrame(raf); });
+</script>
+</body>
+</html>

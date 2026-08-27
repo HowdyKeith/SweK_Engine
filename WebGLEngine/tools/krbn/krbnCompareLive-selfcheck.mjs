@@ -32,6 +32,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+// v4049 -- was MISSING despite two call sites already using it (section 15's own "no headless Chromium here"
+// skip line): a straight ReferenceError on any box without Chromium or without the fixture this section needs,
+// thrown from inside a skip path whose entire job is to degrade gracefully. Every other *-selfcheck.mjs in this
+// tree defines this exact helper (e.g. tools/ship/artifactSize-selfcheck.mjs:45); it just never got copied here.
+const report = (l) => console.log("  ----  " + l);
 
 console.log("krbnCompareLive-selfcheck -- the right pane is really Krbn\n");
 
@@ -123,27 +128,33 @@ console.log("\n4. PRESETS: THE SHIPPED MODEL, AND THE AVATAR FAVOURITES -- READ 
     ok("!! RobotExpressive is a preset and the file it names really is in the tree",
        /GPU_Assets\/RobotExpressive\.glb/.test(HTML) && fs.existsSync(path.join(ENG, "GPU_Assets", "RobotExpressive.glb")),
        "a preset pointing at a path that does not ship is a dead entry that only fails when somebody clicks it");
+    // v4049 -- THE PICKER (favourites, presets, the file input) MOVED TO ui/modelPicker.js, so these checks
+    // follow it there -- the same reason section 7/8's checks followed glbMesh.js when THAT code moved.
+    const MP = fs.readFileSync(path.join(ENG, "ui", "modelPicker.js"), "utf8");
     ok("!! favourites come from voxelEngine.kpopFavorites -- THE STORE THE AVATAR STAR ALREADY WRITES",
-       /voxelEngine\.kpopFavorites/.test(HTML),
+       /voxelEngine\.kpopFavorites/.test(MP),
        "ui/avatarFavorites.js's own header: a second favourites list would be the two-declarations defect -- you would " +
        "star something on server.html, not see it here, and never find out why");
-    // *** THE LOAD-BEARING NEGATIVE. *** Offering favourites is safe only while this page cannot CREATE one.
+    // *** THE LOAD-BEARING NEGATIVE. *** Offering favourites is safe only while this module cannot CREATE one.
     // The moment it writes that key, the store has two authors and the star stops being the single place a
     // favourite is made -- which is the exact defect the file above exists to prevent.
-    ok("!! ...and this page only READS that key, never writes it",
-       !/setItem\(\s*FAV_KEY|setItem\(\s*["']voxelEngine\.kpopFavorites/.test(HTML),
+    ok("!! ...and the module only READS that key, never writes it",
+       !/setItem\(\s*FAV_KEY|setItem\(\s*["']voxelEngine\.kpopFavorites/.test(MP),
        "server.html's star stays the one place a favourite is made");
     const shared = fs.readFileSync(path.join(ENG, "ui", "kpopFavorites.js"), "utf8");
-    ok("...and the key this page reads is byte-for-byte the one that module declares",
+    ok("...and the key it reads is byte-for-byte the one that module declares",
        /STORAGE_KEY = "voxelEngine\.kpopFavorites"/.test(shared),
        "read from the store's own source rather than trusted from memory -- if it is ever renamed, this fails here " +
        "instead of silently showing an empty favourites list forever");
-    ok("!! a preset and a picked file share ONE parse path",
-       /async function loadModel\(src\)/.test(HTML) && /loadModel\(f\)/.test(HTML) && /await loadModel\(\{ name/.test(HTML),
+    ok("!! a preset and a picked file share ONE parse path (krbn-compare.html's own loadModel)",
+       /async function loadModel\(src\)/.test(HTML) && /onPick: \(src\) => loadModel\(src\)/.test(codeOnly(HTML)),
        "two loaders would need the same cache invalidation kept in step in two places -- the bug section 3 already caught once");
     ok("!! a favourite whose file has moved REPORTS its 404 rather than silently doing nothing",
-       /HTTP " \+ r\.status/.test(HTML),
-       "the favourites list is not this page's to prune, so a dead entry must say what happened");
+       /HTTP " \+ r\.status/.test(MP),
+       "the favourites list is not this module's to prune, so a dead entry must say what happened");
+    ok("!! krbn-compare.html actually imports the shared module rather than keeping its own copy beside it",
+       /from "\.\/ui\/modelPicker\.js"/.test(HTML) && !/function readAvatarFavorites/.test(HTML),
+       "an unused parallel implementation left in place is how a second copy starts drifting");
 }
 
 console.log("\n7. THE SKINNING PASS -- A BIND POSE IS NOT A SLIGHTLY-WRONG FIGURE, IT IS A DIFFERENT OBJECT");
@@ -551,6 +562,120 @@ console.log("\n15. STEP 2: THE RIGGED .glb ITSELF, LOADED BACK INDEPENDENTLY AND
                 }
                 try { fs.unlinkSync(glbPath); } catch {}
             }
+        } finally { await browser.close(); srv.close(); }
+    }
+}
+
+console.log("\n16. THE LIVE-LOAD CONTROL ON krbn-avatar.html -- AND THE ERROR-STOMPING BUG ITS TESTING FOUND");
+{
+    const AV = fs.readFileSync(path.join(ENG, "krbn-avatar.html"), "utf8");
+    const AVC = codeOnly(AV);     // code shapes
+    const AVS = noComments(AV);   // string values -- see section 11's own note on why both are used here
+
+    ok("!! the default boot fetch and the picker share ONE loader, loadAvatar()",
+       /async function loadAvatar\(src, label\)/.test(AVC) &&
+       /await loadAvatar\(r, GLB\)/.test(AVC) &&
+       /onPick: \(picked\) => loadAvatar\(picked,/.test(AVC),
+       "a second load path for the picker would be the exact second-copy defect ui/modelPicker.js's own header warns about");
+    ok("!! it is mounted with the RobotExpressive preset ui/modelPicker.js expects, not a bare picker",
+       /mountModelPicker\(\{/.test(AVC) && /RobotExpressive\.glb/.test(AVS),
+       "a picker with no presets still works but silently drops the one model this tree ships alongside the page");
+
+    // *** THE LOAD-BEARING NEGATIVE: THE STOMPING BUG ITSELF. *** The redraw timer fires every REDRAW_MS
+    // regardless of what loadAvatar() is doing. draw() used to call say() with the routine status
+    // UNCONDITIONALLY, so a failed load's error message displayed for at most one redraw cycle before the
+    // next ordinary tick silently overwrote it with the OLD model's still-fine status line -- MEASURED: a
+    // synthetic 404 read as a successful load within one redraw cycle (section 16's live test below re-proves
+    // this against the fixed code rather than trusting the source-level check alone).
+    ok("!! draw() checks the sticky loadErr FIRST, before touching K/scene/fit at all",
+       /function draw\(\) \{\s*(?:\/\/[^\n]*\n\s*)*if \(loadErr\) \{ say\(loadErr, true\); return; \}/.test(AVC.replace(/  +/g, " ")) ||
+       (() => {
+           const body = AVC.slice(AVC.indexOf("function draw() {"));
+           const firstIf = body.slice(0, body.indexOf("{", body.indexOf("{") + 1) + 400);
+           return /if \(loadErr\) \{ say\(loadErr, true\); return; \}/.test(firstIf) && firstIf.indexOf("loadErr") < firstIf.indexOf("dead || busy");
+       })(),
+       "a check placed AFTER the busy/dead/K guards would still let the routine say() run first on some ticks");
+    ok("!! loadAvatar() clears loadErr as its FIRST statement of every new attempt",
+       /async function loadAvatar\(src, label\) \{\s*loadErr = "";/.test(AVC.replace(/ +/g, " ")),
+       "clearing it anywhere later would leave a stale error visible for one more tick on every retry");
+    ok("!! a preset fetch failure (never reaching loadAvatar) ALSO sets the sticky loadErr, not just say()",
+       /onError: \(msg2\) => \{ loadErr = msg2; say\(loadErr, true\); \}/.test(AVC.replace(/ +/g, " ")),
+       "ui/modelPicker.js's onError fires OUTSIDE loadAvatar for a dead favourite's 404 -- calling say() alone " +
+       "would be exactly as vulnerable to the next tick as the original bug");
+
+    let chromium = null;
+    try {
+        const pw = await import(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"));
+        const { createRequire } = await import("node:module");
+        const req = createRequire(import.meta.url);
+        const r = pw.resolvePlaywright(req);
+        if (!pw.browserSkipReason(r.chromium, r.from, pw.HEADLESS_SHELL)) chromium = { mod: r.chromium, shell: pw.HEADLESS_SHELL };
+    } catch {}
+    if (!chromium) {
+        report("live picker+stomping-bug test SKIPPED -- no headless Chromium available here");
+    } else if (!fs.existsSync("/tmp/fixture-icosa.glb")) {
+        report("live picker+stomping-bug test SKIPPED -- no /tmp/fixture-icosa.glb test fixture on this box");
+    } else {
+        const http = await import("node:http");
+        const srv = http.default.createServer((rq, rs) => {
+            const p = decodeURIComponent((rq.url || "/").split("?")[0]);
+            if (p === "/test-fixture.glb") { rs.writeHead(200, { "Content-Type": "model/gltf-binary" }); rs.end(fs.readFileSync("/tmp/fixture-icosa.glb")); return; }
+            const full = path.join(ENG, p === "/" ? "/krbn-avatar.html" : p);
+            if (!full.startsWith(ENG) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) { rs.writeHead(404); rs.end("nf"); return; }
+            const ext = path.extname(full);
+            const ct = { ".html":"text/html", ".js":"text/javascript", ".mjs":"text/javascript", ".glb":"model/gltf-binary" }[ext] || "application/octet-stream";
+            rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(full));
+        });
+        await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+        const port = srv.address().port;
+        const browser = await chromium.mod.launch({ executablePath: chromium.shell });
+        try {
+            const page = await browser.newPage();
+            const errs = [];
+            page.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+            // planted BEFORE navigation: one favourite that resolves (the icosahedron fixture -- distinctly
+            // shaped, unskinned, nothing like RobotExpressive) and one that is a genuine 404, exactly the shape
+            // "a starred avatar whose file has since moved" describes.
+            await page.addInitScript(() => {
+                localStorage.setItem("voxelEngine.kpopFavorites", JSON.stringify([
+                    { url: "/test-fixture.glb", label: "Icosa" },
+                    { url: "/GPU_Assets/GenuinelyMissing.glb", label: "Ghost" },
+                ]));
+            });
+            await page.goto(`http://127.0.0.1:${port}/krbn-avatar.html?ms=1200`, { waitUntil: "networkidle", timeout: 40000 });
+            await page.waitForFunction(() => document.querySelector("#msg").textContent.includes("RobotExpressive"), { timeout: 15000 }).catch(() => {});
+            const beforeMsg = await page.textContent("#msg");
+            ok("!! the default model draws first, before any picker interaction", /RobotExpressive/.test(beforeMsg), beforeMsg);
+
+            // --- the success path: a genuinely different model, loaded live ---
+            // NOTE: the status line names the picked FILE ("test-fixture", from the URL loadAvatar's own label
+            // argument is derived from), not the favourite's star label ("Icosa") -- the star label is only
+            // what the <select> OPTION reads; loadAvatar(picked, picked.name.replace(...)) never sees it. That
+            // matches krbn-compare.html's own picker and is not the thing under test here.
+            await page.selectOption("#modelSel", { label: "★ Icosa" });
+            await page.waitForFunction(() => /test-fixture/.test(document.querySelector("#msg").textContent) && !document.querySelector("#msg").classList.contains("err"), { timeout: 15000 }).catch(() => {});
+            const afterIcosa = await page.textContent("#msg");
+            const errAfterIcosa = await page.getAttribute("#msg", "class");
+            ok("!! picking a favourite REPLACES the drawn model -- status line names the new one, clean class",
+               /test-fixture/.test(afterIcosa) && !/err/.test(errAfterIcosa || ""),
+               afterIcosa + "  (class=" + errAfterIcosa + ")");
+            ok("...and the icosahedron (unskinned) drew with no page error",
+               errs.length === 0, errs[0] || "clean");
+
+            // --- the failure path: a dead favourite, and THE STOMPING BUG'S OWN REGRESSION TEST ---
+            await page.selectOption("#modelSel", { label: "★ Ghost" });
+            await page.waitForFunction(() => document.querySelector("#msg").classList.contains("err"), { timeout: 15000 }).catch(() => {});
+            const errMsg = await page.textContent("#msg");
+            ok("!! a dead favourite's fetch failure reports an error, does not silently do nothing",
+               /Ghost|HTTP|Could not fetch/i.test(errMsg), errMsg);
+            // REDRAW_MS is 1200 here (the query clamp floor) -- three ticks is 3.6s, comfortably past "one cycle"
+            await page.waitForTimeout(4500);
+            const errMsgLater = await page.textContent("#msg");
+            const classLater = await page.getAttribute("#msg", "class");
+            ok("!! *** THE REGRESSION TEST FOR THE STOMPING BUG *** -- the error SURVIVES past multiple redraw ticks",
+               /err/.test(classLater || "") && errMsgLater === errMsg,
+               "at t0: \"" + errMsg + "\"  at t+4.5s: \"" + errMsgLater + "\" -- MEASURED before the loadErr fix: " +
+               "a 404 read as a successful load within one redraw cycle because the timer's own say() call overwrote it");
         } finally { await browser.close(); srv.close(); }
     }
 }

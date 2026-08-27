@@ -61,6 +61,18 @@ export function dropDegenerate(m) {
  * @param {object} THREE  the three module (Vector3 + AnimationMixer are what is used)
  * @returns {{positions:number[][], triangles:number[][], skinned:boolean, posedBy:string, dropped?:number}}
  */
+/**
+ * Bytes in, a parsed glTF out -- the fetch/arrayBuffer/GLTFLoader.parse boilerplate that every loading call
+ * site (krbn-avatar.html's default fetch, its live-load button, ascii-avatar.html) was starting to repeat.
+ * `src` is {name, arrayBuffer()} -- a File, or the {name, text, arrayBuffer} shape mountModelPicker hands a
+ * fetched preset. Returns the raw gltf object; callers that want a Krbn MeshInput still call
+ * gltfToMeshInput(gltf, THREE) themselves -- this function does not assume Krbn is even loaded.
+ */
+export async function loadGLTF(src, GLTFLoaderCtor) {
+    const buf = await src.arrayBuffer();
+    return new Promise((res, rej) => new GLTFLoaderCtor().parse(buf, "", res, rej));
+}
+
 export function gltfToMeshInput(gltf, THREE) {
     const posedBy = poseFromClip(gltf, THREE);
     const { positions, triangles } = skinnedGeometry(gltf, THREE);
