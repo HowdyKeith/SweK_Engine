@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 import { reportLines } from "./scheduleKey.mjs";
 import { scene, runSchedule, constraintResidual, momentumResidual, maxDiff, scheduleGap,
          colourOrderGap, gapExponent, convergenceBoundary, divergenceBoundary, relaxationBracket,
-         convergenceTrace, COMPLIANT, RIGID, MEASURED_V3600 } from "./scheduleKey.mjs";
+         convergenceTrace, COMPLIANT, RIGID, MEASURED_V3600, predicted, jacobiPass, DT } from "./scheduleKey.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c, note = "") => { if (c) { pass++; console.log("  ok   " + n + (note ? "  -- " + note : "")); }
@@ -140,6 +140,54 @@ section("6. THE BOUNDARY IS TWO QUANTITIES -- AND THIS SECTION IS A CORRECTION T
        MEASURED_V3600.shippedJacobiScale < brs[2].lower);
     ok("the correction is on the record rather than tidied away",
        /BUDGET WEARING A STABILITY VERDICT/.test(MEASURED_V3600.myOwnDefect));
+}
+
+section("6b. predicted() IS EXPLICIT EULER, EXACT -- AND A PINNED PARTICLE NEVER MOVES OR ACCUMULATES GRAVITY")
+{
+    // Minimal fixture: predicted() only reads sc.init.{pos,vel,invMass}, so build it directly rather than via
+    // scene(). Particle 0 is free, particle 1 is pinned. Both start at rest (vel = 0).
+    const sc = { init: { pos: Float64Array.from([1, 2, 3, -4, -5, -6]), vel: new Float64Array(6), invMass: Float64Array.from([1, 0]) } };
+    const g = [1.5, -10, 0.25];
+    const buf = predicted(sc, g);
+    // explicit Euler from rest: vel_new = g*dt, pred = pos + vel_new*dt = pos + g*dt^2 -- exact, no other terms.
+    const expectPred0 = [sc.init.pos[0] + g[0] * DT * DT, sc.init.pos[1] + g[1] * DT * DT, sc.init.pos[2] + g[2] * DT * DT];
+    const freeExact = Math.abs(buf.pred[0] - expectPred0[0]) < 1e-15 && Math.abs(buf.pred[1] - expectPred0[1]) < 1e-15 && Math.abs(buf.pred[2] - expectPred0[2]) < 1e-15;
+    const freeVelExact = Math.abs(buf.vel[0] - g[0] * DT) < 1e-15 && Math.abs(buf.vel[1] - g[1] * DT) < 1e-15 && Math.abs(buf.vel[2] - g[2] * DT) < 1e-15;
+    // pinned particle: predicted position and velocity are UNCHANGED -- gravity never touches invMass === 0.
+    const pinnedStill = buf.pred[3] === sc.init.pos[3] && buf.pred[4] === sc.init.pos[4] && buf.pred[5] === sc.init.pos[5] &&
+                         buf.vel[3] === 0 && buf.vel[4] === 0 && buf.vel[5] === 0;
+    ok("!! predicted() is exact explicit Euler (pos + g*dt^2 from rest) for a free particle, and a pinned one is untouched",
+       freeExact && freeVelExact && pinnedStill,
+       "from rest under gravity [1.5,-10,0.25], the free particle's prediction matches pos+g*dt^2 to 1e-15 and its velocity matches g*dt to 1e-15, " +
+       "while the invMass=0 particle stays at its exact original position with velocity still 0 -- gravity integration skips pinned vertices entirely.");
+}
+
+section("6c. jacobiPass() SOLVES AN ISOLATED CONSTRAINT EXACTLY AT scale=1, AND scale LINEARLY INTERPOLATES")
+{
+    // A single unshared distance constraint: at scale 1 (and zero compliance) the Jacobi update for one
+    // constraint IS the standard XPBD projection -- there is nobody else to disagree with -- so the new
+    // separation must land EXACTLY on rest length, not merely closer to it.
+    const cons = [{ i: 0, j: 1, rest: 1.0, compliance: 0 }];
+    const invMass = Float64Array.from([1, 1]);
+    const pred1 = Float64Array.from([0, 0, 0, 1.5, 0, 0]);   // separation 1.5, rest 1.0
+    const lam1 = new Float64Array(1);
+    jacobiPass(pred1, invMass, cons, lam1, DT, 1.0);
+    const sep1 = pred1[3] - pred1[0];
+    // closed form: dLambda = -0.5/2 = -0.25, s = dLambda/1.5, dP = +-0.25 -> pred = [0.25, 1.25]
+    const exact = Math.abs(pred1[0] - 0.25) < 1e-12 && Math.abs(pred1[3] - 1.25) < 1e-12 && Math.abs(lam1[0] - (-0.25)) < 1e-12;
+    ok("!! at scale=1 a single isolated constraint is solved EXACTLY: separation lands on rest length to 1e-12",
+       Math.abs(sep1 - 1.0) < 1e-12 && exact,
+       "starting 1.5 apart with rest 1.0, one Jacobi pass at scale 1 puts the particles at exactly x=0.25 and x=1.25 (separation 1.0) with lambda -0.25 -- the closed-form single-constraint solution.");
+
+    // scale linearly interpolates the correction: scale=0.5 should move the particles exactly HALFWAY from
+    // their start toward the scale=1 solution (1.5 -> 1.25, i.e. separation 1.25, halfway between 1.5 and 1.0).
+    const pred2 = Float64Array.from([0, 0, 0, 1.5, 0, 0]);
+    const lam2 = new Float64Array(1);
+    jacobiPass(pred2, invMass, cons, lam2, DT, 0.5);
+    const sep2 = pred2[3] - pred2[0];
+    ok("!! scale linearly interpolates the correction: scale=0.5 lands exactly halfway to the scale=1 solution",
+       Math.abs(sep2 - 1.25) < 1e-12,
+       "the same constraint at scale 0.5 lands the separation at exactly 1.25 -- halfway between the 1.5 start and the 1.0 rest length reached at scale 1.");
 }
 
 section("7. WHAT IS NOT CLAIMED -- ASSERTED AS AN ABSENT MECHANISM, NOT AN ABSENT MENTION");

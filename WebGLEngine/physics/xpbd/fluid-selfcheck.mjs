@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { buildClothConstraints } from "./clothMesh.js";
 import { colorConstraints } from "./xpbd.js";
-import { fluidMeshSubstep, solveCrossContacts, findCrossContacts, centroidY } from "./fluid.js";
+import { fluidMeshSubstep, solveCrossContacts, findCrossContacts, colorCrossContacts, solveCrossContactsFriction, centroidY, minY } from "./fluid.js";
 import { buildNeighbors, poly6 } from "./pbf.js";
 
 let fails = 0;
@@ -123,5 +123,81 @@ const OPT = { dt: 0.016, iterations: 6, gravity: [0, -6, 0], fluidRadius: 0.09, 
        "with a rest density set, the two-way coupling drives its fluid with the real density solver: the mesh still caves, the fluid stays bounded at y " + a.held.toFixed(2) + ", two runs are byte-identical, and it lands measurably apart from the placeholder contact slot.");
 }
 
+// ---- 8. COLORING: colorCrossContacts offsets B into its own namespace, so distinct fluid/mesh particles ------
+//         never look like a self-collision, and the result is a VALID coloring of the bipartite contact set.
+{
+    // Namespace check: fluid particle 1 vs mesh particle 0, and fluid particle 0 vs mesh particle 1 -- four
+    // DISTINCT physical particles, so nothing stops them sharing a batch. Un-offset (b instead of nA+b) this
+    // would misread contact 1 as touching vertex 0 (which contact 0 already claimed) and force a second batch.
+    const nA = 2;
+    const contacts = [[1, 0], [0, 1]];
+    const batches = colorCrossContacts(contacts, nA);
+    const sameBatch = batches.length === 1 && batches[0].length === 2;
+
+    // General validity: every contact index appears exactly once, and within a batch no combined-space vertex
+    // (a-index, or nA+b for the mesh side) repeats -- the definition of a legal graph coloring.
+    function validColoring(contacts, nA, batches) {
+        const seenIdx = new Set();
+        for (const batch of batches) {
+            const used = new Set();
+            for (const ci of batch) {
+                if (seenIdx.has(ci)) return false;             // each contact colored once
+                seenIdx.add(ci);
+                const [a, b] = contacts[ci], vb = nA + b;
+                if (used.has(a) || used.has(vb)) return false;  // no shared vertex within a batch
+                used.add(a); used.add(vb);
+            }
+        }
+        return seenIdx.size === contacts.length;
+    }
+    // A denser case, including a genuinely shared vertex (two contacts both touching fluid particle 0), to prove
+    // the sharing case is actually forced apart rather than merely absent from the easy case above.
+    const denseContacts = [[0, 0], [0, 1], [1, 0], [2, 2]];
+    const denseBatches = colorCrossContacts(denseContacts, 3);
+    let sharedApart = true;
+    for (const batch of denseBatches) {
+        const seenA = new Set();
+        for (const ci of batch) { const [a] = denseContacts[ci]; if (seenA.has(a)) sharedApart = false; seenA.add(a); }
+    }
+
+    ok("!! colorCrossContacts offsets the mesh side so it never collides with the fluid side, giving a valid coloring",
+       sameBatch && validColoring(contacts, nA, batches) && validColoring(denseContacts, 3, denseBatches) && sharedApart,
+       "fluid-1/mesh-0 and fluid-0/mesh-1 touch four distinct particles and land in the SAME batch (" + JSON.stringify(batches) +
+       "), which only happens if the mesh index is offset past the fluid namespace; a denser set with two contacts sharing fluid particle 0 keeps them in different batches.");
+}
+
+// ---- 9. FRICTION BRACKET: mu=0 keeps the tangential slip, a large mu removes it exactly ------------------------
+{
+    // Mesh node B fixed (wb=0); fluid particle A has moved purely tangentially (along y) since prevA, while the
+    // contact normal is along x. depth = 0.1 either way, so friction's cap is mu*depth.
+    const mkA = () => Float64Array.from([0, 0, 0]), prevA = Float64Array.from([0, -0.05, 0]);
+    const mkB = () => Float64Array.from([0.2, 0, 0]), prevB = Float64Array.from([0.2, 0, 0]);
+    const wA = Float64Array.from([1]), wB = Float64Array.from([0]);
+
+    const noMu = mkA(); const bNoMu = mkB();
+    solveCrossContactsFriction(noMu, prevA.slice(), wA, bNoMu, prevB.slice(), wB, [[0, 0]], [[0]], 0.3, 0);
+    const stuck = mkA(); const bStuck = mkB();
+    solveCrossContactsFriction(stuck, prevA.slice(), wA, bStuck, prevB.slice(), wB, [[0, 0]], [[0]], 0.3, 10);
+
+    // Normal separation is exact regardless of mu (friction only ever removes TANGENTIAL motion).
+    const sepNoMu = Math.abs(noMu[0] - bNoMu[0]), sepStuck = Math.abs(stuck[0] - bStuck[0]);
+    ok("!! zero friction leaves the tangential slip untouched, and a mu large enough to exceed the cap removes it exactly",
+       Math.abs(sepNoMu - 0.3) < 1e-12 && Math.abs(sepStuck - 0.3) < 1e-12 &&
+       Math.abs(noMu[1] - 0) < 1e-12 && Math.abs(stuck[1] - prevA[1]) < 1e-12,
+       "the particle slid tangentially by 0.05 since the previous step; with mu 0 it keeps sliding (y stays " + noMu[1].toFixed(3) +
+       "), and with mu 10 (cap 1.0 far above the 0.05 relative motion) it sticks, landing back at prevA's y=" + prevA[1].toFixed(3) +
+       " exactly -- both runs separate to the identical contact distance 0.3 along the normal.");
+}
+
+// ---- 10. minY: the exact minimum y over a synthetic point set, not merely the first or last point --------------
+{
+    const pos = Float64Array.from([5, 3, -1, -2, -7.5, 4, 8, 100, 9, 1, -0.25, 0]);   // y-values: 3, -7.5, 100, -0.25
+    const m = minY(pos, 4);
+    // move the minimum to the LAST slot too, to rule out an implementation that only checks pos[1] or the last entry
+    const posLast = Float64Array.from([1, 9, 2, 3, 2, 4, 5, -50, 6]);                  // y-values: 9, 2, -50
+    const mLast = minY(posLast, 3);
+    ok("!! minY returns the true minimum y, wherever it sits in the point set", m === -7.5 && mLast === -50,
+       "over y-values {3, -7.5, 100, -0.25} minY returns exactly " + m + ", and with the minimum moved to the LAST point {9, 2, -50} it still returns exactly " + mLast + ".");
+}
 
 process.exit(fails ? 1 : 0);
