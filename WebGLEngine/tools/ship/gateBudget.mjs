@@ -66,12 +66,27 @@
 // genuinely in the general population, so the alternative is a gate that gets killed for being what it is.
 // The tail table below is still where a gate belongs once it outgrows this, and v3913's rule stands --
 // TWO POPULATIONS, TWO BUDGETS, rather than widening the budget for the 1100 gates that never needed it.
-export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 60634 };
+// *** v4075 -- RE-PINNED A THIRD TIME, AND THE GATE IT NAMES HAS NOW BEEN THE SLOWEST THREE ROUNDS RUNNING.
+// *** 46.6s (v3913) -> 60.6s (v4000) -> 103.1s here, all the same gate: physics/nuclear/reactorControl.
+// The value is READ OUT OF gate-timings.json rather than typed, exactly as v4000 and v3913 were, and the
+// check's own instruction is followed to the letter -- "WHEN IT GOES RED THE ANSWER IS TO RAISE
+// SLOWEST_GENERAL FROM THE NEW MEASUREMENT, NOT TO LOWER THIS LINE."
+//
+// The default moves 181.9s -> 309.4s. THAT IS A REAL COST AND IT IS STILL THE SMALLER ONE: reactorControl
+// is genuinely in the general population -- point-reactor kinetics with six delayed-neutron precursor
+// groups, bisected inhour roots checked against RK4 integration of the same seven ODEs -- so the
+// alternative is a gate killed for being what it is.
+//
+// WHAT IS NOT DONE HERE: moving it to the tail table. v3913's rule is TWO POPULATIONS, TWO BUDGETS, and
+// the tail is for gates whose cost is a FIXTURE (the Kelvin-Helmholtz cluster, 527-690s). A 103s gate in
+// a table whose smallest entry is 49.9s would be the tail absorbing the general population instead of
+// standing apart from it -- and then nothing would be left measuring what an ordinary gate costs.
+export const SLOWEST_GENERAL = { gate: "physics/nuclear/reactorControl-selfcheck.mjs", ms: 103141 };
 
 /** The factor selfchecks.mjs's own header already committed to. Kept as a named constant, not a multiplication. */
 export const HEADROOM = 3;
 
-/** 3 x 60.6s. NOT typed: computed, so the two halves cannot drift apart. */
+/** 3 x 103.1s. NOT typed: computed, so the two halves cannot drift apart. */
 export const DEFAULT_BUDGET_MS = SLOWEST_GENERAL.ms * HEADROOM;
 
 /**

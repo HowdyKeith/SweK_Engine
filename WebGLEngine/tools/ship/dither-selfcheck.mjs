@@ -186,7 +186,11 @@ console.log("\n4. *** ONE SET OF CONSTANTS: THE SHADERS ARE BUILT FROM THE ARRAY
         ok(`!! ${name} clamps its result`, /clamp\(/.test(s));
     }
     ok("!! Floyd-Steinberg is ABSENT and the reason is written down, not just omitted",
-        !/floyd|steinberg/i.test(code) && /error diffusion does not exist as a fragment/i.test(SRC),
+        // v4075 -- THIS ONE HUNTS A COMMENT ON PURPOSE and must keep doing so: the claim is that dither.js
+        // EXPLAINS why error diffusion is not a fragment shader, and an explanation lives in prose. So the
+        // fix is not noComments (which would delete the very thing being checked) but UNWRAPPING the comment
+        // line-joins, so the sentence still matches when somebody reflows the paragraph it sits in.
+        !/floyd|steinberg/i.test(code) && /error diffusion does not exist as a fragment/i.test(SRC.replace(/\n\s*\/\/\s?/g, " ")),
         "error diffusion is sequential and has no fragment-shader form; naming the absent half is cheaper than " +
         "someone rediscovering why it never landed");
 }

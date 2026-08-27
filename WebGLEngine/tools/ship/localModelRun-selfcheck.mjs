@@ -250,7 +250,10 @@ console.log("\n8. *** THE PAGE OPENS THE DOOR FROM THE GATE, NOT FROM ITS OWN OP
         "a generate box visible before a model is loaded is a button that cannot work");
     // MEASURED IN A REAL BROWSER, both branches, recorded here because the gate cannot launch one per ship.
     ok("!! *** the browser verification is RECORDED with what it drove ***",
-        /VERIFIED IN A REAL BROWSER/.test(PAGE),
+        // v4075 -- the record it is checking for IS a comment (webgpu-llm.html's `// *** VERIFIED IN A REAL
+        // BROWSER, BOTH BRANCHES (Chromium 141) ***`), so this hunts prose deliberately and the comment
+        // line-joins are unwrapped rather than stripped -- stripping would delete the subject.
+        /VERIFIED IN A REAL BROWSER/.test(PAGE.replace(/\n\s*\/\/\s?/g, " ")),
         "rendered twice under Chromium 141: with this container's real facts (no adapter) the door refuses and " +
         "names why; with Keith's facts injected the input and button appear, the generate box stays hidden, and " +
         "a malformed id is refused by parseRepoId before any network");

@@ -27,7 +27,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
-import { codeOnly } from "./sourceScan.mjs";
+import { codeOnly, noComments } from "./sourceScan.mjs";   // v4075 -- noComments for the vramNote STRING LITERAL, which codeOnly would blank
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -209,7 +209,11 @@ console.log("\n4. *** VRAM IS NOT EXPOSED, AND THE PROBE NEVER PRETENDS OTHERWIS
         "states reached: " + [...states].join(", ") + " -- 16 combinations of quota and adapter. A `yes` would " +
         "be a claim about VRAM, and nobody can make one from a page");
     ok("!! the page says so where a reader will meet it, not only here",
-        /VRAM is not exposed to a page/i.test(PAGE) && /NOT EXPOSED BY ANY BROWSER/.test(SRC),
+        // v4075 -- TWO TARGETS, TWO INSTRUMENTS. The page sentence is prose inside markup (HTML comments
+        // stripped, whitespace collapsed so a reflow cannot redden it); the module sentence is a STRING
+        // LITERAL in `vramNote:`, which noComments keeps and codeOnly would blank.
+        /VRAM is not exposed to a page/i.test(PAGE.replace(/<!--[\s\S]*?-->/g, " ").replace(/\s+/g, " ")) &&
+        /NOT EXPOSED BY ANY BROWSER/.test(noComments(SRC)),
         "a limit recorded only in a gate is a limit the person reading the page never sees");
 }
 

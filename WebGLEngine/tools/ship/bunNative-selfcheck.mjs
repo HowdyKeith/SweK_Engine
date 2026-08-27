@@ -87,7 +87,10 @@ console.log("\n3. *** ABSENT IS NOT BROKEN, AND THE WEBVIEW IS DRIVEN RATHER THA
     // "it is there and it threw" and "it worked" want four different responses from whoever reads the page.
     ok("!! *** `absent` and `threw` are different states, so a missing API never reads as a failure ***",
         /state: "absent"/.test(PROBE) && /state: "threw"/.test(PROBE) &&
-        /NOT a failure and not a broken install/.test(PROBE),
+        // v4075 -- noComments: the sentence lives in a STRING LITERAL (bunNative.mjs's `detail:` message),
+        // which noComments keeps and codeOnly would blank. Raw PROBE would also have matched the same words
+        // in a comment ABOUT the message, which is not the same claim as the message saying them.
+        /NOT a failure and not a broken install/.test(noComments(PROBE)),
         "a box that has not got a feature has not got a broken one, and the message says so in those words");
     // *** codeOnly FOR THE IDIOM, noComments FOR TEXT THE CODE CONTAINS -- and my first draft used codeOnly
     // for both and failed on its own subject. *** `data:text/html` is a STRING LITERAL, and codeOnly blanks
@@ -121,7 +124,10 @@ console.log("\n4. *** THE ROUTE IS A THIRD FIXED ONE, NOT A SCRIPT PARAMETER ON 
     ok("!! the page reaches it, and offers both columns",
         /\/runtime\/native\?rt=/.test(PAGE) && /runNative\("node"\)/.test(PAGE) && /runNative\("bun"\)/.test(PAGE));
     ok("!! ...and the page states the ABSENT-is-not-BROKEN rule where a reader meets it",
-        /has not got a feature has not got a broken one/.test(PAGE),
+        // v4075 -- HTML, so the strip is HTML comments rather than JS ones, and the whitespace collapse is
+        // what makes it survive a reflow: this sentence is prose inside markup and an editor rewrapping the
+        // <b> tag would otherwise redden a page that still says it.
+        /has not got a feature has not got a broken one/.test(PAGE.replace(/<!--[\s\S]*?-->/g, " ").replace(/\s+/g, " ")),
         "a caveat that lives only in a gate is a caveat the person reading the page never sees");
 }
 
