@@ -8,6 +8,60 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4062 -- the physics coverage debt, paid to zero
+
+Keith: "lets continue with #5 claimCheck, #9 definitionGates physics-only debt (81 vs frozen 37), #10
+corpusText/claimCheck rig-only docs."
+
+**The debt is paid by assertion, not by mention.** `definitionGates`' physics `BASELINE` had sat at 37 since
+v3323 while the real count grew to **81** -- 81 exported symbols under `physics/` that no gate so much as
+named. Each is a function nobody had looked at, which is how that file's own header records a 1% error in
+`r_s = 2M` surviving five gates. The cheap way to move the number is to write each symbol into a comment; the
+file itself names that as the *"condemn correct gates to improve a statistic"* trap. So the rule this round was
+the opposite: **a symbol counts as closed only if a check calls it, grades the answer against something
+derivable, and goes red when the source is deliberately broken.** All 81 were closed that way across eight
+parallel sweeps -- mesh, render/path-tracing, XPBD, MPM, optics/splat/octree, orbital/relativity, and two
+batches of singles. Every check sabotage-confirmed; every source file restored byte-identical afterward,
+diff-verified rather than asserted.
+
+**The checks are exact wherever the physics allows it, which is most places.** Paczyński–Wiita acceleration
+bit-exact in rational arithmetic. η(1/2) to 1e-13 against the published constant. Helmholtz reciprocity on the
+microfacet BSDF, exact over 500 configurations. Balance-heuristic MIS weights summing to exactly 1 over 2000
+pairs. `E[cos θ] = 2/3` measured on the cosine sampler's own output over 300k draws. A Yee-grid FDTD step
+hand-traced in exact rationals for two leapfrogs, then matched to an independently-coded scalar wave recursion
+to 1e-12. The Binder cumulant hitting exactly 2/3 in the two-delta-peak limit. d'Alembert's solution exact at
+four (x,c,t) triples. A Landweber iteration's residual descending 116.8 → 0.57, with a 2-iteration control
+proving the claim isn't vacuous.
+
+**And the sweep found a real blind spot in an existing check, which is the point of doing it this way.**
+`gaussianSplat`'s pre-existing coverage graded only `areaDepthSlope`, so a *pure multiplicative scale error* in
+`projectedAreaAtDepth`/`areaDepthFit` passed silently -- exactly the failure mode that module's own v3516
+comment predicted and nothing had ever exercised. Now closed by an exact `sigma^2*f^2/z^2` check plus its
+log-intercept. Three sweeps also caught their **own** first drafts being too weak -- a symmetric probe that
+missed a u/v swap in `surfaceDistance`, a `uvy=0` ray that missed a cross-product sign flip in `pixelRay`, a
+`dist>0` case that missed a normal sign flip in `obbContact` -- and strengthened them before finalising. A
+sabotage that does not bite is a check that does not exist.
+
+**Both ratchets re-frozen at the new floor, and zero is the strongest setting this pin has ever had.**
+Physics-only **37 → 0**, so the next unmentioned export under `physics/` reddens the line the round it lands,
+rather than hiding under 37 slots of headroom. Tree-wide **290 → 209**, because that sweep *subsumes* the
+physics one, so all 81 came off it too. Sabotage-confirmed both directions: un-naming a single symbol
+(`plasma.js:fieldAt`) reddens both lines. The stale detail string on the physics check ("the remaining debt is
+exported FUNCTIONS") was rewritten rather than left -- it described a state that no longer exists, and a
+message that outlives its subject is the defect shape this session has now caught five times.
+
+**Also closed, the two smaller items on the same list.** #5: `claimCheck-selfcheck`'s "newest entry yields at
+least one checkable claim" was red because v4061's entry wrote its gate count only as "1202 -> 1203", an arrow
+form the claim reader's clause-boundary regex correctly declines to parse. Fixed at the **record**, not the
+reader -- the entry now states its count as a bare assertion the tree can re-derive, which is the direction
+that file's own header demands (*"the record informs the tool, never the other way round"*). #10 needed no
+change and is recorded as such: `corpusText-selfcheck` already names the missing rig-only `TODO.md` as a
+retired source with a stated reason and emits no block for it, which is the behaviour the item was asking
+after -- verified by running it rather than by reading it.
+
+No gate files were added or removed this round -- every closure landed as new assertions inside gates that
+already existed -- so this build still carries 1203 gates. verify.mjs ALL GREEN.
+
 ## Since v4061 -- the fly-in, actually watched
 
 Keith's own words: "build the headless harness that actually watches a real-terrain fly-in." v4058 shipped
