@@ -1,9 +1,15 @@
 // ui/pageGauges.js — v1685
 // Unified top-center gauge dock for non-render pages (Universal Viewer, PDF/Comics, Pip-Boy, HEAD/Face, ...).
 // Matches the render view's docked stage (ui/dockedGauges.js): ONE visible row of SVG gauges with up/down scroll,
-// the SweK robot, and a right-side nav toolbar — Home (-> the configured SweK home, default server.html) and
+// the SweK robot, and a nav toolbar — Home (-> the configured SweK home, default server.html) and
 // Minimize (-> a "Show SweK Engine" tab). Self-contained: imports svgGaugeSet + swekRobot.
 //   <script type="module">import { mountPageGauges } from "/ui/pageGauges.js"; mountPageGauges();</script>
+//
+// v4051 -- Keith: "move the 2 vertical Home/Minimize buttons from the right side of the dock, to the left of
+// the 2 row arrows on the left" -- then "the home / minimize buttons should be the same size as the arrows, so
+// they match." Home/Minimize (`rtb`) now sit FIRST in topRow, left of the scroll arrows, and share the scroll
+// arrows' own 28px size (`NAV_BTN_SIZE`) rather than the 30px they were built at -- a plain literal mismatch,
+// not a deliberate size difference; nothing anywhere read or depended on the two being different.
 
 import { mountSvgGaugeSet } from "./svgGaugeSet.js";
 import { createSwekRobot } from "./swekRobot.js";
@@ -73,11 +79,15 @@ export function mountPageGauges(opts = {}) {
         fontFamily: "ui-monospace,monospace",
     });
 
-    // left toolbar: scroll up / down (shown only when there is more than one row of gauges)
+    // v4051 -- ONE shared size for every small nav button in this dock (scroll arrows, Home, Minimize), so
+    // "make X match Y" is a fact about the constant rather than four literals that can drift apart again.
+    const NAV_BTN_SIZE = 28;
+
+    // scroll up / down (shown only when there is more than one row of gauges)
     const scrollBtns = document.createElement("div");
     Object.assign(scrollBtns.style, { display: "none", flexDirection: "column", gap: "5px", alignSelf: "center" });
-    const upBtn = toolBtn("\u25B2", "Scroll gauges up", 28);
-    const dnBtn = toolBtn("\u25BC", "Scroll gauges down", 28);
+    const upBtn = toolBtn("\u25B2", "Scroll gauges up", NAV_BTN_SIZE);
+    const dnBtn = toolBtn("\u25BC", "Scroll gauges down", NAV_BTN_SIZE);
     scrollBtns.append(upBtn, dnBtn);
 
     // single-row gauge viewport: a clip that shows one row; the grid translates to reveal the other row(s)
@@ -119,12 +129,13 @@ export function mountPageGauges(opts = {}) {
     fsLbl.addEventListener("click", () => { try { localStorage.removeItem(FS_KEY); } catch (e) {} _fsApply(_fsAuto(), false); });
     fsCol.append(fsUp, fsLbl, fsDown);
 
-    // right toolbar: Home (top) + Minimize (below)
+    // v4051 -- WAS the right toolbar; moved to sit left of the scroll arrows (Keith's own words), and
+    // sized to match them (was 30px against the arrows' 28px -- a mismatch nobody had asked for).
     const rtb = document.createElement("div");
     Object.assign(rtb.style, { display: "flex", flexDirection: "column", gap: "5px", alignSelf: "center" });
-    const homeBtn = toolBtn("\u2302", "Home \u2014 back to SweK Engine home", 30);
+    const homeBtn = toolBtn("\u2302", "Home \u2014 back to SweK Engine home", NAV_BTN_SIZE);
     homeBtn.addEventListener("click", () => goHome(backUrl));
-    const minBtn = toolBtn("\u2013", "Minimize gauges", 30);
+    const minBtn = toolBtn("\u2013", "Minimize gauges", NAV_BTN_SIZE);
     rtb.append(homeBtn, minBtn);
 
     // robot + its name caption (the robot IS the avatar; its name is the computer's, Title Case e.g. "Galaxina")
@@ -139,7 +150,9 @@ export function mountPageGauges(opts = {}) {
     // the gauges + avatar live in a top row; a scrolling ticker sits underneath them (same as our other avatar tickers)
     const topRow = document.createElement("div");
     Object.assign(topRow.style, { display: "flex", alignItems: "center", gap: "10px" });
-    topRow.append(scrollBtns, clip, robotCol, rtb, fsCol);
+    // v4051 -- rtb (Home/Minimize) FIRST: "move the 2 vertical Home/Minimize buttons from the right side of
+    // the dock, to the left of the 2 row arrows on the left." Was scrollBtns, clip, robotCol, rtb, fsCol.
+    topRow.append(rtb, scrollBtns, clip, robotCol, fsCol);
 
     const ticker = document.createElement("div");
     Object.assign(ticker.style, { display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", paddingTop: "3px", borderTop: "1px solid rgba(90,200,255,0.18)", overflow: "hidden" });

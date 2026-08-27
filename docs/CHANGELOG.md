@@ -8,6 +8,52 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4051 -- circles that matched their row, buttons that matched the arrows, and a Fox sweep
+
+Keith, looking at the top-center gauge dock: "circles need to be smaller, same size as the other rows, so we
+can read the text below the circles" -- about the RECORD/MP4/CLIP row. Then, mid-turn: "lets move the 2
+vertical Home/Minimize buttons from the right side of the dock, to the left of the 2 row arrows on the left."
+Then: "the home / minimize buttons should be the same size as the arrows, so they match."
+
+**All three were real, and the first one's root cause was invisible in the source.** `ui/svgGaugeSet.js`'s own
+comment above the action-cell builder claimed an action cell (record/mp4/clip) is "the same box as a dial" --
+true of the width, false of the one property that actually decides how big a circle READS as. Every dial tilts
+its SVG with `perspective(150px) rotateX(17deg)` (the "physical dial" look), which FORESHORTENS its painted
+bounding box; the action button was the same nominal diameter but perfectly FLAT. At the dock's real scale
+(`scale:2`) that measured a squared-off 84x84 against the dial's tilted ~90x85 -- reading visibly rounder in
+the same row, exactly what Keith saw. Fixed by giving the action button the identical transform. The gate now
+measures this on REAL PAINTED PIXELS rather than trusting that a shared transform string implies a shared
+visual size -- a real browser is what actually decides whether two circles look the same, not source text
+agreeing with itself.
+
+`ui/pageGauges.js`'s Home/Minimize toolbar (`rtb`) was simply LAST in the `topRow.append()` call and built at a
+literal 30px against the scroll arrows' 28px -- a plain literal drift, not a deliberate difference; nothing
+anywhere depended on the two sizes being unequal. Moved to append FIRST (left of the scroll arrows, per Keith's
+own words) and given a shared `NAV_BTN_SIZE` constant, so "make X match Y" is a fact about one number rather
+than four literals that can drift apart again. This file had ZERO gate coverage before this round; it now has
+a dedicated one (`ui/pageGauges-selfcheck.mjs`), static and live.
+
+**Also swept for a Fox.** Keith: "one of our pages shows a Fox, and it is shown tiny in the top left corner.
+can we sweep for Fox?" `glb_viewer.html` is the only page with an actual Fox model (the Khronos glTF sample);
+its own postage-stamp-canvas bug -- a canvas is a replaced element, so `position:absolute;inset:0` alone does
+not stretch one, and an unsized canvas paints at its 300x150 intrinsic default -- was already fixed at v3979.
+Re-verified live, standalone and embedded in universal-viewer's iframe, with the real Khronos `Fox.glb` fetched
+fresh rather than assumed. A tree-wide live sweep of all 209 pages carrying a `<canvas>` (not just the two
+named pages the existing gate checks) found the SAME bug class alive on two others -- `avatarstage.html` and
+`phone.html` -- reported as a separate, not-yet-fixed finding rather than silently folded into this round.
+
+**And one repo looked at and correctly declined.** Keith asked about tacking `Makio64/threejs-cinematic-world-zoom`
+onto the Real Terrain page. Its MIT license is genuinely clean for the code, but the project needs a Vite build
+step (this tree's standing law: nothing in `WebGLEngine/*.html` may need compiling), a mandatory Google Maps
+Platform or Cesium Ion key (`realterrain.html`'s own subtitle: "no API keys"), and a hard pin to three@0.185.1
+with a documented silent depth-texture failure above it (this tree runs r160) -- three independent
+disqualifiers. The camera-move TECHNIQUE underneath it -- `mixLog` logarithmic distance interpolation, an
+analytic singularity-free orbit rig, per-channel shot curves -- needs none of those three things, and is scoped
+as the next round's work: fly that camera onto the real elevation `realterrain.html` + `world/realTerrainStamp.js`
+already fetch and voxelize, with no keys and no build step.
+
+Two sabotages bite per fix (four total), all restored byte-identical. `verify.mjs` ALL GREEN.
+
 ## Since v4050 -- a live-load button on the pencil avatar, an ASCII sibling beside it, and colour that does not change the shape
 
 Keith, in three messages, the second correcting the first: "so we could have the next avatar choice after live

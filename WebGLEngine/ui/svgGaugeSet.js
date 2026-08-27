@@ -249,6 +249,14 @@ function _makeActionCell(cfg, scale) {
         font: (11 * scale) + "px/1 ui-monospace, Menlo, Consolas, monospace",
         display: "flex", alignItems: "center", justifyContent: "center",
         boxShadow: "0 2px 2.5px rgba(0,0,0,0.55)", padding: "0",
+        // Keith: "circles need to be smaller, same size as the other rows." MEASURED why they weren't: every
+        // dial gauge (_makeGauge, _makeWeatherGauge, both above) tilts its SVG back with
+        // `perspective(150px) rotateX(17deg)` -- the "physical dial" look -- which FORESHORTENS its painted
+        // bounding box. This button was the same nominal 42*scale diameter but FLAT, so at an identical width
+        // it painted taller/rounder than every foreshortened dial beside it. This file's own comment above
+        // ("An ACTION cell is the same box as a dial") was true of the width and false of the tilt -- the one
+        // visual property that actually decides how big a circle READS as. Same transform, same row, same size.
+        transform: "perspective(150px) rotateX(17deg)",
     });
     btn.textContent = { record: "●", mp4: "▶", clip: "✂" }[cfg.action] || "●";
 
