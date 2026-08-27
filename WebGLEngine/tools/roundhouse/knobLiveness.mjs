@@ -432,6 +432,24 @@ export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.s
     .sort();
 
 /**
+ * *** AND THE KNOBS FOR WHICH THE DEAFNESS QUESTION WAS NEVER ANSWERED, WHICH IS NOT THE SAME AS `none`. ***
+ *
+ * A knob that reads live and whose device ran out of budget has been checked in SOME modes and not others --
+ * exactly the state in which a deaf mode hides. The first draft of partialDeafness returned 0 for that case
+ * and for a genuinely clean device alike, which is the measurement-versus-admission distinction v4031 drew for
+ * stillKnobs and v4030 drew for null defaults, reintroduced one list later by the same reflex.
+ *
+ * It bit immediately: the first exhaustive run of `stability` reported ZERO deaf knobs having never opened
+ * `deafknob` at all -- "OVER BUDGET at 90000 ms; MODES NEVER ENTERED: direction, horizon, deafknob".
+ * incompleteKnobs could not catch it either, because that list requires the knob to be STILL so far and this
+ * one is live.
+ */
+export const deafnessUnanswered = (rows) => rows.filter((r) => r.incomplete && r.live.length)
+    .map((r) => r.device + "." + r.knob + " (checked in " + r.live.concat(r.still).join(", ")
+        + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")")
+    .sort();
+
+/**
  * Probed, moved nothing SO FAR, and the census ran out of budget before it opened every mode. A THIRD
  * CATEGORY on purpose: "moves nothing" is a measurement, "was never probed" is an admission (unprobedKnobs),
  * and this is the one in between -- a partial measurement, which is the most dangerous of the three to
@@ -536,9 +554,16 @@ export async function reportLines(opts = {}) {
         + (partial.length ? partial.join(", ") : "none"));
     if (exhaustive) {
         const deaf = partialDeafness(rows);
+        const unanswered = deafnessUnanswered(rows);
         L.push("");
         L.push("  LIVE IN SOME MODES AND IGNORED IN OTHERS (" + deaf.length + ") -- USUALLY INNOCENT:");
         for (const d of deaf) L.push("      " + d);
+        if (unanswered.length) {
+            L.push("  AND NOT ANSWERED AT ALL FOR (" + unanswered.length + ") -- live so far, budget ran out"
+                + " before the remaining modes:");
+            for (const u of unanswered) L.push("      " + u);
+            L.push("  *** A ZERO ABOVE MEANS 'NONE FOUND IN WHAT WAS OPENED', NOT 'NONE'. ***");
+        }
         L.push("  A mode with no use for a knob is not ignoring it -- quantum.omega is read by `osc` alone and");
         L.push("  is correctly still in the other six. THE ONE QUESTION THIS PROBE CANNOT ASK IS WHETHER THE");
         L.push("  MODE CLAIMS TO USE THE KNOB, and that is the question this list exists to put in front of");
