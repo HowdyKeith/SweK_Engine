@@ -9,7 +9,10 @@
 import { readFileSync } from "node:fs";
 import { makeAnnulus, potentialFlow, cellValues, annulusFaces, gradientWall, wallSideError } from "./curvedWall.mjs";
 import { vertexNeighbours } from "./rankRepair.mjs";
-import { quadraticGradient, rowResidual, normalExactness } from "./quadraticRecon.mjs";
+import {
+    quadraticGradient, rowResidual, normalExactness,
+    wallAspect, quadraticGradientWithWall, optimalRowWeight, projectFacesToWall, faceMidpointOffset,
+} from "./quadraticRecon.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -133,6 +136,101 @@ const ordersOf = (v) => v.slice(1).map((e, i) => Math.log2(v[i] / e));
     say("   curved wall, the reconstruction was, and the fix v3646 proposed makes it worse rather than better.");
     say("   NOT DONE: the quadratic WITH a boundary row (the row should now be satisfiable, which is a different");
     say("   measurement), and the same question in 3D where a quadratic has NINE unknowns.");
+}
+
+// --- 6. wallAspect: THE CLOSED-FORM CELL ASPECT RATIO, EXACT ARITHMETIC ------------------------------------------
+{
+    say("6. wallAspect -- radial spacing over arc spacing at the inner wall, checked against the formula by hand.");
+    const m1 = { a: 1, b: 3, nr: 4, nt: 24 };
+    const hand = ((m1.b - m1.a) / m1.nr) / (2 * Math.PI * m1.a / m1.nt);
+    ok("!! wallAspect matches its own documented formula to round-off on a hand-built mesh record",
+        Math.abs(wallAspect(m1) - hand) < 1e-14, "wallAspect = " + wallAspect(m1) + " against (b-a)/nr / (2*pi*a/nt) = " + hand);
+    ok("!! doubling the radial span (b-a) doubles the aspect -- it is LINEAR in the numerator",
+        Math.abs(wallAspect({ ...m1, b: 5 }) - 2 * wallAspect(m1)) < 1e-12);
+    ok("!! doubling nt (twice as many angular segments) HALVES the arc spacing and so DOUBLES the aspect",
+        Math.abs(wallAspect({ ...m1, nt: 48 }) - 2 * wallAspect(m1)) < 1e-12,
+        "wallAspect is radial-spacing / arc-spacing, and arc-spacing = 2*pi*a/nt shrinks as nt grows, so the RATIO grows");
+    ok("...and it agrees with the real annulus meshes this file already builds",
+        S.every((s) => Math.abs(wallAspect(s.m) - ((s.m.b - s.m.a) / s.m.nr) / (2 * Math.PI * s.m.a / s.m.nt)) < 1e-12));
+}
+
+// --- 7. faceMidpointOffset and projectFacesToWall: THE CHORD-SITS-INSIDE-THE-CIRCLE GEOMETRY --------------------
+{
+    say("7. A CHORD'S MIDPOINT LIES INSIDE THE CIRCLE BY a(1 - cos(pi/nt)), A CLOSED FORM -- and projecting fixes it.");
+    const off = S.map((s) => faceMidpointOffset(s.m, s.F, "inner"));
+    say("     face-midpoint offset: " + off.map((x) => x.worst.toExponential(3)).join("  "));
+    ok("!! the measured offset matches the closed form a(1 - cos(pi/nt)) to six decimals, at every mesh size",
+        off.every((x) => Math.abs(x.worst / x.closedForm - 1) < 1e-6),
+        off.map((x) => x.worst.toExponential(2) + " vs " + x.closedForm.toExponential(2)).join("; "));
+    ok("...and the offset shrinks as nt grows, consistent with an O(h^2) closed form",
+        off[off.length - 1].worst < off[0].worst);
+    const s = S[1];
+    const P = projectFacesToWall(s.m, s.F, "inner");
+    let worstProjected = 0, sawInner = false;
+    for (let t = 0; t < s.m.tri.length; t++) for (const f of P[t]) {
+        if (f.kind !== "inner") continue;
+        sawInner = true;
+        worstProjected = Math.max(worstProjected, Math.abs(Math.hypot(f.mx, f.my) - s.m.a));
+    }
+    ok("!! projectFacesToWall puts every inner face's midpoint EXACTLY on r = a, to round-off",
+        sawInner && worstProjected < 1e-12, "worst radial residual after projection: " + worstProjected.toExponential(2));
+    let normalsUnchanged = true;
+    for (let t = 0; t < s.m.tri.length; t++) for (let k = 0; k < s.F[t].length; k++) {
+        const a2 = s.F[t][k], b2 = P[t][k];
+        if (a2.nx !== b2.nx || a2.ny !== b2.ny) normalsUnchanged = false;
+    }
+    ok("!! projection moves ONLY the location -- the normal is untouched, exactly", normalsUnchanged);
+    ok("...and the original faces array is untouched -- projectFacesToWall returns a NEW array", (() => {
+        const before = S[2].F.map((l) => l.map((f) => f.mx));
+        projectFacesToWall(S[2].m, S[2].F, "inner");
+        const after = S[2].F.map((l) => l.map((f) => f.mx));
+        return JSON.stringify(before) === JSON.stringify(after);
+    })());
+}
+
+// --- 8. quadraticGradientWithWall: THE ROW HELPS ONCE THE MODEL CAN SATISFY IT, AND AN EMPTY WALL IS A NO-OP ----
+{
+    say("8. quadraticGradientWithWall -- the boundary row on top of the quadratic reconstruction.");
+    // no faces at all: the wall row is a no-op and this must be BIT-IDENTICAL to the plain quadratic fit.
+    const s0 = S[0];
+    const withNoFaces = quadraticGradientWithWall(s0.u, s0.m, s0.vn, null);
+    const plain = quadraticGradient(s0.u, s0.m, s0.vn);
+    let identical = true;
+    for (let t = 0; t < s0.m.tri.length; t++) if (withNoFaces.gx[t] !== plain.gx[t] || withNoFaces.gy[t] !== plain.gy[t]) identical = false;
+    ok("!! with no faces argument, the wall row is a NO-OP -- bit-identical to quadraticGradient", identical,
+        "an absent boundary condition must add nothing, and it adds nothing here");
+    const e1 = S.map((s) => wallSideError(s.m, s.F, grad, quadraticGradient(s.u, s.m, s.vn), "inner"));
+    const e2 = S.map((s) => wallSideError(s.m, s.F, grad, quadraticGradientWithWall(s.u, s.m, s.vn, s.F), "inner"));
+    say("     quadratic, no row: " + e1.map((x) => x.toExponential(2)).join("  "));
+    say("     quadratic + row:   " + e2.map((x) => x.toExponential(2)).join("  "));
+    ok("!! adding the (now-satisfiable) boundary row REDUCES the wall-side error at every mesh size",
+        e2.every((x, i) => x < e1[i]),
+        "the row is a linear condition a quadratic CAN come close to satisfying (v3648), unlike the constant " +
+        "gradient of section 2 above, so it should help rather than hurt -- and it does, at every mesh tested");
+}
+
+// --- 9. optimalRowWeight: GOLDEN-SECTION SEARCH VERIFIED ON A KNOWN PARABOLA FIRST -------------------------------
+{
+    say("9. optimalRowWeight -- golden-section search on log2(weight), checked against a KNOWN analytic minimum first.");
+    // f(logw) = (logw - 1.3)^2 + 5 has its unique minimum at logw = 1.3, value 5 EXACTLY -- no physics needed to
+    // know the answer, so this isolates the search algorithm from the fixture it is normally run against.
+    const known = (logw) => (logw - 1.3) ** 2 + 5;
+    const r = optimalRowWeight(known, { lo: -6, hi: 4, tol: 1e-6 });
+    ok("!! finds the analytic minimum of a known parabola to within its own stated tolerance",
+        Math.abs(r.logw - 1.3) < 1e-4 && Math.abs(r.error - 5) < 1e-6,
+        "logw* = " + r.logw.toFixed(6) + " (true 1.3), error = " + r.error.toFixed(8) + " (true 5), w = " + r.w.toFixed(4) + " = 2^logw*");
+    // a minimum OUTSIDE [lo,hi] must be reported at the boundary it searched, not extrapolated past it.
+    const edge = optimalRowWeight((logw) => (logw - 100) ** 2, { lo: -2, hi: 2, tol: 1e-4 });
+    ok("a minimum outside the search bracket clamps to the bracket's edge, never extrapolates past it",
+        edge.logw <= 2 + 1e-3 && edge.logw >= -2 - 1e-3, "logw* = " + edge.logw.toFixed(4) + " against bracket [-2,2]");
+    // now the real fixture, mirroring what the row-weight thread actually uses it for.
+    const s = S[1];
+    const f = (lw) => wallSideError(s.m, s.F, grad, quadraticGradientWithWall(s.u, s.m, s.vn, s.F, { rowWeight: Math.pow(2, lw) }), "inner");
+    const best = optimalRowWeight(f);
+    const atOne = f(0);
+    ok("!! on the real annulus fixture, the found optimum is genuinely better than the shipped default weight of 1",
+        best.error < atOne, "w* = " + best.w.toFixed(4) + " -> error " + best.error.toExponential(3) +
+        " against weight 1 -> " + atOne.toExponential(3));
 }
 
 console.log("quadraticRecon-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

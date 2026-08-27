@@ -175,6 +175,65 @@ console.log("\n6. THE PARSER REFUSES WHAT IT DOES NOT UNDERSTAND");
 }
 
 // ---------------------------------------------------------------------------
+console.log("\n7. toPathD: THE SERIALIZER, EXACT ON HAND-BUILT POINTS AND HONEST ABOUT ITS OWN ROUNDING");
+{
+    // *** THIS IS THE FUNCTION v4026 FOUND HIDES A REAL DEFECT: toPathD rounds to four decimal places while the
+    // t=1 lerp bug drifted by 1.776e-15, so the RENDERED STRING was bit-identical across the plant. That finding
+    // lives in tools/roundhouse/strokeMorphBind-selfcheck.mjs, which grades the bind; THIS module's own gate had
+    // never called toPathD directly at all, so the exact rounding boundary that made the defect invisible is
+    // pinned down here, on the function itself, not inferred from the bind.
+    ok("!! the format is exact on hand-built points: M<x> <y>L<x> <y>...", M.toPathD([[1, 2], [3, 4]]) === "M1 2L3 4",
+        'toPathD([[1,2],[3,4]]) = "' + M.toPathD([[1, 2], [3, 4]]) + '"');
+    ok("!! rounds to FOUR decimal places by default, standard round-half-up on the boundary digit",
+        M.toPathD([[1.23456, 2.34567]]) === "M1.2346 2.3457",
+        'toPathD([[1.23456,2.34567]]) = "' + M.toPathD([[1.23456, 2.34567]]) + '" -- .23456 -> .2346, .34567 -> .3457');
+    ok("!! the `places` argument is honoured exactly, not just the default",
+        M.toPathD([[1.23456, 2.34567]], 2) === "M1.23 2.35",
+        'toPathD([[1.23456,2.34567]], 2) = "' + M.toPathD([[1.23456, 2.34567]], 2) + '"');
+    // *** THE EXACT BOUNDARY THAT MADE THE v4026 DEFECT INVISIBLE, PINNED DOWN DIRECTLY. *** At 4 places the
+    // rounding unit is 1e-4: two points closer than half that (5e-5) round to the SAME string -- genuinely
+    // indistinguishable in the artefact -- while two points a full rounding unit apart (1e-4) are DISTINGUISHED.
+    // This is the mechanism, stated as a property of the function rather than inferred from a bind test elsewhere.
+    const p1 = [[0, 0]], pClose = [[0.00001, 0]], pFar = [[0.0001, 0]];
+    ok("!! *** two points closer than half the rounding unit produce a BIT-IDENTICAL string -- this IS the blindness ***",
+        M.toPathD(p1) === M.toPathD(pClose), M.toPathD(p1) + " vs " + M.toPathD(pClose) + " for points 1e-5 apart");
+    ok("...while a difference of one full rounding unit (1e-4) IS visible in the string",
+        M.toPathD(p1) !== M.toPathD(pFar), M.toPathD(p1) + " vs " + M.toPathD(pFar) + " for points 1e-4 apart");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n8. morphPaths: THE ONE-CALL PIPELINE MATCHES ITS OWN PARTS, INCLUDING THE DIRECTION SEARCH");
+{
+    // t=0 and t=1 are identities of the PIPELINE, not just of morphAt in isolation: this exercises parseStroke,
+    // resample, pairStrokes and toPathD all wired together in the order morphPaths actually calls them.
+    let zeroOk = true, oneOk = true, midOk = true;
+    for (let i = 0; i < 10; i++) {
+        const dA = M.DIGIT_STROKES[i], dB = M.DIGIT_STROKES[(i + 1) % 10];
+        const a = M.resample(M.parseStroke(dA), N), b = M.resample(M.parseStroke(dB), N);
+        const { target } = M.pairStrokes(a, b);
+        if (M.morphPaths(dA, dB, 0, N) !== M.toPathD(a)) zeroOk = false;
+        if (M.morphPaths(dA, dB, 1, N) !== M.toPathD(target)) oneOk = false;
+        if (M.morphPaths(dA, dB, 0.37, N) !== M.toPathD(M.morphAt(a, target, 0.37))) midOk = false;
+    }
+    ok("!! morphPaths(dA,dB,0) is EXACTLY toPathD of dA's own resampling, for all ten adjacent pairs", zeroOk);
+    ok("!! morphPaths(dA,dB,1) is EXACTLY toPathD of the DIRECTION-CHOSEN target, for all ten pairs", oneOk);
+    ok("!! and an interior t matches composing the four functions by hand, bit for bit in the string", midOk,
+        "morphPaths is not a second implementation of the pipeline -- it is the same four calls, wired in the same order");
+
+    // *** THE DIRECTION SEARCH MUST SURVIVE BEING WRAPPED IN THE ONE-CALL FORM. *** Pair 0 -> 1 is measured
+    // above (section 5's underlying data) to be one where the REVERSED pairing wins. A one-call wrapper that
+    // forgot to route through pairStrokes -- e.g. always morphing toward b's natural point order -- would
+    // silently drop the search and every point would travel the long way round on this pair.
+    const dA = M.DIGIT_STROKES[0], dB = M.DIGIT_STROKES[1];
+    const a = M.resample(M.parseStroke(dA), N), b = M.resample(M.parseStroke(dB), N);
+    const naiveForward = M.toPathD(M.morphAt(a, b, 1));           // skips the direction search entirely
+    const viaMorphPaths = M.morphPaths(dA, dB, 1, N);
+    ok("!! morphPaths on a REVERSING pair (digit 0 -> 1) does NOT match the naive forward-only pairing",
+        viaMorphPaths !== naiveForward,
+        "if morphPaths silently skipped pairStrokes' direction search it would equal the naive forward morph here, and it does not");
+}
+
+// ---------------------------------------------------------------------------
 report("THE REFUSAL, WITH ITS EXPIRY WRITTEN IN",
     "*** morphicons IS NOT REFUSED FOR QUALITY -- it verified cleanly and its two hard parts (subpath " +
     "correspondence and CYCLIC ROTATION ALIGNMENT on closed paths) are real work. THEY ARE IDLE HERE: all ten " +

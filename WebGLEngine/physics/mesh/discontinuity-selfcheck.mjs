@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { makeTriMesh, gradientLS } from "./triReconstruct.mjs";
 import { vertexNeighbours } from "./rankRepair.mjs";
-import { contaminationCensus, piecewiseCells, stencilCrosses } from "./discontinuity.mjs";
+import { contaminationCensus, piecewiseCells, stencilCrosses, sideOf, distanceToInterface } from "./discontinuity.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -147,6 +147,39 @@ const setup = (n) => {
     say("   NOT DONE: a LIMITER on this field, which is what a real solver would reach for and which would change");
     say("   the question from 'how far does contamination reach' to 'how much of the jump survives'. AND STILL NOT");
     say("   DONE, NAMED IN THREE ROUNDS NOW: a genuine zero-flux wall, where the Neumann repair is the honest one.");
+}
+
+// --- 5. sideOf and distanceToInterface in isolation ---------------------------------------------------------------
+{
+    say("5. THE TWO PRIMITIVES THE CENSUS IS BUILT ON, CHECKED DIRECTLY AND NOT JUST THROUGH THE CENSUS THEY FEED.");
+    ok("!! sideOf is right-closed at the interface: x === xi lands on the RIGHT side",
+        sideOf(2.5, 2.5) === 1 && sideOf(2.5 - 1e-9, 2.5) === -1 && sideOf(2.5 + 1e-9, 2.5) === 1,
+        "sideOf(xi,xi)=" + sideOf(2.5, 2.5) + ", sideOf(xi-eps,xi)=" + sideOf(2.5 - 1e-9, 2.5) +
+        ", sideOf(xi+eps,xi)=" + sideOf(2.5 + 1e-9, 2.5) + " -- this is why piecewiseCells' interface can sit on a " +
+        "mesh line with NO cell straddling it: every centroid resolves to exactly one side, never both");
+    ok("sideOf agrees with an independently-written sign rule away from the boundary",
+        [-7, -0.001, 0.001, 4, 100].every((x) => sideOf(x, 0) === (x < 0 ? -1 : 1)));
+    const fakeM = { tri: { length: 5 }, cx: [0, 1, 2, 3, 4], h: 2 };
+    const d = distanceToInterface(fakeM, 2.5);
+    ok("!! distanceToInterface matches the closed-form |cx-xi|/h EXACTLY on a hand-built mesh",
+        Math.abs(d[0] - 1.25) < 1e-15 && Math.abs(d[1] - 0.75) < 1e-15 && Math.abs(d[2] - 0.25) < 1e-15 &&
+        Math.abs(d[3] - 0.25) < 1e-15 && Math.abs(d[4] - 0.75) < 1e-15,
+        "cx=[0,1,2,3,4], xi=2.5, h=2 -> d=[" + Array.from(d).map((v) => v.toFixed(3)).join(",") + "]");
+    ok("distanceToInterface is symmetric about the interface, as the |.| in its definition demands",
+        Math.abs(d[2] - d[3]) < 1e-15 && Math.abs(d[1] - d[4]) < 1e-15);
+    // tie this to the real mesh used in section 4: the nearest centroid on each side, expressed in cell-widths
+    // via distanceToInterface, must equal minL/m.h and minR/m.h computed there by hand.
+    {
+        const { m } = setup(24);
+        const dd = distanceToInterface(m, 10);
+        let minL = Infinity, minR = Infinity;
+        for (let t = 0; t < m.tri.length; t++) {
+            if (m.cx[t] < 10) minL = Math.min(minL, dd[t]); else minR = Math.min(minR, dd[t]);
+        }
+        ok("!! on the real mesh, distanceToInterface's own nearest-cell value matches section 4's hand computation",
+            Math.abs(minL - (0.277778 / m.h)) < 1e-4 && Math.abs(minR - (0.277778 / m.h)) < 1e-4,
+            "minL=" + minL.toFixed(6) + " minR=" + minR.toFixed(6) + " against 0.277778/h=" + (0.277778 / m.h).toFixed(6));
+    }
 }
 
 console.log("discontinuity-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
