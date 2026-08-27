@@ -115,6 +115,22 @@ console.log("\n4. *** AN ACTION CELL REFUSES A PAGE IT CANNOT SERVE ***");
     ok("!! an action handle still satisfies the refresh contract",
         /action:\s*cfg\.action,\s*update\(\)\s*\{\s*\}/.test(CODE),
         "refresh() must never have to ask whether a handle is real");
+
+    // *** v4050 -- Keith, looking at the record row: "circles need to be smaller, same size as the other
+    // rows." *** Every dial (_makeGauge, _makeWeatherGauge) tilts its SVG with
+    // perspective(150px) rotateX(17deg) -- the "physical dial" look, which FORESHORTENS the painted box. The
+    // action button was the same nominal 42*scale diameter but FLAT, so at an identical width it painted
+    // rounder/bigger than every dial beside it in the same row. This file's own comment above the action-cell
+    // builder ("An ACTION cell is the same box as a dial") was true of the width and false of the one property
+    // that actually decides how big a circle READS as. Section 5 below re-proves this live, on real pixels.
+    // TEXT (noComments), not CODE (codeOnly) -- this is a STRING LITERAL value, and codeOnly() blanks string
+    // contents. This file's own header names this exact trap ("codeOnly is what a code SHAPE needs"); the
+    // first run of this very check matched 0 against CODE for that reason.
+    const dialTransforms = (TEXT.match(/perspective\(150px\) rotateX\(17deg\)/g) || []).length;
+    ok("!! the action button now tilts with the SAME transform as every dial, not a flat circle beside tilted ones",
+        dialTransforms === 3,
+        dialTransforms + " occurrences (want 3: _makeWeatherGauge, _makeGauge, and now _makeActionCell) -- " +
+        "fewer than 3 means the action button is still flat and will read bigger than its row-mates");
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +155,10 @@ console.log("\n5. *** AND IT ACTUALLY RENDERS FOUR ROWS IN A REAL BROWSER ***");
                 rs.writeHead(200, { "Content-Type": "text/html" });
                 return rs.end('<canvas width=9 height=9></canvas><div id=h></div><script type="module">' +
                     'import{mountSvgGaugeSet}from"/ui/svgGaugeSet.js";' +
-                    'mountSvgGaugeSet(document.getElementById("h"),{columns:3,pollMs:400}).start();</script>');
+                    // scale:2 matches ui/pageGauges.js's real mount call -- the size-parity check below needs
+                    // the SAME scale production actually uses, because the flat-vs-tilted gap it measures is
+                    // small at scale:1 and only becomes reliably visible (and reliably gate-able) at scale:2.
+                    'mountSvgGaugeSet(document.getElementById("h"),{columns:3,pollMs:400,scale:2}).start();</script>');
             }
             let body = null;
             try { body = fs.readFileSync(path.join(ENG, u)); } catch {}
@@ -183,6 +202,30 @@ console.log("\n5. *** AND IT ACTUALLY RENDERS FOUR ROWS IN A REAL BROWSER ***");
             JSON.stringify(dead) + " -- a dial reading 0 on an unreachable fleet is a convincing nothing");
 
         ok("!! no page errors", errs.length === 0, errs.length ? errs.slice(0, 2).join(" | ") : "clean");
+
+        // *** THE CLAIM ITSELF, MEASURED ON REAL PAINTED PIXELS RATHER THAN SOURCE TEXT. *** Section 4's
+        // static check can only prove the SAME transform string is present; it cannot prove that string
+        // actually makes the two circles the same visual size once the browser paints them. This does.
+        const sizes = await page.evaluate(() => {
+            const cells = [...document.querySelectorAll("#h > div > div")];
+            const dial = cells[0].querySelector("svg");         // row 1, cell 1: a dial (CPU)
+            const action = cells[9].querySelector("button");    // row 4, cell 1: an action (record)
+            const r = (el) => { const b = el.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; };
+            return { dial: r(dial), action: r(action) };
+        });
+        // WIDTH, not height, is what discriminates here -- MEASURED both directions. A flat circle button is
+        // exactly square (84x84 at scale:2); the tilted dial foreshortens to ~90x85 (wider than tall). Fixed,
+        // the action button measures ~91x81 -- width within 1px of the dial's 90, because both now carry the
+        // identical tilt. Height actually moves FARTHER apart post-fix (81 vs 85) than a flat button's height
+        // happens to sit (84 vs 85) -- foreshortening trims height on both, unevenly, so height alone is not a
+        // reliable signal here. Width is: 90 vs 84 (flat, off by 6) against 90 vs 91 (tilted, off by 1).
+        ok("!! *** THE RECORD BUTTON PAINTS THE SAME WIDTH AS A DIAL, NOT VISIBLY BIGGER *** (Keith's own words)",
+            Math.abs(sizes.dial[0] - sizes.action[0]) <= 3,
+            "dial=" + JSON.stringify(sizes.dial) + "  action(record)=" + JSON.stringify(sizes.action) +
+            " -- a FLAT circle at this scale measures a squared-off 84x84 against the dial's tilted ~90x85; " +
+            "width alone separates them (off by ~6px flat, ~1px tilted) because a flat button's height happens " +
+            "to coincidentally sit close to the dial's foreshortened height too");
+
         await browser.close();
         await new Promise((r) => srv.close(r));
     }
