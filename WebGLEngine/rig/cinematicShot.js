@@ -172,3 +172,63 @@ export function sampleShot(shot, t, p) {
     const rig = orbitRig({ center: p.center || [0, 0, 0], target: p.target, distance, pitch, azimuth, roll });
     return { ...rig, distance, pitch, azimuth, roll, fov, t: u };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// SEQUENCES: several shots back to back, for an arrival that warps across a system and then lands on a world.
+//
+// *** THE ONLY HARD PART IS THE SEAM, AND IT IS HARD BECAUSE IT LOOKS EASY. *** Two shots that each run
+// correctly still CUT at the join if leg 2's `from` is not exactly leg 1's `to` -- and since both are typed by
+// hand, they drift the moment either is tuned. That is the same defect shape this tree keeps finding: two
+// declarations of one fact (the pet llama's head typed independently of its neck; a favourites picker copied
+// per page). So continuity is not left to discipline here -- chainLegs() DERIVES every later leg's start from
+// the previous leg's end, and a seam therefore cannot be discontinuous even if somebody types nonsense into it.
+// ---------------------------------------------------------------------------------------------------------------
+
+/**
+ * Rewrite each leg's `from` to be the previous leg's `to` (and carry target/center forward when a leg omits
+ * them), returning a NEW array -- the input is not mutated, so a caller can keep its own declaration around.
+ * Leg 0 is left exactly as written: it is the only leg whose start is genuinely free.
+ */
+export function chainLegs(legs) {
+    const out = [];
+    for (let i = 0; i < legs.length; i++) {
+        const leg = legs[i];
+        if (i === 0) { out.push({ ...leg, p: { ...leg.p } }); continue; }
+        const prev = out[i - 1].p;
+        out.push({
+            ...leg,
+            p: {
+                center: leg.p.center || prev.center,
+                target: leg.p.target || prev.target,
+                from: { ...prev.to },          // *** the seam: derived, never typed ***
+                to: { ...leg.p.to },
+            },
+        });
+    }
+    return out;
+}
+
+/** Total running time of a sequence, in seconds. */
+export function sequenceDuration(legs) { return legs.reduce((s, l) => s + l.dur, 0); }
+
+/**
+ * Sample a chained sequence at an ABSOLUTE time in seconds. Returns the frame plus which leg produced it and
+ * that leg's own normalized time -- callers need the leg index to drive per-leg effects (the warp tunnel runs
+ * over leg 0 and must be gone by the time leg 1's descent starts).
+ *
+ * Times past the end clamp to the final frame rather than wrapping: an arrival that silently restarted would be
+ * a loop, not a landing.
+ */
+export function sampleSequence(legs, tSec) {
+    if (!legs || !legs.length) throw new TypeError("sampleSequence needs at least one leg");
+    let acc = 0;
+    for (let i = 0; i < legs.length; i++) {
+        const leg = legs[i];
+        if (tSec < acc + leg.dur || i === legs.length - 1) {
+            const legT = clamp01(leg.dur > 0 ? (tSec - acc) / leg.dur : 1);
+            return { ...sampleShot(leg.shot, legT, leg.p), leg: i, legT, done: tSec >= sequenceDuration(legs) };
+        }
+        acc += leg.dur;
+    }
+    throw new Error("unreachable");
+}

@@ -8,6 +8,38 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4054 -- fly in through the system at super speed, and land without a cut
+
+Keith: "we could even fly in through the solar system, with our warp tunnel effect at super speed."
+
+`rig/cinematicShot.js` gains **sequences**, and the only hard part is the seam -- which is hard because it looks
+easy. Two shots that each run correctly still **cut** at the join if leg 2's `from` is not exactly leg 1's `to`,
+and since both are typed by hand they drift the moment either is tuned. That is the same two-declarations defect
+this tree keeps finding (v4052's pet llama head typed independently of its neck; v4049's favourites picker copied
+per page), so continuity is not left to discipline: **`chainLegs()` derives** every later leg's start from the
+previous leg's end.
+
+MEASURED, with leg 1 deliberately written with a nonsense start (distance 9999, fov 11, against leg 0 ending at
+140 / fov 50): chained, the camera moves **7.57e-7 units** across the join and the fov is identical either side.
+With `chainLegs` stubbed to a no-op, the same seam becomes a **1.01e+4-unit teleport** with the lens snapping
+50 -> 11. Four checks bite on that sabotage.
+
+**And the four-decade `mixLog` example stops being a footnote.** v4053's header used 20000 -> 2 to argue for
+logarithmic distance; the warp leg really spans it now, so the argument carries a shot instead of illustrating
+one. Half-way through the warp leg the camera is ~1732 units out, where a linear interpolation of the same leg
+would still be at ~10075 -- visually still in deep space with half the shot already spent.
+
+`es-box3d-fly3d.html` gains an **Arrive** button: leg 0 crosses the system inside `render/foldTunnel.js`'s fold
+tunnel, leg 1 is v4053's descent onto the planet. **The tunnel belongs to leg 0 only, and that leg is timed to
+`jumpDuration()` rather than to a second typed number** -- left running into the descent it would wrap the camera
+in a glowing tube exactly as the planet fills the frame, putting the shot's climax behind a curtain.
+
+VERIFIED live in headless Chromium: 12 frames on the warp leg reaching **19919 units** out, 47 on the descent,
+**zero** of them with the tunnel still up, landing clean and handing the camera back, no page errors.
+
+Also corrected one of my own checks that was grading its own punctuation: it pinned the page's exact import
+*line* and went red the moment this round added two names to it. It matches by symbol now.
+
 ## Since v4053 -- a cinematic descent onto our own planet, built from our own parts
 
 Keith: "lets also pick up the terrain camera work." Then, twice, pointing at better material than I had picked:
