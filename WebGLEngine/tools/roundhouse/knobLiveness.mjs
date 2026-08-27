@@ -101,10 +101,39 @@ export function probeValues(v, choices = null) {
     // Declared alternatives win outright -- including for numbers, where a device may know its own range
     // better than a blind 1.5x does. The current value is dropped: probing a knob at what it already is
     // measures nothing and would read as dead.
+    //
+    // *** v4035 -- THE DROP IS BY VALUE, NOT BY REFERENCE. *** `Object.is` compares arrays by identity, so a
+    // declared choice written out with the same contents as the default is a DIFFERENT object and survived
+    // the filter. That rung then moves nothing, and for a knob whose list holds one entry it is the only
+    // rung -- a knob declared live reading dead, off a comparison that never looked at the numbers.
     if (Array.isArray(choices) && choices.length) {
-        return choices.filter((x) => !Object.is(x, v));
+        return choices.filter((x) => !sameValue(x, v));
     }
     if (typeof v === "boolean") return [!v];
+
+    // *** v4035 -- AN ARRAY OF NUMBERS HAS A SCALING, AND SCALING IT IS NOT INVENTING AN ORDERING. ***
+    // This census refuses to make up a value for a knob with no ordering, and that refusal was written for
+    // STRINGS: there is no "1.5x" of "fcc". A list of numbers is not that case -- betas, temps, angles,
+    // queries and levels are sample points, and multiplying them is exactly as principled as multiplying a
+    // scalar. Eight of the lab's fifteen array knobs are sweep lists of this kind and every one of them read
+    // "not probed" purely because the ladder had never been taught to step elementwise.
+    //
+    // *** AND FOR THE OTHER SEVEN THIS LADDER IS THE WRONG QUESTION, WHICH IS WHY knobChoices OUTRANKS IT
+    // ABOVE. *** A rotation axis, a probability distribution and a normalised weight vector are all
+    // SCALE-INVARIANT BY CONSTRUCTION: [1,2,3] and [1.5,3,4.5] are the same axis, and Shannon entropy does
+    // not move when every frequency is multiplied by the same number. A blind elementwise ladder reports
+    // those as dead, and it would be wrong in the exact shape this file has been wrong in four times already
+    // -- the reading would be an artefact of the question. Such a device declares its own alternatives.
+    if (Array.isArray(v)) {
+        if (!v.length || !v.every((x) => typeof x === "number" && Number.isFinite(x))) return [];
+        // *** AN ALL-ZERO ARRAY SCALES TO ITSELF, EXACTLY AS A ZERO SCALAR DOES. *** The scalar branch below
+        // has carried `if (v === 0) return [1, 0.5, -1]` for that reason since this file was written, and the
+        // array case is the same fact one dimension up: strokeMorph's `lineA` is the endpoint [0,0], and a
+        // scaled ladder probes it at [0,0] three times and calls it dead. Offset instead.
+        if (v.every((x) => x === 0)) return [v.map(() => 1), v.map(() => 0.5), v.map(() => -1)];
+        return [v.map((x) => x * 1.5), v.map((x) => x * 0.5), v.map((x) => x * 8)];
+    }
+
     if (typeof v !== "number" || !Number.isFinite(v)) return [];
     if (v === 0) return [1, 0.5, -1];
     // Scaled rather than replaced, so an integer knob stays in its own range and a physical one keeps its units.
@@ -153,6 +182,18 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };
+}
+
+/**
+ * Value equality for dropping a probe rung that is not actually a change. Shallow on purpose: it exists to
+ * catch a declared choice that repeats the default, and one level covers every array knob in the lab except
+ * nbench.sizes, whose entries are pairs -- so that one nests exactly once and is handled.
+ */
+export function sameValue(a, b) {
+    if (Object.is(a, b)) return true;
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((x, i) => Object.is(x, b[i]) ||
+        (Array.isArray(x) && Array.isArray(b[i]) && x.length === b[i].length && x.every((y, j) => Object.is(y, b[i][j]))));
 }
 
 /**
