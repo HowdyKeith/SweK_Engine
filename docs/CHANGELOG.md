@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4074 -- a crash this sandbox cannot see, and a knob that made a device too slow to catch it
+
+### The Windows crash, and the gate that already knew
+
+Keith's rig died at the **end** of `cinematicShot` and `cloudField` -- every check passing, then:
+
+```
+Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: ... Received protocol 'c:'
+```
+
+On Linux an absolute path starts with `/` and the ESM loader tolerates it. On Windows it starts with `C:`, which
+parses as a **URL scheme**. The gate does not fail -- **it dies**, taking every check after it, so a partial run
+reads as a shorter suite rather than a broken one.
+
+**That is exactly what `windowsImport-selfcheck.mjs` was written for at v2997 -- and it was already red, already
+naming them, and nobody had run it.** 17 call sites in 4 files had accumulated since: `cloudField` (1),
+`cinematicShot` (1), `asciify` (1), `krbnCompareLive` (14). All converted to `pathToFileURL(...).href`. Each
+repaired gate was **run to completion**, not read.
+
+The Windows behaviour itself cannot be reproduced here, which is the whole reason v2997 made the check static:
+*"is a dynamic import handed a filesystem path"* has the same answer on every platform.
+
+### The gate that checked for comment-stripping, and could be fooled by a comment
+
+`commentFalsePass` named exactly one genuine case in its census, and it was the ironic one.
+`controlDossier-selfcheck` asserted that `controlDossier.mjs` strips HTML comments before classifying -- against
+**raw source**, so commenting the line out would have left the gate green.
+
+**It cannot be fixed by swapping in `codeOnly()`.** That blanks regex bodies too, so the target line reads
+`html.replace(//g, "")` under it -- the call survives and the pattern does not. Measured: the raw pattern
+matches, the same pattern against `codeOnly(src)` does not. So *"this is live code"* and *"this is the right
+regex"* are two questions and **one instrument cannot answer both**. Both are asked now.
+
+The sabotage shows the split doing its job -- commenting the target line out **fails** the `codeOnly` half and
+**still passes** the raw half. That is the old gate's false pass, caught in the act.
+
+### Keith's census-cost patch: twof was expensive because of a knob nobody read
+
+Applied v4034-v4038a. The headline was **re-derived here rather than inherited**.
+
+`runTwoF` reads `c.settle` and `c.record`. `makeRig` spreads `{ ...DEFAULT_RIG, ...cfg }`, so the `steps` the
+bind passed landed on the config object and nothing read it. Verified independently: `DEFAULT_RIG` has **no
+`steps` key**, and the only `steps` in the module is an *output* field assigned from `c.record`. **A dead knob
+that made a device slow, hidden by the device being too slow to finish probing** -- the last full sweep printed
+*"twof: OVER BUDGET -- probed 1 of 2 declared knobs"*, and the one it never reached was `steps`.
+
+The replacement knobs are live, measured here:
+
+| config | wall | `inletDriftFrac` |
+|---|---|---|
+| `settle 300 / record 900` | 4.7 s | 1.2421e-2 |
+| `settle 600 / record 1800` | 15.7 s | 5.5710e-3 |
+| `settle 6000 / record 18000` (default) | 84.5 s | **1.451886e-3** |
+
+where the old knob returned **bit-identical** numbers across a hundredfold change.
+
+**The patch's load-bearing number reproduces exactly** -- the default gives `1.451886e-3` against its recorded
+`1.452e-3`, so *"the Zou-He inlet holds at 1.45e-3"* is confirmed rather than taken on trust.
+
+**Two of its short rows do not.** The table records `1.649e-2` and `7.125e-3` where this tree gives `1.2421e-2`
+and `5.5710e-3`. Wall times are expected to differ and v4038a says so -- the hint is machine-local -- but the
+drifts are not, and this device is **deterministic here**: the same config run twice is bit-identical
+(`1.242150e-2` both times). So those rows were measured against some other code state. Both sets are kept in the
+file rather than overwritten, because deleting the originals destroys the evidence that they ever disagreed.
+
+The conclusion the table exists to support is unaffected on either set: shortening the run still reports the
+inlet **failing**, so the argument against a cheaper default stands on this machine's numbers too.
+
+### Gates
+
+`windowsImport` all pass (3173 files) | `cloudField`, `cinematicShot`, `asciify`, `krbnCompareLive` all run to
+exit 0 | `controlDossier` all pass | `knobLiveness`, `twoFBind`, `strictConfig` all pass. `verify.mjs` is green
+across 1207 gates.
+
+**Still open and not claimed fixed:** `deviceInstrumentMap` (xenon, paramagnet unexplained), `deviceModes`
+(15 newly unguarded), `claimTrace` (22 gates appeared against a 4-entry baseline). `corroborationCensus` times
+out at 364s and is admitted in UNRESOLVED -- a timeout is not a failure and is not reported as one.
+
 ## Since v4073 -- Keith swept the gate suite, and half of what went red was the gates
 
 Keith ran the selfcheck suite by hand and sent six failures in a row. **Three of the six were gates pointing at
