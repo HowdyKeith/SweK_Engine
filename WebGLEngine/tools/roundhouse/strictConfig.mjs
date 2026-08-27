@@ -119,27 +119,74 @@ export function readButNotDeclared(bindSource, declaredKeys, extra = EXTRA_KEYS)
     // the same shape: a regex over raw source that cannot tell what a file DOES from what it SAYS.
     let scanned = bindSource;
     try { scanned = codeOnly(bindSource); } catch { /* an unparsable file is scanned raw rather than skipped */ }
-    for (const m of scanned.matchAll(/\b(?:cfg|config|c)\.([A-Za-z_$][\w$]*)/g)) read.add(m[1]);
+    // *** v4032 -- AN ASSIGNMENT IS NOT A READ, AND COUNTING ONE AS A READ INVENTS AN OFFENDER. ***
+    // twobody sets `c.keyMass = c.planted ? "primary" : "total"` -- it WRITES a derived field onto the merged
+    // config so the observable can carry it. The old pattern saw `c.keyMass` and reported a device reading an
+    // undeclared key, which would be answered by declaring a knob that nothing reads: A DEAD KNOB, created to
+    // silence a scan. The write lookahead excludes `= ` and nothing else, so `===`, `=>` and every compound
+    // assignment (`+=`, `??=`) still count -- a read-modify-write reads.
+    //
+    // *** AND `(?![\w$])` IS LOAD-BEARING, NOT DECORATION. *** Without it the write lookahead makes the key
+    // capture BACKTRACK: on `c.lambda = 5` the engine matches `lambda`, the lookahead sees ` =` and fails, so
+    // it gives back one character and tries `lambd` -- which is followed by `a`, not `=`, and PASSES. Every
+    // key silently lost its last letter and the audit reported 59 offenders reading `lambd`, `sprea` and
+    // `til`. A regex that answers a question nobody asked, confidently, is the whole reason this file's own
+    // v3930 note says a keyword probe has misled this project five times.
+    for (const m of scanned.matchAll(/\b(?:cfg|config|c)\.([A-Za-z_$][\w$]*)(?![\w$])(?!\s*=(?![=>]))/g)) read.add(m[1]);
     return [...read].filter((k) =>
         !declaredKeys.includes(k) && !extra[k] && !ENABLING_FLAGS[k] && k !== "mode" && k !== "length");
 }
 
-/** Run the mirror check across every bind that declares a config. */
+/**
+ * v4032 -- THE DEVICE -> FILE MAP COMES FROM devices.mjs's OWN IMPORTS, AND WHAT CANNOT BE RESOLVED IS NAMED.
+ *
+ * This guessed a filename from the registry key -- `${name}Bind.mjs`, or the same with a capital first letter
+ * -- and `continue`d when neither existed. Both of those are wrong in the same direction.
+ *
+ * THE GUESS MISSES EVERY CAMELCASE BIND. mpmstep lives in mpmStepBind.mjs, blackhole in blackHoleBind.mjs,
+ * twobody in twoBodyBind.mjs, landauzener in landauZenerBind.mjs. MEASURED: 116 devices declare a config and
+ * this scanned 81 of them, so THIRTY-FIVE -- thirty percent of the lab, including the entire MPM family --
+ * were never looked at.
+ *
+ * AND IT DID NOT SAY SO. `scanned` counted the rows it produced, and the gate asked for `scanned > 40`, which
+ * 81 satisfies comfortably. A scan that silently drops what it cannot resolve REPORTS BEST-CASE COVERAGE AS
+ * COVERAGE -- the same sentence knobLiveness's over-budget note carries, and the same failure: "zero
+ * offenders" meant "zero offenders among the ones I could find", and nothing distinguished the two.
+ *
+ * The registry already knows the answer, in the import statements at the top of devices.mjs, so the map is
+ * READ rather than guessed and the guess survives only as a fallback. Anything still unresolved is RETURNED,
+ * never skipped.
+ */
 export async function mirrorAudit(deviceNames, getDevice, readFile) {
-    const rows = [];
+    // fooDevice -> fooBind.mjs, straight out of devices.mjs's imports
+    const symToFile = new Map();
+    const reg = readFile("tools/roundhouse/devices.mjs") || "";
+    for (const m of reg.matchAll(/import\s*\{([^}]*)\}\s*from\s*"\.\/([^"]+)"/g))
+        for (const sym of m[1].split(",").map((x) => x.trim().split(/\s+as\s+/).pop()).filter(Boolean))
+            symToFile.set(sym, m[2]);
+    // registryName: () => fooDevice   /   registryName: makeFooDevice
+    const nameToFile = new Map();
+    for (const m of reg.matchAll(/^\s{4}(\w+):\s*(?:async\s*)?(?:\(\)\s*=>\s*)?(\w+)/gm))
+        if (symToFile.has(m[2])) nameToFile.set(m[1], symToFile.get(m[2]));
+
+    const rows = [], unresolved = [];
     for (const n of deviceNames) {
         let d; try { d = await getDevice(n); } catch { continue; }
         const def = d.defaults ? d.defaults({}) : null;
         const keys = Object.keys((def && def.config) || {});
-        if (!keys.length) continue;
-        for (const cand of [n, n[0].toUpperCase() + n.slice(1)]) {
-            const src = readFile(`tools/roundhouse/${cand}Bind.mjs`);
+        if (!keys.length) continue;                      // uncheckable, and checkableDevices already says so
+        const named = nameToFile.get(n);
+        const cands = [...(named ? [named] : []), `${n}Bind.mjs`, `${n[0].toUpperCase() + n.slice(1)}Bind.mjs`];
+        let done = false;
+        for (const cand of cands) {
+            const src = readFile("tools/roundhouse/" + cand);
             if (src == null) continue;
-            rows.push({ device: n, declared: keys.length, undeclaredReads: readButNotDeclared(src, keys) });
-            break;
+            rows.push({ device: n, file: cand, declared: keys.length, undeclaredReads: readButNotDeclared(src, keys) });
+            done = true; break;
         }
+        if (!done) unresolved.push(n);                   // NAMED, never dropped
     }
-    return { scanned: rows.length, offenders: rows.filter((r) => r.undeclaredReads.length), rows };
+    return { scanned: rows.length, offenders: rows.filter((r) => r.undeclaredReads.length), rows, unresolved };
 }
 
 /** Which devices can be checked at all -- the ones that declare a config. */

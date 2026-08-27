@@ -126,11 +126,41 @@ const threw = async (fn) => { try { await fn(); return false; } catch { return t
 
     const audit = await mirrorAudit(DEVICE_NAMES, getDevice,
         (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return null; } });
+    const checkable = (await checkableDevices(DEVICE_NAMES)).checkable.length;
     ok("!! the lab-wide audit is down to registered flags only",
         audit.offenders.length === 0 && audit.scanned > 40,
         `${audit.scanned} binds scanned, ${audit.offenders.length} with undeclared reads. planted and ` +
         "dynamicIsco are registered as SWITCHES and excluded on that basis, which is a different claim from " +
         "being clean -- a flag is correctly undeclared, a setting is not");
+
+    // *** v4032 -- AND THE DENOMINATOR IS ASSERTED, BECAUSE `scanned > 40` HID A THIRD OF THE LAB. ***
+    // mirrorAudit guessed its filenames from the registry key and skipped what did not resolve, so every
+    // camelCase bind was invisible: mpmstep is in mpmStepBind.mjs, blackhole in blackHoleBind.mjs, twobody in
+    // twoBodyBind.mjs. It scanned 81 of 116 -- the whole MPM family among the missing -- and `scanned > 40`
+    // passed comfortably while "zero offenders" quietly meant "zero among the ones I could find". A count
+    // is not coverage unless something says what it is a count OF.
+    ok("!! *** EVERY DEVICE THAT DECLARES A CONFIG IS ACTUALLY SCANNED, AND NONE IS SILENTLY SKIPPED ***",
+        audit.scanned === checkable && audit.unresolved.length === 0,
+        `${audit.scanned} scanned of ${checkable} devices that declare a config; unresolved: ` +
+        (audit.unresolved.join(", ") || "none") + ". The map now comes from devices.mjs's OWN import " +
+        "statements rather than from a guess at the filename, and anything still unresolved is RETURNED -- a " +
+        "scan that drops what it cannot resolve reports best-case coverage as coverage.");
+
+    ok("!! an ASSIGNMENT is not a read, so the audit cannot invent a knob to silence itself",
+        readButNotDeclared('c.keyMass = c.planted ? "primary" : "total";', []).length === 0 &&
+        readButNotDeclared("c.total += c.delta;", []).sort().join(",") === "delta,total",
+        "twobody WRITES c.keyMass to carry a derived field on the merged config; reading that as an " +
+        "undeclared read asks for a knob nothing reads -- A DEAD KNOB, CREATED TO SILENCE A SCAN. Compound " +
+        "assignment still counts, because a read-modify-write reads.");
+
+    ok("!! *** AND THE KEY IS MATCHED WHOLE, WHICH THE WRITE RULE ALMOST BROKE ***",
+        readButNotDeclared("const x = cfg.lambda * 2;", []).join(",") === "lambda" &&
+        readButNotDeclared("cfg.lambda = 5;", []).length === 0,
+        "without an anchor on the capture, the write lookahead makes it BACKTRACK: on `cfg.lambda = 5` the " +
+        "engine matches `lambda`, sees ` =`, gives back one character, and `lambd` passes because it is " +
+        "followed by `a`. Every key lost its last letter and the audit reported 59 offenders reading " +
+        "`lambd`, `sprea` and `til`. THE FIX FOR ONE FALSE POSITIVE MANUFACTURED FIFTY-NINE MORE, for one " +
+        "run, and the check that caught it is this one.");
 
     ok("...and the scan is a TEXT scan, which is stated rather than implied",
         readButNotDeclared("const { alpha } = cfg;", []).length === 0 && Object.keys(ENABLING_FLAGS).length >= 2,
