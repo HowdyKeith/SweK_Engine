@@ -983,8 +983,8 @@
   "tools/ship/localModelProbe-selfcheck.mjs": 2895,
   "tools/ship/localModelRun-selfcheck.mjs": 85,
   "tools/ship/loopAccept-selfcheck.mjs": 32353,
-  "tools/ship/loopMetric-selfcheck.mjs": 18553,
-  "tools/ship/loopNoise-selfcheck.mjs": 38483,
+  "tools/ship/loopMetric-selfcheck.mjs": 19477,
+  "tools/ship/loopNoise-selfcheck.mjs": 36667,
   "tools/ship/loopScope-selfcheck.mjs": 87,
   "tools/ship/loopSearch-selfcheck.mjs": 41489,
   "tools/ship/loopTarget-selfcheck.mjs": 23928,
@@ -1186,9 +1186,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 952,
+  "timedThisRun": 954,
   "totalInRecord": 1181,
-  "at": "2026-08-27T03:43:59Z"
+  "at": "2026-08-27T03:44:55Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
