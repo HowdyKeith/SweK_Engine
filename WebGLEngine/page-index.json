@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 407,
+ "count": 410,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -106,6 +106,13 @@
    "t": "Arrival",
    "d": "",
    "g": "smarthome",
+   "p": 0
+  },
+  {
+   "f": "ascii-avatar.html",
+   "t": "SweK &middot; ASCII Avatar",
+   "d": "The loaded avatar GLB rendered live and sampled into a character ramp, real frame rate -- monochrome by default, with an in-panel toggle to color.",
+   "g": "",
    "p": 0
   },
   {
@@ -917,42 +924,42 @@
    "f": "endless-sky.html",
    "t": "Endless Sky",
    "d": "",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-away-mission.html",
    "t": "ES Away Mission",
    "d": "The raycast life-box: the GPU Brain boards a derelict and salvages it, autonomously, forever. A first-person raycast interior of corridors, rooms, and doors that open as it approaches. The brain seeks the nearest salvage, routes around walls, secures it, and when the hull is clear a new derelict is drifted in -- it never wins, it just keeps boarding, the way the Living Box never stops flying. seekTarget is the pilot; the GPU Brain drops into the same hook on-rig. Bloom, minimap, a mission ticker. Press P to take the helm.",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-box3d-3d.html",
    "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D",
    "d": "Long Silence Round A: the box3d Endless-Sky fight from es-box3d.html, now rendered in 3D with Three.js instead of 2D canvas. Each ship is a procedural hull mesh that follows box3d's real (x,0,z) position and a heading-derived Y yaw, lit and flown under a free OrbitControls camera you can orbit and zoom. The simulation is untouched -- box3d still locks the out-of-plane axis to 0 and heading stays a scalar -- so it plays exactly like flat ES space; the 3D is purely the view. Hull geometry reuses shipview.js's procedural generator; the coordinate/heading map is pinned by an answer-key gate (esFlight3dMath-selfcheck).",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-box3d-fly3d.html",
    "t": "SweK &middot; Endless Sky on Box3D &mdash; 3D flight (Round B)",
    "d": "Long Silence Round B: the box3d Endless-Sky fight now FLIES in 3D. Ships gain a pitch axis and an altitude and dogfight in three dimensions under a 3D pursuit AI, banking into turns, rendered with Three.js under a free camera. The 3D flight model is a strict superset of the 2D one -- at pitch 0 it reduces exactly to the old game -- and esBox3d runs in opt-in fly3d mode, so the 2D game and Round A are unchanged. ship-ship collision is now a 3D SLAB (v3832): box3d's own footprint is dormant and an altitude-band collider is the authority, so two ships ram only when their footprints AND altitudes overlap -- vertically clear ships pass freely, and box3d's altitude-blind planar push is gone. The response rides box3d's velocity for x-z and the flight model's altitude for the vertical; full volumetric box3d contact-filtering is still a WASM round. Ships wear Slug outline-text nameplates (class + live hull%, sized by distance from one atlas with no re-bake) on an overlay surface -- the first adoption of the v3823 Slug renderer in a real scene. The backdrop is now a baked nebula/star SKYBOX (v3833): a seedable gradient+noise generator bakes a six-face cubemap whose colour is a pure function of direction, so the faces are seamless by construction; the old flat fill and 700-point starfield are gone and the stars are baked in. Ships trail SWEPT-SPINE ENGINE TRAILS (v3834): one static mesh whose every vertex is placed in the vertex shader from a per-ship spine data texture (a ship's recent path resampled at fixed arc length with a rotation-minimizing frame), so a long trail and a short one cost the same buffer -- technique reimplemented from Noniv/snowflow_demo's surf wake, nothing vendored. A PROCEDURAL STAR (v3835) hangs at the key-light direction, its photosphere baked from the SAME gradient+noise generator as the skybox (granulation + a temperature colour) with limb darkening and a corona applied in the shader. THE PLANET'S SURFACE IS CUBE-BAKED (v3842): the same seeded terrain is baked into a cubemap rather than an equirectangular texture -- so it spends its texels evenly instead of ~80x more densely on the poles than the equator, and the faces meet seamlessly by construction -- and the bake now carries a normal map derived from the height field's own tangent-plane gradient, a roughness mask (smooth seas, rough land) and the height itself, read back on the CPU to displace the sphere so the silhouette carries the terrain too (the Relief button toggles both halves). THE SCENE IS POPULATED (v3843, the Structures button): an ASTEROID BELT whose rocks are icospheres displaced by the planet's own fbm3 and placed by rejection so no two interpenetrate, and a GREEBLED STATION -- hull modules along a spine wearing plates from a recursive panel split that PARTITIONS each face exactly (areas sum, nothing overlaps, nothing escapes), drawn as one instanced mesh for ~900 plates. SHIPS THROW DEBRIS WHEN HIT (v3844, the Hit FX button), ported from cockpit.html's VFX: the burst is chosen from the shield state AFTER absorption, so shields up throws a small cyan spark shower, shields gone throws a bigger red one, and a kill adds a third amber burst ON TOP of the second -- cockpit's own rule, graded against a transcription of its hit() over 3600 shield/armour/damage combinations. Unlike the source it uses no Math.random and decays per SECOND rather than per frame, so the spray does not travel further on a faster machine. A FOLD/WARP JUMP TUNNEL (v3836, the Jump button) sweeps the spine tube down a curving fold path viewed from inside, its ring pattern scrolling toward the camera via a stateless fract wrap (the endless-loop trick, not a persistent buffer) and ramped in and out by a jump envelope. Answer-key gates: flightModel3d-selfcheck, esShipLabels-selfcheck, esSlabCollide-selfcheck, nebulaSkybox-selfcheck, sweptSpine-selfcheck, proceduralStar-selfcheck, foldTunnel-selfcheck, planetSurface-selfcheck, greeble-selfcheck, spaceStructures-selfcheck, hitBurst-selfcheck.",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-box3d.html",
    "t": "SweK &middot; Endless Sky on Box3D",
    "d": "",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "es-hull-combat.html",
    "t": "EV Hull Combat",
    "d": "Endless Sky ships fight with real hull physics: rams deal damage from impact momentum, destroyed ships burst into tumbling wreckage, and asteroid fields are hazards. Deterministic under lockstep for co-op. box3d on a rig; JS fallback here.",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
@@ -973,42 +980,42 @@
    "f": "ev-admin.html",
    "t": "EV Admin &mdash; Live Pilots",
    "d": "",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
    "f": "ev-loader.html",
    "t": "EV Loader",
    "d": "",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
    "f": "ev-mission-creator.html",
    "t": "Mission Authoring Console · SweK EV Engine",
    "d": "",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
    "f": "ev-sprites.html",
    "t": "EV Sprite Viewer",
    "d": "",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
    "f": "ev.html",
    "t": "Stellar Atlas",
    "d": "",
-   "g": "",
+   "g": "ev",
    "p": 0
   },
   {
    "f": "eve.html",
    "t": "🛰️ EVE — SweK Engine",
    "d": "Live EVE Online pilot telemetry via ESI + SSO (pilot, ship, system, online, ISK) with a 3D ship view. Cloud API — register an app at developers.eveonline.com and log in once. Runs on the PC bridge.",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -1043,7 +1050,7 @@
    "f": "fallout.html",
    "t": "☢ Pip-Boy — SweK Engine",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -1106,14 +1113,14 @@
    "f": "flight-gpu.html",
    "t": "SweK &middot; Flight GPU (Endless Sky on Box3D, WebGPU 3D)",
    "d": "",
-   "g": "",
+   "g": "endlesssky",
    "p": 0
   },
   {
    "f": "flight.html",
    "t": "SweK &middot; Flight sandbox",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -1169,14 +1176,14 @@
    "f": "fpscontrol.html",
    "t": "FPS control — engine → bridge → VBA",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
    "f": "fpsmirror.html",
    "t": "FPS mirror — bridge → this screen",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -1488,9 +1495,23 @@
    "p": 0
   },
   {
+   "f": "krbn-avatar.html",
+   "t": "SweK &middot; Krbn Avatar (pencil-drawn, in the panel)",
+   "d": "The rigged avatar GLB drawn by Krbn as a pencil sketch -- skinned, posed, and re-drawn slowly because a pencil frame costs half a second.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "krbn-compare.html",
    "t": "- Krbn compare (our obj vs Krbn, + lift to 3D)",
    "d": "",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "krbn-rigged.html",
+   "t": "SweK &middot; Krbn Rigged (the pencil drawing, animated)",
+   "d": "Krbn draws the model ONCE; every stroke is pinned to a triangle and then follows the skeleton, so the pencil line-work animates at frame rate.",
    "g": "",
    "p": 0
   },
@@ -1848,7 +1869,7 @@
    "f": "pachinko.html",
    "t": "SweK Pachinko",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -1967,7 +1988,7 @@
    "f": "pipboy-models.html",
    "t": "SweK Pip-Boy Models",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -2274,7 +2295,7 @@
   {
    "f": "settings.html",
    "t": "Settings",
-   "d": "One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, PetFBI board backend + mailer, plus tool readiness.",
+   "d": "One place for the bridge configs scattered across ~/.voxelbridge/*.json — TradingAgents source/key, local TTS engine, plus tool readiness.",
    "g": "systools",
    "p": 0
   },
@@ -2338,7 +2359,7 @@
    "f": "skyrim.html",
    "t": "🐉 Skyrim — SweK Engine",
    "d": "Live Skyrim SE/AE player stats (level, health/magicka/stamina, gold, location) via a Papyrus-written JSON file. Runs on the PC bridge.",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -2352,7 +2373,7 @@
    "f": "slotmachine.html",
    "t": "SweK Slots",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -2632,7 +2653,7 @@
    "f": "uvtt.html",
    "t": "UVTT dungeon loader",
    "d": "",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
@@ -2688,7 +2709,7 @@
    "f": "wadmap.html",
    "t": "WAD Map — Engine Companion",
    "d": "DOOM WAD map viewer — load a .wad and explore the level geometry.",
-   "g": "",
+   "g": "gametheory",
    "p": 0
   },
   {
