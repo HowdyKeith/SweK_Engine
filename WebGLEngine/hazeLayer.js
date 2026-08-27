@@ -11,7 +11,13 @@
     try { if (getComputedStyle(mount).position === "static") mount.style.position = "relative"; } catch {}
 
     const hc = document.createElement("canvas");
-    hc.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:" + insetBottom + "px;pointer-events:none;z-index:" + (opts.z || 2) + ";";
+    // v4052 -- the SAME replaced-element bug waterTank.js carried, byte-for-byte the same cssText: insets with
+    // no width/height leave a canvas at its intrinsic 300x150, so the haze tinted a postage stamp in the corner
+    // rather than the avatar. See waterTank.js's note for the full measurement and why height is calc().
+    // These two are the only modules in the tree with this shape (grepped), and they are the two the v3979
+    // sweep could not reach: it matches `#id { ... }` rules, and both canvases are built in JS with no id.
+    const _h = insetBottom ? "calc(100% - " + insetBottom + "px)" : "100%";
+    hc.style.cssText = "position:absolute;left:0;top:0;width:100%;height:" + _h + ";pointer-events:none;z-index:" + (opts.z || 2) + ";";
     mount.appendChild(hc);
     const cx = hc.getContext("2d"); if (!cx) { hc.remove(); return null; }
 

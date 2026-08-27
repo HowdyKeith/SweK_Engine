@@ -14,7 +14,21 @@
     try { if (getComputedStyle(mount).position === "static") mount.style.position = "relative"; } catch {}
 
     const wc = document.createElement("canvas");
-    wc.style.cssText = "position:absolute;left:0;top:0;right:0;bottom:" + insetBottom + "px;pointer-events:none;z-index:" + (behind ? 0 : (opts.z || 3)) + ";";
+    // *** v4052 -- A CANVAS IS A REPLACED ELEMENT, SO INSETS ALONE NEVER STRETCHED IT. *** This read
+    // `position:absolute;left:0;top:0;right:0;bottom:Npx` with NO width/height -- and when width and height are
+    // both `auto`, a replaced element (canvas, img, video) takes its OWN INTRINSIC size, which for a canvas is
+    // 300x150. The insets positioned the box correctly at the mount's top-left and then did nothing about its
+    // size, so the tank painted into a 300x150 postage stamp in the corner of the avatar instead of over it.
+    // MEASURED on avatarstage.html and phone.html: css 300x150 inside a 1200x820 and a 572x420 mount.
+    // *** AND THE DRAWING BUFFER INHERITED IT, WHICH IS WHY NOTHING LOOKED OBVIOUSLY BROKEN: *** resize() sizes
+    // wc.width/height from wc.getBoundingClientRect(), so the buffer matched the wrong CSS box exactly and the
+    // water drew crisply at the wrong size rather than stretching or tearing.
+    // v3979 fixed this exact shape on graph_viewer.html/glb_viewer.html; tools/ship/canvasFill-selfcheck.mjs
+    // swept for it but only matched `#id { ... }` STYLE RULES, and these canvases are built in JS with no id --
+    // so the sweep could not see them. Height is calc() rather than 100% because insetBottom must survive:
+    // top:0 + bottom:22px IS height:calc(100% - 22px), and plain 100% would silently eat the 22px reserve.
+    const _h = insetBottom ? "calc(100% - " + insetBottom + "px)" : "100%";
+    wc.style.cssText = "position:absolute;left:0;top:0;width:100%;height:" + _h + ";pointer-events:none;z-index:" + (behind ? 0 : (opts.z || 3)) + ";";
     mount.insertBefore(wc, behind ? mount.firstChild : null);
     const cx = wc.getContext("2d"); if (!cx) { wc.remove(); return null; }
 
