@@ -18,6 +18,8 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const report = (n, d) => console.log("  ----  " + n + "   " + d);
 
 const honest = await twoFDevice.build({ mode: "inlet" });
+// v4038 -- a deliberately SHORT arm, ~6 s, to pin that shortening the run breaks the key rather than cheapening it
+const short900 = await twoFDevice.build({ mode: "inlet", config: { settle: 300, record: 900 } });
 const planted = await twoFDevice.build({ mode: "nofixedinlet" });
 
 console.log("1. THE FIXED INLET HOLDS, AND THE PLANT TAKES IT AWAY");
@@ -67,15 +69,54 @@ report("*** THIS GATE IS SLOW ENOUGH TO NEED RUNNING ALONE -- MEASURED, NOT ESTI
     "does not settle and the solver works harder. TOTAL ~270 s, WHICH IS AT THE SANDBOX'S ~300 s FOREGROUND " +
     "LIMIT -- it timed out at 250 s once and passed at 280 s once. RUN IT THE WAY orphanTriage AND " +
     "toolFrontDoor ARE RUN: alone, in the background, never alongside another node process. " +
-    "*** AND THE COST IS NOT IN THE STEP LOOP: at steps 2000 the honest run STILL takes 96 s, so shortening " +
-    "the run does not help, and the replay cannot be shrunk anyway without breaking the recorded numbers it " +
-    "grades against. The separation is actually LARGER at 2000 steps (1.54e-4 -> 1.34e-2, 87x against 7x at " +
-    "12000), so the long run is the CONSERVATIVE choice, not the sensitive one. ***");
+    "*** v4038 STRUCK WHAT USED TO FOLLOW HERE. It read: 'AND THE COST IS NOT IN THE STEP LOOP: at steps " +
+    "2000 the honest run STILL takes 96 s, so shortening the run does not help.' THE OBSERVATION WAS RIGHT " +
+    "AND THE CONCLUSION WAS BACKWARDS. It still took 96 s because `steps` WAS READ BY NOBODY -- runTwoF uses " +
+    "c.settle and c.record, makeRig spreads { ...DEFAULT_RIG, ...cfg }, and a passed `steps` landed on the " +
+    "config object and was never looked at, so steps 2000 and steps 12000 ran the identical 24,000 lattice " +
+    "steps. The round that wrote this line MEASURED THE SYMPTOM OF A DEAD KNOB AND RECORDED IT AS A PROPERTY " +
+    "OF THE SOLVER. Shortening the run does help, enormously, once you turn something that is read: settle " +
+    "300 / record 900 is 6.0 s. ***");
 
 report("AND WHAT DECLARING THE PLANT COSTS THE CENSUS, MEASURED",
     "plantedCoverage --verify now takes 472 s end to end and completes (EXIT 0, 50 of 85). It was already a " +
     ">285 s tool that must be run alone, so the declaration adds to a bill that was already being paid that " +
     "way -- but the number is written down here rather than discovered by whoever next watches it hang.");
+
+console.log("\nv4038. THE DEAD KNOB THAT MADE THIS THE MOST EXPENSIVE DEVICE IN THE LAB");
+{
+    const cfg = twoFDevice.defaults({ mode: "inlet" }).config;
+    ok("!! *** THE FICTIONAL KNOB IS GONE AND THE TWO REAL ONES ARE DECLARED ***",
+        !("steps" in cfg) && "settle" in cfg && "record" in cfg &&
+        cfg.settle === 6000 && cfg.record === 18000,
+        "declares " + Object.keys(cfg).join(", ") + ". `steps` defaulted to 12000 AND NAMED NOTHING -- the run " +
+        "is settle 6000 + record 18000 = 24,000 lattice steps, fixed by DEFAULT_RIG, and the declared 12000 " +
+        "was neither of those. The new defaults ARE DEFAULT_RIG's own values, so every recorded number in " +
+        "this file is unchanged.");
+
+    // *** THE CENSUS COULD NOT HAVE FOUND THIS, AND SAID SO IN ITS OWN NOTE. *** The last full sweep printed
+    // "twof: OVER BUDGET at 300000 ms -- probed 1 of 2 declared knobs". The one it never reached was `steps`.
+    // A dead knob that makes a device slow, hidden by the device being slow.
+    ok("!! and the real knobs move the cost, which is what makes the device schedulable at all",
+        twoFDevice.costHint({ mode: "inlet" }) > 100000 &&
+        twoFDevice.costHint({ mode: "inlet", config: { settle: 300, record: 900 } }) < 10000,
+        "costHint 115,200 ms at the default against 5,760 ms at settle 300 / record 900 -- MEASURED ~115 s and " +
+        "~6.0 s, so the estimate is good to a few percent at both ends. The hint is a SCHEDULING AID: a wrong " +
+        "one costs a skipped build or a long one and can never change a reported number.");
+    ok("...and `envelope` declares nil, because it runs no lattice at all",
+        twoFDevice.costHint({ mode: "envelope" }) === 0,
+        "it returns numbers recorded at v2862. A cost hint that charged for a replay would push a free mode " +
+        "out of every budgeted sweep.");
+
+    ok("!! *** AND THE LONG RUN IS NOT WASTE: A SHORT ONE REPORTS THE INLET FAILING ***",
+        honest.inletDriftFrac < 2e-3 && short900.inletDriftFrac > 5e-3,
+        "settle 6000/18000 -> " + honest.inletDriftFrac.toExponential(4) + " (the recorded 1.45e-3); settle " +
+        "300/900 -> " + short900.inletDriftFrac.toExponential(4) + ", an order of magnitude worse. *** THE KEY " +
+        "IS THAT THE ZOU-HE INLET HOLDS, AND THAT IS A DRIFT MEASURED OVER A LONG RUN. A shortened run does " +
+        "not report a cheaper version of this answer, IT REPORTS THE BOUNDARY CONDITION THIS MODULE EXISTS TO " +
+        "DEFEND HAVING BROKEN. v2797 guessed longer runs would fix the shedding and v2834 disproved it with " +
+        "arithmetic; guessing shorter runs here is the same error pointing the other way. ***");
+}
 
 report("WHAT THIS DOES NOT CLAIM",
     "That twoF's negative results are tested. liftSustained is FALSE and dragOverLift has NO VALUE -- not a " +
