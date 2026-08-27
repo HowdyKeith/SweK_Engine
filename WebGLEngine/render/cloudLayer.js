@@ -10,16 +10,12 @@
 // GLSL note: no backticks inside the shader strings (they live in a JS
 // template literal — a stray backtick would close it early).
 
-const TYPES = {
-    cumulus:       { altitude: 135, clouds: 9,  puffs: [4, 7], w: [34, 60], h: [26, 44], spreadXZ: 55, spreadY: 14, colTop: [1.0, 1.0, 1.0],  colBot: [0.80, 0.83, 0.90], density: 0.95 },
-    cumulonimbus:  { altitude: 110, clouds: 3,  puffs: [9, 14], w: [55, 95], h: [55, 120], spreadXZ: 60, spreadY: 90, tower: true, colTop: [1.0, 1.0, 1.0], colBot: [0.40, 0.42, 0.50], density: 1.0 },
-    stratus:       { altitude: 90,  clouds: 14, puffs: [3, 5], w: [90, 150], h: [22, 34], spreadXZ: 120, spreadY: 8, colTop: [0.82, 0.84, 0.88], colBot: [0.70, 0.72, 0.78], density: 0.8 },
-    stratocumulus: { altitude: 105, clouds: 12, puffs: [4, 6], w: [55, 90], h: [30, 46], spreadXZ: 90, spreadY: 12, colTop: [0.92, 0.93, 0.96], colBot: [0.72, 0.75, 0.82], density: 0.88 },
-    cirrus:        { altitude: 235, clouds: 11, puffs: [3, 5], w: [80, 140], h: [8, 16], spreadXZ: 110, spreadY: 18, colTop: [1.0, 1.0, 1.0], colBot: [0.95, 0.97, 1.0], density: 0.5 },
-    nimbostratus:  { altitude: 85,  clouds: 13, puffs: [4, 6], w: [95, 160], h: [24, 38], spreadXZ: 120, spreadY: 8, colTop: [0.62, 0.64, 0.70], colBot: [0.48, 0.50, 0.56], density: 0.92 },
-};
+// v4055 -- the TYPES table and the puff placement moved to render/cloudField.js so the Three.js planet
+// page can build the SAME clouds. This file keeps what is genuinely its own: the WebGL2 program that
+// draws them. One generator, two renderers -- rather than a second copy of the placement per sky.
+import { CLOUD_TYPES as FIELD_TYPES, cloudType, buildPuffsFlat } from "./cloudField.js";
 
-export const CLOUD_TYPES = Object.keys(TYPES);
+export const CLOUD_TYPES = FIELD_TYPES;
 
 const VS = "#version 300 es\n" +
     "in vec2 aCorner;\n" +
@@ -109,7 +105,7 @@ export class CloudLayer {
     }
 
     setType(type, centerX = 0, centerZ = 0) {
-        if (!TYPES[type]) return false;
+        if (!cloudType(type)) return false;
         this.type = type;
         this.enabled = true;
         this.regenerate(centerX, centerZ);
@@ -120,33 +116,12 @@ export class CloudLayer {
     // Build a fresh field of clouds (clusters of puffs) for the active type,
     // scattered across the wrap box centered on (cx,cz).
     regenerate(cx = this._cam.x, cz = this._cam.z) {
-        const t = TYPES[this.type];
-        if (!t) return;
-        const R = this.region;
-        const rnd = (a, b) => a + Math.random() * (b - a);
-        const puffs = [];
-        for (let c = 0; c < t.clouds; c++) {
-            const baseX = cx + rnd(-R, R);
-            const baseZ = cz + rnd(-R, R);
-            const baseY = t.altitude;
-            const n = Math.round(rnd(t.puffs[0], t.puffs[1]));
-            for (let i = 0; i < n; i++) {
-                // Towering types stack puffs upward (cumulonimbus anvil); flat
-                // types spread sideways.
-                const up = t.tower ? (i / n) : Math.random() * 0.4;
-                const w = rnd(t.w[0], t.w[1]) * (t.tower ? (1.0 - up * 0.35) : 1.0);
-                const h = rnd(t.h[0], t.h[1]);
-                puffs.push({
-                    x: baseX + rnd(-t.spreadXZ, t.spreadXZ) * (t.tower ? 0.5 : 1.0),
-                    y: baseY + up * t.spreadY + rnd(-4, 4),
-                    z: baseZ + rnd(-t.spreadXZ, t.spreadXZ) * (t.tower ? 0.5 : 1.0),
-                    w, h,
-                    colTop: t.colTop, colBot: t.colBot,
-                    density: t.density * rnd(0.8, 1.0),
-                });
-            }
-        }
-        this.puffs = puffs;
+        if (!cloudType(this.type)) return;
+        // v4055 -- placement comes from render/cloudField.js now. It is SEEDED where this used to call
+        // Math.random() inline, so a sky can be rebuilt exactly; a fresh seed per call keeps the engine's own
+        // behaviour (a new field every regenerate) identical to what it was.
+        this.puffs = buildPuffsFlat({ type: this.type, cx, cz, region: this.region,
+                                      seed: (Math.random() * 0xffffffff) >>> 0 });
         this._cam = { x: cx, z: cz };
     }
 

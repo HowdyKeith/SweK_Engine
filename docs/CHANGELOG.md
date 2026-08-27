@@ -8,6 +8,45 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4055 -- the cloud round, and an open finding I could not close
+
+Keith: "cloud round."
+
+**The clouds were great and they were unreachable.** `render/cloudLayer.js` generated its puffs *inline* inside
+its own raw-WebGL2 renderer, so the Three.js planet page could not have them without a second copy of the
+placement. New `render/cloudField.js` is the half that ports: a type name and a seed in, an array of
+`{x,y,z,w,h,colTop,colBot,density}` out, no GL and no DOM. `cloudLayer` keeps its WebGL2 drawing and imports its
+puffs from here, and its inline `TYPES` table is **deleted** rather than left beside the shared one.
+
+**The extraction also made a claim possible that could not be made before: it is seeded.** `regenerate()` called
+`Math.random()` directly, so no gate could assert anything about a *particular* sky -- only that numbers landed
+inside ranges. On mulberry32 (`world/procPlanet.js`'s own PRNG) a seed now names a cloud field. The engine still
+gets a fresh sky each regenerate, because it passes a fresh seed.
+
+New `buildPuffsShell()` puts weather on a **world**: clusters inside a cone around the arrival face, on a shell,
+each puff carrying the planet's own radial up so a cumulonimbus towers away from the surface. A type's
+*character* ports -- puff counts, proportions, tower stacking, two-tone colours. Its *absolute altitude* does
+not: `TYPES.cumulus` sits at y=135 in an engine world, which would be eight radii out in space on a planet of
+radius 17. So altitude and size scale come from the caller. Every puff clears the **displaced** terrain beneath
+it (worst 0.87 units), checked against the same `surfaceRadiusAt` v4053's descent uses.
+
+`es-box3d-fly3d.html` renders the deck as one instanced mesh, porting `cloudLayer`'s own radial falloff and
+two-tone gradient line for line, with a button that cycles six types **and reaches OFF**. The arrival now
+crosses it -- measured as an above-then-below transition, not as a sample caught inside a 0.2-unit band. That
+thin-band test reported a false negative on a flight that plainly went through.
+
+**And an open finding, recorded rather than papered over.** Polled to its *true* landing, the descent's final
+frame is a flat pale wash with no terrain detail -- and it reproduces **identically on the clean pre-v4055
+page**, so it is neither the clouds nor this round's work. Ruled out by experiment, not argument: removing the
+deck entirely changes nothing, and fading the atmosphere shell to opacity 0.002 changes nothing. The cause is
+still unidentified, so no speculative fix ships with it. I wrote an atmosphere fade on a theory, could not show
+it helped, and reverted it.
+
+**It hid for two rounds because my own screenshots never reached the landing.** v4053 and v4054 were shot on
+*fixed waits*, and a headless swiftshader frame loop runs slower than real time -- so every "landing" image I
+reported was really taken mid-descent, with the camera still high. A screenshot taken on a guessed clock is not
+evidence of the state it is captioned with. Poll for the state you mean to photograph.
+
 ## Since v4054 -- fly in through the system at super speed, and land without a cut
 
 Keith: "we could even fly in through the solar system, with our warp tunnel effect at super speed."
