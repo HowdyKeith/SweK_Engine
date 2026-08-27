@@ -16,10 +16,22 @@
   #msg { position:absolute; left:0; right:0; bottom:0; font:10px ui-monospace,Menlo,monospace;
          color:#5a5348; background:#f4f1eacc; padding:2px 4px; text-align:center; }
   #msg.err { color:#8a2b22; }
+  /* v4049 -- TOP-LEFT, never top-right: ui/avatarSwitch.js's OWN mode-switch button sits at top:2px;right:2px
+     over this whole box (it lives in the HOST document, this iframe just fills the box beneath it), so a
+     control placed there would sit under a button that already owns that corner. */
+  #ctl { position:absolute; top:2px; left:2px; z-index:3; display:flex; gap:2px; }
+  #ctl select, #ctl button { font:9px ui-monospace,Menlo,monospace; background:#efece3cc; color:#5a5348;
+    border:1px solid #c3bcaa; border-radius:4px; padding:1px 2px; max-width:58px; cursor:pointer; }
+  #ctl button { max-width:20px; padding:1px 3px; }
 </style>
 </head>
 <body>
 <div id="wrap"></div>
+<div id="ctl">
+  <select id="modelSel" title="Load a different avatar"><option value="">(default)</option></select>
+  <button id="modelFileBtn" title="Load a .glb/.gltf file">&#128193;</button>
+  <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none" />
+</div>
 <div id="msg">loading…</div>
 <script type="module">
 // krbn-avatar.html -- v4046
@@ -39,21 +51,28 @@
 //
 // AND IT IS DECLARED `heavy` IN ui/avatarSwitch.js's MODES, beside the WebGPU and MediaPipe surfaces, so the
 // button says what the click costs BEFORE it is paid.
-import { gltfToMeshInput, computeFit, fitDistance } from "./tools/krbn/glbMesh.js";
+// v4049 -- Keith: "so we could have the next avatar choice after live krbn avatar, to be a loaded model
+// converted to krbn" -- then, correcting himself -- "adding a button on the live krbn, to convert and load
+// live, instead of the next choice". So this is not a new avatarSwitch mode: it is a control ON this one,
+// reusing the exact favourites+preset+file picker krbn-compare.html already built (extracted to
+// ui/modelPicker.js this round for exactly this reuse) rather than a third copy.
+import { gltfToMeshInput, computeFit, fitDistance, loadGLTF } from "./tools/krbn/glbMesh.js";
+import { mountModelPicker } from "./ui/modelPicker.js";
 
 const q = new URLSearchParams(location.search);
-const GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");   // no traversal into GPU_Assets
+let GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");   // no traversal into GPU_Assets
 const REDRAW_MS = Math.max(1200, Number(q.get("ms")) || 2600);
 const SCALE = Math.PI / 4.2;
 const wrap = document.getElementById("wrap"), msg = document.getElementById("msg");
 const say = (t, err) => { msg.textContent = t; msg.className = err ? "err" : ""; };
+let THREE = null, GLTFLoader = null;
 
 // The box this is embedded in decides the aspect. avatarSwitch mounts a 143x210 PORTRAIT iframe, which is why
 // glbMesh.fitDistance takes the min of the two half-FOVs rather than assuming landscape: in portrait the
 // HORIZONTAL is the narrower one, and fitting to the vertical alone would push the figure off both sides.
 const view = () => ({ width: Math.max(64, wrap.clientWidth | 0), height: Math.max(64, wrap.clientHeight | 0) });
 
-let K = null, scene = null, mesh = null, fit = null, t = 0, timer = 0, busy = false, dead = false;
+let K = null, scene = null, mesh = null, fit = null, t = 0, timer = 0, busy = false, dead = false, loadErr = "";
 
 function camAt(u, v) {
   const a = u * Math.PI * 2, d = fitDistance(fit.radius, SCALE, v);
@@ -66,6 +85,13 @@ function camAt(u, v) {
 }
 
 function draw() {
+  // *** A LOAD ERROR MUST OUTLIVE THE NEXT TICK, OR IT NEVER READS AS AN ERROR AT ALL. *** The redraw timer
+  // fires every REDRAW_MS regardless of what loadAvatar() is doing, and it used to call say() with the
+  // ROUTINE status unconditionally -- so a failed load's error message (a 404 on a moved favourite, a bad
+  // file) displayed for at most REDRAW_MS (2.6s) before the next ordinary tick silently overwrote it with
+  // the OLD model's still-fine status line. MEASURED: a synthetic 404 read as a successful load within one
+  // redraw cycle. loadErr is now sticky until a NEW load attempt starts (which clears it before trying).
+  if (loadErr) { say(loadErr, true); return; }
   if (dead || busy || !K || !scene || !fit) return;
   busy = true;
   try {
@@ -78,30 +104,22 @@ function draw() {
   busy = false;
 }
 
-(async function boot() {
-  // Krbn first: if it is absent there is nothing to draw and NO FALLBACK IS DRAWN. krbn.html's v2597 rule --
-  // a page that quietly draws something else when its subject is missing is lying about what it shows -- and
-  // avatarSwitch's own missing-asset path already knows how to say "not found" and fall back to the SVG robot.
-  try { K = await import("/vendor/krbn/index.js"); }
-  catch (e) { say("Krbn is not vendored (/vendor/krbn/index.js)", true); return; }
-
-  let gltf;
+/**
+ * Load a source into the drawn mesh -- shared by the default boot fetch AND the live picker, so there is
+ * ONE place that builds a Scene, not an original path and a second one that quietly drifts from it.
+ * @param src   {name, arrayBuffer()} -- a File, or the {name,text,arrayBuffer} shape mountModelPicker hands a preset
+ * @param label what to call it in the status line and the option that gets selected afterward
+ */
+async function loadAvatar(src, label) {
+  loadErr = "";   // a NEW attempt clears any previous one -- see draw()'s own note on why this has to be sticky
+  say("loading " + label + "…");
+  let newMesh;
   try {
-    const [{ GLTFLoader }, THREE] = await Promise.all([
-      import("./vendor/three/jsm/loaders/GLTFLoader.js"),
-      import("three"),
-    ]);
-    const url = "/GPU_Assets/" + GLB + ".glb";
-    const r = await fetch(url);
-    if (!r.ok) { say(GLB + ".glb not found (HTTP " + r.status + ")", true); return; }
-    // the bytes are awaited HERE, not inside the Promise executor: `new Promise((res, rej) => ... await ...)`
-    // puts an await inside a NON-async arrow, which is a SyntaxError that takes the whole module with it.
-    // Caught by verify.mjs's own "every page's inline JavaScript parses" check, by file and line.
-    const buf = await r.arrayBuffer();
-    gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
-    mesh = gltfToMeshInput(gltf, THREE);     // skinned, posed, Z-up, sanitised -- one shared implementation
-  } catch (e) { say("could not load " + GLB + ".glb: " + (e && e.message ? e.message : e), true); return; }
+    const gltf = await loadGLTF(src, GLTFLoader);
+    newMesh = gltfToMeshInput(gltf, THREE);     // skinned, posed, Z-up, sanitised -- one shared implementation
+  } catch (e) { loadErr = "could not load " + label + ": " + (e && e.message ? e.message : e); say(loadErr, true); return; }
 
+  mesh = newMesh; GLB = label;
   fit = computeFit(mesh);
   // *** DRAWN SMALL IS NOT DRAWN THE SAME, AND SETTING IT WRONG LOOKS EXACTLY LIKE SETTING IT RIGHT. ***
   // RobotExpressive is 3349 strokes; in a 143px panel a 3234-triangle mesh puts several crease lines inside
@@ -116,16 +134,52 @@ function draw() {
   // tree keeps finding. Importance and role are separate arguments, so the fix keeps SUBJECT STYLING and
   // lowers only the number the cutoff is scaled by.
   //
-  // AND minFeaturePx IS A FIXED VALUE ON PURPOSE. An earlier draft derived it from the box; it did not need
-  // to, because the unit is PIXELS and therefore already self-correcting. MEASURED on the blob at one setting:
-  // 143x210 goes 602 -> 434 strokes (-28%, decluttered) while 920x560 goes 744 -> 712 (-4%, barely touched) --
-  // the same number does more work exactly where the subject is drawn smaller, which is the whole point.
+  // AND minFeaturePx IS A FIXED VALUE ON PURPOSE. It did not need deriving from the box, because the unit is
+  // PIXELS and therefore already self-correcting: the same setting does more work exactly where a LOADED
+  // model happens to be denser or drawn smaller, with no per-model tuning needed.
   scene = new K.Scene({ svg: { background: "#f4f1ea" }, light: { direction: [-0.4,-0.5,-0.7] },
                         style: { wobble: 0.4 }, abstraction: { minFeaturePx: 14 } });
   scene.add(new K.Mesh(mesh)).setImportance(0.45, { role: "subject" })
        .style({ weight: 1.1, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
-
+  t = 0;
   draw();
+}
+
+(async function boot() {
+  // Krbn first: if it is absent there is nothing to draw and NO FALLBACK IS DRAWN. krbn.html's v2597 rule --
+  // a page that quietly draws something else when its subject is missing is lying about what it shows -- and
+  // avatarSwitch's own missing-asset path already knows how to say "not found" and fall back to the SVG robot.
+  try { K = await import("/vendor/krbn/index.js"); }
+  catch (e) { say("Krbn is not vendored (/vendor/krbn/index.js)", true); return; }
+
+  try {
+    const [gl, th] = await Promise.all([
+      import("./vendor/three/jsm/loaders/GLTFLoader.js"),
+      import("three"),
+    ]);
+    GLTFLoader = gl.GLTFLoader; THREE = th;
+  } catch (e) { say("could not load three.js: " + (e && e.message ? e.message : e), true); return; }
+
+  const r = await fetch("/GPU_Assets/" + GLB + ".glb").catch(() => null);
+  if (!r || !r.ok) { say(GLB + ".glb not found" + (r ? " (HTTP " + r.status + ")" : ""), true); return; }
+  await loadAvatar(r, GLB);
+  if (!mesh) return;   // loadAvatar already said why
+
+  // THE LIVE-LOAD CONTROL. Mounted after the default boot so a picked model REPLACES it via the same
+  // loadAvatar() path -- one mesh loader for both the fixed default and anything picked afterward.
+  mountModelPicker({
+    select: document.getElementById("modelSel"),
+    file: document.getElementById("modelFile"),
+    presets: [{ url: "/GPU_Assets/RobotExpressive.glb", label: "RobotExpressive" }],
+    onPick: (picked) => loadAvatar(picked, picked.name.replace(/\.(glb|gltf)$/i, "")),
+    // a preset FETCH failing (a starred favourite whose file has moved) never reaches loadAvatar at all, so
+    // it has to set the same sticky loadErr itself or it is just as vulnerable to the next tick stomping it
+    onError: (msg2) => { loadErr = msg2; say(loadErr, true); },
+  });
+  document.getElementById("modelFileBtn").onclick = () => document.getElementById("modelFile").click();
+
+  // the redraw timer OUTLIVES any one loaded model -- it just keeps calling draw() against whatever mesh/scene
+  // loadAvatar() most recently set, so picking a new model does not need its own timer management
   timer = setInterval(() => { t = (t + 0.035) % 1; draw(); }, REDRAW_MS);
 })();
 

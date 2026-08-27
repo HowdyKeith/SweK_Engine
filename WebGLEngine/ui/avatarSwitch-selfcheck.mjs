@@ -51,17 +51,19 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
 {
     // v4033 -- Keith: "RobotExpressive can be choice 4 on Server.html. and we can have StickWoman be choice 3."
     // Two named avatar slots (stickwoman, robotexpressive2) inserted between "rigged" (the favorite-of-the-
-    // moment slot, unchanged) and "blob". v4046 adds "krbn" -- NINE surfaces now, cheapest still first, and the
-    // pencil renderer sits with the other heavy ones rather than among the cheap slots a stray click can land on.
-    ok("!! nine surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, Gauges 3000",
-       MODES.length === 9 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,gauges3000",
+    // moment slot, unchanged) and "blob". v4046 adds "krbn"; v4050 adds "ascii" right after it -- Keith's own
+    // "instead of Krbn, we could also have the ascii version" was a SIBLING request, not a replacement, so both
+    // stay. TEN surfaces now, cheapest still first, and the two per-frame-cost modes (krbn heavy, ascii cheap)
+    // sit together rather than either landing among the slots a stray click can hit first.
+    ok("!! ten surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, ASCII, Gauges 3000",
+       MODES.length === 10 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,ascii,gauges3000",
        MODES.map((m) => m.id).join(" -> ") + " — the two DOWNLOAD-COST modes sit before the tail, so a stray " +
        "click lands on something cheap rather than starting a 12 MB download");
     ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
        nextMode("svg") === "rigged" && nextMode("rigged") === "stickwoman" && nextMode("stickwoman") === "robotexpressive2"
        && nextMode("robotexpressive2") === "blob" && nextMode("blob") === "blobgpu"
-       && nextMode("blobgpu") === "thead" && nextMode("thead") === "krbn" && nextMode("krbn") === "gauges3000"
-       && nextMode("gauges3000") === "svg");
+       && nextMode("blobgpu") === "thead" && nextMode("thead") === "krbn" && nextMode("krbn") === "ascii"
+       && nextMode("ascii") === "gauges3000" && nextMode("gauges3000") === "svg");
     ok("!! StickWoman is choice 3 and RobotExpressive is choice 4, as asked",
        MODES.findIndex((m) => m.id === "stickwoman") === 2 && MODES.findIndex((m) => m.id === "robotexpressive2") === 3,
        "1-indexed: " + MODES.map((m, i) => (i + 1) + ":" + m.id).join(" "));
@@ -137,9 +139,9 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
     // navigator is getter-only on Node 22, so it is REDEFINED rather than assigned
     Object.defineProperty(globalThis, "navigator", { value: { gpu: {} }, configurable: true, writable: true });
     await sw.set("blobgpu");
-    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across eight modes",
+    ok("!! a THIRD switch still leaves exactly one iframe — the cost does not accumulate across ten modes",
        iframes(host).length === 1 && /blobulator-gpu/.test(iframes(host)[0].src),
-       "eight surfaces and one context: with four WebGL frames and a WebGPU one in the list, an accumulating panel " +
+       "ten surfaces and one context: with four WebGL frames and a WebGPU one in the list, an accumulating panel " +
        "would be running five renderers behind a gauge row");
     await sw.set("blob");
     ok("!! ...and switching again REPLACES it rather than adding a second",

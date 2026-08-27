@@ -79,6 +79,13 @@ export const MODES = [
     { id: "krbn", label: "✏️", title: "Krbn pencil avatar — the rigged GLB drawn as a graphite sketch (redraws every ~2.6s; a pencil frame costs ~0.5s of CPU)", kind: "frame",
       src: "/krbn-avatar.html?glb=RobotExpressive", heavy: "~0.5s of CPU per redraw, on the main thread",
       needs: "/GPU_Assets/RobotExpressive.glb" },
+    // v4050 -- Keith, in the same breath as asking for the Krbn live-load button: "instead of Krbn, we could
+    // also have the ascii version. ascii-object.html." A SIBLING slot, not a replacement -- both stay in the
+    // rotation. Unlike krbn (above), asciify() is pure arithmetic over pixels already sitting in a WebGL
+    // framebuffer, so this one runs at REAL FRAME RATE and is NOT `heavy`: there is no per-click cost worth a
+    // warning, only the one-time GLB download the `needs` probe already covers for every rigged slot.
+    { id: "ascii", label: "🔤", title: "ASCII avatar — the loaded GLB sampled into a character ramp, live (monochrome by default, color toggle in-panel)", kind: "frame",
+      src: "/ascii-avatar.html?glb=RobotExpressive", needs: "/GPU_Assets/RobotExpressive.glb" },
     // v4033 -- Keith: "the last avatar choice, can we swap out the gauges and avatar scene, and swap in the
     // WebGPU gauges and avatar we already made? I think that is called Avatar3000." The page is gauges3000.html
     // ("Gauges 3000" in its own demo:title -- close enough a name that the swap is unambiguous): a WebGPU

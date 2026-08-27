@@ -8,6 +8,82 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4050 -- a live-load button on the pencil avatar, an ASCII sibling beside it, and colour that does not change the shape
+
+Keith, in three messages, the second correcting the first: "so we could have the next avatar choice after live
+krbn avatar, to be a loaded model converted to krbn" -- then "maybe adding a button on the live krbn, to convert
+and load live, instead of the next choice" -- then "and instead of Krbn, we could also have the ascii version.
+ascii-object.html". The revision is taken as the instruction it is: `krbn-avatar.html` gained a LIVE-LOAD control
+rather than the rotation gaining a second Krbn slot. The ASCII request is read as a SIBLING, so the rotation goes
+from nine surfaces to ten with the pencil one untouched, and `gauges3000` stays the explicit last choice v4033
+asked for.
+
+**The picker is now shared rather than copied a third time.** `krbn-compare.html` had built the
+favourites + preset + file-picker UI inline at v4042/v4046. A second copy on `krbn-avatar` and a third on the new
+ASCII page is exactly the second-copy defect this tree names more than any other, so it is extracted to
+`ui/modelPicker.js` and `krbn-compare.html` is REFACTORED to import it -- one implementation, not an original and
+two copies that start identical and do not stay that way. It remains deliberately read-only on
+`voxelEngine.kpopFavorites`, per `ui/avatarFavorites.js`'s own argument: a second favourites writer means starring
+something on server.html and never finding out why it is not offered here.
+
+**Testing the live-load control found a real bug, and it was found only because a fixture was missing.** The
+first test used a fabricated favourite pointing at `/GPU_Assets/RobotWoman.glb` -- which `ui/avatarSwitch.js`'s own
+"stickwoman" mode references but WHICH DOES NOT EXIST IN THIS SANDBOX (`find` confirms only `RobotExpressive.glb`
+ships here). So the test silently exercised the 404 path instead of a reload. And the 404 read as a SUCCESS:
+`draw()` called `say()` with the routine status unconditionally on every `REDRAW_MS` tick, so a failed load's
+error message survived at most one 2.6s cycle before the next ordinary redraw overwrote it with the OLD model's
+still-fine status line. MEASURED: after a nine-second wait the panel showed a healthy status for a load that had
+failed. Fixed with a sticky `loadErr` checked FIRST in `draw()` and cleared only when a new attempt starts; the
+picker's own `onError` sets it too, because a preset FETCH failure never reaches `loadAvatar` at all and calling
+`say()` there alone would be just as vulnerable. Sabotage (the check removed) bites two gate checks, one of them
+a live one that re-measures the stomp in a real browser.
+
+A real GLB fixture was BUILT rather than borrowed to close the gap the missing asset left: a
+`THREE.IcosahedronGeometry` exported through the `GLTFExporter` this tree vendored last round, so the SUCCESS path
+is tested against a genuinely different model -- and incidentally against the unskinned path through
+`gltfToMeshInput`, which nothing had exercised before.
+
+**Then the ASCII sibling, and one honest answer to a question asked mid-round.** Keith asked about
+`vansh-nagar/ascii-studio` and whether our ASCII does colour. The repo is NOT used here and never was -- grepped,
+zero hits tree-wide; `ascii-video.html` is our own churn/flicker LUT harness and unrelated -- its public tree is a
+landing-site monorepo with the conversion engine not exposed, and its README documents no colour support either.
+There was nothing to borrow. And no, ours was monochrome: `asciify()` reduced every pixel to Rec-601 luma and
+`ascii-object.html` painted the whole result one flat green.
+
+Keith: "monochrome by default, but we would want to be able to switch to color." So `asciify()` gains
+`opts.color` -- OFF by default, with the field simply absent from the result, so all three existing callers pay
+nothing -- plus `toColoredHTML()`. **The glyph choice is unchanged by it on purpose:** colour is a second FACT
+reported about a cell (its average RGB), never a second scheme for picking its character, so a coloured and a
+monochrome render of the same frame read as the same shape. Spans are run-length merged rather than one-per-glyph;
+sabotage confirms both directions, never-merge and always-merge each bite.
+
+New `ascii-avatar.html` renders the loaded glTF through three.js natively and samples the framebuffer -- so unlike
+the pencil page it runs at REAL FRAME RATE with the clip actually playing, and it is NOT declared `heavy` in the
+rotation, because there is no per-click cost worth warning about.
+
+**It shipped wrong once and the gate measured it: a blank frame, zero of 839 cells non-space.** A fresh
+`Object3D`'s `matrixWorld` is IDENTITY until `updateMatrixWorld` runs, and neither `GLTFLoader.parse` nor
+`Box3.setFromObject` calls it -- so the framing box measured every node as if parented at the origin (bounding
+radius 194.6 for a figure a few units tall) and aimed the camera at nothing at all.
+
+**And one copied fix was deliberately REMOVED after testing rather than kept for symmetry.** `krbn-avatar`'s
+sticky `loadErr` was ported here first, then taken out: this page's `frame()` never re-asserts a routine status
+(`#msg` is written once per load EVENT), so there was nothing for the guard to protect -- and all it actually did
+was FREEZE a still-good model when a LATER pick failed. The last good model now keeps animating under the error
+banner, which is both correct and better: the error is about the new pick, not about what is already on screen.
+The gate asserts the invariant this page really relies on (`frame()` makes at most one `say()` call, and `group`
+has exactly one assignment site) instead of copying the neighbouring page's mechanism uncritically.
+
+Also fixed: `tools/krbn/krbnCompareLive-selfcheck.mjs` called `report()` at two skip sites and NEVER DEFINED IT --
+a straight `ReferenceError` thrown from inside the one path whose whole job is to degrade gracefully on a box
+without Chromium. Every other `*-selfcheck.mjs` in this tree defines that one-line helper; it had simply never
+been copied in.
+
+Five sabotages bite across the round, all restored byte-identical. Gates: `tools/ship/asciify-selfcheck.mjs`
+gains a colour section and a full `ascii-avatar` section (static plus live headless),
+`tools/krbn/krbnCompareLive-selfcheck.mjs` gains section 16 for the live-load control, and
+`ui/avatarSwitch-selfcheck.mjs` moves nine surfaces to ten.
+
 ## Since v4008 -- "storage quota can raise to 2 GB, with approval dialog": confirmed, and bounded to never promise a number
 
 Keith's claim was checked against the real API rather than taken on faith. `navigator.storage.persist()`
