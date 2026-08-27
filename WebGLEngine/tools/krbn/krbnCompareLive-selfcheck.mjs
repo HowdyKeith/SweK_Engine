@@ -25,7 +25,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";   // v4073 -- pathToFileURL: 14 dynamic imports here handed the ESM loader a raw path, which is "c:" on Windows and a crash (v2997's law)
 import { codeOnly, noComments } from "../ship/sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -70,9 +70,9 @@ console.log("\n2. THE SCENES THAT CANNOT HATCH AS A MESH USE KRBN'S OWN PRIMITIV
     ok("...and it builds from Cylinder/sphere/ellipsoid, not from a mesh", /new K\.Cylinder\(/.test(SM) && /K\.sphere\(/.test(SM) && /K\.ellipsoid\(/.test(SM),
        "a triangulated cylinder is not a cylinder to a renderer that hatches along the real surface's own parameterisation");
 
-    const { KRBN_NATIVE, sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
+    const { KRBN_NATIVE, sceneMesh } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "sceneMeshes.js")).href);
     let K = null;
-    try { K = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    try { K = await import(pathToFileURL(path.join(ENG, "vendor", "krbn", "index.js")).href); } catch {}
     if (!K) { console.log("  ----  vendor/krbn is not present -- the render assertions below cannot run"); fails++; }
     else {
         const cam = { eye: [3, 3, 2], target: [0, 0, 0], up: [0, 0, 1], projection: "perspective",
@@ -212,8 +212,8 @@ console.log("\n9. *** THE TWO PANES ACTUALLY AGREE -- THE PAGE CLAIMED THIS FOR 
     // horizontally against f*H/2 vertically, and the WebGL shader repeated the same two-focal-length form. So
     // the two panes agreed with EACH OTHER while both disagreed with Krbn, which is precisely why a page built
     // to compare them could not see it. This runs all three and requires them to coincide.
-    const { project } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
-    let K = null; try { K = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    const { project } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "krbnCompare.js")).href);
+    let K = null; try { K = await import(pathToFileURL(path.join(ENG, "vendor", "krbn", "index.js")).href); } catch {}
     const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
     const sub = (a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
     const dot = (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -255,8 +255,8 @@ console.log("\n10. FRAMING IS DERIVED FROM THE FRUSTUM, AND NOTHING LEAVES THE F
     ok("!! the orbit distance comes from the FOV, not from tuned constants",
        /export function fitDistance/.test(GLB) && /Math\.sin\(Math\.min\(halfV, halfH\)\)/.test(GLB),
        "R=radius*1.75 encoded a field of view nobody stated and stops being right when SCALE or the aspect changes");
-    const { project } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
-    const { sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
+    const { project } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "krbnCompare.js")).href);
+    const { sceneMesh } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "sceneMeshes.js")).href);
     const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
     const ELEV = Math.atan2(0.65, 1.75), MARGIN = 1.06;
     const fitD = (r) => r / Math.sin(Math.min(SCALE, Math.atan((VIEW.width/VIEW.height)*Math.tan(SCALE)))) * MARGIN;
@@ -330,7 +330,7 @@ console.log("\n11. THE KRBN AVATAR SURFACE ON server.html");
        "importance " + (imp ? imp[1] : "?") + ", minFeaturePx " + (mfp ? mfp[1] : "?") +
        " -- cutoff = minFeaturePx * (1 - importance), so importance 1 disables it silently");
     // and the mechanism is RUN, not just read, so this cannot pass on a Krbn that changed its scaling rule
-    let K2 = null; try { K2 = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    let K2 = null; try { K2 = await import(pathToFileURL(path.join(ENG, "vendor", "krbn", "index.js")).href); } catch {}
     if (K2 && typeof K2.cutoffFor === "function") {
         ok("!! ...proven against Krbn's own cutoffFor: importance 1 really does yield a zero cutoff",
            K2.cutoffFor(1, 16) === 0 && K2.cutoffFor(0.45, 16) > 0,
@@ -342,7 +342,7 @@ console.log("\n11. THE KRBN AVATAR SURFACE ON server.html");
 
 console.log("\n12. THE RIGGED DRAWING -- PINNED TO THE SURFACE, AND EXACT RATHER THAN CLOSE");
 {
-    const { backProjectHit, baryPoint } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
+    const { backProjectHit, baryPoint } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "krbnCompare.js")).href);
     // *** THE CLAIM IS AN IDENTITY, SO IT IS PROVEN BY RUNNING IT, NOT BY ASSERTING THE COMMENT. ***
     // Linear blend skinning is linear in the vertex position, so a point pinned at barycentric (u,v,w) of a
     // triangle must land on exactly that blend of the triangle's corners under ANY per-vertex deformation --
@@ -397,7 +397,7 @@ console.log("\n12. THE RIGGED DRAWING -- PINNED TO THE SURFACE, AND EXACT RATHER
 
 console.log("\n13. WEIGHT-BLENDING MATHS (riggedExport.js) -- CULLING WITHOUT RENORMALISING IS A SLOW-MOTION IMPLOSION");
 {
-    const { blendInfluences } = await import(path.join(ENG, "tools", "krbn", "riggedExport.js"));
+    const { blendInfluences } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "riggedExport.js")).href);
     // *** THE LOAD-BEARING NEGATIVE. *** A blend of THREE corners, each with up to FOUR influences, can name up
     // to TWELVE distinct joints. glTF's JOINTS_0/WEIGHTS_0 carries only four. Cull without renormalising and
     // the kept weights sum to less than 1 -- linear blend skinning reads a short sum as "pull this vertex
@@ -434,9 +434,9 @@ console.log("\n14. THE SILHOUETTE-CLASSIFICATION FIX -- PROXIMITY REPLACING A ST
        !/toFixed\(1\)[\s\S]{0,40}join\(";"\)[\s\S]{0,80}silPaths\.has/.test(SL.replace(/\s+/g," ")),
        "the exact shape of the original bug: rounding a WOBBLED path to a string and comparing against an UNWOBBLED one");
 
-    let K = null; try { K = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
-    const { sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
-    const { classifyRenderStrokes } = await import(path.join(ENG, "tools", "krbn", "strokeLift.js"));
+    let K = null; try { K = await import(pathToFileURL(path.join(ENG, "vendor", "krbn", "index.js")).href); } catch {}
+    const { sceneMesh } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "sceneMeshes.js")).href);
+    const { classifyRenderStrokes } = await import(pathToFileURL(path.join(ENG, "tools", "krbn", "strokeLift.js")).href);
     if (K) {
         // v4048 -- WAS sceneMesh("ragdoll"), which v4042 already measured as ZERO silhouettes: cylinderMesh()
         // emits no end caps, so every limb is an open surface with no silhouette to classify. blob is a real
@@ -483,7 +483,7 @@ console.log("\n15. STEP 2: THE RIGGED .glb ITSELF, LOADED BACK INDEPENDENTLY AND
 
     let K2 = null, chromium = null;
     try {
-        const pw = await import(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"));
+        const pw = await import(pathToFileURL(path.join(ENG, "tools", "ship", "playwrightResolve.mjs")).href);
         const { createRequire } = await import("node:module");
         const req = createRequire(import.meta.url);
         const r = pw.resolvePlaywright(req);
@@ -605,7 +605,7 @@ console.log("\n16. THE LIVE-LOAD CONTROL ON krbn-avatar.html -- AND THE ERROR-ST
 
     let chromium = null;
     try {
-        const pw = await import(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"));
+        const pw = await import(pathToFileURL(path.join(ENG, "tools", "ship", "playwrightResolve.mjs")).href);
         const { createRequire } = await import("node:module");
         const req = createRequire(import.meta.url);
         const r = pw.resolvePlaywright(req);

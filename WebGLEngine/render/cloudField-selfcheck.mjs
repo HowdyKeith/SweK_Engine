@@ -154,7 +154,7 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
         /function clearCloudDeck\(\)/.test(page) && /cloudTypeIdx === CLOUD_ORDER\.length/.test(page),
         "a control that cannot reach its own off state is also the only way to tell what it is responsible for on screen");
 
-    const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
+    const pw = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs")).href);
     const { createRequire } = await import("node:module");
     const rr = pw.resolvePlaywright(createRequire(import.meta.url));
     const skip = pw.browserSkipReason(rr.chromium, rr.from, pw.HEADLESS_SHELL);

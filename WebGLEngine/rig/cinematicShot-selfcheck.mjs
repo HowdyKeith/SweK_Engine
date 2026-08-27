@@ -539,7 +539,7 @@ console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
         "CLOUD_ALT " + cAlt + " vs DESCENT_END " + dEnd + " -- a deck at or below the landing height would leave " +
         "the shot stopping short of the clouds and looking at them edge-on instead of crossing them");
 
-    const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
+    const pw = await import(pathToFileURL(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs")).href);
     const { createRequire } = await import("node:module");
     const rr = pw.resolvePlaywright(createRequire(import.meta.url));
     const skip = pw.browserSkipReason(rr.chromium, rr.from, pw.HEADLESS_SHELL);
