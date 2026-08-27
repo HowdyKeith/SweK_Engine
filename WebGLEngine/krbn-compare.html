@@ -268,7 +268,7 @@ async function runKrbnRender(cam, forScene) {
     try { await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("Krbn SVG did not decode")); img.src = url; }); }
     finally { URL.revokeObjectURL(url); }
     krbnImg = img; krbnImgFor = forScene; krbnLoadErr = null;
-  } catch (e) { krbnLoadErr = (e && e.message) ? e.message : String(e); }
+  } catch (e) { krbnLoadErr = (e && e.message) ? e.message : String(e); try { window.__krbnErr = (e && e.stack) ? e.stack : String(e); } catch (_) {} }
   krbnBusy = false;
   const pending = krbnPendingCam; krbnPendingCam = null;
   render();   // a fresh frame (or a fresh error) just landed -- repaint now, not on the next unrelated input
@@ -392,6 +392,40 @@ addPresetOptions();
 const elFile = document.getElementById("file"), elLoad = document.getElementById("load");
 elLoad.onclick = () => elFile.click();
 
+// *** DEGENERATE TRIANGLES CRASH KRBN, AND KRBN'S OWN LOADERS ALREADY KNEW THAT. ***
+//
+// MEASURED, on RobotExpressive.glb once the skinning pass made it a real figure: Krbn threw
+// `TypeError: Cannot read properties of undefined (reading '0')` from vec3.sub, called at
+// mesh/halfedge.js:183 -- `tB.find((vi) => vi !== v0 && vi !== v1)` returns UNDEFINED when a triangle's three
+// indices are not three distinct vertices (an [a,b,a] or [a,b,b] sliver), so `positions[apexB]` is undefined
+// and the convexity test dereferences it. Real exporters emit these constantly; they are zero-area and carry
+// no surface, so nothing is lost by removing them and the drawing is unchanged.
+//
+// THE TELL THAT THIS IS OUR GAP RATHER THAN KRBN'S BUG: Krbn's own parseOBJ and parseSTL BOTH document
+// dropping zero-area faces ("zero-area triangles are dropped"). Its loaders sanitise before its mesh builder
+// ever sees the data. Our glTF path does not go through those loaders -- it converts three.js buffers
+// directly -- so it inherited the requirement without inheriting the fix. Applied to EVERY format here rather
+// than only to glTF: it is idempotent on anything Krbn already cleaned, and one sanitiser that always runs
+// beats a second rule about which paths need it.
+function dropDegenerate(m) {
+  const kept = [];
+  let byIndex = 0, byArea = 0;
+  for (const t of m.triangles) {
+    const [i, j, k] = t;
+    if (i === j || j === k || i === k) { byIndex++; continue; }        // the crash: not three distinct vertices
+    const A = m.positions[i], B = m.positions[j], C = m.positions[k];
+    if (!A || !B || !C) { byIndex++; continue; }                       // an index past the end is not geometry
+    const ux = B[0]-A[0], uy = B[1]-A[1], uz = B[2]-A[2];
+    const vx = C[0]-A[0], vy = C[1]-A[1], vz = C[2]-A[2];
+    const cx = uy*vz - uz*vy, cy = uz*vx - ux*vz, cz = ux*vy - uy*vx;
+    if (!(Math.hypot(cx, cy, cz) > 1e-20)) { byArea++; continue; }     // distinct indices, collinear points
+    kept.push(t);
+  }
+  if (byIndex || byArea) console.info("[krbn-compare] dropped " + (byIndex + byArea) +
+    " degenerate triangles (" + byIndex + " repeated/invalid index, " + byArea + " zero area) of " + m.triangles.length);
+  return (byIndex || byArea) ? { ...m, triangles: kept, dropped: byIndex + byArea } : m;
+}
+
 // ONE parse-and-install path. A picked File and a fetched preset differ only in where the bytes come from, so
 // `src` is {name, text(), arrayBuffer()} -- the two methods a File already has, which a fetched Response also
 // has, so a preset needs no adapter beyond passing the Response through.
@@ -414,28 +448,75 @@ async function loadModel(src) {
       const buf = await src.arrayBuffer();
       const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
       const positions = [], triangles = [];
-      let skinned = false;
-      gltf.scene.updateMatrixWorld(true);
+      let skinned = false, posedBy = "";
+
+      // *** THE SKINNING PASS. *** Keith, on being shown RobotExpressive.glb arriving as a heap of splayed
+      // parts: "lets add a skinning pass."
+      //
+      // A glTF's POSITION attribute is in BIND space. For a rigged model, where each vertex actually belongs is
+      // POSITION pushed through its (up to four) weighted joint matrices -- so reading the raw attribute and
+      // applying only the node's matrixWorld, as this did before, produces the unposed rig: RobotExpressive
+      // measured 0.066 x 0.026 x 0.017 units with the limbs splayed. face/avatarStage.js's v4032 note measured
+      // the same asset's gap from the other side: bind height ~0.026 against ~4.5 skinned, a ~172x difference.
+      // The bind pose is not a slightly-wrong version of the figure; it is a different object.
+      //
+      // *** AND THE POSE IS DRIVEN BY A CLIP, NOT LEFT AT REST. *** Bone matrices only mean something once the
+      // skeleton has been placed. Playing the idle clip's FIRST FRAME (AnimationMixer at t=0) is the same
+      // choice avatarStage makes and for the same reason -- it is the pose the asset was authored to be seen
+      // in, and a rest skeleton on a model whose rest IS the splay would have changed nothing.
+      //
+      // applyBoneTransform() is three's OWN skinning, not a fourth hand-rolled weighted sum: this file already
+      // depends on three for the loader, three r160 implements exactly this transform, and avatarStage's
+      // hand-written loop exists only because it runs against the tree's own parser rather than three's.
+      const mixers = [];
+      if (gltf.animations && gltf.animations.length) {
+        const idle = gltf.animations.find((a) => /idle|breath|stand/i.test(a.name || "")) || gltf.animations[0];
+        try {
+          const mx = new THREE.AnimationMixer(gltf.scene);
+          mx.clipAction(idle).play();
+          mx.update(0);                       // t=0: the clip's first frame, deterministic
+          mixers.push(mx);
+          posedBy = idle.name || "(unnamed clip)";
+        } catch (e) { posedBy = ""; }
+      }
+      gltf.scene.updateMatrixWorld(true);     // AFTER the mixer, so bones carry the clip's rotations
+
       gltf.scene.traverse((o) => {
-        if (o.isSkinnedMesh) skinned = true;
         if (!o.isMesh || !o.geometry) return;
         const g3 = o.geometry, pos = g3.getAttribute("position");
         if (!pos) return;
+        const isSkin = !!o.isSkinnedMesh && !!o.skeleton && !!g3.getAttribute("skinIndex");
+        if (isSkin) { skinned = true; try { o.skeleton.update(); } catch (e) {} }
         const off = positions.length, v = new THREE.Vector3();
-        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); positions.push([v.x, v.y, v.z]); }
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          if (isSkin) o.applyBoneTransform(i, v);   // bind space -> posed LOCAL space...
+          v.applyMatrix4(o.matrixWorld);            // ...and both paths then go to world space
+          // *** glTF IS Y-UP; THIS PAGE IS Z-UP. *** Every camera here passes up:[0,0,1], and the built-in
+          // scenes are authored that way -- tools/krbn/sceneMeshes.js's ragdoll opens with
+          // `P = (x, y, z) => [x, z, y - 6.3]` and swek-ragdoll.krbn.ts states the rule outright: "SweK is
+          // Y-up and Krbn is Z-up, so the mapping is (x, y, z) -> (x, z, y)". Without it a loaded glTF is
+          // laid on its back -- which is exactly how RobotExpressive first rendered once skinning made it a
+          // figure at all, and it reads as a broken pose rather than a rotated axis. Same mapping, so a
+          // loaded model and a built-in scene share one convention instead of two.
+          positions.push([v.x, v.z, v.y]);
+        }
         const idx = g3.getIndex();
         if (idx) for (let i = 0; i + 2 < idx.count; i += 3) triangles.push([off + idx.getX(i), off + idx.getX(i+1), off + idx.getX(i+2)]);
         else for (let i = 0; i + 2 < pos.count; i += 3) triangles.push([off + i, off + i + 1, off + i + 2]);
       });
       if (!positions.length) throw new Error("no mesh geometry found in that glTF");
-      m = { positions, triangles, skinned };
+      m = { positions, triangles, skinned, posedBy };
     } else throw new Error("unsupported extension ." + ext + " -- expected .glb, .gltf, .obj or .stl");
     if (!m.positions.length || !m.triangles.length) throw new Error("parsed to an empty mesh (0 vertices or 0 triangles)");
+    m = dropDegenerate(m);
+    if (!m.triangles.length) throw new Error("every triangle was degenerate (zero area) -- nothing left to draw");
   } catch (e) {
     status.textContent = "Could not load " + src.name + ": " + (e && e.message ? e.message : e);
     return;
   }
   loadedMesh = m; loadedName = src.name;
+  try { window.__lastMesh = m; } catch (e) {}   // measurement hook for tools/krbn's gate
   // reloading over an existing "loaded" scene keeps the same sceneName, so the Krbn caches (keyed on it)
   // must be dropped by hand here -- see setScene's note
   // ...and the WebGL side caches its uploaded buffers on the SAME key, so it needs the SAME invalidation:
@@ -458,9 +539,11 @@ async function loadModel(src) {
   // tree's own RobotExpressive.glb: 0.066 x 0.026 x 0.017 units, limbs splayed, which renders as a heap of
   // shapes rather than a figure. That is v4033's finding in avatarStage.js reached from the other side, and
   // a reader who is not told will read it as a broken importer instead of an unposed rig.
-  const skinned = m.skinned ? " *** this is a SKINNED model and no skinning pass runs here, so you are seeing its BIND POSE, not the posed figure. ***" : "";
+  const skinned = m.skinned
+    ? " Skinned model: vertices pushed through their joint matrices" + (m.posedBy ? ", posed by clip \"" + m.posedBy + "\" at t=0" : " at rest") + "."
+    : "";
   status.textContent = "Loaded " + src.name + " -- " + m.positions.length + " vertices, " + m.triangles.length +
-    " triangles. Krbn draws it as a triangle mesh (hatch needs closed silhouette loops, so an open/shell model outlines but does not shade)." + skinned;
+    " triangles" + (m.dropped ? " (" + m.dropped + " degenerate dropped)" : "") + ". Krbn draws it as a triangle mesh (hatch needs closed silhouette loops, so an open/shell model outlines but does not shade)." + skinned;
   render();
 }
 
