@@ -8,6 +8,33 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4058 -- the engine side: arriving on the real terrain instead of teleporting onto it
+
+Item 3 of three.
+
+`realTerrain.load()` ended by snapping the camera to `(0, centerSurface+18, 0)` and setting a pitch -- a cut, at
+the one moment a freshly fetched piece of the actual world has something to show. New `realTerrain.flyIn()` runs
+the same `rig/cinematicShot.js` sequence the planet page flies. `load({fly:false})` still gets the old snap
+exactly, so this is an upgrade rather than a removal.
+
+**A flat voxel world is a sphere whose centre is far below you, and the rig needed no changes at all for that.**
+`orbitRig` builds its frame from `target - center`, so putting the centre 100000 voxels straight down makes the
+local up **exactly** world +Y -- which is what a voxel world's up is. MEASURED rather than assumed, because "it
+should just work on a flat world" is precisely the sort of claim that is off by a rounding error: worst height
+error **7.11e-15** units across a 0..1.4 rad pitch sweep at distance 60, worst orthonormality 2.22e-16. So the
+descent, the seam chaining and the settling orbit all cross over from the planet **unmodified** -- only the
+numbers are in voxels instead of planet radii.
+
+**And it is the first thing to walk across the bridge v4057 built.** `flyIn` does not grow a second per-frame
+camera loop inside `main.js`: `toClip()` turns its legs into the exact keyframe clip `rig/cameraCinematic.js`
+already plays, and `main.js` already ticks that player every frame. The whole method is about fifteen lines --
+the composition earning its keep rather than being asserted. Sabotage-confirmed: stubbing the clip out reddens
+the check.
+
+The cloud deck is switched on for the flight, and the shot settles at 60 above the ground against
+`cloudField.js`'s own `TYPES.cumulus` altitude of 135 -- so the descent crosses real weather on the way down.
+Keith's "great clouds we made to pass through", over the terrain of where he actually lives.
+
 ## Since v4057 -- a third leg, and two camera modules that finally compose
 
 Keith: "let's work through all 3 items." This is items 1 and 2; the engine side is next.
