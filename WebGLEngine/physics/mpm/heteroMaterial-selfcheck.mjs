@@ -11,7 +11,7 @@
 import { restBlock, step } from "./step.mjs";
 import { makeGrid } from "./transfer.mjs";
 import { lame } from "./constitutive.mjs";
-import { materialBlock, totalPx, meanDeformation, byTag, centroidX } from "./heteroMaterial.js";
+import { materialBlock, totalPx, totalPy, meanDeformation, byTag, centroidX } from "./heteroMaterial.js";
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error("  FAIL  " + m); } };
@@ -76,6 +76,28 @@ function collide(steps = 240) {
     const ga = makeGrid(16, 16, H), gb = makeGrid(16, 16, H);
     for (let i = 0; i < 240; i++) { step(A, ga, { dt: 1 / 240, gy: 0, params: GLOBAL, plastic: false }); step(B, gb, { dt: 1 / 240, gy: 0, params: GLOBAL, plastic: false }); }
     ok(centroidX(A) > centroidX(B), "control: on SEPARATE grids the bodies pass through -- the shared grid is what excludes them");
+}
+
+// 6) totalPy IS EXACTLY sum(m * vy) -- a synthetic set with known masses/velocities, computed by hand.
+{
+    const synth = [{ m: 0.5, vy: 2 }, { m: 1.5, vy: -1 }, { m: 0.25, vy: 4 }, { m: 3, vy: 0 }];
+    const handSum = 0.5 * 2 + 1.5 * -1 + 0.25 * 4 + 3 * 0;
+    ok(near(totalPy(synth), handSum, 1e-12), "!!totalPy sums m*vy exactly over a synthetic list (" + totalPy(synth) + " vs " + handSum + ")");
+    ok(near(totalPy([]), 0), "totalPy of an empty set is zero");
+}
+
+// 7) totalPy TRACKS THE GRAVITY IMPULSE -- with no walls and internal stress conserving momentum (v3793's third
+//    law), the ONLY external force is body gravity, added as impulse = M*g*dt every step (step.mjs's own claim).
+//    So total y-momentum after N steps must equal N * totalMass * gy * dt, to tight tolerance.
+{
+    const ps = materialBlock({ n: 4, spacing: 0.25, x0: 4, y0: 6, m: 0.1, vol0: 0.0625, vx: 0, mat: GLOBAL, tag: "g" });
+    const g = makeGrid(16, 16, H);
+    const dt = 1 / 240, gy = -9.81, steps = 30;
+    const py0 = totalPy(ps);
+    let totalMass = 0; for (const p of ps) totalMass += p.m;
+    for (let i = 0; i < steps; i++) step(ps, g, { dt, gy, params: GLOBAL, plastic: false, walls: null });
+    const expected = py0 + totalMass * gy * dt * steps;
+    ok(near(totalPy(ps), expected, 1e-6), "!!totalPy after " + steps + " free-fall steps matches the analytic gravity impulse M*g*dt*N (" + totalPy(ps).toFixed(6) + " vs " + expected.toFixed(6) + ")");
 }
 
 console.log(`heteroMaterial-selfcheck: ${pass} passed, ${fail} failed`);

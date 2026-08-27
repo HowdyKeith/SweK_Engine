@@ -46,8 +46,9 @@ observed against the shot's own 4+8+10=22s leg total, zero page errors. Discover
 time it sits comfortably under a third of the 182s general default, exactly the population `gateBudget-
 selfcheck.mjs`'s own rule says belongs on the default rather than an explicit entry.
 
-Gate count 1202 -> 1203: `case-study.html`'s marker fixed via `staleness.mjs --fix`, `knowledge-index.json`
-rebuilt via `buildKnowledgeIndex.mjs`, both derived-fact checks confirmed clean after. verify.mjs ALL GREEN.
+`case-study.html`'s marker was fixed via `staleness.mjs --fix` and `knowledge-index.json` rebuilt via
+`buildKnowledgeIndex.mjs` so both derived-fact checks agree with the tree again: this build carries
+1203 gates. verify.mjs ALL GREEN.
 
 ## Since v4060 -- two standalone debt gates, fixed for real
 
