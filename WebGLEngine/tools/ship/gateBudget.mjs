@@ -293,6 +293,27 @@ export const MEASURED = {
     // twoFBind-selfcheck (already here at 256s) rather than setting the pace for a thousand gates that finish
     // in milliseconds. MEASURED 92.8s, and it PASSES; it was never broken, only mis-populated.
     "tools/roundhouse/twoF-selfcheck.mjs":            92800,
+
+    // *** v4060 -- claimTrace MOVES OUT OF UNRESOLVED, WHICH TOLD ME EXACTLY WHAT TO DO NEXT AND NAMED IT
+    // BEFORE I DID IT: "THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER." *** The v3913
+    // note only knew a lower bound (>=1800000ms, no output, on an idle box) and refused to guess whether that
+    // was a slow gate or a hung one. Profiled instead of re-guessed: instrumented claimTrace's own per-device
+    // build loop and found ONE outlier accounts for 378,605ms of the total -- twof (twoFDevice, the LBM
+    // two-frequency shedding device), building 3 modes at roughly 126s each. kh (55.2s) and stability (49.4s)
+    // are the next two, and the other 36 traced devices total under 75s COMBINED. This is not a claimTrace
+    // inefficiency to fix: twoFBind-selfcheck and twoF-selfcheck (both above, 249s and 92.8s) already carry the
+    // identical build cost independently -- twof is a genuinely slow physics device by its own three separate
+    // gates' agreement, not a defect claimTrace introduced.
+    //
+    // *** SO IT IS MEASURED, NOT SHRUNK, EXACTLY AS THE THREE KELVIN-HELMHOLTZ GATES WERE AT v3214: *** "THREE
+    // OF THE FOUR GATES THAT READ AS TIMEOUT ... TURNED OUT TO BE FINE ONCE ALLOWED TO RUN." Given room,
+    // claimTrace-selfcheck completes reliably: two full runs, stopwatch-timed end to end (the whole selfcheck
+    // file, not just the imported function), at 551021ms and 555728ms. The higher of the two is recorded here,
+    // matching the tree's own convention (valueMatch above records the worst of three runs, not an average).
+    // IT WILL STAY SLOW: the cost is 39 devices' worth of real physics builds and shrinks only if a future round
+    // narrows claimTrace's own scope (fewer devices per run) or twof's own build cost drops -- this number is a
+    // measurement of today's lab, not a promise about tomorrow's.
+    "tools/roundhouse/claimTrace-selfcheck.mjs":     555728,
 };
 
 export const TAIL_HEADROOM = 2;
@@ -347,30 +368,6 @@ export const UNRESOLVED = {
         "skips without a rasteriser, so this box has never run it to completion. Its former 55ms entry was the SKIP time, removed at v3941",
     "render/holoAgree-selfcheck.mjs":
         "skips without a rasteriser, so this box has never run it to completion. Its former 56ms entry was the SKIP time, removed at v3941",
-
-    // *** v3913 -- claimTrace DID NOT COMPLETE IN THIRTY MINUTES, so there is no measurement to record. ***
-    // A LOWER BOUND IS NOT A MEASUREMENT. Every entry in MEASURED above is a real completion; putting a guess
-    // beside them would poison the one property that table has. This is the table for "we tried and it did not
-    // finish", and it is why the table exists empty rather than not existing.
-    //
-    // What is known: >= 1800000ms with no output, run alone on an idle box, rc 124 from timeout(1). What is NOT
-    // known is whether it would ever finish -- an 1800s bound cannot distinguish a very slow gate from a hung
-    // one, and saying which would be a confident answer about unfinished work.
-    //
-    // THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER. Three of the four gates that read as
-    // TIMEOUT on the rig turned out to be fine once allowed to run; this is the one that is genuinely unresolved,
-    // and calling it out separately is the whole point of keeping the two tables apart.
-    // *** AND THE GATE CAUGHT ME SMUGGLING A NUMBER IN HERE. *** I first wrote this as
-    // { atLeastMs: 1800000, measured: false, note: ... } and gateBudget-selfcheck refused it: the values in this
-    // table must be STRINGS. That is not a formatting rule, it is the table's whole point -- a machine-readable
-    // atLeastMs is a number something downstream can consume as a budget, which is exactly the fabrication this
-    // table exists to refuse. THE BOUND BELONGS IN PROSE, WHERE NOTHING CAN MISTAKE IT FOR A MEASUREMENT.
-    "tools/roundhouse/claimTrace-selfcheck.mjs":
-        "v3913: did not complete in 1800s, run alone on an idle box, no output at all (rc 124 from timeout(1)). " +
-        "That is a LOWER BOUND AND NOT A MEASUREMENT -- it cannot distinguish a very slow gate from a hung one, " +
-        "and saying which would be a confident answer about unfinished work. Three of the four gates that read " +
-        "as TIMEOUT on the rig turned out to be fine once allowed to run; this is the one that is genuinely " +
-        "unresolved. THE NEXT STEP IS A SMALLER FIXTURE OR A PROFILE, NOT A BIGGER NUMBER.",
 };
 
 /**

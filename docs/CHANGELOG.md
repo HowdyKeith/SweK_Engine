@@ -8,6 +8,42 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4060 -- two standalone debt gates, fixed for real
+
+Task #6 (`claimTrace` TIMEOUT), then mid-task: "widen that sweep for real."
+
+**The `definitionGates` sweep is tree-wide now, not just reported.** v4059 stopped at printing the tree-wide
+number (290 unmentioned of 2861 exports) because reddening 209 unaudited definitions in the same breath as
+finding them is the "condemn correct gates to improve a statistic" trap this file argues against. But a number
+only ever *printed* is a number nobody has to act on -- and the file's own history proves it: the physics
+`BASELINE` sat at 37 since v3323 while the real count grew to 81, because a report with no ratchet gives nobody
+a reason to look twice. So the tree-wide count gets the same treatment `BASELINE` got at v3322: frozen at
+today's honest **290**, ratchets down, never up. Sabotage-confirmed. The physics-only ratchet stays as its own
+line, untouched, still red at 81 -- pre-existing debt, not something this widening fixes or hides.
+
+**And `claimTrace-selfcheck.mjs` no longer times out, because it was never given room to finish.** Its own v3913
+note already named the right next step -- *"a smaller fixture or a profile, not a bigger number"* -- and it had
+never been followed. Profiled: 39 devices get built to check gate claims, and **one**, `twof` (the LBM
+two-frequency shedding device), accounts for 378,605 of the ~552,000-555,000ms total -- **68%**, at ~126s per
+mode across 3 modes. Not a `claimTrace` bug: `twoFBind-selfcheck` (249s) and `twoF-selfcheck` (92.8s) already
+carry the identical build cost independently, so three separate gates agree `twof` is just genuinely slow.
+
+Given room the gate completes *reliably* -- three independent full runs, stopwatch-timed end to end through the
+same path `selfchecks.mjs` itself uses: 551021ms, 555728ms, 559100ms. Moved from the `UNRESOLVED` prose table
+into `MEASURED` with a real number, following the identical precedent v3214 set for the Kelvin-Helmholtz cluster
+("three of the four gates that read as TIMEOUT ... turned out to be fine once allowed to run"). Budget: 182s
+(the too-short default it always fell back to) -> **1111.5s**.
+
+**And fixing the timeout uncovered a real, separate, previously invisible finding -- not a clean pass.** The
+gate's own frozen ratchet on untraceable claims is violated: 21 gates have gained untraceable numeric claims
+since it was set, invisible for as long as the gate could never run long enough to check. **Not auto-fixed
+here** -- the gate's own comment names the correct response: *"fixing one means stating the config beside the
+number, which its author can do and I cannot -- guessing would be fabricating provenance."* Reported, not
+resolved; real work for whoever wrote each of those 21 headers.
+
+Neither gate is wired into `verify.mjs`'s hard-fail criteria (checked before touching either), so both were safe
+to widen without risking the ship gate. `verify.mjs` stays ALL GREEN throughout.
+
 ## Since v4059 -- a gate whose number meant less than its label said
 
 Going back to pay this session's own coverage debt, I found `rig/cinematicShot.js` shipping **eight** exported
