@@ -97,6 +97,14 @@ export async function buildNbench(hyp, base = {}) {
 }
 
 export const neighbourBenchDevice = {
+    // *** v4035 -- DECLARED, BECAUSE THE ELEMENTWISE LADDER IS RIGHT TO DECLINE THIS ONE. ***
+    // `sizes` is a list of (N, radius) PAIRS, so its entries are arrays rather than numbers and knobLiveness's
+    // array ladder correctly refuses it -- scaling a pair would multiply a particle count and a cutoff radius
+    // by the same factor, which is two different physical changes wearing one number. The alternatives move
+    // each independently: one raises the counts at the default radii, the other widens the radii at the
+    // default counts, so a reading that came only from N and one that came only from h are distinguishable.
+    knobChoices: { sizes: [[[500, 0.15], [2000, 0.12]], [[800, 0.15], [3000, 0.12]], [[500, 0.25], [2000, 0.2]]] },
+
     modes: NBENCH_MODES,
     plantMode: "boxhits", plantFlips: "differingLists", plantKind: "mode",
     plantIdeal: 0, plantIdealWhy:

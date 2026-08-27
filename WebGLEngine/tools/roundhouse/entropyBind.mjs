@@ -81,6 +81,15 @@ export async function buildEntropy(hyp, base = {}) {
 }
 
 export const entropyDevice = {
+    // *** v4035 -- DECLARED, BECAUSE THE ELEMENTWISE LADDER IS THE ONE TRANSFORMATION THIS QUANTITY IGNORES. ***
+    // `weights` ARE SYMBOL FREQUENCIES, AND SHANNON ENTROPY DOES NOT CARE HOW MANY TIMES YOU COUNTED.
+    // H(p) depends on the normalised distribution, so multiplying every frequency by ten is the identity on
+    // every observable here -- MEASURED BIT-IDENTICAL. The array ladder scales, so it was asking the one
+    // question this device is provably blind to, and reported the knob dead for being right.
+    // The alternatives change the SHAPE instead: uniform is maximum entropy (H = log2(6) = 2.5850 exactly),
+    // and the skewed one is far from it (H = 0.6651). Both move H, expectedLen and excessOverH.
+    knobChoices: { weights: [[45, 13, 12, 16, 9, 5], [1, 1, 1, 1, 1, 1], [90, 5, 2, 1, 1, 1]] },
+
     modes: ENTROPY_MODES,
     // "coding" is FIRST so the mode-plant contract compares the plant against the mode that owns the band.
     plantMode: "mergelargest", plantFlips: "excessOverH", plantKind: "mode",

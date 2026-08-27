@@ -88,6 +88,14 @@ function buildFragRot({ mode = "fragments", config = {} } = {}) {
 }
 
 export const fragmentRotationDevice = {
+    // *** v4035 -- DECLARED, BECAUSE THE ELEMENTWISE LADDER IS THE ONE TRANSFORMATION THIS QUANTITY IGNORES. ***
+    // `axis` IS A DIRECTION. Scaling it by 1.5 gives the same axis, so knobLiveness's array ladder moved
+    // nothing at any rung and reported the knob dead -- MEASURED BIT-IDENTICAL at [1,2,3] and [1.5,3,4.5].
+    // That invariance is the rotation being a rotation, not a defect, and the honest perturbation is a
+    // DIFFERENT DIRECTION rather than a longer vector. Three that are not parallel to the default and not
+    // to each other: two coordinate axes and a face diagonal.
+    knobChoices: { axis: [[1, 2, 3], [0, 0, 1], [1, 0, 0], [1, 1, 0]] },
+
     plantKind: "method",
     modes: ["fragments"],
     name: "fracture-fragments-intermediate-axis",

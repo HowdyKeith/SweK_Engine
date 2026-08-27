@@ -27,6 +27,7 @@ import { BASES } from "../../physics/crystal/structureFactor.mjs";
 import { INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
 import { SCENARIOS } from "../../physics/blobKelvin.js";
+import { sameValue } from "./knobLiveness.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -363,6 +364,68 @@ console.log("\n3g. *** v4034 -- THE OTHER FOUR NAME KNOBS, DERIVED FROM THE TABL
         "THE CHOICES BEEN DERIVED FROM MATERIALS, the census would have probed a value the device is right to " +
         "refuse, and read the fallback as a reading. The two tables differ by exactly one entry and that entry " +
         "is the whole difference between a probe and a no-op. ***");
+}
+
+console.log("\n3h. *** v4035 -- A LIST OF NUMBERS HAS A SCALING, AND THREE QUANTITIES IGNORE IT ON PURPOSE ***");
+{
+    // The refusal to invent an ordering was written for STRINGS -- there is no 1.5x of "fcc". A list of
+    // numbers is not that case: betas, temps, angles and queries are sample points, and multiplying them is
+    // exactly as principled as multiplying a scalar. Eleven of the lab's fifteen array knobs answer to that
+    // ladder alone. THE OTHER FOUR ARE THE INTERESTING ONES.
+    ok("!! a numeric list is stepped elementwise, which is not inventing anything",
+        JSON.stringify(probeValues([2, 4])) === JSON.stringify([[3, 6], [1, 2], [16, 32]]),
+        "1.5x, 0.5x, 8x applied per element -- the same ladder the scalar branch uses, one dimension up.");
+    ok("!! an ALL-ZERO list is offset instead, because scaling zero is the identity",
+        JSON.stringify(probeValues([0, 0])) === JSON.stringify([[1, 1], [0.5, 0.5], [-1, -1]]),
+        "strokeMorph's `lineA` is the endpoint [0,0]. A scaled ladder probes it at [0,0] three times and calls " +
+        "it dead -- the array case of the `v === 0` branch this file has carried for scalars since it was " +
+        "written, which is the same fact one dimension up.");
+    ok("!! a list of non-numbers is still declined rather than guessed at",
+        probeValues([[1, 2], [3, 4]]).length === 0,
+        "nbench's `sizes` is a list of (N, radius) PAIRS: scaling one would multiply a particle count and a " +
+        "cutoff radius by the same factor, which is two different physical changes wearing one number.");
+    ok("!! and a declared choice equal to the default is dropped BY VALUE, not by reference",
+        probeValues([1, 2], [[1, 2], [3, 4]]).length === 1 && sameValue([[1, 2]], [[1, 2]]),
+        "Object.is compares arrays by identity, so a choice written out with the same contents survived the " +
+        "filter, moved nothing, and for a one-entry list would have been the only rung -- a declared knob " +
+        "reading dead off a comparison that never looked at the numbers.");
+
+    // *** THE TWO INVARIANCES, ASSERTED AS PHYSICS RATHER THAN WORKED AROUND. *** Both knobs read dead under
+    // the elementwise ladder, and both were right to: the ladder was asking the one question each quantity is
+    // provably blind to. Recording that here means the reading cannot come back as a mystery.
+    const ent = await getDevice("entropy");
+    const eBase = await ent.build({ mode: "coding", config: {} });
+    const eScaled = await ent.build({ mode: "coding", config: { weights: [450, 130, 120, 160, 90, 50] } });
+    const eUniform = await ent.build({ mode: "coding", config: { weights: [1, 1, 1, 1, 1, 1] } });
+    ok("!! *** SHANNON ENTROPY DOES NOT CARE HOW MANY TIMES YOU COUNTED ***",
+        Object.keys(eBase).every((k) => Object.is(eBase[k], eScaled[k])) &&
+        Math.abs(eUniform.H - Math.log2(6)) < 1e-12,
+        "every frequency x10 is BIT-IDENTICAL on every observable -- H depends on the normalised distribution " +
+        "and on nothing else. And uniform weights give H = " + eUniform.H.toFixed(15) + " against log2(6) = " +
+        Math.log2(6).toFixed(15) + ", the maximum. *** THE KNOB READ DEAD BECAUSE THE DEVICE IS CORRECT, which " +
+        "is the mpmstep.nu shape again: a key that holds looks exactly like a knob that does nothing. The " +
+        "declared choices change the SHAPE of the distribution, which is the question that has an answer. ***");
+
+    const frag = await getDevice("fragmentRotation");
+    const fBase = await frag.build({ mode: "fragments", config: {} });
+    const fScaled = await frag.build({ mode: "fragments", config: { axis: [1.5, 3, 4.5] } });
+    const fTurned = await frag.build({ mode: "fragments", config: { axis: [0, 0, 1] } });
+    ok("!! *** AND A ROTATION AXIS IS A DIRECTION, SO A LONGER VECTOR IS THE SAME AXIS ***",
+        Object.keys(fBase).every((k) => Object.is(fBase[k], fScaled[k])) &&
+        Object.keys(fBase).some((k) => !Object.is(fBase[k], fTurned[k])),
+        "[1,2,3] and [1.5,3,4.5] are BIT-IDENTICAL; [0,0,1] moves an observable. The honest perturbation is a " +
+        "different direction, not a longer vector, and the declared choices are three that are parallel " +
+        "neither to the default nor to each other.");
+
+    const { rows } = await knobLiveness({
+        only: ["fragmentRotation", "entropy", "nbench", "strokeMorph"], budgetMs: 200000 });
+    const named = ["fragmentRotation.axis", "entropy.weights", "nbench.sizes", "strokeMorph.lineA"];
+    const answered = rows.filter((r) => r.live.length).map((r) => r.device + "." + r.knob);
+    ok("!! *** ALL FOUR NOW READ LIVE, AND NO ARRAY KNOB IN THE LAB IS UNPROBED ***",
+        named.every((k) => answered.includes(k)) && unprobedKnobs(rows).length === 0,
+        named.join(", ") + " -- the last full sweep reported every one of them as 'not probed (array)'. " +
+        "Eleven of the fifteen came free from the elementwise ladder; these four each needed the device to " +
+        "say what a real alternative looks like, and two of them needed it BECAUSE THEY WERE RIGHT.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
