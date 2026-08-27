@@ -1,0 +1,29 @@
+// v4043 -- NO EXTERNAL DEPENDENCIES AT ALL. android.webkit.WebView is part of the platform, so this app pulls
+// in neither AndroidX nor a support library: the APK is a few hundred KB and there is no dependency tree to age.
+apply plugin: "com.android.application"
+
+android {
+    namespace "com.swek.webview"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.swek.webview"
+        minSdk 24               // WebView's modern settings + onShowFileChooser; covers Android 7 and up
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // UNSIGNED BY DEFAULT, ON PURPOSE: a signing key checked into a repo is a key that is no longer a
+            // key. `assembleDebug` produces an installable, debug-signed APK, which is what sideloading wants.
+            signingConfig null
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
