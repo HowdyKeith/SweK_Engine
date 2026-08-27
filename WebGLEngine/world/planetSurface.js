@@ -53,6 +53,26 @@ export function tangentFrame(dir) {
 // Height at a direction, on the SAME field the equirect bake uses.
 export function heightAtDir(spec, dir) { const d = norm3(dir); return heightAt(spec, d[0], d[1], d[2]); }
 
+/**
+ * v4053 -- THE DISPLACED SURFACE RADIUS AT A DIRECTION: how far the ground actually is from the planet's centre,
+ * once the relief has pushed the mesh out. es-box3d-fly3d.html has computed this inline since v3842 to displace
+ * its sphere's vertices; rig/cinematicShot.js now needs the SAME number to know where the ground is, and two
+ * copies of a displacement formula is how a camera ends up flying through a mountain that the renderer drew and
+ * the camera never knew about. One declaration, two consumers.
+ *
+ * `height` may be passed in when the caller already has the BAKED value (the page reads it back out of its
+ * cubemap, which is quantised to bytes); omitted, the analytic field answers. Those two agree by construction
+ * but are not bit-identical, which is exactly why a camera clearance should carry a margin rather than trust
+ * equality -- see the gate, which measures the gap rather than assuming it away.
+ *
+ * Sea stays a LEVEL surface: heights below sea level all displace to the same radius, so an ocean is flat.
+ */
+export function surfaceRadiusAt(spec, dir, { radius = 1, ampFrac = 0.035, height = null } = {}) {
+    const h = (height === null || height === undefined) ? heightAtDir(spec, dir) : height;
+    const k = 1 + ampFrac * (Math.max(h, spec.seaLevel) - spec.seaLevel) / Math.max(1e-3, 1 - spec.seaLevel);
+    return radius * k;
+}
+
 // The height field's gradient in the tangent plane: { dEast, dNorth }, a central difference over a small angular
 // step. Pure arithmetic on the gated height field, so a wrong sign here is arithmetic, not taste.
 export function surfaceGradient(spec, dir, P) {

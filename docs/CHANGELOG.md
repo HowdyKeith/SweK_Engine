@@ -8,6 +8,66 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4053 -- a cinematic descent onto our own planet, built from our own parts
+
+Keith: "lets also pick up the terrain camera work." Then, twice, pointing at better material than I had picked:
+"we do have a voxel planet we made", and "we also have great clouds we made to pass through."
+
+**The repo still cannot be adopted, and the reasons are worth restating.** `Makio64/threejs-cinematic-world-zoom`
+needs a Vite build (this tree's standing law: nothing in `WebGLEngine/*.html` may need compiling, because a phone
+peer opens those pages with no toolchain), a **mandatory** Google Maps Platform or Cesium Ion key, and a hard
+`three@0.185.1` pin with a documented silent depth-texture failure above it against our r160. Its MIT licence
+covers the *code* only -- Google's tile terms, not the licence, govern anything rendered from it.
+
+But the camera move is trigonometry over a scalar, so the **technique** is reimplemented in new
+`rig/cinematicShot.js` -- pure arithmetic, no Three.js, no DOM, no GL. The same call this tree already made for
+`asciify.mjs` ("the technique needs nothing") and `world/procPlanet.js` ("lifted (not copied)"). Nothing vendored.
+And Keith's planet is a far better subject than anybody's tile server: `world/procPlanet.js` bakes a whole world
+from a seed, and `world/planetSurface.js` can answer the ground height anywhere on it.
+
+Three things make it read as cinema rather than a lerp, each measured:
+
+1. **Logarithmic distance.** A constant *perceived* zoom rate is a constant rate of change of *log* distance.
+   MEASURED over 20000 -> 2: equal steps of t multiply the distance by equal factors to 3.89e-16. Linear
+   interpolation at t=0.5 sits at 10001 -- 7.5% of the zoom completed for 50% of the shot. A stall, then a slam.
+2. **An analytic, singularity-free rig**, built from `do/dp` (the derivative of the eye direction with respect to
+   pitch) and never from `cross(worldUp, forward)`.
+3. **Per-channel curves**, each a pure function of t. Purity is what makes frame-locked seeking possible and what
+   lets the whole module be graded with no GPU.
+
+**The gate for (2) was wrong twice before it discriminated, and both mistakes were instructive.** I first
+asserted the naive basis "collapses to zero" at straight-down over an *equatorial* target. It passed at length
+1.0 -- correctly, because the singularity is not "straight down" in the abstract, it is *the view direction
+parallel to the reference up*, which on a planet means a **polar** landing site, and a descent picks its site
+freely. Retargeted to the pole, a sabotage swapping our up *for* the naive one **still passed**: in floating
+point that cross product is ~6e-17, not 0, and normalises straight back to a unit vector. The naive rig does not
+fail loudly. It fails silently, and the real symptom is worse than a NaN -- MEASURED, the up vector **flips
+through 180 degrees** in a single 1e-3 rad step across straight-down (jump 2.0000, against ours at 1.00e-3). The
+camera rolls upside down passing over the pole, its orientation on either side decided by rounding error. The
+gate now computes *both* rigs itself and contrasts them, so no sabotage is needed to show the defect and it can
+never quietly pass again.
+
+**And the descent knows where the ground is.** `world/planetSurface.js` gains `surfaceRadiusAt()` -- one
+declaration of the relief displacement `es-box3d-fly3d.html` had carried inline since v3842 -- so the mesh and
+the camera ask the same arithmetic. Two copies of a displacement formula is precisely how a camera flies through
+a mountain the renderer drew. VERIFIED: 4356 sampled frames across 6 seeds x 6 landing sites all clear the
+displaced surface (worst 1.33 units) on a planet whose relief reaches 0.386 units; and live in headless
+Chromium the real Three camera descends from 133.8 to 1.95 units of clearance with zero page errors.
+
+`es-box3d-fly3d.html` gains a **Descend** button, and `?seed=` to make the planet reproducible. OrbitControls is
+disabled for the flight and handed the *landing site* on completion: left enabled its damping fights the shot
+every frame (a shudder), and releasing it to a stale target snaps the view across the planet. Both
+sabotage-confirmed.
+
+One more of my own gate's output caught lying: a detail string that stated its conclusion ("all with controls
+disabled; enabled again at landing") printed that sentence verbatim on the run where the check FAILED. It reports
+the measured values now -- the "flag that lies" defect, found in a gate's own message.
+
+**An honest note on the clouds.** `render/cloudLayer.js` is real and good -- six meteorological types across
+altitude bands 85-235 -- but it is raw WebGL2 with its own shader program, and the planet page is Three.js. So
+flying *through* them is a port, not a wiring, and it is deliberately left for its own round rather than
+half-done here.
+
 ## Since v4052 -- the last two postage-stamp canvases, and a pet whose head finally sits on its neck
 
 Keith: "two leftover postage-stamp canvases first." Then, looking at the render: "could we put the avatar pet

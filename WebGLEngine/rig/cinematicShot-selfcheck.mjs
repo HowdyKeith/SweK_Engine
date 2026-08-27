@@ -1,0 +1,349 @@
+// WebGLEngine/rig/cinematicShot-selfcheck.mjs — v4053
+//
+// Run: node rig/cinematicShot-selfcheck.mjs   (~0.3s MEASURED; no browser, no GPU, no network)
+//
+// GRADES rig/cinematicShot.js, the parametric camera move Keith asked for after
+// Makio64/threejs-cinematic-world-zoom ("could we for example tack on ..."). The repo itself could not be
+// adopted -- Vite build, a mandatory Google/Cesium tile key, a hard three@0.185.1 pin -- so the TECHNIQUE was
+// reimplemented, and a reimplemented technique is exactly the kind of claim that has to be measured rather than
+// asserted. Everything below is arithmetic over fixtures, which is why it needs no GPU: the module takes a
+// scalar t and returns a camera, with no canvas, no DOM and no GL anywhere in it.
+//
+// THE FOUR CLAIMS ON TRIAL:
+//   1. mixLog gives a constant PERCEIVED zoom rate, and linear interpolation demonstrably does not.
+//   2. The rig is orthonormal and singularity-free AT straight-down, where lookAt's own basis collapses.
+//   3. Every shot channel is a pure function of t that actually reaches both endpoints.
+//   4. A descent onto the REAL procedural planet ends ABOVE the ground, not inside a mountain -- checked
+//      against world/planetSurface.js's surfaceRadiusAt(), the same formula es-box3d-fly3d.html displaces its
+//      mesh with. That check is the reason the formula was extracted rather than copied.
+"use strict";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..");
+let fails = 0;
+const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+
+const S = await import(pathToFileURL(path.join(HERE, "cinematicShot.js")).href);
+const PS = await import(pathToFileURL(path.join(ROOT, "world", "planetSurface.js")).href);
+const PP = await import(pathToFileURL(path.join(ROOT, "world", "procPlanet.js")).href);
+
+const len3 = (v) => Math.hypot(v[0], v[1], v[2]);
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+
+console.log("cinematicShot-selfcheck -- a camera move as arithmetic, graded without a GPU\n");
+
+console.log("1. *** LOGARITHMIC DISTANCE: A CONSTANT PERCEIVED ZOOM RATE ***");
+{
+    ok("!! mixLog hits both endpoints exactly",
+        Math.abs(S.mixLog(20000, 2, 0) - 20000) < 1e-9 && Math.abs(S.mixLog(20000, 2, 1) - 2) < 1e-9,
+        "a shot that does not start where it was told to start is a cut, not a move");
+
+    // *** THE IDENTITY. *** Equal steps of t must MULTIPLY the distance by equal factors. That is what "constant
+    // perceived zoom rate" means, and it is checkable to machine precision rather than by eye.
+    const ratios = [];
+    for (let i = 0; i < 10; i++) ratios.push(S.mixLog(20000, 2, (i + 1) / 10) / S.mixLog(20000, 2, i / 10));
+    const spread = Math.max(...ratios) - Math.min(...ratios);
+    ok("!! *** equal steps of t multiply the distance by EQUAL factors (to machine precision) ***",
+        spread < 1e-12, "10 successive ratios spread by " + spread.toExponential(2) +
+        "; each step is x" + ratios[0].toFixed(4) + " -- THIS is the constant perceived zoom rate");
+
+    // and the negative that says why it matters: linear does the opposite, measurably.
+    const linHalf = 20000 + (2 - 20000) * 0.5, logHalf = S.mixLog(20000, 2, 0.5);
+    const linProgress = Math.log(20000 / linHalf) / Math.log(20000 / 2);   // fraction of the ZOOM done, not of the distance
+    ok("!! ...and linear interpolation is a STALL then a SLAM, which is the bug this replaces",
+        logHalf < 300 && linProgress < 0.12,
+        "at t=0.5: linear sits at " + linHalf.toFixed(0) + " (only " + (linProgress * 100).toFixed(1) +
+        "% of the zoom done for 50% of the shot); mixLog sits at " + logHalf.toFixed(1) + " (exactly half)");
+
+    ok("...and a zero/negative endpoint is clamped rather than returning NaN",
+        Number.isFinite(S.mixLog(0, 10, 0.5)) && Number.isFinite(S.mixLog(10, 0, 0.5)),
+        "log(0) is -Infinity; a NaN camera shows up as a black frame, not as an error");
+}
+
+console.log("\n2. *** THE RIG IS ORTHONORMAL AND SURVIVES STRAIGHT-DOWN, WHERE lookAt DOES NOT ***");
+{
+    const center = [0, 0, 0], target = [0, 0, 17];
+    let worstOrtho = 0, worstUnit = 0, worstDist = 0, worstAim = 0;
+    for (let i = 0; i <= 200; i++) {
+        const pitch = -Math.PI / 2 + (i / 200) * Math.PI;          // straight down through straight up
+        for (const az of [0, 1.1, 2.7, -2.0]) {
+            const r = S.orbitRig({ center, target, distance: 40, pitch, azimuth: az });
+            worstUnit = Math.max(worstUnit, Math.abs(len3(r.forward) - 1), Math.abs(len3(r.up) - 1), Math.abs(len3(r.right) - 1));
+            worstOrtho = Math.max(worstOrtho, Math.abs(dot3(r.forward, r.up)), Math.abs(dot3(r.forward, r.right)), Math.abs(dot3(r.up, r.right)));
+            worstDist = Math.max(worstDist, Math.abs(len3(sub3(r.eye, target)) - 40));
+            // forward must actually point from the eye at the target
+            const aim = S.norm3(sub3(target, r.eye));
+            worstAim = Math.max(worstAim, len3(sub3(aim, r.forward)));
+        }
+    }
+    ok("!! the basis is orthonormal at every pitch from straight-down to straight-up",
+        worstOrtho < 1e-12 && worstUnit < 1e-12,
+        "worst |dot| " + worstOrtho.toExponential(2) + ", worst |len-1| " + worstUnit.toExponential(2) + " over 804 rigs");
+    ok("!! ...the eye really is `distance` from the target, and forward really points at it",
+        worstDist < 1e-9 && worstAim < 1e-9,
+        "worst distance error " + worstDist.toExponential(2) + ", worst aim error " + worstAim.toExponential(2));
+
+    // *** THE LOAD-BEARING NEGATIVE, AND MY FIRST VERSION OF IT AIMED AT THE WRONG PLACE. *** I asserted the
+    // collapse at pitch=pi/2 over an EQUATORIAL target and it passed with length 1.0 -- correctly, because
+    // lookAt's singularity is NOT "straight down" in the abstract, it is "the view direction is parallel to the
+    // REFERENCE up". Straight down over the equator looks along -z while worldUp is +y: no degeneracy at all.
+    // The angle that actually breaks lookAt is a POLAR landing site, where the ground's own up IS the world's
+    // up -- and a planetary descent picks its landing site freely, so that is a site a real shot will hit. Our
+    // rig is built from do/dp and never references worldUp, so it does not distinguish the poles at all.
+    const worldUp = [0, 1, 0];
+    const pole = [0, 17, 0];                                   // the one place lookAt cannot aim from
+    const overPole = S.orbitRig({ center, target: pole, distance: 40, pitch: Math.PI / 2, azimuth: 0 });
+    const naive = [
+        worldUp[1] * overPole.forward[2] - worldUp[2] * overPole.forward[1],
+        worldUp[2] * overPole.forward[0] - worldUp[0] * overPole.forward[2],
+        worldUp[0] * overPole.forward[1] - worldUp[1] * overPole.forward[0],
+    ];
+    ok("!! ...the ideal cross(worldUp, forward) really does vanish there (the singularity is real, not folklore)",
+        len3(naive) < 1e-12,
+        "length " + len3(naive).toExponential(2) + " at the pole, straight down");
+
+    // ...and the whole pitch sweep stays orthonormal over that same polar site, not just over the equator.
+    let poleWorst = 0;
+    for (let i = 0; i <= 200; i++) {
+        const r = S.orbitRig({ center, target: pole, distance: 40, pitch: -Math.PI / 2 + (i / 200) * Math.PI, azimuth: 0.9 });
+        poleWorst = Math.max(poleWorst, Math.abs(dot3(r.forward, r.up)), Math.abs(len3(r.up) - 1));
+    }
+    ok("!! ...and a full pitch sweep OVER THE POLE stays orthonormal too",
+        poleWorst < 1e-12, "worst " + poleWorst.toExponential(2) + " over 201 rigs at the pole");
+
+    // *** THE CHECK THAT ACTUALLY DISCRIMINATES, AND MY FIRST TWO ATTEMPTS DID NOT. *** I first asserted the
+    // naive basis "collapses to zero" -- and a sabotage that swapped our up FOR the naive one still PASSED,
+    // because in floating point cross(worldUp, forward) at the pole is not 0, it is ~6e-17, which normalizes
+    // straight back to a unit vector. The naive rig does not fail loudly. It fails SILENTLY, and the observable
+    // symptom is worse than a NaN: MEASURED below, the up vector FLIPS THROUGH 180 DEGREES in a single 1e-3 rad
+    // step across straight-down -- the camera rolls upside down as it passes over the pole, its direction on
+    // either side decided entirely by rounding error. So the gate computes BOTH rigs itself and contrasts them;
+    // no sabotage is needed to show the defect, and this can never quietly pass again.
+    const naiveUp = (fwd) => {
+        const c1 = [fwd[1] * 0 - fwd[2] * 1, fwd[2] * 0 - fwd[0] * 0, fwd[0] * 1 - fwd[1] * 0];   // forward x worldUp
+        const c2 = [c1[1] * fwd[2] - c1[2] * fwd[1], c1[2] * fwd[0] - c1[0] * fwd[2], c1[0] * fwd[1] - c1[1] * fwd[0]];
+        return S.norm3(c2);
+    };
+    let oursJump = 0, naiveJump = 0;
+    for (let i = -40; i < 40; i++) {
+        const p0 = Math.PI / 2 + i * 1e-3, p1 = p0 + 1e-3;
+        const a = S.orbitRig({ center, target: pole, distance: 40, pitch: p0, azimuth: 0.7 });
+        const b = S.orbitRig({ center, target: pole, distance: 40, pitch: p1, azimuth: 0.7 });
+        oursJump = Math.max(oursJump, len3(sub3(a.up, b.up)));
+        naiveJump = Math.max(naiveJump, len3(sub3(naiveUp(a.forward), naiveUp(b.forward))));
+    }
+    ok("!! *** THE NAIVE worldUp BASIS FLIPS 180 DEGREES CROSSING THE POLE -- ours steps smoothly through it ***",
+        naiveJump > 1.9 && oursJump < 1e-2,
+        "naive up jumps " + naiveJump.toFixed(4) + " (a full 180deg flip: the camera rolls upside down) against " +
+        "ours at " + oursJump.toExponential(2) + ", for the same 1e-3 rad pitch step. THIS is why the rig is " +
+        "built from do/dp rather than from a cross product with a reference up");
+
+    // continuity over an EQUATORIAL site too -- the pole is the hard case, but the move must be smooth
+    // everywhere, and an equatorial sweep is what a normal landing site actually looks like.
+    let worstJump = 0;
+    for (let i = -20; i < 20; i++) {
+        const p0 = Math.PI / 2 + i * 1e-3, p1 = p0 + 1e-3;
+        const a = S.orbitRig({ center, target, distance: 40, pitch: p0, azimuth: 0.7 });
+        const b = S.orbitRig({ center, target, distance: 40, pitch: p1, azimuth: 0.7 });
+        worstJump = Math.max(worstJump, len3(sub3(a.up, b.up)));
+    }
+    ok("!! ...and the up vector is CONTINUOUS across straight-down at an ordinary site too",
+        worstJump < 1e-2, "worst step " + worstJump.toExponential(2) + " for a 1e-3 rad pitch step across pi/2");
+}
+
+console.log("\n3. *** EVERY SHOT CHANNEL IS A PURE FUNCTION OF t THAT REACHES BOTH ENDS ***");
+{
+    const P = {
+        center: [0, 0, 0], target: [0, 0, 17],
+        from: { distance: 900, pitch: 0.12, azimuth: 0, fov: 55, roll: 0 },
+        to:   { distance: 3,   pitch: 1.05, azimuth: 1.4, fov: 32, roll: 0 },
+    };
+    for (const name of Object.keys(S.SHOTS)) {
+        const sh = S.SHOTS[name];
+        const ends = ["dist", "pitch", "az", "fov", "roll"].every((c) => {
+            const f = sh[c]; const a = f(0), b = f(1);
+            return Math.abs(a) < 1e-12 && (Math.abs(b - 1) < 1e-12 || Math.abs(b) < 1e-12);   // roll holds at 0
+        });
+        ok("!! shot '" + name + "' has every channel anchored at t=0 and t=1",
+            ends, "a channel that does not reach 1 leaves the move short of its stated endpoint");
+    }
+    // purity: same t twice, byte-identical -- what makes frame-locked seeking possible.
+    const a = S.sampleShot("descent", 0.37, P), b = S.sampleShot("descent", 0.37, P);
+    ok("!! *** sampling the same t twice gives the SAME frame *** (no hidden state, so a recorder can seek)",
+        JSON.stringify(a) === JSON.stringify(b),
+        "a shot that depends on call order cannot be rendered frame-locked, which is how the reference records");
+
+    const s0 = S.sampleShot("descent", 0, P), s1 = S.sampleShot("descent", 1, P);
+    ok("!! ...and the sampled endpoints match the requested from/to",
+        Math.abs(s0.distance - 900) < 1e-9 && Math.abs(s1.distance - 3) < 1e-9 &&
+        Math.abs(s1.fov - 32) < 1e-9 && Math.abs(s1.pitch - 1.05) < 1e-9,
+        "t=0 -> d " + s0.distance.toFixed(1) + " fov " + s0.fov.toFixed(1) +
+        " | t=1 -> d " + s1.distance.toFixed(3) + " fov " + s1.fov.toFixed(1));
+
+    // the distance must fall MONOTONICALLY on a descent -- a camera that backs up mid-dive is not a dive.
+    let mono = true, prev = Infinity;
+    for (let i = 0; i <= 100; i++) { const d = S.sampleShot("descent", i / 100, P).distance; if (d > prev + 1e-9) mono = false; prev = d; }
+    ok("!! ...and a descent's distance never increases (it descends)", mono);
+
+    // hyperzoom is a LENS move: FOV must do most of the work while the camera barely travels.
+    const hzTravel = S.sampleShot("hyperzoom", 0, P).distance / S.sampleShot("hyperzoom", 1, P).distance;
+    ok("!! 'hyperzoom' is mostly a LENS move -- the FOV closes while the camera is already near its mark",
+        S.SHOTS.hyperzoom.dist(0.5) > 0.9 && S.SHOTS.hyperzoom.fov(0.5) < 0.95,
+        "dist easing is " + S.SHOTS.hyperzoom.dist(0.5).toFixed(3) + " done at the half-way mark while fov is only " +
+        S.SHOTS.hyperzoom.fov(0.5).toFixed(3) + " -- total travel ratio " + hzTravel.toFixed(0) + "x");
+}
+
+console.log("\n4. *** A DESCENT ONTO THE REAL PROCEDURAL PLANET ENDS ABOVE THE GROUND, NOT INSIDE A MOUNTAIN ***");
+{
+    // The subject is world/procPlanet.js's actual seeded planet and world/planetSurface.js's actual displacement
+    // -- the same numbers es-box3d-fly3d.html builds its mesh from. Nothing here is a stand-in.
+    const R = 17, AMP = 0.035;
+    let worstClear = Infinity, worstSeed = -1, tested = 0, maxRelief = 0;
+    for (const seed of [1, 7, 42, 1234, 99991, 777777]) {
+        const spec = PP.planetSpec(seed);
+        for (const dir of [[0, 0, 1], [1, 0, 0], [0, 1, 0], [0.4, 0.7, -0.6], [-0.5, -0.2, 0.84], [0.33, -0.9, 0.28]]) {
+            const d = S.norm3(dir);
+            const ground = PS.surfaceRadiusAt(spec, d, { radius: R, ampFrac: AMP });
+            maxRelief = Math.max(maxRelief, ground - R);
+            const target = [d[0] * ground, d[1] * ground, d[2] * ground];
+            // a descent that ends 1.5 units off the deck, straight down the local vertical at the end
+            const P = {
+                center: [0, 0, 0], target,
+                from: { distance: 900, pitch: 0.10, azimuth: 0, fov: 58, roll: 0 },
+                to:   { distance: 1.5, pitch: 1.20, azimuth: 1.2, fov: 34, roll: 0 },
+            };
+            for (let i = 0; i <= 120; i++) {
+                const f = S.sampleShot("descent", i / 120, P);
+                const eyeR = Math.hypot(f.eye[0], f.eye[1], f.eye[2]);
+                const eyeDir = S.norm3(f.eye);
+                const groundUnderEye = PS.surfaceRadiusAt(spec, eyeDir, { radius: R, ampFrac: AMP });
+                const clear = eyeR - groundUnderEye;
+                if (clear < worstClear) { worstClear = clear; worstSeed = seed; }
+                tested++;
+            }
+        }
+    }
+    ok("!! *** the camera stays ABOVE the displaced surface for the WHOLE flight, on every seed ***",
+        worstClear > 0,
+        "worst clearance " + worstClear.toFixed(4) + " units over " + tested + " sampled frames on 6 seeds x 6 " +
+        "landing sites (closest approach on seed " + worstSeed + "); relief reaches " + maxRelief.toFixed(3) +
+        " units above the mean radius, so this is not a claim about a smooth ball");
+
+    ok("!! ...and surfaceRadiusAt keeps the sea LEVEL (every below-sea direction gives the same radius)",
+        (() => {
+            const spec = PP.planetSpec(42);
+            const below = [];
+            for (let i = 0; i < 400 && below.length < 12; i++) {
+                const a = i * 0.7, b = i * 1.3;
+                const d = S.norm3([Math.cos(a) * Math.cos(b), Math.sin(b), Math.sin(a) * Math.cos(b)]);
+                if (PS.heightAtDir(spec, d) < spec.seaLevel) below.push(PS.surfaceRadiusAt(spec, d, { radius: R, ampFrac: AMP }));
+            }
+            return below.length >= 3 && (Math.max(...below) - Math.min(...below)) < 1e-12;
+        })(),
+        "an ocean that follows the noise field under the water is not an ocean");
+
+    // ONE DECLARATION: the page must not carry its own copy of the displacement any more.
+    const fs = await import("node:fs");
+    const page = fs.readFileSync(path.join(ROOT, "es-box3d-fly3d.html"), "utf8");
+    ok("!! *** es-box3d-fly3d.html displaces its mesh through the SAME surfaceRadiusAt the camera asks ***",
+        /surfaceRadiusAt\(spec, \[x, y, z\]/.test(page) && !/const k = 1 \+ \(AMP \/ R\)/.test(page),
+        "two copies of a displacement formula is precisely how a camera flies through a mountain the renderer drew");
+}
+
+console.log("\n5. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS FROM CLEARS THE GROUND ***");
+{
+    const fs = await import("node:fs");
+    const page = fs.readFileSync(path.join(ROOT, "es-box3d-fly3d.html"), "utf8");
+
+    ok("!! es-box3d-fly3d.html drives the shot from the shared module, not a second copy of the maths",
+        /import \{ sampleShot, norm3 as cnorm3 \} from "\/rig\/cinematicShot\.js"/.test(page) &&
+        /sampleShot\("descent", descent\.t, descent\.p\)/.test(page),
+        "a page that re-derived the curves would drift from everything section 1-3 just proved");
+    ok("!! ...and the landing site is chosen on the REAL displaced terrain, not the mean radius",
+        /surfaceRadiusAt\(planetSpec_, dir, \{ radius: planetR, ampFrac: PLANET_AMP_FRAC \}\)/.test(page),
+        "relief reaches ~0.39 units on this planet -- easily enough to end a descent inside a mountain");
+    // *** TWO BUGS THAT ONLY EXIST BECAUSE OrbitControls SHARES THE CAMERA. *** Left enabled, its damping pulls
+    // the camera back toward its own target every frame while the shot pushes it forward -- a visible shudder.
+    // And on landing, handing control back WITHOUT moving controls.target snaps the view across the planet,
+    // because the controls still orbit whatever they were last told to look at.
+    ok("!! *** OrbitControls is DISABLED for the flight and handed the LANDING SITE when it ends ***",
+        /controls\.enabled = false;/.test(page) && /controls\.target\.set\(f\.target\[0\], f\.target\[1\], f\.target\[2\]\)/.test(page),
+        "damping fighting the shot reads as a shudder; releasing to a stale target snaps the view across the planet");
+
+    const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
+    const { createRequire } = await import("node:module");
+    const rr = pw.resolvePlaywright(createRequire(import.meta.url));
+    const skip = pw.browserSkipReason(rr.chromium, rr.from, pw.HEADLESS_SHELL);
+    if (skip) {
+        console.log("  ----  live flight SKIPPED -- " + skip);
+        console.log("  ----  *** THAT IS A SKIP AND NOT A PASS: the checks above read source, and source cannot");
+        console.log("  ----  show that the camera Three actually renders from stayed above a mountain.");
+    } else {
+        const http = await import("node:http");
+        const srv = http.default.createServer((rq, rs) => {
+            const p = decodeURIComponent((rq.url || "/").split("?")[0]);
+            const full = path.join(ROOT, p);
+            if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) { rs.writeHead(404); rs.end("nf"); return; }
+            const ext = path.extname(full);
+            const ct = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css" }[ext] || "application/octet-stream";
+            rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(full));
+        });
+        await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+        const browser = await rr.chromium.launch({ executablePath: pw.HEADLESS_SHELL, args: ["--use-gl=swiftshader", "--enable-webgl"] });
+        try {
+            const pg = await browser.newPage();
+            const errs = [];
+            pg.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+            await pg.setViewportSize({ width: 700, height: 460 });
+            await pg.goto("http://127.0.0.1:" + srv.address().port + "/es-box3d-fly3d.html?seed=42", { waitUntil: "load", timeout: 40000 });
+            await pg.waitForTimeout(3500);
+            const before = await pg.evaluate(() => window.swekDescentProbe && window.swekDescentProbe());
+            ok("!! the page exposes a live probe and the planet is built", !!before, before ? "" : "no swekDescentProbe");
+
+            if (before) {
+                await pg.evaluate(() => window.swekDescend());
+                // sample the WHOLE flight, not just its ends -- flying through a mountain mid-descent and
+                // coming out the far side would satisfy an endpoints-only check perfectly.
+                // sample until the flight REPORTS it has landed, with a bound -- a fixed sample count is a
+                // guess about how fast a headless swiftshader frame loop runs, and my first version guessed
+                // 11.7s for a 9s shot and still caught it mid-flight.
+                const track = [];
+                for (let i = 0; i < 80; i++) {
+                    await pg.waitForTimeout(400);
+                    const p = await pg.evaluate(() => window.swekDescentProbe());
+                    track.push(p);
+                    if (p && !p.flying && i > 2) break;
+                }
+                const flew = track.filter((p) => p);
+                const minClear = Math.min(...flew.map((p) => p.clearance));
+                const last = flew[flew.length - 1];
+                const duringFlight = flew.filter((p) => p.flying);
+
+                ok("!! *** THE LIVE CAMERA CLEARS THE DISPLACED TERRAIN FOR THE WHOLE FLIGHT ***",
+                    minClear > 0,
+                    "worst clearance " + minClear.toFixed(3) + " units over " + flew.length + " sampled frames; " +
+                    "ground under the camera at landing " + last.ground.toFixed(3) + " vs mean radius 17");
+                ok("!! ...and it genuinely descended (orbit distance collapsed onto the surface)",
+                    before.clearance > 20 && last.clearance < before.clearance / 4,
+                    "clearance " + before.clearance.toFixed(1) + " -> " + last.clearance.toFixed(2) + " units");
+                // the detail REPORTS what was measured rather than restating the claim -- my first version of
+                // this line said "all with controls disabled; enabled again at landing" unconditionally, which
+                // printed that sentence verbatim on the run where it FAILED. A detail that asserts the
+                // conclusion is the "flag that lies" this tree keeps removing, in a gate's own output.
+                const allDisabled = duringFlight.every((p) => !p.controlsEnabled);
+                ok("!! ...and OrbitControls really was disabled mid-flight, then handed back",
+                    duringFlight.length > 0 && allDisabled && last.landed !== false && last.controlsEnabled,
+                    duringFlight.length + " of " + flew.length + " sampled frames were in flight; controls disabled " +
+                    "throughout: " + allDisabled + "; final frame flying=" + last.flying + " t=" + last.t.toFixed(3) +
+                    " controlsEnabled=" + last.controlsEnabled);
+                ok("!! ...with zero page errors across the descent", errs.length === 0, errs[0] || "clean");
+            }
+        } finally { await browser.close(); await new Promise((r) => srv.close(r)); }
+    }
+}
+
+console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
+if (fails) process.exit(1);

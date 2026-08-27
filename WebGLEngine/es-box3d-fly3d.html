@@ -41,6 +41,7 @@
   <button id="reliefBtn" title="Cube-baked planet surface (v3842): baked normals from the height field's own gradient plus CPU-displaced vertices. Off = the smooth painted ball" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9968; Relief</button>
   <button id="structuresBtn" title="Asteroid belt and a greebled station (v3843): rocks placed with no interpenetration, hulls plated by an exact panel partition. Off = empty space" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9673; Structures</button>
   <button id="hitfxBtn" title="Hit debris ported from cockpit.html (v3844): shields up throws cyan sparks, shields gone throws red, a kill adds amber on top. Off = no debris" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#10022; Hit FX</button>
+  <button id="descendBtn" title="Cinematic descent (v4053): fly from orbit down onto the planet's surface on a parametric shot -- logarithmic distance (constant perceived zoom rate) and a singularity-free rig that does not roll over at the poles. One-shot" style="background:#152c3a;color:#9fd8ff;border:1px solid #2f6c8c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128640; Descend</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
 </div>
 <div id="modelsPanel" style="position:fixed;top:40px;right:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:520px;max-height:80vh;overflow:auto;box-shadow:0 8px 30px #000a;"></div>
@@ -66,7 +67,8 @@ import { sceneScale } from "/ev/esFlight3dMath.js";
 import { mountShipModels } from "/ev/esShipModels.js";   // v3827 -- user-assignable .glb ships per class
 import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-mean auto-exposure
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
-import { bakeSurfaceCubemap, sampleCubeScalar } from "/world/planetSurface.js";   // v3842 -- the surface, cube-baked with relief
+import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
+import { sampleShot, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 -- the parametric descent
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
@@ -225,9 +227,18 @@ const grid = new THREE.GridHelper(60, 24, 0x1b3350, 0x0e1c30); scene.add(grid); 
 // field's own tangent-plane gradient), a ROUGHNESS mask (sea smooth, land not) and the HEIGHT itself, which is
 // read back on the CPU to push the sphere's vertices out so the silhouette carries the terrain too. All of that
 // arithmetic is pinned in world/planetSurface-selfcheck.mjs; only this GL plumbing is unverifiable here.
+// v4053 -- the relief amplitude as a FRACTION of the radius. Named once here because the mesh displacement
+// and the descent camera's ground clearance must both use it; a second literal is a camera flying into a
+// mountain the renderer drew.
+const PLANET_AMP_FRAC = 0.035;
+// v4053 -- the in-flight descent, or null. One object, driven entirely by sampleShot(t) in the frame loop.
+let descent = null;
 let planetMesh = null, planetSpin = 0, planetMat = null, planetRelief = true;
+let planetSpec_ = null, planetR = 17;   // v4053 -- the descent needs the seed's spec and the radius
 {
-  const spec = planetSpec((Math.random() * 1e9) >>> 0);
+  // v4053 -- ?seed= makes the planet reproducible, which a gate needs and a shared link wants.
+  const _q = new URLSearchParams(location.search), _s = parseInt(_q.get("seed") || "", 10);
+  const spec = planetSpec(Number.isFinite(_s) ? (_s >>> 0) : ((Math.random() * 1e9) >>> 0));
   const SZ = 128, R = 17;
   const bake = bakeSurfaceCubemap(spec, { size: SZ });
   // Each channel becomes its own OPAQUE cube texture: alpha-packing a canvas risks the browser's premultiply
@@ -249,11 +260,13 @@ let planetMesh = null, planetSpin = 0, planetMat = null, planetRelief = true;
   // CPU displacement from the baked height: read each vertex's own direction out of the cubemap (dirToTexel is
   // gated as the exact inverse of the bake's faceTexelDir), so the silhouette is the same terrain the shading is.
   const pos = geo.attributes.position, smooth = pos.array.slice(), relief = new Float32Array(pos.count * 3);
-  const AMP = R * 0.035;
+  // v4053 -- the displacement formula moved to world/planetSurface.js's surfaceRadiusAt() so the DESCENT CAMERA
+  // (rig/cinematicShot.js) can ask where the ground is with the same arithmetic that put it there. It is fed the
+  // BAKED height, exactly as before, so this mesh is unchanged byte-for-byte; only the formula's home moved.
   for (let v = 0; v < pos.count; v++) {
     const x = smooth[v * 3], y = smooth[v * 3 + 1], z = smooth[v * 3 + 2];
     const h = sampleCubeScalar(bake.height, SZ, [x, y, z]);
-    const k = 1 + (AMP / R) * (Math.max(h, spec.seaLevel) - spec.seaLevel) / Math.max(1e-3, 1 - spec.seaLevel);
+    const k = surfaceRadiusAt(spec, [x, y, z], { radius: 1, ampFrac: PLANET_AMP_FRAC, height: h });
     relief[v * 3] = x * k; relief[v * 3 + 1] = y * k; relief[v * 3 + 2] = z * k;   // sea stays a level surface
   }
   pos.array.set(relief); pos.needsUpdate = true;
@@ -282,6 +295,7 @@ let planetMesh = null, planetSpin = 0, planetMat = null, planetRelief = true;
         gl_FragColor = vec4(alb * (uAmb + ndl) + vec3(spec), 1.0);
       }`,
   });
+  planetSpec_ = spec; planetR = R;   // v4053 -- hand the descent the same spec/radius the mesh was built from
   planetMesh = new THREE.Mesh(geo, planetMat);
   planetMesh.position.set(-48, -24, -62); planetMesh.rotation.z = spec.tilt; planetSpin = spec.spin;
   scene.add(planetMesh);
@@ -616,6 +630,26 @@ function frame() {
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
   }
   syncScene(dt); controls.update();
+  // v4053 -- THE CINEMATIC DESCENT. The whole move is rig/cinematicShot.js's sampleShot(t) -- pure arithmetic,
+  // no state here beyond the clock -- so this block only converts one sampled frame into a Three camera and
+  // hands control back to OrbitControls when it lands. OrbitControls is DISABLED for the duration: leaving it
+  // enabled would let its damping fight the shot for the same camera every frame, which reads as a shudder.
+  if (descent) {
+    descent.t = Math.min(1, descent.t + dt / descent.dur);
+    const f = sampleShot("descent", descent.t, descent.p);
+    camera.position.set(f.eye[0], f.eye[1], f.eye[2]);
+    camera.up.set(f.up[0], f.up[1], f.up[2]);
+    camera.lookAt(f.target[0], f.target[1], f.target[2]);
+    if (camera.fov !== f.fov) { camera.fov = f.fov; camera.updateProjectionMatrix(); }
+    if (descent.t >= 1) {
+      // hand the view back intact: OrbitControls orbits whatever it is told to look at, so it is given the
+      // landing site rather than the origin -- otherwise releasing the shot snaps the camera across the planet.
+      controls.target.set(f.target[0], f.target[1], f.target[2]);
+      controls.minDistance = 0.5;
+      controls.enabled = true; controls.update();
+      descent = null; descendBtn.style.opacity = "1";
+    }
+  }
   if (structures.visible) {   // v3843 -- rocks tumble on their own axes, the station turns on its spine
     for (const g of structures.children) if (g.userData.spin) g.rotation.y += g.userData.spin * dt;
     for (const { inst, rocks } of rockSpin) {
@@ -723,6 +757,50 @@ document.getElementById("labelsBtn").onclick = (e) => {
   modeEl.textContent = ready ? "box3d WASM · 3D flight" : "JS fallback · 3D flight (build the WASM on the Box3D page)";
   modeEl.className = ready ? "" : "fallback";
   foldTunnel = makeFoldTunnel();
+
+// v4053 -- START A DESCENT. Everything cinematic lives in rig/cinematicShot.js; this only picks the two
+// endpoints and the landing site, which is the one thing that IS scene knowledge.
+//
+// THE LANDING SITE IS CHOSEN ON THE REAL TERRAIN, not at a fixed lat/lon: surfaceRadiusAt() answers where the
+// displaced ground actually is for a direction, so the shot ends a stated height above THAT rather than above
+// the mean radius -- which on this planet differs by up to ~0.39 units of relief, easily enough to end a
+// descent inside a mountain. Same function the mesh was displaced with; see world/planetSurface.js.
+const descendBtn = document.getElementById("descendBtn");
+descendBtn.addEventListener("click", () => {
+  if (descent || !planetMesh || !planetSpec_) return;
+  const c = planetMesh.position;
+  // aim at whatever face of the planet the camera is currently nearest -- descending onto the FAR side would
+  // fly the camera through the body, which is a different (and much worse) shot than the one on the button.
+  const dir = cnorm3([camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z]);
+  const groundR = surfaceRadiusAt(planetSpec_, dir, { radius: planetR, ampFrac: PLANET_AMP_FRAC });
+  const target = [c.x + dir[0] * groundR, c.y + dir[1] * groundR, c.z + dir[2] * groundR];
+  const startDist = Math.max(120, Math.hypot(camera.position.x - target[0], camera.position.y - target[1], camera.position.z - target[2]));
+  controls.enabled = false;            // the shot owns the camera; damping would fight it every frame
+  descendBtn.style.opacity = "0.5";
+  descent = {
+    t: 0, dur: 9,
+    p: {
+      center: [c.x, c.y, c.z], target,
+      from: { distance: startDist, pitch: 0.10, azimuth: 0.0, fov: 50, roll: 0 },
+      to:   { distance: 2.2,       pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 },
+    },
+  };
+});
+window.swekDescend = () => descendBtn.click();   // so a gate (and the console) can fly it without a mouse
+// v4053 -- a PROBE of the real flight, not a mirror of the shot's own numbers: it reads the LIVE Three camera
+// back and measures it against the same displaced ground surfaceRadiusAt() gave the mesh. A gate asserting the
+// shot's own return value would only prove sampleShot agrees with itself; this proves the camera Three is
+// actually rendering from cleared the terrain.
+window.swekDescentProbe = () => {
+  if (!planetMesh || !planetSpec_) return null;
+  const c = planetMesh.position;
+  const v = [camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z];
+  const radius = Math.hypot(v[0], v[1], v[2]);
+  const ground = surfaceRadiusAt(planetSpec_, cnorm3(v), { radius: planetR, ampFrac: PLANET_AMP_FRAC });
+  return { radius, ground, clearance: radius - ground, flying: !!descent, t: descent ? descent.t : 1,
+           fov: camera.fov, controlsEnabled: controls.enabled };
+};
+
   newBattle(); requestAnimationFrame(frame);
 })();
 </script>
