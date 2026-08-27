@@ -8,6 +8,81 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4075 -- fifteen devices accepted any mode string, and the list was three lines above
+
+### The gate advised against fixing this, and the advice rested on a premise that did not hold
+
+`deviceModes` reported fifteen devices **newly unguarded**, and its own closing note counselled against
+repairing them:
+
+> *NOT FIXED HERE: the unguarded `defaults()` need their own author. Making one validate means knowing WHICH
+> modes it means to offer, and guessing that would declare an interface on somebody else's behalf.*
+
+That is the right instinct and the wrong diagnosis here. Checked rather than accepted, all fifteen turned out
+to be the identical shape:
+
+- Each **already declares** `modes: ["X"]` -- a single mode, written down.
+- Each had `defaults: ({ mode }) => ({ mode: mode || "X" })`, which **echoes any string back**. So `checkMode`
+  asked for a nonsense mode, received it back, and concluded the device declared it.
+- **`build()` never reads `mode` in any of the fifteen.** `mode` appears three or four times per file: the
+  signature, the `modes` array, and the `defaults` line. There was no hidden second mode a guard could break.
+
+So `defaults()` was ignoring a declaration sitting three lines above it. A mode selects **which physics runs**,
+so a device that accepts a name it does not declare runs something else and says nothing about it.
+
+### The fix derives rather than re-types
+
+Each device's list is hoisted to one const that **both** `modes:` and `defaults()` read:
+
+```js
+const XENON_MODES = ["pit"];
+...
+    modes: XENON_MODES,
+    defaults: ({ mode } = {}) => ({ mode: XENON_MODES.includes(mode) ? mode : XENON_MODES[0], ... }),
+```
+
+Re-typing the literal into `defaults()` would have worked and would have been the **second declaration** this
+session has already removed three times -- a future mode added to the array and missed by the guard.
+
+Verified behaviourally rather than by reading the diff:
+
+```
+xenon        defaults("banana") -> "pit"           REFUSED
+paramagnet   defaults("banana") -> "spins"         REFUSED
+bec          defaults("banana") -> "condensation"  REFUSED
+```
+
+and all fifteen devices' **own** gates still pass. Still-unguarded drops **32 -> 17**. The remaining seventeen
+are left alone deliberately: several are genuinely multi-mode, so their lists really would need deciding rather
+than reading, which is exactly the case the gate's note was written for.
+
+### xenon and paramagnet gained instruments, not exemptions
+
+`deviceInstrumentMap` reported both **UNEXPLAINED** -- neither an instrument nor an exemption. An exemption
+would have been the wrong answer for the same reason in both cases: that table is for **primitives with no
+physical constant to put on a front door** (a Hilbert curve, marching cubes, a distance field, an iteration
+count). These are the opposite.
+
+- **Xenon-135** has an analytic peak-time limit, *derived* here rather than quoted:
+  `ln(lambdaI/lambdaXe)/(lambdaI - lambdaXe)` = **11.129 h**, approached monotonically
+  (10.138 -> 11.022 -> 11.118 -> 11.129). The familiar *"xenon peaks about half a day after shutdown"* **is**
+  that asymptote.
+- **The paramagnet's** Schottky peak solves the transcendental `x·tanh(x/2) = 2` at `x* = 2.3994`, with
+  `C_max/(Nk) = 0.43923`, found by a Newton root **and** an independent maximiser that share no line.
+
+Both links are real shared imports, not names that happen to match: `reactor.html` imports
+`physics/nuclear/xenon.mjs` at line 82, `statistical-mechanics.html` imports `physics/statmech/paramagnet.mjs`
+at line 70. The gate now reads **0 awaiting a judgement** -- 210 instruments, 77 explicit links, every one
+backed by a shared module.
+
+### Gates
+
+`deviceModes` all pass | `deviceInstrumentMap` all pass | `instruments` all pass | all 15 guarded devices' own
+binds pass. `verify.mjs` is green across 1207 gates.
+
+**Still open:** `claimTrace` (22 gates appeared against a baseline frozen at v3185, when the lab had 54 devices
+rather than 129) -- running, not yet judged, and not claimed fixed.
+
 ## Since v4074 -- a crash this sandbox cannot see, and a knob that made a device too slow to catch it
 
 ### The Windows crash, and the gate that already knew

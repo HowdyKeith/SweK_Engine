@@ -293,6 +293,14 @@ export const INSTRUMENTS = [
       measures: "The speed distribution of a classical gas, and the three speeds read off it.",
       key: "v_p : v_avg : v_rms = sqrt(2) : sqrt(8/pi) : sqrt(3), which is INDEPENDENT OF GAS AND TEMPERATURE -- the speeds carry units and a convention, the ratios carry neither, which is why they are what gets graded.",
       gate: "physics/md/maxwellSpeed-selfcheck.mjs" },
+    // v4074 -- the paramagnet joined that arc at v3820 and never got a row, so deviceInstrumentMap reported
+    // it UNEXPLAINED. Unlike the seven rows around it this one NAMES ITS DEVICE: those predate v3330 and are
+    // covered by the shared-module inference, but naming the device is the stronger claim and the gate asserts
+    // that a row naming a device names a real one. statistical-mechanics.html imports this module directly.
+    { id: "schottky-anomaly", page: "statistical-mechanics.html", name: "The paramagnet -- the one heat capacity that comes back down", area: "thermal", device: "paramagnet",
+      measures: "Localised spins in a field -- ising.js without the interactions, so there is no phase transition, just alignment competing with temperature.",
+      key: "*** THE LOAD-BEARING NEGATIVE IS THE BOUNDED SPECTRUM: C -> 0 as T -> infinity, NOT the classical constant. *** A gas absorbs energy without limit (equipartition, C constant); a two-level system cannot -- once both levels are equally populated it is full, and no hotter bath extracts more heat. That makes the Schottky anomaly the one C_V in the whole menagerie (Debye's plateau, blackbody's T^3, Fermi's linear, BEC's cusp) that RISES TO A PEAK AND FALLS BACK TO ZERO. Its peak solves the transcendental x tanh(x/2) = 2 at x* = 2.3994 with C_max/(Nk) = 0.43923, found by a Newton root AND an independent maximiser that share no line. The same finiteness makes the entropy climb to exactly ln 2 and fall to 0 at T = 0 -- the third law, honoured, where Sackur-Tetrode's classical gas cannot.",
+      gate: "physics/statmech/paramagnet-selfcheck.mjs" },
     { id: "planck-law", page: "statistical-mechanics.html", name: "The Planck law -- two constants out of one spectrum", area: "thermal",
       measures: "The blackbody spectrum, its peak, and the total exitance integrated over it.",
       key: "Wien's displacement constant and Stefan-Boltzmann's sigma are NOT INPUTS: the peak is the root of x = 5(1 - e^-x) = 4.9651, and sigma needs the Bose integral zeta(4)*Gamma(4) = pi^4/15.",
@@ -555,6 +563,23 @@ export const INSTRUMENTS = [
         page: "device.html", gate: "physics/nuclear/kinetics-selfcheck.mjs",
         measures: "How fast a reactor's power changes when reactivity is inserted, how slowly it can be shut down, and where control stops being possible.",
         key: "*** THE EXTERNAL KEY IS THE SCRAM FLOOR, WHICH IS A FACT ABOUT THE WORLD RATHER THAN ABOUT THIS TREE: a reactor cannot be shut down faster than its longest-lived delayed-neutron precursor. However deep the scram -- $1, $5, $10, $50, $200 -- the dominant rate walks onto -lambda_1 = -0.0124 s^-1 (half-life 55.90 s) and stops, monotonically, with gaps closing 4.82e-4 -> 8.47e-5 -> 4.17e-5 -> 8.23e-6 -> 2.05e-6. lambda_1 is never targeted; it is one of six published Keepin constants used symmetrically with the other five. *** Two routes share no line: the inhour equation solved by bracketed bisection against RK4 integration of the same seven ODEs with the rate MEASURED from the log-slope, agreeing to 1.5e-12 at $0.50. *** AND PROMPT CRITICALITY IS LOCATED BY A CHANGE IN CHARACTER RATHER THAN BY A THRESHOLD: below beta the period is independent of the prompt generation time (0.9996/0.9971/0.9032 across a 100x change in it), above beta it scales as 1/GEN (1.005e-2/1.001e-2/1.000e-2) -- a 90x separation, so beta is RECOVERED from six fractions that merely sum to it and is never written down as a comparison. The seven roots interlace with the six poles, exactly one per interval, which is what makes bracketed bisection well conditioned where linear algebra is not: charPolyFaddeev + durandKerner on the same 7x7 matrix reports w = +2.6e-1 at rho = -$1, POSITIVE GROWTH FOR NEGATIVE REACTIVITY, and that route is refused in the module header with its measurement.",
+    },
+    {
+        // v4074 -- *** xenon GAINS AN INSTRUMENT RATHER THAN AN EXEMPTION, and so does paramagnet below. ***
+        // deviceInstrumentMap reported both as UNEXPLAINED -- neither an instrument nor an exemption -- and an
+        // exemption would have been the wrong answer for the same reason in both cases: the exemptions in that
+        // table are for PRIMITIVES with no physical constant to put on a front door (a Hilbert curve, marching
+        // cubes, a distance field, an iteration count). These two are the opposite. Xenon-135 has an ANALYTIC
+        // PEAK TIME and reactor.html is already its door, importing this exact module at line 82 -- so the
+        // link is a real shared import and not a name that happens to match.
+        //
+        // The `gate` field names the MODULE's gate rather than the device's, per this file's standing rule: a
+        // device gate reaches physics only through its bind, so a row naming one shares no module with the
+        // device and deviceInstrumentMap cannot link them.
+        id: "xenon-135", area: "nuclear", name: "Xenon-135 poisoning -- the pit you cannot restart through", device: "xenon",
+        page: "reactor.html", gate: "physics/nuclear/xenon-selfcheck.mjs",
+        measures: "The iodine pit: how a shut-down reactor's most absorbing fission product keeps BUILDING for half a day after the neutrons that were destroying it are gone, and how long it stays unrestartable.",
+        key: "*** THE EXTERNAL KEY IS THE PEAK-TIME LIMIT, AND IT IS DERIVED HERE RATHER THAN QUOTED: as the pre-shutdown flux rises, the time to peak xenon approaches ln(lambdaI/lambdaXe)/(lambdaI - lambdaXe) = 11.129 h, monotonically (10.138 -> 11.022 -> 11.118 -> 11.129 at 1e14 -> 1e18). The familiar 'xenon peaks about half a day after shutdown' IS that asymptote, and the analytic limit shares no line with the search that finds the peak. *** After shutdown the flux is zero and the system is EXACTLY the two-step chain I -> Xe -> stable, so it is graded against RK4 on the same ODEs: worst 8.0e-14 over three fluxes and four times. AND THE CLOSED FORM IS decay.mjs's, REUSED BY SUPERPOSITION RATHER THAN REIMPLEMENTED -- the system is linear, so the xenon already present decays on its own while the iodine feeds a Bateman daughter and the two add; measured against a directly-written closed form the relative difference is EXACTLY 0, which is what makes it reuse rather than a second copy of the algebra to get wrong.",
     },
     {
         // v3990 -- the `gate` field names the MODULE's gate, not the device's, per this file's standing rule.

@@ -187,13 +187,21 @@ function buildStrokeMorph({ mode = "morph", config = {} } = {}) {
     };
 }
 
+const STROKEMORPH_MODES = ["morph"];   // v4074 -- the single source `modes` and `defaults()` both read
+
 export const strokeMorphDevice = {
     plantKind: "method",
-    modes: ["morph"],
+    modes: STROKEMORPH_MODES,
     name: "the-identity-that-was-half-true-and-invisible-in-the-output",
     observables: STROKEMORPH_OBSERVABLES,
     build: buildStrokeMorph,
-    defaults: ({ mode } = {}) => ({ mode: mode || "morph", config: { ...DEF } }),
+    // v4074 -- ONE DECLARATION, HONOURED BY BOTH FIELDS. `defaults()` used to return `mode || "morph"`,
+    // which ECHOES ANY STRING BACK, so checkMode asked for a nonsense mode, got it back, and concluded the
+    // device declared it. A mode selects WHICH PHYSICS RUNS, so a device that accepts a name it does not
+    // declare runs something else and says nothing. The list was never unknown -- it is the `modes` array
+    // directly above -- and build() never reads `mode` at all, so there was no second mode to protect.
+    // Both fields read MODES so a future mode cannot be added to one and missed by the other.
+    defaults: ({ mode } = {}) => ({ mode: STROKEMORPH_MODES.includes(mode) ? mode : STROKEMORPH_MODES[0], config: { ...DEF } }),
 };
 
 /** v3327's split: this half PRINTS and strokeMorphBind-selfcheck beside it is what exits nonzero. */
