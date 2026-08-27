@@ -8,6 +8,38 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4059 -- a gate whose number meant less than its label said
+
+Going back to pay this session's own coverage debt, I found `rig/cinematicShot.js` shipping **eight** exported
+symbols its gate never named: `clamp01`, `linearE`, `sineInOut`, `cubicOut`, `cubicIn`, `delayed`, `early`,
+`tangentFrameAt`. Not incidental -- the easings *are* the shot channels, so one that failed to reach 1 would
+leave every move short of its stated endpoint, with no check to localise it. Each is exercised now: anchored at
+0 and 1, monotonic, inside [0,1], and **clamping rather than extrapolating** outside it. `delayed()` holds then
+runs (how the arrival's azimuth waits for the dive to be under way); `early()` finishes then holds (what makes
+hyperzoom a lens move rather than a dolly).
+
+**And one of the eight carried a claim I had written in a docstring and never run.** `tangentFrameAt` says it is
+"deliberately the SAME construction `world/planetSurface.js` uses ... so a camera azimuth here and a surface
+gradient there mean the same thing rather than differing by an unstated rotation." Two functions that must
+agree, in two files, verified by a comment. RUN: they agree to **1.57e-16** over 300 directions. The claim was
+true and had never been checked, which is not the same thing as being safe.
+
+**Then the real find.** Naming those eight moved `definitionGates-selfcheck`'s count *not at all*, and chasing
+why showed `definitionCoverage()` ends `walk(path.join(root, "physics"))`. The sweep has always been
+physics-only -- a reasonable scope, silently attached to a headline reading "no NEW exported symbol has
+appeared" and a summary reading "1586 one-line definitions". Neither says physics. So I read 81 as tree-wide and
+briefly believed I had improved it.
+
+MEASURED, identical criterion applied to the whole tree: **597 gated modules, 2861 definitions, 290
+unmentioned** -- so **352 gated modules and 1275 definitions sit entirely outside that number**, and 209
+unmentioned definitions are invisible to it. The check, the summary and a new census line all name the scope now.
+
+**The sweep is not widened, deliberately.** Reddening it on 209 definitions nobody has audited is exactly the
+"condemn correct gates to improve a statistic" trap the file's own import-only check argues against two lines
+down. The tree-wide figure is *reported*, so widening stays a decision somebody makes with the number in front
+of them rather than a gap nobody can see. The physics ratchet is untouched and still red at 81 -- pre-existing
+debt, not a regression. `verify.mjs` stays ALL GREEN.
+
 ## Since v4058 -- the engine side: arriving on the real terrain instead of teleporting onto it
 
 Item 3 of three.

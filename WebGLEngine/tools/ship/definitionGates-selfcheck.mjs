@@ -33,16 +33,17 @@ import { fileURLToPath } from "node:url";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const report = (l) => console.log("  ----  " + l);   // v4059 -- the tree-wide census prints, it does not assert
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Exported one-line definitions, and whether the module's own gate names them. */
-export function definitionCoverage(root) {
+export function definitionCoverage(root, sub = "physics") {
     const out = { total: 0, ungated: [], importOnly: [], gatedModules: 0 };
     const walk = (dir) => {
         let ents; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const e of ents) {
             const p = path.join(dir, e.name);
-            if (e.isDirectory()) { walk(p); continue; }
+            if (e.isDirectory()) { if (!/^(node_modules|vendor|\.git|\.venv)$/.test(e.name)) walk(p); continue; }
             if (!/\.(js|mjs)$/.test(e.name) || /selfcheck/.test(e.name)) continue;
             const gate = p.replace(/\.(js|mjs)$/, "-selfcheck.mjs");
             if (!fs.existsSync(gate)) continue;          // ungated modules are gradedCoverage's business, not this
@@ -70,7 +71,9 @@ export function definitionCoverage(root) {
             }
         }
     };
-    walk(path.join(root, "physics"));
+    // v4059 -- the sweep root is a PARAMETER now, so the same criterion can be run tree-wide and REPORTED
+    // beside the physics number. It still DEFAULTS to physics, so the ratchet above is unchanged.
+    walk(sub ? path.join(root, sub) : root);
     return out;
 }
 
@@ -105,16 +108,46 @@ const cov = definitionCoverage(ENG);
     // sinogram at every angle count), and sirt.mjs's stepForMatched / stepForUnmatched (each at exactly half its
     // own Landweber ceiling, and the unmatched step 3.86x OUTSIDE the matched one's -- the divergence the v3846
     // split exists to prevent, checked by nothing until now). 126 -> 121.
-    ok("!! no NEW exported symbol has appeared without its gate naming it",
+    // *** v4059 -- THE SCOPE IS IN THE LABEL NOW, BECAUSE IT WAS NOT AND I MISREAD MY OWN NUMBER. ***
+    // definitionCoverage() ends `walk(path.join(root, "physics"))`: this sweep has ALWAYS been physics-only, and
+    // that is a reasonable scope. But the check read "no NEW exported symbol has appeared" and the summary read
+    // "1586 one-line definitions" -- neither of which says physics -- so at v4059 I added eight exports under
+    // rig/, saw the count sit unmoved at 81, and briefly concluded I had fixed something. The code was right and
+    // its label was silent, which is the same "a flag that lies" shape this tree keeps removing, in a gate's own
+    // headline. MEASURED with the identical criterion applied tree-wide: 597 gated modules, 2861 definitions,
+    // 290 unmentioned -- so 352 gated modules and 1275 definitions sit entirely outside this number, and 209
+    // unmentioned definitions are invisible to it.
+    //
+    // THE SWEEP IS NOT WIDENED HERE, DELIBERATELY. Turning this red on 209 definitions nobody has looked at is
+    // exactly the "condemn correct gates to improve a statistic" trap the import-only check below names. It is
+    // REPORTED instead, so widening becomes a decision somebody makes with the figure in front of them rather
+    // than a number that quietly means less than it says.
+    ok("!! no NEW exported symbol under physics/ has appeared without its gate naming it",
         cov.ungated.length <= BASELINE,
         cov.ungated.length > BASELINE
             ? "GREW to " + cov.ungated.length + ": " + cov.ungated.slice(0, 6).join(", ") + " ..."
             : `${cov.ungated.length} unmentioned of ${cov.total} exported symbols across ${cov.gatedModules} ` +
-              `gated modules, against a frozen ${BASELINE}. The one-line-definition subset is at ZERO -- all ` +
+              `gated modules UNDER physics/ (this sweep's scope), against a frozen ${BASELINE}. ` +
+              "The one-line-definition subset is at ZERO -- all " +
               "three gaps there were load-bearing and were closed. The remaining debt is exported FUNCTIONS, and " +
               "planting errors in four of them showed all four passing silently, so it is real debt rather than " +
               "a scan artefact");
     // REPORTED, NOT ASSERTED -- a census is not debt, and this one says which KIND of debt the count above is.
+    // *** v4059 -- WHAT THIS NUMBER DOES NOT COVER, REPORTED SO THE SCOPE CANNOT BE MISREAD AGAIN. ***
+    // Same criterion, whole tree. Not asserted: 209 definitions nobody has examined would make this red on
+    // work that may be perfectly well covered indirectly, and the file already argues (see the import-only
+    // check) against failing on a statistic. Printed so that widening the sweep is a decision with a figure
+    // attached rather than a silent gap.
+    {
+        const wide = definitionCoverage(ENG, "");
+        const outside = wide.ungated.length - cov.ungated.length;
+        report(`SCOPE: this sweep covers physics/ only -- ${cov.gatedModules} gated modules, ${cov.total} definitions.`);
+        report(`  Tree-wide the same criterion finds ${wide.gatedModules} gated modules and ${wide.total} definitions,`);
+        report(`  ${wide.ungated.length} unmentioned -- so ${outside} unmentioned definitions sit OUTSIDE this number,`);
+        report(`  across ${wide.gatedModules - cov.gatedModules} gated modules the ratchet above never looks at.`);
+        report("  Widening is a real decision (it would redden this line on work nobody has audited), so it is");
+        report("  reported rather than taken. The physics ratchet is unchanged.");
+    }
     const rateNow = cov.ungated.length / cov.total, rateThen = 37 / 608;
     console.log("  ----  the count against its own denominator   " +
         `${cov.ungated.length} of ${cov.total} = ${(100 * rateNow).toFixed(2)}% now, against 37 of 608 = ` +
@@ -172,7 +205,7 @@ const cov = definitionCoverage(ENG);
 }
 
 console.log();
-console.log(`  definition coverage: ${cov.total} one-line definitions, ${cov.ungated.length} unmentioned, ${cov.importOnly.length} import-only`);
+console.log(`  definition coverage UNDER physics/: ${cov.total} definitions, ${cov.ungated.length} unmentioned, ${cov.importOnly.length} import-only`);
 if (fails) { console.log("definitionGates-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 // ---- v3368: TWO FINDINGS ABOUT THIS CENSUS ITSELF ----------------------------------------------------------
 //
