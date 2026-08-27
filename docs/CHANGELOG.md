@@ -8,6 +8,47 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4061 -- the fly-in, actually watched
+
+Keith's own words: "build the headless harness that actually watches a real-terrain fly-in." v4058 shipped
+`realTerrain.flyIn()` verified only by arithmetic and source -- `rig/cinematicShot-selfcheck.mjs` section 5c
+checks the flat-world-as-sphere math and greps `main.js` for the right shape of call, and neither can tell "a
+`.play()` guard fired" from "a `.play()` guard silently swallowed," or "the camera animated" from "the camera
+snapped to the end frame." New `tools/ship/realTerrainFlyIn-selfcheck.mjs` closes that: it boots the *real*
+bootstrap page (`index.html`, not a stripped fixture), fetches a real location -- Keith's own `realterrain.html`
+default, 41.7001, -71.4162 -- through the real data pipeline, then *watches* rather than screenshots, polling
+live state through the shot's full ~22s dive/descent/orbit duration. Same discipline v4055/v4056 learned the
+hard way, after a "wash" landing frame that only a genuine watch (not a screenshot on a guessed clock) would
+have caught.
+
+**Network, stubbed on purpose, not because this box can't reach it.** Open-Meteo and both Overpass mirrors
+return CONNECT-tunnel 403s from this sandbox's proxy -- but a permanent gate that depends on two third-party
+APIs staying up is a worse gate than one that doesn't, on *any* box. `page.route()` intercepts exactly those
+three endpoints and returns synthetic-but-valid data in their real response shape (elevation with genuine
+per-point variance, one road/building/water OSM way each, placed inside the fetched bbox), while everything
+else on the served page comes straight off disk -- the same pattern `firewallBanner-selfcheck.mjs` and
+`goLinkStyle-selfcheck.mjs` already use for `server.html`/`page-index.html`, walked one page further to the
+real engine.
+
+**Every load-bearing check sabotage-confirmed.** Neutering `flyIn`'s own `window.clouds?.set?.()` call in
+`main.js` reddens the landing-state check -- which first had to be *strengthened* to mean anything, since
+clouds default to cumulus on boot regardless; the gate now forces them off before the flight so a later
+"cumulus" reading can only be `flyIn`'s own doing. An empty Overpass mock reddens both the roads-painted and
+buildings-painted checks. A flattened elevation mock reddens the variance check. Calling `load({fly:false})`
+instead of the real default reddens all four flight-watching checks -- `isPlaying` never true, never stops, 0
+distinct positions, 0.0s observed, against the real run's 78-86 positions over ~22s. All sabotage restored
+byte-identical (diff-confirmed) before shipping.
+
+Live measured: 3 elevation batches, 3 Overpass calls (streets/buildings/water), min=7.40/max=33.62 real
+variance, roadsPainted=1, buildingsPainted=1, 78-86 distinct camera positions across the full flight, 21.4-22.2s
+observed against the shot's own 4+8+10=22s leg total, zero page errors. Discovered automatically by
+`selfchecks.mjs`'s tree walk -- no wiring needed. Not added to `gateBudget.mjs`'s `MEASURED` table: at ~26s wall
+time it sits comfortably under a third of the 182s general default, exactly the population `gateBudget-
+selfcheck.mjs`'s own rule says belongs on the default rather than an explicit entry.
+
+Gate count 1202 -> 1203: `case-study.html`'s marker fixed via `staleness.mjs --fix`, `knowledge-index.json`
+rebuilt via `buildKnowledgeIndex.mjs`, both derived-fact checks confirmed clean after. verify.mjs ALL GREEN.
+
 ## Since v4060 -- two standalone debt gates, fixed for real
 
 Task #6 (`claimTrace` TIMEOUT), then mid-task: "widen that sweep for real."
