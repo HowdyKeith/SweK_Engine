@@ -821,6 +821,15 @@ descendBtn.addEventListener("click", () => {
   };
 });
 window.swekDescend = () => descendBtn.click();   // so a gate (and the console) can fly it without a mouse
+// v4056 -- dolly along the current view ray to a given height above the landing target. Small, and it is what
+// finally measured the wash: contrast against height, rather than another guess about what was drawing it.
+window.swekDolly = (dist) => {
+  const t = controls.target;
+  const d = camera.position.clone().sub(t).normalize();
+  camera.position.copy(t).addScaledVector(d, dist);
+  camera.lookAt(t); controls.update();
+  return dist;
+};
 
 // v4054 -- Keith: "we could even fly in through the solar system, with our warp tunnel effect at super speed."
 // The warp leg starts 20000 units out -- which is exactly the four-decade span rig/cinematicShot.js's own header
@@ -848,7 +857,7 @@ arriveBtn.addEventListener("click", () => {
       // v4055 -- the descent leg now ENDS BELOW THE CLOUD DECK (shell at ground + CLOUD_ALT), so the camera
       // transits the weather on the way down rather than stopping short of it and looking at it from outside.
       { shot: "descent", dur: 8, p: {
-          to: { distance: 0.9, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` is DERIVED; ends UNDER the deck in clear air
+          to: { distance: DESCENT_END, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` DERIVED; under the deck, over readable ground
     ]),
   };
   controls.enabled = false;
@@ -867,16 +876,24 @@ window.swekArrive = () => arriveBtn.click();
 //
 // ONE INSTANCED MESH, not one object per puff: a cumulonimbus field is ~40 puffs and a draw call each would be
 // forty state changes a frame for something that is forty copies of one quad.
-// CLOUD_ALT is a real deck height: high enough that the descent punches THROUGH the weather and comes out into
-// clear air beneath it, rather than stopping level with it and looking at it edge-on.
+// *** THESE TWO HEIGHTS ARE SET BY A MEASUREMENT, NOT BY TASTE, AND THE MEASUREMENT IS THE POINT. ***
+// The descent used to end 2.2 units above the ground, and the frame there is a flat pale wash. Chased down at
+// v4056 by decoding real screenshots rather than by looking at them: contrast (luminance sd over the lower two
+// thirds) reads 9.3 at that height against 49.8 mid-descent. It is not a bug in anything -- it is TEXTURE
+// MAGNIFICATION, and the arithmetic is exact. The surface is a 128px cube face; one face spans R*pi/2 = 26.7
+// units of arc, so a texel is 0.209 units. At height 2.2 with fov 34 the visible ground is 1.19 units across:
+//     ~5.7 TEXELS STRETCHED ACROSS A 700-PIXEL FRAME.
+// Measured contrast against height: 1.95 -> sd 9.8, 3 -> 12.3, 5 -> 14.2, 8 -> 21, 12 -> 38.2, 35 -> 54.
+// The elbow is around 12 units (~35 texels), which is where the terrain starts reading as terrain.
 //
-// *** AND A CORRECTION TO MY OWN DIAGNOSIS, RECORDED BECAUSE IT WAS WRONG IN A USEFUL WAY. *** The landing frame
-// washed out pale, and I attributed it to the camera ending up INSIDE a billboard (a puff is ~1 unit tall here,
-// so it was a plausible cause) and raised this constant on that theory. Raising it did not fix the wash, which
-// is what said the theory was wrong: the culprit was the PLANET'S ATMOSPHERE SHELL -- a BackSide sphere at
-// radius 18.938 on seed 42 that had simply never been flown into before. Both facts are true and only the second
-// one mattered. See planetAtmo's note above. A cause I guessed and a cause I measured are different things.
-const CLOUD_ALT = 3.0, CLOUD_SCALE = 0.02;
+// RAISING THE BAKE WAS PRICED AND REJECTED: bakeSurfaceCubemap costs 740 ms at 128, 2697 ms at 256 and 10222 ms
+// at 512, on the main thread at load. Quadrupling a noticeable load cost to serve one camera position is the
+// wrong trade, so the CAMERA gives way instead -- which is a cinematic camera's own job. Framing a subject
+// where it carries detail is not a workaround for the texture; it is the shot.
+//
+// The deck then has to sit ABOVE that, or the flight would stop short of it and never pass through: at
+// CLOUD_ALT 18 the shell is r~35 and the descent settles at r~29, under the weather and over readable ground.
+const DESCENT_END = 12, CLOUD_ALT = 18, CLOUD_SCALE = 0.06;
 let cloudDeck = null, cloudTypeIdx = 0;
 const CLOUD_ORDER = ["cumulus", "cumulonimbus", "stratocumulus", "stratus", "nimbostratus", "cirrus"];
 

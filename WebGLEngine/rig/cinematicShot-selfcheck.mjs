@@ -341,6 +341,27 @@ console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
         /controls\.enabled = false;/.test(page) && /controls\.target\.set\(f\.target\[0\], f\.target\[1\], f\.target\[2\]\)/.test(page),
         "damping fighting the shot reads as a shudder; releasing to a stale target snaps the view across the planet");
 
+    // *** v4056 -- THE FRAMING RULE, KEPT HONEST BY ARITHMETIC RATHER THAN BY TASTE. ***
+    // The descent used to end 2.2 units above the ground, where the frame is a flat pale wash: MEASURED
+    // luminance sd 9.3, against 49.8 mid-descent. The cause is texture magnification and it is exact -- the
+    // surface is a 128px cube face, one face spans R*pi/2 = 26.7 units of arc, so a texel is 0.209 units, and
+    // at height 2.2 with fov 34 the visible ground is 1.19 units wide: ~5.7 TEXELS ACROSS A 700-PIXEL FRAME.
+    // Raising the bake was PRICED AND REJECTED (740 ms at 128, 2697 at 256, 10222 at 512, on the main thread at
+    // load). So the CAMERA gives way, which is a cinematic camera's own job. This check exists so a later round
+    // cannot "improve" the landing by flying closer again without meeting the number that made it a wash.
+    const numOf = (name) => { const m = page.match(new RegExp(name + "\\s*=\\s*([\\d.]+)")); return m ? parseFloat(m[1]) : NaN; };
+    const dEnd = numOf("DESCENT_END"), cAlt = numOf("CLOUD_ALT");
+    const TEXEL = (17 * Math.PI / 2) / 128;
+    const texelsAt = (h) => (2 * h * Math.tan((34 * Math.PI / 180) / 2)) / TEXEL;
+    ok("!! *** the descent ends where the terrain still CARRIES DETAIL (>= ~30 texels across the frame) ***",
+        Number.isFinite(dEnd) && texelsAt(dEnd) >= 30,
+        "DESCENT_END " + dEnd + " -> ~" + texelsAt(dEnd).toFixed(1) + " texels across the frame. The old 2.2 gave " +
+        texelsAt(2.2).toFixed(1) + " and rendered at luminance sd 9.3; the measured elbow is ~12 units (sd 38.2)");
+    ok("!! ...and the cloud deck sits ABOVE that, so the flight still passes THROUGH the weather",
+        Number.isFinite(cAlt) && cAlt > dEnd,
+        "CLOUD_ALT " + cAlt + " vs DESCENT_END " + dEnd + " -- a deck at or below the landing height would leave " +
+        "the shot stopping short of the clouds and looking at them edge-on instead of crossing them");
+
     const pw = await import(path.join(ROOT, "tools", "ship", "playwrightResolve.mjs"));
     const { createRequire } = await import("node:module");
     const rr = pw.resolvePlaywright(createRequire(import.meta.url));
