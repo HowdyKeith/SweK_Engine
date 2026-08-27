@@ -17,6 +17,7 @@
 //      against world/planetSurface.js's surfaceRadiusAt(), the same formula es-box3d-fly3d.html displaces its
 //      mesh with. That check is the reason the formula was extracted rather than copied.
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -377,6 +378,50 @@ console.log("\n5b. *** A COMPUTED SHOT AS A RECORDED CLIP -- THE TWO CAMERA MODU
         "distance held at " + oEnd.distance.toFixed(3) + " while azimuth moved " +
         (oEnd.azimuth - oStart.azimuth).toFixed(2) + " rad -- the orbit shot's dist channel is the constant 0, " +
         "so mixLog returns whatever the descent handed over");
+}
+
+console.log("\n5c. *** THE SAME RIG FLIES A FLAT VOXEL WORLD -- A SPHERE WHOSE CENTRE IS FAR BELOW YOU ***");
+{
+    // *** THE CLAIM THAT LET THE ENGINE SIDE COST ALMOST NO CODE. *** orbitRig builds its frame from
+    // `target - center`, so a centre placed a long way straight down makes the local up EXACTLY world +Y --
+    // which is what a voxel world's up is. If that is true, the descent, the seam chaining and the settling
+    // orbit all come across from the planet unmodified. It is checked here rather than assumed, because "it
+    // should just work on a flat world" is precisely the sort of thing that is off by a rounding error.
+    const ground = 24, target = [0, ground, 0], center = [0, ground - 100000, 0];
+    let worstUp = 0, worstOrtho = 0;
+    for (let i = 0; i <= 100; i++) {
+        const r = S.orbitRig({ center, target, distance: 60, pitch: (i / 100) * 1.4, azimuth: 0.9 });
+        // at pitch p over a flat world the eye must be exactly (sin p) up and (cos p) out along the bearing
+        worstUp = Math.max(worstUp, Math.abs((r.eye[1] - ground) - 60 * Math.sin((i / 100) * 1.4)));
+        worstOrtho = Math.max(worstOrtho, Math.abs(dot3(r.forward, r.up)), Math.abs(len3(r.up) - 1));
+    }
+    ok("!! *** a centre far below gives EXACTLY world +Y as local up: the flat-world case needs no new code ***",
+        worstUp < 1e-3 && worstOrtho < 1e-12,
+        "worst height error " + worstUp.toExponential(2) + " units over a 0..1.4 rad pitch sweep at distance 60, " +
+        "worst orthonormality " + worstOrtho.toExponential(2) + " -- the engine descent reuses the planet's rig verbatim");
+
+    const MAIN = fs.readFileSync(path.join(ROOT, "main.js"), "utf8");
+    ok("!! main.js's realTerrain ARRIVES on the fetched terrain instead of teleporting onto it",
+        /async flyIn\(o = \{\}\)/.test(MAIN) && /await this\.flyIn\(\{ ground: summary\.centerSurface \|\| 24/.test(MAIN),
+        "it used to snap the camera to (0, centerSurface+18, 0) and set a pitch -- a cut, at the one moment the " +
+        "fetched terrain has something to show");
+    ok("!! ...and the old snap is still reachable, so this is an upgrade and not a removal",
+        /if \(o\.fly === false\) \{/.test(MAIN),
+        "load({fly:false}) gets exactly the previous behaviour");
+    // *** IT DRIVES THE EXISTING PLAYER RATHER THAN GROWING A SECOND PER-FRAME LOOP. *** v4057 built toClip so
+    // a computed move could be played by the recorded-move player; this is the first caller to walk across it.
+    ok("!! *** it plays through rig/cameraCinematic.js via toClip -- no second camera loop in main.js ***",
+        /toClip\(legs, 30\)/.test(MAIN) && /window\.cameraCinematic\?\.play/.test(MAIN) &&
+        /window\.cameraCinematic\?\.tick\?\.\(performance\.now\(\) \/ 1000\)/.test(MAIN),
+        "main.js already ticks that player every frame; a parallel loop would be a second thing driving one camera");
+    ok("!! ...and it settles BELOW the engine's cloud deck, so the descent passes through weather",
+        (() => {
+            const m = MAIN.match(/SETTLE = (\d+)/);
+            const cumulusAlt = 135;   // render/cloudField.js's own TYPES.cumulus altitude, in engine units
+            return m && parseInt(m[1], 10) < cumulusAlt;
+        })(),
+        "TYPES.cumulus sits at altitude 135 in engine units and the shot settles at 60 above the ground, so the " +
+        "flight crosses the deck on the way down rather than stopping above it");
 }
 
 console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS FROM CLEARS THE GROUND ***");
