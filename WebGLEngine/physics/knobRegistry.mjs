@@ -59,6 +59,11 @@ export function registerAll() {
         // 0.142 at N=6, 0.0597 at N=10, 0.0254 at N=16, 0.0077 at N=30. N=40 was already converged to 0.5%, so a
         // "coarse" candidate that passes proves nothing about the adjudicator.
         propose: () => [{ N: 10 }, { N: 60 }, { N: 400 }],
+        // v4066 -- AND THE SHORTLIST'S OWN ANSWER WAS 2.2x MORE EXPENSIVE THAN IT NEEDED TO BE. The static walk
+        // accepts N=60 because 60 is the cheapest of the three numbers above that survives. MEASURED by bisection
+        // on this same adjudicator: the boundary is N=27 (worstRel 9.406e-3, just inside the 0.01 key), and N=26
+        // is verified failing. Nothing was wrong with the list -- it simply never asked where the edge was.
+        search: { knob: "N", cheap: 4, costly: 400, integer: true, make: (N) => ({ N }) },
         score: (c) => 1 / c.N,
         adjudicate: (c) => {
             const got = levels({ N: c.N, L: 1, count: 3 });
@@ -77,6 +82,18 @@ export function registerAll() {
         // MEASURED: rel error 0.207 at T=1, 0.094 at T=2, 0.064 at T=3, 0.020 at T=6, 0.004 at T=40. T=4 already sat
         // inside tolerance, so the original "short window" candidate could not fail.
         propose: () => [{ T: 2 }, { T: 8 }, { T: 40 }],
+        // *** v4066 -- NO `search` HERE, AND THE REASON IS THE MOST USEFUL THING THIS ROUND MEASURED. ***
+        // The ladder in the comment above reads as a clean fall -- 0.207, 0.094, 0.064, 0.020, 0.004 -- and it
+        // is not one. SAMPLED DENSELY the Landau-Zener sweep RINGS: rel is 0.0061 at T=4 (PASS), 0.0207 at T=5
+        // (fail), 0.0198 at T=6 (PASS), 0.0035 at T=7 (PASS), 0.0214 at T=8 (fail), 0.0189 at T=9 (PASS).
+        // Every T the comment happens to name lands on the same side of that oscillation, which is why it has
+        // read as monotone since it was written.
+        //
+        // A bisection over a verdict that flips three times finds A boundary and reports it with exactly the
+        // confidence of the right one: it returned T=5.875, while T=4 is cheaper AND passes. The local edge
+        // check cannot catch that -- T=5.875 really does pass and T=5.837 really does fail -- so this knob is
+        // left on its static shortlist, which at least cannot claim to have found an edge it did not find.
+        // probeMonotone() reports flips=3 here against flips=1 for the three knobs that did adopt the search.
         score: (c) => 1 / c.T,
         adjudicate: (c) => {
             const D = 1, v = 4;
@@ -112,6 +129,9 @@ export function registerAll() {
         id: "kuramoto-N", instrument: "kuramoto", knobs: ["N"], defaultTier: "propose",
         notes: "oscillators in the mean-field population",
         propose: () => [{ N: 64 }, { N: 512 }, { N: 4096 }],
+        // v4066 -- the 1/sqrt(N) noise floor this proposer's own note describes is what makes the verdict
+        // monotone in N: the bias shrinks as the population grows, so there is one edge and the search finds it.
+        search: { knob: "N", cheap: 8, costly: 4096, integer: true, make: (N) => ({ N }) },
         score: (c) => 1 / c.N,
         adjudicate: (c) => {
             const gamma = 0.5, K = 1.5;
@@ -126,6 +146,14 @@ export function registerAll() {
         id: "md-timestep", instrument: "md-pbc", knobs: ["dt"], defaultTier: "propose",
         notes: "velocity Verlet timestep for the periodic LJ fluid",
         propose: () => [{ dt: 0.04 }, { dt: 0.012 }, { dt: 0.004 }],
+        // *** v4066 -- THE REVERSED DIRECTION, AND IT IS WHY search DECLARES ITS ENDS RATHER THAN INFERRING
+        // THEM. *** Every other knob here is cheap at a SMALL number; a timestep is cheap at a LARGE one, and
+        // score is `c.dt` rather than `1/c.dt` to say so. bisectBoundary never compares the two ends
+        // numerically -- it only ever holds "this end fails, that end passes" -- so a descending range walks
+        // the same way an ascending one does. Getting this backwards would silently bisect toward the
+        // expensive end and call it cheap, which is why runAdaptiveProposer verifies the declared direction
+        // against the declared score before it searches.
+        search: { knob: "dt", cheap: 0.08, costly: 0.002, tol: 2e-4, make: (dt) => ({ dt }) },
         score: (c) => c.dt,
         adjudicate: (c) => {
             const box = makeBox({ L: 8, cutoff: 3 });

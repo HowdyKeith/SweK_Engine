@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4066 -- the physics AI stops guessing and starts searching
+
+Keith: *"the physics ai is the most important function of the physics lab."*
+
+**What was actually dumb, and it was the same in all ten registered proposers at once: `propose()` never
+searched.** Every one returns a hand-picked shortlist -- `gyroKnob` offers `[2,5,10,20,40,80,160]`,
+`schrodinger-grid` offers `N` in `{10,60,400}` -- and `runProposer` walks them in score order and stops at the
+first pass. So the honest reading of every answer the physics AI has ever given is *"the cheapest of the
+three-to-seven numbers a human typed that happened to survive"*, never *"the cheapest value that survives"*.
+Those differ by however far the typed list sits from the real edge, and nothing in the loop could report the
+gap because nothing in the loop knew it. Measured on `schrodinger-grid`: the shipped answer is **N=60**; the
+true boundary is **N=27**, with N=26 verified failing -- 2.2x more grid than the key requires.
+
+**The machinery for the fix was already in the file.** `proposers.mjs`'s own header states the two properties a
+boundary hunt needs: `score()` is monotone and declared higher-is-cheaper (`SCORE_IS_A_REWARD`), and
+`adjudicate()` is *independent* -- the proposer cannot move it. So the verdict flips along the cheap-to-costly
+axis, and bisecting on the adjudicator's own answer walks straight to it -- the same technique the hands
+in-plane-roll fixture used to derive a boundary pose. New `bisectBoundary()` plus an opt-in `search` field on
+`registerProposer`. The ten proposers registered before this round declare none and take the identical static
+path byte for byte, verified by all three existing gates passing unchanged. Direction is **declared, never
+inferred**, because both are real here: schrodinger is cheap at small N, `md-timestep` is cheap at *large* dt --
+and the adaptive path verifies the declared direction against the declared score before searching, because
+v3594 already caught two proposers scoring backwards.
+
+**And then the first four knobs it was tried on included one that proved the assumption false, which is the
+real find.** `lz-window`'s registry comment reads as a clean falling ladder -- *"0.207 at T=1, 0.094 at T=2,
+0.064 at T=3, 0.020 at T=6, 0.004 at T=40"* -- and it is not one. Sampled densely, the Landau-Zener sweep
+**rings**: PASS at T=4, fail at 5, PASS at 6 and 7, fail at 8, PASS at 9. Every T that comment names happens to
+land on the same side of the oscillation, which is why it has read as monotone since it was written. A
+bisection over a verdict that flips three times finds *a* boundary and reports it with exactly the confidence
+of the right one: it returned T=5.875, while **T=4 is cheaper and also passes**. The local edge check cannot
+catch that -- 5.875 really does pass and 5.837 really does fail -- so only a sweep can. New `probeMonotone()`
+is that sweep: it licenses the three knobs that adopt the search (flips=1 each, checked against the *shipped*
+adjudicators rather than asserted in a comment) and disqualifies `lz-window` (flips=3), which keeps its static
+list. One mechanism, both answers.
+
+Adopted: `schrodinger-grid` N 60 -> 27, `kuramoto-N` 4096 -> 1181, `md-timestep` dt 0.012 -> 0.0197 (the
+reversed direction, walked correctly).
+
+**The cost is stated rather than buried.** A bisection is a logarithm where a shortlist is a constant: 2 -> 11
+adjudications on schrodinger, and 695ms -> 2612ms measured on `kuramoto-N`, whose adjudicator runs a mean-field
+sweep per probe. That is why `search` is opt-in per proposer and not a mode the lab runs in.
+
+New gate `physics/adaptiveKnob-selfcheck.mjs`, 30 checks. Three sabotages bite: returning the failing side as
+the boundary reddens 5, a `probeMonotone` that always reports monotone reddens 2, re-declaring `lz-window`'s
+search reddens 1 -- all restored byte-identical. **And the v4062 ratchet caught this round the same round it
+could:** the physics `definitionGates` baseline, frozen at zero two rounds ago, went red on `bisectBoundary`
+and `probeMonotone` the moment they landed -- closed by real known-answer checks in `proposers.mjs`'s own gate,
+not by mention.
+
+One gate file added, so this build carries 1206 gates. verify.mjs ALL GREEN.
+
 ## Since v4065 -- optics.spread wired, and the census stops dropping what it cannot answer
 
 Keith's patch: `optics.spread` was an orphaned config field, left over from before the optics device's sweep
