@@ -1511,9 +1511,23 @@ const driveOauth = require("./driveOauth.js");               // v1751 - OAuth in
 // values from Home Assistant. Module degrades gracefully when HA env
 // vars aren't set (latest() returns { available: false, ... }).
 const haSolar = require("./haSolar.js");
+// v4063 — the SAME values read STRAIGHT OFF the Enphase IQ Gateway, no Home Assistant in the path.
+// envoySolar.latest() answers the identical contract (available/stale/lastOkMs/values/roles), so
+// _solar() below can hand either one to /ha/solar and nothing downstream can tell them apart.
+// OPT-IN AND DEFAULTED OFF: SOLAR_SOURCE=envoy switches; unset keeps HA exactly as it was, because
+// a box already reading solar through HA must not change behaviour because a new file landed.
+const envoySolar = require("./envoySolar.js");
 const ballAlerts = require("./ballAlerts.js");   // v1357 — Ball alert/pulse manager
 const tvNotify = require("./tvNotifyBridge.js");   // v1868 — auto-toast engine events onto the TV
 try { haSolar.start(); } catch (e) { console.warn("[ha-solar] start failed:", e.message); }
+// v4063 — start the direct reader only when asked for. Both may run: envoySolar with no token
+// logs one line and stays idle, so the cost of leaving this call in is a no-op on an HA-only box.
+const SOLAR_SOURCE = (process.env.SOLAR_SOURCE || "ha").trim().toLowerCase();
+if (SOLAR_SOURCE === "envoy") { try { envoySolar.start(); } catch (e) { console.warn("[envoy] start failed:", e.message); } }
+// ONE PLACE DECIDES WHICH SOURCE ANSWERS, so /ha/solar and the mood tie-in can never disagree about
+// where today's number came from -- two call sites each picking for themselves is how a panel ends
+// up showing HA's stale copy beside the gateway's live one.
+function _solar() { return SOLAR_SOURCE === "envoy" ? envoySolar : haSolar; }
 // v1332 — optional solar/battery -> avatar mood tie (gated by ha-solar.json "mood": true,
 // set from the solar gauges panel). Battery-centric so it's sign-convention-safe; only
 // touches avatarMood when the band changes, so it never spams. Falls back to production
@@ -10402,9 +10416,11 @@ ${text.replace(/'/g, "''")}
     // v740 — solar values cached by haSolar.js. Returns { available, stale,
     // lastOkMs, values: {entity_id: {state, unit, name, ts}} }. The Pip
     // panel + engine can poll this endpoint to render a "☀ N.NkW" chip.
+    // v4063 — served by whichever source SOLAR_SOURCE selected. The reply shape is identical either
+    // way; the direct reader adds source/host/batterySource so a reader CAN tell, without having to.
     if (req.method === "GET" && req.url === "/ha/solar") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(haSolar.latest()));
+        res.end(JSON.stringify(_solar().latest()));
         return;
     }
     // v1051 — read/write which HA entities map to which solar role + which

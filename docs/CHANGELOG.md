@@ -8,6 +8,69 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4063 -- the solar array, read without Home Assistant
+
+Keith: "if i was not using home assistant at all, can we access the solar array battery state? ... can we get
+the gateway from querying the running swek gateway?"
+
+**Yes to both, and the second needed almost no new code.** `ai-bridge/envoySolar.js` reads production,
+consumption and battery straight off the Enphase IQ Gateway over the LAN, speaking the *exact* `latest()`
+contract `haSolar.js` already serves -- `available/stale/lastOkMs/values/roles` -- so `GET /ha/solar` hands the
+Pip panel and `window.solar` either source without them knowing which answered. Opt-in via `SOLAR_SOURCE=envoy`;
+unset keeps Home Assistant behaving precisely as before, because a box already reading solar through HA must
+not change because a new file landed beside it.
+
+**The trap this module exists to refuse: `production.json`'s `storage[]` is a different product's slot.** Every
+"read your Envoy over the LAN" recipe reaches for `production.json -> storage[0] -> percentFull`. On a system
+with IQ Batteries (Encharge / IQ 5P) that array reports `percentFull: 0`, `activeCount: 0`, `state: "idle"`
+*forever* -- the battery is fine, the slot is legacy AC Battery. A reader that trusts it shows 0% on a full
+battery, which is a **confident wrong number** rather than a missing one, and those cost more. So battery state
+resolves through an ordered cascade -- `ivp/ensemble/secctrl`'s `ENC_agg_soc`, then `ivp/ensemble/inventory`
+averaged per battery, then legacy `storage[]` *only* when it reports `activeCount > 0` -- and the answer
+**carries its source**, because a silent fallback would put the same trap back one layer up. With nothing
+credible the answer is `null`, not zero: absent and empty are different facts. Sabotage-confirmed three ways
+(trusting the legacy zeros first; returning 0 instead of null; summing the batteries instead of averaging --
+130% for two at 70 and 60), each restored byte-identical.
+
+**And the gateway finds itself, through the browser the bridge already runs.** The Envoy advertises
+`_enphase-envoy._tcp` with its serial in the TXT record -- the same broadcast Home Assistant discovers it by --
+so this was a service *type* added to `ai-bridge/mdnsDiscovery.js`'s `TYPES` list, not a second scanner.
+`discover()` asks that existing browser and opens no socket of its own, since two browsers on
+224.0.0.251:5353 is the shape behind the "UDP multicast panics on Bun/Windows" notes the camera and Roku
+discoverers already carry. A configured `ENVOY_IP` always beats a discovered one (the person typing it can see
+the router; a stale cache cannot), and the host travels *with* how it was found. The two files must agree on
+the service name or discovery returns nothing forever while looking like an empty LAN -- so the gate asserts
+`MDNS_TYPE` against `mdnsDiscovery.js`'s source rather than trusting a comment, sabotage-confirmed by renaming
+one side.
+
+**Two real findings fell out of gating it.** First, my own first-draft checks were `commentFalsePass` -- the
+exact defect already open as task #8 on this session's list. Matching `/NODE_TLS_REJECT_UNAUTHORIZED/` and
+`/log\(...token/` against raw source reddened on a *comment* explaining why the env var is not used, and on a
+help string whose prose contains the word "token". Fixed with the tree's own `codeOnly()` for the comment half
+and an interpolation-targeted test for the credential half -- "no log may mention tokens" would forbid the
+message telling Keith where to get one, which is checking the wrong thing. Second, and worse: **`codeOnly()`
+cannot be used on `server.js` at all.** Measured -- it returns 963,836 of 1,454,895 characters, *eating a third
+of the file*, because its lexer desyncs on a regex literal containing a quote (a limit `claimCheck.mjs`'s header
+names by name) and `server.js` is dense with those. The `require()` line the wiring section asserts sits inside
+the eaten third, so a check run through it reported a missing wire that was plainly there. Those checks read raw
+source and match full statements, so a comment cannot satisfy them either.
+
+**A credential gap closed that predates this round.** `envoy.config.json` holds a bearer JWT for Keith's house,
+so it is gitignored and written 0600 -- and adding it revealed that `ha.config.json`, holding the Home Assistant
+long-lived token since v740, **was never listed**. It has stayed out of every commit only because no box running
+`git add -A` happened to have one on disk, which is luck rather than a rule. Both are ignored now, proven with
+`git check-ignore` rather than asserted. `getConfig()` reports `hasToken` and never the token itself.
+
+**Honest scope, stated in the gate itself rather than left for a reader to assume: nothing here has touched a
+real gateway.** This sandbox has no LAN and no Envoy. Gated headlessly against fixtures shaped from the
+documented schemas: the cascade order, the null-not-zero rule, the source labelling, units, credential handling,
+discovery wiring, the degradation contract, and that the default really is unchanged. Not gated: that a real IQ
+Gateway returns these shapes, that the token flow succeeds, that mDNS resolves on Keith's network. Until
+somebody points it at the gateway, the live half is **unverified** -- which is not the same as broken and is not
+the same as working.
+
+One gate file added, so this build carries 1204 gates. verify.mjs ALL GREEN.
+
 ## Since v4062 -- the physics coverage debt, paid to zero
 
 Keith: "lets continue with #5 claimCheck, #9 definitionGates physics-only debt (81 vs frozen 37), #10
