@@ -70,7 +70,7 @@ import { mountShipModels } from "/ev/esShipModels.js";   // v3827 -- user-assign
 import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-mean auto-exposure
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
 import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
-import { sampleShot, sampleSequence, chainLegs, sequenceDuration, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 arrival sequence
+import { sampleShot, sampleSequence, chainLegs, sequenceDuration, toClip, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 sequence; v4057 clip export
 import { buildPuffsShell } from "/render/cloudField.js";   // v4055 -- the engine's own cloud types, on a shell
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
@@ -840,32 +840,53 @@ window.swekDolly = (dist) => {
 // The tunnel plays over leg 0 ONLY. render/foldTunnel.js's own envelope ramps it in, holds, and ramps it out
 // within jumpDuration(), and the leg is timed to that envelope rather than to a number typed here -- so the
 // tunnel is gone by the time the planet is close enough to look at, without anybody maintaining two durations.
+// v4057 -- THE ARRIVAL'S LEGS, DECLARED ONCE. The button flies them and toClip() records them; two copies
+// would mean the clip you exported was a different flight from the one you watched, which is the worst kind of
+// recording -- plausible, and wrong.
+function arrivalSite() {
+  if (!planetMesh || !planetSpec_) return null;
+  const c = planetMesh.position;
+  // aim at whatever face of the planet the camera is currently nearest -- descending onto the FAR side would
+  // fly the camera through the body, which is a different (and much worse) shot than the one on the button.
+  const dir = cnorm3([camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z]);
+  const g = surfaceRadiusAt(planetSpec_, dir, { radius: planetR, ampFrac: PLANET_AMP_FRAC });
+  return { center: [c.x, c.y, c.z], target: [c.x + dir[0]*g, c.y + dir[1]*g, c.z + dir[2]*g] };
+}
+function arrivalLegs(center, target) {
+  const warpDur = jumpDuration();          // the leg IS the tunnel's own lifetime, not a second guess at it
+  return chainLegs([
+    { shot: "dive", dur: warpDur, p: { center, target,
+        from: { distance: 20000, pitch: 0.04, azimuth: -0.5, fov: 62, roll: 0 },
+        to:   { distance: 140,   pitch: 0.30, azimuth: 0.2,  fov: 50, roll: 0 } } },
+    // the descent ENDS BELOW THE CLOUD DECK (shell at ground + CLOUD_ALT) so the camera transits the weather on
+    // the way down, and above the height where the terrain stops carrying detail -- see DESCENT_END's note.
+    { shot: "descent", dur: 8, p: {
+        to: { distance: DESCENT_END, pitch: 1.05, azimuth: LAND_AZ, fov: 34, roll: 0 } } },   // `from` DERIVED
+    // v4057 -- A THIRD LEG SO THE ARRIVAL *ENDS* RATHER THAN STOPS. The `orbit` shot's distance channel is the
+    // constant 0, so mixLog holds it at whatever the descent handed over: the camera keeps its height and only
+    // the azimuth moves, which is what an establishing orbit is. It costs nothing to add, because
+    // sampleSequence takes any number of legs and chainLegs makes the new seam continuous by construction.
+    { shot: "orbit", dur: 12, p: {
+        to: { distance: DESCENT_END, pitch: 1.05, azimuth: LAND_AZ + ORBIT_SWEEP, fov: 34, roll: 0 } } },
+  ]);
+}
 const arriveBtn = document.getElementById("arriveBtn");
 arriveBtn.addEventListener("click", () => {
   if (arrival || descent || !planetMesh || !planetSpec_) return;
-  const c = planetMesh.position;
-  const dir = cnorm3([camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z]);
-  const groundR = surfaceRadiusAt(planetSpec_, dir, { radius: planetR, ampFrac: PLANET_AMP_FRAC });
-  const target = [c.x + dir[0] * groundR, c.y + dir[1] * groundR, c.z + dir[2] * groundR];
-  const warpDur = jumpDuration();          // the leg IS the tunnel's own lifetime, not a second guess at it
-  arrival = {
-    t: 0,
-    legs: chainLegs([
-      { shot: "dive", dur: warpDur, p: { center: [c.x, c.y, c.z], target,
-          from: { distance: 20000, pitch: 0.04, azimuth: -0.5, fov: 62, roll: 0 },
-          to:   { distance: 140,   pitch: 0.30, azimuth: 0.2,  fov: 50, roll: 0 } } },
-      // v4055 -- the descent leg now ENDS BELOW THE CLOUD DECK (shell at ground + CLOUD_ALT), so the camera
-      // transits the weather on the way down rather than stopping short of it and looking at it from outside.
-      { shot: "descent", dur: 8, p: {
-          to: { distance: DESCENT_END, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` DERIVED; under the deck, over readable ground
-    ]),
-  };
+  const site = arrivalSite();
+  if (!site) return;
+  arrival = { t: 0, legs: arrivalLegs(site.center, site.target) };
   controls.enabled = false;
   arriveBtn.style.opacity = "0.5";
   if (foldTunnel) foldTunnel.play();
 });
 window.swekArrive = () => arriveBtn.click();
-
+// v4057 -- hand the CURRENT arrival out as a TrackAnimator clip. The shot is a pure function of t, so this is a
+// faithful record of the flight rather than a trace of one playback -- see toClip's note in rig/cinematicShot.js.
+window.swekArrivalClip = (fps) => {
+  const site = arrivalSite();
+  return site ? toClip(arrivalLegs(site.center, site.target), fps || 30) : null;
+};
 // v4055 -- THE CLOUD DECK. Keith: "we also have great clouds we made to pass through."
 //
 // The PUFFS are the engine's own -- render/cloudField.js, the six meteorological types lifted out of
@@ -894,6 +915,9 @@ window.swekArrive = () => arriveBtn.click();
 // The deck then has to sit ABOVE that, or the flight would stop short of it and never pass through: at
 // CLOUD_ALT 18 the shell is r~35 and the descent settles at r~29, under the weather and over readable ground.
 const DESCENT_END = 12, CLOUD_ALT = 18, CLOUD_SCALE = 0.06;
+// v4057 -- the landing azimuth is NAMED because two legs need it: the descent arrives on it, and the settling
+// orbit sweeps AWAY from it. Typing it twice is how the orbit ends up starting somewhere the descent did not end.
+const LAND_AZ = 1.3, ORBIT_SWEEP = 2.2;
 let cloudDeck = null, cloudTypeIdx = 0;
 const CLOUD_ORDER = ["cumulus", "cumulonimbus", "stratocumulus", "stratus", "nimbostratus", "cirrus"];
 
