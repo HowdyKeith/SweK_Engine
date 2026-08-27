@@ -18,7 +18,7 @@
 // AND A KNOB THAT REFUSES A VALUE IS LIVE. A knob that rejects what it is handed is read by the code -- a
 // refusal is a response. Counting it dead would mark the best-behaved knobs in the lab as the broken ones.
 "use strict";
-import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, probeValues, wideValues,
+import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
          PLANT_STATES, STILL_OK } from "./knobLiveness.mjs";
 
 let fails = 0;
@@ -98,6 +98,25 @@ console.log("\n3. THE WIDE LADDER SEPARATES 'FLAT NEARBY' FROM 'READ BY NOBODY'"
         !stillKnobs(rows).includes("galaxy.zeroTol") &&
         insensitiveKnobs(rows).some((s) => s.startsWith("galaxy.zeroTol")),
         "insensitive: " + (insensitiveKnobs(rows).join(", ") || "none") + " | still: " + (stillKnobs(rows).join(", ") || "none"));
+}
+
+console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DROPPED ***");
+{
+    // Strings and arrays were always skipped and that is right: inventing an ordering would test the device's
+    // error handling instead of the knob. But the row then carried an empty `probed`, so BOTH stillKnobs and
+    // insensitiveKnobs filtered it out and the knob disappeared from every list this census prints.
+    const { rows } = await knobLiveness({ only: ["optics", "blackhole"], budgetMs: 200000 });
+    const un = unprobedKnobs(rows);
+    ok("!! *** the two null-default knobs in the lab are REPORTED rather than silently absent ***",
+        un.some((k) => k.startsWith("optics.spread")) && un.some((k) => k.startsWith("blackhole.onsetLo")),
+        un.join(", ") + ". Both use `cfg.x ?? fallback` -- a live, readable knob whose default means 'compute "
+        + "it'. blackhole.onsetLo has been invisible to this census since it was written; optics.spread became "
+        + "invisible the moment v4030 gave it a null default, WHICH IS A GAP THIS ROUND CREATED AND THEREFORE "
+        + "HAD TO CLOSE.");
+    ok("...and they are NOT counted as still, because 'was never probed' is not 'moves nothing'",
+        !stillKnobs(rows).some((k) => k === "optics.spread" || k === "blackhole.onsetLo"),
+        "still: " + (stillKnobs(rows).join(", ") || "none") + ". A measurement and an admission are different "
+        + "claims and folding the second into the first would report coverage this census does not have.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
