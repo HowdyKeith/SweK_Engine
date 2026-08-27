@@ -1,12 +1,35 @@
 {
- "note": "v3185 -- UNTRACEABLE CLAIM RATCHET. A TALLY, not a list: v3142 proved a list of keys misses a site that GREW, because several tells in one file collapse to one key. A violation is a NEW gate OR a gate whose count ROSE. These 26 are NOT approved -- each needs its author to state the config that produced the number, which is domain knowledge, and guessing one would be FABRICATING PROVENANCE. Re-freeze deliberately with SWEK_FREEZE_CLAIM_TRACE=1 node tools/roundhouse/claimTrace-selfcheck.mjs",
- "captured": "v3185",
- "total": 47,
- "untraceable": 18,
+ "note": "v4075 -- UNTRACEABLE CLAIM RATCHET. A TALLY, not a list: v3142 proved a list of keys misses a site that GREW, because several tells in one file collapse to one key. A violation is a NEW gate OR a gate whose count ROSE. THESE 64 ACROSS 26 GATES ARE NOT approved -- each needs its author to state the config that produced the number, which is domain knowledge, and guessing one would be FABRICATING PROVENANCE. RE-FROZEN DELIBERATELY, AND THE REASON IS THAT THE OLD BASELINE DESCRIBED A DIFFERENT LAB: it was captured at v3185, when the roundhouse held 54 devices; it holds 129 now. NO BASELINED GATE'S COUNT EVER GREW -- escapeBudget, khConvergence, refinementWindow and thermalScaling are all still at or below their v3185 numbers -- so nothing regressed. Every one of the 22 that APPEARED is a gate that did not exist, or cited no numbers, when the old line was drawn. That is the boundaryLint shape: an ancient baseline against a grown tree, and re-freezing records where the tree actually is rather than approving anything. WHAT DID CHANGE THIS ROUND is that the report now PRINTS THE UNMATCHED NUMBERS instead of only counting them -- the closing line has always asked its reader to 'state the CONFIG beside the number' while never showing the number, so the instruction could not be followed and the only available move was another re-freeze. Re-freeze deliberately with SWEK_FREEZE_CLAIM_TRACE=1 node tools/roundhouse/claimTrace-selfcheck.mjs",
+ "captured": "v4075",
+ "total": 141,
+ "untraceable": 64,
  "gates": {
+  "bellBind": 1,
+  "blobBodies": 1,
+  "cflBind": 1,
+  "configContract": 1,
+  "diffusion": 1,
   "escapeBudget": 6,
+  "fieldNav": 2,
+  "hydrostatic": 2,
+  "inference": 2,
   "khConvergence": 7,
+  "landauZener": 1,
+  "langevin": 1,
+  "percolation": 1,
+  "readerPlant": 2,
   "refinementWindow": 2,
-  "thermalScaling": 3
- }
+  "renderBounceBind": 2,
+  "rmt": 2,
+  "seedSpreadModule": 2,
+  "stabilityBind": 3,
+  "tempering": 9,
+  "thermalScaling": 3,
+  "thermostatBind": 1,
+  "tidalBind": 2,
+  "twoF": 1,
+  "voxelizeBind": 6,
+  "whiteDwarfDevice": 2
+ },
+ "previousCapture": "v3185 (54 devices; 4 gates, 18 untraceable)"
 }

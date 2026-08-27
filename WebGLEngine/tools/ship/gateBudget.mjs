@@ -149,7 +149,14 @@ export const MEASURED = {
     "tools/roundhouse/detectionMap-selfcheck.mjs":         90448,
     "tools/roundhouse/compose-selfcheck.mjs":              88058,
     "simulation/lbm/settleCurve-selfcheck.mjs":            82639,
-    "tools/roundhouse/hydrostatic-selfcheck.mjs":          76003,
+    // v4075 -- RE-MEASURED after a timeout on Keith's rig: 91924ms here against the 76003ms recorded in the
+    // v3211 session. The table's own rule is that "a number with its measurement attached CAN BE
+    // CONTRADICTED BY A RE-MEASURE", and this is that contradiction -- the entry understated the gate by
+    // 21%, so every budget derived from it was 21% short before any host factor was applied.
+    // NOT raised beyond the measurement: assumptionMap was re-measured in the same round and came in
+    // BELOW its entry (230.5s against 284s), and was left alone for exactly that reason. A table that is
+    // only ever revised upward is a table that drifts toward never failing.
+    "tools/roundhouse/hydrostatic-selfcheck.mjs":          91924,
     "tools/ship/doorKinds-selfcheck.mjs":                  73762,
     "physics/astroparticle/jeans-selfcheck.mjs":           67863,
     "tools/render-qa/terminatorOracle-selfcheck.mjs":      63310,
