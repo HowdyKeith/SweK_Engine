@@ -12,7 +12,7 @@
 //
 // so "how fast does the blob stretch" is a measurement with an answer key, and this device is that measurement.
 //
-// THREE MODES, AND THE MIDDLE ONE IS THE INTERESTING ONE:
+// FOUR MODES, AND THE MIDDLE ONE IS THE INTERESTING ONE:
 //
 //   "deviation" -- integrate TWO neighbouring radial geodesics exactly (no approximation anywhere) and compare
 //                  their separation to the LINEARISED tidal equation integrated along the same fall. Agreement
@@ -32,6 +32,15 @@
 //   "blob"      -- the blobarium's own Wyvill blob, its centres each on their own geodesic. The ensemble's
 //                  stretch is measured the way the blobarium measures anything else, and compared to the tidal
 //                  prediction for the same fall. This is the one that answers the original question literally.
+//
+//                  *** AND ITS errFrac IS NOT A KEY, WHICH IS WORTH SAYING WHERE THE MODE IS DESCRIBED. *** The
+//                  blob's extent is 1.0 at r0 = 50, and `validity` above measures the linear equation's domain
+//                  limit at 1.407e-2 -- so this mode runs SEVENTY-ONE TIMES PAST IT on purpose, because that is
+//                  what dropping a real blob in looks like. Out there the honest prediction is off by 47.8% and
+//                  the PLANTED one by 34.6%: THE WRONG LAW FITS BETTER. Grading this mode on agreement would
+//                  reward the wrong physics, so tidalBind-selfcheck grades it on the plant moving the PREDICTION
+//                  while the ensemble MEASUREMENT stays bit-identical, and reports the 0.478 rather than
+//                  bounding it.
 //
 // WHAT IS NOT HERE, ON PURPOSE: heating, radiation, shock. A pulsar beam depositing energy in a blob is a MODEL
 // with no answer key in this tree -- see thermalModelNote() at the bottom, which states that plainly rather than
@@ -204,7 +213,13 @@ export function buildTidal(hyp, base = {}) {
     const rs = ends.map((e) => e.r);
     const extent0 = starts[starts.length - 1] - starts[0];
     const extent1 = Math.max(...rs) - Math.min(...rs);
-    const lin = fallLinear(M, c.r0, extent0, c.tau, c.dtau, stop);
+    // *** v4029 -- THE PLANT FLAG WAS NOT THREADED HERE, AND blob WAS THEREFORE BLIND BY OMISSION. ***
+    // roche is blind to the plant BY CONSTRUCTION -- it never calls fallLinear at all, measuring the tidal field
+    // from two exact geodesics instead. blob DOES call it, for exactly the law the plant replaces, and simply
+    // did not pass the flag: the same shape as v4028's iou() dropping its threshold, a value that should reach a
+    // call site and does not. Blind by construction and blind by omission are different facts and only one of
+    // them is a property.
+    const lin = fallLinear(M, c.r0, extent0, c.tau, c.dtau, stop, !!c.planted);
     return {
         kind: "blob",
         blobCount: n,
@@ -249,7 +264,15 @@ export const tidalDevice = {
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
     // DISTINCT answer. *** A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE. ***
-    modes: ["deviation", "validity", "roche"],
+    // v4029 -- "blob" ADDED, AND THE RULE THAT ADDS IT IS THE ONE THIS COMMENT ALREADY STATED. The line above
+    // says the list is "every mode its own build() branches on", and build() branches on FOUR: deviation,
+    // validity and roche each return early, and blob is the fallthrough. The header said "THREE MODES" and then
+    // listed four. So the device's own headline came true about itself -- A MODE NOBODY CAN DISCOVER IS A MODE
+    // NOBODY WILL USE -- and five declared observables (blobStretch, blobStretchPredicted, blobStretchErrFrac,
+    // blobCount, blobDisrupted) lived only in the branch nothing could reach by name. Found by knobLiveness:
+    // blobCount was a declared knob that moved no observable at any value, because the mode that reads it was
+    // not in the list the probe sweeps.
+    modes: ["deviation", "validity", "roche", "blob"],
     name: "tidal-disruption",
     observables: TIDAL_OBSERVABLES,
     build: buildTidal,
