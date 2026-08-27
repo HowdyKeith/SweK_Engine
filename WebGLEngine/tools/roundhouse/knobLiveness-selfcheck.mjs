@@ -19,8 +19,10 @@
 // refusal is a response. Counting it dead would mark the best-behaved knobs in the lab as the broken ones.
 "use strict";
 import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
-         PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob } from "./knobLiveness.mjs";
+         PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob, choicesFor } from "./knobLiveness.mjs";
+import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { kuramotoDevice } from "./kuramotoBind.mjs";
+import { COMPOSE_KNOB_CHOICES } from "./composeBind.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -229,6 +231,61 @@ console.log("\n3e. *** v4032 -- THE BUDGET IS CHECKED BEFORE EVERY BUILD, NOT ON
         "unbounded builds per knob into at most one, which is what is actually achievable. optics went from " +
         "producing nothing at all to a complete row -- every knob live, none still -- once it was given a " +
         "budget it could finish inside.");
+}
+
+console.log("\n3f. *** v4033 -- A KNOB WITH NO ORDERING CAN STILL HAVE ALTERNATIVES, IF THE DEVICE DECLARES THEM ***");
+{
+    // Refusing to GUESS an ordering is right and stays right -- a made-up string tests the device's error
+    // handling instead of the knob. But it is not the same as being unable to ASK. compose is the case that
+    // makes the difference plain: all six of its knobs are names, so the census could say NOTHING AT ALL about
+    // the one device in the lab that consumes other devices.
+    ok("!! nothing is invented: a string knob with no declared choices is still not probed",
+        probeValues("vacuum").length === 0 && probeValues(["a", "b"]).length === 0,
+        "unchanged from before this round, and the reason is unchanged -- inventing a value would test the " +
+        "device's error handling instead of the knob.");
+    ok("!! ...and declared choices are used, with the current value dropped",
+        probeValues("vacuum", ["vacuum", "hall", "snell"]).join(",") === "hall,snell" &&
+        probeValues(4, [4, 9]).join(",") === "9",
+        "probing a knob at the value it already has measures nothing and would read as dead. Choices win for " +
+        "numbers too, because a device may know its own range better than a blind 1.5x does.");
+
+    const { rows } = await knobLiveness({ only: ["compose"], budgetMs: 200000 });
+    const live = rows.filter((r) => r.live.length).map((r) => r.knob).sort();
+    ok("!! *** ALL SIX OF compose's KNOBS NOW READ LIVE, WHERE ALL SIX READ 'not probed (string)' BEFORE ***",
+        live.join(",") === "devA,devB,keyA,keyB,modeA,modeB" && unprobedKnobs(rows).length === 0,
+        "live: " + live.join(", ") + ". *** THE CENSUS VARIES ONE KNOB AT A TIME, so setting devA to `kepler` " +
+        "while keyA is still `cComputed` asks for an observable kepler does not have -- and compose answers " +
+        "verdict:\"missing\", WHICH MOVES OBSERVABLES AND IS A LIVE READING. A refusal is a response, this " +
+        "census's own third category, and a device that answered a broken triple with a number would be the " +
+        "thing worth finding. ***");
+
+    // *** AND THE DECLARED SET IS CHECKED AGAINST THE LAB, BECAUSE A DECLARATION CAN ROT. *** A choice list is
+    // a claim about other devices -- that this name is registered, that this mode exists, that this observable
+    // is produced. Rename any of them and the list still parses, still runs, and quietly probes a knob at
+    // values that only ever produce "unbuildable". THE KNOB WOULD STILL READ LIVE, off the error path alone.
+    const bad = [];
+    for (const d of [...COMPOSE_KNOB_CHOICES.devA, ...COMPOSE_KNOB_CHOICES.devB])
+        if (!DEVICE_NAMES.includes(d)) bad.push("device " + d + " is not registered");
+    const emDev = await getDevice("em"), fdtdDev = await getDevice("fdtd");
+    for (const m of COMPOSE_KNOB_CHOICES.modeA) if (!emDev.modes.includes(m)) bad.push("em has no mode " + m);
+    for (const m of COMPOSE_KNOB_CHOICES.modeB) if (!fdtdDev.modes.includes(m)) bad.push("fdtd has no mode " + m);
+    const emOut = await emDev.build({ mode: "vacuum" }), fdOut = await fdtdDev.build({ mode: "lightspeed" });
+    for (const k of COMPOSE_KNOB_CHOICES.keyA)
+        if (typeof emOut[k] !== "number") bad.push("em/vacuum does not produce a number for " + k);
+    for (const k of COMPOSE_KNOB_CHOICES.keyB)
+        if (typeof fdOut[k] !== "number") bad.push("fdtd/lightspeed does not produce a number for " + k);
+    ok("!! *** EVERY DECLARED CHOICE STILL NAMES SOMETHING THAT EXISTS ***", bad.length === 0,
+        bad.length === 0
+            ? "6 lists checked against the registry, em's and fdtd's declared modes, and their actual output. " +
+              "A choice list is a claim about OTHER devices; rename one and the list still parses, still runs, " +
+              "and probes at values that only ever produce `unbuildable` -- the knob reads live off the error " +
+              "path and the coverage is fictional."
+            : "STALE CHOICES: " + bad.join("; "));
+
+    ok("...and choicesFor answers null for a device that declares none, which is not the same as empty",
+        choicesFor(kuramotoDevice, "pendN") === null && choicesFor(null, "x") === null,
+        "null means NO ORDERING DECLARED and never means nothing to find -- a device without choices keeps " +
+        "the scaled ladder, and one with a non-numeric knob and no choices stays in the unprobed list.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
