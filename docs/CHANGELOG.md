@@ -8,6 +8,63 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4067 -- the physics AI, reachable by an MCP client
+
+Keith: *"is there any downside to setting up the MCP shim for the physics ai? what would that enable?"* Built
+it -- and the answer to the downside question is what the gate is mostly about.
+
+`tools/mcp/physicsAi.mjs` serves the proposer registry to any MCP client over stdio: **list** the proposers,
+**run** one, **compare** the static shortlist against the adaptive boundary search on the same knob, **probe**
+whether a knob's adjudicator is monotone enough to license a search at all, and read the licence tiers. It
+replaces the workflow this session has actually used all round -- write a throwaway script, run it, read the
+output, delete it -- with a standing interface.
+
+**The downside is a second declaration, and every tool is built not to be one.** An MCP shim is the natural
+place to hand-type the proposer ids and the shape `runProposer` returns -- and `proposers.mjs` gained a whole
+new return field (`searched`) *one round* before this shim was written, so a typed copy would already have been
+wrong. So the ids come from `listProposers()` at call time, "does this knob have a search" is read off the
+registered proposer, and **no `outputSchema` is declared anywhere** (declaring one would be a second copy of the
+return shape). The gate proves derivation by **registering a new proposer under the running shim** and
+re-asking -- 10 -> 11 without touching the shim, its search range read back exactly as registered -- rather than
+by reading the source and believing it.
+
+**And it is read-only where it matters: `grantLicence` and `applyKnobs` are not exposed.** They are the
+registry's write path and apply path. `proposers.mjs` already re-checks the adjudication rather than trusting a
+caller's `{pass:true}`, so exposing them would not be forgeable -- they are absent anyway, because an MCP client
+is by construction something other than this repo's own runs, and the licence ratchet has never been reachable
+from outside before. Asserted three ways: not in the tool set, not *called* anywhere in the shim (checked
+against comment-stripped source, since the file's own header discusses both by name and a raw grep would have
+been satisfied by the discussion), and not advertised over the live protocol.
+
+**Two real bugs found by building it, both species this tree keeps naming.** First, the SDK resolver found
+`@modelcontextprotocol/sdk` by explicit path but imported its peer `zod` as a **bare specifier**, which does not
+resolve from `tools/mcp/` -- the zod failure threw inside the same try, and the process printed
+*"@modelcontextprotocol/sdk is not installed"* with the SDK sitting on disk. Exactly the misattribution
+`playwrightResolve.mjs` exists to end for chromium; each dependency now resolves in its own try with its own
+message.
+
+Second, and it nearly became a fabricated measurement: the gate's live half armed a 60s rejection timer per
+JSON-RPC request **and never cleared it**. Every call succeeded in milliseconds, every check passed, and the
+pending timers held Node's event loop open -- 60.8s wall clock, three runs running, consistent enough to look
+like a genuine cost, and about to be written into `gateBudget.mjs` as this gate's budget. **A hang and a cost
+are different facts and a stopwatch cannot tell them apart.** What separated them was that 60.8s sits
+suspiciously close to a round 60s, and that timing the handlers directly found 430ms. Cleared: **60.8s ->
+0.78s**, 74x, and now well under the third-of-default line that would have required a budget entry at all.
+
+New gate `tools/mcp/physicsAi-selfcheck.mjs`, 23 checks, including a real MCP handshake over stdio
+(`initialize` / `tools/list` / `tools/call`) -- because "the handlers return the right thing" and "this process
+speaks the protocol" are different claims and only one is provable by calling functions. Three sabotages bite:
+hard-coding the proposer list reddens 2, declaring an `outputSchema` reddens 1, exposing `grantLicence` reddens
+3 (source *and* live protocol).
+
+`@modelcontextprotocol/sdk` is an **optionalDependency** beside `ffmpeg-static` and `puppeteer-core` -- this
+process is standalone, `ai-bridge/server.js` does not load it, so a rig without it boots unchanged and the gate
+skips its live half loudly rather than passing. Measured: the SDK alone audits at **0 vulnerabilities**;
+ai-bridge's 3 pre-existing high-severity advisories are unrelated to it and were neither introduced nor fixed
+here.
+
+One gate file added, so this build carries 1207 gates. verify.mjs ALL GREEN.
+
 ## Since v4066 -- the physics AI stops guessing and starts searching
 
 Keith: *"the physics ai is the most important function of the physics lab."*

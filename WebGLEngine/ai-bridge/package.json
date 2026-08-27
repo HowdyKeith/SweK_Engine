@@ -23,6 +23,7 @@
     "ws": "^8.21.0"
   },
   "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "ffmpeg-static": "^5.2.0",
     "puppeteer-core": "^24.0.0"
   },
