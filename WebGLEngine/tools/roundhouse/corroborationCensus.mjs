@@ -111,11 +111,49 @@ const isFinite_ = (x) => typeof x === "number" && Number.isFinite(x);
  * Sweep the lab. Returns one record per device/mode plus a roll-up. Nothing here mutates the devices; every
  * build is called exactly as the census and the CLI call it.
  */
-export async function corroborationCensus({ modes = null, verbose = false } = {}) {
+/**
+ * *** v4036 -- A BUDGET AND PROGRESSIVE OUTPUT, BECAUSE THIS COULD NOT BE RUN. ***
+ *
+ * The selfcheck beside this file opens "~60s: it builds the whole lab". It now exceeds 1500 s and returns
+ * NOTHING while it does -- three timed-out runs this session, the last on an otherwise idle machine, with zero
+ * bytes of output. Both halves of that are fixable and both were the same mistake:
+ *
+ *   THE COST WAS NEVER BOUNDED. This builds every device in every mode, and the lab has grown from the 54
+ *   devices of that era to 129 while acquiring members whose SINGLE build costs minutes. The 60-second
+ *   estimate dates from when nothing here cost a second. A census inherits every cost it enumerates.
+ *
+ *   AND IT WAS SILENT. `verbose` existed and defaulted off, so the default run printed its first character
+ *   only after every build had finished -- which makes a slow run and a hung one look identical, and this
+ *   session spent three timeouts unable to tell them apart. onProgress reports each build AS IT LANDS.
+ *
+ * *** THE BUDGET DEFAULTS TO INFINITY AND THAT IS DELIBERATE. *** The pinned numbers in the gate are lab-wide
+ * totals, so a shortened run would quietly understate every one of them. A caller who wants a fast partial
+ * answer asks for one and gets it clearly labelled: `complete: false`, the skipped device-modes counted, and
+ * the gate refusing to assert its totals from partial data rather than passing on a smaller lab.
+ *
+ * The deadline is checked BEFORE each build, and one build is still unbounded -- the same limit probeKnob
+ * states at v4032, for the same reason: a build is synchronous and nothing here can interrupt one already
+ * started. This bounds how many start.
+ */
+export async function corroborationCensus({ modes = null, verbose = false,
+                                            budgetMs = Infinity, onProgress = null } = {}) {
     // v3211 -- BUILT, NOT LISTED, AND IT REFUSES AN EMPTY TABLE. A caller may still pass its own.
     if (!modes) modes = await deviceModeTable();
     const rows = [];
     let built = 0, failed = 0;
+
+    // The DENOMINATOR, computed before any work. The gate used to ask `deviceModes >= 80`, which is a floor and
+    // not a coverage claim -- the identical shape strictConfig's mirrorAudit carried until v4032, where
+    // `scanned > 40` was comfortably satisfied by 81 of 116. A budget without this would have reintroduced
+    // exactly the defect that round removed.
+    const planned = [];
+    for (const name of DEVICE_NAMES) for (const mode of (modes[name] || [])) planned.push(name + "." + mode);
+    const plannedDeviceModes = planned.length;
+
+    const started = Date.now();
+    const deadline = started + budgetMs;
+    const skipped = [];
+    let done = 0, overBudget = false;
 
     for (const name of DEVICE_NAMES) {
         const ms = modes[name];
@@ -124,6 +162,12 @@ export async function corroborationCensus({ modes = null, verbose = false } = {}
         try { dev = await getDevice(name); } catch { continue; }
 
         for (const mode of ms) {
+            if (overBudget || Date.now() > deadline) {
+                overBudget = true;
+                skipped.push(name + "." + mode);    // NAMED, never silently dropped
+                continue;
+            }
+            const t0 = Date.now();
             let port;
             try {
                 // Portability and the build in one shot: the sampled tripwire arms, calls, disarms before
@@ -156,6 +200,14 @@ export async function corroborationCensus({ modes = null, verbose = false } = {}
                 knob: refinable ? knob.key : null,
             });
             if (verbose) console.log(`    ${name}.${mode}: ${unkeyed.length} unkeyed, ${port.rawCalls} raw libm calls`);
+            done++;
+            if (onProgress) {
+                try {
+                    onProgress({ device: name, mode, done, total: plannedDeviceModes,
+                                 ms: Date.now() - t0, elapsedMs: Date.now() - started,
+                                 rawCalls: port.rawCalls, unkeyed: unkeyed.length });
+                } catch { /* a reporter that throws must not take the census down with it */ }
+            }
         }
     }
 
@@ -166,7 +218,15 @@ export async function corroborationCensus({ modes = null, verbose = false } = {}
 
     return {
         rows, built, failed,
+        // *** A SHORTENED RUN SAYS SO IN THE RESULT, NOT ONLY IN A LOG LINE NOBODY KEPT. *** Every total below
+        // is a sum over `rows`, so each one shrinks silently when the sweep stops early. `complete` is what a
+        // caller checks before quoting any of them.
+        complete: !overBudget,
+        skipped, plannedDeviceModes,
         summary: {
+            complete: !overBudget,
+            plannedDeviceModes,
+            skippedDeviceModes: skipped.length,
             deviceModes: rows.length,
             keyedTotal: rows.reduce((a, r) => a + r.keyed.length, 0),
             unkeyedTotal,

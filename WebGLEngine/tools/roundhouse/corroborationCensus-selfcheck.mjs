@@ -1,6 +1,15 @@
 // tools/roundhouse/corroborationCensus-selfcheck.mjs
 //
-// Run: node tools/roundhouse/corroborationCensus-selfcheck.mjs   (~60s: it builds the whole lab)
+// Run: node tools/roundhouse/corroborationCensus-selfcheck.mjs        (it builds the whole lab, in every mode)
+//      node tools/roundhouse/corroborationCensus-selfcheck.mjs --budget 120000   (a labelled PARTIAL run)
+//
+// *** v4036 -- THE "~60s" THAT USED TO BE ON THIS LINE WAS OFF BY MORE THAN AN ORDER OF MAGNITUDE, AND THE RUN
+// WAS SILENT WHILE IT RAN. *** Three timed-out attempts this session -- 400 s, 800 s, then 1500 s on an
+// otherwise idle machine -- every one returning zero bytes, because `await corroborationCensus({})` did all the
+// work before the first console.log. A slow run and a hung one were indistinguishable, and the estimate on this
+// line was the only thing anyone had to go on. It dates from a lab of 54 devices; there are now 129, several
+// with single builds costing minutes. THE COST OF A CENSUS IS THE COST OF WHAT IT ENUMERATES, and this one had
+// never been asked what that was. It now reports each build as it lands and accepts a budget.
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2904 -- WHAT THE LAB CANNOT VOUCH FOR.
@@ -15,9 +24,37 @@ import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
+const report = (name, detail) => console.log("  ----  " + name + (detail ? "   " + detail : ""));
 
-const c = await corroborationCensus({});
+// --budget <ms> bounds the sweep and produces a PARTIAL result that says so. Absent, the run is unbounded,
+// which is what CI wants: the assertions below are lab-wide totals and a shortened run understates every one.
+const argv = process.argv.slice(2);
+const budgetArg = argv.includes("--budget") ? parseInt(argv[argv.indexOf("--budget") + 1] || "", 10) : NaN;
+const budgetMs = Number.isFinite(budgetArg) && budgetArg > 0 ? budgetArg : Infinity;
+
+// *** PROGRESSIVE OUTPUT, ONE LINE PER DEVICE RATHER THAN PER MODE. *** Per mode is 400+ lines and buries the
+// gate; per device is enough to see the sweep is alive and to see WHICH device it is sitting on -- which is the
+// question three timeouts could not answer. A build over a second is marked, because that is the whole story of
+// why this stopped being runnable.
+console.log("sweeping the lab" + (budgetMs === Infinity ? "" : " with a " + budgetMs + " ms budget") + " ...");
+let lastDevice = null, deviceMs = 0, deviceModes = 0;
+const flush = () => {
+    if (lastDevice === null) return;
+    console.log("    " + lastDevice.padEnd(22) + String(deviceModes).padStart(2) + " modes  " +
+        (deviceMs / 1000).toFixed(2).padStart(7) + " s" + (deviceMs > 1000 ? "   <-- over a second" : ""));
+};
+const c = await corroborationCensus({
+    budgetMs,
+    onProgress: ({ device, mode, ms, done, total }) => {
+        if (device !== lastDevice) { flush(); lastDevice = device; deviceMs = 0; deviceModes = 0; }
+        deviceMs += ms; deviceModes++;
+        if (done === total) flush();
+    },
+});
+flush();
 const s = c.summary;
+console.log("  swept " + s.deviceModes + " of " + s.plannedDeviceModes + " device/modes" +
+    (c.complete ? "" : "  -- PARTIAL, " + s.skippedDeviceModes + " skipped at the budget"));
 console.log();
 censusLines(c).forEach((l) => console.log("  " + l));
 console.log();
@@ -27,6 +64,18 @@ console.log();
     const by = (m) => c.rows.find((r) => r.device === "lens" && r.mode === m);
     const shadow = by("shadow"), aim = by("aim"), deflect = by("deflect");
 
+    // *** v4036 -- THIS SECTION READS ROWS BY NAME, AND A BUDGETED SWEEP MAY NOT HAVE BUILT THEM. *** The first
+    // budgeted run of this gate CRASHED here -- `Cannot read properties of undefined (reading 'rawCalls')` --
+    // because lens was never reached. That is the honest consequence of adding a budget and it is guarded
+    // rather than papered over: a control that was not run is REPORTED as not run, never passed and never
+    // thrown. And the guard is `report`, not a lenient `ok`: this is the control the whole census rests on, so
+    // "we did not check" must not print as a pass.
+    if (!shadow || !aim || !deflect) {
+        report("the tripwire control could not be evaluated",
+            "lens rows absent -- the sweep was PARTIAL (" + s.deviceModes + " of " + s.plannedDeviceModes +
+            "). *** EVERY PORTABLE VERDICT IN THIS CENSUS RESTS ON THIS CONTROL, so a partial run has not " +
+            "established them. Run without --budget to assert it. ***");
+    } else {
     ok("!! the tripwire demonstrably reaches device builds (pre-registered control)",
         shadow.rawCalls > 0 && aim.rawCalls > 0,
         "lens.shadow " + shadow.rawCalls + " calls, lens.aim " + aim.rawCalls + " -- had these come back clean, " +
@@ -51,25 +100,42 @@ console.log();
         Number.isFinite(d.deflectionMeasured) && d.deflectionMeasured > d.deflectionWeak * 1.4,
         "measured " + d.deflectionMeasured.toFixed(4) + " rad vs weak-field " + d.deflectionWeak.toFixed(4) +
         " -- a 48% strong-field excess; a stub returning Infinity would also have made zero libm calls");
+    }
 }
 
 // ---- 2. THE HEADLINE: HOW MUCH OF THE LAB NOTHING VOUCHES FOR ----------------------------------------------------
 {
-    ok("the census actually swept the lab", s.deviceModes >= 80 && c.failed === 0,
-        s.deviceModes + " device/modes built, " + c.failed + " refused");
-    ok("!! most of the lab's numbers have no answer key",
+    // *** v4036 -- THE DENOMINATOR, NOT A FLOOR. *** This asked `deviceModes >= 80`, which is satisfied by any
+    // run that reached 80 -- including a budgeted one that stopped at 85 of 400 while every headline total
+    // below silently shrank to match. That is the identical shape strictConfig's mirrorAudit carried until
+    // v4032, where `scanned > 40` was comfortably satisfied by 81 of 116 and "zero offenders" meant "zero
+    // among the ones I could find". Adding a budget without fixing this would have reintroduced it here.
+    ok("!! the census swept EVERY device/mode it planned to, not merely a lot of them",
+        c.complete && s.deviceModes === s.plannedDeviceModes && c.failed === 0,
+        s.deviceModes + " of " + s.plannedDeviceModes + " device/modes built, " + c.failed + " refused" +
+        (c.complete ? "" : ", PARTIAL -- " + s.skippedDeviceModes + " skipped at the budget"));
+    // *** AND THE TOTALS BELOW ARE NOT ASSERTED FROM A PARTIAL SWEEP. *** Each is a sum over the rows that were
+    // built, so a budgeted run makes every one of them smaller and some of the comparisons still hold on the
+    // smaller lab -- `unkeyedTotal > keyedTotal` would pass on half the devices and mean nothing. A partial run
+    // reports them and says it cannot vouch for them; it does not quietly pass.
+    const pinned = (name, cond, detail) => c.complete
+        ? ok(name, cond, detail)
+        : report(name, "NOT ASSERTED -- the sweep was PARTIAL (" + s.deviceModes + " of " +
+                 s.plannedDeviceModes + "). " + detail);
+
+    pinned("!! most of the lab's numbers have no answer key",
         s.unkeyedTotal > s.keyedTotal,
         s.unkeyedTotal + " unkeyed vs " + s.keyedTotal + " keyed -- the tautology census (v2898) audited the " +
         s.keyedTotal + "; nothing had ever audited the " + s.unkeyedTotal);
-    ok("!! more than half the lab's modes touch unspecified libm",
+    pinned("!! more than half the lab's modes touch unspecified libm",
         s.nonPortableModes > s.portableModes,
         s.nonPortableModes + " of " + s.deviceModes + " modes non-portable");
-    ok("!! the number this round exists to surface",
+    pinned("!! the number this round exists to surface",
         s.unkeyedAtRisk >= 150,
         s.unkeyedAtRisk + " of " + s.unkeyedTotal + " unkeyed observables are reported by a non-portable build: " +
         "no answer key checks them, and the fleet's bit-identity guarantee does not cover them. The fingerprint's " +
         "50 subsystems agree across three machines; these are not among the 50");
-    ok("!! criterion 3 is untestable for almost the whole lab",
+    pinned("!! criterion 3 is untestable for almost the whole lab",
         s.unrefinableUnkeyed / s.unkeyedTotal > 0.9,
         s.unrefinableUnkeyed + " of " + s.unkeyedTotal + " unkeyed observables live in modes with no declared " +
         "refinement knob (" + Object.keys(REFINEMENT_KNOBS).length + " devices have one). Convergence is not " +
@@ -86,18 +152,27 @@ console.log();
     // evidence that build-level granularity overstates the damage. Narrowing it needs per-observable
     // instrumentation, which is the follow-on round this census is meant to justify.
     const kerr = c.rows.filter((r) => r.device === "kerr");
+    // *** v4036 -- `kerr.length > 0` IS NOT PADDING. *** [].every(...) is TRUE, so on any run that never
+    // reached kerr this line passed by having nothing to check -- the vacuous pass this session already found
+    // in mpmstep's sideways negative, where a grid too small to hold the block satisfied "driftX is exactly
+    // zero" by never moving it. Unreachable before a budget existed; reachable the moment one did.
     ok("build-level granularity demonstrably overstates the taint",
-        kerr.every((r) => !r.portable && r.rawCalls < 100 && r.unkeyed.length >= 10),
+        kerr.length > 0 && kerr.every((r) => !r.portable && r.rawCalls < 100 && r.unkeyed.length >= 10),
         "kerr modes: " + kerr.map((r) => r.mode + "(" + r.rawCalls + " calls, " + r.unkeyed.length + " unkeyed)").join(", ") +
         " -- twenty-odd calls cannot plausibly have reached all eleven outputs; the census reports them at risk anyway " +
         "because it cannot yet prove otherwise, and overstating is the safe direction");
 
     const worst = c.rows.slice().sort((a, b) => b.rawCalls - a.rawCalls)[0];
-    ok("!! and the reason nobody had run this sweep before is measurable",
-        worst.rawCalls > 1e8,
-        worst.device + "." + worst.mode + " makes " + worst.rawCalls.toLocaleString() + " unspecified libm calls. " +
-        "The existing tripwire captures a stack trace per call, so pointing it at the lab does not finish; the " +
-        "sampling variant in this module counts exactly and samples sites, and gets the sweep down to ~60s");
+    pinned("!! and the reason nobody had run this sweep before is measurable",
+        !!worst && worst.rawCalls > 1e8,
+        (worst ? worst.device + "." + worst.mode + " makes " + worst.rawCalls.toLocaleString() : "no rows") +
+        " unspecified libm calls. The existing tripwire captures a stack trace per call, so pointing it at the " +
+        "lab does not finish; the sampling variant in this module counts exactly and samples sites. *** v4036 " +
+        "STRUCK THE CLAIM THAT THIS 'gets the sweep down to ~60s'. *** It does not, and had not for a long " +
+        "time: ONE build of each device's FIRST MODE ALONE now measures 307.1 s across 129 devices, and this " +
+        "census builds every mode. The sampling variant is still the reason the sweep is possible at all -- " +
+        "the stack-capturing one never finished its second device -- but the number beside it was inherited " +
+        "from a smaller lab and never remeasured.");
 }
 
 // ---- 4. WHAT THIS CENSUS DOES NOT ESTABLISH ------------------------------------------------------------------------
