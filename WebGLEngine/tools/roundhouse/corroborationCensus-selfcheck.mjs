@@ -54,7 +54,9 @@ const c = await corroborationCensus({
 flush();
 const s = c.summary;
 console.log("  swept " + s.deviceModes + " of " + s.plannedDeviceModes + " device/modes" +
-    (c.complete ? "" : "  -- PARTIAL, " + s.skippedDeviceModes + " skipped at the budget"));
+    (c.complete ? "" : "  -- PARTIAL, " + s.skippedDeviceModes + " skipped at the budget, " +
+                       s.declinedDeviceModes + " declined as too costly for what was left"));
+for (const d of c.declined) console.log("    declined: " + d);
 console.log();
 censusLines(c).forEach((l) => console.log("  " + l));
 console.log();

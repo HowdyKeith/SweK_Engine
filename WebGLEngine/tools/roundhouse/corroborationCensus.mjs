@@ -152,7 +152,8 @@ export async function corroborationCensus({ modes = null, verbose = false,
 
     const started = Date.now();
     const deadline = started + budgetMs;
-    const skipped = [];
+    const skipped = [];      // never started: the deadline had passed
+    const declined = [];     // never started: the device said it would not fit in what was left
     let done = 0, overBudget = false;
 
     for (const name of DEVICE_NAMES) {
@@ -166,6 +167,33 @@ export async function corroborationCensus({ modes = null, verbose = false,
                 overBudget = true;
                 skipped.push(name + "." + mode);    // NAMED, never silently dropped
                 continue;
+            }
+            // *** v4037 -- A DEVICE THAT KNOWS WHAT IT COSTS CAN BE DECLINED BEFORE IT STARTS. ***
+            // v4036 stated the limit honestly and left it open: the deadline bounds how many builds START,
+            // and a build already running cannot be interrupted, so one long build overruns any budget. That
+            // is not hypothetical -- a TEN-SECOND budget produced a 2m08s run, because device 82 is twof and
+            // one build of it is 114 s. The budget was working perfectly and the run was still unusable.
+            //
+            // The gap closes from the other side: ask the device first. A `costHint` is a SCHEDULING AID AND
+            // NOT A MEASUREMENT -- it is allowed to be rough, a wrong one costs a skipped build or a long one
+            // and can never change a reported number, and a device that declares none behaves exactly as
+            // before. What it must not do is silently drop the build: an over-cost skip is recorded in
+            // `skipped` beside the budget skips, so coverage still counts it as not swept.
+            if (typeof dev.costHint === "function") {
+                let hint = null;
+                try { hint = dev.costHint({ mode, config: {} }); } catch { hint = null; }
+                const remaining = deadline - Date.now();
+                //
+                // *** AND A DECLINE DOES NOT END THE SWEEP, WHICH THE FIRST DRAFT OF THIS GOT WRONG. ***
+                // TOO EXPENSIVE and OUT OF TIME are different facts. Setting overBudget here would have let
+                // one costly device at position 82 discard the 47 cheap ones after it -- turning a device's
+                // honesty about its own cost into a penalty on everything downstream, which is the opposite
+                // of what declaring a cost is for. The deadline ends the sweep; a decline skips one build.
+                if (Number.isFinite(hint) && hint > remaining) {
+                    declined.push(name + "." + mode + " (declared ~" + Math.round(hint) + " ms, " +
+                                  Math.round(remaining) + " ms left)");
+                    continue;
+                }
             }
             const t0 = Date.now();
             let port;
@@ -221,12 +249,16 @@ export async function corroborationCensus({ modes = null, verbose = false,
         // *** A SHORTENED RUN SAYS SO IN THE RESULT, NOT ONLY IN A LOG LINE NOBODY KEPT. *** Every total below
         // is a sum over `rows`, so each one shrinks silently when the sweep stops early. `complete` is what a
         // caller checks before quoting any of them.
-        complete: !overBudget,
-        skipped, plannedDeviceModes,
+        // `complete` means EVERY PLANNED BUILD RAN. A declined build is as absent from the totals as a
+        // skipped one, so it counts against completeness just the same -- the two are reported separately
+        // because they are different facts, not because one of them is harmless.
+        complete: !overBudget && declined.length === 0,
+        skipped, declined, plannedDeviceModes,
         summary: {
-            complete: !overBudget,
+            complete: !overBudget && declined.length === 0,
             plannedDeviceModes,
             skippedDeviceModes: skipped.length,
+            declinedDeviceModes: declined.length,
             deviceModes: rows.length,
             keyedTotal: rows.reduce((a, r) => a + r.keyed.length, 0),
             unkeyedTotal,
