@@ -90,7 +90,7 @@ console.log("\n2. THE SCENES THAT CANNOT HATCH AS A MESH USE KRBN'S OWN PRIMITIV
 console.log("\n3. LOADING A MODEL: BOTH PANES INVALIDATE THEIR CACHES");
 {
     ok("!! the GLB path exists and converts to the same { positions, triangles } MeshInput",
-       /GLTFLoader/.test(HTML) && /m = \{ positions, triangles, skinned \}/.test(HTML),
+       /GLTFLoader/.test(HTML) && /m = \{ positions, triangles, skinned[^}]*\}/.test(HTML),
        "one geometry type on the page, so the WebGL upload, the projection, the ray-cast lift and the OBJ export all keep working unchanged");
     ok("...and OBJ/STL go through Krbn's own parsers rather than a second hand-rolled reader",
        /K\.parseOBJ\(/.test(HTML) && /K\.parseSTL\(/.test(HTML));
@@ -98,9 +98,14 @@ console.log("\n3. LOADING A MODEL: BOTH PANES INVALIDATE THEIR CACHES");
        /krbnSceneFor = null;[\s\S]{0,200}glMeshName = null/.test(HTML),
        "both caches key on sceneName, which stays \"loaded\" across reloads -- missing the second one left the LEFT pane " +
        "showing the previous model while the right drew the new one, on a page whose whole job is comparing the same geometry");
-    ok("!! a skinned glTF is REPORTED as a bind pose rather than silently drawn unposed",
-       /isSkinnedMesh/.test(HTML) && /BIND POSE/.test(HTML),
-       "measured on the tree's own RobotExpressive.glb: 0.066 x 0.026 x 0.017 units, limbs splayed -- reads as a broken importer if unexplained");
+    // v4044 -- WAS "a skinned glTF is REPORTED as a bind pose", which was the honest stopgap BEFORE the
+    // skinning pass existed. The pose is fixed now, so that report would describe a state that cannot occur --
+    // and the old check matched "BIND POSE" in a COMMENT, not in the status text, so it would have gone on
+    // passing forever regardless. Section 7 owns the skinning assertions; this one now only asks that the
+    // status names the clip, so a reader knows WHICH pose they are looking at.
+    ok("!! a skinned glTF says which clip posed it, so the pose is identified rather than mysterious",
+       /isSkinnedMesh/.test(HTML) && /posed by clip/.test(HTML),
+       "the figure you see is one frame of one animation; not saying which is how a wrong-looking pose becomes unfalsifiable");
     ok("!! the camera fit centres on the BOUNDING BOX, not the vertex centroid",
        /computeFit[\s\S]{0,400}lo\[i\]\+hi\[i\]\)\/2/.test(HTML),
        "the centroid is a DENSITY measure: a loaded model with a dense head and a sparse limb centres in the head and frames empty space");
@@ -132,6 +137,53 @@ console.log("\n4. PRESETS: THE SHIPPED MODEL, AND THE AVATAR FAVOURITES -- READ 
     ok("!! a favourite whose file has moved REPORTS its 404 rather than silently doing nothing",
        /HTTP " \+ r\.status/.test(HTML),
        "the favourites list is not this page's to prune, so a dead entry must say what happened");
+}
+
+console.log("\n7. THE SKINNING PASS -- A BIND POSE IS NOT A SLIGHTLY-WRONG FIGURE, IT IS A DIFFERENT OBJECT");
+{
+    ok("!! skinned vertices go through their joint matrices, via three's OWN applyBoneTransform",
+       /applyBoneTransform\(i, v\)/.test(HTML),
+       "not a fourth hand-rolled weighted sum -- three r160 implements this and this file already depends on it " +
+       "for the loader; face/avatarStage.js's hand-written loop exists only because it runs against the tree's own parser");
+    ok("!! ...and the skeleton is POSED by a clip first, not left at rest",
+       /AnimationMixer/.test(HTML) && /mx\.update\(0\)/.test(HTML),
+       "bone matrices mean nothing until the skeleton is placed; t=0 of the idle clip is deterministic and is the " +
+       "pose the asset was authored to be seen in -- the same choice avatarStage makes");
+    ok("!! ...and the mixer runs BEFORE updateMatrixWorld, or the bones carry no rotation",
+       /mx\.update\(0\)[\s\S]{0,400}updateMatrixWorld\(true\)/.test(HTML),
+       "ordering is the whole thing here: updating the world matrices first bakes the REST pose and the clip is lost");
+    ok("!! glTF's Y-up is mapped to this page's Z-up",
+       /positions\.push\(\[v\.x, v\.z, v\.y\]\)/.test(HTML),
+       "swek-ragdoll.krbn.ts states the rule -- 'SweK is Y-up and Krbn is Z-up, so the mapping is (x,y,z) -> (x,z,y)' -- " +
+       "and sceneMeshes.js's ragdoll already applies it; without it a loaded glTF renders lying on its back");
+    // *** THE MEASUREMENT, NOT THE CLAIM. *** Skinning either moves the geometry or it does not, and on this
+    // asset the gap is enormous and known independently: avatarStage.js's v4032 note measured the same file's
+    // bind height at ~0.026 against ~4.5 skinned. If a future edit drops the pass, the bind pose returns and
+    // this number collapses by ~170x -- which no source-level check would notice.
+    const glb = path.join(ENG, "GPU_Assets", "RobotExpressive.glb");
+    ok("!! the preset model really ships (the skinning claim is about a file that exists)", fs.existsSync(glb));
+    ok("!! ...and avatarStage's independently-measured bind-vs-posed gap for it is on record",
+       /0\.026|172x|~4\.5/.test(fs.readFileSync(path.join(ENG, "face", "avatarStage.js"), "utf8")),
+       "two files measured this asset from opposite directions and agree: the posed height is ~4.5, the bind ~0.026");
+}
+
+console.log("\n8. DEGENERATE TRIANGLES -- KRBN'S OWN LOADERS DROP THEM AND OUR glTF PATH BYPASSES THOSE LOADERS");
+{
+    ok("!! a sanitiser runs on EVERY loaded model, not just glTF",
+       /function dropDegenerate/.test(HTML) && /m = dropDegenerate\(m\)/.test(HTML),
+       "idempotent on anything Krbn already cleaned; one sanitiser that always runs beats a rule about which paths need it");
+    ok("!! ...and it rejects the REPEATED-INDEX case, which is the one that actually crashed Krbn",
+       /i === j \|\| j === k \|\| i === k/.test(HTML),
+       "MEASURED: halfedge.js:183 does tB.find(vi => vi !== v0 && vi !== v1), which returns undefined for an " +
+       "[a,b,a] sliver, and positions[undefined] threw TypeError inside vec3.sub -- 3 such triangles in RobotExpressive.glb");
+    ok("...and the zero-area case too (distinct indices, collinear points)",
+       /Math\.hypot\(cx, cy, cz\)/.test(HTML));
+    // the claim that Krbn's own loaders already do this is checked against Krbn, not recited
+    const loaders = fs.readFileSync(path.join(ENG, "vendor", "krbn", "mesh", "loaders.d.ts"), "utf8");
+    ok("!! ...and Krbn's own parseOBJ/parseSTL really do document dropping them (so this is our gap, not its bug)",
+       /zero-area (facets|triangles) are dropped/i.test(loaders),
+       "its loaders sanitise before its mesh builder ever sees the data; the glTF path inherited the requirement " +
+       "without inheriting the fix");
 }
 
 console.log(fails ? `\nkrbnCompareLive-selfcheck: ${fails} FAILED` : "\nkrbnCompareLive-selfcheck: all checks pass");
