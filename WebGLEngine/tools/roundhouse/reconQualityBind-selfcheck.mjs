@@ -153,5 +153,28 @@ console.log("\n6. *** THE PLANT: WINDOW EACH IMAGE BY ITS OWN RANGE ***");
         + "to fall -- a test whose honest answer is already the failing one cannot report the failure.");
 }
 
+console.log("\n7. *** v4028 -- `thresh` WAS A DEAD KNOB, AND THE REASON WAS A REAL BUG THREE FRAMES DEEP ***");
+{
+    // *** THIS SECTION EXISTS BECAUSE knobLiveness FOUND SOMETHING THIS DEVICE'S OWN AUTHOR DID NOT. ***
+    // reconQualityBind.mjs called `iou(iT, iR, { thresh })`, copying the shipped module's own
+    // `iou(iT, iR, { thresh: 8 })` -- and render/silhouette.mjs's iou(a, b) declared exactly two parameters, so
+    // the option was valid JS and silently discarded. thresh moved NOTHING from 1e-6x to 1e6x, which is not
+    // insensitivity over a margin (galaxy.zeroTol's shape) -- the value never left this function. Fixed at the
+    // source: iou() and scaleDelta() now accept and forward opts to mask(), which already had the parameter and
+    // already argued for it (its own header tells the backendVisualDiff false-positive story).
+    const lo = reconQualityDevice.build({ mode: "blindspot", config: { thresh: 32 } });
+    const hi = reconQualityDevice.build({ mode: "blindspot", config: { thresh: 128 } });
+    ok("!! *** thresh NOW MOVES iouShifted, WHICH IT NEVER DID BEFORE THE FIX ***",
+        lo.iouShifted !== hi.iouShifted,
+        "thresh=32 -> " + lo.iouShifted.toFixed(4) + ", thresh=128 -> " + hi.iouShifted.toFixed(4)
+        + ". Before the fix these were IDENTICAL AT EVERY VALUE TRIED, including 1e6x and 1e-6x, because "
+        + "iou(a, b, opts) had no third parameter to receive them.");
+    const honest = reconQualityDevice.build({ config: {} });
+    ok("...and the shipped default (thresh=8) is UNCHANGED, so this is a live wire, not a behaviour change",
+        Math.abs(honest.iouShifted - 0.4952256944444444) < 1e-12,
+        "iouShifted at thresh=8 reads " + honest.iouShifted + " -- the same value section 4 already asserted "
+        + "as < 0.6, now pinned exactly. The fix reaches an argument nothing was using, not the number.");
+}
+
 console.log("\n" + (fails ? "reconQualityBind-selfcheck: " + fails + " FAILED" : "reconQualityBind-selfcheck: all checks pass"));
 process.exit(fails ? 1 : 0);

@@ -45,9 +45,19 @@ export function mask(img, { thresh = 8 } = {}) {
     return { m, w, h };
 }
 
-/** Intersection over union of two occupancy masks. Two empty frames agree exactly, which is correct. */
-export function iou(a, b) {
-    const A = mask(a), B = mask(b);
+/**
+ * Intersection over union of two occupancy masks. Two empty frames agree exactly, which is correct.
+ *
+ * *** v4028 -- opts WAS ACCEPTED AND DROPPED. *** iou(a, b, { thresh: 8 }) parsed as valid JS -- two declared
+ * parameters and a silently discarded third -- so every caller who thought they were choosing a threshold was
+ * calling mask()'s own default instead, including physics/tomography/reconQuality.mjs's `iou(iT, iR,
+ * { thresh: 8 })`, which read as intentional and was inert. Found by knobLiveness: reconQualityBind's `thresh`
+ * knob was declared, defaulted to 8, and moved no observable at any value from 1e-6x to 1e6x -- not insensitive
+ * over a margin like galaxy.zeroTol, DEAD, because the value never left this function. mask()'s own header
+ * argues thresh is load-bearing (the backendVisualDiff false-positive story); iou() just never carried it there.
+ */
+export function iou(a, b, opts = {}) {
+    const A = mask(a, opts), B = mask(b, opts);
     let inter = 0, union = 0, ca = 0, cb = 0;
     const n = Math.min(A.m.length, B.m.length);
     for (let i = 0; i < n; i++) {
@@ -64,8 +74,8 @@ export function iou(a, b) {
  * poorly while being the same size (a translation), or overlap well while one is systematically larger (a
  * mis-scaled camera). Those are different faults and they want different names.
  */
-export function scaleDelta(a, b) {
-    const r = iou(a, b);
+export function scaleDelta(a, b, opts = {}) {
+    const r = iou(a, b, opts);
     const denom = (r.areaA + r.areaB) / 2;
     return denom === 0 ? 0 : Math.abs(r.areaA - r.areaB) / denom;
 }
