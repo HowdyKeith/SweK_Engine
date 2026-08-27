@@ -14,7 +14,7 @@
 import { pathToFileURL } from "node:url";
 import { reportLines } from "./stabilityMeter.mjs";
 import { KINDS, shmRun, predictedAmplification, verdict, reciprocity, stabilityBoundary,
-         EXPLODE_FACTOR, DAMP_FACTOR, MEASURED_V3599 } from "./stabilityMeter.mjs";
+         EXPLODE_FACTOR, DAMP_FACTOR, MEASURED_V3599, classifyEnvelope, classifyAgainst } from "./stabilityMeter.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c, note = "") => { if (c) { pass++; console.log("  ok   " + n + (note ? "  -- " + note : "")); }
@@ -109,6 +109,60 @@ section("5. WHAT IS NOT CLAIMED");
        Array.isArray(L) && L.length > 5 && L.every((x) => typeof x === "string") &&
        L.join("\n").includes("[stabilityMeter]"),
        L.length + " lines, self-named");
+}
+
+section("6. classifyEnvelope() AND classifyAgainst() CALLED DIRECTLY, ON CONSTRUCTED UNAMBIGUOUS CASES");
+{
+    // classifyEnvelope: an unambiguously FAITHFUL ratio (unchanged energy), an unambiguously EXPLODED one, and
+    // an unambiguously DAMPED one -- called directly rather than only reached indirectly through verdict().
+    ok("!! classifyEnvelope(1, false) is FAITHFUL -- unchanged energy is the unambiguous middle case",
+       classifyEnvelope(1, false) === "FAITHFUL");
+    ok("!! classifyEnvelope(1e6, false) is EXPLODES -- six orders of energy gained is unambiguous",
+       classifyEnvelope(1e6, false) === "EXPLODES");
+    ok("!! classifyEnvelope(1e-6, false) is DAMPED -- six orders of energy lost is unambiguous",
+       classifyEnvelope(1e-6, false) === "DAMPED");
+    ok("!! classifyEnvelope(blewUp=true) is EXPLODES regardless of the ratio it is handed",
+       classifyEnvelope(0.5, true) === "EXPLODES",
+       "a run that already hit a non-finite value must not be rescued by whatever number came back");
+    ok("!! classifyEnvelope(NaN, false) is EXPLODES -- a non-finite ratio is not silently FAITHFUL",
+       classifyEnvelope(NaN, false) === "EXPLODES");
+    // the two boundary values themselves: AT the factor, not PAST it, so the thresholds are strict "> " / "< "
+    // as the source states, and this is the one place that strictness is exercised directly.
+    ok("!! classifyEnvelope(EXPLODE_FACTOR exactly) is still FAITHFUL -- the comparison is strict '>'",
+       classifyEnvelope(EXPLODE_FACTOR, false) === "FAITHFUL",
+       "ratio = EXPLODE_FACTOR = " + EXPLODE_FACTOR + " exactly, not past it");
+    ok("!! classifyEnvelope(DAMP_FACTOR exactly) is still FAITHFUL -- the comparison is strict '<'",
+       classifyEnvelope(DAMP_FACTOR, false) === "FAITHFUL",
+       "ratio = DAMP_FACTOR = " + DAMP_FACTOR + " exactly, not past it");
+
+    // classifyAgainst: a lossy MEDIUM that is supposed to lose energy (predicted < 1) and does exactly what is
+    // predicted must read FAITHFUL, not DAMPED -- that is the whole reason this function exists per the
+    // module's own header (a wave absorbed by its medium is not an integrator fault).
+    ok("!! classifyAgainst(ratio, predicted) reads FAITHFUL when the actual ratio matches the prediction exactly",
+       classifyAgainst(0.3, 0.3, false) === "FAITHFUL",
+       "predicted decay to 0.3 of the starting energy, measured exactly 0.3 -- the MEDIUM is lossy, not the integrator");
+    ok("!! ...and reads EXPLODES when the actual ratio is far ABOVE what the physics predicted",
+       classifyAgainst(30, 1, false) === "EXPLODES",
+       "predicted no change (ratio 1), measured 30x -- the departure from prediction is the fault, not the raw ratio");
+    ok("!! ...and reads DAMPED when the actual ratio is far BELOW what the physics predicted",
+       classifyAgainst(0.001, 1, false) === "DAMPED",
+       "predicted no change, measured 1e-3 of it -- the INTEGRATOR over-damped relative to the medium's own prediction");
+    ok("!! classifyAgainst returns null rather than a verdict when there is no valid prediction to grade against",
+       classifyAgainst(1, 0, false) === null && classifyAgainst(1, -1, false) === null && classifyAgainst(1, NaN, false) === null,
+       "predicted <= 0 or non-finite means there is nothing to divide by -- a meter that answered anyway would be inventing a claim");
+    ok("!! classifyAgainst respects blewUp before it ever looks at the prediction",
+       classifyAgainst(5, 1, true) === "EXPLODES");
+
+    // Tied to the module's own physics rather than only hand-picked numbers: the implicit integrator at a
+    // predicted-vs-actual COMPARISON, using predictedAmplification the way section 1 already validated it.
+    const dt = 0.1, steps = 2000;
+    const predictedRatio = Math.pow(predictedAmplification("implicit", dt), 2 * steps);
+    const actual = shmRun("implicit", { dt, steps });
+    ok("!! classifyAgainst(implicit's actual ratio, its own closed-form predicted ratio) is FAITHFUL",
+       classifyAgainst(actual.ratio, predictedRatio, actual.blewUp) === "FAITHFUL",
+       "actual " + actual.ratio.toExponential(3) + " vs predicted " + predictedRatio.toExponential(3) +
+       " -- the integrator matches ITS OWN closed form, so relative to that prediction nothing is wrong, even " +
+       "though classifyEnvelope alone (section 4) correctly calls the same run DAMPED against unity");
 }
 
 console.log("\n" + (fail ? "FAILED " + fail + " of " + (pass + fail) : "ALL " + pass + " CHECKS PASS"));

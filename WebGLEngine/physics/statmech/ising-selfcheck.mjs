@@ -18,7 +18,7 @@
 // The transition is EMERGENT. Nothing in the update rule mentions a critical temperature -- there is only "flip
 // if it lowers the energy, else flip with probability exp(-dE/T)".
 
-import { ONSAGER_TC, GAMMA_OVER_NU, yangMagnetisation, makeIsing, measure, sweepTemperature, criticalExponent } from "./ising.js";
+import { ONSAGER_TC, GAMMA_OVER_NU, yangMagnetisation, makeIsing, measure, sweepTemperature, criticalExponent, binderMeasure } from "./ising.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -141,6 +141,39 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
     const swap = (c16[0].U4 > c8[0].U4) && (c16[temps.length - 1].U4 < c8[temps.length - 1].U4);
     ok("...and the curves SWAP SIDES across the transition (a graze cannot fake it)", swap,
        "U4(16)-U4(8): " + (c16[0].U4 - c8[0].U4).toFixed(3) + " below, " + (c16[temps.length - 1].U4 - c8[temps.length - 1].U4).toFixed(3) + " above");
+}
+
+// 13. binderMeasure() CALLED DIRECTLY -- U4 = 1 - <m^4>/(3<m^2>^2), AT ITS TWO EXACT LIMITS.
+//
+// binderCurve above only ever reaches binderMeasure through itself, so binderMeasure's own formula was never
+// exercised in isolation. Two constructions give EXACT, hand-derivable answers without needing a synthetic
+// magnetisation array: a FROZEN lattice (T so far below T_c that no flip's Boltzmann factor is anything but
+// numerically zero) samples m = +1 on every single sweep, which makes <m^2> = <m^4> = 1 exactly and
+// U4 = 1 - 1/3 = 2/3 -- the two-delta-peak limit, computed by hand. A HOT lattice (T far above T_c) samples m
+// as a near-independent sum of N = L^2 coin flips, which by the central limit theorem is close to Gaussian, and
+// for a zero-mean Gaussian <m^4> = 3<m^2>^2 exactly, so U4 -> 0.
+{
+    const frozen = binderMeasure({ L: 4, T: 0.05, seed: 1, warmup: 50, samples: 50, cold: true });
+    ok("!! a lattice frozen far below T_c samples m=+1 on every sweep: m2=m4=1 exactly",
+       frozen.m2 === 1 && frozen.m4 === 1,
+       `m2=${frozen.m2}, m4=${frozen.m4} -- at T=0.05 the cheapest flip costs dE=8, exp(-8/0.05)~0, so the ` +
+       `cold start (all spins +1) never flips across 100 sweeps`);
+    ok("!! ...so U4 is EXACTLY 2/3, the two-delta-peak limit, computed by hand from m2=m4=1",
+       Math.abs(frozen.U4 - 2 / 3) < 1e-12,
+       `U4 = 1 - m4/(3*m2*m2) = 1 - 1/3 = ${(2 / 3).toFixed(12)}; measured ${frozen.U4.toFixed(12)}`);
+    const hot = binderMeasure({ L: 16, T: 10, seed: 1, warmup: 200, samples: 2000 });
+    ok("!! a lattice far above T_c is disordered, and its Binder cumulant sits close to the Gaussian limit U4=0",
+       Math.abs(hot.U4) < 0.15,
+       `U4 = ${hot.U4.toFixed(4)} at T=10 (T_c = ${ONSAGER_TC.toFixed(4)}) -- for a zero-mean Gaussian m4=3*m2^2 ` +
+       `exactly, giving U4=0; a disordered L=16 lattice's m is a near-independent sum of 256 spins and approaches it`);
+    ok("!! the two constructions land on OPPOSITE sides of the transition and read the two textbook limits apart",
+       frozen.U4 > 0.6 && hot.U4 < 0.15 && frozen.U4 - hot.U4 > 0.5,
+       `frozen U4=${frozen.U4.toFixed(4)} vs hot U4=${hot.U4.toFixed(4)} -- the same formula distinguishes an ` +
+       `ordered two-delta-peak magnetisation from a disordered near-Gaussian one`);
+    ok("!! and the returned U4 is exactly the stated formula applied to the returned m2, m4 -- no separate slip",
+       Math.abs(frozen.U4 - (1 - frozen.m4 / (3 * frozen.m2 * frozen.m2))) < 1e-15 &&
+       Math.abs(hot.U4 - (1 - hot.m4 / (3 * hot.m2 * hot.m2))) < 1e-15,
+       "1 - m4/(3*m2*m2) recomputed here from binderMeasure's own returned m2/m4 matches its own U4 in both cases");
 }
 
 console.log("ising-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));

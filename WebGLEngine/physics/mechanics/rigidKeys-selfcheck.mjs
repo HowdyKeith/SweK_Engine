@@ -12,7 +12,7 @@
 "use strict";
 import { initNode, exportReport, has } from "../box3d/box3dNode.mjs";
 import { momentumAcrossCollision, dampingDecay, dampingAcrossSubsteps, flipCounts,
-         pendulumPeriod, pendulumRatios, boxInertia, rotate,
+         pendulumPeriod, pendulumRatios, boxInertia, rotate, quatOf, posOf,
          frictionRestitutionAvailable, BLOCKED_ON_REBUILD, DAMPING_BOX, DAMPING_SHIP,
          MEASURED_V3568, reportLines } from "./rigidKeys.mjs";
 
@@ -22,6 +22,30 @@ const skip = (l, n = "") => { skips++; console.log(`  SKIP  ${l}${n ? "   " + n 
 const report = (l, n = "") => console.log(`  ----  ${l}${n ? "   " + n : ""}`);
 
 console.log("rigidKeys-selfcheck -- four keys against the shipped box3d wasm, and the build gap under them\n");
+
+// ---------------------------------------------------------------------------
+console.log("0. quatOf / posOf -- THE PACKED-TRANSFORM EXTRACTORS, ROUND-TRIP TESTED WITHOUT THE WASM");
+{
+    // The layout every key above depends on: XF_STRIDE = 7 floats per body, [px,py,pz, qx,qy,qz,qw], body 0 then
+    // body 1. This is a pure array test -- no _swk_transforms call needed -- because getting THIS layout wrong
+    // silently mis-reads every quaternion and position every other section reads through these two functions.
+    const xf = [1, 2, 3, 0.1, 0.2, 0.3, 0.4, 10, 20, 30, 0.5, 0.6, 0.7, 0.8];
+    const p0 = posOf(xf, 0), q0 = quatOf(xf, 0), p1 = posOf(xf, 1), q1 = quatOf(xf, 1);
+    report("posOf(xf,0)", JSON.stringify(p0) + "   quatOf(xf,0) " + JSON.stringify(q0));
+    report("posOf(xf,1)", JSON.stringify(p1) + "   quatOf(xf,1) " + JSON.stringify(q1));
+    ok("!! posOf pulls exactly the 3 position components packed for body 0, none of the quaternion",
+        p0.length === 3 && p0[0] === 1 && p0[1] === 2 && p0[2] === 3);
+    ok("!! quatOf pulls exactly the 4 quaternion components packed for body 0, starting right after the position",
+        q0.length === 4 && q0[0] === 0.1 && q0[1] === 0.2 && q0[2] === 0.3 && q0[3] === 0.4);
+    ok("!! and the STRIDE is honoured: body 1's fields do not leak into body 0's, and vice versa",
+        p1.length === 3 && p1[0] === 10 && p1[1] === 20 && p1[2] === 30 &&
+        q1.length === 4 && q1[0] === 0.5 && q1[1] === 0.6 && q1[2] === 0.7 && q1[3] === 0.8,
+        "a stride error (e.g. reading body i at i*3 instead of i*7) would make body 1 alias into body 0's own " +
+        "fields or into the gap between them; it does not, both bodies read back exactly what was packed in");
+    ok("...and the two slices are disjoint views over the same packed record -- position then quaternion, no overlap",
+        JSON.stringify([...p0, ...q0]) === JSON.stringify(xf.slice(0, 7)) &&
+        JSON.stringify([...p1, ...q1]) === JSON.stringify(xf.slice(7, 14)));
+}
 
 const st = await initNode();
 if (!st.ready) {
