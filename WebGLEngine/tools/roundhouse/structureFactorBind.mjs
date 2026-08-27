@@ -88,6 +88,17 @@ function buildSF({ mode = "absences", config = {} } = {}) {
 }
 
 export const structureFactorDevice = {
+    // *** v4034 -- DERIVED FROM THE TABLE THE VALIDITY GUARD ALREADY CONSULTS, NOT COPIED BESIDE IT. ***
+    // compose's choices (v4033) name OTHER devices, so they are written out literally and the gate checks them
+    // against the lab -- a claim about somebody else's modes and observables rots the moment that device is
+    // renamed. This knob is the opposite case: the set of values it accepts is a table in reach of this file,
+    // and the guard above decides validity by reading it. Deriving the choices from THE SAME TABLE means they
+    // cannot drift from what the device accepts, and adding an entry to the table extends the probe for free.
+    // A literal copy here would be a second list to keep in step, which is the thing worth avoiding.
+    // BASES: sc, bcc, fcc (default), diamond -- and the lattice IS the answer key here, since which
+    // reflections are forbidden is a property of the lattice and of nothing else.
+    knobChoices: { lattice: Object.keys(BASES) },
+
     plantKind: "knob",
     modes: ["absences"],
     name: "systematic-absences-exact-zero-by-law",

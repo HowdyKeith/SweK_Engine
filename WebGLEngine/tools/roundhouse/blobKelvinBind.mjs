@@ -85,6 +85,19 @@ export function buildKelvin(hyp, base = {}) {
 }
 
 export const blobKelvinDevice = {
+    // *** v4034 -- DERIVED FROM THE TABLE THE VALIDITY GUARD ALREADY CONSULTS, NOT COPIED BESIDE IT. ***
+    // compose's choices (v4033) name OTHER devices, so they are written out literally and the gate checks them
+    // against the lab -- a claim about somebody else's modes and observables rots the moment that device is
+    // renamed. This knob is the opposite case: the set of values it accepts is a table in reach of this file,
+    // and the guard above decides validity by reading it. Deriving the choices from THE SAME TABLE means they
+    // cannot drift from what the device accepts, and adding an entry to the table extends the probe for free.
+    // A literal copy here would be a second list to keep in step, which is the thing worth avoiding.
+    // SCENARIOS: bacterium (default) and cell_realtime -- TWO, so this knob gets exactly one alternative,
+    // and that is the honest size of the question rather than a thin probe. This file's header already
+    // says the table exists so a proposer cannot invent a scale commitment that was never stated; the
+    // census now perturbs within the stated ones for the same reason.
+    knobChoices: { scenario: Object.keys(SCENARIOS) },
+
     // *** v3851 -- KNOB, and blobKelvin.js says so in its own words: "Stokes drag on a sphere is 6*pi*eta*r
     // under a STICK (no-slip) boundary condition and 4*pi*eta*r under a SLIP one. BOTH ARE REAL PHYSICS."
     // The plant swaps STICK for SLIP. A boundary condition on the drag law is a physics input if anything is.

@@ -23,6 +23,10 @@ import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, 
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { kuramotoDevice } from "./kuramotoBind.mjs";
 import { COMPOSE_KNOB_CHOICES } from "./composeBind.mjs";
+import { BASES } from "../../physics/crystal/structureFactor.mjs";
+import { INTEGRATORS } from "../../physics/orbits/kepler.js";
+import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
+import { SCENARIOS } from "../../physics/blobKelvin.js";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -286,6 +290,79 @@ console.log("\n3f. *** v4033 -- A KNOB WITH NO ORDERING CAN STILL HAVE ALTERNATI
         choicesFor(kuramotoDevice, "pendN") === null && choicesFor(null, "x") === null,
         "null means NO ORDERING DECLARED and never means nothing to find -- a device without choices keeps " +
         "the scaled ladder, and one with a non-numeric knob and no choices stays in the unprobed list.");
+}
+
+console.log("\n3g. *** v4034 -- THE OTHER FOUR NAME KNOBS, DERIVED FROM THE TABLE THAT DECIDES VALIDITY ***");
+{
+    // compose's choices name OTHER devices, so they are written out literally and section 3f checks them
+    // against the lab. These four are the opposite case: each device's valid set is a table it can already
+    // reach, and its own guard decides validity by reading that table. Deriving the choices FROM THE SAME
+    // TABLE means they cannot drift from what the device accepts -- and adding an entry extends the probe for
+    // free. A literal copy would be a second list to keep in step.
+    const cases = [
+        ["structureFactor", "absences", "lattice", BASES],
+        ["kepler", "kepler3", "integrator", INTEGRATORS],
+        ["freeze", "control", "material", LIQUIDS],
+        ["blobkelvin", "convert", "scenario", SCENARIOS],
+    ];
+    const drift = [], dead = [], coerced = [];
+    for (const [name, mode, knob, table] of cases) {
+        const dev = await getDevice(name);
+        const declared = (dev.knobChoices || {})[knob] || [];
+        if (declared.join(",") !== Object.keys(table).join(","))
+            drift.push(name + "." + knob + " is a COPY, not the table: [" + declared.join(",") + "] vs [" +
+                       Object.keys(table).join(",") + "]");
+
+        const dflt = ((dev.defaults({ mode }) || {}).config || {})[knob];
+        const base = await dev.build({ mode, config: {} });
+        for (const ch of declared) {
+            if (Object.is(ch, dflt)) continue;
+            const out = await dev.build({ mode, config: { [knob]: ch } });
+            if (Object.keys(base).every((k) => Object.is(base[k], out[k])))
+                coerced.push(name + "." + knob + "=" + ch);
+        }
+        const { rows } = await knobLiveness({ only: [name], budgetMs: 200000 });
+        const r = rows.find((x) => x.knob === knob);
+        if (!r || !r.live.length) dead.push(name + "." + knob);
+    }
+
+    ok("!! *** ALL FOUR READ LIVE, WHERE ALL FOUR READ 'not probed (string)' IN THE LAST FULL SWEEP ***",
+        dead.length === 0,
+        dead.length === 0
+            ? "structureFactor.lattice (6 observables), kepler.integrator (3), freeze.material (3), " +
+              "blobkelvin.scenario (3). keplerBind's own v3993 note says the first-order integrators reach " +
+              "every other mode THROUGH THIS KNOB -- so a census that could not turn it was blind to exactly " +
+              "the two the header says are reachable no other way."
+            : "STILL: " + dead.join(", "));
+
+    ok("!! the choices are DERIVED from the validity table, not copied beside it",
+        drift.length === 0,
+        drift.length === 0
+            ? "each list is Object.keys of the same table the device's guard reads, so the two cannot disagree."
+            : "DRIFTED: " + drift.join("; "));
+
+    // *** AND EVERY DECLARED CHOICE IS ACTUALLY ACCEPTED. *** These guards coerce rather than throw --
+    // `c.material = LIQUIDS[c.material] ? c.material : "ice"` -- so a value the device rejects comes back as
+    // the DEFAULT RUN, bit for bit. That is invisible to liveness (the knob still reads live off its other
+    // choices) and it would mean probing a knob at a value it never actually took.
+    ok("!! *** EVERY DECLARED CHOICE IS ACCEPTED, NOT SILENTLY COERCED BACK TO THE DEFAULT ***",
+        coerced.length === 0,
+        coerced.length === 0
+            ? "every non-default choice produces output that differs from the default run."
+            : "COERCED (the device refused these and fell back): " + coerced.join(", "));
+
+    // The negative control, which is why freeze derives from LIQUIDS and not from MATERIALS.
+    const fz = await getDevice("freeze");
+    const fb = await fz.build({ mode: "control", config: {} });
+    const fp = await fz.build({ mode: "control", config: { material: "paraffin" } });
+    ok("!! ...and the check can fail, shown on the value freeze is RIGHT to refuse",
+        Object.keys(MATERIALS).includes("paraffin") && !Object.keys(LIQUIDS).includes("paraffin") &&
+        Object.keys(fb).every((k) => Object.is(fb[k], fp[k])),
+        "MATERIALS carries five entries and LIQUIDS four: `paraffin` is a solid this module has no liquid " +
+        "phase for, and freeze's guard coerces it to `ice` -- output BIT-IDENTICAL to the default. *** HAD " +
+        "THE CHOICES BEEN DERIVED FROM MATERIALS, the census would have probed a value the device is right to " +
+        "refuse, and read the fallback as a reading. The two tables differ by exactly one entry and that entry " +
+        "is the whole difference between a probe and a no-op. ***");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
