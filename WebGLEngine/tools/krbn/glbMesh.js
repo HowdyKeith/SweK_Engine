@@ -62,27 +62,42 @@ export function dropDegenerate(m) {
  * @returns {{positions:number[][], triangles:number[][], skinned:boolean, posedBy:string, dropped?:number}}
  */
 export function gltfToMeshInput(gltf, THREE) {
-    const positions = [], triangles = [];
-    let skinned = false, posedBy = "";
+    const posedBy = poseFromClip(gltf, THREE);
+    const { positions, triangles } = skinnedGeometry(gltf, THREE);
+    if (!positions.length) throw new Error("no mesh geometry found in that glTF");
+    const skinned = gltf.scene && (() => { let s = false; gltf.scene.traverse((o) => { if (o.isSkinnedMesh) s = true; }); return s; })();
+    return dropDegenerate({ positions, triangles, skinned: !!skinned, posedBy });   // (4)
+}
 
-    // (2) place the skeleton FIRST -- see the header for why the ordering is load-bearing
+/**
+ * Place the skeleton from a clip and return the clip's name. Separated so a PLAYER can re-pose to any time
+ * without rebuilding geometry -- see skinPositions() below, which is the whole basis of the rigged drawing.
+ */
+export function poseFromClip(gltf, THREE, time = 0, mixerOut = null) {
+    let name = "";
     if (gltf.animations && gltf.animations.length) {
         const idle = gltf.animations.find((a) => /idle|breath|stand/i.test(a.name || "")) || gltf.animations[0];
         try {
             const mx = new THREE.AnimationMixer(gltf.scene);
             mx.clipAction(idle).play();
-            mx.update(0);                       // t=0: the clip's first frame, deterministic
-            posedBy = idle.name || "(unnamed clip)";
-        } catch (e) { posedBy = ""; }
+            mx.update(time);                    // t=0 by default: deterministic, the clip's first frame
+            if (mixerOut) mixerOut.mixer = mx;
+            name = idle.name || "(unnamed clip)";
+        } catch (e) { name = ""; }
     }
-    gltf.scene.updateMatrixWorld(true);         // AFTER the mixer, so bones carry the clip's rotations
+    gltf.scene.updateMatrixWorld(true);          // AFTER the mixer, so bones carry the clip's rotations
+    return name;
+}
 
+/** The skinning loop itself. Positions AND triangles, in the traversal order both depend on. */
+function skinnedGeometry(gltf, THREE, positionsOnly = false) {
+    const positions = [], triangles = [];
     gltf.scene.traverse((o) => {
         if (!o.isMesh || !o.geometry) return;
         const g3 = o.geometry, pos = g3.getAttribute("position");
         if (!pos) return;
         const isSkin = !!o.isSkinnedMesh && !!o.skeleton && !!g3.getAttribute("skinIndex");
-        if (isSkin) { skinned = true; try { o.skeleton.update(); } catch (e) {} }
+        if (isSkin) { try { o.skeleton.update(); } catch (e) {} }
         const off = positions.length, v = new THREE.Vector3();
         for (let i = 0; i < pos.count; i++) {
             v.fromBufferAttribute(pos, i);
@@ -90,13 +105,25 @@ export function gltfToMeshInput(gltf, THREE) {
             v.applyMatrix4(o.matrixWorld);            // ...and both paths then go to world space
             positions.push([v.x, v.z, v.y]);          // (3) Y-up -> Z-up
         }
+        if (positionsOnly) return;
         const idx = g3.getIndex();
         if (idx) for (let i = 0; i + 2 < idx.count; i += 3) triangles.push([off + idx.getX(i), off + idx.getX(i+1), off + idx.getX(i+2)]);
         else for (let i = 0; i + 2 < pos.count; i += 3) triangles.push([off + i, off + i + 1, off + i + 2]);
     });
+    return { positions, triangles };
+}
 
-    if (!positions.length) throw new Error("no mesh geometry found in that glTF");
-    return dropDegenerate({ positions, triangles, skinned, posedBy });   // (4)
+/**
+ * *** THE FUNCTION THE RIGGED DRAWING IS BUILT ON. *** Re-run the skinning for the skeleton's CURRENT state
+ * and return only the positions, in the SAME ORDER gltfToMeshInput produced them -- so triangle indices taken
+ * from that mesh still address these vertices. Call poseFromClip(gltf, THREE, t) first to move the skeleton.
+ *
+ * It is deliberately the SAME traversal as the one above rather than a second loop that "does the same thing":
+ * the ordering is load-bearing (every stroke's triangle index depends on it), and two loops that must agree on
+ * an order are two loops that will eventually disagree about one.
+ */
+export function skinPositions(gltf, THREE) {
+    return skinnedGeometry(gltf, THREE, true).positions;
 }
 
 /** Bounding-box centre and bounding-sphere radius. The centroid is a DENSITY measure and frames empty space. */

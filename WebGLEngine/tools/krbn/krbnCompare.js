@@ -97,11 +97,54 @@ function rayTri(o, d, a, b, c) {
 // to 3D" -- the flat stroke lifted onto the surface it was drawn from. It works BECAUSE we have the geometry and camera;
 // the depth the projection discarded is put back by the mesh the ray strikes. Returns the 3D point, or null on a miss.
 export function backProject(sx, sy, mesh, cam = KRBN_CAM) {
+    const h = backProjectHit(sx, sy, mesh, cam);
+    return h ? h.point : null;
+}
+
+/**
+ * *** v4047 -- THE SAME RAY-CAST, BUT IT REMEMBERS WHERE IT LANDED, AND THAT IS WHAT MAKES THE DRAWING
+ * RIGGABLE. *** backProject() above returns only a 3D point, which is enough to drape a stroke and useless
+ * for animating one: a bare position has no relationship to the skeleton that moved it there.
+ *
+ * Returning the TRIANGLE and the BARYCENTRIC coordinates instead pins each stroke point to a place on the
+ * SURFACE rather than a place in space -- and because linear blend skinning is LINEAR IN THE VERTEX POSITION,
+ * a point at barycentric (u,v,w) of a triangle deforms to exactly the same blend of that triangle's three
+ * deformed corners. So a stroke point needs NO weights of its own: re-blend it against the triangle's current
+ * posed vertices and it follows the animation exactly, not approximately. That identity is the whole trick,
+ * and it is why the rigged drawing is a rig rather than a resemblance.
+ *
+ * @returns {{point:number[], tri:number, bary:number[]}|null}
+ */
+export function backProjectHit(sx, sy, mesh, cam = KRBN_CAM) {
     const { origin, dir } = rayThroughScreen(sx, sy, cam);
     let best = Infinity, hit = null;
-    for (const [i, j, k] of mesh.triangles) {
-        const t = rayTri(origin, dir, mesh.positions[i], mesh.positions[j], mesh.positions[k]);
-        if (t !== null && t < best) { best = t; hit = [origin[0] + t * dir[0], origin[1] + t * dir[1], origin[2] + t * dir[2]]; }
+    for (let n = 0; n < mesh.triangles.length; n++) {
+        const [i, j, k] = mesh.triangles[n];
+        const A = mesh.positions[i], B = mesh.positions[j], C = mesh.positions[k];
+        const t = rayTri(origin, dir, A, B, C);
+        if (t === null || t >= best) continue;
+        best = t;
+        const p = [origin[0] + t * dir[0], origin[1] + t * dir[1], origin[2] + t * dir[2]];
+        hit = { point: p, tri: n, bary: baryOf(p, A, B, C) };
     }
     return hit;
+}
+
+/** Barycentric coordinates of p within triangle ABC, by the area (cross-product) method. */
+function baryOf(p, A, B, C) {
+    const v0 = sub(B, A), v1 = sub(C, A), v2 = sub(p, A);
+    const d00 = dot(v0, v0), d01 = dot(v0, v1), d11 = dot(v1, v1);
+    const d20 = dot(v2, v0), d21 = dot(v2, v1);
+    const den = d00 * d11 - d01 * d01;
+    if (!den) return [1, 0, 0];
+    const v = (d11 * d20 - d01 * d21) / den;
+    const w = (d00 * d21 - d01 * d20) / den;
+    return [1 - v - w, v, w];
+}
+
+/** A point pinned to (tri, bary), evaluated against whatever `positions` currently holds. */
+export function baryPoint(positions, triangle, bary) {
+    const [i, j, k] = triangle, [u, v, w] = bary;
+    const A = positions[i], B = positions[j], C = positions[k];
+    return [u*A[0] + v*B[0] + w*C[0], u*A[1] + v*B[1] + w*C[1], u*A[2] + v*B[2] + w*C[2]];
 }

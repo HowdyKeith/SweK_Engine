@@ -97,7 +97,7 @@ console.log("\n2. THE SCENES THAT CANNOT HATCH AS A MESH USE KRBN'S OWN PRIMITIV
 console.log("\n3. LOADING A MODEL: BOTH PANES INVALIDATE THEIR CACHES");
 {
     ok("!! the GLB path exists and converts to the same { positions, triangles } MeshInput",
-       /GLTFLoader/.test(HTML) && /gltfToMeshInput\(gltf, THREE\)/.test(HTML) && /return dropDegenerate\(\{ positions, triangles, skinned, posedBy \}\)/.test(GLB),
+       /GLTFLoader/.test(HTML) && /gltfToMeshInput\(gltf, THREE\)/.test(HTML) && /return dropDegenerate\(\{ positions, triangles, skinned: !!skinned, posedBy \}\)/.test(GLB),
        "one geometry type on the page, so the WebGL upload, the projection, the ray-cast lift and the OBJ export all keep working unchanged");
     ok("...and OBJ/STL go through Krbn's own parsers rather than a second hand-rolled reader",
        /K\.parseOBJ\(/.test(HTML) && /K\.parseSTL\(/.test(HTML));
@@ -153,11 +153,11 @@ console.log("\n7. THE SKINNING PASS -- A BIND POSE IS NOT A SLIGHTLY-WRONG FIGUR
        "not a fourth hand-rolled weighted sum -- three r160 implements this and this file already depends on it " +
        "for the loader; face/avatarStage.js's hand-written loop exists only because it runs against the tree's own parser");
     ok("!! ...and the skeleton is POSED by a clip first, not left at rest",
-       /AnimationMixer/.test(GLB) && /mx\.update\(0\)/.test(GLB),
+       /AnimationMixer/.test(GLB) && /mx\.update\(time\)/.test(GLB) && /poseFromClip\(gltf, THREE, time = 0/.test(GLB),
        "bone matrices mean nothing until the skeleton is placed; t=0 of the idle clip is deterministic and is the " +
        "pose the asset was authored to be seen in -- the same choice avatarStage makes");
     ok("!! ...and the mixer runs BEFORE updateMatrixWorld, or the bones carry no rotation",
-       /mx\.update\(0\)[\s\S]{0,400}updateMatrixWorld\(true\)/.test(GLB),
+       /mx\.update\(time\)[\s\S]{0,400}updateMatrixWorld\(true\)/.test(GLB),
        "ordering is the whole thing here: updating the world matrices first bakes the REST pose and the clip is lost");
     ok("!! glTF's Y-up is mapped to this page's Z-up",
        /positions\.push\(\[v\.x, v\.z, v\.y\]\)/.test(GLB),
@@ -327,6 +327,61 @@ console.log("\n11. THE KRBN AVATAR SURFACE ON server.html");
     } else {
         console.log("  ----  Krbn does not export cutoffFor here; the source-level pairing check above stands alone");
     }
+}
+
+console.log("\n12. THE RIGGED DRAWING -- PINNED TO THE SURFACE, AND EXACT RATHER THAN CLOSE");
+{
+    const { backProjectHit, baryPoint } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
+    // *** THE CLAIM IS AN IDENTITY, SO IT IS PROVEN BY RUNNING IT, NOT BY ASSERTING THE COMMENT. ***
+    // Linear blend skinning is linear in the vertex position, so a point pinned at barycentric (u,v,w) of a
+    // triangle must land on exactly that blend of the triangle's corners under ANY per-vertex deformation --
+    // which is what skinning is. Random triangles, random interior hits, random independent corner motion.
+    const rnd = (function (s) { return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })(7);
+    let worst = 0, trials = 0, badBary = 0;
+    for (let n = 0; n < 200; n++) {
+        const A=[rnd()*2-1,rnd()*2-1,rnd()*2-1], B=[rnd()*2-1,rnd()*2-1,rnd()*2-1], C=[rnd()*2-1,rnd()*2-1,rnd()*2-1];
+        const mesh = { positions:[A,B,C], triangles:[[0,1,2]] };
+        const ctr = [0,1,2].map((k)=>(A[k]+B[k]+C[k])/3);
+        const u0=[B[0]-A[0],B[1]-A[1],B[2]-A[2]], v0=[C[0]-A[0],C[1]-A[1],C[2]-A[2]];
+        const cr=[u0[1]*v0[2]-u0[2]*v0[1], u0[2]*v0[0]-u0[0]*v0[2], u0[0]*v0[1]-u0[1]*v0[0]];
+        const cm=Math.hypot(cr[0],cr[1],cr[2])||1, nrm=[cr[0]/cm,cr[1]/cm,cr[2]/cm];
+        const cam = { eye:[ctr[0]+nrm[0]*3,ctr[1]+nrm[1]*3,ctr[2]+nrm[2]*3], target:ctr,
+                      up: Math.abs(nrm[2])>0.9?[1,0,0]:[0,0,1], scale:Math.PI/4.2, viewport:{width:400,height:400} };
+        const h = backProjectHit(200, 200, mesh, cam);
+        if (!h) continue;
+        trials++;
+        const [u,v,w] = h.bary;
+        if (u<-1e-9||v<-1e-9||w<-1e-9||Math.abs(u+v+w-1)>1e-9) badBary++;
+        const D = [A,B,C].map((P)=>[P[0]+rnd()*4-2, P[1]+rnd()*4-2, P[2]+rnd()*4-2]);   // deform each corner freely
+        const pinned = baryPoint(D, [0,1,2], h.bary);
+        const truth = [0,1,2].map((k)=>u*D[0][k] + v*D[1][k] + w*D[2][k]);
+        for (let k=0;k<3;k++) worst = Math.max(worst, Math.abs(pinned[k]-truth[k]));
+    }
+    ok("!! a pinned point follows ARBITRARY deformation with no error term",
+       trials > 150 && worst < 1e-12,
+       "worst " + worst.toExponential(2) + " over " + trials + " random deformed triangles -- this is why the rig " +
+       "is a rig and not a resemblance, and why per-stroke skin weights are unnecessary");
+    ok("...and every recorded barycentric is a real convex combination of an interior hit",
+       badBary === 0, badBary + " out of range");
+
+    const SL = fs.readFileSync(path.join(ENG, "tools", "krbn", "strokeLift.js"), "utf8");
+    const RG = fs.readFileSync(path.join(ENG, "krbn-rigged.html"), "utf8");
+    ok("!! the player re-skins through the SAME loop that built the mesh, not a second one",
+       /export function skinPositions/.test(GLB) && /skinnedGeometry\(gltf, THREE, true\)/.test(GLB) &&
+       /skinPositions\(gltf, THREE\)/.test(noComments(RG)),
+       "every stroke's triangle index depends on the traversal ORDER; two loops that must agree on an order are " +
+       "two loops that will eventually disagree about one");
+    // *** THE HONEST HALF, HELD BY A CHECK SO IT CANNOT QUIETLY BECOME A CLAIM. ***
+    ok("!! silhouettes are recorded as their own kind, because a rigged outline is BAKED and surface marks are not",
+       /kind === "silhouette"/.test(noComments(RG)) && /silhouette/.test(SL),
+       "a silhouette is where the surface turns away from THIS camera; move the model and that set moves, so " +
+       "carrying it along is right at the source pose and progressively wrong after it");
+    ok("...and the page can hide it, and says which pose the outline belongs to",
+       /id="sil"/.test(RG) && /outline baked at t=/.test(RG),
+       "one array quietly mixing a fact with an artefact is the shape this tree keeps removing");
+    ok("!! Krbn runs ONCE per bake, not per frame -- the whole reason this plays",
+       /scene\.render\(krbnCam\(cam\)\)/.test(noComments(RG)) && !/scene\.render[\s\S]{0,200}requestAnimationFrame/.test(noComments(RG)),
+       "MEASURED in Chromium: 8.67 ms per posed frame against ~500 ms for a Krbn frame");
 }
 
 console.log(fails ? `\nkrbnCompareLive-selfcheck: ${fails} FAILED` : "\nkrbnCompareLive-selfcheck: all checks pass");

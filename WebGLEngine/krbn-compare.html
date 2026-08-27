@@ -128,12 +128,6 @@ function camAt(t) {
   const R = d*Math.cos(ELEV), h = d*Math.sin(ELEV);
   return { eye:[fit.center[0]+R*Math.cos(a), fit.center[1]+R*Math.sin(a), fit.center[2]+h], target:fit.center, up:[0,0,1], scale:SCALE, viewport:VIEW }; }
 
-// wireframe strokes (2D) from the current projection -- the drawing Krbn draws / we export
-function wireStrokes2D(pr) {
-  const strokes = [];
-  for (const [i,j,k] of mesh.triangles) { const a=pr[i],b=pr[j],c=pr[k]; if(a&&b&&c) strokes.push([[a[0],a[1]],[b[0],b[1]],[c[0],c[1]],[a[0],a[1]]]); }
-  return strokes;
-}
 
 // ---- WebGL2 renderer (real, rig-verify) -- replicates krbnCompare.project in the shader so the WebGL
 // left and the 2D Krbn right stay pixel-aligned across the wipe. Falls back to canvas-2D on any failure.
@@ -492,15 +486,26 @@ async function loadPresetUrl(url) {
 
 // EXPORT: lift the current drawing to 3D polylines and download as OBJ
 elX.onclick = () => {
+  // *** v4047 -- THIS EXPORTED THE WIREFRAME WHILE CALLING IT "KRBN'S LINE-WORK". *** v4042 removed the
+  // hand-rolled per-triangle stroke loop from the DISPLAY path after Keith spotted it ("does not actually show
+  // a krbn render/pencil marks, but just wireframe") -- and the identical loop, wireStrokes2D(), was still
+  // feeding the EXPORT. One closed outline per mesh face, downloaded under a status line reading "Krbn's
+  // line-work as a real object you can orbit in Blender". The same bug, in the same file, surviving in the
+  // path nobody had looked at yet, because fixing the visible half looked like fixing it.
+  //
+  // It exports Krbn's OWN drawn strokes now: RenderStroke.path is the 2D polyline Krbn actually draws, so the
+  // OBJ is the pencil drawing draped on the surface rather than the mesh's edges.
   const cam = camAt((+elT.value)/1000);
-  const pr = mesh.positions.map(p => project(p, cam));
-  const strokes = wireStrokes2D(pr);
+  if (!K) { status.textContent = "Krbn has not loaded -- nothing to export."; return; }
+  const scene = ensureKrbnScene();
+  const strokes = scene.render(krbnCamFor(cam)).renderStrokes.map((s) => s.path);
   const lifted = liftStrokes(strokes, mesh, cam);
   const obj = toOBJ(lifted);
   const blob = new Blob([obj], { type: "model/obj" });
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href = url; a.download = "krbn-drawing-3d.obj"; a.click(); URL.revokeObjectURL(url);
-  status.textContent = "Exported krbn-drawing-3d.obj -- " + lifted.length + " polylines, " + lifted.reduce((n,p)=>n+p.length,0) + " vertices, draped on the surface. Import it and orbit.";
+  status.textContent = "Exported krbn-drawing-3d.obj -- " + lifted.length + " polylines from " + strokes.length +
+    " real Krbn strokes, " + lifted.reduce((n,p)=>n+p.length,0) + " vertices, draped on the surface. Import it and orbit.";
 };
 
 const glOK = tryInitGL();
