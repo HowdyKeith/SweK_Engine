@@ -55,6 +55,9 @@ const budgetMs = Number.isFinite(budgetArg) && budgetArg > 0 ? budgetArg : Infin
 // why this stopped being runnable.
 console.log("sweeping the lab" + (budgetMs === Infinity ? "" : " with a " + budgetMs + " ms budget") + " ...");
 let lastDevice = null, deviceMs = 0, deviceModes = 0;
+// v4040 -- (rawCalls, ms) per device/mode, collected from the sweep THIS GATE ALREADY RUNS. It costs nothing
+// extra and it is the evidence for section 3c.
+const costPairs = [];
 const flush = () => {
     if (lastDevice === null) return;
     console.log("    " + lastDevice.padEnd(22) + String(deviceModes).padStart(2) + " modes  " +
@@ -62,9 +65,10 @@ const flush = () => {
 };
 const c = await corroborationCensus({
     budgetMs,
-    onProgress: ({ device, mode, ms, done, total }) => {
+    onProgress: ({ device, mode, ms, rawCalls, done, total }) => {
         if (device !== lastDevice) { flush(); lastDevice = device; deviceMs = 0; deviceModes = 0; }
         deviceMs += ms; deviceModes++;
+        costPairs.push({ device, mode, ms, rawCalls });
         if (done === total) flush();
     },
 });
@@ -236,6 +240,49 @@ console.log("\n3b. *** THE COUNT IS THE PRODUCT, SO A FASTER WRAPPER THAT COUNTS
         "reading was being attributed to the code. The wrapper is ~2x and v4039 makes it ~1.3x. The real " +
         "number in that measurement is 354,000,000 libm calls in one build, three thousand times the 1e8 " +
         "this file already calls the reason nobody had run the sweep before.");
+}
+
+// ---- 3c. v4040 -- rawCalls IS NOT A COST MODEL, AND THE SWEEP ABOVE PROVES IT FOR FREE --------------------------------
+console.log("\n3c. *** rawCalls MEASURES A KIND OF WORK, NOT AN AMOUNT OF TIME ***");
+{
+    // The idea was attractive and wrong: this census already measures rawCalls for every build, its headline
+    // verdict turns on it, and a cost model derived from a number already in hand would have replaced the
+    // hand-calibrated ms-per-step constant twof carries (v4038). MEASURED FIRST, and the measurement killed it.
+    //
+    //     twof.inlet          115714 ms   108,192,309 calls   1069.52 ms per Mcall
+    //     kuramoto.curve        7807 ms   353,976,576 calls     22.06 ms per Mcall
+    //     stability.response   20186 ms     3,430,000 calls   5885.13 ms per Mcall
+    //     em.vacuum                1 ms             0 calls   no calls at all
+    //
+    // *** kuramoto MAKES 3.3x MORE LIBM CALLS THAN twof AND TAKES 15x LESS TIME. *** rawCalls does not weakly
+    // predict cost, it ANTI-predicts it across the two extremes, and no linear fit survives a 267x spread in
+    // ms-per-Mcall.
+    //
+    // The reason is the useful part. 22 ns per call is about what an instrumented Math.sin costs, so kuramoto
+    // sits ON THE FLOOR: it does almost nothing but transcendentals. Every device above that floor is paying
+    // for work the counter cannot see -- lattice sweeps, neighbour searches, arithmetic. So ms-per-Mcall is
+    // really a measure of HOW MUCH NON-TRANSCENDENTAL WORK A DEVICE DOES, which is precisely the quantity
+    // rawCalls is blind to. A counter of one kind of work cannot price the others.
+    const withCalls = costPairs.filter((p) => p.rawCalls > 1e5 && p.ms > 50);
+    const rate = (p) => p.ms * 1e6 / p.rawCalls;
+    const sorted = withCalls.slice().sort((a, b) => rate(a) - rate(b));
+    const lo = sorted[0], hi = sorted[sorted.length - 1];
+    pinned("!! *** ms PER MILLION CALLS SPANS ORDERS OF MAGNITUDE, SO NO LINEAR COST MODEL FITS ***",
+        withCalls.length >= 5 && hi && lo && rate(hi) / rate(lo) > 20,
+        !hi || !lo ? "not enough rows with both a real call count and a real duration"
+            : "cheapest " + lo.device + "." + lo.mode + " at " + rate(lo).toFixed(1) + " ms/Mcall against " +
+              "dearest " + hi.device + "." + hi.mode + " at " + rate(hi).toFixed(1) + " -- a " +
+              (rate(hi) / rate(lo)).toFixed(0) + "x spread across " + withCalls.length + " device/modes that " +
+              "make real calls and take real time. *** THE COST MODEL FROM rawCalls WAS PROPOSED, MEASURED, " +
+              "AND REFUSED. It is pinned here so it is not re-derived from the fact that the number is " +
+              "conveniently already in hand. ***");
+
+    report("AND WHAT WOULD WORK INSTEAD, STATED RATHER THAN BUILT",
+        "a MEASURED RECORD, not a fitted proxy: this sweep already produces (device, mode, ms) for all " +
+        costPairs.length + " builds, which is a better prior than any model of it. What that needs is somewhere " +
+        "to live, and it must not be here -- a gate that wrote a cost cache would be a report and a gate at " +
+        "once, which capabilityCard-selfcheck records a round being refused for. The census returns the " +
+        "timings; persisting them is a caller's job and a round of its own.");
 }
 
 // ---- 4. WHAT THIS CENSUS DOES NOT ESTABLISH ------------------------------------------------------------------------
