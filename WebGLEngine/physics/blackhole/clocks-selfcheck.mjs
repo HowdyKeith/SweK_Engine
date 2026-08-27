@@ -24,6 +24,7 @@ import {
     orbitalPeriod, clockEffect, clockEffectExact, clocksAt,
     radialLightTime, shapiroDelay, staticRedshift, orbitingRedshift,
     epicyclicKappa, radialOscillationPeriod, orbitalOmega, iscoFromTiming,
+    orbitingDilationNaive,
 } from "./clocks.mjs";
 import { timeDilation, circularL } from "./probe.js";
 import { photonSphere } from "./geodesic.js";
@@ -60,6 +61,34 @@ const M = 1;
         !Number.isFinite(circularL(M, 3)) || circularL(M, 3) > 1e10,
         "two functions written for different purposes, both singular at 3M. If one had a 2M there instead, this " +
         "check would catch the mismatch without needing to read either");
+}
+
+// ---- 2b. THE PLANTED-ERROR TWIN: orbitingDilationNaive DIFFERS FROM THE TRUE RATE BY EXACTLY 2M^2/r^2 (squared) ------
+{
+    const rows = [6, 8, 12, 20, 50, 1000].map((r) => {
+        const nv = orbitingDilationNaive(M, r), tr = orbitingDilation(M, r);
+        return { r, nv, tr, gap: (nv * nv - tr * tr) * r * r };   // should equal 2 M^2 exactly, for every r
+    });
+    ok("!! naive^2 - true^2, rescaled by r^2/M^2, is EXACTLY 2 at every radius -- the documented second-order error",
+        rows.every((x) => Math.abs(x.gap - 2) < 1e-9),
+        rows.map((x) => `r=${x.r}: ${x.gap.toFixed(9)}`).join("  ") + ". naive composes sqrt(1-2M/r)*sqrt(1-M/r) " +
+        "(gravity times a Newtonian-speed SR factor) while the true rate is sqrt(1-3M/r); squaring both gives " +
+        "1-3M/r+2M^2/r^2 against 1-3M/r, a gap that is EXACTLY 2M^2/r^2 and nothing else -- not a small-number " +
+        "approximation, an algebraic identity, which is why it holds to 1e-9 from r=6 all the way to r=1000.");
+
+    ok("!! and the naive rate is always FASTER than the true one -- the composed error is one-sided, not noise",
+        rows.every((x) => x.nv > x.tr),
+        "the extra +2M^2/r^2 under the square root makes naive^2 strictly larger than true^2 at every radius " +
+        "tested, so a clock timed with the tempting-but-wrong composition always reads a bit fast, never slow.");
+
+    ok("...and the gap SHRINKS as the clock is carried out, vanishing relative to either rate as r grows",
+        (() => {
+            const rel = (r) => Math.abs(orbitingDilationNaive(M, r) - orbitingDilation(M, r)) / orbitingDilation(M, r);
+            return rel(6) > rel(100) && rel(100) > rel(1000) && rel(1000) < 2e-6;
+        })(),
+        "the rate gap itself runs from order 1e-2 near the photon sphere down under 1e-6 by r=1000 -- exactly why " +
+        "a gate that only ever sampled a far-field clock could not tell this derivation from the correct one, " +
+        "which is the entire reason the file plants it instead of merely warning about it.");
 }
 
 // ---- 3. THE CROSSOVER IS A PURE NUMBER ------------------------------------------------------------------------------

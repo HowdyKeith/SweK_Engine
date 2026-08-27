@@ -12,7 +12,7 @@
 // in the orbit equation, which turns GR bending back toward the Newtonian value and moves the shadow, and the gate refuses
 // it -- the same discrepancy that made the 1919 result a test of Einstein over Newton.
 import { deflection, captureThreshold, tracePhoton, weakDeflection, criticalImpact, deflectionSeries,
-         horizon, photonSphere } from "./geodesic.js";
+         horizon, photonSphere, tracePath } from "./geodesic.js";
 import { readFileSync } from "node:fs";
 
 let fails = 0;
@@ -40,6 +40,26 @@ const M = 1;
     const below = tracePhoton(M, ana * 0.98).captured, above = !tracePhoton(M, ana * 1.02).captured;
     ok("!! the shadow edge falls at the critical impact parameter 3 sqrt(3) M", Math.abs(bc - ana) / ana < 1e-4 && below && above,
        "the capture threshold is " + bc.toFixed(6) + " vs 3 sqrt(3) M " + ana.toFixed(6) + " (" + (Math.abs(bc - ana) / ana).toExponential(1) + " rel), light just inside is swallowed and just outside escapes -- the shadow the EHT images.");
+}
+
+// ---- 3b. tracePath ON FLAT SPACETIME (M=0) TRACES AN EXACTLY STRAIGHT LINE ----------------------------
+//
+// tracePath is the on-screen twin of tracePhoton, sharing the same integrator but returning Cartesian points
+// instead of a deflection angle. At M=0 there is no relativistic term left (accel(u) = -u, the plain SHO
+// equation), so the true trajectory is not "approximately" straight, it is EXACTLY the polar line r sin(phi) = b
+// -- a photon with impact parameter b sweeping past the origin at perpendicular distance b, with y = r sin(phi)
+// constant at every point on the path. That is the flat-spacetime case named as a candidate check: no mass, no
+// bending, a straight line the integrator has to reproduce to numerical precision rather than to any physical
+// tolerance.
+{
+    const b = 10, res = tracePath(0, b, { rView: 500, maxTurns: 2 });
+    let maxDev = 0; for (const [, y] of res.pts) maxDev = Math.max(maxDev, Math.abs(y - b));
+    ok("!! tracePath at M=0 traces an exactly straight line -- y = b at every recorded point", !res.captured && res.pts.length > 100 && maxDev < 1e-3,
+       "with no mass the orbit equation reduces to the plain SHO d^2u/dphi^2 = -u, whose exact solution is the " +
+       "polar line r sin(phi) = b, i.e. y = b for every point on the path. Across " + res.pts.length + " points " +
+       "from x=" + res.pts[0][0].toFixed(1) + " to x=" + res.pts[res.pts.length - 1][0].toFixed(1) + " the worst " +
+       "deviation from that line is " + maxDev.toExponential(1) + " -- RK4 truncation error, not physics, and the " +
+       "photon is correctly reported as escaping (never captured) since a massless hole traps nothing.");
 }
 
 // --- v3077: THE EXPANSION GRADES THE INTEGRATOR, ORDER BY ORDER -----------------------------------------------

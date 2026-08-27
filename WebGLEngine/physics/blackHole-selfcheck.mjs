@@ -12,7 +12,7 @@
 // checks fall at once: the inside-ISCO orbit no longer plunges (Newtonian has stable circular orbits everywhere) and the
 // precession goes to zero (a Newtonian ellipse closes). That is the whole point -- the hidden structure is exactly what
 // Newton cannot show.
-import { schwarzschildRadius, photonSphere, iscoRadius, circularSpeed, makeParticle, step, run, energy, angularMomentum, apoapsisAngles } from "./blackHole.js";
+import { schwarzschildRadius, photonSphere, iscoRadius, circularSpeed, makeParticle, step, run, energy, angularMomentum, apoapsisAngles, accel } from "./blackHole.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -54,6 +54,32 @@ const near = (a, b, e) => Math.abs(a - b) < e;
     if (consistent) consistent = advs.every((d) => d > 0.05) && Math.abs(advs[0] - advs[advs.length - 1]) < 0.05;
     ok("!! the orbit precesses -- the apoapsis advances a steady angle each revolution", consistent,
        "across several revolutions the apoapsis advances by the same nonzero angle each time (~1.76 rad here) -- perihelion precession, the effect that first tested general relativity, which a closed Newtonian ellipse simply does not have.");
+}
+
+// ---- 4b. accel() IS THE EXACT PACZYNSKI-WIITA LAW: GM/(r-rs)^2, pointed straight at the mass -----------
+{
+    // On-axis, at r=8: d = r - rs = 6, so |accel| = G*M/36 exactly, pointed along -x.
+    const a1 = accel([8, 0], M, G, rs);
+    const onAxisExact = a1[0] === -(G * M) / (6 * 6) && a1[1] === 0;
+
+    // Off-axis, a 3-4-5 triangle at r=5: d = 3, |accel| = G*M/9, split along the unit vector back to the origin
+    // (-3/5, -4/5). Every operation here is +,-,*,/ and one sqrt, so the components come out exact to the bit.
+    const a2 = accel([3, 4], M, G, rs);
+    const mag2 = G * M / (3 * 3);
+    const offAxisExact = a2[0] === -mag2 * 3 / 5 && a2[1] === -mag2 * 4 / 5;
+
+    // Inverse-square-ish falloff IN d = r - rs (not in r): halving d should quadruple the magnitude.
+    const near = (x, y, e) => Math.abs(x - y) < e;
+    const rBase = 10, dBase = rBase - rs;
+    const aBase = accel([rBase, 0], M, G, rs), aHalf = accel([rs + dBase / 2, 0], M, G, rs);
+    const quadruples = near(aHalf[0] / aBase[0], 4, 1e-12);
+
+    ok("!! accel() is the exact Paczynski-Wiita law GM/(r-rs)^2, pointed at the mass",
+        onAxisExact && offAxisExact && quadruples,
+        "at r=8 (d=6) accel is exactly -GM/36 along -x; at the 3-4-5 point r=5 (d=3) it splits exactly along " +
+        "the unit vector back to the origin as -GM/9 * (3/5, 4/5); and halving d from 8 to 4 (holding rs fixed) " +
+        "exactly quadruples the magnitude -- the inverse-square law is in (r - rs), the horizon-shifted radius, " +
+        "not in r itself, which is the entire trick that reproduces GR's ISCO and photon sphere from arithmetic.");
 }
 
 // ---- 5. DETERMINISTIC + pure -------------------------------------------------------------------------
