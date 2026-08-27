@@ -8,6 +8,42 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4056 -- the wash, chased down: it was texture magnification all along
+
+Keith: "chase down next."
+
+v4055 shipped an honest open finding: polled to its *true* landing, the descent's final frame was a flat pale
+wash. Chased down here by **decoding real screenshots rather than looking at them** -- luminance sd over the
+lower two thirds reads **9.3** at the landing against **49.8** mid-descent.
+
+Bisected over every one of the page's own feature toggles -- auto-exposure, nebula, star, relief, structures,
+trails, labels -- and **none of them moved it**: mean stayed 117-146, sd 9.7-23.3. So it is not a feature. It is
+the surface itself.
+
+**The arithmetic is exact.** The planet wears a 128px cube face; one face spans `R*pi/2` = 26.7 units of arc, so
+a texel is 0.209 units. At height 2.2 with fov 34 the visible ground is 1.19 units across:
+
+    ~5.7 TEXELS STRETCHED ACROSS A 700-PIXEL FRAME -- a 123x magnification.
+
+Measured contrast against height: 1.95 -> sd 9.8 · 3 -> 12.3 · 5 -> 14.2 · 8 -> 21 · 12 -> **38.2** · 35 -> 54.
+The elbow is around 12 units (~35 texels), which is where terrain starts reading as terrain.
+
+**Raising the bake was priced and rejected, not assumed too expensive.** `bakeSurfaceCubemap` costs 740 ms at
+128, 2697 ms at 256 and **10222 ms at 512** -- on the main thread, at load. Quadrupling a noticeable load cost to
+serve one camera position is the wrong trade. So the **camera** gives way, which is a cinematic camera's own job:
+framing a subject where it carries detail is not a workaround for the texture, it is the shot.
+
+`DESCENT_END` 2.2 -> 12, and `CLOUD_ALT` 3 -> 18, because the deck has to stay *above* the landing or the flight
+stops short of the weather instead of crossing it. MEASURED after: the arrival still crosses the deck (35.5 ->
+28.2, above then below) and the final frame reads **sd 25.8 against 9.3** -- ice texture, a basalt patch and the
+limb all visible. Both heights are gated by the same arithmetic, so a later round cannot fly closer again
+without meeting the number that made it a wash. Sabotage-confirmed at the old 2.2.
+
+**And the three things I got wrong getting here are on the record.** I blamed the clouds (removing the deck
+entirely changed nothing), then the atmosphere shell (fading it to opacity 0.002 changed nothing -- and that
+speculative fade was *reverted*, not shipped). And my v4053/v4054 "landing" screenshots were taken on fixed
+waits that never reached the landing at all.
+
 ## Since v4055 -- the cloud round, and an open finding I could not close
 
 Keith: "cloud round."
