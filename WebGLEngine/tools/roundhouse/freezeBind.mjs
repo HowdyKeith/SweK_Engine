@@ -153,6 +153,19 @@ export function buildFreeze(hyp, base = {}) {
 }
 
 export const freezeDevice = {
+    // *** v4034 -- DERIVED FROM THE TABLE THE VALIDITY GUARD ALREADY CONSULTS, NOT COPIED BESIDE IT. ***
+    // compose's choices (v4033) name OTHER devices, so they are written out literally and the gate checks them
+    // against the lab -- a claim about somebody else's modes and observables rots the moment that device is
+    // renamed. This knob is the opposite case: the set of values it accepts is a table in reach of this file,
+    // and the guard above decides validity by reading it. Deriving the choices from THE SAME TABLE means they
+    // cannot drift from what the device accepts, and adding an entry to the table extends the probe for free.
+    // A literal copy here would be a second list to keep in step, which is the thing worth avoiding.
+    // LIQUIDS, NOT MATERIALS, and the difference is real: MATERIALS carries five entries and LIQUIDS four.
+    // `paraffin` is a solid this module has no liquid phase for, and line 79's guard rejects it for that
+    // reason. Deriving from MATERIALS would probe a value the device is right to refuse and read the
+    // refusal as liveness -- the knob would answer yes off a path that proves nothing about freezing.
+    knobChoices: { material: Object.keys(LIQUIDS) },
+
     modes: FREEZE_MODES,
     // *** controlFieldMirror, and "control" is modes[0] so the contract has it in both arms. The FRONT-based
     // observables are BLIND to this plant and that is the point -- see the header. ***

@@ -203,6 +203,19 @@ export async function buildKepler(hyp, base = {}) {
 }
 
 export const keplerDevice = {
+    // *** v4034 -- DERIVED FROM THE TABLE THE VALIDITY GUARD ALREADY CONSULTS, NOT COPIED BESIDE IT. ***
+    // compose's choices (v4033) name OTHER devices, so they are written out literally and the gate checks them
+    // against the lab -- a claim about somebody else's modes and observables rots the moment that device is
+    // renamed. This knob is the opposite case: the set of values it accepts is a table in reach of this file,
+    // and the guard above decides validity by reading it. Deriving the choices from THE SAME TABLE means they
+    // cannot drift from what the device accepts, and adding an entry to the table extends the probe for free.
+    // A literal copy here would be a second list to keep in step, which is the thing worth avoiding.
+    // INTEGRATORS: euler, eulerSymplectic, verlet (default), rk4. This file's own v3993 note records that
+    // kepler.js registers four while `compare` reports the verlet/rk4 pair only, and that the first-order
+    // methods reach every other mode THROUGH THIS KNOB -- so a census that could not turn it was blind to
+    // exactly the two integrators the header says are reachable no other way.
+    knobChoices: { integrator: Object.keys(INTEGRATORS) },
+
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
