@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v4043 — *** THIS FILE IS THE ENTIRE REASON THE APK EXISTS RATHER THAN THE PWA. ***
+
+  The tree already ships manifest.webmanifest (display:fullscreen), and Chrome's "Install app" turns it into a
+  chrome-less home-screen launcher — most of what this app is. It cannot be used on the LAN: Chrome only offers
+  PWA install from a SECURE origin, and the SweK server is plain http://192.168.50.57:8787, so the prompt never
+  appears there. A WebView has no secure-origin rule; it loads what this file permits. The PWA remains the right
+  answer THROUGH THE TUNNEL (https), this is the right answer on the LAN, and neither replaces the other.
+
+  *** THE FIRST DRAFT OF THIS FILE WAS WRONG IN THE WAY THAT DOES NOT ANNOUNCE ITSELF, AND IS WORTH RECORDING. ***
+  It listed <domain>192.168.0.0</domain>, <domain>10.0.0.0</domain> etc. under a narrow domain-config, with a
+  confident comment about granting cleartext "to private ranges only". ANDROID'S <domain> MATCHES LITERAL
+  HOSTNAMES, NOT CIDR — there is no subnet or range support at any Android version (confirmed against Android's
+  own Network Security Config documentation, not from memory). "192.168.0.0" matches the host literally spelled
+  192.168.0.0 and nothing else, so that config would NOT have matched 192.168.50.57: the app would have shipped
+  looking carefully secured and failing to load the one address it exists to load, with a cleartext-blocked error
+  that reads like the server being down.
+
+  SO THE PLATFORM FLAG IS THE BLUNT ONE, BECAUSE THE NARROW ONE DOES NOT EXIST. Cleartext is permitted
+  app-wide below. What keeps that honest is NOT this file but MainActivity's own routing: the WebView loads only
+  the configured server and private-LAN hosts (isOwnServer), and hands every other URL to a real browser via
+  shouldOverrideUrlLoading — so the app never navigates itself to an arbitrary public http:// origin. That is a
+  behavioural control rather than a declarative one, which is weaker, and saying so is the point of this comment
+  rather than leaving a reader to infer a guarantee the platform is not making.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,7 @@
+// v4043 -- root build file. Deliberately Java-only (no Kotlin plugin): the whole app is one Activity, and a
+// Kotlin toolchain would be a second large dependency bought for nothing.
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath "com.android.tools.build:gradle:8.5.2" }
+}
+allprojects { repositories { google(); mavenCentral() } }
