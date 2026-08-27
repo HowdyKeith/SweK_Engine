@@ -211,5 +211,21 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
     }
 }
 
+console.log("\n6. *** offsetDir/norm -- EXPORTED AT v4076 FOR render/mossField.js, AND PROVEN HERE DIRECTLY ***");
+{
+    // v4076 -- these two were PRIVATE to this file until moss needed the same tangent-offset arithmetic clouds
+    // scatter with. Both cluster placements above already exercise them indirectly through buildPuffsShell();
+    // this proves the two functions on their own terms, which is what definitionGates-selfcheck's tree-wide
+    // ratchet asks of an export -- "closed by ASSERTION, not by mention" -- now that exporting them made them
+    // visible to a check outside this file for the first time.
+    ok("!! offsetDir(dir, 0, 0) returns dir unchanged -- no offset is no offset",
+        JSON.stringify(CF.offsetDir([0, 1, 0], 0, 0)) === JSON.stringify([0, 1, 0]));
+    ok("!! offsetDir ALWAYS returns a unit vector, whatever the offset",
+        Math.abs(Math.hypot(...CF.offsetDir([0, 0, 1], 0.3, -0.2)) - 1) < 1e-12);
+    ok("!! ...even at the pole, where the eastward tangent degenerates and falls back to +x",
+        Math.abs(Math.hypot(...CF.offsetDir([0, 1, 0], 0.4, 0.15)) - 1) < 1e-12);
+    ok("!! norm() actually normalizes", JSON.stringify(CF.norm([3, 4, 0])) === JSON.stringify([0.6, 0.8, 0]));
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 if (fails) process.exit(1);

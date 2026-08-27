@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4076 -- moss, on both terrain kinds, from one generator
+
+Keith: could a moss/root demo ([github.com/MengTo/sylva](https://github.com/MengTo/sylva)'s **idea** -- the repo
+is all-rights-reserved, so nothing of its code is used) fold into the engine's own terrain generation? On both
+terrain kinds.
+
+### One generator, the same shape cloudField already proved
+
+`render/mossField.js` is pure arithmetic -- no GL, no DOM, no Three -- following `render/cloudField.js`'s own
+shape exactly: `buildMossVoxel()` for the voxel terrain, `buildMossShell()` for the planet.
+
+**Moss is patchy, not a carpet, and that is the one structural difference from grass.** Placement is two-level:
+a handful of patch centres scatter across the requested area, then several tufts scatter again within each
+patch's own radius. Every tuft carries its own `patchId`, so a gate can **measure** the clumping on the output
+rather than trust the code that produced it -- measured here, within-patch spacing averages 5x+ tighter than
+patch-to-patch spacing, on both terrain kinds.
+
+**And moss thins on a slope, a real ecological fact rather than decoration, as one shared formula.**
+`slopeDensityMul(gradMag, maxSlope)` -- 1 on flat ground, 0 at or past `maxSlope`, linear between -- is exported
+and proven twice: in isolation (monotonic, exact endpoints, refuses to divide by a non-positive `maxSlope`), and
+against a real terran planet, where the flattest third of 48 real patches carries strictly more density than the
+steepest third. Voxel terrain feeds it a central-difference height gradient over `terrainTopAt()`; the planet
+feeds it `world/planetSurface.js`'s own `surfaceGradient()` -- **one formula, two terrain kinds**, rather than a
+second slope rule invented for voxels.
+
+**The shell placement agrees with the real displaced ground exactly, not approximately.** Every tuft's radius and
+orientation were recomputed independently via `surfaceRadiusAt`/`surfaceNormal` and matched to worst-case `1e-9`
+-- moss sits **on** the terrain, unlike clouds' shell offset above it.
+
+### Voxel: stone and dirt, not a second lawn
+
+`render/mossPatches.js` targets **stone and dirt** -- the tops grass has not claimed -- so the two ground covers
+are ecologically complementary rather than doubled up (measured: an all-grass world grows zero moss). It seeds
+from a coarse-grid hash of the rebuild anchor (the same `73856093`/`19349663` constants
+`world/worleyBiomes.js`'s cell hash already uses), so **the same location grows the same clump on return** -- a
+property `vegetation.js`'s own `Math.random()` reseed does not have.
+
+Wired into `main.js` exactly like `Vegetation`: `window.moss`, a `gfxSettings` `"moss"` toggle in all three
+presets, a saved `localStorage` preference. Verified live: `index.html` boots with zero page errors and
+`window.moss` in the correct default state.
+
+### Planet: parented under the mesh, and that is a real difference from clouds, not an oversight
+
+`es-box3d-fly3d.html` parents the moss `InstancedMesh` **under `planetMesh`** rather than adding it to the scene.
+`planetMesh` carries a static tilt *and* a continuous spin (`rotation.y += planetSpin*dt`, every frame); the
+cloud deck is built in world space and can drift from a spinning planet without anyone noticing -- fine for
+weather, wrong for ground cover. Parenting means Three's own scene graph carries tilt and spin for the moss for
+free, forever, with no per-frame code at all.
+
+**Verified live in a real browser**: a deck of 25-39 tufts sitting at radius `17.00`-`17.21` on a
+groundRadius-17 planet (clouds sit at `34.8`-`35.5`, the shell *offset above* it) -- moss really is on the ground
+and clouds really are not. On/off toggling rebuilds correctly, zero page errors.
+
+### What this does not do, stated rather than left implicit
+
+One moss species, not a biome table -- inventing several nobody asked for is exactly the unrequested scope this
+tree's standing rule refuses. Sylva's procedural root/arch geometry is **not** built here -- a standalone
+decorative structure, not ground cover, named as a real follow-on rather than silently dropped.
+
+And the voxel side's live check is honestly scoped: `render/vegetation.js`'s own grass shows the identical
+zero-count symptom under the same ad hoc headless boot (the world has not streamed real terrain in around the
+camera yet) -- a gap in an existing, shipped feature that inventing a harness for moss alone would have papered
+over rather than fixed.
+
+### definitionGates caught its own kind of debt
+
+Exporting `cloudField.js`'s `offsetDir`/`norm` -- so moss could reuse the **same** tangent-offset arithmetic
+clouds scatter with, rather than re-deriving it -- made them visible to `definitionGates-selfcheck`'s tree-wide
+ratchet for the first time, and it grew `209` -> `211`. Closed by a real assertion in `cloudField-selfcheck.mjs`
+that calls each function and grades the answer, not by typing the name -- back to `209`.
+
+### Gates
+
+`mossField` all pass (10 sections: seeded determinism, clumping measured on the output, the slope formula in
+isolation and against a real planet, the voxel consumer, wiring, and two live-browser sections) | `cloudField`
+all pass (new section 6, the newly-exported helpers) | `definitionGates` all pass (`209`, not `211`) |
+`singleSource`, `gateReach` all pass. `verify.mjs` is green across 1208 gates.
+
 ## Since v4075 -- fifteen devices accepted any mode string, and the list was three lines above
 
 ### The gate advised against fixing this, and the advice rested on a premise that did not hold

@@ -77,8 +77,14 @@ export function buildPuffsFlat({ type, cx = 0, cz = 0, region = 480, seed = 1 } 
     return puffs;
 }
 
-/** Unit direction from spherical offsets around `dir`, using a geographic tangent frame (east/north). */
-function offsetDir(dir, dEast, dNorth) {
+/**
+ * Unit direction from spherical offsets around `dir`, using a geographic tangent frame (east/north).
+ * v4076 -- EXPORTED for render/mossField.js, whose shell placement scatters clumps around an arrival direction
+ * exactly the way this file scatters cloud clusters. It is the SAME tangent-offset arithmetic either way -- a
+ * direction, an east/north basis built from it, a small angular nudge -- and re-deriving it a second time is
+ * exactly the "one generator, two consumers" defect this file's own header was written to close for clouds.
+ */
+export function offsetDir(dir, dEast, dNorth) {
     const d = norm(dir);
     let e = [d[2], 0, -d[0]];
     const l = Math.hypot(e[0], e[1], e[2]);
@@ -86,7 +92,7 @@ function offsetDir(dir, dEast, dNorth) {
     const n = norm([d[1] * e[2] - d[2] * e[1], d[2] * e[0] - d[0] * e[2], d[0] * e[1] - d[1] * e[0]]);
     return norm([d[0] + e[0] * dEast + n[0] * dNorth, d[1] + e[1] * dEast + n[1] * dNorth, d[2] + e[2] * dEast + n[2] * dNorth]);
 }
-function norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+export function norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
 
 /**
  * *** THE SPHERICAL PLACEMENT -- weather on a WORLD, which is the half that did not exist. *** Clusters are

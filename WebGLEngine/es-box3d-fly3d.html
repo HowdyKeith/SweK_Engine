@@ -72,6 +72,7 @@ import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural plan
 import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
 import { sampleShot, sampleSequence, chainLegs, sequenceDuration, toClip, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 sequence; v4057 clip export
 import { buildPuffsShell } from "/render/cloudField.js";   // v4055 -- the engine's own cloud types, on a shell
+import { buildMossShell } from "/render/mossField.js";   // v4076 -- ground cover on the SAME displaced surface
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
@@ -1014,6 +1015,75 @@ window.swekCloudProbe = () => {
   return { deck: true, puffs: p.count, minR, maxR, camR, inside: camR < maxR && camR > minR, below: camR < minR };
 };
 
+// v4076 -- MOSS ON THE PLANET, GROWN FROM THE SAME render/mossField.js THE VOXEL TERRAIN USES (render/mossPatches.js).
+// *** WHY THIS IS A CHILD OF planetMesh AND THE CLOUD DECK IS NOT. *** planetMesh carries a static tilt
+// (rotation.z = spec.tilt, set once) AND a continuous spin (rotation.y += planetSpin*dt, every frame, line
+// ~699). The cloud deck is built in WORLD space and added to `scene` directly -- fine for weather, which is
+// not attached to the ground and can drift from a spinning planet without anyone noticing. Moss is GROUND
+// COVER: if it were built the same way it would visibly detach from the terrain within seconds of watching the
+// planet spin. Parenting the InstancedMesh under planetMesh means Three's own scene graph carries tilt AND
+// spin for free, forever, with no per-frame code here at all -- and building the tufts in the mesh's LOCAL
+// (pre-rotation) frame is exactly the frame the vertex displacement loop above already computed heights in, so
+// nothing about the arithmetic changes, only whose transform is applied to the result.
+let mossDeck = null;
+function buildMossDeck(dir) {
+  if (mossDeck) { planetMesh.remove(mossDeck); mossDeck.geometry.dispose(); mossDeck.material.dispose(); mossDeck = null; }
+  if (!planetMesh || !planetSpec_) return null;
+  const tufts = buildMossShell({ spec: planetSpec_, groundRadius: planetR, ampFrac: PLANET_AMP_FRAC,
+                                  dir, coverage: 0.55, sizeScale: 0.06, seed: planetSpec_.seed, maxSlope: 4.5 });
+  if (!tufts.length) return null;
+
+  // A squashed low-poly hummock -- one shared geometry, matching the "rocks" InstancedMesh recipe already
+  // proven in this file (icosphere-like clump, MeshStandardMaterial, per-instance Matrix4.compose).
+  const clumpGeo = new THREE.IcosahedronGeometry(1, 0);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0, flatShading: true });
+  const inst = new THREE.InstancedMesh(clumpGeo, mat, tufts.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), spinQ = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+  tufts.forEach((t, i) => {
+    // orientation: align the hummock's local +Y to the terrain's own normal here, then spin it around that
+    // normal by the tuft's own random angle -- the same setFromUnitVectors + axis-angle compose the rocks use,
+    // aimed at a surface normal instead of an arbitrary spin axis.
+    q.setFromUnitVectors(up, new THREE.Vector3(t.normal[0], t.normal[1], t.normal[2]));
+    spinQ.setFromAxisAngle(new THREE.Vector3(t.normal[0], t.normal[1], t.normal[2]), t.spin);
+    q.premultiply(spinQ);
+    v.set(t.x, t.y, t.z);
+    s.set(t.scale, t.scale * 0.35, t.scale);   // flattened -- a clump, not a boulder
+    inst.setMatrixAt(i, m.compose(v, q, s));
+    // dark mossy green .. lighter yellow-green, MOSS_CHAR's own tint range, read back rather than re-typed
+    col.setRGB(0.08 + t.tint * 0.10, 0.22 + t.tint * 0.22, 0.08 + t.tint * 0.10);
+    inst.setColorAt(i, col);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  inst.frustumCulled = false;
+  planetMesh.add(inst);   // LOCAL frame: tilt + spin inherited from the parent, not re-derived here
+  mossDeck = inst;
+  return { type: "moss", count: tufts.length };
+}
+window.swekMoss = (on) => {
+  if (on === false || on === "off") {
+    if (mossDeck) { planetMesh.remove(mossDeck); mossDeck.geometry.dispose(); mossDeck.material.dispose(); mossDeck = null; }
+    return null;
+  }
+  if (!planetMesh) return null;
+  // the SAME local-frame direction buildMossDeck used at init -- see there for why this is not a world-space dir.
+  const q = planetMesh.quaternion.clone().invert();
+  const worldDir = cnorm3([camera.position.x - planetMesh.position.x, camera.position.y - planetMesh.position.y, camera.position.z - planetMesh.position.z]);
+  const localDir = new THREE.Vector3(worldDir[0], worldDir[1], worldDir[2]).applyQuaternion(q).normalize();
+  return buildMossDeck([localDir.x, localDir.y, localDir.z]);
+};
+window.swekMossProbe = () => {
+  if (!mossDeck || !planetMesh) return { deck: false };
+  const p = mossDeck.instanceMatrix, m = new THREE.Matrix4(), v = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  let minR = Infinity, maxR = -Infinity;
+  for (let i = 0; i < mossDeck.count; i++) {
+    m.fromArray(p.array, i * 16); m.decompose(v, q, s);
+    minR = Math.min(minR, v.length()); maxR = Math.max(maxR, v.length());
+  }
+  return { deck: true, count: mossDeck.count, minR, maxR };
+};
+
 window.swekArrivalProbe = () => {
   if (!arrival) return { flying: false };
   const f = sampleSequence(arrival.legs, arrival.t);
@@ -1037,6 +1107,7 @@ window.swekDescentProbe = () => {
 
   newBattle();
   try { buildCloudDeck(CLOUD_ORDER[0]); cloudsBtn.textContent = "\u2601 " + CLOUD_ORDER[0]; } catch (e) {}   // v4055 -- a deck to arrive through
+  try { window.swekMoss(); } catch (e) {}   // v4076 -- ground cover on the same arrival face
   requestAnimationFrame(frame);
 })();
 </script>
