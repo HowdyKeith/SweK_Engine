@@ -132,22 +132,28 @@ const cov = definitionCoverage(ENG);
               "three gaps there were load-bearing and were closed. The remaining debt is exported FUNCTIONS, and " +
               "planting errors in four of them showed all four passing silently, so it is real debt rather than " +
               "a scan artefact");
-    // REPORTED, NOT ASSERTED -- a census is not debt, and this one says which KIND of debt the count above is.
-    // *** v4059 -- WHAT THIS NUMBER DOES NOT COVER, REPORTED SO THE SCOPE CANNOT BE MISREAD AGAIN. ***
-    // Same criterion, whole tree. Not asserted: 209 definitions nobody has examined would make this red on
-    // work that may be perfectly well covered indirectly, and the file already argues (see the import-only
-    // check) against failing on a statistic. Printed so that widening the sweep is a decision with a figure
-    // attached rather than a silent gap.
-    {
-        const wide = definitionCoverage(ENG, "");
-        const outside = wide.ungated.length - cov.ungated.length;
-        report(`SCOPE: this sweep covers physics/ only -- ${cov.gatedModules} gated modules, ${cov.total} definitions.`);
-        report(`  Tree-wide the same criterion finds ${wide.gatedModules} gated modules and ${wide.total} definitions,`);
-        report(`  ${wide.ungated.length} unmentioned -- so ${outside} unmentioned definitions sit OUTSIDE this number,`);
-        report(`  across ${wide.gatedModules - cov.gatedModules} gated modules the ratchet above never looks at.`);
-        report("  Widening is a real decision (it would redden this line on work nobody has audited), so it is");
-        report("  reported rather than taken. The physics ratchet is unchanged.");
-    }
+    // *** v4060 -- WIDENED FOR REAL, NOT JUST REPORTED. *** v4059 stopped at reporting the tree-wide number
+    // because reddening 209 unaudited definitions in the same breath as finding them would have been exactly
+    // the "condemn correct gates to improve a statistic" trap this file argues against two lines down. But a
+    // number that is only ever printed is a number nobody has to act on -- and this file's OWN history is the
+    // argument against that: the physics BASELINE has sat at 37 since v3323 while the physics count grew to 81,
+    // because "GREW to N" with no wider ratchet gives a debt line nobody is forced to look at again. So this
+    // scope gets the SAME treatment BASELINE got at v3322: frozen at TODAY'S honest count, ratchets DOWN never
+    // up, existing debt stays visible and shrinkable, and a NEW ungated export anywhere in the tree cannot
+    // arrive quietly. Verified NOT to be redundant with the physics ratchet above: tree-wide can go red on a
+    // change under render/, rig/, ui/ etc. that the physics-scoped check above would never see at all.
+    const BASELINE_WIDE = 290;   // v4060: 597 gated modules, 2861 definitions tree-wide, frozen here -- ratchets down
+    const wide = definitionCoverage(ENG, "");
+    ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
+        wide.ungated.length <= BASELINE_WIDE,
+        wide.ungated.length > BASELINE_WIDE
+            ? "GREW to " + wide.ungated.length + ": " + wide.ungated.slice(0, 6).join(", ") + " ..."
+            : `${wide.ungated.length} unmentioned of ${wide.total} exported symbols across ${wide.gatedModules} ` +
+              `gated modules TREE-WIDE, against a frozen ${BASELINE_WIDE}. This subsumes the physics-only check ` +
+              "above (which stays as its own line because it is the one with the older, tighter history) and " +
+              "additionally covers the " + (wide.gatedModules - cov.gatedModules) + " gated modules outside " +
+              "physics/ -- render/, rig/, ui/, world/ and the rest -- where a silently uncovered export would " +
+              "previously have passed every gate in this file");
     const rateNow = cov.ungated.length / cov.total, rateThen = 37 / 608;
     console.log("  ----  the count against its own denominator   " +
         `${cov.ungated.length} of ${cov.total} = ${(100 * rateNow).toFixed(2)}% now, against 37 of 608 = ` +
