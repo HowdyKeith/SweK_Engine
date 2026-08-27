@@ -35,7 +35,31 @@ export const TWOF_OBSERVABLES = [
     "dragOverLift", "healthy", "reNominal", "blockageFrac", "recordedDrift", "recordedLift",
 ];
 
-const DEF = { runIndex: 0, steps: 12000 };
+// *** v4038 -- `steps` WAS DECLARED, PASSED, AND READ BY NOBODY, AND IT IS THE REASON THIS DEVICE IS THE MOST
+// EXPENSIVE IN THE LAB. ***
+//
+// runTwoF reads c.settle and c.record. makeRig spreads { ...DEFAULT_RIG, ...cfg }, so a `steps` handed to it
+// lands on the config object and NOTHING EVER LOOKS AT IT -- while DEFAULT_RIG's own settle 6000 / record
+// 18000 run regardless. The declared default of 12000 did not even name the real count, which is 24,000.
+// MEASURED: steps 1000 and steps 500 both take ~117 s and return the recorded drift bit for bit.
+//
+// *** AND THE KNOB CENSUS COULD NOT FIND IT, BECAUSE THE DEVICE WAS TOO EXPENSIVE TO FINISH PROBING. *** The
+// last full sweep records exactly that -- "twof: OVER BUDGET at 300000 ms -- probed 1 of 2 declared knobs" --
+// and the one it never reached was this one. A dead knob that makes a device slow, hidden by the device being
+// slow. The fix is not a cheaper default; it is DECLARING THE TWO KNOBS THAT ACTUALLY DRIVE THE SOLVER, at
+// the values DEFAULT_RIG already uses, so every recorded number in this file is unchanged.
+//
+// *** THE COST IS NOT WASTE, AND THIS FILE OF ALL FILES MUST NOT BE "OPTIMISED" BY SHORTENING IT. *** The key
+// is that the Zou-He inlet HOLDS: 1.45e-3 against the 12-21% every body-force-driven attempt showed. That
+// number is a drift measured over a long run, and it needs the run. MEASURED at reduced settings:
+//     settle  300 / record  900  ->   6.0 s, drift 1.649e-2   -- eleven times worse
+//     settle  600 / record 1800  ->  21.4 s, drift 7.125e-3   -- five times worse
+//     settle 6000 / record 18000 -> ~115 s, drift 1.452e-3    -- the recorded result
+// A shortened run does not report a cheaper version of this answer, IT REPORTS THE INLET FAILING. v2797
+// guessed "longer runs" would fix the shedding and v2834 disproved it with arithmetic; guessing "shorter
+// runs" here would be the same error pointing the other way, and it would read as the boundary condition
+// this module exists to defend having been broken.
+const DEF = { runIndex: 0, settle: 6000, record: 18000 };
 const FEEDBACK_DRIFT = 0.12;   // the 12-21% every body-force-driven attempt showed before v2835
 
 function buildTwoF({ mode = "inlet", config = {} } = {}) {
@@ -58,7 +82,8 @@ function buildTwoF({ mode = "inlet", config = {} } = {}) {
     // reads as a tidy-up rather than a physics change, and the module's ENTIRE REASON TO EXIST is that
     // v2834 proved the feedback loop cannot be fixed by running longer. ONE-SIDED: recordedDrift is a number
     // from a real prior run and never sees this lattice. ***
-    const r = runTwoF({ tau: rec.tau, U: rec.U, D: 12, yOffset: rec.yOffset, steps: c.steps,
+    const r = runTwoF({ tau: rec.tau, U: rec.U, D: 12, yOffset: rec.yOffset,
+                        settle: c.settle, record: c.record,
                         dropInlet: mode === "nofixedinlet" });
     return {
         inletDriftFrac: r.inletDriftFrac,
@@ -79,6 +104,25 @@ export const twoFDevice = {
         "inletDriftFrac is the fractional drift of the inlet condition the solver is supposed to hold fixed, ideally 0; releasing it takes the drift 1.45e-3 -> 1.02e-2 and kills vortex shedding, liftAmplitude 2.27e-2 -> 6.2e-12",
     name: "lbm-two-frequency-shedding", observables: TWOF_OBSERVABLES, build: buildTwoF,
     defaults: ({ mode } = {}) => ({ mode: mode || "inlet", config: { ...DEF } }),
+
+    // *** v4038 -- WHAT THIS COSTS, DECLARED, SO A SURVEY CAN DECLINE IT INSTEAD OF DISCOVERING IT. ***
+    // corroborationCensus's deadline bounds how many builds START and cannot interrupt one already running,
+    // so a ten-second budget produced a 2m08s run entirely because this device sits at position 82. v4037 gave
+    // the census a way to ask first; this is the answer.
+    //
+    // A HINT IS A SCHEDULING ESTIMATE, NOT A MEASUREMENT. The rate is machine-local -- 24,000 lattice steps in
+    // ~115 s here, so ~4.8 ms/step -- and it is used for one thing only: deciding whether to attempt a build.
+    // A wrong hint costs a skipped build or a long one and CAN NEVER CHANGE A REPORTED NUMBER. The linear
+    // model is honest about being one: the true cost has a superlinear component in `record` (the recorded
+    // series is spectrally analysed), so this UNDER-estimates large runs, which is the direction that costs
+    // time rather than the direction that silently drops work.
+    //
+    // `envelope` returns numbers recorded at v2862 and runs no lattice at all, so its honest hint is nil.
+    costHint: ({ mode = "inlet", config = {} } = {}) => {
+        if (mode === "envelope") return 0;
+        const c = { ...DEF, ...config };
+        return (Number(c.settle) + Number(c.record)) * 4.8;
+    },
 };
 
 export { RUNS_V2862 };
