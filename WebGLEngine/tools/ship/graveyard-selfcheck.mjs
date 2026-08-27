@@ -406,12 +406,37 @@ const r = scan();
     // note warns about. THE DOORED ONES ARE PRINTED BY NAME, so nothing leaves the report -- only the count.
     const _doors = toolDoors();
     const allOrphanUtils = r.gateOnly.filter((g) => !g.record);
-    const doored = allOrphanUtils.filter((g) => !isExplained(g.file) && hasToolDoor(g.file, _doors));
-    const orphanUtils = allOrphanUtils.filter((g) => !isExplained(g.file) && !hasToolDoor(g.file, _doors));
+    // v4075 -- *** A FIFTH POPULATION, ADDED RATHER THAN ABSORBED, WHICH IS WHAT THE ANTIDOTE NOTE BELOW ASKS
+    // FOR. *** tools/mcp/physicsAi.mjs (v4067) landed in ACTIONABLE -- "these export functions and NOTHING calls
+    // them: wire it, or delete it" -- and NEITHER instruction is right for it. It is an MCP server that speaks
+    // over STDIO: its own header says `RUN: node tools/mcp/physicsAi.mjs (speaks MCP over stdio)`, and the
+    // thing that calls it is an MCP CLIENT IN ANOTHER PROCESS. Nothing in this tree importing it is the DESIGN,
+    // not the defect. Wiring it to an in-tree caller would invent a consumer; deleting it would delete a
+    // working front door.
+    //
+    // THAT IS A DOOR OF ANOTHER SHAPE, exactly like the nineteen with a tools.html row -- and it is a
+    // DIFFERENT shape, so it gets its own name instead of being folded into that one. Widening hasToolDoor to
+    // mean "or is an MCP server" would have made the tools.html count a lie, which is the "two things wearing
+    // one label" defect this file has caught elsewhere. The population is DERIVED from the file declaring
+    // itself a stdio MCP server, never from a path prefix: a future tools/mcp/ helper that is NOT a server
+    // stays actionable, and a server living elsewhere is still counted.
+    const isMcpDoor = (rel) => {
+        try {
+            const src = fs.readFileSync(path.join(ENG, rel), "utf8");
+            return /speaks MCP over stdio/.test(src) && /StdioServerTransport|@modelcontextprotocol\/sdk/.test(src);
+        } catch { return false; }
+    };
+    const doored = allOrphanUtils.filter((g) => !isExplained(g.file) && hasToolDoor(g.file, _doors) && !isMcpDoor(g.file));
+    const mcpDoored = allOrphanUtils.filter((g) => !isExplained(g.file) && !hasToolDoor(g.file, _doors) && isMcpDoor(g.file));
+    const orphanUtils = allOrphanUtils.filter((g) => !isExplained(g.file) && !hasToolDoor(g.file, _doors) && !isMcpDoor(g.file));
     const explained = allOrphanUtils.filter((g) => isExplained(g.file));
     if (doored.length) {
         console.log("        already have a tools.html row (a door of another shape, v3608): " + doored.length);
         for (const g of doored) console.log("          DOORED      " + g.file);
+    }
+    if (mcpDoored.length) {
+        console.log("        an MCP server, called from another PROCESS (a door of a fifth shape, v4075): " + mcpDoored.length);
+        for (const g of mcpDoored) console.log("          MCP-DOOR    " + g.file);
     }
     if (explained.length) {
         console.log("        explained (unwiredRegister, each with a stated blocker): " + explained.length);
@@ -447,9 +472,9 @@ const r = scan();
     // ANTIDOTE: if a FIFTH population is ever needed, ADD IT to the partition and name it. DO NOT widen an
     // existing category to absorb the stragglers -- the whole value of this line is that every member has been
     // put somewhere on purpose.
-    const parts = records.length + orphanUtils.length + doored.length + explained.length;
+    const parts = records.length + orphanUtils.length + doored.length + explained.length + mcpDoored.length;
     ok("!! every gate-only module lands in EXACTLY ONE named population", parts === r.gateOnly.length,
-        `${parts} classified of ${r.gateOnly.length} gate-only: ${records.length} analysis records + ${orphanUtils.length} orphaned utilities (RATCHETED, above) + ${doored.length} with a tools.html door + ${explained.length} explained with a blocker. THE TOTAL IS REPORTED AND NO LONGER CAPPED, and the reason is measured rather than preferred: adding one CORRECT gate-driven analysis primitive raises it while the actionable count does not move, so the old ceiling fired on the project working. A PARTITION CANNOT BE MET BY RAISING A NUMBER -- it goes red when a member belongs to none of the four, which is the failure a total nobody reads would hide.`);
+        `${parts} classified of ${r.gateOnly.length} gate-only: ${records.length} analysis records + ${orphanUtils.length} orphaned utilities (RATCHETED, above) + ${doored.length} with a tools.html door + ${mcpDoored.length} MCP server(s) called from another process + ${explained.length} explained with a blocker. THE TOTAL IS REPORTED AND NO LONGER CAPPED, and the reason is measured rather than preferred: adding one CORRECT gate-driven analysis primitive raises it while the actionable count does not move, so the old ceiling fired on the project working. A PARTITION CANNOT BE MET BY RAISING A NUMBER -- it goes red when a member belongs to none of the four, which is the failure a total nobody reads would hide.`);
     ok("...and neither have fully unreferenced modules", r.orphans.length <= ORPHAN_BASELINE,
         `${r.orphans.length} vs ${ORPHAN_BASELINE}`);
     // v3223 -- *** THIS PINNED THE BASELINE VALUES THEMSELVES, so raising one with a written reason -- the very
