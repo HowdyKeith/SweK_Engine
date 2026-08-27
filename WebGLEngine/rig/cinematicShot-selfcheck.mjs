@@ -318,6 +318,66 @@ console.log("\n5. *** A SEQUENCE'S SEAMS DO NOT CUT -- CONTINUITY IS DERIVED, NO
         " units out; a LINEAR interpolation of the same leg would be " + ((20000 + 150) / 2).toFixed(0));
 }
 
+console.log("\n3b. *** THE EASINGS AND THE FRAME -- EIGHT EXPORTS THIS GATE HAD NEVER NAMED ***");
+{
+    // tools/ship/definitionGates-selfcheck.mjs counts a definition as unprotected when no gate beside it so
+    // much as NAMES it, and eight of this module's exports were in that state: clamp01, linearE, sineInOut,
+    // cubicOut, cubicIn, delayed, early, tangentFrameAt. They are not incidental -- the easings ARE the shot
+    // channels, so an easing that failed to reach 1 would leave every move short of its stated endpoint, and
+    // section 3's per-shot check would not localise it. Named and exercised here rather than left to inflate a
+    // statistic; the tree's own ratchet is what surfaced them.
+    for (const [name, f] of [["linearE", S.linearE], ["sineInOut", S.sineInOut], ["cubicOut", S.cubicOut], ["cubicIn", S.cubicIn]]) {
+        let mono = true, inRange = true, prev = -Infinity;
+        for (let i = 0; i <= 200; i++) { const v = f(i / 200); if (v < prev - 1e-12) mono = false; if (v < -1e-12 || v > 1 + 1e-12) inRange = false; prev = v; }
+        ok("!! easing '" + name + "': anchored at 0 and 1, monotonic, and never leaves [0,1]",
+            Math.abs(f(0)) < 1e-12 && Math.abs(f(1) - 1) < 1e-12 && mono && inRange,
+            "an easing that overshoots sends a distance channel past its endpoint and back, which reads as a bounce");
+        ok("...and '" + name + "' clamps outside [0,1] rather than extrapolating",
+            Math.abs(f(-5)) < 1e-12 && Math.abs(f(5) - 1) < 1e-12,
+            "sampleShot clamps t, but an easing that extrapolated would still be a trap for any other caller");
+    }
+    ok("!! clamp01 really clamps (it is what every channel leans on)",
+        S.clamp01(-3) === 0 && S.clamp01(0.4) === 0.4 && S.clamp01(9) === 1);
+
+    // delayed/early are the two that carry BEHAVIOUR rather than shape: a channel joining a move already in
+    // progress, and one that finishes early and lets the others land.
+    const d = S.delayed(0.5, S.linearE);
+    ok("!! delayed(d, f) HOLDS at 0 until d, then runs f over the remainder",
+        d(0) === 0 && d(0.25) === 0 && d(0.5) === 0 && Math.abs(d(0.75) - 0.5) < 1e-12 && Math.abs(d(1) - 1) < 1e-12,
+        "this is how the arrival's azimuth waits for the dive to be under way before it starts turning");
+    const e = S.early(0.5, S.linearE);
+    ok("!! early(d, f) finishes by d and then HOLDS at 1",
+        e(0) === 0 && Math.abs(e(0.25) - 0.5) < 1e-12 && e(0.5) === 1 && e(0.75) === 1 && e(1) === 1,
+        "this is what makes hyperzoom a lens move: the camera arrives early and the FOV keeps closing");
+
+    // *** A CLAIM I WROTE IN A DOCSTRING AND HAD NEVER RUN. *** tangentFrameAt says it is "deliberately the SAME
+    // construction world/planetSurface.js uses ... so a camera azimuth here and a surface gradient there mean
+    // the same thing rather than differing by an unstated rotation". Two functions that must agree, in two
+    // files, verified by a comment -- which is exactly the shape this tree keeps finding wrong. Run, not read.
+    let worstEast = 0, worstNorth = 0;
+    for (let i = 0; i < 300; i++) {
+        const a = (i / 300) * Math.PI * 2, b = ((i * 13) % 300 / 300) * Math.PI - Math.PI / 2;
+        const dir = S.norm3([Math.cos(a) * Math.cos(b), Math.sin(b), Math.sin(a) * Math.cos(b)]);
+        const mine = S.tangentFrameAt(dir), theirs = PS.tangentFrame(dir);
+        worstEast = Math.max(worstEast, len3(sub3(mine.east, theirs.east)));
+        worstNorth = Math.max(worstNorth, len3(sub3(mine.north, theirs.north)));
+    }
+    ok("!! *** tangentFrameAt AGREES with world/planetSurface.js's tangentFrame -- the docstring's claim, run ***",
+        worstEast < 1e-12 && worstNorth < 1e-12,
+        "worst east " + worstEast.toExponential(2) + ", worst north " + worstNorth.toExponential(2) +
+        " over 300 directions. Two functions that must agree, in two files, had been verified by a comment");
+    ok("...and the frame is orthonormal and right-handed against the direction itself",
+        (() => {
+            for (const dir of [[0, 0, 1], [1, 0, 0], [0, 1, 0], [0.3, -0.8, 0.5]]) {
+                const d2 = S.norm3(dir), { east, north } = S.tangentFrameAt(d2);
+                if (Math.abs(len3(east) - 1) > 1e-12 || Math.abs(len3(north) - 1) > 1e-12) return false;
+                if (Math.abs(dot3(east, north)) > 1e-12 || Math.abs(dot3(east, d2)) > 1e-12 || Math.abs(dot3(north, d2)) > 1e-12) return false;
+            }
+            return true;
+        })(),
+        "including the poles, where east degenerates and falls back to +x -- a naming choice, not a discontinuity");
+}
+
 console.log("\n5b. *** A COMPUTED SHOT AS A RECORDED CLIP -- THE TWO CAMERA MODULES ACTUALLY COMPOSE ***");
 {
     const target = [0, 0, 17.2];
