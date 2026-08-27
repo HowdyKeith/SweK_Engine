@@ -384,5 +384,176 @@ console.log("\n12. THE RIGGED DRAWING -- PINNED TO THE SURFACE, AND EXACT RATHER
        "MEASURED in Chromium: 8.67 ms per posed frame against ~500 ms for a Krbn frame");
 }
 
+console.log("\n13. WEIGHT-BLENDING MATHS (riggedExport.js) -- CULLING WITHOUT RENORMALISING IS A SLOW-MOTION IMPLOSION");
+{
+    const { blendInfluences } = await import(path.join(ENG, "tools", "krbn", "riggedExport.js"));
+    // *** THE LOAD-BEARING NEGATIVE. *** A blend of THREE corners, each with up to FOUR influences, can name up
+    // to TWELVE distinct joints. glTF's JOINTS_0/WEIGHTS_0 carries only four. Cull without renormalising and
+    // the kept weights sum to less than 1 -- linear blend skinning reads a short sum as "pull this vertex
+    // toward the origin", so the mesh visibly shrinks as it animates, worst exactly where the rig is busiest.
+    const joints = [1,2,3,4,  5,6,7,8,  9,10,11,12];         // 3 corners x 4 slots, TWELVE distinct joints
+    const weights = [0.4,0.3,0.2,0.1,  0.4,0.3,0.2,0.1,  0.4,0.3,0.2,0.1];
+    const { J, W } = blendInfluences(joints, weights, [0,1,2], [1/3,1/3,1/3]);
+    const sum = W.reduce((a,b)=>a+b, 0);
+    ok("!! twelve possible influences are culled to the FOUR glTF allows",
+       new Set(J.filter((j,i)=>W[i]>0)).size <= 4, "kept joints " + JSON.stringify(J) + " weights " + JSON.stringify(W.map(w=>+w.toFixed(3))));
+    ok("!! ...and RENORMALISED to sum to 1, not left short",
+       Math.abs(sum - 1) < 1e-9, "sum=" + sum.toFixed(6) + " -- a short sum is the mesh-implodes-while-animating bug");
+    // a barycentric weight of 0 at a corner must contribute NOTHING, even if that corner's own weights are large
+    const { J: J2, W: W2 } = blendInfluences(joints, weights, [0,1,2], [1,0,0]);
+    ok("!! a zero-weight corner contributes nothing (pure barycentric, not an average of all three)",
+       J2.slice(0,4).every((j)=>[1,2,3,4].includes(j)) && Math.abs(W2.reduce((a,b)=>a+b,0)-1)<1e-9,
+       "bary=[1,0,0] must reduce to exactly corner 0's own (already <=4) influence set");
+    // a vertex with genuinely no matched influence (all weights 0) must not divide by zero and vanish silently
+    const { W: W3 } = blendInfluences([0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,1,2], [1/3,1/3,1/3]);
+    ok("!! a vertex with NO influence at all follows the root (weight [1,0,0,0]), not NaN",
+       W3[0] === 1 && W3.slice(1).every((w)=>w===0), JSON.stringify(W3));
+}
+
+console.log("\n14. THE SILHOUETTE-CLASSIFICATION FIX -- PROXIMITY REPLACING A STRING MATCH THAT NEVER MATCHED");
+{
+    const SL = fs.readFileSync(path.join(ENG, "tools", "krbn", "strokeLift.js"), "utf8");
+    ok("!! classifyRenderStrokes exists and is used by BOTH callers, not copied into each",
+       /export function classifyRenderStrokes/.test(SL) &&
+       /classifyRenderStrokes\(paths, res\.strokes\)/.test(codeOnly(fs.readFileSync(path.join(ENG, "krbn-rigged.html"), "utf8"))) &&
+       /classifyRenderStrokes\(paths, res\.strokes\)/.test(codeOnly(fs.readFileSync(path.join(ENG, "tools", "krbn", "riggedExport.js"), "utf8"))),
+       "the same wobble-vs-raw-curve mismatch would otherwise need fixing twice, and did -- both callers carried " +
+       "the identical broken string-match independently");
+    ok("!! it is NOT a string/coordinate match on renderStroke.path any more",
+       !/toFixed\(1\)[\s\S]{0,40}join\(";"\)[\s\S]{0,80}silPaths\.has/.test(SL.replace(/\s+/g," ")),
+       "the exact shape of the original bug: rounding a WOBBLED path to a string and comparing against an UNWOBBLED one");
+
+    let K = null; try { K = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    const { sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
+    const { classifyRenderStrokes } = await import(path.join(ENG, "tools", "krbn", "strokeLift.js"));
+    if (K) {
+        // v4048 -- WAS sceneMesh("ragdoll"), which v4042 already measured as ZERO silhouettes: cylinderMesh()
+        // emits no end caps, so every limb is an open surface with no silhouette to classify. blob is a real
+        // marched (closed) field and is the one triangulated built-in scene known to produce silhouettes.
+        const m = sceneMesh("blob");
+        const cam = { eye:[3,3,2], target:[0,0,0], up:[0,0,1], projection:"perspective", scale:(Math.PI/4.2)*2, viewport:{width:920,height:560} };
+        const scene = new K.Scene({ light:{direction:[-0.4,-0.5,-0.7]}, style:{wobble:0.4}, abstraction:{minFeaturePx:14} });
+        scene.add(new K.Mesh(m)).setImportance(0.45,{role:"subject"}).style({weight:1.1,hatch:{mode:"cross",angle:20,spacingPx:9,field:true}});
+        const res = scene.render(cam);
+        const kinds = classifyRenderStrokes(res.renderStrokes.map((s)=>s.path), res.strokes);
+        const trueSil = res.strokes.filter((s)=>s.feature && s.feature.type==="silhouette").length;
+        const foundSil = kinds.filter((k)=>k==="silhouette").length;
+        // *** THE MEASURED FACT THAT JUSTIFIES THE FIX, RUN LIVE RATHER THAN QUOTED FROM THE CHANGELOG. ***
+        ok("!! on a real scene with real silhouette features, the classifier finds a NON-ZERO count",
+           trueSil > 0 && foundSil > 0,
+           trueSil + " silhouette features present, " + foundSil + " render strokes classified as silhouette " +
+           "(the string-match version measured 0 of these on RobotExpressive despite 12 features existing)");
+        ok("...and it does not over-fire (every render stroke silhouette)",
+           foundSil < kinds.length, foundSil + " of " + kinds.length);
+    } else {
+        console.log("  ----  vendor/krbn missing -- the live classification proof cannot run");
+    }
+}
+
+console.log("\n15. STEP 2: THE RIGGED .glb ITSELF, LOADED BACK INDEPENDENTLY AND ANIMATED");
+{
+    const RG = fs.readFileSync(path.join(ENG, "krbn-rigged.html"), "utf8");
+    const RE = fs.readFileSync(path.join(ENG, "tools", "krbn", "riggedExport.js"), "utf8");
+    ok("!! GLTFExporter is vendored, from the SAME three revision already in the tree",
+       fs.existsSync(path.join(ENG, "vendor", "three", "jsm", "exporters", "GLTFExporter.js")) &&
+       /REVISION = '160'/.test(fs.readFileSync(path.join(ENG, "vendor", "three", "three.module.js"), "utf8")) &&
+       fs.readFileSync(path.join(ENG, "vendor", "three", "jsm", "exporters", "GLTFExporter.js"), "utf8").length > 1000,
+       "a different revision's exporter against this tree's r160 loader is an unverified combination, not a matched pair");
+    ok("!! three's own LICENSE sits beside the vendored copy", fs.existsSync(path.join(ENG, "vendor", "three", "LICENSE")));
+    ok("!! rigid (unskinned) parts get weight 1.0 to their owning bone -- not dropped, not left unweighted",
+       /W\[0\] = 1;/.test(codeOnly(RE)) && /parent, hops = 0, idx = -1/.test(codeOnly(RE)),
+       "measured on the source: 15 of 15 rigid meshes resolve to an existing bone one hop up -- none needed a synthetic joint");
+    ok("!! the export is built from the BIND pose, not whatever the Time slider says at the click",
+       /\.pose\(\)/.test(codeOnly(RE)) && /restore the BIND pose/.test(RE),
+       "an exported RIG plays every clip; baking in the scrub position would export one frozen pose wearing a skeleton");
+    ok("!! stroke geometry is TUBES, not a LINES primitive",
+       /BufferGeometry\(\)/.test(codeOnly(RE)) && /setIndex\(IDX\)/.test(codeOnly(RE)) && !/THREE\.Line\(/.test(codeOnly(RE)),
+       "three's own line materials have no skinning path -- a glTF LINES primitive would export 'correctly' and sit motionless in every viewer");
+
+    let K2 = null, chromium = null;
+    try {
+        const pw = await import(path.join(ENG, "tools", "ship", "playwrightResolve.mjs"));
+        const { createRequire } = await import("node:module");
+        const req = createRequire(import.meta.url);
+        const r = pw.resolvePlaywright(req);
+        if (!pw.browserSkipReason(r.chromium, r.from, pw.HEADLESS_SHELL)) chromium = { mod: r.chromium, shell: pw.HEADLESS_SHELL };
+    } catch {}
+    if (!chromium) {
+        report("live export+round-trip SKIPPED -- no headless Chromium available here");
+    } else {
+        const http = await import("node:http");
+        const srv = http.default.createServer((rq, rs) => {
+            const p = decodeURIComponent((rq.url || "/").split("?")[0]);
+            const full = path.join(ENG, p === "/" ? "/krbn-rigged.html" : p);
+            if (!full.startsWith(ENG) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) { rs.writeHead(404); rs.end("nf"); return; }
+            const ext = path.extname(full);
+            const ct = { ".html":"text/html", ".js":"text/javascript", ".mjs":"text/javascript", ".glb":"model/gltf-binary" }[ext] || "application/octet-stream";
+            rs.writeHead(200, { "Content-Type": ct }); rs.end(fs.readFileSync(full));
+        });
+        await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+        const port = srv.address().port;
+        const browser = await chromium.mod.launch({ executablePath: chromium.shell });
+        try {
+            const page = await browser.newPage();
+            const errs = [];
+            page.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+            await page.goto(`http://127.0.0.1:${port}/krbn-rigged.html`, { waitUntil: "networkidle", timeout: 40000 });
+            await page.waitForTimeout(16000);
+            const [download] = await Promise.all([
+                page.waitForEvent("download", { timeout: 30000 }),
+                page.click("#glb"),
+            ]);
+            const glbPath = path.join(HERE, "..", "..", "node_modules", ".krbn-rigged-gate-tmp.glb");
+            await download.saveAs(glbPath).catch(() => {});
+            let bytes = null; try { bytes = fs.readFileSync(glbPath); } catch {}
+            ok("!! clicking Export rigged .glb produces a real download", !!bytes && bytes.length > 10000,
+               bytes ? (bytes.length/1024).toFixed(0) + " KB" : "no file saved");
+            ok("...with zero page errors during export", errs.length === 0, errs[0] || "clean");
+
+            if (bytes) {
+                const b64 = bytes.toString("base64");
+                const rt = await page.evaluate(async (b64) => {
+                    const { GLTFLoader } = await import("./vendor/three/jsm/loaders/GLTFLoader.js");
+                    const THREE = await import("three");
+                    const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+                    const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
+                    let skinned = null; gltf.scene.traverse((o) => { if (!skinned && o.isSkinnedMesh) skinned = o; });
+                    if (!skinned) return { ok: false, reason: "no SkinnedMesh in the exported file" };
+                    const pos = skinned.geometry.getAttribute("position");
+                    const sample = (i) => { const v = new THREE.Vector3(); v.fromBufferAttribute(pos, i); skinned.applyBoneTransform(i, v); return [v.x,v.y,v.z]; };
+                    const idx = []; for (let i = 0; i < pos.count; i += 97) idx.push(i);
+                    skinned.skeleton.pose(); skinned.updateMatrixWorld(true);
+                    const rest = idx.map(sample);
+                    const clip = gltf.animations.find((a) => /dance|jump/i.test(a.name)) || gltf.animations[0];
+                    const mixer = new THREE.AnimationMixer(gltf.scene);
+                    mixer.clipAction(clip).play(); mixer.update(clip.duration * 0.5);
+                    gltf.scene.updateMatrixWorld(true);
+                    const posed = idx.map(sample);
+                    const moves = rest.map((r, i) => Math.hypot(r[0]-posed[i][0], r[1]-posed[i][1], r[2]-posed[i][2]));
+                    let lo=[1e9,1e9,1e9], hi=[-1e9,-1e9,-1e9];
+                    for (const p of posed) for (let k=0;k<3;k++){ if(p[k]<lo[k])lo[k]=p[k]; if(p[k]>hi[k])hi[k]=p[k]; }
+                    return { ok: true, boneCount: skinned.skeleton.bones.length, clipCount: gltf.animations.length,
+                              vertexCount: pos.count, sampled: idx.length, movedOver1cm: moves.filter((m)=>m>0.01).length,
+                              maxMove: Math.max(...moves), posedBBox: [0,1,2].map((k)=>+(hi[k]-lo[k]).toFixed(2)) };
+                }, b64);
+                ok("!! the exported .glb loads back through GLTFLoader, independent of the export code",
+                   rt.ok, rt.ok ? rt.boneCount + " bones, " + rt.clipCount + " clips, " + rt.vertexCount + " vertices" : rt.reason);
+                if (rt.ok) {
+                    ok("!! MOST sampled vertices actually move under a real clip (>1cm) -- skinning is live, not zeroed out",
+                       rt.sampled > 100 && rt.movedOver1cm > rt.sampled * 0.5,
+                       rt.movedOver1cm + " of " + rt.sampled + " moved, max " + rt.maxMove.toFixed(2));
+                    // *** THE LOAD-BEARING NEGATIVE THAT PROVES THE RENORMALISE WORKED, MEASURED ON THE REAL FILE. ***
+                    // A short weight sum makes the posed mesh SHRINK TOWARD THE ORIGIN as it animates -- this
+                    // asserts a real-world-scale bounding box under an actual animated pose, not near-zero.
+                    ok("!! the posed bounding box is REAL-WORLD SIZE, not collapsed toward the origin",
+                       rt.posedBBox.every((d) => d > 1.0), JSON.stringify(rt.posedBBox) +
+                       " -- an unnormalised weight cull shrinks this toward [0,0,0] as it animates");
+                }
+                try { fs.unlinkSync(glbPath); } catch {}
+            }
+        } finally { await browser.close(); srv.close(); }
+    }
+}
+
 console.log(fails ? `\nkrbnCompareLive-selfcheck: ${fails} FAILED` : "\nkrbnCompareLive-selfcheck: all checks pass");
 if (fails) process.exit(1);

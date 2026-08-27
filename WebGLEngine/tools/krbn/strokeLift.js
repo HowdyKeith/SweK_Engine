@@ -86,6 +86,41 @@ export function hatchStrokes(x0, y0, x1, y1, spacing = 26, step = 5) {
 // ---------------------------------------------------------------------------------------------------------------
 import { backProjectHit, baryPoint } from "./krbnCompare.js";
 
+// v4048 -- *** THIS WAS ONCE A STRING-KEY MATCH, AND IT NEVER MATCHED ANYTHING. *** The first draft (in
+// krbn-rigged.html and again, independently, in riggedExport.js) tried to tell a silhouette render-stroke
+// from a surface one by rounding coordinates to a string and comparing `renderStroke.path` against
+// `classifiedStroke.screen.pts`. Krbn's own pipeline (pipeline/emit.js's emitStroke) SAMPLES, SIMPLIFIES and
+// WOBBLES the classified curve on the way to a render stroke -- RenderStroke.path is a DIFFERENT, PERTURBED
+// set of points from Stroke.screen, so the string keys almost never coincided. MEASURED on RobotExpressive:
+// 12 real silhouette features existed and the string match reported 0 every time -- a check that looked like
+// classification and was actually a constant.
+//
+// *** THE FIX IS PROXIMITY, AND THE GAP IS NOT CLOSE. *** classifyScene(sources, cam) (exported by Krbn's own
+// pipeline/visibility.js) is the SAME classification scene.render() runs internally, callable directly with
+// no wobble applied -- an independent, exact ground truth. MEASURED distance from each render stroke's own
+// points to the nearest silhouette curve point: the closest ~5% of strokes sit within 0.03-0.45px (wobble's
+// own perturbation and nothing more), the median is 118.9px away. There is no ambiguous middle to tune around;
+// TOL_PX=3 sits inside the gap with room on both sides.
+const TOL_PX = 3;
+
+/**
+ * Which of `renderStrokes` (each a Vec2 path, e.g. RenderStroke.path) are silhouettes, by proximity to Krbn's
+ * OWN classifyScene() output rather than by re-deriving or guessing. Returns a parallel string array,
+ * "silhouette" | "surface", because a caller (the rigged player, the rigged exporter) needs to know which
+ * marks are baked to a pose and which live on the surface -- see krbn-rigged.html's header for why that
+ * distinction is drawn at all.
+ */
+export function classifyRenderStrokes(renderStrokes, classifiedStrokes) {
+    const silCurves = classifiedStrokes
+        .filter((s) => s.feature && s.feature.type === "silhouette" && s.screen && s.screen.pts)
+        .map((s) => s.screen.pts);
+    if (!silCurves.length) return renderStrokes.map(() => "surface");
+    const d2 = (a, b) => { const dx = a[0]-b[0], dy = a[1]-b[1]; return dx*dx + dy*dy; };
+    const tol2 = TOL_PX * TOL_PX;
+    const near = (pt) => { for (const c of silCurves) for (const q of c) if (d2(pt, q) <= tol2) return true; return false; };
+    return renderStrokes.map((path) => (path.some(near) ? "silhouette" : "surface"));
+}
+
 /**
  * Lift 2D strokes onto the mesh AND pin each point to (triangle, barycentric) so it can be re-posed.
  * @param strokes  [[ [x,y], ... ], ...]  -- Krbn's own RenderStroke.path arrays

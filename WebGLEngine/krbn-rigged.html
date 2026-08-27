@@ -21,6 +21,8 @@
   button { background:#e4dfd2; color:var(--ink); border:1px solid #c3bcaa; border-radius:5px;
            padding:6px 13px; cursor:pointer; font:12px ui-monospace,monospace; }
   button:hover { background:#d9d3c3; }
+  button.hi { background:#e8d8a8; border-color:#c4a85a; }
+  button.hi:hover { background:#ddc98c; }
   label { font-size:11px; color:var(--dim); display:flex; flex-direction:column; gap:2px; }
   input[type=range] { width:180px; }
   .chk { flex-direction:row; align-items:center; gap:6px; color:var(--ink); font-size:12px; }
@@ -36,6 +38,7 @@
   <label class="chk"><input type="checkbox" id="sil" checked /> draw baked silhouettes</label>
   <button id="redraw">&#9998; Re-draw with Krbn at this pose</button>
   <button id="obj">&#8681; Export OBJ (this pose)</button>
+  <button id="glb" class="hi">&#8681; Export rigged .glb (step 2)</button>
   <div id="st"></div>
 </div>
 <script type="module">
@@ -61,7 +64,7 @@
 // exists for that reason, the strokes carry their kind so the two are separable at all, and the status line
 // says which pose the outline actually belongs to rather than letting it pass as live.
 import { project, KRBN_CAM } from "./tools/krbn/krbnCompare.js";
-import { liftStrokesRigged, poseRiggedStrokes, toOBJ } from "./tools/krbn/strokeLift.js";
+import { liftStrokesRigged, poseRiggedStrokes, toOBJ, classifyRenderStrokes } from "./tools/krbn/strokeLift.js";
 import { gltfToMeshInput, poseFromClip, skinPositions, computeFit, fitDistance } from "./tools/krbn/glbMesh.js";
 
 const q = new URLSearchParams(location.search);
@@ -142,16 +145,14 @@ async function bake(K) {
        .style({ weight: 1.1, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
   const t0 = performance.now();
   const res = scene.render(krbnCam(cam));
-  // RenderStroke.path is the drawn 2D polyline. The FEATURE strokes carry a type; the render strokes do not,
-  // so silhouettes are identified by matching against the feature set rather than guessed at.
-  const silPaths = new Set();
-  for (const s of res.strokes) if (s.feature && s.feature.type === "silhouette" && s.screen && s.screen.pts)
-      silPaths.add(s.screen.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(";"));
+  // RenderStroke.path is the drawn 2D polyline. The FEATURE strokes carry a type; the render strokes do not.
+  // *** v4048 -- THIS WAS A STRING-KEY MATCH AGAINST s.screen.pts AND IT NEVER MATCHED. *** Krbn's own emit
+  // pipeline SAMPLES, SIMPLIFIES and WOBBLES the classified curve before it becomes a render stroke's path, so
+  // rounding both to a string and comparing found zero silhouettes on an asset that measurably has 12.
+  // classifyRenderStrokes() (tools/krbn/strokeLift.js) fixes it by PROXIMITY against the same res.strokes this
+  // render() call already returns -- no second classifyScene() needed, and no wobble mismatch to route around.
   const paths = res.renderStrokes.map((s) => s.path);
-  const kinds = res.renderStrokes.map((s) => {
-      const key = (s.path || []).map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(";");
-      return silPaths.has(key) ? "silhouette" : "surface";
-  });
+  const kinds = classifyRenderStrokes(paths, res.strokes);
   rigged = liftStrokesRigged(paths, mesh, cam, kinds);
   bakedAt = tNorm;
   const ms = Math.round(performance.now() - t0);
@@ -181,6 +182,27 @@ async function bake(K) {
   $("play").onclick = () => { playing = !playing; $("play").innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9658; Play"; if (playing) loop(); else cancelAnimationFrame(raf); };
   $("t").oninput = frame; $("orb").oninput = frame; $("sil").onchange = frame;
   $("redraw").onclick = () => bake(K);          // re-run Krbn AT THIS POSE, so the outline is honest again
+  $("glb").onclick = async () => {
+    // v4048 -- STEP 2. The bind-pose skeleton is drawn from, not whatever pose the viewer happens to be
+    // scrubbed to: an exported RIG plays every clip, so it is built once, from rest, rather than baking in
+    // whatever the Time slider said at the moment of the click.
+    $("glb").disabled = true;
+    try {
+      const { GLTFExporter } = await import("./vendor/three/jsm/exporters/GLTFExporter.js");
+      const { exportRiggedGLB } = await import("./tools/krbn/riggedExport.js");
+      const cam = camAt((+$("orb").value) / 1000, view());
+      const r = await exportRiggedGLB(THREE, GLTFExporter, K, gltf, mesh, cam, st);
+      const blob = new Blob([r.glb], { type: "model/gltf-binary" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "krbn-" + GLB + "-rigged.glb"; a.click();
+      URL.revokeObjectURL(a.href);
+      st("Exported krbn-" + GLB + "-rigged.glb — " + r.strokeCount + " rigged strokes (" + r.silhouetteCount +
+         " baked silhouette), " + (r.glb.byteLength/1024).toFixed(0) + " KB, " +
+         (gltf.animations||[]).length + " clips carried through. Open it in Blender/three.js and press play.");
+    } catch (e) {
+      st("export failed: " + (e && e.message ? e.message : e));
+    } finally { $("glb").disabled = false; }
+  };
   $("obj").onclick = () => {
     const posed = skinPositions(gltf, THREE);
     const polys = poseRiggedStrokes(rigged, mesh.triangles, posed);
