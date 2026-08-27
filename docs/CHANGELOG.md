@@ -8,6 +8,49 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4071 -- every published zip has had backslash separators, and v4070 caught it on its first run
+
+Keith, on the v4070 CI failure: *"did i not follow instructions?"* **He did. He did nothing wrong** -- the run
+failing is v4070 *working*. The first time CI ever read the **published** archive instead of one it packed
+itself, it found a real defect in the release on its very first attempt.
+
+**Every zip the rig has ever published uses backslash path separators.** PowerShell's `Compress-Archive` -- the
+win32 branch of `packagerBridge._zip` -- writes them, against the ZIP spec's own words (APPNOTE 4.4.17.1: *"All
+slashes MUST be forward slashes '/' as opposed to backwards slashes"*). Measured by downloading the published
+`SweK_Engine_v4070.zip`: **4910 entries, 4910 containing a backslash, zero containing a forward slash.**
+
+**It hid this long because the tolerant reader is the common one.** Info-ZIP's `unzip` prints *"appears to use
+backslashes as path separators"* and then repairs them, so every round trip on the rig looked fine. Python's
+`zipfile` does not repair: `SweK_Engine_v4070/WebGLEngine/main.js` is simply absent from `namelist()`, which is
+why `verify_zip.py` reported *"version-file not found in zip"* -- a message that reads like a nested-root
+problem and is really an encoding one. And until v4070, CI graded its own Linux-packed copy, where `zip -rq`
+had always written forward slashes, so the defect was structurally invisible to it.
+
+**The fix is a byte swap, and that is exactly why it is safe.** Backslash and forward slash are both **one
+byte**, so `packagerBridge.normalizeZipSeparators()` rewrites entry names in place: no length changes, no
+local-header offset moves, no compressed size or CRC touched -- the archive is structurally identical
+afterwards, which a re-pack could never promise. Both stored copies of each name are fixed (the central
+directory's and the local file header's), because a reader may consult either and fixing one alone would leave
+the archive disagreeing with itself.
+
+Verified against the **real published artifact** rather than a fixture: 34,734 bytes swapped across 4910
+entries, `testzip()` OK on every one, `main.js` findable by its real path, the correct `ENGINE_VERSION` readable
+out of it, and `unzip` stops warning. Idempotent -- a second pass swaps 0 bytes -- so it costs nothing on Linux
+where the archive was already conformant.
+
+**Fixed in the packer rather than by swapping `Compress-Archive` for `tar.exe`:** this repairs whatever produced
+the archive, needs nothing installed on the rig, and could be verified end to end from a Linux box. A
+Windows-only packer change could not have been, and shipping one unverified is the thing this tree refuses.
+`_zip` calls it on *every* archive, not behind a win32 test, so a future packer swap cannot silently
+reintroduce it.
+
+New section 7 in `releaseWorkflow-selfcheck.mjs` drives the normaliser against a hand-built backslash zip and
+asserts the CRC and offsets are untouched. Three sabotages bite -- fixing only the central directory, gating the
+call behind win32, removing the call -- each measured off a **verified-green baseline**, which is v4070's own
+lesson about "0 fails" from a gate that never ran.
+
+No gate file added or removed, so this build still carries 1207 gates. verify.mjs ALL GREEN.
+
 ## Since v4070 -- CI verifies the archive people actually download
 
 Item (3) of Keith's two-part CI fix, after v4068 stopped the workflow racing the rig to publish.

@@ -19,7 +19,11 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+
+const require_ = createRequire(import.meta.url);
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT = path.resolve(ENG, "..");
@@ -193,6 +197,62 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
     ok("...and the token still asks only for read, since downloading a public release needs nothing more",
         /contents:\s*read/.test(code) && !/contents:\s*write/.test(code),
         "fetching an asset is a read; the reach did not have to grow to gain the coverage");
+}
+
+// ---- 7. THE ARCHIVE THE RIG ACTUALLY PRODUCES IS SPEC-CONFORMANT ------------------------------------------
+{
+    console.log("\n7. *** BACKSLASH SEPARATORS: THE DEFECT v4070's OWN CHANGE FOUND ON ITS FIRST RUN ***");
+    // PowerShell's Compress-Archive -- the win32 branch of packagerBridge._zip -- writes BACKSLASH separators,
+    // against APPNOTE 4.4.17.1 ("All slashes MUST be forward slashes '/'"). Measured on the published
+    // SweK_Engine_v4070.zip: 4910 entries, 4910 with a backslash, zero with a forward slash. Info-ZIP's unzip
+    // warns and repairs, which is why it never showed on the rig; Python's zipfile does not, which is how
+    // verify_zip.py found it the moment v4070 pointed CI at the PUBLISHED archive instead of a local copy.
+    const { normalizeZipSeparators } = require_(path.join(ENG, "ai-bridge", "packagerBridge.js"));
+    ok("!! the packer exports a separator normaliser at all", typeof normalizeZipSeparators === "function");
+
+    // A REAL zip, built here with a backslash name, so this drives the function rather than reading it.
+    const nm = Buffer.from("Pack_v1\\sub\\a.txt", "latin1"), data = Buffer.from("hi");
+    const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 8);
+    lh.writeUInt32LE(0xDEADBEEF, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(data.length, 22);
+    lh.writeUInt16LE(nm.length, 26);
+    const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(0, 10); cd.writeUInt32LE(0xDEADBEEF, 16); cd.writeUInt32LE(data.length, 20);
+    cd.writeUInt32LE(data.length, 24); cd.writeUInt16LE(nm.length, 28); cd.writeUInt32LE(0, 42);
+    const cdStart = lh.length + nm.length + data.length;
+    const eo = Buffer.alloc(22); eo.writeUInt32LE(0x06054b50, 0); eo.writeUInt16LE(1, 8); eo.writeUInt16LE(1, 10);
+    eo.writeUInt32LE(cd.length + nm.length, 12); eo.writeUInt32LE(cdStart, 16);
+    const zipPath = path.join(os.tmpdir(), "swek-sep-gate-" + process.pid + ".zip");
+    fs.writeFileSync(zipPath, Buffer.concat([lh, nm, data, cd, nm, eo]));
+
+    const before = fs.readFileSync(zipPath);
+    const r = normalizeZipSeparators(zipPath);
+    const after = fs.readFileSync(zipPath);
+    ok("!! it rewrites BOTH copies of the name -- the central directory's and the local header's",
+        r.ok && r.entries === 1 && r.bytesFixed === 4,
+        "two backslashes, stored twice = 4 bytes. A reader may consult either copy, so fixing one would leave " +
+        "the archive disagreeing with itself: " + JSON.stringify(r));
+    ok("!! ...and NOTHING BUT THOSE BYTES MOVES -- same length, same CRC, same offsets",
+        after.length === before.length &&
+        after.readUInt32LE(cdStart + 16) === 0xDEADBEEF &&      // the CRC field, untouched
+        after.readUInt32LE(cdStart + 42) === 0,                 // the local-header offset, untouched
+        "*** THIS IS WHY THE REPAIR IS SAFE: '\\' and '/' are both ONE BYTE. *** Rewriting names in place " +
+        "changes no size, no offset and no checksum, so the archive is structurally identical afterwards -- " +
+        "which a re-pack could never promise");
+    const names = after.slice(cdStart + 46, cdStart + 46 + nm.length).toString("latin1");
+    ok("!! the stored name is a real path now",
+        names === "Pack_v1/sub/a.txt" && !names.includes("\\"),
+        "stored as: " + names);
+    ok("!! ...and a second pass is a NO-OP, so an already-clean archive is never rewritten",
+        normalizeZipSeparators(zipPath).bytesFixed === 0,
+        "`zip -rq` on Linux already writes forward slashes, so this must cost nothing there -- and it means a " +
+        "future packer change cannot silently reintroduce the defect either");
+    try { fs.unlinkSync(zipPath); } catch {}
+
+    const pb = fs.readFileSync(path.join(ENG, "ai-bridge", "packagerBridge.js"), "utf8");
+    const pbCode = pb.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join("\n");
+    ok("!! and _zip calls it on EVERY archive, not only the Windows one",
+        /normalizeZipSeparators\(outZip\)/.test(pbCode) && !/win32[\s\S]{0,80}normalizeZipSeparators/.test(pbCode),
+        "gating it behind a platform test would leave the defect one packer-swap away from returning");
 }
 
 console.log(fails ? `\nreleaseWorkflow-selfcheck: ${fails} FAILED` : "\nreleaseWorkflow-selfcheck: all checks pass");
