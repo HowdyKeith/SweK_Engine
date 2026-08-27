@@ -57,21 +57,72 @@ const UNSPEC = [
 ];
 const SITE_SAMPLES = 3;
 
+/**
+ * *** v4039 -- WHAT THE COUNTING COSTS: ABOUT TWICE, NOT ABOUT SEVENTY TIMES. ***
+ *
+ * THIS ENTRY BEGAN AS A WRONG NUMBER AND THE WRONG NUMBER IS KEPT HERE, because the way it was arrived at is
+ * the more useful warning. v4036's progressive output showed `kuramoto 3 modes 1044.15 s` in a census log,
+ * and one uninstrumented `curve` build is 7.3 s. The inference was that the instrument multiplied the cost
+ * some seventyfold. MEASURED DIRECTLY, ON kuramoto ITSELF:
+ *
+ *     curve      bare  7343 ms   instrumented  13971 ms   1.9x    354.0M libm calls
+ *     onset      bare 11319 ms   instrumented  13776 ms   1.2x    354.0M libm calls
+ *     pendulum   bare     5 ms   instrumented      0 ms   --      0 calls
+ *
+ * Twenty-eight seconds instrumented, against 1044 in the log. *** THE OTHER THOUSAND SECONDS WERE CPU
+ * CONTENTION FROM THE OTHER JOBS RUNNING BESIDE IT, AND THE READING WAS ATTRIBUTED TO THE CODE. *** A
+ * standalone benchmark agrees: 2.1x on a tight sin/cos loop. This tree has a name for that mistake -- a
+ * number measured on a machine doing something else is not a measurement of the thing you were looking at --
+ * and the same session had already seen the identical build time 117.0 s, 205.0 s and 207.7 s under load.
+ *
+ * SO THE OPTIMISATION BELOW IS WORTH ITS SIZE AND NOT MORE. It makes the wrapper 1.58x faster on the same
+ * loop, which on kuramoto's 354 MILLION libm calls is seconds rather than minutes. The genuine finding is
+ * the call count itself: 354M is three thousand times the 1e8 that this census's own gate calls the reason
+ * nobody had run the sweep before.
+ *
+ * The wrapper did six things on EVERY call, three of them hash-map operations and one an allocation:
+ *
+ *     (...a)                      allocated an arguments array, per call
+ *     counts.get(name)            a Map read, string key
+ *     counts.set(name, ...)       a Map write
+ *     sampled.get(name)           a second Map read
+ *     originals[name](...a)       a property lookup plus a spread apply
+ *     .bind(Math)                 a bound function, slower to invoke than the original
+ *
+ * None of it is needed. A closure-captured integer counts as exactly as a Map does, and Math's functions do
+ * not use `this`, so binding buys nothing. Fixed-arity wrappers remove the allocation: nineteen of these are
+ * unary, two take two arguments, and only hypot is truly variadic.
+ *
+ * *** THE COUNT IS THE PRODUCT AND THE COUNT IS UNCHANGED. *** Every portable/non-portable verdict this
+ * census reports turns on rawCalls, so a faster wrapper that counted differently would be worthless. The
+ * gate asserts exactness against a synthetic function that makes a KNOWN number of calls, which is a
+ * stronger check than agreeing with the previous implementation would have been -- an implementation is not
+ * an answer key.
+ *
+ * WHAT IS NOT FIXED, AND CANNOT BE FROM HERE: replacing Math.sin at all costs every call site in the process
+ * its inlined intrinsic. That is inherent to counting calls by substitution and is the reason a census will
+ * always cost more than a build. This removes the avoidable half of a 2x, and 2x is the whole size of the
+ * prize -- stated plainly so nobody re-derives the seventyfold story from the same log.
+ */
 export async function measurePortabilitySampled(fn) {
-    const counts = new Map(), sites = new Map(), sampled = new Map();
+    const counters = Object.create(null);     // name -> { n, sampled }, closure-captured, no hashing per call
+    const sites = new Map();
     const originals = {};
+    const note = (name, c) => {               // OFF the hot path: only the first SITE_SAMPLES calls reach it
+        c.sampled++;
+        const frame = (new Error().stack.split("\n")[3] || "").trim().replace(/^at /, "");
+        sites.set(name + " @ " + frame.replace(/file:\/\/\/.*?WebGLEngine\//, ""), true);
+    };
     for (const name of UNSPEC) {
-        originals[name] = Math[name].bind(Math);
-        Math[name] = (...a) => {
-            counts.set(name, (counts.get(name) || 0) + 1);
-            const seen = sampled.get(name) || 0;
-            if (seen < SITE_SAMPLES) {
-                sampled.set(name, seen + 1);
-                const frame = (new Error().stack.split("\n")[2] || "").trim().replace(/^at /, "");
-                sites.set(name + " @ " + frame.replace(/file:\/\/\/.*?WebGLEngine\//, ""), true);
-            }
-            return originals[name](...a);
-        };
+        const orig = Math[name];              // NOT bound: Math's functions do not use `this`
+        originals[name] = orig;
+        const c = { n: 0, sampled: 0 };
+        counters[name] = c;
+        Math[name] = name === "hypot"
+            ? (...a) => { c.n++; if (c.sampled < SITE_SAMPLES) note(name, c); return orig(...a); }
+            : (name === "atan2" || name === "pow")
+                ? (x, y) => { c.n++; if (c.sampled < SITE_SAMPLES) note(name, c); return orig(x, y); }
+                : (x) => { c.n++; if (c.sampled < SITE_SAMPLES) note(name, c); return orig(x); };
     }
     let pending, err = null;
     try { pending = fn(); } catch (e) { err = e; }
@@ -79,10 +130,14 @@ export async function measurePortabilitySampled(fn) {
     if (err) throw err;
     const value = await pending;
     let rawCalls = 0;
-    for (const n of counts.values()) rawCalls += n;
+    const counted = [];
+    for (const name of UNSPEC) {
+        const n = counters[name].n;
+        if (n) { rawCalls += n; counted.push([name, n]); }
+    }
     return {
         value, rawCalls,
-        byFn: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + "x " + k),
+        byFn: counted.sort((a, b) => b[1] - a[1]).map(([k, n]) => n + "x " + k),
         sites: [...sites.keys()].slice(0, 6),
     };
 }

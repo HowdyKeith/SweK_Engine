@@ -19,7 +19,8 @@
 // so they cannot quietly improve by being forgotten: if a later round narrows the portability taint or fills in
 // refinement knobs, these numbers move and the check says so.
 
-import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS } from "./corroborationCensus.mjs";
+import { corroborationCensus, censusLines, CENSUS_REGISTRATION, REFINEMENT_KNOBS,
+         measurePortabilitySampled } from "./corroborationCensus.mjs";
 import { buildLens } from "./lensBind.mjs";
 
 let fails = 0;
@@ -175,6 +176,49 @@ console.log();
         "census builds every mode. The sampling variant is still the reason the sweep is possible at all -- " +
         "the stack-capturing one never finished its second device -- but the number beside it was inherited " +
         "from a smaller lab and never remeasured.");
+}
+
+// ---- 3b. v4039 -- THE COUNTER IS FASTER AND COUNTS THE SAME ---------------------------------------------------------
+console.log("\n3b. *** THE COUNT IS THE PRODUCT, SO A FASTER WRAPPER THAT COUNTS DIFFERENTLY IS WORTHLESS ***");
+{
+    // Every portable/non-portable verdict above turns on rawCalls. v4039 replaced three Map operations and a
+    // rest/spread allocation per call with a closure counter and fixed-arity wrappers, so exactness is checked
+    // against SYNTHETIC FUNCTIONS THAT MAKE A KNOWN NUMBER OF CALLS -- a stronger check than agreeing with the
+    // previous implementation would have been, because an implementation is not an answer key.
+    const unary = await measurePortabilitySampled(() => { let s = 0; for (let i = 0; i < 1000; i++) s += Math.sin(i); return s; });
+    const binary = await measurePortabilitySampled(() => { let s = 0; for (let i = 0; i < 500; i++) s += Math.atan2(i, 2) + Math.pow(i, 2); return s; });
+    const variadic = await measurePortabilitySampled(() => { let s = 0; for (let i = 0; i < 300; i++) s += Math.hypot(i, 2, 3); return s; });
+    ok("!! *** THE COUNT IS EXACT IN ALL THREE ARITY CLASSES ***",
+        unary.rawCalls === 1000 && binary.rawCalls === 1000 && variadic.rawCalls === 300,
+        "1000 unary, 500 atan2 + 500 pow, 300 hypot(3 args) -> " + unary.rawCalls + ", " + binary.rawCalls +
+        ", " + variadic.rawCalls + ". Nineteen of the twenty-two are unary, two take two arguments, and only " +
+        "hypot is truly variadic -- the fixed-arity wrappers are what remove the per-call allocation, so each " +
+        "class needs its own check.");
+
+    const a2 = await measurePortabilitySampled(() => Math.atan2(1, 2));
+    const hy = await measurePortabilitySampled(() => Math.hypot(3, 4));
+    const pw = await measurePortabilitySampled(() => Math.pow(2, 10));
+    ok("!! and arguments survive the fixed-arity wrappers untouched",
+        a2.value === Math.atan2(1, 2) && hy.value === 5 && pw.value === 1024,
+        "atan2(1,2), hypot(3,4)=5, pow(2,10)=1024 -- a wrapper that dropped its second argument would still " +
+        "count correctly and return nonsense, which is the failure this line exists for.");
+
+    const brk = await measurePortabilitySampled(() => { for (let i = 0; i < 7; i++) Math.cos(i); for (let i = 0; i < 3; i++) Math.log(i + 1); return 0; });
+    ok("!! the per-function breakdown and the site frames still point at the CALLER",
+        brk.byFn[0] === "7x cos" && brk.byFn[1] === "3x log" &&
+        brk.sites.length > 0 && !brk.sites.some((x) => /corroborationCensus/.test(x)),
+        brk.byFn.join(", ") + " | sites: " + brk.sites.join("; ") + ". *** THE STACK FRAME INDEX HAD TO MOVE " +
+        "FROM [2] TO [3]: the site capture is now a separate function so it stays off the hot path, and that " +
+        "adds a frame. Left alone, every site would have blamed the instrument itself. ***");
+
+    report("*** AND WHAT THIS SPEED-UP IS WORTH, WHICH IS LESS THAN IT FIRST LOOKED ***",
+        "A census log showed `kuramoto 3 modes 1044.15 s` against a 7.3 s uninstrumented build, and the " +
+        "obvious inference was a seventyfold instrument. MEASURED ON kuramoto ITSELF: curve 7343 -> 13971 ms " +
+        "(1.9x), onset 11319 -> 13776 ms (1.2x), pendulum 5 -> 0 ms. TWENTY-EIGHT SECONDS INSTRUMENTED, " +
+        "AGAINST 1044 IN THE LOG -- the rest was CPU contention from other jobs running beside it, and the " +
+        "reading was being attributed to the code. The wrapper is ~2x and v4039 makes it ~1.3x. The real " +
+        "number in that measurement is 354,000,000 libm calls in one build, three thousand times the 1e8 " +
+        "this file already calls the reason nobody had run the sweep before.");
 }
 
 // ---- 4. WHAT THIS CENSUS DOES NOT ESTABLISH ------------------------------------------------------------------------
