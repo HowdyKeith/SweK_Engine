@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SweK -- Krbn compare (our obj vs Krbn, + lift to 3D)</title>
+<!-- v4042 -- needed by the GLB path's lazy `import("three")` (GLTFLoader.js imports the bare specifier
+     "three" itself, so a relative import of the loader alone is not enough). Same map server.html and the
+     other three-using pages declare; nothing loads until a glTF is actually opened. -->
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
 <style>
   :root { --amber:#ffcc66; --cyan:#33ccff; --green:#9fe6c0; --bg:#06140c; --panel:#0a1c12; --line:#1c3a28; --ink:#cfe8d8; --dim:#6a8a78; }
   * { box-sizing:border-box; }
@@ -52,6 +58,8 @@
     <div class="ctl"><label>Time (orbit)</label><input type="range" id="time" min="0" max="1000" value="120" /></div>
     <div class="ctl"><label>Wipe &mdash; obj / krbn</label><input type="range" id="wipe" min="0" max="100" value="50" /></div>
     <label class="chk"><input type="checkbox" id="lift" /> lift Krbn strokes to 3D</label>
+    <button id="load" title="Draw your own model. OBJ and STL are parsed by Krbn's own loaders; GLB/glTF by the vendored three.js GLTFLoader, then handed over as the same { positions, triangles } MeshInput.">&#8682; Load .glb / .obj / .stl</button>
+    <input type="file" id="file" accept=".glb,.gltf,.obj,.stl" style="display:none" />
     <button id="export" class="hi">&#8681; Export OBJ</button>
   </div>
   <div id="status"></div>
@@ -62,7 +70,7 @@
 <script type="module">
 import { project, backProject, KRBN_CAM } from "./tools/krbn/krbnCompare.js";
 import { liftStrokes, toOBJ } from "./tools/krbn/strokeLift.js";
-import { sceneMesh, SCENES } from "./tools/krbn/sceneMeshes.js";
+import { sceneMesh, SCENES, KRBN_NATIVE } from "./tools/krbn/sceneMeshes.js";
 
 const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
 const cv = document.getElementById("cv"), g = cv.getContext("2d");
@@ -70,14 +78,36 @@ const light = (() => { const v = [-0.4, -0.5, 0.75], m = Math.hypot(...v); retur
 
 // scene geometry (picker-driven) + camera auto-fit
 let mesh, fit;
+// v4042 -- centres on the BOUNDING BOX rather than the centroid. The centroid is the average VERTEX, which
+// is a density measure, not a position: a loaded model with 6000 vertices in a detailed head and 200 in a
+// whole limb pulls its "centre" into the head and then needs a radius large enough to reach back past the
+// limb, framing mostly empty space. That never showed on the four built-in scenes (roughly uniform vertex
+// density, so the two agree) and shows immediately on real files, which is the case this page now accepts.
 function computeFit(m) {
-  let c = [0,0,0]; for (const p of m.positions) { c[0]+=p[0]; c[1]+=p[1]; c[2]+=p[2]; }
-  const k = m.positions.length || 1; c = [c[0]/k, c[1]/k, c[2]/k];
+  if (!m.positions.length) return { center: [0,0,0], radius: 1 };
+  const lo = [Infinity,Infinity,Infinity], hi = [-Infinity,-Infinity,-Infinity];
+  for (const p of m.positions) for (let i=0;i<3;i++) { if (p[i]<lo[i]) lo[i]=p[i]; if (p[i]>hi[i]) hi[i]=p[i]; }
+  const c = [0,1,2].map(i => (lo[i]+hi[i])/2);
   let r = 0; for (const p of m.positions) { const d = Math.hypot(p[0]-c[0], p[1]-c[1], p[2]-c[2]); if (d > r) r = d; }
   return { center: c, radius: r || 1 };
 }
 let sceneName = "blob";
-function setScene(name) { sceneName = name; try { mesh = sceneMesh(name); } catch (e) { mesh = sceneMesh("blob"); sceneName = "blob"; } fit = computeFit(mesh); }
+// v4042 -- a LOADED model is a scene like any other, held here rather than pushed into SCENES: sceneMeshes.js
+// exports deterministic, reproducible geometry (its whole argument is "a drawing you cannot reproduce is not
+// one you can diff"), and a file off Keith's disk is neither. It gets its own slot, named "loaded", which
+// setScene() checks BEFORE the registry so nothing in that module has to know this page can open files.
+let loadedMesh = null, loadedName = "";
+function setScene(name) {
+  sceneName = name;
+  if (name === "loaded" && loadedMesh) { mesh = loadedMesh; }
+  else { try { mesh = sceneMesh(name); } catch (e) { mesh = sceneMesh("blob"); sceneName = "blob"; } }
+  fit = computeFit(mesh);
+  // NOTE: the Krbn side keys its cached scene AND its cached frame on sceneName (krbnSceneFor/krbnImgFor),
+  // so switching scenes invalidates both on its own. Loading a SECOND file does not -- sceneName stays
+  // "loaded" while the geometry underneath changes -- so that one path resets them explicitly, at its own
+  // call site rather than here (these bindings are declared further down, and touching them from a function
+  // that runs during module init, before those `let`s are reached, is a temporal-dead-zone crash).
+}
 setScene("blob");
 
 const sub = (a,b) => [a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -156,12 +186,121 @@ function drawGL(cam){
   } catch(e){ return false; }
 }
 
+// ---- THE REAL KRBN RENDER -----------------------------------------------------------------------------
+//
+// v4042 -- Keith, looking at the Ragdoll spin: "the Krbn - Flat drawing render on the right side does not
+// actually show a krbn render/pencil marks, but just wireframe... when you generated the render pic for
+// github, that was krbn." HE WAS RIGHT, AND drawKrbnSide's OWN NAME WAS THE LIE: it never touched
+// vendor/krbn at all. Every "krbn" frame on this page was a hand-rolled `g.moveTo/lineTo/stroke` per
+// triangle edge -- a plain wireframe cage, the exact opposite of what Keith's reference picture shows
+// (hatch lines that FOLLOW each surface's own curvature -- rings around a cylinder, latitude/longitude on
+// a sphere -- because that picture is real Krbn output, and this panel's was not). krbn.html already
+// proves the real pattern (import vendor/krbn, K.Mesh().style({hatch:{...}}), scene.toSVG(cam), rasterize
+// the SVG via an Image + object URL for its GIF export) -- reused here rather than re-invented.
+//
+// *** WHY THIS IS THROTTLED AND NOT CALLED EVERY FRAME. *** krbn.html's own measured number: ~700ms for one
+// Krbn frame, which is why THAT page renders "on release, not on drag." This page's Play button drives a
+// requestAnimationFrame orbit -- calling toSVG(cam) synchronously every tick would freeze the whole page for
+// most of a second, every frame, forever. So a Krbn render is requested every frame but only ONE actually
+// runs at a time; a request that arrives while one is in flight REPLACES any still-pending one rather than
+// queuing (Play's next 60 ticks all want "the newest camera", never a backlog of stale ones) -- the left
+// WebGL side keeps orbiting smoothly every frame while the right side updates in visible steps, honestly,
+// rather than pretending to be as fast as the fake wireframe it replaces.
+let K = null, krbnLoadErr = null;
+let krbnScene = null, krbnSceneFor = null;
+let krbnImg = null, krbnImgFor = null, krbnBusy = false, krbnPendingCam = null;
+let krbnLastEye = null, krbnLastScene = null;   // the cam actually rendered last -- so a settled view (Play
+                                                 // paused, only the wipe/lift dragged) stops re-requesting
+
+function krbnCamFor(cam) {
+  // cam.scale here is this page's own half-FOV convention (f = 1/tan(scale) in project() above); Krbn's
+  // own perspective camera (vendor/krbn/math/camera.js) takes `scale` as the FULL vertical FOV in radians
+  // (fpx = H/2/tan(scale/2)) -- so it is doubled here, not copied, to hand Krbn an equivalent field of view.
+  return { eye: cam.eye, target: cam.target, up: cam.up, projection: "perspective", scale: cam.scale * 2,
+           viewport: { width: VIEW.width, height: VIEW.height } };
+}
+// A scene built from Krbn's OWN primitives where one exists (ragdoll, splat -- see KRBN_NATIVE's header for
+// why a triangulated cylinder cannot hatch), else from the mesh. krbnKind reports which, so the status line
+// can say it rather than leaving the reader to guess why two scenes look richer than the other two.
+// *** THE INK IS PAPER-COLOURED ON PURPOSE, AND SKIPPING THAT COSTS THE WHOLE PANEL. *** Krbn's default ink
+// is `#1a1a1a` (vendor/krbn/pipeline/style.js BASE_STYLE) because IT IS A PENCIL-PLOTTER LIBRARY THAT
+// EXPECTS PAPER -- and the .krbn.ts scenes copied above set no colour, so they inherit it. Dropped straight
+// onto this page's #04100a background that renders graphite-on-near-black: MEASURED at 0.00% ink coverage
+// on the first attempt here, a completely blank panel. krbn.html's v2600 INKS block is the same bug, found
+// the same way ("I SHIPPED 1.42:1 TWICE AND CALLED IT A HOLOGRAM"), and its conclusion applies unchanged:
+// a pencil drawing IS graphite on paper, so the Krbn pane gets its own paper ground rather than having its
+// ink recoloured to suit a dark console. That is also exactly what Keith's reference render looks like.
+const PAPER = "#f4f1ea";
+let krbnKind = "";
+function ensureKrbnScene() {
+  if (krbnScene && krbnSceneFor === sceneName) return krbnScene;
+  const scene = new K.Scene({ svg: { background: PAPER }, light: { direction: [-0.4, -0.5, -0.7] }, style: { wobble: 0.4 } });
+  const native = KRBN_NATIVE[sceneName];
+  if (native) { native(K, scene); krbnKind = "analytic primitives"; }
+  else {
+    scene.add(new K.Mesh(mesh)).setImportance(1, { role: "subject" })
+         .style({ weight: 1.1, hatch: { mode: "cross", angle: 20, spacingPx: 8, field: true } });
+    krbnKind = "triangle mesh";
+  }
+  krbnScene = scene; krbnSceneFor = sceneName;
+  return scene;
+}
+const eyeClose = (a, b) => !!a && !!b && Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]) < 1e-9;
+
+// requestKrbnRender/runKrbnRender split so krbnBusy clears and the pending cam is captured BEFORE the
+// repaint below re-enters drawKrbnSide -- otherwise that repaint's own requestKrbnRender(currentCam) would
+// see krbnBusy still true and stash itself as "pending" a moment before this function's OWN finally clears
+// it and re-fires that exact same stale request a second time.
+async function runKrbnRender(cam, forScene) {
+  // *** THE GUARD RECORDS AN ATTEMPT, NOT A SUCCESS, AND THAT DISTINCTION IS THE WHOLE BUG. *** This
+  // function ends by calling render(), which re-enters drawKrbnSide -> requestKrbnRender synchronously. A
+  // guard keyed on "do we HAVE a frame for this camera" is satisfied on the happy path and NEVER on the
+  // failure path -- so one throwing camera became render -> request -> run -> throw -> render forever, and
+  // it showed up exactly where a slow model would find it: "RangeError: Maximum call stack size exceeded",
+  // measured on a 3237-triangle GLB. Stamping the attempt BEFORE the work means a camera that fails is
+  // retried never rather than infinitely, and the error is drawn once instead of eating the stack.
+  krbnLastEye = cam.eye; krbnLastScene = forScene;
+  try {
+    const scene = ensureKrbnScene();
+    const svg = scene.toSVG(krbnCamFor(cam));
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    try { await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("Krbn SVG did not decode")); img.src = url; }); }
+    finally { URL.revokeObjectURL(url); }
+    krbnImg = img; krbnImgFor = forScene; krbnLoadErr = null;
+  } catch (e) { krbnLoadErr = (e && e.message) ? e.message : String(e); }
+  krbnBusy = false;
+  const pending = krbnPendingCam; krbnPendingCam = null;
+  render();   // a fresh frame (or a fresh error) just landed -- repaint now, not on the next unrelated input
+  if (pending) requestKrbnRender(pending);
+}
+function requestKrbnRender(cam) {
+  if (!K) return;
+  if (krbnLastScene === sceneName && eyeClose(cam.eye, krbnLastEye)) return;   // already drawn, or already tried
+  if (krbnBusy) { krbnPendingCam = cam; return; }
+  krbnBusy = true;
+  runKrbnRender(cam, sceneName);
+}
+
 // ---- 2D drawing (the Krbn side always; the shaded side only in fallback) ---------------------------
 function drawKrbnSide(pr, cam, x0, x1, lift, opaqueBg){
   g.save(); g.beginPath(); g.rect(x0,0,x1-x0,VIEW.height); g.clip();
   if (opaqueBg){ g.fillStyle = "#04100a"; g.fillRect(x0,0,x1-x0,VIEW.height); }
-  g.strokeStyle = "#9fe6c0"; g.lineWidth = 0.8;
-  for (const [i,j,k] of mesh.triangles){ const a=pr[i],b=pr[j],c=pr[k]; if(!a||!b||!c) continue; g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.closePath(); g.stroke(); }
+  requestKrbnRender(cam);
+  if (K && !krbnLoadErr) {
+    if (krbnImg && krbnImgFor === sceneName) {
+      g.drawImage(krbnImg, 0, 0, VIEW.width, VIEW.height);
+    } else {
+      // no completed Krbn frame for THIS scene yet (first load, or the scene just changed) -- say so rather
+      // than silently showing the wireframe as if it were the real thing (v2597's rule, same as krbn.html)
+      g.fillStyle = "rgba(159,230,192,0.55)"; g.font = "12px ui-monospace,monospace"; g.textAlign = "center";
+      g.fillText("rendering real Krbn frame…", (x0+x1)/2, VIEW.height/2);
+    }
+  } else {
+    g.fillStyle = "#e8736a"; g.font = "12px ui-monospace,monospace"; g.textAlign = "center";
+    g.fillText("Krbn not available" + (krbnLoadErr ? ": " + krbnLoadErr : ""), (x0+x1)/2, VIEW.height/2 - 8);
+    g.fillText("expected /vendor/krbn/index.js", (x0+x1)/2, VIEW.height/2 + 10);
+  }
   if (lift){ g.fillStyle = "#33ccff"; for (const p of pr){ if(!p) continue; const h = backProject(p[0],p[1],mesh,cam); if(h){ const rp = project(h,cam); if(rp){ g.beginPath(); g.arc(rp[0],rp[1],2,0,7); g.fill(); } } } }
   g.restore();
 }
@@ -187,8 +326,163 @@ function render() { draw((+elT.value)/1000, +elW.value, elL.checked); wipeLine.s
 function tick() { if(!playing) return; elT.value = (+elT.value+3)%1001; render(); requestAnimationFrame(tick); }
 elP.onclick = () => { playing = !playing; elP.innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9658; Play"; if(playing) tick(); };
 [elT,elW,elL].forEach(e => e.oninput = render);
-elScene.onchange = () => { setScene(elScene.value); status.textContent = "Scene: " + elScene.value + " -- " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles."; render(); };
+elScene.onchange = () => {
+  // a "url:..." option is a preset/favourite -- fetched and parsed, not a registry lookup (loadPresetUrl and
+  // the two functions below it are declared later in this module; this handler only runs on a user click, so
+  // they are initialised long before it can fire)
+  if (elScene.value.startsWith("url:")) { loadPresetUrl(elScene.value.slice(4)); return; }
+  setScene(elScene.value);
+  status.textContent = "Scene: " + elScene.value + " -- " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles.";
+  render();
+};
 window.addEventListener("resize", render);
+
+// ---- LOAD YOUR OWN MODEL ------------------------------------------------------------------------------
+//
+// v4042 -- Keith: "can we load in our own .glb or object file?"
+//
+// OBJ and STL go through KRBN'S OWN parseOBJ/parseSTL, not a parser written here: they already return
+// exactly the { positions, triangles } MeshInput both sides of this page consume, and they already handle
+// the cases a quick hand-rolled reader gets wrong (STL binary-vs-ASCII autodetect and per-facet winding
+// repair; OBJ's v/vt/vn face forms, negative indices, and n-gon fan triangulation). GLB/glTF is the one
+// format Krbn does NOT read -- so it uses the three.js GLTFLoader already vendored for the rest of the
+// engine, and CONVERTS to the same MeshInput rather than introducing a second geometry type: every
+// downstream consumer (the WebGL upload, the projection, the ray-cast lift, the OBJ export) keeps working
+// unchanged because there is only ever one mesh shape on this page.
+//
+// A glTF scene is a TREE of meshes with per-node transforms; all of them are baked to world space and
+// merged into one mesh, because Krbn draws a scene and "the first primitive of the first mesh" would
+// silently drop most of a real model. Non-indexed geometry is handled too (it is common in exports).
+// v4042 -- Keith: "since we include robotexpressive, that would be a good preset, now that we are looking at
+// it." and "and any favorite models that the user has selected as an avatar."
+//
+// TWO SOURCES, ONE MECHANISM. RobotExpressive.glb ships in the tree (GPU_Assets/), so it is a fixed preset --
+// it is the model we were both already looking at and it needs no file-picker trip. The FAVOURITES come from
+// `voxelEngine.kpopFavorites`, THE STORE THE AVATAR STAR ALREADY WRITES (ui/kpopFavorites.js, via
+// ui/avatarFavorites.js) -- read directly out of localStorage rather than through window.kpopFavorites,
+// because that global is installed by the sandbox and this page is not the sandbox. *** IT IS DELIBERATELY
+// READ-ONLY HERE. *** ui/avatarFavorites.js's own header is about exactly this: "a second favourites list on
+// this page would be the two-declarations defect this tree names more than any other -- you would star
+// something here, not see it there." So this page offers what you starred and never adds to it; the star on
+// server.html stays the one place a favourite is made.
+//
+// A preset is fetched over HTTP and handed to the SAME loadMesh path a picked file uses -- no second parser,
+// no second cache-invalidation to keep in step with the first.
+const FAV_KEY = "voxelEngine.kpopFavorites";
+function readAvatarFavorites() {
+  try {
+    const raw = localStorage.getItem(FAV_KEY);
+    const a = raw ? JSON.parse(raw) : [];
+    return Array.isArray(a) ? a.filter((x) => x && typeof x.url === "string" && /\.(glb|gltf)(\?|#|$)/i.test(x.url)) : [];
+  } catch { return []; }
+}
+const PRESETS = [{ url: "/GPU_Assets/RobotExpressive.glb", label: "RobotExpressive (shipped)" }];
+function addPresetOptions() {
+  const seen = new Set();
+  const add = (url, label) => {
+    if (seen.has(url) || [...elScene.options].some((o) => o.value === "url:" + url)) return;
+    seen.add(url);
+    elScene.add(new Option(label, "url:" + url));
+  };
+  for (const p of PRESETS) add(p.url, p.label);
+  for (const f of readAvatarFavorites()) add(f.url, "★ " + (f.label || f.url.split("/").pop()));
+}
+addPresetOptions();
+
+const elFile = document.getElementById("file"), elLoad = document.getElementById("load");
+elLoad.onclick = () => elFile.click();
+
+// ONE parse-and-install path. A picked File and a fetched preset differ only in where the bytes come from, so
+// `src` is {name, text(), arrayBuffer()} -- the two methods a File already has, which a fetched Response also
+// has, so a preset needs no adapter beyond passing the Response through.
+async function loadModel(src) {
+  status.textContent = "Loading " + src.name + "…";
+  let m = null;
+  try {
+    const ext = (src.name.split(".").pop() || "").toLowerCase().replace(/[?#].*$/, "");
+    if (ext === "obj" || ext === "stl") {
+      if (!K) throw new Error("Krbn has not loaded yet -- its parsers are what read OBJ/STL here");
+      const data = ext === "obj" ? await src.text() : await src.arrayBuffer();
+      m = ext === "obj" ? K.parseOBJ(data) : K.parseSTL(data);
+    } else if (ext === "glb" || ext === "gltf") {
+      // both imported lazily, on the click that needs them: three.module.js is ~1.2MB and this page's other
+      // three scenes are zero -- nobody who never opens a glTF should pay for it
+      const [{ GLTFLoader }, THREE] = await Promise.all([
+        import("./vendor/three/jsm/loaders/GLTFLoader.js"),
+        import("three"),
+      ]);
+      const buf = await src.arrayBuffer();
+      const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
+      const positions = [], triangles = [];
+      let skinned = false;
+      gltf.scene.updateMatrixWorld(true);
+      gltf.scene.traverse((o) => {
+        if (o.isSkinnedMesh) skinned = true;
+        if (!o.isMesh || !o.geometry) return;
+        const g3 = o.geometry, pos = g3.getAttribute("position");
+        if (!pos) return;
+        const off = positions.length, v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); positions.push([v.x, v.y, v.z]); }
+        const idx = g3.getIndex();
+        if (idx) for (let i = 0; i + 2 < idx.count; i += 3) triangles.push([off + idx.getX(i), off + idx.getX(i+1), off + idx.getX(i+2)]);
+        else for (let i = 0; i + 2 < pos.count; i += 3) triangles.push([off + i, off + i + 1, off + i + 2]);
+      });
+      if (!positions.length) throw new Error("no mesh geometry found in that glTF");
+      m = { positions, triangles, skinned };
+    } else throw new Error("unsupported extension ." + ext + " -- expected .glb, .gltf, .obj or .stl");
+    if (!m.positions.length || !m.triangles.length) throw new Error("parsed to an empty mesh (0 vertices or 0 triangles)");
+  } catch (e) {
+    status.textContent = "Could not load " + src.name + ": " + (e && e.message ? e.message : e);
+    return;
+  }
+  loadedMesh = m; loadedName = src.name;
+  // reloading over an existing "loaded" scene keeps the same sceneName, so the Krbn caches (keyed on it)
+  // must be dropped by hand here -- see setScene's note
+  // ...and the WebGL side caches its uploaded buffers on the SAME key, so it needs the SAME invalidation:
+  // loading a second file left the left pane still rendering the first one while the right pane drew the new
+  // geometry -- a compare page showing two different models side by side and labelling them the same thing.
+  // Caught by loading a sphere over a robot and seeing the robot stay put.
+  krbnScene = null; krbnSceneFor = null; krbnImg = null; krbnImgFor = null; krbnLastEye = null; krbnLoadErr = null;
+  glMeshName = null;
+  // A PRESET KEEPS ITS OWN NAME IN THE PICKER. Only a hand-picked file needs the synthetic "loaded file"
+  // entry; snapping the dropdown to it after clicking "RobotExpressive" would answer the click by forgetting
+  // what was clicked, and re-picking that preset would then be a no-change event that fires nothing.
+  const keep = elScene.value.startsWith("url:");
+  if (!keep) {
+    if (![...elScene.options].some((o) => o.value === "loaded")) elScene.add(new Option("loaded file", "loaded"));
+    elScene.value = "loaded";
+  }
+  setScene("loaded");
+  // *** A SKINNED glTF IS REPORTED, NOT SILENTLY DRAWN WRONG. *** GLTFLoader.parse gives the BIND POSE and
+  // this page applies no skinning, so a rigged character arrives as its unposed parts -- measured on the
+  // tree's own RobotExpressive.glb: 0.066 x 0.026 x 0.017 units, limbs splayed, which renders as a heap of
+  // shapes rather than a figure. That is v4033's finding in avatarStage.js reached from the other side, and
+  // a reader who is not told will read it as a broken importer instead of an unposed rig.
+  const skinned = m.skinned ? " *** this is a SKINNED model and no skinning pass runs here, so you are seeing its BIND POSE, not the posed figure. ***" : "";
+  status.textContent = "Loaded " + src.name + " -- " + m.positions.length + " vertices, " + m.triangles.length +
+    " triangles. Krbn draws it as a triangle mesh (hatch needs closed silhouette loops, so an open/shell model outlines but does not shade)." + skinned;
+  render();
+}
+
+elFile.onchange = () => {
+  const f = elFile.files && elFile.files[0];
+  if (!f) return;
+  elFile.value = "";                                    // so re-picking the SAME file fires change again
+  loadModel(f);                                          // a File already IS {name, text, arrayBuffer}
+};
+
+// A preset/favourite: fetch it and hand the Response straight to the same loader. A 404 (a starred avatar
+// whose GLB has since moved) is REPORTED against its URL rather than leaving the picker on a scene it never
+// managed to load -- the favourites list is not this page's to prune, so a dead entry stays visible and says
+// what happened instead of silently doing nothing.
+async function loadPresetUrl(url) {
+  const name = url.split("/").pop() || url;
+  status.textContent = "Fetching " + name + "…";
+  let r;
+  try { r = await fetch(url); } catch (e) { status.textContent = "Could not fetch " + url + ": " + e.message; return; }
+  if (!r.ok) { status.textContent = "Could not fetch " + url + " -- HTTP " + r.status; return; }
+  await loadModel({ name, text: () => r.clone().text(), arrayBuffer: () => r.clone().arrayBuffer() });
+}
 
 // EXPORT: lift the current drawing to 3D polylines and download as OBJ
 elX.onclick = () => {
@@ -206,6 +500,17 @@ elX.onclick = () => {
 const glOK = tryInitGL();
 status.textContent = (glOK ? "WebGL2 render active" : "canvas-2D render (WebGL unavailable -- using fallback)") + " -- scene: blob, " + mesh.positions.length + " vertices, " + mesh.triangles.length + " triangles.";
 render();
+
+// v4042 -- LOAD KRBN ITSELF. Deliberately AFTER the first render() so the page paints its left side and its
+// "rendering real Krbn frame..." note immediately rather than sitting blank behind a module fetch, and
+// deliberately with NO WIREFRAME FALLBACK: krbn.html's own v2597 rule is that a page which quietly draws
+// something else when its subject is missing is lying about what it is showing -- which is exactly the bug
+// this version fixes, so re-introducing it as an error path would undo the fix in the failure case.
+(async function bootKrbn() {
+  try { K = await import("/vendor/krbn/index.js"); }
+  catch (e) { krbnLoadErr = e.message + " -- expected /vendor/krbn/index.js"; render(); return; }
+  render();   // K is live now: drawKrbnSide's next pass requests the first real frame
+})();
 </script>
 </body>
 </html>

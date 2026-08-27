@@ -139,3 +139,61 @@ export function ragdollMesh() {
 
 export const SCENES = { blob: blobMesh, splat: splatMesh, ragdoll: ragdollMesh, flesh: () => fleshMesh() };
 export function sceneMesh(name) { const f = SCENES[name] || SCENES.blob; return f(); }
+
+// --- KRBN-NATIVE SCENE BUILDERS ------------------------------------------------------------------------
+//
+// v4042 -- Keith: "the Krbn - Flat drawing render on the right side does not actually show a krbn
+// render/pencil marks, but just wireframe... when you generated the render pic for github, that was krbn."
+//
+// *** THE MESHES ABOVE CANNOT PRODUCE THE PICTURE HE IS HOLDING, AND THE REASON IS STRUCTURAL RATHER THAN
+// COSMETIC. *** MEASURED, feeding ragdollMesh() to K.Mesh and rendering: 382 crease strokes, 19 boundary,
+// *** ZERO silhouettes and ZERO hatch. *** cylinderMesh() above emits only the side wall -- no end caps --
+// so every tube is an OPEN surface. Krbn's Mesh.hatchRegions() fills CLOSED silhouette loops, an open
+// surface has none, and hatch is what a pencil drawing IS. The blob (a marched voxel field, genuinely
+// closed) does emit 46 silhouettes and hatches fine, which is why this went unnoticed: one of the four
+// scenes worked.
+//
+// AND THE REFERENCE PICTURE'S OWN SOURCE SAYS SO. portfolio/krbn/swek-ragdoll.krbn.ts -- the scene that
+// produced swek-ragdoll-pencil.svg -- never builds a mesh at all: it is `new Cylinder(base, axis, r)` and
+// `sphere(centre, r)`, Krbn's ANALYTIC primitives, whose exact curved direction fields are what draw the
+// rings around a limb and the latitude/longitude on the head. A triangulated copy of a cylinder is not a
+// cylinder to a renderer that hatches along the real surface's own parameterisation.
+//
+// So the Krbn side builds from THE SAME PRIMITIVES THE .krbn.ts SCENES USE, with the numbers below copied
+// from those files rather than re-derived -- and the mesh builders above stay exactly as they are, because
+// the WebGL side genuinely does render a triangle mesh and the compare is honest about that: the left pane
+// is our triangulated approximation, the right is Krbn's analytic original. blob and flesh have no
+// primitive form (they are marched fields, closed, and hatch correctly as meshes) so they stay K.Mesh --
+// KRBN_NATIVE is deliberately partial, and krbn-compare.html falls back to K.Mesh for anything absent
+// rather than pretending every scene has an analytic twin.
+export const KRBN_NATIVE = {
+    // swek-ragdoll.krbn.ts, bone for bone.
+    ragdoll(K, scene) {
+        const P = (x, y, z) => [x, z, y - 6.3];
+        scene.add(new K.Cylinder(P(0, 5.8, 0), [0, 0, 0.92], 0.3)).style({ wobble: 0.32, hatch: { mode: "cross", angle: 22 } });
+        scene.add(K.sphere(P(0, 7.32, 0), 0.245)).style({ wobble: 0.3, hatch: { mode: "cross", angle: 35 } });
+        scene.add(new K.Cylinder(P(0, 6.94, 0), [0, 0, 0.2], 0.085)).style({ wobble: 0.28 });
+        for (const s of [-1, 1]) {
+            scene.add(new K.Cylinder(P(s * 0.42, 6.72, 0), [s * 0.62, 0, 0], 0.135)).style({ wobble: 0.3, hatch: { mode: "single", angle: 40 } });
+            scene.add(new K.Cylinder(P(s * 1.06, 6.72, 0), [s * 0.7, 0, 0], 0.105)).style({ wobble: 0.3, hatch: { mode: "single", angle: 40 } });
+            scene.add(K.sphere(P(s * 0.42, 6.72, 0), 0.115)).setImportance(0.85, { role: "focus" });
+            scene.add(K.sphere(P(s * 1.06, 6.72, 0), 0.09)).setImportance(0.85, { role: "focus" });
+            scene.add(new K.Cylinder(P(s * 0.22, 5.76, 0), [0, 0, -0.84], 0.155)).style({ wobble: 0.3, hatch: { mode: "single", angle: 65 } });
+            scene.add(new K.Cylinder(P(s * 0.22, 4.88, 0), [0, 0, -0.84], 0.125)).style({ wobble: 0.3, hatch: { mode: "single", angle: 65 } });
+            scene.add(K.sphere(P(s * 0.22, 5.76, 0), 0.125)).setImportance(0.85, { role: "focus" });
+            scene.add(K.sphere(P(s * 0.22, 4.88, 0), 0.1)).setImportance(0.85, { role: "focus" });
+        }
+    },
+    // swek-splat.krbn.ts -- same LCG, same seed, same ellipsoids splatMesh() triangulates above.
+    splat(K, scene) {
+        let s = 20250716; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+        const N = 44;
+        for (let i = 0; i < N; i++) {
+            const core = i < N * 0.55, r = core ? 1.5 : 3.0;
+            const th = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1), rad = r * Math.cbrt(rnd());
+            const c = [rad * Math.sin(ph) * Math.cos(th), rad * Math.sin(ph) * Math.sin(th), rad * Math.cos(ph) * 0.62];
+            const radii = [0.30 + rnd() * (core ? 0.34 : 0.20), 0.22 + rnd() * (core ? 0.30 : 0.16), 0.16 + rnd() * (core ? 0.24 : 0.13)];
+            scene.add(K.ellipsoid(c, radii, `splat-${i}`)).style({ wobble: 0.34, hatch: { mode: core ? "cross" : "single", angle: 18 + (i % 5) * 11 } });
+        }
+    },
+};
