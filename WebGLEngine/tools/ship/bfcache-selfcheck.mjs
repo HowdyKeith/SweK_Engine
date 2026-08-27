@@ -52,12 +52,40 @@ function walkHtml(dir, out = []) {
         if (!/pagehide/.test(src)) continue;
         const code = noComments(src);   // KEEPS strings: "pagehide" is one
         // a pagehide handler that disposes/closes/terminates must check persisted
-        const destructive = /pagehide[\s\S]{0,400}?(dispose|close|terminate|loseContext|abort)\s*\(/.test(code);
+        // v4073 -- *** THE VERB LIST WAS THE BLIND SPOT, AND krbn-avatar.html WALKED THROUGH IT. *** Its
+        // handler was `pagehide -> { dead = true; clearInterval(timer); }`: a restored page frozen at dead
+        // with no timer and nothing to restart it -- the SAME dead-page-that-looks-broken this gate exists
+        // for -- reached without using a single one of the five verbs above, so it passed while its ascii
+        // sibling failed on the identical defect. STOPPING THE CLOCK IS AS DESTRUCTIVE AS RELEASING THE
+        // CONTEXT when nothing restarts it. Measured when the list was widened: it flagged exactly the three
+        // real cases (ascii-avatar, krbn-avatar, asteroids) and nothing else in the six pages that carry a
+        // pagehide handler at all -- so this is a widening onto real defects, not a net cast for noise.
+        const destructive = /pagehide[\s\S]{0,400}?(dispose|close|terminate|loseContext|abort|clearInterval|clearTimeout|cancelAnimationFrame)\s*\(/.test(code);
         const guarded = /pagehide[\s\S]{0,200}?persisted/.test(code);
         if (destructive && !guarded) bad.push(path.relative(ENG, p).split(path.sep).join("/"));
     }
     ok("!! NO PAGE TEARS THINGS DOWN ON pagehide WITHOUT CHECKING event.persisted", bad.length === 0,
         bad.length ? bad.join(", ") : "entering bfcache is PAUSED, not GONE -- releasing there leaves a restored page dead");
+
+    // v4073 -- *** AND A GUARD ON A PAGE THAT CANNOT ENTER bfcache IS A GREEN CHECK OVER A CODE PATH NO
+    // BROWSER REACHES. *** An `unload` listener makes a document ineligible for the back-forward cache, so
+    // ascii-avatar.html and krbn-avatar.html -- which carried one on the line directly below their pagehide
+    // handler -- would have been cached never, guard or no guard, and fixing only the pagehide would have
+    // bought a passing gate and no behaviour change at all. Nothing is lost by dropping it: pagehide fires in
+    // every case unload does, unload is deprecated and does not fire reliably on mobile, and the two pages
+    // that own GL contexts (checked in section 2) have never had one.
+    const unloaders = [];
+    for (const p of walkHtml(ENG)) {
+        const code = noComments(fs.readFileSync(p, "utf8"));
+        if (/addEventListener\s*\(\s*["']unload["']/.test(code))
+            unloaders.push(path.relative(ENG, p).split(path.sep).join("/"));
+    }
+    ok("!! ...and NO page registers an `unload` listener, which would make the guard unreachable",
+        unloaders.length === 0,
+        unloaders.length ? unloaders.join(", ") + " -- an unload handler makes the page bfcache-INELIGIBLE, so " +
+            "the persisted guard above can never once be exercised there"
+        : "so every persisted guard in the tree is on a page that can actually be frozen -- the guard and the " +
+          "eligibility are one claim, and checking only the guard is how a cosmetic fix passes");
 }
 
 // 2. the two pages that own GL contexts release on a real unload and rebuild on a restore

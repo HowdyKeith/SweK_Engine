@@ -85,11 +85,31 @@ const store = (() => { const m = {}; return { getItem: (k) => (k in m ? m[k] : n
     ok("!! promoted favourites join the rotation and it still wraps",
        allModes().length === base + 1 && nextMode("fav0") === "svg",
        allModes().map((m) => m.id).join(" -> "));
-    ok("...and the five base modes are unchanged",
-       allModes().slice(0, base).map((m) => m.id).join(",") === "svg,rigged,blob,blobgpu,thead",
-       "favourites are appended, so a stray click still lands on the cheap default first");
+    // v4072 -- *** THIS ASSERTED THE ROSTER BY NAME AND IT WAS A SECOND DECLARATION OF SOMEBODY ELSE'S FACT. ***
+    // It read `=== "svg,rigged,blob,blobgpu,thead"`, a hand-typed copy of MODES made when there were five of
+    // them. avatarSwitch-selfcheck OWNS that roster and freezes it deliberately (ten ids, in order, with the
+    // reasoning for the order beside it) -- and that one has been kept current through every addition, while
+    // THIS copy fell behind at v4033 and stayed behind through v4046, v4050 and gauges3000. The original was
+    // maintained; the copy rotted, which is the entire argument against the second declaration. THE GATE HAS
+    // BEEN RED SINCE v4033 AND THE REDNESS WAS NOT THE FINDING -- the finding is that a favourites gate had an
+    // opinion about the avatar roster at all.
+    //
+    // What this check is actually for is in its own message: favourites are APPENDED, so the base list is
+    // undisturbed and a stray click still lands on the cheap default. Both halves are properties, and both are
+    // now DERIVED from MODES, so adding an eleventh avatar cannot redden this file again. It is compared BY
+    // OBJECT IDENTITY rather than by id, which is strictly stronger: a mutation that kept the ids and swapped a
+    // src would pass a join and fails this.
+    ok("...and the base modes are unchanged -- compared against MODES itself, not a copy of its names",
+       allModes().slice(0, base).every((m, i) => m === MODES[i]),
+       base + " base modes, identical objects in the same order. avatarSwitch-selfcheck is where the roster is " +
+       "frozen BY NAME; naming it here too was a second declaration, and it is the copy that went stale");
+    ok("!! ...and the cheap default is still the one a stray click lands on",
+       allModes()[0] === MODES[0] && !MODES[0].heavy && !MODES[0].needs && !MODES[0].needsWebGPU,
+       "MODES[0] is `" + MODES[0].id + "`, kind " + MODES[0].kind + ", with no download, no asset and no " +
+       "capability requirement -- THAT is what 'cheap default first' means, and it is checked rather than " +
+       "implied by a name. A favourite promoted to the front, or a heavy mode moved there, fails this");
     setExtraModes([]);
-    ok("clearing the favourites returns the rotation to the base five",
+    ok("clearing the favourites returns the rotation to the base modes",
        allModes().length === base);
 }
 

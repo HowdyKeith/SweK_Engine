@@ -127,8 +127,15 @@ const { fail, report } = partition(all);
                              .map((k) => k + (k in base ? " (" + base[k] + " -> " + tally[k] + ")" : " (NEW)"));
         ok("!! no NEW reported boundary tell has appeared",
             added.length === 0,
+            // v4073 -- *** THIS PRINTED `added.slice(0, 4)` AND THE DRIFT WAS ELEVEN. *** The header two
+            // screens up says a baseline is A LIST AND NOT A COUNT because "a count cannot name a newcomer" --
+            // and then the failure named four newcomers out of eleven and gave no hint the other seven
+            // existed. Reading the four on offer (three KILL_NOT_VERIFIED and one JSON body) suggested the
+            // bridges had drifted; the full eleven show something different and more useful, that EIGHT of
+            // them are UNCHECKED_JSON_BODY in browser PAGES. A truncated list is a count wearing a list's
+            // clothes, and it pointed at the wrong half of the tree.
             current.length + " sites against a baseline of " + Object.keys(base).length +
-            (added.length ? "; NEW: " + added.slice(0, 4).join(", ") : "") +
+            (added.length ? "; NEW (" + added.length + "): " + added.join(", ") : "") +
             ". Counted every run since v3103 and never compared until now -- so a rule could have doubled " +
             "quietly, and establishing that it had NOT took walking four shipped zips");
         const goneNow = Object.keys(base).filter((k) => !(k in tally) || tally[k] < base[k]);

@@ -8,6 +8,123 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4073 -- Keith swept the gate suite, and half of what went red was the gates
+
+Keith ran the selfcheck suite by hand and sent six failures in a row. **Three of the six were gates pointing at
+the wrong file or the wrong shape** -- they went red on a refactor, or on where somebody put a newline, not on a
+regression. The other three were real, and two of those hid a second defect behind the first.
+
+These are batched into one version rather than six: they came out of one sweep, and a version bump per gate
+would say six things happened when one did.
+
+*(`verify.mjs` was green through all of this and that is not a contradiction: it is the fast per-ship gate by
+design, and these live in the slow ~1207-gate suite that is run separately. Checked rather than assumed.)*
+
+### avatarFavorites -- the roster asserted by name, which was somebody else's fact
+
+The check read `=== "svg,rigged,blob,blobgpu,thead"`, a hand-typed copy of `MODES` made when there were five of
+them. **`avatarSwitch-selfcheck` owns that roster**, freezes it deliberately with the reasoning for its order
+written beside it, and has been kept current through every addition. This copy fell behind at **v4033**
+(`stickwoman`, `robotexpressive2`) and stayed behind through **v4046** (`krbn`), **v4050** (`ascii`) and
+`gauges3000`. **The original was maintained and the copy rotted, which is the whole argument against the second
+declaration, played out over forty versions of a gate nobody was reading.**
+
+What the check is for was already in its own message -- *favourites are appended, so a stray click still lands on
+the cheap default* -- and both halves are properties, so both are derived from `MODES` now. The base prefix is
+compared **by object identity**, and "cheap default" is checked as what it *means* (`MODES[0]` carries no
+`heavy`, no `needs`, no `needsWebGPU`) rather than by naming `svg`, which would be the same second declaration
+one level down.
+
+Three sabotages bite. The third is **shown, not claimed**: the old join-based shape was run against an
+id-preserving `{...m}` copy and **passes** -- it misses the mutation even with the roster string made current --
+while the identity comparison fails.
+
+### browserSafety -- a false positive, and the two physics modules were innocent
+
+The rig flagged `structureFactor.mjs [243, 245]` and `powder.mjs [230, 232]`. **All four lines are correctly
+guarded.** Their guard spans two lines, so the opening `{` lands on the second -- and the detector set
+`guardDepth`, counted no brace, and then **closed the guard on the same line it opened it**, because
+`depth <= guardDepth` was already true. Everything after read as unguarded.
+
+Measured in isolation before the fix: the shipped detector returned `["3: process","4: process"]` on a two-line
+guard and `[]` on the identical one-line spelling. A guard is now **pending** from the line that opens it until
+the brace that opens its block, and only a guard that actually opened can close.
+
+v4000 wrote in this same file that *"a gate that only recognises the idiom its author happened to write is a
+style rule wearing a safety rule's clothes."* This was that again, about **where the author happened to put a
+newline** -- and the cost is the one the header already names: two innocent modules reported unsafe in a gate
+whose whole value is that somebody believes it at 2am. The positive control it had was one line long, which is
+why it never caught this; there is a multi-line one now, plus a check that the widening bought **no false pass**
+(the body of an inverted guard is still caught).
+
+### bfcache -- real, and the obvious fix would have been cosmetic
+
+`ascii-avatar.html` disposed its GL context and model on `pagehide` with no `persisted` guard, so a
+back-navigation returned a page with `dead = true`, no renderer and no model. That is v3052's exact finding
+reintroduced at v4050.
+
+**But guarding alone would have changed nothing.** The line directly below registered an `unload` listener, and
+an unload handler makes a page **ineligible for bfcache** -- so the page would never be cached, and the new guard
+would have been a green check over a code path no browser reaches. Both are gone; `pagehide` fires in every case
+`unload` does. The gate now checks that **no page in the tree registers `unload` at all**, because the guard and
+the eligibility are one claim and checking only the guard is how a cosmetic fix passes.
+
+None of these pages holds a socket, so a freeze breaks nothing by itself and there is nothing to rebuild: **not
+tearing down is the entire fix.** `raymarch-live` and `volume-cache` reload on `pageshow` because bfcache severs
+websockets and theirs is gone on restore; copying that reload here would be borrowing a remedy for an ailment
+these pages do not have.
+
+**And fixing it meant reading the sibling, which had the same defect in a form the detector could not see.**
+`krbn-avatar.html` did `pagehide -> { dead = true; clearInterval(timer); }` -- the same dead-page-that-looks-broken,
+reached without one of the five verbs the scan greps for, so it passed while its sibling failed. `asteroids.html`
+made it three, cancelling a rAF the browser would have resumed. **Stopping the clock is as destructive as
+releasing the context when nothing restarts it.** Measured when the verb list was widened: it flags exactly those
+three and nothing else among the six pages that carry a `pagehide` handler at all.
+
+### boundaryLint -- the failure showed four newcomers and there were eleven
+
+`added.slice(0, 4)`. The file's own header says a baseline is **a list and not a count** because *"a count cannot
+name a newcomer"* -- and then it named four of eleven with no hint the other seven existed. **The truncation
+pointed at the wrong half of the tree:** the four on offer were three `KILL_NOT_VERIFIED` and one JSON body,
+which reads as bridge drift; the full eleven show that **eight are `UNCHECKED_JSON_BODY` in browser pages.**
+
+Reading all eleven turned up one real defect, in `sysadminBridge`. `awakeProc.kill(); awakeProc = null` --
+**and the line above the spawn already registers `awakeProc.on("exit", () => { awakeProc = null; })`**, which is
+this tree's own remedy for exactly this rule: `kill()` sends a signal, and the exit event is what says it landed.
+The eager null fired **first**, so the handle was gone before the listener could use it, and `keepAwakeState()`
+then reported `awake: false` off `!!awakeProc` while a PowerShell loop that ignored the signal was still holding
+the machine awake. **The report was derived from the variable rather than from the process.** Dropping the eager
+null costs nothing and makes `awake` mean what it says.
+
+The baseline is re-frozen deliberately at 84 sites / 229 tells, from 79 / 199. **What that re-freeze does and does
+not rest on, stated rather than implied:** all eleven new *sites* were read individually; the growth in tell
+*counts* inside already-known sites was accepted on the rule's own published policy (`UNCHECKED_JSON_BODY` is
+report-severity because letting a `.json()` throw on an error page is a legitimate design) rather than line by
+line. The `sysadminBridge` fix is a correctness fix and **does not reduce its count** -- the rule asks whether a
+kill's effect is re-checked, and that is still not what happens there.
+
+### buildName -- the check read server.js and the code left at v4012
+
+`/self/zip` stopped choosing a zip itself and started delegating to `packagerBridge.selfZipCandidate()`. The
+check kept reading the old address.
+
+**And the letter of the old assertion was no longer the right thing to ask.** It required the failure message to
+name both filename patterns, which was right while the pattern was the discriminator; since v4012 `parseBuildZip`
+accepts both spellings and the filter is on the **version**, so naming the patterns would say the patterns were
+why nothing matched when the reason is the number. The check's stated *reason* -- *"'no zip found' without saying
+what it looked for"* -- is about the diagnosis, so it is re-pointed at what a diagnosis needs now: where it
+looked, which spellings it accepts, and **what it actually saw there**. The message had none of the last and now
+carries all three. *"I wanted v4073 and Downloads holds v4070"* is a diagnosis; *"no zip found"* is a shrug.
+
+### budgetEvidence -- ten gates with no evidence, three of them mine
+
+`realTerrainFlyIn` (v4061), `adaptiveKnob` (v4066) and `physicsAi` (v4067) shipped without a recorded runtime,
+which is my debt in a wall built precisely so that *"never run" cannot hide behind "fast"*. All ten were timed
+rather than estimated, and every one **completes and passes**. `physicsAi` at 0.9 s is also the receipt on
+v4067's uncleared-timer bug: that gate used to sit at 60.8 s holding the event loop open.
+
+`verify.mjs` is green across 1207 gates.
+
 ## Since v4072 -- the sweep found no dead knobs; it found three scans that could not see
 
 Keith's patch, and another dead-knob sweep across **118 of 129 devices**. **It found zero still knobs that were

@@ -116,7 +116,10 @@ function draw(){
 let raf;
 function loop(){ update(); draw(); raf=requestAnimationFrame(loop); }
 loop();
-window.addEventListener("pagehide", ()=>{ if(raf) cancelAnimationFrame(raf); });
+// v4073 -- cancelling the rAF on a bfcache freeze left a restored page as a static canvas: the browser FREEZES
+// a pending rAF and resumes it, but it cannot resume one that was cancelled. Nothing else here needs tearing
+// down and there is no socket, so the guard is the whole fix -- on a restore the loop simply carries on.
+window.addEventListener("pagehide", (e)=>{ if(e.persisted) return; if(raf) cancelAnimationFrame(raf); });
 </script>
 <!-- demo chrome (self-mount; idempotent) -->
 <script type="module" src="/ui/demoChrome.js"></script>

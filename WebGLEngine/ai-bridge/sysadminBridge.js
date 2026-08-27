@@ -254,7 +254,16 @@ function keepAwake(on){
         log("keep-awake ON (system sleep prevented)");
         return { ok: true, awake: true, note: "system sleep prevented while the bridge runs" };
     }
-    if (awakeProc){ try { awakeProc.kill(); } catch {} awakeProc = null; }
+    // v4073 -- *** THE EAGER NULL PRE-EMPTED THE ONE THING THAT KNEW THE TRUTH. *** The spawn above already
+    // registers `awakeProc.on("exit", () => { awakeProc = null; })`, which is the tree's own remedy for
+    // KILL_NOT_VERIFIED: kill() SENDS a signal, and the exit event is what says it landed. Nulling the handle
+    // here fired FIRST, so the handle was gone before the listener could use it -- and keepAwakeState() then
+    // reported `awake: false` off `!!awakeProc` while a PowerShell loop that ignored the signal was still
+    // holding the machine awake. The report was derived from the variable rather than from the process.
+    // Dropping the eager null costs nothing and makes `awake` mean what it says: it stays true until the child
+    // actually exits. If the kill does not land, "still awake" is the correct answer, and the early return at
+    // the top of this function refusing to re-arm is then also correct rather than a stuck state.
+    if (awakeProc){ try { awakeProc.kill(); } catch {} }
     cfg.keepAwake = false; saveCfg();
     log("keep-awake OFF");
     return { ok: true, awake: false, note: "normal sleep restored" };
@@ -1069,7 +1078,10 @@ function start(){
         }, 90000);
     }
 }
-function stop(){ if (awakeProc){ try { awakeProc.kill(); } catch {} awakeProc = null; } if (updTimer){ clearInterval(updTimer); updTimer = null; } }
+// v4073 -- same as setKeepAwake: the exit listener nulls awakeProc when the child really goes, so nulling it
+// here would only hide a kill that did not land. updTimer is a timer rather than a process -- clearInterval
+// cannot fail and there is nothing to verify -- so that one is nulled exactly as before.
+function stop(){ if (awakeProc){ try { awakeProc.kill(); } catch {} } if (updTimer){ clearInterval(updTimer); updTimer = null; } }
 
 // ───────────────────────── (4) FLEET PROPAGATION ─────────────────────────
 // v1499 — let an updated machine hand its new EngineProject_vNNN.zip to peers, so the whole

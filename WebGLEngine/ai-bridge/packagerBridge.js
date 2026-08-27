@@ -328,13 +328,37 @@ async function selfZipCandidate({ dlDir, liveVersion } = {}) {
     const home = os.homedir();
     const dir = dlDir || (home ? path.join(home, "Downloads") : null);
     let best = null;
+    const seen = [];   // v4073 -- what WAS in the folder, so a miss can say more than "not found"
     if (dir) {
         let files = []; try { files = fs.readdirSync(dir); } catch {}
-        for (const f of files) { const p2 = buildName.parseBuildZip(f); if (p2 && p2.version === liveNum) best = { path: path.join(dir, f), name: f, version: p2.version }; }
+        for (const f of files) {
+            const p2 = buildName.parseBuildZip(f);
+            if (!p2) continue;
+            seen.push(f);
+            if (p2.version === liveNum) best = { path: path.join(dir, f), name: f, version: p2.version };
+        }
     }
     if (best) return { ok: true, path: best.path, name: best.name, version: best.version, built: false };
     const built = await makeInstallable({});
-    if (!built.ok) return { ok: false, error: "no Downloads zip matches the running build (v" + liveNum + ") and building one fresh failed: " + built.error };
+    // v4073 -- *** THE ERROR SAID WHAT IT WANTED AND NEVER WHAT IT LOOKED AT. *** buildName-selfcheck asserted
+    // that this 404 "names BOTH patterns", with the reason "'no zip found' without saying what it looked for is
+    // how this went unnoticed for 143 versions" -- and it asserted it against server.js, where the message used
+    // to live. v4012 moved the whole decision here and the check kept reading the old address, so it went red
+    // on a refactor rather than on a regression. Re-pointed at this file in the same commit.
+    //
+    // AND THE LETTER OF IT WAS THE WRONG FIX ANYWAY. Since v4012 the FILENAME PATTERN IS NO LONGER THE
+    // DISCRIMINATOR -- parseBuildZip accepts both spellings and the filter is on VERSION -- so naming the two
+    // patterns would imply the patterns were why nothing matched when the reason is the number. What the
+    // check's stated reason actually asks for is WHERE it looked and WHAT IT SAW, so that is what this says:
+    // the directory, the accepted spellings (SweK_Engine_vNNNN.zip and legacy EngineProject_vNNN.zip), and the
+    // build zips that were really sitting there. "I wanted v4073 and Downloads holds v4070" is a diagnosis; "no
+    // zip found" is a shrug.
+    const looked = "looked in " + (dir || "(no home directory)") + " for SweK_Engine_vNNNN.zip or legacy " +
+        "EngineProject_vNNN.zip at v" + liveNum + "; " +
+        (seen.length ? "found " + seen.length + " build zip(s) there, none at that version: " + seen.slice(0, 8).join(", ") +
+            (seen.length > 8 ? ", ..." : "")
+         : "no build zip of either name was there at all");
+    if (!built.ok) return { ok: false, error: "no Downloads zip matches the running build (v" + liveNum + ") and building one fresh failed: " + built.error + " -- " + looked };
     return { ok: true, path: built.path, name: path.basename(built.path), version: built.version, built: true };
 }
 

@@ -91,9 +91,29 @@ const read = (rel) => fs.readFileSync(path.join(ENG, rel), "utf8");
 
 // ---- 5. the download route says what it looked for ---------------------------------------------------------------
 {
-    const server = read("ai-bridge/server.js");
-    ok("a 404 from /self/zip names BOTH patterns", /SweK_Engine_vNNNN\.zip.*EngineProject/.test(server),
-       "'no zip found' without saying what it looked for is how this went unnoticed for 143 versions");
+    // v4073 -- *** THIS READ server.js AND THE CODE LEFT AT v4012. *** The /self/zip route stopped choosing a
+    // zip itself and started delegating to packagerBridge.selfZipCandidate(), which is where the failure
+    // message now lives; the check kept reading the old address and went red on a REFACTOR rather than on a
+    // regression. Exactly what avatarFavorites did in this same round, one file over.
+    //
+    // AND THE LETTER OF THE OLD ASSERTION WAS NO LONGER THE RIGHT THING TO ASK. It required the message to name
+    // BOTH FILENAME PATTERNS, which was the right demand while the pattern was the discriminator. Since v4012
+    // parseBuildZip accepts both spellings and the filter is on the VERSION, so naming the patterns would say
+    // the patterns were why nothing matched when the reason is the number. The check's stated REASON -- "'no
+    // zip found' without saying what it looked for" -- is about the diagnosis, not the wording, so it is
+    // re-pointed at what a diagnosis needs now: WHERE it looked, WHAT SPELLINGS it accepts, and WHAT IT
+    // ACTUALLY SAW there. The message gained the last of those three in the same commit; it had neither of the
+    // first two before.
+    const pkg = read("ai-bridge/packagerBridge.js");
+    ok("a /self/zip failure says where it looked, which spellings it accepts, and what it found",
+       /looked in/.test(pkg) && /SweK_Engine_vNNNN\.zip/.test(pkg) && /EngineProject_vNNN\.zip/.test(pkg) &&
+       /found " \+ seen\.length \+ " build zip\(s\)/.test(pkg),
+       "'no zip found' without saying what it looked for is how this went unnoticed for 143 versions. " +
+       "'I wanted v4073 and Downloads holds v4070' is a diagnosis; 'no zip found' is a shrug.");
+    ok("...and server.js no longer carries that message itself, so there is ONE place it can rot",
+       !/SweK_Engine_vNNNN\.zip[\s\S]{0,200}EngineProject/.test(read("ai-bridge/server.js")),
+       "the route delegates to packagerBridge; a second copy here is the second declaration this tree keeps " +
+       "deleting, and it is what made this check read the wrong file for sixty-one versions");
 }
 
 console.log(fails ? "\nbuildName-selfcheck: " + fails + " FAILED" : "\nbuildName-selfcheck: all checks pass");
