@@ -196,6 +196,41 @@ console.log("\n3d. *** v4031 -- AN OBSERVABLE THAT IS THE KNOB HANDED BACK IS AN
         "kept -- the rule discards a pass-through, not a knob.");
 }
 
+console.log("\n3e. *** v4032 -- THE BUDGET IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS ***");
+{
+    // The guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran unbounded once entered.
+    // optics is what showed it: its `converge` mode costs 7200/F Simpson evaluations, the shipped default is
+    // already 3.5 s, and the near ladder's 8x rung on lambda is 1.85e9 evaluations. It was never hanging; it
+    // was finishing, at a cost the survey could not see coming, and it produced NO COMPLETED ROW all session.
+    const slow = {
+        modes: ["only"], observables: ["v"],
+        build: async ({ config = {} } = {}) => {
+            const end = Date.now() + 120;                 // every build costs the same; three exceed the budget
+            while (Date.now() < end) { /* synchronous, exactly like a real one */ }
+            return { v: config.n };
+        },
+    };
+    const cfg = { n: 4 };
+    const base = await slow.build({ mode: "only", config: cfg });
+    const cut = await probeKnob(slow, "only", cfg, "n", base, {}, Date.now() + 150);
+    ok("!! *** A LADDER THAT RUNS OUT OF BUDGET MID-CLIMB SAYS SO, RATHER THAN SAYING 'STILL' ***",
+        cut.state === "budget-cut",
+        "state " + cut.state + " after a deadline 150 ms out with 120 ms per build. Before this the three " +
+        "rungs ran to completion whatever the budget said, and a knob whose later rungs were never tried was " +
+        "recorded on the evidence of the ones that were.");
+    const room = await probeKnob(slow, "only", cfg, "n", base, {}, Date.now() + 60000);
+    ok("...and with room it answers normally, so the deadline bounds rather than breaks the probe",
+        room.state === "still",
+        "state " + room.state + " with a minute of headroom. `still` is the CORRECT answer for this fixture " +
+        "and 3d is why -- its one observable is the knob handed back, which is an echo, not a response. The " +
+        "point of the line is that the deadline changes WHEN the probe stops, never WHAT it concludes.");
+    report("*** ONE BUILD IS STILL UNBOUNDED, AND THAT IS STATED RATHER THAN PRETENDED AWAY ***",
+        "a build is synchronous work and nothing here can interrupt one that has started. This turns 3N " +
+        "unbounded builds per knob into at most one, which is what is actually achievable. optics went from " +
+        "producing nothing at all to a complete row -- every knob live, none still -- once it was given a " +
+        "budget it could finish inside.");
+}
+
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
 {
     ok("!! every entry carries a real sentence, not a label",

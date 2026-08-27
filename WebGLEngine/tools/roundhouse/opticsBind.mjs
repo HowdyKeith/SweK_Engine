@@ -26,6 +26,9 @@ export const OPTICS_OBSERVABLES = [
     "slitRms", "slitFirstMinFactor", "slitFirstMinErrFrac",
     "edgeShadowIntensity", "edgeFirstFringe", "edgeFirstFringeV", "edgeFirstFringeExact", "edgeFirstFringeErrFrac",
     "fresnelNumber", "nearFarRms",
+    // v4032 -- the converge mode's Simpson budget, reported so the cost of a configuration is visible BEFORE
+    // it is paid rather than inferred from a stopwatch afterwards.
+    "quadratureEvals",
 ];
 
 // *** v4030 -- `spread` WAS AN ORPHAN, AND ITS VALUE SAYS WHAT IT USED TO BE. *** It sat in DEF, was exposed as
@@ -42,6 +45,7 @@ export const OPTICS_OBSERVABLES = [
 // for a sweep that finds no minimum. Found by knobLiveness: a declared knob that moved no observable at any
 // value, the v4028/v4029 signature for the third time.
 const DEF = { lambda: 500e-6, D: 0.2, a: 0.1, z: 2000, nSamples: 900, spread: null };
+
 
 export function opticsDefaults(hyp) {
     const h = { mode: "airy", ...(hyp || {}) };
@@ -165,9 +169,41 @@ export async function buildOptics(hyp, base = {}) {
     // converge: near-field vs far-field at the chosen distance
     const sp = c.spread ?? (3 * c.lambda / c.a);
     const st = sweep(Math.min(161, c.nSamples), sp);   // a shape comparison needs far fewer points than a fringe hunt
+    out.fresnelNumber = fresnelNumber(c.a, c.lambda, c.z);
+
+    // *** v4032 -- THIS MODE'S COST IS EXACTLY THE RECIPROCAL OF THE NUMBER IT REPORTS, AND NOTHING SAID SO. ***
+    //
+    // fresnelCS integrates cos(pi t^2 / 2) by composite Simpson and sets its step count from the argument:
+    // n = 400 * v^2 for v > 1. That is correct and its own comment argues for it -- the integrand oscillates as
+    // t^2, so a fixed step loses accuracy exactly where the physics is interesting. But the argument here is set
+    // by the sweep, and the arithmetic closes:
+    //
+    //     sweep edge  x = 3*lambda*z/a          v = x*sqrt(2/(lambda z)) = 3*sqrt(2*lambda*z)/a
+    //     so          v^2 = 18*lambda*z/a^2 = 18/F        and       n = 400*v^2 = 7200/F
+    //
+    // EXACTLY, not approximately: F = 0.01 at the defaults and n = 7.2e5, measured. *** THE MODE EXISTS TO PUSH
+    // THE NEAR-FIELD PROPAGATOR TOWARD THE FAR FIELD, WHICH MEANS F -> 0, AND ITS COST IS 1/F. IT GETS MORE
+    // EXPENSIVE PRECISELY AS IT APPROACHES THE LIMIT IT IS TESTING. ***
+    //
+    // The shipped default already costs 2.33e8 Simpson evaluations and 3.5 s per build. knobLiveness probes
+    // lambda at 8x, which is inside the [1e-7, 1e-2] clamp and costs 1.85e9; at the clamp's own maximum it is
+    // 4.64e9, twenty times the default. The census does not hang there, IT FINISHES -- eventually, at a cost
+    // nobody had written down, which is why optics never once produced a completed row in any sweep this
+    // session. A cost that is invisible cannot be budgeted against.
+    //
+    // *** THE COST IS REPORTED AND NOT REFUSED, AND THE FIRST DRAFT OF THIS ROUND GOT THAT BACKWARDS. ***
+    // A ceiling of 1e9 evaluations went in here first, in this file's own refusal idiom, and it REFUSED THE
+    // DEVICE'S OWN KEY: opticsBind-selfcheck section 2 grades the Fraunhofer limit by sweeping z to 20000,
+    // which is F = 1e-3 and 2.32e9 evaluations. The mode is expensive in exactly the direction its key must
+    // travel, so any ceiling low enough to protect a caller is low enough to cut off the physics. A COST
+    // POLICY DOES NOT BELONG INSIDE A PHYSICS DEVICE; what belongs here is the cost, stated, so a caller can
+    // decide BEFORE paying it instead of inferring it from a stopwatch afterwards. The bound is knobLiveness's
+    // (v4032, probeKnob's per-build deadline), because a budget is a property of the survey, not of the optics.
+    const perCall = Math.max(64, Math.ceil(7200 / out.fresnelNumber));
+    out.quadratureEvals = 2 * st.length * perCall;      // two fresnelCS per angle, one per slit edge
+
     const far = slitAnalytic(c.a, c.lambda, st);
     const near = slitFresnelAtAngles(c.a, c.lambda, c.z, st);
-    out.fresnelNumber = fresnelNumber(c.a, c.lambda, c.z);
     out.nearFarRms = profileRms(near, far);
     return out;
 }

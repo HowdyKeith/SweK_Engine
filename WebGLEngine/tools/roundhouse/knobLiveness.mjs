@@ -95,9 +95,22 @@ export function probeValues(v) {
  *   `refused` IS live -- see the header. `moved` names the observables that changed, because a knob that moves
  *   one observable and a knob that moves twenty are different facts about the same yes.
  */
-export async function probeKnob(device, mode, cfg, knob, base, extra = {}) {
+export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadline = Infinity) {
     const def = cfg[knob];
     for (const alt of probeValues(def)) {
+        // *** v4032 -- THE DEADLINE IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS. ***
+        // knobLiveness's budget guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran
+        // unbounded once entered. optics is what showed it: its `converge` mode costs 7200/F Simpson
+        // evaluations, the shipped default is already 3.5 s, and the near ladder's 8x rung on lambda is 1.85e9
+        // evaluations. Three of those per plant state per mode is why optics NEVER PRODUCED A COMPLETED ROW in
+        // any sweep this session -- it was not hanging, it was finishing, at a cost the survey had no way to
+        // see coming.
+        //
+        // *** AND ONE BUILD IS STILL UNBOUNDED, WHICH IS STATED RATHER THAN PRETENDED AWAY. *** A build is
+        // synchronous work; nothing here can interrupt one that has started. This turns 3N unbounded builds
+        // per knob into at most one, which is what is actually achievable, and the row is marked so the
+        // difference between "measured still" and "ran out of time" survives into the report.
+        if (Date.now() > deadline) return { state: "budget-cut", moved: [] };
         let out;
         try { out = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt } }); }
         catch { return { state: "refused", moved: [] }; }
@@ -188,7 +201,21 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
                     }
                     if (a.live.length) continue;                       // already answered yes; the rest is cost
                     a.probed.push(where);
-                    const r = await probeKnob(dev, m, cfg, knob, base, ps.extra);
+                    const r = await probeKnob(dev, m, cfg, knob, base, ps.extra, devStart + budgetMs);
+                    if (r.state === "budget-cut") {
+                        // Not a reading either way: the ladder was cut mid-climb. The knob is recorded as
+                        // PROBED HERE and neither live nor still, which routes the row to incompleteKnobs --
+                        // where a partial measurement belongs.
+                        //
+                        // *** THIS `probed` ENTRY IS NOT BOOKKEEPING AND MUST NOT BE POPPED. *** The first
+                        // draft removed it, reasoning that a rung never tried should not count. But `probed`
+                        // records the MODE AND PLANT STATE, not the rung, and that location WAS entered -- so
+                        // popping it emptied the row, and stillKnobs, insensitiveKnobs, unprobedKnobs and
+                        // incompleteKnobs all filter on a non-empty `probed`. The knob vanished from every
+                        // list the census prints: exactly the defect v4030 fixed for null defaults,
+                        // reintroduced one round later by a different route. Section 3c caught it.
+                        overBudget = true; break;
+                    }
                     if (r.state === "still") a.still.push(where);
                     else { a.live.push(r.state === "refused" ? where + " (refused)" : where); a.movedMost = Math.max(a.movedMost, r.moved.length); }
                 }
