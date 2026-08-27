@@ -96,11 +96,23 @@ export function probeValues(v) {
  *   one observable and a knob that moves twenty are different facts about the same yes.
  */
 export async function probeKnob(device, mode, cfg, knob, base, extra = {}) {
-    for (const alt of probeValues(cfg[knob])) {
+    const def = cfg[knob];
+    for (const alt of probeValues(def)) {
         let out;
         try { out = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt } }); }
         catch { return { state: "refused", moved: [] }; }
-        const moved = Object.keys(base).filter((o) => base[o] !== out[o]);
+        // *** v4031 -- AN OBSERVABLE THAT IS THE KNOB HANDED BACK IS AN ECHO, NOT A RESPONSE. ***
+        // Several binds publish their own config among their observables -- mpmstep does it with `steps` and
+        // `dt`, and this round nearly added `nx` and `ny` to the same list before the census obligingly
+        // reported nx as "live in freefall [1 observables]". The one observable was nx. A knob that reads
+        // live off its own echo is worse than one that reads dead: dead invites a look and live closes the
+        // question, so this census would have certified as answered the exact knob it had just been wrong
+        // about. The rule is narrow on purpose -- an observable counts as an echo ONLY if it equalled the
+        // default before AND equals the probe value after, which is the signature of a pass-through and of
+        // nothing else. A real observable that merely happens to land on the probe value at one rung still
+        // moves at the others.
+        const echo = (o) => Object.is(base[o], def) && Object.is(out[o], alt);
+        const moved = Object.keys(base).filter((o) => !Object.is(base[o], out[o]) && !echo(o));
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };
@@ -137,13 +149,18 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
         // only the BASE build -- one build out of (modes x knobs x values + 1) -- so a device costing 20 s per
         // build passed the guard and then ran unbounded. The cost of a census is what the census DOES, not what
         // its first step costs.
+        // *** v4031 -- WHICH MODES WERE ENTERED IS PART OF THE READING, NOT BOOKKEEPING. *** See the note
+        // below: without this the census could not say WHERE its coverage stopped, only that it had.
         const devStart = Date.now();
         let overBudget = false;
+        const entered = [], declared = new Set();
         for (const mode of modes) {
             if (overBudget) break;
             let def; try { def = dev.defaults({ mode }); } catch { continue; }
             const cfg = (def && def.config) || {};
             const m = (def && def.mode) || mode;
+            entered.push(mode);
+            for (const k of Object.keys(cfg)) declared.add(k);
             for (const ps of PLANT_STATES) {
                 if (overBudget) break;
                 const where = ps.label ? m + "/" + ps.label : m;
@@ -180,9 +197,30 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
         // A device the budget cut short is REPORTED, never counted as clean. A census that silently dropped its
         // slowest members would report best-case coverage as coverage, and every knob it never reached would
         // read as "nothing dead here" -- the most expensive kind of quiet.
+        // *** v4031 -- THE OVER-BUDGET NOTE UNDER-REPORTED ITS OWN DAMAGE TWICE, AND THE SECOND WAY WAS A
+        // FALSE VERDICT, NOT A MISSING ONE. ***
+        //
+        // "probed N of M knobs" read M off `acc`, which only ever holds knobs the loop REACHED -- so a device
+        // cut off after its first knob reported "probed 1 of 1", a perfect score, while four declared knobs
+        // were never looked at. M is now the DECLARED count.
+        //
+        // Worse: the modes never entered were not named, and stillKnobs did not exclude an incomplete row. On
+        // kuramoto that produced a sentence with no true reading behind it -- `pendN` was probed in `curve`
+        // alone, went over budget there (rCurve sweeps 4096 oscillators, eight base builds), and appeared
+        // under the census's own heading MOVES NOTHING ANYWHERE. It is read in `pendulum`, the mode the
+        // census never entered, where it moves four observables. *** "ANYWHERE" IS A CLAIM ABOUT EVERY MODE
+        // AND THIS ROW HAD SEEN ONE. *** The knob was live the whole time and the report said dead, which is
+        // the one failure mode a census of dead knobs cannot have: it manufactures exactly the work it exists
+        // to find. Incomplete rows now go in their own list, WITH THE MODES THAT WERE NEVER OPENED NAMED.
         if (overBudget) notes.push(name + ": OVER BUDGET at " + budgetMs + " ms -- probed " +
-            [...acc.values()].filter((a) => a.probed.length).length + " of " + acc.size + " knobs, INCOMPLETE");
-        for (const [knob, a] of acc) rows.push({ device: name, knob, modeSource, incomplete: overBudget, ...a });
+            [...acc.values()].filter((a) => a.probed.length).length + " of " + declared.size + " declared knobs" +
+            (entered.length < modes.length
+                ? "; MODES NEVER ENTERED: " + modes.filter((m) => !entered.includes(m)).join(", ")
+                : "") + ", INCOMPLETE");
+        for (const [knob, a] of acc) rows.push({
+            device: name, knob, modeSource, incomplete: overBudget,
+            unenteredModes: modes.filter((m) => !entered.includes(m)), ...a,
+        });
     }
     return { rows, notes };
 }
@@ -218,9 +256,27 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
     return rows;
 }
 
-/** Knobs that moved nothing in any mode they were probed in. THE READING, not the diagnosis. */
-export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive)
+/**
+ * Knobs that moved nothing in any mode they were probed in. THE READING, not the diagnosis.
+ *
+ * *** v4031 -- AND ONLY FROM A DEVICE THE CENSUS FINISHED. *** The heading this list prints under is MOVES
+ * NOTHING ANYWHERE, and "anywhere" is a claim about every mode. A row from an over-budget device has seen
+ * some prefix of the mode list, so it cannot support that sentence -- kuramoto.pendN sat in this list having
+ * been probed in `curve` alone, and is live in `pendulum`, four observables' worth. It goes to
+ * incompleteKnobs instead, which says what it is: unfinished, not answered.
+ */
+export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive && !r.incomplete)
     .map((r) => r.device + "." + r.knob).sort();
+
+/**
+ * Probed, moved nothing SO FAR, and the census ran out of budget before it opened every mode. A THIRD
+ * CATEGORY on purpose: "moves nothing" is a measurement, "was never probed" is an admission (unprobedKnobs),
+ * and this is the one in between -- a partial measurement, which is the most dangerous of the three to
+ * promote, because it looks exactly like the first.
+ */
+export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive && r.incomplete)
+    .map((r) => r.device + "." + r.knob + " (probed in " + r.probed.join(", ")
+        + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")").sort();
 
 /** Read, but flat across its working range -- and the wide ladder proves the code reaches it. */
 export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive)
@@ -262,6 +318,22 @@ export const STILL_OK = {
     // blind to them by construction, which is worth knowing rather than worth silencing.
     "mpmdrucker.E": "the Drucker-Prager keys are exactly homogeneous in the elastic moduli -- a friction angle is not a stiffness -- so E is flat over four decades, in all four modes, both plant states, and negative. No key this device carries can grade it",
 
+    // *** v4031 -- THE SECOND ENTRY, AND IT IS THE SAME SHAPE AS THE FIRST: A KEY THAT IS TRUE READS AS A
+    // KNOB THAT IS DEAD. *** mpmstep's whole claim is that a freely falling block's centre of mass follows
+    // the analytic parabola WHATEVER THE MATERIAL DOES INTERNALLY. Poisson's ratio is the material. It
+    // enters through lame(E, nu) into the internal stress and nowhere else, and internal stress cannot move
+    // a centre of mass -- so a flat reading here is the device's first sentence, measured, and there is
+    // nothing to fix. mpmStepBind-selfcheck section 5 pins it AT THE SOURCE rather than only here, so it
+    // goes red where the physics is if it ever stops holding.
+    //
+    // *** AND THE ENTRY NAMES WHAT IT COSTS. *** E is the same physics and the census calls it LIVE, on a
+    // ONE-ULP difference in one observable (errNoPlastic, 8.882e-16 -> 1.776e-15 at E = 250) plus a run at
+    // E = 5e8 where the explicit step violates CFL and the particles leave the grid. Motion is tested with
+    // Object.is, so one bit of round-off reads exactly like a response. The live/still line between E and nu
+    // in this device is rounding, not grading, and registering nu without saying so would leave E looking
+    // graded when it is not.
+    "mpmstep.nu": "the centre-of-mass parabola is blind to the constitutive model by construction -- nu enters only through lame(E, nu) into the internal stress, and internal stress cannot move a centre of mass. Bit-identical at nu = 0, 0.15, 0.3, 0.45, 0.49, 1e-6, -0.3 and 3e5, in all four modes and both plant states; the last two are not admissible Poisson ratios and the observables do not notice. No key this device carries can grade the constitutive model, and E only reads live on one ULP",
+
 };
 
 /** v3327's split: this half PRINTS, and knobLiveness-selfcheck beside it is what exits nonzero. */
@@ -284,14 +356,20 @@ export async function reportLines(opts = {}) {
         for (const r of rs.sort((a, b) => a.knob.localeCompare(b.knob))) {
             const verdict = !r.probed.length ? "not probed (" + r.kind + ")"
                 : r.live.length ? "live in " + r.live.join(", ") + (r.movedMost ? "  [" + r.movedMost + " observables]" : "")
+                : r.incomplete ? "INCOMPLETE -- still in " + r.still.join(", ") + ", "
+                    + (r.unenteredModes && r.unenteredModes.length
+                        ? "NEVER ENTERED " + r.unenteredModes.join(", ") : "cut off mid-mode")
                 : "*** MOVES NOTHING in " + r.still.join(", ") + " ***";
             L.push("    " + r.knob.padEnd(18) + verdict);
         }
     }
     L.push("");
     const unprobed = unprobedKnobs(rows);
+    const partial = incompleteKnobs(rows);
     L.push("  MOVES NOTHING ANYWHERE: " + (still.length ? still.join(", ") : "none"));
     L.push("  NOT PROBED (no ordering to perturb the default along): " + (unprobed.length ? unprobed.join(", ") : "none"));
+    L.push("  STILL SO FAR, BUT THE CENSUS RAN OUT OF BUDGET -- NOT A VERDICT: "
+        + (partial.length ? partial.join(", ") : "none"));
     L.push("  A READING, NEVER A DIAGNOSIS -- dead, saturated at an asymptote, and quantised below the search");
     L.push("  step are three different conditions that produce this same one.");
     for (const n of notes) L.push("  note: " + n);
