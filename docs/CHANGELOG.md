@@ -8,6 +8,39 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4065 -- optics.spread wired, and the census stops dropping what it cannot answer
+
+Keith's patch: `optics.spread` was an orphaned config field, left over from before the optics device's sweep
+widths became self-scaling.
+
+**The orphan's own value said what it used to be.** `spread: 0.02` sat in `opticsBind`'s `DEF`, was exposed as
+a knob, and was read *nowhere* in `buildOptics`. Every sweep width is computed fresh at its own call site from
+the physics -- `4*lambda/D` for the Airy ring, `4*lambda/a` for the slit, `3*lambda/a` for the convergence
+comparison. The frozen 0.02 turned out to be **exactly** `4*lambda/a` at the default wavelength and aperture:
+right for the slit mode, wrong for the other two (airy wants 0.01, converge wants 0.015) -- so wiring it in as
+a flat window across all three would have been a regression wearing a fix. `null` now means *self-scale from
+the physics*, which is what the device already did and must keep doing since the sweep has to widen as
+wavelength grows or aperture shrinks; a number overrides it. Every shipped default stays bit-identical.
+
+**And wiring it exposed a latent inconsistency that was unreachable before.** With the window always
+self-scaled, the first minimum was always inside it, so nothing had ever asked what the modes do when it
+isn't. At `spread=0.0005`: `airy` correctly refuses (`{error: "no-first-minimum-found"}`), while `slit`
+silently set two declared observables to `undefined` and reported anyway -- with an RMS that *looked better*
+than the shipped default only because a narrower window contains less of the pattern to disagree with. Two
+modes answering the same question two different ways means one of them is wrong; `slit` refuses now too, with
+no change for any existing caller (the self-scaled window always kept the minimum inside it).
+
+**Then the fix made a knob invisible to the tool that found it -- a gap this round created and had to
+close.** `probeValues(null)` returns nothing, so `knobLiveness` skipped the row with an empty `probed` array,
+and both its still-knob and insensitive-knob lists filter on `probed.length` -- the knob vanished from every
+list the census prints. There are exactly two null-default knobs in the whole lab (`optics.spread` and
+`blackhole.onsetLo`, the latter invisible to this census since it was written); `knobLiveness` now records a
+`"null-default"` kind and prints its own `NOT PROBED` line, kept separate from "moves nothing" on purpose --
+one is a measurement, the other is an admission.
+
+Six gates verified green, no gate file added or removed, so this build still carries 1205 gates. verify.mjs
+ALL GREEN.
+
 ## Since v4064 -- tidal had no gate at all
 
 Keith's patch, applied: v4027 (hands' last two negatives) + v4028 (`iou()` dropped a threshold) + v4029
