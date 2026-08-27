@@ -55,6 +55,25 @@ export const TWOF_OBSERVABLES = [
 //     settle  300 / record  900  ->   6.0 s, drift 1.649e-2   -- eleven times worse
 //     settle  600 / record 1800  ->  21.4 s, drift 7.125e-3   -- five times worse
 //     settle 6000 / record 18000 -> ~115 s, drift 1.452e-3    -- the recorded result
+//
+// v4073 -- RE-MEASURED ON THE APPLYING MACHINE, because a recorded number that nobody re-runs is a number
+// nobody can check. *** THE LOAD-BEARING ROW REPRODUCES EXACTLY: the default gives 1.451886e-3 here against
+// the 1.452e-3 above, so "the Zou-He inlet HOLDS at 1.45e-3" is confirmed rather than inherited. *** The two
+// SHORT rows do not:
+//
+//     settle  300 / record  900  ->   4.7 s, drift 1.2421e-2  (table says 1.649e-2)
+//     settle  600 / record 1800  ->  15.7 s, drift 5.5710e-3  (table says 7.125e-3)
+//     settle 6000 / record 18000 ->  84.5 s, drift 1.451886e-3  -- AGREES
+//
+// The wall times are expected to differ and v4038a says so: the hint is machine-local. THE DRIFTS ARE NOT
+// SUPPOSED TO. This device is deterministic here -- the same config run twice gives 1.242150e-2 both times,
+// bit for bit -- so the short rows were measured against some other code state, not sampled from noise.
+// NOT SILENTLY OVERWRITTEN: both sets are kept, because deleting the originals would destroy the evidence
+// that they ever disagreed, and one of them may be right about a tree this one has not got.
+//
+// WHAT IS UNAFFECTED: the CONCLUSION the table exists to support. Shortening the run makes the drift much
+// worse on both sets of numbers -- 1.24e-2 and 5.57e-3 here against 1.45e-3 -- so "shortened, it reports the
+// inlet FAILING" holds, and the argument against a cheaper default stands on this machine's numbers too.
 // A shortened run does not report a cheaper version of this answer, IT REPORTS THE INLET FAILING. v2797
 // guessed "longer runs" would fix the shedding and v2834 disproved it with arithmetic; guessing "shorter
 // runs" here would be the same error pointing the other way, and it would read as the boundary condition

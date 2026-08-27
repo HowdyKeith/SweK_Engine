@@ -17,6 +17,7 @@
 // and what "never type a reference value a gate compares against" forbids. Evidence, not a ruling.
 
 import fs from "node:fs";
+import { codeOnly } from "./sourceScan.mjs";   // v4073 -- see the comment-stripping check below
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -97,9 +98,26 @@ const dos = D.controlDossier(ENG, cen);
         "ONE definition of 'round-trip control', not two. A second scan would drift from the first and the " +
         "disagreement would be invisible -- the shape this session has found five times");
 
-    ok("...and it strips comments before classifying",
+    // v4073 -- *** A CHECK THAT THE FILE STRIPS COMMENTS, WHICH A COMMENT COULD HAVE SATISFIED. *** This
+    // asserted the `replace(/<!--[\s\S]*?-->/g` idiom against RAW SOURCE, so commenting the line out would have
+    // left the gate green -- commentFalsePass-selfcheck flagged it as the one GENUINE case in its census, and
+    // the irony is exact: the gate verifying that a file strips comments was itself readable by one.
+    //
+    // IT CANNOT BE FIXED BY SWAPPING IN codeOnly(), AND THE REASON IS WORTH WRITING DOWN. codeOnly blanks
+    // string AND regex BODIES, so under it line 36 reads `const src = html.replace(//g, "");` -- the call
+    // survives and the pattern does not. MEASURED: the raw pattern matches, the same pattern against
+    // codeOnly(src) does not. So "this is live code" and "this is the RIGHT regex" are two questions and one
+    // instrument cannot answer both. Asking both is not ceremony: either alone is a false pass waiting.
+    const code = codeOnly(src);
+    ok("...and it strips comments before classifying -- the CALL is live code",
+        /html\.replace\(\/\/g/.test(code),
+        "codeOnly blanks the regex body, so this sees `html.replace(//g` and nothing inside it -- which is " +
+        "exactly the half raw source could not prove: that the line is CODE and not a comment about code");
+    ok("...and the regex it strips with really is the HTML-COMMENT one",
         /replace\(\/<!--\[\\s\\S\]\*\?-->\/g/.test(src),
-        "a commented-out control must not classify a live one, and this file names every input type it detects");
+        "raw source is the only instrument that can read INSIDE a regex literal, so this half is asked of raw " +
+        "source deliberately rather than by oversight. On its own it would pass on a commented-out line; the " +
+        "check above is what stops that, and neither is sufficient alone");
 }
 
 console.log();
