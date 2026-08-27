@@ -797,11 +797,11 @@
   "tools/roundhouse/submit-selfcheck.mjs": 135,
   "tools/roundhouse/sweepDevice-selfcheck.mjs": 35870,
   "tools/roundhouse/swekGates-selfcheck.mjs": 73,
-  "tools/roundhouse/symmetry-selfcheck.mjs": 163,
-  "tools/roundhouse/tempering-selfcheck.mjs": 1306,
-  "tools/roundhouse/termuxPeerScript-selfcheck.mjs": 67,
-  "tools/roundhouse/thermalPlants-selfcheck.mjs": 15264,
-  "tools/roundhouse/thermalScaling-selfcheck.mjs": 76026,
+  "tools/roundhouse/symmetry-selfcheck.mjs": 173,
+  "tools/roundhouse/tempering-selfcheck.mjs": 1313,
+  "tools/roundhouse/termuxPeerScript-selfcheck.mjs": 63,
+  "tools/roundhouse/thermalPlants-selfcheck.mjs": 14322,
+  "tools/roundhouse/thermalScaling-selfcheck.mjs": 75871,
   "tools/roundhouse/thermostatBind-selfcheck.mjs": 249,
   "tools/roundhouse/tomographyBind-selfcheck.mjs": 359,
   "tools/roundhouse/tunnelCandidates-selfcheck.mjs": 62,
@@ -1181,9 +1181,9 @@
  },
  "coverage": {
   "complete": false,
-  "timedThisRun": 782,
+  "timedThisRun": 788,
   "totalInRecord": 1176,
-  "at": "2026-08-27T03:00:42Z"
+  "at": "2026-08-27T03:02:14Z"
  },
  "failingAt": {
   "ai-bridge/tools/lab-scene-run-selfcheck.mjs": 330,
