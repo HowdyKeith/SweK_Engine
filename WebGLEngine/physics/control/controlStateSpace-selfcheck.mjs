@@ -9,7 +9,7 @@
 // whole number", WOULD HAVE PASSED EVERY WRONG ANSWER, because it converges to a wrong INTEGER.
 "use strict";
 import { routhHurwitz, rhpCountNumeric } from "./controlStability.mjs";
-import { charPolyFaddeev, charPolyInterp, rank, det, cholesky, transpose, matMul, eye,
+import { charPolyFaddeev, charPolyInterp, rank, det, cholesky, transpose, matMul, eye, solve,
          ctrbMatrix, obsvMatrix, dualityCheck, lyapunovStable, expm,
          discretisationPreservesStability, nyquistEncirclements, nyquistConverged,
          nyquistClosedLoopRhp, MEASURED_V3573, reportLines } from "./controlStateSpace.mjs";
@@ -23,6 +23,38 @@ const closedLoop = (num, den) => { const o = den.slice();
     for (let i = 0; i < num.length; i++) o[den.length - num.length + i] += num[i]; return o; };
 
 console.log("controlStateSpace-selfcheck -- four more routes to one integer, and the bridge between two halves\n");
+
+// ---------------------------------------------------------------------------
+console.log("0. solve(): THE DENSE LINEAR SOLVE UNDER LYAPUNOV AND expm");
+{
+    ok("!! solve() reproduces a trivial known-diagonal solution exactly",
+        JSON.stringify(solve([[2, 0], [0, 3]], [4, 9])) === JSON.stringify([2, 3]),
+        "diag(2,3) x = [4,9] has the exact solution [2,3]; no round-off possible on this system");
+
+    let worst = 0, n5 = 0;
+    for (const n of [2, 3, 4, 5]) for (let t = 0; t < 100; t++) {
+        const A = randA(n), xTrue = Array.from({ length: n }, () => rnd() - 0.5);
+        const b = A.map((row) => row.reduce((s, a, j) => s + a * xTrue[j], 0));
+        const x = solve(A, b);
+        if (!x) continue;
+        for (let i = 0; i < n; i++) worst = Math.max(worst, Math.abs(x[i] - xTrue[i]));
+        n5++;
+    }
+    report("random systems solved (n=2..5), known x recovered", n5);
+    ok("!! solve() recovers the KNOWN x used to build b = A x, on random systems", worst < 1e-8,
+        "worst |recovered - true| = " + worst.toExponential(2) + ". b is built FROM x, so this checks the solve " +
+        "against a planted answer rather than against Ax residual alone");
+
+    const Aresid = randA(4), xr = solve(Aresid, [1, 2, 3, 4]);
+    const resid = Aresid.map((row, i) => row.reduce((s, a, j) => s + a * xr[j], 0) - [1, 2, 3, 4][i]);
+    ok("...and the residual A x - b is near zero, independently of how x was constructed",
+        Math.max(...resid.map(Math.abs)) < 1e-8, "max |residual| = " + Math.max(...resid.map(Math.abs)).toExponential(2));
+
+    ok("solve() refuses a singular system rather than returning garbage",
+        solve([[1, 2], [2, 4]], [1, 2]) === null,
+        "row 2 is exactly twice row 1: no pivot survives, and this is the same null-return lyapunovStable relies " +
+        "on to detect a singular Lyapunov equation");
+}
 
 // ---------------------------------------------------------------------------
 console.log("1. THE CHARACTERISTIC POLYNOMIAL, BY A TRACE RECURSION AND BY DETERMINANTS");

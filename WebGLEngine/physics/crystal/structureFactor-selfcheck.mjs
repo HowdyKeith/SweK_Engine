@@ -9,7 +9,7 @@
 "use strict";
 import { pathToFileURL } from "node:url";
 import { reciprocal, reciprocalResidual, structureFactorSum, structureFactorClosed, isAbsent,
-         allSameParity, absenceSweep, rowIntensity, rowAmplitude, rowZerosPerOrder,
+         allSameParity, absenceSweep, rowIntensity, rowAmplitude, rowZerosPerOrder, dot,
          BASES, MEASURED_V3579, reportLines } from "./structureFactor.mjs";
 import { doubleSlitNumeric, doubleSlitMaxima } from "../optics/diffraction.js";
 
@@ -66,6 +66,22 @@ console.log("\n2. TWO ROUTES: A SUM OVER ATOMS, AND A PARITY RULE THAT NEVER SEE
         !isAbsent("fcc", 0, 0, 0) && !isAbsent("diamond", 0, 0, 0),
         "the forward beam is every atom in phase; calling it forbidden would be an arithmetic slip that a " +
         "parity rule alone would happily commit");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n2b. dot(): THE PLAIN VECTOR PRODUCT UNDER reciprocal() AND ITS RESIDUAL");
+{
+    ok("!! dot() of orthogonal unit vectors is EXACTLY zero",
+        dot([1, 0, 0], [0, 1, 0]) === 0 && dot([1, 0, 0], [0, 0, 1]) === 0 && dot([0, 1, 0], [0, 0, 1]) === 0,
+        "the cardinal axes are orthogonal by construction; a x . y term with a sign or index slip would not " +
+        "land on exactly 0");
+    ok("!! dot(v, v) is EXACTLY |v|^2, checked against a hand-computed value",
+        dot([3, 4, 0], [3, 4, 0]) === 25 && dot([1, 2, 2], [1, 2, 2]) === 9,
+        "3-4-0 and 1-2-2 are both Pythagorean-style triples chosen so |v|^2 is an exact integer: 9+16=25, " +
+        "1+4+4=9 -- no floating-point tolerance needed");
+    ok("!! and a hand-computed non-trivial case matches by arithmetic, not by symmetry",
+        dot([1, 2, 3], [4, -5, 6]) === (1 * 4 + 2 * -5 + 3 * 6),
+        "1*4 + 2*(-5) + 3*6 = 4 - 10 + 18 = 12, computed by hand and by the function and compared exactly");
 }
 
 // ---------------------------------------------------------------------------

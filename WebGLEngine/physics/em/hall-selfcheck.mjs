@@ -21,7 +21,7 @@
 // the ensemble. Nothing in the integrator knows sigma_0 or the closed form.
 
 import { ELEM_CHARGE, ELECTRON_MASS, cyclotron, sigma0, sigmaTensor, rhoTensor,
-         hallResistivity, measureSigma, measureRho, rhoXX_WRONG } from "./hall.js";
+         hallResistivity, measureSigma, measureRho, driftVelocity, rhoXX_WRONG } from "./hall.js";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -45,6 +45,22 @@ const MC = { carriers: 900, steps: 2500, seed: 11 };
     const spread = (Math.max(...slopes) - Math.min(...slopes)) / Math.abs(slopes[0]);
     ok("!! ...and it is LINEAR in B, so the slope alone gives the carrier density",
        spread < 0.05, "slope spread " + (spread * 100).toFixed(1) + "% across the range");
+}
+
+// ---- 1b. driftVelocity() CALLED DIRECTLY: AT B=0 IT IS THE PLAIN DRUDE FORMULA v = q E tau / m ----------------------
+{
+    const Ex = 1;
+    const v = driftVelocity({ n, tau, B: 0, E: [Ex, 0], carriers: 1500, steps: 3000, seed: 11 });
+    const expected = (-1) * Math.abs(ELEM_CHARGE) * Ex * tau / ELECTRON_MASS;
+    ok("!! at zero field, driftVelocity's own vx matches q E tau / m directly (no sigma/rho wrapper involved)",
+       Math.abs(v.vx - expected) / Math.abs(expected) < 0.03,
+       "measured " + v.vx.toExponential(4) + " vs closed-form q E tau/m = " + expected.toExponential(4) +
+       " -- the same relaxation-time result that sigma0 = n q^2 tau/m encodes, read straight off the ensemble");
+    ok("...and with no B field there is no rotation, so the transverse drift is exactly zero",
+       v.vy === 0, "vy = " + v.vy + " -- nothing in a B=0 integration can populate the y component");
+    ok("...and driftVelocity reports its own wc*tau consistently with cyclotron(B)*tau",
+       Math.abs(driftVelocity({ n, tau, B: 2, E: [1, 0], carriers: 300, steps: 1500, seed: 3 }).wcTau -
+                cyclotron(2) * tau) < 1e-9);
 }
 
 // ---- 2. IT CONTAINS NO SCATTERING TIME AND NO MASS, WHICH IS WHY THE MEASUREMENT IS USEFUL ---------------------------

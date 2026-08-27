@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SCENE_TRIAGE, PROVENANCE, candidates, refused, joinRegistered,
+import { SCENE_TRIAGE, PROVENANCE, candidates, refused, joinRegistered, bySceneId,
          MEASURED_V3587, reportLines } from "./labScenes.mjs";
 import { listProposers, resetRegistry } from "./proposers.mjs";
 import { registerAll, NOT_REGISTERED } from "./knobRegistry.mjs";
@@ -87,6 +87,29 @@ console.log("\n2. *** THE KNOB NAMES ARE THE PAGE'S, AND NINE OF TWELVE WERE NOT
         [...pageScenes.keys()].every((id) => SCENE_TRIAGE.some((r) => r.scene === id)),
         "a scene with no row would show 'no triage row for this scene' in the panel -- honest, but it means " +
         "somebody added a scene and the drill-down silently stopped covering it");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n2b. bySceneId(): THE LOOKUP MAP, CALLED DIRECTLY");
+{
+    const byId = bySceneId();
+    ok("!! bySceneId() is a real Map with one entry per triage row, no more and no fewer",
+        byId instanceof Map && byId.size === SCENE_TRIAGE.length,
+        byId.size + " entries against " + SCENE_TRIAGE.length + " rows in SCENE_TRIAGE");
+    ok("!! a known id (gyroscope) resolves to the EXACT SAME row object, not a copy",
+        byId.get("gyroscope") === SCENE_TRIAGE.find((r) => r.scene === "gyroscope"),
+        "identity equality, not a deep-equal reconstruction -- the map wraps the array's own rows rather than " +
+        "rebuilding them, so an edit to one row never drifts from the other");
+    ok("...and a second known id resolves correctly too, so the first was not luck",
+        byId.get("orbit") === SCENE_TRIAGE.find((r) => r.scene === "orbit") &&
+        byId.get("orbit").knob === "e",
+        "orbit -> the eccentricity-knobbed row, checked by both identity and by a field on it");
+    ok("!! an unknown id returns undefined, not a crash and not some other row",
+        byId.get("this-scene-does-not-exist") === undefined,
+        "Map.get on a missing key is undefined by JS semantics, and bySceneId does nothing to paper over that");
+    ok("...and every SCENE_TRIAGE row is reachable through the map by its own scene id",
+        SCENE_TRIAGE.every((r) => byId.get(r.scene) === r),
+        "no row is orphaned by a key collision or a typo'd scene field");
 }
 
 // ---------------------------------------------------------------------------

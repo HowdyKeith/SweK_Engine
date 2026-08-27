@@ -22,7 +22,7 @@
 //                      implementation using one formula for both is wrong in a way that only appears at speed.
 
 import {
-    gaussianPulse, propagationError, peakAmplitude, courant, fdtd,
+    dalembert, gaussianPulse, propagationError, peakAmplitude, courant, fdtd,
     dopplerMovingSource, dopplerMovingObserver, dopplerAsymmetry,
     modeOpenOpen, modeOpenClosed, phaseVelocity, groupVelocity, omegaOf,
 } from "./waves.mjs";
@@ -30,6 +30,22 @@ import {
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const shape = gaussianPulse(80, 12);
+
+// ---- 0. D'ALEMBERT ITSELF, DIRECTLY -----------------------------------------------------------------------------
+{
+    ok("!! dalembert(shape, x, c, t) is exactly shape(x - c t), nothing more",
+        [[100, 1, 0], [100, 2, 10], [50, 3, 20], [0, 1.5, -30]].every(([x, c, t]) =>
+            dalembert(shape, x, c, t) === shape(x - c * t)),
+        "checked against the definition directly, at four unrelated (x, c, t) triples including negative t -- " +
+        "this is the object the rest of the file's error metric is measured against, so it must be the raw " +
+        "closure and not a numerical approximation of one");
+
+    ok("!! and it is a rigid translation: advancing t by dt shifts the pulse by exactly c dt, unchanged in shape",
+        Math.abs(dalembert(shape, 100 + 2 * 5, 2, 5) - dalembert(shape, 100, 2, 0)) < 1e-15,
+        `dalembert at (x=110, t=5) equals dalembert at (x=100, t=0) to within float noise for c=2 -- the pulse ` +
+        "moved 10 units in 5 time units at speed 2 and is bit-for-bit the same shape, which is the whole content " +
+        "of 'travels unchanged forever'");
+}
 
 // ---- 1. THE MAGIC TIME STEP -------------------------------------------------------------------------------------
 {
