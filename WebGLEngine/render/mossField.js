@@ -1,4 +1,4 @@
-// WebGLEngine/render/mossField.js — v4076
+// WebGLEngine/render/mossField.js — v4077
 // ---------------------------------------------------------------------------------------------------------------
 // WHERE THE MOSS GOES. Pure arithmetic, following render/cloudField.js's own shape exactly: seed and placement
 // spec in, an array of tuft instances out. No GL, no DOM, no Three -- so the SAME clump of moss can be scattered
@@ -32,12 +32,19 @@
 // field, gradient and normal are ALL pure functions of direction, so buildMossShell() needs nothing injected and
 // is exactly as testable as cloudField's own buildPuffsShell.
 //
-// WHAT THIS DOES NOT DO, STATED RATHER THAN LEFT IMPLICIT: there is one moss "species" (MOSS_CHAR) for this
-// round, not a table of types the way clouds have six -- Keith asked whether moss/root could fold into terrain
-// gen at all, not for a biome system, and inventing several moss varieties nobody asked for is exactly the kind
-// of unrequested scope this tree's own standing rule refuses. The procedural ROOT/ARCH geometry Sylva's demo also
-// showed is NOT built here either: it is a standalone decorative structure, not ground cover, and belongs to a
-// terrain-gen answer only if Keith wants it as one -- named rather than silently dropped.
+// *** v4077 -- SPECIES, VIA THE SAME INJECTION SHAPE AS accept/patchDensity, AND A CORRECTION. *** v4076 shipped
+// one species and said "no moisture concept exists in world/ yet" -- WRONG, and left uncorrected would be the
+// same "recorded conclusion struck rather than left" defect this tree has caught in itself before (v4038's note
+// on twoF). world/worleyBiomes.js's biomeAt(x,z,seed) is a REAL Whittaker heat x moisture classification, already
+// wired into actual terrain painting via world/biomeTerrain.js. This file still does not know what a biome IS --
+// `speciesFor` is injected exactly like `accept`/`patchDensity`, and a caller that does not supply one gets
+// "common", the single species v4076 shipped, byte-identical to before. A species name this file does not
+// recognise is not guessed at either: MOSS_SPECIES[name] undefined means that patch grows nothing, the same
+// refusal shape as an unknown cloud type in render/cloudField.js.
+//
+// WHAT THIS STILL DOES NOT DO: the procedural ROOT/ARCH geometry Sylva's demo also showed lives in
+// world/rootArch.js, a separate file, because it is a standalone decorative structure and not ground cover --
+// the two ideas share an inspiration, not a generator.
 // ---------------------------------------------------------------------------------------------------------------
 "use strict";
 
@@ -46,15 +53,23 @@ import { offsetDir } from "./cloudField.js";                 // the SAME tangent
 import { surfaceRadiusAt, surfaceNormal, surfaceGradient, makeSurfaceParams } from "../world/planetSurface.js";
 
 /**
- * The one moss species this round builds. Ranges are in WORLD UNITS on voxel terrain; the shell placement
- * rescales tuft SIZE by the caller's `sizeScale` exactly as cloudField's puffLook does for clouds, because a
- * patch's proportions port between terrain kinds and its absolute size does not.
+ * Four species, keyed by how well a real biome supports moss rather than by an arbitrary palette. Ranges are in
+ * WORLD UNITS on voxel terrain; the shell placement rescales tuft SIZE by the caller's `sizeScale` exactly as
+ * cloudField's puffLook does for clouds. `colTop`/`colBot` are actual RGB triples, the SAME shape cloudField's
+ * TYPES table carries them in -- not a tint scalar the renderer has to reinterpret -- because the four species
+ * are meant to look distinct (lush green, dull green, pale lichen-grey, dry brown), which a single hue range
+ * mixed by one scalar cannot express. `vigor` is the species' own ceiling on density, independent of slope:
+ * a dry-margin species that merely tolerates a place still grows thinner there than a lush one would.
  */
-export const MOSS_CHAR = {
-    patchRadius: [1.4, 3.0],      // one clump's own radius
-    tuftsPerPatch: [4, 10],       // before slope derating
-    tuftScale: [0.18, 0.42],      // one tuft's footprint
-    colTint: [0.10, 0.42],        // 0 = dark mossy green-black, 1 = lighter yellow-green; the renderer's own palette
+export const MOSS_SPECIES = {
+    lush:   { patchRadius: [1.8, 3.6], tuftsPerPatch: [6, 12], tuftScale: [0.22, 0.48],
+              colTop: [0.16, 0.34, 0.12], colBot: [0.05, 0.16, 0.05], vigor: 1.00 },   // jungle, forest -- wet and warm
+    common: { patchRadius: [1.4, 3.0], tuftsPerPatch: [4, 10], tuftScale: [0.18, 0.42],
+              colTop: [0.14, 0.30, 0.10], colBot: [0.05, 0.14, 0.05], vigor: 0.75 },   // plains, shrubland, taiga -- v4076's one species
+    pale:   { patchRadius: [1.0, 2.0], tuftsPerPatch: [2, 5],  tuftScale: [0.14, 0.30],
+              colTop: [0.55, 0.60, 0.48], colBot: [0.32, 0.38, 0.28], vigor: 0.40 },   // tundra, ice caps -- cold, real reindeer-lichen colouring
+    dry:    { patchRadius: [0.8, 1.6], tuftsPerPatch: [1, 3],  tuftScale: [0.12, 0.24],
+              colTop: [0.55, 0.46, 0.24], colBot: [0.30, 0.24, 0.12], vigor: 0.20 },   // desert margins, savanna -- sparse and brownish
 };
 
 /**
@@ -70,6 +85,17 @@ export function slopeDensityMul(gradMag, maxSlope) {
     return g >= maxSlope ? 0 : 1 - g / maxSlope;
 }
 
+/** One tuft's look, shared by both placements exactly as cloudField's puffLook is shared by both cloud shapes. */
+function tuftLook(sp, r, sizeScale) {
+    const rnd = (a, b) => a + r() * (b - a);
+    const bright = rnd(0.85, 1.15);   // per-tuft brightness jitter within the species' own colours
+    const jit = (c) => c.map((v) => Math.min(1, v * bright));
+    return {
+        scale: rnd(sp.tuftScale[0], sp.tuftScale[1]) * sizeScale,
+        colTop: jit(sp.colTop), colBot: jit(sp.colBot),
+    };
+}
+
 /**
  * THE VOXEL PLACEMENT. `accept(x, z)` must return `{ ok, y }` -- `y` already at the exact placement height (the
  * voxel top-face convention lives in the CALLER, which is the only side that knows it, not here) -- or a falsy
@@ -82,9 +108,13 @@ export function slopeDensityMul(gradMag, maxSlope) {
  * caller might. render/mossPatches.js supplies one built from the SAME slopeDensityMul() the shell path uses --
  * one formula, two terrain kinds, rather than a second slope rule invented for voxels. Defaults to full density
  * so a caller that does not care about slope is unaffected.
+ *
+ * `speciesFor(pcx, pcz)` picks a MOSS_SPECIES key per patch, defaulting to "common" -- v4076's one species,
+ * unchanged for a caller that does not supply one. A name this file does not recognise grows nothing for that
+ * patch, the same refusal an unknown cloud type gets.
  */
 export function buildMossVoxel({ cx = 0, cz = 0, region = 40, seed = 1, patches = 18, accept,
-                                  patchDensity = () => 1 } = {}) {
+                                  patchDensity = () => 1, speciesFor = () => "common" } = {}) {
     if (typeof accept !== "function") return [];
     const r = rng(seed >>> 0);
     const rnd = (a, b) => a + r() * (b - a);
@@ -93,18 +123,20 @@ export function buildMossVoxel({ cx = 0, cz = 0, region = 40, seed = 1, patches 
         // area-uniform patch centre (sqrt keeps density even across the disk rather than bunching at cx,cz)
         const a = r() * Math.PI * 2, rad = Math.sqrt(r()) * region;
         const pcx = cx + Math.cos(a) * rad, pcz = cz + Math.sin(a) * rad;
-        const pr = rnd(MOSS_CHAR.patchRadius[0], MOSS_CHAR.patchRadius[1]);
-        const n = Math.round(rnd(MOSS_CHAR.tuftsPerPatch[0], MOSS_CHAR.tuftsPerPatch[1]) * patchDensity(pcx, pcz));
+        const sp = MOSS_SPECIES[speciesFor(pcx, pcz)];
+        if (!sp) continue;
+        const pr = rnd(sp.patchRadius[0], sp.patchRadius[1]);
+        const n = Math.round(rnd(sp.tuftsPerPatch[0], sp.tuftsPerPatch[1]) * patchDensity(pcx, pcz) * sp.vigor);
         for (let i = 0; i < n; i++) {
             const ta = r() * Math.PI * 2, trad = Math.sqrt(r()) * pr;
             const x = pcx + Math.cos(ta) * trad, z = pcz + Math.sin(ta) * trad;
             const g = accept(x, z);
             if (!g || !g.ok) continue;
+            const L = tuftLook(sp, r, 1);
             out.push({
                 x, y: g.y, z,
-                scale: rnd(MOSS_CHAR.tuftScale[0], MOSS_CHAR.tuftScale[1]),
+                scale: L.scale, colTop: L.colTop, colBot: L.colBot,
                 rot: r() * Math.PI * 2,
-                tint: rnd(MOSS_CHAR.colTint[0], MOSS_CHAR.colTint[1]),
                 patchId: p,
             });
         }
@@ -120,13 +152,18 @@ export function buildMossVoxel({ cx = 0, cz = 0, region = 40, seed = 1, patches 
  * surviving tuft sits at `surfaceRadiusAt` (the real displaced ground, not the mean radius) and is oriented to
  * `surfaceNormal` there, so a clump lies along the terrain rather than floating level with the planet's core.
  *
+ * `speciesFor(dir)` picks a MOSS_SPECIES key per patch centre direction, defaulting to "common" -- v4076's one
+ * species. es-box3d-fly3d.html supplies one built from the planet's own type and latitude; a molten or gas world
+ * has no solid biosphere-friendly surface at all and can refuse every patch by returning a name this file does
+ * not recognise, the same refusal shape as everywhere else in this file.
+ *
  * `spec` (world/procPlanet.js's planetSpec) and, implicitly, `surfaceParams` (world/planetSurface.js's own
  * relief/eps/maxTilt bundle, defaulted via makeSurfaceParams() when omitted) are the SAME two objects the mesh
  * displacement and the descent camera already consult -- one more reader of a fact this file does not own.
  */
 export function buildMossShell({ center = [0, 0, 0], groundRadius = 17, dir = [0, 0, 1], coverage = 0.45,
                                   seed = 1, spec = null, surfaceParams = null, patches = 14, maxSlope = 4.5,
-                                  sizeScale = 1, ampFrac } = {}) {
+                                  sizeScale = 1, ampFrac, speciesFor = () => "common" } = {}) {
     if (!spec) return [];
     const P = surfaceParams || makeSurfaceParams();
     const r = rng(seed >>> 0);
@@ -135,11 +172,13 @@ export function buildMossShell({ center = [0, 0, 0], groundRadius = 17, dir = [0
     for (let p = 0; p < patches; p++) {
         const a = r() * Math.PI * 2, rad = Math.sqrt(r()) * coverage;
         const base = offsetDir(dir, Math.cos(a) * rad, Math.sin(a) * rad);
+        const sp = MOSS_SPECIES[speciesFor(base)];
+        if (!sp) continue;
         const g = surfaceGradient(spec, base, P);
         const gradMag = Math.hypot(g.dEast, g.dNorth);
-        const densityMul = slopeDensityMul(gradMag, maxSlope);
-        const pr = rnd(MOSS_CHAR.patchRadius[0], MOSS_CHAR.patchRadius[1]);
-        const n = Math.round(rnd(MOSS_CHAR.tuftsPerPatch[0], MOSS_CHAR.tuftsPerPatch[1]) * densityMul);
+        const densityMul = slopeDensityMul(gradMag, maxSlope) * sp.vigor;
+        const pr = rnd(sp.patchRadius[0], sp.patchRadius[1]);
+        const n = Math.round(rnd(sp.tuftsPerPatch[0], sp.tuftsPerPatch[1]) * densityMul);
         for (let i = 0; i < n; i++) {
             // linear ground-unit jitter converted to an angle by the same "divide by shell" idiom cloudField
             // uses for cluster spread; groundRadius is moss's own shell, since a tuft sits at ~zero altitude.
@@ -147,12 +186,12 @@ export function buildMossShell({ center = [0, 0, 0], groundRadius = 17, dir = [0
             const td = offsetDir(base, ex, ez);
             const radius = surfaceRadiusAt(spec, td, { radius: groundRadius, ampFrac });
             const nrm = surfaceNormal(spec, td, P);
+            const L = tuftLook(sp, r, sizeScale);
             out.push({
                 x: center[0] + td[0] * radius, y: center[1] + td[1] * radius, z: center[2] + td[2] * radius,
                 normal: nrm, dir: td, radius,
-                scale: rnd(MOSS_CHAR.tuftScale[0], MOSS_CHAR.tuftScale[1]) * sizeScale,
+                scale: L.scale, colTop: L.colTop, colBot: L.colBot,
                 spin: r() * Math.PI * 2,
-                tint: rnd(MOSS_CHAR.colTint[0], MOSS_CHAR.colTint[1]),
                 patchId: p, gradMag, densityMul,
             });
         }

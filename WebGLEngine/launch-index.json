@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 407,
+  "page": 410,
   "demo": 49,
   "builtin": 34
  },
@@ -144,6 +144,14 @@
    "display": "Arrival",
    "href": "/arrival.html",
    "section": "Smart Home",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ascii-avatar.html",
+   "display": "Ascii Avatar",
+   "href": "/ascii-avatar.html",
+   "section": null,
    "collision": false
   },
   {
@@ -1724,9 +1732,25 @@
   },
   {
    "kind": "page",
+   "id": "krbn-avatar.html",
+   "display": "Krbn Avatar",
+   "href": "/krbn-avatar.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "krbn-compare.html",
    "display": "Krbn Compare",
    "href": "/krbn-compare.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "krbn-rigged.html",
+   "display": "Krbn Rigged",
+   "href": "/krbn-rigged.html",
    "section": null,
    "collision": false
   },

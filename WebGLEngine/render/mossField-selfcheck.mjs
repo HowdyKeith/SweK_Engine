@@ -1,4 +1,4 @@
-// WebGLEngine/render/mossField-selfcheck.mjs — v4076
+// WebGLEngine/render/mossField-selfcheck.mjs — v4077
 //
 // Run: node render/mossField-selfcheck.mjs   (~1-2s pure; live sections need a browser, skip with a reason otherwise)
 //
@@ -201,6 +201,58 @@ console.log("\n6. *** THE SLOPE RULE, MEASURED AGAINST A REAL PLANET RATHER THAN
         "flat-third avg " + avg(lowThird).toFixed(3) + " vs steep-third avg " + avg(highThird).toFixed(3));
 }
 
+console.log("\n6b. *** MOSS_SPECIES: FOUR REAL SPECIES, AND AN UNRECOGNISED NAME REFUSES ON BOTH TERRAIN KINDS ***");
+{
+    // v4077 -- Keith: could the follow-on (species/biomes, root/arch) be built. Species is here; root/arch is
+    // world/rootArch.js and its own gate. Four keys, not the single "common" v4076 shipped -- the exact scope
+    // v4076 named as deliberately NOT built yet.
+    const keys = Object.keys(MF.MOSS_SPECIES).sort();
+    ok("!! exactly four species, each with the fields both placements read",
+        JSON.stringify(keys) === JSON.stringify(["common", "dry", "lush", "pale"]) &&
+        keys.every((k) => {
+            const s = MF.MOSS_SPECIES[k];
+            return Array.isArray(s.patchRadius) && Array.isArray(s.tuftsPerPatch) && Array.isArray(s.tuftScale) &&
+                   Array.isArray(s.colTop) && s.colTop.length === 3 && Array.isArray(s.colBot) && s.colBot.length === 3 &&
+                   typeof s.vigor === "number" && s.vigor > 0 && s.vigor <= 1;
+        }), keys.join(", "));
+
+    ok("!! lush is denser than dry -- the species TABLE, not chance, drives the count difference",
+        (() => {
+            const accept = () => ({ ok: true, y: 0 });
+            const lush = MF.buildMossVoxel({ seed: 5, patches: 20, accept, speciesFor: () => "lush" }).length;
+            const dry = MF.buildMossVoxel({ seed: 5, patches: 20, accept, speciesFor: () => "dry" }).length;
+            return lush > dry * 3;
+        })(), "same seed, same patch count, only the species differs");
+
+    ok("!! ...and each species carries its OWN colour, not a shared palette scaled by a tint scalar",
+        (() => {
+            const accept = () => ({ ok: true, y: 0 });
+            const lush = MF.buildMossVoxel({ seed: 5, patches: 20, accept, speciesFor: () => "lush" })[0];
+            const pale = MF.buildMossVoxel({ seed: 5, patches: 20, accept, speciesFor: () => "pale" })[0];
+            const spread = (c) => Math.max(...c) - Math.min(...c);
+            // pale is a washed-out lichen grey (channels close together); lush is a saturated green -- a real
+            // distinguishing property, not an arbitrary one directional check happened to pick.
+            return spread(MF.MOSS_SPECIES.lush.colTop) > spread(MF.MOSS_SPECIES.pale.colTop) &&
+                   spread(lush.colTop) > spread(pale.colTop);
+        })(), "lush is a saturated green (max-min spread " + (Math.max(...MF.MOSS_SPECIES.lush.colTop) - Math.min(...MF.MOSS_SPECIES.lush.colTop)).toFixed(2) +
+        "), pale is washed-out lichen grey (spread " + (Math.max(...MF.MOSS_SPECIES.pale.colTop) - Math.min(...MF.MOSS_SPECIES.pale.colTop)).toFixed(2) + ") -- read from MOSS_SPECIES, not derived");
+
+    ok("!! an unrecognised species name grows NOTHING on the voxel side, the same refusal as no `accept` at all",
+        MF.buildMossVoxel({ seed: 5, patches: 20, accept: () => ({ ok: true, y: 0 }), speciesFor: () => "nonexistent" }).length === 0);
+
+    const spec = PP.planetSpec(7);
+    ok("!! ...and the same refusal holds on the shell placement",
+        MF.buildMossShell({ seed: 42, spec, groundRadius: 150, dir: [0, 1, 0], patches: 14, speciesFor: () => "nonexistent" }).length === 0);
+
+    ok("...and the default speciesFor is exactly \"common\" -- v4076's one species, unaffected for a caller that does not ask",
+        (() => {
+            const accept = () => ({ ok: true, y: 0 });
+            const a = MF.buildMossVoxel({ seed: 5, patches: 12, accept });
+            const b = MF.buildMossVoxel({ seed: 5, patches: 12, accept, speciesFor: () => "common" });
+            return JSON.stringify(a) === JSON.stringify(b);
+        })());
+}
+
 console.log("\n7. *** THE VOXEL CONSUMER: STONE/DIRT ONLY, SLOPE-DERATED, AND DETERMINISTIC PER LOCATION ***");
 {
     const MP = await import(pathToFileURL(path.join(HERE, "mossPatches.js")).href);
@@ -250,6 +302,38 @@ console.log("\n7. *** THE VOXEL CONSUMER: STONE/DIRT ONLY, SLOPE-DERATED, AND DE
     mp2.rebuild(0, 0);
     ok("!! a world that is ENTIRELY grass grows NO moss at all",
         mp2._count === 0, "grass is vegetation.js's surface, not this file's -- 0 tufts confirms no overlap");
+
+    // v4077 -- SPECIES BY REAL BIOME, on world.biomeSeed = 1337 (world/world.js's own default), a flat all-stone
+    // world so surface type never confounds the result -- only the biome map decides what grows.
+    const { biomeAt } = await import(pathToFileURL(path.join(ROOT, "world", "worleyBiomes.js")).href);
+    const flatStoneWorld = { biomeSeed: 1337, voxelAt: (x, y, z) => (y === 5 ? VOXEL.STONE : (y < 5 ? VOXEL.STONE : 0)) };
+    const findFarFromBorder = (biomeName) => {
+        let best = null, bestMargin = -1;
+        for (let x = -3000; x < 3000; x += 23) {
+            const b = biomeAt(x, 0, 1337);
+            if (b.primary !== biomeName) continue;
+            const margin = 1 - 2 * b.blend;   // 1 = cell centre, 0 = right on a border
+            if (margin > bestMargin) { bestMargin = margin; best = x; }
+        }
+        return best;
+    };
+    const jungleX = findFarFromBorder("jungle"), desertX = findFarFromBorder("desert");
+    ok("!! a real jungle location (world.biomeSeed = 1337) grows moss -- lush, per SPECIES_BY_BIOME",
+        jungleX !== null && (() => {
+            const mp3 = new MP.MossPatches(fakeGl, flatStoneWorld, { enabled: true, patches: 60, region: 15, maxSlope: 50 });
+            mp3.rebuild(jungleX, 0);
+            return mp3._count > 0;
+        })(), "jungle at x=" + jungleX);
+    ok("!! *** and a real desert location, DEEP INSIDE THE CELL rather than near a border, grows NONE ***",
+        desertX !== null && (() => {
+            const mp4 = new MP.MossPatches(fakeGl, flatStoneWorld, { enabled: true, patches: 60, region: 15, maxSlope: 50 });
+            mp4.rebuild(desertX, 0);
+            return mp4._count === 0;
+        })(), "desert at x=" + desertX +
+        " -- SPECIES_BY_BIOME.desert is null, the same ecological refusal as bare rock with no moss habitat");
+    ok("!! ...and SPECIES_BY_BIOME names all eight real biomes, not a guessed subset",
+        JSON.stringify(Object.keys(MP.SPECIES_BY_BIOME).sort()) ===
+        JSON.stringify(["desert", "forest", "jungle", "plains", "savanna", "shrubland", "taiga", "tundra"].sort()));
 }
 
 console.log("\n8. *** WIRING: ONE GENERATOR, TWO CONSUMERS, NEITHER CARRYING A SECOND COPY ***");
@@ -271,9 +355,17 @@ console.log("\n8. *** WIRING: ONE GENERATOR, TWO CONSUMERS, NEITHER CARRYING A S
     ok("!! ...and every preset states it explicitly rather than leaving it to fall through",
         /grass: false, moss: false/.test(gfx) && /grass: true,\s*moss: true/.test(gfx));
 
+    ok("!! render/mossPatches.js reads the biome from the SAME seed the real terrain was painted with",
+        /world\.biomeSeed/.test(mainJs) || /world\.biomeSeed/.test(fs.readFileSync(path.join(ROOT, "render", "mossPatches.js"), "utf8")),
+        "aligning to a different seed would give a species map that does not match the ground the player sees");
+
     const page = fs.readFileSync(path.join(ROOT, "es-box3d-fly3d.html"), "utf8");
     ok("!! es-box3d-fly3d.html builds its moss from the shared generator, not its own placement",
         /import \{ buildMossShell \} from "\/render\/mossField\.js"/.test(page) && /buildMossShell\(\{ spec: planetSpec_/.test(page));
+    ok("!! ...and picks a species from the planet's REAL type and latitude, not a fixed one",
+        /function mossSpeciesForPlanet\(spec, dir\)/.test(page) &&
+        /case "gas": case "molten": return null;/.test(page),
+        "gas and molten worlds have no solid biosphere-friendly surface and grow no moss at all");
     ok("!! ...as ONE instanced mesh, not a draw call per tuft",
         /new THREE\.InstancedMesh\(clumpGeo, mat, tufts\.length\)/.test(page));
     ok("!! ...parented under the planet mesh, so tilt AND spin carry it for free",
@@ -326,6 +418,32 @@ console.log("\n9. *** LIVE: THE PLANET REALLY GROWS MOSS ON THE DISPLACED GROUND
             ok("!! ...and rebuilt on request", on2 && on2.deck && on2.count > 0, on2.deck ? on2.count + " tufts" : "no deck");
 
             ok("!! ...with zero page errors from any of it", errs.length === 0, errs[0] || "clean");
+            await pg.close();
+
+            // v4077 -- SPECIES BY REAL PLANET TYPE, LIVE: seed 7 is terran (confirmed elsewhere in this file),
+            // seed 1 ice, seed 2 gas, seed 4 molten -- planetSpec() is deterministic, so these seeds name their
+            // types on every run. Gas and molten must show NO deck at all; the two solid types must both show
+            // one, and a different one, because their species differ.
+            const typeCounts = {};
+            for (const [seed, type] of [[7, "terran"], [1, "ice"], [2, "gas"], [4, "molten"]]) {
+                const pg2 = await b.newPage();
+                const e2 = [];
+                pg2.on("pageerror", (e) => e2.push(String(e).slice(0, 200)));
+                await pg2.setViewportSize({ width: 700, height: 460 });
+                await pg2.goto("http://127.0.0.1:" + srv.address().port + "/es-box3d-fly3d.html?seed=" + seed, { waitUntil: "load", timeout: 40000 });
+                await pg2.waitForTimeout(3000);
+                const m = await pg2.evaluate(() => window.swekMossProbe());
+                typeCounts[type] = { deck: !!(m && m.deck), count: m && m.deck ? m.count : 0, errs: e2.length };
+                await pg2.close();
+            }
+            ok("!! *** gas and molten planets grow NO moss at all -- no solid biosphere-friendly surface ***",
+                typeCounts.gas.deck === false && typeCounts.molten.deck === false,
+                JSON.stringify(typeCounts));
+            ok("!! ...while terran and ice BOTH grow moss, with real decks on the real displaced ground",
+                typeCounts.terran.deck && typeCounts.terran.count > 0 && typeCounts.ice.deck && typeCounts.ice.count > 0,
+                "terran " + typeCounts.terran.count + " tufts, ice " + typeCounts.ice.count + " tufts");
+            ok("...and none of the four seeds threw a page error",
+                Object.values(typeCounts).every((t) => t.errs === 0));
         } finally { await b.close(); await new Promise((x) => srv.close(x)); }
     }
 }

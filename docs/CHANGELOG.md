@@ -8,6 +8,90 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4077 -- moss species/biomes, and Sylva's root/arch geometry
+
+The two follow-ons v4076's own changelog named rather than built: "one moss species, not a biome table" and
+"Sylva's procedural ROOT/ARCH geometry is NOT built here." This round builds both.
+
+### Moss species, by real biome -- and a correction to v4076's own claim
+
+v4076 said no moisture concept existed in world/ yet. It was wrong: `world/worleyBiomes.js`'s `biomeAt(x, z,
+seed)` is a real Whittaker heat x moisture classification, already wired into actual terrain painting via
+`world/biomeTerrain.js`. This round reads it rather than re-deriving a second biome system.
+
+`render/mossField.js`'s new `MOSS_SPECIES` table replaces v4076's single species with four -- lush, common,
+pale, dry -- each carrying its own patch radius, tufts-per-patch, colour pair, and vigor. A new `speciesFor(x, z)`
+injection hook (the same shape `accept()`/`patchDensity()` already used) defaults to `"common"`, which is
+byte-identical to v4076's old behaviour when a caller supplies nothing.
+
+`render/mossPatches.js`'s new `SPECIES_BY_BIOME` maps all eight real biomes to a species -- desert maps to none,
+the same refusal shape an unrecognised name already had -- read with `world.biomeSeed`, the SAME seed the
+terrain was actually painted with, so a species boundary lines up with the ground the player sees rather than an
+independent map that happens to overlap. `es-box3d-fly3d.html`'s new `mossSpeciesForPlanet(spec, dir)` does the
+planet's equivalent from the planet's own type and latitude (`dir[1]` is sin(latitude), `world/procPlanet.js`'s
+own convention); gas and molten worlds refuse outright, the same "no solid biosphere-friendly surface" reasoning
+their moss already used.
+
+Per-species colour is now a real `colTop`/`colBot` RGB pair, not a tint scalar mixed against one hardcoded green
+range -- `mossPatches.js`'s shader moved from one `aTint` float attribute to two `vec3` attributes, and the
+fragment shader's mix formula reads the pair directly.
+
+### Root/arch: a swept-tube spline with recursive tapering offshoots
+
+New `world/rootArch.js` is pure geometry -- no GL, no DOM, no Three -- so the identical structure can be drawn on
+voxel terrain and on the planet by two different renderers, the split `render/mossField.js` and
+`render/cloudField.js` already keep. A quadratic-Bezier path is extruded with a circular cross-section using a
+PARALLEL-TRANSPORTED FRAME (Rodrigues' rotation formula) rather than a frame recomputed independently at every
+sample -- the same species of problem `world/planetSurface.js`'s `tangentFrame()` solves for a direction on a
+sphere, solved here for a moving point on a curve. Branches recurse with radius AND length scaled by 0.55 per
+depth level, measurable from the new `branches` metadata rather than merely asserted from the code, and each
+branch is its own closed, capped solid graded by `world/spaceStructures.js`'s own `meshVolume()` -- reused, not
+re-derived.
+
+**A real mesh-winding defect was found here, and fixed the hard way.** An initial cap-disk winding gave a
+positive `meshVolume` for one hand-picked test shape. Stress-testing every individual branch of 60 seeds via a
+new `branchIndices()`/`mergeMeshes()` span-slicing mechanism found 46 of 431 branches were actually negatively
+wound. Worse: a naive "flip until the sign is positive" attempt left 12 duplicate-direction edges and 12
+missing-reverse edges on the exact same failing case -- proof that volume sign alone is not sufficient evidence
+of a correctly wound closed mesh. The real fix (corrected cap-disk winding; the side-quad winding was already
+right) was verified with a directed-edge manifold check (every edge appears at most once, every edge has a
+reverse) run alongside `meshVolume` across 200 seeds and 1428 branches: 0 bad volumes, 0 bad edge-manifolds.
+
+**One landmark, not scattered ground cover, and that is a deliberate difference from moss.** A natural root or
+rock arch is rare and noticed, not a texture underfoot, so this builds ONE structure per call, placed once at
+init rather than rebuilt as the camera moves.
+
+Voxel: new `world/rootArchPlace.js`'s `findRootArchSite()` runs a deterministic spiral search -- the same
+widening-ring idiom `world/ruinPlacer.js` already uses -- for real, non-desert, gentle ground via
+`terrainTopAt()` and `worleyBiomes`, refusing rather than guessing when nothing streamed in yet qualifies. New
+`render/rootArchLandmark.js` draws the result as ONE static raw-GL mesh, placed once and never rebuilt, wired
+into `main.js` exactly like `MossPatches` (`window.rootArch`, a `gfxSettings` `'rootarch'` toggle left ON in
+every quality preset since a single static draw call costs nothing to keep, even at LOW).
+
+Planet: `es-box3d-fly3d.html`'s `buildRootArchLandmark(dir)` parents ONE mesh under `planetMesh` (tilt and spin
+inherited for free, the same reasoning moss already established), oriented to the real `surfaceNormal` at a
+fixed arrival-face direction, built once at boot and idempotent on every later call. Gas and molten planets
+refuse, the same solid-surface reasoning as their moss refusal.
+
+VERIFIED LIVE IN A REAL BROWSER across four planet types: terran and ice both place a real landmark (7 branches
+each), gas and molten place none, zero page errors across all four. The voxel side's live check is honestly
+scoped the same way v4076's own moss check was: the page boots clean with `window.rootArch` in its correct
+default state; placement itself needs real streamed terrain around the search origin, which this ad hoc headless
+boot does not provide, and neither does `render/vegetation.js`'s own grass check under the identical boot.
+
+### Gates
+
+`world/rootArch-selfcheck.mjs` is new: determinism, per-branch closed-volume AND edge-manifold checks across 40
+seeds (extended to 200 seeds / 1428 branches during development), the depth-scaling property measured from
+`branches` metadata, a sabotage test proving the thin-branch refusal is radius-driven rather than dead code, the
+placement search's determinism and its three refusals (no ground, desert, too steep), and live checks on both
+terrain kinds. `render/mossField-selfcheck.mjs` gained real biome-driven species tests (a real jungle location
+grows moss, a real desert location does not) and the four-species colour-and-density assertions.
+
+`definitionGates-selfcheck`'s tree-wide ratchet caught its own kind of debt again: `world/rootArch.js`'s
+`sweptTube()` was exported without the new gate exercising it directly (growing 209 -> 210). Closed by a real
+assertion that calls `sweptTube()` in isolation and grades its endpoints, its closed volume, its edge-manifold,
+and its start/end radii -- not by mention. Back to 209.
 ## Since v4076 -- moss, on both terrain kinds, from one generator
 
 Keith: could a moss/root demo ([github.com/MengTo/sylva](https://github.com/MengTo/sylva)'s **idea** -- the repo

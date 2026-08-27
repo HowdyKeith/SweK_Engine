@@ -27,6 +27,7 @@ const DEFAULTS = {
     water_refraction: true,
     grass:     true,      // v432 — wind-blown ground grass
     moss:      true,      // v4076 — clumped moss on stone/dirt tops
+    rootarch:  true,      // v4077 — one procedural root/arch landmark, placed once (near-zero per-frame cost)
     slopes:    true,      // v432 — smooth ramps over stair-stepped terrain
     mc_terrain: false,    // v434 — experimental marching-cubes smooth terrain (opt-in)
 };
@@ -103,6 +104,7 @@ export class GraphicsSettings {
             ["water_refraction", "Water refraction", "See through the surface to a distorted lakebed"],
             ["grass",     "Grass",            "Wind-blown grass blades on grassy ground"],
             ["moss",      "Moss",             "Clumped moss on stone/dirt, thinning out on steep ground"],
+            ["rootarch",  "Root/arch",        "One procedural root/arch landmark near spawn"],
             ["slopes",    "Smooth slopes",    "Ramp over stair-stepped terrain (mountains)"],
             ["mc_terrain","Smooth terrain (MC)","Experimental: round the whole world via marching cubes. Heavier."],
         ];
@@ -166,9 +168,11 @@ export class GraphicsSettings {
             return b;
         };
         // v4076 -- moss follows grass's own cost tier in every preset (one more instanced draw, comparable cost).
-        presets.appendChild(mkPreset("LOW",  { shadows: false, godrays: false, particles: false, water_ssr: false, water_refraction: false, grass: false, moss: false, slopes: true }));
-        presets.appendChild(mkPreset("MED",  { shadows: false, godrays: false, particles: true,  water_ssr: false, water_refraction: true,  grass: true,  moss: true,  slopes: true }));
-        presets.appendChild(mkPreset("HIGH", { shadows: true,  godrays: true,  particles: true,  water_ssr: true,  water_refraction: true,  grass: true,  moss: true,  slopes: true }));
+        // v4077 -- rootarch stays ON in every tier: one static mesh, one draw call, built once and never rebuilt,
+        // so it carries none of the per-frame cost the LOW preset is turning the others off to avoid.
+        presets.appendChild(mkPreset("LOW",  { shadows: false, godrays: false, particles: false, water_ssr: false, water_refraction: false, grass: false, moss: false, rootarch: true, slopes: true }));
+        presets.appendChild(mkPreset("MED",  { shadows: false, godrays: false, particles: true,  water_ssr: false, water_refraction: true,  grass: true,  moss: true,  rootarch: true, slopes: true }));
+        presets.appendChild(mkPreset("HIGH", { shadows: true,  godrays: true,  particles: true,  water_ssr: true,  water_refraction: true,  grass: true,  moss: true,  rootarch: true, slopes: true }));
         content.appendChild(presets);
 
         // Round 43p - perf readout. Populated by window._perfStats each
