@@ -28,6 +28,7 @@
 
 import { getDevice } from "./devices.mjs";
 import { codeOnly } from "../ship/sourceScan.mjs";
+import { bindFileMap } from "./bindFiles.mjs";
 
 /**
  * Keys a device accepts that its defaults() does not list. Registered rather than guessed, so adding one is a
@@ -158,16 +159,11 @@ export function readButNotDeclared(bindSource, declaredKeys, extra = EXTRA_KEYS)
  * never skipped.
  */
 export async function mirrorAudit(deviceNames, getDevice, readFile) {
-    // fooDevice -> fooBind.mjs, straight out of devices.mjs's imports
-    const symToFile = new Map();
-    const reg = readFile("tools/roundhouse/devices.mjs") || "";
-    for (const m of reg.matchAll(/import\s*\{([^}]*)\}\s*from\s*"\.\/([^"]+)"/g))
-        for (const sym of m[1].split(",").map((x) => x.trim().split(/\s+as\s+/).pop()).filter(Boolean))
-            symToFile.set(sym, m[2]);
-    // registryName: () => fooDevice   /   registryName: makeFooDevice
-    const nameToFile = new Map();
-    for (const m of reg.matchAll(/^\s{4}(\w+):\s*(?:async\s*)?(?:\(\)\s*=>\s*)?(\w+)/gm))
-        if (symToFile.has(m[2])) nameToFile.set(m[1], symToFile.get(m[2]));
+    // v4033 -- ONE PARSER, IN bindFiles.mjs. This was written inline here at v4032 and composeBind needed the
+    // same answer a round later, which is two copies of a text scan and the point at which one of them starts
+    // drifting. bindFileMap is PURE when handed a source, so this file still takes its reader by injection and
+    // never imports node:fs.
+    const nameToFile = bindFileMap({ source: readFile("tools/roundhouse/devices.mjs") || "" });
 
     const rows = [], unresolved = [];
     for (const n of deviceNames) {

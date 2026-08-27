@@ -22,6 +22,7 @@ import { getDevice } from "./devices.mjs";
 import { comparable } from "./observableUnits.mjs";
 import { sampleCount, standardError, agreeWithinError } from "./uncertainty.mjs";
 import { classifyCoupling } from "./couplingIndependence.mjs";
+import { bindPathFor } from "./bindFiles.mjs";
 
 export const COMPOSE_OBSERVABLES = [
     "valueA", "valueB", "absDiff", "relDiff",
@@ -32,6 +33,42 @@ export const COMPOSE_OBSERVABLES = [
 const DEF = {
     devA: "em", modeA: "vacuum", keyA: "cComputed",
     devB: "fdtd", modeB: "lightspeed", keyB: "cMeasured",
+};
+
+// *** v4033 -- THE ALTERNATIVES, DECLARED, BECAUSE THIS DEVICE'S KNOBS ARE NAMES AND NAMES DO NOT SCALE. ***
+//
+// knobLiveness probes a knob by moving it: 1.5x, 0.5x, 8x. Every knob here is a STRING, so there was nothing
+// to move and the census reported all six as "not probed (string)" -- THE ONLY DEVICE IN THE LAB THAT CONSUMES
+// OTHER DEVICES, and the survey could say nothing whatever about it. That was the census being honest rather
+// than wrong: inventing a device name would have tested this file's error handling instead of the knob.
+//
+// But these knobs are not unorderable, they are ENUMERABLE. devA ranges over the registry, modeA over that
+// device's declared modes, keyA over its observables. The set exists; there was just nowhere to write it down.
+// So it is written down here, next to the defaults it perturbs, and DECLARED RATHER THAN DERIVED -- deriving
+// devA from DEVICE_NAMES would make the probe's meaning depend on registry order, and this lab has been bitten
+// by a probed list standing in for a declared one before (v3191: lbm read as a 29-mode device because
+// checkMode answers ok to any string when there is nothing to ask).
+//
+// *** THE EXPECTED ANSWER FOR HALF OF THESE IS A REFUSAL, AND THAT IS THE POINT. *** The census varies one knob
+// at a time, so setting devA to `kepler` while keyA is still `cComputed` asks for an observable kepler does not
+// have -- and this device answers `verdict: "missing"`, which MOVES OBSERVABLES and is therefore a live
+// reading. A refusal is a response (this census's own third category), and a device that answered a broken
+// triple with a number would be the thing worth finding.
+export const COMPOSE_KNOB_CHOICES = {
+    // a real device, and one whose bind file resolves -- the coupling filter is the interesting path
+    devA: ["kepler", "mpmstep"],
+    devB: ["em", "twobody"],
+    // other modes of the DEFAULT devA/devB, so the triple stays half-coherent and reaches deeper filters
+    modeA: ["waveguide", "cherenkov"],
+    modeB: ["dispersion", "dielectric"],
+    // other observables of the default device/mode: these keep the triple fully coherent, so the comparison
+    // runs all the way to a verdict and valueA/valueB actually change
+    keyA: ["z0", "index", "impedance"],
+    // `pointsPerWavelength` was here for one run and the gate's staleness check rejected it on sight: it is
+    // produced by fdtd's `dispersion` mode, not by `lightspeed`, and it was picked by reading modes[0]'s
+    // output instead of the default mode's. A choice list is a claim about another device, and this is
+    // exactly the way one rots.
+    keyB: ["S", "cExact", "steps"],
 };
 
 async function buildCompose({ mode = "compare", config = {} } = {}) {
@@ -72,10 +109,28 @@ async function buildCompose({ mode = "compare", config = {} } = {}) {
     // *** UNKNOWN IS NOT INDEPENDENT. An undecidable independence check now REFUSES BY NAME rather than being
     // silently treated as the strongest verdict. WHEN THIS GOES RED the fix is to make the coupling decidable
     // -- give the device a real bind file -- NEVER to fall back to reporting agreement. ***
+    //
+    // *** v4033 -- AND THE PATHS ARE RESOLVED FROM THE REGISTRY, BECAUSE 36 OF THE 37 MISSES WERE THIS BUG. ***
+    // The note above is right about lbm and generalised from it. The paths were built as `${dev}Bind.mjs`, and
+    // THE REGISTRY KEY IS LOWERCASE WHILE THE FILENAME IS CAMELCASE -- mpmstep is mpmStepBind.mjs, blackhole is
+    // blackHoleBind.mjs, twobody is twoBodyBind.mjs. MEASURED: 37 of 129 device names had no file at the
+    // guessed path, so every comparison touching the whole MPM family, blackhole, twobody, whitedwarf and 32
+    // others returned "independence-unknown" FOR A REASON THAT HAD NOTHING TO DO WITH COUPLING. The refusal was
+    // correct behaviour on a wrong input, which is the worst kind of wrong to find: nothing looked broken.
+    //
+    // bindFiles resolves 128 of the 129 from devices.mjs's own imports. THE ONE IT CANNOT RESOLVE IS lbm, which
+    // is exactly the device v3722 named -- its build is a local function in devices.mjs and there is no file to
+    // read. So that refusal stands, unchanged and now for the stated reason rather than as one of thirty-seven.
     let indep = { verdict: "unknown", reason: "the coupling check threw" };
-    try {
-        indep = classifyCoupling(`tools/roundhouse/${c.devA}Bind.mjs`, `tools/roundhouse/${c.devB}Bind.mjs`);
-    } catch (e) { indep = { verdict: "unknown", reason: `the coupling check threw: ${String(e && e.message).slice(0, 80)}` }; }
+    const pathA = bindPathFor(c.devA), pathB = bindPathFor(c.devB);
+    if (!pathA || !pathB) {
+        indep = { verdict: "unreadable",
+                  reason: `no bind file is registered for ${!pathA ? c.devA : c.devB} -- its device is not `
+                        + "imported from a module, so there is no import graph to read" };
+    } else {
+        try { indep = classifyCoupling(pathA, pathB); }
+        catch (e) { indep = { verdict: "unknown", reason: `the coupling check threw: ${String(e && e.message).slice(0, 80)}` }; }
+    }
     if (indep.verdict === "unknown" || indep.verdict === "unreadable") {
         return { ...blank, valueA: a, valueB: b, dimensionsComparable: true, dimA: dim.a ?? null, dimB: dim.b ?? null,
                  verdict: "independence-unknown",
@@ -171,6 +226,9 @@ async function composeRefusalExpired() {
 }
 
 export const composeDevice = {
+    // v4033 -- see COMPOSE_KNOB_CHOICES. Without this the census reports six "not probed (string)" rows and
+    // this device contributes nothing to the lab's knob coverage at all.
+    knobChoices: COMPOSE_KNOB_CHOICES,
     plantRefusedExpiry: composeRefusalExpired,
     modes: ["compare"],
     name: "cross-device-comparison", observables: COMPOSE_OBSERVABLES, build: buildCompose,

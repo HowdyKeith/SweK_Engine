@@ -78,8 +78,32 @@ import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";
 
-/** The values tried for one knob. A knob is live as soon as ONE of them moves something -- the rest are skipped. */
-export function probeValues(v) {
+/**
+ * The values tried for one knob. A knob is live as soon as ONE of them moves something -- the rest are skipped.
+ *
+ * *** v4033 -- A DEVICE MAY DECLARE ALTERNATIVES FOR A KNOB THAT HAS NO ORDERING. ***
+ *
+ * A string or a list has nothing to scale, and this census has always refused to invent an ordering for one --
+ * correctly, because a made-up value tests the device's error handling instead of the knob. But refusing to
+ * GUESS is not the same as being unable to ASK, and `compose` is the case that makes the difference plain: all
+ * six of its knobs are strings, so the census could say nothing whatever about the one device in the lab that
+ * consumes other devices. Its knobs are NAMES -- devA ranges over the registry, modeA over that device's
+ * declared modes, keyA over its observables -- and that is a perfectly good set to perturb within. What was
+ * missing was somewhere to write it down.
+ *
+ * So a device may export `knobChoices`, and the census uses it INSTEAD of the scaled ladder. Declared, never
+ * inferred: the same move this lab already made for `modes` (v3191 -- probing a candidate list reported lbm as
+ * a 29-mode device, because checkMode answers ok to any string when there is nothing to ask) and for
+ * PLANT_STATES. A device that declares nothing stays unprobed and is still REPORTED as unprobed, because an
+ * admission is not a measurement.
+ */
+export function probeValues(v, choices = null) {
+    // Declared alternatives win outright -- including for numbers, where a device may know its own range
+    // better than a blind 1.5x does. The current value is dropped: probing a knob at what it already is
+    // measures nothing and would read as dead.
+    if (Array.isArray(choices) && choices.length) {
+        return choices.filter((x) => !Object.is(x, v));
+    }
     if (typeof v === "boolean") return [!v];
     if (typeof v !== "number" || !Number.isFinite(v)) return [];
     if (v === 0) return [1, 0.5, -1];
@@ -97,7 +121,7 @@ export function probeValues(v) {
  */
 export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadline = Infinity) {
     const def = cfg[knob];
-    for (const alt of probeValues(def)) {
+    for (const alt of probeValues(def, choicesFor(device, knob))) {
         // *** v4032 -- THE DEADLINE IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS. ***
         // knobLiveness's budget guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran
         // unbounded once entered. optics is what showed it: its `converge` mode costs 7200/F Simpson
@@ -129,6 +153,20 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };
+}
+
+/**
+ * A device's declared alternatives for one knob, or null. `knobChoices` may be an object or a function of the
+ * mode, because compose's valid modeA depends on which devA is set -- a device that knows that can say so.
+ * ANYTHING THAT THROWS RESOLVES TO null, which means "no ordering declared" and never "nothing to find".
+ */
+export function choicesFor(device, knob, mode) {
+    try {
+        const kc = device && device.knobChoices;
+        const table = typeof kc === "function" ? kc({ mode }) : kc;
+        const v = table && table[knob];
+        return Array.isArray(v) && v.length ? v : null;
+    } catch { return null; }
 }
 
 /** The axes liveness is asked along. Named rather than implicit, so adding a third is a visible change. */
@@ -194,7 +232,7 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
                     // fallback` is a live, readable knob whose default means "compute it", and there are two in
                     // the lab (optics.spread and blackhole.onsetLo, the latter unnoticed since it was written).
                     // Reported as UNPROBED so the census names what it cannot answer rather than implying it did.
-                    if (!probeValues(v).length) {
+                    if (!probeValues(v, choicesFor(dev, knob, m)).length) {
                         a.kind = v === null || v === undefined ? "null-default" : (Array.isArray(v) ? "array" : kind);
                         a.unprobed = true;
                         continue;
