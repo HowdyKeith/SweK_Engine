@@ -19,7 +19,8 @@
 // refusal is a response. Counting it dead would mark the best-behaved knobs in the lab as the broken ones.
 "use strict";
 import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
-         PLANT_STATES, STILL_OK } from "./knobLiveness.mjs";
+         PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob } from "./knobLiveness.mjs";
+import { kuramotoDevice } from "./kuramotoBind.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -117,6 +118,82 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
         !stillKnobs(rows).some((k) => k === "optics.spread" || k === "blackhole.onsetLo"),
         "still: " + (stillKnobs(rows).join(", ") || "none") + ". A measurement and an admission are different "
         + "claims and folding the second into the first would report coverage this census does not have.");
+}
+
+console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB THAT MOVES NOTHING ***");
+{
+    // THE MOST EXPENSIVE READING THIS CENSUS EVER PRODUCED, and the only kind it cannot afford: a knob that
+    // is LIVE, reported DEAD, under a heading that says ANYWHERE. kuramoto's `curve` mode sweeps 4096
+    // oscillators eight times over two plant states; that blew the budget before the loop ever reached
+    // `pendulum`, which is the one mode reading pendN and cycle at all. The row carried one mode's worth of
+    // evidence and the report carried a claim about all three.
+    const honest = await kuramotoDevice.build({ mode: "pendulum", config: {} });
+    const moves = async (knob, v) => {
+        const o = await kuramotoDevice.build({ mode: "pendulum", config: { [knob]: v } });
+        return Object.keys(honest).filter((k) => !Object.is(honest[k], o[k]));
+    };
+    const mN = await moves("pendN", 40), mC = await moves("cycle", 120);
+    ok("!! *** kuramoto.pendN AND .cycle ARE LIVE, AND WERE LIVE THE WHOLE TIME THE CENSUS CALLED THEM DEAD ***",
+        mN.length >= 3 && mC.length >= 3,
+        "pendN 15 -> 40 moves " + mN.join(", ") + "; cycle 60 -> 120 moves " + mC.join(", ") + ". Both in " +
+        "`pendulum`, in about a millisecond each -- THE COST THAT HID THEM WAS ENTIRELY IN THE OTHER TWO MODES.");
+
+    // *** THE BUDGET IS MEASURED IN BUILDS, NOT MILLISECONDS, SO THIS CHECK IS NOT A RACE. *** A flat
+    // millisecond figure would assert the machine's speed as much as the census's logic: too small and the
+    // loop is cut off before it probes anything (a different bug, unprobedKnobs' territory), too large and a
+    // fast machine finishes and there is nothing incomplete to classify. One `curve` build is the natural
+    // unit -- 7.3 s here -- and the budget check falls between knobs, so at 1.5 builds the loop clears the
+    // base build, probes exactly one knob (three more builds), and is over. That holds at any clock speed.
+    const c0 = Date.now();
+    await kuramotoDevice.build({ mode: "curve", config: {} });
+    const oneBuild = Date.now() - c0;
+    const { rows, notes } = await knobLiveness({ only: ["kuramoto"], budgetMs: Math.round(oneBuild * 1.5) });
+    const row = rows.find((r) => r.knob === "pendN");
+    ok("!! *** and a cut-off census reports them as UNFINISHED, never as answered ***",
+        !!row && row.incomplete === true && row.probed.length > 0 &&
+        !stillKnobs(rows).some((k) => k.startsWith("kuramoto.")) &&
+        incompleteKnobs(rows).some((k) => k.startsWith("kuramoto.")),
+        "one build " + oneBuild + " ms, budget " + Math.round(oneBuild * 1.5) + " ms. still: " +
+        (stillKnobs(rows).join(", ") || "none") + " | incomplete: " +
+        (incompleteKnobs(rows).join(", ") || "none") + ". Three categories, not two: 'moves nothing' is a " +
+        "measurement, 'was never probed' is an admission, and THIS ONE IS A PARTIAL MEASUREMENT -- the most " +
+        "dangerous to promote, because it looks exactly like the first.");
+    ok("...and the note names the modes it never opened, so the gap has an address",
+        notes.some((n) => /MODES NEVER ENTERED:/.test(n) && /pendulum/.test(n)),
+        notes.join(" | ") + ". The old note said only that the device was incomplete, and counted its " +
+        "denominator off the knobs the loop had REACHED -- so kuramoto scored 'probed 1 of 1', a perfect " +
+        "score, with four declared knobs never looked at.");
+}
+
+console.log("\n3d. *** v4031 -- AN OBSERVABLE THAT IS THE KNOB HANDED BACK IS AN ECHO, NOT A RESPONSE ***");
+{
+    // SABOTAGE, in the spirit of section 2: a device that grades nothing at all and would have read as
+    // perfectly live. Several real binds publish their config among their observables -- mpmstep does it with
+    // `steps` and `dt` -- and this round nearly added two more before the census obligingly reported the new
+    // knob as "live in freefall [1 observables]". The one observable was the knob.
+    const parrot = { modes: ["only"], observables: ["nx"], build: async ({ config = {} } = {}) => ({ nx: config.nx }) };
+    const cfg = { nx: 16 };
+    const pBase = await parrot.build({ mode: "only", config: cfg });
+    const pr = await probeKnob(parrot, "only", cfg, "nx", pBase);
+    ok("!! *** A DEVICE WHOSE ONLY OBSERVABLE IS ITS OWN INPUT READS STILL, NOT LIVE ***",
+        pr.state === "still",
+        "state " + pr.state + ". A knob that reads live off its own echo is WORSE THAN ONE THAT READS DEAD: " +
+        "dead invites a look and live closes the question, so the census would have certified as answered the " +
+        "exact knob it had just been wrong about.");
+
+    // And the rule has to be narrow, or it starts deleting real responses. An observable counts as an echo
+    // ONLY if it equalled the default before AND equals the probe value after -- the signature of a
+    // pass-through and of nothing else.
+    const nearly = {
+        modes: ["only"], observables: ["nx", "twice"],
+        build: async ({ config = {} } = {}) => ({ nx: config.nx, twice: config.nx * 2 }),
+    };
+    const nBase = await nearly.build({ mode: "only", config: cfg });
+    const nr = await probeKnob(nearly, "only", cfg, "nx", nBase);
+    ok("!! ...and one real observable beside the echo is still enough to read live",
+        nr.state === "live" && nr.moved.includes("twice") && !nr.moved.includes("nx"),
+        "state " + nr.state + ", moved " + nr.moved.join(", ") + ". The echo is dropped and the RESPONSE is " +
+        "kept -- the rule discards a pass-through, not a knob.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
