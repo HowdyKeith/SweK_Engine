@@ -126,11 +126,19 @@ export const eulerDefect = (faces) => eulerCharacteristic(faces) - 2 * component
  * THE PLANT: the census with the link test dropped -- marchingCubes' definition of watertight, which is the
  * shape this module exists to replace. Everything else is the module's own answer, unmodified.
  */
+// *** v4032 -- THE LOCAL IS `cen`, NOT `c`, AND THAT IS NOT A STYLE CHOICE. *** `c` means the merged config
+// everywhere else in this file, so a census result bound to `c` made `c.boundaryEdges` and
+// `c.nonManifoldEdges` read as CONFIG KEYS THIS BIND USES AND NEVER DECLARES -- the one offender in the
+// lab-wide mirror audit, and a false one. strictConfig's own v3930 note records the identical defect in xpbd
+// ("a local named `c` shadowing the config object -- a genuine naming defect, since `c.` means config
+// everywhere else in that file") and this file reintroduced it at v4026, three rounds after the lesson was
+// written down. A scan that cannot tell a config from a result is worth exactly as much as the naming
+// discipline underneath it.
 function census(faces, planted) {
-    const c = manifoldCensus(faces);
-    if (!planted) return c;
-    return { ...c, nonManifoldVertices: 0,
-             closedManifold: c.boundaryEdges === 0 && c.nonManifoldEdges === 0 };
+    const cen = manifoldCensus(faces);
+    if (!planted) return cen;
+    return { ...cen, nonManifoldVertices: 0,
+             closedManifold: cen.boundaryEdges === 0 && cen.nonManifoldEdges === 0 };
 }
 
 function buildManifold({ mode = "census", config = {} } = {}) {
