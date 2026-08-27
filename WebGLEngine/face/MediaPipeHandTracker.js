@@ -46,6 +46,17 @@ const DEFAULT_OPTS = {
     // centre as a stable reference" -- and it leaves every metric returning a plausible number while making the
     // classification depend on WHERE THE HAND IS. False, or a { x, y, z } point. NOTHING SHIPS WITH THIS ON.
     fixedAnchor: false,
+    // v4027 -- A THIRD DECLARED DEFECT KNOB, OFF BY DEFAULT. _dist3D is a Euclidean hypot, and Euclidean
+    // distance is EXACTLY invariant under rotation in any plane -- which is why in-plane roll reads 0/64 under
+    // every plant so far. The L1 (Manhattan) sum is the classic cheap substitute, and it is NOT rotation
+    // invariant: |dx|+|dy| changes as a rigid pair turns even though the pair has not moved. "hypot is a square
+    // root per landmark pair, use the taxicab sum" is the same shape of edit as dropping z.
+    manhattan: false,
+    // v4027 -- A FOURTH. The mirror x -> 1-x is applied at three sites, and this file's own gate says the
+    // involution test "catches the mirror being applied to one side of a difference and not the other". Half of
+    // it -- forgetting mx() on the grab point while keeping it on the cursor -- is the single most ordinary slip
+    // available here, and every gesture still returns a number in range.
+    mirrorHalf: false,
 };
 
 // MediaPipe hand landmark indices (21 points per hand).
@@ -320,7 +331,13 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
     // v3850 -- the declared defect knob; see DEFAULT_OPTS. `false` here means every call below takes the
     // three-argument path character for character, which is what makes the default verifiable.
     const flat = opts.flatDistance ?? DEFAULT_OPTS.flatDistance;
-    const dist = (a, b) => _dist3D(a, b, flat);
+    // v4027 -- the metric knob. Like `flat` it branches the WHOLE call rather than reshaping the default's
+    // arithmetic, so the Euclidean path is entered character for character when nothing is asked for.
+    const l1 = opts.manhattan ?? DEFAULT_OPTS.manhattan;
+    const dist = l1 ? (a, b) => _distL1(a, b) : (a, b) => _dist3D(a, b, flat);
+    const halfMirror = opts.mirrorHalf ?? DEFAULT_OPTS.mirrorHalf;
+    // The grab point's own mirror, separable from the cursor's. `mx` when the knob is off -- the same function.
+    const gx = halfMirror ? (x) => x : mx;
     // v4026 -- the second declared defect knob; see DEFAULT_OPTS. When it is false the fold reference below is
     // THE WRIST OBJECT ITSELF, so the default path is not merely equivalent to the old one, it is the same call
     // on the same operand -- the discipline _dist3D's comment sets out, applied to an operand instead of an
@@ -342,7 +359,7 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
 
         // Grab point: midpoint of thumb+index (mirrored X).
         const grabPoint = {
-            x: mx((thumbTip.x + indexTip.x) / 2),
+            x: gx((thumbTip.x + indexTip.x) / 2),
             y: (thumbTip.y + indexTip.y) / 2,
             z: (thumbTip.z + indexTip.z) / 2,
         };
@@ -390,6 +407,13 @@ export function computeHandMetrics(landmarksArray, result = null, opts = {}) {
         pinch: primary?.pinch?.active ?? false,
         twoHand,
     };
+}
+
+// v4027 -- the L1 substitute, as its own function for the reason _dist3D's comment gives about argument counts:
+// a knob that reshapes the default's arithmetic is not a knob. This is entered only when a caller asks by name.
+function _distL1(a, b) {
+    if (!a || !b) return 0;
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs((a.z ?? 0) - (b.z ?? 0));
 }
 
 function _dist3D(a, b, flat = false) {

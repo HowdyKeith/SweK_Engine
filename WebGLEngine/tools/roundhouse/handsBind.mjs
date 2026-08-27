@@ -104,6 +104,52 @@
 // so the anchor STARTS at the wrist and still breaks translation invariance 8 times. IT IS THE FIXEDNESS AND
 // NOT THE POSITION.
 //
+// ================================================================================================================
+// v4027 -- THE LAST TWO NEGATIVES, AND ONE OF THEM WAS BLIND FOR A REASON NOBODY HAD MEASURED
+// ================================================================================================================
+//
+// THE MIRROR INVOLUTION was the easy one. mirrorMaxDelta asserts that computing with mirror:true on a pose
+// equals computing with mirror:false on its reflection, and this file's own gate says it "catches the mirror
+// being applied to one side of a difference and not the other". `mirrorHalf` is that slip made a declared knob:
+// keep mx() on the cursor, forget it on the grab point. 0 -> 0.127. Every gesture still returns a number in
+// range, which is why it is the ordinary slip rather than an exotic one.
+//
+// *** IN-PLANE ROLL WAS THE INTERESTING ONE, AND THE FIRST ANSWER WAS WRONG. *** The census called it "BLIND BY
+// CONSTRUCTION -- a 2D metric is EXACTLY invariant under rotation in the image plane". True of the metric, and
+// it is NOT the reason the observable cannot move. `manhattan` replaces the Euclidean hypot with the taxicab
+// sum -- a metric that is emphatically NOT rotation invariant -- and on the four committed poses it reads
+// 0/64. MEASURED, the mechanism is MARGIN:
+//
+//     under z-rotation, the L1 fold DISTANCE swings   30-40%
+//     under z-rotation, the L1 fold RATIO swings       6-10%     <- two distances from the SAME point in
+//                                                                  nearly the SAME direction, so the
+//                                                                  anisotropy largely cancels
+//     closest fold decision on a committed pose        14-23% from its boundary
+//
+// A 6-10% perturbation cannot cross a 14% margin, so the plant is invisible -- and that is a statement about
+// THE POSES, not about the metric. THE PREDICTION THAT FOLLOWS WAS TESTED: at a flexion where the margin is
+// 0.01%, the same plant flips 69 of 80. So the sweep is repeated on a pose sitting ON the decision boundary,
+// DERIVED BY BISECTION on the module's own verdict rather than typed, using whichever metric is active.
+//
+//     mode          committed inPlane   AT THE BOUNDARY   boundary flex   margin
+//     honest              0/64             0/16            44.096 deg     1.06e-11 %
+//     flatdistance        0/64             0/16            36.788 deg     7.25 %
+//     fixedanchor         0/64             8/16            52.823 deg     8.80 %
+//     manhattan           0/64            16/16            55.239 deg     11.1 %
+//
+// *** THE HONEST ARM SITS AT A MARGIN OF 1.06e-11 PERCENT AND STILL READS 0 OF 16, WHICH IS THE KEY RATHER THAN
+// A CONVENIENCE. *** The Euclidean fold ratio varies 0.0000% under z-rotation -- exactly invariant, not nearly --
+// so no margin however thin can make it flip. A boundary pose is the hardest case available to the honest metric
+// and it is unmoved, which is what makes the planted 16/16 mean something.
+//
+// AND THE BOUNDARY POSE MAKES AN EXISTING PLANT VISIBLE IN A FAMILY IT COULD NOT PREVIOUSLY REACH: fixedanchor
+// goes 0/64 to 8/16. flatdistance stays 0 in both, and that one IS structural -- z is constant under a rotation
+// about z, so dropping it cannot change an in-plane verdict at any margin.
+//
+// THE BOUNDARY SWEEP IS REPORTED SEPARATELY and kept out of rigidDisagreements on purpose: it runs on a pose
+// constructed to sit at the decision boundary, which is not one of the four committed gestures, and folding it
+// into the headline would move a number that means "the vocabulary's own poses are invariant".
+//
 // *** FOUR OF THE FIVE TRANSFORM FAMILIES CANNOT SEE IT, AND THE BLIND ONE IS THE OBVIOUS ONE TO TEST WITH. ***
 // A 2D metric is EXACTLY invariant under rotation in the image plane, so rolling your hand at the camera -- the
 // first thing anyone does to check a hand tracker, and the motion barehands' two-hand rotate is built on --
@@ -135,13 +181,14 @@
 import { computeHandMetrics } from "../../face/MediaPipeHandTracker.js";
 
 import { pathToFileURL } from "node:url";
-export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance", "fixedanchor"];
+export const HANDS_MODES = ["rigid", "scale", "mirror", "flatdistance", "fixedanchor", "manhattan", "mirrorhalf"];
 
 export const HANDS_OBSERVABLES = [
     "rigidDisagreements", "rotationDisagreements", "translationDisagreements",
     "outOfPlaneDisagreements", "inPlaneDisagreements", "posesSwept", "twoHandSpreadDrift",
     "foldScaleDisagreements", "pinchCriticalScale", "pinchHomogeneityErr", "pinchFlipsAtCritical",
     "scalesSwept", "mirrorMaxDelta", "mirrorPoses",
+    "inPlaneBoundaryDisagreements", "boundaryFlexDeg", "boundaryMarginPct", "inPlaneBoundarySwept",
     "poses", "kind",
 ];
 
@@ -249,12 +296,35 @@ export function handsDefaults(hyp) {
     if (!HANDS_MODES.includes(h.mode)) h.mode = "rigid";
     if (!h.claim || !h.claim.observable) {
         h.claim =
-            (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor")
+            (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor" || h.mode === "manhattan")
                 ? { observable: "rigidDisagreements", max: 0 } :
+            h.mode === "mirrorhalf" ? { observable: "mirrorMaxDelta", max: 0 } :
             h.mode === "scale" ? { observable: "foldScaleDisagreements", max: 0 } :
                                  { observable: "mirrorMaxDelta", max: 0 };
     }
     return h;
+}
+
+/**
+ * v4027 -- THE FLEXION AT WHICH THE FOLD DECISION SITS ON ITS BOUNDARY, DERIVED BY BISECTION ON THE MODULE'S
+ * OWN VERDICT rather than typed. The census's own lesson is that "A DEFECT IS VISIBLE WHERE A DECISION IS
+ * CLOSE, NOT WHERE THE ERROR IS LARGE" -- the four committed poses sit 14% to 23% from their fold boundary, and
+ * nothing that perturbs the ratio by less than that can be seen on them. This finds the place where it can.
+ *
+ * Bisects on `folded.index` flipping as the fingers curl, USING WHATEVER METRIC THE CALLER HAS SELECTED, so the
+ * boundary is the active metric's own and not a constant carried over from another one.
+ */
+function boundaryFlex(metrics, lo = 0.2, hi = 1.6, iters = 40) {
+    const foldedAt = (fx) => {
+        const m = metrics(place(handPose({ flex: [fx, fx, fx, fx] })));
+        return !!(m && m.hands && m.hands[0] && m.hands[0].folded.index);
+    };
+    if (foldedAt(lo) === foldedAt(hi)) return null;      // no crossing in the bracket: REFUSED, not guessed
+    for (let i = 0; i < iters; i++) {
+        const mid = (lo + hi) / 2;
+        if (foldedAt(mid) === foldedAt(lo)) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
 }
 
 export async function buildHands(hyp, base = {}) {
@@ -270,12 +340,17 @@ export async function buildHands(hyp, base = {}) {
     // in the image instead of to the wrist, which is the one edit that makes a classification depend on WHERE
     // THE HAND IS.
     const anchored = h.mode === "fixedanchor";
+    // v4027 -- THE THIRD AND FOURTH PLANTS, for the last two families nothing could reach.
+    const taxicab = h.mode === "manhattan";
+    const halfMirror = h.mode === "mirrorhalf";
     const opts = flat ? { flatDistance: true, pinchThreshold: c.pinchThreshold }
                : anchored ? { fixedAnchor: { x: c.anchorX, y: c.anchorY, z: 0 }, pinchThreshold: c.pinchThreshold }
+               : taxicab ? { manhattan: true, pinchThreshold: c.pinchThreshold }
+               : halfMirror ? { mirrorHalf: true, pinchThreshold: c.pinchThreshold }
                           : { pinchThreshold: c.pinchThreshold };
     const metrics = (lm) => computeHandMetrics([lm], null, opts);
 
-    if (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor") {
+    if (h.mode === "rigid" || h.mode === "flatdistance" || h.mode === "fixedanchor" || h.mode === "manhattan") {
         let rotDis = 0, transDis = 0, outDis = 0, inDis = 0, n = 0;
         for (const name of POSE_NAMES) {
             const pose = handPose(POSES[name]);
@@ -303,6 +378,40 @@ export async function buildHands(hyp, base = {}) {
                 }
             }
         }
+        // *** v4027 -- IN-PLANE ROLL AT THE DECISION BOUNDARY. *** The four committed poses cannot see a
+        // metric that is not rotation-invariant, and the reason is MARGIN rather than symmetry: measured, the
+        // L1 fold DISTANCE swings 30-40% under z-rotation while the fold RATIO -- two distances from the same
+        // point in nearly the same direction, so the anisotropy largely cancels -- swings only 6-10%, against a
+        // closest margin of 14%. At a flexion where the margin is 0.01% the same plant flips 69 of 80. So the
+        // sweep is repeated on a pose sitting ON the boundary, derived by bisection on the module's own verdict.
+        //
+        // AND THE HONEST ARM STAYS EXACTLY 0 THERE, WHICH IS THE KEY RATHER THAN A CONVENIENCE: the Euclidean
+        // fold ratio varies 0.0000% under z-rotation -- exactly invariant, not nearly -- so no margin however
+        // thin can make it flip. A boundary pose is the hardest case for the honest metric and it is unmoved.
+        let bDis = 0, bN = 0, bFlex = null, bMargin = null;
+        {
+            const fx = boundaryFlex(metrics);
+            if (fx !== null) {
+                bFlex = fx * 180 / Math.PI;
+                const bp = handPose({ flex: [fx, fx, fx, fx] });
+                const bref = classify(metrics(place(bp)));
+                if (bref) {
+                    for (let d = -c.rotDeg; d <= c.rotDeg; d += c.rotStep) {
+                        if (d === 0) continue;
+                        bN++;
+                        if (differs(classify(metrics(place(rotate(bp, "z", d * D)))), bref)) bDis++;
+                    }
+                }
+                // How close the decision actually is, so "on the boundary" is a measurement and not a label.
+                const m0 = metrics(place(bp));
+                const w = place(bp)[0], pts = place(bp);
+                const dTip = Math.hypot(pts[8].x - w.x, pts[8].y - w.y, pts[8].z - w.z);
+                const dPip = Math.hypot(pts[6].x - w.x, pts[6].y - w.y, pts[6].z - w.z);
+                bMargin = Math.abs(dTip / dPip - 1) * 100;
+                void m0;
+            }
+        }
+
         // Two-hand spread under a rigid motion of the PAIR -- barehands scales with it. REPORTED, NOT PINNED AT
         // ZERO: unlike the classification bits this is a hypot over transformed coordinates, so it carries
         // floating-point roundoff (measured 5.6e-17 under translation, 1.1e-16 under in-plane rotation) and
@@ -322,6 +431,13 @@ export async function buildHands(hyp, base = {}) {
             rotationDisagreements: rotDis, translationDisagreements: transDis,
             outOfPlaneDisagreements: outDis, inPlaneDisagreements: inDis,
             posesSwept: n, poses: POSE_NAMES.length, twoHandSpreadDrift: spreadDrift,
+            // The boundary sweep is REPORTED SEPARATELY and deliberately kept out of rigidDisagreements: it runs
+            // on a pose constructed to sit at the decision boundary, which is not one of the four committed
+            // gestures, and folding it into the headline count would move a number that means "the vocabulary's
+            // own poses are invariant".
+            inPlaneBoundaryDisagreements: bDis, inPlaneBoundarySwept: bN,
+            boundaryFlexDeg: bFlex === null ? -1 : bFlex,
+            boundaryMarginPct: bMargin === null ? -1 : bMargin,
         };
     }
 

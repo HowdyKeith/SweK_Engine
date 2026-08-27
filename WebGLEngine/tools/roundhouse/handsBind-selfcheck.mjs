@@ -301,5 +301,64 @@ console.log("\n" + "6. *** v4026 -- THE LOAD-BEARING NEGATIVE THAT NOTHING HAD S
         + "otherwise: it closes ONE of the six, and names which.");
 }
 
+// ---- v4027: THE LAST TWO NEGATIVES ---------------------------------------------------------------------------
+console.log("\n" + "7. *** v4027 -- THE MIRROR INVOLUTION, AND IN-PLANE ROLL AT THE DECISION BOUNDARY ***");
+{
+    const mir2 = await buildHands({ mode: "mirror" });
+    const half = await buildHands({ mode: "mirrorhalf" });
+    ok("!! *** THE MIRROR INVOLUTION FIRES: 0 -> 0.127 ***",
+        mir2.mirrorMaxDelta === 0 && half.mirrorMaxDelta > 0.01,
+        "max delta " + mir2.mirrorMaxDelta + " -> " + half.mirrorMaxDelta.toFixed(6) + " across "
+        + half.mirrorPoses + " poses. mirrorHalf keeps mx() on the cursor and forgets it on the grab point -- "
+        + "the ordinary slip, and this gate's own section 3 already said the involution test exists to catch "
+        + "'the mirror being applied to one side of a difference and not the other'. Now it has.");
+
+    const man = await buildHands({ mode: "manhattan" });
+    const anch2 = await buildHands({ mode: "fixedanchor" });
+    const flat3 = await buildHands({ mode: "flatdistance" });
+
+    ok("!! the taxicab metric is invisible on all four COMMITTED poses",
+        man.rigidDisagreements === 0 && man.inPlaneDisagreements === 0,
+        "0 of " + man.posesSwept + ". A metric that is emphatically NOT rotation invariant, seen by nothing -- "
+        + "which is a statement about the poses and not about the metric.");
+    ok("!! *** AND IT FIRES 16/16 ON A POSE AT THE DECISION BOUNDARY ***",
+        rigid.inPlaneBoundaryDisagreements === 0 && man.inPlaneBoundaryDisagreements === man.inPlaneBoundarySwept
+        && man.inPlaneBoundarySwept > 0,
+        rigid.inPlaneBoundaryDisagreements + "/" + rigid.inPlaneBoundarySwept + " -> "
+        + man.inPlaneBoundaryDisagreements + "/" + man.inPlaneBoundarySwept + ". The mechanism is MARGIN: the "
+        + "L1 fold DISTANCE swings 30-40% under z-rotation while the RATIO -- two distances from the same point "
+        + "in nearly the same direction -- swings only 6-10%, against a closest committed margin of 14%. THE "
+        + "PREDICTION THAT FOLLOWS WAS TESTED before this pose existed: at a 0.01% margin the same plant flips "
+        + "69 of 80.");
+    ok("!! *** THE HONEST ARM IS AT A MARGIN OF 1e-11 PERCENT AND STILL READS 0 ***",
+        rigid.inPlaneBoundaryDisagreements === 0 && rigid.boundaryMarginPct < 1e-6,
+        "margin " + rigid.boundaryMarginPct.toExponential(3) + "%, flexion "
+        + rigid.boundaryFlexDeg.toFixed(3) + " deg, disagreements " + rigid.inPlaneBoundaryDisagreements
+        + ". *** THE EUCLIDEAN FOLD RATIO VARIES 0.0000% UNDER z-ROTATION -- EXACTLY INVARIANT, NOT NEARLY -- "
+        + "so no margin however thin can flip it. *** A boundary pose is the hardest case available to the "
+        + "honest metric and it is unmoved, which is what makes the planted 16/16 mean anything.");
+    ok("!! the boundary flexion is DERIVED by bisection on the module's own verdict, not typed",
+        rigid.boundaryFlexDeg > 0 && man.boundaryFlexDeg > 0 && rigid.boundaryFlexDeg !== man.boundaryFlexDeg,
+        "honest " + rigid.boundaryFlexDeg.toFixed(3) + " deg, taxicab " + man.boundaryFlexDeg.toFixed(3)
+        + " deg -- DIFFERENT, because each metric has its own boundary and a constant carried from one to the "
+        + "other would be measuring the wrong place.");
+    ok("!! ...and the boundary pose makes an EXISTING plant visible in a family it could not reach",
+        anch2.inPlaneDisagreements === 0 && anch2.inPlaneBoundaryDisagreements > 0,
+        "fixedanchor: committed " + anch2.inPlaneDisagreements + "/" + anch2.posesSwept + " -> boundary "
+        + anch2.inPlaneBoundaryDisagreements + "/" + anch2.inPlaneBoundarySwept + ". The pose is not only for "
+        + "the new plant.");
+    ok("!! AND flatdistance STAYS 0 AT THE BOUNDARY, which is the one that really is structural",
+        flat3.inPlaneBoundaryDisagreements === 0,
+        "0/" + flat3.inPlaneBoundarySwept + " at a margin of " + flat3.boundaryMarginPct.toFixed(2) + "%. z is "
+        + "CONSTANT under a rotation about z, so dropping it cannot change an in-plane verdict at any margin. "
+        + "Margin explains three of the four rows; symmetry explains this one, and the two are different "
+        + "reasons wearing the same zero.");
+    report("WHAT REMAINS",
+        "the committed-pose inPlaneDisagreements is still 0 under every plant, and that is now EXPLAINED "
+        + "rather than merely observed: the four gesture poses sit 14-23% from their fold boundary. The "
+        + "boundary sweep is reported separately and deliberately kept out of rigidDisagreements, because a "
+        + "pose built to sit on a decision boundary is not one of the four gestures the vocabulary uses.");
+}
+
 console.log("\nhandsBind-selfcheck: " + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);
