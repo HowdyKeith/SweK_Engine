@@ -2198,10 +2198,27 @@ export function mountStage(canvas, opts = {}){
     const legs=[[-0.10,0.13,0],[0.10,0.13,Math.PI],[-0.10,-0.15,Math.PI],[0.10,-0.15,0]];
     for(const lg of legs){ const sw=mv?Math.sin(t*8+lg[2])*0.35:0;
       drawLlamaPart(GEO.cyl, mMul(B, mMul(mMul(mTranslate(lg[0],0.15,lg[1]), mRotX(sw)), mScale(0.13,0.30,0.13))), CREAM); }
-    drawLlamaPart(GEO.cyl,  mMul(B, mMul(mMul(mTranslate(0,0.46,0.13), mRotX(-0.5)), mScale(0.16,0.30,0.16))), CREAM);  // neck
-    drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(0,0.60,0.22), mScale(0.62,0.55,0.72))), CREAM);   // head
-    drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(0,0.57,0.33), mScale(0.36,0.32,0.40))), FACE);    // snout
-    for(const sx of [-1,1]) drawLlamaPart(GEO.cone, mMul(B, mMul(mMul(mTranslate(sx*0.045,0.70,0.19), mRotX(-Math.PI/2)), mScale(0.55,0.55,0.55))), EAR);  // ears
+    // v4052 -- Keith: "could we put the avatar pet head on top of the neck, and the neck is half the height?"
+    // *** THE HEAD WAS ALREADY RIGHT. THE NECK HAD A FLIPPED SIGN AND ROUGHLY DOUBLE THE LENGTH. *** buildCylinder
+    // spans y 0->1 (base at the origin, NOT centred), so the neck's top cap is base + len*(0, cos t, sin t).
+    // As drawn -- base (0,0.46,0.13), tilt -0.5, len 0.30 -- that top landed at (0, 0.723, -0.014): UP AND
+    // BACKWARD, toward the tail. The head sat at (0, 0.60, 0.22), i.e. 0.12 BELOW that top and 0.23 FORWARD of
+    // it, so the head floated clear of the neck and the neck pointed at nothing. MEASURED BACKWARD FROM THE
+    // HEAD'S OWN POSITION, the neck it was placed for has tilt atan2(0.09, 0.14) = +0.571 rad and length
+    // hypot = 0.1664 -- so the sign was inverted and the length was nearly doubled, two independent errors,
+    // and Keith's eyeballed "half the height" (0.30 -> 0.15) lands within 0.017 of the head's own implied 0.166.
+    // The head therefore barely moves (0.600,0.220 -> 0.592,0.202): the llama still looks like itself, the neck
+    // now actually reaches it, and it leans toward the NOSE (+z, where the snout is) instead of the tail.
+    //
+    // AND THE HEAD IS DERIVED FROM THE NECK NOW RATHER THAN TYPED AS A SECOND POSITION, which is the whole
+    // reason these two could disagree: NECK_TOP comes from the same base/tilt/length the cylinder is drawn
+    // with, and the snout and ears hang off the head as OFFSETS, so nothing here can drift apart again.
+    const NECK_BASE=[0,0.46,0.13], NECK_TILT=0.5, NECK_LEN=0.15;
+    const HEAD=[NECK_BASE[0], NECK_BASE[1]+NECK_LEN*Math.cos(NECK_TILT), NECK_BASE[2]+NECK_LEN*Math.sin(NECK_TILT)];
+    drawLlamaPart(GEO.cyl,  mMul(B, mMul(mMul(mTranslate(NECK_BASE[0],NECK_BASE[1],NECK_BASE[2]), mRotX(NECK_TILT)), mScale(0.16,NECK_LEN,0.16))), CREAM);  // neck
+    drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(HEAD[0],HEAD[1],HEAD[2]), mScale(0.62,0.55,0.72))), CREAM);   // head, centred ON the neck's top cap
+    drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(HEAD[0],HEAD[1]-0.03,HEAD[2]+0.11), mScale(0.36,0.32,0.40))), FACE);    // snout
+    for(const sx of [-1,1]) drawLlamaPart(GEO.cone, mMul(B, mMul(mMul(mTranslate(HEAD[0]+sx*0.045,HEAD[1]+0.10,HEAD[2]-0.03), mRotX(-Math.PI/2)), mScale(0.55,0.55,0.55))), EAR);  // ears
     drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(0,0.40,-0.26), mScale(0.45,0.45,0.55))), CREAM);  // tail
     if(fetchBall && fetchBall.y>-0.18){ drawLlamaPart(GEO.ball, mMul(mTranslate(fetchBall.x, fetchBall.y, fetchBall.z), mScale(0.7,0.7,0.7)), [1.0,0.5,0.12]); }   // v1228 — the fetched ball
     if(_hoop){   // v1242/v1243 — gold ring course the llama threads (one or many)

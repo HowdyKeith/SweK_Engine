@@ -205,5 +205,63 @@ if (typeof blob === "number") {
         false, "render failed: " + JSON.stringify(blob));
 }
 
+// ---- v4052: THE PET LLAMA'S HEAD ACTUALLY SITS ON ITS NECK -------------------------------------------------
+// Keith: "could we put the avatar pet head on top of the neck, and the neck is half the height?"
+//
+// *** THE HEAD WAS ALREADY IN THE RIGHT PLACE. THE NECK HAD A FLIPPED SIGN AND ROUGHLY DOUBLE THE LENGTH. ***
+// buildCylinder spans y 0->1 (base at the origin, NOT centred), so the neck's top cap is
+// base + len*(0, cos tilt, sin tilt). As drawn -- base (0,0.46,0.13), tilt -0.5, len 0.30 -- that top landed at
+// (0, 0.723, -0.014): up and BACKWARD, toward the tail. The head was drawn at (0, 0.60, 0.22), so it floated
+// 0.12 below and 0.23 forward of the neck's end, and the neck pointed at nothing.
+//
+// SOLVED BACKWARD FROM THE HEAD'S OWN COORDINATES, the neck it was placed for has tilt
+// atan2(0.22-0.13, 0.60-0.46) = +0.571 rad and length hypot(...) = 0.1664. So the tilt SIGN was inverted and
+// the length was nearly doubled -- two independent errors -- and Keith's eyeballed "half the height"
+// (0.30 -> 0.15) lands within 0.017 of the length the head itself implies. The head barely moved.
+//
+// The head is DERIVED from the neck now rather than typed as a second position, which is the whole reason the
+// two could disagree; these checks hold that, and hold the tilt pointing at the NOSE rather than the tail.
+{
+    const AS = noComments(fs.readFileSync(path.join(ROOT, "face", "avatarStage.js"), "utf8"));
+    const num = (re) => { const m = AS.match(re); return m ? parseFloat(m[1]) : NaN; };
+    const base = (() => { const m = AS.match(/const NECK_BASE=\[([-\d.]+),([-\d.]+),([-\d.]+)\]/); return m ? [+m[1], +m[2], +m[3]] : null; })();
+    const tilt = num(/NECK_TILT=([-\d.]+)/), len = num(/NECK_LEN=([-\d.]+)/);
+
+    ok("!! the llama's neck is described by named constants, not three hand-typed transforms",
+        !!base && Number.isFinite(tilt) && Number.isFinite(len),
+        base ? "base " + JSON.stringify(base) + ", tilt " + tilt + ", len " + len : "NECK_BASE/TILT/LEN not found");
+
+    ok("!! *** the HEAD is DERIVED from the neck, so the two cannot drift apart again ***",
+        /const HEAD=\[NECK_BASE\[0\], NECK_BASE\[1\]\+NECK_LEN\*Math\.cos\(NECK_TILT\), NECK_BASE\[2\]\+NECK_LEN\*Math\.sin\(NECK_TILT\)\]/.test(AS.replace(/\s+/g, " ")),
+        "a second hand-typed position IS the defect -- the head was at (0,0.60,0.22) while the neck ended at (0,0.723,-0.014)");
+
+    ok("!! ...and the head/snout/ears are drawn from HEAD, never from absolute coordinates",
+        /mTranslate\(HEAD\[0\],HEAD\[1\],HEAD\[2\]\)/.test(AS) &&
+        /mTranslate\(HEAD\[0\],HEAD\[1\]-0\.03,HEAD\[2\]\+0\.11\)/.test(AS) &&
+        /mTranslate\(HEAD\[0\]\+sx\*0\.045,HEAD\[1\]\+0\.10,HEAD\[2\]-0\.03\)/.test(AS),
+        "the face has to travel WITH the head, or fixing the head just moves the gap to the snout");
+
+    if (base && Number.isFinite(tilt) && Number.isFinite(len)) {
+        // *** THE SIGN. *** The snout is drawn at HEAD z +0.11 and the tail at z -0.26, so +z IS the nose
+        // direction. A negative tilt leans the neck toward the TAIL, which is exactly the shipped bug.
+        ok("!! *** the neck leans toward the NOSE (+z), not the tail -- the sign that was inverted ***",
+            tilt > 0, "tilt " + tilt + " rad; the snout sits at +z and the tail at -0.26, so a negative tilt " +
+            "puts the head over the llama's own back");
+
+        // and the length agrees with what the head's original placement implied (0.1664), i.e. Keith's "half".
+        const IMPLIED = Math.hypot(0.60 - base[1], 0.22 - base[2]);
+        ok("!! ...and the neck length matches the one the head's own original position implied",
+            Math.abs(len - IMPLIED) < 0.03,
+            "len " + len + " vs " + IMPLIED.toFixed(4) + " implied by the head at (0,0.60,0.22) -- the old 0.30 " +
+            "was off by " + (0.30 - IMPLIED).toFixed(4) + ", which is why the head floated clear of it");
+
+        const top = [base[0], base[1] + len * Math.cos(tilt), base[2] + len * Math.sin(tilt)];
+        ok("!! ...and the resulting head still lands where the llama already looked right (it barely moved)",
+            Math.abs(top[1] - 0.60) < 0.05 && Math.abs(top[2] - 0.22) < 0.05,
+            "head now (" + top.map((n) => n.toFixed(3)).join(", ") + ") vs the old hand-placed (0, 0.600, 0.220) " +
+            "-- fixing the neck must not restyle the pet, only connect it");
+    }
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "all passed"));
 process.exit(fails ? 1 : 0);

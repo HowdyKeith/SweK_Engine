@@ -8,6 +8,57 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4052 -- the last two postage-stamp canvases, and a pet whose head finally sits on its neck
+
+Keith: "two leftover postage-stamp canvases first." Then, looking at the render: "could we put the avatar pet
+head on top of the neck, and the neck is half the height?"
+
+**The two canvases were a real feature broken in plain sight, on every page that shows the avatar.**
+`waterTank.js` (the watering overlay) and `hazeLayer.js` (the smog overlay) each build their canvas in JS with
+no id, and set the identical `cssText`:
+
+    position:absolute;left:0;top:0;right:0;bottom:Npx     <- four insets, no width/height
+
+A canvas is a **replaced element**, so with `width` and `height` both `auto` it takes its own intrinsic
+300x150, and the insets only position that little box at the mount's top-left. MEASURED live: css 300x150
+inside a 1200x820 mount on `avatarstage.html` and a 572x420 mount on `phone.html` -- both modules, both pages.
+
+**And it rendered cleanly at the wrong size, which is why nobody caught it.** `resize()` sizes the drawing
+buffer from the canvas's own `getBoundingClientRect()`, so the buffer matched the wrong CSS box exactly: the
+water drew crisp and correct-looking in a corner rather than stretched or torn. Verified by forcing
+`/water/status` active and screenshotting before and after -- before, a small blue rectangle pinned in the
+top-left; after, the avatar genuinely submerged, with a sloshing surface line, bubbles and the countdown.
+Height is `calc(100% - Npx)` rather than `100%` because `insetBottom` must survive: `top:0` + `bottom:22px`
+IS `height:calc(100% - 22px)`, and plain `100%` would silently eat the 22px reserve.
+
+**The gate that existed could not have found these, and that gap is now closed.** v3979 fixed this exact shape
+on `graph_viewer`/`glb_viewer` and `canvasFill-selfcheck.mjs` swept for it -- but only by matching
+`#id { ... }` style rules in `.html`, and these canvases have no id and are styled from JS. A second sweep now
+correlates the style string with an actual canvas: it finds the variable a canvas was created into, then tests
+only the `cssText` assigned to *that* variable. My first version matched the style string alone and went red on
+29 innocent files, because `position:absolute;inset:0` on a `<div>` is correct and ordinary -- the
+intrinsic-size trap is unique to replaced elements. My second version captured `[^;]*` and silently PASSED the
+live bug, because a CSS declaration is full of semicolons and the capture stopped at `"position:absolute`. Both
+corrected; the finished check names both real offenders under sabotage. A tree-wide live sweep of all **209**
+canvas-bearing pages now reports zero postage stamps.
+
+**Then the pet llama, where the head was already right and the neck had two independent errors.**
+`buildCylinder` spans y 0->1 (base at the origin, *not* centred), so the neck's top cap is
+`base + len*(0, cos t, sin t)`. As drawn -- base (0,0.46,0.13), tilt -0.5, len 0.30 -- that top landed at
+(0, 0.723, -0.014): up and *backward*, toward the tail. The head was drawn at (0, 0.60, 0.22), floating 0.12
+below and 0.23 forward of the neck's end, so the neck pointed at nothing.
+
+Solved backward from the head's own coordinates, the neck it was placed for has tilt
+`atan2(0.09, 0.14) = +0.571` rad and length `hypot = 0.1664`. So the tilt **sign was inverted** and the length
+was **nearly doubled** -- and Keith's eyeballed "half the height" (0.30 -> 0.15) lands within 0.017 of the
+length the head itself implies. The head therefore barely moves (0.600,0.220 -> 0.592,0.202): the llama still
+looks like itself, the neck now actually reaches it, and it leans toward the nose instead of the tail. The head
+is **derived** from the neck constants now rather than typed as a second position -- which is the whole reason
+the two could disagree -- and the snout and ears hang off it as offsets.
+
+Five sabotages bite across the round (two on the canvas sweep, three on the llama rig), all restored
+byte-identical. `verify.mjs` ALL GREEN.
+
 ## Since v4051 -- circles that matched their row, buttons that matched the arrows, and a Fox sweep
 
 Keith, looking at the top-center gauge dock: "circles need to be smaller, same size as the other rows, so we

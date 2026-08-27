@@ -26,6 +26,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { noComments } from "./sourceScan.mjs";   // v4052 -- strings kept, comments dropped: see the JS sweep's own note
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.join(HERE, "..", "..");
@@ -243,6 +244,58 @@ const ALL = FIELD.concat(PLOT);
         ok("!! " + page + "'s #c rule explicitly sizes the canvas, not just insets it",
             /#c\{position:absolute;inset:0;width:100%;height:100%;display:block\}/.test(src));
     }
+
+    // *** v4052 -- THE HALF OF THIS SWEEP THAT DID NOT EXIST, AND THE TWO LIVE BUGS IT WOULD HAVE CAUGHT. ***
+    // Everything above reads STYLE RULES out of .html and matches them to a canvas BY ITS id. Both checks are
+    // correct and both were blind to waterTank.js and hazeLayer.js, which build their canvas in JavaScript,
+    // give it no id at all, and set the identical broken shape through cssText:
+    //     "position:absolute;left:0;top:0;right:0;bottom:Npx;..."   <- four insets, no width/height
+    // MEASURED live on avatarstage.html and phone.html: css 300x150 inside a 1200x820 and a 572x420 mount, on
+    // BOTH pages, for BOTH modules -- the watering tank and the smog haze had been painting into a postage
+    // stamp in the corner of the avatar rather than over it, and because resize() sizes the drawing buffer from
+    // the canvas's own getBoundingClientRect() the buffer matched the wrong box exactly, so it drew crisply at
+    // the wrong size instead of looking stretched or torn. A bug that renders cleanly is the kind this tree
+    // keeps having to find twice. So the sweep now covers the JS side too, by SHAPE rather than by id.
+    const jsFiles = [];
+    (function walkJs(d) {
+        for (const f of fs.readdirSync(d)) {
+            if (f === "node_modules" || f === ".git" || f === "vendor" || f === ".venv") continue;
+            const p = path.join(d, f);
+            let st; try { st = fs.statSync(p); } catch { continue; }
+            if (st.isDirectory()) walkJs(p);
+            else if (/\.(js|mjs|html)$/.test(f)) jsFiles.push(p);
+        }
+    })(ENG);
+    // *** IT MUST BE A REPLACED ELEMENT, AND MY FIRST VERSION OF THIS CHECK FORGOT THAT AND WENT RED ON 29
+    // INNOCENT FILES. *** `position:absolute;inset:0` on a <div> is CORRECT and ordinary -- a div stretches to
+    // its insets exactly as written. The intrinsic-size trap is unique to REPLACED elements (canvas, img,
+    // video), so a sweep that matches the style string alone flags every absolutely-positioned overlay in the
+    // tree and means nothing. The style string is therefore CORRELATED WITH A CANVAS: find the variable a
+    // canvas was created into, then test only the cssText assigned to THAT variable.
+    // noComments (strings kept, comments dropped) because the strings ARE the subject here -- and because both
+    // waterTank.js's fix note and this very check quote the broken CSS as an example, which raw text would
+    // read as the defect itself. That is the trap this tree names in half its gates; it applies here too.
+    const jsOffenders = [];
+    for (const f of jsFiles) {
+        const src = noComments(fs.readFileSync(f, "utf8"));
+        const vars = [...src.matchAll(/(?:const|let|var)?\s*([\w$.]+)\s*=\s*document\.createElement\(\s*["'`]canvas["'`]\s*\)/g)].map((m) => m[1]);
+        for (const v of new Set(vars)) {
+            const esc = v.replace(/[.$]/g, "\\$&");
+            // to END OF LINE, not to the first ";" -- my first version stopped at `"position:absolute` because
+            // a CSS declaration is FULL OF semicolons, so it never saw the insets and passed the live bug.
+            for (const m of src.matchAll(new RegExp(esc + "\\.style\\.cssText\\s*=\\s*([^\\n]*)", "g"))) {
+                const decl = m[1];
+                const sides = ["left", "top", "right", "bottom"].filter((s) => new RegExp("\\b" + s + "\\s*:").test(decl)).length;
+                const inset = /\binset\s*:/.test(decl) || sides >= 3;
+                const sized = /\bwidth\s*:/.test(decl) || /\bheight\s*:/.test(decl);
+                if (inset && !sized) jsOffenders.push(path.relative(ENG, f) + " (" + v + ")  ->  " + decl.trim().slice(0, 100));
+            }
+        }
+    }
+    ok("!! *** no JS-BUILT element is stretched by insets alone either -- the half of this sweep that was blind ***",
+        jsOffenders.length === 0,
+        jsOffenders.length ? "OFFENDERS: " + jsOffenders.join("  |  ")
+            : "swept " + jsFiles.length + " js/mjs/html files for absolute+inset style strings carrying no width/height");
 }
 
 // ---- 8. THE REAL BROWSER, DRIVEN -- SOURCE TEXT PROVES THE RULE EXISTS, NOT THAT IT WORKS. v3979 -----------------
