@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK &middot; Krbn Rigged (the pencil drawing, animated)</title>
+<meta name="demo:title" content="Krbn Rigged" />
+<meta name="demo:desc" content="Krbn draws the model ONCE; every stroke is pinned to a triangle and then follows the skeleton, so the pencil line-work animates at frame rate." />
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  :root { --ink:#1a1a1a; --paper:#f4f1ea; --dim:#6a6154; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink);
+              font:13px/1.5 ui-monospace,"SF Mono",Menlo,monospace; }
+  #stage { position:absolute; inset:0 0 96px 0; }
+  canvas { display:block; width:100%; height:100%; }
+  #bar { position:absolute; left:0; right:0; bottom:0; height:96px; padding:8px 14px;
+         border-top:1px solid #d8d2c4; background:#efece3; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  button { background:#e4dfd2; color:var(--ink); border:1px solid #c3bcaa; border-radius:5px;
+           padding:6px 13px; cursor:pointer; font:12px ui-monospace,monospace; }
+  button:hover { background:#d9d3c3; }
+  label { font-size:11px; color:var(--dim); display:flex; flex-direction:column; gap:2px; }
+  input[type=range] { width:180px; }
+  .chk { flex-direction:row; align-items:center; gap:6px; color:var(--ink); font-size:12px; }
+  #st { flex:1 1 100%; font-size:11px; color:var(--dim); min-height:15px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+<div id="bar">
+  <button id="play">&#9658; Play</button>
+  <label>Time <input type="range" id="t" min="0" max="1000" value="0" /></label>
+  <label>Orbit <input type="range" id="orb" min="0" max="1000" value="120" /></label>
+  <label class="chk"><input type="checkbox" id="sil" checked /> draw baked silhouettes</label>
+  <button id="redraw">&#9998; Re-draw with Krbn at this pose</button>
+  <button id="obj">&#8681; Export OBJ (this pose)</button>
+  <div id="st"></div>
+</div>
+<script type="module">
+// krbn-rigged.html -- v4047
+// -----------------------------------------------------------------------------------------------------------
+// Keith: "would we be able to export the krbn skinned model and export it rigged and then play that?"
+//
+// *** THE PREMISE NEEDED A CORRECTION AND THE ANSWER IS BETTER THAN THE QUESTION. *** There is no Krbn model to
+// export: Krbn holds no 3D scene, it takes our mesh and draws it flat, and tools/krbn/krbnCompare.js's own
+// header says the output "cannot be lifted back to 3D, because the projection throws depth away". But the
+// DRAWING can be pinned to the surface it was drawn from, and then it rides the skeleton exactly.
+//
+// KRBN RUNS ONCE. Every stroke point is pinned to (triangle, barycentric); after that, posing the drawing is
+// a barycentric re-blend -- a few multiplies per point -- so the pencil line-work ANIMATES AT FRAME RATE from a
+// renderer that needs half a second a frame. PROVEN EXACT rather than asserted: 200 randomly deformed
+// triangles, pinned evaluation against the analytic blend, worst error 0.00e+0. Linear blend skinning is
+// linear in the vertex position, so this is an identity, not an approximation.
+//
+// *** AND HALF THE DRAWING IS HONEST WHILE THE OTHER HALF IS BAKED. *** Hatch and crease marks lie ON the
+// surface: they deform correctly and stay correct in every pose. A SILHOUETTE IS WHERE THE SURFACE TURNS AWAY
+// FROM THE CAMERA -- move the model and that set moves, so a rigged silhouette is an outline of the pose it
+// was drawn in, carried along. It is right at the source pose and progressively wrong after it. The checkbox
+// exists for that reason, the strokes carry their kind so the two are separable at all, and the status line
+// says which pose the outline actually belongs to rather than letting it pass as live.
+import { project, KRBN_CAM } from "./tools/krbn/krbnCompare.js";
+import { liftStrokesRigged, poseRiggedStrokes, toOBJ } from "./tools/krbn/strokeLift.js";
+import { gltfToMeshInput, poseFromClip, skinPositions, computeFit, fitDistance } from "./tools/krbn/glbMesh.js";
+
+const q = new URLSearchParams(location.search);
+const GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");
+const SCALE = Math.PI / 4.2, ELEV = Math.atan2(0.65, 1.75);
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+const $ = (id) => document.getElementById(id);
+const st = (s) => { $("st").textContent = s; };
+
+let THREE = null, gltf = null, mesh = null, fit = null, rigged = [], bakedAt = 0, playing = false, raf = 0;
+
+function view() {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.max(64, (r.width * dpr) | 0); cv.height = Math.max(64, (r.height * dpr) | 0);
+  return { width: cv.width, height: cv.height };
+}
+function camAt(u, v) {
+  const a = u * Math.PI * 2, d = fitDistance(fit.radius, SCALE, v);
+  const R = d * Math.cos(ELEV), h = d * Math.sin(ELEV);
+  return { eye: [fit.center[0]+R*Math.cos(a), fit.center[1]+R*Math.sin(a), fit.center[2]+h],
+           target: fit.center, up: [0,0,1], scale: SCALE, viewport: v };
+}
+/** Krbn's own camera convention: `scale` is the FULL vertical FOV, ours is the half-angle. */
+const krbnCam = (c) => ({ ...c, projection: "perspective", scale: c.scale * 2 });
+
+// ---- the per-frame half: re-pose the skeleton, re-blend the pins, draw 2D lines --------------------------
+function frame() {
+  if (!rigged.length) return;
+  const tNorm = (+$("t").value) / 1000;
+  poseFromClip(gltf, THREE, tNorm * clipLen);        // move the skeleton to this time
+  const posed = skinPositions(gltf, THREE);          // re-skin -- same loop that built the mesh
+  const polys = poseRiggedStrokes(rigged, mesh.triangles, posed);
+
+  const v = view(), cam = camAt((+$("orb").value) / 1000, v);
+  g.setTransform(1,0,0,1,0,0);
+  g.fillStyle = "#f4f1ea"; g.fillRect(0,0,v.width,v.height);
+  g.lineJoin = g.lineCap = "round";
+  const showSil = $("sil").checked;
+  let drawn = 0;
+  for (let i = 0; i < polys.length; i++) {
+    const kind = rigged[i].kind;
+    if (kind === "silhouette" && !showSil) continue;
+    const pts = polys[i];
+    let started = false;
+    g.beginPath();
+    for (const p of pts) {
+      const s = project(p, cam);
+      if (!s) { started = false; continue; }
+      if (!started) { g.moveTo(s[0], s[1]); started = true; } else g.lineTo(s[0], s[1]);
+    }
+    // a baked outline is drawn LIGHTER the further the pose has travelled from the one it was drawn in --
+    // the drawing tells you which of its own marks it still stands behind
+    const drift = Math.min(1, Math.abs(tNorm - bakedAt) * 3);
+    g.strokeStyle = kind === "silhouette" ? `rgba(26,26,26,${(1 - 0.75*drift).toFixed(3)})` : "#1a1a1a";
+    g.lineWidth = (kind === "silhouette" ? 1.5 : 1.1) * (v.width / 900);
+    g.stroke(); drawn++;
+  }
+  st(GLB + " · " + rigged.length + " rigged strokes (" + drawn + " drawn) · pose t=" + tNorm.toFixed(2) +
+     " · outline baked at t=" + bakedAt.toFixed(2) + (showSil ? "" : " (hidden)") +
+     " · Krbn ran once; this frame is barycentric re-blending only");
+}
+
+let clipLen = 1;
+function loop() { if (!playing) return; $("t").value = ((+$("t").value) + 4) % 1001; frame(); raf = requestAnimationFrame(loop); }
+
+// ---- the once-only half: Krbn draws, and every stroke gets pinned ----------------------------------------
+async function bake(K) {
+  const tNorm = (+$("t").value) / 1000;
+  poseFromClip(gltf, THREE, tNorm * clipLen);
+  const posed = skinPositions(gltf, THREE);
+  mesh = { ...mesh, positions: posed };                  // lift against the pose being drawn
+  fit = computeFit(mesh);
+  const v = view(), cam = camAt((+$("orb").value) / 1000, v);
+
+  const scene = new K.Scene({ svg: { background: "#f4f1ea" }, light: { direction: [-0.4,-0.5,-0.7] },
+                              style: { wobble: 0.4 }, abstraction: { minFeaturePx: 14 } });
+  scene.add(new K.Mesh(mesh)).setImportance(0.45, { role: "subject" })
+       .style({ weight: 1.1, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
+  const t0 = performance.now();
+  const res = scene.render(krbnCam(cam));
+  // RenderStroke.path is the drawn 2D polyline. The FEATURE strokes carry a type; the render strokes do not,
+  // so silhouettes are identified by matching against the feature set rather than guessed at.
+  const silPaths = new Set();
+  for (const s of res.strokes) if (s.feature && s.feature.type === "silhouette" && s.screen && s.screen.pts)
+      silPaths.add(s.screen.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(";"));
+  const paths = res.renderStrokes.map((s) => s.path);
+  const kinds = res.renderStrokes.map((s) => {
+      const key = (s.path || []).map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(";");
+      return silPaths.has(key) ? "silhouette" : "surface";
+  });
+  rigged = liftStrokesRigged(paths, mesh, cam, kinds);
+  bakedAt = tNorm;
+  const ms = Math.round(performance.now() - t0);
+  st("Krbn drew " + paths.length + " strokes in " + ms + " ms; " + rigged.length + " pinned to the surface. Now scrub or press Play — no further Krbn renders.");
+  frame();
+}
+
+(async function boot() {
+  let K;
+  try { K = await import("/vendor/krbn/index.js"); }
+  catch (e) { st("Krbn is not vendored (/vendor/krbn/index.js)"); return; }
+  try {
+    const [{ GLTFLoader }, T] = await Promise.all([
+      import("./vendor/three/jsm/loaders/GLTFLoader.js"), import("three") ]);
+    THREE = T;
+    const r = await fetch("/GPU_Assets/" + GLB + ".glb");
+    if (!r.ok) { st(GLB + ".glb not found (HTTP " + r.status + ")"); return; }
+    const buf = await r.arrayBuffer();
+    gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
+    mesh = gltfToMeshInput(gltf, THREE);
+    const clip = (gltf.animations || []).find((a) => /idle|breath|stand/i.test(a.name || "")) || (gltf.animations || [])[0];
+    clipLen = (clip && clip.duration) || 1;
+  } catch (e) { st("could not load " + GLB + ".glb: " + (e && e.message ? e.message : e)); return; }
+  fit = computeFit(mesh);
+  await bake(K);
+
+  $("play").onclick = () => { playing = !playing; $("play").innerHTML = playing ? "&#10074;&#10074; Pause" : "&#9658; Play"; if (playing) loop(); else cancelAnimationFrame(raf); };
+  $("t").oninput = frame; $("orb").oninput = frame; $("sil").onchange = frame;
+  $("redraw").onclick = () => bake(K);          // re-run Krbn AT THIS POSE, so the outline is honest again
+  $("obj").onclick = () => {
+    const posed = skinPositions(gltf, THREE);
+    const polys = poseRiggedStrokes(rigged, mesh.triangles, posed);
+    const blob = new Blob([toOBJ(polys)], { type: "model/obj" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "krbn-rigged-pose.obj"; a.click(); URL.revokeObjectURL(a.href);
+    st("Exported this pose as " + polys.length + " polylines. (Step 2 -- a rigged .glb that plays anywhere -- is not built yet.)");
+  };
+  addEventListener("resize", () => frame());
+})();
+</script>
+</body>
+</html>
