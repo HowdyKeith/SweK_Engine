@@ -253,15 +253,83 @@ console.log("\n4. *** A DESCENT ONTO THE REAL PROCEDURAL PLANET ENDS ABOVE THE G
         "two copies of a displacement formula is precisely how a camera flies through a mountain the renderer drew");
 }
 
-console.log("\n5. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS FROM CLEARS THE GROUND ***");
+console.log("\n5. *** A SEQUENCE'S SEAMS DO NOT CUT -- CONTINUITY IS DERIVED, NOT REMEMBERED ***");
+{
+    const target = [0, 0, 17.2];
+    // Leg 1 deliberately carries a NONSENSE `from` -- a different distance, pitch, azimuth and fov from where
+    // leg 0 ends. If chainLegs did nothing, the camera would teleport at the seam. This is the load-bearing
+    // fixture: a chain that only works when the author typed matching endpoints has not solved anything.
+    const raw = [
+        { shot: "descent", dur: 6, p: { center: [0, 0, 0], target,
+            from: { distance: 20000, pitch: 0.05, azimuth: 0.0, fov: 62, roll: 0 },
+            to:   { distance: 150,   pitch: 0.35, azimuth: 0.6, fov: 50, roll: 0 } } },
+        { shot: "descent", dur: 8, p: { center: [0, 0, 0], target,
+            from: { distance: 9999, pitch: -1.2, azimuth: 3.0, fov: 11, roll: 0 },   // <- wrong on purpose
+            to:   { distance: 2.2,  pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },
+    ];
+    const legs = S.chainLegs(raw);
+
+    ok("!! chainLegs OVERWRITES a later leg's start with the previous leg's end",
+        legs[1].p.from.distance === 150 && Math.abs(legs[1].p.from.pitch - 0.35) < 1e-12 &&
+        Math.abs(legs[1].p.from.fov - 50) < 1e-12,
+        "leg 1 was written with from.distance 9999 / fov 11 and now starts at " + legs[1].p.from.distance +
+        " / fov " + legs[1].p.from.fov + " -- the seam is DERIVED, so it cannot drift when either leg is tuned");
+    ok("...and it does not mutate the caller's own declaration",
+        raw[1].p.from.distance === 9999,
+        "returning a new array means a page can keep its legs as written and re-chain them");
+
+    ok("!! sequenceDuration is the sum of the legs", S.sequenceDuration(legs) === 14, "6 + 8 = " + S.sequenceDuration(legs));
+
+    // *** THE SEAM ITSELF, MEASURED: step ACROSS the boundary and the camera must not move appreciably. ***
+    const eps = 1e-4;
+    const a = S.sampleSequence(legs, 6 - eps), b = S.sampleSequence(legs, 6 + eps);
+    const seamJump = len3(sub3(a.eye, b.eye));
+    ok("!! *** THE CAMERA DOES NOT CUT AT THE SEAM *** (leg 0 -> leg 1, sampled 0.1ms either side)",
+        seamJump < 1e-2 && a.leg === 0 && b.leg === 1,
+        "eye moves " + seamJump.toExponential(2) + " units across the join, and the leg index really did " +
+        "advance (" + a.leg + " -> " + b.leg + ") so this is a real boundary and not one leg sampled twice");
+    ok("...and fov is continuous across it too (a lens jump reads as a cut just as badly)",
+        Math.abs(a.fov - b.fov) < 1e-3, "fov " + a.fov.toFixed(4) + " -> " + b.fov.toFixed(4));
+
+    // the whole arrival must still descend monotonically -- a warp leg that ended further out than it started
+    // would be a retreat with a tunnel drawn over it.
+    let mono = true, prev = Infinity, minD = Infinity;
+    for (let i = 0; i <= 400; i++) {
+        const f = S.sampleSequence(legs, (i / 400) * 14);
+        if (f.distance > prev + 1e-6) mono = false;
+        prev = f.distance; minD = Math.min(minD, f.distance);
+    }
+    ok("!! the whole two-leg arrival descends monotonically, 20000 -> 2.2",
+        mono && Math.abs(minD - 2.2) < 1e-6, "closest approach " + minD.toFixed(4));
+
+    // and past the end it CLAMPS rather than wrapping: an arrival that restarted would be a loop, not a landing.
+    const end = S.sampleSequence(legs, 14), past = S.sampleSequence(legs, 999);
+    ok("!! ...and sampling past the end clamps to the landing rather than wrapping",
+        Math.abs(end.distance - past.distance) < 1e-9 && past.done === true,
+        "t=14 and t=999 both give distance " + past.distance.toFixed(4) + ", done=" + past.done);
+
+    // *** AND THIS IS WHERE THE FOUR-DECADE mixLog EXAMPLE STOPS BEING A FOOTNOTE. *** The module's own header
+    // uses 20000 -> 2 to argue for log distance; an arrival leg really does span that, so the argument is now
+    // load-bearing rather than illustrative. Half-way through leg 0, a linear camera would still be ~10000 out.
+    const half = S.sampleSequence(legs, 3).distance;
+    ok("!! *** half-way through the warp leg the camera is genuinely in the system, not still in deep space ***",
+        half < 3000, "at t=3s of a 6s leg the camera is " + half.toFixed(0) +
+        " units out; a LINEAR interpolation of the same leg would be " + ((20000 + 150) / 2).toFixed(0));
+}
+
+console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS FROM CLEARS THE GROUND ***");
 {
     const fs = await import("node:fs");
     const page = fs.readFileSync(path.join(ROOT, "es-box3d-fly3d.html"), "utf8");
 
-    ok("!! es-box3d-fly3d.html drives the shot from the shared module, not a second copy of the maths",
-        /import \{ sampleShot, norm3 as cnorm3 \} from "\/rig\/cinematicShot\.js"/.test(page) &&
-        /sampleShot\("descent", descent\.t, descent\.p\)/.test(page),
-        "a page that re-derived the curves would drift from everything section 1-3 just proved");
+    // matched by SYMBOL rather than by the whole import line -- my first version pinned the exact line and went
+    // red the moment v4054 added two more names to it, which is a check grading its own punctuation.
+    const importsFrom = (sym) => new RegExp("import \\{[^}]*\\b" + sym + "\\b[^}]*\\} from \"/rig/cinematicShot\\.js\"").test(page);
+    ok("!! es-box3d-fly3d.html drives both flights from the shared module, not a second copy of the maths",
+        ["sampleShot", "sampleSequence", "chainLegs"].every(importsFrom) &&
+        /sampleShot\("descent", descent\.t, descent\.p\)/.test(page) &&
+        /sampleSequence\(arrival\.legs, arrival\.t\)/.test(page),
+        "a page that re-derived the curves would drift from everything sections 1-5 just proved");
     ok("!! ...and the landing site is chosen on the REAL displaced terrain, not the mean radius",
         /surfaceRadiusAt\(planetSpec_, dir, \{ radius: planetR, ampFrac: PLANET_AMP_FRAC \}\)/.test(page),
         "relief reaches ~0.39 units on this planet -- easily enough to end a descent inside a mountain");
@@ -340,6 +408,38 @@ console.log("\n5. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
                     "throughout: " + allDisabled + "; final frame flying=" + last.flying + " t=" + last.t.toFixed(3) +
                     " controlsEnabled=" + last.controlsEnabled);
                 ok("!! ...with zero page errors across the descent", errs.length === 0, errs[0] || "clean");
+
+                // ---- v4054: the ARRIVAL -- warp leg with the tunnel, then the descent, on one page ----
+                await pg.reload({ waitUntil: "load" });
+                await pg.waitForTimeout(3500);
+                await pg.evaluate(() => window.swekArrive());
+                const arr = [];
+                for (let i = 0; i < 60; i++) {
+                    await pg.waitForTimeout(400);
+                    const p = await pg.evaluate(() => window.swekArrivalProbe());
+                    arr.push(p);
+                    if (p && !p.flying && i > 2) break;
+                }
+                const flying = arr.filter((p) => p && p.flying);
+                const leg0 = flying.filter((p) => p.leg === 0), leg1 = flying.filter((p) => p.leg === 1);
+                ok("!! *** THE ARRIVAL RUNS BOTH LEGS: a warp cross, then a descent ***",
+                    leg0.length > 0 && leg1.length > 0,
+                    leg0.length + " frames on the warp leg, " + leg1.length + " on the descent");
+                ok("!! ...and it really starts out at solar-system range, not just outside the atmosphere",
+                    leg0.length > 0 && Math.max(...leg0.map((p) => p.distance)) > 5000,
+                    "furthest sampled " + (leg0.length ? Math.max(...leg0.map((p) => p.distance)).toFixed(0) : "-") +
+                    " units out -- the four-decade span rig/cinematicShot.js's header argues mixLog for");
+                // *** THE TUNNEL BELONGS TO LEG 0 ONLY. *** Left running into the descent it would wrap the
+                // camera in a glowing tube while the planet fills the frame -- the shot's climax, behind a
+                // curtain. The leg is timed to jumpDuration() rather than to a second typed number.
+                ok("!! *** THE WARP TUNNEL IS GONE BY THE TIME THE DESCENT STARTS ***",
+                    leg1.length > 0 && leg1.every((p) => !p.tunnel),
+                    leg1.filter((p) => p.tunnel).length + " of " + leg1.length + " descent frames still had the " +
+                    "tunnel up (want 0); leg 0 is timed to render/foldTunnel.js's own jumpDuration()");
+                ok("!! ...and the arrival lands and hands the camera back",
+                    arr.length > 0 && arr[arr.length - 1] && arr[arr.length - 1].flying === false,
+                    "final probe flying=" + (arr[arr.length - 1] || {}).flying);
+                ok("!! ...with zero page errors across the arrival too", errs.length === 0, errs[0] || "clean");
             }
         } finally { await browser.close(); await new Promise((r) => srv.close(r)); }
     }

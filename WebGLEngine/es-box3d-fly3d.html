@@ -41,6 +41,7 @@
   <button id="reliefBtn" title="Cube-baked planet surface (v3842): baked normals from the height field's own gradient plus CPU-displaced vertices. Off = the smooth painted ball" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9968; Relief</button>
   <button id="structuresBtn" title="Asteroid belt and a greebled station (v3843): rocks placed with no interpenetration, hulls plated by an exact panel partition. Off = empty space" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9673; Structures</button>
   <button id="hitfxBtn" title="Hit debris ported from cockpit.html (v3844): shields up throws cyan sparks, shields gone throws red, a kill adds amber on top. Off = no debris" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#10022; Hit FX</button>
+  <button id="arriveBtn" title="Arrival (v4054): warp in across the system inside the fold tunnel, then descend onto the planet -- two chained legs whose seam is DERIVED, so the camera cannot cut between them. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#127756; Arrive</button>
   <button id="descendBtn" title="Cinematic descent (v4053): fly from orbit down onto the planet's surface on a parametric shot -- logarithmic distance (constant perceived zoom rate) and a singularity-free rig that does not roll over at the poles. One-shot" style="background:#152c3a;color:#9fd8ff;border:1px solid #2f6c8c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128640; Descend</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
 </div>
@@ -68,7 +69,7 @@ import { mountShipModels } from "/ev/esShipModels.js";   // v3827 -- user-assign
 import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-mean auto-exposure
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
 import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
-import { sampleShot, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 -- the parametric descent
+import { sampleShot, sampleSequence, chainLegs, sequenceDuration, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 arrival sequence
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
@@ -233,6 +234,7 @@ const grid = new THREE.GridHelper(60, 24, 0x1b3350, 0x0e1c30); scene.add(grid); 
 const PLANET_AMP_FRAC = 0.035;
 // v4053 -- the in-flight descent, or null. One object, driven entirely by sampleShot(t) in the frame loop.
 let descent = null;
+let arrival = null;   // v4054 -- the two-leg warp-in + descent, or null
 let planetMesh = null, planetSpin = 0, planetMat = null, planetRelief = true;
 let planetSpec_ = null, planetR = 17;   // v4053 -- the descent needs the seed's spec and the radius
 {
@@ -634,6 +636,22 @@ function frame() {
   // no state here beyond the clock -- so this block only converts one sampled frame into a Three camera and
   // hands control back to OrbitControls when it lands. OrbitControls is DISABLED for the duration: leaving it
   // enabled would let its damping fight the shot for the same camera every frame, which reads as a shudder.
+  // v4054 -- THE ARRIVAL. Two chained legs: a warp cross of the system inside the fold tunnel, then the
+  // descent onto the planet. The seam between them is DERIVED by chainLegs (see rig/cinematicShot.js), so
+  // nothing here has to keep two sets of endpoints in agreement -- the camera cannot cut at the join.
+  if (arrival) {
+    arrival.t += dt;
+    const f = sampleSequence(arrival.legs, arrival.t);
+    camera.position.set(f.eye[0], f.eye[1], f.eye[2]);
+    camera.up.set(f.up[0], f.up[1], f.up[2]);
+    camera.lookAt(f.target[0], f.target[1], f.target[2]);
+    if (camera.fov !== f.fov) { camera.fov = f.fov; camera.updateProjectionMatrix(); }
+    if (f.done) {
+      controls.target.set(f.target[0], f.target[1], f.target[2]);
+      controls.minDistance = 0.5; controls.enabled = true; controls.update();
+      arrival = null; arriveBtn.style.opacity = "1";
+    }
+  }
   if (descent) {
     descent.t = Math.min(1, descent.t + dt / descent.dur);
     const f = sampleShot("descent", descent.t, descent.p);
@@ -787,6 +805,46 @@ descendBtn.addEventListener("click", () => {
   };
 });
 window.swekDescend = () => descendBtn.click();   // so a gate (and the console) can fly it without a mouse
+
+// v4054 -- Keith: "we could even fly in through the solar system, with our warp tunnel effect at super speed."
+// The warp leg starts 20000 units out -- which is exactly the four-decade span rig/cinematicShot.js's own header
+// uses to argue for logarithmic distance, so that argument stops being illustrative here and starts carrying a
+// shot. MEASURED: half-way through the 6s warp leg the camera is ~1732 units out; a linear interpolation of the
+// same leg would still be at ~10075, i.e. visually still in deep space with half the shot already spent.
+//
+// The tunnel plays over leg 0 ONLY. render/foldTunnel.js's own envelope ramps it in, holds, and ramps it out
+// within jumpDuration(), and the leg is timed to that envelope rather than to a number typed here -- so the
+// tunnel is gone by the time the planet is close enough to look at, without anybody maintaining two durations.
+const arriveBtn = document.getElementById("arriveBtn");
+arriveBtn.addEventListener("click", () => {
+  if (arrival || descent || !planetMesh || !planetSpec_) return;
+  const c = planetMesh.position;
+  const dir = cnorm3([camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z]);
+  const groundR = surfaceRadiusAt(planetSpec_, dir, { radius: planetR, ampFrac: PLANET_AMP_FRAC });
+  const target = [c.x + dir[0] * groundR, c.y + dir[1] * groundR, c.z + dir[2] * groundR];
+  const warpDur = jumpDuration();          // the leg IS the tunnel's own lifetime, not a second guess at it
+  arrival = {
+    t: 0,
+    legs: chainLegs([
+      { shot: "dive", dur: warpDur, p: { center: [c.x, c.y, c.z], target,
+          from: { distance: 20000, pitch: 0.04, azimuth: -0.5, fov: 62, roll: 0 },
+          to:   { distance: 140,   pitch: 0.30, azimuth: 0.2,  fov: 50, roll: 0 } } },
+      { shot: "descent", dur: 8, p: {
+          to: { distance: 2.2, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` is DERIVED
+    ]),
+  };
+  controls.enabled = false;
+  arriveBtn.style.opacity = "0.5";
+  if (foldTunnel) foldTunnel.play();
+});
+window.swekArrive = () => arriveBtn.click();
+window.swekArrivalProbe = () => {
+  if (!arrival) return { flying: false };
+  const f = sampleSequence(arrival.legs, arrival.t);
+  return { flying: true, t: arrival.t, leg: f.leg, distance: f.distance, fov: f.fov,
+           tunnel: !!(foldTunnel && foldTunnel.active), total: sequenceDuration(arrival.legs) };
+};
+
 // v4053 -- a PROBE of the real flight, not a mirror of the shot's own numbers: it reads the LIVE Three camera
 // back and measures it against the same displaced ground surfaceRadiusAt() gave the mesh. A gate asserting the
 // shot's own return value would only prove sampleShot agrees with itself; this proves the camera Three is
