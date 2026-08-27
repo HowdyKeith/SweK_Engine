@@ -19,11 +19,21 @@
 //   ATTEMPT a build, never to decide what one means, and every consumer must behave identically with the file
 //   absent -- which is the state of a fresh checkout on a machine nobody has frozen it on.
 //
-//   NOT PORTABLE. These are milliseconds on whoever ran the freeze. The same twof build in this session was
-//   timed at 115.7 s idle and 205.0 s under load, a 1.8x spread from contention alone, and kuramoto once read
-//   1044 s in a contended census log against 28 s measured directly. A record frozen on a busy machine
-//   over-states, which is the direction that DECLINES work that would have fitted -- the wrong direction --
-//   so `frozenOn` records the conditions and a reader is entitled to distrust it.
+//   NOT PORTABLE. These are milliseconds on whoever ran the freeze, and kuramoto once read 1044 s in a
+//   contended census log against 28 s measured directly, so `frozenOn` records the conditions and a reader is
+//   entitled to distrust them.
+//
+//   *** AND THE DOMINANT VARIANCE IS NOT OTHER PROCESSES, WHICH TOOK A MEASUREMENT TO SEE. *** twof.inlet, at
+//   one unchanging config, timed 115.7 s and 117.0 s and then 205.0, 207.7 and 212.5 s. The split is not
+//   instrumented against bare -- 115.7 and 212.5 are BOTH instrumented -- and the freeze that produced 212.5
+//   ran alone on an idle machine. The split is FIRST HEAVY BUILD IN A FRESH PROCESS against everything after
+//   it: the eighty devices the census builds beforehand leave a heap that makes an LBM run take almost twice
+//   as long.
+//
+//   *** THAT MAKES THIS A RECORD OF COST IN CENSUS POSITION, AND THAT IS THE RIGHT QUANTITY. *** A budget
+//   needs to know what a device will cost WHEN THE SWEEP REACHES IT, not what it costs alone in a fresh
+//   process. So the 212.5 s here is the useful number and the isolated 115.7 s is the misleading one -- which
+//   is the opposite of the conclusion the isolated measurement invited, and the reason this paragraph exists.
 //
 //   NOT A RATCHET. corroboration-reach-baseline.json exists to catch a number FALLING and says so. This one
 //   carries no assertion at all: a device getting slower is news about the device, not a regression in the
