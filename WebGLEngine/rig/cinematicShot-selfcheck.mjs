@@ -317,6 +317,68 @@ console.log("\n5. *** A SEQUENCE'S SEAMS DO NOT CUT -- CONTINUITY IS DERIVED, NO
         " units out; a LINEAR interpolation of the same leg would be " + ((20000 + 150) / 2).toFixed(0));
 }
 
+console.log("\n5b. *** A COMPUTED SHOT AS A RECORDED CLIP -- THE TWO CAMERA MODULES ACTUALLY COMPOSE ***");
+{
+    const target = [0, 0, 17.2];
+    const legs = S.chainLegs([
+        { shot: "dive", dur: 2.5, p: { center: [0, 0, 0], target,
+            from: { distance: 20000, pitch: 0.04, azimuth: -0.5, fov: 62, roll: 0 },
+            to:   { distance: 140, pitch: 0.30, azimuth: 0.2, fov: 50, roll: 0 } } },
+        { shot: "descent", dur: 8, p: { to: { distance: 12, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },
+        { shot: "orbit", dur: 12, p: { to: { distance: 12, pitch: 1.05, azimuth: 3.5, fov: 34, roll: 0 } } },
+    ]);
+
+    // the yaw/pitch conversion is ROUND-TRIPPED against camera/camera.js's own stated forward, not trusted.
+    let worstRT = 0;
+    for (let i = 0; i < 400; i++) {
+        const a = (i / 400) * Math.PI * 2 - Math.PI, b = ((i * 7) % 400 / 400) * Math.PI * 0.98 - Math.PI * 0.49;
+        const f = S.norm3([Math.sin(a) * Math.cos(b), Math.sin(b), -Math.cos(a) * Math.cos(b)]);
+        const { yaw, pitch } = S.forwardToYawPitch(f);
+        const back = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
+        worstRT = Math.max(worstRT, len3(sub3(f, back)));
+    }
+    ok("!! forwardToYawPitch inverts camera/camera.js's OWN forward (yaw=0 -> -Z, +pitch up) exactly",
+        worstRT < 1e-12, "worst round-trip error " + worstRT.toExponential(2) + " over 400 directions");
+
+    const clip = S.toClip(legs, 30);
+    ok("!! toClip emits the schema cameraCinematic/TrackAnimator already consume",
+        clip.bones.length === 2 && clip.bones[0].id === "camera.pos" && clip.bones[1].id === "camera.aim" &&
+        clip.bones.every((b) => b.frames.every((f) => typeof f.t === "number" && Array.isArray(f.position) && f.position.length === 3)),
+        clip.bones[0].frames.length + " frames per track over " + clip.duration + "s");
+    ok("...and its duration is the sequence's own, with frames spanning it end to end",
+        Math.abs(clip.duration - S.sequenceDuration(legs)) < 1e-12 &&
+        clip.bones[0].frames[0].t === 0 &&
+        Math.abs(clip.bones[0].frames.at(-1).t - clip.duration) < 1e-9);
+
+    // *** THE CLAIM THAT MATTERS: THE CLIP IS THE SAME FLIGHT, NOT A LOSSY TRACE OF ONE PLAYBACK. ***
+    let worstPos = 0;
+    for (const fr of clip.bones[0].frames) {
+        const live = S.sampleSequence(legs, fr.t);
+        worstPos = Math.max(worstPos, len3(sub3(fr.position, live.eye)));
+    }
+    ok("!! *** every recorded frame equals the shot sampled at that same t -- a record, not a trace ***",
+        worstPos < 1e-9, "worst position error " + worstPos.toExponential(2) + " across " +
+        clip.bones[0].frames.length + " frames; purity is what makes seeking and playing-forward the same frame");
+    ok("...and recording twice gives a byte-identical clip",
+        JSON.stringify(S.toClip(legs, 30)) === JSON.stringify(clip));
+    ok("...and it carries its own provenance rather than looking hand-recorded",
+        clip._shot && clip._shot.fps === 30 && clip._shot.legs === 3, JSON.stringify(clip._shot));
+    let threw = 0;
+    try { S.toClip([], 30); } catch { threw++; }
+    try { S.toClip(legs, 0); } catch { threw++; }
+    ok("...and bad input refuses rather than emitting an empty clip", threw === 2,
+        "an empty clip plays as a camera frozen at the origin, which reads as a broken player");
+
+    // THE THIRD LEG's own character: an orbit holds its distance and moves only the azimuth.
+    const oStart = S.sampleSequence(legs, 10.5 + 0.01), oEnd = S.sampleSequence(legs, 22.5);
+    ok("!! *** the settling ORBIT holds its height and sweeps only azimuth -- it ends the shot, not extends the dive ***",
+        oStart.leg === 2 && Math.abs(oStart.distance - oEnd.distance) < 1e-9 &&
+        Math.abs(oEnd.azimuth - oStart.azimuth) > 1.5,
+        "distance held at " + oEnd.distance.toFixed(3) + " while azimuth moved " +
+        (oEnd.azimuth - oStart.azimuth).toFixed(2) + " rad -- the orbit shot's dist channel is the constant 0, " +
+        "so mixLog returns whatever the descent handed over");
+}
+
 console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS FROM CLEARS THE GROUND ***");
 {
     const fs = await import("node:fs");
@@ -357,6 +419,16 @@ console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
         Number.isFinite(dEnd) && texelsAt(dEnd) >= 30,
         "DESCENT_END " + dEnd + " -> ~" + texelsAt(dEnd).toFixed(1) + " texels across the frame. The old 2.2 gave " +
         texelsAt(2.2).toFixed(1) + " and rendered at luminance sd 9.3; the measured elbow is ~12 units (sd 38.2)");
+    ok("!! *** the arrival's legs are declared ONCE -- the button flies them and toClip records them ***",
+        /function arrivalLegs\(center, target\)/.test(page) &&
+        /arrival = \{ t: 0, legs: arrivalLegs\(site\.center, site\.target\) \}/.test(page) &&
+        /toClip\(arrivalLegs\(site\.center, site\.target\), fps \|\| 30\)/.test(page),
+        "two copies would mean the clip you exported was a different flight from the one you watched -- the " +
+        "worst kind of recording, because it is plausible and wrong");
+    ok("!! ...and the settling orbit sweeps from the SAME named azimuth the descent lands on",
+        /const LAND_AZ = [\d.]+, ORBIT_SWEEP = [\d.]+;/.test(page) &&
+        /azimuth: LAND_AZ, /.test(page) && /azimuth: LAND_AZ \+ ORBIT_SWEEP/.test(page),
+        "typing the landing azimuth twice is how an orbit ends up starting somewhere the descent did not end");
     ok("!! ...and the cloud deck sits ABOVE that, so the flight still passes THROUGH the weather",
         Number.isFinite(cAlt) && cAlt > dEnd,
         "CLOUD_ALT " + cAlt + " vs DESCENT_END " + dEnd + " -- a deck at or below the landing height would leave " +
@@ -435,7 +507,7 @@ console.log("\n6. *** THE PAGE ACTUALLY FLIES IT, AND THE CAMERA THREE RENDERS F
                 await pg.waitForTimeout(3500);
                 await pg.evaluate(() => window.swekArrive());
                 const arr = [];
-                for (let i = 0; i < 60; i++) {
+                for (let i = 0; i < 220; i++) {   // 22.5s of flight, and headless runs ~2x slower than real time
                     await pg.waitForTimeout(400);
                     const p = await pg.evaluate(() => window.swekArrivalProbe());
                     arr.push(p);

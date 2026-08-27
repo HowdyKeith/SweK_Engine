@@ -212,6 +212,56 @@ export function chainLegs(legs) {
 export function sequenceDuration(legs) { return legs.reduce((s, l) => s + l.dur, 0); }
 
 /**
+ * A forward vector as the engine's own yaw/pitch pair. camera/camera.js:318 states the convention outright --
+ * "yaw=0 -> -Z; positive pitch up" -- and builds forward as (sin y * cos p, sin p, -cos y * cos p). This is that
+ * function inverted, and it is exported so a gate can round-trip it rather than trust the algebra.
+ */
+export function forwardToYawPitch(f) {
+    const d = norm3(f);
+    return { yaw: Math.atan2(d[0], -d[2]), pitch: Math.asin(Math.max(-1, Math.min(1, d[1]))) };
+}
+
+/**
+ * *** A PARAMETRIC SHOT AS A KEYFRAME CLIP -- WHICH IS WHAT MAKES THIS FILE AND rig/cameraCinematic.js ACTUALLY
+ * COMPOSE, RATHER THAN MERELY NOT OVERLAP. *** This module's own header claims "a shot sampled at N times IS a
+ * keyframe list"; until now that was an assertion nobody could run. toClip() samples the sequence on a fixed
+ * grid and emits the exact schema cameraCinematic._buildClip() produces and TrackAnimator consumes -- so a move
+ * that was COMPUTED can be handed to the player built for moves that were RECORDED, saved to the asset library
+ * beside them, and replayed anywhere a clip plays.
+ *
+ * A FIXED GRID, and that is the point rather than an implementation detail: because every channel is a pure
+ * function of t, frame N is the same frame whether you played forward to it or seeked straight there. That is
+ * the property a frame-locked recorder needs, and it is why sampling here is a faithful record of the flight
+ * rather than a lossy trace of one particular playback.
+ *
+ * @param legs  a CHAINED sequence (run it through chainLegs first, or the seams it records will be the cuts)
+ * @param fps   sampling rate; the clip's own frames, not a playback rate -- TrackAnimator interpolates between
+ * @returns {{duration:number, bones:Array, _shot:{fps:number, legs:number}}}
+ */
+export function toClip(legs, fps = 30) {
+    if (!legs || !legs.length) throw new TypeError("toClip needs at least one leg");
+    if (!(fps > 0)) throw new RangeError("fps must be positive");
+    const dur = sequenceDuration(legs);
+    const n = Math.max(1, Math.round(dur * fps));
+    const pos = [], aim = [];
+    for (let i = 0; i <= n; i++) {
+        const t = (i / n) * dur;
+        const f = sampleSequence(legs, t);
+        const { yaw, pitch } = forwardToYawPitch(f.forward);
+        pos.push({ t, position: [f.eye[0], f.eye[1], f.eye[2]] });
+        aim.push({ t, position: [yaw, pitch, 0] });
+    }
+    return {
+        duration: dur,
+        bones: [
+            { id: "camera.pos", frames: pos },
+            { id: "camera.aim", frames: aim },
+        ],
+        _shot: { fps, legs: legs.length },   // provenance: TrackAnimator ignores it, a reader should not have to guess
+    };
+}
+
+/**
  * Sample a chained sequence at an ABSOLUTE time in seconds. Returns the frame plus which leg produced it and
  * that leg's own normalized time -- callers need the leg index to drive per-leg effects (the warp tunnel runs
  * over leg 0 and must be gone by the time leg 1's descent starts).

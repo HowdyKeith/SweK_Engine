@@ -8,6 +8,39 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4057 -- a third leg, and two camera modules that finally compose
+
+Keith: "let's work through all 3 items." This is items 1 and 2; the engine side is next.
+
+**A third leg, so the arrival ends rather than stops.** The `orbit` shot's distance channel is the constant 0,
+so `mixLog` holds whatever the descent handed over: the camera keeps its height and only the azimuth moves,
+which is what an establishing orbit *is*. It cost one array entry, because `sampleSequence` already takes any
+number of legs and `chainLegs` already makes a new seam continuous by construction -- the v4054 machinery paying
+off without being touched. Live: legs fire at 19490 -> 140 -> 12 units, the third holding 12.000 while azimuth
+sweeps 2.20 rad.
+
+**And the two camera modules now actually compose, instead of merely not overlapping.** `cinematicShot.js`'s
+header has claimed since v4053 that "a shot sampled at N times IS a keyframe list" -- an assertion nobody could
+run. New `toClip()` samples a chained sequence on a fixed grid and emits the *exact* schema
+`cameraCinematic._buildClip()` produces and `TrackAnimator` consumes. So a move that was **computed** can be
+played by the player built for moves that were **recorded**, and saved to the asset library beside them.
+
+MEASURED: every one of 676 recorded frames equals the live shot sampled at the same t to **0.00e+0** -- a record,
+not a lossy trace of one playback. That exactness is purity paying rent: frame N is the same frame whether you
+played forward to it or seeked straight there, which is precisely what a frame-locked recorder needs.
+
+New `forwardToYawPitch()` inverts `camera/camera.js:318`'s own stated convention (yaw=0 -> -Z, +pitch up), and is
+round-tripped against it over 400 directions at worst **2.01e-15** rather than trusted.
+
+The arrival's legs are **declared once** and shared by the button and the exporter. Two copies would mean the
+clip you exported was a different flight from the one you watched -- the worst kind of recording, because it is
+plausible and wrong. The landing azimuth is named once for the same reason: the descent arrives on it and the
+orbit sweeps away from it.
+
+**And a polling budget I had to widen, for the reason v4056 just named.** The sequence grew from 10.5s to 22.5s
+and the gate's 36s poll cap expired mid-flight, reporting a landing that had not happened -- the same
+guessed-clock mistake. Caught this time by a gate going red, rather than by a screenshot quietly lying.
+
 ## Since v4056 -- the wash, chased down: it was texture magnification all along
 
 Keith: "chase down next."

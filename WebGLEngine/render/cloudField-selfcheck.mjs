@@ -191,7 +191,7 @@ console.log("\n5. *** THE PLANET PAGE DRAWS THEM, AND THE ARRIVAL REALLY FLIES T
             // maxR" is asking to win a timing lottery, and it reported a false negative on a flight that plainly
             // went through. Above-then-below is the property that actually means "flew through it".
             let wasAbove = false, endedBelow = false, minR = Infinity;
-            for (let i = 0; i < 90; i++) {
+            for (let i = 0; i < 220; i++) {   // 22.5s of flight, and headless runs ~2x slower than real time
                 await pg.waitForTimeout(350);
                 const c = await pg.evaluate(() => window.swekCloudProbe());
                 const a = await pg.evaluate(() => window.swekArrivalProbe());
