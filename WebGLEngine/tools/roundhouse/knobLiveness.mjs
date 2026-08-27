@@ -156,7 +156,19 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
                     const kind = typeof v;
                     if (!acc.has(knob)) acc.set(knob, { kind, probed: [], live: [], still: [], movedMost: 0 });
                     const a = acc.get(knob);
-                    if (!probeValues(v).length) { a.kind = Array.isArray(v) ? "array" : kind; continue; }  // strings/arrays: no ordering to perturb along
+                    // *** v4030 -- A KNOB WITH NO ORDERING TO PERTURB ALONG IS NAMED, NOT DROPPED. *** Strings
+                    // and arrays were already skipped here and that is right -- inventing an ordering would test
+                    // the device's error handling instead of the knob. But the row then carried an empty
+                    // `probed`, so stillKnobs and insensitiveKnobs BOTH filtered it out and the knob vanished
+                    // from every list the census prints. A null default is the case that matters: `cfg.x ??
+                    // fallback` is a live, readable knob whose default means "compute it", and there are two in
+                    // the lab (optics.spread and blackhole.onsetLo, the latter unnoticed since it was written).
+                    // Reported as UNPROBED so the census names what it cannot answer rather than implying it did.
+                    if (!probeValues(v).length) {
+                        a.kind = v === null || v === undefined ? "null-default" : (Array.isArray(v) ? "array" : kind);
+                        a.unprobed = true;
+                        continue;
+                    }
                     if (a.live.length) continue;                       // already answered yes; the rest is cost
                     a.probed.push(where);
                     const r = await probeKnob(dev, m, cfg, knob, base, ps.extra);
@@ -215,6 +227,14 @@ export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && 
     .map((r) => r.device + "." + r.knob + " (" + r.wideLive + ")").sort();
 
 /**
+ * Declared, and NOT ANSWERED EITHER WAY -- no ordering exists to perturb the default along. A separate list from
+ * `still` on purpose: "moves nothing" is a measurement and "was never probed" is an admission, and folding the
+ * second into the first would report coverage this census does not have.
+ */
+export const unprobedKnobs = (rows) => rows.filter((r) => r.unprobed && !r.probed.length)
+    .map((r) => r.device + "." + r.knob + " (" + r.kind + ")").sort();
+
+/**
  * v4025 -- KNOBS THAT MOVE NOTHING AND HAVE AN EXAMINED REASON.
  *
  * Empty on purpose, and the emptiness is the claim. The one entry this file was built around --
@@ -269,7 +289,9 @@ export async function reportLines(opts = {}) {
         }
     }
     L.push("");
+    const unprobed = unprobedKnobs(rows);
     L.push("  MOVES NOTHING ANYWHERE: " + (still.length ? still.join(", ") : "none"));
+    L.push("  NOT PROBED (no ordering to perturb the default along): " + (unprobed.length ? unprobed.join(", ") : "none"));
     L.push("  A READING, NEVER A DIAGNOSIS -- dead, saturated at an asymptote, and quantised below the search");
     L.push("  step are three different conditions that produce this same one.");
     for (const n of notes) L.push("  note: " + n);

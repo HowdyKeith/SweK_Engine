@@ -28,7 +28,20 @@ export const OPTICS_OBSERVABLES = [
     "fresnelNumber", "nearFarRms",
 ];
 
-const DEF = { lambda: 500e-6, D: 0.2, a: 0.1, z: 2000, nSamples: 900, spread: 0.02 };
+// *** v4030 -- `spread` WAS AN ORPHAN, AND ITS VALUE SAYS WHAT IT USED TO BE. *** It sat in DEF, was exposed as
+// a knob, and was READ NOWHERE in buildOptics: every sweep width is computed fresh at its own call site from the
+// physics (4*lambda/D for the Airy ring, 4*lambda/a for the slit, 3*lambda/a for the convergence comparison).
+// The frozen 0.02 is EXACTLY 4*lambda/a at the default lambda and a -- the slit's own width, left behind when
+// self-scaling came in. It was therefore right for one mode and wrong for the other two (airy wants 0.01,
+// converge 0.015), which is why wiring it in as a flat window would have been a regression wearing a fix.
+//
+// null now means SELF-SCALE FROM THE PHYSICS, which is what the device already did and must keep doing: the
+// sweep has to widen when the wavelength grows or the aperture shrinks, or the first minimum leaves the window.
+// A NUMBER OVERRIDES IT, for a caller who wants a specific window -- and if that window is too narrow to contain
+// the feature, the mode REFUSES rather than returning the wrong dip, which is the behaviour that already existed
+// for a sweep that finds no minimum. Found by knobLiveness: a declared knob that moved no observable at any
+// value, the v4028/v4029 signature for the third time.
+const DEF = { lambda: 500e-6, D: 0.2, a: 0.1, z: 2000, nSamples: 900, spread: null };
 
 export function opticsDefaults(hyp) {
     const h = { mode: "airy", ...(hyp || {}) };
@@ -39,6 +52,10 @@ export function opticsDefaults(hyp) {
     c.a = Math.min(10, Math.max(1e-3, num(c.a, DEF.a)));
     c.z = Math.min(1e6, Math.max(1, num(c.z, DEF.z)));
     c.nSamples = Math.min(2001, Math.max(101, num(c.nSamples, DEF.nSamples) | 0));
+    // null (or anything non-positive) keeps the self-scaling path. Deliberately NOT clamped to a "sensible"
+    // range: a window too small to hold the first minimum is a question worth being able to ask, and the answer
+    // is the refusal below rather than a silently widened sweep.
+    c.spread = (typeof c.spread === "number" && Number.isFinite(c.spread) && c.spread > 0) ? c.spread : null;
     h.config = c;
     if (!["airy", "slit", "edge", "converge", "radiusconfusion"].includes(h.mode)) h.mode = "airy";
     return h;
@@ -63,7 +80,7 @@ export async function buildOptics(hyp, base = {}) {
         // caller making this mistake would make it in ONE place -- a plant that changed both sides would
         // cancel and prove nothing (v3733). ***
         const aperture = h.mode === "radiusconfusion" ? c.D / 2 : c.D;
-        const sp = 4 * c.lambda / c.D;                       // enough angle to contain the first ring
+        const sp = c.spread ?? (4 * c.lambda / c.D);          // enough angle to contain the first ring
         const st = sweep(c.nSamples, sp);
         const pat = circularNumeric(aperture, c.lambda, st);
         // v2931 -- ADOPTED FROM v2911. Two changes, both measured improvements:
@@ -82,7 +99,7 @@ export async function buildOptics(hyp, base = {}) {
     }
 
     if (h.mode === "slit") {
-        const sp = 4 * c.lambda / c.a;
+        const sp = c.spread ?? (4 * c.lambda / c.a);
         const st = sweep(c.nSamples, sp);
         const num = slitNumeric(c.a, c.lambda, st);
         const ana = slitAnalytic(c.a, c.lambda, st);
@@ -93,8 +110,16 @@ export async function buildOptics(hyp, base = {}) {
         // only when (nSamples-1) divided by 4 (a grid point landing on the answer) and ~1e-3 otherwise. Refined
         // converges toward 1 smoothly instead of alternating between exact-hit and grid-miss.
         const first = firstMinimumRefined(num, st);
-        out.slitFirstMinFactor = first > 0 ? first / (c.lambda / c.a) : undefined;   // analytically exactly 1
-        out.slitFirstMinErrFrac = first > 0 ? Math.abs(out.slitFirstMinFactor - 1) : undefined;
+        // *** v4030 -- REFUSES NOW, WHERE IT USED TO EMIT `undefined` INTO TWO DECLARED OBSERVABLES. *** airy
+        // three branches up already returns { error: "no-first-minimum-found" } for exactly this condition; slit
+        // set both fields to undefined and returned, so the mode reported slitRms and silently dropped the other
+        // two. THAT WAS UNREACHABLE UNTIL `spread` BECAME A LIVE KNOB -- with the window self-scaled from the
+        // physics the first minimum is always inside it -- which is what made wiring the knob worth doing beyond
+        // the knob itself. Two modes answering the same question two ways is one of them being wrong, and the
+        // one that refuses is right: an observable that reads `undefined` is a reference that reports nothing.
+        if (!(first > 0)) return { error: "no-first-minimum-found" };
+        out.slitFirstMinFactor = first / (c.lambda / c.a);                          // analytically exactly 1
+        out.slitFirstMinErrFrac = Math.abs(out.slitFirstMinFactor - 1);
         return out;
     }
 
@@ -138,7 +163,7 @@ export async function buildOptics(hyp, base = {}) {
     // to. NOTHING FAILED, because nothing asks a device to produce every observable it declares. ***
     // The mode name below is what makes it reachable, and the Fraunhofer limit below is the key it never had.
     // converge: near-field vs far-field at the chosen distance
-    const sp = 3 * c.lambda / c.a;
+    const sp = c.spread ?? (3 * c.lambda / c.a);
     const st = sweep(Math.min(161, c.nSamples), sp);   // a shape comparison needs far fewer points than a fringe hunt
     const far = slitAnalytic(c.a, c.lambda, st);
     const near = slitFresnelAtAngles(c.a, c.lambda, c.z, st);
