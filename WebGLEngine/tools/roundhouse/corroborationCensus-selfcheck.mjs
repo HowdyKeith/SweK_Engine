@@ -27,6 +27,22 @@ let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 const report = (name, detail) => console.log("  ----  " + name + (detail ? "   " + detail : ""));
 
+// *** AND THE LAB-WIDE TOTALS ARE NOT ASSERTED FROM A PARTIAL SWEEP. *** Each is a sum over the rows that were
+// built, so a budgeted run makes every one smaller while some comparisons still hold on the smaller lab --
+// `unkeyedTotal > keyedTotal` would pass on half the devices and mean nothing. A partial run REPORTS them and
+// says it cannot vouch for them; it does not quietly pass.
+//
+// *** v4039a -- THIS LIVES AT MODULE SCOPE BECAUSE IT WAS DECLARED INSIDE ONE SECTION'S BLOCK AND USED IN THE
+// NEXT, AND `const` IS BLOCK-SCOPED. *** The unbudgeted run swept all 484 device/modes, passed every
+// assertion, and then died with `ReferenceError: pinned is not defined` on the last one. The budgeted runs
+// crashed there too and I READ THE TRAILING STACK TRACE AS THE END OF THE OUTPUT and reported the guards as
+// firing correctly. They did -- and the gate still exited non-zero one line later, which is exactly the kind
+// of thing a gate exists to make impossible to miss.
+let censusComplete = true, sweptSoFar = "";
+const pinned = (name, cond, detail) => censusComplete
+    ? ok(name, cond, detail)
+    : report(name, "NOT ASSERTED -- the sweep was PARTIAL (" + sweptSoFar + "). " + detail);
+
 // --budget <ms> bounds the sweep and produces a PARTIAL result that says so. Absent, the run is unbounded,
 // which is what CI wants: the assertions below are lab-wide totals and a shortened run understates every one.
 const argv = process.argv.slice(2);
@@ -54,6 +70,8 @@ const c = await corroborationCensus({
 });
 flush();
 const s = c.summary;
+censusComplete = c.complete;
+sweptSoFar = s.deviceModes + " of " + s.plannedDeviceModes;
 console.log("  swept " + s.deviceModes + " of " + s.plannedDeviceModes + " device/modes" +
     (c.complete ? "" : "  -- PARTIAL, " + s.skippedDeviceModes + " skipped at the budget, " +
                        s.declinedDeviceModes + " declined as too costly for what was left"));
@@ -117,15 +135,6 @@ console.log();
         c.complete && s.deviceModes === s.plannedDeviceModes && c.failed === 0,
         s.deviceModes + " of " + s.plannedDeviceModes + " device/modes built, " + c.failed + " refused" +
         (c.complete ? "" : ", PARTIAL -- " + s.skippedDeviceModes + " skipped at the budget"));
-    // *** AND THE TOTALS BELOW ARE NOT ASSERTED FROM A PARTIAL SWEEP. *** Each is a sum over the rows that were
-    // built, so a budgeted run makes every one of them smaller and some of the comparisons still hold on the
-    // smaller lab -- `unkeyedTotal > keyedTotal` would pass on half the devices and mean nothing. A partial run
-    // reports them and says it cannot vouch for them; it does not quietly pass.
-    const pinned = (name, cond, detail) => c.complete
-        ? ok(name, cond, detail)
-        : report(name, "NOT ASSERTED -- the sweep was PARTIAL (" + s.deviceModes + " of " +
-                 s.plannedDeviceModes + "). " + detail);
-
     pinned("!! most of the lab's numbers have no answer key",
         s.unkeyedTotal > s.keyedTotal,
         s.unkeyedTotal + " unkeyed vs " + s.keyedTotal + " keyed -- the tautology census (v2898) audited the " +
@@ -159,7 +168,10 @@ console.log();
     // reached kerr this line passed by having nothing to check -- the vacuous pass this session already found
     // in mpmstep's sideways negative, where a grid too small to hold the block satisfied "driftX is exactly
     // zero" by never moving it. Unreachable before a budget existed; reachable the moment one did.
-    ok("build-level granularity demonstrably overstates the taint",
+    // `pinned`, for the same reason as the totals: on a partial sweep kerr may simply not have been reached,
+    // which is missing data and not a defect. The kerr.length > 0 guard still stands for the complete run,
+    // where an empty list would mean the rows vanished rather than that the budget ran out.
+    pinned("build-level granularity demonstrably overstates the taint",
         kerr.length > 0 && kerr.every((r) => !r.portable && r.rawCalls < 100 && r.unkeyed.length >= 10),
         "kerr modes: " + kerr.map((r) => r.mode + "(" + r.rawCalls + " calls, " + r.unkeyed.length + " unkeyed)").join(", ") +
         " -- twenty-odd calls cannot plausibly have reached all eleven outputs; the census reports them at risk anyway " +
@@ -204,9 +216,14 @@ console.log("\n3b. *** THE COUNT IS THE PRODUCT, SO A FASTER WRAPPER THAT COUNTS
         "count correctly and return nonsense, which is the failure this line exists for.");
 
     const brk = await measurePortabilitySampled(() => { for (let i = 0; i < 7; i++) Math.cos(i); for (let i = 0; i < 3; i++) Math.log(i + 1); return 0; });
+    // *** THE PATTERN IS THE INSTRUMENT'S MODULE, NOT ANY FILE WHOSE NAME LOOKS LIKE IT. *** The first draft
+    // asked for no site matching /corroborationCensus/ and FAILED HERE while passing from a scratch file --
+    // because the correct caller frame is corroborationCensus-SELFCHECK.mjs, which matches. A check that
+    // fails on the right answer because it cannot tell two filenames apart is worse than no check.
     ok("!! the per-function breakdown and the site frames still point at the CALLER",
-        brk.byFn[0] === "7x cos" && brk.byFn[1] === "3x log" &&
-        brk.sites.length > 0 && !brk.sites.some((x) => /corroborationCensus/.test(x)),
+        brk.byFn[0] === "7x cos" && brk.byFn[1] === "3x log" && brk.sites.length > 0 &&
+        !brk.sites.some((x) => /corroborationCensus\.mjs/.test(x)) &&
+        brk.sites.every((x) => /-selfcheck\.mjs:\d+/.test(x)),
         brk.byFn.join(", ") + " | sites: " + brk.sites.join("; ") + ". *** THE STACK FRAME INDEX HAD TO MOVE " +
         "FROM [2] TO [3]: the site capture is now a separate function so it stays off the hot path, and that " +
         "adds a frame. Left alone, every site would have blamed the instrument itself. ***");
