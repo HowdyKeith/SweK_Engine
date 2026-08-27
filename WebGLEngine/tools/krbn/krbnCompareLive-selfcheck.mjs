@@ -186,5 +186,88 @@ console.log("\n8. DEGENERATE TRIANGLES -- KRBN'S OWN LOADERS DROP THEM AND OUR g
        "without inheriting the fix");
 }
 
+console.log("\n9. *** THE TWO PANES ACTUALLY AGREE -- THE PAGE CLAIMED THIS FOR ITS WHOLE LIFE AND IT WAS FALSE ***");
+{
+    // krbn-compare.html's own "Honest scope" note said "its shader uses the same projection as the Krbn side,
+    // so the two stay aligned across the wipe". MEASURED at v4045: the vertical agreed to 0.0px and the
+    // HORIZONTAL was out by exactly W/H = 1.643x -- project() used an effective focal length of f*W/2
+    // horizontally against f*H/2 vertically, and the WebGL shader repeated the same two-focal-length form. So
+    // the two panes agreed with EACH OTHER while both disagreed with Krbn, which is precisely why a page built
+    // to compare them could not see it. This runs all three and requires them to coincide.
+    const { project } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
+    let K = null; try { K = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
+    const sub = (a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+    const dot = (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    const cross = (a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    const norm = (a)=>{const m=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/m,a[1]/m,a[2]/m];};
+    // The GLSL, evaluated in JS exactly as the vertex shader computes it -- a GPU is not needed to check
+    // arithmetic, and this is the copy of the projection that a reader is least likely to keep in step.
+    const shaderPx = (p, cam) => {
+        const fwd=norm(sub(cam.target,cam.eye)), right=norm(cross(fwd,cam.up)), up=cross(right,fwd);
+        const rel=sub(p,cam.eye), cz=Math.max(dot(rel,fwd),0.001);
+        const uF=1/Math.tan(cam.scale), uInv=VIEW.height/VIEW.width;
+        return [VIEW.width/2 + ((dot(rel,right)/cz)*uF*uInv)*(VIEW.width/2),
+                VIEW.height/2 - ((dot(rel,up)/cz)*uF)*(VIEW.height/2)];
+    };
+    const cam = { eye:[4,3,2.5], target:[0,0,0], up:[0,0,1], scale:SCALE, viewport:VIEW };
+    let worstShader = 0, worstKrbn = 0, n = 0;
+    const P = K ? K.projectionMatrix({ ...cam, projection:"perspective", scale:SCALE*2 }) : null;
+    for (let i = 0; i < 300; i++) {
+        const p = [Math.sin(i*1.7)*2, Math.cos(i*2.3)*2, Math.sin(i*0.9)*1.5];
+        const a = project(p, cam); if (!a) continue;
+        n++;
+        const s = shaderPx(p, cam);
+        worstShader = Math.max(worstShader, Math.abs(a[0]-s[0]), Math.abs(a[1]-s[1]));
+        if (P) { const k = K.projectPoint(P, p).point; worstKrbn = Math.max(worstKrbn, Math.abs(a[0]-k[0]), Math.abs(a[1]-k[1])); }
+    }
+    ok("!! the WebGL shader and project() put a point in the SAME pixel",
+       n > 200 && worstShader < 1e-9, "worst " + worstShader.toExponential(2) + " px over " + n + " points");
+    ok("!! ...and both match KRBN'S OWN projectionMatrix, which is the one that was right all along",
+       !!K && worstKrbn < 1e-9, K ? "worst " + worstKrbn.toExponential(2) + " px" : "vendor/krbn missing");
+    ok("!! project() uses ONE focal length, not one per axis",
+       /const fpx = \(H \/ 2\) \/ Math\.tan\(cam\.scale\)/.test(fs.readFileSync(path.join(ENG,"tools","krbn","krbnCompare.js"),"utf8")),
+       "f*W/2 horizontally against f*H/2 vertically is anisotropic by W/H -- a sphere draws as an ellipse");
+    ok("!! ...and the shader carries the matching uInvAspect rather than repeating the old form",
+       /uInvAspect/.test(HTML) && /uF\*uInvAspect/.test(HTML.replace(/\s/g, "")));
+}
+
+console.log("\n10. FRAMING IS DERIVED FROM THE FRUSTUM, AND NOTHING LEAVES THE FRAME");
+{
+    ok("!! the orbit distance comes from the FOV, not from tuned constants",
+       /function fitDistance/.test(HTML) && /Math\.sin\(half\)/.test(HTML),
+       "R=radius*1.75 encoded a field of view nobody stated and stops being right when SCALE or the aspect changes");
+    const { project } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
+    const { sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
+    const VIEW = { width: 920, height: 560 }, SCALE = Math.PI / 4.2;
+    const ELEV = Math.atan2(0.65, 1.75), MARGIN = 1.06;
+    const fitD = (r) => r / Math.sin(Math.min(SCALE, Math.atan((VIEW.width/VIEW.height)*Math.tan(SCALE)))) * MARGIN;
+    // a deliberately PATHOLOGICAL subject: 9 units tall against 0.7 wide, the shape a bounding-sphere fit is
+    // worst at and the one a tuned constant would crop first.
+    const tall = { positions: [], triangles: [[0,1,2]] };
+    for (let i = 0; i < 200; i++) tall.positions.push([Math.cos(i)*0.35, Math.sin(i)*0.35, (i/199)*9-4.5]);
+    let worstFill = 0, cropped = [];
+    for (const [nm, m] of Object.entries({ blob: sceneMesh("blob"), ragdoll: sceneMesh("ragdoll"),
+                                           splat: sceneMesh("splat"), flesh: sceneMesh("flesh"), "tall 9:0.7": tall })) {
+        const lo=[Infinity,Infinity,Infinity], hi=[-Infinity,-Infinity,-Infinity];
+        for (const p of m.positions) for (let i=0;i<3;i++){ if(p[i]<lo[i])lo[i]=p[i]; if(p[i]>hi[i])hi[i]=p[i]; }
+        const c=[0,1,2].map(i=>(lo[i]+hi[i])/2);
+        let r=0; for (const p of m.positions){ const d=Math.hypot(p[0]-c[0],p[1]-c[1],p[2]-c[2]); if(d>r)r=d; }
+        const d = fitD(r||1); let fill = 0;
+        for (let s=0;s<72;s++){                     // a FULL orbit: what fits at 0 degrees must fit at 45
+            const a=s/72*Math.PI*2, R=d*Math.cos(ELEV), h=d*Math.sin(ELEV);
+            const cam={eye:[c[0]+R*Math.cos(a),c[1]+R*Math.sin(a),c[2]+h],target:c,up:[0,0,1],scale:SCALE,viewport:VIEW};
+            for (const p of m.positions){ const q=project(p,cam); if(!q) continue;
+                fill=Math.max(fill, Math.abs(q[0]-VIEW.width/2)/(VIEW.width/2), Math.abs(q[1]-VIEW.height/2)/(VIEW.height/2)); }
+        }
+        if (fill > 1) cropped.push(nm + " " + fill.toFixed(2));
+        worstFill = Math.max(worstFill, fill);
+    }
+    ok("!! every vertex of every scene stays in frame across a FULL 72-step orbit",
+       cropped.length === 0, cropped.length ? "CROPPED: " + cropped.join(", ") : "worst fill " + (100*worstFill).toFixed(0) + "% of the half-frame");
+    ok("...and the frame is actually USED (the old constants left ~30% of it empty)",
+       worstFill > 0.7, "worst fill " + (100*worstFill).toFixed(0) + "%");
+}
+
 console.log(fails ? `\nkrbnCompareLive-selfcheck: ${fails} FAILED` : "\nkrbnCompareLive-selfcheck: all checks pass");
 if (fails) process.exit(1);

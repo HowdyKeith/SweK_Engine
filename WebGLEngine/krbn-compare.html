@@ -64,7 +64,7 @@
   </div>
   <div id="status"></div>
   <div class="note">
-    <b>Honest scope:</b> the left pane is a real WebGL2 render of the geometry, and it falls back to a canvas-2D render if the GPU or the shader is unavailable (the status line says which is live). Its shader uses the same projection as the Krbn side, so the two stay aligned across the wipe. It is not a byte-for-byte copy of index.html's own shader and lighting &mdash; exact parity with the main engine view is a further tuning pass. The Krbn side uses the real perspective projection; the lift and the export use ray&ndash;mesh back-projection onto the geometry we already hold. Backed by <b>tools/krbn/krbnCompare.js</b> and <b>tools/krbn/strokeLift.js</b>, both gated.
+    <b>Honest scope:</b> the left pane is a real WebGL2 render of the geometry, and it falls back to a canvas-2D render if the GPU or the shader is unavailable (the status line says which is live). Its shader uses the same projection as the Krbn side, so the two stay aligned across the wipe &mdash; which was <b>not true until v4045</b>: both this page's <code>project()</code> and its shader used one focal length horizontally and another vertically, stretching everything by exactly W/H (1.64&times; at 920&times;560). Because both halves of the wipe repeated the same mistake they agreed with each other and disagreed with Krbn, so the one comparison this page exists to make was the one it could not see. All three now land within 1e-13&nbsp;px of each other, checked over 300 points by the gate rather than asserted here. The orbit distance is derived from the frustum too, so nothing leaves the frame across a full turn. It is not a byte-for-byte copy of index.html's own shader and lighting &mdash; exact parity with the main engine view is a further tuning pass. The Krbn side uses the real perspective projection; the lift and the export use ray&ndash;mesh back-projection onto the geometry we already hold. Backed by <b>tools/krbn/krbnCompare.js</b> and <b>tools/krbn/strokeLift.js</b>, both gated.
   </div>
 </div>
 <script type="module">
@@ -115,7 +115,31 @@ const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]
 const norm = a => { const m = Math.hypot(a[0],a[1],a[2])||1; return [a[0]/m,a[1]/m,a[2]/m]; };
 const depth = (p,eye) => Math.hypot(p[0]-eye[0], p[1]-eye[1], p[2]-eye[2]);
 
-function camAt(t) { const a = t*Math.PI*2, R = fit.radius*1.75, h = fit.radius*0.65;
+// *** v4045 -- THE DISTANCE IS DERIVED FROM THE FRUSTUM, NOT TUNED. *** This was `R = radius*1.75, h =
+// radius*0.65` -- two constants that encode a field of view nobody stated, and that silently stop being right
+// the moment SCALE or the viewport aspect changes. Both just changed (the projection is isotropic now), and a
+// tall loaded model was being cropped, so the numbers are replaced by the geometry that produces them.
+//
+// With one focal length for both axes, the VERTICAL half-FOV is exactly SCALE and the horizontal is wider
+// (tan h = (W/H)*tan v), so the vertical is what binds. A bounding sphere of radius r subtends asin(r/d) at
+// distance d, so it fits when d >= r / sin(halfFovMin). MARGIN is the only judgement left in it: 1.06 is a 6%
+// rim of air, enough that a wobbled Krbn stroke or a fat outline does not touch the edge.
+//
+// ELEVATION is kept at the old pair's own angle -- atan(0.65/1.75) = 20.4 degrees -- so this changes the
+// FRAMING TIGHTNESS without changing the viewpoint the four built-in scenes were composed against. The
+// distance it yields (1.56r) is CLOSER than the old 1.87r, so everything gets slightly larger in frame; the
+// old value was not merely arbitrary, it was leaving ~17% of the frame unused on every scene.
+const ELEV = Math.atan2(0.65, 1.75);            // 20.4 degrees, the elevation the old constants implied
+const MARGIN = 1.06;                            // 6% rim of air around the bounding sphere
+function fitDistance(r) {
+  const halfV = SCALE;                                                   // vertical half-FOV, exactly
+  const halfH = Math.atan((VIEW.width / VIEW.height) * Math.tan(SCALE));  // wider; kept for the min below so a
+  const half = Math.min(halfV, halfH);                                   // portrait viewport still frames right
+  return (r / Math.sin(half)) * MARGIN;
+}
+function camAt(t) {
+  const a = t*Math.PI*2, d = fitDistance(fit.radius);
+  const R = d*Math.cos(ELEV), h = d*Math.sin(ELEV);
   return { eye:[fit.center[0]+R*Math.cos(a), fit.center[1]+R*Math.sin(a), fit.center[2]+h], target:fit.center, up:[0,0,1], scale:SCALE, viewport:VIEW }; }
 
 // wireframe strokes (2D) from the current projection -- the drawing Krbn draws / we export
@@ -131,12 +155,17 @@ const cvgl = document.getElementById("cvgl");
 let gl = null, glProg = null, glLoc = {}, glBuf = null, glMeshName = null;
 const VS = `#version 300 es
 in vec3 aPos; in vec3 aNormal;
-uniform vec3 uEye, uRight, uUp, uFwd; uniform float uF;
+uniform vec3 uEye, uRight, uUp, uFwd; uniform float uF; uniform float uInvAspect;
 out vec3 vN;
 void main(){
   vec3 rel = aPos - uEye;
   float cz = max(dot(rel, uFwd), 0.001);
-  gl_Position = vec4((dot(rel,uRight)/cz)*uF, (dot(rel,uUp)/cz)*uF, 1.0 - 0.1/cz, 1.0);
+  // v4045 -- uInvAspect (= H/W) is the fix for the 1.64x horizontal stretch. NDC spans [-1,1] over BOTH axes,
+  // so writing the same (c/cz)*uF into x and y silently gives x a focal length of uF*W/2 px against y's
+  // uF*H/2 -- the two-focal-length bug krbnCompare.project() carried, repeated here. Because BOTH sides of
+  // the wipe repeated it identically they agreed with each other and disagreed with Krbn, which is exactly
+  // why it survived: the one comparison the page exists to make was the one it could not see.
+  gl_Position = vec4((dot(rel,uRight)/cz)*uF*uInvAspect, (dot(rel,uUp)/cz)*uF, 1.0 - 0.1/cz, 1.0);
   vN = aNormal;
 }`;
 const FS = `#version 300 es
@@ -155,7 +184,7 @@ function tryInitGL(){
     g2.attachShader(p, glCompile(g2, g2.FRAGMENT_SHADER, FS));
     g2.linkProgram(p); if(!g2.getProgramParameter(p, g2.LINK_STATUS)) throw new Error(g2.getProgramInfoLog(p));
     gl = g2; glProg = p;
-    for (const u of ["uEye","uRight","uUp","uFwd","uF","uLight"]) glLoc[u] = g2.getUniformLocation(p, u);
+    for (const u of ["uEye","uRight","uUp","uFwd","uF","uLight","uInvAspect"]) glLoc[u] = g2.getUniformLocation(p, u);
     glLoc.aPos = g2.getAttribLocation(p, "aPos"); glLoc.aNormal = g2.getAttribLocation(p, "aNormal");
     g2.enable(g2.DEPTH_TEST); return true;
   } catch(e){ gl = null; return false; }
@@ -181,7 +210,7 @@ function drawGL(cam){
     gl.viewport(0,0,VIEW.width,VIEW.height); gl.clearColor(0.016,0.063,0.039,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.useProgram(glProg); gl.bindVertexArray(glBuf.vao);
     gl.uniform3f(glLoc.uEye, cam.eye[0],cam.eye[1],cam.eye[2]); gl.uniform3f(glLoc.uRight, right[0],right[1],right[2]); gl.uniform3f(glLoc.uUp, up[0],up[1],up[2]); gl.uniform3f(glLoc.uFwd, fwd[0],fwd[1],fwd[2]);
-    gl.uniform1f(glLoc.uF, 1/Math.tan(cam.scale)); gl.uniform3f(glLoc.uLight, light[0],light[1],light[2]);
+    gl.uniform1f(glLoc.uF, 1/Math.tan(cam.scale)); gl.uniform1f(glLoc.uInvAspect, VIEW.height/VIEW.width); gl.uniform3f(glLoc.uLight, light[0],light[1],light[2]);
     gl.drawElements(gl.TRIANGLES, glBuf.count, gl.UNSIGNED_INT, 0); return true;
   } catch(e){ return false; }
 }
@@ -312,6 +341,7 @@ function drawShaded2D(pr, cam, x0, x1){
 }
 function draw(t, wipePct, lift) {
   const cam = camAt(t); const pr = mesh.positions.map(p => project(p, cam)); const wipeX = VIEW.width*wipePct/100;
+  try { window.__lastProjected = pr; } catch (e) {}   // measurement hook (see tools/krbn's gate)
   if (gl){ uploadMesh(sceneName); if (drawGL(cam)){ g.clearRect(0,0,VIEW.width,VIEW.height); drawKrbnSide(pr, cam, wipeX, VIEW.width, lift, true); return; } gl = null; }
   g.fillStyle = "#04100a"; g.fillRect(0,0,VIEW.width,VIEW.height);
   drawShaded2D(pr, cam, 0, wipeX);

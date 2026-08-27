@@ -44,9 +44,21 @@ export function project(p, cam = KRBN_CAM) {
     const rel = sub(p, cam.eye);
     const cx = dot(rel, right), cy = dot(rel, up), cz = dot(rel, fwd);
     if (cz <= 1e-6) return null;
-    const f = 1 / Math.tan(cam.scale);
     const W = cam.viewport.width, H = cam.viewport.height;
-    return [W / 2 + (cx / cz) * f * (W / 2), H / 2 - (cy / cz) * f * (H / 2)];
+    // *** v4045 -- ONE FOCAL LENGTH FOR BOTH AXES. THE OLD FORM USED TWO AND THE PANES NEVER LINED UP. ***
+    // This was `[W/2 + (cx/cz)*f*(W/2), H/2 - (cy/cz)*f*(H/2)]` -- an effective focal length of f*W/2
+    // horizontally against f*H/2 vertically, i.e. ANISOTROPIC by exactly W/H. At this page's 920x560 that is a
+    // 1.643x horizontal stretch: a sphere projects as an ellipse, and the wider the viewport the worse it gets.
+    //
+    // MEASURED against Krbn's own projectionMatrix (vendor/krbn/math/camera.js, which uses a single
+    // `fpx = H/2/tan(scale/2)` for both axes and is correct): the VERTICAL axis agreed to 0.0px, and the
+    // HORIZONTAL was out by 32.3px at x=1 and 64.7px at x=2 -- growing linearly, ratio exactly 1.642 = 920/560.
+    // krbn-compare.html's own "Honest scope" note claimed "its shader uses the same projection as the Krbn
+    // side, so the two stay aligned across the wipe". IT WAS NOT AND THEY DID NOT, by a factor of 1.64, for
+    // this page's whole life -- and because the WebGL shader repeated the same two-focal-length form, the two
+    // panes agreed with EACH OTHER while both disagreed with Krbn, which is what made it invisible.
+    const fpx = (H / 2) / Math.tan(cam.scale);
+    return [W / 2 + (cx / cz) * fpx, H / 2 - (cy / cz) * fpx];
 }
 
 // Project a whole mesh -- the flat 2D point set Krbn draws from.
@@ -57,9 +69,14 @@ export function rayThroughScreen(sx, sy, cam = KRBN_CAM) {
     const fwd = norm(sub(cam.target, cam.eye));
     const right = norm(cross(fwd, cam.up));
     const up = cross(right, fwd);
-    const f = 1 / Math.tan(cam.scale), W = cam.viewport.width, H = cam.viewport.height;
-    const a = (sx - W / 2) / (f * W / 2);       // cx/cz
-    const b = (H / 2 - sy) / (f * H / 2);       // cy/cz
+    const W = cam.viewport.width, H = cam.viewport.height;
+    // v4045 -- MUST TRACK project() EXACTLY: this is its inverse, and the lift/export ray-cast the drawing back
+    // onto the surface through it. Leaving this on the old two-focal-length form while project() moved to one
+    // would put every lifted point on the wrong ray -- a silent, plausible-looking wrongness rather than a
+    // crash. krbnCompare-selfcheck's round-trip check is what holds the two together.
+    const fpx = (H / 2) / Math.tan(cam.scale);
+    const a = (sx - W / 2) / fpx;               // cx/cz
+    const b = (H / 2 - sy) / fpx;               // cy/cz
     const dir = norm([a * right[0] + b * up[0] + fwd[0], a * right[1] + b * up[1] + fwd[1], a * right[2] + b * up[2] + fwd[2]]);
     return { origin: cam.eye.slice(), dir };
 }
