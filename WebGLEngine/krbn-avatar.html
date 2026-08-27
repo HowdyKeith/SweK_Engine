@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK &middot; Krbn Avatar (pencil-drawn, in the panel)</title>
+<meta name="demo:title" content="Krbn Avatar" />
+<meta name="demo:desc" content="The rigged avatar GLB drawn by Krbn as a pencil sketch -- skinned, posed, and re-drawn slowly because a pencil frame costs half a second." />
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  html,body { margin:0; height:100%; background:#f4f1ea; overflow:hidden; }
+  #wrap { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  #wrap svg { width:100%; height:100%; display:block; }
+  #msg { position:absolute; left:0; right:0; bottom:0; font:10px ui-monospace,Menlo,monospace;
+         color:#5a5348; background:#f4f1eacc; padding:2px 4px; text-align:center; }
+  #msg.err { color:#8a2b22; }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="msg">loading…</div>
+<script type="module">
+// krbn-avatar.html -- v4046
+// -----------------------------------------------------------------------------------------------------------
+// Keith: "so can we have a krbn avatar switch to on server.html?"
+//
+// The rigged avatar GLB, drawn by Krbn as a pencil sketch, sized to whatever box it is embedded in. It is a
+// surface for ui/avatarSwitch.js's rotation, so it obeys that file's rules: it is an IFRAME the switch mounts
+// and REMOVES (never hides), and it must cost nothing once torn down.
+//
+// *** IT REDRAWS ON A TIMER AND NOT PER FRAME, AND THAT IS THE WHOLE DESIGN CONSTRAINT. *** krbn.html measured
+// ~708 ms for one Krbn frame and concluded "renders on RELEASE, not on drag"; krbn-compare.html measured ~520 ms
+// and throttles to one render in flight. A pencil renderer cannot animate, so this does not pretend to: it draws
+// a still, then advances the orbit by a step every REDRAW_MS. The avatar corner is a thing you glance at, and a
+// slow sketch that is honest about being slow beats a fast one that is not a Krbn drawing at all -- which is
+// exactly the bug v4042 found on krbn-compare.html's own "krbn" pane.
+//
+// AND IT IS DECLARED `heavy` IN ui/avatarSwitch.js's MODES, beside the WebGPU and MediaPipe surfaces, so the
+// button says what the click costs BEFORE it is paid.
+import { gltfToMeshInput, computeFit, fitDistance } from "./tools/krbn/glbMesh.js";
+
+const q = new URLSearchParams(location.search);
+const GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");   // no traversal into GPU_Assets
+const REDRAW_MS = Math.max(1200, Number(q.get("ms")) || 2600);
+const SCALE = Math.PI / 4.2;
+const wrap = document.getElementById("wrap"), msg = document.getElementById("msg");
+const say = (t, err) => { msg.textContent = t; msg.className = err ? "err" : ""; };
+
+// The box this is embedded in decides the aspect. avatarSwitch mounts a 143x210 PORTRAIT iframe, which is why
+// glbMesh.fitDistance takes the min of the two half-FOVs rather than assuming landscape: in portrait the
+// HORIZONTAL is the narrower one, and fitting to the vertical alone would push the figure off both sides.
+const view = () => ({ width: Math.max(64, wrap.clientWidth | 0), height: Math.max(64, wrap.clientHeight | 0) });
+
+let K = null, scene = null, mesh = null, fit = null, t = 0, timer = 0, busy = false, dead = false;
+
+function camAt(u, v) {
+  const a = u * Math.PI * 2, d = fitDistance(fit.radius, SCALE, v);
+  const ELEV = Math.atan2(0.65, 1.75);                 // the same 20.4 degrees krbn-compare orbits at
+  const R = d * Math.cos(ELEV), h = d * Math.sin(ELEV);
+  return { eye: [fit.center[0] + R*Math.cos(a), fit.center[1] + R*Math.sin(a), fit.center[2] + h],
+           target: fit.center, up: [0,0,1], projection: "perspective",
+           scale: SCALE * 2,                            // Krbn's `scale` is the FULL vertical FOV; ours is half
+           viewport: v };
+}
+
+function draw() {
+  if (dead || busy || !K || !scene || !fit) return;
+  busy = true;
+  try {
+    const v = view();
+    wrap.innerHTML = scene.toSVG(camAt(t, v));
+    say(GLB + " · Krbn pencil" + (mesh.posedBy ? " · " + mesh.posedBy : ""));
+  } catch (e) {
+    say("Krbn could not draw it: " + (e && e.message ? e.message : e), true);
+  }
+  busy = false;
+}
+
+(async function boot() {
+  // Krbn first: if it is absent there is nothing to draw and NO FALLBACK IS DRAWN. krbn.html's v2597 rule --
+  // a page that quietly draws something else when its subject is missing is lying about what it shows -- and
+  // avatarSwitch's own missing-asset path already knows how to say "not found" and fall back to the SVG robot.
+  try { K = await import("/vendor/krbn/index.js"); }
+  catch (e) { say("Krbn is not vendored (/vendor/krbn/index.js)", true); return; }
+
+  let gltf;
+  try {
+    const [{ GLTFLoader }, THREE] = await Promise.all([
+      import("./vendor/three/jsm/loaders/GLTFLoader.js"),
+      import("three"),
+    ]);
+    const url = "/GPU_Assets/" + GLB + ".glb";
+    const r = await fetch(url);
+    if (!r.ok) { say(GLB + ".glb not found (HTTP " + r.status + ")", true); return; }
+    // the bytes are awaited HERE, not inside the Promise executor: `new Promise((res, rej) => ... await ...)`
+    // puts an await inside a NON-async arrow, which is a SyntaxError that takes the whole module with it.
+    // Caught by verify.mjs's own "every page's inline JavaScript parses" check, by file and line.
+    const buf = await r.arrayBuffer();
+    gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf, "", res, rej));
+    mesh = gltfToMeshInput(gltf, THREE);     // skinned, posed, Z-up, sanitised -- one shared implementation
+  } catch (e) { say("could not load " + GLB + ".glb: " + (e && e.message ? e.message : e), true); return; }
+
+  fit = computeFit(mesh);
+  // *** DRAWN SMALL IS NOT DRAWN THE SAME, AND SETTING IT WRONG LOOKS EXACTLY LIKE SETTING IT RIGHT. ***
+  // RobotExpressive is 3349 strokes; in a 143px panel a 3234-triangle mesh puts several crease lines inside
+  // every few pixels and they merge into a smudge. Krbn's own stage-3 `abstraction.minFeaturePx` ("drop
+  // features whose projected extent < this many px, importance-scaled") is built for exactly this.
+  //
+  // *** THE FIRST ATTEMPT SET IT AND IT DID NOTHING -- IDENTICAL STROKE COUNT *AND* IDENTICAL BYTE COUNT AT
+  // minFeaturePx=16. *** The cause is in Krbn's own abstract.js: `cutoffFor(importance, base) =
+  // base * (1 - importance)`, with the doc comment "importance 1 -> cutoff 0 (never dropped)". This page had
+  // `setImportance(1, {role:"subject"})`, so the knob was MATHEMATICALLY INERT -- a setting that reads as
+  // deliberate tuning and cannot ever fire, which is the "a flag that lies is worse than no flag" shape this
+  // tree keeps finding. Importance and role are separate arguments, so the fix keeps SUBJECT STYLING and
+  // lowers only the number the cutoff is scaled by.
+  //
+  // AND minFeaturePx IS A FIXED VALUE ON PURPOSE. An earlier draft derived it from the box; it did not need
+  // to, because the unit is PIXELS and therefore already self-correcting. MEASURED on the blob at one setting:
+  // 143x210 goes 602 -> 434 strokes (-28%, decluttered) while 920x560 goes 744 -> 712 (-4%, barely touched) --
+  // the same number does more work exactly where the subject is drawn smaller, which is the whole point.
+  scene = new K.Scene({ svg: { background: "#f4f1ea" }, light: { direction: [-0.4,-0.5,-0.7] },
+                        style: { wobble: 0.4 }, abstraction: { minFeaturePx: 14 } });
+  scene.add(new K.Mesh(mesh)).setImportance(0.45, { role: "subject" })
+       .style({ weight: 1.1, hatch: { mode: "cross", angle: 20, spacingPx: 9, field: true } });
+
+  draw();
+  timer = setInterval(() => { t = (t + 0.035) % 1; draw(); }, REDRAW_MS);
+})();
+
+// *** TEARDOWN MATTERS HERE MORE THAN USUAL. *** ui/avatarSwitch.js removes the iframe and points it at
+// about:blank precisely because a hidden surface that keeps working is "a second GPU context burning frames
+// behind a panel nobody is looking at". This one burns CPU rather than GPU, on the main thread, for half a
+// second at a time -- so the interval is cleared on unload rather than left to the frame's destruction timing.
+addEventListener("pagehide", () => { dead = true; clearInterval(timer); });
+addEventListener("unload",   () => { dead = true; clearInterval(timer); });
+
+// Re-fit when the host box changes shape. Cheap: it only re-draws, it does not re-parse the GLB.
+let rz = 0;
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(draw, 250); });
+</script>
+</body>
+</html>

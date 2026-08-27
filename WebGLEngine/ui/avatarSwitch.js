@@ -56,6 +56,29 @@ export const MODES = [
       src: "/blobulator-gpu.html?embed=1", heavy: "WebGPU", needsWebGPU: true },
     { id: "thead", label: "\ud83d\udde3", title: "Talking head — MediaPipe face tracking and speech (~12 MB on first use)", kind: "frame",
       src: "/thead.html?embed=1", heavy: "~12 MB MediaPipe bundle on first use" },
+    // v4046 -- Keith: "so can we have a krbn avatar switch to on server.html?" The same rigged GLB the "rigged"
+    // slot shows, drawn by Krbn as a PENCIL SKETCH instead of shaded WebGL -- graphite on paper, the one surface
+    // in this rotation that is not a screen-lit render.
+    //
+    // *** IT IS `heavy` FOR A REASON THE OTHER TWO ARE NOT: THE COST IS PER FRAME, FOREVER, ON THE MAIN
+    // THREAD. *** blobgpu's cost is a WebGPU context and thead's is a one-time ~12 MB download; this one is
+    // ~0.5s of CPU EVERY time it redraws (krbn.html measured ~708 ms, krbn-compare ~520 ms). So the page draws
+    // a still and advances the orbit on a timer rather than animating, and the button says so before the click.
+    // A pencil renderer that pretended to run at 60fps would not be a pencil renderer -- which is exactly the
+    // bug v4042 found on krbn-compare.html's own "krbn" pane, where the label was real and the drawing was not.
+    //
+    // PLACED SECOND-TO-LAST, NOT LAST: v4033 made gauges3000 the explicit final choice at Keith's request ("the
+    // last avatar choice, can we swap out the gauges and avatar scene..."), and this file's own gate asserts it.
+    // Appending here would have silently overruled a stated preference to save one edit -- and the gate caught
+    // exactly that on the first attempt.
+    //
+    // `needs` names the GLB, same probe as the rigged slots, so a missing asset falls back to the SVG robot AND
+    // SAYS SO. It deliberately does NOT declare a need on /vendor/krbn: the page reports that absence in its own
+    // box with the route to fix it, and asserting the same fact here would put it in two places with two
+    // different messages.
+    { id: "krbn", label: "✏️", title: "Krbn pencil avatar — the rigged GLB drawn as a graphite sketch (redraws every ~2.6s; a pencil frame costs ~0.5s of CPU)", kind: "frame",
+      src: "/krbn-avatar.html?glb=RobotExpressive", heavy: "~0.5s of CPU per redraw, on the main thread",
+      needs: "/GPU_Assets/RobotExpressive.glb" },
     // v4033 -- Keith: "the last avatar choice, can we swap out the gauges and avatar scene, and swap in the
     // WebGPU gauges and avatar we already made? I think that is called Avatar3000." The page is gauges3000.html
     // ("Gauges 3000" in its own demo:title -- close enough a name that the swap is unambiguous): a WebGPU
@@ -66,6 +89,7 @@ export const MODES = [
     // elsewhere (the universal viewer, direct URL), only this switch's rotation drops it.
     { id: "gauges3000", label: "\ud83c\udf00", title: "Gauges 3000 \u2014 WebGPU energy-core avatar ringed by an LCARS gauge cluster (Canvas2D fallback)", kind: "frame",
       src: "/gauges3000.html?embed=1" },
+
 ];
 
 // v3557 -- THE ROTATION IS NOW BASE MODES PLUS PROMOTED FAVOURITES, and the favourites come from the SANDBOX'S

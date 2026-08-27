@@ -51,15 +51,17 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
 {
     // v4033 -- Keith: "RobotExpressive can be choice 4 on Server.html. and we can have StickWoman be choice 3."
     // Two named avatar slots (stickwoman, robotexpressive2) inserted between "rigged" (the favorite-of-the-
-    // moment slot, unchanged) and "blob", eight surfaces now, cheapest still first.
-    ok("!! eight surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Gauges 3000",
-       MODES.length === 8 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,gauges3000",
+    // moment slot, unchanged) and "blob". v4046 adds "krbn" -- NINE surfaces now, cheapest still first, and the
+    // pencil renderer sits with the other heavy ones rather than among the cheap slots a stray click can land on.
+    ok("!! nine surfaces, cheapest first: SVG robot, rigged GLB, StickWoman, RobotExpressive, Blobulator, WebGPU Blobulator, talking head, Krbn pencil, Gauges 3000",
+       MODES.length === 9 && MODES.map((m) => m.id).join(",") === "svg,rigged,stickwoman,robotexpressive2,blob,blobgpu,thead,krbn,gauges3000",
        MODES.map((m) => m.id).join(" -> ") + " — the two DOWNLOAD-COST modes sit before the tail, so a stray " +
        "click lands on something cheap rather than starting a 12 MB download");
     ok("!! the button cycles and WRAPS, so it cannot dead-end on the last one",
        nextMode("svg") === "rigged" && nextMode("rigged") === "stickwoman" && nextMode("stickwoman") === "robotexpressive2"
        && nextMode("robotexpressive2") === "blob" && nextMode("blob") === "blobgpu"
-       && nextMode("blobgpu") === "thead" && nextMode("thead") === "gauges3000" && nextMode("gauges3000") === "svg");
+       && nextMode("blobgpu") === "thead" && nextMode("thead") === "krbn" && nextMode("krbn") === "gauges3000"
+       && nextMode("gauges3000") === "svg");
     ok("!! StickWoman is choice 3 and RobotExpressive is choice 4, as asked",
        MODES.findIndex((m) => m.id === "stickwoman") === 2 && MODES.findIndex((m) => m.id === "robotexpressive2") === 3,
        "1-indexed: " + MODES.map((m, i) => (i + 1) + ":" + m.id).join(" "));
@@ -83,10 +85,15 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
        ["blobgpu", "thead"].every((id) => MODES.findIndex((m) => m.id === id) >
            Math.max(...["svg", "rigged", "stickwoman", "robotexpressive2", "blob"].map((c) => MODES.findIndex((m) => m.id === c)))),
        MODES.map((m) => m.id + (m.heavy ? "*" : "")).join(" -> ") + "   (* = declares a download cost)");
-    ok("!! the two expensive modes DECLARE their cost, so the button can say it before the click",
-       MODES.filter((m) => m.heavy).length === 2 &&
+    // v4046 -- THREE now, and the third is a different SPECIES of cost, which is why the check names it
+    // separately: blobgpu needs a capability and thead is a one-time download, but the Krbn pencil spends
+    // ~0.5s of MAIN-THREAD CPU on every redraw, for as long as it is mounted. A cost that recurs is the one a
+    // reader most needs told before the click, not after.
+    ok("!! the three expensive modes DECLARE their cost, so the button can say it before the click",
+       MODES.filter((m) => m.heavy).length === 3 &&
        /12 MB/.test(MODES.find((m) => m.id === "thead").heavy) &&
-       /WebGPU/.test(MODES.find((m) => m.id === "blobgpu").heavy),
+       /WebGPU/.test(MODES.find((m) => m.id === "blobgpu").heavy) &&
+       /CPU/.test(MODES.find((m) => m.id === "krbn").heavy),
        "MediaPipe is ~12 MB on first use and WebGPU is not everywhere — a cost discovered after the click is a " +
        "cost the reader never agreed to");
     ok("!! ...and the talking head is the MediaPipe one (a Google API) rather than the wireframe or the mirror",

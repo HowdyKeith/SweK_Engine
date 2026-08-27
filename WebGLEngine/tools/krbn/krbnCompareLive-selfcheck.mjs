@@ -26,6 +26,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { codeOnly, noComments } from "../ship/sourceScan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENG = path.resolve(HERE, "..", "..");
@@ -35,6 +36,12 @@ const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  "
 console.log("krbnCompareLive-selfcheck -- the right pane is really Krbn\n");
 
 const HTML = fs.readFileSync(path.join(ENG, "krbn-compare.html"), "utf8");
+// v4046 -- the glTF conversion moved into tools/krbn/glbMesh.js so krbn-avatar.html could share it instead of
+// carrying a second copy. These checks follow it there: gating the ONE implementation both pages import is
+// strictly stronger than gating an inline copy on one of them, and this file failed 11 checks the moment the
+// code moved -- which is the gate doing its job rather than a regression.
+const GLB = fs.readFileSync(path.join(ENG, "tools", "krbn", "glbMesh.js"), "utf8");
+const BOTH = HTML + "\n" + GLB;
 
 console.log("1. THE PAGE CALLS KRBN AT ALL -- THE THING THAT WAS FALSE FOR THE WHOLE OF THIS PAGE'S LIFE");
 {
@@ -90,7 +97,7 @@ console.log("\n2. THE SCENES THAT CANNOT HATCH AS A MESH USE KRBN'S OWN PRIMITIV
 console.log("\n3. LOADING A MODEL: BOTH PANES INVALIDATE THEIR CACHES");
 {
     ok("!! the GLB path exists and converts to the same { positions, triangles } MeshInput",
-       /GLTFLoader/.test(HTML) && /m = \{ positions, triangles, skinned[^}]*\}/.test(HTML),
+       /GLTFLoader/.test(HTML) && /gltfToMeshInput\(gltf, THREE\)/.test(HTML) && /return dropDegenerate\(\{ positions, triangles, skinned, posedBy \}\)/.test(GLB),
        "one geometry type on the page, so the WebGL upload, the projection, the ray-cast lift and the OBJ export all keep working unchanged");
     ok("...and OBJ/STL go through Krbn's own parsers rather than a second hand-rolled reader",
        /K\.parseOBJ\(/.test(HTML) && /K\.parseSTL\(/.test(HTML));
@@ -104,10 +111,10 @@ console.log("\n3. LOADING A MODEL: BOTH PANES INVALIDATE THEIR CACHES");
     // passing forever regardless. Section 7 owns the skinning assertions; this one now only asks that the
     // status names the clip, so a reader knows WHICH pose they are looking at.
     ok("!! a skinned glTF says which clip posed it, so the pose is identified rather than mysterious",
-       /isSkinnedMesh/.test(HTML) && /posed by clip/.test(HTML),
+       /isSkinnedMesh/.test(GLB) && /posed by clip/.test(HTML),
        "the figure you see is one frame of one animation; not saying which is how a wrong-looking pose becomes unfalsifiable");
     ok("!! the camera fit centres on the BOUNDING BOX, not the vertex centroid",
-       /computeFit[\s\S]{0,400}lo\[i\]\+hi\[i\]\)\/2/.test(HTML),
+       /computeFit[\s\S]{0,400}lo\[i\]\+hi\[i\]\)\/2/.test(GLB),
        "the centroid is a DENSITY measure: a loaded model with a dense head and a sparse limb centres in the head and frames empty space");
 }
 
@@ -142,18 +149,18 @@ console.log("\n4. PRESETS: THE SHIPPED MODEL, AND THE AVATAR FAVOURITES -- READ 
 console.log("\n7. THE SKINNING PASS -- A BIND POSE IS NOT A SLIGHTLY-WRONG FIGURE, IT IS A DIFFERENT OBJECT");
 {
     ok("!! skinned vertices go through their joint matrices, via three's OWN applyBoneTransform",
-       /applyBoneTransform\(i, v\)/.test(HTML),
+       /applyBoneTransform\(i, v\)/.test(GLB),
        "not a fourth hand-rolled weighted sum -- three r160 implements this and this file already depends on it " +
        "for the loader; face/avatarStage.js's hand-written loop exists only because it runs against the tree's own parser");
     ok("!! ...and the skeleton is POSED by a clip first, not left at rest",
-       /AnimationMixer/.test(HTML) && /mx\.update\(0\)/.test(HTML),
+       /AnimationMixer/.test(GLB) && /mx\.update\(0\)/.test(GLB),
        "bone matrices mean nothing until the skeleton is placed; t=0 of the idle clip is deterministic and is the " +
        "pose the asset was authored to be seen in -- the same choice avatarStage makes");
     ok("!! ...and the mixer runs BEFORE updateMatrixWorld, or the bones carry no rotation",
-       /mx\.update\(0\)[\s\S]{0,400}updateMatrixWorld\(true\)/.test(HTML),
+       /mx\.update\(0\)[\s\S]{0,400}updateMatrixWorld\(true\)/.test(GLB),
        "ordering is the whole thing here: updating the world matrices first bakes the REST pose and the clip is lost");
     ok("!! glTF's Y-up is mapped to this page's Z-up",
-       /positions\.push\(\[v\.x, v\.z, v\.y\]\)/.test(HTML),
+       /positions\.push\(\[v\.x, v\.z, v\.y\]\)/.test(GLB),
        "swek-ragdoll.krbn.ts states the rule -- 'SweK is Y-up and Krbn is Z-up, so the mapping is (x,y,z) -> (x,z,y)' -- " +
        "and sceneMeshes.js's ragdoll already applies it; without it a loaded glTF renders lying on its back");
     // *** THE MEASUREMENT, NOT THE CLAIM. *** Skinning either moves the geometry or it does not, and on this
@@ -170,14 +177,14 @@ console.log("\n7. THE SKINNING PASS -- A BIND POSE IS NOT A SLIGHTLY-WRONG FIGUR
 console.log("\n8. DEGENERATE TRIANGLES -- KRBN'S OWN LOADERS DROP THEM AND OUR glTF PATH BYPASSES THOSE LOADERS");
 {
     ok("!! a sanitiser runs on EVERY loaded model, not just glTF",
-       /function dropDegenerate/.test(HTML) && /m = dropDegenerate\(m\)/.test(HTML),
+       /export function dropDegenerate/.test(GLB) && /m = dropDegenerate\(m\)/.test(HTML) && /return dropDegenerate\(/.test(GLB),
        "idempotent on anything Krbn already cleaned; one sanitiser that always runs beats a rule about which paths need it");
     ok("!! ...and it rejects the REPEATED-INDEX case, which is the one that actually crashed Krbn",
-       /i === j \|\| j === k \|\| i === k/.test(HTML),
+       /i === j \|\| j === k \|\| i === k/.test(GLB),
        "MEASURED: halfedge.js:183 does tB.find(vi => vi !== v0 && vi !== v1), which returns undefined for an " +
        "[a,b,a] sliver, and positions[undefined] threw TypeError inside vec3.sub -- 3 such triangles in RobotExpressive.glb");
     ok("...and the zero-area case too (distinct indices, collinear points)",
-       /Math\.hypot\(cx, cy, cz\)/.test(HTML));
+       /Math\.hypot\(cx, cy, cz\)/.test(GLB));
     // the claim that Krbn's own loaders already do this is checked against Krbn, not recited
     const loaders = fs.readFileSync(path.join(ENG, "vendor", "krbn", "mesh", "loaders.d.ts"), "utf8");
     ok("!! ...and Krbn's own parseOBJ/parseSTL really do document dropping them (so this is our gap, not its bug)",
@@ -235,7 +242,7 @@ console.log("\n9. *** THE TWO PANES ACTUALLY AGREE -- THE PAGE CLAIMED THIS FOR 
 console.log("\n10. FRAMING IS DERIVED FROM THE FRUSTUM, AND NOTHING LEAVES THE FRAME");
 {
     ok("!! the orbit distance comes from the FOV, not from tuned constants",
-       /function fitDistance/.test(HTML) && /Math\.sin\(half\)/.test(HTML),
+       /export function fitDistance/.test(GLB) && /Math\.sin\(Math\.min\(halfV, halfH\)\)/.test(GLB),
        "R=radius*1.75 encoded a field of view nobody stated and stops being right when SCALE or the aspect changes");
     const { project } = await import(path.join(ENG, "tools", "krbn", "krbnCompare.js"));
     const { sceneMesh } = await import(path.join(ENG, "tools", "krbn", "sceneMeshes.js"));
@@ -267,6 +274,59 @@ console.log("\n10. FRAMING IS DERIVED FROM THE FRUSTUM, AND NOTHING LEAVES THE F
        cropped.length === 0, cropped.length ? "CROPPED: " + cropped.join(", ") : "worst fill " + (100*worstFill).toFixed(0) + "% of the half-frame");
     ok("...and the frame is actually USED (the old constants left ~30% of it empty)",
        worstFill > 0.7, "worst fill " + (100*worstFill).toFixed(0) + "%");
+}
+
+console.log("\n11. THE KRBN AVATAR SURFACE ON server.html");
+{
+    const AV = fs.readFileSync(path.join(ENG, "krbn-avatar.html"), "utf8");
+    // *** THIRD TIME THIS SESSION: BOTH LOAD-BEARING NEGATIVES BELOW FIRST MATCHED THIS GATE'S OWN PROSE. ***
+    // krbn-avatar.html's comment QUOTES `setImportance(1, {role:"subject"})` as the inert setting it warns
+    // about, so a raw-text regex read the bug as present in the file that had fixed it. Sections 2 and 3 above
+    // learned this already; the stripping is the same codeOnly() they use. A gate that reads comments is a gate
+    // that grades the explanation instead of the code.
+    // *** AND THEN THE OTHER HALF OF THE SAME TRAP, WHICH THIS TREE HAS NOW HIT EIGHT TIMES. *** codeOnly()
+    // strips comments AND BLANKS STRING CONTENTS, so `id: "krbn"` becomes `id: ""` and four string-value checks
+    // went red against correct code. The tree's own rule (v4021, after the fourth time): noComments() for
+    // STRING LITERALS, codeOnly() for CODE SHAPES. Both are used here, deliberately, for the halves they suit.
+    const AVC = codeOnly(AV);        // code shapes: setImportance(0.45, minFeaturePx: 14, setInterval
+    const AVS = noComments(AV);      // string values: the import path, "pagehide"
+    const SW = fs.readFileSync(path.join(ENG, "ui", "avatarSwitch.js"), "utf8");
+    const SWC = noComments(SW);   // ids and heavy text are STRING VALUES
+    ok("!! krbn-avatar.html shares tools/krbn/glbMesh.js rather than copying the conversion",
+       /from "\.\/tools\/krbn\/glbMesh\.js"/.test(AVS) && /gltfToMeshInput/.test(AVC),
+       "skinning, Y-up->Z-up and the degenerate drop are each invisible when wrong -- a drifted second copy " +
+       "would quietly draw a bind pose on ONE of the two pages and look like that page's bug");
+    ok("!! it is in the avatar rotation, and DECLARES its cost like the other heavy surfaces",
+       /id: "krbn"/.test(SWC) && /heavy: "~0\.5s of CPU per redraw/.test(SWC),
+       "krbn.html measured ~708ms per pencil frame; a cost discovered after the click is one the reader never agreed to");
+    ok("!! ...and gauges3000 is STILL the last choice, which Keith asked for at v4033",
+       SWC.indexOf('id: "krbn"') > 0 && SWC.indexOf('id: "gauges3000"') > SWC.indexOf('id: "krbn"'),
+       "appending the new mode would have silently overruled a stated preference to save one edit");
+    ok("!! it redraws on a TIMER, not per frame -- a pencil renderer cannot animate",
+       /setInterval/.test(AVC) && /REDRAW_MS/.test(AVC) && !/requestAnimationFrame/.test(AVC),
+       "pretending to run at 60fps is exactly the bug v4042 found on the compare page's own 'krbn' pane");
+    ok("...and it clears that timer on teardown (avatarSwitch REMOVES the iframe, but timing is not guaranteed)",
+       /pagehide[\s\S]{0,200}clearInterval/.test(AVS));
+
+    // *** THE LOAD-BEARING NEGATIVE, AND THE BUG THIS PAGE NEARLY SHIPPED. *** Krbn's abstract.js defines
+    // cutoffFor(importance, base) = base * (1 - importance), documented "importance 1 -> cutoff 0 (never
+    // dropped)". So minFeaturePx with importance 1 is MATHEMATICALLY INERT -- measured: identical stroke count
+    // AND identical byte count at minFeaturePx=16. A setting that reads as deliberate tuning and cannot fire.
+    const imp = AVC.match(/setImportance\(([0-9.]+)/);
+    const mfp = AVC.match(/minFeaturePx:\s*([0-9.]+)/);
+    ok("!! minFeaturePx is paired with an importance BELOW 1, or it can never fire",
+       !!imp && !!mfp && Number(mfp[1]) > 0 && Number(imp[1]) < 1,
+       "importance " + (imp ? imp[1] : "?") + ", minFeaturePx " + (mfp ? mfp[1] : "?") +
+       " -- cutoff = minFeaturePx * (1 - importance), so importance 1 disables it silently");
+    // and the mechanism is RUN, not just read, so this cannot pass on a Krbn that changed its scaling rule
+    let K2 = null; try { K2 = await import(path.join(ENG, "vendor", "krbn", "index.js")); } catch {}
+    if (K2 && typeof K2.cutoffFor === "function") {
+        ok("!! ...proven against Krbn's own cutoffFor: importance 1 really does yield a zero cutoff",
+           K2.cutoffFor(1, 16) === 0 && K2.cutoffFor(0.45, 16) > 0,
+           "cutoffFor(1,16)=" + K2.cutoffFor(1, 16) + "  cutoffFor(0.45,16)=" + K2.cutoffFor(0.45, 16).toFixed(2));
+    } else {
+        console.log("  ----  Krbn does not export cutoffFor here; the source-level pairing check above stands alone");
+    }
 }
 
 console.log(fails ? `\nkrbnCompareLive-selfcheck: ${fails} FAILED` : "\nkrbnCompareLive-selfcheck: all checks pass");
