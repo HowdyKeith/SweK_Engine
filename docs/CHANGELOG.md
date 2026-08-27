@@ -8,6 +8,53 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4064 -- tidal had no gate at all
+
+Keith's patch, applied: v4027 (hands' last two negatives) + v4028 (`iou()` dropped a threshold) + v4029
+(tidal had no gate). The first two landed as no-ops -- `git am` reported "No changes -- Patch already
+applied," because this session had already independently applied and shipped the identical fix earlier.
+The third is genuinely new.
+
+**`tidalBind.mjs` has existed since v2894, carried a declared plant since v3686, exports seventeen
+observables across four modes -- and had no gate at all.** Found by `knobLiveness` sweeping for a dead knob
+(`blobCount` moved nothing, the v4028 `iou()` shape again), and the cause ran deeper. The device's own
+comment named the bug in its own header: *"Derived from this file's own default plus EVERY MODE ITS OWN
+`build()` BRANCHES ON... A MODE NOBODY CAN DISCOVER IS A MODE NOBODY WILL USE"* -- above a list of **three**
+modes, while `build()` branches on **four**. `blob` was the undiscoverable fallthrough, and five declared
+observables lived only in the branch nothing could reach by name.
+
+**And `blob` was blind to the device's own plant, for a different reason than `roche` is.** `roche` never
+calls `fallLinear` -- it measures the tidal field from two exact geodesics, blind *by construction*, a
+property worth asserting. `blob` calls `fallLinear` for exactly the law the plant replaces and never passed
+the flag -- blind *by omission*, the same shape v4028's `iou()` carried. Threaded: `blobStretchPredicted`
+9.075716 → 3.519810 under the plant, while the ensemble measurement (24 exact geodesics, no linear law
+anywhere in it) stays bit-identical at 4.737978.
+
+**The part that makes `blob` worth grading carefully rather than just wiring up: the wrong law fits
+better.** The blob runs 71.1× past this device's own measured validity limit (extent 1.0 against a domain of
+1.407e-2), and out there: honest linear prediction errFrac 0.4780, **planted** prediction errFrac 0.3461 --
+closer to the true 4.737978. A gate asserting "prediction agrees with measurement" would prefer the wrong
+physics. So the gate grades `blob` on the plant *moving* the prediction, never on the two numbers being
+close, and reports the 0.478 rather than bounding it -- the device already contained the instrument
+(`validity`) that explains why, and nothing had connected them until now. Under the plant, `validity` itself
+collapses 1.407e-2 → 5.000e-5: the mode that measures a domain reports it has no domain.
+
+All nine tidal knobs read live now. Ten gates verified green: `tidalBind`, `handsBind`, `reconQualityBind`,
+`perceptual`, `renderAccountability`, `reconQuality`, `knobLiveness`, `instruments`, `registryOrphans`,
+`knobGate`. One conflict on landing, in a generated file only -- `knowledge-index.json` (this tree carries
+1205 gates against the patch's older snapshot) -- resolved by keeping this tree's copy and rebuilding via
+`buildKnowledgeIndex.mjs` rather than hand-merging JSON.
+
+**Still open from the patch's own sweep, stated rather than silently dropped:** `optics.spread` is an
+orphaned config field (declared as a knob, never read in `buildOptics()` -- every sweep width is self-scaling
+at three call sites instead) -- a wire-up-or-delete judgement call, not a mechanical fix. `kuramoto.pendN`/
+`.cycle` and `mpmstep.nu`/`.nx` are read by real simulation code but didn't complete a wide sensitivity ladder
+within a 220s budget (`mpmstep` was using 6GB near the timeout) -- probably insensitive rather than dead, not
+confirmed either way. `freesurface`, `flip3d`, `multigrid3d`, `probe` never produced a still-list at all,
+timing out at 200s -- open.
+
+This build carries 1205 gates. verify.mjs ALL GREEN.
+
 ## Since v4063 -- the solar array, read without Home Assistant
 
 Keith: "if i was not using home assistant at all, can we access the solar array battery state? ... can we get
