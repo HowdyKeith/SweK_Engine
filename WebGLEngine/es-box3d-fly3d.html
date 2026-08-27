@@ -41,6 +41,7 @@
   <button id="reliefBtn" title="Cube-baked planet surface (v3842): baked normals from the height field's own gradient plus CPU-displaced vertices. Off = the smooth painted ball" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9968; Relief</button>
   <button id="structuresBtn" title="Asteroid belt and a greebled station (v3843): rocks placed with no interpenetration, hulls plated by an exact panel partition. Off = empty space" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9673; Structures</button>
   <button id="hitfxBtn" title="Hit debris ported from cockpit.html (v3844): shields up throws cyan sparks, shields gone throws red, a kill adds amber on top. Off = no debris" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#10022; Hit FX</button>
+  <button id="cloudsBtn" title="Cloud deck (v4055): the engine's own six meteorological types (render/cloudField.js) placed on a shell above the planet's DISPLACED terrain, drawn as camera-facing billboards with cloudLayer's own falloff and two-tone shading. Click to cycle type; the arrival flies through them" style="background:#1d3a2a;color:#9fe6c0;border:1px solid #2f486c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9729; Clouds</button>
   <button id="arriveBtn" title="Arrival (v4054): warp in across the system inside the fold tunnel, then descend onto the planet -- two chained legs whose seam is DERIVED, so the camera cannot cut between them. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#127756; Arrive</button>
   <button id="descendBtn" title="Cinematic descent (v4053): fly from orbit down onto the planet's surface on a parametric shot -- logarithmic distance (constant perceived zoom rate) and a singularity-free rig that does not roll over at the poles. One-shot" style="background:#152c3a;color:#9fd8ff;border:1px solid #2f6c8c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#128640; Descend</button>
   <button id="jumpBtn" title="Fold/warp jump tunnel: the swept-spine tube down a fold spine, viewed from inside, ring pattern scrolling via a fract wrap; ramps in and out. One-shot" style="background:#2a2140;color:#c7b3ff;border:1px solid #4a3f6c;border-radius:5px;cursor:pointer;font:11px ui-monospace,monospace;padding:2px 9px;">&#9889; Jump</button>
@@ -70,6 +71,7 @@ import { makeAutoExposure } from "/render/autoExposure.js";   // v3829 -- sqrt-m
 import { planetSpec } from "/world/procPlanet.js";   // v3830 -- procedural planet backdrop
 import { bakeSurfaceCubemap, sampleCubeScalar, surfaceRadiusAt } from "/world/planetSurface.js";   // v3842 -- cube-baked relief; v4053 -- surfaceRadiusAt shared with the descent camera
 import { sampleShot, sampleSequence, chainLegs, sequenceDuration, norm3 as cnorm3 } from "/rig/cinematicShot.js";   // v4053 descent; v4054 arrival sequence
+import { buildPuffsShell } from "/render/cloudField.js";   // v4055 -- the engine's own cloud types, on a shell
 import { asteroidMesh, asteroidField, stationSpec } from "/world/spaceStructures.js";   // v3843 -- asteroids and greebled stations
 import { burstsFor, spawnBurst, stepBurst, packPoints } from "/render/hitBurst.js";   // v3844 -- the cockpit's hit VFX
 import { makeShipLabels } from "/ev/esShipLabels.js";   // v3831 -- Slug outline-text nameplates on a real surface
@@ -237,6 +239,7 @@ let descent = null;
 let arrival = null;   // v4054 -- the two-leg warp-in + descent, or null
 let planetMesh = null, planetSpin = 0, planetMat = null, planetRelief = true;
 let planetSpec_ = null, planetR = 17;   // v4053 -- the descent needs the seed's spec and the radius
+let planetAtmo = null, planetAtmoR = 0;   // v4055 -- hidden from inside; see the note at its construction
 {
   // v4053 -- ?seed= makes the planet reproducible, which a gate needs and a shared link wants.
   const _q = new URLSearchParams(location.search), _s = parseInt(_q.get("seed") || "", 10);
@@ -315,6 +318,18 @@ let planetSpec_ = null, planetR = 17;   // v4053 -- the descent needs the seed's
     new THREE.SphereGeometry(R * (1 + spec.atmosphere.thickness * 3) + 0.5, 48, 30),
     new THREE.MeshBasicMaterial({ color: new THREE.Color(ac[0], ac[1], ac[2]), transparent: true, opacity: 0.22, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false }));
   atmo.position.copy(planetMesh.position); scene.add(atmo);
+  // v4055 -- *** AN OPEN FINDING, MEASURED AND DELIBERATELY NOT "FIXED" HERE. *** Polled to its TRUE landing
+  // (not to a guessed clock), the descent's final frame is a flat pale wash with no terrain detail at all --
+  // reproduced identically on the clean pre-v4055 page, so it is NOT the clouds and NOT this round's work.
+  // Ruled out by experiment rather than by argument: removing the cloud deck entirely changes nothing, and
+  // fading this atmosphere shell to opacity 0.002 changes nothing either. The cause is still unidentified, so
+  // no speculative fix ships with it; the shell is left exactly as v3830 wrote it.
+  //
+  // *** AND IT HID FOR TWO ROUNDS BECAUSE MY OWN SCREENSHOTS NEVER REACHED THE LANDING. *** v4053 and v4054
+  // were shot on FIXED WAITS, and a headless swiftshader frame loop runs slower than real time, so every
+  // "landing" image was really taken mid-descent with the camera still high. A screenshot taken on a guessed
+  // clock is not evidence of the state it is captioned with -- poll for the state you mean to photograph.
+  planetAtmo = atmo; planetAtmoR = R * (1 + spec.atmosphere.thickness * 3) + 0.5;
   const hint = document.getElementById("hint");
   if (hint) hint.textContent += "  \u00b7  " + spec.type + " planet #" + spec.seed;
 }
@@ -632,6 +647,7 @@ function frame() {
     shots = advanceShots(shots.concat(sA, sB), A.concat(B), dt); t += dt;
   }
   syncScene(dt); controls.update();
+
   // v4053 -- THE CINEMATIC DESCENT. The whole move is rig/cinematicShot.js's sampleShot(t) -- pure arithmetic,
   // no state here beyond the clock -- so this block only converts one sampled frame into a Three camera and
   // hands control back to OrbitControls when it lands. OrbitControls is DISABLED for the duration: leaving it
@@ -829,8 +845,10 @@ arriveBtn.addEventListener("click", () => {
       { shot: "dive", dur: warpDur, p: { center: [c.x, c.y, c.z], target,
           from: { distance: 20000, pitch: 0.04, azimuth: -0.5, fov: 62, roll: 0 },
           to:   { distance: 140,   pitch: 0.30, azimuth: 0.2,  fov: 50, roll: 0 } } },
+      // v4055 -- the descent leg now ENDS BELOW THE CLOUD DECK (shell at ground + CLOUD_ALT), so the camera
+      // transits the weather on the way down rather than stopping short of it and looking at it from outside.
       { shot: "descent", dur: 8, p: {
-          to: { distance: 2.2, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` is DERIVED
+          to: { distance: 0.9, pitch: 1.05, azimuth: 1.3, fov: 34, roll: 0 } } },   // `from` is DERIVED; ends UNDER the deck in clear air
     ]),
   };
   controls.enabled = false;
@@ -838,6 +856,123 @@ arriveBtn.addEventListener("click", () => {
   if (foldTunnel) foldTunnel.play();
 });
 window.swekArrive = () => arriveBtn.click();
+
+// v4055 -- THE CLOUD DECK. Keith: "we also have great clouds we made to pass through."
+//
+// The PUFFS are the engine's own -- render/cloudField.js, the six meteorological types lifted out of
+// render/cloudLayer.js so both skies share one generator. What is rebuilt here is only the DRAWING, because
+// cloudLayer's renderer is raw WebGL2 with its own program and this page is Three.js. The billboard maths and
+// the look are cloudLayer's, ported line for line: a camera-facing quad, radial falloff
+// smoothstep(1.0, 0.18, |uv|) * density, and a two-tone vertical gradient between colBot and colTop.
+//
+// ONE INSTANCED MESH, not one object per puff: a cumulonimbus field is ~40 puffs and a draw call each would be
+// forty state changes a frame for something that is forty copies of one quad.
+// CLOUD_ALT is a real deck height: high enough that the descent punches THROUGH the weather and comes out into
+// clear air beneath it, rather than stopping level with it and looking at it edge-on.
+//
+// *** AND A CORRECTION TO MY OWN DIAGNOSIS, RECORDED BECAUSE IT WAS WRONG IN A USEFUL WAY. *** The landing frame
+// washed out pale, and I attributed it to the camera ending up INSIDE a billboard (a puff is ~1 unit tall here,
+// so it was a plausible cause) and raised this constant on that theory. Raising it did not fix the wash, which
+// is what said the theory was wrong: the culprit was the PLANET'S ATMOSPHERE SHELL -- a BackSide sphere at
+// radius 18.938 on seed 42 that had simply never been flown into before. Both facts are true and only the second
+// one mattered. See planetAtmo's note above. A cause I guessed and a cause I measured are different things.
+const CLOUD_ALT = 3.0, CLOUD_SCALE = 0.02;
+let cloudDeck = null, cloudTypeIdx = 0;
+const CLOUD_ORDER = ["cumulus", "cumulonimbus", "stratocumulus", "stratus", "nimbostratus", "cirrus"];
+
+function buildCloudDeck(typeName) {
+  if (cloudDeck) { scene.remove(cloudDeck); cloudDeck.geometry.dispose(); cloudDeck.material.dispose(); cloudDeck = null; }
+  if (!planetMesh || !planetSpec_) return null;
+  const c = planetMesh.position;
+  // the deck sits over the face we arrive at, so the puffs generated are puffs somebody sees
+  const dir = cnorm3([camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z]);
+  const puffs = buildPuffsShell({ type: typeName, center: [c.x, c.y, c.z], groundRadius: planetR,
+                                  altitude: CLOUD_ALT, dir, coverage: 0.6, sizeScale: CLOUD_SCALE, seed: 4055 });
+  if (!puffs.length) return null;
+
+  const geo = new THREE.InstancedBufferGeometry();
+  const quad = new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]);
+  geo.setAttribute("aCorner", new THREE.BufferAttribute(quad, 2));
+  const N = puffs.length;
+  const iPos = new Float32Array(N * 3), iSize = new Float32Array(N * 2);
+  const iTop = new Float32Array(N * 3), iBot = new Float32Array(N * 3), iDen = new Float32Array(N);
+  puffs.forEach((p, i) => {
+    iPos.set([p.x, p.y, p.z], i * 3); iSize.set([p.w, p.h], i * 2);
+    iTop.set(p.colTop, i * 3); iBot.set(p.colBot, i * 3); iDen[i] = p.density;
+  });
+  geo.setAttribute("iPos", new THREE.InstancedBufferAttribute(iPos, 3));
+  geo.setAttribute("iSize", new THREE.InstancedBufferAttribute(iSize, 2));
+  geo.setAttribute("iTop", new THREE.InstancedBufferAttribute(iTop, 3));
+  geo.setAttribute("iBot", new THREE.InstancedBufferAttribute(iBot, 3));
+  geo.setAttribute("iDen", new THREE.InstancedBufferAttribute(iDen, 1));
+  geo.instanceCount = N;
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { uSun: { value: 0.9 } },
+    vertexShader: `
+      attribute vec2 aCorner; attribute vec3 iPos; attribute vec2 iSize;
+      attribute vec3 iTop; attribute vec3 iBot; attribute float iDen;
+      varying vec2 vUv; varying vec3 vTop; varying vec3 vBot; varying float vDen;
+      void main(){
+        // camera-facing basis pulled out of the view matrix -- cloudLayer takes uRight/uUp from the engine
+        // camera; in Three the same two vectors are the first two ROWS of the view matrix.
+        vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+        vec3 up    = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+        vec3 world = iPos + aCorner.x * iSize.x * right + aCorner.y * iSize.y * up;
+        vUv = aCorner; vTop = iTop; vBot = iBot; vDen = iDen;
+        gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+      }`,
+    fragmentShader: `
+      precision highp float;
+      varying vec2 vUv; varying vec3 vTop; varying vec3 vBot; varying float vDen;
+      uniform float uSun;
+      void main(){
+        float r = length(vUv);
+        float a = smoothstep(1.0, 0.18, r) * vDen;      // cloudLayer's own falloff
+        if (a < 0.01) discard;
+        vec3 col = mix(vBot, vTop, clamp(vUv.y * 0.5 + 0.5, 0.0, 1.0));
+        col *= (0.86 + 0.14 * clamp(uSun, 0.0, 1.0));   // ...and its own sun tint
+        gl_FragColor = vec4(col, a);
+      }`,
+  });
+  cloudDeck = new THREE.Mesh(geo, mat);
+  cloudDeck.frustumCulled = false;
+  scene.add(cloudDeck);
+  return { puffs: N, type: typeName };
+}
+
+// the button cycles the six types and then OFF, so the deck can always be taken away -- which is both a real
+// control and the only way to tell what the clouds are actually responsible for on screen.
+function clearCloudDeck() {
+  if (!cloudDeck) return;
+  scene.remove(cloudDeck); cloudDeck.geometry.dispose(); cloudDeck.material.dispose(); cloudDeck = null;
+}
+const cloudsBtn = document.getElementById("cloudsBtn");
+cloudsBtn.addEventListener("click", () => {
+  cloudTypeIdx = (cloudTypeIdx + 1) % (CLOUD_ORDER.length + 1);
+  if (cloudTypeIdx === CLOUD_ORDER.length) { clearCloudDeck(); cloudsBtn.textContent = "\u2601 Clouds"; cloudsBtn.style.opacity = "0.5"; return; }
+  const r = buildCloudDeck(CLOUD_ORDER[cloudTypeIdx]);
+  cloudsBtn.style.opacity = r ? "1" : "0.5";
+  cloudsBtn.textContent = r ? "\u2601 " + r.type : "\u2601 Clouds";
+});
+window.swekClouds = (t) => {
+  if (t === false || t === "off") { clearCloudDeck(); cloudTypeIdx = CLOUD_ORDER.length; return null; }
+  if (t) cloudTypeIdx = Math.max(0, CLOUD_ORDER.indexOf(t));
+  return buildCloudDeck(CLOUD_ORDER[cloudTypeIdx % CLOUD_ORDER.length]);
+};
+window.swekCloudProbe = () => {
+  if (!cloudDeck || !planetMesh) return { deck: false };
+  const c = planetMesh.position, p = cloudDeck.geometry.getAttribute("iPos");
+  let minR = Infinity, maxR = -Infinity;
+  for (let i = 0; i < p.count; i++) {
+    const r = Math.hypot(p.getX(i) - c.x, p.getY(i) - c.y, p.getZ(i) - c.z);
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+  }
+  const camR = Math.hypot(camera.position.x - c.x, camera.position.y - c.y, camera.position.z - c.z);
+  return { deck: true, puffs: p.count, minR, maxR, camR, inside: camR < maxR && camR > minR, below: camR < minR };
+};
+
 window.swekArrivalProbe = () => {
   if (!arrival) return { flying: false };
   const f = sampleSequence(arrival.legs, arrival.t);
@@ -859,7 +994,9 @@ window.swekDescentProbe = () => {
            fov: camera.fov, controlsEnabled: controls.enabled };
 };
 
-  newBattle(); requestAnimationFrame(frame);
+  newBattle();
+  try { buildCloudDeck(CLOUD_ORDER[0]); cloudsBtn.textContent = "\u2601 " + CLOUD_ORDER[0]; } catch (e) {}   // v4055 -- a deck to arrive through
+  requestAnimationFrame(frame);
 })();
 </script>
 </body>
