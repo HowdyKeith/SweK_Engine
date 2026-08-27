@@ -14,20 +14,38 @@
 # opened anywhere else. So: BUILD ONCE, then VERIFY THAT ONE ARTIFACT ON ubuntu, macOS AND Windows -- unpack it
 # and make the tree answer for itself on each. That tests the thing hand-carrying never did, and it is aimed
 # squarely at the class of bug this repo keeps finding: path handling that only fails on Windows.
+#
+# *** v4068 -- THIS WORKFLOW DOES NOT PUBLISH ANY MORE, AND IT NEVER SUCCESSFULLY DID. *** Every run since it
+# was written -- ten of them, v3958 through v4067 -- ended red on `gh release create` with "a release with the
+# same tag name already exists", and THE BUILD WAS NEVER THE PROBLEM. The rig is the publisher: the GitHub
+# panel's button packs the zip, creates the release, uploads the asset AND PUSHES THE TAG -- and it is that tag
+# push which starts this workflow. Measured on v4067: the release was published at 17:13:34Z and this run began
+# at 17:13:36Z, two seconds behind the thing that started it. The job was racing a publisher that had already
+# finished, and losing by construction, every single time.
+#
+# *** AND THE OBVIOUS REPAIR -- upload --clobber -- WOULD HAVE BEEN WORSE THAN THE RED X. *** The zip is NOT
+# byte-reproducible across machines: the packer walks a live tree, so the same commit (dbc0855, v4067) produced
+# 26,775,683 bytes on this runner, 27,424,068 on the rig, and 27,766,762 in a third checkout. Clobbering would
+# replace the artifact the rig built, verified and shipped with a different one assembled elsewhere, silently,
+# under a release somebody had already downloaded.
+#
+# So publishing is left to the rig, which was doing it correctly all along, and this workflow keeps the half it
+# was actually valuable for and the half that has always passed: BUILD ONCE, VERIFY ON THREE PLATFORMS.
 name: release
 
 on:
   push:
     tags: ["v*"]
+  # *** THE dry_run INPUT IS GONE BECAUSE IT NEVER DID ANYTHING -- A FLAG THAT LIES. *** It was declared with
+  # the description "Build and verify, but publish nothing" and was REFERENCED NOWHERE: the publish job gated on
+  # `github.event_name == 'push' && github.ref_type == 'tag'`, which is already false for a manual run, so the
+  # button was a dry run whether the toggle said true or false. A control that reads as a choice and is wired to
+  # nothing is worse than no control, and with publishing gone it would now be doubly meaningless.
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Build and verify, but publish nothing"
-        type: boolean
-        default: true
 
 permissions:
-  contents: write        # creating a release and uploading its asset; nothing else is needed
+  contents: read         # v4068: was `write` for creating releases. Nothing here writes any more, so it asks
+                         # for nothing it cannot use -- the token's reach should end where the job's work does.
 
 jobs:
   build:
@@ -156,29 +174,3 @@ jobs:
             if(!eng||eng!==brn){console.error("markers disagree after unpack: "+eng+" vs "+brn);process.exit(1);}
             if(eng!=="${{ needs.build.outputs.version }}"){console.error("unpacked tree says "+eng);process.exit(1);}
             console.log("unpacked build agrees: "+eng);'
-
-  publish:
-    needs: [build, verify]
-    # A DRY RUN IS THE DEFAULT FOR THE MANUAL BUTTON and publishing only ever happens for a real tag: the
-    # workflow can be exercised end to end without putting anything on the releases page.
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-zip
-          path: dl
-
-      # gh is preinstalled on the runner, so there is no third-party action here whose version could change what
-      # publishing means. --verify-tag refuses to invent a tag that does not exist.
-      - name: Create the release and attach the build
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" \
-            "dl/${{ needs.build.outputs.zipname }}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "SweK Engine ${{ needs.build.outputs.version }}" \
-            --generate-notes \
-            --verify-tag

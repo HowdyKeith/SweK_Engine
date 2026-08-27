@@ -126,22 +126,41 @@ const code = raw.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join("\n");
 
 // ---- 5. PUBLISHING IS THE NARROW PATH ---------------------------------------------------------------------
 {
-    console.log("\n5. THE ONLY STEP THAT CANNOT BE UNDONE IS THE MOST CONDITIONAL");
-    ok("!! publishing requires a real pushed TAG, not a manual click",
-        /github\.event_name == 'push'/.test(code) && /ref_type == 'tag'/.test(code),
-        "the manual button builds and verifies and publishes NOTHING, so the whole path can be exercised " +
-        "without putting anything on the releases page");
-    ok("!! ...and it waits for the cross-OS verify, not just the build",
-        /needs:\s*\[\s*build\s*,\s*verify\s*\]/.test(code),
-        "publishing on `needs: build` alone would attach an artifact that no other machine had opened -- which " +
-        "is the state this workflow exists to end");
-    ok("...and gh --verify-tag refuses to invent a tag",
-        /--verify-tag/.test(code),
-        "gh release create will happily CREATE a missing tag otherwise, which would mint a release for a commit " +
-        "nobody tagged");
-    ok("the token is the workflow's own, with contents:write and nothing else",
-        /permissions:/.test(code) && /contents:\s*write/.test(code) && !/secrets\.[A-Z_]*(PAT|TOKEN)/.test(code.replace(/github\.token/g, "")),
-        "no personal access token is referenced; a release workflow needs to write releases and nothing more");
+    console.log("\n5. *** PUBLISHING IS THE RIG'S JOB, AND THIS WORKFLOW MUST NOT TAKE IT BACK ***");
+    // v4068 -- THIS SECTION USED TO GRADE THE PUBLISH STEP'S CONDITIONS, AND THE PUBLISH STEP IS GONE. It is
+    // re-pointed rather than deleted, because what replaced it is a REAL invariant with a measured history
+    // behind it: every run of this workflow since it was written -- ten, v3958 through v4067 -- died on
+    // `gh release create` with "a release with the same tag name already exists", because the rig publishes
+    // first and its tag push is what STARTS this workflow (v4067: release at 17:13:34Z, run at 17:13:36Z).
+    // Re-adding a publish step would resurrect a job that has never once succeeded.
+    //
+    // AND THE OBVIOUS REPAIR IS THE DANGEROUS ONE, WHICH IS WHY --clobber IS NAMED HERE RATHER THAN LEFT TO
+    // JUDGEMENT: the zip is not byte-reproducible across machines (the same commit dbc0855 packed to
+    // 26,775,683 bytes on the runner, 27,424,068 on the rig, 27,766,762 in a third checkout), so an upload
+    // over the rig's asset would silently replace a verified, already-downloaded artifact with a different one.
+    ok("!! the workflow does NOT create or upload a release -- the rig is the publisher",
+        !/gh\s+release\s+(create|upload|edit|delete)/.test(code),
+        "ten straight red runs came from racing a publisher that had already finished. Build and verify are " +
+        "what this workflow is for and what has always passed");
+    ok("!! *** AND IF PUBLISHING EVER COMES BACK, IT MAY NOT CLOBBER *** -- --clobber is refused outright",
+        !/--clobber/.test(code),
+        "the zip is not byte-reproducible across machines, so overwriting the rig's asset would replace a " +
+        "verified build with a differently-assembled one, under a release somebody had already downloaded. " +
+        "A publisher that overwrites a good artifact to make its own log go green is worse than a red X");
+    ok("!! the token asks for READ and nothing more, now that nothing writes",
+        /permissions:/.test(code) && /contents:\s*read/.test(code) && !/contents:\s*write/.test(code) &&
+        !/secrets\.[A-Z_]*(PAT|TOKEN)/.test(code.replace(/github\.token/g, "")),
+        "least privilege is checkable here: the token's reach should end where the job's work does, and no " +
+        "personal access token is referenced either");
+    ok("!! no input is declared that nothing reads -- the dry_run flag that lied is gone",
+        !/dry_run/.test(code),
+        "dry_run was declared 'Build and verify, but publish nothing' and referenced NOWHERE: publish already " +
+        "gated on push+tag, which is false for a manual run, so the button was a dry run whether the toggle " +
+        "said true or false. A control that reads as a choice and is wired to nothing is worse than no control");
+    ok("...and the cross-OS verify still gates on the build, so the artifact tested is the one built",
+        /needs:\s*build/.test(code),
+        "verify must consume the build's uploaded artifact rather than packing its own, or three machines " +
+        "would each be opening a different zip");
 }
 
 console.log(fails ? `\nreleaseWorkflow-selfcheck: ${fails} FAILED` : "\nreleaseWorkflow-selfcheck: all checks pass");

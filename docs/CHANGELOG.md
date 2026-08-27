@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4068 -- the release workflow stops racing a publisher that already finished
+
+Keith sent a CI failure: *"Run failed: release - v4067."*
+
+**The build was never the problem, and every run of that workflow had failed the same way since it was
+written.** Ten runs, v3958 through v4067, all red on `gh release create` with *"a release with the same tag name
+already exists"* -- while build (19s) and all three cross-OS verifies passed every single time. The rig is the
+publisher: the GitHub panel's button packs the zip, creates the release, uploads the asset **and pushes the
+tag** -- and that tag push is what *starts* this workflow. Measured on v4067: the release was published at
+17:13:34Z and the run began at 17:13:36Z, two seconds behind the thing that triggered it. The job was racing a
+publisher that had already finished, and losing by construction. Nothing was ever lost --
+`SweK_Engine_v4067.zip` is attached, 27,424,068 bytes, and had already been downloaded.
+
+**And the obvious repair -- `upload --clobber` -- would have been worse than the red X.** That finding is what
+decided the fix. The zip is *not* byte-reproducible across machines: the packer walks a live tree, so commit
+`dbc0855` packed to **26,775,683** bytes on the runner, **27,424,068** on the rig, and **27,766,762** in a third
+checkout (node_modules correctly excluded in all three -- checked, not assumed). Clobbering would silently
+replace the artifact the rig built, verified and shipped with a different one assembled elsewhere, under a
+release somebody had already downloaded. A publisher that overwrites a good artifact to make its own log go
+green is worse than a red X.
+
+So publishing stays with the rig, which was doing it correctly all along, and the workflow keeps the half it was
+built for and the half that always passed: **build once, verify on three platforms.**
+
+**Two more things the removal exposed.** The `dry_run` input was declared *"Build and verify, but publish
+nothing"* and referenced **nowhere** -- publish already gated on `push` + `ref_type == 'tag'`, which is false
+for a manual run, so the button was a dry run whether the toggle said true or false. A control that reads as a
+choice and is wired to nothing is worse than no control. And `permissions: contents: write` existed only to
+create releases, so it drops to `read` -- the token's reach should end where the job's work does.
+
+**The workflow has its own gate, and it caught this edit immediately.** `releaseWorkflow-selfcheck.mjs` section
+5 graded the publish step's conditions and went four-red the moment publish left. It is **re-pointed rather than
+deleted**, at the invariant that replaced it: this workflow must not take publishing back, and if it ever does
+it *may not* `--clobber`. Sabotage-confirmed three ways -- re-adding a publish step reddens 1, adding
+`--clobber` reddens 2, escalating permissions back to `write` reddens 1 -- all restored byte-identical. The
+idempotent publish logic that was written first was also driven against a mock `gh` in all three states
+(already-published / published-without-asset / not-published) before being discarded in favour of removal;
+that is how the non-clobber property was proven rather than reasoned about.
+
+Next, at Keith's direction: CI verifying the **published** asset instead of its own build -- which would also
+move the credential sweep onto the zip people actually download.
+
+No gate file added or removed, so this build still carries 1207 gates. verify.mjs ALL GREEN.
+
 ## Since v4067 -- the physics AI, reachable by an MCP client
 
 Keith: *"is there any downside to setting up the MCP shim for the physics ai? what would that enable?"* Built
