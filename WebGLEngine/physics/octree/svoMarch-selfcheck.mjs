@@ -18,7 +18,7 @@ import fs from "node:fs";
 import { buildOctree } from "./octree.js";
 import { buildSVO, svoAt } from "./svoGenerator.js";
 import { shaderConstants, render, compareRays, svoSampleGL, marchGL, marchDDA,
-         CUBE_DIAGONAL, SHADER_PATH, MEASURED_V3561 } from "./svoMarch.mjs";
+         CUBE_DIAGONAL, SHADER_PATH, MEASURED_V3561, cubeSpan, pixelRay } from "./svoMarch.mjs";
 import { notAllBlack, notUniform, colorPresent, stats, runCheck } from "../../tools/render-qa/checks.mjs";
 import { reportLines } from "./svoMarch.mjs";
 
@@ -43,6 +43,82 @@ console.log("1. THE CONSTANTS COME OUT OF THE SHADER, AND A SHAPE CHANGE FAILS L
     try { shaderConstants("// a shader with none of those lines\nvoid main() {}"); } catch { threw = true; }
     ok("!! ...and a shader whose shape changed THROWS rather than falling back to a default", threw,
         "a silent default would let this mirror keep grading the constants of a shader that no longer exists");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n1b. cubeSpan IS THE SHADER'S OWN SLAB TEST, GRADED AGAINST HAND-COMPUTED GEOMETRY");
+{
+    // An axis-aligned ray straight through the cube on x, centred in y and z: enters at x=0 (t=1), exits at
+    // x=1 (t=2), by inspection of the [0,1] cube -- not derived from cubeSpan itself.
+    const s1 = cubeSpan([-1, 0.5, 0.5], [1, 0, 0]);
+    ok("!! an axis-aligned ray gives the exact hand-computed tEnter/tExit (1 and 2)",
+        Math.abs(s1.tEnter - 1) < 1e-12 && Math.abs(s1.tExit - 2) < 1e-12,
+        "tEnter=" + s1.tEnter + " tExit=" + s1.tExit);
+
+    // A ray along the cube's own main diagonal, starting outside one corner and normalized: it must cross the
+    // FULL diagonal length, so tExit - tEnter equals CUBE_DIAGONAL exactly -- a number this file already owns
+    // and did not invent for this check.
+    const L = Math.sqrt(3);
+    const s2 = cubeSpan([-0.5, -0.5, -0.5], [1 / L, 1 / L, 1 / L]);
+    ok("!! a ray down the main diagonal spans exactly CUBE_DIAGONAL of parameter t",
+        Math.abs((s2.tExit - s2.tEnter) - CUBE_DIAGONAL) < 1e-12,
+        "tExit-tEnter=" + (s2.tExit - s2.tEnter) + " vs CUBE_DIAGONAL=" + CUBE_DIAGONAL);
+
+    // A ray whose origin is INSIDE the cube: tEnter clamps to 0 (the ray is already inside), tExit is the exact
+    // hand-computed distance to the +z face.
+    const s3 = cubeSpan([0.5, 0.5, 0.5], [0, 0, 1]);
+    ok("!! starting inside the cube clamps tEnter to 0, and tExit is the exact distance to the far face",
+        s3.tEnter === 0 && Math.abs(s3.tExit - 0.5) < 1e-12, "tEnter=" + s3.tEnter + " tExit=" + s3.tExit);
+
+    // A ray approaching purely along z, from below the cube, centred in x and y: the Z AXIS ALONE must bind
+    // tEnter here (x and y never constrain it), so this catches a slab test that dropped the z dimension from
+    // its max/min -- which the diagonal-ray check above cannot, because that ray's three axes bind identically.
+    const s3b = cubeSpan([0.5, 0.5, -2], [0, 0, 1]);
+    ok("!! a ray entering purely along z has its tEnter/tExit set entirely by the z slab, hand-computed",
+        Math.abs(s3b.tEnter - 2) < 1e-12 && Math.abs(s3b.tExit - 3) < 1e-12, "tEnter=" + s3b.tEnter + " tExit=" + s3b.tExit);
+
+    // A ray that never enters the cube's footprint at all -- fixed at x=2, y=2 forever, marching only along z --
+    // must report tEnter > tExit, the shader's own miss condition.
+    const s4 = cubeSpan([2, 2, 0.5], [0, 0, 1]);
+    ok("!! a ray whose footprint never touches the cube reports tEnter > tExit (a miss)", s4.tEnter > s4.tExit,
+        "tEnter=" + s4.tEnter + " tExit=" + s4.tExit);
+}
+
+console.log("\n1c. pixelRay IS THE SHADER'S OWN PINHOLE BASIS, GRADED AGAINST HAND-COMPUTED DIRECTIONS");
+{
+    // Looking straight down +z: the CENTRE pixel (uv = (0,0)) must return camDir itself, exactly, with no trig
+    // rounding anywhere in this construction (camDir is already axis-aligned).
+    const centre = pixelRay(50, 50, 100, 100, [0, 0, 0], [0, 0, 1]);
+    ok("!! the centre pixel's ray equals the camera's forward direction exactly", centre[0] === 0 && centre[1] === 0 && centre[2] === 1,
+        "[" + centre.join(",") + "]");
+
+    // The right EDGE pixel (uv=(1,0)) tilts by exactly one full 'right' basis vector before normalising. Hand
+    // derivation: right = normalize(cross(fwd,[0,1,0])) = (-1,0,0) for fwd=(0,0,1); the un-normalised ray is
+    // fwd + 1*right = (-1,0,1), so the normalised result is exactly (-1/sqrt2, 0, 1/sqrt2).
+    const edge = pixelRay(100, 50, 100, 100, [0, 0, 0], [0, 0, 1]);
+    const want = [-1 / Math.sqrt(2), 0, 1 / Math.sqrt(2)];
+    ok("!! the right-edge pixel matches the hand-derived direction (-1/sqrt2, 0, 1/sqrt2)",
+        Math.abs(edge[0] - want[0]) < 1e-12 && Math.abs(edge[1] - want[1]) < 1e-12 && Math.abs(edge[2] - want[2]) < 1e-12,
+        "[" + edge.map((v) => v.toFixed(6)).join(",") + "]");
+
+    // The TOP row pixel (uv=(0,-1)) exercises 'up' rather than 'right'. Hand derivation: up = cross(right,fwd) =
+    // cross((-1,0,0),(0,0,1)) = (0,1,0), so the un-normalised ray is fwd + (-1)*up = (0,-1,1), normalised to
+    // (0, -1/sqrt2, 1/sqrt2). A construction that built 'up' with the cross product's arguments swapped would
+    // flip this sign while leaving the right-edge check above untouched (that check has uvy = 0).
+    const top = pixelRay(50, 0, 100, 100, [0, 0, 0], [0, 0, 1]);
+    const wantTop = [0, -1 / Math.sqrt(2), 1 / Math.sqrt(2)];
+    ok("!! the top-row pixel matches the hand-derived direction (0, -1/sqrt2, 1/sqrt2), pinning the sign of 'up'",
+        Math.abs(top[0] - wantTop[0]) < 1e-12 && Math.abs(top[1] - wantTop[1]) < 1e-12 && Math.abs(top[2] - wantTop[2]) < 1e-12,
+        "[" + top.map((v) => v.toFixed(6)).join(",") + "]");
+
+    // Every ray pixelRay returns must be a unit vector -- it feeds directly into cubeSpan's parametric t, so a
+    // non-unit ray would silently rescale every distance downstream.
+    let worstLen = 0;
+    for (const [x, y] of [[0, 0], [37, 12], [99, 99], [50, 0], [0, 99]]) {
+        const r = pixelRay(x, y, 100, 100, [0.2, -0.1, -0.5], [0.3, 0.1, 1]);
+        worstLen = Math.max(worstLen, Math.abs(Math.hypot(...r) - 1));
+    }
+    ok("!! pixelRay always returns a unit vector", worstLen < 1e-12, "worst |len-1| = " + worstLen.toExponential(2));
 }
 
 // ---------------------------------------------------------------------------

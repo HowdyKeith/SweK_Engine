@@ -9,7 +9,7 @@
 // (the point of a sparse tree), the build is deterministic, and -- tying it to the pathfinder -- A* run on the
 // octree's occupancy returns the byte-identical path it returns on the flat grid, so the octree is a true drop-in.
 import { createHash } from "node:crypto";
-import { buildOctree, octreeAt, octreeFromGrid, octreeToBlocked } from "./octree.js";
+import { buildOctree, octreeAt, octreeFromGrid, octreeToBlocked, countNodes } from "./octree.js";
 import { astar } from "../../brain/astar/astar.js";
 
 let fails = 0;
@@ -31,6 +31,29 @@ const occ = (x, y, z) => {
     for (let z = 0; z < SIZE; z++) for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (octreeAt(tree, x, y, z) !== occ(x, y, z)) mism++;
     ok("!! the octree reproduces the source occupancy for every cell", mism === 0,
        "all " + (SIZE ** 3) + " cells match the source grid exactly -- the compression is lossless, the tree never lies about what is solid.");
+}
+
+// ---- 1b. countNodes ON SYNTHETIC TREES WITH EXACT, HAND-COUNTED ANSWERS -----------------------------------------
+{
+    const leaf = (solid) => ({ solid, children: null });
+    ok("!! a single leaf is exactly one node", countNodes(leaf(1)) === 1);
+
+    // A root that branches into 8 leaves and nothing deeper: 1 root + 8 leaves = 9, counted by hand.
+    const flat = { solid: -1, children: Array.from({ length: 8 }, (_, i) => leaf(i % 2)) };
+    ok("!! a root with 8 leaf children counts to exactly 9 (1 root + 8 leaves)", countNodes(flat) === 9);
+
+    // A two-level tree: root branches into 8 children; 7 are leaves and 1 itself branches into 8 leaf
+    // grandchildren. Hand count: 1 (root) + 7 (leaves) + 1 (the branching child) + 8 (its leaf children) = 17.
+    const kids = Array.from({ length: 8 }, (_, i) => leaf(i % 2));
+    kids[3] = { solid: -1, children: Array.from({ length: 8 }, (_, i) => leaf((i + 1) % 2)) };
+    const twoLevel = { solid: -1, children: kids };
+    ok("!! a two-level synthetic tree counts to exactly 17, matching the hand count", countNodes(twoLevel) === 17,
+       "1 root + 7 leaves + 1 branching child + 8 grandchildren = 17, none of it read off buildOctree's own nodeCount");
+
+    // The smallest real tree buildOctree can build: an entirely uniform 2^3 world merges to a single leaf.
+    const uniform = buildOctree(2, () => 1);
+    ok("!! the smallest real octree buildOctree can build (a uniform world) is exactly 1 node", countNodes(uniform.root) === 1,
+       "an 8-cell uniform world collapses fully -- countNodes agrees with the merge, not just with buildOctree's own bookkeeping");
 }
 
 // ---- 2. COMPRESSION: a sparse world costs far fewer nodes than cells -------------------------------------------

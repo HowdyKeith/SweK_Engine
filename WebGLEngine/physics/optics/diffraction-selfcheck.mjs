@@ -10,7 +10,7 @@
 // already know, so the answer key is exact. The sabotage drops the sine-of-angle from the phase -- the way a propagator
 // silently loses its angular dependence -- and the slit no longer matches sinc squared, which the gate refuses.
 import { meijerG, gamma as gammaFn } from "../../math/meijerG.js";
-import { slitNumeric, slitAnalytic, doubleSlitNumeric, doubleSlitAnalytic, doubleSlitMaxima, circularNumeric, circularAnalytic, airyFirstMinimum, firstMinimumAt, scorePattern } from "./diffraction.js";
+import { slitNumeric, slitAnalytic, slitMinima, doubleSlitNumeric, doubleSlitAnalytic, doubleSlitMaxima, circularNumeric, circularAnalytic, airyFirstMinimum, firstMinimumAt, scorePattern } from "./diffraction.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
@@ -23,6 +23,19 @@ const sweep = (lo, hi, n) => { const a = []; for (let i = 0; i <= n; i++) a.push
     const s = scorePattern(slitNumeric(a, lambda, st), slitAnalytic(a, lambda, st));
     ok("!! the single-slit pattern matches the analytic sinc squared", s.rms < 1e-3,
        "the phasor-summed slit reproduces sinc^2 with rms " + s.rms.toExponential(1) + " -- the propagator is the correct diffraction integral, graded against a closed form.");
+}
+
+// ---- 1b. slitMinima GIVES THE ANALYTIC DARK-FRINGE FORMULA, AND THE FRINGES REALLY LAND THERE -------
+{
+    const a = 4.0, mins = slitMinima(a, lambda, 3);
+    const want = [1, 2, 3].map((m) => m * lambda / a);
+    ok("!! slitMinima matches m*lambda/a exactly, for m = 1, 2, 3", mins.every((v, i) => Math.abs(v - want[i]) < 1e-15),
+       "slitMinima(" + a + ", " + lambda + ") = [" + mins.join(", ") + "]");
+    // The formula is only worth having if those angles really are dark fringes of the pattern it names.
+    const depth = slitAnalytic(a, lambda, mins);
+    ok("!! ...and the single-slit pattern is genuinely (near-)zero at every predicted minimum", depth.every((v) => v < 1e-27),
+       "sinc^2 at the m predicted minima: [" + depth.map((v) => v.toExponential(1)).join(", ") + "] -- these are the dark fringes, not merely nearby points");
+    ok("mMax controls the count returned", slitMinima(a, lambda, 5).length === 5 && slitMinima(a, lambda, 1).length === 1);
 }
 
 // ---- 2. TWO SLITS GIVE YOUNG'S FRINGES UNDER THE DIFFRACTION ENVELOPE ------------------------------

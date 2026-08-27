@@ -12,13 +12,31 @@
 // way to get phase-shifting subtly wrong -- and the recovered surface no longer matches, which the gate refuses.
 import { sphereGap, ringRadii, newtonRingRadius, newtonRingRadiusNoShift } from "./interferometer.js";
 import { readFileSync } from "node:fs";
-import { sampleSurface, fourStep, phaseShiftRecover, recoverHeight, scoreRecovery, interferogram, phaseFromHeight } from "./interferometer.js";
+import { sampleSurface, fourStep, phaseShiftRecover, recoverHeight, scoreRecovery, interferogram, phaseFromHeight, metaballHeight, unwrap2d } from "./interferometer.js";
 
 let fails = 0;
 const ok = (name, cond, detail) => { console.log((cond ? "  PASS  " : "  FAIL  ") + name + (detail ? "   " + detail : "")); if (!cond) fails++; };
 const W = 64, H = 64, lambda = 1.0;
 const balls = [{ cx: 22, cy: 26, a: 1.4, s: 11 }, { cx: 42, cy: 34, a: 1.1, s: 9 }, { cx: 30, cy: 44, a: 0.8, s: 7 }];
 const truth = sampleSurface(balls, W, H);
+
+// ---- 0a. metaballHeight IS THE EXACT ANALYTIC SUM OF GAUSSIAN BUMPS, NOT A REIMPLEMENTATION HERE -----
+{
+    const ball = { cx: 10, cy: 20, a: 1.4, s: 5 };
+    ok("!! at a bump's own centre, height equals its amplitude exactly (exp(0) = 1)",
+       Math.abs(metaballHeight([ball], 10, 20) - 1.4) < 1e-15, "z(cx,cy) = " + metaballHeight([ball], 10, 20));
+    // one sigma off-centre along x: height = a * exp(-1/2), a closed form nobody fed the function
+    const oneSigma = metaballHeight([ball], 10 + 5, 20);
+    ok("!! one sigma away, height matches a*exp(-1/2) exactly", Math.abs(oneSigma - 1.4 * Math.exp(-0.5)) < 1e-14,
+       oneSigma.toPrecision(15) + " vs " + (1.4 * Math.exp(-0.5)).toPrecision(15));
+    // two balls superpose LINEARLY -- the sum at a point equals the sum of each ball's own contribution
+    const far = { cx: 10, cy: 20, a: 1.4, s: 5 }, near = { cx: 12, cy: 21, a: 0.8, s: 3 };
+    const combined = metaballHeight([far, near], 12, 21);
+    const bySum = metaballHeight([far], 12, 21) + metaballHeight([near], 12, 21);
+    ok("!! two balls superpose linearly: z(balls,p) == sum of each ball's own z(p)", Math.abs(combined - bySum) < 1e-15,
+       combined.toPrecision(15) + " vs " + bySum.toPrecision(15));
+    ok("far from every bump the height decays toward zero", Math.abs(metaballHeight([ball], 10 + 1000, 20)) < 1e-30);
+}
 
 // ---- 1. THE FULL PIPELINE RECOVERS THE KNOWN SURFACE TO MACHINE PRECISION ---------------------------
 {
@@ -48,6 +66,34 @@ const truth = sampleSurface(balls, W, H);
     let maxErr = 0; for (let k = 0; k < rec.length; k++) { const d = Math.atan2(Math.sin(phiTrue[k] - rec[k]), Math.cos(phiTrue[k] - rec[k])); if (Math.abs(d) > maxErr) maxErr = Math.abs(d); }
     ok("!! the four-step algorithm recovers a known phase exactly, modulo 2 pi", maxErr < 1e-9,
        "worst circular phase error over the field is " + maxErr.toExponential(1) + " -- the recovery is the correct inverse of the stepped-reference model, not an approximation.");
+}
+
+// ---- 3b. unwrap2d IS A NO-OP ON A CONTINUOUS FIELD, AND REMOVES A KNOWN SYNTHETIC 2*pi JUMP ----------
+{
+    const w = 6, h = 4;
+    // A field with no jump larger than pi anywhere (adjacent step 0.3 rad << pi): unwrapping must change nothing.
+    const smooth = new Float64Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) smooth[j * w + i] = 0.3 * i + 0.2 * j;
+    const smoothOut = unwrap2d(smooth, w, h);
+    let maxDelta = 0; for (let k = 0; k < smooth.length; k++) maxDelta = Math.max(maxDelta, Math.abs(smoothOut[k] - smooth[k]));
+    ok("!! unwrap2d is a NO-OP on an already-continuous phase field", maxDelta < 1e-15, "max |out - in| = " + maxDelta.toExponential(2));
+
+    // Now build a WRAPPED version of a true linear ramp: wrap every sample into (-pi, pi], which injects exactly
+    // the 2*pi jumps unwrap2d exists to undo, and check the true ramp is recovered up to the single global
+    // constant unwrapping cannot resolve (the arbitrary reference phase).
+    const trueRamp = new Float64Array(w * h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) trueRamp[j * w + i] = 0.9 * i + 0.6 * j;   // spans > 2*pi
+    const TAU = 2 * Math.PI;
+    const wrapped = trueRamp.map((v) => { let x = v; while (x > Math.PI) x -= TAU; while (x <= -Math.PI) x += TAU; return x; });
+    const recovered = unwrap2d(wrapped, w, h);
+    const offset = recovered[0] - trueRamp[0];
+    let worst = 0; for (let k = 0; k < recovered.length; k++) worst = Math.max(worst, Math.abs((recovered[k] - offset) - trueRamp[k]));
+    ok("!! unwrap2d recovers a synthetically-wrapped linear ramp up to a global constant", worst < 1e-9,
+       "worst deviation after removing the single unresolvable offset: " + worst.toExponential(2));
+    // and the jump really was there before unwrapping -- otherwise the check above is vacuous
+    let hadJump = false;
+    for (let i = 1; i < w; i++) if (Math.abs(wrapped[i] - wrapped[i - 1]) > 3) hadJump = true;
+    ok("...and the wrapped input really did contain a 2*pi discontinuity to remove", hadJump);
 }
 
 // --- v3078: AN ANSWER KEY THAT OWES NOTHING TO THE RECOVERY ALGEBRA -------------------------------------------

@@ -15,6 +15,7 @@ import {
     covarianceFromScaleRot, projectCovariance, perspectiveJacobian, eigen2, det2,
     gaussian2DIntegral, rasteriseIntegral, compositeFrontToBack, accumulatedAlpha,
     depthOrder, areaScale, areaDepthSlope, rotZ, rotY, quatToMat3, mat3mul, mat3T,
+    mat3vec, toCamera, projectedAreaAtDepth, areaDepthFit,
 } from "./gaussianSplat.js";
 
 let fails = 0;
@@ -85,11 +86,82 @@ const ISO = covarianceFromScaleRot([0.1, 0.1, 0.1], { x: 0, y: 0, z: 0, w: 1 });
        "axis ratio " + (A[0] / A[1]).toFixed(1) + " -- a round splat would pass the swap trivially");
 }
 
+// ---- 5b. mat3vec IS AN ORDINARY 3x3 * VECTOR PRODUCT, HAND-COMPUTED --------------------------------------------
+{
+    ok("!! identity times any vector returns the vector unchanged, exactly", (() => {
+        const v = [3.7, -2.1, 5.0];
+        const r = mat3vec(I3, v);
+        return r[0] === v[0] && r[1] === v[1] && r[2] === v[2];
+    })());
+    // A hardcoded 90-degree rotation about z, integer entries so the arithmetic is exact: [1,0,0] -> [0,1,0].
+    const ROT90Z = [0, -1, 0, 1, 0, 0, 0, 0, 1];
+    ok("!! a hand-written 90-degree rotation sends (1,0,0) to exactly (0,1,0)", (() => {
+        const r = mat3vec(ROT90Z, [1, 0, 0]);
+        return r[0] === 0 && r[1] === 1 && r[2] === 0;
+    })());
+    // A general (non-rotation) matrix, picking out rows and sums by hand: m = [[1,2,3],[4,5,6],[7,8,9]].
+    const M = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    ok("!! mat3vec(M, e_x) picks out M's first column as its result", (() => {
+        const r = mat3vec(M, [1, 0, 0]); return r[0] === 1 && r[1] === 4 && r[2] === 7;
+    })());
+    ok("!! mat3vec(M, (1,1,1)) sums each row exactly", (() => {
+        const r = mat3vec(M, [1, 1, 1]); return r[0] === 6 && r[1] === 15 && r[2] === 24;
+    })());
+}
+
+// ---- 5c. toCamera IS world point MINUS eye, THEN ROTATED BY THE VIEW MATRIX -------------------------------------
+{
+    ok("!! with an identity view and eye at (1,2,3), toCamera is just p - eye, exactly", (() => {
+        const r = toCamera([4, 6, 10], { eye: [1, 2, 3], W: I3 });
+        return r[0] === 3 && r[1] === 4 && r[2] === 7;
+    })());
+    // The same hand-written 90-degree-about-z rotation as above, so no trig rounding enters the expected value.
+    const ROT90Z = [0, -1, 0, 1, 0, 0, 0, 0, 1];
+    ok("!! a 90-degree view rotation sends world (1,0,0) at the origin to camera-space (0,1,0) exactly", (() => {
+        const r = toCamera([1, 0, 0], { eye: [0, 0, 0], W: ROT90Z });
+        return r[0] === 0 && r[1] === 1 && r[2] === 0;
+    })());
+    ok("...and toCamera really does subtract the eye BEFORE rotating, not after", (() => {
+        // Move the eye to (1,0,0) too: the point now coincides with the eye, so camera-space position must be zero
+        // regardless of the (still nontrivial) rotation -- a wrong operation order would not zero out here.
+        const r = toCamera([1, 0, 0], { eye: [1, 0, 0], W: ROT90Z });
+        return r[0] === 0 && r[1] === 0 && r[2] === 0;
+    })(), "eye coincides with the point: camera-space position must be the zero vector under ANY rotation");
+}
+
 // ---- 6. KEY: projected area falls as 1/z^2, slope exactly -2 --------------------------------------------------
 {
     const slope = areaDepthSlope([2, 3, 5, 8, 13, 21]);
     ok("!! log(projected area) vs log(depth) has slope EXACTLY -2", Math.abs(slope + 2) < 1e-12,
        "measured " + slope.toPrecision(15) + " -- the perspective law, emergent from the Jacobian");
+}
+
+// ---- 6b. projectedAreaAtDepth MATCHES ITS OWN CLOSED FORM sigma^2 * f^2 / z^2, ON-AXIS --------------------------
+// On the view axis the perspective shear is zero (see the header), so S2D = diag(sigma^2 (f/z)^2, sigma^2 (f/z)^2)
+// falls out of the same Jacobian algebra Key 6 already grades the SLOPE of -- this pins the actual VALUE.
+{
+    const sigma = 0.1, f = 800;
+    const closedForm = (z) => (sigma * sigma * f * f) / (z * z);
+    let worst = 0;
+    for (const z of [4, 7, 10, 25, 100]) worst = Math.max(worst, Math.abs(projectedAreaAtDepth(z, { sigma, f }) / closedForm(z) - 1));
+    ok("!! projectedAreaAtDepth(z) matches sigma^2 f^2 / z^2 exactly, not merely its slope", worst < 1e-9,
+       "worst relative deviation " + worst.toExponential(2) + " across five depths");
+    // Direct 1/depth^2 falloff between two synthetic depths, stated as a ratio rather than through the fit.
+    const a10 = projectedAreaAtDepth(10, { sigma, f }), a20 = projectedAreaAtDepth(20, { sigma, f });
+    ok("!! doubling the depth cuts the projected area by exactly 4x (1/z^2)", Math.abs(a10 / a20 - 4) < 1e-9,
+       "area(10)/area(20) = " + (a10 / a20).toPrecision(10));
+}
+
+// ---- 6c. areaDepthFit RECOVERS BOTH THE SLOPE -2 AND THE INTERCEPT log(sigma^2 f^2) -----------------------------
+{
+    const sigma = 0.2, f = 500;
+    const { slope, intercept } = areaDepthFit([2, 3, 5, 8, 13, 21], { sigma, f });
+    ok("!! areaDepthFit's slope is exactly -2, matching areaDepthSlope", Math.abs(slope + 2) < 1e-12, slope.toPrecision(15));
+    const wantIntercept = Math.log(sigma * sigma * f * f);
+    ok("!! ...and its INTERCEPT recovers log(sigma^2 f^2), the multiplicative constant slope alone throws away",
+       Math.abs(intercept - wantIntercept) < 1e-9,
+       "intercept " + intercept.toPrecision(12) + " vs log(sigma^2 f^2) " + wantIntercept.toPrecision(12) +
+       " -- exp(intercept)=" + Math.exp(intercept).toPrecision(8) + " vs sigma^2 f^2=" + (sigma * sigma * f * f).toPrecision(8));
 }
 
 // ---- 7. KEY: opacity accumulation is 1-(1-a)^N ----------------------------------------------------------------
