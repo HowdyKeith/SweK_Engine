@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4069 -- four knobs the census called dead, and not one of them was
+
+Keith's patch closes the four dead-knob candidates the earlier sweeps left unresolved -- probed surgically,
+because the generic ladder had never finished on either device. **None of the four is dead, and each is a
+different thing.**
+
+- **`kuramoto.pendN` and `.cycle` are live** -- and were live the whole time the census called them dead. Both
+  are read in `pendulum`, the one mode the census never entered: `curve` sweeps 4096 oscillators at 7.3s a
+  build, and eight base builds blew the 20s budget before the mode list ran out. `pendN` 15 -> 40 moves four
+  observables in about a millisecond.
+- **`mpmstep.nu` is still because the key holds**, and is registered in `STILL_OK`. The device's claim is that a
+  falling block's centre of mass follows the parabola *whatever the material does internally* -- and `nu` is the
+  material. Bit-identical at 0, 0.15, 0.3, 0.45, 0.49, 1e-6, and at -0.3 and 3e5, which are not admissible
+  Poisson ratios at all and the observables do not notice.
+- **`mpmstep.nx` is insensitive with a derived threshold**, not a tuned one. `restBlock` spans x in [2,3], the
+  quadratic kernel reaches one node past, h = 0.5 -- so nx >= 7, measured exact at 7 and broken at 6. `ny` needs
+  15 by the same arithmetic, and the census called ny live and nx dead only because its 0.5x rung is 8, which
+  clears 7 and not 15.
+
+**Three things were wrong in the census itself, and the first is the one a dead-knob census cannot have.** An
+over-budget row could land under the heading *MOVES NOTHING ANYWHERE* on a single mode's evidence --
+manufacturing the very work it exists to find. `stillKnobs` excludes incomplete rows now, `incompleteKnobs` is a
+third list, and the note names the modes never opened. Second: *"probed N of M knobs"* read M off the knobs the
+loop had **reached**, so kuramoto scored 1 of 1 -- a perfect score -- with four declared knobs never looked at;
+M is the declared count now. Third: an observable that is the knob handed straight back read as a response,
+nearly introduced this round by echoing `nx` and `ny` -- `probeKnob` drops a pass-through, which also removes
+the free liveness `steps` and `dt` had been drawing (6 observables -> 5).
+
+**And two defects fell out of walking the ladder down, including a vacuous pass on the strongest kind of key.**
+`nx` and `ny` sized three Float64Arrays with no clamp, so the wide ladder's 1e6x rung asked for **6 GB** and the
+census never returned -- which is exactly why nx had no wide-ladder answer. Clamped to [2,128]; mpmstep's full
+census plus wide ladder now runs in 491 ms and 90 MB.
+
+The sideways negative was passing **vacuously**: at nx = 2 the block sits entirely outside the grid, `p2g`'s
+bounds guard drops every scatter, no node carries mass, nothing moves -- and `driftX === 0`. Exact zero, the
+strongest form of the claim, satisfied by a simulation that did nothing. `blockFell` is the witness that
+separates that from a real pass, reported **separately** rather than folded in (two facts averaged into one
+observable is a number that means neither), and the gate asks for both. The honest failure between them still
+fires: nx = 3 clips the block asymmetrically and driftX goes to 3.113e-8 -- a real asymmetry, caught.
+
+All four gates the patch names verified here: `mpmStepBind` 17 pass, `knobLiveness` all pass in 119s,
+`mpmPage` 12 pass, `kuramoto` 5 pass. No gate file added or removed, so this build still carries 1207 gates.
+verify.mjs ALL GREEN.
+
 ## Since v4068 -- the release workflow stops racing a publisher that already finished
 
 Keith sent a CI failure: *"Run failed: release - v4067."*
