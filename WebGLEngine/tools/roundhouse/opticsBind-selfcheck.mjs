@@ -66,6 +66,35 @@ console.log("\n2. THE FRAUNHOFER LIMIT IS APPROACHED QUADRATICALLY IN THE FRESNE
         "exactly, which would mean the Fresnel path was not being computed at all");
 }
 
+// ---- 2b. v4032 -- WHAT THIS MODE COSTS, AND WHY IT IS THE RECIPROCAL OF WHAT IT MEASURES -------------------
+console.log("\n2b. *** THE COST OF THE CONVERGE MODE IS EXACTLY 1/F, THE NUMBER IT REPORTS ***");
+{
+    // fresnelCS sets its Simpson step count from the argument, n = 400*v^2, and its own comment argues for
+    // that correctly: the integrand oscillates as t^2, so a fixed step loses accuracy where the physics is
+    // interesting. The sweep then fixes v -- and the arithmetic closes exactly.
+    //     x = 3*lambda*z/a,  v = x*sqrt(2/(lambda z)) = 3*sqrt(2*lambda*z)/a,  v^2 = 18*lambda*z/a^2 = 18/F
+    //     n = 400*v^2 = 7200/F
+    const rows = [];
+    for (const z of [500, 2000, 20000]) rows.push(await build({ mode: "converge", config: { z } }));
+    ok("!! *** THE REPORTED COST IS 7200/F PER CALL, DERIVED AND NOT FITTED ***",
+        rows.every((r) => r.quadratureEvals === 2 * 161 * Math.max(64, Math.ceil(7200 / r.fresnelNumber))),
+        rows.map((r) => "F=" + r.fresnelNumber.toExponential(1) + " -> " + r.quadratureEvals.toExponential(3)).join("  ") +
+        ". *** THIS MODE EXISTS TO PUSH THE NEAR FIELD TOWARD THE FAR FIELD, WHICH MEANS F -> 0, AND ITS COST " +
+        "IS 1/F. IT GETS MORE EXPENSIVE PRECISELY AS IT APPROACHES THE LIMIT IT IS TESTING. ***");
+    ok("!! the cost RISES as the residual FALLS, which is the same sweep read twice",
+        rows[0].quadratureEvals < rows[2].quadratureEvals && rows[0].nearFarRms > rows[2].nearFarRms,
+        "z 500 -> 20000: cost " + rows[0].quadratureEvals.toExponential(2) + " -> " +
+        rows[2].quadratureEvals.toExponential(2) + ", residual " + rows[0].nearFarRms.toExponential(3) + " -> " +
+        rows[2].nearFarRms.toExponential(3) + ". Section 2 grades the residual; this grades what it costs to " +
+        "get it, and they are the same numbers.");
+    ok("!! *** AND THE COST IS REPORTED, NEVER REFUSED ***",
+        rows.every((r) => !r.error && typeof r.nearFarRms === "number"),
+        "a 1e9-evaluation ceiling went in here first and REFUSED SECTION 2'S OWN SWEEP -- z = 20000 is F = 1e-3 " +
+        "and 2.32e9 evaluations. The mode is expensive in exactly the direction its key must travel, so any " +
+        "ceiling low enough to protect a caller is low enough to cut off the physics. A COST POLICY DOES NOT " +
+        "BELONG INSIDE A PHYSICS DEVICE: the bound is knobLiveness's, and what belongs here is the number.");
+}
+
 // ---- 3. THE FRAUNHOFER KEYS, AND WHERE THE CONSTANT COMES FROM --------------------------------------------
 console.log("\n3. THE KEYS THAT WERE ALREADY THERE, AND ONE THAT IS TYPED");
 {
