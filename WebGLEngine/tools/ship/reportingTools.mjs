@@ -251,6 +251,22 @@ export const ARTEFACT_TOOLS = [
       blurb: "Walks the tree with pageReach's own walker and writes the index page-index.html renders. IT WAS GENERATED ONCE AND NEVER REGENERATED: pageReach counted 315 every round while page-index claimed 256 -- two counts of one thing, and nobody had compared them. The page has told its reader to run a terminal command ever since, which is the CLI-only deliverable this project refuses, and this row is the button. Regenerates unconditionally because the output is a pure function of the tree: running it twice is bit-identical, so an accidental press cannot leave anything stale." },
     { rel: "tools/ship/buildKnowledgeIndex.mjs", args: [], alwaysWrites: true, artefact: "/knowledge-index.json", label: "Knowledge index",
       blurb: "Bakes the gate and claim index instruments.html reads. Its absence was named the same way -- by telling the reader to type the command -- and its writer was invisible to the artefact ratchet because it binds `const OUT = path.join(...)` rather than exporting a string literal. THE DETECTOR KEYED ON A DECLARATION SHAPE WHERE THE PROPERTY IS BEHAVIOURAL. Regenerates unconditionally, idempotently, for the same reason as the page index; the ship ritual still runs it by hand and this row does not replace that." },
+    // v4072 -- A THIRD PROSE DOOR, FOUND BY THE SAME BEHAVIOURAL CENSUS AND OPEN SINCE v4040. buildEngineCatalog
+    // writes /engine-catalog.json into the served root, has a main block, and showcase.html READS IT -- which is
+    // the whole join the law is about -- and it had no row. It was invisible to the ratchet for the same reason
+    // the other two were: it binds `const catPath = path.join(ENG, ...)` inside main() rather than exporting a
+    // string literal, so the DECLARATION-SHAPE detector sees nothing while the BEHAVIOURAL one sees the write.
+    //
+    // *** IT CARRIES alwaysWrites, AND IT EARNS THE ADMISSION MORE CLEANLY THAN THE OTHER TWO RATHER THAN BY
+    // ANALOGY WITH THEM. *** The dry-run rule guards against a stale artefact left behind by an accidental run.
+    // This tool cannot leave one: it READS the existing catalog, replaces ONLY `builtinDemos` (a pure function
+    // of main.js's DEMO_MODES), and preserves `apps` and `generatedFrom` untouched -- its own header refuses to
+    // rewrite the fields it was not asked about. So an accidental press can only make the file FRESHER. Measured
+    // rather than argued, per the standing rule: run twice, bit-identical (bc875f1bf728de99 both times), and the
+    // gate re-measures it every run instead of trusting this sentence. It also parses main.js right now, so a
+    // press after a DEMO_MODES edit is exactly the button the page was missing.
+    { rel: "tools/ship/buildEngineCatalog.mjs", args: [], alwaysWrites: true, artefact: "/engine-catalog.json", label: "Engine catalog",
+      blurb: "Regenerates engine-catalog.json's `builtinDemos` from main.js's live DEMO_MODES array, which NOTHING did before v4040 -- the file claimed 58 while the source held 42, and was dated three days before the main.js it says it was generated from. It parses SOURCE TEXT rather than evaluating the array, because DEMO_MODES entries carry real closures and a build step has no business running application code to count a list. Touches neither `apps` nor `generatedFrom`. Read by showcase.html, which is why the missing row was a defect and not merely a gap: the page reads the output and had no button to refresh it." },
     { rel: "tools/roundhouse/gateActivity.mjs", args: ["--write"], artefact: "/gate-activity.json", label: "Gate activity",
       blurb: "WHAT THE GATE RUNNER KNOWS ABOUT EACH DEVICE, AND HOW OLD THAT IS. *** gate-timings.json HAS NO CLOCK IN IT -- `captured` is a SENTENCE naming a run -- so the age is a VERSION DISTANCE, which is exact, carries no timezone, and cannot silently become 'moments ago' when somebody re-saves the file. *** Four states that PARTITION the devices: timed / partly / never-timed / no-gate. NEVER-TIMED IS NOT FAST -- it carries a null runtime and never a zero, because an unmeasured gate drawn as a quick one claims a measurement nobody made. AND A RUNTIME IS NOT A VERDICT: this says how long a check took, never whether it passed. Three routes reach a device (a gate IMPORTS its bind, NAMES it in getDevice, or SWEEPS every device) and the import walk alone reads 37 of 67 -- a subset that looks like a corpus. Read by cosmic-map.html's gate-runner layer." },
 ];

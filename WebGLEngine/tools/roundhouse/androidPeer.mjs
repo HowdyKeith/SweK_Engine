@@ -87,6 +87,14 @@ export const DEP_CLASSIFICATION = {
     "selfsigned":         { kind: "pure-js", note: "cert generation on node-forge" },
     "ws":                 { kind: "pure-js", note: "bufferutil/utf-8-validate accelerators are OPTIONAL peers it runs without" },
     // optionalDependencies -- allowed to be unportable, that is what optional means
+    // v4072 -- added to optionalDependencies at v4067 (the physics-AI MCP shim) and NOT to this table, which is
+    // exactly the rot the table exists to catch: the gate went red on the next run and named the dep. It is
+    // OPTIONAL FOR A DIFFERENT REASON THAN THE TWO BELOW -- those are unportable, this one is simply rig-only --
+    // and `kind` describes what a dep is MADE OF rather than why it is optional, so the reason lives in the note
+    // instead of widening the vocabulary. VERIFIED against the installed tree, not assumed: no .node addon and no
+    // "gypfile": true anywhere under ai-bridge/node_modules, so `npm install --omit=optional` still has no gyp
+    // step and installing it anyway would not add one.
+    "@modelcontextprotocol/sdk": { kind: "pure-js", note: "TypeScript compiled to JS; would run on bionic fine. Optional because tools/mcp/physicsAi.mjs is a rig-only shim -- no selfcheck path awaits it, so an absent SDK stays green" },
     "ffmpeg-static":      { kind: "binary",  note: "prebuilt ffmpeg; no android binary; skipped by --omit=optional" },
     "puppeteer-core":     { kind: "pure-js", note: "pure JS, but drives a desktop Chrome that is not there; optional" },
 };

@@ -8,6 +8,121 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4072 -- the sweep found no dead knobs; it found three scans that could not see
+
+Keith's patch, and another dead-knob sweep across **118 of 129 devices**. **It found zero still knobs that were
+not already registered with a reason.** What it turned up instead was that three separate scans in the lab were
+reporting coverage they did not have, and one physics device had a cost nobody had written down.
+
+### Three tools guessed which file implements a device, and all three were wrong the same way
+
+`strictConfig.mirrorAudit`, `composeBind`'s independence filter, and `knobLiveness` through both of them all
+built a device's path as `` `${name}Bind.mjs` `` and `continue`d on a miss. **The registry key is lowercase and
+the filename is camelCase** -- `mpmstep` lives in `mpmStepBind.mjs`, `blackhole` in `blackHoleBind.mjs`,
+`twobody` in `twoBodyBind.mjs`. Measured here independently of the patch: **37 of 129 names have no file at the
+guessed path**, the whole MPM family among them.
+
+New `tools/roundhouse/bindFiles.mjs` reads the map out of `devices.mjs`'s **own import statements** and resolves
+**128 of 129** -- verified here by running it: unresolved is exactly `["lbm"]`. **The one it cannot is `lbm`,
+which is exactly the device v3722 named when it built the refusal** -- its build is a local function inside
+`devices.mjs` with no file to read -- so that refusal stands unchanged, now for the stated reason instead of as
+one of thirty-seven. Renaming files to match keys would have hidden that one true case among 36 spurious ones.
+
+**`mirrorAudit` had scanned 81 of the 116 devices that declare a config and said nothing about it.** The gate
+asked `scanned > 40`, which 81 clears comfortably, so *"zero offenders"* meant *"zero among the ones I could
+find"* and nothing distinguished the two. It is 116 of 116 now, unresolved none, and **the gate asserts the
+denominator**.
+
+Two more defects fell out of the same file. **An assignment was being counted as a read**: `twobody` writes
+`c.keyMass` as a derived field on the merged config, and the fix for reading that as an undeclared key would
+have been to declare a knob nothing reads -- *a dead knob, created to silence a scan*. And the write rule then
+manufactured **59 false offenders of its own**: without an anchor on the capture the lookahead **backtracks**,
+so on `cfg.lambda = 5` the engine matches `lambda`, sees ` =`, gives back one character, and `lambd` passes
+because it is followed by `a`. Every key silently lost its last letter. The check that caught it shipped in the
+same commit.
+
+The round opened on a red gate that was mine: `manifoldCensusBind` (v4026) bound a census **result** to `c` in a
+file where `c` means the merged config everywhere else, so `c.boundaryEdges` read as an undeclared config key.
+strictConfig's own v3930 note records the identical defect in xpbd and calls it a naming defect -- reintroduced
+three rounds after the lesson was written down. The local is `cen`.
+
+### optics never had a dead knob either -- it had a cost
+
+The sweep stalled on optics and would not come off it. It was not hanging. Its `converge` mode grades the
+near-field propagator against the far-field one, and the arithmetic closes exactly:
+
+```
+x = 3*lambda*z/a    v = 3*sqrt(2*lambda*z)/a    v^2 = 18/F    n = 400*v^2 = 7200/F
+```
+
+**The mode's cost is the reciprocal of the number it reports.** It exists to push the near field toward the far
+field, which means `F -> 0`, so it gets more expensive precisely as it approaches the limit it is testing.
+Verified here as an identity rather than a fit: `quadratureEvals === 2*161*max(64, ceil(7200/F))` holds at
+z = 500, 2000 and 20000. The shipped default is already 2.32e8 evaluations and 3.5 s.
+
+A 1e9 ceiling went in first and **refused the device's own key** -- section 2 of its gate sweeps z to 20000,
+which is F = 1e-3 and 2.32e9 evaluations. The mode is expensive in exactly the direction its key must travel, so
+any ceiling low enough to protect a caller is low enough to cut off the physics. **A cost policy does not belong
+inside a physics device.** Reverted: the device reports `quadratureEvals`, so the cost of a configuration is
+visible before it is paid instead of inferred from a stopwatch after, and the bound moved to the survey --
+`probeKnob` checks a deadline **before every build** rather than only between knobs, turning 3N unbounded builds
+per knob into at most one. optics went from producing no completed row all session to a complete one: every knob
+live, none still.
+
+### compose's knobs are names, and a name can still have alternatives
+
+All six of compose's knobs are strings, so the census reported *"not probed (string)"* six times -- for **the
+one device in the lab that consumes other devices**. That was the census being honest, not wrong: inventing a
+device name would test composeBind's error handling instead of the knob, and it still refuses to. But refusing
+to **guess** is not being unable to **ask**. These knobs are enumerable, and a device may now export
+`knobChoices` -- declared, never derived, because deriving `devA` from `DEVICE_NAMES` would make the probe's
+meaning depend on registry order (v3191's lesson). A device that declares nothing keeps the scaled ladder.
+
+All six read live. **Half of them read live off a refusal, which is the point:** `devA=kepler` with
+`keyA=cComputed` asks for an observable kepler does not have, and compose answers `verdict:"missing"`, moving
+nine observables. A refusal is a response -- this census's own third category -- and *a device that answered a
+broken triple with a number would be the finding*. The gate checks declared choices against the lab, because a
+choice list is a claim about **other devices** and rots silently; it rejected a stale entry on its first run
+(`pointsPerWavelength` is fdtd's `dispersion` mode, not `lightspeed`).
+
+### And two gates Keith ran mid-round went red, one of them on my own debt
+
+**`androidPeer`.** `@modelcontextprotocol/sdk` went into `ai-bridge/package.json` at v4067 and never into
+`DEP_CLASSIFICATION` -- which is exactly the rot that table exists to catch. Adding a dependency to the bridge
+is supposed to require stating what it is made of, and the gate named the dep on its next run. Classified
+`pure-js` and **verified against the installed tree rather than assumed**: no `.node` addon and no
+`"gypfile": true` anywhere under `ai-bridge/node_modules`, so `npm install --omit=optional` still has no gyp
+step. It is optional for a *different reason* than `ffmpeg-static` and `puppeteer-core` -- those are unportable,
+this one is simply rig-only -- and since `kind` describes what a dep is **made of** rather than why it is
+optional, the reason lives in the note instead of widening the vocabulary. 13 required, 3 optional, 0
+unclassified.
+
+**`artefactWriters`: a third prose door, open since v4040.** `buildEngineCatalog.mjs` writes
+`/engine-catalog.json` into the served root, has a main block, and `showcase.html` **reads it** -- the join that
+makes a missing row a defect -- and it had no row. It was invisible to the declaration-shape detector for the
+same reason the other two were: it binds `const catPath = path.join(ENG, ...)` inside `main()` instead of
+exporting a string literal, so only the behavioural census sees the write.
+
+It carries `alwaysWrites`, and **it earns that admission more cleanly than the other two rather than by analogy
+with them.** The dry-run rule guards against a stale artefact left behind by an accidental run; this tool cannot
+leave one, because it *reads* the existing catalog and replaces **only** `builtinDemos`, preserving `apps` and
+`generatedFrom` untouched. An accidental press can only make the file **fresher**. Measured rather than argued,
+per the standing rule: two runs bit-identical at `bc875f1bf728de99`, and the gate re-measures it every run
+instead of trusting that sentence.
+
+The gate's own check was `always.length === 2` -- **a ratchet on a count, and therefore blind to a swap**: drop
+one regenerator and add another and the number is still 2. It compares the **names** now, which is strictly
+stronger and still a ratchet. Two sabotages bite two checks each (`alwaysWrites` falsified; the row deleted),
+both restored byte-identical, with a verified-green baseline **before and after** -- the v4070 lesson about
+"0 fails" from a gate that never ran.
+
+### Gates
+
+`knobLiveness` all pass | `strictConfig` all pass (116 of 116 scanned) | `opticsBind` all pass |
+`compose` all pass | `manifoldCensusBind` all pass | `mpmStepBind` all pass | `boundKeys` all pass |
+`crossDevice` all pass | `androidPeer` all pass | `artefactWriters` all pass. `verify.mjs` is green across
+1207 gates.
+
 ## Since v4071 -- every published zip has had backslash separators, and v4070 caught it on its first run
 
 Keith, on the v4070 CI failure: *"did i not follow instructions?"* **He did. He did nothing wrong** -- the run
