@@ -110,12 +110,21 @@ export const twoFDevice = {
     // so a ten-second budget produced a 2m08s run entirely because this device sits at position 82. v4037 gave
     // the census a way to ask first; this is the answer.
     //
-    // A HINT IS A SCHEDULING ESTIMATE, NOT A MEASUREMENT. The rate is machine-local -- 24,000 lattice steps in
-    // ~115 s here, so ~4.8 ms/step -- and it is used for one thing only: deciding whether to attempt a build.
-    // A wrong hint costs a skipped build or a long one and CAN NEVER CHANGE A REPORTED NUMBER. The linear
-    // model is honest about being one: the true cost has a superlinear component in `record` (the recorded
-    // series is spectrally analysed), so this UNDER-estimates large runs, which is the direction that costs
-    // time rather than the direction that silently drops work.
+    // A HINT IS A SCHEDULING ESTIMATE, NOT A MEASUREMENT, and it is used for one thing only: deciding whether
+    // to attempt a build. A wrong hint costs a skipped build or a long one and CAN NEVER CHANGE A REPORTED
+    // NUMBER.
+    //
+    // *** THE RATE IS MACHINE-LOCAL *AND* LOAD-LOCAL, AND THE SECOND HALF IS NOT A QUIBBLE. *** The proof run
+    // that established `steps` was inert timed the IDENTICAL 24,000-step build three times and got 117.0 s,
+    // 205.0 s and 207.7 s -- a 1.8x spread from nothing but CPU contention. The 4.8 ms/step anchor here is
+    // calibrated at the fast end (~115 s), so on a busy machine this UNDER-estimates by nearly a factor of
+    // two. That is deliberate and it is the safe direction: an under-estimate lets a build start that does
+    // not fit, which is exactly the pre-v4037 behaviour and costs time, while an over-estimate would decline
+    // work that would have fitted. A scheduler that skips real work to protect a schedule has the priorities
+    // backwards.
+    //
+    // The linear model is also honest about being one: the true cost has a superlinear component in `record`
+    // (the recorded series is spectrally analysed), which pushes the same way.
     //
     // `envelope` returns numbers recorded at v2862 and runs no lattice at all, so its honest hint is nil.
     costHint: ({ mode = "inlet", config = {} } = {}) => {

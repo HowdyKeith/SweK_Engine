@@ -100,9 +100,12 @@ console.log("\nv4038. THE DEAD KNOB THAT MADE THIS THE MOST EXPENSIVE DEVICE IN 
     ok("!! and the real knobs move the cost, which is what makes the device schedulable at all",
         twoFDevice.costHint({ mode: "inlet" }) > 100000 &&
         twoFDevice.costHint({ mode: "inlet", config: { settle: 300, record: 900 } }) < 10000,
-        "costHint 115,200 ms at the default against 5,760 ms at settle 300 / record 900 -- MEASURED ~115 s and " +
-        "~6.0 s, so the estimate is good to a few percent at both ends. The hint is a SCHEDULING AID: a wrong " +
-        "one costs a skipped build or a long one and can never change a reported number.");
+        "costHint 115,200 ms at the default against 5,760 ms at settle 300 / record 900 -- good to a few " +
+        "percent against ~115 s and ~6.0 s ON AN IDLE MACHINE, and the qualifier is measured: the same " +
+        "24,000-step build timed 117.0 s, 205.0 s and 207.7 s under contention, a 1.8x spread. The anchor is " +
+        "the fast end deliberately, so a busy machine UNDER-estimates -- which lets a build start that does " +
+        "not fit (the pre-v4037 behaviour, costing time) rather than declining work that would have fitted. " +
+        "The hint is a SCHEDULING AID: a wrong one can never change a reported number.");
     ok("...and `envelope` declares nil, because it runs no lattice at all",
         twoFDevice.costHint({ mode: "envelope" }) === 0,
         "it returns numbers recorded at v2862. A cost hint that charged for a replay would push a free mode " +
