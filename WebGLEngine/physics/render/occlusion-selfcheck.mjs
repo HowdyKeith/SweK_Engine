@@ -11,7 +11,7 @@
 //      it is the most-made mistake in ray tracing.
 "use strict";
 import { rng, cosineSampleHemisphere, createCoordinateSystem, toWorld } from "./furnace.mjs";
-import { furnaceOccluded, capPrediction, raySphere } from "./occlusion.mjs";
+import { furnaceOccluded, capPrediction, raySphere, occluded } from "./occlusion.mjs";
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
@@ -89,6 +89,35 @@ const run = (spheres, opts = {}) => furnaceOccluded(RHO, S, { seed: 5, spheres, 
     ok("...and an EMPTY scene still reads the plain albedo, so occlusion did not cost the original key",
        Math.abs(run([]) / RHO - 1) < 1e-9,
        `${run([]).toFixed(6)}. v3467's furnace still holds with the occlusion machinery in the path -- if it did not, the new code would have broken the old answer and the new keys would be measuring a different renderer than the one that passed before.`);
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 4. `occluded` ITSELF: THE .some() OVER A LIST, AND THE OPTS PASSTHROUGH, CHECKED DIRECTLY -- NOT ONLY THROUGH
+ *    furnaceOccluded's MONTE CARLO ESTIMATE, WHICH COULD HIDE A WRONG COMBINATOR BEHIND SAMPLING NOISE.
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const O = [0, 0, 0], DIR = [0, 1, 0];
+    const front = { centre: [0, 3, 0], radius: 1 };     // dead ahead, blocks
+    const miss = { centre: [5, 3, 0], radius: 1 };       // off to the side, never on this ray
+    const behind = { centre: [0, -3, 0], radius: 1 };    // on the line, but behind the origin
+
+    ok("!! occluded is false against an empty occluder list", occluded(O, DIR, []) === false,
+       "no spheres, nothing to intersect -- the base case any .some()-based combinator must get right.");
+
+    ok("!! occluded is true when exactly one sphere in a MULTI-sphere list actually blocks",
+       occluded(O, DIR, [miss, front]) === true,
+       "raySphere returns null for `miss` and a hit for `front`; .some() must return true on the SECOND element even though the first is null -- an .every() or an unconditional `[0]` read would get this wrong.");
+
+    ok("!! occluded is false when NO sphere in a multi-sphere list blocks", occluded(O, DIR, [miss, behind]) === false,
+       "neither the off-axis sphere nor the one behind the origin lies on the forward ray; every element must be tried and none should count as a block.");
+
+    ok("!! *** occluded forwards opts to EVERY raySphere call, not just some of them ***",
+       occluded(O, DIR, [behind]) === false && occluded(O, DIR, [behind], { noTMin: true }) === true,
+       "with no opts the behind-sphere is correctly ignored (t > 0 test); passed { noTMin: true } it must flip to occluded, because occluded's own job is nothing more than passing that option through to raySphere for every candidate -- dropping the opts argument anywhere in the chain would leave this always false.");
+
+    ok("...and occluded still finds the block when the blocking sphere is not the first element checked",
+       occluded(O, DIR, [behind, miss, front]) === true,
+       "three candidates, only the third blocks -- confirms the scan does not stop or decide early on the first two nulls.");
 }
 
 console.log(fails ? "\nocclusion-selfcheck: " + fails + " FAILED" : "\nocclusion-selfcheck: all checks pass");

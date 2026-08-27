@@ -14,7 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ndfIntegral, furnaceIntegral, directionalAlbedo, D, G1, G2, Lambda } from "./microfacet.mjs";
+import { ndfIntegral, furnaceIntegral, directionalAlbedo, D, G1, G2, Lambda, sampleHalfVector, sampleDirPdf, bounceWeight, bsdfEval, misWeight } from "./microfacet.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 let fails = 0;
@@ -134,6 +134,114 @@ const ANGLES = [0.9, 0.5, 0.2];
     ok("!! path-tracer.html imports the model and calls the furnace integrals",
        /from\s*"\/physics\/render\/microfacet\.mjs"/.test(src) && /directionalAlbedo\(/.test(src),
        "A .mjs with no page is the CLI-only deliverable this project refuses. The assertion is on the IMPORT and the CALL rather than on the name appearing, because a check counting its own prose is this tree's most-committed defect.");
+}
+
+/* ------------------------------------------------------------------------------------------------------------
+ * 7. SAMPLING: THE HALF-VECTOR SAMPLER, ITS PDF, AND THE ALGEBRA THAT COLLAPSES eval*cosI/pdf INTO bounceWeight
+ * --------------------------------------------------------------------------------------------------------- */
+{
+    const { rng } = await import("./furnace.mjs");
+
+    // sampleHalfVector: the samples it draws must actually be distributed proportional to D(cosH)*cosH -- not
+    // merely "look plausible". Checked by the importance-sampling identity E[1/pdf(X)] = measure(domain): if
+    // p(wh) = D(cosH,alpha)*cosH is really the density sampleHalfVector draws from, averaging the RECIPROCAL of
+    // that density over its own samples must converge to the solid angle of the hemisphere, 2*pi -- exactly, no
+    // free parameter, and independent of the fact that ndfIntegral already proved D*cosH integrates to 1
+    // (that proved the FORMULA normalises; this proves the SAMPLER actually follows it).
+    for (const alpha of [0.3, 0.6]) {
+        const rand = rng(alpha === 0.3 ? 71 : 73);
+        let acc = 0, n = 250000;
+        for (let i = 0; i < n; i++) {
+            const s = sampleHalfVector(rand(), rand(), alpha);
+            const cosH = s[1];
+            acc += 1 / (D(cosH, alpha) * cosH);
+        }
+        const estimate = acc / n;
+        ok(`!! *** sampleHalfVector's OWN SAMPLES, IMPORTANCE-WEIGHTED BY D*cosH, RECOVER THE HEMISPHERE'S 2*pi (alpha ${alpha}) ***`,
+           Math.abs(estimate / (2 * Math.PI) - 1) < 0.02,
+           `${estimate.toFixed(4)} against 2*pi = ${(2 * Math.PI).toFixed(4)}. A sampler that drew from the wrong density (wrong CDF inversion, swapped u1/u2, wrong axis) would bias this estimate away from 2*pi even though every individual sample still looks like a plausible unit vector on the hemisphere.`);
+    }
+
+    // Every half-vector must be a unit vector on the upper hemisphere -- the domain sampleDirPdf's Jacobian and
+    // bsdfEval's cosH both assume.
+    {
+        const rand = rng(77);
+        let maxLenErr = 0, minCosH = Infinity;
+        for (let i = 0; i < 20000; i++) {
+            const s = sampleHalfVector(rand(), rand(), 0.4);
+            maxLenErr = Math.max(maxLenErr, Math.abs(s[0] * s[0] + s[1] * s[1] + s[2] * s[2] - 1));
+            minCosH = Math.min(minCosH, s[1]);
+        }
+        ok("!! sampleHalfVector returns unit vectors with cosH >= 0", maxLenErr < 1e-9 && minCosH >= 0,
+           `worst |len^2-1|: ${maxLenErr.toExponential(2)}, min cosH: ${minCosH.toFixed(6)} over 20000 draws.`);
+    }
+
+    // sampleDirPdf: the Jacobian term is exactly 1/(4|dotOH|), so at FIXED cosH and alpha the pdf must scale as
+    // exactly 1/dotOH -- an exact algebraic ratio with no quadrature or Monte Carlo involved.
+    {
+        const cosH = 0.83, alpha = 0.35;
+        const p1 = sampleDirPdf(cosH, 0.2, alpha), p2 = sampleDirPdf(cosH, 0.6, alpha);
+        ok("!! sampleDirPdf scales as exactly 1/|dotOH| at fixed cosH and alpha (the reflection Jacobian, isolated)",
+           Math.abs((p1 * 0.2) / (p2 * 0.6) - 1) < 1e-12,
+           `pdf(dotOH=0.2)*0.2 = ${(p1 * 0.2).toFixed(9)} against pdf(dotOH=0.6)*0.6 = ${(p2 * 0.6).toFixed(9)}. Anything other than a bare 1/dotOH dependence -- a missing abs, a stray factor of cosO -- would break this ratio.`);
+    }
+
+    // bsdfEval: Helmholtz reciprocity. f(wo,wi) must equal f(wi,wo) -- swapping cosO and cosI leaves D(cosH)
+    // untouched (it does not see the swap at all) and G2's height-correlated form is manifestly symmetric in its
+    // two cosines, so the whole expression must be invariant. This is an EXACT identity, not a measured one.
+    {
+        const rand = rng(83);
+        let maxAsym = 0, allNonNeg = true;
+        for (let i = 0; i < 500; i++) {
+            const cosO = 0.05 + 0.9 * rand(), cosI = 0.05 + 0.9 * rand(), cosH = 0.05 + 0.9 * rand(), alpha = 0.05 + 0.9 * rand();
+            const fwd = bsdfEval(cosO, cosI, cosH, alpha), rev = bsdfEval(cosI, cosO, cosH, alpha);
+            maxAsym = Math.max(maxAsym, Math.abs(fwd - rev) / Math.max(fwd, rev, 1e-300));
+            if (fwd < 0) allNonNeg = false;
+        }
+        ok("!! *** bsdfEval OBEYS HELMHOLTZ RECIPROCITY: f(cosO,cosI) === f(cosI,cosO), EXACTLY, OVER 500 RANDOM CONFIGURATIONS ***",
+           maxAsym < 1e-12 && allNonNeg,
+           `worst relative |f(o,i)-f(i,o)|: ${maxAsym.toExponential(2)}. A physically-based BRDF must be symmetric under exchanging the incoming and outgoing directions -- a bug that mixed up which cosine gets which role (e.g. only cosO appearing in G2, or the wrong one in the denominator) would break this while D and G2's own checks elsewhere stay green.`);
+    }
+
+    // bounceWeight: the throughput weight is DERIVED algebraically from f*cosI/pdf (the comment above it in
+    // microfacet.mjs shows the cancellation), so the two must agree numerically -- checked with bsdfEval and
+    // sampleDirPdf computed independently, not by re-reading the comment.
+    {
+        const rand = rng(89);
+        let maxRel = 0;
+        for (let i = 0; i < 500; i++) {
+            const cosO = 0.05 + 0.9 * rand(), cosI = 0.05 + 0.9 * rand(), cosH = 0.05 + 0.9 * rand(),
+                  dotOH = 0.05 + 0.9 * rand(), alpha = 0.05 + 0.9 * rand(), F = 0.3 + 0.6 * rand();
+            const w = bounceWeight(cosO, cosI, cosH, dotOH, alpha, { F });
+            const viaEval = bsdfEval(cosO, cosI, cosH, alpha, { F }) * cosI / sampleDirPdf(cosH, dotOH, alpha);
+            maxRel = Math.max(maxRel, Math.abs(w - viaEval) / Math.max(Math.abs(w), Math.abs(viaEval), 1e-300));
+        }
+        ok("!! *** bounceWeight === bsdfEval(...) * cosI / sampleDirPdf(...), THE ALGEBRAIC REDUCTION VERIFIED NUMERICALLY OVER 500 RANDOM CONFIGURATIONS ***",
+           maxRel < 1e-9,
+           `worst relative disagreement: ${maxRel.toExponential(2)}. bounceWeight is a hand-simplified closed form of f*cos_i/pdf with D cancelled out; this ties it back to bsdfEval and sampleDirPdf, computed independently, so an arithmetic slip in the simplification (wrong power of cosH, dropped |wo.wh|) cannot pass unnoticed just because it still looks like a plausible weight.`);
+
+        ok("...and bounceWeight is exactly 0 below the horizon on either side, which the reduced form does not enforce on its own",
+           bounceWeight(-0.1, 0.5, 0.8, 0.5, 0.4) === 0 && bounceWeight(0.5, -0.1, 0.8, 0.5, 0.4) === 0,
+           "the closed form F*G2*|wo.wh|/(cosO*cosH) has no cosI in it at all, so the cosI<=0 guard is the ONLY thing stopping a light-leak weight from a direction below the surface -- an easy line to lose while simplifying the algebra.");
+    }
+
+    // misWeight: the balance heuristic. p_i/(p1+p2) summed over the two strategies is 1 BY CONSTRUCTION -- an
+    // exact identity, and the reason combining two sampling strategies does not double- or under-count energy.
+    {
+        const rand = rng(97);
+        let maxDev = 0, allBounded = true;
+        for (let i = 0; i < 2000; i++) {
+            const p1 = rand() * 10, p2 = rand() * 10;
+            const w1 = misWeight(p1, p2), w2 = misWeight(p2, p1);
+            maxDev = Math.max(maxDev, Math.abs(w1 + w2 - 1));
+            if (w1 < 0 || w1 > 1 || w2 < 0 || w2 > 1) allBounded = false;
+        }
+        ok("!! *** THE BALANCE-HEURISTIC WEIGHTS SUM TO EXACTLY 1 FOR EVERY PAIR OF POSITIVE PDFS, OVER 2000 RANDOM PAIRS ***",
+           maxDev < 1e-12 && allBounded,
+           `worst |misWeight(p1,p2)+misWeight(p2,p1)-1|: ${maxDev.toExponential(2)}. This is the whole reason MIS does not double-count: the two strategies' weights partition unity exactly, by construction, for every pair of positive sample densities -- not approximately for some of them.`);
+        ok("...and misWeight(0,0) = 0 rather than NaN, the degenerate case where neither strategy could have sampled the direction",
+           misWeight(0, 0) === 0, `misWeight(0,0) = ${misWeight(0, 0)}.`);
+    }
 }
 
 console.log(fails ? "\nmicrofacet-selfcheck: " + fails + " FAILED" : "\nmicrofacet-selfcheck: all checks pass");
