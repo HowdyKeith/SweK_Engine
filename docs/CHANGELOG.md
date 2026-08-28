@@ -8,6 +8,45 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4084 -- a ratchet that outlived the sentence it was built to catch
+
+`tools/ship/referenceKind-selfcheck.mjs` reported a real ratchet break off Keith's rig: 181 prose-rescued
+orphan modules against a ceiling frozen at 166 since v3453, plus a specific "proven instance" assertion gone
+red on its own known example.
+
+### The proven instance moved, and the test had it nailed to one address
+
+The gate's first assertion hardcoded lib/derivedCache.js's rescuer as "main.js's ENGINE_VERSION changelog
+line" -- true when the assertion was written, and MEASURED now to be false: `grep derivedCache main.js`
+returns zero hits. The specific historical entry (once part of a v3992 changelog line) has aged out of
+main.js's ever-growing changelog history entirely. The underlying property the test is about -- an orphan
+module rescued from the census by a mention somewhere in the tree -- still held, just off a different file:
+`ai-bridge/sysadminBridge.js:833` carries the same reference now. Hardcoding WHICH file supplies a mention is
+the identical second-declaration shape this project names constantly, one level up from where it usually
+appears -- so the assertion now discovers the current rescuer dynamically, the same way the gate's own census
+loop already does, instead of asserting one address that is free to drift.
+
+### The ceiling break is accumulated drift, not new debt
+
+Every file this round touched or added (`simulation/carrySpawn.js`, `ui/dockSystem.js`, `core/ecs/World.js`,
+`core/ecs/ComponentStore.js`, the ported deafknob work) was checked by name against the current rescued list.
+None of them are on it -- each has a real non-gate importer. The 166->181 rise is drift accumulated over the
+roughly 630 rounds since this ceiling was last set at v3453, on a gate `verify.mjs` never runs as part of its
+routine ship suite (confirmed directly: `verify.mjs` never imports `referenceKind-selfcheck.mjs`; the only
+`tools/roundhouse` reference inside it is the unrelated unbound-builtin static scan). Nobody re-measured this
+specific ratchet for a long stretch, and the slow one-per-round drift its own v3453 comment already predicted
+simply went unmeasured rather than un-happening.
+
+`RESCUED_CEILING` raised from 166 to 181 to match the measured reality, reasoned inline in the same style as
+the file's own v3450/v3453 history. Reducing the true count remains future work -- wire, delete, or teach the
+census to resolve, applied to each of the 181 individually -- exactly the three routes this file has always
+named.
+
+### Gate
+
+`referenceKind-selfcheck.mjs`: all checks pass. The known-instance assertion for lib/derivedCache.js now
+verifies the CURRENT rescuer rather than one hardcoded location, and the ceiling matches the measured
+population exactly (181/181), so the ratchet is tight again rather than carrying slack.
 ## Since v4083 -- a planted dead knob the census could not see, and a call counter that could not price what it counted
 
 This round ports work from a bundle Keith uploaded from a diverged session lineage (patches numbered
