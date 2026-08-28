@@ -254,7 +254,11 @@ export const SECTIONS = [
       // for ui/faceExpressionSet.js (the named-expression classifier), and the mirror is the OTHER consumer of
       // the same camera and the same blendshapes -- filing it anywhere else would put two readings of one face
       // behind different chips.
-      pages: ["face-mirror.html", "population.html", "cat-reactions.html"] },
+      // v4111 -- gesture-vfx.html joins the same drawer. It reads the HAND tracker rather than the face one,
+      // but MediaPipeHandTracker.js is explicitly "the hand sibling of MediaPipeFaceTracker" and mirrors its
+      // API exactly -- so this is the landmark-tracking drawer, and filing the hand reading away from the face
+      // readings would split one subject across two chips for no reason a reader would guess.
+      pages: ["face-mirror.html", "population.html", "cat-reactions.html", "gesture-vfx.html"] },
 
     // v3230 -- PetFBI: a real project inside the engine with three pages and no drawer. It is also the example
     // Keith reached for when describing a TAILORED FRONT DOOR -- "a PetFBI person who posts lost pets on

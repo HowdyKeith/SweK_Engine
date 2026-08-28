@@ -8,6 +8,75 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4111 -- gesture VFX, and a hole the gate's own output revealed
+
+Keith: "gesture VFX next."
+
+The idea came from SAT0RU (reinesana/SAT0RU). **None of its code is used here, and none needed to be.** That
+repo states no licence at all, which makes it all-rights-reserved and unusable in a tree that publishes public
+release zips. It also would not have helped: `face/MediaPipeHandTracker.js` has computed pinch, fist, open
+palm, pointing and two-hand spread since it was written. The only missing piece was something to do with them.
+
+### The same split, applied twice
+
+New `ui/gestureVfx.js` takes v4110's split and uses it for both halves. The JUDGEMENT (which gesture is this,
+and may it fire) and the SIMULATION (where is each spark next frame) are BOTH pure -- no canvas, no camera, no
+timers, no `requestAnimationFrame`. So the gate drives every gesture, every ambiguity, every cooldown edge, and
+600 frames of particle physics without a browser or a webcam.
+
+Six gestures: pinch to a spark, fist to an impact ring, point to a beam, one open palm to a shield, two palms
+together to a rising column, two palms apart to a rift.
+
+### The ambiguities are the real content, and one would have shipped it broken
+
+Two open palms ALSO satisfy the one-palm shield recipe, and shield is listed first. Without its explicit
+two-hand exclusion, the rift and prayer would have been **unreachable** -- every two-palm frame caught by
+shield, and two gestures that simply never fired.
+
+Also driven: a pinching hand usually also reads as three folded fingers (order is the tie-break, and these are
+booleans with no score to rank -- "highest score wins" would have nothing to compare and would alternate frame
+to frame); one palm cannot fake a two-hand gesture even with a stale `twoHand` block present; a malformed hand
+in the array is caught rather than crashing the frame.
+
+### Two guards, because they catch two different failures
+
+Edge-triggering makes a held gesture ONE gesture -- firing per frame would spawn sixty bursts a second and the
+effect would be a solid wall. The cooldown is separate: it stops a shape flickering at its detection threshold
+from re-firing, which edge-triggering alone CANNOT, because each wobble is genuinely a fresh onset. Each
+gesture holds its own cooldown, so a two-gesture combo does not drop its second half.
+
+### The particle sim is gated like physics
+
+Every burst kind is run to exhaustion and must EMPTY. An immortal particle is an unbounded array and a slow
+leak that looks like "the effect is still going" -- exactly the bug a renderer cannot show you. Also checked:
+no NaN after 40 steps, and a 4-SECOND dt from a backgrounded tab is CLAMPED. Unclamped, one stalled frame moves
+every particle several screen-widths and the whole effect appears as a single frame of scattered dots.
+
+### The hole found by reading the gate's output rather than its verdict
+
+The near-miss check "palms held close together do not fire the rift" was PASSING -- while that pose classified
+as NONE. Correct that it is not a rift, and a dead pose for the feature, because shield already excludes every
+two-hand frame. That is SAT0RU's fourth trigger falling straight into a gap.
+
+Added the prayer gesture, re-asserted it by NAME rather than by "is not X" (which is what let it hide), and
+added a partition check across the whole spread axis -- 0, 0.10, 0.249, 0.25, 0.2501, 0.4, 0.9 -- proving
+prayer and rift cover it with no seam and no overlap.
+
+### What it refuses
+
+Crossed fingers, by name, as exported data with both its cause and its way out: `metrics()` reports per-finger
+FOLD and a single index-tip cursor, and never where the middle fingertip is -- so "index crossed over middle"
+is not expressible from this input at all. Approximating it from fold flags would fire on any ordinary
+half-curled hand. It would need the raw 21-landmark array from the tracker's `snapshot()`, a different input.
+
+### Verification
+
+New `gesture-vfx.html` renders it, including a "fire one without a camera" button so the effects can be seen
+without granting one. Verified in a real browser: the demo button lit 3279 pixels and the canvas returned to
+EXACTLY 0 lit pixels after settling -- the "every particle dies" property confirmed visually as well as in the
+gate -- with zero page errors.
+
+New gate `tools/ship/gestureVfx-selfcheck.mjs`: 57 checks, fully headless, all pass.
 ## Since v4110 -- a named expression, and the one it refuses to claim
 
 Keith, after I weighed three repos he sent: "gesture-triggered VFX and mapping expressions to cat reaction
