@@ -8,6 +8,22 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4096 -- a test fixture missing a field the real caller always has
+
+`ui/webgpuProbe-selfcheck.mjs` reported 2 FAILs, both on the same root cause. The insecure-origin fixture
+supplied `location.host` ("192.168.10.193:8787") but never `location.port` ("8787") as a separate field.
+`describeWebGPU()`'s route-(1) URL (the "open this same page over localhost" fix) is built from `loc.port`
+specifically; route-(3)'s https URL is built from `loc.host` directly. So route 1 silently dropped the port --
+`http://localhost/server.html` instead of `http://localhost:8787/server.html` -- while route 3 stayed correct,
+and both assertions checking for `localhost:8787` in the message failed.
+
+Confirmed this is a fixture gap and not a code defect: every real caller (`ui/avatarSwitch.js` among them)
+passes the actual global `location`, where `.host` and `.port` are always populated consistently by the
+browser. Fixed by adding `port: "8787"` to the fixture, matching its own `host` field.
+
+### Gates
+
+`ui/webgpuProbe-selfcheck.mjs`: all checks pass.
 ## Since v4095 -- three gates that had drifted behind a tree that kept growing
 
 All three reproduced here and all three are the same shape: a gate that was correct when written and never

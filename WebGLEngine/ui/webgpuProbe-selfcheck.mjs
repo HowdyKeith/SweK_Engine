@@ -149,8 +149,14 @@ const env = (gpu, secure, host, proto = "http:") => ({
 // HTTPS IS SET, and a grep for HTTPS=1 across every .bat, .sh and .md in the tree returned NOTHING.
 // NAMING A FIX THAT DOES NOT EXIST IS WORSE THAN NAMING NO FIX, BECAUSE IT SENDS SOMEBODY TO TRY IT. ***
 {
+    // v4096 -- THE FIXTURE ITSELF WAS INCOMPLETE, NOT THE CODE. A real window.location always carries `.port`
+    // as a field separate from `.host` (the compound "hostname:port" string) -- describeWebGPU's route-(1) URL
+    // reads `loc.port` specifically, and this fixture supplied `host` but never `port`, so `localUrl` came out
+    // as "http://localhost/server.html" with the port silently dropped while route (3)'s URL (built from
+    // `loc.host` directly) stayed correct. Every real caller (avatarSwitch.js passes the actual global
+    // `location`) already has both fields consistent; only this fixture omitted one.
     const insecure = describeWebGPU({ navigator: {}, isSecureContext: false,
-        location: { protocol: "http:", hostname: "192.168.10.193", host: "192.168.10.193:8787", pathname: "/server.html" } });
+        location: { protocol: "http:", hostname: "192.168.10.193", host: "192.168.10.193:8787", port: "8787", pathname: "/server.html" } });
     ok("!! *** THE INSECURE-ORIGIN MESSAGE NAMES THE SWITCH, NOT JUST THE URL ***",
         /HTTPS=1/.test(insecure.message) && /https:\/\/192\.168\.10\.193:8787/.test(insecure.message),
         "it claims `actionable: true`, so the reader must be able to ACT: the message now names HTTPS=1, says " +
