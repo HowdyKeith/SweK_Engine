@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/authTrust-selfcheck.mjs
 //
-// Run: node tools/ship/authTrust-selfcheck.mjs   (~0.2s -- MEASURED)
+// Run: node tools/ship/authTrust-selfcheck.mjs   (~0.8s -- MEASURED)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3246 -- THE SERVER ENFORCED ONE TRUST RULE AND REPORTED A NARROWER ONE.

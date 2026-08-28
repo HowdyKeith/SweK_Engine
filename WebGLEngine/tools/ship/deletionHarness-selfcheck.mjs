@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/deletionHarness-selfcheck.mjs
 //
-// Run: node tools/ship/deletionHarness-selfcheck.mjs   (~1s -- MEASURED, it spawns node --check per position)
+// Run: node tools/ship/deletionHarness-selfcheck.mjs   (~2s -- MEASURED, it spawns node --check per position)
 //
 // v3326 -- THE INSTRUMENT THAT TELLS A REAL HARDENING FROM A PLAUSIBLE ONE.
 //

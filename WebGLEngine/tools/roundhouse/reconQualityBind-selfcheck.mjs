@@ -1,6 +1,6 @@
 // tools/roundhouse/reconQualityBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/reconQualityBind-selfcheck.mjs   (~1s MEASURED -- two builds on a 96x96 phantom)
+// Run: node tools/roundhouse/reconQualityBind-selfcheck.mjs   (~0.4s MEASURED -- two builds on a 96x96 phantom)
 //
 // THIS GRADES THE BIND. physics/tomography/reconQuality-selfcheck.mjs owns the physics.
 //

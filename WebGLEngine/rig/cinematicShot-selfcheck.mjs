@@ -1,6 +1,6 @@
 // WebGLEngine/rig/cinematicShot-selfcheck.mjs — v4053
 //
-// Run: node rig/cinematicShot-selfcheck.mjs   (~0.3s MEASURED; no browser, no GPU, no network)
+// Run: node rig/cinematicShot-selfcheck.mjs   (~61.5s MEASURED; no browser, no GPU, no network)
 //
 // GRADES rig/cinematicShot.js, the parametric camera move Keith asked for after
 // Makio64/threejs-cinematic-world-zoom ("could we for example tack on ..."). The repo itself could not be

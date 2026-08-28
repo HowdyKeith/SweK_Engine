@@ -1,6 +1,6 @@
 // tools/roundhouse/xenonBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/xenonBind-selfcheck.mjs   (~3s MEASURED -- two peak searches and two bisections)
+// Run: node tools/roundhouse/xenonBind-selfcheck.mjs   (~0.34s MEASURED -- two peak searches and two bisections)
 //
 // THIS GRADES THE BIND. physics/nuclear/xenon-selfcheck.mjs owns the physics.
 //

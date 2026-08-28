@@ -1,6 +1,6 @@
 // tools/roundhouse/khConvergence-selfcheck.mjs
 //
-// Run: node tools/roundhouse/khConvergence-selfcheck.mjs   (~288s)
+// Run: node tools/roundhouse/khConvergence-selfcheck.mjs   (~616s)
 //
 // v3164 -- THE LAB'S BIGGEST DISAGREEMENT WITH AN EXTERNAL REFERENCE IS NOT A PHYSICS RESULT.
 //

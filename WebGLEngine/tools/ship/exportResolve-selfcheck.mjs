@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/exportResolve-selfcheck.mjs
 //
-// Run: node tools/ship/exportResolve-selfcheck.mjs   (~1s)
+// Run: node tools/ship/exportResolve-selfcheck.mjs   (~3s)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3211 -- A NAMED IMPORT THAT THE TARGET DOES NOT EXPORT. Nothing in 604 gates asked this question.

@@ -1,6 +1,6 @@
 // WebGLEngine/render/cloudField-selfcheck.mjs — v4055
 //
-// Run: node render/cloudField-selfcheck.mjs   (~0.2s; no browser, no GPU)
+// Run: node render/cloudField-selfcheck.mjs   (~42.5s; no browser, no GPU)
 //
 // Keith: "we also have great clouds we made to pass through." They were great and they were UNREACHABLE: the
 // puffs were generated inline inside render/cloudLayer.js's WebGL2 renderer, so a Three.js page could not have

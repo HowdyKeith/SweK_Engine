@@ -1,6 +1,6 @@
 // tools/roundhouse/powderBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/powderBind-selfcheck.mjs   (~2s MEASURED -- four Friedel sweeps and eight 2x2 cells)
+// Run: node tools/roundhouse/powderBind-selfcheck.mjs   (~0.35s MEASURED -- four Friedel sweeps and eight 2x2 cells)
 //
 // THIS GRADES THE BIND. physics/crystal/powder.mjs owns the physics.
 //

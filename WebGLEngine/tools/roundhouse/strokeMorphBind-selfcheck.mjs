@@ -1,6 +1,6 @@
 // tools/roundhouse/strokeMorphBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/strokeMorphBind-selfcheck.mjs   (~1s MEASURED -- two builds over ten glyphs)
+// Run: node tools/roundhouse/strokeMorphBind-selfcheck.mjs   (~0.3s MEASURED -- two builds over ten glyphs)
 //
 // THIS GRADES THE BIND. physics/mesh/strokeMorph-selfcheck.mjs owns the morphing.
 //

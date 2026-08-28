@@ -8,6 +8,49 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4089 -- twenty-nine headers, corrected in both directions
+
+`tools/ship/statedRuntime-selfcheck.mjs` reported 29 gate headers whose stated runtime had drifted more than
+2x from what `gate-timings.json` actually measures, none of them yet on the frozen "may only shrink" baseline
+this gate maintains.
+
+### Corrected the numbers, not the ratchet
+
+The fix here is exactly what this file's own header prescribes: correct each header FROM THE MEASUREMENT, and
+do not widen the frozen baseline to swallow the drift -- that would be "a ratchet growing back, the one thing
+a ratchet must never do." All 29 headers now state their measured runtime:
+
+- Drastically under-claimed: `tools/roundhouse/khGrowthKey-selfcheck.mjs` (389s -> 801s),
+  `tools/roundhouse/khMichalke-selfcheck.mjs` (328s -> 672s), `tools/roundhouse/khConvergence-selfcheck.mjs`
+  (288s -> 616s), `tools/ship/asciify-selfcheck.mjs` (0.1s -> 3.7s), `render/cloudField-selfcheck.mjs`
+  (0.2s -> 42.5s), `rig/cinematicShot-selfcheck.mjs` (0.3s -> 61.5s).
+- Drastically over-claimed: `tools/roundhouse/refusalExpiry-selfcheck.mjs` (15s -> 0.34s),
+  `tools/roundhouse/xenonBind-selfcheck.mjs` (3s -> 0.34s), `tools/roundhouse/powderBind-selfcheck.mjs`
+  (2s -> 0.35s), `tools/roundhouse/fragmentRotationBind-selfcheck.mjs` (4s -> 0.4s).
+- The remaining 19 span smaller gaps in both directions.
+
+### Spot-verified the largest and most suspicious swings before trusting them
+
+This file's own header carries a standing caution: "a gate claiming 25s that runs in 0.1s looks exactly like a
+check that stopped doing its work." The two biggest gaps here run the OTHER way (claiming fast, actually slow)
+which is a different risk, but still worth checking directly rather than trusting a number blindly:
+
+- `render/cloudField-selfcheck.mjs`: claimed 0.2s, measured 42.5s (a 212x gap). Re-ran it directly: 55.9s real,
+  all checks pass, genuine substantive work (page-load geodesic sampling, cloud-deck crossing checks).
+- `rig/cinematicShot-selfcheck.mjs`: claimed 0.3s, measured 61.5s (a 205x gap). Re-ran it directly: 62.9s real,
+  all checks pass (warp-tunnel timing, descent-frame sampling, arrival handback).
+
+Also spot-checked the two largest swings in the OTHER direction:
+
+- `tools/roundhouse/refusalExpiry-selfcheck.mjs`: claimed 15s, measured 0.34s. Re-ran: 226ms, all pass --
+  genuinely fast, not a broken/skipping gate.
+- `tools/ship/gateSelection-selfcheck.mjs`: claimed 7.1s (itself a v3941 correction from an original 41s),
+  measured 70.5s -- grown back up. Re-ran: 41s, all pass, building the real import graph -- a legitimate
+  regrowth as the tree's dependency graph has grown since that correction, not a defect.
+
+### Gate
+
+`statedRuntime-selfcheck.mjs`: all checks pass, 0 drifted headers outside the frozen baseline.
 ## Since v4088 -- an insensitive list manufactured by starvation, and a budget that could not afford one build
 
 A diverged-lineage bundle (its own v4043-v4045a, built on a shared ancestor with this tree) proposed three

@@ -1,6 +1,6 @@
 // tools/roundhouse/blackbodyBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/blackbodyBind-selfcheck.mjs   (~0.3s MEASURED -- two builds, each two quadratures)
+// Run: node tools/roundhouse/blackbodyBind-selfcheck.mjs   (~0.6s MEASURED -- two builds, each two quadratures)
 //
 // THIS GRADES THE BIND, NOT THE PHYSICS. physics/thermal/blackbody-selfcheck.mjs owns the physics: the Wien
 // roots by two routes, the Gamma(s)zeta(s) identity across three modules, sigma and b against published CODATA.
