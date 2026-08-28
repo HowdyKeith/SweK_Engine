@@ -429,7 +429,7 @@ console.log("\n3h. *** v4035 -- A LIST OF NUMBERS HAS A SCALING, AND THREE QUANT
         "say what a real alternative looks like, and two of them needed it BECAUSE THEY WERE RIGHT.");
 }
 
-console.log("\n3i. *** v4080 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS AND IS IGNORED IN THE OTHER TWO ***");
+console.log("\n3i. *** v4083 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS AND IS IGNORED IN THE OTHER TWO ***");
 {
     // *** THE LAB ALREADY CONTAINS A PLANTED DEAD KNOB (stabilityBind.mjs's `deafknob`, declared since v3783)
     // AND THIS CENSUS COULD NOT SEE IT. *** `deafknob` hands every run the shipped viscosity whatever the
@@ -465,7 +465,7 @@ console.log("\n3i. *** v4080 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS
         !Object.is(deafBase.ladder, deafAlt.ladder) && sameValue(deafBase.ladder, deafAlt.ladder),
         "gain went 2 -> 9 in a mode that ignores gain, so `ladder`'s CONTENTS are identical ([{a:1,b:2},{a:2,b:4}] " +
         "both times) but its IDENTITY differs because it is rebuilt per call. Object.is(oldLadder, newLadder) is " +
-        "false -- the exact reading that made probeKnob's pre-v4080 `moved` check report every knob on such a " +
+        "false -- the exact reading that made probeKnob's pre-v4083 `moved` check report every knob on such a " +
         "device live, whatever it did -- and sameValue(oldLadder, newLadder) is true, because it compares the " +
         "{a,b} pairs by VALUE rather than the array by REFERENCE.");
     ok("!! ...and Object.is stays at the LEAVES, because NaN is a real physics observable",
@@ -510,7 +510,7 @@ console.log("\n3i. *** v4080 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS
     ok("!! *** THE REAL PLANT: stability.visc READS LIVE IN response AND STILL IN deafknob ***",
         rResponse.state === "live" && rDeafknob.state === "still",
         "response: " + rResponse.state + " (moved " + rResponse.moved.join(",") + "), deafknob: " +
-        rDeafknob.state + ". *** BEFORE v4080 THIS SAME CALL PAIR MEASURED response: live, deafknob: live (moved " +
+        rDeafknob.state + ". *** BEFORE v4083 THIS SAME CALL PAIR MEASURED response: live, deafknob: live (moved " +
         "[\"ratioLadder\"]) -- deafknob's own array observable was rebuilt every call, so it always compared " +
         "unequal to itself and masked the one mode built to be caught. *** stabilityBind-selfcheck's own " +
         "spanAcrossViscosity check already proved the plant flattens the response ladder; this is the separate " +
