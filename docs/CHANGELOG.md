@@ -8,6 +8,29 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4097 -- libmSensitivity's UNRESOLVED entry gets its first real measurement
+
+`tools/roundhouse/libmSensitivity-selfcheck.mjs` has sat in `tools/ship/gateBudget.mjs`'s `UNRESOLVED` table
+since v3924 with a note that said only "exceeded a 150s cap; never timed before that. Not measured to
+completion" -- an absence of data, not a measurement.
+
+Re-attempted it properly this round: ran with a 2400s (40 minute) budget on the current 129-device registry,
+watched to the timeout rather than assumed. IT STILL DID NOT COMPLETE. That is itself new evidence -- 2400s is
+now a measured LOWER BOUND on its runtime, not the previous absence of any timing at all.
+
+Its own cost model explains the shape without needing further digging: `libmSensitivitySweep()` runs THREE
+builds per device/mode (a base build with call-counting, a determinism control, and the perturbed rebuild), the
+same registry-scaling structure already documented in this table for `corroborationCensus-selfcheck.mjs`,
+`plantedCoverage-selfcheck.mjs` and `responseCensus-selfcheck.mjs` -- a census over the whole device registry
+whose cost grows with the lab rather than sitting at a fixed fixture cost.
+
+This is a TEXT-ONLY update to the existing entry, not a move into `MEASURED` -- the table's own rule is explicit
+that only a completion earns that, and this run did not complete. `gateBudget-selfcheck.mjs` verified clean
+against the new text.
+
+### Gates
+
+`gateBudget-selfcheck.mjs`: all checks pass, unchanged logic.
 ## Since v4096 -- a test fixture missing a field the real caller always has
 
 `ui/webgpuProbe-selfcheck.mjs` reported 2 FAILs, both on the same root cause. The insecure-origin fixture

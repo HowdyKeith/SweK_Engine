@@ -388,7 +388,12 @@ export const UNRESOLVED = {
     "tools/roundhouse/corroborationCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. A census over the device registry, so it grows with the lab -- the same shape as labResults, whose entry records that it will outrun any number written down",
     "tools/roundhouse/libmSensitivity-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion",
+        "exceeded a 150s cap at v3924; never timed before that. RE-ATTEMPTED with a 2400s (40 minute) budget " +
+        "on a device registry that has since grown to 129 devices (up from whatever count v3924 measured " +
+        "against) and STILL DID NOT COMPLETE -- 2400s is now a measured LOWER BOUND, not a runtime. Its own " +
+        "cost model explains why: three builds per device/mode (base, a determinism control, and the " +
+        "perturbed rebuild), which is the same registry-scaling shape as corroborationCensus, plantedCoverage " +
+        "and responseCensus below. Still not measured to completion",
     "tools/roundhouse/plantedCoverage-selfcheck.mjs":
         "exceeded a 150s cap at v3924. It builds two arms of every declared plant across the whole registry, so its cost tracks the plant census rather than any fixture of its own",
     "tools/roundhouse/responseCensus-selfcheck.mjs":
