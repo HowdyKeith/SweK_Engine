@@ -8,6 +8,21 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+Spring-physics toasts: one shared integrator for both toast surfaces, graded against the damping ratio that predicts its overshoot.
+
+Keith pointed at hiaaryan/sileo -- "an opinionated, physics-based toast component" -- and asked whether our rendered toasts could move like that. None of sileo's code is used and none could be: it is a React component library (this tree ships no React) and its repository carries no LICENSE file, checked and 404, which makes it all-rights-reserved and unusable in a tree that publishes public release zips. What is adopted is the idea, which is not sileo's to own anyway -- a damped harmonic oscillator is how iOS, react-spring and framer-motion have all animated for years.
+
+New ui/springMotion.js holds the physics once. This tree already had two in-engine toast surfaces (ui/toast.js centre-top, ui/toaster.js top-right) and writing the integrator into whichever one was upgraded first and then again into the second is the second-copy defect this session has watched land repeatedly. Because step(state, dt) -> state is pure -- no DOM, no rAF, no timers -- the gate settles thousands of frames headlessly and measures the overshoot against exp(-pi*z/sqrt(1-z^2)), a closed form the integrator is never told: gentle 8.9% against 9.9% predicted, snappy 9.2% against 10.1%, stiff critically damped at 0.0%. Agreement is evidence rather than a restatement of the constants.
+
+The first tuning was measured and rejected. At zeta 0.81 it overshot 0.6-0.8% of travel -- under three pixels on a 380px slide. It was a correct spring that was visually indistinguishable from an ease, which is the whole feature failing quietly while every correctness check passes. Retuned to zeta 0.59.
+
+Then the same mistake hid a second time inside the gate written to catch it. The visibility check hardcoded 380, toaster.js's travel, and so graded both presets against the longer of the two surfaces. ui/toast.js shipped a 14px rise, and a fraction of a small number is a smaller number: Chromium measured its overshoot at 1.27px, sub-pixel on a non-retina display. The check now reads each surface's travel constant out of its own source and grades in real pixels. RISE_PX is 32 and measures 2.93px.
+
+Driving both surfaces in real Chromium then found two defects no headless property could reach. Opacity derived as 1 - abs(x)/TRAVEL looks right and reverses during an overshoot, because past the target abs(x) grows again: the toast dimmed to opacity 0.909 at the peak of its own bounce, a flicker that only exists because the motion became springy. It is now measured as travel from the start, which rises monotonically inward and falls monotonically outward so both overshoots clamp harmlessly. And toast.js caps its stack at four and evicts with a bare .remove() that never stopped the running rAF: nine live loops for four visible toasts, each still writing transform and opacity to a detached node until its duration ran out. toaster.js had that guard from the start; toast.js did not, and it is now a gated rule for both.
+
+Retargeting is why both surfaces use one spring rather than two animations. Clicking a toast mid-entrance flips the existing spring's target instead of starting a second animation, so it reverses from where it actually is and carries its velocity out. The old CSS pair restarted from the element's committed style rather than its rendered position and the toast jumped; the browser trace of a mid-entrance click now shows a continuous turnaround.
+
+Sabotage-verified rather than assumed: reverting to the rejected tuning fails four checks, removing the substepping diverges the stiff preset to x = -2030 (the toast literally launched off screen), and dropping the snap-on-rest fails three. Gate: tools/ship/springMotion-selfcheck.mjs, 45 checks, all pass.
 ## Since v4113 -- the storage quota is a promise, not a reservation
 
 Found while running the measurement Keith asked for: does voxtral (2.5-9 GB) clear `localModelProbe`'s quota

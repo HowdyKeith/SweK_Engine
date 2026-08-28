@@ -628,6 +628,11 @@ window.addEventListener("load", function () {
                  which fetches zero model bytes before anything downloads a gigabyte. Filed with System Tools
                  beside Node/Bun for the same reason -- it answers "can this box do X" rather than showing physics. -->
             <a href="/webgpu-llm.html" target="_blank" rel="noopener" title="Can this box run a local model? -- a WebGPU adapter, reported-VRAM and model-cache probe that runs before anything downloads a gigabyte. Structurally cannot say yes: VRAM is not readable by any browser API, so the verdict is only ever no / unknown / maybe, and the page fetches zero model bytes to produce it.">WebGPU / Local Model</a>
+            <!-- v4115 -- voxtral.html JOINS, next to webgpu-llm.html for the same reason: it asks what THIS BOX
+                 can do rather than showing physics. It is the opt-in wrapper around a 2.5 GB third-party speech
+                 model that runs entirely in the tab. The link says the cost out loud (14x slower than real time)
+                 because the page's whole design is that the expensive facts come BEFORE the decision. -->
+            <a href="/voxtral.html" target="_blank" rel="noopener" title="Voxtral in the tab (opt-in) -- speech recognition with no bridge, no local server and no Windows, running as WASM + WebGPU entirely client-side. Downloads nothing until you say so, twice: a 9.4 MB engine checked against a pinned SHA-256, then 2.5 GB of weights as a separate decision. Upstream measures it at 14x SLOWER than real time on a DGX Spark, and whisperBridge already does the same job natively and fast -- the only thing this adds is needing none of it.">Voxtral (in-tab ASR)</a>
             <a href="/petfbi.html" target="_blank" rel="noopener" title="PetFBI -- the lost-pet posting flow.">PetFBI</a>
             <a href="/path-tracer.html" target="_blank" rel="noopener" title="Path tracer: Monte Carlo global illumination on the CPU. The furnace scene must render FLAT -- the sphere disappears -- which is the answer key six rounds of physics/render were built around.">Path Tracer</a>
             <a href="/petfbi-board.html" target="_blank" rel="noopener" title="PetFBI board -- the lost-pet board itself.">PetFBI Board</a>

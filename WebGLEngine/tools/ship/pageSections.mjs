@@ -199,7 +199,12 @@ export const SECTIONS = [
       // THIS MACHINE can run a generative model in the browser (WebGPU adapter, storage quota, persistent-storage
       // permission), which is a question about the box rather than about the world -- the same kind rig.html and
       // settings.html answer. Filed by what it MEASURES, not by what it is about.
-      pages: ["webgpu-llm.html",
+      // v4115 -- voxtral.html JOINS, filed by the same rule that put webgpu-llm.html here: it answers "what can
+      // THIS BOX do" rather than showing a phenomenon. It is the opt-in front door to a 2.5 GB third-party
+      // speech model running as WASM + WebGPU in the tab, and like its neighbour it is built so the expensive
+      // facts land BEFORE the decision -- it downloads nothing on load, and says the 14x-slower-than-real-time
+      // cost on screen before any button works.
+      pages: ["webgpu-llm.html", "voxtral.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
