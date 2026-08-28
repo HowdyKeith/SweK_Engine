@@ -151,6 +151,7 @@ export function probeValues(v, choices = null) {
  */
 export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadline = Infinity) {
     const def = cfg[knob];
+    let sawEcho = false;
     for (const alt of probeValues(def, choicesFor(device, knob))) {
         // *** v4032 -- THE DEADLINE IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS. ***
         // knobLiveness's budget guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran
@@ -179,10 +180,18 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         // nothing else. A real observable that merely happens to land on the probe value at one rung still
         // moves at the others.
         const echo = (o) => sameValue(base[o], def) && sameValue(out[o], alt);
+        // *** v4046 -- WHETHER THE MODE ECHOED THE KNOB IS RECORDED, AND IT IS THE WHOLE DISCRIMINATOR. ***
+        // A knob still in a mode is USUALLY INNOCENT: quantum's `bands` has no use for omega and never
+        // mentions it. A DEAF knob is different in a way the output shows -- stability's `deafknob` reports
+        // `viscosity: c.visc` while handing the solver the shipped value, so THE MODE ACKNOWLEDGES THE INPUT
+        // AND THEN IGNORES IT. That is "a control that does nothing" exactly, and it is separable from "a
+        // control this screen does not have". MEASURED: deafknob's output carries `viscosity`; quantum/bands
+        // carries none of omega, E or V0.
+        if (Object.keys(base).some(echo)) sawEcho = true;
         const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !echo(o));
-        if (moved.length) return { state: "live", moved };
+        if (moved.length) return { state: "live", moved, echoed: sawEcho };
     }
-    return { state: "still", moved: [] };
+    return { state: "still", moved: [], echoed: sawEcho };
 }
 
 /**
@@ -350,7 +359,7 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
                         // reintroduced one round later by a different route. Section 3c caught it.
                         overBudget = true; break;
                     }
-                    if (r.state === "still") a.still.push(where);
+                    if (r.state === "still") { a.still.push(where); if (r.echoed) (a.echoedStill ||= []).push(where); }
                     else { a.live.push(r.state === "refused" ? where + " (refused)" : where); a.movedMost = Math.max(a.movedMost, r.moved.length); }
                 }
             }
@@ -467,7 +476,8 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
 export const LIST_CLAIMS = {
     stillKnobs: "universal",          // "MOVES NOTHING ANYWHERE"
     insensitiveKnobs: "universal",    // "flat across its WORKING RANGE"
-    partialDeafness: "particular",    // "live in A, B; STILL in C" -- names its own scope
+    partialDeafness: "particular",    // "live in A, B; ECHOED AND IGNORED in C" -- names its own scope
+    unusedInMode: "particular",       // "unused in N of M" -- the innocent remainder, counted
     incompleteKnobs: "admission",     // the sweep ran out of budget
     deafnessUnanswered: "admission",  // the deafness question was never answered for this knob
     unprobedKnobs: "admission",       // no ordering exists to perturb the default along
@@ -504,9 +514,27 @@ export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.liv
  * off the echo of the very knob being ignored. The rule written to stop mpmstep.nx reading live off itself is
  * what makes this plant findable.
  */
-export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.still.length)
-    .map((r) => r.device + "." + r.knob + " -- live in " + r.live.join(", ") + "; STILL in " + r.still.join(", "))
-    .sort();
+export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.echoedStill && r.echoedStill.length)
+    .map((r) => r.device + "." + r.knob + " -- live in " + r.live.join(", ")
+        + "; ECHOED AND IGNORED in " + r.echoedStill.join(", ")).sort();
+
+/**
+ * *** v4046 -- STILL IN A MODE THAT NEVER MENTIONS THE KNOB. THE INNOCENT MAJORITY, COUNTED NOT LISTED. ***
+ *
+ * The first draft of partialDeafness listed every knob live somewhere and still somewhere else, and a
+ * lab-wide exhaustive sweep made the problem obvious before it finished: blackhole 14, em 10, xpbd 10,
+ * seismic 8 -- HUNDREDS OF CANDIDATES, and a list nobody can act on is not a finding, it is a second haystack.
+ *
+ * Nearly all of it is a multi-mode device whose modes each use a subset of the knobs, which is a device being
+ * organised rather than broken. What separates the real case is that the deaf mode ACKNOWLEDGES THE INPUT:
+ * stability's deafknob reports `viscosity` and then hands the solver 0.1 regardless. So this list is the
+ * remainder -- still, and not echoed -- kept as a COUNT so the split is visible and the innocent majority is
+ * not passed off as a finding.
+ */
+export const unusedInMode = (rows) => rows.filter((r) => r.live.length && r.still.length
+        && !(r.echoedStill && r.echoedStill.length))
+    .map((r) => r.device + "." + r.knob + " (unused in " + r.still.length + " of "
+        + (r.live.length + r.still.length) + ")").sort();
 
 /**
  * *** AND THE KNOBS FOR WHICH THE DEAFNESS QUESTION WAS NEVER ANSWERED, WHICH IS NOT THE SAME AS `none`. ***
@@ -651,8 +679,12 @@ export async function reportLines(opts = {}) {
         const deaf = partialDeafness(rows);
         const unanswered = deafnessUnanswered(rows);
         L.push("");
-        L.push("  LIVE IN SOME MODES AND IGNORED IN OTHERS (" + deaf.length + ") -- USUALLY INNOCENT:");
+        const unused = unusedInMode(rows);
+        L.push("  ECHOED BY A MODE AND IGNORED BY IT (" + deaf.length + ") -- THE DEAF-KNOB SHAPE:");
         for (const d of deaf) L.push("      " + d);
+        L.push("  ...and still in a mode that never mentions the knob (" + unused.length + "), which is a");
+        L.push("  device being ORGANISED rather than broken -- counted, not listed: "
+            + (unused.slice(0, 6).join(", ") || "none") + (unused.length > 6 ? ", ..." : ""));
         if (unanswered.length) {
             L.push("  AND NOT ANSWERED AT ALL FOR (" + unanswered.length + ") -- live so far, budget ran out"
                 + " before the remaining modes:");
