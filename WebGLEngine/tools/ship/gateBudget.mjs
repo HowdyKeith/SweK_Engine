@@ -365,7 +365,17 @@ export const MEASURED = {
     // from nothing but a second measurement racing the first. *** 260224 is therefore a real upper reading and
     // not a clean-room runtime; the clean-room figure is 235489 and both are here so the next reader can tell
     // which question they are answering.
-    "physics/sph/stability-selfcheck.mjs":           260224,
+    //
+    // *** v4099 -- RE-PINNED: 260224 -> 405628, GROWTH FROM A SECTION THAT DID NOT EXIST WHEN 260224 WAS
+    // MEASURED. *** Keith's rig reported this gate TIMING OUT at a 182s budget; reproduced here, but not as a
+    // hang -- REPRODUCED AS GENUINE GROWTH. A first attempt killed it at a hard 400s wall mid-section-7b with
+    // every check up to that point PASSING, so re-run to completion at a 1200s budget: 405628ms, exit 0, all
+    // checks pass. Section 7b (its own header: "ADDED BY A SECOND SURFACE THAT BUILT THIS SAME ROUND IN THE
+    // SAME SANDBOX") adds a THIRD refinement axis on top of the ones this entry's 260224ms already accounted
+    // for -- viscosityThreshold bisected at T=4 as well as T=1, a 4x-longer-horizon simulation the earlier
+    // measurement never ran. Not broken, not hung: the gate grew a real section and the number describing it
+    // had not been asked since.
+    "physics/sph/stability-selfcheck.mjs":           405628,
 };
 
 export const TAIL_HEADROOM = 2;

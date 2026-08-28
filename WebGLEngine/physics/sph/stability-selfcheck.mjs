@@ -2,7 +2,9 @@
 //
 // v3542 -- GRADES THE ENERGY FINDING, AND EVERY ASSERTION IS A RELATION OR A PHYSICAL BOUNDARY.
 //
-// STATED RUNTIME: ~200s, MEASURED. The cost is bisections; the gate uses FEWER bisection steps than the
+// STATED RUNTIME: ~406s, MEASURED at v4099 (was ~200s, before section 7b's T=4 refinement axis added a
+// second, longer-horizon bisection on top of the ones this figure originally covered). The cost is
+// bisections; the gate uses FEWER bisection steps than the
 // register because what it needs are ORDERINGS (this threshold exceeds that one, this one did not move under
 // refinement) and not a precise value. A gate re-deriving the register's digits would be pinning an
 // arrangement.

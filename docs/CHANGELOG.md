@@ -8,6 +8,34 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4099 -- four rig reports, triaged individually rather than assumed related
+
+### Three did not reproduce
+
+`physics/mesh/weightScaling-selfcheck.mjs` (reported TIMEOUT at a 101s budget), `physics/sph/materialKnobs-selfcheck.mjs`
+and `physics/sph/packingTransfer-selfcheck.mjs` (both reported FAIL) all ran clean here -- 79s, 3m38s, and
+4m54s respectively, every check passing, exit 0. No code defect found on this box; treated as rig-side load or
+timing noise rather than patched speculatively.
+
+### The fourth reproduced, as growth rather than a hang
+
+`physics/sph/stability-selfcheck.mjs` was reported TIMEOUT at a 182s budget. A first attempt here, capped at a
+hard 400s wall, was genuinely killed mid-run -- every check up to that point (through section 7b) was PASSING,
+not stuck. Re-run to completion at a 1200s budget: 405628ms, exit 0, all checks pass.
+
+The cause is a real section, not a regression: section 7b's own header records it was "ADDED BY A SECOND
+SURFACE THAT BUILT THIS SAME ROUND IN THE SAME SANDBOX" -- it bisects `viscosityThreshold` at T=4 as well as
+the T=1 the rest of the file already covered, a four-times-longer-horizon simulation that did not exist when
+this gate's `tools/ship/gateBudget.mjs` entry was last measured at 260224ms (v4090).
+
+`gateBudget.mjs`'s `MEASURED` entry re-pinned from 260224 to 405628, with the section-7b explanation recorded
+beside it so the next reader can tell growth from a hang without re-deriving it. The gate's own stated-runtime
+header corrected from "~200s" to "~406s" to match.
+
+### Gates
+
+`weightScaling-selfcheck.mjs`, `materialKnobs-selfcheck.mjs`, `packingTransfer-selfcheck.mjs`,
+`stability-selfcheck.mjs`, `gateBudget-selfcheck.mjs`: all pass.
 ## Since v4098 -- toolFrontDoor's two FAILs, one root cause and one thing found along the way
 
 `tools/ship/toolFrontDoor-selfcheck.mjs` reported 2 FAILs, both against `tools/roundhouse/knobLiveness.mjs`.
