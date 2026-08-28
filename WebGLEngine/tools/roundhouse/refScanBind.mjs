@@ -64,7 +64,7 @@ const tiltedSky = (k) => (d) => 0.3 + k * Math.max(0, d[1]);
 
 export const REFSCAN_OBSERVABLES = [
     "worstAlbedoErrFrac", "albedosTested", "furnaceSpread", "furnaceGradeable", "furnaceMean",
-    "worstCropDiff", "cropRegions", "cropSky",
+    "worstCropDiff", "cropRegions", "cropDiffAltSky", "cropSkyGraded",
     "brightBias", "darkBias", "signMeanGap",
     "gradedGradeable", "indicatorGradeable", "gradedVerdictNull", "indicatorVerdictSet",
     "arbitrarySceneGradeable", "indicatorResidual", "mayConclude",
@@ -111,9 +111,6 @@ export function build({ mode = "furnace", config = {} } = {}) {
         // BREAKS. A scan of a rectangle must equal the same rectangle cut out of the whole frame, BIT FOR BIT.
         // Swept over five rectangles including a 1x1 and one touching the edge. ***
         const F = furnacePatch(0.6);
-        const sky = tiltedSky(c.skyTilt);
-        const opts = { ...CAM(c), sky, streamRng };
-        const full = render(F.scene, opts);
         const regions = [
             { x0: 19, y0: 27, w: 17, h: 11 },
             { x0: 0, y0: 0, w: 1, h: 1 },
@@ -121,13 +118,42 @@ export function build({ mode = "furnace", config = {} } = {}) {
             { x0: c.w - 6, y0: c.h - 6, w: 6, h: 6 },
             { x0: 12, y0: 3, w: 4, h: 20 },
         ];
-        let worst = 0;
-        for (const R of regions) {
-            const scan = scanRegion(F.scene, R, { ...opts, mode: "indicator" });
-            for (let y = 0; y < R.h; y++) for (let x = 0; x < R.w; x++)
-                worst = Math.max(worst, Math.abs(scan.pixels[y * R.w + x] - full[(y + R.y0) * c.w + (x + R.x0)]));
-        }
-        return { ...blank, worstCropDiff: worst, cropRegions: regions.length, cropSky: c.skyTilt };
+        const worstAt = (k) => {
+            const opts = { ...CAM(c), sky: tiltedSky(k), streamRng };
+            const full = render(F.scene, opts);
+            let worst = 0;
+            for (const R of regions) {
+                const scan = scanRegion(F.scene, R, { ...opts, mode: "indicator" });
+                for (let y = 0; y < R.h; y++) for (let x = 0; x < R.w; x++)
+                    worst = Math.max(worst, Math.abs(scan.pixels[y * R.w + x] - full[(y + R.y0) * c.w + (x + R.x0)]));
+            }
+            return worst;
+        };
+        // *** v4056 -- `cropSky: c.skyTilt` USED TO BE HERE, AND IT WAS THE KNOB HANDED BACK. *** The census
+        // read skyTilt as ECHOED AND IGNORED in `crop` -- the deaf-knob shape, the same signature as the lab's
+        // planted deaf knob -- and the reading was right about the echo and wrong about the implication. crop
+        // DOES use skyTilt: it builds the sky both sides render under. The knob moves nothing because THE KEY
+        // HOLDS: a scanned rectangle equals that rectangle cut from the full frame whatever the sky is, so a
+        // number that changed with the tilt would be the defect. This is mpmstep.nu exactly -- flat BECAUSE
+        // the claim is true -- and echoing the input turned that into a suspicion.
+        //
+        // So the echo is replaced by the thing it was standing in for: THE SAME CHECK UNDER A DIFFERENT SKY,
+        // which states the independence instead of gesturing at it.
+        //
+        // *** AND THE ALTERNATE KEEPS A GRADIENT, WHICH IS WHY IT IS NOT SIMPLY 0. *** This file's header
+        // says a CONSTANT sky is where the plant hides: every sample carries the same radiance, so the two RNG
+        // streams have little noise to differ in. MEASURED rather than taken from the header, because the
+        // header overstates it: at skyTilt 0 the planted crop diff is 0.04, not 0 -- detectable, but an order
+        // of magnitude weaker than the 0.23 the same plant produces once a gradient is restored. So a flat
+        // alternate would not have been a check that CANNOT fail; it would have been the weakest available
+        // second opinion, chosen from the one region the file warns about. Doubling keeps the gradient and
+        // cannot coincide with the original; k === 0 is sent to 1 rather than staying flat.
+        const altK = c.skyTilt === 0 ? 1 : c.skyTilt * 2;
+        // A LOAD-BEARING NEGATIVE NEEDS A WITNESS THAT THE RUN COULD HAVE FAILED (mpmstep's blockFell). With
+        // skyTilt at 0 the primary check is vacuous against the plant, so whether the sky it used actually has
+        // a gradient is reported beside the zero rather than assumed.
+        return { ...blank, worstCropDiff: worstAt(c.skyTilt), cropRegions: regions.length,
+                 cropDiffAltSky: worstAt(altK), cropSkyGraded: c.skyTilt !== 0 };
     }
 
     if (mode === "sign") {
