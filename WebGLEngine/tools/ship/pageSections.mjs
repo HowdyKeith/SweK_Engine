@@ -250,7 +250,11 @@ export const SECTIONS = [
       pages: ["blob-studio.html", "blobarium.html", "blobulator.html"] },
 
     { id: "face", tab: "face", label: "Face & Population", note: "landmarks, the mirror, the GPU population field",
-      pages: ["face-mirror.html", "population.html"] },
+      // v4110 -- cat-reactions.html joins the drawer that already holds face-mirror.html. It is the front door
+      // for ui/faceExpressionSet.js (the named-expression classifier), and the mirror is the OTHER consumer of
+      // the same camera and the same blendshapes -- filing it anywhere else would put two readings of one face
+      // behind different chips.
+      pages: ["face-mirror.html", "population.html", "cat-reactions.html"] },
 
     // v3230 -- PetFBI: a real project inside the engine with three pages and no drawer. It is also the example
     // Keith reached for when describing a TAILORED FRONT DOOR -- "a PetFBI person who posts lost pets on

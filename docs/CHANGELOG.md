@@ -8,6 +8,78 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4110 -- a named expression, and the one it refuses to claim
+
+Keith, after I weighed three repos he sent: "gesture-triggered VFX and mapping expressions to cat reaction
+images. we would also be able to map the expression onto a avatar mirror, or the google api talking head?"
+
+That is THREE consumers of ONE judgement, so this round builds the judgement rather than the first consumer.
+
+### What was already here, checked before building anything
+
+- v3114's `ui/faceExpression.js` reads exactly TWO signals -- jawOpen onto a mouth class, smile onto a cheer
+  animation -- and wires them onto ONE robot.
+- `face-mirror.html` already drives that robot from the camera.
+- `facePuppet.js` already drives the 3D avatar's JAW.
+
+None of them can answer "which expression is this" with a name. A cat-reaction page written against them would
+have re-derived the recipes a third time, which is the second-copy defect this session has now watched happen
+repeatedly.
+
+### The judgement, once
+
+New `ui/faceExpressionSet.js`: eight named recipes -- smile, shock, glare, angry, sad, kiss, puff, wink -- over
+MediaPipe's blendshapes. It is PURE: no DOM, no camera, no timers. That is not tidiness, it is what makes the
+gate possible. A classifier wired straight into a webcam page can only be checked by a person pulling faces at
+it, which is a demo, not a check.
+
+### The names are quoted from MediaPipe's source, and that paid off immediately
+
+`kBlendshapeNames` in `face_blendshapes_graph.cc`, fetched and read this round rather than recalled. The first
+thing it settled: **MediaPipe has no `tongueOut`.** ARKit's 52 include it; MediaPipe's 52 spend that slot on
+`_neutral` and stop at `noseSneerRight`. MeowCV -- the project the cat idea came from -- gets its tongue from
+landmark GEOMETRY, a different input entirely.
+
+So tongue is REFUSED by name, as exported data rather than a sentence in a comment, carrying both the reason
+and what detecting it would actually require. Faking it from an inner-lip gap would fire on any wide-open mouth
+and call it a tongue: a detector that lies, which this tree rates worse than one that is absent. The page shows
+that refusal on screen instead of quietly lacking the feature.
+
+### The near-miss ceilings are the real content
+
+A sneer and a smile both raise the mouth corners. Shock and sad both raise the inner brow. A squinty laugh
+looks like a glare. Each `not` clause in the module exists for exactly one of those collisions, and the gate
+drives all six -- plus the sharpest one: a BLINK averaged across both eyes scores as half a wink, so the wink
+recipe is a custom asymmetry test rather than a pair average.
+
+That section is the point of the whole gate. It is not "does a smile read as a smile" but "does a sneer read as
+a smile" -- the failure a person testing at a webcam would never think to try.
+
+### The front door
+
+New `cat-reactions.html` shows ALL EIGHT recipe scores live rather than only its winner (a classifier that
+prints one number cannot be argued with), shows the refusal, and holds an expression steady with two SEPARATE
+stabilisers -- a dwell floor and a challenger margin -- because they fix two different flickers.
+
+**No cat photographs ship with the engine.** MeowCV bundles pictures of specific TikTok cats; those are
+somebody's copyrighted images and this engine publishes public release zips. The reactions are Unicode emoji,
+which belong to nobody, and a reader can point the page at a folder of their own images -- where a 404 falls
+back to the emoji rather than blanking the reaction.
+
+### Verification
+
+New gate `tools/ship/faceExpressionSet-selfcheck.mjs`: 40 checks, fully headless, all pass. It caught two real
+bugs before shipping:
+
+- angry and sad shipped the SAME crying-cat emoji, so two different verdicts rendered identically on the one
+  surface the user actually sees. Now gated for distinctness.
+- My own gate first grepped RAW source and went red on the module's header comment, which names
+  `faceExpression.js` to explain why it does NOT wrap it -- a check punishing a file for documenting itself.
+  That is the commentFalsePass species this tree has already paid for; fixed with its own `codeOnly()`.
+
+And `pageSections-selfcheck` caught a third: a drawer MOVES an existing anchor and cannot invent one, so the
+page needed a real link in the Arriving row rather than just a registry entry. Filed in the Face & Population
+drawer beside `face-mirror.html`, the other consumer of the same camera and the same blendshapes.
 ## Since v4109 -- the dock's fill, and a Mac-peer relay for Pairlane
 
 Four related requests, landing together.

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Cat Reactions">
+<meta name="demo:desc" content="Your expression, named and mirrored back as a reaction cat. Pure-classifier front door for ui/faceExpressionSet.js -- shows every recipe's live score, and says out loud which expression it refuses to claim and why.">
+<meta name="demo:category" content="tools">
+<title>Cat Reactions</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#ffb454; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:900px; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; display:flex; flex-direction:column; gap:8px; }
+  .card h2 { margin:0; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { padding:7px 13px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  button.run { border-color:#3a6a4a; background:#153a25; color:#9fe88f; }
+  button:disabled { opacity:.45; cursor:default; }
+  .good { color:#9fe88f; } .bad { color:#f88; } .warn { color:#eac06a; }
+  #stage { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  #cat { font-size:96px; line-height:1; min-width:120px; text-align:center; filter:drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+  #catImg { max-width:180px; max-height:180px; border-radius:10px; display:none; }
+  #verdict { font-size:22px; font-weight:700; letter-spacing:.04em; }
+  #verdictWhy { font-size:11px; color:var(--dim); max-width:380px; }
+  table { border-collapse:collapse; width:100%; font-size:11.5px; }
+  td { padding:3px 8px 3px 0; border-bottom:1px solid #0d1826; }
+  td.k { color:var(--dim); width:90px; }
+  .barOuter { background:#070a0f; border:1px solid var(--line); border-radius:3px; height:10px; width:100%; overflow:hidden; }
+  .barIn { background:linear-gradient(90deg,#2a6a4a,#5fd886); height:100%; width:0; transition:width .12s linear; }
+  .refused { border:1px solid #5a4520; background:#1e1704; border-radius:6px; padding:8px 10px; font-size:11px; color:#e8c07a; line-height:1.55; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#128571; Cat Reactions</h1>
+  <span class="hint">Your expression, named &mdash; and answered by a cat.</span>
+</header>
+<main>
+
+  <div class="card">
+    <div class="row">
+      <button class="run" id="bStart">Start camera</button>
+      <button id="bStop" disabled>Stop</button>
+      <span id="state" class="hint">idle &mdash; nothing is running, and no camera has been requested.</span>
+    </div>
+    <div class="hint">Everything runs <b>on this machine</b>: MediaPipe loads its model into this page and the
+      video never leaves the browser. Nothing is uploaded, recorded, or sent to the engine bridge.</div>
+  </div>
+
+  <div class="card">
+    <h2>Reaction</h2>
+    <div id="stage">
+      <div id="cat">&#128064;</div>
+      <img id="catImg" alt="">
+      <div>
+        <div id="verdict">not started</div>
+        <div id="verdictWhy">Press <b>Start camera</b>. The reaction only changes when an expression clears
+          its threshold and holds &mdash; a flicker is not an expression.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Every recipe, live</h2>
+    <div class="hint">Each row is one recipe's score this frame &mdash; the <b>weakest</b> signal it requires,
+      or zero when a threshold is unmet or a near-neighbour vetoes it. Showing all of them is the point: a
+      classifier that only prints its winner cannot be argued with.</div>
+    <table id="scores"><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>What this will not claim</h2>
+    <div id="refused"></div>
+  </div>
+
+  <div class="card">
+    <h2>Your own cats (optional)</h2>
+    <div class="hint">
+      <b>No cat photographs ship with this engine.</b> The reactions above are Unicode emoji, which belong to
+      nobody. The project that inspired this one bundles photos of specific TikTok cats; those are somebody's
+      copyrighted pictures, and this engine publishes public release zips, so vendoring them would redistribute
+      them. Point this at a folder of your own images instead &mdash; a file per expression name
+      (<code>smile.png</code>, <code>shock.png</code>, <code>glare.png</code>, <code>angry.png</code>,
+      <code>sad.png</code>, <code>kiss.png</code>, <code>puff.png</code>, <code>wink.png</code>,
+      <code>neutral.png</code>) and it will use those instead of the emoji.
+    </div>
+    <div class="row">
+      <input type="text" id="catDir" placeholder="/GPU_Assets/my-cats  (a URL path this server can serve)"
+             style="flex:1 1 320px;padding:7px 9px;background:#0c0f14;color:#e8eef8;border:1px solid #2a3340;border-radius:6px;font:12px ui-monospace,monospace;">
+      <button id="bUseDir">Use these</button>
+      <button id="bClearDir">Back to emoji</button>
+    </div>
+    <div id="dirState" class="hint"></div>
+  </div>
+
+</main>
+<script type="module">
+// v4110 -- the front door for ui/faceExpressionSet.js. THE JUDGEMENT IS NOT HERE: this page renders whatever
+// classify() says and adds no thresholds of its own. A page that re-derived "is this a smile" would be the
+// second copy of the rule, and the copy is always the one that drifts (v3527's shape, which this tree has now
+// paid for repeatedly). Everything below is presentation.
+import { RECIPES, REFUSED, NEUTRAL, makeExpressionReader } from "/ui/faceExpressionSet.js";
+import { makeMediaPipeFaceTracker } from "/face/MediaPipeFaceTracker.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Emoji per expression, read from the recipes themselves so this page invents no mapping of its own.
+const EMOJI = Object.fromEntries(RECIPES.map((r) => [r.name, r.emoji]));
+EMOJI[NEUTRAL] = "\u{1F63C}";
+const NO_FACE = "\u{1F440}";
+
+// ---- the refusals, shown rather than silently missing ------------------------------------------------------
+$("refused").innerHTML = REFUSED.map((r) =>
+    '<div class="refused"><b>' + esc(r.name) + "</b> &mdash; " + esc(r.why) +
+    '<div style="margin-top:5px;color:#b9a06a;">Would need: ' + esc(r.wouldNeed) + "</div></div>"
+).join("") || '<div class="hint">nothing is refused</div>';
+
+// ---- the live score table, one row per recipe --------------------------------------------------------------
+const rows = new Map();
+{
+    const tb = $("scores").querySelector("tbody");
+    for (const r of RECIPES) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td class="k">' + r.emoji + " " + esc(r.name) + '</td>' +
+                       '<td style="width:58px" class="val">-</td>' +
+                       '<td><div class="barOuter"><div class="barIn"></div></div></td>';
+        tb.appendChild(tr);
+        rows.set(r.name, { val: tr.querySelector(".val"), bar: tr.querySelector(".barIn") });
+    }
+}
+
+// ---- optional user-supplied images -------------------------------------------------------------------------
+let catDir = "";
+try { catDir = localStorage.getItem("swek.catReactions.dir") || ""; } catch {}
+if (catDir) $("catDir").value = catDir;
+function applyDir(dir) {
+    catDir = String(dir || "").trim().replace(/\/+$/, "");
+    try { if (catDir) localStorage.setItem("swek.catReactions.dir", catDir); else localStorage.removeItem("swek.catReactions.dir"); } catch {}
+    $("dirState").textContent = catDir
+        ? "using images from " + catDir + " -- a name that 404s falls back to its emoji, so a missing file is not a broken page"
+        : "using emoji (nothing third-party ships with the engine)";
+}
+applyDir(catDir);
+$("bUseDir").onclick = () => applyDir($("catDir").value);
+$("bClearDir").onclick = () => { $("catDir").value = ""; applyDir(""); };
+
+// A 404 on a user's own file must NOT blank the reaction -- fall back to the emoji for that expression.
+function showReaction(name) {
+    const emoji = EMOJI[name] || NO_FACE;
+    if (!catDir) { $("cat").textContent = emoji; $("cat").style.display = ""; $("catImg").style.display = "none"; return; }
+    const img = $("catImg");
+    img.onerror = () => { img.style.display = "none"; $("cat").style.display = ""; $("cat").textContent = emoji; };
+    img.onload = () => { img.style.display = ""; $("cat").style.display = "none"; };
+    img.src = catDir + "/" + name + ".png";
+}
+
+// ---- the run loop ------------------------------------------------------------------------------------------
+let tracker = null, timer = null;
+const reader = makeExpressionReader({ holdMs: 700, enter: 0.05 });
+
+function render(out) {
+    // The score table always reflects the RAW verdict; the big reaction reflects the STABLE one. Showing the
+    // raw scores while the reaction holds is what makes the hold visible instead of looking like a stuck page.
+    const byName = new Map(((out.raw && out.raw.ranked) || []).map((r) => [r.name, r.score]));
+    for (const [name, el] of rows) {
+        const v = byName.get(name) || 0;
+        el.val.textContent = v ? v.toFixed(2) : "-";
+        el.bar.style.width = Math.round(v * 100) + "%";
+    }
+    if (!out.usable) {
+        $("verdict").innerHTML = '<span class="warn">no face</span>';
+        $("verdictWhy").textContent = "The camera is running but nobody is in frame. This is deliberately NOT " +
+            "shown as neutral -- a face that cannot be seen is not a calm face.";
+        showReaction(null);
+        return;
+    }
+    const r = RECIPES.find((x) => x.name === out.name);
+    $("verdict").innerHTML = (EMOJI[out.name] || "") + " " + esc(out.name) +
+        (out.score ? ' <span class="hint">' + out.score.toFixed(2) + "</span>" : "");
+    $("verdictWhy").textContent = r ? r.note : "nothing cleared its threshold, which is what neutral means here";
+    showReaction(out.name);
+}
+
+$("bStart").onclick = async () => {
+    $("bStart").disabled = true;
+    $("state").innerHTML = "requesting the camera and loading the model (about 12MB, once)&hellip;";
+    try {
+        tracker = makeMediaPipeFaceTracker({});
+        await tracker.start();
+    } catch (e) {
+        $("state").innerHTML = '<span class="bad">camera unavailable: ' + esc((e && e.message) || e) + "</span>";
+        $("bStart").disabled = false; tracker = null; return;
+    }
+    $("state").innerHTML = '<span class="good">running</span> &mdash; local only, nothing leaves this page.';
+    $("bStop").disabled = false;
+    timer = setInterval(() => {
+        let snap = null;
+        try { snap = tracker && tracker.snapshot ? tracker.snapshot() : null; } catch {}
+        render(reader.read(snap && snap.active ? snap.blendShapes : null));
+    }, 80);
+};
+
+$("bStop").onclick = () => {
+    if (timer) { clearInterval(timer); timer = null; }
+    try { tracker && tracker.stop && tracker.stop(); } catch {}
+    tracker = null; reader.reset();
+    $("bStart").disabled = false; $("bStop").disabled = true;
+    $("state").textContent = "stopped -- the camera is released.";
+    // STOPPING IS NOT SEEING: the reaction goes back to the no-face state rather than freezing on the last
+    // expression, which would claim a face nobody is reading any more (v3114's own rule, kept).
+    $("verdict").innerHTML = '<span class="hint">stopped</span>';
+    $("verdictWhy").textContent = "The camera is released. The last expression is deliberately not left on screen.";
+    showReaction(null);
+    for (const [, el] of rows) { el.val.textContent = "-"; el.bar.style.width = "0"; }
+};
+
+// Release the camera if the page is hidden/unloaded -- an orphaned getUserMedia keeps the light on.
+window.addEventListener("pagehide", () => { try { if (timer) clearInterval(timer); tracker && tracker.stop && tracker.stop(); } catch {} });
+</script>
+<script type="module" src="/ui/demoChrome.js"></script>
+</body>
+</html>
