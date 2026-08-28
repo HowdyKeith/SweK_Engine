@@ -35,6 +35,14 @@
 //   process. So the 212.5 s here is the useful number and the isolated 115.7 s is the misleading one -- which
 //   is the opposite of the conclusion the isolated measurement invited, and the reason this paragraph exists.
 //
+//   *** AND THE REPEATABILITY WAS MEASURED TOO, BECAUSE "DISTRUST THEM" IS NOT A NUMBER. *** The paragraphs
+//   above are all about how far a cost can move, and they are worth little without the other bound: how far
+//   it moves when nothing changes. quantum's sweep cost was frozen at 100481 ms and then re-measured, alone
+//   and in the same position, at 100264 ms -- 0.2 % apart. SO THE NOISE FLOOR AT FIXED POSITION IS TENTHS OF
+//   A PERCENT AND EVERY LARGE DISCREPANCY IN THIS FILE'S HISTORY WAS POSITION OR CONTENTION, NEVER JITTER.
+//   That is what makes the 1.9x and 15x readings above diagnosable instead of just noisy: a lab whose
+//   repeat measurements disagreed by 50 % could not have told any of those stories.
+//
 //   NOT A RATCHET. corroboration-reach-baseline.json exists to catch a number FALLING and says so. This one
 //   carries no assertion at all: a device getting slower is news about the device, not a regression in the
 //   record, and pinning costs with === would fire on every machine that is not the one that froze it.

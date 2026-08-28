@@ -589,24 +589,24 @@
   "freeze": 107873,
   "vaporize": 2,
   "crystallize": 2538,
-  "blobkelvin": 4
+  "blobkelvin": 4,
+  "quantum": 100481,
+  "diffusion": 113720,
+  "cfl": 285346,
+  "lens": 329530,
+  "xpbd": 527619
  },
  "sweepAtLeast": {
-  "xpbd": 285950,
   "windtunnel": 302518,
   "thermal": 302543,
   "pipe3d": 321927,
   "kh": 309287,
   "kuramoto": 301810,
-  "diffusion": 105243,
   "twof": 1,
-  "cfl": 191595,
   "stability": 311683,
-  "quantum": 92768,
   "freesurface": 300158,
   "flip3d": 302325,
-  "multigrid3d": 302048,
-  "lens": 217040
+  "multigrid3d": 302048
  },
- "sweepFrozenOn": "2026-08-28T14:20:01.188Z"
+ "sweepFrozenOn": "2026-08-28T14:43:39.328Z"
 }
