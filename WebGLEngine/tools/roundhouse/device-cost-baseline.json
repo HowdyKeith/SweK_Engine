@@ -600,13 +600,13 @@
   "kh": 1806334,
   "twof": 4053123,
   "multigrid3d": 361751,
-  "windtunnel": 370394
+  "windtunnel": 370394,
+  "thermal": 469500
  },
  "sweepAtLeast": {
-  "thermal": 302543,
   "pipe3d": 321927,
   "kuramoto": 301810,
   "freesurface": 300158
  },
- "sweepFrozenOn": "2026-08-28T17:49:28.423Z"
+ "sweepFrozenOn": "2026-08-28T17:57:17.925Z"
 }
