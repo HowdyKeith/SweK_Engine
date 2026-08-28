@@ -599,14 +599,14 @@
   "flip3d": 2898487,
   "kh": 1806334,
   "twof": 4053123,
-  "multigrid3d": 361751
+  "multigrid3d": 361751,
+  "windtunnel": 370394
  },
  "sweepAtLeast": {
-  "windtunnel": 302518,
   "thermal": 302543,
   "pipe3d": 321927,
   "kuramoto": 301810,
   "freesurface": 300158
  },
- "sweepFrozenOn": "2026-08-28T17:43:18.026Z"
+ "sweepFrozenOn": "2026-08-28T17:49:28.423Z"
 }
