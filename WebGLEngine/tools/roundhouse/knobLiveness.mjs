@@ -455,12 +455,30 @@ export const deafnessUnanswered = (rows) => rows.filter((r) => r.incomplete && r
  * and this is the one in between -- a partial measurement, which is the most dangerous of the three to
  * promote, because it looks exactly like the first.
  */
-export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive && r.incomplete)
+export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.incomplete)
     .map((r) => r.device + "." + r.knob + " (probed in " + r.probed.join(", ")
         + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")").sort();
 
-/** Read, but flat across its working range -- and the wide ladder proves the code reaches it. */
-export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive)
+/**
+ * Read, but flat across its working range -- and the wide ladder proves the code reaches it.
+ *
+ * *** v4043 -- AND ONLY FROM A DEVICE THE CENSUS FINISHED, WHICH v4031 GOT RIGHT FOR `still` AND ARGUED
+ * ITSELF OUT OF HERE. *** That round excluded incomplete rows from stillKnobs and left this list alone on the
+ * reasoning, written down at the time, that "an incomplete row that woke on the wide ladder IS live, so leave
+ * it alone". The reasoning was wrong, and a sweep found out how wrong.
+ *
+ * "Insensitive over its working range" is a claim about how a knob behaves WHERE IT IS READ. A row from a
+ * device that never entered the modes reading that knob cannot support it: the knob is simply absent from the
+ * mode that was probed, so the near ladder finds nothing and the wide ladder wakes something incidental -- a
+ * clamp, a refusal, a shared guard. MEASURED: a sweep on tight per-device budgets probed `quantum` in `bands`
+ * alone and filed EIGHT of its knobs as insensitive -- E, L, N, V0, count, dt, omega, steps. Given a budget
+ * it could finish inside, every one is LIVE: omega in `osc`, E in `tunnel`, count in `well`. The insensitive
+ * list had been manufactured by budget starvation.
+ *
+ * That is the fourth time this file has needed the same line drawn -- v4030 for null defaults, v4031 for
+ * still, v4042a for deafness -- and the second time I have been the one to erase it.
+ */
+export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive && !r.incomplete)
     .map((r) => r.device + "." + r.knob + " (" + r.wideLive + ")").sort();
 
 /**
