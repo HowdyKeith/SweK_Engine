@@ -336,6 +336,25 @@ export const MEASURED = {
     // narrows claimTrace's own scope (fewer devices per run) or twof's own build cost drops -- this number is a
     // measurement of today's lab, not a promise about tomorrow's.
     "tools/roundhouse/claimTrace-selfcheck.mjs":     555728,
+
+    // *** v4090 -- stability MOVES OUT OF UNRESOLVED, WHERE IT HAD SAT SINCE v3924 AS "exceeded a 150s cap;
+    // never timed before that". *** It was never a hung gate and never a broken one: measured to completion
+    // TWICE, all checks passing both times, and the only reason it read as a timeout is that the ~139.9s general
+    // default kills it about 40% of the way in. That is precisely the population this table exists for, and the
+    // v3924 note beside it named the correct traffic in advance ("packingTransfer was, and moved out of this
+    // list to MEASURED at 195s on the same round, which is what that traffic should look like").
+    //
+    // TWO RUNS, AND THE DIFFERENCE BETWEEN THEM IS RECORDED RATHER THAN AVERAGED AWAY: 235489ms run ALONE on an
+    // otherwise idle box, and 260224ms on a run that OVERLAPPED another gate. The higher figure is the one
+    // written here, matching this file's own convention two entries up (claimTrace: "The higher of the two is
+    // recorded here", and valueMatch records the worst of three) -- for a BUDGET the observed worst is the
+    // conservative choice, and a budget set from the fastest clean run is one that kills the gate the first time
+    // the box is busy. *** THE CONTENTION IS NAMED BECAUSE THIS TREE HAS PAID FOR NOT NAMING IT: v4039 recorded
+    // a kuramoto build reading 1064s inside a contended sweep against 19.4s in isolation, a 55x error that came
+    // from nothing but a second measurement racing the first. *** 260224 is therefore a real upper reading and
+    // not a clean-room runtime; the clean-room figure is 235489 and both are here so the next reader can tell
+    // which question they are answering.
+    "physics/sph/stability-selfcheck.mjs":           260224,
 };
 
 export const TAIL_HEADROOM = 2;
@@ -364,8 +383,8 @@ export const UNRESOLVED = {
     // fit". IT IS NOT A RUNTIME. A LOWER BOUND IS NOT A MEASUREMENT -- the rule this table was created for --
     // so none of these gets a number in MEASURED until it has been watched to the end. packingTransfer was, and
     // moved out of this list to MEASURED at 195s on the same round, which is what that traffic should look like.
-    "physics/sph/stability-selfcheck.mjs":
-        "exceeded a 150s cap at v3924; never timed before that. Not measured to completion, so no budget is claimed",
+    // v4090 -- stability's line WAS HERE and is DELETED rather than edited, exactly as the paragraph above this
+    // table instructs. It is measured to completion in MEASURED now (260224ms, all checks passing, two runs).
     "tools/roundhouse/corroborationCensus-selfcheck.mjs":
         "exceeded a 150s cap at v3924. A census over the device registry, so it grows with the lab -- the same shape as labResults, whose entry records that it will outrun any number written down",
     "tools/roundhouse/libmSensitivity-selfcheck.mjs":

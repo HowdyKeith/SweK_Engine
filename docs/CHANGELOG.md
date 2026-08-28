@@ -8,6 +8,59 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4090 -- a gate that was never hung, and three that are not red here
+
+`physics/sph/stability-selfcheck.mjs` moves out of `tools/ship/gateBudget.mjs`'s `UNRESOLVED` table, where it
+had sat since v3924 labelled "exceeded a 150s cap at v3924; never timed before that."
+
+### It was never a hung gate and never a broken one
+
+Measured to completion TWICE on this box, all checks passing both times. The only reason it ever read as a
+timeout is that the ~139.9s general default kills it roughly 40% of the way in -- and, as that table's own
+header puts it, a gate that cannot finish cannot tell you whether it is broken. This is exactly the traffic the
+v3924 note beside it predicted: "packingTransfer was, and moved out of this list to MEASURED at 195s on the
+same round, which is what that traffic should look like."
+
+### The two runs disagree, and the difference is recorded rather than averaged away
+
+    235489 ms   run ALONE on an otherwise idle box
+    260224 ms   run that OVERLAPPED another gate
+
+The higher figure ships as the budget, matching this file's own stated convention two entries above it
+(claimTrace: "The higher of the two is recorded here"; valueMatch records the worst of three). For a BUDGET the
+observed worst is the conservative choice: a budget set from the fastest clean run is one that kills the gate
+the first time the box is busy.
+
+The contention is NAMED because this tree has already paid for not naming it. v4039 recorded a kuramoto build
+reading 1064 s inside a contended sweep against 19.4 s in isolation -- a 55x error produced by nothing but a
+second measurement racing the first. So both figures live in the table, and the next reader can tell which
+question each one answers: 260224 is a real upper reading, 235489 is the clean-room runtime.
+
+Its `UNRESOLVED` line is DELETED rather than edited in place, which is what the paragraph above that table
+instructs and the one thing it says has reliably stopped a threshold being loosened in this tree.
+`UNRESOLVED` goes 9 entries -> 8.
+
+### Three reported failures that do not reproduce here, and no invented fixes for them
+
+`shipRitual-selfcheck.mjs`, `physics/stepperMeter-selfcheck.mjs` and
+`tools/roundhouse/strictConfig-selfcheck.mjs` were all reported red from the rig. ALL THREE PASS CLEAN ON THIS
+TREE -- exit 0, zero failures each, run directly.
+
+`stepperMeter`'s reported failure is a BIT-IDENTICAL float comparison against a frozen v3604 extract, which is
+precisely the reading this tree's own v3997 finding predicts will differ between platforms: "over 200,000
+inputs Math.sqrt was the ONLY function tested that agreed on both runtimes -- cbrt, cos, sin, tan, atan, exp,
+log, pow, hypot and atan2 all differ somewhere by 1 ulp." Reproducing it needs the rig, and a fix invented here
+would be a guess at a defect that cannot be seen from this box.
+
+`shipRitual`'s reported failure (launch-index 407 pages against 410 html on disk) also does not reproduce: the
+index reads 410/410 here and its committed state already matches, so that report was a transient snapshot taken
+between an HTML page landing and the next `launchIndex.mjs --write`.
+
+Writing these down as "not reproducible here" rather than shipping speculative patches for them is the point.
+
+### Gates
+
+`gateBudget-selfcheck.mjs`: all checks pass with stability in `MEASURED` and absent from `UNRESOLVED`.
 ## Since v4089 -- twenty-nine headers, corrected in both directions
 
 `tools/ship/statedRuntime-selfcheck.mjs` reported 29 gate headers whose stated runtime had drifted more than
