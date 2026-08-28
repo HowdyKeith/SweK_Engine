@@ -8,6 +8,50 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4103 -- the verify-preview launcher never stopped anything it started, and Keith found the tell
+
+Keith, after this session pushed twelve rounds to `origin/main`: "old swek launcher is still running, and
+old kpop listener is still running too, not closing" -- "normally that always works now, but not now." When
+the obvious workaround was floated he pushed back correctly: "closing manually would be dangerous as a user
+could not easily tell which is old." Then came the actual diagnostic tell: "i see that swek is getting a
+different port each time?"
+
+That last line named the mechanism. `ai-bridge/sourceChainBridge.js`'s `launch()` (v4014, the "Clone ->
+verify -> Publish" panel's preview button) hands the clone a fresh OS-assigned port on every single call,
+via `listen(0)` -- on purpose, so a verify preview never fights the running production engine for its own
+`:8787`. v3941/v4014's own words for the guarantee: "side by side, never over the top." That guarantee was
+never the bug, and this fix does not touch it.
+
+### What was actually missing
+
+Nothing about `launch()` ever recorded what an earlier call had started. Click the preview button three
+times and there are three live engines, three console windows, each on its own port, and nothing about any
+of them says which is current and which is a leftover -- exactly the ambiguity Keith flagged as dangerous to
+resolve by hand.
+
+### The fix
+
+`launch()` now remembers `{port, root, version, at}` for the preview it just started. The next call to
+`launch()` stops that specific one first, by calling `portHandoff.js`'s existing `freePort()` -- the same
+kill-whatever-is-listening-here helper the production port-collision handoff already relies on -- pointed at
+the port this bridge itself recorded. It can never reach production's own bound port, because it is never
+given that port: the call only ever names `R.launched.port`, a value nothing but a previous `launch()` call
+from this same process could have set.
+
+The spawned console window also gets a real title now -- `"SweK Verify vNNNN :PORT"` -- replacing the empty
+string that `start` previously received only as its dummy quoting argument. So a preview that does linger
+(a crash between launches, a manual close that missed) is nameable on sight rather than indistinguishable
+from production, which is the actual danger in Keith's second message.
+
+### Verification
+
+The real spawn path is Windows/Mac only and this box is neither, the same limit `tools/ship/sourceChain-
+selfcheck.mjs` sections 8 and 8b already name for this file. So the new section 9b proves the source
+properties directly, the same technique 8b already uses for `launcherName()`'s platform-only regression: the
+stop runs before a new port is requested, the `freePort()` target can only ever be `R.launched.port` and
+never `PORT` (a regex asserts `freePort(PORT` never appears in the file), the window title is a real string,
+and `R.launched` is recorded after a successful spawn and surfaced on `status()`. `sourceChain-selfcheck`:
+all 42 checks pass.
 ## Since v4102 -- a scrollbar inside the GitHub Manager panel, and why 110% made it obvious
 
 Keith saw a horizontal scrollbar inside the GitHub Manager overlay on `server.html`, and reported it looking
