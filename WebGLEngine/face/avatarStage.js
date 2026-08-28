@@ -2196,8 +2196,18 @@ export function mountStage(canvas, opts = {}){
     const CREAM=[0.90,0.85,0.74], EAR=[0.60,0.54,0.44], FACE=[0.74,0.67,0.56];
     drawLlamaPart(GEO.ball, mMul(B, mMul(mTranslate(0,0.34,0), mScale(1.05,0.85,1.65))), CREAM);     // body
     const legs=[[-0.10,0.13,0],[0.10,0.13,Math.PI],[-0.10,-0.15,Math.PI],[0.10,-0.15,0]];
+    // Keith: the legs looked planted at the floor and swinging at the top -- backward from how a leg actually
+    // moves. *** THE PIVOT WAS AT THE FOOT INSTEAD OF THE HIP. *** buildCylinder spans local y 0->1, base (the
+    // foot end, once scaled+placed) AT THE ORIGIN -- so `mRotX(sw)`, applied before the final translate, always
+    // rotated about that base. The base is fixed under its own rotation, so the foot never moved at all, and
+    // the free end swinging was the TOP of the cylinder, near the body -- exactly backward: a real leg is
+    // anchored to the body at the HIP and it is the FOOT that swings free beneath it.
+    // Fixed by shifting the unit cylinder by (0,-1,0) BEFORE scaling, so the TOP (y=1) lands on the origin
+    // instead of the base (y=0) -- the pivot is now the hip end, and the foot (now at local y=-1, scaled to
+    // -0.30) is what swings. The final translate moves to y=0.45 (=0.15+0.30, the old unrotated TOP height)
+    // instead of y=0.15, so the resting (sw=0) pose is pixel-identical to before -- only the swing changes.
     for(const lg of legs){ const sw=mv?Math.sin(t*8+lg[2])*0.35:0;
-      drawLlamaPart(GEO.cyl, mMul(B, mMul(mMul(mTranslate(lg[0],0.15,lg[1]), mRotX(sw)), mScale(0.13,0.30,0.13))), CREAM); }
+      drawLlamaPart(GEO.cyl, mMul(B, mMul(mMul(mMul(mTranslate(lg[0],0.45,lg[1]), mRotX(sw)), mScale(0.13,0.30,0.13)), mTranslate(0,-1,0))), CREAM); }
     // v4052 -- Keith: "could we put the avatar pet head on top of the neck, and the neck is half the height?"
     // *** THE HEAD WAS ALREADY RIGHT. THE NECK HAD A FLIPPED SIGN AND ROUGHLY DOUBLE THE LENGTH. *** buildCylinder
     // spans y 0->1 (base at the origin, NOT centred), so the neck's top cap is base + len*(0, cos t, sin t).

@@ -8,6 +8,36 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4078 -- the pet llama's legs pivoted at the foot, not the hip
+
+Keith: "the legs stay locked at the floor, and the legs swing at the top of the legs, which I think is
+opposite how legs move." Correct, and found in `face/avatarStage.js`'s pet-llama walk cycle.
+
+### The rotation pivoted at the foot instead of the hip
+
+`buildCylinder` spans local y 0->1 with the base (the foot end, once the leg is placed) AT THE ORIGIN, and
+`mRotX(sw)` was applied to that cylinder BEFORE the final translate -- so it always rotated about the base. A
+point at its own rotation's pivot cannot move, so the foot the old code placed there was locked to the floor no
+matter what the swing angle was, while the far end of the cylinder (which the leg's placement puts near the
+body -- the hip) swept an arc around it. Exactly backward: a real leg is anchored to the body at the hip and it
+is the foot that swings free beneath it.
+
+MEASURED rather than argued from the matrix algebra alone: recomputing the exact `mMul`/`mTranslate`/`mRotX`/
+`mScale` chain the source used, the local point at the foot end moved 0.0000 under a 0.35 rad swing while the
+hip end moved 0.1045 -- the opposite of a walking gait.
+
+Fixed by shifting the unit cylinder by (0,-1,0) before scaling, so the TOP (hip) lands on the rotation's pivot
+instead of the base (foot); the foot (now at local y=-1, scaled) is what swings. The final translate moved from
+0.15 to 0.45 (=0.15+0.30, the old unrotated top's height) so the resting pose is unchanged to within float32
+rounding (2.98e-8) -- only which end swings changed, not the llama's look.
+
+### Gate
+
+`tools/ship/avatarFraming-selfcheck.mjs` gained a new section that reproduces the old bug's exact numbers (foot
+0.0000 / hip 0.1045) and confirms the fix (hip 0.0000 / foot 0.1045) by independently recomputing the same
+matrix chain the source defines, plus regex assertions on the source shape itself -- sabotage-checked against
+the old line, which does not match the fixed-shape regex. All prior sections of that gate (the three real
+render-verified framing bugs from v4033, and the v4052 neck-derivation fix) still pass unchanged.
 ## Since v4077 -- moss species/biomes, and Sylva's root/arch geometry
 
 The two follow-ons v4076's own changelog named rather than built: "one moss species, not a biome table" and
