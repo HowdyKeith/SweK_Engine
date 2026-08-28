@@ -16477,6 +16477,36 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- ntfs-mounter: install button for zavierferodova/Mac-NTFS-Mounter (no licence, macOS-only) ---------
+    // v4125 -- Keith: the free Mac App Store NTFS mounters lie about being free, the paid one he has fails
+    // often. Same non-vendoring reasoning as /galaxy/*, but this one asks for root and touches a real disk, so
+    // Keith chose "confirm before each mount" over full automation: /ntfs/volumes is read-only and needs no
+    // privilege; /ntfs/mount requires the exact volume named in a SEPARATE call. Neither this route layer nor
+    // the bridge ever receives or stores a password -- every privileged step uses `sudo -n`, which fails
+    // closed rather than prompting.
+    if (req.url.split("?")[0] === "/ntfs/status" && req.method === "GET") {
+        try { require("./ntfsMounterBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ntfs/install" && req.method === "POST") {
+        try { sendJson(require("./ntfsMounterBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url.split("?")[0] === "/ntfs/volumes" && req.method === "GET") {
+        try { require("./ntfsMounterBridge.js").listVolumes().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/ntfs/mount" && req.method === "POST") {
+        readJson(d => {
+            try { require("./ntfsMounterBridge.js").mount(d && d.name).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 

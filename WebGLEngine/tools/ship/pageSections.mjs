@@ -209,7 +209,11 @@ export const SECTIONS = [
       // v4124 -- galaxy-profile.html JOINS, filed beside webrtx.html and voxtral.html for the same reason: it is
       // an opt-in front door to somebody else's work (vinimlo/galaxy-profile, GPL-3.0), installed and run on
       // this machine rather than vendored into the tree, with the licence and attribution surfaced on the page.
-      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html", "galaxy-profile.html",
+      // v4125 -- ntfs-mounter.html JOINS, same rule again: an opt-in install button for zavierferodova/Mac-NTFS-
+      // Mounter (no licence file at all). It ALSO appears in the Mac System view (pagePlacements.mjs's
+      // macPages()) because diskutil/MacFUSE make it Mac-only by construction -- that is a VIEW, not a second
+      // home, so this is still the one place it is actually filed.
+      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this

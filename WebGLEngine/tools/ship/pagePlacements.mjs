@@ -254,6 +254,12 @@ export function macPages() {
         { file: "hosting.html",        why: "calls /hosting/tunnel/status, the tunnel the Mac fronts" },
         { file: "settings.html",       why: "same tunnel status route" },
         { file: "phone.html",        why: "launches a .command from its own script" },
+        // v4125 -- Keith: "this would be in the Mac System panel section on Server.html," about the NTFS mounter
+        // install button. Its real home is System Tools (pageSections.mjs), same as galaxy-profile.html and
+        // webrtx.html -- this is the view, not a second claim. Genuinely Mac-only by construction, same shape
+        // as external-linalg.html above: diskutil, /Volumes and MacFUSE do not exist on any other platform, and
+        // the bridge's own IS_MAC guard refuses cleanly everywhere else.
+        { file: "ntfs-mounter.html", why: "needs diskutil, /Volumes and MacFUSE; Mac-only by construction" },
         // v4034 -- bzflag.html and rocket-league.html LEAVE this view, at Keith's request: "these need to be
         // removed from Mac System panel. they are in Game Theory panel and that is where they should be." They
         // still launch a .command from their own script -- that fact did not change -- but this view's whole

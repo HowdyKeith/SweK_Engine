@@ -1,0 +1,180 @@
+<meta charset="utf-8">
+<title>NTFS Mounter (opt-in, macOS only)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#070b11; --ink:#cfe0f2; --dim:#7690ad; --line:#16283c; --ok:#4e9e78; --hot:#d9695f; --warn:#c8a24e; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+  .wrap { max-width:900px; margin:0 auto; padding:26px 18px 60px }
+  h1 { font-size:20px; margin:0 0 4px } .sub { color:var(--dim); font-size:12.5px; margin:0 0 20px }
+  .card { border:1px solid var(--line); border-radius:10px; padding:15px 16px; margin-bottom:14px; background:#050a12 }
+  .card.locked { opacity:.55 }
+  h2 { font-size:14px; margin:0 0 9px; color:#9fc4e6 }
+  .note { color:var(--dim); font-size:12px; margin:0 0 10px }
+  table { border-collapse:collapse; width:100%; font-size:12.5px }
+  td { padding:4px 8px 4px 0; vertical-align:top; border-bottom:1px solid #0d1826 }
+  td.k { color:var(--dim); width:150px; white-space:nowrap }
+  code { color:#9fd7ff; font-size:11.5px; word-break:break-all }
+  .yes { color:var(--ok) } .no { color:var(--hot) } .unk { color:var(--warn) }
+  button { background:#12243a; color:var(--ink); border:1px solid #24405e; border-radius:7px; padding:6px 13px; cursor:pointer; font:inherit }
+  button:disabled { opacity:.4; cursor:not-allowed }
+  ul { margin:6px 0 0; padding-left:18px } li { margin:3px 0; font-size:12px; color:var(--dim) }
+  pre.log { background:#040810; border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; font-size:11px; color:#7690ad; margin:8px 0 0; max-height:180px }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  .banner { border:1px solid #4a2f2c; background:#150a09; border-radius:9px; padding:12px 14px; margin-bottom:16px }
+  .banner b { color:#f0a79e }
+  .vol { border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin-top:6px; display:flex; justify-content:space-between; align-items:center; gap:10px }
+  .vol.sel { border-color:#3a608c; background:#0c1826 }
+  .confirmBox { border:1px solid #4a3a20; background:#160f08; border-radius:8px; padding:10px 12px; margin-top:10px }
+</style>
+<div class="wrap">
+  <h1>NTFS Mounter</h1>
+  <p class="sub">An install button for <b>somebody else's script</b> (no licence file on it at all, so run it
+    unmodified rather than reimplement it), macOS-only, and never handling your password.</p>
+
+  <div id="platformBanner"></div>
+
+  <div class="card">
+    <h2>Whose work this is</h2>
+    <table id="prov"></table>
+    <p class="note" style="margin-top:8px">No LICENSE file exists in this repo at any commit checked, which
+      means all rights are reserved by default. This page never vendors it, never edits it, and runs it exactly
+      as published rather than re-deriving its commands.</p>
+  </div>
+
+  <div class="card" id="card1">
+    <h2>1 &mdash; Install (clone, pin to a reviewed commit, brew macfuse + ntfs-3g-mac)</h2>
+    <table id="facts"></table>
+    <div class="row" style="margin-top:8px">
+      <button id="install">Install</button>
+      <span id="installState" class="note"></span>
+    </div>
+    <pre class="log" id="installLog" style="display:none"></pre>
+    <p class="note" style="margin-top:8px"><b>After Install:</b> macOS will ask you, separately, to approve the
+      MacFUSE system extension in <b>System Settings &rarr; Privacy &amp; Security</b> (and may ask for a
+      restart). No script can click through that on your behalf &mdash; it is Apple's own gate, not this page's.</p>
+  </div>
+
+  <div class="card locked" id="card2">
+    <h2>2 &mdash; Volumes (read-only &mdash; listing needs no privilege and mounts nothing)</h2>
+    <div class="row"><button id="refreshVols">Refresh</button> <span id="volState" class="note"></span></div>
+    <div id="volList"></div>
+  </div>
+
+  <div class="card locked" id="card3">
+    <h2>3 &mdash; Mount (requires a separate, explicit confirmation)</h2>
+    <div id="confirmArea"></div>
+    <pre class="log" id="mountLog" style="display:none"></pre>
+  </div>
+
+  <div class="card">
+    <h2>What this page refuses to do</h2>
+    <ul id="refusedList"></ul>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const rows = (t, p) => { t.innerHTML = p.map(([k, v]) => `<tr><td class="k">${k}</td><td>${v}</td></tr>`).join(""); };
+let installPoll = null, ready = false, selected = null, volumes = [];
+
+async function api(path, opts) { const r = await fetch(path, opts); return r.json(); }
+
+function renderProvenance(s) {
+  const u = s.upstream, m = s.maintenance;
+  rows($("prov"), [
+    ["Project", `<a href="${u.repo}" style="color:#9fd7ff">${u.repo}</a> by ${u.author}`],
+    ["What it does", u.what],
+    ["Licence", `<b class="no">${u.license}</b> &mdash; ${u.licenseVerified}`],
+    ["Pinned commit", `<code>${s.pinnedCommit || ""}</code> (${u.committed})`],
+    ["Maintenance", `${m.commits} commits, ${m.branches.join(", ")}, ${m.tags} tags, last ${m.lastCommit}.
+       <i>How checked: ${m.howChecked}</i>`],
+  ]);
+  $("refusedList").innerHTML = (s.refused || []).map((r) =>
+    `<li><b class="no">${r.what}</b> &mdash; ${r.why}</li>`).join("");
+}
+
+function renderFacts(s) {
+  rows($("facts"), [
+    ["Homebrew", s.brewPresent ? '<b class="yes">found</b>' : '<b class="no">not found</b> -- see brew.sh'],
+    ["Cloned", s.cloned ? '<b class="yes">yes</b>' : "not yet"],
+    ["At pinned commit", s.cloned ? (s.atPinnedCommit ? '<b class="yes">yes</b>' : '<b class="no">NO -- re-run Install</b>') : "&mdash;"],
+    ["MacFUSE (brew cask)", s.macfuseInstalled ? '<b class="yes">installed</b>' : "not yet"],
+    ["ntfs-3g-mac (brew)", s.ntfs3gInstalled ? '<b class="yes">installed</b>' : "not yet"],
+    ["sudo authenticated", s.sudoCached ? '<b class="yes">yes, in this environment</b>'
+        : '<b class="unk">no</b> -- run <code>sudo -v</code> in a real Terminal first'],
+  ]);
+  const job = s.installJob;
+  if (job && !job.done) { $("installLog").style.display = "block"; $("installLog").textContent = "[" + job.kind + "] running...\n" + job.tail; $("installState").textContent = "running (" + job.kind + ")..."; }
+  else if (job && job.done) { $("installLog").style.display = "block"; $("installLog").textContent = job.tail; $("installState").innerHTML = job.code === 0 ? '<b class="yes">done</b>' : '<b class="no">failed (exit ' + job.code + ')</b>'; }
+  ready = !!s.ready;
+  $("install").disabled = !!(job && !job.done);
+  $("card2").classList.toggle("locked", !ready);
+  if (s.why && !(job && !job.done)) $("installState").innerHTML += ' <span class="note">' + s.why + "</span>";
+}
+
+async function refresh() {
+  const s = await api("/ntfs/status");
+  if (!s.ok) { $("installState").innerHTML = '<b class="no">' + (s.error || "bridge unavailable") + "</b>"; return; }
+  if (!s.isMac) {
+    $("platformBanner").innerHTML = `<div class="banner"><b>This tool is macOS-only.</b> This box reports platform
+      <code>${s.platform}</code>. diskutil, /Volumes and MacFUSE do not exist anywhere else, so nothing below can run here.</div>`;
+  }
+  renderProvenance(s);
+  renderFacts(s);
+  if (s.installJob && !s.installJob.done) { if (!installPoll) installPoll = setInterval(refresh, 1500); }
+  else if (installPoll) { clearInterval(installPoll); installPoll = null; }
+}
+
+$("install").onclick = async () => {
+  $("installState").textContent = "starting...";
+  const r = await api("/ntfs/install", { method: "POST" });
+  if (!r.ok) { $("installState").innerHTML = '<b class="no">' + r.error + "</b>"; return; }
+  installPoll = setInterval(refresh, 1500);
+};
+
+function renderVolumes() {
+  $("volList").innerHTML = volumes.length
+    ? volumes.map((v, i) => `<div class="vol${selected === v.name ? " sel" : ""}" data-i="${i}">
+        <span><b>${v.name}</b> <span class="note">(${v.identifier})</span></span>
+        <button data-pick="${v.name}">${selected === v.name ? "Selected" : "Select"}</button>
+      </div>`).join("")
+    : '<p class="note">No external volumes found. Plug in the NTFS disk and press Refresh.</p>';
+  for (const b of $("volList").querySelectorAll("[data-pick]")) {
+    b.onclick = () => { selected = b.getAttribute("data-pick"); renderVolumes(); renderConfirm(); };
+  }
+}
+
+function renderConfirm() {
+  $("card3").classList.toggle("locked", !selected);
+  if (!selected) { $("confirmArea").innerHTML = '<p class="note">Select a volume above first.</p>'; return; }
+  const v = volumes.find((x) => x.name === selected);
+  $("confirmArea").innerHTML = `<div class="confirmBox">
+      This will <b>unmount</b> <code>/Volumes/${v ? v.name : selected}</code>
+      (device <code>${v ? v.identifier : "?"}</code>) and <b>remount it read-write via ntfs-3g</b>, using
+      <code>sudo -n</code> (no password prompt -- this page cannot supply one; if sudo is not already
+      authenticated in a real Terminal, this will fail cleanly rather than hang).
+      <div class="row" style="margin-top:8px"><button id="confirmMount">Confirm &amp; Mount ${v ? v.name : selected}</button>
+      <span id="mountState" class="note"></span></div>
+    </div>`;
+  $("confirmMount").onclick = async () => {
+    $("confirmMount").disabled = true;
+    $("mountState").textContent = "running...";
+    const r = await api("/ntfs/mount", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected }) });
+    $("confirmMount").disabled = false;
+    $("mountState").innerHTML = r.ok ? '<b class="yes">mounted ' + r.mounted + "</b>" : '<b class="no">' + r.error + "</b>";
+    if (r.log) { $("mountLog").style.display = "block"; $("mountLog").textContent = r.log; }
+  };
+}
+
+$("refreshVols").onclick = async () => {
+  $("volState").textContent = "reading...";
+  const r = await api("/ntfs/volumes");
+  if (!r.ok) { $("volState").innerHTML = '<b class="no">' + r.error + "</b>"; volumes = []; renderVolumes(); return; }
+  volumes = r.volumes || [];
+  $("volState").textContent = volumes.length + " external volume(s)";
+  renderVolumes();
+};
+
+refresh();
+</script>
