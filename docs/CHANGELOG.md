@@ -8,6 +8,59 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4079 -- demo switching didn't clear the old demo, and Reset never actually cleared an ECS entity
+
+Keith: "when we switch from one orange pill demo to a different demo, the old running demo should stop first
+and clear to empty sandbox, but it is just starting the new demo on top of the old demo."
+
+### Reproduced live, and it was not any of the 42 demos
+
+`window._perfStats.entCount` -- a REAL per-frame draw count (`EntityCubeRenderer`/`EntityMeshRenderer` recompute
+`lastDrawn = entities.length` every frame, not a sticky counter) -- climbed monotonically across 12 demo
+switches (50 -> 57 -> 117 -> 237 -> 865 -> ... -> 2612) and never dropped, even switching FROM the heaviest
+demo tried (missile_command, 2612 entities) to something small.
+
+Isolated further: booting straight to "kaiju" and letting its city sim settle for 6s gave 1180 entities;
+switching to "wildlife" (whose own fresh-boot baseline is 0) left `entCount` at exactly 1180 -- kaiju's own
+entities never went away. But `kaijuManager.kaiju` and `civManager.civilizations` were BOTH size 0 after the
+switch: the demo-specific managers' own bookkeeping was correct.
+
+### The bug was one shared function underneath all 42 demos
+
+`core/ecs/World.js`'s `removeEntity(id)` -- called by every demo's `stop()` via
+`router.exec({type:"entity:despawn", id})` -- only ever did `this.entities.delete(id)`. Nothing that draws a
+frame reads `World.entities`: `bridge/ecs_render_bridge.js`'s `getVisibleEntities()` queries
+`this.components.getAll(Position)` DIRECTLY. So an entity's `Position` (and every other component) stayed in
+`ComponentStore` forever, and it kept rendering exactly as before "despawning" it.
+
+Every demo that ever called `entity:despawn` (tridchess, dejarik, `ambientNPCs`, `aquariumDemo`, `openSeaDemo`,
+`treeSpawner`, ...) was individually correct. The one function all of them funneled through silently did half
+its job.
+
+Fixed with a new `ComponentStore.removeEntity(entityId)` (removes every component type an entity carries,
+across all types) called from `World.removeEntity()`. Every existing `entity:despawn` call site is fixed for
+free -- nothing else needed to change.
+
+VERIFIED: re-ran the same 12-demo-switch live reproduction after the fix. `entCount` now correctly rises AND
+falls per demo instead of only ever climbing; the kaiju->wildlife case (1180 -> 0) now matches wildlife's own
+fresh-boot baseline exactly.
+
+### Bonus: the Reset button's own claim was dead code for the same reason, one layer up
+
+`commandRouter.js`'s `world:reset`/`world:hardReset` handlers have logged "cleared N ECS entities" since v337,
+gated on `this.env.ecs?.clearAll` -- but `World` never had a `clearAll()` method, so that branch was always
+`undefined` and never ran. Reset never actually cleared an ECS entity either.
+
+New `World.clearAll()` (removes every entity and every component, returns `{cleared}`) turns that existing
+branch live rather than adding a new call site -- the fix was making the method commandRouter.js already calls
+actually exist.
+
+### Gate
+
+New `core/ecs/World-selfcheck.mjs`: reproduces the old one-line `removeEntity` leaving a component behind,
+confirms the fix removes it, proves the fix end-to-end through the SAME `getVisibleEntities()` query the
+renderer actually uses (not a proxy metric), and confirms `clearAll()`'s `{cleared: N}` shape against
+`commandRouter.js`'s own expectation.
 ## Since v4078 -- the pet llama's legs pivoted at the foot, not the hip
 
 Keith: "the legs stay locked at the floor, and the legs swing at the top of the legs, which I think is

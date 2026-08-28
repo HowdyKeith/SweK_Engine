@@ -23,6 +23,19 @@ export class ComponentStore {
         this.store.get(type)?.delete(entityId);
     }
 
+    // Removes EVERY component this entity carries, across all types. Without this, deleting an entity from
+    // World.entities did nothing to stop it rendering: bridge/ecs_render_bridge.js's getVisibleEntities() reads
+    // straight from this store (this.ecs.components.getAll(Position)), never from World.entities at all -- so a
+    // "despawned" entity whose Position component was never removed here kept drawing forever. Returns true if
+    // the entity carried at least one component (so a caller can tell "nothing to remove" from "removed").
+    removeEntity(entityId) {
+        let had = false;
+        for (const typeMap of this.store.values()) {
+            if (typeMap.delete(entityId)) had = true;
+        }
+        return had;
+    }
+
     getAll(componentClass) {
         const type = componentClass.name;
         return this.store.get(type) || new Map();
