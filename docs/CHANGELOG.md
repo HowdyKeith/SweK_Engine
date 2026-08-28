@@ -8,6 +8,64 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4101 -- "equals the input" is not the same as "is the input"
+
+Keith uploaded `swekechoconfirm.zip`, a diverged-lineage patch bundle (its own v4048, built on top of a much
+earlier checkout of this tree's `knobLiveness.mjs` history, around this tree's own v4047a) diagnosing a real
+false-negative in `probeKnob`'s echo rule. Per this session's established discipline for a diverged bundle, it
+was read for its diagnosis rather than applied as a patch -- the bundle's version of `probeKnob` tracks
+`sawEcho`/`echoed` fields this tree's version does not have, and its own `partialDeafness` shortlist assumes a
+discriminator (`echoed`) this tree's `partialDeafness` never used in the first place (it filters on live/still
+mode membership instead, shipped independently at v4083). The fix itself was re-derived against this tree's
+actual current shape, and its diagnosis was re-verified fresh before adopting anything.
+
+### The bug
+
+v4031's echo rule discards an observable from a knob's `moved` list whenever it equalled the DEFAULT before the
+probe and the PROBE VALUE after -- exact for a true pass-through (`stability.visc` in mode `deafknob` hands
+`viscosity: c.visc` straight back regardless of anything else), but also the exact signature of a computation
+whose coefficient happens to be one. `box3d`'s `impulse` mode reports `speedAfter` and `speedIdeal`, both
+`j / mass`, and the shipped default `mass` is exactly 1 -- so both numerically equalled `j` at every probe rung,
+both were discarded as echoes, and `box3d.j` read STILL in the one mode that actually applies it. THE RULE
+WRITTEN TO PREVENT FALSE LIVENESS WAS PRODUCING FALSE STILLNESS, reproduced directly on this tree before
+anything was changed:
+
+    probeKnob(box3d, "impulse", cfg, "j", base)  ->  {state: "still", moved: []}   (before the fix)
+
+### The fix
+
+A true echo equals the knob whatever else changes; a computation that merely coincides diverges the moment
+another knob moves -- `j/mass` stops equalling `j` as soon as `mass` does. So a candidate echo is now CONFIRMED
+by trying every other numeric config knob in turn, stopping at the first that breaks the identity. Cost lands
+the right way round: a false echo usually breaks on an early knob and costs little; a true echo pays the full
+cost of trying every other knob, because proving a pass-through is a stronger claim than disproving one. A
+confirmation cut short by the existing `deadline` parameter leaves the candidate an echo -- the safer default
+this file already preferred -- so a rushed sweep degrades to the old, conservative behaviour rather than
+reinstating false stillness silently.
+
+VERIFIED both directions, on the real devices, not only a synthetic fixture:
+
+    box3d.j in impulse             ->  LIVE, moved [speedAfter, speedIdeal]   (1ms -- box3d is a cheap
+                                        closed-form calculation, even with confirmation)
+    stability.visc in deafknob     ->  STILL, confirmed as a true echo        (230586ms -- three other
+                                        config knobs, tried at every probe rung; a genuinely bounded but
+                                        real cost, the deliberately-adversarial worst case in the lab)
+
+### The fix's own cost, found while shipping it
+
+Section 3l (the new demonstration) initially failed on its own fixture: the "reproduce the old bug" assertion
+compared against the default instead of the actual probe value, making it vacuously never trigger. Fixed and
+re-verified.
+
+Separately, `quantum.N`'s starvation test (already re-tuned once this session at v4100, from 2000ms to 6000ms
+for an unrelated reason) needed re-tuning a SECOND time in this same round: 6000ms stopped reaching `N` at all,
+because `quantum`'s `bandGridN` knob now pays its own echo-confirmation cost, and the fix changed the cost
+landscape its own test is measured against. Re-measured a safe margin and set 30000ms.
+
+### Gates
+
+`knobLiveness-selfcheck.mjs`: all checks pass, 594.6s (two full runs during this round -- the first caught both
+the `quantum.N` re-tuning and the section-3l fixture bug; the second was clean).
 ## Since v4100 -- a fourth condition behind a "still" knob reading, adopted from an uploaded bundle
 
 Keith uploaded `swek-deafsweep.zip`, a diverged-lineage patch bundle (its own v4046-v4047a, based on a much

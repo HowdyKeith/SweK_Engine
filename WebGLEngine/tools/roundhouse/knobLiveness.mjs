@@ -199,7 +199,46 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         // Object.is(NaN, NaN) is true. This is the mirror of the v4031 echo bug and the worse direction of the
         // two: a dead reading invites a look, a live one closes the question.
         const echo = (o) => sameValue(base[o], def) && sameValue(out[o], alt);
-        const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !echo(o));
+        // *** v4101 -- "EQUALS THE INPUT" IS NOT THE SAME AS "IS THE INPUT". ***
+        //
+        // The rule above is exact for a TRUE pass-through -- stability's deafknob mode hands `viscosity: c.visc`
+        // straight back regardless of anything else -- but it is ALSO the signature of a computation whose
+        // coefficient happens to be one. box3d/impulse reports speedAfter and speedIdeal, both j/mass, and the
+        // shipped default mass IS 1 -- so both numerically equal j at every probe rung, both were discarded as
+        // echoes, and box3d.j read STILL in the one mode that actually applies it. THE RULE WRITTEN TO PREVENT
+        // FALSE LIVENESS WAS PRODUCING FALSE STILLNESS, the worse of the two: a dead reading invites a look and
+        // this one hid a working knob.
+        //
+        // A TRUE echo equals the knob whatever else changes; a computation that merely coincides diverges the
+        // moment another knob moves -- j/mass stops equalling j as soon as mass does. So a candidate echo is
+        // CONFIRMED with one extra build per other knob tried, and only when the shallow check fires at all.
+        let echoCandidates = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && echo(o));
+        if (echoCandidates.length) {
+            // EVERY OTHER KNOB IS TRIED, NOT THE FIRST ONE. box3d's config begins with `g`, and gravity does
+            // not affect the speed a body has after an impulse -- only `density` does, by changing the mass
+            // in j/mass, and it is sixth in Object.keys order. One arbitrary knob proves nothing; which knob
+            // reaches which observable is not knowable in advance, so they are tried in turn and the loop
+            // stops at the first that BREAKS the identity. Cost lands the right way round: a false echo
+            // usually breaks on an early knob, a true echo pays the full O(K) to prove no knob can break it --
+            // proving a pass-through is the stronger claim than disproving one.
+            const others = Object.keys(cfg).filter((k) => k !== knob && typeof cfg[k] === "number"
+                && Number.isFinite(cfg[k]) && cfg[k] !== 0);
+            for (const other of others) {
+                if (!echoCandidates.length) break;
+                // A confirmation cut short by the budget leaves the remaining candidates UNTESTED, not
+                // disproven -- keeping them as echoes is the safer default this file already prefers ("a knob
+                // that reads live off its own echo is worse than one that reads dead"), so a rushed sweep
+                // reverts to the old, conservative behaviour rather than reinstating false stillness silently.
+                if (Date.now() > deadline) break;
+                let out2;
+                try { out2 = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt, [other]: cfg[other] * 1.5 } }); }
+                catch { continue; }
+                // survives as an echo only while it STILL equals the probe value with another knob moved
+                echoCandidates = echoCandidates.filter((o) => sameValue(out2[o], alt));
+            }
+        }
+        const isEcho = (o) => echoCandidates.includes(o);
+        const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !isEcho(o));
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };

@@ -504,6 +504,14 @@ console.log("\n3i. *** v4083 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS
     // POINT IS THAT THE REAL ONE WAS INVISIBLE. *** Two direct probeKnob calls rather than a full exhaustive
     // census (which also has to open `direction` and `horizon` first) -- a full `--only stability --exhaustive`
     // run is a separate, slower measurement reported alongside this gate rather than inside it.
+    //
+    // *** v4101 -- THIS deafknob CALL IS NOW THE MOST EXPENSIVE LINE IN THIS FILE, ON PURPOSE. *** visc is a
+    // TRUE echo (deafknob hands `viscosity: c.visc` straight back regardless of everything else), and section
+    // 3l's fix confirms a candidate echo by trying every OTHER numeric config knob before accepting it -- a
+    // true echo pays the full cost because disproving nothing is the stronger claim. MEASURED standalone: one
+    // stability build costs ~19s and deafknob has three other knobs (c, T, dt), each tried at up to three probe
+    // rungs, so this single call now costs on the order of minutes rather than the handful of builds it used
+    // to. It still reads STILL, correctly -- the fix does not promote a confirmed echo, only an unconfirmed one.
     const rDef = stabilityDefaults({ mode: "response" });
     const rBase = await stabilityDevice.build({ mode: "response", config: rDef.config });
     const rResponse = await probeKnob(stabilityDevice, "response", rDef.config, "visc", rBase);
@@ -588,7 +596,16 @@ console.log("\n3j. *** v4088 -- THE ONE RULE THREE LISTS HAVE NOW NEEDED, ENFORC
     // (labResults' device count, libmSensitivity's sweep, knobLiveness's own tool-front-door cap). MEASURED A
     // SAFE MARGIN rather than nudging the number: 2000ms reaches 1 knob (2657ms wall), 4000ms reaches N with
     // room to spare (4324ms wall, still correctly incomplete) -- 6000ms is comfortably above both.
-    const { rows: qrows } = await knobLiveness({ only: ["quantum"], budgetMs: 6000 });
+    //
+    // *** v4101 -- RE-MEASURED AGAIN, SAME NIGHT: 6000ms STOPPED REACHING N TOO. *** Not a second instance of
+    // the same drift -- this one is a direct, expected cost of section 3l's own fix. bandGridN's own probe now
+    // triggers the echo-confirmation loop at least once, and quantum has roughly ten OTHER numeric knobs to
+    // try each candidate against, so ONE knob's ladder got measurably more expensive the moment
+    // echo-confirmation shipped. MEASURED FRESH: 6000/10000/15000ms all still land on bandGridN alone (up to
+    // 16478ms wall); 20000ms finally reaches N (20268ms wall, correctly incomplete). 30000ms is comfortably
+    // above the observed worst case (verified: 58745ms wall INCLUDING the widenStill call below, which carries
+    // its own separate 20000ms budget).
+    const { rows: qrows } = await knobLiveness({ only: ["quantum"], budgetMs: 30000 });
     await widenStill(qrows, { budgetMs: 20000 });
     const qn = qrows.find((r) => r.knob === "N");
     ok("!! *** quantum.N, REAL DEVICE: STARVED TO `bands` ALONE, WOKEN BY THE WIDE LADDER, AND NOT CALLED INSENSITIVE ***",
@@ -636,6 +653,77 @@ console.log("\n3k. *** v4100 -- A FOURTH THING THAT LOOKS LIKE A DEAD KNOB: A PA
         "a pair that moves something together is JOINTLY GATED; a pair that does not has been asked one more " +
         "question and not answered. Nothing here promotes a knob to live on its own, and thermal.beta and " +
         "thermal.gravity are still reported still -- correctly, because each of them alone is.");
+}
+
+console.log("\n3l. *** v4101 -- \"EQUALS THE INPUT\" IS NOT THE SAME AS \"IS THE INPUT\" ***");
+{
+    // v4031's echo rule (section 3d) is exact for a TRUE pass-through, but it is ALSO the signature of a
+    // computation whose coefficient happens to be one -- a knob divided by something that defaults to 1 reads
+    // identically to an echo at every probe rung, because the shallow rule only ever looks at ONE build.
+    const coincidence = {
+        modes: ["only"], observables: ["ratio"],
+        build: async ({ config = {} } = {}) => ({ ratio: config.k / (config.scale ?? 1) }),
+    };
+    const cfg = { k: 4, scale: 1 };
+    const cBase = await coincidence.build({ mode: "only", config: cfg });
+    const before = await (async () => {
+        // the OLD, unconfirmed rule, inlined so this proves what WOULD happen without the fix rather than
+        // depending on main.js never regressing back to it. Matches the real echo() exactly: equals the
+        // DEFAULT (cfg.k, 4) beforehand and equals the PROBE VALUE (alt, 6) afterward -- not cfg.k twice,
+        // which is a different (and vacuously false) condition a first draft of this fixture wrote by mistake.
+        const alt = cfg.k * 1.5;   // probeValues(4)'s first rung, matching the real ladder
+        const out = await coincidence.build({ mode: "only", config: { ...cfg, k: alt } });
+        const echo = (o) => cBase[o] === cfg.k && out[o] === alt;
+        return Object.keys(cBase).filter((o) => cBase[o] !== out[o] && !echo(o)).length === 0 ? "still" : "live";
+    })();
+    ok("!! *** THE UNCONFIRMED RULE READS THIS AS STILL, WHICH IS WRONG ***",
+        before === "still",
+        "ratio = k / scale with scale defaulting to 1 equals k at every rung, so the OLD rule discarded it as " +
+        "an echo -- reproduced here rather than assumed, since a fix aimed at a bug that no longer reproduces " +
+        "is not a fix");
+    const cr = await probeKnob(coincidence, "only", cfg, "k", cBase);
+    ok("!! *** AND THE CONFIRMED RULE READS IT AS LIVE, BECAUSE ANOTHER KNOB BREAKS THE IDENTITY ***",
+        cr.state === "live" && cr.moved.includes("ratio"),
+        "state " + cr.state + ", moved " + cr.moved.join(", ") + ". Trying `scale` at 1.5x makes ratio = " +
+        "k/1.5, which no longer equals k -- a true echo cannot be broken this way and a coincidence always can.");
+
+    // AND A TRUE ECHO MUST SURVIVE THE SAME CONFIRMATION, OR THE FIX WOULD FREE ONE BUG BY REINTRODUCING THE
+    // ORIGINAL ONE. The fixture needs a second knob to try, or the confirmation loop has nothing to attempt --
+    // which is also checked, immediately below, as the case with no confirming knob available at all.
+    const echoWithFriend = {
+        modes: ["only"], observables: ["nx"],
+        build: async ({ config = {} } = {}) => ({ nx: config.nx, unused: config.decoy }),
+    };
+    const eCfg = { nx: 16, decoy: 3 };
+    const eBase = await echoWithFriend.build({ mode: "only", config: eCfg });
+    const er = await probeKnob(echoWithFriend, "only", eCfg, "nx", eBase);
+    ok("!! *** A TRUE ECHO STAYS STILL EVEN WHEN THERE IS A KNOB TO CONFIRM AGAINST ***",
+        er.state === "still",
+        "state " + er.state + ". nx is handed straight back regardless of `decoy`, so the confirmation build " +
+        "changes nothing and the echo survives -- exactly what makes it a true echo rather than a coincidence.");
+
+    // AND THE REAL DEVICE, CHEAPLY -- box3d/impulse reports speedAfter and speedIdeal, both j/mass, and the
+    // shipped default mass is exactly 1, so this is the SAME shape as `coincidence` above, found by a lab-wide
+    // sweep rather than invented for the fixture. box3d is a closed-form impulse calculation, not a simulated
+    // one, so this call costs milliseconds; stability.visc's real-plant confirmation (section 3i, above) is
+    // where the expensive, true-echo half of this fix is exercised for real.
+    const box3d = await getDevice("box3d");
+    const bDef = box3d.defaults({ mode: "impulse" });
+    const bBase = await box3d.build({ mode: "impulse", config: bDef.config });
+    const br = await probeKnob(box3d, "impulse", bDef.config, "j", bBase);
+    ok("!! *** THE REAL KNOB THIS ROUND WAS FOUND FOR: box3d.j READS LIVE, NOT STILL ***",
+        br.state === "live" && br.moved.includes("speedAfter") && br.moved.includes("speedIdeal"),
+        "state " + br.state + ", moved " + br.moved.join(", ") + ". speedAfter and speedIdeal are j/mass at " +
+        "mass=1, so both equalled j at every probe rung and the pre-v4101 rule discarded both as echoes -- " +
+        "THE RULE WRITTEN TO PREVENT FALSE LIVENESS WAS PRODUCING FALSE STILLNESS, hiding the exact knob that " +
+        "applies an impulse.");
+
+    report("*** THE COST LANDS THE RIGHT WAY ROUND ***",
+        "a false echo usually breaks on an early confirming knob and costs little; a true echo pays the full " +
+        "cost of trying every other knob, because proving a pass-through is a stronger claim than disproving " +
+        "one. A confirmation cut short by its deadline leaves the candidate an echo -- the safer default this " +
+        "file already preferred -- so a rushed sweep reverts to the old, conservative behaviour rather than " +
+        "reinstating false stillness silently.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
