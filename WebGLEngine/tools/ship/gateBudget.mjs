@@ -270,7 +270,18 @@ export const MEASURED = {
     // AND THE MEASUREMENT IS OF THE FIXED GATE, WHICH IS THE SMALLER NUMBER: v3853 also stopped section
     // 1 running every tool twice (562s with one run still red, 555s green), so this is not a budget
     // raised to fit a gate that was never trimmed.
-    "tools/ship/toolFrontDoor-selfcheck.mjs":        555000,
+    //
+    // *** v4098 -- RE-PINNED: 555s -> 1302s, AND THE CAUSE IS THE SAME SHAPE AGAIN, ONE TOOL DEEP. ***
+    // tools/roundhouse/knobLiveness.mjs sweeps the whole device registry with a 20s-per-device budget by
+    // default, and the registry has grown to 129 devices. MEASURED TO COMPLETION, stopwatch, alone: 744s
+    // (12m24s), exit 0, real output the whole way -- so it is not broken, it is registry-scaled, the same
+    // finding gateBudget.mjs already carries for corroborationCensus/plantedCoverage/responseCensus/
+    // libmSensitivity, just discovered on a TOOL this gate SPAWNS rather than on a `-selfcheck.mjs` gate
+    // in this table. Given a matching per-tool cap override (toolFrontDoor-selfcheck.mjs's own
+    // TOOL_CAP_OVERRIDE, 1500000ms -- roughly 2x the 744s measurement, this table's own MEASURED
+    // convention), the WHOLE GATE now measures 1302s (21m42s) stopwatch, exit 0, all pass -- up from 555s
+    // because it previously never waited long enough for knobLiveness to answer at all.
+    "tools/ship/toolFrontDoor-selfcheck.mjs":        1302000,
 
     // ================================================================================================================
     // *** v3939 -- THE ROUNDHOUSE CENSUS CLUSTER, AND IT IS ONE DEVICE RATHER THAN FIVE GATES. ***

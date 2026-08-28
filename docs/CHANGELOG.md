@@ -8,6 +8,46 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4098 -- toolFrontDoor's two FAILs, one root cause and one thing found along the way
+
+`tools/ship/toolFrontDoor-selfcheck.mjs` reported 2 FAILs, both against `tools/roundhouse/knobLiveness.mjs`.
+
+### FAIL 1: knobLiveness.mjs grew past the general per-tool cap
+
+The gate spawns all 64 reporting tools directly, once each, capped at a host-scaled 120s. `knobLiveness.mjs`
+sweeps the whole device registry with a 20s-per-device budget by default, and the registry has grown to 129
+devices, so it was being killed at 120s and reported as broken -- the same "not broken, slow" shape this gate's
+own v3941 fix already named for `physics/thermal/stefan.mjs`, except that fix was for a slower BOX and
+`hostScale`-based; this one is a slower TREE, and no host-scale factor would ever put 744s inside a 120s cap on
+any box.
+
+MEASURED to completion standalone, stopwatch: 744s (12m24s), exit 0, real output the whole way. Fixed with a
+per-tool cap override (`TOOL_CAP_OVERRIDE`, 1500000ms, roughly 2x the measurement -- matching `gateBudget.mjs`'s
+own stated convention for a MEASURED entry) rather than raising the general 120s cap for all 64 tools to cover
+one outlier: TWO POPULATIONS, TWO BUDGETS, the same rule `gateBudget.mjs` already applies at the whole-gate
+level.
+
+### FAIL 2 (found once the tool could finish and be graded): a self-naming outlier
+
+With the cap fixed, a second FAIL surfaced: `knobLiveness.mjs` was the only reporting tool in the whole tree not
+naming itself correctly. Every other tool in `tools/roundhouse/` and `tools/ship/` self-names with a bare
+basename in brackets -- `[changelog]`, `[census]`, `[verify]`, `[gradedCoverage]`, and so on -- but
+`knobLiveness.mjs` printed `[roundhouse/knobLiveness]`, a parent-directory-qualified name matching no other tool
+in the tree. Corrected to `[knobLiveness]`.
+
+### Re-measured, both fixes together
+
+The whole gate now runs to completion at 1302s (21m42s), exit 0, all pass -- up from 555s (v3853) because that
+figure predated `knobLiveness.mjs`'s registry-scaled cost entirely; it was never trimmed, it simply never waited
+long enough to see the real number. `gateBudget.mjs`'s `MEASURED` entry for `tools/ship/toolFrontDoor-selfcheck.mjs`
+re-pinned from 555000ms to 1302000ms, and the gate's own header runtime corrected to match.
+
+### Gates
+
+`toolFrontDoor-selfcheck.mjs`: all checks pass. `knobLiveness-selfcheck.mjs`: separately re-measured at 192s
+(also up from a stale 35.8s in `gate-timings.json`, but comfortably inside the suite's general default budget --
+no fix needed there, an earlier too-tight manual test timeout had been misread as a defect). `gateBudget-selfcheck.mjs`:
+all checks pass against the re-pinned entry.
 ## Since v4097 -- libmSensitivity's UNRESOLVED entry gets its first real measurement
 
 `tools/roundhouse/libmSensitivity-selfcheck.mjs` has sat in `tools/ship/gateBudget.mjs`'s `UNRESOLVED` table

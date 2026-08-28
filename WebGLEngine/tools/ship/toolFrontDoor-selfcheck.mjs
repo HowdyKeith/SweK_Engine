@@ -1,6 +1,7 @@
 // WebGLEngine/tools/ship/toolFrontDoor-selfcheck.mjs
 //
-// Run: node tools/ship/toolFrontDoor-selfcheck.mjs   (555s -- MEASURED at v3853 on an idle box, stopwatch)
+// Run: node tools/ship/toolFrontDoor-selfcheck.mjs   (1302s -- MEASURED at v4098 on an idle box, stopwatch;
+//      was 555s at v3853, before knobLiveness.mjs's own registry-scaling cost was accounted for)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered), with a MEASURED budget entry in gateBudget.mjs.
 //
 // *** v3853 -- THIS LINE SAID "~25s -- MEASURED" AND THE GATE TAKES NINE MINUTES. *** It spawns every
@@ -82,13 +83,27 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
     // cap has not shown that it prints; they just stop being the same finding.
     // scaled() hands back {ms, scale, why} -- the REASON travels with the number, because a cap that moved
     // and cannot say why is the unexplained budget this suite spent a round replacing.
+    //
+    // *** v4098 -- tools/roundhouse/knobLiveness.mjs GREW PAST THE GENERAL CAP, AND HOST-SCALING DOES NOT
+    // REACH IT. *** stefan.mjs's slowness (above) was a slower BOX; this one is a slower TREE -- knobLiveness
+    // sweeps every device in the registry with a 20s-per-device budget by default, and the registry has grown
+    // to 129 devices. MEASURED TO COMPLETION here, stopwatch: 744s (12m24s), exit 0, real output the whole
+    // way. No host-scale factor would ever put 744s inside a 120s cap on ANY box -- this is registry growth,
+    // the same shape gateBudget.mjs already names for corroborationCensus/plantedCoverage/responseCensus/
+    // libmSensitivity, just landing on a TOOL rather than a `-selfcheck.mjs` gate. TWO POPULATIONS, TWO
+    // BUDGETS, the same rule this file already applies at the whole-gate level (its own header carries a
+    // MEASURED entry in gateBudget.mjs rather than the general default): the other 63 tools keep the general
+    // 120s cap, and this one gets its own, headroomed at roughly 2x the measurement -- gateBudget.mjs's own
+    // stated convention for a MEASURED entry -- rather than widening everybody's cap for one outlier.
     const CAP = scaled(120000), TOOL_CAP_MS = CAP.ms;
+    const TOOL_CAP_OVERRIDE = { "tools/roundhouse/knobLiveness.mjs": 1500000 };   // measured 744s x ~2 headroom
     const out = new Map(), silent = [], broken = [], slow = [];
     for (const rel of SHOULD_REPORT) {
+        const capMs = TOOL_CAP_OVERRIDE[rel] || TOOL_CAP_MS;
         let text = "";
-        try { text = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: TOOL_CAP_MS }); }
+        try { text = execFileSync(process.execPath, [rel], { cwd: ROOT, encoding: "utf8", timeout: capMs }); }
         catch (e) {
-            if (e && (e.code === "ETIMEDOUT" || e.signal)) slow.push(rel + " (killed at " + Math.round(TOOL_CAP_MS / 1000) + "s)");
+            if (e && (e.code === "ETIMEDOUT" || e.signal)) slow.push(rel + " (killed at " + Math.round(capMs / 1000) + "s)");
             else broken.push(rel + " (exit " + (e && e.status) + ")");
             continue;
         }
@@ -98,7 +113,9 @@ const SHOULD_REPORT = REPORTING.map((t) => t.rel);
     ok("!! *** every analysis tool that should report, PRINTS SOMETHING when you run it ***",
         silent.length === 0 && broken.length === 0 && slow.length === 0,
         SHOULD_REPORT.length + " tools run directly, ONCE EACH, capped at " +
-        Math.round(TOOL_CAP_MS / 1000) + "s (120s x host " + CAP.scale.toFixed(2) + " -- " + CAP.why + "). " +
+        Math.round(TOOL_CAP_MS / 1000) + "s (120s x host " + CAP.scale.toFixed(2) + " -- " + CAP.why + "), " +
+        "except " + Object.keys(TOOL_CAP_OVERRIDE).length + " named tool(s) carrying their own measured cap " +
+        "(" + Object.entries(TOOL_CAP_OVERRIDE).map(([k, v]) => k + ": " + Math.round(v / 1000) + "s").join(", ") + "). " +
         (silent.length ? "SILENT: " + silent.join(", ") + ". " : "") +
         (broken.length ? "NONZERO EXIT: " + broken.join(", ") + ". " : "") +
         (slow.length ? "KILLED AT THE CAP, WHICH IS NOT AN EXIT CODE: " + slow.join(", ") +

@@ -635,7 +635,7 @@ export async function reportLines(opts = {}) {
     const L = [];
     const devices = new Set(rows.map((r) => r.device));
     const still = stillKnobs(rows);
-    L.push("[roundhouse/knobLiveness] a declared knob and a knob that DOES something are not the same thing");
+    L.push("[knobLiveness] a declared knob and a knob that DOES something are not the same thing");
     L.push("");
     L.push("  " + rows.length + " declared knobs across " + devices.size + " devices, probed per MODE rather than");
     L.push("  per device -- the first draft of this probe asked per device and reported eight dead knobs on");
