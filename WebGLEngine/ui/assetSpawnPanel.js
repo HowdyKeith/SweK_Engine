@@ -64,11 +64,38 @@ const BTN = { padding: "4px 8px", border: "1px solid #6cf", borderRadius: "3px",
 
 function el(t, s, x) { const e = document.createElement(t); if (s) Object.assign(e.style, s); if (x != null) e.textContent = x; return e; }
 
-export function mountAssetSpawnPanel() {
+export function mountAssetSpawnPanel(carrySpawn) {
     const root = el("div", { width: "280px", color: "#cde", font: "11px ui-monospace, monospace", padding: "2px 2px 6px" });
     root.appendChild(el("div", H, "SPAWN ASSET"));
     const note = el("div", { fontSize: "10px", color: "#9ab", padding: "0 4px 4px", lineHeight: "1.4" }, "Pick an asset, then click on the world floor in SANDBOX demo to drop one there.");
     root.appendChild(note);
+
+    // v4082 — Keith: "where is the 'Spawn' button... spawn to center of screen with the object hanging from
+    // the cursor... sway when i move it." A SECOND placement path alongside arm-then-click-the-world above:
+    // this spawns immediately at screen center and follows the cursor (simulation/carrySpawn.js) until you
+    // left-click to drop it, right-click or Esc to cancel it.
+    const spawnBtn = el("div", { ...BTN, marginTop: "6px", background: "rgba(255,200,80,0.10)", borderColor: "#fc6" }, "🎯 Spawn (drag to place)");
+    const spawnHint = el("div", { fontSize: "9.5px", opacity: "0.6", padding: "2px 4px 4px", lineHeight: "1.3" },
+        "Left-click to drop · right-click or Esc to cancel");
+    const updateSpawnBtn = () => {
+        const armed = window._armedAsset;
+        const busy = !!(carrySpawn && carrySpawn.isActive());
+        spawnBtn.style.opacity = armed && !busy ? "1" : "0.45";
+        spawnBtn.style.cursor = armed && !busy ? "pointer" : "default";
+        spawnBtn.textContent = busy ? "🎯 Placing… (click to drop)" : "🎯 Spawn (drag to place)";
+    };
+    spawnBtn.addEventListener("click", () => {
+        if (!carrySpawn) { console.warn("[spawnPanel] carrySpawn not available"); return; }
+        if (carrySpawn.isActive()) return;   // already placing one — finish or cancel it first
+        const armed = window._armedAsset;
+        if (!armed) return;
+        const started = carrySpawn.start(armed, () => updateSpawnBtn());
+        if (!started) console.warn("[spawnPanel] carrySpawn.start failed (no camera/canvas/router yet?)");
+        updateSpawnBtn();
+    });
+    root.appendChild(spawnBtn);
+    root.appendChild(spawnHint);
+    setInterval(updateSpawnBtn, 500);   // reflect (dis)arming even though setArmed() below already calls it directly
 
     // v616 — Global Picker toggle. Off by default. When ON, the picker
     // (hover yellow + click cyan + click-to-spawn-armed) works in ANY demo,
@@ -122,6 +149,7 @@ export function mountAssetSpawnPanel() {
             ? "Armed: <span style='color:#fc6;font-weight:700'>" + asset.label + "</span>  <span style='opacity:0.6'>" + (asset.kind || "") + "</span>"
             : "Armed: <span style='opacity:0.6'>(none)</span>";
         renderRows();
+        updateSpawnBtn();
     }
 
     function renderRows() {

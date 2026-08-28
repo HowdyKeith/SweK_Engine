@@ -8,6 +8,46 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4082 -- the SPAWN panel gets a dedicated "Spawn (drag to place)" button, with sway
+
+Keith: "when we are looking at the SPAWN panel, if i select a KAIJU -> Sky, where is the 'Spawn' button to put
+the object on the page? Can we have a spawn to center of screen with the object hanging from the cursor? so i
+can move the mouse cursor somewhere on screen and place it? Can the hanging spawned object sway when i move it
+across the screen?"
+
+### A second placement path, alongside the existing one
+
+`ui/assetSpawnPanel.js`'s existing workflow -- arm an asset, then click a voxel in the SANDBOX demo to drop it
+there -- had no dedicated Spawn button and nothing followed the cursor. This adds a second path rather than
+replacing it: a new "Spawn (drag to place)" button.
+
+### The hang point reuses the SAME cursor ray SandboxMode's own click-to-place already depends on
+
+New `simulation/carrySpawn.js`: clicking the button spawns the armed asset at screen centre and follows the
+cursor via `simulation/pickerCore.js`'s own `ndcToWorldRay()` at a fixed 6-unit hang distance -- not a second,
+possibly-disagreeing projection.
+
+### The sway is a damped spring, not a snap
+
+Position eases toward the cursor's hang point via velocity-based spring integration -- measured: one 60fps
+frame covers only 8.4% of a full swing, but 5 simulated seconds closes the gap to 2e-5 units. It converges; it
+doesn't teleport. A lean (`tiltZ`/`tiltX`, via `entity:move` -- the same per-tick shape `KaijuManager` already
+uses) derives from lateral/vertical velocity, so the object visibly tips into a fast drag instead of staying
+rigidly upright while it swings.
+
+Left-click drops it (the entity stays, carry mode ends). Right-click or Escape cancels it (`entity:despawn`,
+carry mode ends).
+
+VERIFIED in a real browser: dragging really does move the carried entity (4.2 world units measured for one
+mouse sweep), a left-click drop leaves it in the ECS, a right-click cancel actually removes it.
+
+### Gate
+
+New `simulation/carrySpawn-selfcheck.mjs`: pure-Node unit sections (a fake router plus Node's own built-in
+`EventTarget` as a fake canvas, so the class's real listener wiring is exercised without needing a browser for
+arithmetic that has nothing to do with one) proving the spring converges, `finalize()`/`cancel()` take
+genuinely different actions, and listeners are removed on end (no leak) -- plus a full live-browser section
+driving the actual panel end to end: arm, spawn, drag, drop, and a second cycle for cancel.
 ## Since v4081 -- RIG LAB's Gemini creature generator now says "needs Key" up front
 
 Keith: "same with RIG LAB panel spawn. the AI Voxel creature (Gemini) needs to have a '(Gemini needs Key)' and
