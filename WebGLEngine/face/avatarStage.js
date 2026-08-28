@@ -18,6 +18,7 @@
 //   h.destroy();
 
 import { GLBParser } from "../gpu/GLBParser.js";
+import { blendMorphPositions, morphFits } from "../gpu/morphTargets.js";   // v4112 -- expression morphs on the 3D avatar
 import { SPACETIME_VERT, SPACETIME_FRAG, isSpacetimeStyle, modeFor } from "../fx/gauge/gaugeShaders.js";   // v2433 -- wormhole / blackhole gauge styles
 import { SkeletalAnimator } from "../gpu/SkeletalAnimator.js";
 import avatarOrientation from "../ui/avatarOrientation.js";
@@ -694,7 +695,10 @@ export function mountStage(canvas, opts = {}){
     try{ if(typeof opts.onAvatarLoaded==="function") opts.onAvatarLoaded(_loadedPath, url, _fellBack); }catch{}
 
     const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
-    const buf3=(loc,data,n)=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,n,gl.FLOAT,false,0,0); };
+    // v4112 -- buf3 threw its buffer away. The POSITION buffer has to be kept now: morphing is a
+    // bufferSubData into exactly this VBO, and without a handle there is nothing to write to.
+    let _posVBO=null;
+    const buf3=(loc,data,n)=>{ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,n,gl.FLOAT,false,0,0); if(loc===0) _posVBO=b; return b; };
     buf3(0,parsed.positions,3);
     if(parsed.normals) buf3(1,parsed.normals,3); else gl.vertexAttrib3f(1,0,1,0);
     const hasSkin=!!(parsed.skin&&parsed.joints&&parsed.weights);
@@ -708,7 +712,15 @@ export function mountStage(canvas, opts = {}){
 
     let texture=null;
     if(parsed.texture instanceof HTMLImageElement||parsed.texture instanceof ImageBitmap){ texture=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,texture); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,parsed.texture); gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR); }
-    mesh={ vao, indexCount:parsed.indices.length, hasSkin, hasVColor, texture };
+    mesh={ vao, indexCount:parsed.indices.length, hasSkin, hasVColor, texture,
+      // v4112 -- everything setMorph() needs, carried on the mesh so the applier never re-parses.
+      // *** SKINNING IS DONE IN THE SHADER HERE (joints/weights are attributes, jointMatrices are uniforms),
+      // so writing morphed positions into this VBO composes correctly: the GPU skins whatever it is given.
+      // Morph-then-skin is also the order glTF specifies, so this is not a happy accident. ***
+      posVBO:_posVBO, rawPositions:parsed.positions,
+      morphTargets:parsed.morphTargets||null, morphTargetNames:parsed.morphTargetNames||null,
+      morphVertexCount:parsed.morphVertexCount||0, morphVertexOffset:parsed.morphVertexOffset||0,
+      morphPlaced:!!parsed.morphPlaced };
 
     let mnX=Infinity,mnY=Infinity,mnZ=Infinity,mxX=-Infinity,mxY=-Infinity,mxZ=-Infinity;
     const p=parsed.positions;
@@ -2778,7 +2790,51 @@ export function mountStage(canvas, opts = {}){
 
   // v1529 — live accessory tweak from the console: setAccessory("head",{on,url,scale,lift,fwd}) / ("hand",{...,side}) / ("foot",{...,side}). Forces a reload of that slot.
   function setAccessory(slot, cfg){ if(!/^(head|hand|foot)$/.test(slot)) return false; _accCfg[slot]=Object.assign({}, _accCfg[slot], cfg||{}); _accAv[slot]=undefined; return true; }
-  return { destroy, setAvatar, talkFor, setTalking, selfie, registerGrabbable, clearGrabbables, cheerleader, avatarMood, setVisorHud, setHeadView, setTalkLevel, setEffect, setJaw, setChannelAxis, setAccessory, peerVisit, setPaused(v){ extPaused=!!v; }, ok:true };
+  // ---- v4112 -- EXPRESSION MORPHS ON THE 3D AVATAR --------------------------------------------------------
+  //
+  // The gap Keith asked about: RobotExpressive.glb genuinely ships Angry / Surprised / Sad morph targets,
+  // gpu/GLBParser.js has parsed them since v1391, gpu/morphTargets.js has blended them since v1391 -- and this
+  // stage, the thing that actually draws the avatar on nearly every page, never applied a single weight. The
+  // machinery existed at both ends with nothing joining them.
+  //
+  // *** THE APPLY IS REFUSED RATHER THAN APPROXIMATED WHEN THE DATA DOES NOT FIT. *** morphFits() checks the
+  // morph block really lands inside this mesh; a stale offset (a weld renumbering vertices, a model whose
+  // targets belong to a primitive we could not place) would otherwise deform the WRONG geometry silently and
+  // read as a broken model rather than a bad index.
+  let _morphActive = false;
+  function morphInfo(){
+    const m = mesh;
+    if(!m || !m.morphTargets || !m.morphTargets.length) return { ok:false, names:[], count:0, why:"this avatar ships no morph targets" };
+    const fit = morphFits(m, (m.rawPositions && m.rawPositions.length) || 0);
+    return { ok:fit.ok, names:(m.morphTargetNames||[]).slice(), count:m.morphTargets.length,
+             vertexCount:m.morphVertexCount, vertexOffset:m.morphVertexOffset, placed:!!m.morphPlaced,
+             why:fit.ok ? "" : fit.why };
+  }
+  /** setMorph({ Angry: 0.8 }) -- names come from morphInfo().names. setMorph(null) restores the base mesh. */
+  function setMorph(map){
+    const m = mesh;
+    if(!gl || !m || !m.posVBO || !m.rawPositions) return false;
+    if(!map){
+      if(!_morphActive) return true;                       // already clean: do not re-upload every frame
+      gl.bindBuffer(gl.ARRAY_BUFFER, m.posVBO);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, m.rawPositions);
+      _morphActive = false; return true;
+    }
+    if(!m.morphTargets || !m.morphTargets.length) return false;
+    const fit = morphFits(m, m.rawPositions.length);
+    if(!fit.ok){ try{ console.warn("[avatarStage] morph refused:", fit.why); }catch{} return false; }
+    const names = m.morphTargetNames||[];
+    const w = new Float32Array(m.morphTargets.length);
+    let any=false;
+    for(let i=0;i<names.length;i++){ const v=map[names[i]]; if(v!=null){ w[i]=Math.max(0,Math.min(1,+v||0)); if(w[i])any=true; } }
+    if(!any) return setMorph(null);                        // an all-zero map IS the base mesh; say so once
+    const blended = blendMorphPositions(m.rawPositions, m.morphTargets, w, m.morphVertexOffset||0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.posVBO);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, blended);
+    _morphActive = true; return true;
+  }
+
+  return { destroy, setAvatar, talkFor, setTalking, selfie, registerGrabbable, clearGrabbables, cheerleader, avatarMood, setVisorHud, setHeadView, setTalkLevel, setEffect, setJaw, setChannelAxis, setAccessory, peerVisit, setMorph, morphInfo, setPaused(v){ extPaused=!!v; }, ok:true };
 }
 
 export default mountStage;

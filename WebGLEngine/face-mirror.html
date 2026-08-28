@@ -199,6 +199,12 @@
              rather than "sleepy". -->
         <div id="robot-host"></div>
         <div id="face-state" style="font-size:11px;color:#8b97a8;margin-top:6px;min-height:14px;"></div>
+        <!-- v4112 -- THE NAMED EXPRESSION, BESIDE THE ROBOT RATHER THAN ON IT. The robot's own vocabulary is
+             five MOTIONS (wave/nod/dance/cheer/spin) plus a mouth-open class -- it has no face channels, so
+             there is nowhere on it to put "glare" or "kiss". v3114's two-signal wiring below is still exactly
+             right for what the robot can do and is left alone; this adds the reading the robot cannot show. -->
+        <div id="expr-name" style="font-size:15px;font-weight:700;margin-top:8px;min-height:20px;"></div>
+        <div id="expr-note" style="font-size:10.5px;color:#8b97a8;min-height:26px;line-height:1.4;"></div>
       </div>
     </div>
 
@@ -290,6 +296,7 @@ const mRoll = document.getElementById("m-roll");
 
 let tracker = null;
 let faceFx = null, bot = null;
+let exprTimer = null, exprReader = null;   // v4112 -- the named-expression readout
 const robotHost = document.getElementById("robot-host");
 const faceStateEl = document.getElementById("face-state");
 let frameCount = 0;
@@ -323,6 +330,29 @@ btnStart.addEventListener("click", async () => {
                 faceStateEl.style.color = st === "live" ? "#8b97a8" : "#fc6";
             },
         });
+        // v4112 -- the eight-expression classifier, polled at its OWN low rate rather than on the detect
+        // path, for the same reason v3115 gave the robot wiring: this page must not add work to a
+        // detectForVideo that is still synchronous on this thread.
+        const { makeExpressionReader, RECIPES } = await import("./ui/faceExpressionSet.js");
+        exprReader = makeExpressionReader({ holdMs: 600 });
+        const exprNameEl = document.getElementById("expr-name");
+        const exprNoteEl = document.getElementById("expr-note");
+        exprTimer = setInterval(() => {
+            let snap = null;
+            try { snap = tracker && tracker.snapshot ? tracker.snapshot() : null; } catch {}
+            const out = exprReader.read(snap && snap.active ? snap.blendShapes : null);
+            if (!out.usable) {
+                // UNREADABLE IS NOT NEUTRAL -- the same law the robot's own state line follows one element up.
+                exprNameEl.textContent = "\u2014"; exprNameEl.style.color = "#fc6";
+                exprNoteEl.textContent = "no face to read (this is deliberately not shown as 'neutral')";
+                return;
+            }
+            const r = RECIPES.find((x) => x.name === out.name);
+            exprNameEl.textContent = (r ? r.emoji + " " : "") + out.name + (out.score ? "  " + out.score.toFixed(2) : "");
+            exprNameEl.style.color = out.name === "neutral" ? "#8b97a8" : "#9fe88f";
+            exprNoteEl.textContent = r ? r.note : "nothing cleared its threshold, which is what neutral means here";
+        }, 100);
+
         btnStop.disabled = false;
         statusEl.innerHTML = "<span class='ok'>Tracking active. Try opening your mouth, blinking, raising eyebrows, turning your head.</span>";
     } catch (e) {
@@ -335,6 +365,12 @@ btnStop.addEventListener("click", () => {
     // v3115 -- STOP THE WIRING BEFORE THE TRACKER. The other order would leave one tick polling a tracker
     // mid-teardown; faceExpression already reports "unavailable" on stop(), so the robot says so rather than
     // freezing on whatever expression it happened to be wearing.
+    // v4112 -- torn down BEFORE the tracker, the same ordering this file already argues for below: the other
+    // order leaves a tick polling a tracker mid-teardown.
+    if (exprTimer) { clearInterval(exprTimer); exprTimer = null; }
+    if (exprReader) { exprReader.reset(); exprReader = null; }
+    { const n = document.getElementById("expr-name"), o = document.getElementById("expr-note");
+      if (n) { n.textContent = ""; } if (o) { o.textContent = ""; } }
     if (faceFx) { faceFx.stop(); faceFx = null; }
     if (tracker) { tracker.stop(); tracker = null; }
     btnStart.disabled = false;

@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4112 -- the expression onto the avatar's face, and two corrections I owed first
+
+Keith named two items. Before either, two things I had told him were wrong.
+
+### Correction 1: he was right about the head
+
+I said there was no Google talking-head API in the tree, and that `thead.html` is "SweK's own wireframe head".
+True as far as it went, and it left out exactly the part he was remembering: **`ui/faceRig.js` has driven that
+head from MediaPipe blendshapes since v3117** -- fourteen coefficients into five continuous channels (jaw,
+brow, eye, mouth curve). MediaPipe IS the Google API he meant. Blendshapes-to-a-head has existed for a thousand
+versions; my answer described the head and omitted its driver.
+
+### Correction 2: I overstated the avatar job
+
+I said the 3D avatar "needs morph blending added to the stage renderer". `gpu/morphTargets.js` has had the
+blend, the VBO apply and the reset since v1391. The job was WIRING, not writing a morph system.
+
+### Item 1: the mirror (small, as promised)
+
+`face-mirror.html` gains the eight-expression readout **beside** the robot rather than on it. The robot's own
+vocabulary is five MOTIONS (wave/nod/dance/cheer/spin) plus a mouth-open class -- it has no face channels, so
+there is nowhere on it to put "glare" or "kiss". v3114's two-signal wiring is still exactly right for what the
+robot can do and is left untouched. Polled at its own rate, torn down before the tracker, and an unreadable
+frame shows an em-dash rather than "neutral" -- the same law the state line above it already follows.
+
+### Item 2: the 3D avatar -- and the silent bug it hid
+
+**A morph target belongs to ONE primitive, and `positions` is every primitive concatenated.**
+
+GLBParser reads deltas from a single primitive -- RobotExpressive's head, 302 vertices -- while `positions` is
+4 skinned + 15 unskinned primitives concatenated to 7214. Nothing recorded where those 302 land. Blending
+`delta[i]` onto `positions[i]` would have deformed the first 302 vertices of the concatenation, a different
+primitive entirely: no error, no crash, no warning, just the wrong part of the model bending when you smile.
+
+Fixed at the parser, and cheaply: the concat loop was ALREADY computing each primitive's vertex start in order
+to remap indices, and simply was not keeping it. `primData` now carries its source primitive,
+`primitiveRanges` gains `vertexStart`/`vertexCount`, and the result exports `morphVertexOffset` AND
+`morphPlaced` -- two fields, because a single-primitive mesh really does start at 0 and a failed lookup also
+yields 0, so "found, and it is zero" must stay distinguishable from "could not place it".
+
+`blendMorphPositions` gains an offset argument **defaulting to 0**, so every pre-v4112 caller is unchanged
+(checked, not assumed -- `main.js` has called it since v1391), plus a clamp so a mismatched target can never
+write past the base array. New `morphFits()` refuses a block that does not fit rather than applying it
+somewhere else; the realistic cause is `glbPostProcess.js` WELDING duplicate vertices, which renumbers
+everything and invalidates any offset taken before it -- so it is checked at APPLY time, not trusted from parse
+time.
+
+`face/avatarStage.js` -- which contained the string "morph" **zero** times -- gains `setMorph()` and
+`morphInfo()`. `buf3()` threw every buffer away, so the position VBO is kept now: a `bufferSubData` needs a
+handle. Morph-then-skin composes correctly here because skinning is done in the SHADER, which is also the order
+glTF specifies.
+
+### The name problem, which is the actually hard part
+
+Morph names belong to the MODELLER, not to us. RobotExpressive ships "Angry", "Surprised", "Sad"; another GLB
+might ship "angry", "mouthAngry", "expression_angry", or nothing. A fixed `{ angry: "Angry" }` table would work
+on exactly one model and silently do nothing on every other -- and "silently does nothing" is indistinguishable
+from a feature that is switched off.
+
+New `ui/avatarExpression.js` matches CANDIDATE lists case- and punctuation-insensitively against what a model
+really ships, and an expression with no matching morph resolves to NULL rather than an empty map a caller would
+push to the GPU as a no-op. RobotExpressive supports 4 of 8 (shock to Surprised, glare and angry to Angry, sad
+to Sad); the other four are REFUSED BY NAME. Inventing "kiss is 0.5 Surprised + 0.3 Sad" would author an
+expression the modeller never made -- `faceRig.js`'s own "noise wearing the costume of detail", one file over.
+
+### Verification
+
+New gate `tools/ship/avatarMorph-selfcheck.mjs`: 27 checks, headless, all pass. The offset arithmetic is driven
+as its own section, including that vertices 0 and 1 stay untouched when the offset is 2.
+
+Two bugs in my own gate, both caught by running it: a claim that "mouth_angry" maps to angry when no mouth-form
+was in the candidate list at all (the CHECK was wrong, not the resolver -- and the list gained mouthAngry and
+mouthSad for real, since smile already carried mouthSmile and their absence was an inconsistency); and an
+import-path assertion read through `codeOnly()`, WHICH BLANKS STRING LITERALS. v4021 landed exactly that rule
+-- "noComments() for string literals and codeOnly() for code shapes" -- and this gate re-learned it.
+
+Verified in a real browser: both modules import, the classifier names a glare, the resolver returns
+`{Angry:0.9}`, no page errors.
 ## Since v4111 -- gesture VFX, and a hole the gate's own output revealed
 
 Keith: "gesture VFX next."

@@ -339,7 +339,7 @@ export class GLBParser {
                     }
                 }
 
-                primData.push({ pos, norm, uv, j, w, idx, vc: vcSkinned, color: colors, materialIdx: sp.prim.material ?? null });
+                primData.push({ pos, norm, uv, j, w, idx, vc: vcSkinned, color: colors, materialIdx: sp.prim.material ?? null, prim: sp.prim });
                 totalVerts   += vcSkinned;
                 totalIndices += idx.length;
             }
@@ -514,7 +514,7 @@ export class GLBParser {
                     idx = new Uint32Array(vc);
                     for (let i = 0; i < vc; i++) idx[i] = i;
                 }
-                primData.push({ pos, norm, uv, j, w, idx, vc, color: colors, materialIdx: up.prim.material ?? null });
+                primData.push({ pos, norm, uv, j, w, idx, vc, color: colors, materialIdx: up.prim.material ?? null, prim: up.prim });
                 totalVerts   += vc;
                 totalIndices += idx.length;
             }
@@ -544,6 +544,14 @@ export class GLBParser {
             // just call drawElements once on the full index buffer if
             // there's only one texture in play.
             const primitiveRanges = [];
+            // v4112 -- *** A MORPH TARGET BELONGS TO ONE PRIMITIVE, AND THIS ARRAY IS ALL OF THEM CONCATENATED. ***
+            // _readMorphTargets reads deltas from a SINGLE primitive, so its delta array is that primitive's own
+            // vertex count -- 302 for RobotExpressive's head against 7214 for the whole concatenated mesh. Until
+            // now nothing recorded WHERE those 302 land, so any consumer adding delta[i] to positions[i] would
+            // have deformed the first 302 vertices of the concatenation, which are a different primitive
+            // entirely. The vertex start is already being computed here to offset the indices; it just was not
+            // being kept.
+            const primVertexStart = new Map();
             let vOff = 0;
             let iOff = 0;
             for (const pd of primData) {
@@ -564,10 +572,14 @@ export class GLBParser {
                     indexStart: iOff,
                     indexCount: pd.idx.length,
                     materialIdx: pd.materialIdx ?? null,
+                    vertexStart: vOff,          // v4112
+                    vertexCount: pd.vc,         // v4112
                 });
+                if (pd.prim) primVertexStart.set(pd.prim, vOff);   // v4112
                 vOff += pd.vc;
                 iOff += pd.idx.length;
             }
+            this._lastPrimVertexStart = primVertexStart;   // v4112
             // Expose concat outputs through outer-scope vars; the
             // primitiveRanges array is added to the return shape below.
             colors = colorsCombined;
@@ -866,7 +878,16 @@ export class GLBParser {
             if (mp) {
                 if (mMeshIdx < 0) { const all = [].concat(skinnedPrims || [], unskinnedPrims || []); const hit = all.find(e => e && e.prim === mp); mMeshIdx = hit ? hit.meshIdx : 0; }
                 _morph = this._readMorphTargets(json, bin, mp, (json.meshes && json.meshes[mMeshIdx]) || null);
-                if (_morph) console.log(`[GLBParser] morph targets: ${_morph.count} (${_morph.names.slice(0, 6).join(", ")}${_morph.count > 6 ? ", ..." : ""}) on ${_morph.vertexCount} verts`);
+                // v4112 -- WHERE those vertices sit in the concatenated array. Zero is the honest default: a
+                // single-primitive mesh really does start at 0, and a lookup miss means we could not place the
+                // deltas, which a consumer must be able to tell apart from a real 0 -- so morphVertexOffset is
+                // reported and morphPlaced says whether it was actually FOUND rather than assumed.
+                const _mStart = (this._lastPrimVertexStart && this._lastPrimVertexStart.get(mp));
+                if (_morph) {
+                    _morph.vertexOffset = (_mStart != null) ? _mStart : 0;
+                    _morph.placed = (_mStart != null);
+                    console.log(`[GLBParser] morph targets: ${_morph.count} (${_morph.names.slice(0, 6).join(", ")}${_morph.count > 6 ? ", ..." : ""}) on ${_morph.vertexCount} verts @ vertex ${_morph.vertexOffset}${_morph.placed ? "" : " (offset NOT resolved -- single-primitive assumption)"}`);
+                }
             }
         } catch (e) {}
 
@@ -876,6 +897,8 @@ export class GLBParser {
             morphTargetNames: _morph ? _morph.names : null,
             morphWeights: _morph ? _morph.weights : null,
             morphVertexCount: _morph ? _morph.vertexCount : 0,
+            morphVertexOffset: _morph ? (_morph.vertexOffset || 0) : 0,   // v4112
+            morphPlaced: _morph ? !!_morph.placed : false,                // v4112
             joints, weights, skin, animations, nodes, colors,
             hybrid: !!(unskinnedPrims && unskinnedPrims.length),   // v1015 — rigid bone-parented parts present (e.g. RobotExpressive)
             // Round 122 — multi-primitive metadata. primitiveRanges is
