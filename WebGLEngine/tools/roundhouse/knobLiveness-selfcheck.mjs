@@ -20,7 +20,7 @@
 "use strict";
 import { knobLiveness, widenStill, stillKnobs, insensitiveKnobs, unprobedKnobs, probeValues, wideValues,
          PLANT_STATES, STILL_OK, incompleteKnobs, probeKnob, choicesFor,
-         partialDeafness, deafnessUnanswered, LIST_CLAIMS } from "./knobLiveness.mjs";
+         partialDeafness, deafnessUnanswered, LIST_CLAIMS, unusedInMode, jointlyLive } from "./knobLiveness.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -562,6 +562,44 @@ console.log("\n3j. *** v4045 -- THE ONE RULE ALL SIX LISTS KEPT NEEDING, ENFORCE
         pd.join(" | ") + " -- it may include an unfinished row precisely BECAUSE it names the modes it is " +
         "talking about and claims nothing beyond them. A list that reported 'k is deaf' without saying where " +
         "would need the universal rule too.");
+}
+
+console.log("\n3k. *** v4047 -- A FOURTH THING THAT LOOKS LIKE A DEAD KNOB: A PAIR THAT ONLY WORKS TOGETHER ***");
+{
+    // This file names three conditions behind a still reading -- dead, saturated, quantised below the step.
+    // A lab-wide sweep found a fourth, and it nearly went in the register as two dead knobs.
+    //
+    // thermal.beta and thermal.gravity survived BOTH ladders in every mode and plant state: 1.5x/0.5x/8x and
+    // 1e-6x to 1e6x and negated. They would have been the first unregistered still knobs in four sweeps.
+    const dev = await getDevice("thermal");
+    const base = await dev.build({ mode: "convect", config: {} });
+    const only = async (cfg) => {
+        const o = await dev.build({ mode: "convect", config: cfg });
+        return Object.keys(base).filter((k) => JSON.stringify(base[k]) !== JSON.stringify(o[k]));
+    };
+    const b = await only({ beta: 1 }), g = await only({ gravity: 1e-3 }), both = await only({ beta: 1, gravity: 1e-3 });
+    ok("!! *** NEITHER MOVES ANYTHING ALONE AND TOGETHER THEY MOVE THREE OBSERVABLES ***",
+        b.length === 0 && g.length === 0 && both.length >= 3,
+        "beta=1 alone: " + (b.join(", ") || "NOTHING") + " | gravity=1e-3 alone: " + (g.join(", ") || "NOTHING") +
+        " | both: " + both.join(", ") + ". *** BOTH DEFAULT TO ZERO AND THEY MULTIPLY -- Boussinesq buoyancy " +
+        "is beta * gravity * dT, so moving either alone leaves the product at zero. NEITHER KNOB IS DEAD; THE " +
+        "PAIR IS THE KNOB, and a probe that moves one at a time cannot see it however far it moves that one. ***");
+
+    const rows = [
+        { device: "thermal", knob: "beta", live: [], still: ["convect"], probed: ["convect"], incomplete: false },
+        { device: "thermal", knob: "gravity", live: [], still: ["convect"], probed: ["convect"], incomplete: false },
+    ];
+    const found = await jointlyLive(rows, { budgetMs: 120000 });
+    ok("!! ...and the pair pass finds it without being told which pair to try",
+        found.length >= 1 && found[0].includes("beta") && found[0].includes("gravity"),
+        (found[0] || "NOTHING FOUND") + ". Only STILL knobs whose default is ZERO are paired, which is what " +
+        "keeps this a handful of builds instead of the O(K^2) sweep that pairing every knob would be -- a " +
+        "knob already at a working value multiplies to something, one at zero cannot.");
+
+    report("*** AND IT REMAINS A READING ***",
+        "a pair that moves something together is JOINTLY GATED; a pair that does not has been asked one more " +
+        "question and not answered. Nothing here promotes a knob to live on its own, and thermal.beta and " +
+        "thermal.gravity are still reported still -- correctly, because each of them alone is.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
