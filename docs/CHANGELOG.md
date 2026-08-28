@@ -8,6 +8,61 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4104 -- the ML-Sharp panel could say "not installed" and offer nothing to press
+
+Keith: "for the ML-Sharp panel, we need an install button." `ai-bridge/sharpBridge.js`'s `status()` has
+reported ml-sharp as not installed since v3948 with nothing behind it but a link to `apple/ml-sharp`.
+
+### What the README actually says
+
+apple/ml-sharp publishes no PyPI package. Its README (fetched directly rather than guessed at) documents one
+path: create a checkout, then `pip install -r requirements.txt` run from inside it, verified afterward with
+`sharp --help` -- which is exactly the smoke test `status()`'s `_resolveInvocation()` already runs.
+
+### The fix
+
+`sharpBridge.js` gains `install()`. It clones `apple/ml-sharp` outside the engine tree -- the same rule this
+file already applies to its config file and the weights cache, for the same reason `wouldBePackaged()`
+enforces on every other path in this bridge -- then runs `pip install -r requirements.txt` inside the
+checkout. The two steps are chained into **one** job: a clone that exits cleanly walks straight into the pip
+step, so pressing Install once is enough. `ai-bridge/comicTranslateBridge.js`'s own `install()` for
+`ogkalu2/comic-translate` is the same shape, one click short of this -- reading it before writing anything
+new is what caught that the extra click was avoidable.
+
+A checkout that already exists skips straight to the pip step, so a failed or interrupted install can be
+retried by pressing Install again without re-cloning. A second click while a job is already running is
+refused outright, not queued and not restarted.
+
+### Verified for real, not mocked
+
+A scratch checkout with an **empty** `requirements.txt` makes real `pip` exit almost instantly with nothing
+to install -- so the chaining, the already-running refusal, and the resume-after-done retry are all proven
+against a real spawned process rather than a stand-in. That real run caught two bugs in the test itself
+before either could hide a genuine defect: an `uptimeMs` field that legitimately differs by a few
+milliseconds between two calls, which a strict `JSON.stringify` equality treated as a failure; and a
+"`git clone`" adjacency regex that could never match the real array-form `spawn()` arguments. Both were fixed
+before the gate was trusted.
+
+The one step that genuinely cannot run in this sandbox -- the real network clone against
+`github.com/apple/ml-sharp` -- is proven from source instead: the real URL is really there, and a clone
+exiting 0 really does hand off into the pip step. `tools/ship/sourceChain-selfcheck.mjs`'s section 8b already
+draws this same line for platform-only code, and the same technique applies here.
+
+### The panel
+
+`server.html`'s ml-sharp tab gains an Install / Re-install button. It is hidden the moment a Modal endpoint
+is configured, because there is nothing local to install into in that case. While a job runs, the panel
+shows its live log tail and polls only for as long as the job is actually in flight -- the panel's own
+existing comment already warns against polling a panel nobody has opened, and this preserves that: the
+interval starts on click and clears itself the instant the job reports done. A new route,
+`POST /sharp/install`, exposes it.
+
+`tools/ship/sharpPanel-selfcheck.mjs` proves the entire loop in a real headless browser, against a
+`/sharp/status` stub that advances its own answer from call to call -- not-installed, then cloning, then
+installed -- so a passing gate proves the panel is actually re-polling live state rather than reading status
+once and going stale.
+
+Gates: `sharpBridge-selfcheck` and `sharpPanel-selfcheck`, both all pass.
 ## Since v4103 -- the verify-preview launcher never stopped anything it started, and Keith found the tell
 
 Keith, after this session pushed twelve rounds to `origin/main`: "old swek launcher is still running, and

@@ -1807,6 +1807,14 @@ A password fetches a token from the list server; an unregistered callsign needs 
           </div>
           <div id="sharpLicence" style="font-size:11px;color:#e8c07a;background:#1e1704;border:1px solid #5a4520;border-radius:6px;padding:6px 9px;margin-bottom:8px;">checking&hellip;</div>
           <div id="sharpStatus" style="font:12px/1.6 ui-monospace,Menlo,Consolas,monospace;margin-bottom:8px;">checking&hellip;</div>
+          <div id="sharpInstallWrap" hidden style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <button id="sharpInstallBtn" style="font-size:11px;padding:3px 12px;background:#1a2438;color:#b0c4ff;border:1px solid #3a4a6a;border-radius:5px;cursor:pointer;">&#11015;&#65039; Install ml-sharp</button>
+              <span id="sharpInstallState" style="font-size:11px;color:var(--dim);"></span>
+            </div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px;">Clones <code>apple/ml-sharp</code> outside the engine tree and runs its own <code>pip install -r requirements.txt</code>. Pulls PyTorch -- multi-GB, can take a while; weights are fetched separately on first prediction.</div>
+            <pre id="sharpInstallLog" hidden style="background:#04060d;border:1px solid #14203a;border-radius:6px;padding:6px 8px;margin:6px 0 0;overflow:auto;font-size:10px;color:#b9c9e6;white-space:pre-wrap;max-height:140px;"></pre>
+          </div>
 
           <div style="border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px;background:#0a1016;">
             <div style="font-size:11px;color:#b0c4ff;margin-bottom:5px;">&#9729;&#65039; Modal endpoint (optional &mdash; lets a box with no GPU still predict)</div>
@@ -7835,6 +7843,7 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
   (function(){
     const esc=(x)=>String(x==null?"":x).replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
     let lastStatus = null;
+    let installPoll = null;   // set only while a job is in flight, so this stays load-on-click otherwise
 
     async function sharpLoad(){
       const lic=document.getElementById("sharpLicence"), body=document.getElementById("sharpStatus"),
@@ -7861,8 +7870,45 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
         rows.push("writes to: <span style=\"color:#6f8a7c\">" + esc(j.outDir||"") + "</span>");
         body.innerHTML = rows.map(r=>"<div>"+r+"</div>").join("");
         if(stat) stat.textContent = j.ready ? j.where : "not ready";
+
+        // Install is a LOCAL concept -- a Modal endpoint already runs elsewhere, so there is nothing here to
+        // install into. Shown whenever the local path is in play, whether or not ml-sharp is installed yet, so
+        // re-installing (a broken venv, an interrupted pip step) is always reachable, not just the first time.
+        sharpRenderInstall(j);
       }catch(e){ body.textContent = "bridge unreachable"; }
     }
+
+    function sharpRenderInstall(j){
+      const wrap=document.getElementById("sharpInstallWrap"), btn=document.getElementById("sharpInstallBtn"),
+            st=document.getElementById("sharpInstallState"), log=document.getElementById("sharpInstallLog");
+      if(!wrap) return;
+      if(j.where === "modal"){ wrap.hidden = true; if(installPoll){ clearInterval(installPoll); installPoll = null; } return; }
+      wrap.hidden = false;
+      const job = j.installJob;
+      const running = !!(job && !job.done);
+      if(btn){ btn.disabled = running; btn.textContent = j.sharpInstalled ? "⬇️ Re-install ml-sharp" : "⬇️ Install ml-sharp"; }
+      if(st) st.textContent = running ? ("(" + job.kind + "… " + Math.round(job.uptimeMs/1000) + "s)")
+                             : (job ? (job.code === 0 ? "✓ done" : "exited " + job.code) : "");
+      if(log){
+        if(job){ log.hidden = false; log.textContent = job.tail || "(no output yet)"; }
+        else { log.hidden = true; }
+      }
+      // Poll only while something is actually running -- this panel is load-on-click by design (v3963's own
+      // comment above), so an interval that outlived the job would be the exact "fires on every page load for
+      // a panel nobody opened" cost that comment exists to avoid.
+      if(running && !installPoll) installPoll = setInterval(sharpLoad, 1500);
+      if(!running && installPoll){ clearInterval(installPoll); installPoll = null; }
+    }
+
+    const installBtn=document.getElementById("sharpInstallBtn");
+    if(installBtn) installBtn.addEventListener("click", async ()=>{
+      installBtn.disabled = true;
+      try{
+        const j = await (await fetch("/sharp/install",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})).json();
+        if(!j.ok){ const st=document.getElementById("sharpInstallState"); if(st) st.textContent = "error: " + (j.error||"?"); installBtn.disabled = false; return; }
+      }catch(e){ const st=document.getElementById("sharpInstallState"); if(st) st.textContent = "bridge unreachable"; installBtn.disabled = false; return; }
+      await sharpLoad();   // picks up installJob and starts polling itself
+    });
 
     const epIn=document.getElementById("sharpEndpoint");
     if(epIn) epIn.addEventListener("input", ()=>{ epIn.dataset.touched = "1"; });

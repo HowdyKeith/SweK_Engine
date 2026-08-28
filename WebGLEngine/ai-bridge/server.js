@@ -16343,6 +16343,15 @@ ${text.replace(/'/g, "''")}
         });
         return;
     }
+    // v4104 — Install button: clone apple/ml-sharp (outside the tree) then pip-install its requirements.
+    // Fire-and-poll like every other long-running install in this tree (autoInstall.js, comicTranslateBridge.js)
+    // — install() returns the moment the job STARTS, not when it finishes; the panel reads progress back off
+    // the installJob field /sharp/status already carries.
+    if (req.url === "/sharp/install" && req.method === "POST") {
+        try { sendJson(require("./sharpBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 
