@@ -55,7 +55,7 @@
 // NEITHER EQUATION OF STATE PRODUCES A RESTING COLUMN, so there is nothing for a level surface to be level
 // about. The score was never the missing half -- A SETTLED COLUMN IS.
 "use strict";
-import { createSphWorld } from "./sph.js";
+import { createSphWorld, REFERENCE_WALK } from "./sph.js";
 import { knobMoves } from "../../tools/ship/floors.mjs";
 
 import { pathToFileURL } from "node:url";
@@ -105,7 +105,14 @@ export function columnSpec({ eos = "tait", lidY = SHIPPED_LID, steps = 1200, dt 
             const o = { h: c.h, mass: c.mass, restDensity: rho0, stiffness: c.stiffness, viscosity: c.viscosity,
                         gravity: [0, -9.81, 0], eos: c.eos, gamma: c.gamma };
             if (c.eos === "tait") o.soundSpeed = c.soundSpeed;
-            const w = createSphWorld(o); fill(w);
+            // v4121 -- useGrid PINNED FALSE: this census reports a SENSITIVITY ORDERING at the 8.4e-4
+            // scale, taken from a configuration physics/sph/settling.mjs records as unstable (energy
+            // per particle quadruples over 2000 steps). An unstable trajectory amplifies the ~1e-14
+            // summation-order difference between the two neighbour walks until the ordering flips --
+            // measured, when v4121 dropped GRID_CROSSOVER to 128 and these worlds changed path. The
+            // walk is pinned to the one the ordering was established with, because what is being
+            // preserved is the order of a sum and that has to be said rather than re-baselined away.
+            const w = createSphWorld({ ...o, ...REFERENCE_WALK }); fill(w);
             const y0 = w.particles.map((p) => p.y);
             const h0 = Math.max(...y0) - Math.min(...y0);
             const BOX = [0, 0, 0, 0.6, c.lidY, 0.6];
@@ -144,7 +151,8 @@ export function lidReach({ lidY = SHIPPED_LID, steps = 1200, eos = "tait", h = 0
     const o = { h, mass: 0.02, restDensity: rho0, stiffness: 8, viscosity: 0.1,
                 gravity: [0, -9.81, 0], eos, gamma: 7 };
     if (eos === "tait") o.soundSpeed = 15;
-    const w = createSphWorld(o); fill(w);
+    // v4121 -- useGrid pinned false, same reason as above.
+    const w = createSphWorld({ ...o, ...REFERENCE_WALK }); fill(w);
     const y0 = w.particles.map((p) => p.y);
     const h0 = Math.max(...y0) - Math.min(...y0);
     const BOX = [0, 0, 0, 0.6, lidY, 0.6];

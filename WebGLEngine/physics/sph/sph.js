@@ -67,6 +67,25 @@ const DEFAULTS = { h: 0.1, mass: 0.02, restDensity: 1000, stiffness: 3.0, viscos
                    eos: "ideal", gamma: 7, soundSpeed: null };
 
 /** Tait coefficient B = rho0 c^2 / gamma. Exposed so a caller can see the number rather than trust a default. */
+/**
+ * *** THE REFERENCE NEIGHBOUR WALK, FOR FIXTURES THAT CARRY ANSWER KEYS. ***
+ *
+ * v4121 made the grid win everywhere and dropped GRID_CROSSOVER from 1000 to 128, which silently switched
+ * every 686-particle fixture from the brute force to the grid. Two gates went red -- materialKnobs and
+ * stability -- and NEITHER because the grid is wrong: spatialGrid-selfcheck holds the two walks to 1.4e-14 on
+ * density and ZERO drift over 60 steps. They went red because their configurations are the deliberately
+ * UNSTABLE ones (physics/sph/settling.mjs records mechanical energy per particle QUADRUPLING over 2000 steps),
+ * and an exploding trajectory amplifies a 1e-14 change in summation order until a settled-state statistic
+ * moves.
+ *
+ * So the policy is explicit rather than scattered: A FIXTURE WHOSE BASELINE WAS TAKEN ON ONE WALK KEEPS THAT
+ * WALK. What is being preserved is the ORDER OF A SUM, not a property of the fluid, and that is worth saying
+ * out loud -- the alternative was re-cutting keys that four rounds of work established, against a trajectory
+ * no more correct than the one they came from. Everything that is not an answer-key fixture -- the flesh, the
+ * runtime, anything new -- gets the grid by default and the speedup with it.
+ */
+export const REFERENCE_WALK = Object.freeze({ useGrid: false });
+
 export function taitB(restDensity, soundSpeed, gamma = 7) { return (restDensity * soundSpeed * soundSpeed) / gamma; }
 
 /** A sound speed that keeps density variation near 1% for a column of height H under gravity g. */
@@ -108,19 +127,33 @@ function createSphWorld(opts = {}) {
     // because spatialGrid-selfcheck.mjs asserts the two AGREE, and a fast path with no slow path to check it
     // against is a fast path nobody can trust. Deleting the brute force would delete the oracle.
     const grid = new SpatialGrid(o.h);
-    // THE GRID IS NOT ALWAYS FASTER, AND MEASURING SAID SO. Constant particle density (box grows with N, as real
-    // flesh does), JIT warmed, medians:
+    // v2536 measured, and the numbers were right about the IMPLEMENTATION rather than about grids:
     //     200 -> brute 0.60ms / grid 1.50ms = 0.4x   THE GRID LOSES
     //     600 -> brute 3.51ms / grid 4.26ms = 0.8x   THE GRID LOSES
     //    1500 -> brute 18.5ms / grid 11.2ms = 1.7x
     //    3000 -> brute 68.2ms / grid 24.4ms = 2.8x
     //    6000 -> brute  283ms / grid 56.0ms = 5.1x
-    // Below ~1000 particles, 27 Map lookups and a closure per neighbour cost more than the pairs they save. The
-    // flesh runs 400. So the grid DEFAULTS OFF THERE, and forcing it on would be a pessimisation wearing the word
-    // "optimisation" -- which is exactly how the GPU brain lost to CPU Dijkstra by 50x.
+    // and it named the cause exactly: "27 Map lookups and a closure per neighbour cost more than the pairs they
+    // save". The crossover sat at 1000 and the flesh runs 400, so the grid was off where it was most wanted.
+    //
+    // *** v4121 -- THE CAUSE WAS FIXED RATHER THAN THE CONCLUSION REPEATED, AND THE CROSSOVER COLLAPSED. ***
+    // spatialGrid.js now indexes cells by arithmetic over a bounding box instead of hashing into a Map: buckets
+    // are one Int32Array linked list with no allocation per step, and because distinct cell indices cannot
+    // collide, the hash-collision dedupe went away with the hash. Same rig as above -- constant particle
+    // density, JIT warmed, medians:
+    //     200 -> brute  1.51ms / grid 0.57ms =  2.6x   (was 0.4x)
+    //     600 -> brute  2.17ms / grid 1.14ms =  1.9x   (was 0.8x)
+    //    1500 -> brute 12.17ms / grid 2.50ms =  4.9x
+    //    3000 -> brute 50.96ms / grid 4.83ms = 10.6x
+    //    6000 -> brute  189.1ms / grid 9.68ms = 19.5x
+    // The grid now wins at every size that was ever measured losing. Below ~128 particles the two are within
+    // noise of each other -- BOTH under half a millisecond, and repeated runs disagree about which is ahead --
+    // so the constant there is a formality rather than a finding, and it is set where the grid STOPS being
+    // noise-competitive and starts winning consistently. The brute force stays regardless: spatialGrid-
+    // selfcheck asserts the two agree, and deleting the slow path would delete the oracle.
     //
     // Same shape as brain/flowfieldAuto.js: the engine picks by size, and either can be forced for testing.
-    const GRID_CROSSOVER = 1000;
+    const GRID_CROSSOVER = 128;
     const gridWanted = () => (o.useGrid === undefined ? P.length >= GRID_CROSSOVER : !!o.useGrid);
 
     function addParticle(pos, vel = [0, 0, 0]) {

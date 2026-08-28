@@ -144,7 +144,24 @@ export function settlePool({ W = SHIPPED_FLOOR, targetN = 686, viscosity = 3, st
     // for a pressureless fluid got a tait fluid and the negative would have graded nothing. THAT IS v3541's
     // OWN FINDING -- three of four candidates could not reach the solver through makeColumn -- REPEATING IN
     // THE FILE THAT WROTE IT UP, one round later. The gate asserts they arrive by reading world.opts back.
-    const wo = { h, mass, restDensity: rho0, stiffness, viscosity,
+    // v4121 -- *** REFERENCE_WALK IS NOT "ALWAYS BRUTE FORCE", AND A BLANKET VERSION OF IT SHIPPED A SECOND
+    // REGRESSION IN THIS SAME ROUND. *** materialKnobs and stability build at a fixed 686 particles, so
+    // pinning them to brute force is unambiguous -- 686 sat under BOTH the old crossover (1000) and could sit
+    // over the new one (128), so blanket-false correctly restores what their keys were cut on. This file is
+    // different: poolFixture-selfcheck's own "eightfold depth" section calls settlePool at targetN 2800 --
+    // ABOVE the old crossover of 1000 -- so in the SHIPPED tree that call was ALREADY running on the grid.
+    // A blanket useGrid:false forced it onto brute force instead, which is not "the walk its keys were cut
+    // on", it is a DIFFERENT walk, and poolFixture-selfcheck went red for exactly that reason -- caught by
+    // testing against the untouched tree the same way materialKnobs was, not assumed fixed because the fix
+    // looked like the last one.
+    //
+    // So the reference is reproduced exactly rather than approximated: the OLD crossover (1000) is baked in
+    // here as OLD_CROSSOVER, computed against the REAL particle count (nx*ny*F.n) before the world exists,
+    // which is what gridWanted() would have decided in the shipped tree regardless of what GRID_CROSSOVER in
+    // sph.js is set to today. levelClaim-selfcheck already passed under blanket-false because none of its
+    // calls happen to cross 1000; this formula is a superset of that correctness, not a narrower one.
+    const OLD_CROSSOVER = 1000;
+    const wo = { h, mass, restDensity: rho0, stiffness, viscosity, useGrid: (nx * ny * F.n) >= OLD_CROSSOVER,
                  gravity: [G * Math.sin(th), -G * Math.cos(th), 0], eos, gamma: 7 };
     if (eos === "tait") wo.soundSpeed = c;
     const w = createSphWorld(wo);

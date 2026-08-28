@@ -152,14 +152,76 @@ const OPTS = { h: 0.35, mass: 1000 * 0.13 ** 3, restDensity: 1000, gravity: [0, 
        n + " particles: brute " + tb.toFixed(1) + "ms -> grid " + tf.toFixed(1) + "ms  (" + (tb / tf).toFixed(1) + "x)");
 
     // ...and the engine must not switch it on below the crossover, where it is a pessimisation.
+    //
+    // *** v4121 -- THE SIZES MOVED BECAUSE THE CROSSOVER MOVED, AND THAT IS THE POINT OF THE CHECK. ***
+    // This asserted "OFF at 300, ON at 1500", which encoded the OLD threshold of 1000 as a literal. Rewriting
+    // spatialGrid.js to index cells directly instead of hashing into a Map made the grid win at 200 (2.6x,
+    // where it used to lose at 0.4x), so the constant dropped to 128 and 300 is now correctly ON. The check
+    // still has to exist -- an engine that switched the grid on everywhere would be re-committing v2536's
+    // measured pessimisation -- so it now brackets whatever the constant IS rather than restating a number
+    // that drifts: comfortably below it must be off, comfortably above must be on.
     const small = createSphWorld({ ...OPTS });          // no useGrid: let it choose
-    cloudBox(small, 300, 2);
+    cloudBox(small, 64, 1.2);
     small.step(1 / 120);
     const big = createSphWorld({ ...OPTS });
     cloudBox(big, 1500, 3.2);
     big.step(1 / 120);
-    ok("the engine picks by size: OFF at 300, ON at 1500", small.usingGrid() === false && big.usingGrid() === true,
-       "300 -> grid " + small.usingGrid() + ",  1500 -> grid " + big.usingGrid());
+    ok("the engine picks by size: OFF at 64, ON at 1500", small.usingGrid() === false && big.usingGrid() === true,
+       "64 -> grid " + small.usingGrid() + ",  1500 -> grid " + big.usingGrid());
+}
+
+
+// ---- v4121: THE DIRECT-INDEX PATH, ITS FALLBACK, AND THE FIXTURE PINS -----------------------------------------
+{
+    console.log("\n*** v4121 -- THE FAST PATH, THE PATH IT FALLS BACK TO, AND THE FIXTURES THAT OPT OUT ***");
+    const { SpatialGrid } = await import("./spatialGrid.js");
+
+    // A normal fluid must take the direct path, or the rewrite bought nothing.
+    const g = new SpatialGrid(0.1);
+    const P = [];
+    for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) P.push({ x: i * 0.05, y: j * 0.05, z: 0 });
+    g.rebuild(P);
+    ok("!! a normal cloud uses the DIRECT index, not the hash", g.stats().direct === true,
+        "the Map lookup per cell was the whole reason v2536 measured the grid losing below 1000");
+
+    // *** AND THE HASH MUST STILL BE THERE, because a direct index needs a bounded domain and nothing
+    // guarantees one. Two particles far apart ask for more cells than there is memory; that is the case the
+    // hash was chosen for, and it is the case that would crash if the fallback were deleted as dead code.
+    const far = new SpatialGrid(0.001);
+    far.rebuild([{ x: 0, y: 0, z: 0 }, { x: 1e6, y: 0, z: 0 }]);
+    ok("!! *** a pathological extent FALLS BACK to the hash instead of asking for 1e27 cells ***",
+        far.stats().direct === false,
+        "a direct index needs a bounded domain; the hash does not, which is why it survives as the fallback");
+    const near = far.near(0, 0, 0);
+    ok("   ...and the fallback still finds the right neighbour", near.includes(0) && !near.includes(1));
+
+    // Both paths must agree with each other, not merely each with itself.
+    const a = new SpatialGrid(0.1), b = new SpatialGrid(0.1);
+    a.rebuild(P); b._direct = false; b.map.clear();
+    for (let i = 0; i < P.length; i++) { const k = b._key(Math.floor(P[i].x / 0.1), Math.floor(P[i].y / 0.1), Math.floor(P[i].z / 0.1));
+        const bu = b.map.get(k); if (bu) bu.push(i); else b.map.set(k, [i]); }
+    b.built = P.length;
+    let same = true;
+    for (const q of [[0,0,0],[0.25,0.25,0],[0.55,0.55,0]]) {
+        const A = a.near(q[0], q[1], q[2]).slice().sort((x, y) => x - y);
+        const B = b.near(q[0], q[1], q[2]).slice().sort((x, y) => x - y);
+        if (A.join() !== B.join()) same = false;
+    }
+    ok("!! *** the direct path and the hash path return the SAME neighbour sets ***", same,
+        "the fallback is only safe if it is the same answer by a slower route");
+
+    // *** THE POLICY GUARD. *** Four answer-key fixtures pin the brute-force walk because their configurations
+    // are unstable enough that a 1e-14 change in summation order moves a settled statistic. That is a decision
+    // with a reason, and a later edit that quietly drops a pin would re-break exactly the gates this round
+    // already watched go red -- somewhere else, and much later.
+    const fs2 = await import("node:fs"), path2 = await import("node:path");
+    const HERE2 = path2.dirname(new URL(import.meta.url).pathname);
+    for (const f of ["materialKnobs.mjs", "stability.mjs", "poolFixture.mjs", "hydrostatic.mjs"]) {
+        const src = fs2.readFileSync(path2.join(HERE2, f), "utf8");
+        ok("!! " + f + " still pins REFERENCE_WALK", /REFERENCE_WALK/.test(src),
+            "materialKnobs, stability and levelClaim all went red when the crossover dropped and these worlds " +
+            "switched path -- not because the grid is wrong, but because their trajectories are chaotic");
+    }
 }
 
 console.log(fails ? "\nspatialGrid-selfcheck: " + fails + " FAILED" : "\nspatialGrid-selfcheck: all checks pass");

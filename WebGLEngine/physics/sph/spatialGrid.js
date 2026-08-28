@@ -28,23 +28,76 @@ export class SpatialGrid {
     constructor(h) {
         this.h = h;
         this.cell = h;
-        this.map = new Map();   // key -> array of particle indices
+        this.map = new Map();   // key -> array of particle indices  (the HASH fallback, see rebuild)
         this._seen = new Int32Array(27);   // scratch for the collision dedupe in forEachNear
         this.built = 0;
+
+        // v4121 -- *** THE DIRECT-INDEX PATH, WHICH IS WHY THE CROSSOVER MOVED. *** sph.js's own note measured
+        // this grid LOSING below ~1000 particles and named the reason exactly: "27 Map lookups and a closure
+        // per neighbour cost more than the pairs they save". That measurement was right about the
+        // IMPLEMENTATION, not about grids. A Map.get() per cell, a JS array per bucket that grows by push, and
+        // a hash whose collisions must then be deduped, are all avoidable: with a bounding box the cell index
+        // is arithmetic, buckets become one Int32Array linked list with zero allocation per step, and distinct
+        // cells cannot collide so the dedupe disappears with them.
+        this._head = null;      // Int32Array, one slot per cell, -1 when empty
+        this._next = null;      // Int32Array, one slot per particle: the next particle in the same cell
+        this._dim = [0, 0, 0];
+        this._min = [0, 0, 0];
+        this._direct = false;   // false = fall back to the hash Map (see MAX_CELLS in rebuild)
     }
 
     /** Rebuild from scratch. Called once per step: particles move every step, and an incrementally-maintained
      *  grid is a cache, and a cache is a second source of truth. */
     rebuild(particles) {
-        this.map.clear();
-        const c = this.cell;
-        for (let i = 0; i < particles.length; i++) {
+        const n = particles.length, c = this.cell;
+        this.built = n;
+        if (n === 0) { this.map.clear(); this._direct = false; return; }
+
+        // The bounding box is what buys direct indexing. It is recomputed every step for the same reason the
+        // grid is: particles move, and a cached extent is a second source of truth.
+        let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+        for (let i = 0; i < n; i++) {
             const p = particles[i];
-            const k = this._key(Math.floor(p.x / c), Math.floor(p.y / c), Math.floor(p.z / c));
-            const b = this.map.get(k);
-            if (b) b.push(i); else this.map.set(k, [i]);
+            if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+            if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+            if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
         }
-        this.built = particles.length;
+        // *** THE CAP IS WHY THE HASH PATH SURVIVES. *** Two particles a kilometre apart with h in millimetres
+        // would ask for more cells than there is memory. A hash has no bounded domain, which was the stated
+        // reason it was chosen; that reason is still true for the pathological case, so the fallback stays and
+        // the oracle gate exercises BOTH.
+        const MAX_CELLS = 1 << 22;   // 4.2M cells, ~17 MB of Int32 -- generous for any real fluid
+        const nx = Math.floor((x1 - x0) / c) + 3, ny = Math.floor((y1 - y0) / c) + 3, nz = Math.floor((z1 - z0) / c) + 3;
+        const cells = nx * ny * nz;
+        if (!Number.isFinite(cells) || cells <= 0 || cells > MAX_CELLS) {
+            this._direct = false;
+            this.map.clear();
+            for (let i = 0; i < n; i++) {
+                const p = particles[i];
+                const k = this._key(Math.floor(p.x / c), Math.floor(p.y / c), Math.floor(p.z / c));
+                const b = this.map.get(k);
+                if (b) b.push(i); else this.map.set(k, [i]);
+            }
+            return;
+        }
+
+        this._direct = true;
+        this._min[0] = x0 - c; this._min[1] = y0 - c; this._min[2] = z0 - c;   // one cell of margin
+        this._dim[0] = nx; this._dim[1] = ny; this._dim[2] = nz;
+        if (!this._head || this._head.length < cells) this._head = new Int32Array(cells);
+        if (!this._next || this._next.length < n) this._next = new Int32Array(n);
+        const head = this._head, next = this._next;
+        head.fill(-1, 0, cells);
+        // Walked BACKWARDS so each cell's list comes out in ASCENDING index order. Not cosmetic: the neighbour
+        // order sets the summation order, and a stable ascending walk keeps a run reproducible between hosts
+        // instead of depending on which particle happened to be inserted first.
+        for (let i = n - 1; i >= 0; i--) {
+            const p = particles[i];
+            const ix = ((p.x - this._min[0]) / c) | 0, iy = ((p.y - this._min[1]) / c) | 0, iz = ((p.z - this._min[2]) / c) | 0;
+            const k = (iz * ny + iy) * nx + ix;
+            next[i] = head[k];
+            head[k] = i;
+        }
     }
 
     // The standard spatial hash (Teschner et al. 2003): three large primes, XORed, giving a NUMBER key.
@@ -70,6 +123,26 @@ export class SpatialGrid {
      */
     forEachNear(x, y, z, fn) {
         const c = this.cell;
+        if (this._direct) {
+            // No Map, no hash, and therefore NO DEDUPE: 27 distinct cell indices cannot collide with each
+            // other, so the collision problem the hash created does not exist to be solved here.
+            const nx = this._dim[0], ny = this._dim[1], nz = this._dim[2];
+            const head = this._head, next = this._next;
+            const cx = Math.floor((x - this._min[0]) / c), cy = Math.floor((y - this._min[1]) / c),
+                  cz = Math.floor((z - this._min[2]) / c);
+            // The RANGE is clamped, not the centre: a query just outside the box still reaches the cells that
+            // are inside it, and one far outside intersects nothing and correctly yields no neighbours.
+            const ax = cx - 1 < 0 ? 0 : cx - 1, bx = cx + 1 >= nx ? nx - 1 : cx + 1;
+            const ay = cy - 1 < 0 ? 0 : cy - 1, by = cy + 1 >= ny ? ny - 1 : cy + 1;
+            const az = cz - 1 < 0 ? 0 : cz - 1, bz = cz + 1 >= nz ? nz - 1 : cz + 1;
+            for (let iz = az; iz <= bz; iz++)
+                for (let iy = ay; iy <= by; iy++) {
+                    const row = (iz * ny + iy) * nx;
+                    for (let ix = ax; ix <= bx; ix++)
+                        for (let m = head[row + ix]; m >= 0; m = next[m]) fn(m);
+                }
+            return;
+        }
         const cx = Math.floor(x / c), cy = Math.floor(y / c), cz = Math.floor(z / c);
         // Dedupe the 27 keys. Two of them CAN collide under the hash, and walking a bucket twice means applying
         // the same pair force twice -- a wrong simulation that looks like float noise. 27 entries is small enough
@@ -102,9 +175,18 @@ export class SpatialGrid {
     /** How full are the cells? A grid whose cells hold one particle each is a grid that costs more than it saves,
      *  and one holding hundreds is a grid that is not doing anything. Both are worth being able to see. */
     stats() {
-        let max = 0, total = 0;
-        for (const b of this.map.values()) { max = Math.max(max, b.length); total += b.length; }
-        const cells = this.map.size;
-        return { cells, mean: cells ? total / cells : 0, max };
+        let max = 0, total = 0, cells = 0;
+        if (this._direct) {
+            const n = this._dim[0] * this._dim[1] * this._dim[2], head = this._head, next = this._next;
+            for (let k = 0; k < n; k++) {
+                let len = 0;
+                for (let m = head[k]; m >= 0; m = next[m]) len++;
+                if (len) { cells++; total += len; if (len > max) max = len; }
+            }
+        } else {
+            for (const b of this.map.values()) { max = Math.max(max, b.length); total += b.length; }
+            cells = this.map.size;
+        }
+        return { cells, mean: cells ? total / cells : 0, max, direct: this._direct };
     }
 }
