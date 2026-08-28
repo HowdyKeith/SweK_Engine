@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK &middot; Heerich Avatar (voxel CSG, in the panel)</title>
+<meta name="demo:title" content="Heerich Avatar" />
+<meta name="demo:desc" content="The rigged avatar GLB voxelized and rendered as a colored voxel-art SVG through Heerich's CSG-to-SVG pipeline, redrawn on a slow turntable." />
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<style>
+  html,body { margin:0; height:100%; background:#0b0f14; overflow:hidden; }
+  #wrap { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  #wrap svg { width:100%; height:100%; display:block; }
+  #msg { position:absolute; left:0; right:0; bottom:0; font:10px ui-monospace,Menlo,monospace;
+         color:#5d7fa8; background:#0b0f14cc; padding:2px 4px; text-align:center; }
+  #msg.err { color:#ff9a9a; }
+  /* top-left, never top-right: ui/avatarSwitch.js's own mode-switch button sits at top:2px;right:2px over this
+     whole box (host document; this iframe just fills the box beneath it), matching krbn-avatar.html/ascii-avatar.html. */
+  #ctl { position:absolute; top:2px; left:2px; z-index:3; display:flex; gap:2px; }
+  #ctl select, #ctl button { font:9px ui-monospace,Menlo,monospace; background:#121a24cc; color:#cfe3ff;
+    border:1px solid #24384f; border-radius:4px; padding:1px 2px; max-width:58px; cursor:pointer; }
+  #ctl button { max-width:20px; padding:1px 3px; }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="ctl">
+  <select id="modelSel" title="Load a different avatar"><option value="">(default)</option></select>
+  <button id="modelFileBtn" title="Load a .glb/.gltf file">&#128193;</button>
+  <input type="file" id="modelFile" accept=".glb,.gltf" style="display:none" />
+</div>
+<div id="msg">loading…</div>
+<script type="module">
+// heerich-avatar.html
+// -----------------------------------------------------------------------------------------------------------
+// Keith: "can we do an avatar switch to render through Heerich, like we did for krbn and ascii?"
+//
+// A THIRD non-WebGL surface in the avatar rotation, alongside krbn's pencil sketch and ascii's character ramp.
+// Where krbn draws EDGES (a line renderer over a skinned mesh) and ascii samples a raster into glyphs, this one
+// turns the loaded GLB into VOXELS -- ui/assetVoxelizer.js's voxelizeObject(), the same surface-plus-fill
+// voxelizer asset2voxels.html already uses -- and renders those voxels as a colored voxel-art SVG through
+// vendor/heerich, a zero-dependency voxel-grid CSG-to-SVG library (MIT, meodai/heerich).
+//
+// *** IT REDRAWS ON A TIMER AND NOT PER FRAME, FOR THE SAME REASON krbn-avatar.html DOES. *** MEASURED here,
+// headless, on RobotExpressive.glb at the resolution this page uses (16 voxels along the longest axis, with
+// occlusion culling so the SVG stays a few hundred KB rather than the multi-megabyte payload an unoccluded
+// scan produces): voxelize ~10ms, Heerich CSG build ~2ms, toSVG(occlusion) ~40-70ms -- a rebuild-and-redraw is
+// real CPU, not free arithmetic over a framebuffer the way ascii's is, so this is declared `heavy` in
+// ui/avatarSwitch.js beside krbn, blobgpu and thead. It is, however, roughly 6-10x CHEAPER per redraw than
+// krbn's ~500ms pencil frame, so it redraws far more often (every REDRAW_MS, default 700ms) while still
+// comfortably inside its own budget.
+//
+// COLOR IS REAL, NOT DECORATIVE: assetVoxelizer samples each voxel's color from the mesh's own material (texture,
+// vertex color, or base color), and that RGB is passed straight through as each box's Heerich `style.fill` --
+// so the voxel-art render shows the model's actual surface colors, not a silhouette.
+import { loadGLTF } from "./tools/krbn/glbMesh.js";
+import { mountModelPicker } from "./ui/modelPicker.js";
+import * as THREE from "three";
+import { voxelizeObject } from "./ui/assetVoxelizer.js";
+
+const q = new URLSearchParams(location.search);
+let GLB = (q.get("glb") || "RobotExpressive").replace(/[^A-Za-z0-9_.-]/g, "");   // no traversal into GPU_Assets
+const REDRAW_MS = Math.max(300, Number(q.get("ms")) || 700);
+const RESOLUTION = Math.max(6, Math.min(64, Number(q.get("res")) || 16));
+const wrap = document.getElementById("wrap"), msg = document.getElementById("msg");
+const say = (t, err) => { msg.textContent = t; msg.className = err ? "err" : ""; };
+let GLTFLoader = null, Heerich = null;
+
+const view = () => ({ width: Math.max(64, wrap.clientWidth | 0), height: Math.max(64, wrap.clientHeight | 0) });
+
+let voxels = null, dims = null, t = 0, timer = 0, busy = false, dead = false, loadErr = "";
+
+const rgbHex = (r, g, b) => "#" + [r, g, b].map((c) => Math.max(0, Math.min(255, Math.round(c * 255))).toString(16).padStart(2, "0")).join("");
+
+function buildHeerich() {
+  // Rebuilt from the frozen voxel list on every redraw (position/size/style never change -- only camera does),
+  // because Heerich has no cheap "just re-render from a different angle without rebuilding" path documented,
+  // and MEASURED the rebuild itself is the cheap half (~2ms of the ~50-90ms total) -- the CSG structure, not the
+  // SVG projection, is what a rebuild costs, and skipping it would optimise the part that is already fast.
+  const h = new Heerich({ tile: 18, gap: 0.05 });
+  for (const v of voxels) {
+    const [x, y, z, r, g, b] = v;
+    h.applyGeometry({ type: "box", position: [x, y, z], size: [1, 1, 1], mode: "union", style: { fill: rgbHex(r, g, b), stroke: "#05070d", strokeWidth: 0.5 } });
+  }
+  return h;
+}
+
+function draw() {
+  // sticky loadErr, same reasoning as krbn-avatar.html's draw(): the redraw timer fires regardless of what
+  // loadAvatar() is doing, so a failed load's message must outlive the next ordinary tick rather than being
+  // silently overwritten by it.
+  if (loadErr) { say(loadErr, true); return; }
+  if (dead || busy || !voxels || !voxels.length) return;
+  busy = true;
+  try {
+    const h = buildHeerich();
+    const angle = (t * 360) % 360;
+    h.setCamera({ type: "isometric", angle });
+    const v = view();
+    const svg = h.toSVG({ padding: 8, occlusion: true });
+    wrap.innerHTML = svg;
+    const el = wrap.querySelector("svg");
+    if (el) { el.setAttribute("width", "100%"); el.setAttribute("height", "100%"); el.style.background = "#0b0f14"; }
+    say(GLB + " · Heerich voxels · " + voxels.length + " @ res" + RESOLUTION);
+  } catch (e) {
+    say("Heerich could not draw it: " + (e && e.message ? e.message : e), true);
+  }
+  busy = false;
+}
+
+/**
+ * Load a source into the voxelized model -- shared by the default boot fetch AND the live picker, the same
+ * shape krbn-avatar.html's and ascii-avatar.html's loadAvatar() already establish.
+ * @param src   {name, arrayBuffer()} -- a File, or the {name,text,arrayBuffer} shape mountModelPicker hands a preset
+ * @param label what to call it in the status line
+ */
+async function loadAvatar(src, label) {
+  loadErr = "";   // a NEW attempt clears any previous one -- see draw()'s own note on why this has to be sticky
+  say("loading " + label + "…");
+  let gltf;
+  try {
+    gltf = await loadGLTF(src, GLTFLoader);
+  } catch (e) { loadErr = "could not load " + label + ": " + (e && e.message ? e.message : e); say(loadErr, true); return; }
+  if (!gltf.scene) { loadErr = label + " has no scene to voxelize"; say(loadErr, true); return; }
+
+  gltf.scene.updateMatrixWorld(true);   // a fresh Object3D's matrixWorld is identity until this runs -- the
+                                         // same bug ascii-avatar.html's own note documents for bounding boxes,
+                                         // and voxelizeObject's own bbox measurement is exactly as vulnerable
+  let out;
+  try {
+    out = voxelizeObject(THREE, gltf.scene, { resolution: RESOLUTION, fill: true });
+  } catch (e) { loadErr = "could not voxelize " + label + ": " + (e && e.message ? e.message : e); say(loadErr, true); return; }
+
+  const json = out.toJSON();
+  if (!json.voxels || !json.voxels.length) { loadErr = label + " voxelized to nothing"; say(loadErr, true); return; }
+  voxels = json.voxels; dims = json.dims; GLB = label;
+  t = 0;
+  draw();
+}
+
+(async function boot() {
+  try {
+    const hv = await import("/vendor/heerich/heerich.js");
+    Heerich = hv.Heerich;
+  } catch (e) { say("Heerich is not vendored (/vendor/heerich/heerich.js): " + (e && e.message ? e.message : e), true); return; }
+
+  try {
+    const gl = await import("./vendor/three/jsm/loaders/GLTFLoader.js");
+    GLTFLoader = gl.GLTFLoader;
+  } catch (e) { say("could not load GLTFLoader: " + (e && e.message ? e.message : e), true); return; }
+
+  const r = await fetch("/GPU_Assets/" + GLB + ".glb").catch(() => null);
+  if (!r || !r.ok) { say(GLB + ".glb not found" + (r ? " (HTTP " + r.status + ")" : ""), true); return; }
+  await loadAvatar(r, GLB);
+  if (!voxels) return;   // loadAvatar already said why
+
+  mountModelPicker({
+    select: document.getElementById("modelSel"),
+    file: document.getElementById("modelFile"),
+    presets: [{ url: "/GPU_Assets/RobotExpressive.glb", label: "RobotExpressive" }],
+    onPick: (picked) => loadAvatar(picked, picked.name.replace(/\.(glb|gltf)$/i, "")),
+    onError: (msg2) => { loadErr = msg2; say(loadErr, true); },
+  });
+  document.getElementById("modelFileBtn").onclick = () => document.getElementById("modelFile").click();
+
+  // the redraw timer outlives any one loaded model -- it just keeps calling draw() against whatever voxel list
+  // loadAvatar() most recently set, the same shape krbn-avatar.html's timer uses
+  timer = setInterval(() => { t = (t + 0.02) % 1; draw(); }, REDRAW_MS);
+})();
+
+// *** TEARDOWN, THE SAME ONE-WAY SHAPE krbn-avatar.html AND ascii-avatar.html BOTH USE. *** ui/avatarSwitch.js
+// removes the iframe rather than hiding it, so a surface that keeps working once hidden is exactly the "second
+// context burning cycles behind a panel nobody is looking at" this tree refuses elsewhere -- CPU here, not GPU,
+// so the interval is what has to be cleared. pagehide fires for bfcache too (persisted=true), and a freeze is
+// not a teardown: this page holds no socket, so a freeze breaks nothing and there is nothing to rebuild, and
+// tearing down on freeze would return a dead page (timer cleared, nothing to restart it) on back-navigation --
+// v4073's exact finding on ascii-avatar.html, repeated here in advance rather than found the same way twice.
+addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    dead = true; clearInterval(timer);
+});
+
+// Re-fit when the host box changes shape. Cheap: it only re-draws (from the same frozen voxel list plus the
+// current camera angle), it does not re-parse or re-voxelize the GLB.
+let rz = 0;
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(draw, 250); });
+</script>
+</body>
+</html>

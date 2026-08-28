@@ -8,6 +8,69 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4094 -- a Heerich voxel avatar, rendering through the same pipeline asset2voxels.html only tries live
+
+Keith: "can we do an avatar switch to render through Heerich, like we did for krbn and ascii?"
+
+### Vendored: vendor/heerich, MIT, meodai/heerich
+
+8 source files (~3,560 lines), zero runtime dependencies, zero browser APIs -- a voxel-grid CSG-to-SVG library.
+Verified before use: no Node built-ins anywhere in the tree (`require(`/`node:` grep comes back empty),
+`node --check` clean on all 8 files, and a live functional test produced real SVG output (a box union'd with a
+subtracted sphere, 82038 bytes, starts with `<svg`).
+
+### heerich-avatar.html -- a fourth non-WebGL avatar surface
+
+Where krbn draws edges over a skinned mesh and ascii samples a raster into glyphs, this one voxelizes the loaded
+GLB (`ui/assetVoxelizer.js`'s `voxelizeObject()`, the same surface-plus-fill voxelizer `asset2voxels.html`
+already uses, chosen over `physics/mesh/voxelize.mjs` because that one refuses open/rigged meshes and
+RobotExpressive's rigged geometry is exactly that) and draws the result as a colored voxel-art SVG through
+Heerich, one box per voxel, styled with the voxel's own sampled RGB -- so the render shows the model's actual
+surface colors, not a silhouette.
+
+COST WAS MEASURED, NOT ASSUMED, before deciding whether this could claim ascii's real-frame-rate class or
+needed krbn's periodic-redraw one. Headless, on RobotExpressive.glb: voxelize ~10-20ms, Heerich CSG build
+~1-2ms, `toSVG({occlusion:true})` ~40-70ms at the resolution this page uses (16 voxels along the longest axis)
+-- real, non-trivial CPU per redraw, unlike ascii's arithmetic-over-an-existing-framebuffer, but roughly 6-10x
+CHEAPER than krbn's own measured ~500ms-per-frame cost. So it is declared `heavy` in `ui/avatarSwitch.js`
+(the button says so before the click, same as krbn/blobgpu/thead) but redraws every 700ms rather than krbn's
+2.6s, comfortably inside its own measured budget.
+
+Unoccluded SVG output was measured too and rejected: at resolution 24-48 (closer to `asset2voxels.html`'s own
+defaults) an unoccluded `toSVG()` produced 1.2-7.5 MB of SVG, one box's worth of hidden faces per interior
+voxel with nothing culling them. `occlusion:true` roughly halves that and resolution 16 keeps the panel's own
+payload in the low hundreds of KB, appropriate for a 143x210 corner panel rather than a full-page render.
+
+Same teardown shape as its siblings: torn down (not hidden) by `ui/avatarSwitch.js` on mode switch, its own
+`pagehide` guard clears the redraw interval on a real unload but does NOT tear down on a bfcache freeze
+(`e.persisted`) -- the exact bug v4073 found and fixed on `ascii-avatar.html`, applied here in advance rather
+than reintroduced and found the same way twice.
+
+VERIFIED LIVE, headless Chromium, not just read: loads RobotExpressive.glb, voxelizes to 596 voxels at the
+shipped resolution, renders a 659-shape SVG, zero page errors, zero console errors, across several redraw ticks
+on its own timer.
+
+### ui/avatarSwitch.js + ui/avatarSwitch-selfcheck.mjs
+
+New `heerich` mode inserted after `ascii` and before `gauges3000`, which the gate's own v4033 assertion requires
+stay last -- appending after it would have silently overruled a stated preference to save one edit. Roster
+grows from 10 to 11; every frozen count/order/heavy-count assertion in the selfcheck updated in lockstep
+(cycle-and-wrap chain, the four-heavy-modes check with a new CSG-cost regex, the eleven-id-order string). All
+checks pass.
+
+### pageReach: heerich-avatar.html joins the same judgement call already on record for its siblings
+
+`tools/pageReach-selfcheck.mjs` reports it as newly invisible (server.html mentions no filename for it), exactly
+the same shape already recorded for `ascii-avatar.html` and `krbn-avatar.html` at v4091: reachable through the
+avatar switch's own `src:` entry, which the pageReach check does not look at (its own stated limit: "it checks
+that server.html MENTIONS THE FILENAME... a weak check and I am saying so"). Left exactly where its siblings
+were left, for the same reason: linking it into the curated front door, or writing a baseline exception, is
+Keith's call per the baseline file's own rule ("Keith reviews these and says where each goes"), not something to
+invent here. Total invisible count is still 90 against a baseline ceiling of 100, so the ratchet itself holds.
+
+### Gates
+
+`heerich-avatar.html`: live headless test, zero errors. `ui/avatarSwitch-selfcheck.mjs`: all checks pass.
 ## Since v4093 -- the lab-results baseline re-frozen, and every drift traced to a cause
 
 `tools/roundhouse/labResults-selfcheck.mjs` had been red for several rounds against a baseline last frozen
