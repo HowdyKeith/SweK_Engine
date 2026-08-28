@@ -8,6 +8,40 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4081 -- RIG LAB's Gemini creature generator now says "needs Key" up front
+
+Keith: "same with RIG LAB panel spawn. the AI Voxel creature (Gemini) needs to have a '(Gemini needs Key)' and
+the link to the Gemini API key setup in the SETTINGS control panel." Follow-up: "Gemini needs key if no key is
+stored/ready so we need to check that."
+
+### Before: the missing key only showed up after a failed round-trip
+
+The RIG LAB panel's "AI voxel creature (Gemini)" section surfaced a missing key only after a failed generate
+attempt (`doGenerate()`'s `r?.error === "no_api_key"` branch) -- a full Gemini round-trip's worth of latency
+just to learn the key was never set.
+
+### Now: checked up front, via the same endpoint Settings already uses
+
+A new inline note is checked via `window.ai.keyStatus()` (the same masked-status endpoint `/ai/keys` already
+serves the rest of Settings) -- shown before typing anything, hidden when a key IS set, and re-checked every
+time the tab opens, so setting the key in Settings and coming back updates it without a reload.
+
+### The link goes to "discord", not "ai" -- a real surprise found while wiring it
+
+`settingsHub.js` groups the `geminiKey` control under its "Connectors" category alongside Discord/Grok/OpenAI/
+Claude, not under "LLM / AI Models" where one would expect it. `window.openSettings(catId)` only resolves at
+category granularity, so `"discord"` is the correct (if oddly-named) deep link, not a guess.
+
+And when the bridge itself is unreachable, the note stays hidden rather than claiming "needs key" -- absent-
+and-unknown is not the same fact as "no key", the same distinction this tree draws everywhere a probe can fail
+short of a real answer.
+
+### Gate
+
+New `tools/ship/rigLabGeminiKey-selfcheck.mjs` verifies all four real states live in a real browser (bridge
+unreachable -> hidden; key set -> hidden; key missing -> visible + amber; click -> opens Settings at
+"discord") by monkey-patching `window.ai.keyStatus()` to each answer in turn, rather than trusting the DOM
+would render correctly just because the source reads right.
 ## Since v4080 -- the PROMPT dock panel showed only its header, no content
 
 Keith: "When i click the PROMPT vertical side menu on the right top side, it is orange, menu line, but then
