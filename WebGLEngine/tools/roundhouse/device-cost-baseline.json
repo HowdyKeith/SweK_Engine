@@ -594,7 +594,8 @@
   "diffusion": 113720,
   "cfl": 285346,
   "lens": 329530,
-  "xpbd": 527619
+  "xpbd": 527619,
+  "stability": 1395075
  },
  "sweepAtLeast": {
   "windtunnel": 302518,
@@ -603,10 +604,9 @@
   "kh": 309287,
   "kuramoto": 301810,
   "twof": 1,
-  "stability": 311683,
   "freesurface": 300158,
   "flip3d": 302325,
   "multigrid3d": 302048
  },
- "sweepFrozenOn": "2026-08-28T14:43:39.328Z"
+ "sweepFrozenOn": "2026-08-28T15:10:21.386Z"
 }
