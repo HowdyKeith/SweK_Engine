@@ -84,6 +84,56 @@ export function writeCostRecord(pairs, { file = COST_BASELINE, note = "" } = {})
     return body;
 }
 
+/**
+ * *** v4049 -- AND THE COST OF SWEEPING A DEVICE IS NOT DERIVABLE FROM THE COST OF BUILDING IT. ***
+ *
+ * The exhaustive sweep budgets each device by formula: sum(modeCosts) x 2 x (1 + 3K), being plant states, a
+ * base build, and three ladder rungs per knob. v4048's echo confirmation broke that. Proving a TRUE echo
+ * costs up to K-1 extra builds, so the worst case becomes 1 + 3K^2 -- for K=10 that is 31 -> 301, tenfold --
+ * but only echo-heavy devices pay anything at all, and a FALSE echo usually breaks on the first knob tried.
+ *
+ * MEASURED, five devices with K between 6 and 9, as a multiple of sum(modeCosts):
+ *
+ *     invariants  K=7    2.5x        seismic     K=8    6.7x
+ *     thermostat  K=6   19.5x        acoustics   K=7   23.1x
+ *     centrifuge  K=9   82.3x
+ *
+ * *** A 33x SPREAD ACROSS NEARLY IDENTICAL KNOB COUNTS. *** The formula yields 38-56x over that range, so it
+ * OVER-budgets invariants by fifteenfold and UNDER-budgets centrifuge by half -- wrong in both directions at
+ * once, and the second direction is what produced 142 unanswered rows. What varies is how echo-heavy a device
+ * is, which is exactly the thing a coefficient cannot know in advance.
+ *
+ * So sweep cost is MEASURED and kept, on the same terms as build cost and for the same reason v4040 refused
+ * to model cost from rawCalls: when a proxy spans two orders of magnitude, the measurement is the model.
+ */
+export function sweepCostFor(device, rec = null) {
+    const r = rec || readCostRecord();
+    const v = r && r.sweepCosts && r.sweepCosts[device];
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Freeze measured exhaustive-sweep costs. Separate from writeCostRecord because they are measured by a
+ * different run -- build cost comes from corroborationCensus, sweep cost from knobLiveness --- and merging
+ * them into one freeze would mean neither could be refreshed without paying for both.
+ *
+ * `atLeast` marks a device that did NOT complete inside the budget it was given: its true cost is unknown and
+ * above this figure, which is a bound and must never be read as a measurement.
+ */
+export function writeSweepCosts(entries, { file = COST_BASELINE } = {}) {
+    const rec = readCostRecord(file);
+    rec.sweepCosts = rec.sweepCosts || {};
+    rec.sweepAtLeast = rec.sweepAtLeast || {};
+    for (const e of entries) {
+        if (!e || typeof e.ms !== "number" || !Number.isFinite(e.ms)) continue;
+        if (e.complete) { rec.sweepCosts[e.device] = e.ms; delete rec.sweepAtLeast[e.device]; }
+        else { rec.sweepAtLeast[e.device] = e.ms; delete rec.sweepCosts[e.device]; }
+    }
+    rec.sweepFrozenOn = new Date().toISOString();
+    fs.writeFileSync(file, JSON.stringify(rec, null, 1));
+    return rec;
+}
+
 /** The devices worth knowing about: the ones a budget will trip over. */
 export function dearest(rec = null, n = 10) {
     const r = rec || readCostRecord();
