@@ -598,7 +598,22 @@ export const INSTRUMENTS = [
         // from a declaration nobody can verify, and the field for saying so already exists.
         id: "xpbd-compliance", area: "soft bodies", name: "Compliance, and what iteration count must not change",
         device: "xpbd", page: null, gate: "physics/xpbd/compliance-selfcheck.mjs",
-        measures: "XPBD constraint compliance across substeps, iterations, volume, pressure, damping, friction, muscle and weave.",
+        // *** v4052 -- THIS LINE CLAIMED THE COMPLIANCE KNOB REACHED MODES IT NEVER TOUCHES. *** It read
+        // "compliance across substeps, iterations, volume, pressure, damping, friction, muscle and weave",
+        // and knobLiveness measured the opposite: `compliance` is read only by hooke, iteration and substep,
+        // where it reaches physics through the {...c} spread into hangingLink, iterationIndependence and
+        // stiffnessIndependence. Every other mode returns first. The census could see the knob was ignored
+        // there; IT COULD NOT SEE THAT SOMETHING CLAIMED OTHERWISE, which is the question its deafness list
+        // exists to hand to a reader -- and this is that reader answering it.
+        //
+        // WIRING THE KNOB INTO THOSE MODES WOULD HAVE BEEN THE WRONG FIX AND WORSE PHYSICS: a volume or
+        // pressure constraint's compliance is not a distance constraint's, and they carry their own
+        // (volume.js builds edges at 5e-4). The claim was wrong, not the code.
+        measures: "XPBD constraint compliance, and that iteration and substep count do not change the stiffness "
+            + "it implies (hooke, iteration, substep). The remaining modes -- volume, pressure, damping, "
+            + "friction, kernel, density, muscle, weave, tear, modulate, sampled, fluid, attach, clothloop, "
+            + "grains -- grade their own constraint families, each with its own compliance rather than this "
+            + "device's knob.",
         key: "*** THE KEY IS A PARAMETER THAT MUST NOT MATTER: XPBD's effective stiffness is INDEPENDENT of the iteration count, and PBD's is not -- which is exactly why the planted error SUBSTITUTES THE PBD INTEGRATOR (plantKind: method) rather than nudging a number. It is the historically REAL mistake, not an invented one, and a device graded only on 'does the cloth hang' would rate the plant a fine model.",
     },
     {
