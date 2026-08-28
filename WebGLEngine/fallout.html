@@ -48,6 +48,21 @@
   .radio { font-size:18px; }
   .blink { animation:bl 1.1s step-end infinite; } @keyframes bl { 50%{opacity:.25} }
   #offline { text-align:center; padding:60px 20px; color:var(--green-dim); }
+
+  /* v4120 -- *** WHEN THE SHADER CRT IS ON, THE CSS CRT MUST GO OFF, OR YOU GET BOTH. ***
+     body::before draws gradient scanlines and body::after a vignette. Those are part of the DOM, so the
+     rasteriser captures them INTO the texture -- and then the shader adds its own scanlines on top of them at
+     a different pitch. Two scanline grids at slightly different periods is a moire pattern, which looks like a
+     broken shader rather than like two effects stacking. So the shader path turns the CSS one off. */
+  body.crt-shader::before, body.crt-shader::after { display:none !important; }
+  body.crt-shader > *:not(#crtLayer) { visibility:hidden; }
+  #crtLayer { position:fixed; inset:0; z-index:100; display:none; background:#000; }
+  #crtLayer canvas { width:100%; height:100%; display:block; }
+  /* The toggle has to stay reachable, because the CRT surface itself is not interactive -- see the note in
+     the script. It is deliberately OUTSIDE the hidden subtree. */
+  #crtBtn { position:fixed; right:12px; bottom:12px; z-index:101; padding:6px 12px; background:#06200f;
+            color:var(--green); border:1px solid var(--green-dim); border-radius:4px; cursor:pointer;
+            font:12px/1 "Consolas",ui-monospace,monospace; }
 </style>
 </head>
 <body>
@@ -138,6 +153,62 @@
   async function load() { try { const r = await fetch("/fallout/state",{cache:"no-store"}); render(await r.json()); } catch(e) { $("status").textContent="bridge unreachable"; } }
   $("refresh").onclick = load;
   load(); setInterval(load, 1500);
+</script>
+<div id="crtLayer"></div>
+<button id="crtBtn">CRT: off</button>
+<script type="module">
+// v4120 -- THE OTHER PIP-BOY. pipboy-models.html's screen is a canvas, so render/crtPass.js could sample it
+// directly. THIS page is DOM and CSS, so there was nothing to sample -- ui/domToTexture.js is the missing
+// step, and it rasterises the live page through SVG <foreignObject> into something the shader can have.
+//
+// *** THE CRT VIEW IS A DISPLAY MODE, NOT A SKIN, AND THAT IS AN HONEST LIMITATION RATHER THAN AN OVERSIGHT. ***
+// Barrel distortion MOVES every pixel, so a click at (x,y) on the curved image is no longer over the control
+// that appears to be there. Inverse-mapping pointer events through barrel() is possible -- it is the same
+// function, solved numerically -- but it is not done here, so while the CRT is on the surface is display-only
+// and the toggle deliberately lives outside it. Saying which is better than a dash whose buttons quietly
+// aim a few pixels wrong.
+import { rasterize } from "/ui/domToTexture.js";
+import { makeCrtPass, PRESETS } from "/render/crtPass.js";
+
+const layer = document.getElementById("crtLayer"), btn = document.getElementById("crtBtn");
+let pass = null, on = false, timer = 0, busy = false;
+
+async function frame() {
+  if (!on || busy) return;
+  busy = true;
+  try {
+    const w = Math.min(1280, Math.max(320, window.innerWidth));
+    const h = Math.min(800, Math.max(200, window.innerHeight));
+    if (!pass) { pass = makeCrtPass(w, h); if (!pass) { fail("no WebGL2"); return; } layer.appendChild(pass.canvas); }
+    else if (pass.canvas.width !== w || pass.canvas.height !== h) pass.resize(w, h);
+    // The CRT layer and its toggle must not appear INSIDE the picture, and the class that hides the page for
+    // the viewer must be undone on the clone -- otherwise the snapshot is of a hidden page and the result is
+    // black. Both are the clone's business, not the live DOM's.
+    const shot = await rasterize(document.body, {
+      width: w, height: h,
+      exclude: "#crtLayer, #crtBtn",
+      stripClasses: ["crt-shader"],
+    });
+    if (shot) pass.render(shot, PRESETS.pipboy);
+  } catch (e) { /* a bad frame is not worth losing the dash over */ }
+  finally { busy = false; }
+}
+
+function fail(why) { on = false; btn.textContent = "CRT: " + why; document.body.classList.remove("crt-shader"); layer.style.display = "none"; }
+
+btn.onclick = () => {
+  on = !on;
+  document.body.classList.toggle("crt-shader", on);
+  layer.style.display = on ? "block" : "none";
+  btn.textContent = on ? "CRT: on" : "CRT: off";
+  try { localStorage.setItem("swek.falloutCrt", on ? "1" : ""); } catch (e) {}
+  clearInterval(timer);
+  // *** DRIVEN ON A TIMER, NOT requestAnimationFrame. *** Rasterising the whole page measured about 12 ms, so
+  // 60 Hz would spend most of a frame budget redrawing a dashboard that changes every 1.5 s. Four times a
+  // second is well ahead of the data.
+  if (on) { frame(); timer = setInterval(frame, 250); }
+};
+try { if (localStorage.getItem("swek.falloutCrt")) btn.click(); } catch (e) {}
 </script>
 <script src="kiosk.js"></script>
 </body>
