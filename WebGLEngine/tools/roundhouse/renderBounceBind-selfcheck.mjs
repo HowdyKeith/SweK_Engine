@@ -24,7 +24,12 @@ import { occluded } from "../../physics/render/occlusion.mjs";
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const report = (l) => console.log(`  ----  ${l}`);
-const finite = (v) => typeof v === "number" && Number.isFinite(v);
+// v4058 -- an ARRAY observable is finite when every entry is, and an EMPTY one is not finite but absent.
+// seriesRelByDepth is the first array this device declares; centrifuge has carried errRatios,
+// doublingTimes and bands for far longer, so this is the check catching up with the lab, not a new rule.
+const finite = (v) => (Array.isArray(v)
+    ? v.length > 0 && v.every((x) => typeof x === "number" && Number.isFinite(x))
+    : typeof v === "number" && Number.isFinite(v));
 
 console.log("renderBounceBind-selfcheck -- the same solid angle, blocking and emitting\n");
 
@@ -66,8 +71,10 @@ console.log("\n3. THE GEOMETRY IS MEASURED, NOT TYPED");
         + ", residual " + v.kResidual.toExponential(3) + " at 60k samples. *** TYPING 0.25 WOULD HAVE MADE THE "
         + "SERIES A RESTATEMENT OF ITSELF *** rather than a second route to the same number.");
     ok("!! the truncated series is graded at EVERY depth, not only at convergence",
-        v.seriesDepths >= 5 && v.seriesWorstRel < 0.02,
-        v.seriesDepths + " depths, worst relative " + v.seriesWorstRel.toExponential(3)
+        v.seriesRelByDepth.length >= 5 && v.seriesWorstRel < 0.02,
+        // v4058: was v.seriesDepths, a count that equalled maxDepth exactly and so read as the knob
+        // handed back. The per-depth errors carry the same coverage in their LENGTH and are measurements.
+        v.seriesRelByDepth.length + " depths, worst relative " + v.seriesWorstRel.toExponential(3)
         + ". L(n) = rho(1-k)(1-(rho k)^n)/(1-rho k) is exact at every n, so a recursive gather is checked at "
         + "n = 1, 2, 3 ... A limit-only key would pass a renderer that got the early bounces wrong.");
     ok("!! the white-furnace shortfall IS k^n, a number predicted before the run",
