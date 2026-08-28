@@ -8,6 +8,48 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4093 -- the lab-results baseline re-frozen, and every drift traced to a cause
+
+`tools/roundhouse/labResults-selfcheck.mjs` had been red for several rounds against a baseline last frozen
+75 devices ago. Rather than re-freeze blind, diffed the old committed baseline against the fresh capture,
+key by key, before writing anything: 6 MOVED values (all previously investigated and explained earlier this
+session), 1 VANISHED, and the rest -- 680 new device-level observables, 1926 new pair-level observables --
+is device-roster growth (75 -> 129 devices, 283 -> 484 device-mode pairs), which the file's own rules call
+legitimate and not something a re-freeze needs to justify individually.
+
+### The six MOVED values, each already accounted for
+
+`figureeight/period.energyDriftFrac` and `angMomDrift` moved from the sentinel `-1` to real measured values
+(8.63e-16, 1.27e-15) -- this is `figureEightBind.mjs`'s own documented behaviour (v3852/v3973): perturbed and
+choreography modes return `-1` because there is no reference orbit to diff against, while `period` mode
+computes a real `Math.abs((r.E1 - r.E0) / r.E0)`. Confirmed by reading the source directly rather than assuming
+the comment still matches the code.
+
+`xpbd/kernel.restDensity` VANISHED entirely -- also already explained (v3973): a stowaway field that leaked
+into the pair's frozen shape and was later removed once the observable-filter widening (v3520) made it visible
+as a field that was never meant to be watched at all.
+
+`blackhole/onset.captureOnsetR` and `captureOnsetRBracket` moved by about 0.01 (6.0357 -> 6.0252, and the
+bracket with it). Investigated fresh this round rather than assumed: zero commits to either
+`blackHoleBind.mjs` or `physics/blackHole.js` since the initial mirror, and the value reproduces bit-identical
+across repeated runs on this box -- so it is not a live bug and not non-determinism, it is cross-platform
+floating-point drift compounding over 200,000 RK4 steps near a bisection boundary the file's own comments
+already call fragile and non-monotonic. A boundary this close to a captured/escaped transition is exactly where
+a few ULPs of accumulated integration error changes which side of the bisection lands first.
+
+### The growth: 75 -> 129 devices is the lab, not a defect
+
+`deviceCount` 75 -> 129, `observables` 638 -> 1264, `pairCount` 283 -> 484, `pairObservables` 2339 -> 4264. This
+baseline had simply never been re-frozen since long before most of this session's own device work (crystal
+diffraction, xenon/paramagnet, structureFactor/powder, and everything else that landed between whenever this
+file was last written and now). None of it is a silent absorption: the diff above is exhaustive over every
+key in both files, so "genuinely new" and "quietly changed" cannot be confused with each other here.
+
+### Gates
+
+`labResults-selfcheck.mjs`: all checks pass, including its own positive control (a planted 5% move on
+`friction/critical.criticalSlope`, detected as exactly one flagged pair at the predicted 1.05x ratio) -- proof
+the comparator that just cleared 4264 observables is not vacuous.
 ## Since v4092 -- a Windows crash left in my own earlier work
 
 `tools/ship/windowsImport-selfcheck.mjs` went red off Keith's rig: `core/ecs/World-selfcheck.mjs` -- the gate
