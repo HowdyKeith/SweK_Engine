@@ -117,44 +117,68 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     // Strings and arrays were always skipped and that is right: inventing an ordering would test the device's
     // error handling instead of the knob. But the row then carried an empty `probed`, so BOTH stillKnobs and
     // insensitiveKnobs filtered it out and the knob disappeared from every list this census prints.
-    const { rows } = await knobLiveness({ only: ["optics", "blackhole"], budgetMs: 200000 });
-    const un = unprobedKnobs(rows);
-    ok("!! *** a null-default knob is REPORTED rather than silently absent ***",
-        un.some((k) => k.startsWith("optics.spread")),
-        un.join(", ") + ". `cfg.x ?? fallback` is a live, readable knob whose default means 'compute it'. "
-        + "optics.spread became invisible the moment v4030 gave it a null default, WHICH IS A GAP THAT ROUND "
-        + "CREATED AND THEREFORE HAD TO CLOSE.");
-    ok("...and it is NOT counted as still, because 'was never probed' is not 'moves nothing'",
-        !stillKnobs(rows).some((k) => k === "optics.spread"),
-        "still: " + (stillKnobs(rows).join(", ") || "none") + ". A measurement and an admission are different "
-        + "claims and folding the second into the first would report coverage this census does not have.");
+    //
+    // *** v4051 -- THIS BLOCK HAS NOW BEEN BROKEN TWICE BY ITS OWN SUBJECT BEING FIXED, AND THAT IS THE
+    // FINDING. *** It was written naming the two null-default knobs the lab happened to have. v4050 resolved
+    // blackhole.onsetLo and the assertion went red -- a test failing because the defect it described was
+    // cured. v4050's repair kept optics.spread as a real witness, WHICH REBUILT THE SAME TRAP ONE DEVICE
+    // LATER: the very next fix would have broken it again.
+    //
+    // So the block is now in three parts, and the order is the point:
+    //   (a) THE RULE, on rows this file owns. It cannot go vacuous and cannot be broken by fixing a device.
+    //   (b) THE POPULATION, scanned from defaults() across the whole lab rather than from two typed names.
+    //   (c) THE RATCHET, a POSITIVE claim about the knob that was fixed -- true forever unless reverted.
+    // A test about "what the census does with an unanswerable knob" must not be anchored to a device
+    // REMAINING unanswerable, which is what (a) and (b) together fix and (c) could never have.
 
-    // *** v4050 -- THIS TEST NAMED TWO DEVICES, ONE OF THEM GOT FIXED, AND THE TEST WENT RED FOR IT. ***
-    // blackhole.onsetLo was the second witness. Sweep 6 surfaced it in the admission list, bhDefaults() now
-    // resolves it the way v3712 resolved onsetHi one line above -- and this assertion then FAILED, because it
-    // asserted the knob was still unaskable. A TEST THAT BREAKS WHEN THE DEFECT IT DESCRIBES IS CURED WAS
-    // PINNED TO THE WRONG THING: the invariant is about what the census does with an unanswerable knob, never
-    // about which devices happen to have one. It is asserted structurally below, on rows owned by this file,
-    // so the next fix cannot look like a regression -- and onsetLo now ratchets the other way.
+    // (a) THE RULE. NO DEVICE APPEARS HERE ON PURPOSE.
+    const synth = [{ device: "d", knob: "nul", unprobed: true, kind: "null-default",
+                     probed: [], live: [], still: [], incomplete: false }];
+    ok("!! *** a knob with NO LADDER TO WALK is an admission, never a verdict ***",
+        probeValues(null).length === 0 && probeValues(null, [1, 2]).length === 2
+        && unprobedKnobs(synth).length === 1 && unprobedKnobs(synth)[0].startsWith("d.nul")
+        && stillKnobs(synth).length === 0,
+        "probeValues(null) yields no ladder, so the row lands in the admission list and in NO universal one. "
+        + "'Was never probed' is not 'moves nothing': folding the second into the first would report coverage "
+        + "this census does not have. *** AND DECLARED CHOICES ARE THE WAY BACK: probeValues(null, [1,2]) "
+        + "yields 2 -- the same escape hatch eight devices already use, and the reason a null default is a gap "
+        + "rather than a dead end.");
+
+    // (b) THE POPULATION. defaults() only -- no builds, so scanning all of them is cheap.
+    const nullDefaults = [];
+    for (const name of DEVICE_NAMES) {
+        let dev; try { dev = await getDevice(name); } catch { continue; }
+        if (typeof dev.defaults !== "function") continue;
+        for (const mode of (Array.isArray(dev.modes) && dev.modes.length ? dev.modes : [undefined])) {
+            let cfg; try { cfg = (dev.defaults({ mode }) || {}).config || {}; } catch { continue; }
+            for (const [k, v] of Object.entries(cfg)) if (v === null) nullDefaults.push(name + "." + k);
+        }
+    }
+    const population = [...new Set(nullDefaults)].sort();
+    const devs = [...new Set(population.map((s) => s.split(".")[0]))];
+    const { rows } = await knobLiveness({ only: [...new Set([...devs, "blackhole"])], budgetMs: 200000 });
+    const un = unprobedKnobs(rows);
+    if (population.length) {
+        ok("!! *** EVERY null-default knob in the lab is reported, and none is counted still ***",
+            population.every((k) => un.some((u) => u.startsWith(k + " ") || u === k))
+            && !stillKnobs(rows).some((k) => population.includes(k)),
+            population.length + " found by scanning defaults(): " + population.join(", ") + ". Quantified over "
+            + "whatever the lab HAS, so closing one is not a regression and adding one cannot go unnoticed.");
+    } else {
+        report("*** THE LAB CURRENTLY HAS NO NULL-DEFAULT KNOBS, AND THIS IS REPORTED RATHER THAN PASSED. ***"
+            + " A quantifier over an empty set is true for free, and a green check that means 'there was "
+            + "nothing to check' is the vacuous pass this lab refuses everywhere else. The rule above does "
+            + "the work; this line states the population it was applied to, which is zero.");
+    }
+
+    // (c) THE RATCHET. A positive claim, so it survives every future fix.
     const lo = rowFor(rows, "blackhole", "onsetLo");
-    ok("!! *** onsetLo IS NOW ASKED THE QUESTION, and cannot quietly go back to being unaskable ***",
+    ok("!! *** onsetLo IS ASKED THE QUESTION, and cannot quietly go back to being unaskable ***",
         !!lo && lo.probed.length > 0 && !un.some((k) => k.startsWith("blackhole.onsetLo")),
         lo ? "probed in " + (lo.probed.join(", ") || "NOTHING") + " -- verdict "
              + (lo.live.length ? "live in " + lo.live.join(", ") : "still in " + lo.still.join(", "))
              + ". Reverting the default to null would put it back in the admission list and fail here."
            : "ROW NOT FOUND");
-
-    // The rule itself, on rows this file owns. NO DEVICE APPEARS HERE ON PURPOSE.
-    const synth = [{ device: "d", knob: "nul", unprobed: true, kind: "null-default",
-                     probed: [], live: [], still: [], incomplete: false }];
-    ok("!! ...and the rule holds WITHOUT NAMING A DEVICE, which is the part that survives a fix",
-        probeValues(null).length === 0 && probeValues(null, [1, 2]).length === 2
-        && unprobedKnobs(synth).length === 1 && unprobedKnobs(synth)[0].startsWith("d.nul")
-        && stillKnobs(synth).length === 0,
-        "probeValues(null) yields no ladder, so the row is unprobed and lands in the admission list and in no "
-        + "universal one. *** AND DECLARED CHOICES ARE THE WAY BACK: probeValues(null, [1,2]) yields 2 -- the "
-        + "same escape hatch eight devices already use, and the reason a null default is a gap rather than a "
-        + "dead end.");
 }
 
 console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB THAT MOVES NOTHING ***");
