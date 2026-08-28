@@ -204,7 +204,9 @@ export const SECTIONS = [
       // speech model running as WASM + WebGPU in the tab, and like its neighbour it is built so the expensive
       // facts land BEFORE the decision -- it downloads nothing on load, and says the 14x-slower-than-real-time
       // cost on screen before any button works.
-      pages: ["webgpu-llm.html", "voxtral.html",
+      // v4118 -- webrtx.html JOINS, same rule again: it answers what THIS BOX can do (is there a secure origin,
+      // is there WebGPU, will an acceleration structure build) rather than showing a phenomenon.
+      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this

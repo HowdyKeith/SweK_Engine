@@ -110,6 +110,39 @@ export const REFUSED = [
     },
 ];
 
+/**
+ * *** THE SINGLE FACT THAT DECIDES WHETHER ANY OF THIS PAGE WORKS, AND I SHIPPED v4115 WITHOUT IT. ***
+ *
+ * WebCrypto's `crypto.subtle` is SECURE-CONTEXT ONLY, and so is `navigator.gpu`. SweK's primary origin is
+ * http://<lan-ip>:8787 -- neither https nor localhost -- so on the address the engine actually ships as, BOTH
+ * ARE UNDEFINED. Measured in Chromium, same server, two origins: on 127.0.0.1 isSecureContext is true and
+ * navigator.gpu, crypto.subtle, VideoEncoder, getUserMedia and navigator.storage.estimate all exist; on
+ * 192.0.2.2 isSecureContext is false and EVERY ONE of them is undefined.
+ *
+ * *** THE BUG THAT CAUSED: *** verifyArtefact() called sha256Hex(), which reached straight into
+ * crypto.subtle.digest and threw a TypeError into an un-caught promise -- so on the LAN the "Load the engine"
+ * button did NOTHING AT ALL, with no message. And the gate could not see it, because the gate served the page
+ * from localhost, WHICH IS A SECURE CONTEXT. The right lesson is not "add a try/catch": it is that a probe run
+ * on the wrong ORIGIN measures a different browser. The gate now drives a non-loopback address too.
+ *
+ * ui/codecProbe.mjs recorded exactly this rule at v3735 for WebCodecs and I did not carry it across.
+ */
+export const INSECURE_WHY =
+    "this page is on an INSECURE ORIGIN (" +
+    (typeof location !== "undefined" ? location.origin : "unknown") + "). WebCrypto's crypto.subtle and " +
+    "navigator.gpu are both secure-context only, so on http://<lan-ip> they do not exist at all -- the digest " +
+    "cannot be checked and WebGPU cannot be reached. Open this page over the https tunnel, or on localhost.";
+
+/** Is there a usable WebCrypto? The one place that question is asked, so the answer cannot drift. */
+export function hasSubtleCrypto() {
+    return !!(typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.subtle);
+}
+
+/** Is this a secure context? Reported rather than assumed, because the LAN origin is the DEFAULT here. */
+export function isSecure(win = typeof window !== "undefined" ? window : null) {
+    return win ? !!win.isSecureContext : null;
+}
+
 /** Bytes -> "2.50 GB". Kept here so the page and the gate format the same number the same way. */
 export function gb(n) { return typeof n === "number" && isFinite(n) ? (n / 1e9).toFixed(2) + " GB" : "unknown"; }
 
@@ -206,6 +239,14 @@ export function nextStep(state = initialState(), facts = null) {
 export function blockersFrom(facts) {
     const out = [];
     if (!facts) return out;                        // unknown is not a "no" -- v3103's rule, both ways
+    // *** THIS OUTRANKS EVERY HARDWARE FACT BELOW IT. *** On an insecure origin there is no navigator.gpu to
+    // ask about an adapter and no crypto.subtle to check a digest with, so reporting "no WebGPU adapter" there
+    // would blame the machine for what the URL did.
+    if (facts.secureContext === false) {
+        out.push("this is an INSECURE ORIGIN -- navigator.gpu and crypto.subtle are both secure-context only, " +
+                 "so neither exists here. Use the https tunnel or localhost");
+        return out;
+    }
     // *** THE KEY IS `gpuNamespace`, AND GETTING IT WRONG WAS SILENT. *** This read `facts.webgpu` first, which
     // localModelProbe has never emitted, so the strict `=== false` was never true and THIS BLOCKER COULD NOT
     // FIRE ON REAL DATA. Nothing failed: the gate fuzzed the same invented key, so code and test agreed with
@@ -241,6 +282,7 @@ export function warningsFrom(facts) {
  * enforces is computed by the same code the gate exercises rather than by a second implementation.
  */
 export async function sha256Hex(bytes) {
+    if (!hasSubtleCrypto()) throw new Error(INSECURE_WHY);
     const buf = bytes instanceof ArrayBuffer ? bytes : (bytes && bytes.buffer ? bytes.buffer : bytes);
     // *** `globalThis.crypto`, NOT A BARE `crypto`, AND THE TREE'S OWN GATE ASKED FOR THAT. *** unboundBuiltin
     // treats a bare `crypto.` as Node's crypto module used without importing it -- and its v3678 note predicted
@@ -258,6 +300,9 @@ export async function sha256Hex(bytes) {
  * "wrong length" is a far more useful message to a person than "digest differs".
  */
 export async function verifyArtefact(bytes, artefact = ARTEFACTS.wasm) {
+    // An insecure origin is a REFUSAL with a reason, never an exception: the caller renders `reason`, and a
+    // thrown TypeError rendered nothing at all.
+    if (!hasSubtleCrypto()) return { ok: false, reason: INSECURE_WHY, expected: artefact.sha256, got: null, insecure: true };
     const len = bytes ? (bytes.byteLength ?? bytes.length ?? 0) : 0;
     if (!len) return { ok: false, reason: "no bytes were supplied", expected: artefact.sha256, got: null };
     if (len !== artefact.bytes) {

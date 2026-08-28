@@ -113,7 +113,8 @@
 <script type="module">
 import { UPSTREAM, ARTEFACTS, WEIGHTS, UPSTREAM_BENCH, MEASURED_HERE, REFUSED,
          gb, humanDuration, estimateWallClock, initialState, nextStep,
-         blockersFrom, warningsFrom, verifyArtefact, costLines, humanBytes } from "/ui/voxtralBrowser.js";
+         blockersFrom, warningsFrom, verifyArtefact, costLines, humanBytes,
+         isSecure, hasSubtleCrypto, INSECURE_WHY } from "/ui/voxtralBrowser.js";
 import { probeLocalModel } from "/ui/localModelProbe.js";
 
 const $ = (id) => document.getElementById(id);
@@ -147,6 +148,21 @@ rows($("prov"), [
   ["Measured here", `${MEASURED_HERE.wasmInstantiateMs} ms to instantiate, ${MEASURED_HERE.wgpuDeviceMs} ms to a
      WebGPU device (${MEASURED_HERE.where}). <b>${MEASURED_HERE.note}</b>`],
 ]);
+// *** THE ORIGIN IS CHECKED ON LOAD, BECAUSE ON THE LAN NOTHING BELOW CAN WORK AND THE OLD FAILURE WAS
+// SILENT. *** v4115 shipped with the digest check reaching straight into crypto.subtle, which is undefined on
+// an insecure origin: the button threw into an un-caught promise and did nothing at all. This says so up
+// front rather than letting a person press a dead button.
+if (!isSecure() || !hasSubtleCrypto()) {
+  const b = document.createElement("div");
+  b.className = "banner";
+  b.innerHTML = "<b>This page cannot work on this address.</b> " + INSECURE_WHY +
+    "<br><br><b>SweK's own LAN origin is one of these.</b> Measured in Chromium on one server: from " +
+    "<code>127.0.0.1</code> every API is present; from a LAN IP <code>navigator.gpu</code>, " +
+    "<code>crypto.subtle</code>, <code>VideoEncoder</code>, <code>getUserMedia</code> and " +
+    "<code>navigator.storage.estimate</code> are <b>all undefined</b>.";
+  document.querySelector(".wrap").insertBefore(b, document.getElementById("headline").nextSibling);
+}
+
 $("refused").innerHTML = "<ul>" + REFUSED.map((r) =>
   `<li><b class="no">${r.what}</b> &mdash; ${r.why} <i>Would need: ${r.wouldNeed}</i></li>`).join("") + "</ul>";
 
@@ -154,8 +170,13 @@ $("refused").innerHTML = "<ul>" + REFUSED.map((r) =>
 $("probe").onclick = async () => {
   $("probeState").textContent = "reading…";
   facts = await probeLocalModel();
+  facts.secureContext = isSecure();          // the fact that outranks every hardware row below
   const blockers = blockersFrom(facts), warns = warningsFrom(facts);
   rows($("facts"), [
+    ["Secure context", facts.secureContext
+        ? '<b class="yes">yes</b> &mdash; ' + location.origin
+        : '<b class="no">NO</b> &mdash; ' + location.origin + ' (this is what breaks everything below)'],
+    ["crypto.subtle", hasSubtleCrypto() ? '<b class="yes">available</b>' : '<b class="no">undefined</b>'],
     ["WebGPU namespace", facts.gpuNamespace ? '<b class="yes">present</b>' : '<b class="no">absent</b>'],
     ["Adapter", facts.adapter ? '<b class="yes">granted</b>' : '<b class="no">null</b>'],
     ["Adapter is software", facts.softwareRenderer === null ? '<b class="unk">unknown</b>'

@@ -35,13 +35,23 @@ This page is honest about what an Apple device can and cannot do as a peer, and 
 <table>
   <tr><th>capability</th><th>iOS</th><th>why</th></tr>
   <tr><td>browser front-end (WebGL2)</td><td class="yes">&#10003; full</td><td>Safari runs WebGL2 on every modern iPhone/iPad</td></tr>
-  <tr><td>GPU audition (magmap WGSL)</td><td class="yes">&#10003; full</td><td>WebGPU shipped in Safari 18 (iOS/iPadOS 18); the Apple GPU is a first-class third vendor</td></tr>
+  <tr><td>GPU audition (magmap WGSL)</td><td class="yes">&#10003; full</td><td>WebGPU shipped in Safari 18 (iOS/iPadOS 18); the Apple GPU is a first-class third vendor. <b>In Safari</b> &mdash; that qualifier is load-bearing, see the WKWebView row below. Enabled by default from iOS&nbsp;26</td></tr>
   <tr><td>portable physics subset</td><td class="yes">&#10003; in-page</td><td>the strict core is pure ES modules &mdash; Safari's JS engine runs it with no Node</td></tr>
   <tr><td>fleet console / hub / invites</td><td class="yes">&#10003; full</td><td>all same-origin web pages; an iPad makes a fine operator console</td></tr>
   <tr><td>native subset off-browser</td><td class="part">~ a-Shell</td><td>a free App Store terminal with a sandboxed shell; runs the same subset via its JS, slower and manual</td></tr>
   <tr><td>full 38-check spawning suite</td><td class="no">&#183; no</td><td>needs a process spawner (node:child_process); no iOS runtime provides one</td></tr>
   <tr><td>background compute daemon</td><td class="no">&#183; no</td><td>iOS backgrounding is stricter than Android Doze &mdash; seconds, not a battery exemption</td></tr>
   <tr><td>app push to the device</td><td class="no">&#183; no</td><td>no adb equivalent exists on iOS; consent-gated download is the only path (which is cleaner anyway)</td></tr>
+  <!-- v4118 -- A THIRD SENSE OF "APP" SITS HERE, AND IT IS THE ONE THAT LOOKS LIKE A GOOD IDEA. v4117 gave the
+       Android wrapper leanback + D-pad support, and the obvious next move is the same wrapper for iOS: a
+       WKWebView pointed at the LAN server, which on Android is a REAL WIN because a WebView has no
+       secure-origin rule and the PWA install prompt does. *** ON iOS THAT SAME MOVE COSTS YOU THE GPU, WHICH
+       IS THE ONE THING THIS DEVICE IS BEST AT. *** WebKit's feature flags apply to SAFARI, not to WebKit
+       generally: WKWebView gets a feature only once it is on BY DEFAULT for the OS. For WebGPU that is iOS 26.
+       So below iOS 26 a wrapper app is a CAPABILITY DOWNGRADE from just opening Safari -- it would take the
+       magmap audition, two rows above, from a check to a dash. Same idea as the Android round, opposite sign,
+       which is why it is written down rather than left to be rediscovered. -->
+  <tr><td>a WKWebView wrapper app (like the Android APK)</td><td class="no">&#183; not worth it</td><td><b>It would LOSE WebGPU below iOS&nbsp;26.</b> Feature flags affect Safari only, not WebKit generally &mdash; WKWebView gets a feature when it is <i>enabled by default</i> for the OS, which for WebGPU means iOS&nbsp;26. On iOS&nbsp;18 a wrapper is <b>worse than Safari</b>: it would kill the GPU audition above. On Android the same wrapper is a win (no secure-origin rule on the LAN); here it is a downgrade</td></tr>
   <!-- v3332 -- TWO SENSES OF "PUSH" SAT ONE ROW APART AND ONLY ONE OF THEM IS IMPOSSIBLE. The row ABOVE means
        pushing a BUILD onto the device (an adb equivalent), which iOS genuinely does not offer. THIS row means
        waking the device with a NOTIFICATION, which it does offer and which nothing here had ever built. The
@@ -62,6 +72,18 @@ The compute-daemon half that makes the Android peer a background worker has no h
     secret, and anyone who knows it can read <i>and</i> publish.</div>
   <p><button id="nfStatus">Check hub status</button> <button id="nfTest">Send a test to this device</button></p>
   <pre id="nfOut" class="sub">not checked yet</pre>
+</div>
+
+<h2>the address matters more than the device</h2>
+<div class="note" style="border:1px solid #5a4a22;background:#221c10;border-radius:9px;padding:11px 13px;margin:10px 0">
+  <b>Open this over the https tunnel, not the LAN IP.</b> <code>navigator.gpu</code> is <b>secure-context
+  only</b>, and so are <code>crypto.subtle</code>, <code>VideoEncoder</code>, <code>getUserMedia</code> and
+  <code>navigator.storage.estimate</code>. SweK's primary origin is <code>http://&lt;lan-ip&gt;:8787</code>,
+  which is neither https nor localhost. <b>Measured in Chromium, one server, two origins:</b> from
+  <code>127.0.0.1</code> every one of those exists; from a LAN IP <b>every one is <code>undefined</code></b>.
+  So the GPU audition below is not gated on the phone at all &mdash; it is gated on the URL you opened, and a
+  device that looks incapable on the LAN is fine through the tunnel. Same rule
+  <code>ui/codecProbe.mjs</code> recorded for WebCodecs at v3735.
 </div>
 
 <h2>run the portable physics subset &mdash; right here, on this device</h2>
