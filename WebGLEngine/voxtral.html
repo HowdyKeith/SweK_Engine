@@ -55,17 +55,21 @@
     <p class="note">
       The engine is <b>not shipped with this tree</b>. It is 9.4&nbsp;MB and the largest thing otherwise vendored
       here is 3.5&nbsp;MB, so copying it in would make one opt-in curiosity the biggest file in a repo that
-      publishes public zips. Supply the two files yourself &mdash; from a staged
-      <code>/vendor/voxtral/</code> directory or a file picker &mdash; and
-      <b>they are checked against a pinned SHA-256 before a single byte is executed</b>. A mismatch is refused
-      outright, not warned about.
+      publishes public zips. <b>Install&nbsp;it&nbsp;for&nbsp;me</b> does the clone and the staging for you if a
+      bridge is running; otherwise supply the two files by hand, from a staged <code>/vendor/voxtral/</code>
+      directory or the file picker. <b>Every route ends at the same check: the bytes are matched against a
+      pinned SHA-256 before a single one is executed</b>, whether they came from the installer, the disk or a
+      file you chose. A mismatch is refused outright, not warned about.
     </p>
     <div>
       <button id="consent">Enable the browser build</button>
-      <button id="stagedBtn" disabled>Try /vendor/voxtral/</button>
+      <button id="installBtn" disabled>Install the engine for me</button>
+      <button id="stagedBtn" disabled>Load the engine</button>
       <label><input type="file" id="files" multiple accept=".wasm,.js" disabled style="display:none"><button id="pickBtn" disabled>Choose the two files&hellip;</button></label>
       <span id="engineState" class="note"></span>
     </div>
+    <p class="note" id="bridgeLine" style="margin-top:8px"></p>
+    <div class="log" id="iLog" style="display:none"></div>
     <div id="digests"></div>
   </div>
 
@@ -168,13 +172,19 @@ $("probe").onclick = async () => {
 };
 
 // ---- 2. consent, then supply + VERIFY the engine ---------------------------------------------------------------
-$("consent").onclick = () => { state = { ...state, consented: true }; $("engineState").textContent =
-  "enabled — now supply the engine files; still nothing downloaded"; refresh(); };
+$("consent").onclick = () => {
+  state = { ...state, consented: true };
+  $("engineState").textContent = "enabled — now supply the engine files; no engine or weights downloaded yet";
+  refresh();
+  askBridge();          // a status question, not a download
+};
 
 function refresh() {
   const step = nextStep(state, facts);
   const canLoad = step.action === "load-module";
   $("stagedBtn").disabled = !canLoad; $("pickBtn").disabled = !canLoad;
+  // Offered only when a bridge is there AND has not already staged a verified engine.
+  $("installBtn").disabled = !canLoad || !bridge || !bridge.ok || bridge.installed;
   $("weights").disabled = step.action !== "download-weights";
   $("pickAudio").disabled = step.action !== "transcribe";
   $("card3").classList.toggle("locked", !state.moduleReady);
@@ -209,17 +219,77 @@ async function useBytes(glueText, wasmBuf) {
   } finally { URL.revokeObjectURL(url); refresh(); }
 }
 
-$("stagedBtn").onclick = async () => {
-  $("engineState").textContent = "looking in /vendor/voxtral/…";
+// *** THE BRIDGE IS ASKED ABOUT, NEVER RELIED ON. *** This page's whole claim is that it needs no bridge, no
+// local server and no Windows. So a missing /voxtral/status is a NORMAL outcome that just hides one button;
+// the file picker is always there. This status call is the only request consent triggers, and it fetches no
+// engine and no weights -- the gate asserts exactly that, rather than a bare "zero requests" that would have
+// to be weakened the moment a status probe existed.
+let bridge = null;
+async function askBridge() {
   try {
-    const [g, w] = await Promise.all([
-      fetch("/vendor/voxtral/" + ARTEFACTS.glue.name).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
-      fetch("/vendor/voxtral/" + ARTEFACTS.wasm.name).then((r) => r.ok ? r.arrayBuffer() : Promise.reject(r.status)),
-    ]);
-    await useBytes(g, w);
-  } catch (e) {
-    $("engineState").innerHTML = `<span class="unk">nothing staged there (${e}) — use the file picker</span>`;
+    const r = await fetch("/voxtral/status");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    bridge = await r.json();
+  } catch { bridge = null; }
+  if (!bridge || !bridge.ok) {
+    $("bridgeLine").innerHTML = "<b>No install bridge here.</b> That is fine — supply the two files with the " +
+      "picker. The bridge is a convenience; this page is built to need no server at all.";
+  } else if (bridge.installed) {
+    $("bridgeLine").innerHTML = `<b class="yes">Engine already installed</b> and digest-verified, staged in
+      <code>${bridge.engineDir}</code>. Press <b>Load the engine</b>.`;
+  } else {
+    $("bridgeLine").innerHTML = `<b>An install bridge is available.</b> It shallow-clones
+      <code>${bridge.repo}</code>, <b>verifies both SHA-256s</b>, and stages the two files in
+      <code>${bridge.engineDir}</code> — <b>outside the engine tree on purpose</b>, because
+      <code>vendor/</code> is not in the packager's skip list and installing there would add 9.4&nbsp;MB to
+      every release zip.`;
   }
+  refresh();
+}
+
+$("installBtn").onclick = async () => {
+  $("installBtn").disabled = true;
+  $("iLog").style.display = "block";
+  $("iLog").textContent = "starting\n";
+  try {
+    const r = await (await fetch("/voxtral/install", { method: "POST" })).json();
+    if (!r.ok) throw new Error(r.error || "install refused");
+  } catch (e) { $("iLog").textContent += "FAILED: " + e + "\n"; $("installBtn").disabled = false; return; }
+  const tick = async () => {
+    let st;
+    try { st = await (await fetch("/voxtral/status")).json(); } catch { setTimeout(tick, 1200); return; }
+    if (st.installJob) $("iLog").textContent = st.installJob.tail || "";
+    if (st.installJob && st.installJob.done) {
+      bridge = st;
+      $("engineState").innerHTML = st.installed
+        ? '<b class="yes">installed and verified</b> — now press Load the engine'
+        : '<b class="no">install did not verify — nothing was staged</b>';
+      if (!st.installed) $("installBtn").disabled = false;
+      refresh(); return;
+    }
+    setTimeout(tick, 900);
+  };
+  tick();
+};
+
+// Load order: the bridge's staged copy, then a hand-staged /vendor/voxtral/, then the picker. Whichever
+// supplies the bytes, they go through the SAME digest check before anything is executed.
+$("stagedBtn").onclick = async () => {
+  const sources = [];
+  if (bridge && bridge.ok) sources.push(["the installed engine", "/voxtral/engine/"]);
+  sources.push(["/vendor/voxtral/", "/vendor/voxtral/"]);
+  for (const [label, base] of sources) {
+    $("engineState").textContent = "looking in " + label + "…";
+    try {
+      const [g, w] = await Promise.all([
+        fetch(base + ARTEFACTS.glue.name).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
+        fetch(base + ARTEFACTS.wasm.name).then((r) => r.ok ? r.arrayBuffer() : Promise.reject(r.status)),
+      ]);
+      await useBytes(g, w);
+      return;
+    } catch { /* try the next source */ }
+  }
+  $("engineState").innerHTML = '<span class="unk">not staged anywhere — install it above, or use the file picker</span>';
 };
 $("pickBtn").onclick = () => $("files").click();
 $("files").onchange = async (ev) => {

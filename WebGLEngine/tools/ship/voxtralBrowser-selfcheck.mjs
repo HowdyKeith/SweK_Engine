@@ -23,6 +23,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { codeOnly, noComments } from "./sourceScan.mjs";
@@ -323,9 +324,19 @@ console.log("\n8. *** SOURCE CANNOT PROVE A PAGE DOWNLOADS NOTHING. INTERCEPT IT
         // Consent must unlock the engine step -- and STILL not fetch anything by itself.
         const before = asked.length;
         await pg.click("#consent");
-        await pg.waitForTimeout(300);
-        ok("!! *** consenting alone still downloads nothing ***", asked.length === before,
-            "consent unlocks the button; it does not press it. " + (asked.length - before) + " new requests");
+        await pg.waitForTimeout(400);
+        const sinceConsent = asked.slice(before);
+        // *** THE INVARIANT IS MADE PRECISE RATHER THAN WEAKENED. *** v4116 added an install bridge, so consent
+        // now asks /voxtral/status whether one exists. That is a status question, not a download, and the
+        // honest check is not "zero requests" -- which I would simply have had to relax -- but "no ENGINE and
+        // no WEIGHTS bytes". Those are the things a person is consenting to spend, and neither may move here.
+        ok("!! *** consenting fetches NO engine and NO weights ***",
+            !sinceConsent.some((u) => /voxtral\/engine|vendor\/voxtral|huggingface/.test(u)),
+            "consent unlocks the buttons; it does not press them. Requests since consent: " +
+            (sinceConsent.join(", ") || "none"));
+        ok("   ...and the only thing it DOES ask is whether an install bridge exists",
+            sinceConsent.every((u) => /\/voxtral\/status/.test(u)),
+            sinceConsent.join(", ") || "none");
         ok("   ...and it does unlock the engine buttons",
             await pg.evaluate(() => !document.getElementById("stagedBtn").disabled),
             "an invariant that never lets anything happen would also pass every check above");
@@ -338,9 +349,93 @@ console.log("\n8. *** SOURCE CANNOT PROVE A PAGE DOWNLOADS NOTHING. INTERCEPT IT
         ok("!! pressing the engine button DOES reach for the engine (and only it)",
             asked.some((u) => /vendor\/voxtral/.test(u)) && !asked.some((u) => /huggingface/.test(u)));
         ok("!! ...and a missing engine fails visibly instead of silently",
-            /nothing staged there/i.test(await pg.evaluate(() => document.body.innerText)));
+            /not staged anywhere/i.test(await pg.evaluate(() => document.body.innerText)),
+            "the button must say it found nothing and what to do instead -- a dead button that reports " +
+            "nothing is how a person concludes the page is broken");
         await b.close();
     }
+}
+
+// ---- 9. *** THE INSTALL BUTTON MUST NOT UNDO THE REASON NOTHING WAS VENDORED *** ----------------------------
+console.log("\n9. *** THE INSTALL BRIDGE: STAGES OUTSIDE THE TREE, VERIFIES BEFORE IT STAGES ***");
+{
+    const vb = require_("../../ai-bridge/voxtralBridge.js");
+    const PB = require_("../../ai-bridge/packagerBridge.js");
+
+    // *** THE MEASURED PREMISE OF THE WHOLE DESIGN, CHECKED RATHER THAN REMEMBERED. *** v4115 refused to vendor
+    // the 9.4 MB engine because it would ride into every release zip. An install button that copied into
+    // vendor/voxtral/ would do precisely that, silently. So the fact the design rests on is asserted here: if
+    // `vendor` ever joins SKIP_DIRS this check fails, and whoever sees it should re-read the reasoning rather
+    // than discover later that a decision was resting on something no longer true.
+    const skip = new Set(PB.SKIP_DIRS || []);
+    ok("!! *** `vendor/` is NOT in the packager's SKIP_DIRS -- which is WHY the engine is staged elsewhere ***",
+        !skip.has("vendor"),
+        "SKIP_DIRS = " + [...skip].join(", ") + ". Anything under vendor/ ships in every release zip");
+    ok("!! *** ...so ENGINE_DIR is outside the engine tree entirely ***",
+        !path.resolve(vb.ENGINE_DIR).startsWith(path.resolve(ENG) + path.sep),
+        "staging into the tree would add 9.4 MB to every release and undo v4115's reason for not vendoring. " +
+        "ENGINE_DIR = " + vb.ENGINE_DIR);
+    ok("   ...and so is the checkout it clones into", 
+        !path.resolve(vb.SRC_DIR).startsWith(path.resolve(ENG) + path.sep), vb.SRC_DIR);
+
+    // *** THE SERVED NAME IS A WHITELIST, NOT A PATH JOIN. *** A request path is attacker-controlled.
+    const traversals = ["../../../etc/passwd", "..\\..\\windows\\win.ini", "/etc/passwd", "", "."];
+    let leaked = null;
+    for (const t of traversals) if (await vb.engineFile(t)) leaked = t;
+    ok("!! *** engineFile() resolves NOTHING outside its two pinned names ***", leaked === null,
+        leaked ? "RESOLVED: " + leaked : "tried " + traversals.length + " traversals; only the two artefact " +
+        "names can ever resolve, so a request path never reaches path.join");
+    const names = await vb.artefactNames();
+    ok("   ...and the whitelist is the artefact list itself, not a retyped pair",
+        names.length === 2 && names.includes(ARTEFACTS.wasm.name) && names.includes(ARTEFACTS.glue.name),
+        names.join(", "));
+
+    // *** VERIFY-BEFORE-STAGE, DRIVEN FOR REAL: a checkout whose bytes are wrong must stage NOTHING. ***
+    // This is the case that matters when upstream moves past the pinned commit. Built with deliberately wrong
+    // bytes, because wrong bytes are the thing being tested and the real 9.4 MB artefact is not in this tree.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vxgate-"));
+    const src = path.join(tmp, "src"), eng = path.join(tmp, "eng");
+    fs.mkdirSync(path.join(src, vb.PKG_SUBDIR), { recursive: true });
+    fs.mkdirSync(path.join(src, ".git"), { recursive: true });          // so install() skips the clone
+    for (const a of Object.values(ARTEFACTS)) {
+        fs.writeFileSync(path.join(src, vb.PKG_SUBDIR, a.name), Buffer.alloc(a.bytes, 0x41));  // right SIZE, wrong bytes
+    }
+    const child = require_("child_process").spawnSync(process.execPath, ["-e", `
+        const vb = require(${JSON.stringify(path.join(ENG, "ai-bridge", "voxtralBridge.js"))});
+        vb.install();
+        const poll = () => { const s = vb.installStatus();
+            if (s && s.done) { console.log(JSON.stringify({ code: s.code, tail: s.tail })); return; }
+            setTimeout(poll, 100); };
+        poll();`],
+        { env: { ...process.env, VOXTRAL_SRC_DIR: src, VOXTRAL_ENGINE_DIR: eng }, encoding: "utf8", timeout: 30000 });
+    let res = {};
+    try { res = JSON.parse((child.stdout || "").trim().split("\n").pop()); } catch { res = { code: null, tail: child.stderr }; }
+    ok("!! *** a checkout whose digest does not match FAILS the install ***", res.code !== 0,
+        "exit code " + res.code);
+    ok("!! *** ...and stages NOTHING -- not one of the two files ***",
+        !fs.existsSync(eng) || fs.readdirSync(eng).length === 0,
+        "a half-staged engine that the page then refuses is a worse outcome than a failed install, because the " +
+        "person cannot see from the button why it broke. Left behind: " +
+        (fs.existsSync(eng) ? fs.readdirSync(eng).join(", ") || "(nothing)" : "(no dir)"));
+    ok("   ...and says WHY, naming the likely cause a person can act on",
+        /REFUSED/.test(res.tail || "") && /moved past the\s+pinned commit/.test(res.tail || ""),
+        "the message is wrapped for a terminal, so the phrase spans a newline -- matched with \\s+ rather " +
+        "than by unwrapping a message written to be read");
+    ok("   ...and prints both digests so the mismatch is checkable",
+        (res.tail || "").includes(ARTEFACTS.wasm.sha256));
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+
+    // The routes exist, and the page can live without them.
+    const srv = noComments(fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8"));
+    for (const r of ["/voxtral/status", "/voxtral/install", "/voxtral/engine/"]) {
+        ok("   server.js routes " + r, srv.includes(r));
+    }
+    ok("!! *** the bridge is required LAZILY, so a tree without it still boots ***",
+        /require\("\.\/voxtralBridge\.js"\)/.test(srv) && !/^const\s+voxtralBridge/m.test(srv),
+        "same discipline as sharpBridge: a missing bridge file must not take the whole server down");
+    ok("!! the PAGE treats the bridge as optional, not required",
+        /No install bridge here/.test(pageCode("voxtral.html").jsRaw),
+        "the page's whole claim is that it needs no bridge; a missing one must read as normal, not as an error");
 }
 
 console.log("\n" + (fails ? fails + " FAILED" : "all checks pass"));

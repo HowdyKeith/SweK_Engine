@@ -16416,6 +16416,42 @@ ${text.replace(/'/g, "''")}
         catch (e) { sendJson({ ok: false, error: "sharp bridge unavailable: " + String(e && e.message || e) }); }
         return;
     }
+
+    // --- voxtral: the install button for voxtral.html's engine -------------------------------------
+    // v4116 -- Keith: "we have a button to do the install?" v4115 shipped the page with the clone-and-copy
+    // written out as two shell lines, and a feature whose setup is a paste-this-into-a-terminal is one most
+    // people will not use. Same fire-and-poll shape as /sharp/install: install() returns when the job STARTS.
+    //
+    // *** IT STAGES OUTSIDE THE TREE, WHICH IS THE POINT. *** packagerBridge's SKIP_DIRS does NOT contain
+    // `vendor/`, so a button that copied into vendor/voxtral/ would add 9.4 MB to every release zip and undo
+    // v4115's whole reason for not vendoring it. The engine lands in ~/.voxelbridge/voxtral-engine and is
+    // SERVED from there by the route below.
+    if (req.url.split("?")[0] === "/voxtral/status" && req.method === "GET") {
+        try { require("./voxtralBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "voxtral bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/voxtral/install" && req.method === "POST") {
+        try { sendJson(require("./voxtralBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "voxtral bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    // Serve one staged artefact. *** THE NAME IS NEVER JOINED ONTO A PATH HERE: *** engineFile() matches it
+    // against the two pinned artefact names and returns null for anything else, so a request path -- which is
+    // attacker-controlled -- cannot walk out of the engine directory.
+    if (req.method === "GET" && req.url.split("?")[0].startsWith("/voxtral/engine/")) {
+        const want = decodeURIComponent(req.url.split("?")[0].slice("/voxtral/engine/".length));
+        let vb = null;
+        try { vb = require("./voxtralBridge.js"); } catch (e) { res.writeHead(404); res.end("voxtral bridge unavailable"); return; }
+        vb.engineFile(want).then((abs) => {
+            if (!abs) { res.writeHead(404); res.end("not staged"); return; }
+            res.writeHead(200, { "Content-Type": /\.wasm$/.test(abs) ? "application/wasm" : "text/javascript",
+                                 "Content-Length": fs.statSync(abs).size, "Cache-Control": "no-cache" });
+            if (req.method === "HEAD") { res.end(); return; }
+            fs.createReadStream(abs).pipe(res);
+        }).catch((e) => { res.writeHead(500); res.end(String(e && e.message || e)); });
+        return;
+    }
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 
