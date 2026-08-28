@@ -84,11 +84,15 @@ const corr = await dev.build({ mode: "corrections" });
 
 // ---- 4. FOUR MODES, EXPORTED ---------------------------------------------------------------------------------------
 {
-    ok("!! four modes, EXPORTED, nonsense refused",
-        Array.isArray(dev.modes) && dev.modes.length === 4 &&
+    // v3902 added a fifth mode, "nocorrection" -- the plant for the K=0 defect `corrections` already MEASURES
+    // (plantMode: "nocorrection", plantFlips: "errAbs" in zetaBind.mjs's own zetaDevice declaration), sharing
+    // `even`'s build arm so both compute errAbs against the same pi^2/6 rather than restating the finding in a
+    // sentinel that reads -1 everywhere else. This assertion hardcoded "four" before that mode existed.
+    ok("!! five modes, EXPORTED, nonsense refused",
+        Array.isArray(dev.modes) && dev.modes.length === 5 &&
         dev.modes.every((m) => K.checkMode(dev, m).ok !== false) &&
         K.checkMode(dev, "zzz_no_mode").ok === false,
-        dev.modes.join(", "));
+        dev.modes.join(", ") + " -- nocorrection is the v3902 plant mode for the K=0 defect");
 
     ok("...and every key is a closed form or a published constant",
         !/baseline|frozen|remembered/i.test(fsMod.readFileSync(path.join(HERE, "zetaBind.mjs"), "utf8")

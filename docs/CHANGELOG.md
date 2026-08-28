@@ -8,6 +8,58 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4095 -- three gates that had drifted behind a tree that kept growing
+
+All three reproduced here and all three are the same shape: a gate that was correct when written and never
+re-derived against a tree that grew past it.
+
+### valueMatch: three more quantities equal one for their own unrelated reasons
+
+`tools/roundhouse/valueMatch-selfcheck.mjs`'s undeclared-small-integer check went red: the lab now runs 129
+devices (up from the count this file's `UNITY_BY_CONSTRUCTION` cluster was declared against), and three new
+observables sit at 1 for reasons that were never registered. Found by running the real gate mechanism -- the
+live `ADJUDICATED`/`unityCluster`/`conservedPair` census -- rather than reconstructing it by hand, then reading
+each device to get the reason from the source instead of guessing:
+
+  - `reconQuality/blindspot.scaledCorr` and `.shiftedCorr`: `ct.js`'s `scoreRecon` computes a Pearson
+    correlation coefficient (`cov / sqrt(vr*vt)`), and the Pearson correlation of any variable against its own
+    exact positive-slope affine transform is 1 BY THE DEFINITION OF THE STATISTIC. `scaled = truth * 1.3` and
+    `shifted = truth + 0.4` are both exact affine transforms of `truth`, which is the file's own headline
+    finding restated as a coupling risk: a 30%-too-bright reconstruction scores a perfect 1.0.
+  - `cartpole/regulate.positionGainVsExact`: `cartPoleBind.mjs`'s own comment states the identity directly --
+    `|K1| = sqrt(qx/r)` exactly, from the return-difference identity in the s -> 0 limit. This field is the
+    computed LQR gain divided by that closed form, reported as a ratio specifically so it reads 1 whatever qx
+    and r are.
+
+Added as three new `UNITY_BY_CONSTRUCTION` entries, each with the device's own reason rather than this file's
+opinion of it, matching the file's own established convention. `valueMatch-selfcheck.mjs`: all checks pass
+(re-measured the full 116-device scan to completion rather than trusting a partial run -- an earlier attempt at
+this measurement was killed mid-flight by too tight a wrapper timeout and lost its buffered output, which is
+why this took two tries).
+
+### zeta: a fifth mode the gate's own hardcoded count predates
+
+`tools/roundhouse/zeta-selfcheck.mjs` asserted `dev.modes.length === 4`. `zetaBind.mjs` gained a fifth mode at
+v3902 -- `nocorrection`, the deliberate plant for the K=0 Euler-Maclaurin defect `corrections` already measures
+(`plantMode: "nocorrection", plantFlips: "errAbs"` in the device's own declaration) -- and this gate's count
+assertion was never updated to match. Fixed to `=== 5`, with the plant mode named in the assertion detail
+rather than left as a bare number. All checks pass.
+
+### winPathGuard: bunNative.mjs's own basename guard was unfinished, not exempt
+
+`tools/ship/bunNative.mjs` carried `import.meta.url.endsWith(process.argv[1].replace(/\\/g,"/").split("/").pop())`
+-- UNANCHORED, so a file ending in the same characters as another (e.g. `xScope.mjs` against a check for
+`Scope.mjs`) could false-match, exactly the species `winPathGuard-selfcheck.mjs` exists to catch. This file
+already imports `fileURLToPath` from `node:url`, so per that gate's own stated rule ("a file that already
+imports node: something COULD use the strong form, so a basename guard there is unfinished, not exempt") the
+fix is not to anchor the weak form but to replace it outright: `pathToFileURL(process.argv[1]).href ===
+import.meta.url`. Verified the CLI main-module block still fires (`node tools/ship/bunNative.mjs --json` prints
+real output). `winPathGuard-selfcheck.mjs` and `bunNative-selfcheck.mjs`: all checks pass.
+
+### Gates
+
+`valueMatch-selfcheck.mjs`, `zeta-selfcheck.mjs`, `winPathGuard-selfcheck.mjs`, `bunNative-selfcheck.mjs`: all
+pass.
 ## Since v4094 -- a Heerich voxel avatar, rendering through the same pipeline asset2voxels.html only tries live
 
 Keith: "can we do an avatar switch to render through Heerich, like we did for krbn and ascii?"

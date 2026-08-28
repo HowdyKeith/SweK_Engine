@@ -216,6 +216,23 @@ export const UNITY_BY_CONSTRUCTION = {
     // bookkeeping fix, and it is left open here rather than settled quietly. ***
     "induction/radialdot.circulationWorstErr":
         "PLANT MODE. A relative error saturating at unity because the measured circulation is annihilated to ~1e-19 against a fixed exact -- not a normalisation",
+
+    // --- three more that arrived once the lab grew past 129 devices, found by re-running the census rather
+    // than trusting the old 11-member count -----------------------------------------------------------------
+    "reconQuality/blindspot.scaledCorr":
+        "ct.js's scoreRecon computes a Pearson correlation coefficient (cov / sqrt(vr*vt)) between the " +
+        "reconstruction and the truth. scaled = truth * 1.3 is an exact positive-slope affine transform of " +
+        "truth, and the Pearson correlation of any variable against its own positive-slope affine transform " +
+        "is 1 by the mathematical definition of the statistic -- not a measurement of reconstruction quality " +
+        "at all, which is the file's own headline finding (a 30%-too-bright image scores a perfect 1.0)",
+    "reconQuality/blindspot.shiftedCorr":
+        "the same identity as scaledCorr, against shifted = truth + 0.4: an additive offset is also an exact " +
+        "affine transform with positive slope (slope 1), so the Pearson correlation is 1 for the same reason",
+    "cartpole/regulate.positionGainVsExact":
+        "cartPoleBind.mjs's own comment states the identity directly: |K1| = sqrt(qx/r) EXACTLY, from the " +
+        "return-difference identity in the s -> 0 limit where the cart's integrator dominates both sides. " +
+        "This field is the computed LQR gain divided by that closed form, reported as a RATIO specifically " +
+        "so it reads 1 whatever qx and r are -- an identity checked against itself, not a measurement",
 };
 
 /**
