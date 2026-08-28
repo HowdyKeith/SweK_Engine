@@ -27,8 +27,11 @@ import { BASES } from "../../physics/crystal/structureFactor.mjs";
 import { INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
 import { SCENARIOS } from "../../physics/blobKelvin.js";
-import { sameValue, partialDeafness, deafnessUnanswered } from "./knobLiveness.mjs";
+import { sameValue, partialDeafness, deafnessUnanswered, LIST_CLAIMS } from "./knobLiveness.mjs";
 import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -516,6 +519,79 @@ console.log("\n3i. *** v4083 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS
         "spanAcrossViscosity check already proved the plant flattens the response ladder; this is the separate " +
         "claim that the GENERIC per-knob census can now see the same thing stabilityBind-selfcheck sees " +
         "directly, which it could not before this round.");
+}
+
+console.log("\n3j. *** v4088 -- THE ONE RULE THREE LISTS HAVE NOW NEEDED, ENFORCED INSTEAD OF REMEMBERED ***");
+{
+    // Three rounds, three local fixes, one rule nobody wrote down: A ROW FROM A DEVICE THAT DID NOT FINISH MAY
+    // NOT APPEAR IN A LIST WHOSE HEADING CLAIMS COMPLETENESS. v4030 (a null-default knob vanishing instead of
+    // being named unprobed), v4031 (stillKnobs printing "MOVES NOTHING ANYWHERE" off one mode) and this round's
+    // insensitiveKnobs (quantum.N called insensitive off a budget starved down to `bands`, the one mode that
+    // does not read it) each found the same shape of wrong answer reaching a report. This section is the check
+    // none of those rounds had.
+    const SRC = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "knobLiveness.mjs"), "utf8");
+    const declared = [...SRC.matchAll(/^export const (\w+) = \(rows\)/gm)].map((m) => m[1]);
+    const undeclaredClaim = declared.filter((n) => !LIST_CLAIMS[n]);
+    ok("!! *** EVERY LIST THIS FILE EXPORTS DECLARES WHAT IT CLAIMS ***",
+        declared.length >= 6 && undeclaredClaim.length === 0,
+        declared.length + " lists, all classified: " + declared.map((n) => n + "=" + LIST_CLAIMS[n]).join(", ") +
+        ". *** THIS IS THE RATCHET. *** A list written as `export const X = (rows)` and not added to " +
+        "LIST_CLAIMS fails here, which is exactly the check the earlier rounds did not have -- each of them " +
+        "found the rule by shipping a wrong answer instead.");
+
+    // A row that qualifies for each universal list EXCEPT that its device skipped a mode. It must not appear.
+    const cut = { device: "d", knob: "k", probed: ["m"], live: [], still: ["m"], incomplete: true,
+                  unenteredModes: ["never"] };
+    const lists = { stillKnobs, insensitiveKnobs, partialDeafness, incompleteKnobs, deafnessUnanswered, unprobedKnobs };
+    const leaks = [];
+    for (const [name, fn] of Object.entries(lists)) {
+        if (LIST_CLAIMS[name] !== "universal") continue;
+        if (fn([{ ...cut }]).length) leaks.push(name + " (still)");
+        if (fn([{ ...cut, wideLive: "1e6" }]).length) leaks.push(name + " (wide)");
+    }
+    ok("!! *** NO UNIVERSAL LIST ADMITS A ROW FROM A DEVICE THAT SKIPPED A MODE ***",
+        leaks.length === 0,
+        leaks.length === 0
+            ? "stillKnobs and insensitiveKnobs both reject it, with and without a wide-ladder wake. The wide " +
+              "case is the one this round got wrong on quantum.N: a knob whose device never opened the mode " +
+              "that READS it wakes on something incidental, and 'flat across its working range' is a claim " +
+              "about where it IS read."
+            : "LEAKED: " + leaks.join(", "));
+
+    const admits = [];
+    if (!incompleteKnobs([{ ...cut }]).length) admits.push("incompleteKnobs");
+    if (!deafnessUnanswered([{ ...cut, live: ["m"] }]).length) admits.push("deafnessUnanswered");
+    if (!unprobedKnobs([{ device: "d", knob: "k", probed: [], unprobed: true, kind: "string", live: [], still: [] }]).length) admits.push("unprobedKnobs");
+    ok("!! ...and every ADMISSION list does admit it, because that is its whole subject",
+        admits.length === 0,
+        admits.length === 0 ? "an unfinished row surfaces in all three. A list that exists to say something "
+            + "was not measured and then drops the unmeasured row is the v4030 defect exactly."
+            : "SILENT: " + admits.join(", "));
+
+    const pd = partialDeafness([{ device: "d", knob: "k", live: ["a"], still: ["b"], probed: ["a", "b"], incomplete: false }]);
+    ok("!! and the PARTICULAR list names its scope, or it would be universal in disguise",
+        pd.length === 1 && pd[0].includes("live in a") && pd[0].includes("STILL in b"),
+        pd.join(" | ") + " -- it may include an unfinished row precisely BECAUSE it names the modes it is " +
+        "talking about and claims nothing beyond them. A list that reported 'k is deaf' without saying where " +
+        "would need the universal rule too.");
+
+    // *** AND THE REAL DEVICE, NOT ONLY THE SYNTHETIC ROW. *** quantum.N, starved down to `bands` alone
+    // (budgetMs: 2000, well under the ~230 ms cost of one `bands` build here plus the knobs ahead of it in
+    // Object.keys order), then widened. MEASURED on this tree, directly: before this round's fix, this exact
+    // row satisfied insensitiveKnobs's filter and printed "quantum.N (moves at 800000000)"; this tree's own
+    // unstarved sweep (`--only quantum`, default budget) reports N live in `well` with 3 observables moving.
+    const { rows: qrows } = await knobLiveness({ only: ["quantum"], budgetMs: 2000 });
+    await widenStill(qrows, { budgetMs: 20000 });
+    const qn = qrows.find((r) => r.knob === "N");
+    ok("!! *** quantum.N, REAL DEVICE: STARVED TO `bands` ALONE, WOKEN BY THE WIDE LADDER, AND NOT CALLED INSENSITIVE ***",
+        !!qn && qn.incomplete === true && !!qn.wideLive && !insensitiveKnobs(qrows).some((s) => s === "quantum.N " + "(" + qn.wideLive + ")")
+        && incompleteKnobs(qrows).some((s) => s.startsWith("quantum.N ")),
+        qn ? "incomplete=" + qn.incomplete + ", wideLive=" + qn.wideLive + ". insensitive: " +
+            (insensitiveKnobs(qrows).join(", ") || "none") + " | incomplete: " +
+            (incompleteKnobs(qrows).join(", ") || "none") + ". N is a `well`-only knob; `bands` (probed here) " +
+            "does not read it, so the near ladder found nothing and the wide ladder woke something incidental. " +
+            "This tree's own unstarved sweep reports N live in well with 3 observables."
+            : "NOT FOUND");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");

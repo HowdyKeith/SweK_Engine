@@ -8,6 +8,84 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4088 -- an insensitive list manufactured by starvation, and a budget that could not afford one build
+
+A diverged-lineage bundle (its own v4043-v4045a, built on a shared ancestor with this tree) proposed three
+fixes to tools/roundhouse/knobLiveness.mjs. Re-derived and re-measured directly on THIS tree rather than
+applied as patches -- the bundle's own device set, costs and version numbers do not carry over, since this
+tree already shipped its own, unrelated v4043-v4045a and its own independent v4083 knobLiveness work.
+
+### 1. insensitiveKnobs could be manufactured by budget starvation
+
+MEASURED on this tree's real quantum device: `knobLiveness({ only: ["quantum"], budgetMs: 2000 })` starves the
+sweep down to `bands` alone (the cheapest and first of quantum's six modes here, ~230 ms a build) before the
+per-device budget runs out. `N` -- a knob `bands` never reads at all, read only in `well` -- comes back
+`probed` (in `bands`) and `still`, with `incomplete: true`. Running `widenStill` over that row wakes it
+incidentally: `wideLive = "moves at 800000000"`. BEFORE this fix, `insensitiveKnobs` did not exclude incomplete
+rows, so this printed as `quantum.N (moves at 800000000)` -- an insensitive verdict manufactured entirely by
+starving the budget down to one mode. This tree's own unstarved sweep (`--only quantum`, default 20000 ms
+budget) reports N live in `well`, 3 observables moving; all 11 quantum knobs read live given a budget the
+sweep can finish inside.
+
+Fixed: `insensitiveKnobs` now excludes incomplete rows (matching the same exclusion v4031 already gave
+`stillKnobs`), and `incompleteKnobs` no longer requires `!wideLive` -- so a row like quantum.N lands there
+instead of vanishing between the two lists.
+
+### 2. A budget smaller than one build buys nothing, and spending it proves that slowly
+
+MEASURED directly, one build each, nothing else running: twof.inlet costs 82336 ms, twof.envelope costs 0 ms
+(it replays v2862's recorded numbers and reads no config at all), twof.nofixedinlet costs 148719 ms. `node
+tools/roundhouse/knobLiveness.mjs --only twof --budget 20000` (the CLI's own default budget), BEFORE this fix,
+spent the full 82.3 s of the inlet base build -- unstoppable once started, per this file's existing v4032 note
+-- then reported "OVER BUDGET at 20000 ms -- probed 0 of 3 declared knobs; MODES NEVER ENTERED: envelope,
+nofixedinlet, INCOMPLETE": eighty-two real seconds that answered nothing.
+
+Fixed: knobLiveness now consults `costFor` (tools/roundhouse/costRecord.mjs, already on this tree since v4080)
+before entering a mode, and declines any mode whose one build costs more than half the remaining budget,
+naming which modes were skipped and what budget would work. VERIFIED against a temporary, uncommitted cost
+record built from the two measurements above (this tree ships NO device-cost-baseline.json -- none is
+committed by this round either, so on a fresh checkout `costFor` returns null for every device and this check
+is a deliberate no-op, exactly as it is today): the same `--only twof --budget 20000` run now completes in
+about two seconds (only the free `envelope` mode is entered) and reports "twof: 2 mode(s) NOT ATTEMPTED, the
+budget cannot afford two builds -- inlet (one build ~82 s), nofixedinlet (one build ~149 s) against a budget of
+20 s. RAISE IT TO AT LEAST 596 s FOR THIS DEVICE."
+
+*** AND THE FIRST SHAPE OF THIS FIX TRADED 82 SECONDS FOR A WRONG ANSWER. *** A bare `continue` on the skipped
+modes left `incomplete` false, so twof's one still-affordable mode (`envelope`, cost 0, reads no config) got
+entered, its three knobs read still, and -- with the row not marked incomplete -- record/runIndex/settle
+reported under MOVES NOTHING ANYWHERE: three false dead knobs bought with a saved 82 seconds. VERIFIED both
+ways on the temporary cost record: with the bare `continue`, the run prints `record`/`runIndex`/`settle` as
+`*** MOVES NOTHING ***`; folding the skip into `incomplete` (`cutForCost`) instead reports them `INCOMPLETE`
+and removes them from `stillKnobs` entirely. Same measurement-versus-admission line this file has drawn since
+v4030.
+
+### 3. The invariant: what a list built from these rows is allowed to claim
+
+Both fixes above are the same shape of mistake this file has now made three times under different names (v4030
+for null defaults, v4031 for stillKnobs, this round for insensitiveKnobs): a row from a device that did not
+finish reaching a list whose heading claims it looked everywhere. `LIST_CLAIMS` names three claim types --
+UNIVERSAL (excludes any incomplete row, no matter the reason), PARTICULAR (names its own scope, may include an
+unfinished row), ADMISSION (exists to report "not measured", so it must include unfinished rows) -- and
+`knobLiveness-selfcheck.mjs` scans this file for every `export const X = (rows) =>` list-builder and fails if
+one is undeclared. Six lists currently exist (stillKnobs, insensitiveKnobs = universal; partialDeafness =
+particular; incompleteKnobs, deafnessUnanswered, unprobedKnobs = admission); the scan is syntactic and is a
+lower bound, not a proof.
+
+### On the diverged bundle's own v4045a (not ported)
+
+That lineage's v4044 (their own numbering) apparently changed a frozen cost record covering kuramoto too,
+which broke their selfcheck's section 3c (a 1.5-build budget-cut demonstration on kuramoto) and required
+recalibrating it to 4 builds. CHECKED on this tree: section 3c's kuramoto test is UNCHANGED and still passes
+at 1.5 builds, because this tree ships no device-cost-baseline.json -- `costFor` returns null for kuramoto.curve
+here regardless of this round's changes, so the affordability check never engages for it. No recalibration
+needed here; if a cost record is ever frozen and committed on this tree, that test should be re-checked against
+it then.
+
+### Gates
+
+`knobLiveness-selfcheck.mjs`: 50 PASS, 0 FAIL. Includes a new section 3j that exercises LIST_CLAIMS's
+syntactic scan against three universal lists, three admission lists, one particular list, and the real
+quantum.N row described above -- not only a synthetic one.
 ## Since v4087 -- a detector that erased the exact thing it was looking for
 
 `tools/ship/shaderRefs-selfcheck.mjs` reported 2 failures off Keith's rig. Both trace to expectations that had

@@ -77,6 +77,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";
+import { costFor } from "./costRecord.mjs";
 
 /**
  * The values tried for one knob. A knob is live as soon as ONE of them moves something -- the rest are skipped.
@@ -275,12 +276,39 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
         // below: without this the census could not say WHERE its coverage stopped, only that it had.
         const devStart = Date.now();
         let overBudget = false;
-        const entered = [], declared = new Set();
+        const entered = [], declared = new Set(), unaffordable = [];
         for (const mode of modes) {
             if (overBudget) break;
             let def; try { def = dev.defaults({ mode }); } catch { continue; }
             const cfg = (def && def.config) || {};
             const m = (def && def.mode) || mode;
+
+            // *** v4088 -- A BUDGET SMALLER THAN ONE BUILD BUYS NOTHING, AND SPENDING IT PROVES THAT SLOWLY. ***
+            // A probe needs at least two builds -- a baseline and one rung -- so a budget that cannot afford two
+            // is spent entirely on a base build whose result is then thrown away, and a build IS UNBOUNDED once
+            // started (see probeKnob's v4032 note above -- nothing here can interrupt one that is running).
+            // MEASURED on this tree, directly, the way costRecord.mjs's own header measures things outside a
+            // sweep: twof.inlet costs 82336 ms and twof.nofixedinlet costs 148719 ms per build, one build each,
+            // timed with nothing else running. `node tools/roundhouse/knobLiveness.mjs --only twof --budget
+            // 20000` (the CLI's own default budget) against THIS tree, BEFORE this fix, spent the entire 82.3 s
+            // of the inlet base build -- unstoppable, per the same note -- then reported exactly
+            // "OVER BUDGET at 20000 ms -- probed 0 of 3 declared knobs; MODES NEVER ENTERED: envelope,
+            // nofixedinlet, INCOMPLETE": eighty-two seconds of real work that answered nothing, at a budget the
+            // cost record could have named as hopeless before the first build even started.
+            //
+            // *** AND ONCE A COST RECORD EXISTS, "OVER BUDGET, PROBED 0 OF 3" READS LIKE A SLOW DEVICE RATHER
+            // THAN AN IMPOSSIBLE REQUEST. *** The record can say which it is BEFORE the time is spent, naming a
+            // budget that would actually work. With NO record (the state of a fresh checkout -- this tree ships
+            // no device-cost-baseline.json, and none is committed by this round either) `costFor` returns null
+            // and this check is a deliberate no-op: an unknown cost is not an excuse to skip work, so the mode
+            // is attempted exactly as it was before this existed. The mechanism was verified directly against a
+            // temporary, uncommitted cost record built from the two measurements above before this landed --
+            // see the changelog for the exact command and its output.
+            const known = costFor(name, m);
+            if (known != null && known * 2 > budgetMs) {
+                unaffordable.push(m + " (one build ~" + Math.round(known / 1000) + " s)");
+                continue;
+            }
             entered.push(mode);
             for (const k of Object.keys(cfg)) declared.add(k);
             for (const ps of PLANT_STATES) {
@@ -362,8 +390,25 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
             (entered.length < modes.length
                 ? "; MODES NEVER ENTERED: " + modes.filter((m) => !entered.includes(m)).join(", ")
                 : "") + ", INCOMPLETE");
+        // *** v4088 -- A MODE SKIPPED FOR COST IS A MODE NOT ENTERED, AND THE ROW MUST SAY SO. *** The first
+        // shape of the affordability skip above left a bare `continue`, which left `incomplete` false -- so a
+        // device whose expensive modes are all skipped but whose one CHEAP mode still gets entered (twof's
+        // `envelope`, cost 0 by its own declared hint, which replays v2862's recorded numbers and reads no
+        // config at all) would probe that cheap mode, find nothing moves, and report record/runIndex/settle
+        // under MOVES NOTHING ANYWHERE -- three false dead knobs bought with a saved 82 seconds, which is the
+        // worse trade and the same measurement-versus-admission line this file has drawn since v4030. VERIFIED
+        // against a temporary cost record (see changelog): with the bare `continue`, `--only twof --budget
+        // 20000` reported record/runIndex/settle still; with `cutForCost` folded into `incomplete`, the same
+        // run reports them incomplete instead, and stillKnobs no longer contains any of the three.
+        if (unaffordable.length) notes.push(name + ": " + unaffordable.length + " mode(s) NOT ATTEMPTED, the "
+            + "budget cannot afford two builds -- " + unaffordable.join(", ") + " against a budget of "
+            + Math.round(budgetMs / 1000) + " s. RAISE IT TO AT LEAST "
+            + Math.round(Math.max(...unaffordable.map((u) => (parseFloat(u.match(/~([\d.]+) s/)?.[1]) || 0))) * 4)
+            + " s FOR THIS DEVICE. Skipped rather than spent: a budget under one build answers nothing and takes"
+            + " just as long.");
+        const cutForCost = unaffordable.length > 0;
         for (const [knob, a] of acc) rows.push({
-            device: name, knob, modeSource, incomplete: overBudget,
+            device: name, knob, modeSource, incomplete: overBudget || cutForCost,
             unenteredModes: modes.filter((m) => !entered.includes(m)), ...a,
         });
     }
@@ -402,6 +447,46 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
 }
 
 /**
+ * ================================================================================================================
+ * *** v4088 -- WHAT EACH LIST CLAIMS, DECLARED ONCE, BECAUSE THE SAME MISTAKE HAS NOW BEEN MADE MULTIPLE TIMES. ***
+ * ================================================================================================================
+ *
+ * Every list below partitions the same rows, and the only question that has ever gone wrong here is whether a
+ * row from a device THAT DID NOT FINISH may appear in it. That mistake has recurred on this file under several
+ * names -- a null-default knob silently dropped (v4030, fixed by reporting it unprobed instead), stillKnobs
+ * printing "MOVES NOTHING ANYWHERE" off a device the budget cut short (v4031, fixed by excluding incomplete
+ * rows), and, this round, insensitiveKnobs calling quantum.N insensitive off a starved sweep that never entered
+ * the one mode (`well`) that reads it, when this tree's own unstarved sweep reports it live there (see that
+ * function's header for the measured before/after). Three different lists, the identical shape of wrong answer.
+ *
+ * EVERY FIX SO FAR WAS LOCAL, EACH FOUND BY A WRONG ANSWER REACHING A REPORT RATHER THAN BY ASKING FIRST. Here is
+ * the rule, written once, as three claim types a list built from these rows can make:
+ *
+ *   UNIVERSAL   the list's own heading makes a claim about EVERY mode -- "moves nothing ANYWHERE", "flat across
+ *               its working range". A row whose device skipped a mode, FOR ANY REASON, cannot support that
+ *               claim and MUST be excluded.
+ *   PARTICULAR  the list names the modes it is talking about, so it claims nothing beyond them and may include
+ *               an unfinished row. Its output MUST name that scope, or it is universal in disguise.
+ *   ADMISSION   the list exists to say something was NOT measured. It MUST include unfinished rows -- that is
+ *               its entire subject.
+ *
+ * *** THE TABLE IS THE RATCHET, NOT THE DOCUMENTATION. *** knobLiveness-selfcheck scans this file for
+ * `export const X = (rows)` and FAILS IF ANY SUCH LIST IS MISSING FROM THIS TABLE, then checks each one behaves
+ * as its class requires. A future list cannot be added without declaring what it claims, which is the check the
+ * earlier rounds did not have -- each of them had to rediscover the rule by shipping a wrong answer first. The
+ * scan is SYNTACTIC and says so: it is a lower bound that catches the style all six current lists share
+ * (`export const X = (rows) => ...`) and would miss a list written as a plain function declaration instead.
+ */
+export const LIST_CLAIMS = {
+    stillKnobs: "universal",          // "MOVES NOTHING ANYWHERE"
+    insensitiveKnobs: "universal",    // "flat across its WORKING RANGE"
+    partialDeafness: "particular",    // "live in A, B; STILL in C" -- names its own scope
+    incompleteKnobs: "admission",     // the sweep ran out of budget
+    deafnessUnanswered: "admission",  // the deafness question was never answered for this knob
+    unprobedKnobs: "admission",       // no ordering exists to perturb the default along
+};
+
+/**
  * Knobs that moved nothing in any mode they were probed in. THE READING, not the diagnosis.
  *
  * *** v4031 -- AND ONLY FROM A DEVICE THE CENSUS FINISHED. *** The heading this list prints under is MOVES
@@ -419,7 +504,7 @@ export const stillKnobs = (rows) => rows.filter((r) => r.probed.length && !r.liv
  * and this is the one in between -- a partial measurement, which is the most dangerous of the three to
  * promote, because it looks exactly like the first.
  */
-export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && !r.wideLive && r.incomplete)
+export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.incomplete)
     .map((r) => r.device + "." + r.knob + " (probed in " + r.probed.join(", ")
         + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")").sort();
 
@@ -463,8 +548,30 @@ export const deafnessUnanswered = (rows) => rows.filter((r) => r.incomplete && r
         + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")")
     .sort();
 
-/** Read, but flat across its working range -- and the wide ladder proves the code reaches it. */
-export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive)
+/**
+ * Read, but flat across its working range -- and the wide ladder proves the code reaches it.
+ *
+ * *** v4088 -- AND ONLY FROM A DEVICE THE CENSUS FINISHED, WHICH v4031 GOT RIGHT FOR `still` AND ARGUED ITSELF
+ * OUT OF DOING HERE. *** That round excluded incomplete rows from stillKnobs and left this list alone on the
+ * reasoning, written down at the time, that "an incomplete row that woke on the wide ladder IS live, so leave it
+ * alone." Wrong: "insensitive over its working range" is a claim about how a knob behaves WHERE IT IS READ, and
+ * a row from a device that never entered the modes reading that knob cannot support it -- the near ladder finds
+ * nothing because the knob is simply absent from the mode that was probed, and the wide ladder wakes something
+ * incidental instead.
+ *
+ * MEASURED on this tree's real quantum device: `knobLiveness({ only: ["quantum"], budgetMs: 2000 })` starves the
+ * sweep down to `bands` alone (the first of its six modes, ~230 ms a build here), leaving `N` -- a `well`-only
+ * knob, not read in `bands` at all -- probed and still there. Running `widenStill` over that row wakes it:
+ * `wideLive = "moves at 800000000"`, an incidental response from code that has nothing to do with N's actual
+ * job in `well`. Before this fix that row satisfied `probed.length && !live.length && wideLive` and printed as
+ * `quantum.N (moves at 800000000)` -- an insensitive verdict manufactured entirely by starving the budget down
+ * to one mode, on a knob this same tree's own unstarved sweep (budgetMs: 20000, the CLI default) reports live
+ * in `well` with 3 observables moving. Excluding incomplete rows here removes it from this list; the
+ * `incompleteKnobs` fix above (dropping its own `!wideLive` requirement) means it now surfaces THERE instead of
+ * vanishing between the two lists -- the same fate v4030 caught for null defaults and v4031 caught for
+ * `stillKnobs`.
+ */
+export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive && !r.incomplete)
     .map((r) => r.device + "." + r.knob + " (" + r.wideLive + ")").sort();
 
 /**
