@@ -487,8 +487,13 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
         "hears: " + rHears.state + ", deaf: " + rDeaf.state + ". In `deaf` the only thing the knob moves is " +
         "its own echo, which is discarded -- so the mode that ignores it is the mode that reads still.");
 
+    // *** v4047a -- `echoedStill` IS ON THIS FIXTURE BECAUSE v4046 CHANGED WHAT DEAFNESS MEANS. *** The
+    // split knob models a mode that ACKNOWLEDGES the input and ignores it, which is the whole discriminator;
+    // a row without it is the innocent case and belongs in unusedInMode. The fixture predated the field and
+    // this assertion failed until it was brought up to the definition -- the test moved because the
+    // definition sharpened, not because the assertion was wrong.
     const rows = [
-        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], probed: ["hears", "deaf"], incomplete: false },
+        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], echoedStill: ["deaf"], probed: ["hears", "deaf"], incomplete: false },
         { device: "d", knob: "clean", live: ["hears", "deaf"], still: [], probed: ["hears", "deaf"], incomplete: false },
         { device: "d", knob: "cut", live: ["hears"], still: [], probed: ["hears"], incomplete: true, unenteredModes: ["deaf"] },
     ];
@@ -556,9 +561,9 @@ console.log("\n3j. *** v4045 -- THE ONE RULE ALL SIX LISTS KEPT NEEDING, ENFORCE
             + "was not measured and then drops the unmeasured row is the v4030 defect exactly."
             : "SILENT: " + admits.join(", "));
 
-    const pd = partialDeafness([{ device: "d", knob: "k", live: ["a"], still: ["b"], probed: ["a", "b"], incomplete: false }]);
+    const pd = partialDeafness([{ device: "d", knob: "k", live: ["a"], still: ["b"], echoedStill: ["b"], probed: ["a", "b"], incomplete: false }]);
     ok("!! and the PARTICULAR list names its scope, or it would be universal in disguise",
-        pd.length === 1 && pd[0].includes("live in a") && pd[0].includes("STILL in b"),
+        pd.length === 1 && pd[0].includes("live in a") && pd[0].includes("ECHOED AND IGNORED in b"),
         pd.join(" | ") + " -- it may include an unfinished row precisely BECAUSE it names the modes it is " +
         "talking about and claims nothing beyond them. A list that reported 'k is deaf' without saying where " +
         "would need the universal rule too.");
