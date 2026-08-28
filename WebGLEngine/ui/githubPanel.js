@@ -14,7 +14,16 @@ export function mountGithubPanel() {
     const TA = (ph, rows) => { const t = document.createElement("textarea"); t.placeholder = ph || ""; t.rows = rows || 4; t.style.cssText = "padding:6px 8px;background:#0c0f14;color:#e8eef8;border:1px solid #2a3340;border-radius:6px;font:11px ui-monospace,monospace;width:100%;box-sizing:border-box;resize:vertical;"; return t; };
 
     // ---- panel shell (the Dock provides the minitab + slide-in drawer) ----
-    const root = E("div", "width:440px;max-width:92vw;display:flex;flex-direction:column;font:12px system-ui,sans-serif;color:#cde;");
+    // *** v4102 -- KEITH SAW A HORIZONTAL SCROLLBAR INSIDE THE PANEL, AND IT WAS THERE AT EVERY ZOOM LEVEL. ***
+    // A hardcoded `width:440px` was right for the ORIGINAL host (main.js's dock, a slide-in drawer with no
+    // competing padding of its own) and wrong for the SECOND one v3908 added: server.html's swekOverlay() wraps
+    // this root in a `card` that has 18px of horizontal padding on each side, so root's OWN 440px demanded more
+    // width than card's 440px-wide CONTENT AREA (440 - 36px padding = ~402px) could give it -- a CONSTANT ~38px
+    // overflow, MEASURED headless in the real page (card.scrollWidth 476 vs card.clientWidth 438) at 100%, 110%
+    // and 120% zoom alike, so this was never a zoom-interaction bug, only more visually obvious at Keith's 110%.
+    // `width:100%` fills whichever host actually contains it -- the dock's own drawer width for main.js, and
+    // card's real content width for server.html -- instead of a duplicate literal that has to happen to agree.
+    const root = E("div", "width:100%;max-width:440px;display:flex;flex-direction:column;font:12px system-ui,sans-serif;color:#cde;");
     root.id = "ghPanelRoot";
     const head = E("div", "display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #1d2736;");
     head.append(E("span", "font-weight:700;color:#9fd;letter-spacing:.5px;", "GITHUB MANAGER"));

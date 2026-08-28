@@ -8,6 +8,41 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4102 -- a scrollbar inside the GitHub Manager panel, and why 110% made it obvious
+
+Keith saw a horizontal scrollbar inside the GitHub Manager overlay on `server.html`, and reported it looking
+worse at the page's 110% interface scale than at 100%. Rather than assume the scale control was the cause,
+the actual layout was driven live in headless Chromium at 100%, 110% and 120% body zoom and measured directly.
+
+### The real cause: two hosts, one width, no accounting for the second one's padding
+
+`ui/githubPanel.js`'s `root` div carried a hardcoded `width:440px`. That was correct for the panel's ORIGINAL
+host -- `main.js` mounts it into a slide-in dock drawer with no competing padding of its own. v3908 gave the
+panel a SECOND host: `server.html`'s `swekOverlay()`, whose `card` element carries 18px of horizontal padding
+on each side. `root`'s own `440px` was never adjusted for that second host's padding, so it always asked for
+more width than `card`'s real content area (roughly 402px, after padding) could give it.
+
+MEASURED, not guessed: `card.scrollWidth` (476) exceeded `card.clientWidth` (438) by a CONSTANT ~38px at every
+zoom level tested -- 100%, 110%, and 120% alike. This proves it was never a zoom-interaction bug; the overflow
+was always there. At 110% it simply reads as a larger fraction of a panel that already feels tighter, which is
+why it was more visually obvious to Keith there than at 100%.
+
+### The fix
+
+`root` now takes `width:100%;max-width:440px` instead of a duplicated literal `440px`. It fills whichever
+host's real content area actually contains it -- the dock drawer's own width on `main.js`, or `card`'s real
+content width (padding already subtracted) on `server.html` -- rather than a second number that has to happen
+to agree with a container it cannot see. `max-width:440px` keeps the panel from stretching wider than its
+design ever intended, replacing the old `max-width:92vw` mobile safety net (which is now redundant: `card`
+already caps itself at `92vw`, and `root` filling 100% of that inherits the limit for free).
+
+Re-verified with the same harness: `card.scrollWidth === card.clientWidth` at all three zoom levels, no
+internal overflow, `root`'s rendered width tracks its parent's real content width exactly.
+
+### Gates
+
+`tools/ship/githubPanelLive-selfcheck.mjs` (the existing live-browser gate for this exact panel, driving the
+real `server.html` flow end to end): all checks pass, no regression.
 ## Since v4101 -- "equals the input" is not the same as "is the input"
 
 Keith uploaded `swekechoconfirm.zip`, a diverged-lineage patch bundle (its own v4048, built on top of a much
