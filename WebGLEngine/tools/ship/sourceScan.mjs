@@ -68,6 +68,24 @@ export function regexAllowedHere(out) {
         return REGEX_ALLOWED_KEYWORDS.has(word);           // an IDENTIFIER ended: regex only after a keyword that starts an expression
     }
     if (c === ")" || c === "]") return false;              // a grouped or indexed VALUE just ended: division
+    // v4085 -- `<` IS NOT A SAFE OPENER, AND doorbell.html/arrival.html/spacedesk.html PROVED IT. This file is
+    // fed .html source too (roundTrip-selfcheck.mjs's own known-fix assertion runs noComments() on whole pages),
+    // and `</tag>` is a closing HTML tag, not "less-than, then a regex" -- but the old rule treated `<` as a
+    // bare operator/opener and let regexBody() go hunting for a closing `/`. MEASURED, doorbell.html:
+    // `</label><input id="shieldUrl" data-rt-placeholder="/cloudedge...` -- the `/` after `<` was judged a
+    // regex start, and regexBody() (which tracks `[`/`]`/`\` but has NO notion of an HTML attribute's quotes)
+    // walked straight into the STILL-OPEN data-rt-placeholder="..." value and grabbed ITS leading "/" as the
+    // "closing" delimiter, consuming an ODD number of quote characters (3: id="shieldUrl"'s pair, plus the
+    // placeholder attribute's OPENING quote alone, its matching close left stranded past where the scan
+    // stopped). One swallowed quote shifts the open/close parity for every quote in the rest of the file, and by
+    // the time the scanner reached the real `//` comments deep in the page's own <script> block -- the ones
+    // documenting this exact bug's own history -- mode was stuck mid-"string" and those comments were never
+    // recognised as comments at all, so their prose (an OLD idiom quoted to explain why it is gone) leaked
+    // through as if it were live code. Grepped this tree for a genuine `X < /regex/` (less-than immediately
+    // followed by a regex literal, no space) in real .js/.mjs source: zero hits, against 16,435 `</` occurrences
+    // across .html files, all of them closing tags. So `<` is excluded from the opener set; a real `a < b`
+    // division-adjacent case is unaffected (division only ever follows a value, never a bare `<`).
+    if (c === "<") return false;
     return true;                                            // an operator/opener (or `}` closing a block): regex allowed
 }
 

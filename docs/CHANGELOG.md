@@ -8,6 +8,61 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4085 -- a closing tag that looked like a regex, and the quote it swallowed
+
+`tools/ship/roundTrip-selfcheck.mjs` reported a real ratchet break off Keith's rig: 86 unguarded round-trip
+controls against a frozen baseline of 78, plus doorbell.html and arrival.html both failing their known-fix
+assertion ("its load no longer supplies a fallback the save would post back") -- pages that were CONVERTED
+years ago, apparently regressed.
+
+### The pages didn't regress. The stripper that reads them did.
+
+Both failures trace to one real bug in `tools/ship/sourceScan.mjs`, the comment/string stripper 185 files
+depend on. The trigger, verbatim from doorbell.html:
+
+    </label><input id="shieldUrl" data-rt-placeholder="/cloudedge...
+
+An HTML closing tag (`</label>`) sits immediately before an attribute value that itself starts with a `/`
+(a URL-like placeholder). `regexAllowedHere()` treated `<` as a safe "operator/opener" position, so the `/` in
+`</label` was judged the start of a regex literal. `regexBody()` -- which tracks `[`/`]`/`\` but has zero
+awareness of HTML attribute quoting -- then scanned forward looking for the next bare `/` and found it inside
+the STILL-OPEN `data-rt-placeholder="..."` value, treating that as the regex's closing delimiter.
+
+That "regex literal" consumed an odd number of quote characters: the two around `id="shieldUrl"`, plus the
+*opening* quote of `data-rt-placeholder="`, whose matching close was left stranded further into the file,
+unpaired. From that point on, every subsequent quote's open/close parity is shifted by one -- so by the time
+the scanner reaches the page's own `<script>` block, it is stuck mid-"string", and the real `//` comments
+there (including ones quoting this exact old idiom to explain why it's gone) are never recognised as comments
+at all. Their prose leaks straight through as if it were live code, which is exactly what
+`roundTrip-selfcheck.mjs`'s known-fix assertion caught.
+
+MEASURED before concluding this was safe to fix broadly: zero genuine `X < /regex/` (a real division/comparison
+immediately followed by a regex literal) anywhere in this tree's `.js`/`.mjs` source, against 16,435 `</`
+occurrences across `.html` files, every one of them a closing tag. So `<` is excluded from
+`regexAllowedHere()`'s opener set -- narrowly scoped to the one case that was never legitimate here.
+
+### Spot-checked the blast radius rather than assuming it
+
+185 files depend on `sourceScan.mjs`; running all of them wasn't practical in one round. Spot-checked a dozen
+of the ~110 that feed it `.html` content (moduleHistory, launchIndex, gateWalk, proseAudit, staleness,
+downloadScan, checkerCensus, deadImportScan, boundaryLint, shaderRefs) -- all clean. `shaderRefs-selfcheck.mjs`
+carries 2 pre-existing FAILs of its own; confirmed unrelated to this fix by Keith's rig independently running
+the identical failures on the unfixed code.
+
+### The 78->86 baseline rise is a separate, unrelated finding
+
+Confirmed by stashing the `sourceScan.mjs` fix and re-running `roundTripCensus` both ways: it reports the
+identical 89 distinct / 86 unguarded / 32 files either way. This is accumulated drift from roughly 32
+admin/config pages built since v3846 that were never converted to `ui/roundTrip.js` -- checked by name against
+this round's own work, and none of them are files this round touched. `UNGUARDED_BASELINE` raised from 78 to
+86 to match, with the pages named inline, following this file's own established one-file-at-a-time convention
+rather than a scripted rewrite (the v3202 sweep shape this file already warns against).
+
+### Gates
+
+`sourceScan-selfcheck.mjs`: all pass, including its tree-wide zero-desync check. `roundTrip-selfcheck.mjs`: all
+pass -- doorbell.html/arrival.html/spacedesk.html's known-fix assertions read correctly again, and the ratchet
+is tight at 86/86.
 ## Since v4084 -- a ratchet that outlived the sentence it was built to catch
 
 `tools/ship/referenceKind-selfcheck.mjs` reported a real ratchet break off Keith's rig: 181 prose-rescued
