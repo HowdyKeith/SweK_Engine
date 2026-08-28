@@ -190,9 +190,21 @@ console.log("\n4. *** THE CENSUS RESCUED FOUR SHADERS WITH ITS OWN HEADER, AND I
             .match(/export function selfExclusions[\s\S]*?\n}/)[0]),
         "derived from import.meta.url rather than written as a string -- v3449's precedent exactly. A name " +
         "list would go stale the day somebody renames the file, and stale means SILENTLY re-opened.");
-    ok("...and svo-raymarch.glsl reads UNREFERENCED once the census stops naming it",
-        r.rows.find((x) => x.file === "physics/octree/svo-raymarch.glsl").state === "unreferenced",
-        "which is the finding this whole round came from: 88 lines of WebGL2 that nothing loads");
+    // v4087 -- THIS ASSERTION WENT STALE, WHICH IS DIFFERENT FROM GOING WRONG. It asserted the file's ORIGINAL
+    // headline finding ("88 lines of WebGL2 that nothing loads") as a PERMANENT property, and a subsequent round
+    // fixed exactly that: physics/octree/svoMarch.mjs was built as the CPU-side mirror the shader's own header
+    // asked for, and it genuinely reads the file -- `export const SHADER_PATH = path.join(HERE,
+    // "svo-raymarch.glsl")`, then parses the shipped constants OUT of that file rather than retyping them. That
+    // is a real, live reference in real .mjs code, so "loader-capable" is the CORRECT classification now, not a
+    // census defect -- the shader went from invisible to instrumented, which is the whole point of this file
+    // having existed. Re-asserting "unreferenced" here would be grading this gate against a version of the tree
+    // that no longer exists, the same shape roundTrip-selfcheck.mjs's own header names for a converted page.
+    ok("...and svo-raymarch.glsl now reads MENTIONED-ONLY / loader-capable, because svoMarch.mjs was built to consume it",
+        r.rows.find((x) => x.file === "physics/octree/svo-raymarch.glsl").state === "mentioned-only" &&
+        r.rows.find((x) => x.file === "physics/octree/svo-raymarch.glsl").kind === "loader-capable",
+        "mentioned by: " + r.rows.find((x) => x.file === "physics/octree/svo-raymarch.glsl").mentions.join(", ") +
+        " -- svoMarch.mjs's SHADER_PATH reads this file for real, so the shader this round's own header found " +
+        "as '88 lines of WebGL2 that nothing loads' is now instrumented rather than invisible");
     ok("the claims register is excluded too", excluded.includes("predictions.html"),
         "it describes every capability in the engine, so a CLAIM ABOUT a shader would stand as evidence of use");
 }
@@ -215,11 +227,27 @@ console.log("\n5. THE CENSUS IS A CENSUS -- NOT RATCHETED, NOT SWEPT, AND IT HAS
         "these files were in NO count before today, so a baseline frozen now would freeze MY FIRST LOOK at " +
         "them -- v3453's refusal to ratchet a count derived from shapes the author chose. Each is a judgement, " +
         "one at a time (v3451's instruction, and it is what the last three rounds have been doing).");
+    // v4087 -- 5 -> 11, AND THE DIRECTION OF THE FIX MATTERS MORE THAN THE NUMBER. The old floor of 5 was
+    // measured against a BROKEN detector: handSpelledCorpusFilters() scanned codeOnly()'d text for a REGEX
+    // LITERAL'S OWN SOURCE SPELLING, and codeOnly() blanks regex literal BODIES by design (sourceScan.mjs's own
+    // contract) -- so a real `/\.(js|mjs|html)$/` in someone else's code came out as bare `//` every time.
+    // MEASURED: this returned an empty list on the real tree, which read as "the antidote fully won" while
+    // actually meaning the check could never find anything, regardless of how many callers still hand-spell
+    // the pattern. Switched to noComments(), which keeps a regex literal verbatim (v3052's reasoning) while
+    // still dropping the comment that quotes the pattern in prose -- MEASURED, 11 real callers found: orphan-
+    // Triage.mjs and wiringClaims.mjs in live tool code, the rest in gate fixtures/corpus-walkers
+    // (referenceKind-selfcheck.mjs's own corpus() among them). RAISED TO 11 BECAUSE THE OLD 5 WAS NEVER A
+    // MEASUREMENT OF THE TREE, it was a measurement of a detector that could not see past 0 -- the same v3453
+    // shape ("a rise is only debt if the thing being measured actually rose"), verified here by reading BOTH
+    // detectors against the identical files rather than assumed.
+    const HAND_SPELLED_CEILING = 11;
+    const handSpelled = handSpelledCorpusFilters();
     ok("!! the hand-spelled corpus filters are COUNTED, not swept",
-        handSpelledCorpusFilters().length >= 5,
-        handSpelledCorpusFilters().length + " callers still spell /\\.(js|mjs|html)$/ by hand. *** THE " +
-        "ANTIDOTE, WRITTEN IN ADVANCE: as callers import SOURCE_EXT this number FALLS -- DO NOT RAISE IT, and " +
-        "DO NOT rewrite all of them in one script, which is v3202's sweep that deleted 61 live modules. ***");
+        handSpelled.length > 0 && handSpelled.length <= HAND_SPELLED_CEILING,
+        handSpelled.length + " callers still spell /\\.(js|mjs|html)$/ by hand: " + handSpelled.join(", ") +
+        ". *** THE ANTIDOTE, WRITTEN IN ADVANCE: as callers import SOURCE_EXT this number FALLS -- DO NOT RAISE " +
+        "IT past " + HAND_SPELLED_CEILING + ", and DO NOT rewrite all of them in one script, which is v3202's " +
+        "sweep that deleted 61 live modules. ***");
     ok("the report prints and the tool exits zero",
         reportLines().length > 20 && /REFERENCED/.test(reportLines().join("\n")),
         "v3327's split: a reporting tool prints, the gate beside it is what exits nonzero");

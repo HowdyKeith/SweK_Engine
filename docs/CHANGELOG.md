@@ -8,6 +8,44 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4087 -- a detector that erased the exact thing it was looking for
+
+`tools/ship/shaderRefs-selfcheck.mjs` reported 2 failures off Keith's rig. Both trace to expectations that had
+gone stale in different ways.
+
+### The corpus-filter census had been vacuous since it was written
+
+`handSpelledCorpusFilters()` searched `codeOnly()`'d source text for the literal substring
+`/\.(js|mjs|html)$/` -- looking for a REGEX LITERAL's own spelling. `codeOnly()` blanks regex literal BODIES by
+design (its own docstring: "a regex pattern MENTIONING os.homedir is not a USE of it"), so a real, live
+occurrence of that exact regex in someone else's code came out as bare `//` every time. MEASURED directly:
+`codeOnly()` turns `tools/ship/orphanTriage.mjs`'s own line -- `const all = walk(ENG, (e) => /\.(js|mjs|html)$/
+.test(e));` -- into `... => //.test(e));`, erasing the substring being searched for. The function had returned
+an empty list since it was written, regardless of how many callers actually hand-spell the pattern; a recent
+report of "0 callers still spell it by hand" was this vacuous emptiness, not the antidote succeeding.
+
+Switched to `noComments()`, which keeps a regex literal verbatim (the same reasoning that already keeps string
+content) while still dropping a comment that merely quotes the pattern in prose -- verified both directions
+directly against real code and a real comment. Re-measured: 11 real callers, not 0 --
+`tools/ship/orphanTriage.mjs` and `tools/ship/wiringClaims.mjs` in live tool code, the rest in gate fixtures
+and corpus-walkers (`tools/ship/referenceKind-selfcheck.mjs`'s own `corpus()` among them). The gate's floor
+moves from `>= 5` (measured against the broken detector) to `> 0 && <= 11`, with all 11 named inline.
+
+### The known-instance assertion outlived the defect it was proving
+
+The gate still expected `physics/octree/svo-raymarch.glsl` to read UNREFERENCED -- this file's own v3560
+headline finding ("88 lines of WebGL2 that nothing loads"), frozen as a permanent property. A later round built
+`physics/octree/svoMarch.mjs` as exactly the CPU-side mirror the shader's own header asked for, and it
+genuinely reads the file: `export const SHADER_PATH = path.join(HERE, "svo-raymarch.glsl")`, then parses the
+shipped constants OUT of it rather than retyping them. That is a real, live reference in real `.mjs` code, so
+"mentioned-only / loader-capable" is the correct classification now -- the shader went from invisible to
+instrumented, which is the entire reason this census exists. The assertion was simply grading the gate against
+a version of the tree that no longer has the defect it was written to catch; updated to check the current,
+correct classification and explain why it changed.
+
+### Gate
+
+`shaderRefs-selfcheck.mjs`: all checks pass, 0 failures.
 ## Since v4086 -- a threshold above its default, and a comparator too tight to notice the difference
 
 `tools/roundhouse/sensitivity-selfcheck.mjs` reported 2 real failures off Keith's rig: 3 dead knobs with no
