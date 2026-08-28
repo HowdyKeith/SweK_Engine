@@ -78,6 +78,17 @@ export const TWOF_OBSERVABLES = [
 // guessed "longer runs" would fix the shedding and v2834 disproved it with arithmetic; guessing "shorter
 // runs" here would be the same error pointing the other way, and it would read as the boundary condition
 // this module exists to defend having been broken.
+// v4080 -- AND THIS DEVICE IS THE COUNTEREXAMPLE THAT SETTLED WHETHER rawCalls COULD STAND IN FOR THE ms ABOVE.
+// corroborationCensus.mjs already counts every unspecified libm call this device (and every other) makes,
+// which makes "derive a cost hint from rawCalls instead of asking every device to declare one" look free --
+// the census counts it already, and this file's own inlet build makes well over a hundred million of them at
+// 24,000 lattice steps. MEASURED instead of assumed (see costRecord.mjs's header for the full comparison):
+// kuramoto.curve makes MORE libm calls than this device's inlet build and finishes in a small fraction of the
+// wall time, because kuramoto's inner loop is close to nothing BUT trig while this one spends most of its time
+// on the LBM lattice update between calls, which the counter cannot see. A rawCalls-derived hint would have
+// ranked kuramoto as the pricier of the two and been backwards. costRecord.mjs measures wall time directly
+// instead, and corroborationCensus.mjs's decline logic (v4037, extended this round) now falls back to that
+// measured record for every device -- this one included -- that declares no costHint of its own.
 const DEF = { runIndex: 0, settle: 6000, record: 18000 };
 const FEEDBACK_DRIFT = 0.12;   // the 12-21% every body-force-driven attempt showed before v2835
 

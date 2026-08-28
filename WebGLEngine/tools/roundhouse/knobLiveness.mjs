@@ -177,23 +177,53 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         // default before AND equals the probe value after, which is the signature of a pass-through and of
         // nothing else. A real observable that merely happens to land on the probe value at one rung still
         // moves at the others.
-        const echo = (o) => Object.is(base[o], def) && Object.is(out[o], alt);
-        const moved = Object.keys(base).filter((o) => !Object.is(base[o], out[o]) && !echo(o));
+        // *** v4080 -- THIS COMPARISON WAS STILL Object.is, AND THAT IS THE SAME BUG v4035 FIXED ONE FUNCTION
+        // OVER. *** probeValues (above) learned at v4035 to drop a declared rung by VALUE rather than identity,
+        // because Object.is on arrays is reference equality and a rewritten-but-equal choice survived the
+        // filter. This comparison -- whether an OBSERVABLE moved between base and out -- had the identical
+        // defect and nobody had looked here yet: a device that rebuilds an array (or object) observable fresh
+        // on every call compares unequal TO ITSELF, so every knob on it reads live no matter what it does.
+        //
+        // MEASURED, on the real device this bites: stability reports `ratioLadder`, an array of {visc, ratio}
+        // pairs rebuilt every build. probeKnob(stabilityDevice, "deafknob", cfg, "visc", base) returned
+        // { state: "live", moved: ["ratioLadder"] } -- BEFORE this fix -- even though `deafknob` forces every
+        // rung to the shipped viscosity 0.1 regardless of the probed knob, so the array's CONTENTS never
+        // change between base and out. Only its IDENTITY did. That is exactly backwards: `visc` is stability's
+        // own planted dead knob (stabilityBind.mjs's `deafknob` mode, declared since v3783), and the one mode
+        // built to prove a census can catch a control that does nothing was invisible to this one because an
+        // unrelated array field on the SAME device always read as freshly moved.
+        //
+        // sameValue is recursive now (object literals included, not just nested arrays), with Object.is AT THE
+        // LEAVES rather than === because NaN is a real physics observable and NaN === NaN is false while
+        // Object.is(NaN, NaN) is true. This is the mirror of the v4031 echo bug and the worse direction of the
+        // two: a dead reading invites a look, a live one closes the question.
+        const echo = (o) => sameValue(base[o], def) && sameValue(out[o], alt);
+        const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !echo(o));
         if (moved.length) return { state: "live", moved };
     }
     return { state: "still", moved: [] };
 }
 
 /**
- * Value equality for dropping a probe rung that is not actually a change. Shallow on purpose: it exists to
- * catch a declared choice that repeats the default, and one level covers every array knob in the lab except
- * nbench.sizes, whose entries are pairs -- so that one nests exactly once and is handled.
+ * Value equality, used both for dropping a probe rung that is not a change (probeValues, above) and for
+ * deciding whether an observable in probeKnob MOVED.
+ *
+ * *** v4080 -- RECURSIVE OVER PLAIN OBJECTS NOW, NOT ONLY NESTED ARRAYS, BECAUSE THE SHALLOW VERSION WAS STILL
+ * WRONG FOR probeKnob'S USE AND NOBODY HAD ROUTED IT THERE. *** The one-level array recursion here since v4035
+ * covered every array knob in the lab except nbench.sizes (pairs) -- but it never handled an ARRAY OF OBJECTS,
+ * which is what stability's `ratioLadder` observable is ({visc, ratio} per rung), and it was never called from
+ * probeKnob's echo/moved comparison at all -- that comparison used raw Object.is until this round, which is a
+ * separate instance of the identical mistake one function over. Depth-capped at 6 rather than unbounded,
+ * because this is a liveness probe and not a general deep-equal utility, and every real observable in the lab
+ * bottoms out in two or three.
  */
-export function sameValue(a, b) {
+export function sameValue(a, b, depth = 0) {
     if (Object.is(a, b)) return true;
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((x, i) => Object.is(x, b[i]) ||
-        (Array.isArray(x) && Array.isArray(b[i]) && x.length === b[i].length && x.every((y, j) => Object.is(y, b[i][j]))));
+    if (depth > 6 || a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => sameValue(x, b[i], depth + 1));
+    const ka = Object.keys(a), kb = Object.keys(b);
+    return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameValue(a[k], b[k], depth + 1));
 }
 
 /**
@@ -223,7 +253,7 @@ export function wideValues(v) {
  * The whole register, one row per device/knob.
  * @returns rows of { device, knob, kind, modeSource, probed[], live[], still[], movedMost, note }
  */
-export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
+export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive = false } = {}) {
     const MODES = await deviceModeTable();
     const names = only && only.length ? only : DEVICE_NAMES;
     const rows = [], notes = [];
@@ -278,7 +308,16 @@ export async function knobLiveness({ only = null, budgetMs = 20000 } = {}) {
                         a.unprobed = true;
                         continue;
                     }
-                    if (a.live.length) continue;                       // already answered yes; the rest is cost
+                    // *** v4080 -- STOPPING AT THE FIRST YES ANSWERS ONE QUESTION AND HIDES ANOTHER. ***
+                    // "Is this knob dead ANYWHERE" is settled by one live mode, so skipping the rest is right
+                    // and cheap by default. But it makes a second question unaskable: IS THIS KNOB DEAF IN SOME
+                    // MODE WHILE WORKING IN OTHERS -- exactly the shape of stability's planted `deafknob` mode
+                    // (stabilityBind.mjs, declared since v3783), which sits LAST in that device's mode list.
+                    // MEASURED: a default-budget sweep of `stability` reports `visc live in response` and never
+                    // enters `deafknob` at all, because `response` answers yes first and every later mode is
+                    // skipped for that knob. Now opt-in via --exhaustive, because probing every mode and plant
+                    // state for every knob costs real time and most callers want the cheap yes/no.
+                    if (!exhaustive && a.live.length) continue;         // already answered yes; the rest is cost
                     a.probed.push(where);
                     const r = await probeKnob(dev, m, cfg, knob, base, ps.extra, devStart + budgetMs);
                     if (r.state === "budget-cut") {
@@ -384,6 +423,46 @@ export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !
     .map((r) => r.device + "." + r.knob + " (probed in " + r.probed.join(", ")
         + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")").sort();
 
+/**
+ * *** v4080 -- KNOBS THAT WORK IN SOME MODES AND ARE IGNORED IN OTHERS. Requires exhaustive: true, since a
+ * default-budget sweep stops probing a knob as soon as one mode answers live and never learns whether a LATER
+ * mode ignores it. ***
+ *
+ * *** AND THIS IS USUALLY INNOCENT, WHICH IS THE WHOLE DIFFICULTY. *** mpmdrucker's E is read in three modes
+ * and correctly still in the mode whose keys are homogeneous in the elastic moduli (STILL_OK, above) -- a mode
+ * with no use for a knob is not ignoring it. stability's `deafknob` looks IDENTICAL from out here: a knob live
+ * elsewhere, moving nothing in this one mode.
+ *
+ * So this is a READING and emphatically not a diagnosis, the same contract the rest of this file keeps. What
+ * it buys is that the deafknob-class defect becomes VISIBLE AT ALL: a human can then ask the one question the
+ * probe cannot, which is whether the mode CLAIMS to use the knob. A knob dead everywhere invites suspicion the
+ * first time somebody turns it; a knob that demonstrably works in three mode/plant combinations and is quietly
+ * dropped in the fourth is the shape that survives review, which is presumably why this lab planted one.
+ *
+ * *** IT IS ALSO ONLY DETECTABLE BECAUSE OF v4031's ECHO RULE. *** In `deafknob` the knob still reaches the
+ * OUTPUT -- stabilityBind copies it straight to `out.viscosity` -- so before v4031 discarded pass-throughs
+ * this would have read LIVE off the echo of the very knob being ignored. The rule written to stop mpmstep.nx
+ * reading live off itself is what makes THIS plant findable too.
+ */
+export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.still.length)
+    .map((r) => r.device + "." + r.knob + " -- live in " + r.live.join(", ") + "; STILL in " + r.still.join(", "))
+    .sort();
+
+/**
+ * *** v4080 -- AND THE KNOBS FOR WHICH THE DEAFNESS QUESTION WAS NEVER ANSWERED, WHICH IS NOT THE SAME AS
+ * "none". *** A knob that reads live and whose device ran out of budget has been checked in SOME modes and
+ * not others -- exactly the state in which a deaf mode hides. A first draft of partialDeafness that filtered
+ * only on `r.live.length && r.still.length` would return 0 for that case and for a genuinely clean device
+ * alike, which is the measurement-versus-admission distinction v4031 drew for stillKnobs and v4030 drew for
+ * null defaults, reintroduced one list later by the same reflex -- so this list is separated out rather than
+ * folded into a zero that could mean either thing. incompleteKnobs cannot substitute for it: that list
+ * requires the knob to be STILL so far, and a knob caught by this one is LIVE.
+ */
+export const deafnessUnanswered = (rows) => rows.filter((r) => r.incomplete && r.live.length)
+    .map((r) => r.device + "." + r.knob + " (checked in " + r.live.concat(r.still).join(", ")
+        + (r.unenteredModes && r.unenteredModes.length ? "; NEVER ENTERED: " + r.unenteredModes.join(", ") : "") + ")")
+    .sort();
+
 /** Read, but flat across its working range -- and the wide ladder proves the code reaches it. */
 export const insensitiveKnobs = (rows) => rows.filter((r) => r.probed.length && !r.live.length && r.wideLive)
     .map((r) => r.device + "." + r.knob + " (" + r.wideLive + ")").sort();
@@ -445,6 +524,7 @@ export const STILL_OK = {
 /** v3327's split: this half PRINTS, and knobLiveness-selfcheck beside it is what exits nonzero. */
 export async function reportLines(opts = {}) {
     const { rows, notes } = await knobLiveness(opts);
+    const exhaustive = !!opts.exhaustive;
     const L = [];
     const devices = new Set(rows.map((r) => r.device));
     const still = stillKnobs(rows);
@@ -476,6 +556,25 @@ export async function reportLines(opts = {}) {
     L.push("  NOT PROBED (no ordering to perturb the default along): " + (unprobed.length ? unprobed.join(", ") : "none"));
     L.push("  STILL SO FAR, BUT THE CENSUS RAN OUT OF BUDGET -- NOT A VERDICT: "
         + (partial.length ? partial.join(", ") : "none"));
+    if (exhaustive) {
+        const deaf = partialDeafness(rows);
+        const unanswered = deafnessUnanswered(rows);
+        L.push("");
+        L.push("  LIVE IN SOME MODES AND IGNORED IN OTHERS (" + deaf.length + ") -- USUALLY INNOCENT:");
+        for (const d of deaf) L.push("      " + d);
+        if (unanswered.length) {
+            L.push("  AND NOT ANSWERED AT ALL FOR (" + unanswered.length + ") -- live so far, budget ran out"
+                + " before the remaining modes:");
+            for (const u of unanswered) L.push("      " + u);
+            L.push("  *** A ZERO ABOVE MEANS 'NONE FOUND IN WHAT WAS OPENED', NOT 'NONE'. ***");
+        }
+        L.push("  A mode with no use for a knob is not ignoring it -- the one question this probe cannot ask is");
+        L.push("  whether the mode CLAIMS to use the knob, and that is the question this list exists to put in");
+        L.push("  front of somebody who can. stability.visc in `deafknob` is the lab's planted example.");
+    } else {
+        L.push("  (run with --exhaustive to also ask which knobs are IGNORED IN SOME MODES while working in");
+        L.push("   others -- this pass stops at the first mode that responds, so it cannot see that.)");
+    }
     L.push("  A READING, NEVER A DIAGNOSIS -- dead, saturated at an asymptote, and quantised below the search");
     L.push("  step are three different conditions that produce this same one.");
     for (const n of notes) L.push("  note: " + n);
@@ -504,8 +603,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     const valueOf = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : null; };
     const only = (valueOf("--only") || "").split(",").map((s2) => s2.trim()).filter(Boolean);
     const budget = parseInt(valueOf("--budget") || "", 10);
+    const exhaustive = argv.includes("--exhaustive");
     reportLines({
         only: only.length ? only : null,
         ...(Number.isFinite(budget) && budget > 0 ? { budgetMs: budget } : {}),
+        ...(exhaustive ? { exhaustive: true } : {}),
     }).then((L) => console.log(L.join("\n")));
 }

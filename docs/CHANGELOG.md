@@ -8,6 +8,120 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4083 -- a planted dead knob the census could not see, and a call counter that could not price what it counted
+
+This round ports work from a bundle Keith uploaded from a diverged session lineage (patches numbered
+v4039-v4042b on a branch whose base commit, labeled v4038a, is byte-identical to this tree's own adc8368 --
+the two lineages share that ancestor and diverged after it). The bundle's patches were not applied with git
+am or git apply: their version numbers collide with content this tree already shipped under the same numbers
+(this tree's real v4042 is krbn-compare's Krbn pane, unrelated to knobs), and applying them directly would
+have created a nonsensical history. Instead, each finding was re-derived and re-measured on this tree.
+
+### stability's planted dead knob already existed here -- it just could not be seen
+
+The bundle's headline finding is a deliberately planted "deafknob" mode: a control that hands every run the
+shipped viscosity whatever the caller asks for, so that nothing throws, every run completes, every number is
+finite, and the only tell is that the answer stops depending on the input. `tools/roundhouse/stabilityBind.mjs`
+already has exactly this mode, planted since v3783, independently of the bundle -- nothing needed porting
+there.
+
+What *was* missing: `tools/roundhouse/knobLiveness.mjs`, the generic per-knob liveness census, could not catch
+it. Two separate defects, both real and both measured on this tree directly:
+
+1. **An observable rebuilt per call compared by reference.** `probeKnob`'s live/still verdict compared
+   observables with raw `Object.is`. stability reports `ratioLadder`, an array of `{visc, ratio}` objects
+   rebuilt fresh on every build, so it always compared unequal to itself -- every knob on the device read live
+   regardless of what it did. MEASURED, before the fix:
+
+       probeKnob(stabilityDevice, "deafknob", cfg, "visc", base) => { state: "live", moved: ["ratioLadder"] }
+
+   `sameValue` (this file's existing deep-equal helper, extended at v4035 to handle nested arrays) is now
+   recursive over plain objects too, and `probeKnob`'s echo/moved comparison uses it instead of `Object.is`.
+   The SAME call now measures:
+
+       probeKnob(stabilityDevice, "deafknob", cfg, "visc", base) => { state: "still", moved: [] }
+
+   while `response` mode still correctly reads live (`moved: ["ratio"]`) -- re-measured, not merely asserted
+   to still work.
+
+2. **The sweep stopped at a knob's first live mode**, and `deafknob` is last in stability's mode list, so it
+   was never entered by a default-budget run. A new `--exhaustive` flag opts into probing every mode/plant
+   combination instead of stopping at the first yes, and two new report functions -- `partialDeafness` (a
+   knob live in some modes and ignored in others) and `deafnessUnanswered` (the same question when the budget
+   ran out before it could be answered, which is not the same as "none found") -- surface the reading.
+
+Run for real, on the actual device, with a budget it could finish inside:
+
+    knobLiveness --only stability --exhaustive
+
+reports exactly one entry: `stability.visc -- live in response, response/planted, direction, direction/planted,
+horizon, horizon/planted; STILL in deafknob, deafknob/planted` -- while `c`, `dt` and `T` stay live in all
+eight mode/plant combinations, because the plant overrides viscosity alone. That is the exact discrimination
+the plant was built to test for.
+
+New gate section: `knobLiveness-selfcheck.mjs` section 3i, sabotage-style -- a synthetic device reproduces
+both traps (an array-of-objects observable rebuilt per call, and a knob echoed to the output then ignored in
+one mode) and the gate also runs the two `probeKnob` calls against the real `stability` device directly,
+asserting the same live/still discrimination measured above.
+
+### rawCalls is not a cost model -- proposed, measured, and refused
+
+`corroborationCensus.mjs`'s decline logic (v4037) asks a device what it costs before starting it via an
+optional `costHint`, but as of the shared v4038a ancestor only one device in the lab (twof) declares one. The
+obvious next move -- derive a hint from `rawCalls`, the libm-call tripwire the census already counts for a
+completely different reason (portability) -- was proposed and refused, MEASURED on this machine, one build of
+each device's named mode, timed directly:
+
+    kuramoto.curve       19396 ms   353,976,576 calls      54.8 ms/Mcall
+    twof.inlet           92078 ms   108,192,309 calls     851.1 ms/Mcall
+    stability.response   16355 ms     3,430,000 calls    4768.2 ms/Mcall
+
+kuramoto makes 3.3x MORE libm calls than twof and costs 4.75x LESS wall time -- and stability, with the fewest
+calls of the three by two orders of magnitude, is the most expensive per build. An 87x span at the extremes.
+A call counter cannot price the work a build does BETWEEN calls (SPH neighbour search and an
+energy-conservation sweep for stability, an LBM lattice update for twof), which is exactly what those two
+devices spend most of their time on and kuramoto barely touches.
+
+New `tools/roundhouse/costRecord.mjs`: a frozen `(device, mode) -> ms` record. Opt-in freeze
+(`SWEK_FREEZE_DEVICE_COST=1`, following `corroborationReach`'s existing convention), and it refuses to write
+from a partial sweep -- a budgeted run would record the cheap devices and drop every expensive one, which is
+exactly the population a cost record exists to describe. Wired into `corroborationCensus.mjs`'s decline check
+as a fallback behind `costHint`, so every device that declares no hint of its own (all but one) is still
+priced once a record exists. `corroborationCensus.mjs` also now keeps `ms` on every row it builds and exports
+`costVsCalls()`, so the ms-per-Mcall finding above is available to any caller for free instead of being a
+one-off script.
+
+**What did not finish: a real full-lab freeze.** The unbudgeted sweep (`corroborationCensus-selfcheck.mjs`,
+no `--budget`) ran for 28 minutes under this round's own CPU contention -- two other measurements (the
+stability probe above and a small kuramoto/twof/stability timing script) racing it for the same CPU, which is
+the identical mistake this tree's own v4039 already named and warned about. Watching it happen live: the same
+`kuramoto.curve` build that measured 19.4 s in isolation read 1064.5 s inside the contended sweep. The sweep
+covered 65 of 484 device/modes in that time before its own timeout, dominated by a handful of devices over a
+minute each (optics 372 s, kh 102 s). `tools/ship/gateBudget.mjs` already lists this exact gate in
+`UNRESOLVED`, unmeasured to completion since v3924, for the identical reason ("a census over the device
+registry, so it grows with the lab"). So `device-cost-baseline.json` ships absent rather than fabricated --
+every consumer of `costFor()` treats a missing entry as UNKNOWN, never as free, which is the whole point of
+the contract.
+
+### Found along the way: a real crash in the gate itself
+
+While testing the freeze mechanism with `--budget`, `corroborationCensus-selfcheck.mjs` crashed one line past
+its own coverage check with `ReferenceError: pinned is not defined`. `pinned` was declared inside section 2's
+block and read again in section 3; `const` does not survive a block boundary. Moved to module scope, with the
+two values it reads (`censusComplete`, `sweptSoFar`) set once the census returns, and the `kerr` assertion
+that had the same problem (a `FAIL` on a partial sweep that simply had not reached `kerr` yet) now goes
+through `pinned` too. Re-ran at `--budget 2000` and `--budget 5000`: the gate now completes cleanly with
+exactly one expected failure (the coverage assertion itself, which SHOULD fail on a partial sweep) instead of
+crashing.
+
+### Gates
+
+`knobLiveness-selfcheck.mjs`: new section 3i, all checks pass, including the real `stability` measurement
+above. `corroborationCensus-selfcheck.mjs`: the block-scoping crash is fixed and verified at two different
+budgets; the unbudgeted/complete form remains in `gateBudget.mjs`'s `UNRESOLVED` list exactly as before this
+round (that classification predates this work and is unrelated to it). `stabilityBind-selfcheck.mjs` is
+untouched and still passes -- its own plant check was never the gap; the gap was in the generic census that
+sits beside it.
 ## Since v4082 -- the SPAWN panel gets a dedicated "Spawn (drag to place)" button, with sway
 
 Keith: "when we are looking at the SPAWN panel, if i select a KAIJU -> Sky, where is the 'Spawn' button to put

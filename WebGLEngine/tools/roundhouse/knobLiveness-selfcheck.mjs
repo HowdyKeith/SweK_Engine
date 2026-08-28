@@ -27,7 +27,8 @@ import { BASES } from "../../physics/crystal/structureFactor.mjs";
 import { INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
 import { SCENARIOS } from "../../physics/blobKelvin.js";
-import { sameValue } from "./knobLiveness.mjs";
+import { sameValue, partialDeafness, deafnessUnanswered } from "./knobLiveness.mjs";
+import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -426,6 +427,95 @@ console.log("\n3h. *** v4035 -- A LIST OF NUMBERS HAS A SCALING, AND THREE QUANT
         named.join(", ") + " -- the last full sweep reported every one of them as 'not probed (array)'. " +
         "Eleven of the fifteen came free from the elementwise ladder; these four each needed the device to " +
         "say what a real alternative looks like, and two of them needed it BECAUSE THEY WERE RIGHT.");
+}
+
+console.log("\n3i. *** v4080 -- A KNOB THAT WORKS IN SIX MODE/PLANT COMBINATIONS AND IS IGNORED IN THE OTHER TWO ***");
+{
+    // *** THE LAB ALREADY CONTAINS A PLANTED DEAD KNOB (stabilityBind.mjs's `deafknob`, declared since v3783)
+    // AND THIS CENSUS COULD NOT SEE IT. *** `deafknob` hands every run the shipped viscosity whatever the
+    // caller asked for -- its own comment names the shape: "a control that does nothing ... nothing throws,
+    // every run completes, every number is finite, and the ONLY tell is that the answer stopped depending on
+    // the input." Two separate defects hid it from THIS file specifically:
+    //
+    //   1. AN OBSERVABLE REBUILT PER CALL COMPARED BY REFERENCE. stability reports `ratioLadder`, an array of
+    //      {visc, ratio} pairs rebuilt on every build, so raw Object.is called it "moved" unconditionally and
+    //      every knob on the device read live no matter what it did.
+    //   2. THE SWEEP STOPPED AT THE FIRST RESPONDING MODE, and `deafknob` is last in stability's mode list.
+    //
+    // AND WITHOUT v4031's ECHO RULE IT WOULD STILL BE INVISIBLE: in `deafknob` the knob reaches the OUTPUT
+    // (stabilityBind copies it to out.viscosity) while never reaching the solver, so the one thing that moves
+    // in that mode is the knob's own echo. The rule written to stop mpmstep.nx reading live off itself is what
+    // makes THIS deliberately deaf knob findable too.
+    const synth = {
+        modes: ["hears", "deaf"], name: "synthetic-deaf",
+        defaults: ({ mode } = {}) => ({ mode: mode || "hears", config: { gain: 2, other: 5 } }),
+        // `ladder` is an array of OBJECTS rebuilt every call -- the reference-comparison trap, one level past
+        // the plain-array recursion v4035 already handled, and the exact shape of stability's ratioLadder.
+        // `gain` is echoed to the output and then IGNORED in `deaf`, which is the deafknob shape exactly.
+        build: async ({ mode = "hears", config = {} } = {}) => {
+            const c = { gain: 2, other: 5, ...config };
+            const used = mode === "deaf" ? 2 : c.gain;
+            return { gain: c.gain, ladder: [{ a: 1, b: used }, { a: 2, b: used * 2 }], answer: used * c.other };
+        },
+    };
+    const cfg = { gain: 2, other: 5 };
+    const deafBase = await synth.build({ mode: "deaf", config: cfg });
+    const deafAlt = await synth.build({ mode: "deaf", config: { ...cfg, gain: 9 } });
+    ok("!! *** THE OLD COMPARISON (Object.is) WOULD HAVE CALLED THIS ARRAY 'MOVED' EVEN THOUGH ITS VALUES DID NOT CHANGE ***",
+        !Object.is(deafBase.ladder, deafAlt.ladder) && sameValue(deafBase.ladder, deafAlt.ladder),
+        "gain went 2 -> 9 in a mode that ignores gain, so `ladder`'s CONTENTS are identical ([{a:1,b:2},{a:2,b:4}] " +
+        "both times) but its IDENTITY differs because it is rebuilt per call. Object.is(oldLadder, newLadder) is " +
+        "false -- the exact reading that made probeKnob's pre-v4080 `moved` check report every knob on such a " +
+        "device live, whatever it did -- and sameValue(oldLadder, newLadder) is true, because it compares the " +
+        "{a,b} pairs by VALUE rather than the array by REFERENCE.");
+    ok("!! ...and Object.is stays at the LEAVES, because NaN is a real physics observable",
+        sameValue(NaN, NaN) && !sameValue(NaN, Infinity) && !sameValue({ a: 1 }, { a: 1, b: 2 }),
+        "NaN === NaN is false, so === at the leaves would call an unchanged NaN a move. JSON.stringify would " +
+        "have been shorter and wrong the other way: it renders NaN and Infinity BOTH as null, so a value that " +
+        "changed from one to the other would compare EQUAL.");
+
+    const rHears = await probeKnob(synth, "hears", cfg, "gain", await synth.build({ mode: "hears", config: cfg }));
+    const rDeaf = await probeKnob(synth, "deaf", cfg, "gain", deafBase);
+    ok("!! *** THE SAME KNOB NOW READS LIVE IN ONE MODE AND STILL IN THE OTHER, ON THE FIXED COMPARISON ***",
+        rHears.state === "live" && rDeaf.state === "still",
+        "hears: " + rHears.state + " (moved " + rHears.moved.join(",") + "), deaf: " + rDeaf.state + ". In " +
+        "`deaf` the only thing gain used to move was its own echo, which v4031 already discards -- so once the " +
+        "array-identity false-positive is fixed, the mode that ignores the knob reads STILL, not live.");
+
+    const rows = [
+        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], probed: ["hears", "deaf"], incomplete: false },
+        { device: "d", knob: "clean", live: ["hears", "deaf"], still: [], probed: ["hears", "deaf"], incomplete: false },
+        { device: "d", knob: "cut", live: ["hears"], still: [], probed: ["hears"], incomplete: true, unenteredModes: ["deaf"] },
+    ];
+    ok("!! partialDeafness names the split knob and leaves the one that works everywhere alone",
+        partialDeafness(rows).length === 1 && partialDeafness(rows)[0].startsWith("d.k "),
+        partialDeafness(rows).join(" | ") + " -- a knob live in every mode is not deaf anywhere.");
+    ok("!! *** AND A ZERO MEANS 'NONE FOUND IN WHAT WAS OPENED', NEVER 'NONE' ***",
+        deafnessUnanswered(rows).length === 1 && deafnessUnanswered(rows)[0].includes("NEVER ENTERED: deaf"),
+        deafnessUnanswered(rows).join(" | ") + ". A knob live so far on a device the budget cut short has been " +
+        "checked in SOME modes and not others -- exactly the state in which a deaf mode hides -- and " +
+        "incompleteKnobs cannot catch it either: that list requires the knob to be STILL so far, and this one " +
+        "is live.");
+
+    // *** AND ON THE REAL PLANT, MEASURED HERE RATHER THAN ONLY ASSERTED ON THE SYNTHETIC, BECAUSE THE WHOLE
+    // POINT IS THAT THE REAL ONE WAS INVISIBLE. *** Two direct probeKnob calls rather than a full exhaustive
+    // census (which also has to open `direction` and `horizon` first) -- a full `--only stability --exhaustive`
+    // run is a separate, slower measurement reported alongside this gate rather than inside it.
+    const rDef = stabilityDefaults({ mode: "response" });
+    const rBase = await stabilityDevice.build({ mode: "response", config: rDef.config });
+    const rResponse = await probeKnob(stabilityDevice, "response", rDef.config, "visc", rBase);
+    const dDef = stabilityDefaults({ mode: "deafknob" });
+    const dBase = await stabilityDevice.build({ mode: "deafknob", config: dDef.config });
+    const rDeafknob = await probeKnob(stabilityDevice, "deafknob", dDef.config, "visc", dBase);
+    ok("!! *** THE REAL PLANT: stability.visc READS LIVE IN response AND STILL IN deafknob ***",
+        rResponse.state === "live" && rDeafknob.state === "still",
+        "response: " + rResponse.state + " (moved " + rResponse.moved.join(",") + "), deafknob: " +
+        rDeafknob.state + ". *** BEFORE v4080 THIS SAME CALL PAIR MEASURED response: live, deafknob: live (moved " +
+        "[\"ratioLadder\"]) -- deafknob's own array observable was rebuilt every call, so it always compared " +
+        "unequal to itself and masked the one mode built to be caught. *** stabilityBind-selfcheck's own " +
+        "spanAcrossViscosity check already proved the plant flattens the response ladder; this is the separate " +
+        "claim that the GENERIC per-knob census can now see the same thing stabilityBind-selfcheck sees " +
+        "directly, which it could not before this round.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
