@@ -109,6 +109,23 @@ And a bug shipped into the browser, found by looking at the render rather than b
 One more interaction worth recording: the CSS scanlines are switched off while the shader ones are on. body::before draws gradient scanlines and body::after a vignette, and the rasteriser captures both into the texture; the shader then lays its own scanlines over them at a different pitch, and two grids at slightly different periods is a moire pattern that reads as a broken shader rather than as two effects stacking.
 
 Gate: tools/ship/domToTexture-selfcheck.mjs, 27 checks, all pass.
+The CRT on the ES/EV pages, as one toggle rather than a fourth and fifth copy -- and a survey of my own that was wrong.
+
+Keith asked to wire the CRT into the two 2D-canvas ES pages as a toggle and to flip preserveDrawingBuffer on ev.html so it could join them.
+
+ui/crtToggle.js owns the button, the overlay, the resize tracking and the requestAnimationFrame loop exactly once, and the three pages carry a call each. pipboy-models.html and fallout.html needed bespoke plumbing because their pipelines genuinely differ -- one filters a texture source, the other rasterises a DOM -- but the ES and EV pages do not differ from each other at all, and writing the same overlay into each would have been the second-copy defect this session has watched land repeatedly.
+
+My earlier survey of those pages was wrong, and checking is what found it. I had reported ev.html as a WebGL page that needed the flag; grepping ev.html for getContext finds only 2d, six times over. The WebGL is in ev/systemView.js, ev/flightView.js, ev/galaxyMap.js and ev/esShipLabels.js, which the page imports. A grep of a page is not a survey of what that page renders with. The flag went into all four modules.
+
+The cost of preserveDrawingBuffer is stated beside it with its number rather than described as free: a 1000 by 588 WebGL2 canvas over 90 frames measured 26.99 milliseconds a frame with the flag against 28.90 without, which is inside the noise -- on this container's software rasteriser, which is not proof about a real GPU, and the comment says so.
+
+The proof that it worked is a read rather than a diff. Before the flag, probing ev.html measured zero lit pixels, which briefly looked like an empty page rather than an unreadable buffer. After it, readPixels on the live context returns between a third and half a percent lit with a peak brightness of 637 out of 765 -- so the low fraction is the scene, because the EV system view is black space with stars in it, and not a failed read. The gate asserts both numbers, because a sampled-but-empty buffer and a genuinely dark scene are indistinguishable unless something checks peak brightness as well as coverage. It also asserts the flag against getContextAttributes on the live context rather than against the source line that requests it: a browser is free to refuse an attribute, and reading the file back would never notice.
+
+The default preset is trinitron deliberately. The overlay is pointer-events:none so input still reaches the game underneath and these stay playable, but barrel distortion moves what you see away from what you click, and trinitron curves at 0.04 against arcade's 0.18. Inverse-mapping pointer coordinates through the barrel function is possible and is not done, and the module says so rather than leaving it to be discovered.
+
+Also evaluated at Keith's link: vinimlo/galaxy-profile, GPL-3.0, Python, which generates animated SVG banners for a GitHub profile README from GitHub stats. There is nothing in it to lift into an engine, and the licence would be contagious for a tree that publishes public release zips -- the same reasoning the APK README already recorded for InstallerX-Revived. Recorded and parked.
+
+Gate: tools/ship/crtToggle-selfcheck.mjs, 30 checks, all pass.
 ## Since v4113 -- the storage quota is a promise, not a reservation
 
 Found while running the measurement Keith asked for: does voxtral (2.5-9 GB) clear `localModelProbe`'s quota

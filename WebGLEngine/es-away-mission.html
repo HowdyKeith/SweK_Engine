@@ -150,5 +150,20 @@ function frame() {
 }
 frame();
 </script>
+
+<script type="module">
+// v4121 -- CRT toggle. This page draws to a 2D canvas, which is the easy case: a 2D canvas is always a
+// valid texImage2D source, so render/crtPass.js can sample it with no preserveDrawingBuffer question and
+// no DOM rasterising. The button, overlay, resize handling and rAF loop all live in ui/crtToggle.js so
+// this page carries one line rather than a fourth copy of them.
+//
+// Default preset is `trinitron` deliberately: the overlay is pointer-events:none so input still reaches
+// the away-mission surface underneath, but barrel distortion moves what you see away from what you
+// click, and trinitron's curvature is 0.04 against arcade's 0.18. The selector offers arcade for when
+// looking matters more than aiming.
+import { mountCrtToggle } from "/ui/crtToggle.js";
+const _cv = document.getElementById("c");
+if (_cv) mountCrtToggle(_cv, { preset: "trinitron", storageKey: "swek.crt.es-away-mission" });
+</script>
 </body>
 </html>
