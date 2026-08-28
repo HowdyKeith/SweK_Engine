@@ -8,6 +8,68 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4107 -- the dock's buttons, a fill fix that measured worse, and a bridge for handing a file to a stranger
+
+### The dock buttons were already there, and invisible
+
+Keith, once v4106 made the top-right box render at all: "we would need the dock buttons too."
+
+The view-cycle button already existed and was already wired to `cycleTier()` (full -> mini -> head -> svg).
+It was simply `opacity: 0` until a `mouseenter`, so the only way to discover the cycle was to hover a 20px
+corner of a 64px strip and notice something fade in. An affordance nobody can see is the same defect as a
+missing one. It now rests at 0.5 and brightens to 1 on hover -- visible without competing with the avatar it
+sits on.
+
+### "Stretched to fill the box" -- the obvious fix measured worse, so it was not applied
+
+`avatarStage.js` has a `compact` mode written for exactly this wide, short strip. Its own comment reads
+"fill the actual (wide) canvas -- no cap, so the camera doesn't pull way back", and `ui/dockedGauges.js` --
+the *other* dock mounting this same stage -- passes it. `demoChrome.js` never did. That is about as strong a
+case as a one-line fix ever gets.
+
+Driven in headless Chromium against the real 278x56 strip, it made things **worse**: width fill went
+78% -> 64%, and the drawn-pixel count *halved*, 7107 -> 3351. `compact` tightens the gauge row (spacing 0.62
+vs 0.85) and frames that narrower group, so the camera pulls **in** on a smaller scene and leaves *more*
+empty canvas, not less.
+
+So the flag is left off, with the measurement recorded at the call site so the next reader does not re-try it
+on the strength of the same reasonable-sounding argument. The remaining gap is named rather than papered
+over: a roughly 1.7:1 scene contain-fit into a roughly 5:1 box has side gaps by construction. Closing them is
+a choice between a taller dock, spreading the scene wider, or cropping vertically -- a visual decision, not a
+bug with one right answer.
+
+### New bridge: pairlane
+
+`kiyo-e/pairlane` (MIT) is browser-to-browser file transfer over WebRTC. This tree already has three P2P
+paths -- `webtorrentBridge.js`, copyparty for the phone peers, and the trusted-peer + PIN transfer between
+SweK boxes -- and **every one of them assumes the other end is already equipped**: a torrent client, copyparty
+installed, or a box that has passed the trust gate. None covers "send this to a person who has a browser and
+nothing else". That gap is the only reason this bridge exists.
+
+It is orchestration only, the same shape as `comicTranslateBridge.js`: it spawns the published CLI and reads
+the room URL that CLI prints. Nothing is reimplemented.
+
+**The platform limit is reported first, because it lands on Keith.** pairlane's own README lists supported
+platforms as Linux (x86_64) and macOS -- **Windows is not on that list, and Keith's primary rig is Windows.**
+So `win32` is refused explicitly, quoting the README's platform list, rather than spawning an `npx` that fails
+with whatever npm says about a missing optional binary -- an error that would read like a bug in SweK. A build
+from source may work there; the README does not claim it and this box cannot test it, so it is offered as a
+possibility rather than asserted as a fact.
+
+**The room URL is a bearer secret.** Encryption is on by default and the key rides in the URL *fragment*,
+which is exactly what makes it end-to-end -- a fragment is never sent to the room server. The consequence is
+that anyone holding the URL can fetch the file while the send runs. So the routes are local-only behind
+`_isTrustedReq`, and the URL is never written to the shared debug log or the demo-chrome ticker, both of which
+fan out to every connected page.
+
+New gate `tools/ship/pairlaneBridge-selfcheck.mjs`, 33 checks, all pass: every refusal, the platform gate on
+all four branches (including `win32`, which cannot be reached by running the real thing on this Linux box),
+endpoint validation, the URL scanner driven against the README's own example line, and the local-only route
+ordering. Sabotage-verified: deleting the `_isTrustedReq` guard turns the security check red.
+
+**No real transfer was run here**, and that is stated plainly rather than implied -- it needs `npx`, a
+reachable room server, and a second endpoint, none of which exist in this container. One real run on a Linux
+or Mac box is what turns the contract into a fact. `bridgeCensus`: all pass.
 ## Since v4106 -- the docked avatar box never loaded, and now it does
 
 Keith asked directly, after v4105 shipped: "empty top-right box never loads. did you fix it in the new

@@ -469,6 +469,16 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
                     document.querySelectorAll("canvas").forEach(c => { if (c === stageCanvas) return; const a = (c.width || 0) * (c.height || 0); if (a > area) { area = a; best = c; } });
                     return best;
                 };
+                // v4107 -- *** `compact: true` LOOKS LIKE THE FIX FOR "STRETCH IT TO FILL THE BOX" AND MEASURES
+                // WORSE, SO IT IS NOT APPLIED. *** avatarStage.js's _compact branch is written for a wide strip
+                // and says so ("fill the actual (wide) canvas -- no cap"), and ui/dockedGauges.js -- the other
+                // dock mounting this same stage -- passes it. I tried it here for exactly that reason. Driven in
+                // headless Chromium against this real strip (278x56): width fill 78% -> 64% and the drawn-pixel
+                // count HALVED, 7107 -> 3351. compact tightens the gauge row (SPACING 0.62 vs 0.85) and frames
+                // that tighter group, so the camera pulls IN on a narrower scene and leaves MORE empty canvas,
+                // not less. The flag is right for dockedGauges' own layout and wrong for this one; it is left off
+                // here with the measurement recorded, so the next reader does not re-try it on the strength of
+                // the same reasonable-sounding argument.
                 _stage = mod.mountStage(stageCanvas, { url: av2.url, gauges: stageGauges, scene: settings.stageScene || "diorama", carrier: settings.stageCarrier || "boat", url2: settings.stageAvatar2 || "RobotWoman", accessories: settings.accessories, getScreenCanvas, selfQuip: true, pet: true });   // v1505 — pet:true brings the wandering llama into the docked/undocked stage, matching the phone view; v1529 — accessories: worn/held GLB props on head/hand/foot bones
                 if (!_stage || !_stage.ok) { stageWrap.remove(); if (settings.liveStamp) body.insertBefore(stamp, gaugesWrap); }
             } catch (e) { try { stageWrap.remove(); } catch {} }
@@ -658,11 +668,16 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
             position: "absolute", top: "4px", right: "4px", width: "20px", height: "20px", zIndex: "3",
             borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center",
             background: "rgba(6,10,18,0.55)", color: "#bfe6ff", fontSize: "12px", lineHeight: "1",
-            cursor: "pointer", border: "1px solid rgba(120,200,255,0.35)", opacity: "0", transition: "opacity .15s",
+            // v4107 -- Keith: "we would need the dock buttons too." The button was already HERE and already
+            // wired to cycleTier(); it was just opacity:0 until a mouseenter, so the only way to discover the
+            // view cycle was to hover a 20px corner of a 64px strip and notice something fade in. An affordance
+            // nobody can see is the same defect as a missing one -- it rests at 0.5 now and brightens to 1 on
+            // hover, so the control is visible without competing with the avatar it sits on top of.
+            cursor: "pointer", border: "1px solid rgba(120,200,255,0.35)", opacity: "0.5", transition: "opacity .15s",
         });
         stageHost.appendChild(dockBtn);
         stageHost.addEventListener("mouseenter", () => { if (dockBtn) dockBtn.style.opacity = "1"; if (_docked) stageWrap.style.boxShadow = "0 0 0 1px rgba(120,200,255,0.6), 0 6px 20px rgba(0,0,0,0.5)"; });
-        stageHost.addEventListener("mouseleave", () => { if (dockBtn) dockBtn.style.opacity = "0"; stageWrap.style.boxShadow = ""; });
+        stageHost.addEventListener("mouseleave", () => { if (dockBtn) dockBtn.style.opacity = "0.5"; stageWrap.style.boxShadow = ""; });
         stageHost.addEventListener("click", () => { if (_docked) setDocked(false); });
         dockBtn.addEventListener("click", (e) => { e.stopPropagation(); cycleTier(); });
     }

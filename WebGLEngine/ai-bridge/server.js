@@ -16297,6 +16297,27 @@ ${text.replace(/'/g, "''")}
         if (req.method === "POST" && cp === "/comic/launch") { sendJson(comicTranslateBridge.launch()); return; }
         if (req.method === "POST" && cp === "/comic/stop") { sendJson(comicTranslateBridge.stop()); return; }
     }
+    // v4107 — pairlane (kiyo-e/pairlane, MIT): browser-to-browser file transfer for somebody who has NOTHING
+    // installed, which is the one case webtorrent / copyparty / the trusted-peer path all miss.
+    //
+    // *** LOCAL-ONLY, AND THAT IS NOT BOILERPLATE HERE. *** These routes spawn a process AND publish a chosen
+    // file to anyone holding the room URL. That URL carries the decryption key in its fragment, so /pairlane/
+    // status returns a BEARER SECRET -- a LAN-reachable version of this route would hand every peer on the
+    // network the ability to start a send and read back the link for it.
+    //
+    // Lazily required, same discipline as sharpBridge: a tree missing the file still boots.
+    if (req.url.split("?")[0].startsWith("/pairlane/")) {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only" }, 403); return; }
+        const pp = req.url.split("?")[0];
+        const PB = () => require("./pairlaneBridge.js");
+        try {
+            if (req.method === "GET" && pp === "/pairlane/status") { sendJson(PB().status()); return; }
+            if (req.method === "POST" && pp === "/pairlane/send") { readJson(d => sendJson(PB().send((d || {}).file, d || {}))); return; }
+            if (req.method === "POST" && pp === "/pairlane/receive") { readJson(d => sendJson(PB().receive((d || {}).room, (d || {}).outputDir))); return; }
+            if (req.method === "POST" && pp === "/pairlane/stop") { readJson(d => sendJson(PB().stop((d || {}).id))); return; }
+            if (req.method === "POST" && pp === "/pairlane/config") { readJson(d => sendJson(PB().setConfig(d || {}))); return; }
+        } catch (e) { sendJson({ ok: false, error: "pairlane bridge unavailable: " + String(e && e.message || e) }); return; }
+    }
     if (req.method === "POST" && req.url === "/github/release") { readJson(d => githubBridge.createRelease(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/upload") { readJson(d => githubBridge.uploadAsset(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/publish") { readJson(d => githubBridge.publishVersion(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
