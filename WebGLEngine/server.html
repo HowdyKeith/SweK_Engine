@@ -806,6 +806,7 @@ window.addEventListener("load", function () {
             <a href="/wall.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🎛 Switchboard</a>
             <a href="/instrument-bench.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🔬 Instrument Bench</a>
             <a href="/raycast.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">🚀 Raycast Local LLM</a>
+            <a href="/pairlane.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">📦 Pairlane File Drop</a>
             <a href="/box3d-contacts.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">◆ Box3D Contacts</a>
             <a href="/curriculum.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#127891; Curriculum</a>
             <a href="/ssim-compare.html" target="_blank" rel="noopener" style="color:#9ab6e8;text-decoration:none;border:1px solid #1e3050;padding:2px 6px;border-radius:3px;font-size:11px;">&#128200; SSIM Compare</a>
@@ -935,7 +936,11 @@ window.addEventListener("load", function () {
              it -- the third time this project has caught me shipping a module nobody can reach (fitCanvas v2880,
              machine.mjs v2988). The bridge census I wrote LAST ROUND checks that a bridge is required and
              dispatched, and that is exactly the pair of facts that were already true here. -->
-        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; NearShare</span><span class="gtabState" id="nsStat"></span></button>
+        <!-- v4109 -- Keith: "so NearShare is an app, that button could rename to File Transfer Utils, and both
+             could be in there." Renamed the VISIBLE label only -- data-tab/data-panel stay "nearshare" so
+             every existing selector, the pageSections id, and the pages/placements JSON key keep pointing at
+             the same panel. pairlane.html joined this panel's page list in pageSections.mjs the same round. -->
+        <button class="gtab" data-tab="nearshare"><span class="gtabTog">&#9656;</span><span>&#128242; File Transfer Utils</span><span class="gtabState" id="nsStat"></span></button>
         <!-- v3020 -- the roundhouse had NO minipanel. Seventeen tabs on this page and the thing the engine is
              actually FOR was not one of them: everything built in v3016-v3019 landed on report.html, a separate
              page you have to go to. Keith asked where the button was, which is the right question. -->

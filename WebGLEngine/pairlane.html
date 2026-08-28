@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pairlane File Drop</title>
+<style>
+  :root { --bg:#0a0e14; --ink:#dde6f2; --dim:#8b97a8; --line:#1f2733; --accent:#7fd6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:15px; margin:0; color:var(--accent); font-weight:700; }
+  main { padding:14px 16px; display:flex; flex-direction:column; gap:12px; max-width:860px; }
+  .hint { font-size:11px; color:var(--dim); line-height:1.5; }
+  .card { border:1px solid var(--line); border-radius:8px; padding:12px; background:#0c1018; display:flex; flex-direction:column; gap:8px; }
+  .card h2 { margin:0; font-size:12px; color:#9bd6ff; text-transform:uppercase; letter-spacing:.08em; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input[type=text] { flex:1 1 260px; padding:7px 9px; background:#0c0f14; color:#e8eef8; border:1px solid #2a3340; border-radius:6px; font:12px ui-monospace,monospace; }
+  select { padding:6px 8px; background:#0c0f14; color:#e8eef8; border:1px solid #2a3340; border-radius:6px; font:11px ui-monospace,monospace; min-width:240px; }
+  label.chk { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--dim); cursor:pointer; }
+  button { padding:7px 13px; border-radius:6px; cursor:pointer; font:12px ui-monospace,monospace; border:1px solid #4a5a8a; background:#2a3a5a; color:#cfe; }
+  button.run { border-color:#3a6a4a; background:#153a25; color:#9fe88f; }
+  button:disabled { opacity:.45; cursor:default; }
+  .kv { display:grid; grid-template-columns:170px 1fr; gap:4px 12px; font-size:12px; }
+  .kv b { color:var(--dim); font-weight:400; }
+  .good { color:#9fe88f; } .bad { color:#f88; } .warn { color:#eac06a; }
+  pre { margin:0; padding:8px; background:#070a0f; border:1px solid var(--line); border-radius:6px; font-size:11px;
+        max-height:220px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  .secret { color:#eac06a; }
+</style>
+</head>
+<body>
+<header><h1>&#128230; Pairlane File Drop</h1><span class="hint">Browser-to-browser file transfer over WebRTC &mdash; no app, no account, on either end.</span></header>
+<main>
+
+  <div class="card">
+    <h2>This box</h2>
+    <div class="kv">
+      <b>platform</b> <span id="kPlat">checking&hellip;</span>
+      <b>endpoint</b> <span id="kEp"></span>
+      <b>repo</b> <span><a href="https://github.com/kiyo-e/pairlane" target="_blank" rel="noopener" style="color:#9fd5ff;">kiyo-e/pairlane</a> (MIT)</span>
+    </div>
+    <div class="hint" id="kNote"></div>
+  </div>
+
+  <div class="card" id="localCard">
+    <h2>Send a file (this box)</h2>
+    <div class="row">
+      <input type="text" id="sendFile" placeholder="path to a file on this box">
+      <label class="chk"><input type="checkbox" id="sendEncrypt" checked> encrypt (default)</label>
+      <button class="run" id="bSend">Send</button>
+    </div>
+    <h2 style="margin-top:6px">Receive a file</h2>
+    <div class="row">
+      <input type="text" id="recvRoom" placeholder="room URL or code (the sender's printed link)">
+      <input type="text" id="recvOut" placeholder="output directory">
+      <button class="run" id="bRecv">Receive</button>
+    </div>
+    <pre id="localOut" style="display:none;"></pre>
+  </div>
+
+  <div class="card" id="remoteCard" style="display:none;">
+    <h2>Remote &mdash; drive a Mac peer (middle man)</h2>
+    <div class="hint" id="gateWhy"></div>
+    <div class="row">
+      <select id="peerSel"></select>
+      <button id="bPeerRefresh" title="reload known peers (saved + discovered + external tunnels)">&#8635;</button>
+    </div>
+    <div class="row">
+      <input type="text" id="rSendFile" placeholder="path to a file ON THE PEER (not this box)">
+      <label class="chk"><input type="checkbox" id="rSendEncrypt" checked> encrypt</label>
+      <button class="run" id="rSend">Send (on peer)</button>
+    </div>
+    <div class="row">
+      <input type="text" id="rRecvRoom" placeholder="room URL or code">
+      <input type="text" id="rRecvOut" placeholder="output directory ON THE PEER">
+      <button class="run" id="rRecv">Receive (on peer)</button>
+    </div>
+    <div class="hint">This relays a whitelisted action to a KNOWN mesh peer's <code>/pairlane/peer-exec</code> &mdash;
+      the file path and output directory are resolved ON THAT MACHINE, not this one. Pair unknown peers first
+      (LAN discovery, or Hosting &rarr; external peer for a cloudflared URL).</div>
+    <pre id="relayOut" style="display:none;"></pre>
+  </div>
+
+</main>
+<script>
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function esc(x) { return String(x == null ? "" : x).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function j(url, opts) { return fetch(url, opts).then(function (r) { return r.json(); }).catch(function (e) { return { ok: false, error: e && e.message }; }); }
+
+  var supported = false;
+  function status() {
+    return j("/pairlane/status").then(function (s) {
+      supported = !!(s && s.supported);
+      $("kPlat").innerHTML = !s || !s.ok ? "<span class='bad'>bridge unreachable</span>"
+        : supported ? "<span class='good'>" + esc(s.platforms || "") + " (this box)</span>"
+                    : "<span class='warn'>not supported here</span> &mdash; " + esc(s.why || "");
+      $("kEp").textContent = (s && s.endpoint) || "";
+      $("kNote").textContent = (s && s.note) || "";
+      $("localCard").style.display = supported ? "" : "none";
+      $("remoteCard").style.display = supported ? "none" : "";
+      if (!supported) $("gateWhy").innerHTML = "This box cannot run pairlane directly: <span class='warn'>" + esc((s && s.why) || "") + "</span> Drive a Mac peer instead.";
+      return s;
+    });
+  }
+
+  // ---- local send/receive (this box, when it's Linux/macOS) ----
+  var localTimer = null;
+  function pollLocal(id, out) {
+    if (localTimer) clearInterval(localTimer);
+    localTimer = setInterval(function () {
+      j("/pairlane/status").then(function (s) {
+        var job = ((s && s.jobs) || []).find(function (x) { return x.id === id; });
+        if (!job) { clearInterval(localTimer); return; }
+        var lines = [job.kind + " job " + job.id + (job.done ? " -- exited " + job.code : " -- running " + Math.round(job.uptimeMs / 1000) + "s")];
+        if (job.url) lines.push("<span class='secret'>ROOM URL (bearer secret -- share only with the receiver): " + esc(job.url) + "</span>");
+        lines.push(esc(job.tail || ""));
+        out.innerHTML = lines.join("\n");
+        if (job.done) clearInterval(localTimer);
+      });
+    }, 1200);
+  }
+  $("bSend").onclick = function () {
+    var f = $("sendFile").value.trim(); var out = $("localOut"); out.style.display = "block";
+    if (!f) { out.textContent = "enter a file path first"; return; }
+    out.textContent = "starting…";
+    j("/pairlane/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ file: f, encrypt: $("sendEncrypt").checked }) })
+      .then(function (r) { if (!r || !r.ok) { out.textContent = "error: " + ((r && r.error) || "?"); return; } pollLocal(r.id, out); });
+  };
+  $("bRecv").onclick = function () {
+    var room = $("recvRoom").value.trim(), outDir = $("recvOut").value.trim(); var out = $("localOut"); out.style.display = "block";
+    if (!room || !outDir) { out.textContent = "enter a room and an output directory"; return; }
+    out.textContent = "starting…";
+    j("/pairlane/receive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ room: room, outputDir: outDir }) })
+      .then(function (r) { if (!r || !r.ok) { out.textContent = "error: " + ((r && r.error) || "?"); return; } pollLocal(r.id, out); });
+  };
+
+  // ---- remote relay (drive a Mac peer from this box) ----
+  function peerRefresh() {
+    var sel = $("peerSel"); sel.innerHTML = "";
+    var seen = {};
+    function add(url, name) { url = (url || "").replace(/\/+$/, ""); if (!url || seen[url]) return; seen[url] = 1; var o = document.createElement("option"); o.value = url; o.textContent = (name ? name + " — " : "") + url; sel.appendChild(o); }
+    j("/sync/peers").then(function (r) {
+      ((r && r.peers) || []).forEach(function (p) { add(p.url || p, p.name); });
+      return j("/hosting/tunnel-registry");
+    }).then(function (t) {
+      (((t && t.tunnels) || [])).forEach(function (p) { if (!p.self) add(p.tunnelUrl, p.peerName); });
+      if (!sel.options.length) { var o = document.createElement("option"); o.value = ""; o.textContent = "(no known peers — pair one first)"; sel.appendChild(o); }
+    });
+  }
+  var relayTimer = null;
+  function relay(action, body, btn) {
+    var peer = $("peerSel").value; var out = $("relayOut"); out.style.display = "block";
+    if (!peer) { out.textContent = "pick a peer first"; return; }
+    if (btn) btn.disabled = true;
+    out.textContent = "[relay] " + action + " -> " + peer + " …";
+    j("/pairlane/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(Object.assign({ peer: peer, action: action }, body || {})) })
+      .then(function (r) {
+        if (btn) btn.disabled = false;
+        if (!r || !r.ok) { out.textContent = "[relay] error: " + JSON.stringify(r); return; }
+        if (r.id) {
+          out.textContent = "[relay] job " + r.id + " started on " + peer + " — polling…";
+          if (relayTimer) clearInterval(relayTimer);
+          relayTimer = setInterval(function () {
+            j("/pairlane/relay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ peer: peer, action: "status" }) }).then(function (s) {
+              var job = s && s.ok && (s.jobs || []).find(function (x) { return x.id === r.id; });
+              if (!job) return;
+              var lines = [job.kind + " job " + job.id + (job.done ? " -- exited " + job.code : " -- running " + Math.round(job.uptimeMs / 1000) + "s")];
+              if (job.url) lines.push("<span class='secret'>ROOM URL (bearer secret): " + esc(job.url) + "</span>");
+              lines.push(esc(job.tail || ""));
+              out.innerHTML = lines.join("\n");
+              if (job.done) { clearInterval(relayTimer); relayTimer = null; }
+            });
+          }, 1500);
+        } else { out.textContent = "[relay] " + JSON.stringify(r); }
+      });
+  }
+  $("bPeerRefresh").onclick = peerRefresh;
+  $("rSend").onclick = function () {
+    var f = $("rSendFile").value.trim();
+    if (!f) { $("relayOut").style.display = "block"; $("relayOut").textContent = "enter a file path on the peer first"; return; }
+    relay("send", { file: f, encrypt: $("rSendEncrypt").checked }, $("rSend"));
+  };
+  $("rRecv").onclick = function () {
+    var room = $("rRecvRoom").value.trim(), outDir = $("rRecvOut").value.trim();
+    if (!room || !outDir) { $("relayOut").style.display = "block"; $("relayOut").textContent = "enter a room and an output directory on the peer"; return; }
+    relay("receive", { room: room, outputDir: outDir }, $("rRecv"));
+  };
+
+  status();
+  peerRefresh();
+})();
+</script>
+</body>
+</html>

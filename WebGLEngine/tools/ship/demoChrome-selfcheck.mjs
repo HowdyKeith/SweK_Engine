@@ -103,6 +103,31 @@ const b = await chromium.launch({ executablePath: HEADLESS_SHELL });
     ok("!! ...and the canvas element inside it inherits that same real height",
         info && info.canvasHeight > 0, "canvas=" + (info && info.canvasHeight) + "px");
     ok("no uncaught page errors while mounting", pageErrors.length === 0, pageErrors.join(" | ").slice(0, 200));
+
+    // *** v4109 -- WIDTH FILL, MEASURED IN ACTUAL DRAWN PIXELS, NOT INFERRED FROM THE HEIGHT NUMBER. *** Keith:
+    // "taller dock but not too taller, and spreading the scene wider." The obvious lever (avatarStage's
+    // compact:true) was tried at v4107 and MEASURED WORSE -- width fill 78% -> 64%. This round found that
+    // raising the docked height alone spreads the scene wider too, because halfH in camera()'s non-compact
+    // diorama branch is a fixed constant while halfW is already pulled wide by the llama's forced roam range --
+    // a short box was vertically constrained with width to spare. Read back with gl.readPixels rather than
+    // trusting the CSS height number, because a taller CSS box proves nothing about how much of it the SCENE
+    // actually draws into.
+    const fill = await page.evaluate(() => {
+        const dc = document.getElementById("demoChrome");
+        const c = dc.children[1].children[1].querySelector("canvas");
+        const gl = c.getContext("webgl2") || c.getContext("webgl");
+        if (!gl) return null;
+        const w = c.width, h = c.height;
+        const px = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        let minX = w, maxX = -1;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (px[(y * w + x) * 4 + 3] > 10) { if (x < minX) minX = x; if (x > maxX) maxX = x; } }
+        return { w, h, widthFillPct: maxX < 0 ? 0 : Math.round(((maxX - minX + 1) / w) * 100) };
+    });
+    ok("!! *** the docked canvas fills a REAL majority of its width, measured in drawn pixels ***",
+        !!fill && fill.widthFillPct >= 85,
+        JSON.stringify(fill) + " -- v4106's original fix (canvas height 0px) measured 0%; the pre-v4109 64px " +
+        "dock measured 78%; this asserts the v4109 96px height actually delivers the improvement it claims");
     await page.close();
 }
 

@@ -161,5 +161,90 @@ console.log("pairlaneBridge-selfcheck -- who may start a transfer, and who may r
         "both fan out to every connected page, which would defeat the local-only route one line above");
 }
 
+// ---- 7. THE MAC-PEER RELAY, SAME SHAPE raycastBridge's ALREADY EARNED, DRIVEN ON SOURCE ---------------------
+//
+// v4109 -- Keith: "can we call a mac peer to start the pairlane bridge, like we do with other mac services?"
+// pairlane refuses on win32 (section 1), so on Keith's Windows rig THAT is the end of the road without a relay.
+// raycastBridge's /raycast/relay + /raycast/peer-exec is the SAME SHAPE this need already has an answer for
+// (Raycast is also darwin-only and the PC drives it through a known mesh peer) -- reused rather than reinvented.
+// A live two-box relay cannot be driven from one container with no peer to call; what CAN be driven, and is,
+// is the two-tier trust split that makes the relay safe: peer-exec must accept BOTH a trusted caller and a
+// known mesh peer (the relay itself, calling FROM the PC, is recognised on the Mac side that way), while relay
+// itself must stay trusted-only (this box's owner decides who gets driven) and must verify the target peer
+// against the KNOWN mesh before forwarding anything -- an unpaired URL must never be dialled.
+{
+    console.log("\n7. *** THE MAC-PEER RELAY: TWO TRUST LEVELS, AND NEITHER COLLAPSES INTO THE OTHER ***");
+    const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
+    const peerExecBlock = (server.match(/req\.url === "\/pairlane\/peer-exec"\)[\s\S]{0,500}/) || [""])[0];
+    const relayBlock = (server.match(/req\.url === "\/pairlane\/relay"\)[\s\S]{0,1100}/) || [""])[0];
+
+    ok("!! /pairlane/peer-exec is dispatched", peerExecBlock.length > 0);
+    ok("!! *** ...and accepts a trusted caller OR a KNOWN MESH PEER, not trusted-only ***",
+        /!_isTrustedReq\(req\) && !_knownPeerReq\(req\)/.test(peerExecBlock),
+        "trusted-only here would refuse the relay's own forwarded request -- the PC calling FROM its own IP, " +
+        "which the Mac only recognises via _knownPeerReq, not _isTrustedReq (that only ever answers for the " +
+        "box's own owner)");
+
+    ok("!! /pairlane/relay is dispatched", relayBlock.length > 0);
+    ok("!! *** ...and relay is TRUSTED-ONLY -- unlike peer-exec, a known peer may NOT ask THIS box to relay ***",
+        /if \(!_isTrustedReq\(req\)\) \{ sendJson\(\{ ok: false, error: "local only" \}, 403\); return; \}/.test(relayBlock),
+        "relay is the box's own owner choosing which peer gets driven; a peer that could trigger it too would " +
+        "let ANY paired box use this one as a launchpad against a THIRD box");
+    ok("!! ...and the target peer is checked against the KNOWN MESH before anything is forwarded",
+        /known\.has\(peer\)/.test(relayBlock) && /not in the known mesh/.test(relayBlock),
+        "an unpaired URL typed into the peer field must never be dialled -- that would make this box an open " +
+        "relay to anywhere on the internet, not just the LAN mesh it is meant for");
+    ok("!! ...and the peer field itself is stripped before forwarding, not passed through as an action arg",
+        /delete body\.peer/.test(relayBlock),
+        "the receiving peer's OWN action dispatcher should never see who relayed the call as if it were part of " +
+        "the request payload");
+
+    // The whitelist dispatcher itself: same shape as _rayPeerAction, five named actions and a named refusal.
+    const dispatch = (server.match(/async function _pairlanePeerAction\([\s\S]{0,900}?\n    \}/) || [""])[0];
+    ok("!! *** the dispatcher is a WHITELIST with a named default, not an eval of the action string ***",
+        /case "status":/.test(dispatch) && /case "send":/.test(dispatch) && /case "receive":/.test(dispatch) &&
+        /case "stop":/.test(dispatch) && /case "config":/.test(dispatch) && /default: return \{ ok: false, error: "unknown action"/.test(dispatch),
+        "an unrecognised action is refused BY NAME, listing what IS allowed -- the same shape _rayPeerAction " +
+        "already uses, so a caller that gets it wrong can see why");
+    ok("...and every branch calls into the SAME pairlaneBridge functions the local routes call -- no second copy",
+        /P\.status\(\)/.test(dispatch) && /P\.send\(/.test(dispatch) && /P\.receive\(/.test(dispatch) &&
+        /P\.stop\(/.test(dispatch) && /P\.setConfig\(/.test(dispatch));
+}
+
+// ---- 8. THE PAGE: A REAL HOME, THE MAC SYSTEM VIEW, AND THE RENAMED FILE-TRANSFER PANEL ----------------------
+{
+    console.log("\n8. *** pairlane.html IS REACHABLE FROM WHERE A READER WOULD ACTUALLY LOOK ***");
+    ok("!! pairlane.html exists", fs.existsSync(path.join(ENG, "pairlane.html")));
+    const page = fs.readFileSync(path.join(ENG, "pairlane.html"), "utf8");
+    const opens = (page.match(/<div\b/g) || []).length, closes = (page.match(/<\/div>/g) || []).length;
+    ok("!! its <div> tags balance", opens === closes && opens > 0, opens + " open, " + closes + " close");
+    ok("!! it has a local card AND a remote (Mac-peer) card -- one page, both paths",
+        /id="localCard"/.test(page) && /id="remoteCard"/.test(page));
+    ok("!! the remote card is hidden by DEFAULT and shown only once status() says this box is unsupported",
+        /remoteCard[\s\S]{0,40}display:\s*none/.test(page) && /remoteCard.*\.style\.display = supported \? "none" : ""/.test(page.replace(/\s+/g, " ")),
+        "a Linux/Mac box that can already run pairlane directly should not be steered at a peer it does not need");
+    ok("!! the room URL is flagged as a secret in the page too, not just in the bridge's status() note",
+        /class=.secret./.test(page) && /BEARER SECRET/i.test(page));
+
+    const placements = fs.readFileSync(path.join(ENG, "tools", "ship", "pagePlacements.mjs"), "utf8");
+    ok("!! pairlane.html is listed in macPages() -- Keith: \"pairlane would show in the Mac System panel\"",
+        /file: "pairlane\.html",\s*why: "[^"]*Mac peer/.test(placements));
+
+    const sections = fs.readFileSync(path.join(ENG, "tools", "ship", "pageSections.mjs"), "utf8");
+    const nearshareBlock = (sections.match(/id: "nearshare"[\s\S]{0,900}?pages: \[[^\]]*\]/) || [""])[0];
+    ok("!! pairlane.html joined the (renamed) File Transfer Utils panel's page list too",
+        /"pairlane\.html"/.test(nearshareBlock), nearshareBlock.slice(0, 160));
+    ok("!! *** the panel's label is RENAMED to what Keith actually asked for, id/tab left untouched ***",
+        /label: "File Transfer Utils"/.test(nearshareBlock) && /id: "nearshare", tab: "nearshare"/.test(nearshareBlock),
+        "renaming the internal id too would touch every existing data-tab/data-panel selector for no reason " +
+        "the request asked for -- the visible label is what changed");
+
+    const serverHtml = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+    ok("!! the server.html tab button shows the renamed label, not the old one",
+        /data-tab="nearshare">[\s\S]{0,80}File Transfer Utils/.test(serverHtml) && !/data-tab="nearshare">[\s\S]{0,80}>\s*NearShare</.test(serverHtml));
+    ok("!! ...and pairlane.html is also a direct link where the other Mac-System tools already are",
+        /href="\/pairlane\.html"/.test(serverHtml));
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

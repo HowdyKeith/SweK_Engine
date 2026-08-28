@@ -16306,10 +16306,53 @@ ${text.replace(/'/g, "''")}
     // network the ability to start a send and read back the link for it.
     //
     // Lazily required, same discipline as sharpBridge: a tree missing the file still boots.
+    //
+    // v4109 — Keith: "can we call a mac peer to start the pairlane bridge, like we do with other mac services?"
+    // pairlane refuses on win32 (its own README lists Linux/macOS only), and Keith's primary rig is win32 --
+    // so on that box THIS FAR is the end of the road without a relay. raycastBridge's /raycast/relay +
+    // /raycast/peer-exec is the SAME SHAPE this need already has an answer for (Raycast is also darwin-only
+    // and the PC drives it through a known mesh peer), so it is reused rather than reinvented: a PC-side
+    // /pairlane/relay forwards a whitelisted action to a KNOWN peer's /pairlane/peer-exec, which runs it
+    // locally there and returns the result. Two different trust levels on purpose, same split raycast draws:
+    // relay is _isTrustedReq ONLY (this box's own owner decides who gets driven), peer-exec accepts a trusted
+    // caller OR a KNOWN MESH PEER (so the relay itself, calling FROM the PC, is recognised on the Mac side).
+    const PB = () => require("./pairlaneBridge.js");
+    async function _pairlanePeerAction(action, d) {
+        const P = PB();
+        switch (action) {
+            case "status":  return P.status();
+            case "send":    return P.send((d && d.file) || "", { encrypt: !d || d.encrypt !== false });
+            case "receive": return P.receive((d && d.room) || "", (d && d.outputDir) || "");
+            case "stop":    return P.stop((d && d.id) || "");
+            case "config":  return P.setConfig(d || {});
+            default: return { ok: false, error: "unknown action", allow: ["status", "send", "receive", "stop", "config"] };
+        }
+    }
+    if (req.method === "POST" && req.url === "/pairlane/peer-exec") {
+        if (!_isTrustedReq(req) && !_knownPeerReq(req)) { sendJson({ ok: false, error: "trusted or known mesh peer only" }, 403); return; }
+        readJson((d) => { _pairlanePeerAction(String((d && d.action) || ""), d).then(sendJson).catch(e => sendJson({ ok: false, error: String((e && e.message) || e) }, 500)); });
+        return;
+    }
+    if (req.method === "POST" && req.url === "/pairlane/relay") {
+        if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only" }, 403); return; }
+        readJson((d) => {
+            (async () => {
+                const peer = String((d && d.peer) || "").replace(/\/+$/, "");
+                const known = new Set();
+                try { for (const u of assetSync.loadPeers()) known.add(String(u).replace(/\/+$/, "")); } catch {}
+                try { for (const dd of assetDiscovery.discovered()) if (dd && dd.url) known.add(String(dd.url).replace(/\/+$/, "")); } catch {}
+                try { for (const u of tunnelRegistry.aliveUrls()) known.add(String(u).replace(/\/+$/, "")); } catch {}
+                if (!known.has(peer)) { sendJson({ ok: false, error: "peer not in the known mesh (pair it first — LAN discovery or /net/peer/external)", knownCount: known.size }); return; }
+                const body = Object.assign({}, d || {}); delete body.peer;
+                const r = await _peerJSON(peer, "/pairlane/peer-exec", "POST", body, 15000);
+                sendJson(r || { ok: false, error: "peer did not answer" });
+            })().catch(e => sendJson({ ok: false, error: String((e && e.message) || e) }, 500));
+        });
+        return;
+    }
     if (req.url.split("?")[0].startsWith("/pairlane/")) {
         if (!_isTrustedReq(req)) { sendJson({ ok: false, error: "local only" }, 403); return; }
         const pp = req.url.split("?")[0];
-        const PB = () => require("./pairlaneBridge.js");
         try {
             if (req.method === "GET" && pp === "/pairlane/status") { sendJson(PB().status()); return; }
             if (req.method === "POST" && pp === "/pairlane/send") { readJson(d => sendJson(PB().send((d || {}).file, d || {}))); return; }

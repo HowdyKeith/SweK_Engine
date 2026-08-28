@@ -298,8 +298,18 @@ export const SECTIONS = [
               // reimplements would put the two halves of one claim behind different chips.
               "mpm-gpu.html", "mpm-gpu-check.html"] },
     // v3434 -- "Cross-Arch" merged into Box3D above.
-    { id: "nearshare", tab: "nearshare", label: "NearShare", note: "appended",
-      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html"] },
+    // v4109 -- label renamed to "File Transfer Utils" (id/tab stay "nearshare" -- see server.html's tab button
+    // for why). Keith: "NearShare is an app, that button could rename to File Transfer Utils, and both could
+    // be in there" -- referring to pairlane.html, added to pages[] below in the same round.
+    { id: "nearshare", tab: "nearshare", label: "File Transfer Utils", note: "appended",
+      // v4109 -- pairlane.html JOINS. Keith: "pairlane should also show up under a File Transfer panel. or a
+      // more general panel too, but i dont know which." There is no dedicated File Transfer panel -- this one's
+      // own header text is narrower than its real membership (Quick Share / Nearby Sharing specifically), but
+      // its PAGES are already the LAN-peer/transfer cluster (android-invite, remote-desktop, lan, sync-probe),
+      // which is the closer match than any topic drawer. A dedicated panel is a bigger reorg (regrouping
+      // webtorrent/copyparty/the trusted-peer transfer too) that nobody has asked for yet; this is the minimal,
+      // honest placement today.
+      pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 

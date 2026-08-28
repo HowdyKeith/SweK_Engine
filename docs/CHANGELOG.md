@@ -8,6 +8,68 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4109 -- the dock's fill, and a Mac-peer relay for Pairlane
+
+Four related requests, landing together.
+
+### The dock's fill: one lever, not two
+
+Keith: "taller dock but not too taller, and spreading the scene wider."
+
+Both requests turned out to be a single lever. `avatarStage.js`'s camera framing for this scene fixes `halfH`
+(the vertical half-extent) at a constant 0.92 regardless of aspect ratio, while `halfW` (horizontal) is already
+pulled wide by the wandering llama's forced roam range. The result: a short, wide dock was constrained
+vertically, with horizontal room the fixed-height frame never used.
+
+Measured across five real heights on the actual page, rather than guessed: 64px -> 78% width fill, 76px -> 84%,
+84px -> 88%, 96px -> 94%, 112px -> 100% (but that last one is a 75% height increase -- the "too much taller"
+this was explicitly asked to avoid). Landed on 96px: a 50% increase, and not an invented number -- it's what
+`applyHead()` already uses two branches below for its own larger-dock tier -- reaching 94% fill, close enough
+that the remaining gap no longer reads as letterboxing. No camera code was touched; both asks were answered by
+the height alone.
+
+New assertion in `demoChrome-selfcheck.mjs` reads back the actual drawn pixels via `gl.readPixels` rather than
+trusting the CSS height number, so a future change that claims to help but doesn't (the way `compact: true`
+did at v4107) gets caught the same way.
+
+### A Mac-peer relay for Pairlane
+
+Keith: "can we call a mac peer to start the pairlane bridge, like we do with other mac services?"
+
+pairlane's CLI is Linux/macOS only (v4107), so on a Windows box that was the end of the road without a way to
+hand the job to a peer that can run it. `raycastBridge.js`'s `/raycast/relay` + `/raycast/peer-exec` is the
+same shape this need already has a working answer for -- Raycast is also darwin-only, and the PC already
+drives it through a known mesh peer -- so it's reused rather than reinvented.
+
+Two trust levels, deliberately not collapsed into one: `/pairlane/relay` is trusted-only (this box's own owner
+decides which peer gets driven, and the target peer is checked against the known mesh before anything is
+forwarded -- an unpaired URL is never dialled), while `/pairlane/peer-exec` accepts a trusted caller *or* a
+known mesh peer, so the relay's own forwarded request -- arriving from the PC's IP -- is recognized on the
+receiving Mac.
+
+New page `pairlane.html`: a local card (works directly when this box can run pairlane itself) and a remote
+card (relays to a chosen peer, shown only once `status()` says this box can't run it directly). The room URL
+is flagged as a bearer secret in the page's own UI, not just in the bridge's `status()` note.
+
+### Placement
+
+- `pairlane.html` joined `macPages()` in `pagePlacements.mjs`, so it shows in server.html's Mac System panel --
+  Keith: "pairlane would show in the Mac System panel on Server.html."
+- Keith: "pairlane should also show up under a File Transfer panel. or a more general panel too, but i dont
+  know which." -- then, on seeing NearShare's actual page membership: "so NearShare is an app, that button
+  could rename to File Transfer Utils, and both could be in there." NearShare's page list was already the
+  LAN-peer/transfer cluster (android-invite, remote-desktop, lan, sync-probe) even though its own header text
+  describes one narrower bridge. `pairlane.html` joined that list, and the tab's *visible* label renamed to
+  "File Transfer Utils" -- `id`/`tab`/`data-tab`/`data-panel` all stayed `"nearshare"`, so no existing selector
+  needed touching.
+
+### Verification
+
+New sections in `pairlaneBridge-selfcheck.mjs` cover the relay/peer-exec trust split, the whitelist action
+dispatcher, the page's two-card structure, both placements, and the rename -- 46 checks total, all pass. Also
+run clean: `demoChrome-selfcheck`, `bridgeCensus`, `pageSections-selfcheck`. One pre-existing
+`pagePlacements-selfcheck` failure was confirmed unrelated to this round by reverting these changes and
+reproducing the same failure on the untouched tree.
 ## Since v4108 -- the model was never being asked a question, and v4105's fix made it worse
 
 Keith, on the real page, on `onnx-community/Qwen2.5-0.5B-Instruct`, typing "what is 4+2?":

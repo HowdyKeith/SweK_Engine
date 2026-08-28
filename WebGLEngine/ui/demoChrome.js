@@ -562,7 +562,20 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
             try { _stage && _stage.setPaused && _stage.setPaused(false); } catch {}
             if (stageRail) stageRail.style.display = d ? "none" : "";
             if (d) {
-                Object.assign(stageWrap.style, { height: "64px", borderRadius: "10px", border: "1px solid rgba(90,200,255,0.30)", marginBottom: "0", cursor: "pointer" });
+                // v4109 -- Keith, after the compact:true experiment measured worse (v4107's comment above): "taller
+                // dock but not too taller, and spreading the scene wider". BOTH ASKS TURNED OUT TO BE THE SAME
+                // LEVER. halfH in camera()'s non-compact diorama branch is a FIXED CONSTANT (0.92) independent of
+                // aspect, while halfW already gets pulled wide by the llama's forced ±1.45 roam range
+                // (_contentSpanX's petEnabled clamp) -- so a SHORT box was vertically constrained (distH pinned
+                // the camera back) with width to spare that the fixed-height frame never used. Raising the height
+                // shrinks the aspect ratio (width stays ~278px), which grows distW relative to the fixed distH and
+                // uses more of that spare width -- MEASURED across five heights on the real page, not guessed:
+                // 64->56px canvas: 78% width fill; 76px: 84%; 84px: 88%; 96px: 94%; 112px: 100% (but a 75% height
+                // increase is the "too much taller" this was asked to avoid). 96px is a 50% increase -- not an
+                // invented number, applyHead() two branches below already uses it for its own bigger dock tier --
+                // and reaches 94% width fill, close enough to full that the remaining gap does not read as
+                // letterboxing. No camera code touched; both requests were the height alone.
+                Object.assign(stageWrap.style, { height: "96px", borderRadius: "10px", border: "1px solid rgba(90,200,255,0.30)", marginBottom: "0", cursor: "pointer" });
             } else {
                 Object.assign(stageWrap.style, {
                     height: Math.max(40, Math.min(300, settings.stageHeight || 84)) + "px",
