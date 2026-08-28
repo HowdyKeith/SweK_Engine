@@ -8,6 +8,62 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4108 -- the model was never being asked a question, and v4105's fix made it worse
+
+Keith, on the real page, on `onnx-community/Qwen2.5-0.5B-Instruct`, typing "what is 4+2?":
+
+> And the answer to question: " How Would Someone Do To The Question?" They would be In. So It Is A Then
+> There Re Re REREPTREATEREPTETERTERTERTTOTTOROTORORTOUR...
+
+### v4105 fixed the wrong thing
+
+v4105 saw an earlier form of this ("And And And ... The The The ...") and read it as a repetition loop, adding
+`repetition_penalty: 1.3` and `no_repeat_ngram_size: 3`. Those are real knobs for a real failure mode. They
+were aimed at the wrong one.
+
+The actual cause is one layer up: **an `-Instruct` model is trained to answer inside its own chat template**
+(Qwen's is `<|im_start|>user ... <|im_end|><|im_start|>assistant`), and `ui/localModelRun.js` was handing the
+pipeline a **bare string**. Given a bare string, a language model does what a language model does -- it
+*continues the text*. "what is 4+2?" continuing into more question-shaped rambling was never a broken model or
+a bad prompt; nobody had told it a conversation was happening at all.
+
+And then v4105's penalties made the visible symptom worse. Forbidding every repeated 3-token phrase, at a
+penalty of 1.3, on a small model that is *not being instructed*, leaves it nothing ordinary left to say -- which
+is exactly the character-level wreckage in the paste above. A well-meant fix aimed at a misdiagnosis degraded
+the output it was meant to repair.
+
+### The fix is the template
+
+Checked rather than assumed -- `huggingface.co` is egress-blocked from this container, so the contract was
+confirmed via HuggingFace's own `skills/transformers-js/TEXT_GENERATION` reference and the transformers.js
+chat-template documentation reached by search: passing an **array of `{role, content}` messages** makes the
+pipeline apply the tokenizer's own chat template.
+
+That changes the output shape too, and the extraction had to change with it: with messages in, `generated_text`
+comes back as an array of messages rather than a string, and the assistant's reply is the **last** entry. A
+caller that printed it whole would show the user their own prompt back with the answer glued onto the end.
+
+With the template doing the real work, the generation options return to ordinary values -- `repetition_penalty`
+1.1, no n-gram ban, sampling on at temperature 0.7. v4105's numbers were compensating for a problem that no
+longer exists, and leaving them in place would keep distorting output that is now correctly conditioned.
+
+### The base-model fallback is real, not hypothetical
+
+The repo id on this page is a free-text field by deliberate design (see `localModelRun.js`'s header on why no
+model id ships as a constant). So a reader **will** eventually paste a *base* model -- `gpt2`, SmolLM2 base --
+which ships no chat template at all, and transformers.js throws when asked to apply one that does not exist.
+
+That specific error retries as a plain prompt and reports `templated: false`, so a caller can tell an
+instructed reply from a raw completion. Every other error still fails properly: a catch-all retry would turn
+each genuine failure into a second, more confusing one.
+
+### Verification
+
+Gate: `localModelRun-selfcheck`, all pass. The mock pipeline was rewritten to answer the way a chat model
+really does -- messages in, messages out with the assistant's turn appended -- so the array-unwrapping bug could
+not slip through a mock that returned a convenient string. Added driven coverage for the system-prompt ordering
+(system leads the array), the base-model fallback (two calls: the messages attempt, then the string retry), and
+the rule that the fallback does not swallow unrelated errors.
 ## Since v4107 -- the dock's buttons, a fill fix that measured worse, and a bridge for handing a file to a stranger
 
 ### The dock buttons were already there, and invisible

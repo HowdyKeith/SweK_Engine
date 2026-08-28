@@ -154,10 +154,13 @@ console.log("\n6. *** THE STATE MACHINE, AND THE ORDER THAT KEEPS THE GIGABYTE B
 {
     const order = [];
     const fake200 = async () => { order.push("preflight"); return { ok: true, status: 200, json: async () => ({ model_type: "x" }) }; };
-    let genArgs = null;
+    let genArgs = null, genInput = null;
     const importer = async () => {
         order.push("import");
-        return { pipeline: async (task, repo, opts) => { if (opts.progress_callback) opts.progress_callback({ file: "w.onnx", loaded: 1, total: 2 }); return async (prompt, genOpts) => { genArgs = genOpts; return [{ generated_text: "hello" }]; }; } };
+        // v4108 -- the mock now answers the way a CHAT model really does: messages in, messages out, with the
+        // assistant's turn appended. A mock that returned a bare string would have let the array-unwrapping bug
+        // through, which is the whole point of driving this rather than reading the diff.
+        return { pipeline: async (task, repo, opts) => { if (opts.progress_callback) opts.progress_callback({ file: "w.onnx", loaded: 1, total: 2 }); return async (input, genOpts) => { genArgs = genOpts; genInput = input; return [{ generated_text: [...input, { role: "assistant", content: "hello" }] }]; }; } };
     };
     const r = createRunner({ importer, fetchImpl: fake200 });
     const seen = [];
@@ -171,15 +174,77 @@ console.log("\n6. *** THE STATE MACHINE, AND THE ORDER THAT KEEPS THE GIGABYTE B
         "before finding out the id was mistyped");
     ok("!! ...and every state passed through is a declared one", seen.every((s) => RUN_STATES.includes(s)));
     const gen = await r.generate("hi");
-    ok("!! generate returns the text", gen.ok === true && gen.text === "hello");
-    // v4105 -- Keith, on the real page, with the CLEAN prompt "what is 3 + 3?": the reply degenerated into
-    // "And And And ... The The The ...". Greedy decoding (the pipeline's default with no sampling options) has
-    // no penalty for repeating a token, and a 360M/0.5B quantised model falls into that loop easily. Driven
-    // here rather than trusted from the diff: the mock pipe() CAPTURES what generate() actually sent it.
-    ok("!! *** generate() asks for a repetition penalty, so a small quantised model cannot loop forever ***",
-        !!genArgs && genArgs.repetition_penalty > 1, JSON.stringify(genArgs));
-    ok("!! ...and forbids repeating any 3-token phrase, the second half of the same fix",
-        !!genArgs && genArgs.no_repeat_ngram_size === 3, JSON.stringify(genArgs));
+    // v4108 -- *** THE ROOT CAUSE v4105 MISSED: AN -Instruct MODEL FED A RAW STRING NEVER SEES ITS CHAT
+    // TEMPLATE, SO IT CONTINUES THE TEXT INSTEAD OF ANSWERING. *** Keith, on Qwen2.5-0.5B-Instruct: "what is
+    // 4+2?" came back as more question-shaped rambling and then character wreckage. v4105 read the earlier
+    // "And And And" form of that as a repetition loop and reached for repetition_penalty -- a real knob for a
+    // real failure mode, aimed at the wrong one. Driven here rather than argued: the mock CAPTURES what
+    // generate() actually passes, so "it sends messages, not a string" is a measurement.
+    ok("!! *** generate() sends a MESSAGES ARRAY, which is what makes the pipeline apply the chat template ***",
+        Array.isArray(genInput) && genInput.length === 1 && genInput[0].role === "user" && genInput[0].content === "hi",
+        JSON.stringify(genInput));
+    ok("!! *** ...and the reply is the LAST message's content, not the whole transcript ***",
+        gen.ok === true && gen.text === "hello",
+        "messages in -> messages out: printing generated_text whole would show the user their own prompt back " +
+        "with the answer glued on. Got: " + JSON.stringify(gen.text));
+    ok("...and the reply reports that a template was applied, so a caller can tell the two paths apart",
+        gen.templated === true);
+    // The penalties come BACK DOWN now that the template does the real work. v4105's 1.3 + a total ban on any
+    // repeated 3-token phrase were compensating for a problem that no longer exists, and left in place they
+    // would keep distorting output that is now correctly conditioned -- which is what produced the character
+    // wreckage in Keith's last paste.
+    ok("!! a mild repetition penalty remains, but not v4105's aggressive one",
+        !!genArgs && genArgs.repetition_penalty > 1 && genArgs.repetition_penalty <= 1.15, JSON.stringify(genArgs));
+    ok("!! *** and the total 3-gram ban is GONE -- it is what turned rambling into character wreckage ***",
+        !!genArgs && genArgs.no_repeat_ngram_size === undefined,
+        "forbidding every repeated 3-token phrase on a small model that is not even being instructed leaves it " +
+        "nothing ordinary to say: " + JSON.stringify(genArgs));
+    ok("...and sampling is on with a real temperature, rather than silent greedy decoding",
+        !!genArgs && genArgs.do_sample === true && genArgs.temperature > 0);
+
+    // A SYSTEM PROMPT, WHEN GIVEN, LEADS THE ARRAY -- the one ordering the template cares about.
+    {
+        const g2 = await r.generate("hi", { system: "be terse" });
+        ok("!! a system prompt is sent as the FIRST message, before the user turn",
+            g2.ok === true && genInput.length === 2 && genInput[0].role === "system" &&
+            genInput[0].content === "be terse" && genInput[1].role === "user",
+            JSON.stringify(genInput));
+    }
+
+    // *** THE BASE-MODEL FALLBACK, DRIVEN. *** The repo id is a free-text field by design, so a reader WILL
+    // eventually paste a base model (gpt2, SmolLM2 base) that ships no chat template. transformers.js throws
+    // when asked to apply one that does not exist; refusing there would break models that work fine.
+    {
+        let sawInput = null, calls = 0;
+        const baseImporter = async () => ({
+            pipeline: async () => async (input, o) => {
+                calls++;
+                if (Array.isArray(input)) throw new Error("Chat template not found in tokenizer_config");
+                sawInput = input;
+                return [{ generated_text: "plain completion" }];
+            },
+        });
+        const rb = createRunner({ importer: baseImporter, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
+        await rb.load("owner/base-model");
+        const g = await rb.generate("once upon a time");
+        ok("!! *** a model with NO chat template falls back to the plain prompt instead of failing ***",
+            g.ok === true && g.text === "plain completion" && sawInput === "once upon a time",
+            "calls: " + calls + " (messages attempt, then the string retry)");
+        ok("!! ...and it REPORTS that no template was applied, rather than quietly looking the same",
+            g.templated === false,
+            "a caller that cannot tell an instructed reply from a raw completion cannot explain a bad one");
+    }
+
+    // A REAL failure must still fail -- the fallback catches template errors ONLY, not everything.
+    {
+        const boomImporter = async () => ({ pipeline: async () => async () => { throw new Error("out of memory"); } });
+        const rx = createRunner({ importer: boomImporter, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
+        await rx.load("owner/m");
+        const g = await rx.generate("hi");
+        ok("!! *** the fallback does NOT swallow unrelated errors -- only a missing template retries ***",
+            g.ok === false && /out of memory/i.test(g.error || ""),
+            "a catch-all retry would turn every real failure into a second confusing failure: " + (g.error || ""));
+    }
 
     // A BAD REPO NEVER REACHES THE IMPORT.
     const order2 = [];
