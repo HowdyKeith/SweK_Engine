@@ -206,7 +206,10 @@ export const SECTIONS = [
       // cost on screen before any button works.
       // v4118 -- webrtx.html JOINS, same rule again: it answers what THIS BOX can do (is there a secure origin,
       // is there WebGPU, will an acceleration structure build) rather than showing a phenomenon.
-      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html",
+      // v4124 -- galaxy-profile.html JOINS, filed beside webrtx.html and voxtral.html for the same reason: it is
+      // an opt-in front door to somebody else's work (vinimlo/galaxy-profile, GPL-3.0), installed and run on
+      // this machine rather than vendored into the tree, with the licence and attribution surfaced on the page.
+      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html", "galaxy-profile.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this

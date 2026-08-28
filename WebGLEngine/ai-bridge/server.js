@@ -16452,6 +16452,31 @@ ${text.replace(/'/g, "''")}
         }).catch((e) => { res.writeHead(500); res.end(String(e && e.message || e)); });
         return;
     }
+    // --- galaxy-profile: install button for vinimlo/galaxy-profile (GPL-3.0), never vendored ---------
+    // v4124 -- Keith: is it allowed to not vendor a repo but offer to install and run it for the user? Yes, the
+    // same reasoning voxtral's engine and webrtx's build already use: cloning a PUBLIC repo onto the user's OWN
+    // machine and running it as its own process is not distributing it. Pinned to a reviewed commit (see the
+    // bridge's own header) rather than trusting `main` to stay what it was read as. Same fire-and-poll shape as
+    // /sharp/install and /voxtral/install for the clone+venv+pip job; /galaxy/generate is bounded (a couple of
+    // GitHub API calls) so it is awaited directly and the 4 SVGs travel in the one response body.
+    if (req.url.split("?")[0] === "/galaxy/status" && req.method === "GET") {
+        try { require("./galaxyProfileBridge.js").status().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+        catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/galaxy/install" && req.method === "POST") {
+        try { sendJson(require("./galaxyProfileBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/galaxy/generate" && req.method === "POST") {
+        readJson(d => {
+            try { require("./galaxyProfileBridge.js").generate(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
+            catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
     // v1640 — GitHub-as-peer: monitored repos shown in the Server-Mode peer panel with their latest version.
     if (req.method === "GET" && req.url.split("?")[0] === "/github/peers") { const force = new URLSearchParams(req.url.split("?")[1] || "").get("force") === "1"; githubBridge.peerRepos(force).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
 
