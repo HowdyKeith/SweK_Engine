@@ -8,6 +8,53 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4086 -- a threshold above its default, and a comparator too tight to notice the difference
+
+`tools/roundhouse/sensitivity-selfcheck.mjs` reported 2 real failures off Keith's rig: 3 dead knobs with no
+entry in `KNOWN_DEAD` (fragmentRotation:cell, fragmentRotation:density, reconQuality:thresh), and the
+escalation-rescue count coming up short (4 of 8 rescued where at least 7 were expected).
+
+### Two of the three are dead for good, and now proven
+
+`physics/mechanics/fragmentRotation.mjs`'s `fragmentCensus()` scales the WHOLE per-fragment inertia tensor by
+one positive factor for `cell` (voxel size) and one for `density`. Every observable this device reports through
+that path is a RATIO or a boolean derived from one: `traceResidual` divides by `|trace(I)|`, `spread` divides
+by `P[2]`, `physical`/`distinct` compare the principal moments to each other, never to an absolute scale.
+MEASURED: scaling `cell` by 1e6x, `density` by 1e-9x, and both simultaneously (5000x / 3e-4x) all leave every
+count and boolean bit-identical. Added to `KNOWN_DEAD` with the measured proof -- dead here is correct and
+permanent.
+
+### The third is genuinely live -- the escalation ladder just never looked above the default
+
+`reconQuality:thresh` feeds `render/silhouette.mjs`'s `iou()`, a fixed-size scan whose cost never depends on
+the threshold VALUE. Its response is a real cliff, but it sits between 60 and 100 -- entirely ABOVE its default
+of 8. `tools/roundhouse/sensitivity.mjs`'s escalation ladder tests integers strictly downward (a deliberate
+safety choice: an integer usually IS a cost-bearing loop count, and lowering one can only reduce work), so
+every rung it tried for thresh=8 (4, 0-filtered, 1) landed below the default, and the knob read permanently
+dead.
+
+Added one bounded upward rung: `min(v*20, v+2000)`. For thresh=8 that reaches 160, past the transition. For a
+genuine large step-count knob it adds at most 2000 -- a 200000-step device escalates to 202000 (1% more), never
+the "200-million-step" runaway the strictly-down design existed to rule out.
+
+### That rung immediately exposed a second, older defect
+
+Escalating `xpbd:h` and `fragmentRotation:cell`/`density` to magnitude 20 falsely "rescued" all three under the
+comparator's bit-exact number check: `xpbd:h`'s `kernelIntegral` moved 1.0000000000000153 ->
+1.0000000000000149 (the 15th significant digit -- a quadrature's own roundoff), and `fragmentRotation`'s
+`censusWorstTraceResidual` moved between 3.19e-16 and 0 (both already "zero" for a residual that should BE
+zero). Neither is a physical response.
+
+`changed()` now carries a relative numeric noise floor (1e-9). Verified it still catches every real signal
+(`reconQuality:thresh`'s 1 -> 0.0239 is nowhere near the floor, and the array/nested-object/NaN cases stay
+exactly as before) while the three noise-only "moves" now correctly read as unchanged. Re-ran the full 30-device
+lab sweep afterward: all three settle back to genuinely, permanently dead, matching the `KNOWN_DEAD` entries
+exactly, and `reconQuality:thresh` is properly rescued alongside 6 other tolerance/cap/threshold knobs.
+
+### Gate
+
+`sensitivity-selfcheck.mjs`: all checks pass. The genuinely-dead list is exactly the 3 named `KNOWN_DEAD`
+entries, and the escalation-rescue count clears its expected floor.
 ## Since v4085 -- a closing tag that looked like a regex, and the quote it swallowed
 
 `tools/ship/roundTrip-selfcheck.mjs` reported a real ratchet break off Keith's rig: 86 unguarded round-trip

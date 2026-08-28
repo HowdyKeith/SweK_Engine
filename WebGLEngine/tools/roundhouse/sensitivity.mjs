@@ -57,11 +57,25 @@ export function perturb(value) {
     return value * 1.1;
 }
 
+// v4086 -- A NUMERIC NOISE FLOOR, ADDED BECAUSE THE NEW UPWARD ESCALATION RUNG (below) PROVED THIS COMPARATOR
+// TOO TIGHT. Escalating three knobs already proven dead by an exact mathematical invariant -- xpbd:h (a
+// normalised kernel integrates to unity at every support radius) and fragmentRotation:cell/density (a uniform
+// positive rescale of a whole inertia tensor changes no ratio derived from it) -- to h=20/cell=20/density=20
+// "rescued" all three under the OLD bit-exact comparison: MEASURED, xpbd:h's kernelIntegral moved
+// 1.0000000000000153 -> 1.0000000000000149 (the 15th significant digit, a quadrature's own roundoff) and
+// fragmentRotation's censusWorstTraceResidual moved between 3.19e-16 and 0 (both already "zero" for a residual
+// that should BE exactly zero). Neither is a physical response; both are the SAME device computing the SAME
+// answer through slightly different floating-point paths at a different scale. A real response at the same
+// escalation magnitude class -- reconQuality:thresh's iouScaled going 1 -> 0.0239 -- sits nowhere near this
+// floor, so a relative tolerance catches the noise without hiding a signal.
+const NUMERIC_NOISE_FLOOR = 1e-9;
+
 /** Deep-ish equality that survives arrays and nested plain objects, so a moved array is not invisible. */
 export function changed(a, b) {
     if (a === b) return false;
     if (typeof a === "number" && typeof b === "number") {
-        return !(Number.isNaN(a) && Number.isNaN(b)) && a !== b;
+        if (Number.isNaN(a) || Number.isNaN(b)) return Number.isNaN(a) !== Number.isNaN(b);
+        return Math.abs(a - b) > NUMERIC_NOISE_FLOOR * Math.max(Math.abs(a), Math.abs(b), 1);
     }
     if (Array.isArray(a) && Array.isArray(b)) {
         return a.length !== b.length || a.some((v, i) => changed(v, b[i]));
@@ -229,12 +243,28 @@ export async function pairedSensitivity(deadList, getDevice, { factor = 1.1 } = 
 // that does not reach O(1) has not spanned the knob's range at all. It is stated as a property of that kind of
 // knob, and it was found by measuring where this one actually turns rather than by widening until green.
 
-/** The values a knob is retried at once a 1.1x nudge has found nothing. Integers strictly downward. */
+// v4086 -- ONE BOUNDED UPWARD RUNG, ADDED BECAUSE reconQuality:thresh PROVED THE DOWN-ONLY LADDER BLIND TO A
+// REAL LIVE KNOB. thresh=8 is an integer default but not a cost-bearing loop count: it feeds
+// render/silhouette.mjs's iou(), a fixed-size O(pixels) scan whose cost NEVER depends on the threshold VALUE
+// (measured: the inner loop touches exactly n pixels whether thresh is 1 or 200000). MEASURED on the real
+// device: thresh's response is a cliff between 60 and 100 -- iouScaled/iouShifted sit flat at the baseline
+// through thresh=60 and have moved by thresh=80 -- which the strictly-down ladder (floor(8/2)=4, floor(8/10)=0
+// filtered to nothing, 1) can never reach, because every rung it tried was BELOW the default.
+//
+// min(v*20, v+2000) reaches 160 for thresh=8 (past the transition) while adding at most 2000 to a genuine
+// large step-count knob -- acoustics:N=200 -> 2200, an 11x one-time probe; a 200000-step device -> 202000, 1%
+// more -- BOUNDED ABSOLUTE growth rather than the unbounded multiplicative growth the original "strictly down"
+// design existed to rule out. Only tried for POSITIVE integers: for v<=0 "upward" does not have one consistent
+// meaning under a single formula (v*20 makes a negative v more negative), and every integer knob measured in
+// this lab so far is a non-negative count or threshold, so there is nothing here to be conservative FOR yet.
+/** The values a knob is retried at once a 1.1x nudge has found nothing. Integers mostly downward, with one
+ *  bounded upward rung for knobs a down-only ladder cannot reach (see v4086 above). */
 export function escalations(v) {
     if (!Number.isFinite(v) || v === 0) return [];
     if (Number.isInteger(v)) {
-        // Strictly down: cost falls, and a cap that never binds is exactly the thing lowering exposes.
-        return [...new Set([Math.floor(v / 2), Math.floor(v / 10), 1])].filter((x) => x >= 1 && x !== v);
+        const rungs = [Math.floor(v / 2), Math.floor(v / 10), 1];
+        if (v > 0) rungs.push(Math.min(v * 20, v + 2000));
+        return [...new Set(rungs)].filter((x) => x >= 1 && x !== v);
     }
     const out = [v * 1e-3, v * 1e3];
     if (Math.abs(v) < 1) out.push(1);   // span the whole meaningful range of a sub-unit tolerance
