@@ -602,11 +602,11 @@
   "multigrid3d": 361751,
   "windtunnel": 370394,
   "thermal": 469500,
-  "pipe3d": 839478
+  "pipe3d": 839478,
+  "freesurface": 954046
  },
  "sweepAtLeast": {
-  "kuramoto": 301810,
-  "freesurface": 300158
+  "kuramoto": 301810
  },
- "sweepFrozenOn": "2026-08-28T18:11:17.405Z"
+ "sweepFrozenOn": "2026-08-28T18:27:11.452Z"
 }
