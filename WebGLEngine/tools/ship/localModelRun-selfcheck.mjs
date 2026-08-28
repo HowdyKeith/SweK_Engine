@@ -154,9 +154,10 @@ console.log("\n6. *** THE STATE MACHINE, AND THE ORDER THAT KEEPS THE GIGABYTE B
 {
     const order = [];
     const fake200 = async () => { order.push("preflight"); return { ok: true, status: 200, json: async () => ({ model_type: "x" }) }; };
+    let genArgs = null;
     const importer = async () => {
         order.push("import");
-        return { pipeline: async (task, repo, opts) => { if (opts.progress_callback) opts.progress_callback({ file: "w.onnx", loaded: 1, total: 2 }); return async () => [{ generated_text: "hello" }]; } };
+        return { pipeline: async (task, repo, opts) => { if (opts.progress_callback) opts.progress_callback({ file: "w.onnx", loaded: 1, total: 2 }); return async (prompt, genOpts) => { genArgs = genOpts; return [{ generated_text: "hello" }]; }; } };
     };
     const r = createRunner({ importer, fetchImpl: fake200 });
     const seen = [];
@@ -171,6 +172,14 @@ console.log("\n6. *** THE STATE MACHINE, AND THE ORDER THAT KEEPS THE GIGABYTE B
     ok("!! ...and every state passed through is a declared one", seen.every((s) => RUN_STATES.includes(s)));
     const gen = await r.generate("hi");
     ok("!! generate returns the text", gen.ok === true && gen.text === "hello");
+    // v4105 -- Keith, on the real page, with the CLEAN prompt "what is 3 + 3?": the reply degenerated into
+    // "And And And ... The The The ...". Greedy decoding (the pipeline's default with no sampling options) has
+    // no penalty for repeating a token, and a 360M/0.5B quantised model falls into that loop easily. Driven
+    // here rather than trusted from the diff: the mock pipe() CAPTURES what generate() actually sent it.
+    ok("!! *** generate() asks for a repetition penalty, so a small quantised model cannot loop forever ***",
+        !!genArgs && genArgs.repetition_penalty > 1, JSON.stringify(genArgs));
+    ok("!! ...and forbids repeating any 3-token phrase, the second half of the same fix",
+        !!genArgs && genArgs.no_repeat_ngram_size === 3, JSON.stringify(genArgs));
 
     // A BAD REPO NEVER REACHES THE IMPORT.
     const order2 = [];

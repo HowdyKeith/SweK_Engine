@@ -8,6 +8,54 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4105 -- three real bugs found live on webgpu-llm.html, all three fixed
+
+Keith was live on `webgpu-llm.html`, testing a downloaded model, and surfaced three separate problems in one
+sitting.
+
+### 1. A clean prompt degenerated into a repeated-word loop
+
+He typed a plain, unambiguous prompt -- "what is 3 + 3?" -- and the model's reply degenerated into
+"And And And ... The The The ...". Not a typo, not a corrupted prompt: this is greedy decoding's own
+well-known failure mode. `pipe()` was called with only `max_new_tokens`, no penalty against repeating a
+token, and a 360M/0.5B quantised instruct model falls into that loop easily.
+
+`ui/localModelRun.js`'s `generate()` now passes `repetition_penalty: 1.3` and `no_repeat_ngram_size: 3` --
+the two standard HuggingFace generation-config knobs built for exactly this failure mode, not a guess at this
+particular library's internals. Verified by capturing the actual arguments `generate()` sends to a mocked
+`pipe()` in `tools/ship/localModelRun-selfcheck.mjs`, rather than trusting the diff.
+
+### 2. "Use this repo" filled fields nobody could see, and still needed a second click
+
+"i click on the first repo to download. the page should send us to the download link at the bottom of the
+page or we wont know why nothing is happening... after we click [Use this repo] then should fill and start
+downloading without another download click."
+
+The repo id and dtype fields the button fills sit below the candidate list. On a page with more than one or
+two candidates, those fields were off-screen the moment they were filled, with nothing on screen to say the
+click had done anything -- and a second, separate click on "Check id, then download" was still required
+regardless. Both are fixed: the click now scrolls the download button into view, then auto-triggers the
+download once the fields have visibly landed.
+
+### 3. "done" looked like the whole job was finished, but a silent step was still running
+
+"it then says done, but i think it is actually installing? ... after the install it shows ready ... so we
+need a 'now installing...' before that starts installing so we know that done refers only to downloading."
+
+`transformers.js`'s `progress_callback` only fires **during file downloads**. Once the last byte of the last
+file lands, `mod.pipeline()` is still running -- ONNX Runtime is building the inference session and, on
+WebGPU, compiling shaders -- and nothing reports progress for that step. The page just left the last download
+line on screen for however long that silently took, which reads exactly like Keith described: finished, when
+real work was still running.
+
+Fixed without inventing a percentage nobody measured (that would be the lying-progress-bar shape this engine
+already forbids one layer up, at v2579): an idle timer arms on every progress event and clears the moment a
+new one arrives or the state moves to ready/failed. If it ever fires, the page says plainly that no download
+activity has been seen for a few seconds and this is *likely* -- not certainly -- the runtime/shader-compile
+step, which reports no progress of its own.
+
+Gate: `localModelRun-selfcheck`, all pass (new repetition-penalty assertions included). The page's inline
+module script was re-verified with `node --check` after the edit.
 ## Since v4104 -- the ML-Sharp panel could say "not installed" and offer nothing to press
 
 Keith: "for the ML-Sharp panel, we need an install button." `ai-bridge/sharpBridge.js`'s `status()` has

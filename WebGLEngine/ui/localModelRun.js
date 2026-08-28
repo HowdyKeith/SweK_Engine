@@ -192,11 +192,19 @@ export function createRunner({ importer, fetchImpl, cdn = TRANSFORMERS_CDN, base
         }
     };
 
+    // v4105 -- Keith, on the real page, with a CLEAN prompt ("what is 3 + 3?"): the reply degenerated into "And
+    // And And ... The The The ...". Not a typo of his, not a bad prompt -- greedy decoding (the pipeline's
+    // default when no sampling options are given) has no penalty for repeating itself, and a 0.5B/360M
+    // quantised model falls into a repeated-token loop easily. repetition_penalty and no_repeat_ngram_size are
+    // standard HF generation-config knobs (same names transformers.js's pipeline forwards straight through to
+    // the underlying generate() call) built for exactly this failure mode -- not a guess at this library's own
+    // internals, just the same two knobs every HF text-generation pipeline already exposes.
     const generate = async (prompt, { max_new_tokens = 64 } = {}) => {
         if (state !== "ready") return { ok: false, error: "not ready (state: " + state + ")" };
         to("generating");
         try {
-            const out = await pipe(String(prompt == null ? "" : prompt), { max_new_tokens });
+            const out = await pipe(String(prompt == null ? "" : prompt),
+                { max_new_tokens, repetition_penalty: 1.3, no_repeat_ngram_size: 3 });
             to("ready");
             const text = Array.isArray(out) ? (out[0] && (out[0].generated_text ?? out[0].summary_text)) : (out && out.generated_text);
             return { ok: true, text: text == null ? JSON.stringify(out).slice(0, 2000) : String(text) };
