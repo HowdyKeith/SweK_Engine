@@ -119,16 +119,42 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     // insensitiveKnobs filtered it out and the knob disappeared from every list this census prints.
     const { rows } = await knobLiveness({ only: ["optics", "blackhole"], budgetMs: 200000 });
     const un = unprobedKnobs(rows);
-    ok("!! *** the two null-default knobs in the lab are REPORTED rather than silently absent ***",
-        un.some((k) => k.startsWith("optics.spread")) && un.some((k) => k.startsWith("blackhole.onsetLo")),
-        un.join(", ") + ". Both use `cfg.x ?? fallback` -- a live, readable knob whose default means 'compute "
-        + "it'. blackhole.onsetLo has been invisible to this census since it was written; optics.spread became "
-        + "invisible the moment v4030 gave it a null default, WHICH IS A GAP THIS ROUND CREATED AND THEREFORE "
-        + "HAD TO CLOSE.");
-    ok("...and they are NOT counted as still, because 'was never probed' is not 'moves nothing'",
-        !stillKnobs(rows).some((k) => k === "optics.spread" || k === "blackhole.onsetLo"),
+    ok("!! *** a null-default knob is REPORTED rather than silently absent ***",
+        un.some((k) => k.startsWith("optics.spread")),
+        un.join(", ") + ". `cfg.x ?? fallback` is a live, readable knob whose default means 'compute it'. "
+        + "optics.spread became invisible the moment v4030 gave it a null default, WHICH IS A GAP THAT ROUND "
+        + "CREATED AND THEREFORE HAD TO CLOSE.");
+    ok("...and it is NOT counted as still, because 'was never probed' is not 'moves nothing'",
+        !stillKnobs(rows).some((k) => k === "optics.spread"),
         "still: " + (stillKnobs(rows).join(", ") || "none") + ". A measurement and an admission are different "
         + "claims and folding the second into the first would report coverage this census does not have.");
+
+    // *** v4050 -- THIS TEST NAMED TWO DEVICES, ONE OF THEM GOT FIXED, AND THE TEST WENT RED FOR IT. ***
+    // blackhole.onsetLo was the second witness. Sweep 6 surfaced it in the admission list, bhDefaults() now
+    // resolves it the way v3712 resolved onsetHi one line above -- and this assertion then FAILED, because it
+    // asserted the knob was still unaskable. A TEST THAT BREAKS WHEN THE DEFECT IT DESCRIBES IS CURED WAS
+    // PINNED TO THE WRONG THING: the invariant is about what the census does with an unanswerable knob, never
+    // about which devices happen to have one. It is asserted structurally below, on rows owned by this file,
+    // so the next fix cannot look like a regression -- and onsetLo now ratchets the other way.
+    const lo = rowFor(rows, "blackhole", "onsetLo");
+    ok("!! *** onsetLo IS NOW ASKED THE QUESTION, and cannot quietly go back to being unaskable ***",
+        !!lo && lo.probed.length > 0 && !un.some((k) => k.startsWith("blackhole.onsetLo")),
+        lo ? "probed in " + (lo.probed.join(", ") || "NOTHING") + " -- verdict "
+             + (lo.live.length ? "live in " + lo.live.join(", ") : "still in " + lo.still.join(", "))
+             + ". Reverting the default to null would put it back in the admission list and fail here."
+           : "ROW NOT FOUND");
+
+    // The rule itself, on rows this file owns. NO DEVICE APPEARS HERE ON PURPOSE.
+    const synth = [{ device: "d", knob: "nul", unprobed: true, kind: "null-default",
+                     probed: [], live: [], still: [], incomplete: false }];
+    ok("!! ...and the rule holds WITHOUT NAMING A DEVICE, which is the part that survives a fix",
+        probeValues(null).length === 0 && probeValues(null, [1, 2]).length === 2
+        && unprobedKnobs(synth).length === 1 && unprobedKnobs(synth)[0].startsWith("d.nul")
+        && stillKnobs(synth).length === 0,
+        "probeValues(null) yields no ladder, so the row is unprobed and lands in the admission list and in no "
+        + "universal one. *** AND DECLARED CHOICES ARE THE WAY BACK: probeValues(null, [1,2]) yields 2 -- the "
+        + "same escape hatch eight devices already use, and the reason a null default is a gap rather than a "
+        + "dead end.");
 }
 
 console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB THAT MOVES NOTHING ***");
