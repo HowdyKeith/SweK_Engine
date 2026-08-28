@@ -93,15 +93,46 @@ const code = codeOnly(raw);
     ok("...and a peer that reports nothing is not failed", sendVerdict(4096, NaN) === "OK");
 }
 
-// ---- 4. THE SCANNER'S OWN LIMIT, RECORDED SO IT IS NOT REDISCOVERED -------------------------------------------------
+// ---- 4. THE SCANNER'S LIMIT WAS REAL, AND v4031 REPAIRED IT ---------------------------------------------------------
+//
+// *** v4090 -- THIS SECTION ASSERTED A DEFECT THAT NO LONGER EXISTS, AND THAT IS A DIFFERENT KIND OF WRONG FROM
+// A CHECK THAT BROKE. *** It required codeOnly to LOSE the Send token on server.js -- `!code.includes(...)` --
+// which was a true and load-bearing reading when it was written: the lexer had no notion of a regex literal, so
+// a `/` inside `["']` opened a phantom string it never closed, and everything after that point was silently
+// unreadable. Freezing that as a PERMANENT property is what went stale, because v4031 ("a shared lexer was
+// blind on 180 files") then fixed exactly it.
+//
+// MEASURED BOTH WAYS, by importing the pre-v4031 lexer out of git alongside the shipped one and running them on
+// the SAME server.js rather than reasoning about the diff:
+//
+//     pre-v4031 lexer     kept 59.3%   Send token PRESENT: false     <- the desync this section was written for
+//     shipped lexer       kept 66.2%   Send token PRESENT: true      <- repaired
+//
+// So the 66.2% was never the evidence: comments and string bodies are a third of this 1.45MB file and blanking
+// them is codeOnly DOING ITS JOB. The evidence was always the POSITIONAL loss, and that is gone -- both the Grab
+// patch and the Send patch forty lines later survive now.
+//
+// *** WHAT DOES NOT CHANGE IS THE ASSERTIONS ABOVE. *** They still match against RAW, and this is left alone
+// deliberately rather than swept to `code` now that it would work: nine passing checks rewritten to a different
+// scanner, for no defect, on a gate guarding a data-transfer path, is the v3202 sweep shape this tree names
+// repeatedly. The reason to prefer RAW here is now a weaker one (a comment quoting an idiom can false-positive)
+// rather than a forced one, and swapping them is a judgement for a round that has a reason to make it.
 {
     const kept = code.length / raw.length;
-    ok("!! codeOnly TRUNCATES server.js, and this file says so rather than trusting it",
-        kept < 0.9 && raw.includes("const stored = Number(rr.bytes)") && !code.includes("const stored = Number(rr.bytes)"),
-        "codeOnly keeps " + (100 * kept).toFixed(1) + "% of the file and the desync is POSITIONAL -- it finds the " +
-        "Grab patch and loses the Send patch forty lines later. A gate matching code tokens against it would " +
-        "check the first part and PASS ON THE REST: a partial scan reporting as a full one, which is why every " +
-        "code-token assertion above is against RAW");
+    const sendTok = "const stored = Number(rr.bytes)";
+    const grabTok = "const want = Number(f.size)";
+    ok("!! *** codeOnly NO LONGER desyncs on server.js -- v4031 repaired the limit this section recorded ***",
+        raw.includes(sendTok) && code.includes(sendTok) && code.includes(grabTok),
+        "codeOnly keeps " + (100 * kept).toFixed(1) + "% of the file -- comments and string bodies, which is the " +
+        "function doing its job -- and BOTH the Grab patch and the Send patch forty lines later survive it. " +
+        "MEASURED against the pre-v4031 lexer loaded out of git: it kept 59.3% and LOST the Send token, which is " +
+        "the positional desync this section was written to record. A LIMIT THAT HAS BEEN FIXED MUST STOP BEING " +
+        "ASSERTED, or the gate reports a hazard that no longer exists and the next reader routes around nothing");
+    ok("...and the blanking is still real, so this is not a check that stopped looking",
+        kept < 0.9 && !code.includes("peer stored"),
+        "kept " + (100 * kept).toFixed(1) + "%, and 'peer stored' -- a STRING literal in server.js -- is absent " +
+        "from the output. Without this line the check above would pass just as happily if codeOnly started " +
+        "returning its input unchanged, which is the failure mode a repaired-limit assertion invites");
 }
 
 console.log();

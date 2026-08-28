@@ -8,6 +8,81 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4091 -- two gates asserting a defect that a later round had already fixed
+
+Both reported red from the rig, both reproduced here, and both turned out to be assertions that had frozen a
+real finding as a permanent property of the tree.
+
+### peerTransfer: the positional desync was real, and v4031 repaired it
+
+`tools/ship/peerTransfer-selfcheck.mjs` required `codeOnly()` to LOSE a token on `ai-bridge/server.js` --
+literally `!code.includes("const stored = Number(rr.bytes)")`. That recorded a POSITIONAL desync: the lexer had
+no notion of a regex literal, so a `/` inside `["']` opened a phantom string it never closed, and everything
+past that point was silently unreadable. True and load-bearing when written.
+
+v4031 ("a shared lexer was blind on 180 files") then fixed exactly it. MEASURED BOTH WAYS rather than reasoned
+from the diff -- the pre-v4031 lexer was loaded out of git and run beside the shipped one on the same file:
+
+    pre-v4031 lexer     kept 59.3%   Send token PRESENT: false
+    shipped lexer       kept 66.2%   Send token PRESENT: true
+
+So the 66.2% was never the evidence. Comments and string bodies are a third of that 1.45MB file, and blanking
+them is `codeOnly` doing its job. The evidence was always the positional loss, and both the Grab patch and the
+Send patch forty lines later survive now.
+
+The assertion proves the repair instead, and carries a SECOND line so it cannot pass vacuously: `codeOnly` must
+still blank a known string literal (`peer stored`), because otherwise a `codeOnly` that started returning its
+input unchanged would satisfy the first check perfectly happily.
+
+The nine code-token assertions above it still match against RAW and are DELIBERATELY LEFT ALONE. Rewriting nine
+passing checks to a different scanner, for no defect, on a gate guarding a data-transfer path, is the v3202
+sweep shape. The reason to prefer RAW there is now a weaker one (a comment quoting an idiom can false-positive)
+rather than a forced one, and swapping them is a judgement for a round that has a reason to make it.
+
+### localModelResolve: a token the refactor renamed
+
+`ai-bridge/tools/localModelResolve-selfcheck.mjs` ordered a refusal against
+`src.indexOf("spawn(cmd, args")`. v4037 had made that spawn INJECTABLE -- `spawnImpl(cmd, args, ...)` with
+`spawnImpl = spawn` as a default parameter, precisely so this gate could drive the failure branches without
+spawning anything. So `indexOf` returned -1, and `12413 < -1` is false. THE ORDERING NEVER CHANGED, THE NAME
+DID: the refusal is still on line 154 and the spawn still on line 158.
+
+A second hardcoded literal would rot the same way, so it now brace-extracts `install()`'s OWN BODY and asks the
+question the sentence actually makes. That is also STRICTLY STRONGER than the original: the old form compared
+against the first `spawn(cmd, args` anywhere in the file, and `uninstall()` below carries a byte-for-byte
+identical spawn -- so a future edit moving `install()`'s refusal after its spawn could still have passed on
+`uninstall()`'s copy.
+
+MY FIRST EXTRACTOR WAS WRONG AND THE GATE CAUGHT IT. `install()`'s parameter list is itself a destructured
+object, so brace-matching from the first `{` returned a 64-char stub of the PARAMS -- and the seam assertion
+then passed VACUOUSLY against that stub, since its regex matches the declaration prefix and its negative had
+nothing to find. Fixed by closing the parameter parens first, with a new line asserting the body is really 500+
+chars and contains `return new Promise`, because a scope check that silently extracts nothing turns every
+assertion against it into a check of the empty string.
+
+Sabotage-verified against the REAL FILE on disk: moving the refusal to after the spawn reddens the ordering
+check while the extractor stays valid (1482 chars), restored byte-identical afterwards.
+
+### pageReach: NOT fixed, deliberately, because both halves are Keith's call
+
+`tools/pageReach-selfcheck.mjs` has two failures and its own files reserve both for him.
+
+Three pages read as born-invisible. Measured, they are not the same case: `ascii-avatar.html` and
+`krbn-avatar.html` DO have a real curated route -- `src:` entries at lines 80 and 88 of `ui/avatarSwitch.js`'s
+MODES roster, the one `avatarSwitch-selfcheck` owns and freezes -- so they are reachable through the avatar
+picker rather than orphaned. `krbn-rigged.html` has NO href or src anywhere in the tree, only prose mentions in
+`tools/krbn/*`, despite being a complete page with `demo:title` and `demo:desc`.
+
+The second failure is an Arriving row at 39 links against a baseline of 30, whose own comment says trimming
+"is a judgement per page -- which pages have stopped being recent is not derivable."
+
+`pageReach-baseline.json` states the rule directly: "This list may SHRINK and may never GROW ... Keith reviews
+these and says where each goes." Inventing either answer is the one thing that file forbids, so the measurement
+is reported and the gate is left red.
+
+### Gates
+
+`peerTransfer-selfcheck.mjs`: all checks pass. `localModelResolve-selfcheck.mjs`: ALL PASS.
 ## Since v4090 -- a gate that was never hung, and three that are not red here
 
 `physics/sph/stability-selfcheck.mjs` moves out of `tools/ship/gateBudget.mjs`'s `UNRESOLVED` table, where it
