@@ -8,6 +8,30 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4092 -- a Windows crash left in my own earlier work
+
+`tools/ship/windowsImport-selfcheck.mjs` went red off Keith's rig: `core/ecs/World-selfcheck.mjs` -- the gate
+this session's own v4079 round added for `ComponentStore.removeEntity()`/`World.clearAll()` -- had four
+`await import(path.join(...))` calls passing a raw filesystem path directly to dynamic `import()`.
+
+That is the exact crash shape this gate exists to catch: a raw path happens to parse as a relative module
+specifier on POSIX, and is not a valid specifier at all on Windows (`C:\...` is neither a bare specifier nor a
+`file://` URL). Every sibling gate that reads a file dynamically already carries the fix --
+`holoPicture-selfcheck.mjs`, `biomeSpawnWiring-selfcheck.mjs`, `roundhouseDevices-selfcheck.mjs`,
+`deviceBridge-selfcheck.mjs` all wrap with `pathToFileURL(...).href` -- this file simply predated learning the
+lesson.
+
+Wrapped all four imports (`World.js`, `ComponentStore.js`, `bridge/ecs_render_bridge.js`, `components.js`) the
+same way, and added the missing `pathToFileURL` import.
+
+Two other files the rig had flagged in an earlier run -- `render/cloudField-selfcheck.mjs` and
+`rig/cinematicShot-selfcheck.mjs` -- were checked directly and are already correctly wrapped, so they did not
+reproduce here; only `core/ecs/World-selfcheck.mjs` was real.
+
+### Gates
+
+`core/ecs/World-selfcheck.mjs`: all checks pass, unchanged logic. `tools/ship/windowsImport-selfcheck.mjs`: all
+checks pass, zero raw-path dynamic imports found tree-wide.
 ## Since v4091 -- two gates asserting a defect that a later round had already fixed
 
 Both reported red from the rig, both reproduced here, and both turned out to be assertions that had frozen a

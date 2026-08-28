@@ -29,16 +29,16 @@
 // time, which turns that branch live rather than adding a new call site for it.
 "use strict";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 
-const { World } = await import(path.join(HERE, "World.js"));
-const { ComponentStore } = await import(path.join(HERE, "ComponentStore.js"));
-const { EntityRenderBridge } = await import(path.resolve(HERE, "..", "..", "bridge", "ecs_render_bridge.js"));
-const { Position } = await import(path.join(HERE, "components.js"));
+const { World } = await import(pathToFileURL(path.join(HERE, "World.js")).href);
+const { ComponentStore } = await import(pathToFileURL(path.join(HERE, "ComponentStore.js")).href);
+const { EntityRenderBridge } = await import(pathToFileURL(path.resolve(HERE, "..", "..", "bridge", "ecs_render_bridge.js")).href);
+const { Position } = await import(pathToFileURL(path.join(HERE, "components.js")).href);
 
 console.log("World-selfcheck -- despawn actually despawns, and Reset actually resets\n");
 
