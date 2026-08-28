@@ -120,6 +120,16 @@
     <option value="avatar">Avatar (live diorama)</option>
     <option value="image">Image / page URL</option>
   </select>
+  <label>CRT screen</label>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button id="crtBtn" class="btn" style="flex:0 0 auto">CRT: off</button>
+    <select id="crtPreset" style="flex:1">
+      <option value="pipboy">Pip-Boy (green phosphor)</option>
+      <option value="arcade">Arcade (heavy scanlines)</option>
+      <option value="trinitron">Trinitron (fine pitch)</option>
+    </select>
+  </div>
+
   <select id="ovComic" style="display:none;margin-top:4px;"></select>
   <input id="ovFolder" type="text" value="screen" placeholder="image folder under GPU_Assets" style="display:none;" />
   <select id="ovVid" style="display:none;margin-top:4px;"></select>
@@ -195,6 +205,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/jsm/loaders/GLTFLoader.js";
 import { enableMeshopt } from "/vendor/three/jsm/libs/meshoptGltf.js";
+import { makeCrtPass, PRESETS as CRT_PRESETS } from "/render/crtPass.js";
 import { OrbitControls } from "./vendor/three/jsm/controls/OrbitControls.js";
 import { createPipboyWireframe } from "./ui/pipboyWireframe.js";
 import { buildWireframeHead } from "/face/wireframeHead.js";
@@ -595,6 +606,46 @@ loop();   // initial model load is kicked off by loadFolderModels() (saved curre
 // ---- Unified pip-boy screen: one canvas drives a 2D overlay AND the 3D screen mesh ----
 (function initScreen(){
   const SCV = document.createElement("canvas"); SCV.width = 512; SCV.height = 320; const sctx = SCV.getContext("2d");
+
+  // *** THE CRT PASS SITS BETWEEN THE SCREEN CANVAS AND THE TEXTURE, WHICH IS THE ONLY PLACE IT BELONGS. ***
+  // Everything that draws a Pip-Boy screen -- gauges, map, avatar, dashboard, video -- already lands in SCV,
+  // so filtering HERE covers every mode at once instead of each drawing function learning about scanlines.
+  // The model's material samples whatever canvas scrTex points at, so turning the effect on or off is a
+  // pointer swap and not a second render path.
+  //
+  // *** IT IS OFF BY DEFAULT AND DEGRADES TO NOTHING. *** makeCrtPass returns null when WebGL2 is missing
+  // rather than throwing, and every use below is guarded: a box that cannot have the effect still gets its
+  // Pip-Boy, which matters because this page is one of the things a TV box or a phone opens.
+  let crtPass = null, crtOn = false, crtPreset = "pipboy";
+  function crtSurface() { return (crtOn && crtPass) ? crtPass.canvas : SCV; }
+  function crtEnsure() {
+    if (crtPass || !crtOn) return crtPass;
+    try { crtPass = makeCrtPass(SCV.width, SCV.height); } catch (e) { crtPass = null; }
+    if (!crtPass) { crtOn = false; try { crtBtn.textContent = "CRT: unavailable"; } catch (e) {} }
+    return crtPass;
+  }
+  function crtApply() {
+    if (!crtOn || !crtEnsure()) return;
+    try { crtPass.render(SCV, CRT_PRESETS[crtPreset] || CRT_PRESETS.pipboy); } catch (e) {}
+  }
+
+  // *** SWAPPING THE TEXTURE'S SOURCE, NOT REBUILDING THE MATERIAL. *** three's Texture holds a reference to
+  // its image, so pointing scrTex at the other canvas is the whole toggle -- no new texture, no material
+  // rebuild, no reupload of anything the GPU already has. Doing it the other way would drop a frame and
+  // re-run bindScreen's material surgery for a boolean.
+  const crtBtn = document.getElementById("crtBtn"), crtSel = document.getElementById("crtPreset");
+  function crtSync() {
+    crtBtn.textContent = crtOn ? ("CRT: " + crtPreset) : "CRT: off";
+    if (scrTex) { scrTex.image = crtSurface(); scrTex.needsUpdate = true; }
+    try { localStorage.setItem("voxelengine.pipboyCrt", crtOn ? crtPreset : ""); } catch (e) {}
+  }
+  crtBtn.onclick = () => { crtOn = !crtOn; if (crtOn) crtEnsure(); crtApply(); crtSync(); startTick(); };
+  crtSel.onchange = () => { crtPreset = crtSel.value; if (crtOn) { crtApply(); crtSync(); } };
+  try {
+    const saved = localStorage.getItem("voxelengine.pipboyCrt");
+    if (saved) { crtPreset = saved; crtSel.value = saved; crtOn = true; crtEnsure(); }
+  } catch (e) {}
+  crtSync();
   const cpCanvas = document.getElementById("cpCanvas"), cpCtx = cpCanvas.getContext("2d"); let cpOn = false;
   const content = document.getElementById("ovContent"), comicSel = document.getElementById("ovComic"), comicNav = document.getElementById("ovComicNav");
   const prevB = document.getElementById("ovPrev"), nextB = document.getElementById("ovNext"), autoB = document.getElementById("ovAuto"), urlIn = document.getElementById("ovUrl");
@@ -750,7 +801,7 @@ loop();   // initial model load is kicked off by loadFolderModels() (saved curre
     const _n = performance.now(); const _dt = _n - pperf.last; pperf.last = _n;
     if (_dt > 0 && _dt < 1000) { pperf.ms = pperf.ms ? pperf.ms * 0.9 + _dt * 0.1 : _dt; pperf.fps = 1000 / pperf.ms; pperf.ring.push(_dt); if (pperf.ring.length > 90) pperf.ring.shift(); }
     if (autoCyc && _n - cycAt > CYC_MS) { cycIdx = (cycIdx + 1) % CYCLE.length; cycAt = _n; gotoScene(CYCLE[cycIdx]); }
-    if (mode === "gauges") drawGauges(); else if (mode === "map") drawMap(); else if (mode === "fidget") drawFidget(); else if (mode === "perf") drawPerf(); else if (mode === "presence") { if (performance.now() - pres.last > 8000) { pres.last = performance.now(); refreshPresence(); } drawPresence(); } else if (mode === "avatar") blitAvatar(); else if (mode === "dashboard") { if (performance.now() - dash.last > 5000) { dash.last = performance.now(); refreshDash(); } drawDash(); } else if ((mode === "image" || mode === "ai") && staticImg) fitImg(staticImg); else if (mode === "video" && vid.readyState >= 2) fitVid(); drawButtons(sctx); if (scrTex) scrTex.needsUpdate = true; if (scr2On) { draw2nd(); if (scrTex2) scrTex2.needsUpdate = true; } if (cpOn) { try { cpCtx.drawImage(SCV, 0, 0, cpCanvas.width, cpCanvas.height); } catch (e) {} } raf = requestAnimationFrame(tick); }
+    if (mode === "gauges") drawGauges(); else if (mode === "map") drawMap(); else if (mode === "fidget") drawFidget(); else if (mode === "perf") drawPerf(); else if (mode === "presence") { if (performance.now() - pres.last > 8000) { pres.last = performance.now(); refreshPresence(); } drawPresence(); } else if (mode === "avatar") blitAvatar(); else if (mode === "dashboard") { if (performance.now() - dash.last > 5000) { dash.last = performance.now(); refreshDash(); } drawDash(); } else if ((mode === "image" || mode === "ai") && staticImg) fitImg(staticImg); else if (mode === "video" && vid.readyState >= 2) fitVid(); drawButtons(sctx); crtApply(); if (scrTex) scrTex.needsUpdate = true; if (scr2On) { draw2nd(); if (scrTex2) scrTex2.needsUpdate = true; } if (cpOn) { try { cpCtx.drawImage(crtSurface(), 0, 0, cpCanvas.width, cpCanvas.height); } catch (e) {} } raf = requestAnimationFrame(tick); }
   function startTick(){ if (!raf) tick(); }
 
   // comic source (comicBridge)
@@ -869,7 +920,7 @@ loop();   // initial model load is kicked off by loadFolderModels() (saved curre
   function refreshMeshPicker(){ const cur = meshSel.value; meshSel.innerHTML = "<option value=''>\u2014 pick the screen mesh \u2014</option>"; const seen = new Set(); if (pivot) pivot.traverse(o => { if (o.isMesh && o.material) { const n = o.name || ("mesh_" + seen.size); if (!seen.has(n)) { seen.add(n); const op = document.createElement("option"); op.value = n; op.textContent = n; meshSel.appendChild(op); } } }); if (cur) meshSel.value = cur; }
   function unbindScreen(){ try { if (scrMesh && scrOrig) { const m = Array.isArray(scrMesh.material) ? scrMesh.material[0] : scrMesh.material; m.map = scrOrig.map; if ("emissiveMap" in m) m.emissiveMap = scrOrig.emissiveMap; if (m.emissive && scrOrig.emissive) m.emissive.copy(scrOrig.emissive); m.needsUpdate = true; } } catch {} scrMesh = null; scrOrig = null; }
   function bindScreen(name){ if (!pivot) return; unbindScreen(); let found = null; pivot.traverse(o => { if (!found && o.isMesh && o.name === name) found = o; }); if (!found) return; scrMesh = found; const m = Array.isArray(found.material) ? found.material[0] : found.material; scrOrig = { map: m.map, emissiveMap: ("emissiveMap" in m) ? m.emissiveMap : undefined, emissive: m.emissive && m.emissive.clone() };
-    if (!scrTex) { scrTex = new THREE.CanvasTexture(SCV); if ("colorSpace" in scrTex) scrTex.colorSpace = THREE.SRGBColorSpace; }
+    if (!scrTex) { scrTex = new THREE.CanvasTexture(crtSurface()); if ("colorSpace" in scrTex) scrTex.colorSpace = THREE.SRGBColorSpace; }
     m.map = scrTex; if ("emissiveMap" in m) { m.emissiveMap = scrTex; if (m.emissive) m.emissive.setRGB(1, 1, 1); } m.needsUpdate = true; applyScreenFlip(); btn3d.textContent = "3D screen \u2713"; startTick(); }
   meshSel.onchange = () => { if (meshSel.value) bindScreen(meshSel.value); else { unbindScreen(); btn3d.textContent = "On 3D screen"; } try { localStorage.setItem("voxelengine.pipboyMesh", meshSel.value || ""); } catch {} };
   btn3d.onclick = () => { const show = meshSel.style.display === "none"; meshSel.style.display = show ? "block" : "none"; if (show) { refreshMeshPicker(); const saved = localStorage.getItem("voxelengine.pipboyMesh"); if (saved && !meshSel.value) { meshSel.value = saved; if (meshSel.value) bindScreen(saved); } } };
