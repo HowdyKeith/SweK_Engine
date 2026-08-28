@@ -603,10 +603,9 @@
   "windtunnel": 370394,
   "thermal": 469500,
   "pipe3d": 839478,
-  "freesurface": 954046
+  "freesurface": 954046,
+  "kuramoto": 665197
  },
- "sweepAtLeast": {
-  "kuramoto": 301810
- },
- "sweepFrozenOn": "2026-08-28T18:27:11.452Z"
+ "sweepAtLeast": {},
+ "sweepFrozenOn": "2026-08-28T18:38:16.650Z"
 }
