@@ -8,6 +8,39 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4080 -- the PROMPT dock panel showed only its header, no content
+
+Keith: "When i click the PROMPT vertical side menu on the right top side, it is orange, menu line, but then
+when i click that, the horizontal PROMPT menu shows, but only the header line, and it's blue. there is no
+panel under the header line."
+
+### Traced to a collision between two independent panel-visibility mechanisms
+
+The "Prompt" panel is main.js's `demoMenu.root`, wired into the Dock system
+(`dock.add({id:"prompt", root: demoMenu.root, ...})`). `ui/bootClean.js`'s one-shot "tuck the auto-opening
+panels away at boot" sets `demoMenu.root.style.display = "none"` directly, with no knowledge that Dock later
+reparents the root into a drawer and shows/hides that drawer by sliding it via a CSS transform
+(`.dock-drawer.expanded`), never by touching the child root's own `display`.
+
+So clicking the dock tab slid the drawer into view exactly as designed -- the blue dock-chrome header really
+was there -- while the panel's own content stayed `display:none` regardless. An empty header was the correct
+rendering of an actually-inconsistent state, not a bug in the chrome itself.
+
+### Fix
+
+`ui/dockSystem.js`'s `DockedPanel.expand()`/`pin()` (the click-to-open path the tab's own click handler calls)
+now unconditionally clear the panel root's own `display`, whoever last touched it and for whatever reason.
+`expand()` is the one place in this file that means "this panel's content should now be visible," so it is the
+right place to guarantee that. `collapse()` is untouched -- the drawer's own CSS transform already owns hiding
+it, and forcing the child's display there too would just be a second, redundant place for the two to disagree
+again later.
+
+### Gate
+
+New `ui/dockSystem-selfcheck.mjs` (jsdom-based, no browser needed): reproduces the OLD `expand()` leaving a
+bootClean-hidden root at `display:none` even once the drawer reports itself expanded, confirms the fix clears
+it via both a direct `expand()` call and a real dispatched tab click (the `pin()` path an actual user click
+fires), and confirms `collapse()` still leaves the root's display alone.
 ## Since v4079 -- demo switching didn't clear the old demo, and Reset never actually cleared an ECS entity
 
 Keith: "when we switch from one orange pill demo to a different demo, the old running demo should stop first

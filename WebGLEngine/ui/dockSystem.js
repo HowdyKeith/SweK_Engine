@@ -216,9 +216,20 @@ class DockedPanel {
         }
     }
 
-    expand()   { this.expanded = true;  this._update(); }
+    // v4080 -- Keith: clicking the "Prompt" tab opened the drawer (chrome header visible, blue) but showed no
+    // panel underneath it. *** THE DRAWER'S OWN COLLAPSE MECHANISM (a CSS transform, per .dock-drawer.expanded
+    // in lcars.css) NEVER TOUCHES THE PANEL ROOT'S OWN display -- IT DIDN'T NEED TO, UNTIL SOMETHING ELSE SET
+    // IT. *** ui/bootClean.js's one-shot "tuck the auto-opening panels away at boot" runs `el.style.display =
+    // "none"` directly on demoMenu.root (BEFORE it is reparented into this drawer), with no knowledge that Dock
+    // will later expand/collapse it by sliding the DRAWER, not by touching the root's own display. So the
+    // drawer slid into view exactly as designed, and the panel inside it stayed display:none regardless --
+    // an empty chrome header was the correct rendering of an actually-inconsistent state, not a mystery.
+    // Fixed here rather than in bootClean.js: expand() is the one place that means "this panel's content
+    // should now be visible," so it is the right place to guarantee that, whoever last touched the root's
+    // inline display and for whatever reason.
+    expand()   { this.expanded = true; this.root.style.display = ""; this._update(); }
     collapse() { this.expanded = false; this._update(); }
-    pin()      { this.pinned = true; this.expanded = true; this._update(); }
+    pin()      { this.pinned = true; this.expanded = true; this.root.style.display = ""; this._update(); }
 
     // v598 — per-demo menu gating. Hides the whole tab+drawer when a demo
     // doesn't use this panel. Collapses it first so it can't linger open.
