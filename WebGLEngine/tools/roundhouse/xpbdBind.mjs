@@ -15,7 +15,11 @@
 // THE PLANTED FAULT drops the lambda term, which is the exact fault the header warns about. PBD's stretch then
 // HALVES with each doubling of iterations: 1.0000e-2, 4.9383e-3, 2.4082e-3, 1.1447e-3, 5.1599e-4.
 
-import { hangingLink, iterationIndependence, stiffnessIndependence, hookeStretch } from "../../physics/xpbd/compliance.mjs";
+// v4053 -- `hookeStretch` WAS IMPORTED HERE AND NEVER CALLED. It is one line -- compliance * force -- and
+// hangingLink ALREADY APPLIES IT to produce the `exact` this bind publishes as exactStretch, so importing it
+// again bought a second name for a number already on the row. Dropped rather than wired: a second call site
+// would have recomputed the same product and invited the two to drift.
+import { hangingLink, iterationIndependence, stiffnessIndependence } from "../../physics/xpbd/compliance.mjs";
 import { volumeConvergence, pressureRun, baseSolid, meshVolume } from "../../physics/xpbd/volumeKey.mjs";
 import { dampingSweep, reducesToUndamped } from "../../physics/xpbd/dampingKey.mjs";
 import { thresholdSweep, offsetConvergence, criticalAngle, coulombExact } from "../../physics/xpbd/frictionKey.mjs";
