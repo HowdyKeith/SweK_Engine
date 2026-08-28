@@ -1,3 +1,4 @@
+// @ts-check
 // WebGLEngine/ui/webrtxBrowser.js -- v4118
 //
 // THE OPT-IN GATE FOR RAY TRACING IN THE PAGE, via codedhead/webrtx.
@@ -112,14 +113,27 @@ export const REFUSED = [
 export const STAGED_PATH = "/vendor/webrtx/index.js";
 
 export const STAGES = ["idle", "consented", "loaded", "verified"];
+
+/**
+ * @typedef {{ stage: string, consented: boolean, loaded: boolean, verified: boolean }} State
+ *
+ * Same v3103 shape as voxtralBrowser.js's Facts: every field is optional/nullable because a probe that never
+ * ran, or a browser that has no answer for one specific field, is not evidence of a "no".
+ * @typedef {{ secureContext?: boolean | null, gpuNamespace?: boolean | null, adapter?: boolean | null,
+ *             softwareRenderer?: boolean | null, appleGpu?: boolean | null }} Facts
+ */
+
+/** @returns {State} */
 export function initialState() { return { stage: "idle", consented: false, loaded: false, verified: false }; }
 
 /**
  * *** THE ORDER OF THESE CHECKS IS THE POINT. *** The origin is asked about FIRST, because on an insecure one
  * there is no navigator.gpu to ask anything else of, and "no WebGPU adapter" would be a true sentence that
  * blames the wrong thing.
+ * @param {Facts | null} [facts] @returns {string[]}
  */
 export function blockersFrom(facts) {
+    /** @type {string[]} */
     const out = [];
     if (!facts) return out;                       // unknown is not a "no"
     if (facts.secureContext === false) {
@@ -132,7 +146,9 @@ export function blockersFrom(facts) {
     return out;
 }
 
+/** @param {Facts | null} [facts] @returns {string[]} */
 export function warningsFrom(facts) {
+    /** @type {string[]} */
     const out = [];
     if (!facts) return out;
     if (facts.softwareRenderer) {
@@ -147,7 +163,8 @@ export function warningsFrom(facts) {
     return out;
 }
 
-/** The one step that must happen before anything spends: consent. Same invariant shape as voxtralBrowser. */
+/** The one step that must happen before anything spends: consent. Same invariant shape as voxtralBrowser.
+ * @param {State} [state] @param {Facts | null} [facts] */
 export function nextStep(state = initialState(), facts = null) {
     const s = state || initialState();
     if (!s.consented) return { action: "consent", label: "Enable ray tracing", detail: "nothing loaded yet" };
@@ -158,7 +175,8 @@ export function nextStep(state = initialState(), facts = null) {
     return { action: "ready", label: "ray tracing available", detail: "" };
 }
 
-/** Bytes at a readable scale -- shared shape with voxtralBrowser so the two pages read alike. */
+/** Bytes at a readable scale -- shared shape with voxtralBrowser so the two pages read alike.
+ * @param {number} [n] @returns {string} */
 export function humanBytes(n) {
     if (typeof n !== "number" || !isFinite(n)) return "unknown";
     if (n >= 1e9) return (n / 1e9).toFixed(2) + " GB";
@@ -167,7 +185,8 @@ export function humanBytes(n) {
     return n + " B";
 }
 
-/** Total download a consumer ends up with, computed rather than restated. */
+/** Total download a consumer ends up with, computed rather than restated.
+ * @returns {number} */
 export function totalBytes() {
     const w = MEASURED_HERE.wasmBytes;
     return MEASURED_HERE.bundleBytes + w.glsl + w.naga + w.bvh;

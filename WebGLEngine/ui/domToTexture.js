@@ -1,3 +1,4 @@
+// @ts-check
 // WebGLEngine/ui/domToTexture.js -- v4120
 //
 // RASTERISE A LIVE DOM SUBTREE INTO A CANVAS, so a shader can have it.
@@ -64,7 +65,14 @@ export const MEASURED = {
           "second; NOT cheap enough to do every frame at 60 Hz, which is why callers drive it on a timer.",
 };
 
-/** Every <style> on the page, concatenated. External sheets are NOT followed -- see REFUSED. */
+/**
+ * @typedef {{ width: number, height: number, srcWidth?: number, srcHeight?: number, css?: string }} SvgOpts
+ * @typedef {{ width?: number, height?: number, css?: string | null, doc?: Document | null,
+ *             exclude?: string | null, stripClasses?: string[] | null }} RasterizeOpts
+ */
+
+/** Every <style> on the page, concatenated. External sheets are NOT followed -- see REFUSED.
+ * @param {Document | null} [doc] @returns {string} */
 export function inlineCss(doc = typeof document !== "undefined" ? document : null) {
     if (!doc) return "";
     return [...doc.querySelectorAll("style")].map((s) => s.textContent || "").join("\n");
@@ -76,6 +84,7 @@ export function inlineCss(doc = typeof document !== "undefined" ? document : nul
  * Exported separately from the drawing so the gate can inspect the STRING without needing a browser: the
  * XHTML namespace and the viewBox are the two things that silently produce a blank image when wrong, and a
  * blank image is indistinguishable from a page that happens to be dark.
+ * @param {string} xml @param {SvgOpts} opts @returns {string}
  */
 export function buildSvg(xml, { width, height, srcWidth, srcHeight, css = "" }) {
     const vw = srcWidth || width, vh = srcHeight || height;
@@ -92,6 +101,7 @@ export function buildSvg(xml, { width, height, srcWidth, srcHeight, css = "" }) 
  *
  * Resolves to null rather than throwing when the browser will not load the SVG -- a caller that cannot have
  * the picture should fall back to showing the DOM, not lose the page.
+ * @param {Element} el @param {RasterizeOpts} [opts] @returns {Promise<HTMLCanvasElement | null>}
  */
 export async function rasterize(el, { width, height, css = null, doc = null,
                                       exclude = null, stripClasses = null } = {}) {
@@ -99,7 +109,10 @@ export async function rasterize(el, { width, height, css = null, doc = null,
     const d = doc || document;
     const w = width || el.clientWidth || 512, h = height || el.clientHeight || 320;
 
-    const clone = el.cloneNode(true);
+    // cloneNode()'s declared return type is the looser Node, not Element -- true for any node in general, but
+    // el IS an Element and cloning one always yields another one. Asserted once here rather than at every
+    // Element-only call below (querySelectorAll, classList).
+    const clone = /** @type {Element} */ (el.cloneNode(true));
     // Scripts must go: they would be serialised into the SVG, and an SVG image never executes them anyway --
     // but their TEXT would be laid out as content if the markup came through oddly.
     clone.querySelectorAll("script").forEach((n) => n.remove());
@@ -135,6 +148,7 @@ export async function rasterize(el, { width, height, css = null, doc = null,
     const cv = d.createElement("canvas");
     cv.width = w; cv.height = h;
     const ctx = cv.getContext("2d");
+    if (!ctx) return null;
     try { ctx.drawImage(img, 0, 0, w, h); } catch (e) { return null; }
     return cv;
 }

@@ -1,3 +1,4 @@
+// @ts-check
 // WebGLEngine/render/crtModel.js -- v4119
 //
 // THE CRT TRANSFER FUNCTION, ON THE CPU. This is the ANSWER KEY for render/crtPass.js's GLSL.
@@ -27,8 +28,14 @@
 "use strict";
 
 /**
+ * @typedef {{ curvature: number, scanlines: number, scanDepth: number, maskPitch: number, maskDepth: number,
+ *             vignette: number, bleed: number, gain: number, tint: [number, number, number] }} CrtParams
+ */
+
+/**
  * The parameter set is PHYSICAL: every field is a thing you could measure on a real tube with a ruler or an
  * oscilloscope, not a taste knob. That is what lets the gate check them.
+ * @type {CrtParams}
  */
 export const DEFAULTS = {
     curvature: 0.12,      // barrel coefficient k in r' = r * (1 + k*r^2); 0 is a flat panel
@@ -42,7 +49,8 @@ export const DEFAULTS = {
     tint: [0.35, 1.0, 0.55],   // phosphor colour. P1-ish green for a Pip-Boy; [1,1,1] leaves colour alone
 };
 
-/** Clamp helper shared by both halves so rounding cannot differ at the edges. */
+/** Clamp helper shared by both halves so rounding cannot differ at the edges.
+ * @param {number} v @returns {number} */
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /**
@@ -52,6 +60,7 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  *
  * Returns null when the sample falls outside the tube -- the black beyond the glass, which must be a hard edge
  * rather than a clamp. Clamping instead smears the border pixel outward and reads as a stretched image.
+ * @param {number} u @param {number} v @param {number} curvature @returns {[number, number] | null}
  */
 export function barrel(u, v, curvature) {
     const cx = u * 2 - 1, cy = v * 2 - 1;
@@ -67,7 +76,7 @@ export function barrel(u, v, curvature) {
  * line, which is close enough to a raised cosine. `scanlines` is a LINE COUNT, so the period in the output is
  * height/scanlines pixels and the gate can literally count the dark rows.
  */
-/*
+/**
  * *** THE PHASE IS TAKEN AT THE ROW'S TOP EDGE, NOT ITS CENTRE, AND THAT IS A BUG THE GATE CAUGHT AFTER BOTH
  * IMPLEMENTATIONS AGREED WITH EACH OTHER. *** Sampling at the pixel centre, (y+0.5)/h, is the right thing
  * everywhere else in this file -- and here it is catastrophic at the MOST NATURAL SETTING. With 240 scanlines
@@ -79,6 +88,7 @@ export function barrel(u, v, curvature) {
  *
  * Using y/h aligns the raster grid to the pixel grid: cos(y*pi) alternates +1, -1, so one row is beam and the
  * next is gap, which is what two-rows-per-line is supposed to look like.
+ * @param {number} vRow @param {number} lines @param {number} depth @returns {number}
  */
 export function scanline(vRow, lines, depth) {
     const phase = vRow * lines * Math.PI * 2;
@@ -89,15 +99,18 @@ export function scanline(vRow, lines, depth) {
  * THE PHOSPHOR MASK. An aperture-grille tube has vertical R,G,B stripes; a pixel sitting on the red stripe
  * shows red brighter. Indexed by OUTPUT PIXEL COLUMN, not by uv, because the pitch is a property of the screen
  * and not of the image being shown.
+ * @param {number} px @param {number} pitch @param {number} depth @returns {[number, number, number]}
  */
 export function mask(px, pitch, depth) {
     const idx = Math.floor(px % pitch) % 3;
+    /** @type {[number, number, number]} */
     const w = [1 - depth, 1 - depth, 1 - depth];
     w[idx] = 1 + depth * 2;
     return w;
 }
 
-/** VIGNETTE. Falls off with radius; monotonic by construction so the gate can require that it never brightens. */
+/** VIGNETTE. Falls off with radius; monotonic by construction so the gate can require that it never brightens.
+ * @param {number} u @param {number} v @param {number} strength @returns {number} */
 export function vignette(u, v, strength) {
     const cx = u * 2 - 1, cy = v * 2 - 1;
     const r2 = cx * cx + cy * cy;
@@ -108,6 +121,9 @@ export function vignette(u, v, strength) {
  * ONE OUTPUT PIXEL, from a nearest-neighbour sampler. `sample(x, y)` takes INTEGER source pixel coordinates
  * and returns [r,g,b] in 0..1; the GLSL does the same with texelFetch, which is also integer and unfiltered,
  * so the two agree by construction rather than by tuning a tolerance.
+ * @param {number} px @param {number} py @param {number} w @param {number} h
+ * @param {(x: number, y: number) => [number, number, number]} sample
+ * @param {CrtParams} [p] @returns {[number, number, number]}
  */
 export function crtPixel(px, py, w, h, sample, p = DEFAULTS) {
     const u = (px + 0.5) / w, v = (py + 0.5) / h;
@@ -140,9 +156,12 @@ export function crtPixel(px, py, w, h, sample, p = DEFAULTS) {
     ];
 }
 
-/** Whole-image convenience: RGBA in, RGBA out, both Uint8ClampedArray. The gate's CPU side. */
+/** Whole-image convenience: RGBA in, RGBA out, both Uint8ClampedArray. The gate's CPU side.
+ * @param {Uint8ClampedArray} src @param {number} w @param {number} h @param {CrtParams} [p]
+ * @returns {Uint8ClampedArray} */
 export function crtImage(src, w, h, p = DEFAULTS) {
     const out = new Uint8ClampedArray(w * h * 4);
+    /** @param {number} x @param {number} y @returns {[number, number, number]} */
     const sample = (x, y) => {
         const i = (y * w + x) * 4;
         return [src[i] / 255, src[i + 1] / 255, src[i + 2] / 255];
@@ -161,6 +180,7 @@ export function crtImage(src, w, h, p = DEFAULTS) {
 }
 
 /** Named looks. `off` exists so the page can A/B without a second code path. */
+/** @type {Record<string, CrtParams>} */
 export const PRESETS = {
     off:    { ...DEFAULTS, curvature: 0, scanDepth: 0, maskDepth: 0, vignette: 0, bleed: 0, gain: 1, tint: [1, 1, 1] },
     pipboy: { ...DEFAULTS },

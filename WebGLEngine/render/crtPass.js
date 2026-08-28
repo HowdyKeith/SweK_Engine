@@ -1,3 +1,4 @@
+// @ts-check
 // WebGLEngine/render/crtPass.js -- v4119
 //
 // THE CRT POST-PROCESS, ON THE GPU. Its GLSL is a LINE-FOR-LINE MIRROR of render/crtModel.js.
@@ -86,8 +87,10 @@ void main() {
     fragColor = vec4(clamp(c * mk * k * uTint, 0.0, 1.0), 1.0);
 }`;
 
+/** @param {WebGL2RenderingContext} gl @param {number} type @param {string} src @returns {WebGLShader} */
 function compile(gl, type, src) {
     const s = gl.createShader(type);
+    if (!s) throw new Error("crtPass shader: createShader returned null");
     gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error("crtPass shader: " + gl.getShaderInfoLog(s));
     return s;
@@ -99,6 +102,7 @@ function compile(gl, type, src) {
  * `makeCrtPass(w, h)` -> { canvas, render(source, params), resize(w,h), readPixels(), dispose() }
  * A missing WebGL2 context returns null rather than throwing: a caller that cannot have the effect should be
  * able to fall through to drawing the source unchanged, not lose the page.
+ * @param {number} width @param {number} height @param {{ canvas?: HTMLCanvasElement }} [opts]
  */
 export function makeCrtPass(width, height, opts = {}) {
     const canvas = opts.canvas || (typeof document !== "undefined" ? document.createElement("canvas") : null);
@@ -130,46 +134,57 @@ export function makeCrtPass(width, height, opts = {}) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    /** @type {Record<string, WebGLUniformLocation | null>} */
     const U = {};
     for (const n of ["uTex", "uSize", "uCurvature", "uScanlines", "uScanDepth", "uMaskPitch",
                      "uMaskDepth", "uVignette", "uBleed", "uGain", "uTint"]) U[n] = gl.getUniformLocation(prog, n);
 
+    // *** GL AND CANVAS ARE RE-CAPTURED HERE, NON-NULL, FOR THE CLOSURES BELOW. *** The two early returns
+    // above prove both non-null for the REST OF THIS FUNCTION'S OWN BODY, but that narrowing does not cross
+    // into a nested function's body -- TypeScript cannot see that render/readPixels/resize/dispose only ever
+    // run after makeCrtPass has already returned successfully. Rather than re-checking or asserting inside
+    // each one, the proof is done once, here, and the closures close over these instead.
+    const GL = gl, CV = canvas;
+
+    /** @param {TexImageSource | Uint8Array | Uint8ClampedArray} source
+     * @param {import("./crtModel.js").CrtParams} [params] @returns {HTMLCanvasElement} */
     function render(source, params = DEFAULTS) {
         const p = { ...DEFAULTS, ...params };
-        gl.bindTexture(gl.TEXTURE_2D, tex);
+        GL.bindTexture(GL.TEXTURE_2D, tex);
         // FLIP_Y stays FALSE: texel row 0 must be the source's FIRST row, because crtModel.js indexes rows
         // from the top and the shader flips gl_FragCoord to match. Turning this on would move the scanlines
         // half a period and nothing else, which is exactly the kind of bug a look would never catch.
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, false);
         if (source instanceof Uint8Array || source instanceof Uint8ClampedArray) {
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA,
-                          gl.UNSIGNED_BYTE, source instanceof Uint8Array ? source : new Uint8Array(source));
+            GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, CV.width, CV.height, 0, GL.RGBA,
+                          GL.UNSIGNED_BYTE, source instanceof Uint8Array ? source : new Uint8Array(source));
         } else {
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+            GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, source);
         }
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        gl.useProgram(prog);
-        gl.bindVertexArray(vao);
-        gl.uniform1i(U.uTex, 0);
-        gl.uniform2f(U.uSize, canvas.width, canvas.height);
-        gl.uniform1f(U.uCurvature, p.curvature);
-        gl.uniform1f(U.uScanlines, p.scanlines);
-        gl.uniform1f(U.uScanDepth, p.scanDepth);
-        gl.uniform1f(U.uMaskPitch, p.maskPitch);
-        gl.uniform1f(U.uMaskDepth, p.maskDepth);
-        gl.uniform1f(U.uVignette, p.vignette);
-        gl.uniform1f(U.uBleed, p.bleed);
-        gl.uniform1f(U.uGain, p.gain);
-        gl.uniform3f(U.uTint, p.tint[0], p.tint[1], p.tint[2]);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        return canvas;
+        GL.viewport(0, 0, CV.width, CV.height);
+        GL.useProgram(prog);
+        GL.bindVertexArray(vao);
+        GL.uniform1i(U.uTex, 0);
+        GL.uniform2f(U.uSize, CV.width, CV.height);
+        GL.uniform1f(U.uCurvature, p.curvature);
+        GL.uniform1f(U.uScanlines, p.scanlines);
+        GL.uniform1f(U.uScanDepth, p.scanDepth);
+        GL.uniform1f(U.uMaskPitch, p.maskPitch);
+        GL.uniform1f(U.uMaskDepth, p.maskDepth);
+        GL.uniform1f(U.uVignette, p.vignette);
+        GL.uniform1f(U.uBleed, p.bleed);
+        GL.uniform1f(U.uGain, p.gain);
+        GL.uniform3f(U.uTint, p.tint[0], p.tint[1], p.tint[2]);
+        GL.drawArrays(GL.TRIANGLES, 0, 3);
+        return CV;
     }
 
-    /** Read back in IMAGE ORDER (top row first) -- readPixels is bottom-up, so it is flipped here once. */
+    /** Read back in IMAGE ORDER (top row first) -- readPixels is bottom-up, so it is flipped here once.
+     * @returns {Uint8ClampedArray} */
     function readPixels() {
-        const w = canvas.width, h = canvas.height;
+        const w = CV.width, h = CV.height;
         const raw = new Uint8Array(w * h * 4);
-        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+        GL.readPixels(0, 0, w, h, GL.RGBA, GL.UNSIGNED_BYTE, raw);
         const out = new Uint8ClampedArray(w * h * 4);
         for (let y = 0; y < h; y++) out.set(raw.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
         return out;
@@ -178,8 +193,9 @@ export function makeCrtPass(width, height, opts = {}) {
     return {
         canvas, gl,
         render, readPixels,
-        resize(w, h) { canvas.width = w; canvas.height = h; },
-        dispose() { try { gl.getExtension("WEBGL_lose_context")?.loseContext(); } catch (e) {} },
+        /** @param {number} w @param {number} h */
+        resize(w, h) { CV.width = w; CV.height = h; },
+        dispose() { try { GL.getExtension("WEBGL_lose_context")?.loseContext(); } catch (e) {} },
     };
 }
 
