@@ -527,14 +527,28 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
     let dockBtn = null;
     function _nudgeStage() { try { _stage && _stage.resize && _stage.resize(); } catch {} try { window.dispatchEvent(new Event("resize")); } catch {} }
     function setDocked(v) { _leaveHead(); _headMode = false; _docked = !!v; try { localStorage.setItem("voxelengine.demoChromeDocked", _docked ? "1" : "0"); } catch {} applyDockState(); }
+    // v4106 -- Keith: "empty top-right box never loads." IT WAS NEVER LOADING BECAUSE IT WAS NEVER FLEX. pill,
+    // body and stageWrap are all built with `display: "flex"` (lines 213/234/427) -- their children rely on it:
+    // stageWrap's canvas-host div is `flex: 1 1 auto` with NO in-flow content of its own (the canvas inside it
+    // is `position: absolute`), so its height comes ENTIRELY from the flex layout sizing it against the row's
+    // siblings. "Restore" here set `.style.display = ""`, which does not restore the flex the element was
+    // BUILT with -- it REMOVES the inline override, and a bare <div> with no override falls back to `block`.
+    // Once stageWrap is `block`, `flex: 1 1 auto` on its children is inert (flex-basis/grow/shrink only mean
+    // anything inside a flex container), so canvasHost keeps its natural block height for absolutely-positioned
+    // content: ZERO. `inset: 0` on the canvas then gives it that same zero height. MEASURED, not assumed: a
+    // real headless run of webgpu-llm.html found stageWrap.style.display === "" (computed: block) and the
+    // canvas-host child's getBoundingClientRect().height === 0, on the FIRST load -- docked is the default
+    // state (_docked = true), and applyDockState() runs unconditionally at mount (line 655), so this fired on
+    // every page that mounts this chrome, every time, not intermittently -- exactly "never loads" rather than
+    // "loads late". Fixed by restoring the value each element actually needs, not the empty string.
     function applyDockState() {
         const d = _docked;
         svgTierWrap.style.display = "none";   // v1519 — full/mini never show the svg-only tier
-        pill.style.display = d ? "none" : "";
-        body.style.display = d ? "none" : "";
+        pill.style.display = d ? "none" : "flex";
+        body.style.display = d ? "none" : "flex";
         tickerOuter.style.display = d ? "none" : "";
         if (stageWrap) {
-            stageWrap.style.display = "";   // v1519 — restore after the svg-only tier hid it
+            stageWrap.style.display = "flex";   // v1519 — restore after the svg-only tier hid it; v4106 -- "flex", not "" (see header)
             try { _stage && _stage.setPaused && _stage.setPaused(false); } catch {}
             if (stageRail) stageRail.style.display = d ? "none" : "";
             if (d) {
@@ -604,7 +618,7 @@ import { backoffDelay, onConnectivityRegained } from "../net/wsReconnect.js";
         svgTierWrap.style.display = "none"; if (_svgSet) { try { _svgSet.stop(); } catch {} }
         if (stageRail) stageRail.style.display = "none";
         if (stageWrap) {
-            stageWrap.style.display = "";
+            stageWrap.style.display = "flex";   // v4106 -- "flex", not "" (see applyDockState's header comment)
             Object.assign(stageWrap.style, { height: "96px", borderRadius: "10px", border: "1px solid rgba(140,210,255,0.45)", marginBottom: "0", cursor: "pointer" });
             try { _stage && _stage.setPaused && _stage.setPaused(false); } catch {}
         }

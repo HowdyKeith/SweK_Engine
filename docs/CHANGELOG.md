@@ -8,6 +8,54 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4106 -- the docked avatar box never loaded, and now it does
+
+Keith asked directly, after v4105 shipped: "empty top-right box never loads. did you fix it in the new
+version?" It hadn't been fixed -- v4105 had only speculated that box was `demoChrome.js`'s docked avatar
+widget and left the question open. This round drove it for real instead of guessing again.
+
+### Measured, not assumed
+
+A real headless-Chromium load of `webgpu-llm.html` measured the avatar canvas's own hosting `<div>` at
+`getBoundingClientRect().height === 0` on the very first load, consistently -- not a slow load, a
+structurally broken one. "Never loads" turned out to be exactly the right description.
+
+### Root cause
+
+`ui/demoChrome.js` builds its three chrome rows (`pill`, `body`, `stageWrap`) with `display: "flex"`, and
+their children depend on that: `stageWrap`'s canvas-hosting `<div>` is `flex: 1 1 auto` and holds only an
+absolutely-positioned `<canvas>` with no in-flow content of its own, so its height comes **entirely** from
+the flex layout sizing it against its siblings.
+
+Three places in the file "restore" one of these rows after hiding it, by setting `.style.display = ""`.
+That does not restore `flex` -- it removes the inline style override entirely, and a bare `<div>` with no
+override falls back to the browser default, `block`. Once the row is `block`, `flex: 1 1 auto` on its
+children means nothing (flex properties only apply inside a flex container), so the canvas-host's own height
+collapses to its natural block height for absolutely-positioned content: zero. `inset: 0` on the canvas then
+inherits that same zero height.
+
+`applyDockState()` runs unconditionally the moment the chrome mounts, and **docked** -- the state where
+`stageWrap` is the only visible row -- is the default. So this fired on every page that mounts this chrome,
+on every single load. Not an occasional glitch; a universal one.
+
+### The fix
+
+All three call sites now restore to `"flex"`, the value each row actually needs, instead of the empty
+string. `tickerOuter`'s own `.style.display = ""` restore was checked against its own creation block and
+left alone -- it was never built with `display: "flex"` in the first place, so falling back to `block` is
+its genuine, correct default, not a fourth instance of this bug.
+
+Measured before and after on the real page: the canvas-host's height went from `0px` to `56px`; `stageWrap`'s
+computed `display` went from `"block"` to `"flex"`.
+
+### Verification
+
+`ui/demoChrome.js` is 899 lines mounted on nearly every standalone demo page in this tree, and had **zero**
+prior automated coverage. New gate `tools/ship/demoChrome-selfcheck.mjs` drives it in a real headless
+browser: the docked default state (where Keith's box lives), the undock click path (`pill` and `body` carry
+the identical bug shape), and a source-level check that no flex-built row is ever restored to the empty
+string again. Sabotage-verified by temporarily reverting the fix and re-running the gate: exactly 8 real
+failures across both browser-driven sections, all clearing once the fix is back.
 ## Since v4105 -- three real bugs found live on webgpu-llm.html, all three fixed
 
 Keith was live on `webgpu-llm.html`, testing a downloaded model, and surfaced three separate problems in one
