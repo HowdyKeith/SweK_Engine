@@ -175,6 +175,28 @@ export async function probeLocalModel(nav = typeof navigator !== "undefined" ? n
         vramBytes: null,          // *** ALWAYS NULL. There is no API. Kept as a field so its absence is VISIBLE. ***
         vramNote: "NOT EXPOSED BY ANY BROWSER. WebGPU withholds device memory deliberately (fingerprinting), " +
                   "so maxBufferSize below is the closest thing there is and it is a PROXY, not the VRAM.",
+        // v4113 -- *** THE QUOTA IS A PROMISE, NOT A RESERVATION, AND THIS FILE WAS TREATING IT AS THE
+        // AUTHORITY ON WHETHER A MODEL FITS. *** MEASURED on this tree, headless Chromium, one container:
+        // a PERSISTENT profile reported a 162.33 GB quota on a filesystem with 28.73 GB actually free -- the
+        // quota overstated real disk by 5.6x. So `quota >= model.bytes` can be TRUE for a download that will
+        // still die partway through on a full disk, which is precisely the mid-gigabyte failure
+        // localModelRun.js's preflightRepo() exists to prevent one layer up.
+        //
+        // FREE DISK IS NOT EXPOSED TO A PAGE EITHER -- same class of absence as VRAM, and handled the same
+        // way: named rather than guessed. A page that subtracted a made-up "typical free space" would be
+        // inventing the number this note exists to say nobody has.
+        quotaNote: "A CEILING, NOT A RESERVATION. The browser may report a quota far larger than the disk can " +
+                   "actually supply (measured on this tree: 162.33 GB reported against 28.73 GB really free, " +
+                   "5.6x over), and free disk is not exposed to a page any more than VRAM is. Clearing this " +
+                   "check means 'not ruled out', never 'there is room'.",
+        // *** AND THE QUOTA MOVES WITH THE BROWSING CONTEXT FAR MORE THAN WITH THE DISK. *** Same container,
+        // same 28.73 GB free, measured both ways: an incognito/ephemeral context reported 0.90 GB and a
+        // persistent profile reported 162.33 GB -- a 180x swing from the context alone. That is why a refusal
+        // here is worth checking against the window it happened in before it is read as a hardware limit.
+        quotaContextNote: "Quota depends on the BROWSING CONTEXT more than on the disk: measured 0.90 GB in an " +
+                          "incognito/ephemeral context and 162.33 GB in a persistent profile, on the same " +
+                          "machine with the same free space. A private window can refuse a model a normal " +
+                          "window would allow.",
         errors: [],
     };
 
@@ -288,6 +310,14 @@ export function verdictFor(facts, model) {
     if (facts.quotaBytes !== null && facts.quotaBytes < model.bytes) {
         blockers.push("storage quota " + gb(facts.quotaBytes) + " is smaller than the model's " + gb(model.bytes));
     } else if (facts.quotaBytes === null) unknowns.push("storage quota unreadable");
+    else {
+        // v4113 -- *** PASSING THE QUOTA CHECK IS NOT THE SAME CLAIM AS "THERE IS ROOM", AND UNTIL NOW THE
+        // VERDICT MADE NO DISTINCTION. *** The quota can exceed real free disk several-fold (see quotaNote),
+        // so this is an UNKNOWN rather than a blocker -- v3103's rule in both directions: it cannot become a
+        // "no" on a number nobody measured, and it must not be silently counted as a "yes" either.
+        unknowns.push("the " + gb(facts.quotaBytes) + " quota is a browser CEILING, not a reservation -- free " +
+            "disk is not exposed to a page, so a download that fits the quota can still run out of real space");
+    }
     // A SOFTWARE ADAPTER IS A BLOCKER, NOT A WARNING. It is the case where the page would look capable and be
     // unusable, which is worse than reporting nothing at all.
     if (facts.softwareRenderer === true) {

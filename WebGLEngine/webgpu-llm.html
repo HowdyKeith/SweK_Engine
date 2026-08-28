@@ -109,7 +109,13 @@ async function go(finalState) {
        ? Object.entries(f.adapterInfo).filter(([, v]) => v).map(([k, v]) => k + ": " + v).join(", ") || "(empty)"
        : mark(null));
   t += row("<b>VRAM</b>", '<span class="unk">not exposed</span> <span class="note">&mdash; ' + f.vramNote + "</span>");
-  t += row("storage quota", gb(f.quotaBytes) || mark(null));
+  // v4113 -- THE QUOTA GETS ITS CAVEAT ON SCREEN, exactly as VRAM does two rows down. Measured on this tree:
+  // a persistent profile reported 162.33 GB against 28.73 GB really free, and an incognito context reported
+  // 0.90 GB on that same disk. A reader who sees only the number reads a promise; the note is what makes it a
+  // ceiling. Same reasoning as the vramNote row -- an absent number is NAMED rather than substituted.
+  t += row("storage quota", (gb(f.quotaBytes) || mark(null)) +
+       (f.quotaNote ? ' <span class="note">&mdash; ' + f.quotaNote + "</span>" : ""));
+  if (f.quotaContextNote) t += row("<i>...and the context matters</i>", '<span class="note">' + f.quotaContextNote + "</span>");
   t += row("storage in use", gb(f.usageBytes) || mark(null));
   t += row("model already cached", mark(f.modelCached) +
        (f.cacheNames ? ' <span class="note">&mdash; caches: ' + (f.cacheNames.join(", ") || "none") + "</span>" : ""));

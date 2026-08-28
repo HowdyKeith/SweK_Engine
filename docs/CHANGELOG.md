@@ -8,6 +8,52 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4113 -- the storage quota is a promise, not a reservation
+
+Found while running the measurement Keith asked for: does voxtral (2.5-9 GB) clear `localModelProbe`'s quota
+check? I predicted it would be ruled out on disk. **Measuring disproved that.** On Keith's real recorded box
+(10.74 GB quota, the fixture the tree already keeps from v4032), ASR+TTS Q4 at 5.17 GB is ALLOWED with 5.57 GB
+spare; only the 17 GB BF16 pair blocks.
+
+Two findings came out of the measurement that matter more than the answer.
+
+### 1. The quota can exceed real free disk several-fold
+
+Measured live, headless Chromium, one container: a **persistent profile reported a 162.33 GB quota on a
+filesystem with 28.73 GB actually free** -- overstating real disk by 5.6x.
+
+`verdictFor()`'s only storage rule was `quota < model.bytes` becomes a blocker. So clearing that check was
+being counted, silently, as "there is room" -- when it only ever meant "not ruled out". A download can pass the
+check and still die partway through on a full disk, which is precisely the mid-gigabyte failure
+`localModelRun.js`'s `preflightRepo()` exists to prevent one layer up.
+
+Fixed as an UNKNOWN rather than a blocker. v3103's rule runs both ways: it must not become a "no" on a number
+nobody measured either. And free disk is not exposed to a page any more than VRAM is -- so the new `quotaNote`
+NAMES the absent number in exactly the shape this file already uses for `vramNote`, rather than substituting a
+plausible "typical free space".
+
+### 2. The quota tracks the browsing context far more than the disk
+
+I was about to state that Chromium grants roughly 60% of free disk. Measuring both ways on the SAME container
+with the SAME 28.73 GB free:
+
+- incognito / ephemeral context: **0.90 GB**
+- persistent profile: **162.33 GB**
+
+A 180x swing from the browsing context alone -- nothing like a disk-proportional rule. The number I nearly
+asserted would have been fabricated.
+
+Recorded as `quotaContextNote`, because a private window refusing a model that a normal window allows is a
+refusal a reader would otherwise read as a hardware limit.
+
+Both notes carry their measured numbers rather than the claim alone. `webgpu-llm.html` renders the quota
+caveat inline, the same way it already renders the VRAM one.
+
+### Verification
+
+`localModelProbe-selfcheck`: 41 checks, all pass -- including that the ceiling caveat fires when the check is
+CLEARED, that it stays an unknown rather than becoming a blocker, and that it does NOT fire on a quota
+genuinely smaller than the model (one message per state). `localModelRun-selfcheck` all pass, unchanged.
 ## Since v4112 -- the expression onto the avatar's face, and two corrections I owed first
 
 Keith named two items. Before either, two things I had told him were wrong.

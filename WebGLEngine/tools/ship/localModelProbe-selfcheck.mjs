@@ -224,6 +224,44 @@ console.log("\n4b. *** v4015: THE PROXY AGAINST THE MODEL'S OWN NUMBER, NOT JUST
     // 128MB floor above but under either Gemma build's stated VRAM requirement.
     const keith = await probeLocalModel(nav({ gpu: gpuWith(adapter({ info: { vendor: "intel", architecture: "gen-9" }, maxBuf: 2.15e9 })), quota: 900e9 }), win);
     const e2b = verdictFor(keith, MODELS.find((m) => m.id === "E2B"));
+    // ---- v4113: THE QUOTA IS A CEILING, NOT A RESERVATION -------------------------------------------------
+    // MEASURED on this tree rather than reasoned about, and it disproved the assumption this file shipped
+    // with: a persistent-profile Chromium reported a 162.33 GB quota on a filesystem with 28.73 GB actually
+    // free -- 5.6x over. So `quota >= model.bytes` was being treated as "there is room" when it only ever
+    // meant "not ruled out". The same run also measured 0.90 GB in an incognito context against 162.33 GB in
+    // a persistent profile on the SAME disk -- a 180x swing from the browsing context alone.
+    {
+        const roomy = Object.assign({}, keith, { quotaBytes: 100e9 });
+        const v = verdictFor(roomy, MODELS[0]);
+        ok("!! *** clearing the quota check is reported as an UNKNOWN, not counted as a silent yes ***",
+            v.unknowns.some((u) => /CEILING, not a reservation/.test(u)),
+            "a quota that exceeds real disk by 5.6x can pass this check and still die partway through the " +
+            "download -- the mid-gigabyte failure preflightRepo() exists to prevent one layer up");
+        ok("...and it stays an unknown rather than becoming a blocker",
+            v.blockers.every((b) => !/CEILING/.test(b)),
+            "v3103 runs both ways: it cannot become a 'no' on a number nobody measured either");
+        const tight = Object.assign({}, keith, { quotaBytes: 1e6 });
+        const tv = verdictFor(tight, MODELS[0]);
+        ok("!! a quota genuinely SMALLER than the model is still a real blocker",
+            tv.blockers.some((b) => /smaller than the model/.test(b)) &&
+            !tv.unknowns.some((u) => /CEILING/.test(u)),
+            "the ceiling caveat must not fire on the case that is already decided -- one message per state");
+    }
+    {
+        const src = fs.readFileSync(path.join(ENG, "ui", "localModelProbe.js"), "utf8");
+        ok("!! the probe carries a quotaNote, the same way it carries vramNote for the other absent number",
+            /quotaNote:/.test(src) && /free disk is not exposed/i.test(src),
+            "free disk is unreadable from a page exactly as VRAM is, and this file's whole discipline is to " +
+            "NAME an absent number rather than substitute a plausible one");
+        ok("!! ...and records that the quota tracks the browsing CONTEXT, not the disk",
+            /quotaContextNote:/.test(src) && /incognito/i.test(src) && /180x|0\.90 GB/.test(src),
+            "a private window reporting 0.90 GB where a normal one reports 162.33 GB is a refusal a reader " +
+            "would otherwise read as a hardware limit");
+        ok("!! the measured evidence travels with the claim rather than being asserted",
+            /162\.33 GB/.test(src) && /28\.73 GB/.test(src),
+            "both numbers came from a real headless run on this tree; a note without them is an opinion");
+    }
+
     ok("!! *** a 2.15 GB proxy against E2B's 4 GB requirement lands in unknowns with both numbers named ***",
         e2b.unknowns.includes("the closest available proxy (2.15 GB) is smaller than this model's stated " +
             "requirement (4.00 GB) -- not conclusive, but worth knowing"),
