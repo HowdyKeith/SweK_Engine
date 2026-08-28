@@ -596,17 +596,17 @@
   "lens": 329530,
   "xpbd": 527619,
   "stability": 1395075,
-  "flip3d": 2898487
+  "flip3d": 2898487,
+  "kh": 1806334
  },
  "sweepAtLeast": {
   "windtunnel": 302518,
   "thermal": 302543,
   "pipe3d": 321927,
-  "kh": 309287,
   "kuramoto": 301810,
   "twof": 1,
   "freesurface": 300158,
   "multigrid3d": 302048
  },
- "sweepFrozenOn": "2026-08-28T15:58:39.874Z"
+ "sweepFrozenOn": "2026-08-28T16:28:46.211Z"
 }
