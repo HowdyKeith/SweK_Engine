@@ -30,6 +30,8 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -43,6 +45,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
@@ -56,6 +60,8 @@ public class MainActivity extends Activity {
     private static final String DEFAULT_URL = "http://192.168.50.57:8787/";
 
     private WebView web;
+    private boolean isTv;                 // set once in onCreate; decides whether the D-pad layer is installed
+    private String tvNavJs;               // res/raw/tv_nav.js, read once and injected on every page finish
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST = 1;
 
@@ -68,8 +74,26 @@ public class MainActivity extends Activity {
         // watched rather than tapped, so the default screen timeout reads as "it froze".
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // *** IS THIS A TELEVISION. *** Asked two ways because neither is reliable alone: FEATURE_LEANBACK is
+        // what a real Android TV device declares, and UI_MODE_TYPE_TELEVISION catches emulators and boxes that
+        // report the mode without the feature. Getting this wrong in the false direction is the expensive one:
+        // a phone that thinks it is a TV has its arrow keys hijacked for a D-pad nobody is holding.
+        isTv = getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            || getPackageManager().hasSystemFeature("android.hardware.type.television")
+            || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK)
+                   == Configuration.UI_MODE_TYPE_TELEVISION;
+        if (isTv) tvNavJs = readRaw(R.raw.tv_nav);
+
         web = new WebView(this);
         setContentView(web);
+
+        // A TV HAS NO POINTER, SO THE WebView ITSELF MUST TAKE FOCUS or the D-pad never reaches the page at
+        // all -- the keys go to the Activity, find nothing focusable, and the screen appears frozen.
+        if (isTv) {
+            web.setFocusable(true);
+            web.setFocusableInTouchMode(true);
+            web.requestFocus();
+        }
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);        // every page here is an ES-module app; without this they render blank
@@ -107,6 +131,15 @@ public class MainActivity extends Activity {
                 if (isOwnServer(host)) return false;          // let the WebView load it
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
                 return true;
+            }
+
+            // *** THE D-PAD LAYER IS RE-INJECTED ON EVERY PAGE, because every page is a fresh document and the
+            // script's own guard makes a second injection into the same one a no-op. Injecting once at startup
+            // would give the landing page a D-pad and every page navigated to afterwards none, which is worse
+            // than having none at all: the remote works until you go somewhere, and then silently stops.
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                if (isTv && tvNavJs != null) v.evaluateJavascript(tvNavJs, null);
             }
 
             @Override
@@ -218,10 +251,61 @@ public class MainActivity extends Activity {
 
     // BACK GOES BACK THROUGH THE PAGES, not straight out of the app. Without this the hardware/gesture back
     // closes the whole thing from any depth, which in a wrapper with no address bar means losing your place.
+    //
+    // *** ON A TV, BACK HAS ONE MORE JOB FIRST: LEAVING CAPTURE MODE. *** tv_nav.js hands the arrows to the page
+    // when OK is pressed on a canvas, and something has to hand them back. BACK is the only key every Android TV
+    // remote has. The page is ASKED whether it consumed the press -- evaluateJavascript returns the script's own
+    // value, so no JavaScript bridge (and no addJavascriptInterface attack surface) is needed to find out.
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && web != null && web.canGoBack()) { web.goBack(); return true; }
+        if (keyCode == KeyEvent.KEYCODE_BACK && web != null) {
+            if (isTv) {
+                web.evaluateJavascript(
+                    "(window.__swekTvNav && window.__swekTvNav.release()) === true",
+                    value -> { if (!"true".equals(value)) goBackOrExit(); });
+                return true;
+            }
+            if (web.canGoBack()) { web.goBack(); return true; }
+        }
+        // A long press needs tracking turned on for onKeyLongPress to ever fire.
+        if (isTv && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+                     || keyCode == KeyEvent.KEYCODE_MENU)) {
+            event.startTracking();
+        }
         return super.onKeyDown(keyCode, event);
+    }
+
+    private void goBackOrExit() {
+        if (web != null && web.canGoBack()) web.goBack(); else finish();
+    }
+
+    // *** THE SETTINGS GESTURE WAS UNREACHABLE ON A TV, WHICH IS THE SAME BUG THIS FILE ALREADY RECORDS ONCE. ***
+    // installSettingsGesture() puts the server address behind a LONG-PRESS ON THE PAGE BACKGROUND -- and a D-pad
+    // remote cannot long-press a background, because it has no pointer to press one with. That is exactly the
+    // failure the comment down there describes for the action bar: "an engine on the wrong IP with no way to say
+    // so is a brick", arrived at a second time on a different device. So on a TV the same dialog is bound to a
+    // LONG-PRESS OF OK (and MENU, where a remote has one), which every remote can do.
+    @Override
+    public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+        if (isTv && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+                     || keyCode == KeyEvent.KEYCODE_MENU)) {
+            showSettingsDialog();
+            return true;
+        }
+        return super.onKeyLongPress(keyCode, event);
+    }
+
+    /** res/raw as a string. Small file, read once; a failure here disables the D-pad layer rather than crashing. */
+    private String readRaw(int resId) {
+        try (InputStream in = getResources().openRawResource(resId)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return out.toString("UTF-8");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // *** THE SETTING HAS TO BE REACHABLE, AND THE OBVIOUS PLACE FOR IT IS NOT. *** The first version of this
@@ -241,13 +325,18 @@ public class MainActivity extends Activity {
         web.setOnLongClickListener(v -> {
             WebView.HitTestResult hit = web.getHitTestResult();
             if (hit != null && hit.getType() != WebView.HitTestResult.UNKNOWN_TYPE) return false;
-            new AlertDialog.Builder(MainActivity.this)
-                .setTitle("SweK")
-                .setItems(new CharSequence[]{ "Server address…", "Reload" }, (d, which) -> {
-                    if (which == 0) promptForUrl(false); else web.reload();
-                })
-                .show();
+            showSettingsDialog();
             return true;
         });
+    }
+
+    /** One dialog, two ways in: a long-press on the background (touch) or a long-press of OK (remote). */
+    private void showSettingsDialog() {
+        new AlertDialog.Builder(MainActivity.this)
+            .setTitle("SweK")
+            .setItems(new CharSequence[]{ "Server address…", "Reload" }, (d, which) -> {
+                if (which == 0) promptForUrl(false); else web.reload();
+            })
+            .show();
     }
 }
