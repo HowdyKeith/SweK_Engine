@@ -433,6 +433,47 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
 }
 
 /**
+ * ================================================================================================================
+ * *** v4045 -- WHAT EACH LIST CLAIMS, DECLARED ONCE, BECAUSE THE SAME MISTAKE HAS NOW BEEN MADE SIX TIMES. ***
+ * ================================================================================================================
+ *
+ * Every list below partitions the same rows, and the only question that has ever gone wrong here is whether a
+ * row from a device THAT DID NOT FINISH may appear in it. Six times a list has been written or changed without
+ * asking, and six times it reported a device as answered when the census had simply not looked:
+ *
+ *   v4030  a null-default knob was filtered out of every list and vanished  -> unprobedKnobs
+ *   v4031  stillKnobs printed "MOVES NOTHING ANYWHERE" off ONE mode         -> excluded incomplete
+ *   v4042a partialDeafness returned 0 for "clean" and "never looked" alike  -> deafnessUnanswered
+ *   v4043  insensitiveKnobs called eight LIVE quantum knobs insensitive     -> excluded incomplete
+ *   v4044  a cost-skip left `incomplete` false and invented three dead knobs -> set the flag
+ *   ...and v4043's own fix was argued against in a v4031 comment that said this list was fine as it was.
+ *
+ * EVERY FIX WAS LOCAL AND EVERY ONE WAS FOUND BY A WRONG ANSWER REACHING A REPORT. The rule was never written
+ * down, so each new way of not-looking had to rediscover it. Here it is, once:
+ *
+ *   UNIVERSAL   the list's own heading makes a claim about EVERY mode -- "moves nothing ANYWHERE", "flat
+ *               across its working range". A row whose device skipped a mode, FOR ANY REASON, cannot support
+ *               that claim and MUST be excluded.
+ *   PARTICULAR  the list names the modes it is talking about, so it claims nothing beyond them and may
+ *               include an unfinished row. Its output MUST name that scope, or it is universal in disguise.
+ *   ADMISSION   the list exists to say something was NOT measured. It MUST include unfinished rows -- that is
+ *               its entire subject.
+ *
+ * *** THE TABLE IS THE RATCHET, NOT THE DOCUMENTATION. *** knobLiveness-selfcheck scans this file for
+ * `export const X = (rows)` and FAILS IF ANY SUCH LIST IS MISSING FROM THIS TABLE, then checks each one
+ * behaves as its class requires. A seventh list cannot be added without declaring what it claims, which is
+ * the check none of the six previous rounds had.
+ */
+export const LIST_CLAIMS = {
+    stillKnobs: "universal",          // "MOVES NOTHING ANYWHERE"
+    insensitiveKnobs: "universal",    // "flat across its WORKING RANGE"
+    partialDeafness: "particular",    // "live in A, B; STILL in C" -- names its own scope
+    incompleteKnobs: "admission",     // the sweep ran out of budget
+    deafnessUnanswered: "admission",  // the deafness question was never answered for this knob
+    unprobedKnobs: "admission",       // no ordering exists to perturb the default along
+};
+
+/**
  * Knobs that moved nothing in any mode they were probed in. THE READING, not the diagnosis.
  *
  * *** v4031 -- AND ONLY FROM A DEVICE THE CENSUS FINISHED. *** The heading this list prints under is MOVES
