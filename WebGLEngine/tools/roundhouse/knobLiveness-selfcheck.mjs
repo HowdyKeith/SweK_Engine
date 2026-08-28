@@ -151,20 +151,27 @@ console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB TH
 
     // *** THE BUDGET IS MEASURED IN BUILDS, NOT MILLISECONDS, SO THIS CHECK IS NOT A RACE. *** A flat
     // millisecond figure would assert the machine's speed as much as the census's logic: too small and the
-    // loop is cut off before it probes anything (a different bug, unprobedKnobs' territory), too large and a
-    // fast machine finishes and there is nothing incomplete to classify. One `curve` build is the natural
-    // unit -- 7.3 s here -- and the budget check falls between knobs, so at 1.5 builds the loop clears the
-    // base build, probes exactly one knob (three more builds), and is over. That holds at any clock speed.
+    // loop is cut off before it probes anything, too large and a fast machine finishes and there is nothing
+    // incomplete to classify. One `curve` build is the natural unit -- 7.3 s here -- and the budget check
+    // falls between knobs, so the loop clears the base build, probes one knob, and is over.
+    //
+    // *** v4045a -- FOUR BUILDS, NOT 1.5, AND v4044 IS WHY. *** This read 1.5 until the affordability
+    // pre-check landed: a budget that cannot afford TWO builds of a mode now skips that mode outright rather
+    // than spending itself on a base build whose result is discarded. At 1.5 builds kuramoto is no longer cut
+    // off mid-sweep, it is DECLINED before it starts -- better behaviour, and no longer the scenario this
+    // section exists to demonstrate. Four builds affords the base plus one knob's three rungs and runs out
+    // exactly where it used to. The check moved because the code got better, which is the honest reason to
+    // move a test and the only one.
     const c0 = Date.now();
     await kuramotoDevice.build({ mode: "curve", config: {} });
     const oneBuild = Date.now() - c0;
-    const { rows, notes } = await knobLiveness({ only: ["kuramoto"], budgetMs: Math.round(oneBuild * 1.5) });
+    const { rows, notes } = await knobLiveness({ only: ["kuramoto"], budgetMs: Math.round(oneBuild * 4) });
     const row = rows.find((r) => r.knob === "pendN");
     ok("!! *** and a cut-off census reports them as UNFINISHED, never as answered ***",
         !!row && row.incomplete === true && row.probed.length > 0 &&
         !stillKnobs(rows).some((k) => k.startsWith("kuramoto.")) &&
         incompleteKnobs(rows).some((k) => k.startsWith("kuramoto.")),
-        "one build " + oneBuild + " ms, budget " + Math.round(oneBuild * 1.5) + " ms. still: " +
+        "one build " + oneBuild + " ms, budget " + Math.round(oneBuild * 4) + " ms. still: " +
         (stillKnobs(rows).join(", ") || "none") + " | incomplete: " +
         (incompleteKnobs(rows).join(", ") || "none") + ". Three categories, not two: 'moves nothing' is a " +
         "measurement, 'was never probed' is an admission, and THIS ONE IS A PARTIAL MEASUREMENT -- the most " +
