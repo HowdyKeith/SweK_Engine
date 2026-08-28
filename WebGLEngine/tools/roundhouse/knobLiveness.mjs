@@ -151,7 +151,7 @@ export function probeValues(v, choices = null) {
  */
 export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadline = Infinity) {
     const def = cfg[knob];
-    let sawEcho = false;
+    let sawEcho = false, echoUnconfirmed = false;
     for (const alt of probeValues(def, choicesFor(device, knob))) {
         // *** v4032 -- THE DEADLINE IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS. ***
         // knobLiveness's budget guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran
@@ -180,18 +180,68 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         // nothing else. A real observable that merely happens to land on the probe value at one rung still
         // moves at the others.
         const echo = (o) => sameValue(base[o], def) && sameValue(out[o], alt);
-        // *** v4046 -- WHETHER THE MODE ECHOED THE KNOB IS RECORDED, AND IT IS THE WHOLE DISCRIMINATOR. ***
+        // *** v4048 -- AN ECHO IS CONFIRMED AGAINST A SECOND KNOB, BECAUSE "EQUALS THE INPUT" IS NOT THE SAME
+        // AS "IS THE INPUT". ***
+        //
+        // v4031's rule discards an observable that equalled the default before and equals the probe value
+        // after -- the signature of a pass-through. It is ALSO the signature of a computation whose
+        // coefficient happens to be one. box3d/impulse reports speedAfter and speedIdeal, both j/m, and the
+        // default mass IS 1 -- so both numerically equal j, both were discarded, and box3d.j read STILL in
+        // the mode that applies it. THE RULE WRITTEN TO PREVENT FALSE LIVENESS WAS PRODUCING FALSE STILLNESS,
+        // which is the worse of the two: a dead reading invites a look and this one hid a working knob.
+        //
+        // The discriminator is exact. A TRUE ECHO EQUALS THE KNOB WHATEVER ELSE CHANGES -- out.viscosity =
+        // c.visc regardless of tau, T or dt. A computation that merely coincides diverges the moment another
+        // knob moves: j/m stops equalling j as soon as density does anything. So a candidate echo costs ONE
+        // extra build with a different knob perturbed, and only when an echo was seen at all.
+        //
+        // With no second knob to move, the candidate stays an echo -- the old behaviour, for a device that
+        // cannot be asked the question.
         // A knob still in a mode is USUALLY INNOCENT: quantum's `bands` has no use for omega and never
         // mentions it. A DEAF knob is different in a way the output shows -- stability's `deafknob` reports
         // `viscosity: c.visc` while handing the solver the shipped value, so THE MODE ACKNOWLEDGES THE INPUT
         // AND THEN IGNORES IT. That is "a control that does nothing" exactly, and it is separable from "a
         // control this screen does not have". MEASURED: deafknob's output carries `viscosity`; quantum/bands
         // carries none of omega, E or V0.
-        if (Object.keys(base).some(echo)) sawEcho = true;
-        const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !echo(o));
-        if (moved.length) return { state: "live", moved, echoed: sawEcho };
+        let echoKeys = Object.keys(base).filter(echo);
+        if (echoKeys.length) {
+            // *** EVERY OTHER KNOB IS TRIED, NOT THE FIRST ONE, AND THE FIRST DRAFT PICKED THE FIRST. ***
+            // The confirming knob has to REACH the observable. box3d's config begins with `g`, and gravity
+            // does not affect the speed a body has after an impulse -- only `density` does, by changing the
+            // mass in j/m, and it is sixth in the list. One arbitrary knob proved nothing and box3d.j stayed
+            // wrongly still. Which knob reaches which observable is not knowable in advance, so they are
+            // tried in turn and the loop STOPS AT THE FIRST ONE THAT BREAKS THE IDENTITY.
+            //
+            // Cost is bounded and lands where it should: a FALSE echo usually breaks on an early knob, while
+            // a TRUE echo pays the full O(K) to prove no knob can break it -- which is the right way round,
+            // because proving a pass-through is a stronger claim than disproving one.
+            const others = Object.keys(cfg).filter((k) => k !== knob && typeof cfg[k] === "number"
+                && Number.isFinite(cfg[k]) && cfg[k] !== 0);
+            let tried = 0;
+            for (const other of others) {
+                if (!echoKeys.length) break;
+                // *** AND A CONFIRMATION CUT SHORT BY THE BUDGET IS RECORDED, NOT PASSED OFF AS A FINISHED
+                // ONE. *** The loop respects the deadline, so under budget pressure echoKeys can keep entries
+                // no knob was ever tried against -- which would reinstate exactly the false stillness this
+                // change removes, silently and only when the sweep is rushed. Keeping them as echoes is the
+                // right default by this file's own preference ("a knob that reads live off its own echo is
+                // worse than one that reads dead: dead invites a look and live closes the question"), but an
+                // UNCONFIRMED echo is a third state and the caller is told which it got.
+                if (Date.now() > deadline) { echoUnconfirmed = tried < others.length; break; }
+                tried++;
+                let out2 = null;
+                try { out2 = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt, [other]: cfg[other] * 1.5 } }); }
+                catch { continue; }
+                // survives as an echo only while it STILL equals the probe value with another knob moved
+                echoKeys = echoKeys.filter((o) => sameValue(out2[o], alt));
+            }
+        }
+        if (echoKeys.length) sawEcho = true;
+        const isEcho = (o) => echoKeys.includes(o);
+        const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !isEcho(o));
+        if (moved.length) return { state: "live", moved, echoed: sawEcho, echoUnconfirmed };
     }
-    return { state: "still", moved: [], echoed: sawEcho };
+    return { state: "still", moved: [], echoed: sawEcho, echoUnconfirmed };
 }
 
 /**
