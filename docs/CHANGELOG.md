@@ -8,6 +8,62 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4100 -- a fourth condition behind a "still" knob reading, adopted from an uploaded bundle
+
+Keith uploaded `swek-deafsweep.zip`, a diverged-lineage patch bundle (its own v4046-v4047a, based on a much
+earlier checkout of this tree -- around this tree's own v4045a -- and unrelated to this tree's own v4046/v4047
+history) proposing two ideas for `tools/roundhouse/knobLiveness.mjs`. Per this session's established rule for
+diverged bundles ("re-derive and re-measure directly on this tree rather than patched in, since the bundle's
+device set and costs do not carry over" -- the v4088 precedent), the bundle was read for its ideas rather than
+applied as a patch, especially since `knobLiveness.mjs` and `knobLiveness-selfcheck.mjs` were both already
+modified this session at v4098 for an unrelated fix.
+
+### Idea 1 (deafness sweep): already independently shipped
+
+The bundle's section 1 -- a knob that ECHOES an input but never lets it move anything, live in some modes and
+ignored in others -- turned out to already exist in this tree under a different name and version number,
+`partialDeafness` (shipped at v4083). No action needed; the two lineages independently arrived at the same
+finding.
+
+### Idea 2 (jointlyLive): genuinely new, verified fresh, adopted
+
+`thermal.beta` and `thermal.gravity` both default to zero and multiply in Boussinesq buoyancy
+(`beta * gravity * dT`), so a probe that moves one knob at a time can never see either move anything -- each
+alone is genuinely inert, and the pair is the live knob. MEASURED FRESH on this tree before adopting anything
+(not carried over from the bundle's own numbers):
+
+    beta = 1                     moved NOTHING
+    gravity = 1e-3                moved NOTHING
+    beta = 1 AND gravity = 1e-3   moved peakSpeed, kineticEnergy, convecting
+
+This is a fourth condition behind a "still" reading, beside dead, saturated at an asymptote, and quantised
+below the search step -- and neither `thermal.beta` nor `thermal.gravity` was in this tree's still-knob
+register, so an unstarved sweep would have logged both as unexplained dead knobs.
+
+`jointlyLive()` re-probes still knobs IN PAIRS, restricted to those whose default is zero (a knob already at a
+working value multiplies to something nonzero; one at zero cannot), which keeps the population small enough to
+be affordable -- a handful of extra builds rather than an O(K^2) sweep over every knob pair in the lab. Added to
+`tools/roundhouse/knobLiveness.mjs` as its own function, and to `knobLiveness-selfcheck.mjs` as section 3k,
+which drives the real `thermal` device and confirms `jointlyLive` finds the pair unprompted rather than being
+told which knobs to try.
+
+It remains a reading, not a promotion: a pair that moves something together is jointly gated; a pair that does
+not has been asked one more question and not answered. Both knobs are still reported `still` on their own --
+correctly, because each of them alone is.
+
+### Found while verifying: an unrelated pre-existing defect
+
+Verifying the new section against the full gate surfaced a second FAIL, reproduced twice (not a flake), in
+completely unrelated pre-existing code: section 3j's `quantum.N` starvation test used `budgetMs: 2000`, a figure
+tuned when one `bands` build cost roughly 230ms. MEASURED FRESH: 2000ms now probes exactly one knob
+(`bandGridN`) and never reaches `N` at all -- `quantum`'s per-knob build cost has grown, the same registry-scaled
+pattern already seen this session in `labResults`, `libmSensitivity`, and `knobLiveness.mjs`'s own tool-front-door
+cap. Re-measured a safe margin (2000ms reaches 1 knob at 2657ms wall; 4000ms reaches N correctly incomplete at
+4324ms wall) and set the budget to 6000ms.
+
+### Gates
+
+`knobLiveness-selfcheck.mjs`: all checks pass, confirmed on a clean run after both fixes.
 ## Since v4099 -- four rig reports, triaged individually rather than assumed related
 
 ### Three did not reproduce

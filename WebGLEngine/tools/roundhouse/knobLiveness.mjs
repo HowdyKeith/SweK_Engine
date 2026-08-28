@@ -447,6 +447,69 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
 }
 
 /**
+ * *** v4100 -- A FOURTH CONDITION THAT PRODUCES "STILL": TWO KNOBS THAT ONLY WORK TOGETHER. ***
+ *
+ * This file has always said its reading is not a diagnosis, and named three conditions behind it -- dead,
+ * saturated at an asymptote, quantised below the search step. A lab-wide sweep produced a fourth.
+ *
+ * thermal.beta and thermal.gravity survive BOTH ladders across every mode and plant state: still at 1.5x,
+ * 0.5x, 8x and still from 1e-6x to 1e6x and negated. The obvious reading is two dead knobs. MEASURED INSTEAD,
+ * on this tree, fresh (not carried over from an earlier one):
+ *
+ *     beta = 1                     moved NOTHING
+ *     gravity = 1e-3               moved NOTHING
+ *     beta = 1 AND gravity = 1e-3  moved peakSpeed, kineticEnergy, convecting
+ *
+ * *** BOTH DEFAULT TO ZERO AND THEY MULTIPLY. *** Boussinesq buoyancy is beta * gravity * dT, so moving
+ * either alone leaves the product at zero and nothing can happen. Neither knob is dead; the PAIR is the knob,
+ * and a probe that moves one at a time cannot see it however far it moves that one.
+ *
+ * So still knobs whose default is zero are re-probed IN PAIRS. That is affordable precisely because the
+ * population is small -- a knob has to be still after both ladders AND default to zero to qualify -- so this
+ * is a handful of extra builds on a handful of devices, not the O(K^2) sweep that pairing every knob would be.
+ *
+ * *** IT IS STILL A READING. *** A pair that moves something together is jointly gated; a pair that does not
+ * has been asked one more question and not answered. Nothing here promotes a knob to live on its own.
+ */
+export async function jointlyLive(rows, { budgetMs = 60000 } = {}) {
+    const MODES = await deviceModeTable();
+    const byDev = new Map();
+    for (const r of rows) {
+        if (r.live.length || r.wideLive || !r.probed.length) continue;
+        if (!byDev.has(r.device)) byDev.set(r.device, []);
+        byDev.get(r.device).push(r);
+    }
+    const found = [];
+    for (const [name, rs] of byDev) {
+        if (rs.length < 2) continue;
+        let dev; try { dev = await getDevice(name); } catch { continue; }
+        const t0 = Date.now();
+        for (const mode of (MODES[name] || [])) {
+            if (Date.now() - t0 > budgetMs) break;
+            let def; try { def = dev.defaults({ mode }); } catch { continue; }
+            const cfg = (def && def.config) || {};
+            // ZERO-DEFAULT ONLY. A knob already at a working value multiplies to something; one at zero
+            // cannot, and that asymmetry is the whole reason this pass is cheap enough to run.
+            const zeros = rs.filter((r) => cfg[r.knob] === 0).map((r) => r.knob);
+            if (zeros.length < 2) continue;
+            let base; try { base = await dev.build({ mode, config: { ...cfg } }); } catch { continue; }
+            for (let i = 0; i < zeros.length; i++) for (let j = i + 1; j < zeros.length; j++) {
+                if (Date.now() - t0 > budgetMs) break;
+                const pair = { [zeros[i]]: 1, [zeros[j]]: 1 };
+                let out; try { out = await dev.build({ mode, config: { ...cfg, ...pair } }); } catch { continue; }
+                const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]));
+                if (moved.length) {
+                    found.push(name + "." + zeros[i] + " + " + name + "." + zeros[j]
+                        + " -- neither moves anything alone; TOGETHER they move " + moved.join(", ")
+                        + " in " + mode);
+                }
+            }
+        }
+    }
+    return found;
+}
+
+/**
  * ================================================================================================================
  * *** v4088 -- WHAT EACH LIST CLAIMS, DECLARED ONCE, BECAUSE THE SAME MISTAKE HAS NOW BEEN MADE MULTIPLE TIMES. ***
  * ================================================================================================================

@@ -27,7 +27,7 @@ import { BASES } from "../../physics/crystal/structureFactor.mjs";
 import { INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
 import { SCENARIOS } from "../../physics/blobKelvin.js";
-import { sameValue, partialDeafness, deafnessUnanswered, LIST_CLAIMS } from "./knobLiveness.mjs";
+import { sameValue, partialDeafness, deafnessUnanswered, LIST_CLAIMS, jointlyLive } from "./knobLiveness.mjs";
 import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -575,12 +575,20 @@ console.log("\n3j. *** v4088 -- THE ONE RULE THREE LISTS HAVE NOW NEEDED, ENFORC
         "talking about and claims nothing beyond them. A list that reported 'k is deaf' without saying where " +
         "would need the universal rule too.");
 
-    // *** AND THE REAL DEVICE, NOT ONLY THE SYNTHETIC ROW. *** quantum.N, starved down to `bands` alone
-    // (budgetMs: 2000, well under the ~230 ms cost of one `bands` build here plus the knobs ahead of it in
-    // Object.keys order), then widened. MEASURED on this tree, directly: before this round's fix, this exact
-    // row satisfied insensitiveKnobs's filter and printed "quantum.N (moves at 800000000)"; this tree's own
-    // unstarved sweep (`--only quantum`, default budget) reports N live in `well` with 3 observables moving.
-    const { rows: qrows } = await knobLiveness({ only: ["quantum"], budgetMs: 2000 });
+    // *** AND THE REAL DEVICE, NOT ONLY THE SYNTHETIC ROW. *** quantum.N, starved down to `bands` alone.
+    // MEASURED on this tree, directly: before this round's fix, this exact row satisfied insensitiveKnobs's
+    // filter and printed "quantum.N (moves at 800000000)"; this tree's own unstarved sweep (`--only quantum`,
+    // default budget) reports N live in `well` with 3 observables moving.
+    //
+    // *** v4100 -- RE-MEASURED: budgetMs: 2000 STOPPED REACHING N AT ALL. *** The original comment here quoted
+    // ~230ms for one `bands` build plus the knobs ahead of N in Object.keys order; MEASURED FRESH, 2000ms now
+    // probes exactly ONE knob (bandGridN) and never reaches N -- `qn` came back undefined and the assertion
+    // read "NOT FOUND" rather than testing anything. Not a hang and not this round's regression: quantum's
+    // per-knob build cost grew the same way the rest of this lab's registry-scaled costs have all session
+    // (labResults' device count, libmSensitivity's sweep, knobLiveness's own tool-front-door cap). MEASURED A
+    // SAFE MARGIN rather than nudging the number: 2000ms reaches 1 knob (2657ms wall), 4000ms reaches N with
+    // room to spare (4324ms wall, still correctly incomplete) -- 6000ms is comfortably above both.
+    const { rows: qrows } = await knobLiveness({ only: ["quantum"], budgetMs: 6000 });
     await widenStill(qrows, { budgetMs: 20000 });
     const qn = qrows.find((r) => r.knob === "N");
     ok("!! *** quantum.N, REAL DEVICE: STARVED TO `bands` ALONE, WOKEN BY THE WIDE LADDER, AND NOT CALLED INSENSITIVE ***",
@@ -592,6 +600,42 @@ console.log("\n3j. *** v4088 -- THE ONE RULE THREE LISTS HAVE NOW NEEDED, ENFORC
             "does not read it, so the near ladder found nothing and the wide ladder woke something incidental. " +
             "This tree's own unstarved sweep reports N live in well with 3 observables."
             : "NOT FOUND");
+}
+
+console.log("\n3k. *** v4100 -- A FOURTH THING THAT LOOKS LIKE A DEAD KNOB: A PAIR THAT ONLY WORKS TOGETHER ***");
+{
+    // This file names three conditions behind a still reading -- dead, saturated, quantised below the step.
+    // thermal.beta and thermal.gravity survive BOTH ladders in every mode and plant state: 1.5x/0.5x/8x and
+    // 1e-6x to 1e6x and negated. They would be the first unregistered still knobs in four sweeps.
+    const dev = await getDevice("thermal");
+    const base = await dev.build({ mode: "convect", config: {} });
+    const only = async (cfg) => {
+        const o = await dev.build({ mode: "convect", config: cfg });
+        return Object.keys(base).filter((k) => JSON.stringify(base[k]) !== JSON.stringify(o[k]));
+    };
+    const b = await only({ beta: 1 }), g = await only({ gravity: 1e-3 }), both = await only({ beta: 1, gravity: 1e-3 });
+    ok("!! *** NEITHER MOVES ANYTHING ALONE AND TOGETHER THEY MOVE THREE OBSERVABLES ***",
+        b.length === 0 && g.length === 0 && both.length >= 3,
+        "beta=1 alone: " + (b.join(", ") || "NOTHING") + " | gravity=1e-3 alone: " + (g.join(", ") || "NOTHING") +
+        " | both: " + both.join(", ") + ". *** BOTH DEFAULT TO ZERO AND THEY MULTIPLY -- Boussinesq buoyancy " +
+        "is beta * gravity * dT, so moving either alone leaves the product at zero. NEITHER KNOB IS DEAD; THE " +
+        "PAIR IS THE KNOB, and a probe that moves one at a time cannot see it however far it moves that one. ***");
+
+    const rows = [
+        { device: "thermal", knob: "beta", live: [], still: ["convect"], probed: ["convect"], incomplete: false },
+        { device: "thermal", knob: "gravity", live: [], still: ["convect"], probed: ["convect"], incomplete: false },
+    ];
+    const found = await jointlyLive(rows, { budgetMs: 120000 });
+    ok("!! ...and the pair pass finds it without being told which pair to try",
+        found.length >= 1 && found[0].includes("beta") && found[0].includes("gravity"),
+        (found[0] || "NOTHING FOUND") + ". Only STILL knobs whose default is ZERO are paired, which is what " +
+        "keeps this a handful of builds instead of the O(K^2) sweep that pairing every knob would be -- a " +
+        "knob already at a working value multiplies to something, one at zero cannot.");
+
+    report("*** AND IT REMAINS A READING ***",
+        "a pair that moves something together is JOINTLY GATED; a pair that does not has been asked one more " +
+        "question and not answered. Nothing here promotes a knob to live on its own, and thermal.beta and " +
+        "thermal.gravity are still reported still -- correctly, because each of them alone is.");
 }
 
 console.log("\n4. THE REGISTER OF EXAMINED STILL KNOBS");
