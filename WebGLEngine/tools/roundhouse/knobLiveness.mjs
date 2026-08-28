@@ -77,6 +77,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEVICE_NAMES, getDevice } from "./devices.mjs";
 import { deviceModeTable } from "./deviceModes.mjs";
+import { costFor } from "./costRecord.mjs";
 
 /**
  * The values tried for one knob. A knob is live as soon as ONE of them moves something -- the rest are skipped.
@@ -263,12 +264,32 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
         // below: without this the census could not say WHERE its coverage stopped, only that it had.
         const devStart = Date.now();
         let overBudget = false;
-        const entered = [], declared = new Set();
+        const entered = [], declared = new Set(), unaffordable = [];
         for (const mode of modes) {
             if (overBudget) break;
             let def; try { def = dev.defaults({ mode }); } catch { continue; }
             const cfg = (def && def.config) || {};
             const m = (def && def.mode) || mode;
+
+            // *** v4044 -- A BUDGET SMALLER THAN ONE BUILD BUYS NOTHING, AND SPENDING IT PROVES THAT SLOWLY.
+            // ***
+            // A probe needs at least two builds -- a baseline and one rung -- so a budget that cannot afford
+            // two is spent entirely on a base build whose result is then thrown away. MEASURED: a sweep gave
+            // twof 240 s, one build of it is ~212 s, and the run reported "OVER BUDGET at 240000 ms -- probed
+            // 0 OF 3 DECLARED KNOBS" after four minutes of work that answered nothing.
+            //
+            // *** AND "OVER BUDGET, PROBED 0 OF 3" READS LIKE A SLOW DEVICE RATHER THAN AN IMPOSSIBLE
+            // REQUEST. *** The cost record knows the difference and can say which it is BEFORE the time is
+            // spent, naming the budget that would actually work. That is the record earning its keep on the
+            // question it was built for -- what a device costs when the sweep reaches it.
+            //
+            // With no record there is no estimate and the mode is attempted exactly as before: an unknown
+            // cost is not an excuse to skip work.
+            const known = costFor(name, m);
+            if (known != null && known * 2 > budgetMs) {
+                unaffordable.push(m + " (one build ~" + Math.round(known / 1000) + " s)");
+                continue;
+            }
             entered.push(mode);
             for (const k of Object.keys(cfg)) declared.add(k);
             for (const ps of PLANT_STATES) {
@@ -352,13 +373,28 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
         // AND THIS ROW HAD SEEN ONE. *** The knob was live the whole time and the report said dead, which is
         // the one failure mode a census of dead knobs cannot have: it manufactures exactly the work it exists
         // to find. Incomplete rows now go in their own list, WITH THE MODES THAT WERE NEVER OPENED NAMED.
+        if (unaffordable.length) {
+            const need = Math.max(...unaffordable.map((u) => parseInt(u.replace(/.*~(\d+) s.*/, "$1"), 10) || 0));
+            notes.push(name + ": " + unaffordable.length + " mode(s) NOT ATTEMPTED, the budget cannot afford "
+                + "two builds -- " + unaffordable.join(", ") + " against a budget of "
+                + Math.round(budgetMs / 1000) + " s. RAISE IT TO AT LEAST " + (need * 4) + " s FOR THIS DEVICE. "
+                + "Skipped rather than spent: a budget under one build answers nothing and takes just as long.");
+        }
         if (overBudget) notes.push(name + ": OVER BUDGET at " + budgetMs + " ms -- probed " +
             [...acc.values()].filter((a) => a.probed.length).length + " of " + declared.size + " declared knobs" +
             (entered.length < modes.length
                 ? "; MODES NEVER ENTERED: " + modes.filter((m) => !entered.includes(m)).join(", ")
                 : "") + ", INCOMPLETE");
+        // *** A MODE SKIPPED FOR COST IS A MODE NOT ENTERED, AND THE ROW MUST SAY SO. *** The first draft of
+        // the affordability skip used a bare `continue`, leaving `incomplete` false -- so twof, whose two
+        // expensive modes were skipped and whose cheap `envelope` mode replays recorded numbers and reads no
+        // knobs at all, reported THREE FALSE DEAD KNOBS under MOVES NOTHING ANYWHERE: record, runIndex,
+        // settle. A saved four minutes bought a wrong answer, which is the worse trade, and it is the same
+        // measurement-versus-admission line as v4030, v4031, v4042a and v4043 -- walked into one commit after
+        // fixing the fourth instance of it.
+        const cutForCost = unaffordable.length > 0;
         for (const [knob, a] of acc) rows.push({
-            device: name, knob, modeSource, incomplete: overBudget,
+            device: name, knob, modeSource, incomplete: overBudget || cutForCost,
             unenteredModes: modes.filter((m) => !entered.includes(m)), ...a,
         });
     }
