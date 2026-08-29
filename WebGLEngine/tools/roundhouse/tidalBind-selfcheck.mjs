@@ -1,6 +1,15 @@
 // tools/roundhouse/tidalBind-selfcheck.mjs
 //
-// Run: node tools/roundhouse/tidalBind-selfcheck.mjs   (~6s MEASURED -- four modes, each integrating geodesics)
+// Run: node tools/roundhouse/tidalBind-selfcheck.mjs   (~0.85s MEASURED -- four modes, each integrating geodesics)
+//
+// v4130 -- THE TWO SIDES OF THE TIER-2 MERGE DISAGREED ABOUT THIS NUMBER AND IT WAS SETTLED BY RE-RUNNING IT.
+// The file arrived from two branches byte-identical except for this line: 0.85s here, ~6s on the branch. Both
+// were taken in good faith on different machines, so the merge resolved it the only way that settles anything
+// -- measured again on the applying machine: 840 ms, which is this side's figure. THE ~6s IS NOT DELETED AS
+// WRONG, because v4038a's rule is that a cost hint is machine-local AND load-local: a box seven times slower
+// here is a plausible box, not a mistake. Kept as the wider bound a budget should respect, in the same shape
+// twoFBind.mjs uses for its own disagreeing rows -- deleting the other number would destroy the evidence that
+// they ever differed, and one of them describes a machine this one is not.
 //
 // *** THIS DEVICE HAD NO GATE AT ALL. *** tidalBind.mjs has existed since v2894, carries a declared plant since
 // v3686, exports seventeen observables across four modes -- and nothing ran it. It was found by knobLiveness
