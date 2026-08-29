@@ -42,25 +42,54 @@ const A = await import(pathToFileURL(path.join(ENG, "tools", "roundhouse", "assu
 // all: not how far it got, not which device was slow, not whether it was stuck or merely long. The tree's own
 // rule is that a timeout wants "either a longer budget or a smaller fixture" -- AND YOU CANNOT CHOOSE BETWEEN
 // THOSE FROM AN EMPTY REPORT. Progress is written as it goes, so a kill leaves a position instead of a blank.
+// v4136 -- *** THE PROGRESS LINE NAMED THE CULPRIT AND CALLED IT SOMETHING ELSE. ***
+// Keith's timeout ended on "classified 80/129 ... (last: twof)". `n` there is the device ABOUT TO BE BUILT,
+// not the one just finished -- so the line that looked like "twof is done, 49 to go" actually meant "we are
+// starting twof now", and twof is 178.1s of a 250.9s run: 71% of this gate, measured. The one label anybody
+// reads at a timeout pointed at the right device while saying the opposite about it.
+//
+// TWO THINGS ARE ADDED, and they are what v3923 was reaching for when it added progress at all ("you cannot
+// choose between a longer budget and a smaller fixture from an empty report"): a position is not enough when
+// one device is most of the cost. The line now names what FINISHED and what is STARTING, and any device that
+// costs real time is announced on its own the moment it lands -- so a kill leaves a COST, not just a place.
+const SLOW_DEVICE_MS = 5000;
 async function classify() {
     const rows = [];
+    const costs = [];
     let done = 0; const total = D.DEVICE_NAMES.length; const t0 = Date.now();
+    let prev = "(none)";
     for (const n of D.DEVICE_NAMES) {
         if (done && done % 10 === 0) {
             const s = (Date.now() - t0) / 1000;
             console.log("  ----  classified " + String(done).padStart(3) + "/" + total + "  " +
-                        s.toFixed(0) + "s elapsed, ~" + (s / done * total).toFixed(0) + "s projected  (last: " + n + ")");
+                        s.toFixed(0) + "s elapsed, ~" + (s / done * total).toFixed(0) + "s projected" +
+                        "  (finished: " + prev + " | starting: " + n + ")");
         }
         done++;
-        let d; try { d = await D.getDevice(n); } catch { continue; }
-        if (typeof d.defaults !== "function" || typeof d.build !== "function") continue;
+        const tDev = Date.now();
+        const settle = () => {
+            const ms = Date.now() - tDev;
+            costs.push([n, ms]); prev = n;
+            // Announced AS IT HAPPENS, not only in a summary a killed run never reaches.
+            if (ms >= SLOW_DEVICE_MS) console.log("  ----    " + n + " took " + (ms / 1000).toFixed(1) + "s");
+        };
+        let d; try { d = await D.getDevice(n); } catch { settle(); continue; }
+        if (typeof d.defaults !== "function" || typeof d.build !== "function") { settle(); continue; }
         const def = d.defaults({});
-        let o; try { o = await d.build({ mode: def.mode }); } catch { continue; }
+        let o; try { o = await d.build({ mode: def.mode }); } catch { settle(); continue; }
+        settle();
         const errs = Object.entries(o).filter(([k, v]) => /err/i.test(k) && typeof v === "number" && isFinite(v) && v !== 0);
         if (!errs.length) { rows.push({ n, group: "NO-ERROR-TERM", best: null }); continue; }
         const best = Math.min(...errs.map(([, v]) => Math.abs(v)));
         rows.push({ n, group: best < 1e-8 ? "EPSILON" : (best < 1e-3 ? "TIGHT" : "LOOSE"), best });
     }
+    // WHERE THE TIME WENT, printed every run rather than only when somebody asks. A gate this expensive that
+    // cannot say WHICH device it spent itself on is a gate whose budget can only ever be guessed at.
+    costs.sort((a, b) => b[1] - a[1]);
+    const sum = costs.reduce((a, c) => a + c[1], 0) || 1;
+    console.log("  ----  cost: " + (sum / 1000).toFixed(1) + "s over " + costs.length + " devices; slowest -> " +
+                costs.slice(0, 3).map(([n, ms]) => n + " " + (ms / 1000).toFixed(1) + "s (" +
+                (100 * ms / sum).toFixed(0) + "%)").join(", "));
     return rows;
 }
 const rows = await classify();

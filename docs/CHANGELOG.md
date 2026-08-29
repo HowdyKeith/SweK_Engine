@@ -8,6 +8,23 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4136 -- a gate that has hard-crashed since v4055, and a timeout report that named the culprit while calling it something else
+
+Two rig failures from Keith, and neither was the thing it looked like.
+
+*** blackbodyBind HAS BEEN CRASHING FOR EIGHTY VERSIONS AND NOTHING NOTICED. *** It died on `v.exitanceQuarticRel.toExponential(3)` -- TypeError, undefined. The observable is not missing by accident: v4055 DELETED IT ON PURPOSE, and its note is the argument. exitance(T) is sigma*T^4, so exitance(tHi)/exitance(tLo) IS pow(tHi/tLo,4) algebraically -- sigma cancels, and so does the exponent, because the 4 is on both sides. What was left graded IEEE754 rather than physics, so the observable went and tLo/tHi went with it. THE SELFCHECK KEPT TWO REFERENCES. One threw; that is the crash Keith saw.
+
+THE SECOND REFERENCE IS WORSE THAN THE CRASH. A list of seven observables asserted BIT-IDENTICAL under the plant still carried the dead name, and `h.exitanceQuarticRel === p.exitanceQuarticRel` is `undefined === undefined` -- TRUE. A check advertising seven was really asserting six and taking a free pass on the seventh. A crash announces itself; a vacuous pass does not. The list is now checked to EXIST before it is checked to MATCH, so deleting an observable can never again quietly hollow out the check that named it. The dead check is NOT re-implemented: restoring the observable would restore the tautology v4055 spent a round arguing away.
+
+AND NOTHING CAUGHT IT. gate-timings.json records blackbodyBind at 560ms -- so it HAS been run and timed -- while its failingAt table, 19 entries of known-red gates, does not list it. That snapshot predates v4055. A gate can therefore hard-crash for eighty versions with a plausible runtime on file and an absence from the red list, and the first thing to notice is a person clicking it on rig.html.
+
+*** AND THE assumptionMap TIMEOUT REPORT POINTED AT THE RIGHT DEVICE WHILE SAYING THE OPPOSITE ABOUT IT. *** The run died at 557s ending on "classified 80/129 ... (last: twof)". `n` in that line is the device ABOUT TO BE BUILT, not the one just finished -- so a line reading "twof is done, 49 to go" actually meant "we are starting twof now". Timed per device: 250.9s total and TWOF ALONE IS 178.1s, 71% of the whole gate. kh is 20.6s, stability 16.4s, the top five are 90.4%, and the remaining 124 devices share under 10% between them. The one label anybody reads at a timeout had named the culprit and mislabelled it as already past.
+
+So the line now says what FINISHED and what is STARTING, any device costing over five seconds is announced the moment it lands, and every run ends with where the time went. v3923 added progress because "you cannot choose between a longer budget and a smaller fixture from an empty report"; a position is still not enough when one device is most of the cost. Re-run with it: the projection reads ~69s at 80/129 and ~340s at 90/129, and the line between them says `twof took 177.8s`.
+
+NOT ACTED ON, DELIBERATELY: twof's fixture is not shrunk. It would change what assumptionMap classifies, and the classification IS this gate's verdict -- a round must not move a verdict it is not about, which is gateBudget's own rule at the configContract entry. The measurement is recorded beside the budget so the choice is informed. The budget entry is also LEFT ALONE at 278482ms: this box measured 250.7s, BELOW it, and v4075 faced exactly this and refused to move it, because a table only ever revised upward drifts toward never failing.
+
+Verified: blackbodyBind all checks pass; assumptionMap all checks pass in 250.7s. 1232 gates.
 ## Since v4135 -- the launcher fix was right and the polish I bundled with it was not
 
 Keith, on the v4134 clone: "it opened and then all consoles closed. now nothing is running."

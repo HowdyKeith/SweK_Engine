@@ -303,6 +303,17 @@ export const MEASURED = {
     // MEASURED ON THIS BOX, wall-clock, each run to completion:
     "tools/roundhouse/configContract-selfcheck.mjs":  72509,
     "tools/roundhouse/compose-selfcheck.mjs":         88479,
+    // *** v4136 -- WHERE THIS 278s ACTUALLY GOES, because "either a longer budget or a smaller fixture" is a
+    // choice nobody could make without it. Keith's rig TIMED OUT at 557s (this entry x2) with the progress log
+    // ending on "80/129 (last: twof)". Timed per device on this box: 250.9s total, and TWOF ALONE IS 178.1s --
+    // 71% of the whole gate. kh is 20.6s, stability 16.4s; the top five are 90.4% and the remaining 124
+    // devices share under 10% between them. So this is not a gate that grew evenly and it is not a slow host:
+    // it is ONE DEVICE, and any budget conversation that does not start there is arithmetic about noise.
+    //
+    // NOT ACTED ON HERE, and that is deliberate. Shrinking twof's fixture inside assumptionMap would change
+    // what gets classified, and the classification IS the verdict this gate exists to produce -- a round must
+    // not move a verdict it is not about (this table's own rule, stated at the configContract entry above).
+    // The measurement is recorded so the choice is informed; the choice is Keith's.
     "tools/roundhouse/assumptionMap-selfcheck.mjs":  278482,
     "tools/roundhouse/census-selfcheck.mjs":         697984,
     // *** NOT GIVEN A BUDGET, AND SAYING SO IS THE POINT: corroborationCensus ran past 1500s and was KILLED
