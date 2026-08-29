@@ -8,6 +8,19 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4142 -- the Deck gets adb, and the installer learns the difference between required and optional
+
+Keith asked whether the Deck could show the SweK remote panel for a Roku or a Shield/Android TV. Roku needed nothing extra -- ui/rokuRemotePanel.js talks plain ECP over HTTP (port 8060) through a Node-only proxy in ai-bridge/server.js, no external binary, so it already worked the moment install-steamdeck.sh finished at v4140.
+
+Shield/Android TV is different: ui/shieldDebugPanel.js drives it through ai-bridge/server.js's /shield/exec route, which shells out to a real `adb` binary on whichever machine's ai-bridge handles the request, and install-steamdeck.sh never installed one.
+
+Added an adb step to install-steamdeck.sh, offering Distrobox first -- same read-only-root reasoning as the Node.js step, and the same container -- with Google's platform-tools zip as a second path, since unlike Node.js it needs no package manager or Distrobox at all, just unzip and PATH.
+
+THE PART THAT MATTERED WAS NOT THE INSTRUCTIONS, IT WAS THE CONTROL FLOW. adb is genuinely optional -- the engine, and the Roku panel specifically, work fully without it -- so this step must never call the script's own fail(), which exits 1 and aborts the whole install. Copying the Node.js block's fail-if-missing shape here would have been wrong: Node is not optional, adb is.
+
+steamdeckLaunch-selfcheck's new section 7 proves this rather than trusting a read of the source: it isolates the adb-missing block from the shipped file and asserts the word "fail" never appears in it, then goes further and RUNS install-steamdeck.sh FOR REAL with adb kept off PATH -- a real gap on this sandbox, not a simulated one (`command -v adb` genuinely exits 1 here) -- and confirms the script still reaches "Setup complete." A sabotage check (inserting a real fail() call into a throwaway copy of the block) confirmed the isolation regex actually catches it, rather than trivially passing.
+
+Verified: steamdeckLaunch-selfcheck all checks pass (24 checks across 7 sections), tools/check.mjs syntax OK (1464 files), install-steamdeck.sh run for real twice -- once with adb genuinely absent (prints the Distrobox/platform-tools instructions, continues, reaches Setup complete) and once with a stubbed adb on PATH (reports its version, no instructions printed). verify.mjs ALL GREEN.
 ## Since v4141 -- rig.html sorts by measured time, and a repaint that would have hidden its own results
 
 Keith: "for rig.html, could we have an option to sort the tests by short time first, instead of alphabetical?" Added a sort dropdown (A-Z / shortest first) next to Run all and Stop.

@@ -106,6 +106,34 @@ else
     fi
 fi
 
+# ---- 2c. adb (optional -- only needed for the Shield / Android TV remote panel) ----
+# *** v4142 -- ROKU NEEDED NOTHING EXTRA; SHIELD DOES, AND THIS IS WHY. *** ui/rokuRemotePanel.js talks ECP
+# over plain HTTP (port 8060) through a Node-only proxy in ai-bridge/server.js -- no external binary, so it
+# already worked the moment install-steamdeck.sh finished. ui/shieldDebugPanel.js is different: server.js's
+# /shield/exec route shells out to a real `adb` binary (execFile("adb", ...)) on whichever machine's ai-bridge
+# handles the request, and that binary was never part of this installer. Same read-only-root trap as Node.js
+# above applies to `pacman -S android-tools`, so Distrobox is offered first here too; Google's own downloadable
+# platform-tools zip is the second path because, unlike Node.js, it needs no package manager or Distrobox at
+# all -- just unzip and add to PATH, which is why it is listed as B rather than C this time.
+if ! command -v adb >/dev/null 2>&1; then
+    say ""
+    say "adb (Android Debug Bridge) not found -- optional, only needed to control a Shield / Android TV from"
+    say "this engine's Shield panel. The Roku remote panel already works without it."
+    say ""
+    say "  ${BOLD}A. Distrobox (recommended on SteamOS -- same container as Node.js above)${RESET}"
+    say "     distrobox enter swek"
+    say "     sudo pacman -Sy android-tools           # provides adb, persists across updates"
+    say "     distrobox-export --bin \$(which adb)"
+    say ""
+    say "  ${BOLD}B. Google's platform-tools zip (any Linux, no root, no Distrobox needed)${RESET}"
+    say "     Download from https://developer.android.com/tools/releases/platform-tools"
+    say "     unzip and add its folder to PATH"
+    say ""
+    say "Skip this if you only want Roku control, or add adb later and re-run this script."
+else
+    ok "adb $(adb --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "present") -- Shield / Android TV panel will work"
+fi
+
 # ---- 3. npm install ----
 if [ ! -d "ai-bridge/node_modules" ]; then
     say ""

@@ -182,6 +182,53 @@ console.log("\n6. THE PORT-TAKEOVER LOOP CANNOT SPIN FOREVER ON A PID IT NEVER F
         "kill \"\" is a bash error, not a no-op -- this is the branch that fires when even the fixed fallback finds nothing");
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n7. adb IS OFFERED FOR SHIELD/ANDROID TV, OPTIONAL, AND NEVER RUN BY THE SCRIPT ITSELF");
+{
+    // v4142 -- ui/shieldDebugPanel.js's server-side route (ai-bridge/server.js's /shield/exec) shells out to a
+    // real `adb` binary; ui/rokuRemotePanel.js does not (plain Node http to ECP port 8060), which is why this
+    // section exists only for adb and Roku needed nothing here. Unlike Node.js, adb is genuinely OPTIONAL --
+    // the engine, and the Roku panel specifically, work fully without it -- so this block must never call the
+    // script's own `fail` (which exits 1 and aborts the whole install over a feature nobody may want).
+    const src = rd(INSTALL);
+    ok("!! the adb block is GATED behind a real presence check, not printed unconditionally",
+        /if ! command -v adb >\/dev\/null 2>&1; then/.test(src));
+    ok("!! it names Distrobox as the SteamOS-recommended path, same container as the Node.js step",
+        /Distrobox.*same container as Node\.js|same container as Node\.js.*Distrobox|Distrobox \(recommended on SteamOS/.test(src));
+    ok("!! ...and offers Google's platform-tools zip as a no-Distrobox, no-root alternative",
+        /platform-tools/.test(src) && /developer\.android\.com/.test(src));
+    ok("!! it says PLAINLY that Roku already works without it, so a reader does not chase a dependency they don't need",
+        /Roku.*(already works|works without)/i.test(src));
+    // THE PART THAT MATTERS: this block must be able to fall through to npm install even when adb is absent.
+    // A `fail` call here would abort setup entirely over an optional feature -- the exact overreach v3xxx's
+    // Node.js block is RIGHT to commit (Node is not optional) and this block would be WRONG to copy.
+    const adbBlockMatch = /if ! command -v adb[\s\S]*?\nfi\n/.exec(src);
+    ok("!! the adb-missing block can be isolated in the file", !!adbBlockMatch);
+    if (adbBlockMatch) {
+        ok("!! ...and that block never calls fail() (adb is optional; Node.js above is not)",
+            !/\bfail\b/.test(adbBlockMatch[0]));
+    }
+    // RUN IT FOR REAL: the script must reach "Setup complete" whether or not adb is on PATH -- proof, not a
+    // regex guess about bash control flow. A PATH built from node's REAL install dir plus /usr/bin:/bin (and
+    // deliberately nothing that could hold an adb binary) simulates the box this sandbox actually is: adb
+    // genuinely absent here (checked: `command -v adb` exits 1), Node genuinely present but not on the system
+    // PATH by default (this box's node lives under /opt), which is why that directory is named explicitly
+    // rather than trusted to already be in process.env.PATH.
+    try {
+        const nodeDir = path.dirname(process.execPath);
+        const out = execFileSync("bash", [INSTALL], {
+            timeout: 30000, encoding: "utf8",
+            env: { ...process.env, PATH: nodeDir + ":/usr/bin:/bin" },
+        });
+        ok("!! install-steamdeck.sh RUN FOR REAL with adb off PATH still reaches Setup complete",
+            /Setup complete/.test(out) && /adb .* not found -- optional/.test(out),
+            "confirms the missing-adb branch is reachable AND non-fatal in the real script, not just in a regex read of it");
+    } catch (e) {
+        ok("!! install-steamdeck.sh RUN FOR REAL with adb off PATH still reaches Setup complete", false,
+            String((e && e.message) || e).slice(0, 300));
+    }
+}
+
 console.log("\n  ----  NOT RUN HERE: the actual Steam Deck. This box is generic Linux (verified: lacks `ss`, which is exactly");
 console.log("  ----  the case the /proc fallback above is proven against), and has no AMD RDNA2 GPU to confirm the Vulkan");
 console.log("  ----  pin against real hardware, and no Distrobox to confirm the install instructions verbatim. What IS");
