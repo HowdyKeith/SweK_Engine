@@ -7,10 +7,34 @@
 //
 // *** THE SHIPPED VISCOSITY FAILS IT AND THAT IS NOT NEWS -- it is why viscosityThreshold exists. What is new
 // is that the numbers are RE-DERIVED EVERY RUN rather than sitting in MEASURED_V3542 as readings somebody once
-// took: visc 0.1 -> 2.734, 0.3 -> 1.550, 0.47 -> 0.775, 0.7 -> 0.692, 1.5 -> 0.346. ***
+// took. THE RATIO FALLS MONOTONELY AS VISCOSITY RISES, AND CROSSES ONE partway up the sweep -- that shape is
+// the claim, and every assertion below re-derives it as an INEQUALITY rather than comparing to a stored value.
+//
+// *** v4139 -- THE SENTENCE ABOVE USED TO END WITH FIVE FROZEN DECIMALS, WHICH IS THE THING IT SAYS NOT TO DO.
+// *** A sentence refusing frozen readings, immediately freezing five of them. claimTrace reads this header --
+// everything before the first import -- for numbers carrying two or more decimals, and asks whether the device
+// can still produce them. On Keith's rig TWO THAT MATCH HERE DID NOT MATCH THERE, taking this gate's
+// untraceable count from three to five and reddening the ratchet.
+//
+// THEY ARE NOT PORTABLE NUMBERS, AND THAT IS NOT A DEFECT IN HIS RIG. This fixture is DELIBERATELY UNSTABLE --
+// a ratio above one means the solver is inventing energy, which is the entire point of the key -- and an
+// unstable SPH run's energy ratio after many steps is set by how the divergence develops, which differences in
+// the last bit move. Measured here: bit-identical under two Node versions, so nothing on this box is flaky; his
+// Node 24 Windows rig disagreed by more than claimTrace's generous two-percent tolerance. The same shape as
+// v4137's cflBind runaway, one file over.
+//
+// THE READINGS ARE NOT DELETED. They sit below the imports, out of the region a gate reads as CLAIMS and into
+// the region that holds CONTEXT, labelled with the box that took them. A header states what a gate PROVES; one
+// machine's reading of a divergent run is not that. AND THIS NOTE CARRIES NO DECIMALS OF ITS OWN, because the
+// first draft of it quoted the five it was removing and took the header from five claims to eight.
 
 import { stabilityDevice, STABILITY_MODES, buildStability } from "./stabilityBind.mjs";
 import { DEVICE_NAMES } from "./devices.mjs";
+
+// ONE BOX'S READINGS, kept for the shape rather than for the values. Measured on the authoring machine
+// (Linux, Node 20 and 22 agreeing bit-for-bit): visc 0.1 -> 2.734, 0.3 -> 1.550, 0.47 -> 0.775, 0.7 -> 0.692,
+// 1.5 -> 0.346. Monotone, crossing 1 between 0.3 and 0.47. ANOTHER MACHINE WILL NOT REPRODUCE THESE EXACTLY --
+// see the header -- so nothing below compares against them; the assertions re-derive and test inequalities.
 
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };

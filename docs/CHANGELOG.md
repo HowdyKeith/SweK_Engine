@@ -8,6 +8,23 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4139 -- a sentence that refused frozen readings, and then froze five of them
+
+Keith's rig: claimTrace's ratchet went red on one row -- stabilityBind, untraceable claims 3 -> 5.
+
+*** THE FILE HAD NOT CHANGED SINCE v3845, SO THE CLAIMS WERE NOT NEW. *** What changed was whether the device could still produce them. Its header ended with five decimals -- visc 0.1 -> 2.734 and four more -- inside the very sentence that says the numbers are "RE-DERIVED EVERY RUN rather than sitting in MEASURED_V3542 as readings somebody once took". A sentence refusing frozen readings, immediately freezing five.
+
+MEASURED BEFORE DECIDING ANYTHING. claimTrace reads a gate's header for numbers with two or more decimals and asks whether any DECLARED mode of the named device still emits them, at a generous two-percent tolerance. Here, two of the five do: the device's default modes give the visc-0.47 ratio, and its deafknob mode gives the visc-0.1 one. The other three come from CONFIG overrides rather than modes, which is exactly the baseline of three. ON KEITH'S RIG NEITHER OF THE TWO MATCHED, which is the whole of the 3 -> 5.
+
+*** THEY ARE NOT PORTABLE NUMBERS, AND THAT IS NOT A DEFECT IN HIS RIG. *** This fixture is DELIBERATELY UNSTABLE: a ratio above one means the solver is inventing energy, which is the entire point of the key it exists to state. An unstable SPH run's energy ratio after many steps is set by how the divergence develops, and last-bit differences move that. Bit-identical here under Node 20 and Node 22 -- so nothing on this box is flaky -- and his Node 24 Windows rig disagreed by more than two percent. THE SAME SHAPE AS v4137's cflBind RUNAWAY, ONE FILE OVER, and finding it twice in two rounds is the finding: a gate that re-derives a number from a divergent simulation and compares it to a written one is comparing machines, not code.
+
+THE READINGS ARE NOT DELETED. They sit below the imports now -- out of the region claimTrace reads as CLAIMS and into the region that holds CONTEXT -- labelled with the box that took them and with a line saying another machine will not reproduce them exactly. That is not hiding a number from the ratchet. A header states what a gate PROVES; one machine's reading of a divergent run is not that, and the assertions below never compared against those literals anyway: they re-derive and test INEQUALITIES (ratio > 2, createsEnergy === true), which is what makes the key portable in the first place.
+
+AND THE FIRST DRAFT OF THE NOTE EXPLAINING ALL THIS QUOTED THE FIVE DECIMALS IT WAS REMOVING, plus the two Node measurements, and took the header from five numeric claims to EIGHT. The file explaining the trap became an instance of it -- the same prose-as-code shape that broke my own arrival gate at v4134. The note carries no decimals of its own now, and says why.
+
+RE-FROZEN WITH THE DOCUMENTED SWITCH, and the diff checked rather than trusted: total 141 -> 135, untraceable 64 -> 61, the stabilityBind row GONE rather than zeroed (a header with no numeric claims is skipped, not counted), and NOTHING ELSE MOVED. The gate's own text calls an unrecorded shrink "headroom", so recording it is the point; its reason is written into the baseline's note.
+
+Verified: claimTrace-selfcheck all checks pass, stabilityBind-selfcheck all checks pass. 1233 gates.
 ## Since v4138 -- an install button for an RDP client, and the 110 lines of it that decided how the button works
 
 Keith pasted https://github.com/nakagami/grdpwasm and asked for the galaxy-profile treatment: install it, run it, credit them, vendor nothing.
