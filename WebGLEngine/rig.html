@@ -96,6 +96,12 @@
     <div class="bar">
       <button class="go" id="all">Run all</button>
       <button id="stop" disabled>Stop</button>
+      <label style="font-size:11px;display:flex;align-items:center;gap:5px;color:var(--dim)">sort
+        <select id="sortMode" style="font:inherit;font-size:11px;background:#0e2036;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:2px 6px">
+          <option value="name">A-Z</option>
+          <option value="time">shortest first</option>
+        </select>
+      </label>
       <span id="tally" class="tot"></span>
       <div id="failed" style="display:none;margin-top:8px;padding:8px 10px;border-left:3px solid #a05040;background:#1a1010;color:#f0b0a0;font:12px ui-monospace,monospace;white-space:pre-wrap;"></div>
     </div>
@@ -105,17 +111,36 @@
 
 <script>
 (function () {
-  var checks = [], stopped = false;
+  var checks = [], rawChecks = [], sortMode = "name", stopped = false;
 
   function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
 
-  function render(data) {
-    // v4129 -- the rigOnly loop went with its panel (see the note above where that panel used to be).
-    // data.rigOnly is still SENT by /rig/list and is deliberately not read here: the payload is shared with
-    // other callers, and narrowing a response because one consumer stopped rendering it would break them.
-    checks = data.checks;
+  // v4141 -- SORT IS A VIEW, NOT A REFETCH. rawChecks keeps /rig/list's own order (alphabetical, from
+  // rigRunner.js's discover()); `checks` is whichever order is currently on screen and is what runOne(i) and
+  // "Run all" actually index into. Re-sorting reassigns `checks` to a reordered COPY of the same objects --
+  // never new ones -- so a result a check already earned (c._result, set in runOne below) travels with it
+  // regardless of where it lands on screen.
+  function sortChecks(mode) {
+    var arr = rawChecks.slice();
+    if (mode === "time") {
+      // UNMEASURED SINKS, IT DOES NOT FLOAT. The exp-column tooltip elsewhere on this page already says it:
+      // "NEVER TIMED. Unmeasured is not quick -- a blank here is missing evidence, not a fast gate." Sorting
+      // nulls first would read as "these are the fastest", which is the opposite of what a blank means.
+      arr.sort(function (a, b) {
+        var ae = a.expectedMs, be = b.expectedMs;
+        if (ae == null && be == null) return a.name.localeCompare(b.name);
+        if (ae == null) return 1;
+        if (be == null) return -1;
+        return ae - be;
+      });
+    }
+    return arr;
+  }
+
+  function paintList() {
     document.getElementById("count").textContent = "(" + checks.length + " found on disk)";
     var list = document.getElementById("list");
+    list.innerHTML = "";
     checks.forEach(function (c, i) {
       var row = el("div", "row");
       var b = el("button", null, "Run");
@@ -160,9 +185,20 @@
       row.appendChild(exp); row.appendChild(st);
       var step = el("div", "step"); step.style.display = "none";
       var out = el("pre"); out.style.display = "none";
+
+      // A RESULT SURVIVES ITS ROW BEING REBUILT. paintList() runs again on every re-sort, throwing away the
+      // old st/out elements -- without this, a check that already passed would read "not run" the moment the
+      // sort order changed, which is exactly the "confident wrong answer" this page's own exit-code rule
+      // exists to refuse elsewhere.
+      if (c._result) {
+        st.className = c._result.stCls; st.textContent = c._result.stText;
+        out.textContent = c._result.outText; out.style.display = c._result.outDisplay;
+      }
+
       list.appendChild(row); list.appendChild(step); list.appendChild(out);
       c._st = st; c._out = out; c._btn = b; c._step = step;
     });
+    tally();
   }
 
   function secs(ms) {
@@ -241,6 +277,7 @@
         c._out.style.display = r.ok ? "none" : "block";
         c._btn.disabled = false;
         c._ok = r.ok; c._timedOut = !!r.timedOut;
+        c._result = { stCls: c._st.className, stText: c._st.textContent, outText: c._out.textContent, outDisplay: c._out.style.display };
         tally();
         return r.ok;
       })
@@ -250,7 +287,9 @@
         c._st.className = "st fail"; c._st.textContent = "error";
         c._out.textContent = String(e); c._out.style.display = "block";
         c._btn.disabled = false;
-        c._ok = false; c._errored = true; tally();
+        c._ok = false; c._errored = true;
+        c._result = { stCls: c._st.className, stText: c._st.textContent, outText: c._out.textContent, outDisplay: c._out.style.display };
+        tally();
       });
   }
 
@@ -284,11 +323,17 @@
     stopped = false;
     document.getElementById("all").disabled = true;
     document.getElementById("stop").disabled = false;
+    // v4141 -- LOCKED FOR THE SAME REASON "all" DISABLES ITSELF: this loop indexes `checks` by POSITION
+    // (i++), so reassigning `checks` to a differently-ordered array mid-loop would run the wrong row at
+    // every remaining i, not just reorder the screen under it.
+    var sortSel = document.getElementById("sortMode");
+    if (sortSel) sortSel.disabled = true;
     var i = 0;
     (function next() {
       if (stopped || i >= checks.length) {
         document.getElementById("all").disabled = false;
         document.getElementById("stop").disabled = true;
+        if (sortSel) sortSel.disabled = false;
         return;
       }
       runOne(i++).then(next);
@@ -296,7 +341,21 @@
   };
   document.getElementById("stop").onclick = function () { stopped = true; };
 
-  fetch("/rig/list").then(function (r) { return r.json(); }).then(render).catch(function (e) {
+  var sortSelEl = document.getElementById("sortMode");
+  if (sortSelEl) sortSelEl.onchange = function () {
+    sortMode = sortSelEl.value;
+    checks = sortChecks(sortMode);
+    paintList();
+  };
+
+  fetch("/rig/list").then(function (r) { return r.json(); }).then(function (data) {
+    // v4129 -- the rigOnly loop went with its panel (see the note above where that panel used to be).
+    // data.rigOnly is still SENT by /rig/list and is deliberately not read here: the payload is shared with
+    // other callers, and narrowing a response because one consumer stopped rendering it would break them.
+    rawChecks = data.checks;
+    checks = sortChecks(sortMode);
+    paintList();
+  }).catch(function (e) {
     document.getElementById("list").textContent = "could not reach /rig/list: " + e;
   });
 })();

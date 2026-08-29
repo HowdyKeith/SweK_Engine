@@ -8,6 +8,17 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4141 -- rig.html sorts by measured time, and a repaint that would have hidden its own results
+
+Keith: "for rig.html, could we have an option to sort the tests by short time first, instead of alphabetical?" Added a sort dropdown (A-Z / shortest first) next to Run all and Stop.
+
+Shortest-first orders by each check's own expectedMs -- the same server-measured number the exp column already prints -- and sinks never-timed checks to the BOTTOM rather than the top. That is not the obvious default: a blank time could easily read as "nothing to wait for", but the exp column's own tooltip already states the opposite -- "unmeasured is not quick -- a blank here is missing evidence, not a fast gate" -- so nulls sort last, after every measured check, alphabetically among themselves.
+
+THE HARDER PART WAS NOT THE SORT. rig.html's rows carry their run state (pass/fail text, output, hash chip) on live DOM elements built once at load. A naive re-sort rebuilds the row list from scratch, which would have blanked every already-run result back to "not run" the instant someone switched sort order -- reporting a check hadn't run when it had, which is exactly the kind of confident wrong answer this page's own exit-code rule exists to refuse for pass/fail itself. Fixed by moving the outcome off the DOM and onto the check object (c._result), independent of whichever row currently represents it, and having every repaint -- including the one a sort triggers -- restore it before deciding a row is blank.
+
+VERIFIED against the real page, not just read: a headless Chromium run (Playwright) against the live ai-bridge server confirmed all 1234 checks sort correctly -- expectedMs strictly non-decreasing through the measured portion (43, 43, 43, 43, 43, 44, 44, 44, 44, 45...) with every never-timed check trailing after the last measured one, the identical SET of checks in both orders, and a check run before switching sort back to A-Z still showing its real pass/fail afterward rather than reverting. The sort control also disables itself while Run all is running, same reason Stop exists for: that loop indexes `checks` by array position, and reordering the array mid-loop would run the wrong row at every step after the swap, not just reorder what's on screen.
+
+Verified: tools/check.mjs syntax OK (1464 files), inline-script parse OK, Playwright end-to-end pass, verify.mjs ALL GREEN. 1234 gates.
 ## Since v4140 -- a Steam Deck peer, and the relaunch that looked like it worked and didn't
 
 Keith asked "can we have a steam deck swek peer?" after a side question about whether the Deck has WebGPU (it does, via Mesa RADV/Vulkan). RESEARCHED FIRST rather than assumed: assetDiscovery.js's UDP beacon, /net/info, /lighthouse, and server.js's GPU-detect and browser-open code already carry real, tested Linux branches. The only actual gap was the launcher trio macOS already has -- install-mac.sh, start-mac.sh, brain/start-brain-mac.sh -- with no Linux/SteamOS equivalent.
