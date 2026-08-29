@@ -203,9 +203,19 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
     const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
     const panel = fs.readFileSync(path.join(ENG, "ui", "githubPanel.js"), "utf8");
 
-    ok("!! the clone COMPARES what it fetched against what is running",
-        /_verLt\(ver, _run\)/.test(src) && /_verLt\(_run, ver\)/.test(src),
-        "both numbers were already in the return and nothing compared them");
+    // *** THIS LINE WAS PINNED TO A LOCAL VARIABLE'S NAME AND WENT RED WHEN THAT NAME CHANGED. *** v4148 renamed
+    // the local from `_run` to `_running` -- because `_run` is ALSO the module-level function that runs git, and
+    // the collision put that function in a temporal dead zone and broke the clone button for fifteen versions.
+    // The rename was the fix. This check asserted the old spelling, so a CORRECT tree failed a check about a
+    // defect that no longer exists: the gate was measuring a name, not the comparison it is named after.
+    // Now it captures whatever the local is called and requires the REVERSE comparison to use the SAME
+    // identifier -- which is the actual claim (both directions, one pair of numbers) and survives the next rename.
+    const cmp = /_verLt\(\s*ver\s*,\s*([A-Za-z_$][\w$]*)\s*\)/.exec(src);
+    const bothWays = !!cmp && new RegExp("_verLt\\(\\s*" + cmp[1].replace(/\$/g, "\\$") + "\\s*,\\s*ver\\s*\\)").test(src);
+    ok("!! the clone COMPARES what it fetched against what is running, in BOTH directions",
+        bothWays,
+        cmp ? "compared against `" + cmp[1] + "` both ways" :
+              "both numbers were already in the return and nothing compared them");
     ok("!! ...and SAYS SO when the copy is older",
         /staleWarning/.test(src) && /older/.test(src),
         "a success tick over a stale tree is how sixteen versions went unnoticed");

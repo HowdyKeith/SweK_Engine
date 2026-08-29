@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 410,
+  "page": 422,
   "demo": 49,
   "builtin": 34
  },
@@ -103,7 +103,7 @@
    "id": "android-invite.html",
    "display": "Android Invite",
    "href": "/android-invite.html",
-   "section": "NearShare",
+   "section": "File Transfer Utils",
    "collision": false
   },
   {
@@ -119,7 +119,7 @@
    "id": "angle-of-repose.html",
    "display": "Angle Of Repose",
    "href": "/angle-of-repose.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -652,6 +652,14 @@
   },
   {
    "kind": "page",
+   "id": "cat-reactions.html",
+   "display": "Cat Reactions",
+   "href": "/cat-reactions.html",
+   "section": "Face & Population",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "catalog.html",
    "display": "Catalog",
    "href": "/catalog.html",
@@ -863,7 +871,7 @@
    "id": "couple.html",
    "display": "Couple",
    "href": "/couple.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -999,7 +1007,7 @@
    "id": "discovery-lab.html",
    "display": "Discovery Lab",
    "href": "/discovery-lab.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1055,7 +1063,7 @@
    "id": "ecology.html",
    "display": "Ecology",
    "href": "/ecology.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1135,7 +1143,7 @@
    "id": "euler-gpu-check.html",
    "display": "Euler Gpu Check",
    "href": "/euler-gpu-check.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1335,7 +1343,7 @@
    "id": "fluid-selfie.html",
    "display": "Fluid Selfie",
    "href": "/fluid-selfie.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1404,6 +1412,14 @@
   },
   {
    "kind": "page",
+   "id": "galaxy-profile.html",
+   "display": "Galaxy Profile",
+   "href": "/galaxy-profile.html",
+   "section": "Opt-in: somebody else's work",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "gallery.html",
    "display": "Gallery",
    "href": "/gallery.html",
@@ -1448,6 +1464,14 @@
    "display": "Geodesic",
    "href": "/geodesic.html",
    "section": "PL: Cosmic & Relativity",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gesture-vfx.html",
+   "display": "Gesture Vfx",
+   "href": "/gesture-vfx.html",
+   "section": "Face & Population",
    "collision": false
   },
   {
@@ -1503,7 +1527,7 @@
    "id": "gravity-waves.html",
    "display": "Gravity Waves",
    "href": "/gravity-waves.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1512,6 +1536,14 @@
    "display": "Gray Scott",
    "href": "/gray-scott.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "grdpwasm.html",
+   "display": "Grdpwasm",
+   "href": "/grdpwasm.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -1551,6 +1583,14 @@
    "id": "health.html",
    "display": "Health",
    "href": "/health.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "heerich-avatar.html",
+   "display": "Heerich Avatar",
+   "href": "/heerich-avatar.html",
    "section": null,
    "collision": false
   },
@@ -1679,7 +1719,7 @@
    "id": "ising.html",
    "display": "Ising",
    "href": "/ising.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1727,7 +1767,7 @@
    "id": "kinematic.html",
    "display": "Kinematic",
    "href": "/kinematic.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1799,7 +1839,7 @@
    "id": "lan.html",
    "display": "Lan",
    "href": "/lan.html",
-   "section": "NearShare",
+   "section": "File Transfer Utils",
    "collision": false
   },
   {
@@ -1823,7 +1863,7 @@
    "id": "lbm-fluid.html",
    "display": "Lbm Fluid",
    "href": "/lbm-fluid.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1831,7 +1871,7 @@
    "id": "lbm3d-flow.html",
    "display": "Lbm3d Flow",
    "href": "/lbm3d-flow.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1839,7 +1879,7 @@
    "id": "lbm3d-gpu-check.html",
    "display": "Lbm3d Gpu Check",
    "href": "/lbm3d-gpu-check.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1847,7 +1887,7 @@
    "id": "lbm3d-gpu.html",
    "display": "Lbm3d Gpu",
    "href": "/lbm3d-gpu.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -1911,7 +1951,7 @@
    "id": "logistic.html",
    "display": "Logistic",
    "href": "/logistic.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -1967,7 +2007,7 @@
    "id": "md-demo.html",
    "display": "Md Demo",
    "href": "/md-demo.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2015,7 +2055,7 @@
    "id": "mpm-gpu-check.html",
    "display": "Mpm Gpu Check",
    "href": "/mpm-gpu-check.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -2023,7 +2063,7 @@
    "id": "mpm-gpu.html",
    "display": "Mpm Gpu",
    "href": "/mpm-gpu.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -2031,7 +2071,7 @@
    "id": "mpm.html",
    "display": "Mpm",
    "href": "/mpm.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -2047,7 +2087,7 @@
    "id": "multigrid.html",
    "display": "Multigrid",
    "href": "/multigrid.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -2119,7 +2159,15 @@
    "id": "normal-modes.html",
    "display": "Normal Modes",
    "href": "/normal-modes.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ntfs-mounter.html",
+   "display": "Ntfs Mounter",
+   "href": "/ntfs-mounter.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -2172,6 +2220,14 @@
   },
   {
    "kind": "page",
+   "id": "pairlane.html",
+   "display": "Pairlane",
+   "href": "/pairlane.html",
+   "section": "File Transfer Utils",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "panel-brain.html",
    "display": "Panel Brain",
    "href": "/panel-brain.html",
@@ -2215,7 +2271,7 @@
    "id": "percolation.html",
    "display": "Percolation",
    "href": "/percolation.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2247,7 +2303,7 @@
    "id": "phase-change.html",
    "display": "Phase Change",
    "href": "/phase-change.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2279,7 +2335,7 @@
    "id": "physics-showcase.html",
    "display": "Physics Showcase",
    "href": "/physics-showcase.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2359,7 +2415,7 @@
    "id": "probe-lab.html",
    "display": "Probe Lab",
    "href": "/probe-lab.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2503,7 +2559,7 @@
    "id": "remote-desktop.html",
    "display": "Remote Desktop",
    "href": "/remote-desktop.html",
-   "section": "NearShare",
+   "section": "File Transfer Utils",
    "collision": false
   },
   {
@@ -2607,7 +2663,7 @@
    "id": "schrodinger.html",
    "display": "Schrodinger",
    "href": "/schrodinger.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -2868,6 +2924,14 @@
   },
   {
    "kind": "page",
+   "id": "steamdeck-peer.html",
+   "display": "Steamdeck Peer",
+   "href": "/steamdeck-peer.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "stellar.html",
    "display": "Stellar",
    "href": "/stellar.html",
@@ -2887,7 +2951,7 @@
    "id": "sync-probe.html",
    "display": "Sync Probe",
    "href": "/sync-probe.html",
-   "section": "NearShare",
+   "section": "File Transfer Utils",
    "collision": false
   },
   {
@@ -2975,7 +3039,7 @@
    "id": "torsion-modes.html",
    "display": "Torsion Modes",
    "href": "/torsion-modes.html",
-   "section": "Matter & Chaos",
+   "section": "PL: Matter & Chaos",
    "collision": false
   },
   {
@@ -3116,6 +3180,22 @@
   },
   {
    "kind": "page",
+   "id": "voxtral.html",
+   "display": "Voxtral",
+   "href": "/voxtral.html",
+   "section": "Opt-in: somebody else's work",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "vpi.html",
+   "display": "Vpi",
+   "href": "/vpi.html",
+   "section": "Opt-in: somebody else's work",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "wadmap.html",
    "display": "Wadmap",
    "href": "/wadmap.html",
@@ -3228,6 +3308,14 @@
   },
   {
    "kind": "page",
+   "id": "webrtx.html",
+   "display": "Webrtx",
+   "href": "/webrtx.html",
+   "section": "Opt-in: somebody else's work",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "webtorrent.html",
    "display": "Webtorrent",
    "href": "/webtorrent.html",
@@ -3255,7 +3343,7 @@
    "id": "wind-tunnel.html",
    "display": "Wind Tunnel",
    "href": "/wind-tunnel.html",
-   "section": "Fluid",
+   "section": "PL: Fluids",
    "collision": false
   },
   {
@@ -3280,6 +3368,14 @@
    "display": "Writeup",
    "href": "/writeup.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "ws-scrcpy.html",
+   "display": "Ws Scrcpy",
+   "href": "/ws-scrcpy.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {

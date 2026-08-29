@@ -2624,6 +2624,7 @@ const gatesBridge = require("./gatesBridge.js");          // v2806 - verificatio
 const toolsBridge = require("./toolsBridge.js");          // v3220 - front door at /tools for the analysis tools that used to print nothing
 const shipBridge = require("./shipBridge.js");            // v2807 - ship-ritual front door at /ship (dry run free; a real ship needs an explicit confirm).
 const deviceBridge = require("./deviceBridge.js");        // v2813 - roundhouse DEVICE front door at /device (pick a lab, watch the loop crystallise round by round).
+const repoTerrainBridge = require("./repoTerrainBridge.js");  // v4149 - count a source tree so world/repoHeightfield.js can make ground out of it.
 const policyMassBridge = require("./policyMassBridge.js");
 const moduleHistoryBridge = require("./moduleHistoryBridge.js");
 const frugonBridge = require("./frugonBridge.js");    // v3039 - LLM call-log cost front door at /frugon (drives frugon, never parses it).// v2856 - mass-vs-merit front door at /policymass.
@@ -4698,6 +4699,13 @@ const server = http.createServer((req, res) => {
         // /okf/* — the engine's OKF self-knowledge bundle, served live. Read-only + public, so no trust gate.
         Promise.resolve(okfBridge.handle(req, res, { sendJson }))
             .catch((e) => { try { sendJson({ ok: false, error: "okf: " + String(e && e.message || e) }, 500); } catch (_) {} });
+        return;
+    }
+    if (repoTerrainBridge.owns(req.url)) {
+        // /repoterrain - walk an allowlisted repository into { path, lines } so window.repoTerrain can stand on
+        // it. Returns COUNTS, never contents, and only for directories inside a repo this box already has.
+        Promise.resolve(repoTerrainBridge.handle(req, res, { sendJson }))
+            .catch((e) => { try { sendJson({ ok: false, error: "repoterrain", message: String(e && e.message || e) }, 500); } catch {} });
         return;
     }
     if (deviceBridge.owns(req.url)) {

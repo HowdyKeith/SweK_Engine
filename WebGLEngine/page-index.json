@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 418,
+ "count": 422,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1218,7 +1218,7 @@
    "f": "galaxy-profile.html",
    "t": "Galaxy Profile SVGs (opt-in)",
    "d": "",
-   "g": "systools",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -1324,6 +1324,13 @@
    "t": "Gray-Scott reaction-diffusion",
    "d": "Reaction-diffusion patterns: spots, stripes, mitosis-like blobs.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "grdpwasm.html",
+   "t": "RDP in the browser (opt-in)",
+   "d": "An opt-in front door to nakagami/grdpwasm (GPL-3.0): a web-based RDP client, Go compiled to WebAssembly speaking RDP in the browser with a small Go proxy bridging its WebSocket to the RDP server's TCP port. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, builds it with the local Go toolchain, and runs their binary as its own subprocess. THE PROXY IS STARTED ON LOOPBACK, and that is the point of this page: upstream's proxy defaults to -listen :8080, accepts WebSocket upgrades from ANY origin, and dials whatever host:port the query string names -- three choices that are individually reasonable for `make serve` on your own desktop and jointly an unauthenticated open TCP relay on a machine that sits on a LAN. It is launched with THEIR OWN -listen flag pointed at 127.0.0.1, so their code is unmodified, unpatched and unforked; the bind is overridable because it is your machine, but never silently, and the bridge returns a warning whenever it is not loopback.",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -1869,7 +1876,7 @@
    "f": "ntfs-mounter.html",
    "t": "NTFS Mounter (opt-in, macOS only)",
    "d": "",
-   "g": "systools",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2531,6 +2538,13 @@
    "p": 0
   },
   {
+   "f": "steamdeck-peer.html",
+   "t": "SweK Steam Deck Peer (SteamOS / Linux)",
+   "d": "The Steam Deck as a full SweK peer: an x86_64 Linux box that runs ai-bridge/server.js itself rather than a subset, joins the UDP 47474 fleet beacon and can host the GPU brain. Honest about the half that has never been verified -- no physical Deck has ever run this, so the RDNA2 GPU rows, SteamOS's read-only root and Game Mode are reasoned from Valve's documentation rather than measured, while the server, beacon, mDNS and port-takeover rows were measured on generic x86_64 Linux.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "stellar.html",
    "t": "SweK &middot; Lane-Emden Polytropes",
    "d": "Turn the polytropic index and watch a star's density profile change shape -- and its surface run away to infinity as the index approaches 5. Three indices have exact closed forms and the page draws them over the integration so you can see the solver land on them; past n=5 the star has no edge at all, which is why Chandrasekhar used it as the boundary of physical polytropes.",
@@ -2751,7 +2765,14 @@
    "f": "voxtral.html",
    "t": "Voxtral in the tab (opt-in)",
    "d": "",
-   "g": "systools",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
+   "f": "vpi.html",
+   "t": "Verified polygon intersection (opt-in)",
+   "d": "An opt-in front door to schildep/verified-polygon-intersection (MIT): a multipolygon intersection algorithm written and machine-checked in Lean 4, compiled to WebAssembly, with a browser demo you draw two multipolygons on and see the proved intersection computed live. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button fetches the four prebuilt static files GitHub Pages already serves (index.html, lean_app.js, lean_app.wasm, coi-serviceworker.min.js) onto THIS machine, pinned to a reviewed commit, and this server serves them back with real Cross-Origin-Opener-Policy/Cross-Origin-Embedder-Policy headers -- upstream's own service worker exists only because GitHub Pages cannot set HTTP headers; this server can, so it does, without touching a byte of their files.",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2856,7 +2877,7 @@
    "f": "webrtx.html",
    "t": "Ray tracing in the page (opt-in)",
    "d": "",
-   "g": "systools",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2906,6 +2927,13 @@
    "t": "Demo Writeup &mdash; SweK Engine",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "ws-scrcpy.html",
+   "t": "Android in the browser (opt-in)",
+   "d": "An opt-in front door to NetrisTV/ws-scrcpy (MIT): browser-based Android screen mirroring and control, over adb, using a vendored unmodified prebuilt Genymobile scrcpy-server.jar. NOTHING OF THEIRS IS VENDORED into this tree or imported into this engine's process -- the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, runs their own five-stage build, and runs their server as its own subprocess. *** IT BINDS TO ALL INTERFACES AND HAS NO LOGIN, AND THAT CANNOT BE CHANGED WITHOUT PATCHING THEIR CODE: *** their HttpServer.ts calls server.listen(port, cb) with no host argument and has no config field for one, unlike grdpwasm's -listen flag which this engine could point at loopback. So the exposure is stated plainly and warned on before every start rather than silently narrowed by running a fork of their behaviour.",
+   "g": "thirdparty",
    "p": 0
   },
   {

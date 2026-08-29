@@ -214,8 +214,14 @@ const OPTS = { h: 0.35, mass: 1000 * 0.13 ** 3, restDensity: 1000, gravity: [0, 
     // are unstable enough that a 1e-14 change in summation order moves a settled statistic. That is a decision
     // with a reason, and a later edit that quietly drops a pin would re-break exactly the gates this round
     // already watched go red -- somewhere else, and much later.
+    // *** THE WINDOWS PATH LAW, WHICH THIS LINE BROKE THE ROUND IT SHIPPED. *** A file: URL's `.pathname` on
+    // Windows is "/C:/..." -- a leading slash IN FRONT OF the drive letter -- so every readFileSync below would
+    // have thrown on Keith's box while passing here on Linux, where the two spellings happen to coincide.
+    // fileURLToPath is the one conversion that is correct on both, and tools/ship/winPathGuard-selfcheck.mjs
+    // exists to catch exactly this; it caught this.
     const fs2 = await import("node:fs"), path2 = await import("node:path");
-    const HERE2 = path2.dirname(new URL(import.meta.url).pathname);
+    const { fileURLToPath: toPath2 } = await import("node:url");
+    const HERE2 = path2.dirname(toPath2(import.meta.url));
     for (const f of ["materialKnobs.mjs", "stability.mjs", "poolFixture.mjs", "hydrostatic.mjs"]) {
         const src = fs2.readFileSync(path2.join(HERE2, f), "utf8");
         ok("!! " + f + " still pins REFERENCE_WALK", /REFERENCE_WALK/.test(src),

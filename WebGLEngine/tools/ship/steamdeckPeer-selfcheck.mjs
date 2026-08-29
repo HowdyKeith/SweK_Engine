@@ -55,8 +55,15 @@ const bridge = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8")
 // ---- 2. THE PAGE SEPARATES MEASURED FROM REASONED, PER ROW ------------------------------------------------
 {
     console.log("\n2. *** MEASURED AND REASONED ARE MARKED APART, WHICH IS THE WHOLE POINT OF THE PAGE ***");
+    // Matched against a WHITESPACE-FLATTENED copy, with \s+ standing in for every gap, rather than as one long
+    // literal run against the raw file. Two reasons, and neither is cosmetic: this sentence lives inside HTML
+    // where a reflow or a re-indent puts newlines between its words at any moment, and a check that a re-wrap
+    // can turn red is a check that teaches people to stop re-wrapping. The second is that tools/ship/
+    // gateQuality-selfcheck.mjs counts an unbroken run of words aimed at unprocessed source as debt, and it was
+    // right to: this one pushed the tree-wide count above its baseline the round it shipped.
+    const flat = page.replace(/\s+/g, " ");
     ok("!! the page states plainly that no physical Deck has ever run this",
-        /No physical Steam Deck has ever run any of this/i.test(page));
+        /No\s+physical\s+Steam\s+Deck\s+has\s+ever\s+run/i.test(flat));
     const measured = (page.match(/<b>MEASURED<\/b>/g) || []).length;
     const unverified = (page.match(/<b>NOT VERIFIED ON HARDWARE\.<\/b>/g) || []).length;
     ok("!! *** BOTH kinds of row actually exist -- a page with only one kind is selling or apologising ***",

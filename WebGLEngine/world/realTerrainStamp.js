@@ -68,6 +68,24 @@ function makeHeightOverride(data, R, baseY, amp) {
     };
 }
 
+// v4149 -- the same (wx,wz) -> cell mapping as makeHeightOverride, returning a BIOME NAME instead of a height.
+// data.biomes is a row-major grid of ids into data.biomeOrder; id 0 means "no opinion", which is what the
+// shoreline and everything outside the region return, so the procedural biome noise stays in charge there.
+// NEAREST-CELL, not bilinear: you cannot interpolate halfway between jungle and tundra, and a blurred boundary
+// would be a lie about which file you are standing on.
+function makeBiomeOverride(data, R) {
+    const { biomes, grid } = data;
+    const order = data.biomeOrder || [];
+    const half = R / 2;
+    return function biomeOverride(wx, wz) {
+        if (wx < -half || wx > half || wz < -half || wz > half) return null;
+        const col = Math.round((wx / R + 0.5) * (grid - 1));
+        const row = Math.round((wz / R + 0.5) * (grid - 1));
+        if (col < 0 || row < 0 || col >= grid || row >= grid) return null;
+        return order[biomes[row * grid + col]] || null;
+    };
+}
+
 // lat/lon -> world (x,z), matching the height mapping (north=-z, west=-x).
 function latlonToWorld(lat, lon, bbox, R) {
     const fx = (lon - bbox.west) / ((bbox.east - bbox.west) || 1);
@@ -191,6 +209,16 @@ export function applyRealTerrain(world, data, opts = {}) {
 
     // 1) height override + regenerate
     world._heightOverride = makeHeightOverride(data, R, baseY, amp);
+    // v4149 -- a per-column BIOME, when the data carries one (world/repoHeightfield.js does; a fetched
+    // elevation grid does not, and is unaffected). *** THE WORLEY PATH IS FORCED ON WHILE ONE IS INSTALLED,
+    // BECAUSE IT IS OFF BY DEFAULT AND THE OVERRIDE IS ONLY CONSULTED THERE. *** Without this the biome layer
+    // would silently do nothing in an ordinary session -- the terrain would be right and the ground cover
+    // would be the noise's, with no error anywhere to say so. The previous value is restored on clear.
+    if (Array.isArray(data.biomes) && data.biomes.length === data.grid * data.grid) {
+        world._biomeOverride = makeBiomeOverride(data, R);
+        if (world._biomePrevWorley === undefined) world._biomePrevWorley = world.useWorleyBiomes;
+        world.useWorleyBiomes = true;
+    }
     try { world.regenerate(); } catch (e) { console.warn("[realTerrain] regenerate:", e?.message || e); }
 
     // 2) water (OSM areas + waterways) — painted before roads so bridges sit on top
@@ -224,6 +252,7 @@ export function applyRealTerrain(world, data, opts = {}) {
     const summary = { region: R, baseY, amp, raisedRoads: raised, roadsPainted, roadVoxels: roadVox, waterCells,
                       buildingsPainted, buildingVoxels: buildingVox, buildingsClipped, buildingsTotal,
                       centerSurface, heightBand: [baseY, baseY + amp], grid: data.grid,
+                      biomeOverride: !!world._biomeOverride,
                       elevation: [data.min, data.max], lat: data.lat, lon: data.lon };
     console.log("[realTerrain] applied:", JSON.stringify(summary));
     return summary;
@@ -232,6 +261,8 @@ export function applyRealTerrain(world, data, opts = {}) {
 export function clearRealTerrain(world) {
     if (!world) return;
     world._heightOverride = null;
+    world._biomeOverride = null;
+    if (world._biomePrevWorley !== undefined) { world.useWorleyBiomes = world._biomePrevWorley; world._biomePrevWorley = undefined; }
     try { world.regenerate(); } catch (e) { console.warn("[realTerrain] clear regenerate:", e?.message || e); }
     console.log("[realTerrain] cleared — back to procedural terrain");
 }
