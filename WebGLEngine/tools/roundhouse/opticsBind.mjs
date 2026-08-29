@@ -125,6 +125,12 @@ export async function buildOptics(hyp, base = {}) {
         const first = firstMinimumRefined(pat, st);
         if (!(first > 0)) return { error: "no-first-minimum-found" };
         out.rayleighFactor = first / (c.lambda / c.D);
+        // *** v4076 -- AN OBSERVABLE CENSUS FLAGGED rayleighFactorExact AS MOVED BY NOTHING, AND CHECKED FOR
+        // structureFactor'S SHAPE AGAINST beam'S. *** AIRY_FIRST_RING = J1_FIRST_ZERO / pi is a mathematical
+        // constant, the first zero of the Bessel function J1 -- and firstMinimumRefined, which produces
+        // rayleighFactor, finds a minimum by parabolic interpolation of a NUMERICALLY SAMPLED diffraction
+        // pattern with no reference to J1_FIRST_ZERO or AIRY_FIRST_RING anywhere in its body. Independent
+        // routes, not beam's closedFormPcr calling the same function pcrExact already called.
         out.rayleighFactorExact = AIRY_FIRST_RING;           // j(1,1)/pi = 1.2196698912665045
         out.airyRingErrFrac = Math.abs(out.rayleighFactor - AIRY_FIRST_RING) / AIRY_FIRST_RING;
         return out;
