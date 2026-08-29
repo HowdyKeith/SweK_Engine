@@ -8,6 +8,32 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4148 -- the clone button had not worked since v4133, and the error named a line that was fine
+
+Keith tried to pull from GitHub and got:
+
+    [chain] cloning HowdyKeith/SweK_Engine...
+    [chain] clone FAILED: Cannot access '_run' before initialization
+
+*** THE BUG WAS AT THE BOTTOM OF THE FUNCTION AND THE CRASH WAS AT THE TOP. *** githubBridge.js declares `function _run(cmd, args, opts)` at module level -- the thing that actually runs git. v4133 added three good lines near the BOTTOM of cloneEngineSource to compare the cloned version against the running one, and named the local for what it holds: `const _run = engineVersion()`.
+
+A `const` shadows its outer name for the WHOLE enclosing block, not from its own line downward. So the very first `await _run("git", ["--version"])` -- the version probe, a hundred lines ABOVE the declaration -- resolved to that const, hit its temporal dead zone and threw before git was ever invoked. Nothing about cloning was broken. The function simply could no longer reach the tool that does its job, and the thrown message points at the CALL while the defect is the DECLARATION, which is why it reads as nonsense.
+
+REPRODUCED BEFORE FIXING rather than deduced: calling cloneEngineSource() directly threw the exact message Keith saw. Re-run after the rename it returns ok:true, version v4147, running v4147, auth token -- a real clone of the real repository.
+
+THE RENAME WENT ON THE LOCAL, NOT THE HELPER. `_running` is what the variable holds and is what the `running:` field beside it is already called. Renaming the module helper instead would have moved the collision rather than removed it, and every other caller of the git runner would have had to move with it.
+
+*** AND THE CLASS IS WORTH A GATE, BECAUSE THE MESSAGE CANNOT LEAD ANYONE TO IT. *** New tools/ship/shadowedHelper.mjs looks for the conjunction that actually crashes: a scoped const/let that shadows a module-level function AND is called earlier in the SAME BLOCK. Shadowing alone is legal and common -- the tree has thirteen instances and twelve are harmless, because they declare before they use. Reporting those would be twelve false positives and a list nobody reads.
+
+*** ITS OWN FIRST DRAFT CRIED WOLF, WHICH IS WHY IT COUNTS BRACES INSTEAD OF INDENTATION. *** That draft approximated the enclosing scope as "the nearest column-zero function" and reported a second hit: deviceBridge.js, makeCaller called at line 161 and shadowed at line 270, both inside handle(). By that rule it was a crash. IT IS NOT ONE: 161 sits inside `if (route === "/start")` and 270 inside `if (route === "/bench/start")` -- SIBLING BLOCKS -- and `const` is block-scoped, so a declaration in one branch shadows nothing in another. Shipping it would have put a non-bug at the top of a list whose entire value is that it is short. The scope is found now by walking braces back from the declaration over codeOnly() source, so a brace inside a string or a comment cannot move the boundary.
+
+Tree-wide, across eleven roots: ZERO. That is a floor, so the next one reddens the line the round it lands.
+
+The gate proves itself three ways rather than asserting it works. SABOTAGE ONE rebuilds the actual v4133 defect from the shipped file -- not a toy fixture -- and the detector catches it, naming the call that would throw. SABOTAGE TWO is the sibling-block case the first draft got wrong, which must stay silent. SABOTAGE THREE is the same-block case, which must still fire -- because a fix for a false positive that quietly disarmed the true positive would be worse than the false positive was.
+
+NOT RUN IN THE GATE: a live clone. It was run by hand against the real repository after the fix; a gate that clones GitHub on every ship is a gate somebody switches off, which is the argument grdpwasm's gate already makes about its Go build.
+
+Verified: shadowedHelper-selfcheck all checks pass, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
 ## Since v4147 -- a Steam Deck peer button, and the guard that had to be fixed before it could be honest
 
 Keith asked whether a "Steam Deck Peer" button could LEGITIMATELY go after the iOS Peer button. The honest answer turned out to be that it outranks both phones, and he moved it: "I had thought Android would be King. I am pleasantly surprised. We could put the Steam Deck button before Android."

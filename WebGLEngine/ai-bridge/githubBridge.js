@@ -491,13 +491,29 @@ async function cloneEngineSource({ repo, ref, targetDir, prefix } = {}) {
     // return -- `version` (cloned) and `running` (here) -- and nothing compared them, while _verLt sits forty
     // lines below and does exactly this comparison for three other callers. So a clone of a stale default
     // branch reported success, in full, with the evidence of its own staleness sitting unread in the payload.
-    const _run = engineVersion();
-    const _older = !!(ver && _run && _verLt(ver, _run));
-    const _newer = !!(ver && _run && _verLt(_run, ver));
-    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: _run,
+    // *** v4148 -- RENAMED FROM `_run`, WHICH KILLED EVERY CLONE THIS FUNCTION EVER ATTEMPTED. ***
+    //
+    // Keith pressed Clone and got "Cannot access '_run' before initialization". The cause is entirely here:
+    // `_run` is ALSO the name of this module's git runner, `function _run(cmd, args, opts)` fourteen lines
+    // above this function. Declaring `const _run` ANYWHERE inside cloneEngineSource puts a function-scoped
+    // binding in the temporal dead zone for the WHOLE body -- so the very first `await _run("git", ...)`, up
+    // at the version probe, resolved to this const instead of the module helper and threw before git ever ran.
+    //
+    // *** THE BUG WAS AT THE BOTTOM OF THE FUNCTION AND THE CRASH WAS AT THE TOP, WHICH IS WHY THE MESSAGE
+    // POINTS NOWHERE USEFUL. *** TDZ does not care about statement order: a `const` shadows its outer name
+    // from the first line of the scope, not from its own line. Nothing about the clone was broken; the
+    // function simply could no longer reach the tool that does it.
+    //
+    // v4133 added these three lines to compare the cloned version against the running one -- a good check,
+    // and the local was named for what it holds. `_running` says the same thing and collides with nothing;
+    // it also matches the `running:` field it feeds, which is what it was named after in the first place.
+    const _running = engineVersion();
+    const _older = !!(ver && _running && _verLt(ver, _running));
+    const _newer = !!(ver && _running && _verLt(_running, ver));
+    return { ok: true, version: ver, path: dest, repo, ref: ref || "(default branch)", running: _running,
              older: _older, newer: _newer,
              staleWarning: _older
-                 ? "the clone is " + ver + " but this engine is " + _run + " -- you asked for " +
+                 ? "the clone is " + ver + " but this engine is " + _running + " -- you asked for " +
                    (ref ? ("branch " + ref) : "the DEFAULT branch, and newer work may be on another branch") +
                    ". Pick a branch to clone something newer."
                  : undefined,
