@@ -8,6 +8,25 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4133 -- which branch, asked out loud: the clone took the default and never said so
+
+Keith: "are we able to detect that a feature branch exists and give us the option of choosing the branch?"
+
+*** THE ANSWER TO WHY FOUR DAYS OF GATE RESULTS COULD NOT BE REPRODUCED. *** His rig ran gate after gate against v4116 and sent failures; this tree was at v4132 and two of them did not exist here. origin/main is v4116. Every version from v4117 to v4132 lives on a feature branch, and the clone button takes the DEFAULT branch.
+
+NOTHING WAS BROKEN, WHICH IS WHY IT LASTED. cloneEngineSource has always honoured a `ref`, and it has always read the version out of the CLONED TREE rather than guessing -- so it cloned main, found v4116 in it, and correctly named the folder SweK_Engine_v4116. A correct fetcher and a correct namer. The defect was that nobody was ASKED which branch, and that the result never mentioned the copy it handed back was OLDER than the engine asking for it -- with BOTH numbers already sitting in its own return value (`version` and `running`) and _verLt defined forty lines below, doing that exact comparison for three other callers.
+
+So: the clone now compares them and leads with the warning when the copy is older, naming the branch it actually used and what to do instead. A new listSourceBranches returns the branches with their head-commit dates, and the panel grows a picker that passes the chosen ref.
+
+THE VERSION IN THAT DROPDOWN IS A GUESS AND IS NAMED ONE. Reading a branch's true ENGINE_VERSION means fetching main.js, which is 2.5 MB, and doing that per branch to fill a dropdown is a lot of bytes for a label. So it is parsed from the head commit's SUBJECT and returned as `versionGuess` with `versionSource: "commit subject"`, and the UI prints it with a tilde. The authoritative version is still the one read out of the tree after the clone, exactly as before. A picker that guesses well and a namer that knows is the right split; a picker that guessed and then got BELIEVED is this same bug coming back wearing a dropdown. A branch whose subject carries no version reports EMPTY rather than inventing one.
+
+THE DEFAULT BRANCH IS FLAGGED, NOT FLOATED TO THE TOP. On this repo it is the stale one, and a list that always shows main first is the same wrong default in a new costume. The list sorts by commit date.
+
+AND A ROTTEN TOKEN NO LONGER BLOCKS A PUBLIC READ, which was found by the feature failing on the box that wrote it: this sandbox's saved PAT is rejected and the branch list came back "Bad credentials" for a repo that needs no credentials at all. cloneEngineSource already makes that argument in its own words -- "Failing the whole clone on an expired PAT is refusing to do something that needs no permission at all" -- and nobody had carried it to the REST side. The retry is SCOPED TO READS: _api is shared by createRepo, putFile, createRelease and deleteRepo, and a WRITE retried anonymously turns "your token expired" into a 404 nobody can read.
+
+VERIFIED BY RUNNING IT, NOT BY READING IT. cloneSource-selfcheck gains two sections: one over the source, and one that stubs fetch and runs the REAL listSourceBranches against Keith's own arrangement -- a stale default at v4116 and a feature branch at v4132. It confirms the feature branch sorts above the default, both commit-subject spellings parse, an unlabelled branch yields empty, the default is flagged not floated, and the 401 really does drive an anonymous retry. Three sabotages checked: sorting default-first, dropping the retry, and the UI ceasing to pass the ref each redden the checks that name them, and all restored byte-identical. One bug was caught this way before it shipped -- the first draft passed the repo as a fourth "query" argument to api(), whose signature is (op, body, method), so it would have been silently dropped and the repo would never have arrived.
+
+HONEST LIMIT, PRINTED BY THE GATE ITSELF: the live GitHub listing is NOT exercised here. This box is rate-limited on a shared IP, so listSourceBranches was confirmed to REACH GitHub anonymously -- the reply changed from "Bad credentials" to a rate-limit notice, which only an unauthenticated request receives -- but never returned a real branch list. The shape is checked from source, the logic is checked against a stub, and the live call wants a run on the rig. 1230 gates.
 ## Since v4132 -- eighteen rounds of changelog that belonged to no version, and the write that now refuses them
 
 Keith ran the rig's gates and sent five failures. One of them had been right for eighteen rounds and nobody had read it.

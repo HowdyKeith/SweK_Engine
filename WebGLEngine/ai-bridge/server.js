@@ -16601,6 +16601,10 @@ ${text.replace(/'/g, "''")}
     if (req.method === "POST" && req.url === "/github/issue/create") { readJson(d => githubBridge.createIssue(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/issue/close") { readJson(d => githubBridge.closeIssue(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "GET" && req.url.split("?")[0] === "/github/commits") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listCommits({ repo: q.get("repo"), branch: q.get("branch") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
+    // v4133 -- branches WITH their head-commit date and an inferred version, so the clone button can offer a
+    // choice instead of silently taking the default branch. See githubBridge.listSourceBranches on why the
+    // version is a GUESS here and authoritative only after the clone.
+    if (req.method === "GET" && req.url.split("?")[0] === "/github/source-branches") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listSourceBranches({ repo: q.get("repo"), limit: q.get("limit") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.method === "GET" && req.url.split("?")[0] === "/github/branches") { const q = new URLSearchParams(req.url.split("?")[1] || ""); githubBridge.listBranches({ repo: q.get("repo") }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.method === "POST" && req.url === "/github/file/get") { readJson(d => githubBridge.getFile(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.method === "POST" && req.url === "/github/file/put") { readJson(d => githubBridge.putFile(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }

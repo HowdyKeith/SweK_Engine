@@ -187,5 +187,136 @@ console.log("cloneSource-selfcheck -- the way IN, and what it must never overwri
         "the running engine does not change under you, so the panel must not imply that it did");
 }
 
+// ---- 6. WHICH BRANCH (v4133) --------------------------------------------------------------------------------
+//
+// THE BUG THIS SECTION EXISTS FOR COST DAYS AND BROKE NOTHING. cloneEngineSource always honoured a `ref` and
+// always read the version out of the CLONED TREE rather than guessing, so it behaved perfectly: it cloned the
+// default branch, found v4116 in it, and named the folder v4116. Meanwhile sixteen versions of work sat on a
+// feature branch, the rig ran gate after gate against the stale tree, and the failures it reported could not
+// be reproduced. NOTHING IN THE SYSTEM WAS WRONG EXCEPT THAT NOBODY WAS ASKED WHICH BRANCH, and the result
+// never mentioned that the copy it handed back was older than the engine asking for it -- with BOTH numbers
+// sitting in its own return value, and _verLt defined forty lines below doing that comparison for three other
+// callers. A correct function, a correct namer, and a silent default: the defect was the missing question.
+{
+    console.log("\n6. WHICH BRANCH -- THE QUESTION THAT WAS NEVER ASKED");
+    const src = fs.readFileSync(path.join(ENG, "ai-bridge", "githubBridge.js"), "utf8");
+    const server = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
+    const panel = fs.readFileSync(path.join(ENG, "ui", "githubPanel.js"), "utf8");
+
+    ok("!! the clone COMPARES what it fetched against what is running",
+        /_verLt\(ver, _run\)/.test(src) && /_verLt\(_run, ver\)/.test(src),
+        "both numbers were already in the return and nothing compared them");
+    ok("!! ...and SAYS SO when the copy is older",
+        /staleWarning/.test(src) && /older/.test(src),
+        "a success tick over a stale tree is how sixteen versions went unnoticed");
+    ok("...and the warning names the branch it actually used",
+        /staleWarning[\s\S]{0,400}?DEFAULT branch/.test(src),
+        "'older' without 'you asked for the default branch' does not tell anybody what to do next");
+
+    ok("!! the branch lister exists and is exported",
+        /async function listSourceBranches/.test(src) && /listSourceBranches, getFile/.test(src));
+    ok("!! it calls the version a GUESS, in the field name itself",
+        /versionGuess/.test(src) && /versionSource/.test(src) && !/\bversion:\s*m \?/.test(src),
+        "reading a real ENGINE_VERSION means fetching 2.5 MB per branch; this parses the commit subject, and a " +
+        "field called `version` would get BELIEVED -- which is the same over-trust that hid the default branch");
+    ok("...and the picker's label marks it as inferred too",
+        /"  ~" \+ b\.versionGuess/.test(panel),
+        "the tilde is the UI half of the same honesty; a bare vNNNN in a dropdown reads as fact");
+    ok("!! the per-branch commit fan-out is CAPPED",
+        /slice\(0, 25\)/.test(src) && /truncated/.test(src),
+        "N+1 calls against a rate limit a dropdown has no business exhausting -- and it says when it truncated");
+
+    ok("!! a PUBLIC read survives a rotten token",
+        /async function _apiReadPublic/.test(src) && /401 \|\| r\.status === 403/.test(src),
+        "cloneEngineSource makes exactly this argument for git ('refusing to do something that needs no " +
+        "permission at all') and nobody carried it to the REST side; an expired PAT turned a public branch " +
+        "list into 'Bad credentials' on the very box this was written on");
+    ok("!! ...and the fallback is SCOPED TO READS, never to writes",
+        !/_apiReadPublic\("(POST|PUT|PATCH|DELETE)/.test(src) && /_apiReadPublic\(p\)/.test(src)
+          && /const r = await _api\("GET", p\)/.test(src),
+        "_api is shared by createRepo/putFile/createRelease/deleteRepo -- a WRITE retried anonymously turns " +
+        "'your token expired' into a 404 nobody can read");
+
+    ok("!! there is a route",
+        /"\/github\/source-branches"/.test(server) && /listSourceBranches/.test(server));
+    ok("!! ...and the button actually PASSES the chosen ref",
+        /api\("clone-source", ref \? \{ repo: er, ref \}/.test(panel),
+        "the backend honoured `ref` all along; the UI never sent one, which is the entire bug");
+    ok("...and the stale warning is printed BEFORE the success tick",
+        /j\.staleWarning \? "\\u26A0 " \+ j\.staleWarning/.test(panel),
+        "burying it under a tick is how the last one was missed");
+    ok("...and the query goes in the op string, since api() is (op, body, method)",
+        /api\("source-branches\?repo="/.test(panel),
+        "a 4th 'query' argument would be silently dropped and the repo would never arrive -- caught by reading " +
+        "api()'s signature rather than by assuming it took one");
+
+    // The DEFAULT branch is flagged, not floated to the top: on this repo it is the stale one, and a list that
+    // always shows `main` first is the same wrong default wearing a dropdown.
+    ok("!! the list sorts by COMMIT DATE, not by default-branch-first",
+        /heads\.sort\(\(a, b\) => String\(b\.committedAt\)/.test(src) && /isDefault/.test(src),
+        "flagged rather than forced to the top");
+
+    // HONEST LIMIT, PRINTED: the live call is not exercised here.
+    console.log("  ----  NOT RUN HERE: the live GitHub listing. This sandbox's shared IP is rate-limited and its " +
+                "saved token is rejected, so listSourceBranches was confirmed to REACH GitHub anonymously " +
+                "(the reply changed from 'Bad credentials' to a rate-limit notice, which only an " +
+                "unauthenticated request receives) but never returned a branch list here. The shape above is " +
+                "checked from source; the listing itself wants a run on the rig.");
+}
+
+// ---- 7. AND THE LISTER IS ACTUALLY RUN (v4133) --------------------------------------------------------------
+//
+// Section 6 reads the source. Source cannot tell "sorts by date" from "sorts by date and throws on the way".
+// GitHub itself is not usable as a fixture -- this box's token is rejected and its shared IP is rate-limited,
+// and a permanent gate that needs a third party to be up is a worse gate anyway -- so fetch is stubbed and the
+// REAL listSourceBranches runs against it. The fixture is Keith's own situation: a stale default branch at
+// v4116 and a feature branch at v4132, which is the arrangement that cost the days this feature exists for.
+{
+    console.log("\n7. THE LISTER, RUN RATHER THAN READ");
+    const realFetch = globalThis.fetch;
+    let sawAuthed = false, sawAnon = false;
+    globalThis.fetch = async (url, opts) => {
+        const u = String(url);
+        const J = (o, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(o) });
+        if (opts && opts.headers && opts.headers.Authorization) { sawAuthed = true; return J({ message: "Bad credentials" }, 401); }
+        sawAnon = true;
+        if (/\/repos\/[^/]+\/[^/]+$/.test(u)) return J({ default_branch: "main" });
+        if (/\/branches\?/.test(u)) return J([{ name: "main" }, { name: "feature/x" }, { name: "old" }]);
+        if (/\/commits\?/.test(u)) {
+            const b = decodeURIComponent((u.match(/sha=([^&]+)/) || [])[1] || "");
+            const rows = {
+                "main":      [{ commit: { message: "v4116 -- an install button\nbody", committer: { date: "2026-08-01T00:00:00Z" } } }],
+                "feature/x": [{ commit: { message: "v4132: eighteen rounds of changelog", committer: { date: "2026-08-29T00:00:00Z" } } }],
+                "old":       [{ commit: { message: "no version in this subject", committer: { date: "2025-01-01T00:00:00Z" } } }],
+            };
+            return J(rows[b] || []);
+        }
+        return J({}, 404);
+    };
+    try {
+        const r = await gh.listSourceBranches({ repo: "owner/repo" });
+        ok("!! it returns a list at all", !!(r && r.ok), r && r.error ? r.error : "");
+        const names = (r.branches || []).map((b) => b.name);
+        ok("!! the NEWER feature branch sorts ABOVE the stale default",
+            names[0] === "feature/x" && names.indexOf("main") > 0,
+            "got: " + names.join(" > ") + " -- this is the exact arrangement that hid v4117..v4132 for days");
+        const feat = (r.branches || []).find((b) => b.name === "feature/x") || {};
+        const main = (r.branches || []).find((b) => b.name === "main") || {};
+        const old = (r.branches || []).find((b) => b.name === "old") || {};
+        ok("the versions are parsed off both commit-subject spellings (`vNNNN --` and `vNNNN:`)",
+            feat.versionGuess === "v4132" && main.versionGuess === "v4116");
+        ok("!! a subject with NO version yields EMPTY rather than a guess",
+            old.versionGuess === "" && old.versionSource === "",
+            "inventing a version for an unlabelled branch is precisely the over-trust this field name avoids");
+        ok("the default branch is FLAGGED and not floated to the top",
+            main.isDefault === true && feat.isDefault === false && names[0] !== "main");
+        ok("!! the rotten token was retried anonymously, and the result says which path answered",
+            sawAuthed && sawAnon && r.auth === "anonymous",
+            "authed attempt -> 401 -> anonymous retry -> list; reported as auth:" + r.auth);
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+}
+
 console.log(fails ? `\ncloneSource-selfcheck: ${fails} FAILED` : "\ncloneSource-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
