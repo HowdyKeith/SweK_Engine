@@ -31,7 +31,7 @@ import { measureTipDeflection, tipDeflection, stiffness, solve, naturalOmega } f
 // no planted error, no lab-results row. A MODULE YOU CAN LOOK AT BUT CANNOT RUN. *** It is a MODE here rather
 // than a new device because it shares beam.js's fourth-difference operator -- v3199's shared-substrate rule,
 // which is also why one wrong row in that operator would break the static, vibration AND buckling keys at once.
-import { measureBuckling, criticalLoad } from "../../physics/elasticity/buckling.js";
+import { measureBuckling } from "../../physics/elasticity/buckling.js";
 
 const DEF = {
     // v3435 -- DECLARED, NOT ADDED: every key below was ALREADY READ by this bind and ALREADY had this
@@ -108,9 +108,20 @@ export function build({ mode = "exponent", config = {} } = {}) {
         // is a number and not a fit -- convergenceOrder's territory, but the point here is only that it is 4.
         const coarse = measureBuckling({ n: Math.max(10, n >> 1), count: 1 });
         const eFine = Math.abs(m.loads[0] - m.exact[0]), eCoarse = Math.abs(coarse.loads[0] - coarse.exact[0]);
+        // *** v4073 -- closedFormPcr WAS REMOVED, AND WHAT IT MEASURED WAS ITS OWN SIBLING. *** An observable
+        // census flagged it as moved by nothing, which was correct for a reason worse than a fixed reference:
+        // criticalLoad(1, { L:1, E:1, I:1 }) is the EXACT CALL that produces m.exact[0] two lines above, at
+        // the same hardcoded literals. MEASURED bit-identical: 2.4674011002723395 both ways, always, because
+        // it is the same function called the same way -- not two independent routes like structureFactor's
+        // reciprocal check or em's cErrFrac, which combine different physical quantities. It is hookeStretch's
+        // shape (v4053): a second name for a number already on the row, and the boundKeys-selfcheck assertion
+        // it fed (`closedFormPcr - pcrExact < 1e-12`) could never have been anything but a vacuous pass.
+        //
+        // pcrRelErr already does the job the removed check's comment claimed for it: MEASURED, scaling pcr by
+        // 1% moves pcrRelErr from 8.03e-6 to 9.99e-3, well past its own 1e-4 gate, while leaving oddSquare2 and
+        // oddSquare3 untouched -- which is exactly "a scale error preserves every ratio" stated as a number.
         return {
             pcr: m.loads[0], pcrExact: m.exact[0], pcrRelErr: Math.abs(m.loads[0] - m.exact[0]) / m.exact[0],
-            closedFormPcr: criticalLoad(1, { L: 1, E: 1, I: 1 }),
             oddSquare2: m.loads[1] / m.loads[0], oddSquare3: m.loads[2] / m.loads[0],
             refineRatio: eCoarse / (eFine || Number.MIN_VALUE), buckleNodes: n,
         };
@@ -131,7 +142,7 @@ export function build({ mode = "exponent", config = {} } = {}) {
 
 export const BEAM_OBSERVABLES = ["exponent", "points", "exponentError", "closedFormAtUnitL", "worstResidual",
     "relative", "nodes", "dij", "dji", "relGap", "reciprocityIsFiner",
-    "pcr", "pcrExact", "pcrRelErr", "closedFormPcr", "oddSquare2", "oddSquare3", "refineRatio", "buckleNodes"];
+    "pcr", "pcrExact", "pcrRelErr", "oddSquare2", "oddSquare3", "refineRatio", "buckleNodes"];
 // *** THE EXPIRY, AS A PREDICATE RATHER THAN AN ABSENCE. *** The refusal above says reciprocity does not
 // SELECTIVELY catch the free-end asymmetry, and points at the `conditioning` mode for the data. What it never
 // said is what would change its mind -- and a refusal with no stated expiry is PERMANENT BY DEFAULT, which is

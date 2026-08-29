@@ -37,8 +37,13 @@ async function main() {
             Math.abs(r.oddSquare2 - 9) < 0.02 && Math.abs(r.oddSquare3 - 25) < 0.05,
             `${r.oddSquare2.toFixed(4)} against 9 and ${r.oddSquare3.toFixed(4)} against 25 -- NOTHING HERE WAS TOLD THOSE NUMBERS. ` +
             "A wrong operator would have to be wrong by the SAME factor at every mode to leave both ratios intact");
+        // v4073 -- closedFormPcr removed from beamBind: it was criticalLoad(1,{L:1,E:1,I:1}), the SAME CALL
+        // that produces pcrExact, so `closedFormPcr - pcrExact` could never be anything but exactly 0. The
+        // conjunct it fed here was structurally guaranteed to pass and is dropped; pcrRelErr alone is the
+        // check, and it was always doing the real work (measured: a 1% scale in pcr moves it from 8e-6 to
+        // 1e-2 against this 1e-4 gate, while the odd-square ratios above stay untouched).
         ok("...and the absolute load matches pi^2 EI/(4L^2), which the ratios alone could not catch",
-            r.pcrRelErr < 1e-4 && Math.abs(r.closedFormPcr - r.pcrExact) < 1e-12,
+            r.pcrRelErr < 1e-4,
             `relative error ${r.pcrRelErr.toExponential(2)} -- a scale error preserves every ratio, so the two checks fail on different faults`);
         ok("!! ...and the error QUARTERS when the grid doubles, measured rather than asserted",
             Math.abs(r.refineRatio - 4) < 0.15,
