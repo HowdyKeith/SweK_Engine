@@ -61,7 +61,7 @@ import {
 
 export const STROKEMORPH_OBSERVABLES = [
     "straightLineWorstErr",
-    "resampleEndpointMismatch", "resampleEndpointPlantedMismatch",
+    "resampleEndpointMismatch", "resampleEndpointPlantedMismatch", "resampleEndpointBreakDetected",
     "morphZeroMismatch", "morphOneMismatch", "morphComparisons",
     "naiveLerpZeroMismatch", "naiveLerpOneMismatch", "naiveWorstDrift",
     "pathStringDiffPairs",
@@ -122,7 +122,23 @@ function buildStrokeMorph({ mode = "morph", config = {} } = {}) {
     }
 
     // ---- THE RESAMPLER'S ENDPOINT IDENTITY, and the plant that does not fire on it.
-    let resEnd = 0, resEndPlanted = 0;
+    //
+    // *** v4070 -- "THE PLANT THAT DOES NOT FIRE ON IT" WAS HONEST AND LEFT THE CHECK UNWITNESSED. *** An
+    // observable census flagged resampleEndpointMismatch as moved by nothing, which is the point of it -- a
+    // resampler must return the original endpoints, so a nonzero count is the defect. But a load-bearing
+    // negative needs a witness that it COULD have counted, and the one this file supplies does not work:
+    // resampleEndpointPlantedMismatch reads 0 in both arms, and naiveWorstDrift measures the two resamplers
+    // apart at 1.78e-15 -- MACHINE EPSILON. naiveResample is not a contrast here at all, so nothing on the
+    // row shows the comparison can fire.
+    //
+    // (The MORPH's endpoint identity beside it is properly witnessed and stays as it is: naiveLerpOneMismatch
+    // is 40 and the plant moves morphOneMismatch from 0 to 40. The gap is the resampler's alone.)
+    //
+    // So the detector is tested directly: an endpoint moved ONE UNIT off must be counted by the same `same()`
+    // the row above trusts. Derived from the run rather than typed -- it perturbs whatever the resampler just
+    // produced -- and it must equal the glyph count, so a comparison that silently stopped comparing shows up
+    // as a number falling rather than as a zero that looks like success.
+    let resEnd = 0, resEndPlanted = 0, resEndDetects = 0;
     for (const d of Object.values(DIGIT_STROKES)) {
         const p = parseStroke(d, c.curveSteps);
         const o = resample(p, N), np = naiveResample(p, N);
@@ -130,6 +146,8 @@ function buildStrokeMorph({ mode = "morph", config = {} } = {}) {
         if (!same(o[N - 1], p[p.length - 1])) resEnd++;
         if (!same(np[0], p[0])) resEndPlanted++;
         if (!same(np[N - 1], p[p.length - 1])) resEndPlanted++;
+        const moved = [o[N - 1][0] + 1, o[N - 1][1]];
+        if (!same(moved, p[p.length - 1])) resEndDetects++;
     }
 
     // ---- THE MORPH'S ENDPOINT IDENTITY, over every adjacent digit pair.
@@ -177,6 +195,7 @@ function buildStrokeMorph({ mode = "morph", config = {} } = {}) {
     return {
         straightLineWorstErr: straightWorst,
         resampleEndpointMismatch: resEnd, resampleEndpointPlantedMismatch: resEndPlanted,
+        resampleEndpointBreakDetected: resEndDetects,
         morphZeroMismatch: m0, morphOneMismatch: m1, morphComparisons: tot,
         naiveLerpZeroMismatch: n0, naiveLerpOneMismatch: n1, naiveWorstDrift: drift,
         pathStringDiffPairs: strDiff,
