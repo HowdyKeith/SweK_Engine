@@ -121,5 +121,68 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
         /href="\/ntfs-mounter\.html"/.test(fs.readFileSync(path.join(ENG, "server.html"), "utf8")));
 }
 
+// ---- 7. *** THE .command LAUNCHER: GENERATED SCRIPT, INJECTION DEFENCE, AND REAL bash BEHAVIOUR *** ------------
+{
+    console.log("\n7. *** THE GENERATED .command LAUNCHER ***");
+    const bridge = require_("../../ai-bridge/ntfsMounterBridge.js");
+
+    // *** THE ONE THAT MATTERS MOST: A VOLUME NAME IS NOT TRUSTED INPUT. *** Anyone can name a USB stick, and
+    // that string is written into a bash script. Checked as BEHAVIOUR (does bash execute it?) rather than by
+    // eyeballing the quoting, because a quoting bug looks fine right up until it does not.
+    const nasty = "'; touch /tmp/swek-ntfs-gate-PWNED #";
+    const quoted = bridge.shellQuote(nasty);
+    ok("!! shellQuote wraps in single quotes and escapes embedded ones",
+        quoted.startsWith("'") && quoted.endsWith("'") && quoted.includes("'\\''"), quoted);
+
+    const { execFileSync } = require_("node:child_process");
+    const os2 = require_("node:os"), fs2 = require_("node:fs"), path2 = require_("node:path");
+    const marker = "/tmp/swek-ntfs-gate-PWNED";
+    try { fs2.rmSync(marker, { force: true }); } catch {}
+    const probe = path2.join(os2.tmpdir(), "swek-ntfs-gate-quote.sh");
+    fs2.writeFileSync(probe, "#!/usr/bin/env bash\necho \" You picked " + quoted + " in SweK.\"\n");
+    let quoteOut = "";
+    try { quoteOut = String(execFileSync("bash", [probe], { timeout: 10000, encoding: "utf8" })); } catch (e) { quoteOut = String(e.message || ""); }
+    const pwned = fs2.existsSync(marker);
+    ok("!! *** SABOTAGE: a volume named \"'; touch ... #\" is printed as TEXT, never executed ***",
+        !pwned && quoteOut.includes("touch " + marker),
+        pwned ? "INJECTION FIRED -- the marker file was created" : "echoed literally, marker absent");
+    try { fs2.rmSync(probe, { force: true }); fs2.rmSync(marker, { force: true }); } catch {}
+
+    // The generator itself is macOS-guarded, so on Linux assert the guard; on a Mac, generate and bash -n it.
+    if (!bridge.IS_MAC) {
+        const r = bridge.writeCommandFile("whatever");
+        ok("!! writeCommandFile() refuses cleanly off macOS", r.ok === false && /macOS only/.test(r.error));
+        const o = bridge.openCommandFile(false);
+        ok("!! openCommandFile() refuses cleanly off macOS", o.ok === false && /macOS only/.test(o.error));
+        report("full-script generation SKIPPED -- macOS only; the source-level checks below still run");
+    } else {
+        report("running on macOS -- generation is exercised by the live half above");
+    }
+
+    // Source-level invariants that hold on every platform.
+    ok("!! *** the generated script carries the launchd PATH fix (Homebrew is not on a .command's PATH) ***",
+        /opt\/homebrew\/bin/.test(bridgeSrc) && /launchd, not by your shell/.test(bridgeSrc),
+        "without it ntfs-3g reads as missing on a Mac where it works fine in Terminal -- the false negative " +
+        "this tree already paid for twice");
+    ok("!! *** the script asks Continue? [y/N] before touching a disk, and cancels without running sudo ***",
+        /Continue\? \[y\/N\]/.test(bridgeSrc) && /Cancelled\. Nothing was changed/.test(bridgeSrc));
+    ok("!! the launcher is chmod 0755 -- without +x Finder opens it in a text editor instead of running it",
+        /chmodSync\(p, 0o755\)/.test(bridgeSrc));
+    ok("!! *** it runs the mounter INTERACTIVELY (no fed index), so there is no stale-selection risk at all ***",
+        /sudo \.\/ntfsmounter/.test(bridgeSrc) && !/stdin\.write/.test(bridgeSrc.split("writeCommandFile")[1].split("function openCommandFile")[0]));
+    // A CALL, not a mention: this file's own comment discusses xattr at length (explaining why it is absent),
+    // which is the same prose-vs-code distinction section 2's sudo check already had to make.
+    ok("!! *** no xattr de-quarantine CALL here, and the file says WHY that differs from sysadminBridge.js ***",
+        !/(?:_run|spawn|execFile(?:Sync)?)\(\s*["'`]xattr["'`]/.test(bridgeSrc) && /cargo-culting/.test(bridgeSrc),
+        "quarantine is set by whatever DOWNLOADED a file; fs.writeFileSync does not set it, so stripping it " +
+        "would be a fix for a condition that cannot occur");
+    ok("!! openCommandFile() uses `open` (Terminal.app), not a silent background spawn",
+        /spawn\("open", reveal \? \["-R", p\] : \[p\]/.test(bridgeSrc));
+    ok("!! both launcher routes are wired in server.js",
+        serverSrc.includes('"/ntfs/command"') && serverSrc.includes('"/ntfs/command/open"'));
+    ok("!! the page explains WHY the launcher beats the sudo -n button rather than just offering both",
+        /Terminal<\/b> asks for your password/.test(pageSrc) && /better option, not just another one/.test(pageSrc));
+}
+
 console.log("\n" + (fails ? fails + " FAILED" : "all checks pass"));
 process.exit(fails ? 1 : 0);

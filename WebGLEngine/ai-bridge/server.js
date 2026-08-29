@@ -16499,6 +16499,25 @@ ${text.replace(/'/g, "''")}
         catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
         return;
     }
+    // v4126 -- Keith: "can we generate a .sh file to run? can that be a created terminal file that will double
+    // click and run in terminal? can that terminal file be executed by SweK and then we approve it?" Yes to
+    // all three, and it is BETTER than /ntfs/mount rather than an alternative to it: a .command opened with
+    // `open` runs in Terminal.app, so TERMINAL asks for the sudo password. The password still never reaches
+    // this server, but the "run `sudo -v` first" homework /ntfs/mount needs disappears.
+    if (req.url === "/ntfs/command" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./ntfsMounterBridge.js").writeCommandFile(d && d.name)); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/ntfs/command/open" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./ntfsMounterBridge.js").openCommandFile(!!(d && d.reveal))); }
+            catch (e) { sendJson({ ok: false, error: "ntfs-mounter bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
     if (req.url === "/ntfs/mount" && req.method === "POST") {
         readJson(d => {
             try { require("./ntfsMounterBridge.js").mount(d && d.name).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }

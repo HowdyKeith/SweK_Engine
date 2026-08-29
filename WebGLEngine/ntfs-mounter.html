@@ -67,6 +67,25 @@
     <pre class="log" id="mountLog" style="display:none"></pre>
   </div>
 
+  <div class="card locked" id="card4">
+    <h2>4 &mdash; Or: a double-clickable Terminal launcher <span class="note" style="font-weight:400">(recommended)</span></h2>
+    <p class="note">This writes a <code>.command</code> file &mdash; a script Finder runs in Terminal when you
+      double-click it. <b>It is the better option, not just another one:</b> the mount button above uses
+      <code>sudo -n</code>, which refuses to prompt, so it only works if you already ran <code>sudo -v</code> in
+      a Terminal. A <code>.command</code> runs in <b>Terminal.app</b>, so <b>Terminal</b> asks for your password
+      &mdash; it still never reaches this server, but there is nothing to do first. The script also asks
+      <code>Continue? [y/N]</code> before touching any disk, and lets you pick the volume from the mounter's own
+      menu rather than trusting a selection this page cached.</p>
+    <div class="row">
+      <button id="genCmd">Generate launcher</button>
+      <button id="runCmd" disabled>Run it now (opens Terminal)</button>
+      <button id="revealCmd" disabled>Show in Finder</button>
+      <span id="cmdState" class="note"></span>
+    </div>
+    <p class="note" id="cmdPath" style="margin-top:8px"></p>
+    <pre class="log" id="cmdScript" style="display:none"></pre>
+  </div>
+
   <div class="card">
     <h2>What this page refuses to do</h2>
     <ul id="refusedList"></ul>
@@ -110,6 +129,10 @@ function renderFacts(s) {
   ready = !!s.ready;
   $("install").disabled = !!(job && !job.done);
   $("card2").classList.toggle("locked", !ready);
+  // The launcher needs the install to have finished, but NOT a volume selection -- the script's own menu
+  // handles that, which is exactly why it has no stale-index problem to guard against.
+  $("card4").classList.toggle("locked", !ready);
+  $("genCmd").disabled = !ready;
   if (s.why && !(job && !job.done)) $("installState").innerHTML += ' <span class="note">' + s.why + "</span>";
 }
 
@@ -166,6 +189,30 @@ function renderConfirm() {
     if (r.log) { $("mountLog").style.display = "block"; $("mountLog").textContent = r.log; }
   };
 }
+
+// The launcher unlocks with the same readiness the mount card uses, but does NOT need a volume selected --
+// the script's own menu handles that. A selection, if there is one, is passed through so the script can echo
+// which one you picked; it never drives the selection.
+$("genCmd").onclick = async () => {
+  $("cmdState").textContent = "writing...";
+  const r = await api("/ntfs/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected || undefined }) });
+  if (!r.ok) { $("cmdState").innerHTML = '<b class="no">' + r.error + "</b>"; return; }
+  $("cmdState").innerHTML = '<b class="yes">written</b>';
+  $("cmdPath").innerHTML = "Saved to <code>" + r.path + "</code> &mdash; drag it to your Desktop from Finder to keep it.";
+  $("cmdScript").style.display = "block";
+  $("cmdScript").textContent = r.script;
+  $("runCmd").disabled = false;
+  $("revealCmd").disabled = false;
+};
+$("runCmd").onclick = async () => {
+  $("cmdState").textContent = "opening Terminal...";
+  const r = await api("/ntfs/command/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+  $("cmdState").innerHTML = r.ok ? '<b class="yes">opened -- approve it in the Terminal window</b>' : '<b class="no">' + r.error + "</b>";
+};
+$("revealCmd").onclick = async () => {
+  const r = await api("/ntfs/command/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reveal: true }) });
+  $("cmdState").innerHTML = r.ok ? '<b class="yes">shown in Finder</b>' : '<b class="no">' + r.error + "</b>";
+};
 
 $("refreshVols").onclick = async () => {
   $("volState").textContent = "reading...";
