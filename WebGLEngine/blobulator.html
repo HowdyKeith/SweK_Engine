@@ -31,7 +31,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="hud">
-  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest(\'#hud\').classList.toggle(\'min\')" title="show/hide controls">&#9776;</span>&#129514; Blobulator <a href="blobulator-gpu.html" id="gpuLink" style="font-size:13px;color:#0b0e14;background:#8ab4ff;padding:3px 9px;border-radius:5px;text-decoration:none;font-weight:600;white-space:nowrap">&#9889; WebGPU version</a></h1>
+  <h1><span class="hudTab" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="this.closest('#hud').classList.toggle('min')" title="show/hide controls">&#9776;</span>&#129514; Blobulator <a href="blobulator-gpu.html" id="gpuLink" style="font-size:13px;color:#0b0e14;background:#8ab4ff;padding:3px 9px;border-radius:5px;text-decoration:none;font-weight:600;white-space:nowrap">&#9889; WebGPU version</a></h1>
   <p id="blurb">Metaballs marched to an isosurface every frame. Reuses the engine's marching-cubes mesher.
      <span id="fps" class="dim"></span></p>
   <div class="row">
@@ -48,6 +48,32 @@
     <span class="dim" id="msg"></span>
   </div>
 </div>
+
+
+<!-- v4128 -- *** THE WHOLE TITLE LINE TOGGLES THE PANEL, NOT JUST THE HAMBURGER. *** Keith: "can the top line
+     'Blobulator GPU' minimize the controls panel to just the top line, and then click again to re-show?" -- yes,
+     and #hud.min already does exactly that (it hides every child except the h1), so this only had to widen what
+     you can press. He also reported the hamburger "does not move/drag/activate": it is not a drag handle, it is
+     this same show/hide control, and its inline onclick was DEAD because the attribute was written
+     this.closest(\'#hud\') -- a backslash-escaped quote is invalid inside an HTML attribute, so the handler was a
+     syntax error rather than a no-op. That is fixed on the h1 line itself; this listener is the widening.
+     TWO THINGS ARE DELIBERATELY SKIPPED: a click on the .hudTab span (it carries its own onclick, and handling
+     it here too would toggle twice and look like nothing happened) and a click on any <a> -- blobulator.html's
+     title contains the "WebGPU version" link, which must navigate rather than collapse the panel. -->
+<script>
+(function () {
+  var hud = document.getElementById("hud");
+  var h1 = hud && hud.querySelector("h1");
+  if (!h1) return;
+  h1.style.cursor = "pointer";
+  h1.title = "click to show/hide the controls";
+  h1.addEventListener("click", function (ev) {
+    if (ev.target.closest(".hudTab")) return;   // its own onclick already toggles
+    if (ev.target.closest("a")) return;         // let real links navigate
+    hud.classList.toggle("min");
+  });
+})();
+</script>
 
 <script type="module">
 import { attachGestures as _swekGestures } from "./ui/touchGestures.js";
@@ -122,7 +148,26 @@ function seedEmber(i, LX, LY, LZ, fresh) {
 }
 emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
 emberGeo.setAttribute("color", new THREE.BufferAttribute(emberCol, 3));
-const emberMat = new THREE.PointsMaterial({ size: 1.4, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
+// v4128 -- *** ROUND EMBERS, AND THE SQUARES WERE THE DEFAULT RATHER THAN A CHOICE. *** Keith, looking at the
+// flaming river: "can we make the float particles round or roundish?" A THREE.PointsMaterial with no `map`
+// draws each point as a flat SQUARE -- that is simply what an untextured point sprite is -- so the river was
+// throwing off little orange tiles. The sprite is generated here on a canvas rather than shipped as a PNG: a
+// binary nobody can review in a diff is exactly what this tree avoids adding, and a radial gradient is four
+// lines. WHITE on purpose: vertexColors multiplies through it, so the fire ramp still decides the colour and
+// this only decides the SHAPE. The soft alpha edge is what makes them read as glowing rather than as discs,
+// and with AdditiveBlending the transparent rim contributes nothing at all.
+function emberSprite() {
+  const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const g2 = cv.getContext("2d");
+  const grd = g2.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grd.addColorStop(0.00, "rgba(255,255,255,1)");
+  grd.addColorStop(0.30, "rgba(255,255,255,0.72)");
+  grd.addColorStop(0.65, "rgba(255,255,255,0.20)");
+  grd.addColorStop(1.00, "rgba(255,255,255,0)");
+  g2.fillStyle = grd; g2.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(cv);
+}
+const emberMat = new THREE.PointsMaterial({ size: 1.4, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true, map: emberSprite() });
 const embers = new THREE.Points(emberGeo, emberMat); scene.add(embers); embers.visible = false;
 
 // river metaballs live in FIELD space with real velocities so they flow + rise + respawn
@@ -276,21 +321,32 @@ function frame() {
   frameCount++;
 
   if (mode === "river") {
+    // v4128 -- *** THE RIVER'S DIMENSIONS ARE READ ONCE, AT THE TOP, AND THAT FIXES A CRASH. *** They used to
+    // be destructured TWICE below (once inside the march block, once after it) while the skin line ABOVE both
+    // of them already referenced wLY and cs. A `const` is hoisted but not initialised, so reading it earlier in
+    // the same scope is a temporal-dead-zone ReferenceError, not undefined -- and this one threw EVERY FRAME.
+    // *** IT HID BEHIND A SHORT-CIRCUIT, WHICH IS WHY IT SHIPPED. *** The guard is `!== "native"`, and native
+    // is the default skin, so the expression after it was never evaluated until somebody picked another skin.
+    // Keith did: "i clicked the skin: lava button and there is no render shown", with the console filling at
+    // 60 Hz. A crash reachable only from a non-default control is exactly the kind a page-load smoke test sees
+    // as green, which is why the gate added this round drives EVERY skin rather than the one that loads.
+    const { LX, LY, LZ, cs } = riverDims;
+    const wLX = LX * cs, wLY = LY * cs, wLZ = LZ * cs;
     if (frameCount % marchEvery === 0) {
       const m = riverGeom(RES, t, dt);
       const g = blobMesh.geometry;
       const pos = new Float32Array(m.positions), nor = new Float32Array(m.normals);
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
       g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
-      if (SKIN_CYCLE[skinIdx] !== "native") g.setAttribute("color", new THREE.BufferAttribute(computeSkinColors(pos, SKIN_CYCLE[skinIdx], { t, center: [0, wLY * cs * 0.4, 0], radius: COL_R * 1.6 }), 3));
+      // wLY is ALREADY LY * cs, so the old `wLY * cs * 0.4` multiplied by the cell size twice -- a second bug
+      // on the same line, which would have put the colour ramp's centre far above the fluid had it ever run.
+      if (SKIN_CYCLE[skinIdx] !== "native") g.setAttribute("color", new THREE.BufferAttribute(computeSkinColors(pos, SKIN_CYCLE[skinIdx], { t, center: [0, wLY * 0.4, 0], radius: COL_R * 1.6 }), 3));
       paintFire(g, pos, nor, t);
       g.computeBoundingSphere();
       blobMesh.scale.set(1, 1, 1); blobMesh.position.set(0, 0, 0);
-      const { LX, LY, LZ, cs } = riverDims;
       riverBed.scale.set(LX * cs * 1.15, 3, LZ * cs * 2.2); riverBed.position.set(0, -1.5, 0);
     }
     // advance + recolour embers (rising sparks)
-    const { LX, LY, LZ, cs } = riverDims; const wLX = LX * cs, wLY = LY * cs, wLZ = LZ * cs;
     for (let i = 0; i < EMBERS; i++) {
       const e = emberVel[i]; if (!e) { seedEmber(i, wLX, wLY, wLZ, true); continue; }
       emberPos[i * 3] += (e.vx + Math.sin(t * 2 + e.wob) * 2) * dt;
