@@ -67,7 +67,7 @@
 // smeared over, with nothing to do with the ramp. Correcting 0.649 in the filter would be right at the gate's
 // own fixture and wrong everywhere else.
 
-import { phantomField } from "../../physics/tomography/ct.js";
+import { phantomField, radon, filteredBackProjection } from "../../physics/tomography/ct.js";
 import { scoreRecon } from "../../physics/tomography/ct.js";
 import { reconQuality, absoluteFidelity, fieldToImage, range, gainRatio, FBP_GAIN_IS_GEOMETRIC }
     from "../../physics/tomography/reconQuality.mjs";
@@ -79,7 +79,7 @@ export const RECONQ_OBSERVABLES = [
     "recoveredGain", "gainRecoveryErr", "recoveredOffset", "offsetRecoveryErr",
     "absRmsScaled", "absRmsShifted",
     "structureScaled", "ssimScaled", "edgesScaled", "iouScaled", "iouShifted",
-    "fbpRatioMean", "fbpRatioSpread", "fbpGainSpread",
+    "fbpRatioMean", "fbpRatioSpread", "fbpGainSpread", "fbpTableWorstDrift",
 ];
 
 const DEF = { N: 96, gain: 1.3, offset: 0.4, thresh: 8 };
@@ -141,6 +141,23 @@ function buildReconQuality({ mode = "blindspot", config = {} } = {}) {
         fbpRatioMean: g.mean, fbpRatioSpread: g.spread,
         // The RAW spread, so "it collapses" is a comparison rather than an assertion.
         fbpGainSpread: Math.max(...gains) - Math.min(...gains),
+        // *** v4068 -- THE TABLE'S ARITHMETIC WAS RE-DERIVED AND ITS PHYSICS WAS NOT. *** An observable census
+        // flagged fbpRatioMean, fbpRatioSpread and fbpGainSpread as moved by nothing -- no knob, no plant, no
+        // rung -- which is true and, for a REPLAYED MEASUREMENT, expected. gainRatio() already recomputes the
+        // collapsed constant from the recorded rows, and reconQualityBind-selfcheck says so: the claim in
+        // FBP_GAIN_IS_GEOMETRIC.answer cannot drift away from the rows. But the ROWS are typed gains, and
+        // nothing re-measured whether an FBP at (N, nDet, angles) still produces them. A reconstruction change
+        // would leave this device asserting a law about a renderer that no longer exists -- the shape v3712
+        // named on blackHole's onsetHi: RE-DERIVE FROM WHAT IS IN PLAY, NEVER TYPE A NUMBER BACK IN.
+        //
+        // Every recorded row is now re-run. MEASURED: the live gains reproduce the table to 3e-7, which is the
+        // rounding in its own six decimal places, at 25-63 ms per row. The table is CHECKED rather than quoted.
+        fbpTableWorstDrift: Math.max(...FBP_GAIN_IS_GEOMETRIC.measured.map((r) => {
+            const angles = Array.from({ length: r.angles }, (_, i) => i * Math.PI / r.angles);
+            const truth = phantomField(r.N, ELL);
+            const recon = filteredBackProjection(radon(truth, r.N, angles, r.nDet), r.N, angles, r.nDet);
+            return Math.abs(absoluteFidelity(recon, truth).gain - r.gain);
+        })),
     };
 }
 
