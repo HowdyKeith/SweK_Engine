@@ -2944,7 +2944,24 @@ A password fetches a token from the list server; an unregistered callsign needs 
   // v1690 — the event->move mapping lives in swekRobot.react() now (shared by the engine + page robots too);
   // server.html just feeds its log stream in.
   function _robotReact(line){ try { window._swekRobot && window._swekRobot.react && window._swekRobot.react(line); } catch(e){} }
-  window.swekTick = function(msg){ try { push({ t:Date.now(), level:"info", msg:String(msg) }); } catch(e){ tickShow({msg:msg}); } };
+  // *** v4146 -- RENAMED FROM swekTick, WHICH IT HAD BEEN SILENTLY OVERWRITING SINCE THE POLLING GUARD WAS
+  // ADDED. *** Two completely different functions were both called window.swekTick in this one file: the
+  // POLLING GUARD at the top (key, fn) -> SwekPoller.guardedTick, and THIS TICKER FEEDER (msg) -> push a log
+  // line. This assignment runs later, so it WON -- and every one of the thirty `swekTick("key", poll)` call
+  // sites below was calling THIS: it wrote the KEY STRING into the ticker as a log line and NEVER CALLED THE
+  // POLL FUNCTION AT ALL. Thirty pollers that looked guarded, read as guarded to the gate that greps for
+  // them, and did nothing after their first manual call.
+  //
+  // MEASURED, NOT REASONED: driving server.html in a real browser showed window.swekTick with arity 1 and
+  // this function's source, the "sharp-install" key arriving twice in the ticker, and ZERO matching fetches.
+  // FOUND BY CONVERTING ONE MORE POLLER TO THE GUARD (fetchCap's last unguarded poller) AND WATCHING ITS
+  // PANEL STOP WORKING -- the conversion was correct and it moved that poller from working-but-unguarded to
+  // silently-dead, which is what made the collision finally visible.
+  //
+  // The guard keeps the name because thirty sites use it and one used this. poller-selfcheck now asserts
+  // window.swekTick is assigned EXACTLY ONCE, which is the check that was missing: it already verified the
+  // definition came before its first use, and a SECOND definition after it satisfied that test perfectly.
+  window.swekTickerSay = function(msg){ try { push({ t:Date.now(), level:"info", msg:String(msg) }); } catch(e){ tickShow({msg:msg}); } };
   (function(){
     var mb=document.getElementById("tickMute");
     if(mb) mb.onclick=function(){ _tickMuted=!_tickMuted; try{window._swekMuted=_tickMuted;}catch(e){} mb.textContent=_tickMuted?"\ud83d\udd07":"\ud83d\udd0a"; mb.title=_tickMuted?"Unmute \u2014 read the ticker aloud with this computer's voice":"Mute the spoken ticker"; if(_tickMuted){ try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){} setTimeout(function(){ try{ if(_tickMuted&&window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){} },80); try{window._swekRobot&&window._swekRobot.setTalking&&window._swekRobot.setTalking(false);}catch(e){} } else { try{ speakAloud("Voice On"); }catch(e){} } };
@@ -5523,7 +5540,7 @@ t:Date.now(),level:"info",msg:"📡 RustDesk view request sent — accept the in
           el.appendChild(clr);
         }
         if(!any)el.innerHTML="<span style='color:var(--dim);font-size:10px;'>no tunnel URLs known yet — start Cloudflare on any peer and they will be remembered here</span>";
-        if(_seenTunnels){ Object.keys(live).forEach(function(k){ if(!_seenTunnels[k]){ var pp=live[k]; try{ window.swekTick && window.swekTick("[tunnel] "+pp.name+" tunnel is live: "+pp.tunnel); }catch(e){} } }); }
+        if(_seenTunnels){ Object.keys(live).forEach(function(k){ if(!_seenTunnels[k]){ var pp=live[k]; try{ window.swekTickerSay && window.swekTickerSay("[tunnel] "+pp.name+" tunnel is live: "+pp.tunnel); }catch(e){} } }); }
         _seenTunnels=live;
       }).catch(function(){el.textContent="unavailable";});
     }
@@ -7971,7 +7988,15 @@ import { FleetTracker } from "/brain/fleet/fleetTracker.js";
       // Poll only while something is actually running -- this panel is load-on-click by design (v3963's own
       // comment above), so an interval that outlived the job would be the exact "fires on every page load for
       // a panel nobody opened" cost that comment exists to avoid.
-      if(running && !installPoll) installPoll = setInterval(sharpLoad, 1500);
+      // *** v4146 -- THROUGH swekTick, WHICH THIS POLLER WALKED PAST WHEN IT WAS WRITTEN AT v4104. ***
+      // fetchCap-selfcheck went red with "1 still unguarded: sharpLoad@1500ms" against a baseline of ZERO --
+      // the guard already existed and this was the first new interval to skip it. The comment above is right
+      // that the interval is short-lived, and that is NOT the property the cap is about: an install job runs
+      // for minutes, ticking every 1.5s, at exactly the moment the user is ALSO watching the log fill and the
+      // rest of the page polling. Unguarded it competes for the same six sockets, and a 1500ms interval with a
+      // slower-than-1500ms response stacks a second call on top of the first. guardedTick refuses that stack
+      // and puts the request in the shared pool; the key is its own, so nothing else can starve it.
+      if(running && !installPoll) installPoll = setInterval(() => swekTick("sharp-install", sharpLoad), 1500);
       if(!running && installPoll){ clearInterval(installPoll); installPoll = null; }
     }
 

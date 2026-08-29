@@ -8,6 +8,27 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4146 -- thirty pollers that were not polling, and the gate that counted them said they were fine
+
+fetchCap-selfcheck went red on Keith's rig with a single finding: one unguarded fetching poller, sharpLoad at 1500ms, against a baseline of ZERO. That poller is mine, added at v4104 for the ml-sharp install panel, and the gate's own line said it plainly -- THE GUARD ALREADY EXISTS AND THEY WALK PAST IT.
+
+Converting it to swekTick was the right fix and it took four characters. *** AND IT BROKE THE PANEL. *** sharpPanel-selfcheck, which drives the whole install loop in a real headless browser against a status stub that advances its own answer call over call, went from all-passed to 2 FAILED: the job never appeared to finish and the button never re-enabled. Stashing the one-line change and re-running confirmed the cause was mine rather than a coincidence.
+
+*** THE CONVERSION WAS NOT THE BUG. IT WAS THE INSTRUMENT THAT FOUND ONE. ***
+
+server.html assigned window.swekTick TWICE. Near the top, the polling guard: `function (key, fn)`, which routes fn through SwekPoller.guardedTick so it obeys the hidden-page rule, the in-flight rule, the backoff and the shared socket cap. Two thousand lines later, in the ticker's own IIFE, a completely different function with the same name: `function (msg)`, which pushes a log line into the scrolling ticker.
+
+The second assignment runs later, so it WON. Every one of the thirty `swekTick("key", poll)` call sites in the file was calling the FEEDER -- which takes one argument. It wrote the KEY STRING into the ticker as a log line and NEVER CALLED THE POLL FUNCTION AT ALL. The second argument was dropped on the floor. Thirty pollers that looked guarded, read as guarded to the gate that greps for them, and did nothing after whatever manual first call their panel happened to make.
+
+MEASURED IN A REAL BROWSER RATHER THAN REASONED ABOUT. Driving server.html headless and instrumenting it showed window.swekTick reporting arity 1 and the feeder's source; the interval firing twice in 4500ms and throwing nothing; the key "sharp-install" arriving twice in the ticker's own call list; and ZERO matching /sharp/status fetches in the same window. After the fix: arity 2, and the fetches appear -- two became four. Every step of that was a reading, not an inference, and one of the readings corrected me mid-diagnosis: an early grep made the tick list look EMPTY when it was actually a multi-line array the filter had truncated, which sent me hunting a scope-shadowing theory that was never true.
+
+THE FIX PUTS THE NAME WHERE THE WEIGHT IS. The feeder is renamed swekTickerSay -- it had exactly ONE call site, the tunnel-is-live notice -- and the polling guard keeps the name, which had thirty. Nothing else in the tree references either.
+
+*** AND poller-selfcheck ALREADY CARRIED A CHECK LABELLED "the tick predicate is defined ONCE". *** It never checked that. What it asserted was that the first definition appears before the first use -- which is perfectly TRUE of a file that defines the name twice, so it passed the entire time the second definition was winning. A label claiming more than its assertion proves is the most expensive kind of green, because it reads as the question having been asked. The right question is a COUNT, it costs one regex, and it is asserted now and sabotage-confirmed: restoring the clobber takes the count to 2 and fails the check.
+
+WHAT THIS CHANGES AT RUNTIME, STATED PLAINLY RATHER THAN LEFT TO BE DISCOVERED: thirty pollers that were silently inert are now live. That is what they were always meant to be, and it is also a real increase in request volume on a page whose socket pool has been the subject of several rounds. The cap, the backoff and the in-flight guard are exactly the machinery for that, and they now apply to thirty callers that were bypassing them by accident rather than obeying them. If the pool proves tight, the dial and the live pool chip that v3269's arc added are the instruments to turn on it -- and unlike before, the number they show will be about traffic that actually exists.
+
+Verified: fetchCap-selfcheck all checks pass (0 unguarded, 32 guarded), poller-selfcheck all pass including the new count, sharpPanel-selfcheck all passed again, tools/check.mjs syntax OK (1466 files), verify.mjs ALL GREEN.
 ## Since v4145 -- six red gates from the rig, and a patch series whose first commit was already obsolete
 
 Keith ran gates on his rig and sent six failures. Three more arrived while the first three were being worked. Every one is answered below, and two of them were mine.
