@@ -152,6 +152,15 @@ function buildReconQuality({ mode = "blindspot", config = {} } = {}) {
         //
         // Every recorded row is now re-run. MEASURED: the live gains reproduce the table to 3e-7, which is the
         // rounding in its own six decimal places, at 25-63 ms per row. The table is CHECKED rather than quoted.
+        //
+        // *** AND THE NUMBER WITNESSES ITSELF, WHICH IS WHY IT IS REPORTED AS A DRIFT AND NOT AS A BOOLEAN. ***
+        // The next census flagged this observable too -- no knob moves a re-derivation of a frozen table, and
+        // none should. What keeps it from being a check that cannot fail is the VALUE: live 0.6502792653978106
+        // against a recorded 0.650279 is 2.654e-7, exactly the six-decimal rounding of the row it re-derives.
+        // A drift of EXACTLY 0 would mean the recorded value had been compared with itself -- the live
+        // reconstruction never ran -- and NaN would mean it ran and failed. So the small nonzero reading is
+        // the evidence that both sides are being computed, which a pass/fail boolean here would have thrown
+        // away. THE PRECISION OF THE AGREEMENT IS THE WITNESS.
         fbpTableWorstDrift: Math.max(...FBP_GAIN_IS_GEOMETRIC.measured.map((r) => {
             const angles = Array.from({ length: r.angles }, (_, i) => i * Math.PI / r.angles);
             const truth = phantomField(r.N, ELL);
