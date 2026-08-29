@@ -96,6 +96,20 @@ function breakWorst(fpp, { centro, hklMax = 3 }, planted) {
 
 function buildPowder({ mode = "friedel", config = {} } = {}) {
     const c = { ...DEF, ...config };
+    // *** v4064 -- checkTo SIZES AN ARRAY AND NOTHING CHECKED IT WAS A WHOLE NUMBER. ***
+    // knobLiveness read this knob as LIVE in friedel, and it was live only because every rung THREW: at 1.5x
+    // (181.5) and 0.5x (60.5) `r3Series(c.checkTo)` asks for an array of fractional length and the runtime
+    // answers RangeError "Invalid array length". The census counted that as a refusal, a refusal counts as a
+    // response, and the knob has read healthy since. The 8x rung, 968, is a whole number and builds fine --
+    // which is the tell: the knob works, it was simply never given a value it could survive.
+    //
+    // THE BOUNDS ARE DERIVED, NOT TYPED AT A NUMBER THAT LOOKED SAFE. The floor is 7 because this device
+    // REPORTS r3AtSeven -- below that its own observable has nothing to read. The cap is the allocation
+    // argument mpmstep made for nx/ny: a knob that SIZES something hands the machine the whole value, and the
+    // wide ladder's 1e6x rung would ask r3Series for 1.21e8 entries and rings() for a triple loop around
+    // (sqrt N)^3 ~ 1.3e12. 10000 is two orders above the shipped 121, costs 10k entries and 1e6 loop steps,
+    // and is a reading rather than a hang.
+    c.checkTo = Math.min(10000, Math.max(7, Math.floor(Number(c.checkTo)) || DEF.checkTo));
     const planted = !!config.planted;
 
     // ---- ROUTE 1 vs ROUTE 2: a triple loop over hkl against a convolution of power series.

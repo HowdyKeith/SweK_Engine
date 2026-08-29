@@ -57,6 +57,19 @@ const VALS = [2.0, -1.0, 4.5, 0.25, 7.0, -3.0];
 const QUERIES = [0.5, 2.0, 4.75, 8.3, 12.5];
 
 const DEF = { queries: QUERIES, exponents: [1, 1.05, 1.25, 1.5], probe: 4.75, nuggetLevel: 1 };
+
+// *** v4064 -- AND A LADDER THAT OBEYS THE RULE ABOVE, so the knob is ANSWERED and not merely guarded. ***
+// A guard alone would turn every rung into a refusal, and v4063 named that outcome for what it is: live only
+// because everything was rejected is not live. Each alternative keeps the Markov exponent 1 and moves the
+// DEPARTURES, which is the axis this mode actually grades -- derived from the shipped set (halved gaps,
+// doubled gaps, one extra step) rather than typed as a fourth opinion about which exponents matter.
+export const GEOSTATS_KNOB_CHOICES = {
+    exponents: [
+        [1, ...DEF.exponents.slice(1).map((p) => 1 + (p - 1) / 2)],   // the same departures, halved
+        [1, ...DEF.exponents.slice(1).map((p) => 1 + (p - 1) * 2)],   // and doubled
+        [1, ...DEF.exponents.slice(1), 1 + (DEF.exponents[DEF.exponents.length - 1] - 1) * 1.5],
+    ],
+};
 // *** v3852 -- `noconstraint` IS THE PLANT, AND THE `screen` NEGATIVE NEVER WAS ONE. *** plantedCoverage read
 // this device as UNCOVERED while its header advertised a LOAD-BEARING NEGATIVE, and the census was right:
 // sweeping the variogram exponent away from 1 opens the screen PROPORTIONALLY, which is a SENSITIVITY SWEEP
@@ -121,6 +134,25 @@ export function build({ mode = "bridge", config = {} } = {}) {
 
     if (mode === "screen") {
         // The screen is a property of exponent 1 EXACTLY. Nothing is tuned: one function, four exponents.
+        //
+        // *** v4064 -- "EXACTLY 1" WAS A SENTENCE IN THIS COMMENT AND NOWHERE IN THE CODE. ***
+        // markovOuter below is rows.find((r) => r.p === 1).outer, so an exponent list WITHOUT 1 makes find()
+        // return undefined and the device dies on `.outer` with a TypeError. knobLiveness read `exponents` as
+        // LIVE in screen, and it was live only because every rung of its ladder threw that TypeError: scaling
+        // the array by 1.5, 0.5 or 8 removes the 1 every time. A crash was standing in for a verdict.
+        //
+        // THE LIST IS NOT FREELY SCALABLE AND NOW SAYS SO. The other three exponents are measured AGAINST the
+        // Markov reference -- perUnitDeparture divides by (p - 1), and worstOffMarkov and openingIsMonotone
+        // are both about departure FROM 1 -- so a set without it is not a harsher test, it is a different
+        // question with no reference to ask it against. Refused by name, in this tree's own idiom (a returned
+        // error object, as blackHoleBind does for onset-lo-inside-horizon), rather than left to the runtime:
+        // a device-authored refusal tells a reader WHICH rule was broken, and v4063 now carries that reason
+        // onto the census row where a bare TypeError used to sit.
+        if (!Array.isArray(c.exponents) || !c.exponents.some((p) => p === 1)) {
+            return { error: "screen-needs-markov-exponent: exponents must contain 1 exactly -- the other "
+                + "exponents are graded as departures FROM it, so there is no screen to measure without it. "
+                + "Got: " + JSON.stringify(c.exponents) };
+        }
         const rows = c.exponents.map((p) => {
             const o = outerWeight((h) => Math.pow(h, p), c.probe);
             return { p, outer: o.max, perUnitDeparture: p === 1 ? null : o.max / (p - 1) };
@@ -177,6 +209,7 @@ export const GEOSTATS_OBSERVABLES = [
 
 /** The device descriptor, in the same shape every other bind uses -- ONE declaration, not a second convention. */
 export const geostatsDevice = {
+    knobChoices: GEOSTATS_KNOB_CHOICES,
     // *** "nugget" IS modes[0] ON PURPOSE, AND THE REASON IS A MEASURED BLINDNESS. *** The obvious choice was
     // "bridge" (worstValueErr), and the plant DOES NOT MOVE IT: 2.6645e-15 in both arms. For the Brownian
     // variogram the system is Markov and the UNCONSTRAINED solution coincides with the constrained one, so
