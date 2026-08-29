@@ -21,7 +21,7 @@ import {
 } from "../../physics/nuclear/decay.mjs";
 
 export const NUCLEAR_OBSERVABLES = [
-    "chainWorstDiff", "conservationResidual", "nA", "nB", "nC",
+    "chainWorstDiff", "conservationResidual", "integratedConservationResidual", "nA", "nB", "nC",
     "activityRatio", "equilibDeparture", "equilibFirstOrder",
     "peakA", "peakPerNucleon", "predictedZ", "predictedZCorrect", "fissionQ", "planted",
 ];
@@ -47,7 +47,8 @@ function peakNoSurface(Amin = 2, Amax = 250) {
 function buildNuclear({ mode = "chain", config = {} } = {}) {
     const c = { ...DEF, ...config };
     const blank = {
-        chainWorstDiff: null, conservationResidual: null, nA: null, nB: null, nC: null,
+        chainWorstDiff: null, conservationResidual: null, integratedConservationResidual: null,
+        nA: null, nB: null, nC: null,
         activityRatio: null, equilibDeparture: null, equilibFirstOrder: null,
         peakA: null, peakPerNucleon: null, predictedZ: null, predictedZCorrect: null,
         fissionQ: null, planted: !!config.planted,
@@ -85,7 +86,29 @@ function buildNuclear({ mode = "chain", config = {} } = {}) {
     return {
         ...blank,
         chainWorstDiff: Math.max(Math.abs(closed.A - integ.A), Math.abs(closed.B - integ.B), Math.abs(closed.C - integ.C)),
+        // *** v4065 -- THIS RESIDUAL IS AN ALGEBRAIC IDENTITY OF THE CLOSED FORM, AND IT IS KEPT FOR A
+        // NARROWER REASON THAN THE ONE ITS NAME SUGGESTS. *** An observable census -- which knobs move which
+        // observables -- found that nothing moves it: not a knob, not the plant, and not any rung of the
+        // ladder. MEASURED at the shipped defaults and at l2 x1.5, x0.5 and x8: EXACTLY 0 every time.
+        //
+        // It is zero by algebra, not by physics. With u = exp(-l1 t), v = exp(-l2 t) and d = l2 - l1,
+        //     A + B + C = N0[1 + u + (l1/d)(u - v) - (l2 u - l1 v)/d] = N0[1 + u + u(l1 - l2)/d] = N0
+        // for ALL l1, l2 and t. And in the degenerate branch batemanChain returns C as N0 - A - B outright, so
+        // there it is zero by construction rather than by cancellation. "The chain conserves nuclei" is
+        // therefore not what this number tests.
+        //
+        // WHAT IT DOES TEST IS CONDITIONING, and that is real: (l2 - l1) sits in two denominators, so near --
+        // but not inside -- the degenerate branch's 1e-12 threshold the cancellation is catastrophic. MEASURED
+        // at l1 = 0.1, l2 = 0.1000000001, t = 10: the residual is 4.082e-5 on N0 = 1000. A genuine reading,
+        // reachable by no default and no ladder rung this device carries, which is why the census sees it as
+        // stone dead. Kept, and now labelled for what it is.
         conservationResidual: Math.abs(closed.A + closed.B + closed.C - c.N0),
+        // *** AND THE CONSERVATION CHECK THAT CAN ACTUALLY FAIL, WHICH WAS NOT BEING MADE. *** batemanIntegrated
+        // RK4s the ODEs and "deliberately shares nothing with the closed form" -- so its A + B + C is NOT an
+        // identity, it is an accumulation of integrator error. At the same defaults it reads 4.774e-15, a real
+        // number that grows with a worse step, a stiffer pair or a longer t. chainWorstDiff already compares
+        // the two solutions to each other; nothing asked whether the integrator conserves anything at all.
+        integratedConservationResidual: Math.abs(integ.A + integ.B + integ.C - c.N0),
         nA: closed.A, nB: closed.B, nC: closed.C,
     };
 }
