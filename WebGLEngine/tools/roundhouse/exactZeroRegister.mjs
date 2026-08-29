@@ -10,6 +10,17 @@
 // ceremony the guard exists to force. An entry cannot be added without writing the sentence.
 
 export const EXACT_OK = {
+    // *** v4071 -- THREE ENTRIES REMOVED, AND THEY ARE THE REASON THIS COMMENT EXISTS. *** This register's
+    // contract is that an entry "cannot be added without writing the sentence". It forced three sentences
+    // about freerotation.{conserve,flip,attitude}.sigmaRelErr, all saying the fixture conserves sigma "by
+    // construction, so the spread over the run is bit-zero". MEASURED: those modes NEVER COMPUTE SIGMA. Only
+    // `stability` runs that expression; the other three inherited 0 from a blank that filled every unset
+    // observable with 0 instead of null (fixed in freeRotationBind at v4071), so the zero was ABSENCE wearing
+    // the face of a result -- and the register recorded a physical explanation for it three times.
+    //
+    // *** THE CEREMONY FORCES A REASON AND CANNOT CHECK ONE. *** That is not an argument against the register,
+    // which is what surfaced these at all; it is the limit of what a written sentence can promise, and the
+    // entries are gone because the values are now null and there is no exact zero left to explain.
     // *** v3916 -- NINE OF THE TEN v3211 BACKLOG ENTRIES, EXAMINED AT LAST. *** That backlog was created by the
     // first real run of census-selfcheck and eight of its ten said only "NOT EXAMINED". They have been debt for
     // seven hundred versions because census could not finish to keep asking.
@@ -40,9 +51,6 @@ export const EXACT_OK = {
     // observable, another mode, a plant, or a perturbed input. That pairing is the whole standard here.
 
     // FREEROTATION -- the control is the `stability` mode, where the SAME observable reads 1.3875e-5.
-    "freerotation.conserve.sigmaRelErr": "the conserve fixture integrates a torque-free body whose sigma is constant by construction, so the spread over the run is bit-zero; the stability mode reads 1.3875e-5 from the same expression, which is the control that it can move",
-    "freerotation.flip.sigmaRelErr": "as conserve -- the flip fixture changes WHICH axis the body tumbles about, not whether sigma is conserved, so the residual stays exactly zero while stability shows the same key going non-zero",
-    "freerotation.attitude.sigmaRelErr": "as conserve; attitude grades orientation rather than the invariant, and leaves sigma exactly conserved",
 
     // CLOCKS -- an exact GR identity, verified at four independent (M, r) pairs.
     "clocks.rates.crossoverResidual": "|orbitingDilation(M,r) - staticDilation(M, r/1.5)| is the identity sqrt(1-3M/r) = sqrt(1-2M/(2r/3)), algebraically exact; measured bit-zero at (M,r) = (1,12), (0.3,7.7), (2,50) and (0.05,4), while the sibling clockEffectErrFrac reads 5.65e-15 so the arithmetic is genuinely floating point",
