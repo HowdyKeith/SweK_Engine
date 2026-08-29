@@ -108,6 +108,17 @@ export async function buildKerr(hyp, base = {}) {
 
     if (h.mode === "limit") {
         // the cross-instrument claim, measured against the OTHER module's own exports
+        //
+        // *** v4074 -- AN OBSERVABLE CENSUS FLAGGED THESE THREE, AND THEY ARE THE GENUINE ARTICLE THIS FILE'S
+        // OWN v3299 COMMENT WISHED horizonProductErr AND horizonSumErr WERE. *** schwarzHorizon, schwarzPhoton
+        // and schwarzShadow are imported from geodesic.js, a module that never touches kerr.js -- an
+        // independent implementation of the a -> 0 limit, not a round trip through the same closed form.
+        //
+        // MEASURED FOR TEETH RATHER THAN ASSUMED TO HAVE THEM: at M=1, a=0 all three read exactly 0 (both
+        // sides land on the same integers -- 2, 3 -- so there is no rounding to hide a real disagreement
+        // behind). Perturbing M by a relative 1e-9 on the Schwarzschild side alone moves schwarzHorizonErr to
+        // 2.0e-9, tracking the perturbation linearly. Not moved by any knob here because `limit` fixes a = 0
+        // by construction; that is the claim, not an evasion of it.
         const p = photonOrbits(M, 0), b = criticalImpacts(M, 0);
         out.schwarzHorizonErr = Math.abs(hz.outer - schwarzHorizon(M));
         out.schwarzPhotonErr = Math.max(Math.abs(p.prograde - schwarzPhoton(M)), Math.abs(p.retrograde - schwarzPhoton(M)));
