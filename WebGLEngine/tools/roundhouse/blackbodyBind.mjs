@@ -37,7 +37,7 @@
 
 import {
     wienRootNewton, wienPeakMaximise, boseIntegral, boseClosed,
-    stefanBoltzmannSigma, wienConstant, exitance,
+    stefanBoltzmannSigma, wienConstant, K_BOLTZ, H_PLANCK, C_LIGHT,
 } from "../../physics/thermal/blackbody.mjs";
 
 export const BLACKBODY_OBSERVABLES = [
@@ -46,10 +46,23 @@ export const BLACKBODY_OBSERVABLES = [
     "peakProductRatio",
     "bose4Quad", "bose4Closed", "bose4Rel",
     "bose3Quad", "bose3Closed", "bose3Rel",
-    "sigma", "wienB", "exitanceQuarticRel",
+    "sigma", "wienB", "sigmaFromBoseRel",
 ];
 
-const DEF = { tMax: 8, steps: 400000, tLo: 300, tHi: 600 };
+// *** v4055 -- tLo AND tHi ARE GONE, AND THE OBSERVABLE THAT USED THEM WAS A TAUTOLOGY. ***
+// knobLiveness reported tHi as insensitive: flat on the near ladder, waking only at 6e8. The reading was
+// right and the cause was not slack in a bound. Its one use was
+//
+//     exitanceQuarticRel: rel(exitance(tHi) / exitance(tLo), Math.pow(tHi / tLo, 4))
+//
+// and exitance(T) is `stefanBoltzmannSigma() * Math.pow(T, 4)`, so the left side is sigma*tHi^4 / sigma*tLo^4
+// -- ALGEBRAICALLY THE RIGHT SIDE. The old comment beside it said "sigma cancels in the ratio, so this needs
+// no constant at all: it is a statement about the exponent". Sigma does cancel; the exponent does not survive
+// either, because the 4 is on BOTH sides. What was left graded IEEE754: does pow(a,4)/pow(b,4) equal
+// pow(a/b,4). MEASURED at 0 or one ulp (2.5e-16) for temperature ratios spanning twelve orders of magnitude,
+// AND FOR tLo === tHi. *** A KEY THAT CANNOT FAIL IS WORSE THAN NO KEY: it reports a passing number and makes
+// the device look graded on a law it never touches. *** The 6e8 wake was pow() losing precision, nothing else.
+const DEF = { tMax: 8, steps: 400000 };
 
 const rel = (a, b) => Math.abs(a - b) / Math.max(1e-300, Math.abs(b));
 
@@ -75,8 +88,17 @@ function buildBlackbody({ mode = "spectrum", config = {} } = {}) {
         bose4Quad: b4q, bose4Closed: b4c, bose4Rel: rel(b4q, b4c),
         bose3Quad: b3q, bose3Closed: b3c, bose3Rel: rel(b3q, b3c),
         sigma: stefanBoltzmannSigma(), wienB: wienConstant(),
-        // sigma cancels in the ratio, so this needs no constant at all: it is a statement about the exponent.
-        exitanceQuarticRel: rel(exitance(c.tHi) / exitance(c.tLo), Math.pow(c.tHi / c.tLo, 4)),
+        // *** THE LINK THIS MODULE NEVER GRADED, PUT WHERE THE TAUTOLOGY WAS. *** sigma is TYPED here as the
+        // closed form 2 pi^5 k^4 / (15 h^3 c^2), and the Bose integral is computed separately -- and NOTHING
+        // checked that the two agree. They must: sigma = 2 pi k^4 / (h^3 c^2) times the integral of
+        // x^3/(e^x - 1), which is Gamma(4) zeta(4) = pi^4/15. So this compares the DIMENSIONFUL ANCHOR against
+        // the DIMENSIONLESS IDENTITY by a different route -- pi^5/15 typed on one side, Gamma*zeta on the
+        // other -- and a wrong power of pi, a 15 written for a 90, or a zeta returning the wrong argument
+        // moves it off zero. That last one is not hypothetical: MEASURED_V3811 records zeta.js returning
+        // zeta(3) for zeta(2.5). Unlike what it replaces, THIS ONE CAN FAIL.
+        sigmaFromBoseRel: rel(2 * Math.PI * Math.pow(K_BOLTZ, 4)
+                              / (Math.pow(H_PLANCK, 3) * C_LIGHT * C_LIGHT) * b4c,
+                              stefanBoltzmannSigma()),
     };
 }
 

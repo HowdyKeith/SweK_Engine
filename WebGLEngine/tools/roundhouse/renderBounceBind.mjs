@@ -54,7 +54,7 @@ import { directExact, directNEE, directBSDF, directMIS, misWeights, capHalfAngle
 
 export const RENDERBOUNCE_OBSERVABLES = [
     "kMeasured", "kGeometric", "kResidual",
-    "seriesWorstRel", "seriesDepths",
+    "seriesWorstRel", "seriesDeepestRel", "seriesRelByDepth",
     "whiteFurnaceWorstRel", "deficitVsKPowNWorst",
     "neeRel", "bsdfRel", "misRel", "misWeightSumErr",
     "identityResidual",
@@ -102,12 +102,32 @@ function buildRenderBounce({ mode = "series", config = {} } = {}) {
     // ---- THE TRUNCATED SERIES, graded at every depth rather than at convergence.
     // THE PLANT: forget to carry albedo into the recursive call. bounces.mjs' own parameter.
     const fault = planted ? { loseThroughput: true } : {};
-    let seriesWorstRel = 0, depths = 0;
+    // *** v4058 -- `seriesDepths` USED TO BE COUNTED HERE AND IT WAS maxDepth WRITTEN OUT LONGHAND. *** The
+    // census read maxDepth as ECHOED AND IGNORED in `series`: the loop runs to it, every depth passes, so the
+    // WORST over 1..n is the same number whether n is 3 or 9 -- correctly, because a worst-case that grew when
+    // you looked at more depths would be the defect. The knob moved exactly one observable, and that observable
+    // was the knob. (Under the plant the error compounds with depth, the worst does climb, and it read live --
+    // which is why this arrived as a split reading rather than a still one.)
+    //
+    // The count is replaced by a MEASUREMENT AT THE SAME PLACE: the relative error at the DEEPEST depth
+    // checked. It carries the coverage the count carried -- the deepest is maxDepth -- and unlike the count it
+    // is a number the run produced rather than one the caller supplied, so moving the knob moves it honestly.
+    // The deepest term is also the hardest one, which is the term a truncation defect reaches first.
+    // *** AND THE COUNT IS REPLACED BY THE ERRORS THEMSELVES, WHICH THE FIRST DRAFT OF THIS FIX GOT WRONG. ***
+    // Dropping seriesDepths broke renderBounceBind-selfcheck, which reads it to assert the series really is
+    // graded at EVERY depth rather than only at the limit -- so the count was a COVERAGE WITNESS with a real
+    // consumer, not spare rope. Restoring the count would restore the echo with it. The per-depth errors do
+    // both jobs and neither is a knob handed back: their LENGTH is the coverage the gate checks, their VALUES
+    // are measurements the run produced, and both move when maxDepth moves.
+    const seriesRelByDepth = [];
+    let seriesWorstRel = 0;
     for (let n = 1; n <= c.maxDepth; n++) {
         const got = gather(c.rho, S, { seed: c.seed, maxDepth: n, blocked, ...wire, ...fault });
-        seriesWorstRel = Math.max(seriesWorstRel, rel(got, seriesExact(c.rho, kMeasured, n)));
-        depths++;
+        const r = rel(got, seriesExact(c.rho, kMeasured, n));
+        seriesRelByDepth.push(r);
+        seriesWorstRel = Math.max(seriesWorstRel, r);
     }
+    const seriesDeepestRel = seriesRelByDepth[seriesRelByDepth.length - 1];
 
     // ---- THE WHITE FURNACE. At rho = 1 the shortfall IS k^n, predicted before the run.
     let whiteWorstRel = 0, deficitWorst = 0;
@@ -141,7 +161,7 @@ function buildRenderBounce({ mode = "series", config = {} } = {}) {
 
     return {
         kMeasured, kGeometric, kResidual: Math.abs(kMeasured - kGeometric),
-        seriesWorstRel, seriesDepths: depths,
+        seriesWorstRel, seriesDeepestRel, seriesRelByDepth,
         whiteFurnaceWorstRel: whiteWorstRel, deficitVsKPowNWorst: deficitWorst,
         neeRel: rel(nee, exact), bsdfRel: rel(bsdf, exact), misRel: rel(mis, exact),
         misWeightSumErr: wErr,
@@ -184,7 +204,8 @@ export function reportLines() {
     L.push("    (r/d)^2                    " + f(h.kGeometric) + "     residual " + f(h.kResidual));
     L.push("");
     L.push("  THE TRUNCATED SERIES, EXACT AT EVERY DEPTH");
-    L.push("    worst relative over " + h.seriesDepths + "     " + f(h.seriesWorstRel));
+    L.push("    worst relative over " + DEF.maxDepth + "     " + f(h.seriesWorstRel)
+        + "   (at the deepest, " + f(h.seriesDeepestRel) + ")");
     L.push("    white furnace: |(1-L) - k^n|  " + f(h.deficitVsKPowNWorst) + "   a number predicted before the run");
     L.push("");
     L.push("  THREE ESTIMATORS, ONE DIRECT TERM");

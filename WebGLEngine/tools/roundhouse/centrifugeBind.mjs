@@ -38,7 +38,8 @@ export const CF_OBSERVABLES = [
     "recoveredVsDiscrete", "recoveredVsContinuous",
     "orderMeasured", "orderTheory", "errRatios", "dtCoarse",
     "doublingTimes", "doublingSpread", "doublingTheory",
-    "neutralDensityRecovered", "neutralDensityConfigured", "neutralRelErr", "driftAtNeutral",
+    "neutralDensityRecovered", "neutralRelErr", "driftAtNeutral",
+    "driftOffNeutral", "offNeutralMoved",
     "bandOrderCorrect", "bands", "planted",
 ];
 
@@ -129,10 +130,37 @@ export function build({ mode = "rate", config = {} } = {}) {
 
     if (mode === "neutral") {
         // THE KEY IS A BIFURCATION, RECOVERED FROM BEHAVIOUR: bisect the particle density on WHICH WAY IT MOVES.
-        // Nothing here reads rhoF -- the sign of one step is the only input -- so the recovered value is an
-        // external key rather than a mirror (v3201: the measuring route is independent of the setting route).
+        //
+        // *** v4057 -- THE CLAIM THAT USED TO STAND HERE WAS FALSE, AND THE CENSUS IS WHAT ASKED. *** It read
+        // "Nothing here reads rhoF -- the sign of one step is the only input -- so the recovered value is an
+        // external key rather than a mirror". THE STEPPER READS rhoF: stepper() is built with it and every
+        // move goes through sedCoeff(a, rhoP, rhoF, eta) = 2a^2(rhoP - rhoF)/(9 eta). That factor IS the sign
+        // this bisection reads, so the route that measures and the route that sets are THE SAME ROUTE -- a
+        // mirror, which is exactly what v3201 says to avoid.
+        //
+        // MEASURED, and worse than a mirror: recovered comes back BIT-EXACTLY rhoF at 1 and at 3, neutralRelErr
+        // is exactly 0, driftAtNeutral is exactly 0 -- AND ALL THREE ARE UNCHANGED BY THE PLANT. They are zero
+        // by FACTORISATION, not by physics: a particle at rhoP === rhoF has a sedimentation coefficient of
+        // exactly 0, and this device's plant replaces the field law (omega^2 r -> omega^2 refR), which
+        // MULTIPLIES that coefficient. *** ZERO TIMES A WRONG FIELD IS STILL ZERO, so this mode cannot see its
+        // own device's plant and never could. ***
+        //
+        // What survives is narrow but real: driftAtNeutral === 0 rules out a spurious ADDITIVE force, a term
+        // that would push a neutrally buoyant particle. That is a LOAD-BEARING NEGATIVE, and this file had it
+        // in the form mpmstep's noSidewaysDrift was found in -- satisfiable by a step that does nothing at all.
+        // So a witness is reported beside it: a particle at the TOP OF THE BRACKET the bisection just searched
+        // must move. If it does not, the step is inert and the zero below means nothing -- and the bracket was
+        // never a bracket, so the recovered value is meaningless too. One witness, two claims.
+        //
+        // *** AND THE WITNESS TURNED OUT TO DO MORE THAN WITNESS, WHICH IS WHY THE PARAGRAPH ABOVE IS SCOPED
+        // TO THE THREE ORIGINAL OBSERVABLES. *** driftOffNeutral is measured OFF the zero, so the field law
+        // no longer multiplies nothing: 0.01 honest against 0.05 planted, a 5x separation in the mode that a
+        // moment ago could not see its own plant at all. It also moves with rhoF -- 0.01 at 1, 0.03 at 3 --
+        // so the knob is now LIVE here rather than merely echoed. A witness added to make a negative mean
+        // something turned the mode from ungraded into graded, which says how little was being asked before.
         const step = stepper(c);
-        let lo = c.rhoF * 0.5, hi = c.rhoF * 1.5;
+        const hi0 = c.rhoF * 1.5;
+        let lo = c.rhoF * 0.5, hi = hi0;
         for (let i = 0; i < 80; i++) {
             const mid = (lo + hi) / 2;
             const parts = [{ a: c.a, rho: mid, r: c.r0, species: "x" }];
@@ -143,11 +171,19 @@ export function build({ mode = "rate", config = {} } = {}) {
         const recovered = (lo + hi) / 2;
         const neutral = [{ a: c.a, rho: c.rhoF, r: c.r0, species: "x" }];
         step(neutral, 1);
+        // The witness: same stepper, same one step, a density the bisection treated as OFF the neutral point.
+        const off = [{ a: c.a, rho: hi0, r: c.r0, species: "x" }];
+        step(off, 1);
+        const driftOff = Math.abs(off[0].r - c.r0);
         return {
             ...blank,
-            neutralDensityRecovered: recovered, neutralDensityConfigured: c.rhoF,
+            // `neutralDensityConfigured: c.rhoF` was here and was the knob handed straight back -- the echo
+            // that made the census read rhoF as DEAF in this mode. It graded nothing: the row already carries
+            // the recovered value and the relative error between them.
+            neutralDensityRecovered: recovered,
             neutralRelErr: Math.abs(recovered - c.rhoF) / c.rhoF,
             driftAtNeutral: Math.abs(neutral[0].r - c.r0),
+            driftOffNeutral: driftOff, offNeutralMoved: driftOff > 0,
         };
     }
 

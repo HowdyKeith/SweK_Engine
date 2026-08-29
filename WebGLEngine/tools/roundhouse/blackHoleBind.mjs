@@ -101,6 +101,23 @@ export function bhDefaults(hyp) {
     // "onset-hi-captured" refusal catches whatever the floor lets through.
     // *** WHEN THIS GOES RED, re-derive the multiple from the rs IN PLAY -- NEVER type a number back in. ***
     cfg.onsetHi = Math.max(3 * rs, num(cfg.onsetHi, 6 * rs));
+
+    // *** v4050 -- onsetLo WAS RESOLVED AT THE BUILD SITE INSTEAD OF HERE, AND THAT MADE IT INVISIBLE. ***
+    // Its default stayed `null` in the config every caller reads, and the real value (3*rs*0.9) was computed
+    // inline where the bisection starts. knobLiveness reports a knob it cannot perturb as UNPROBED rather
+    // than as still -- "no ordering to perturb the default along" -- so this knob has been in the census's
+    // ADMISSION list since it was written, never in a verdict. THE READING WAS CORRECT AND THE KNOB WAS NOT
+    // DEAD: nothing had ever asked it anything. Resolving it here is the same cure v3712 applied to onsetHi
+    // one line above, left undone on the lower bound for the same reason it was left undone there.
+    //
+    // *** AND IT IS DELIBERATELY NOT CLAMPED, WHICH IS WHERE IT DIFFERS FROM onsetHi. *** A floor of rs would
+    // read as symmetry with the line above and would DISARM A LOAD-BEARING GUARD: "onset-lo-inside-horizon"
+    // exists precisely to refuse a lower bound inside the horizon, and blackHoleBind-selfcheck proves it
+    // fires by passing onsetLo = rs/2. Clamping would make that value unreachable, the guard unreachable, and
+    // the selfcheck's negative vacuous -- a pass that means nothing, which is the failure this lab names most
+    // often. onsetHi can carry a floor because its floor sits ABOVE where the boundary lives; onsetLo's guard
+    // is the whole question of what lies BELOW.
+    cfg.onsetLo = num(cfg.onsetLo, 3 * rs * 0.9);
     h.r0 = Math.max(rs * 1.05, num(h.r0, iscoRadius(cfg.M, cfg.G, cfg.c) * 1.5));
     if (!BH_MODES.includes(h.mode)) h.mode = "orbit";
     h.config = cfg;
@@ -186,7 +203,8 @@ function onsetRun(cfg) {
     // a bisection over a non-monotonic predicate is only trustworthy while its lower bound is inside the band,
     // and nothing here checks that it is. onsetLo is exposed so a caller can move it, and "onset-lo-survives"
     // is REPORTED BY NAME rather than being returned as a number, which is what saved this round. ***
-    let lo = cfg.onsetLo ?? (3 * horizon(cfg) * 0.9);   // captured side
+    let lo = cfg.onsetLo;                     // captured side -- RESOLVED IN defaults() SINCE v4050,
+                                              // so the config the census reads is the config this uses
     let hi = cfg.onsetHi;                     // surviving side
     // *** v3709 -- "CAPTURED" WAS TWO THINGS WEARING ONE LABEL, AND THE BAND CHECK ONLY EVER WANTED ONE OF
     // THEM. *** survives(lo) === false is satisfied by a start inside the CAPTURING BAND *and* by a start

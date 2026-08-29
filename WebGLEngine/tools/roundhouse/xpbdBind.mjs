@@ -15,7 +15,11 @@
 // THE PLANTED FAULT drops the lambda term, which is the exact fault the header warns about. PBD's stretch then
 // HALVES with each doubling of iterations: 1.0000e-2, 4.9383e-3, 2.4082e-3, 1.1447e-3, 5.1599e-4.
 
-import { hangingLink, iterationIndependence, stiffnessIndependence, hookeStretch } from "../../physics/xpbd/compliance.mjs";
+// v4053 -- `hookeStretch` WAS IMPORTED HERE AND NEVER CALLED. It is one line -- compliance * force -- and
+// hangingLink ALREADY APPLIES IT to produce the `exact` this bind publishes as exactStretch, so importing it
+// again bought a second name for a number already on the row. Dropped rather than wired: a second call site
+// would have recomputed the same product and invited the two to drift.
+import { hangingLink, iterationIndependence, stiffnessIndependence } from "../../physics/xpbd/compliance.mjs";
 import { volumeConvergence, pressureRun, baseSolid, meshVolume } from "../../physics/xpbd/volumeKey.mjs";
 import { dampingSweep, reducesToUndamped } from "../../physics/xpbd/dampingKey.mjs";
 import { thresholdSweep, offsetConvergence, criticalAngle, coulombExact } from "../../physics/xpbd/frictionKey.mjs";
@@ -60,7 +64,23 @@ function buildXpbd({ mode = "hooke", config = {} } = {}) {
         stretch: null, exactStretch: null, stretchErrFrac: null, amplitude: null, meanLength: null,
         iterSpread: null, iterWorstErrFrac: null, halvesWithIterations: null,
         substepSpread: null, amplitudeGrows: null,
-        compliance: c.compliance, iterations: c.iterations, substeps: c.substeps, planted,
+        // *** v4052 -- THESE THREE WERE ECHOED IN EVERY MODE AND READ BY THREE, WHICH MADE FOURTEEN
+        // INNOCENT MODES LOOK DEAF. *** knobLiveness's discriminator calls a mode DEAF when it hands the
+        // knob back and then ignores it -- acknowledging an input and doing nothing with it. Publishing the
+        // config here unconditionally is exactly that gesture, so volume, pressure, damping, friction,
+        // kernel, density, muscle, weave, tear, modulate, sampled, fluid, attach, clothloop and grains were
+        // reported with the same shape as stability's PLANTED deaf knob. They do not read compliance at all:
+        // it reaches physics only through the {...c} spread into hangingLink, iterationIndependence and
+        // stiffnessIndependence, and every other mode returns before those. A mode that never uses a knob is
+        // unusedInMode -- a device being ORGANISED -- and saying so is the whole difference.
+        //
+        // null here means THIS MODE DID NOT USE IT, which is what the rest of `blank` already means. The
+        // three modes that do use them fill them in below, and each fills in only what it did not SWEEP:
+        // `iteration` sweeps the iteration count and `substep` sweeps the substep count, so echoing the
+        // caller's value in those modes would report a number the run overrode. The census measured that
+        // split before this comment was written -- iterations reads live in hooke and substep but not
+        // iteration, substeps in hooke and iteration but not substep -- and the echo now matches it.
+        compliance: null, iterations: null, substeps: null, planted,
         meshVolume: null, meshVolumeErrFrac: null, convergenceRatio: null, secondOrder: null,
         volumeRatio: null, targetErrFrac: null, baseFaces: null, baseIsOctahedron: null,
         amplitudeReduction: null, amplitudeMonotoneDown: null, equilibriumSpread: null, dampedLimitRelDiff: null,
@@ -244,17 +264,23 @@ function buildXpbd({ mode = "hooke", config = {} } = {}) {
     }
     if (mode === "iteration") {
         const r = iterationIndependence([1, 2, 4, 8, 16], { ...c, plantPBD: planted });
-        return { ...blank, iterSpread: r.spread, iterWorstErrFrac: r.worstErrFrac,
+        // `iterations` stays null: this mode SWEEPS it, so the caller's value is not what ran.
+        return { ...blank, compliance: c.compliance, substeps: c.substeps,
+                 iterSpread: r.spread, iterWorstErrFrac: r.worstErrFrac,
                  halvesWithIterations: r.halvesWithIterations, exactStretch: r.exact };
     }
     if (mode === "substep") {
         const r = stiffnessIndependence([400, 800, 1600, 3200], { ...c, plantPBD: planted });
-        return { ...blank, substepSpread: r.spread, amplitudeGrows: r.amplitudeGrows, exactStretch: r.exact };
+        // `substeps` stays null: this mode SWEEPS it.
+        return { ...blank, compliance: c.compliance, iterations: c.iterations,
+                 substepSpread: r.spread, amplitudeGrows: r.amplitudeGrows, exactStretch: r.exact };
     }
 
     const r = hangingLink({ ...c, plantPBD: planted });
     return {
         ...blank,
+        // hooke sweeps nothing, so all three are the values that actually ran.
+        compliance: c.compliance, iterations: c.iterations, substeps: c.substeps,
         stretch: r.stretch, exactStretch: r.exact,
         stretchErrFrac: Math.abs(r.stretch - r.exact) / r.exact,
         amplitude: r.amplitude, meanLength: r.mean,

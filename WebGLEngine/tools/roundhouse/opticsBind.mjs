@@ -46,6 +46,34 @@ export const OPTICS_OBSERVABLES = [
 // value, the v4028/v4029 signature for the third time.
 const DEF = { lambda: 500e-6, D: 0.2, a: 0.1, z: 2000, nSamples: 900, spread: null };
 
+// *** v4051 -- `spread` IS PROBED BY DECLARED CHOICES, AND ITS null IS DELIBERATELY LEFT ALONE. ***
+// Sweep 6 surfaced it in the census's ADMISSION list: probeValues has no ordering to walk from `null`, so the
+// knob has never been asked anything. blackhole.onsetLo carried the same symptom one commit earlier and was
+// cured by resolving its default in defaults() -- AND THAT CURE IS WRONG HERE, for the reason the v4030 note
+// above already gives. onsetLo had ONE fallback computed at the wrong site. `spread` has THREE, one per mode
+// (4*lambda/D for the Airy ring, 4*lambda/a for the slit, 3*lambda/a for the convergence comparison), and its
+// null MEANS something a number cannot: self-scale, so the window follows the wavelength and the aperture.
+// Resolving it to a constant would freeze the window at whatever lambda happened to be set when defaults()
+// ran -- "a regression wearing a fix", which is the phrase v4030 used to refuse exactly this.
+//
+// So the OTHER escape hatch is used, the one eight devices already use and knobLiveness names: DECLARED
+// CHOICES. The default stays null and keeps self-scaling; the census gets a ladder to walk. knobChoices may be
+// a function of the mode, which is what makes this expressible at all -- a single flat list would have been
+// right for one mode and wrong for the other two, the same trap in a new place.
+//
+// THE VALUES ARE THE CALL SITES' OWN FORMULAS, NOT A FOURTH NUMBER TYPED HERE. The middle rung is the width
+// the mode would have chosen for itself, so it must move NOTHING -- that rung is a control, and if it ever
+// moves an observable, the default and the declared choice have drifted apart.
+export const OPTICS_KNOB_CHOICES = ({ mode } = {}) => {
+    const nat = mode === "slit"     ? 4 * DEF.lambda / DEF.a
+              : mode === "converge" ? 3 * DEF.lambda / DEF.a
+              :                       4 * DEF.lambda / DEF.D;   // airy and radiusconfusion
+    // `edge` reads no spread at all and still gets a ladder: the honest answer there is "still in edge",
+    // which is unusedInMode -- a device being ORGANISED, not a knob being ignored. Withholding the choices
+    // would hide that behind an admission instead of reporting it.
+    return { spread: [nat / 2, nat, nat * 2] };
+};
+
 
 export function opticsDefaults(hyp) {
     const h = { mode: "airy", ...(hyp || {}) };
@@ -209,6 +237,7 @@ export async function buildOptics(hyp, base = {}) {
 }
 
 export const opticsDevice = {
+    knobChoices: OPTICS_KNOB_CHOICES,
     // v3192 -- EXPORTED. This device reported as ONE-MODE to the census because its own mode names were
     // not in the probe's candidate list -- the LOWER BOUND, biting for the third time. Derived from
     // this file's own default plus every mode its own build() branches on, each verified to give a
