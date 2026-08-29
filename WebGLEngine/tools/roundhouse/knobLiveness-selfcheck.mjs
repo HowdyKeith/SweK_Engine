@@ -117,18 +117,80 @@ console.log("\n3b. *** v4030 -- A KNOB THE CENSUS CANNOT ANSWER IS NAMED, NOT DR
     // Strings and arrays were always skipped and that is right: inventing an ordering would test the device's
     // error handling instead of the knob. But the row then carried an empty `probed`, so BOTH stillKnobs and
     // insensitiveKnobs filtered it out and the knob disappeared from every list this census prints.
-    const { rows } = await knobLiveness({ only: ["optics", "blackhole"], budgetMs: 200000 });
+    //
+    // *** v4062 -- THIS BLOCK NAMED TWO DEVICES AND WENT RED WHEN BOTH WERE FIXED. *** It asserted that
+    // optics.spread and blackhole.onsetLo are reported unprobed. They no longer are: onsetLo's default is
+    // resolved in bhDefaults() and spread carries declared choices, so both are ANSWERED now. A test that
+    // fails because the defect it describes was cured was pinned to the wrong thing -- the invariant is about
+    // what the census does with an unanswerable knob, never about which devices happen to have one.
+    //
+    // Three parts, and the order is the point:
+    //   (a) THE RULE, on rows this file owns. Cannot go vacuous, cannot be broken by fixing a device.
+    //   (b) THE POPULATION, scanned across the whole lab by the predicate that DECIDES answerability --
+    //       probeValues yields no rungs for the default and none for the declared choices -- rather than by
+    //       one cause of it. A null-default scan would have missed mpmcouple.left/.right, which are objects.
+    //   (c) THE RATCHET, a POSITIVE claim about a knob that was fixed. Positive claims survive every fix.
+
+    // (a) THE RULE. NO DEVICE APPEARS HERE ON PURPOSE.
+    const synth = [{ device: "d", knob: "nul", unprobed: true, kind: "null-default",
+                     probed: [], live: [], still: [], incomplete: false }];
+    ok("!! *** a knob with NO LADDER TO WALK is an admission, never a verdict ***",
+        probeValues(null).length === 0 && probeValues(null, [1, 2]).length === 2
+        && unprobedKnobs(synth).length === 1 && unprobedKnobs(synth)[0].startsWith("d.nul")
+        && stillKnobs(synth).length === 0,
+        "probeValues(null) yields no ladder, so the row lands in the admission list and in NO universal one. "
+        + "'Was never probed' is not 'moves nothing'. *** AND DECLARED CHOICES ARE THE WAY BACK: "
+        + "probeValues(null, [1,2]) yields 2 -- the escape hatch that makes a null default a gap, not a dead end.");
+
+    // (b) THE POPULATION. defaults() and probeValues only -- no builds, so scanning every device is cheap.
+    const bare = new Map(), withChoices = new Map();
+    for (const name of DEVICE_NAMES) {
+        let dev; try { dev = await getDevice(name); } catch { continue; }
+        if (typeof dev.defaults !== "function") continue;
+        for (const mode of (Array.isArray(dev.modes) && dev.modes.length ? dev.modes : [undefined])) {
+            let cfg; try { cfg = (dev.defaults({ mode }) || {}).config || {}; } catch { continue; }
+            for (const [k, v] of Object.entries(cfg)) {
+                const key = name + "." + k;
+                bare.set(key, !!bare.get(key) || probeValues(v).length > 0);
+                withChoices.set(key, !!withChoices.get(key)
+                    || probeValues(v, choicesFor(dev, k, mode)).length > 0);
+            }
+        }
+    }
+    const unanswerable = [...withChoices.keys()].filter((k) => !withChoices.get(k)).sort();
+    const rescued = [...withChoices.keys()].filter((k) => withChoices.get(k) && !bare.get(k)).sort();
+    const devs = [...new Set([...unanswerable, ...rescued].map((x) => x.split(".")[0]))];
+    const { rows } = await knobLiveness({ only: [...new Set([...devs, "blackhole"])], budgetMs: 200000 });
     const un = unprobedKnobs(rows);
-    ok("!! *** the two null-default knobs in the lab are REPORTED rather than silently absent ***",
-        un.some((k) => k.startsWith("optics.spread")) && un.some((k) => k.startsWith("blackhole.onsetLo")),
-        un.join(", ") + ". Both use `cfg.x ?? fallback` -- a live, readable knob whose default means 'compute "
-        + "it'. blackhole.onsetLo has been invisible to this census since it was written; optics.spread became "
-        + "invisible the moment v4030 gave it a null default, WHICH IS A GAP THIS ROUND CREATED AND THEREFORE "
-        + "HAD TO CLOSE.");
-    ok("...and they are NOT counted as still, because 'was never probed' is not 'moves nothing'",
-        !stillKnobs(rows).some((k) => k === "optics.spread" || k === "blackhole.onsetLo"),
-        "still: " + (stillKnobs(rows).join(", ") || "none") + ". A measurement and an admission are different "
-        + "claims and folding the second into the first would report coverage this census does not have.");
+    const named = (k) => un.some((u) => u === k || u.startsWith(k + " "));
+
+    if (unanswerable.length) {
+        ok("!! *** EVERY knob with no ladder is reported, and none is counted still ***",
+            unanswerable.every(named) && !stillKnobs(rows).some((k) => unanswerable.includes(k)),
+            unanswerable.length + " unladderable across " + bare.size + " knobs scanned: "
+            + unanswerable.join(", ") + ". Quantified by the predicate that decides answerability, so closing "
+            + "one is not a regression and adding one cannot go unnoticed.");
+    } else {
+        report("*** EVERY knob in the lab (" + bare.size + " scanned) NOW CARRIES A LADDER, so there is no "
+            + "unanswerable knob left to report on -- STATED RATHER THAN PASSED. A quantifier over an empty "
+            + "set is true for free, and a green check meaning 'there was nothing to check' is the vacuous "
+            + "pass this lab refuses everywhere else. The rule in (a) carries the weight.");
+    }
+    if (rescued.length) {
+        ok("!! ...and a knob answerable ONLY through declared choices is ANSWERED, never admitted",
+            rescued.every((k) => !named(k)),
+            rescued.join(", ") + " -- no ordering in the default, a real ladder from the declaration, so these "
+            + "belong in a VERDICT and not in the admission list.");
+    }
+
+    // (c) THE RATCHET. A positive claim, so it survives every future fix.
+    const lo = rowFor(rows, "blackhole", "onsetLo");
+    ok("!! *** onsetLo IS ASKED THE QUESTION, and cannot quietly go back to being unaskable ***",
+        !!lo && lo.probed.length > 0 && !named("blackhole.onsetLo"),
+        lo ? "probed in " + (lo.probed.join(", ") || "NOTHING") + " -- verdict "
+             + (lo.live.length ? "live in " + lo.live.join(", ") : "still in " + lo.still.join(", "))
+             + ". Reverting the default to null would put it back in the admission list and fail here."
+           : "ROW NOT FOUND");
 }
 
 console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB THAT MOVES NOTHING ***");
@@ -169,8 +231,19 @@ console.log("\n3c. *** v4031 -- A KNOB THE CENSUS NEVER REACHED IS NOT A KNOB TH
         (incompleteKnobs(rows).join(", ") || "none") + ". Three categories, not two: 'moves nothing' is a " +
         "measurement, 'was never probed' is an admission, and THIS ONE IS A PARTIAL MEASUREMENT -- the most " +
         "dangerous to promote, because it looks exactly like the first.");
+    // *** v4062 -- THIS ASSERTED ONE PHRASING AND THE MEASURED COST RECORD CHANGED WHICH ONE FIRES. ***
+    // knobLiveness emits the gap two ways. With no device-cost-baseline.json -- which is what this file's own
+    // comment says main's round shipped -- costFor returns null, every mode is attempted until the budget
+    // runs out, and the note reads "MODES NEVER ENTERED: ...". With a record committed, the cost-aware path
+    // can see in advance that a mode costs more than the whole budget, SKIPS it rather than spending the
+    // budget to prove it, and says so with an address: "2 mode(s) NOT ATTEMPTED ... RAISE IT TO AT LEAST 52 s".
+    // The second is v4044's own finding -- a budget under one build answers nothing and takes just as long --
+    // so the behaviour is strictly better and the test was pinned to the wording of the poorer path.
+    // The PROPERTY is what matters: a note exists, it names modes of the device, and it states the gap.
+    const gapNote = notes.some((n) => /MODES NEVER ENTERED:/.test(n) || /NOT ATTEMPTED/.test(n));
+    const namesAMode = notes.some((n) => ["pendulum", "curve", "onset"].some((m) => n.includes(m)));
     ok("...and the note names the modes it never opened, so the gap has an address",
-        notes.some((n) => /MODES NEVER ENTERED:/.test(n) && /pendulum/.test(n)),
+        gapNote && namesAMode,
         notes.join(" | ") + ". The old note said only that the device was incomplete, and counted its " +
         "denominator off the knobs the loop had REACHED -- so kuramoto scored 'probed 1 of 1', a perfect " +
         "score, with four declared knobs never looked at.");

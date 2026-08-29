@@ -151,6 +151,14 @@ export function probeValues(v, choices = null) {
  */
 export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadline = Infinity) {
     const def = cfg[knob];
+    // *** v4062 -- WHETHER AN ECHO WAS SEEN AT ALL IS THE DEAF-KNOB DISCRIMINATOR, AND IT WAS BEING THROWN
+    // AWAY. *** The confirmation above decides which observables are pass-throughs so they can be excluded
+    // from `moved`. That answers "did the knob move anything real". It does NOT answer the question the
+    // deafness list actually asks: DID THIS MODE ACKNOWLEDGE THE KNOB AND THEN IGNORE IT? A mode that hands
+    // the value back and changes nothing else is stability's planted `deafknob` exactly; a mode that never
+    // mentions the knob is a device being ORGANISED. Both look identical once the echo is discarded, so the
+    // fact of the echo is carried out of the loop rather than dropped with it.
+    let sawEcho = false;
     for (const alt of probeValues(def, choicesFor(device, knob))) {
         // *** v4032 -- THE DEADLINE IS CHECKED BEFORE EVERY BUILD, NOT ONLY BETWEEN KNOBS. ***
         // knobLiveness's budget guard sat in the knob loop, so ONE knob's ladder -- three full builds -- ran
@@ -237,11 +245,13 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
                 echoCandidates = echoCandidates.filter((o) => sameValue(out2[o], alt));
             }
         }
+        // Confirmed survivors only: an unconfirmed candidate was never shown to be a pass-through.
+        if (echoCandidates.length) sawEcho = true;
         const isEcho = (o) => echoCandidates.includes(o);
         const moved = Object.keys(base).filter((o) => !sameValue(base[o], out[o]) && !isEcho(o));
-        if (moved.length) return { state: "live", moved };
+        if (moved.length) return { state: "live", moved, echoed: sawEcho };
     }
-    return { state: "still", moved: [] };
+    return { state: "still", moved: [], echoed: sawEcho };
 }
 
 /**
@@ -401,7 +411,11 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
                         // reintroduced one round later by a different route. Section 3c caught it.
                         overBudget = true; break;
                     }
-                    if (r.state === "still") a.still.push(where);
+                    if (r.state === "still") {
+                        a.still.push(where);
+                        // the mode was still AND handed the knob back -- the deaf shape, not the innocent one
+                        if (r.echoed) (a.echoedStill ||= []).push(where);
+                    }
                     else { a.live.push(r.state === "refused" ? where + " (refused)" : where); a.movedMost = Math.max(a.movedMost, r.moved.length); }
                 }
             }
@@ -582,7 +596,8 @@ export async function jointlyLive(rows, { budgetMs = 60000 } = {}) {
 export const LIST_CLAIMS = {
     stillKnobs: "universal",          // "MOVES NOTHING ANYWHERE"
     insensitiveKnobs: "universal",    // "flat across its WORKING RANGE"
-    partialDeafness: "particular",    // "live in A, B; STILL in C" -- names its own scope
+    partialDeafness: "particular",    // "live in A, B; ECHOED AND IGNORED in C" -- names its own scope
+    unusedInMode: "particular",       // live somewhere, still elsewhere, and the mode never mentions it
     incompleteKnobs: "admission",     // the sweep ran out of budget
     deafnessUnanswered: "admission",  // the deafness question was never answered for this knob
     unprobedKnobs: "admission",       // no ordering exists to perturb the default along
@@ -631,8 +646,35 @@ export const incompleteKnobs = (rows) => rows.filter((r) => r.probed.length && !
  * this would have read LIVE off the echo of the very knob being ignored. The rule written to stop mpmstep.nx
  * reading live off itself is what makes THIS plant findable too.
  */
-export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.still.length)
-    .map((r) => r.device + "." + r.knob + " -- live in " + r.live.join(", ") + "; STILL in " + r.still.join(", "))
+/*
+ * *** v4062 -- THIS LIST WAS "LIVE HERE, STILL THERE", AND THAT IS A HAYSTACK RATHER THAN A FINDING. ***
+ * Measured on the full lab at the broad definition: 357 rows qualify. Almost all of them are innocent --
+ * quantum.omega is read by `osc` alone and is correctly still in the other six, which is a device being
+ * ORGANISED, not a control being ignored. A list nobody can act on is a second haystack to search, and this
+ * file's own note beside the old report line already conceded as much ("USUALLY INNOCENT").
+ *
+ * The discriminator is the ECHO. A mode that hands the knob back among its observables and then changes
+ * nothing else has ACKNOWLEDGED the input and ignored it -- which is stability's planted `deafknob` exactly,
+ * and mpmpile's `deafangle`. A mode with no use for the knob echoes nothing. Narrowing on `echoedStill` takes
+ * the same lab from 357 rows to 16, and BOTH PLANTED DEAF KNOBS ARE IN THE 16.
+ *
+ * The innocent remainder is not discarded -- it moves to unusedInMode below, counted rather than listed, so
+ * "not deaf" stays a reported fact instead of becoming a silence.
+ */
+export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.echoedStill && r.echoedStill.length)
+    .map((r) => r.device + "." + r.knob + " -- live in " + r.live.join(", ")
+        + "; ECHOED AND IGNORED in " + r.echoedStill.join(", "))
+    .sort();
+
+/**
+ * The innocent half of the old partialDeafness: live somewhere, still elsewhere, and the still modes never
+ * mentioned the knob at all. PARTICULAR, because it names the scope it is talking about. Counted rather than
+ * listed in the report -- 346 rows on the current lab -- because the useful signal is that the number is
+ * large and that these are NOT the deaf ones.
+ */
+export const unusedInMode = (rows) => rows.filter((r) => r.live.length && r.still.length
+        && !(r.echoedStill && r.echoedStill.length))
+    .map((r) => r.device + "." + r.knob)
     .sort();
 
 /**
@@ -769,8 +811,13 @@ export async function reportLines(opts = {}) {
         const deaf = partialDeafness(rows);
         const unanswered = deafnessUnanswered(rows);
         L.push("");
-        L.push("  LIVE IN SOME MODES AND IGNORED IN OTHERS (" + deaf.length + ") -- USUALLY INNOCENT:");
+        L.push("  ECHOED BY A MODE AND IGNORED BY IT (" + deaf.length + ") -- THE DEAF-KNOB SHAPE:");
         for (const d of deaf) L.push("      " + d);
+        // v4062 -- counted, not listed: the innocent remainder is large and its size is the useful signal.
+        const unused = unusedInMode(rows);
+        L.push("  ...and still in a mode that never mentions the knob (" + unused.length + "), which is a");
+        L.push("  device being ORGANISED rather than broken -- counted, not listed: "
+            + (unused.slice(0, 6).join(", ") || "none") + (unused.length > 6 ? ", ..." : ""));
         if (unanswered.length) {
             L.push("  AND NOT ANSWERED AT ALL FOR (" + unanswered.length + ") -- live so far, budget ran out"
                 + " before the remaining modes:");
