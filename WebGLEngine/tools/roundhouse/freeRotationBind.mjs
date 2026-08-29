@@ -40,9 +40,25 @@ export const FR_OBSERVABLES = [
     "attitudeOrder",
 ];
 
+// *** v4071 -- THIS FILLED EVERY UNSET OBSERVABLE WITH 0, AND 0 IS A PASSING SCORE FOR MOST OF THEM. ***
+// An observable census -- which knobs move which observables -- flagged eight to ten observables in EVERY mode
+// of this device. The cause is here: each mode computes its own four or five numbers and inherited 0 for the
+// rest, so `stability` reported driftE 0 and driftL 0 without integrating anything, and `conserve` reported
+// sigmaRelErr 0 without measuring sigma. FOR AN ERROR OR A DRIFT, 0 IS NOT ABSENCE -- IT IS THE BEST POSSIBLE
+// RESULT, so three modes of four announced perfect energy conservation and exact sigma agreement they had
+// never computed. Every other bind in this lab fills its blank with null for exactly this reason (mpmstep,
+// xpbd, refscan, nuclear); this one was the exception.
+//
+// *** AND THE DEGENERATE PATH IS THE SHARP CASE: `if (mid < 0) return blank` HANDED A BODY WITH NO
+// INTERMEDIATE AXIS A CLEAN SWEEP OF ZEROS *** -- driftE 0, driftL 0, sigmaRelErr 0 -- for a run that never
+// happened. That is mpmstep's "the block did not move at all" satisfying the strongest form of its own key,
+// which is the shape this lab names a vacuous pass.
+//
+// null means THIS MODE DID NOT COMPUTE IT. I0, I1, I2 and midAxis stay numbers because they are derived from
+// the inertia tensor before any mode branches and are true of every run.
 const blankOf = (I, mid) => {
     const o = {};
-    for (const k of FR_OBSERVABLES) o[k] = 0;
+    for (const k of FR_OBSERVABLES) o[k] = null;
     o.I0 = I[0]; o.I1 = I[1]; o.I2 = I[2]; o.midAxis = mid;
     return o;
 };

@@ -34,11 +34,24 @@ console.log("1. THE DEVICE IS REGISTERED AND ITS MODE LIST IS DECLARED ONCE");
         dev.defaults({ mode: "tumble" }) === null && (() => {
             try { dev.build({ mode: "tumble" }); return false; } catch { return true; } })(),
         "v3420's ratchet: 21 devices accepted any string as a mode. This one does not join them.");
+    // *** v4071 -- "AND NUMERIC" WAS RIDING ALONG WITH "FLAT", AND IT FORCED A DEFECT. *** v3446's finding was
+    // about FLATNESS: one nested return out of 67 devices. Requiring every observable to be a NUMBER in every
+    // mode came with it, and this device could only satisfy that by filling its blank with 0 -- which made
+    // three modes of four report driftE 0 and sigmaRelErr 0 for quantities they never computed. For an error
+    // or a drift, 0 is the BEST POSSIBLE RESULT, so the check that demanded numbers was buying a vacuous pass.
+    // Every other bind in this lab uses null for "this mode did not compute it".
+    //
+    // Both original protections are kept and neither is weakened: the key must be PRESENT (a dropped
+    // observable still fails) and the row must be FLAT (the nested return v3446 found still fails -- and note
+    // the flatness test already tolerated null, since `v &&` short-circuits on it). Only the demand that
+    // ABSENCE be spelled as a passing number is gone.
     ok("every mode returns the full flat observable set", FR_MODES.every((m) => {
         const r = run(m, false);
-        return FR_OBSERVABLES.every((k) => typeof r[k] === "number") && !Object.values(r).some((v) => v && typeof v === "object");
-    }), "FLAT and numeric -- v3446's finding, where one nested return out of 67 devices was the outlier and the " +
-        "REGISTRY'S OWN DECLARATION was the thing that had been right all along");
+        return FR_OBSERVABLES.every((k) => k in r && (typeof r[k] === "number" || r[k] === null))
+            && !Object.values(r).some((v) => v && typeof v === "object");
+    }), "FLAT, PRESENT, and numeric-or-null -- v3446's finding was the nested return; null is this lab's "
+        + "declared marker for a quantity a mode does not measure, and spelling it 0 made absence look like "
+        + "a perfect score");
 }
 
 // ---------------------------------------------------------------------------
