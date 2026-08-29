@@ -169,6 +169,17 @@ function buildManifold({ mode = "census", config = {} } = {}) {
     const BOW = TET_A.concat(TET_B);
     return {
         tetraNmVertices: tet.nonManifoldVertices, tetraClosed: tet.closedManifold ? 1 : 0,
+        // *** v4069 -- AN OBSERVABLE CENSUS FLAGGED NINETEEN OF THESE AS MOVED BY NOTHING, AND THE STRONGEST
+        // RESULT ON THIS DEVICE IS ONE OF THEM. *** mtEuler holds at exactly 2 while mtN takes mtFaces from
+        // 768 to 3168 to 12768 -- a SIXTEENFOLD change in mesh size with the Euler characteristic unmoved.
+        // That is topological invariance MEASURED, not asserted, and a census that reads knobs can only ever
+        // report it as death. The same is true of the fixed fixtures: TET_A and BOW are typed because they
+        // are REFERENCES, so no knob may reach them.
+        //
+        // AND THE FAMILY WITNESSES ITSELF, which is what stops the invariance being vacuous:
+        // eulerCharacteristic returns 2 for the closed tetrahedron, 3 for the non-manifold bowtie and 0 for
+        // the empty mesh, with eulerDefect 0 against 1. A function that always answered 2 would fail every
+        // one of those but the first.
         tetraEuler: eulerCharacteristic(TET_A), tetraEulerDefect: eulerDefect(TET_A),
         bowtieBoundary: bowtie.boundaryEdges, bowtieNmEdges: bowtie.nonManifoldEdges,
         bowtieNmVertices: bowtie.nonManifoldVertices, bowtieClosed: bowtie.closedManifold ? 1 : 0,
@@ -198,6 +209,13 @@ const MANIFOLDCENSUS_MODES = ["census"];   // v4074 -- the single source `modes`
 
 export const manifoldCensusDevice = {
     plantKind: "method",
+    // *** v4069 -- THE PLANT FLIPS A NAMED OBSERVABLE AND DID NOT SAY WHICH. *** plantKind was declared at
+    // v3851 and plantFlips was left off, so the contract said HOW the device is sabotaged and not WHAT that
+    // is supposed to break. MEASURED: the plant takes bowtieClosed from 0 to 1 and bowtieNmVertices from 1
+    // to 0 -- it makes a NON-MANIFOLD BOWTIE REPORT AS A CLOSED MANIFOLD, which is this device's whole
+    // subject ("watertight-is-not-manifold") sabotaged at exactly the point it grades. bowtieClosed is named
+    // rather than bowtieNmVertices because it is the CLAIM: a boolean going falsely true.
+    plantFlips: "bowtieClosed",
     modes: MANIFOLDCENSUS_MODES,
     name: "watertight-is-not-manifold",
     observables: MANIFOLD_OBSERVABLES,
