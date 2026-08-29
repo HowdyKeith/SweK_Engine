@@ -16477,6 +16477,36 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- grdpwasm: install button for nakagami/grdpwasm (GPL-3.0), never vendored ---------------------
+    // v4138 -- an RDP client that runs in the browser. Same non-vendoring reasoning as /galaxy above, and the
+    // same commit pin. THE DIFFERENCE IS THE BIND ADDRESS: their proxy defaults to :8080, accepts any origin,
+    // and dials whatever host:port the query string names -- three reasonable choices that together make an
+    // open TCP relay. It is started on 127.0.0.1 using THEIR OWN -listen flag, so their code is unmodified and
+    // the relay is not published to the LAN. /grdpwasm/start takes an optional host, and the bridge returns a
+    // warning whenever that host is not loopback.
+    if (req.url.split("?")[0] === "/grdpwasm/status" && req.method === "GET") {
+        try { sendJson(require("./grdpwasmBridge.js").status()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/grdpwasm/install" && req.method === "POST") {
+        try { sendJson(require("./grdpwasmBridge.js").install()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if (req.url === "/grdpwasm/start" && req.method === "POST") {
+        readJson(d => {
+            try { sendJson(require("./grdpwasmBridge.js").start(d || {})); }
+            catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+    if (req.url === "/grdpwasm/stop" && req.method === "POST") {
+        try { sendJson(require("./grdpwasmBridge.js").stop()); }
+        catch (e) { sendJson({ ok: false, error: "grdpwasm bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+
     // --- ntfs-mounter: install button for zavierferodova/Mac-NTFS-Mounter (no licence, macOS-only) ---------
     // v4125 -- Keith: the free Mac App Store NTFS mounters lie about being free, the paid one he has fails
     // often. Same non-vendoring reasoning as /galaxy/*, but this one asks for root and touches a real disk, so

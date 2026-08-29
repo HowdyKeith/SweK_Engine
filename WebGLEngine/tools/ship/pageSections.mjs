@@ -215,7 +215,19 @@ export const SECTIONS = [
       // Mounter (no licence file at all). It ALSO appears in the Mac System view (pagePlacements.mjs's
       // macPages()) because diskutil/MacFUSE make it Mac-only by construction -- that is a VIEW, not a second
       // home, so this is still the one place it is actually filed.
-      pages: ["webgpu-llm.html", "voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html",
+      // v4138 -- grdpwasm.html JOINS the same shelf: an opt-in install button for nakagami/grdpwasm (GPL-3.0),
+      // an in-browser RDP client. Filed here for the same reason as its three neighbours -- somebody else's
+      // work, installed and run on this machine rather than vendored, with licence and attribution on the page.
+      // Its page carries one thing the others do not: WHY it is started on loopback, because upstream's proxy
+      // binds all interfaces, accepts any origin and dials any host:port a caller names.
+      // *** v4138 -- FIVE OF THESE MOVED OUT, INTO THE SUB-DRAWER BELOW, AND THE COMMENTS ABOVE ARE WHY. ***
+      // v4115, v4118, v4124 and v4125 each wrote "JOINS, same rule again" about a page that is an opt-in front
+      // door to SOMEBODY ELSE'S work. Four notes saying one sentence is a category the file kept documenting
+      // without ever creating. Adding grdpwasm made this drawer 17 -- but it was ALREADY 16 against its own cap
+      // of 15 before that, so this is not a cap bent to fit a new page: it is a pre-existing overflow with an
+      // obvious seam through it. webgpu-llm.html STAYS -- it asks what THIS BOX can do, which is rig.html's
+      // question, not "shall I install somebody's repo".
+      pages: ["webgpu-llm.html",
               "rig.html", "tools.html", "ship.html", "changelog.html", "module-history.html",
               "page-index.html", "case-study.html", "gate-plan.html", "method-lab.html",
               // v3813 -- settings.html JOINS, closing an issue open since v3809. Keith: "we need to add this
@@ -241,6 +253,19 @@ export const SECTIONS = [
     // ray-march-demo and raymarch-gl-demo, which were already here.
     // codemap and wallpaper came OUT to make room: a code-city visualisation and a desktop wallpaper engine are
     // the weakest fits in a voxel/render PIPELINE drawer, and ten is the limit.
+    // v4138 -- THE CATEGORY systools KEPT WRITING NOTES ABOUT. Every page here is a front door to a repo this
+    // engine did not write, installed and run on the user's own machine rather than vendored into the tree --
+    // which is a licensing position (voxtral Apache-2.0, galaxy-profile and grdpwasm GPL-3.0, Mac-NTFS-Mounter
+    // no licence file at all) as much as a taxonomy. Grouping them puts the attribution in one place instead of
+    // four, and takes System Tools back under the cap it had already outgrown.
+    //
+    // A SUB-DRAWER, NOT A TOP-LEVEL CHIP: these ARE System Tools, and a chip of their own would claim they are
+    // a peer of the rig and the ship ritual. It also needs ONE data-panel-pages slot rather than a gtab, a
+    // gpanel and a slot -- and v4127 is on record that gtab wiring is where this row breaks.
+    { id: "thirdparty", tab: null, parentTab: "systools", label: "Opt-in: somebody else's work",
+      note: "install buttons for repos this engine did not write -- cloned and run on your machine, never vendored",
+      pages: ["voxtral.html", "webrtx.html", "galaxy-profile.html", "ntfs-mounter.html", "grdpwasm.html"] },
+
     { id: "voxelrender", tab: "voxelrender", label: "Voxel & Render", note: "meshers, ray marchers, caches, the viewer",
       pages: ["voxel-viewer.html", "path-tracer.html", "rle-mesh-demo.html", "pom-demo.html", "ray-march-demo.html",
               "raymarch-gl-demo.html", "raymarch-live.html", "sphere-impostor.html", "volume-cache.html",

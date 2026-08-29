@@ -642,6 +642,13 @@ window.addEventListener("load", function () {
                  else's work, installed and run on this machine rather than vendored -- GPL-3.0 makes vendoring
                  the wrong move, not automating the same `git clone` a person would type themselves. -->
             <a href="/galaxy-profile.html" target="_blank" rel="noopener" title="Galaxy Profile SVGs (opt-in) -- an install button for vinimlo/galaxy-profile (GPL-3.0), a generator for animated GitHub-profile SVG banners. Nothing of theirs is vendored into this tree or imported into this engine's process: the button clones the repo onto THIS machine, pinned to a reviewed commit, and runs it as its own subprocess in a venv. A supplied GitHub token is passed only as that one subprocess's environment variable and is never written to disk.">Galaxy Profile SVGs</a>
+            <!-- v4138 -- grdpwasm.html JOINS the same shelf: an opt-in front door to nakagami/grdpwasm
+                 (GPL-3.0), an RDP client that runs in the browser. Same non-vendoring reasoning as its two
+                 neighbours. ONE THING IS DIFFERENT AND IT IS WHY THE TITLE SAYS SO: their proxy defaults to
+                 -listen :8080, accepts any origin, and dials whatever host:port the query string names --
+                 individually reasonable for `make serve` on a desktop, jointly an open TCP relay on a machine
+                 that sits on a LAN. It is started on 127.0.0.1 using THEIR OWN flag; their code is unchanged. -->
+            <a href="/grdpwasm.html" target="_blank" rel="noopener" title="RDP in the browser (opt-in) -- an install button for nakagami/grdpwasm (GPL-3.0), a web-based RDP client: Go compiled to WebAssembly speaks RDP in the browser and a small Go proxy bridges its WebSocket to the RDP server. Nothing of theirs is vendored into this tree or imported into this engine&#39;s process: the button clones the repo onto THIS machine, pinned to a reviewed commit on the master branch, builds it with the local Go toolchain and runs their binary as a subprocess. STARTED ON LOOPBACK ON PURPOSE -- upstream&#39;s proxy defaults to all interfaces, accepts any origin and dials any host:port a caller names, which together would be an unauthenticated open TCP relay; it is launched with their own -listen flag pointed at 127.0.0.1, their source unmodified. RDP credentials are typed into their page and never reach this engine.">RDP in the browser</a>
             <!-- v4125 -- ntfs-mounter.html JOINS beside galaxy-profile.html: another opt-in front door to
                  somebody else's work (zavierferodova/Mac-NTFS-Mounter, no licence file at all), installed and
                  run on this machine rather than vendored. Also appears in the Mac System panel (a view, via
@@ -1510,6 +1517,17 @@ window.addEventListener("load", function () {
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">Pages in this drawer. They are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is in exactly one place because it is ASSIGNED, not because somebody deleted a line.</div>
           <div data-group-chips="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px;"></div>
           <div data-panel-pages="systools" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          <!-- v4138 -- OPT-IN: SOMEBODY ELSE'S WORK. A sub-drawer of System Tools, same shape as Physics Lab's
+               Sampling & Methods: one slot, no chip of its own, because these are System Tools rather than a
+               peer of the rig. Everything filed here is a front door to a repo this engine did not write --
+               cloned and run on this machine, never vendored -- so the licence and the attribution live in one
+               place instead of four. It exists because systools had grown to 16 against its own cap of 15
+               while four separate notes in pageSections.mjs each said "JOINS, same rule again". -->
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid #24382e;">
+            <div style="font-size:11px;color:#b6f0cf;margin-bottom:4px;">&#128230; Opt-in: somebody else&#39;s work</div>
+            <div style="font-size:11px;color:var(--dim);margin-bottom:6px;">Install buttons for repos this engine did not write &mdash; cloned and run on YOUR machine, pinned to a reviewed commit, never vendored into the tree or a release zip. Each page names the author and the licence.</div>
+            <div data-panel-pages="thirdparty" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+          </div>
         </div>
         <div class="gpanel" data-panel="voxelrender" hidden>
           <div class="gpanelHdr">&#129513; Voxel &amp; Render</div>

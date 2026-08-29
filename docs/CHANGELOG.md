@@ -8,6 +8,29 @@ history. Nothing is dropped: the sections below are the same bytes, in the same 
 The three earlier per-version changelogs live beside this file, following the same rule
 Keith set when CHANGELOG-*.md was moved out of root: history goes in docs/.
 
+## Since v4138 -- an install button for an RDP client, and the 110 lines of it that decided how the button works
+
+Keith pasted https://github.com/nakagami/grdpwasm and asked for the galaxy-profile treatment: install it, run it, credit them, vendor nothing.
+
+The licensing half is v4124's argument unchanged. GPL-3.0's obligations are about DISTRIBUTING code or LINKING it into your own program, not about automating the `git clone` a person would type themselves onto their own machine. Nothing of theirs enters this tree, nothing is imported into this engine's process, their LICENSE is untouched -- which was READ, not inferred from a badge: 35146 bytes off the master branch, GPLv3 FSF boilerplate. Pinned to e10016ba. The branch is `master` and raw.githubusercontent 404s on `main`, which is exactly the detail that turns a clone into a baffling failure six months from now, so it is recorded rather than left to be rediscovered.
+
+*** AND THEN I READ proxy/main.go, WHICH IS WHY THIS BUTTON IS NOT SHAPED LIKE ITS NEIGHBOURS. *** It is 110 lines and does three things that are each entirely reasonable:
+
+    listen := flag.String("listen", ":8080", ...)          // ALL interfaces
+    upgrader.CheckOrigin = func(r) bool { return true }    // any origin
+    target := r.URL.Query().Get("target"); dialer.Dial("tcp", target)   // caller picks the destination
+
+Jointly, on a machine that sits on a network, they are an unauthenticated OPEN TCP RELAY: anything that can reach the port can have that process dial any host and port the machine can see, including hosts behind its own firewall. THIS IS NOT A BUG IN THEIR PROJECT. Their README says `make serve` and browse to localhost, and for a tool you run on your own desktop for five minutes those are the right defaults. It becomes a problem only when a button starts it unattended on a box that lives on a LAN -- which is precisely what was being asked for.
+
+SO IT IS LAUNCHED ON LOOPBACK, AND THAT IS AN ARGUMENT RATHER THAN A PATCH: `-listen 127.0.0.1:PORT` uses THEIR OWN FLAG, the one they wrote for this. Their source is unmodified, unpatched, unforked -- this bridge simply declines to pass the value that publishes the socket. Choosing a flag value is not forking somebody's project, and forking a GPL work would be a far larger claim than declining to publish a port. It is overridable, because it is Keith's machine and refusing to let him decide would be its own dishonesty -- but never by default, and start() returns a warning whenever the host is not loopback.
+
+*** THE LOOPBACK CLAIM IS PROVEN ON A SOCKET, NOT READ OUT OF THE SOURCE. *** A regex confirming "127.0.0.1" appears in a file is the check that passes while the thing it describes is wrong. The gate binds a listener, reaches it on loopback, FAILS to reach it on this machine's own non-loopback address (192.0.2.2), and then binds 0.0.0.0 AS A CONTROL and confirms that one IS reachable -- because without the control the first result could mean the network is broken rather than the bind is narrow. Measured: loopback reachable, LAN refused; 0.0.0.0 reachable.
+
+MEASURED RATHER THAN TAKEN FROM THE README, twice. go.mod declares `go 1.26.3`, not the 1.24 the README claims, so the Go toolchain downloads itself. The build was RUN: 10.5 MB static/main.wasm, 9.4 MB proxy/proxy, exit 0. The bridge was then driven against that real build -- started on 127.0.0.1:8088, served their page with their own no-cache header, status reported running, stop cleared it. Three sabotages redden the checks that name them: defaulting to 0.0.0.0, dropping the bind refusal, and detaching the child.
+
+*** AND FILING IT FOUND A DRAWER THAT HAD ALREADY OVERFLOWED. *** pageSections' System Tools drawer holds a cap of 15 and was at SIXTEEN before this page existed -- a red gate that verify does not run. Adding grdpwasm would have made it 17. It is not fixed by bending the cap: v4115, v4118, v4124 and v4125 had each written "JOINS, same rule again" about a page that is an opt-in front door to somebody else's work, and four notes repeating one sentence is a category the file kept documenting without creating. Those five pages now sit in an "Opt-in: somebody else's work" SUB-drawer -- one slot, no chip of its own, because they are System Tools rather than a peer of the rig, and because v4127 is on record that gtab wiring is where that row breaks. System Tools drops to 12 and pageSections-selfcheck goes green for the first time in this session.
+
+Gate: tools/ship/grdpwasm-selfcheck.mjs, source and live. 1233 gates.
 ## Since v4137 -- a check that pinned the size of a chaotic runaway, which is not a portable number
 
 Keith's rig: cflBind-selfcheck FAILED with "maxSpeed 1.20e+2" against the 8.8e8 written into the check's own name.
