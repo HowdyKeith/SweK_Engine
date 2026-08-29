@@ -31,7 +31,11 @@ import { BASES } from "../../physics/crystal/structureFactor.mjs";
 import { INTEGRATORS } from "../../physics/orbits/kepler.js";
 import { LIQUIDS, MATERIALS } from "../../physics/thermal/phaseOps.mjs";
 import { SCENARIOS } from "../../physics/blobKelvin.js";
-import { sameValue } from "./knobLiveness.mjs";
+// v4145 -- MERGE NOTE: main's import block above already carries partialDeafness, deafnessUnanswered,
+// LIST_CLAIMS, unusedInMode, jointlyLive, fs, path and fileURLToPath, so the incoming patch's copy of them
+// would have been a second import of the same names. Only what main genuinely lacked is added here.
+import { sameValue, refusedOnly } from "./knobLiveness.mjs";
+import { stabilityDevice, stabilityDefaults } from "./stabilityBind.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -579,7 +583,14 @@ console.log("\n3i. *** v4042 -- A KNOB THAT WORKS IN SIX MODES AND IS IGNORED IN
     // this assertion failed until it was brought up to the definition -- the test moved because the
     // definition sharpened, not because the assertion was wrong.
     const rows = [
-        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], echoedStill: ["deaf"], probed: ["hears", "deaf"], incomplete: false },
+        // v4063 -- `echoedStill` is on this fixture because v4062 sharpened what deafness MEANS. The split
+        // knob models a mode that ACKNOWLEDGES the input and ignores it, which is the whole discriminator;
+        // a row without it is the innocent case and belongs in unusedInMode. The fixture predated the field
+        // and this assertion failed until it was brought up to the definition -- the test moved because the
+        // definition sharpened, not because the assertion was wrong.
+        // v4145 MERGE NOTE: main reached the same fixture independently, so only the explanation is new here.
+        { device: "d", knob: "k", live: ["hears"], still: ["deaf"], echoedStill: ["deaf"],
+          probed: ["hears", "deaf"], incomplete: false },
         { device: "d", knob: "clean", live: ["hears", "deaf"], still: [], probed: ["hears", "deaf"], incomplete: false },
         { device: "d", knob: "cut", live: ["hears"], still: [], probed: ["hears"], incomplete: true, unenteredModes: ["deaf"] },
     ];
@@ -621,8 +632,13 @@ console.log("\n3j. *** v4045 -- THE ONE RULE ALL SIX LISTS KEPT NEEDING, ENFORCE
 
     // A row that qualifies for each universal list EXCEPT that its device skipped a mode. It must not appear.
     const cut = { device: "d", knob: "k", probed: ["m"], live: [], still: ["m"], incomplete: true,
-                  unenteredModes: ["never"] };
-    const lists = { stillKnobs, insensitiveKnobs, partialDeafness, incompleteKnobs, deafnessUnanswered, unprobedKnobs };
+                  // v4063 -- carries the echo for the same reason as the fixture above: partialDeafness is
+                  // now gated on it, so a row meant to exercise that list has to be a row it can see.
+                  echoedStill: ["m"], unenteredModes: ["never"] };
+    // v4063 -- unusedInMode and refusedOnly join the table they are declared in. A list named in
+    // LIST_CLAIMS but absent here is DECLARED and never behaviour-checked, which is half a ratchet.
+    const lists = { stillKnobs, insensitiveKnobs, partialDeafness, incompleteKnobs, deafnessUnanswered,
+                    unprobedKnobs, unusedInMode, refusedOnly };
     const leaks = [];
     for (const [name, fn] of Object.entries(lists)) {
         if (LIST_CLAIMS[name] !== "universal") continue;
@@ -641,13 +657,19 @@ console.log("\n3j. *** v4045 -- THE ONE RULE ALL SIX LISTS KEPT NEEDING, ENFORCE
     if (!incompleteKnobs([{ ...cut }]).length) admits.push("incompleteKnobs");
     if (!deafnessUnanswered([{ ...cut, live: ["m"] }]).length) admits.push("deafnessUnanswered");
     if (!unprobedKnobs([{ device: "d", knob: "k", probed: [], unprobed: true, kind: "string", live: [], still: [] }]).length) admits.push("unprobedKnobs");
+    // v4063 -- live ONLY by refusal, and the device also ran out of budget: an admission list must still
+    // name it, because "we never showed this knob does anything" is exactly what it exists to say.
+    if (!refusedOnly([{ ...cut, live: ["m (refused: RangeError: x)"], refusals: ["m (RangeError: x)"] }]).length) admits.push("refusedOnly");
     ok("!! ...and every ADMISSION list does admit it, because that is its whole subject",
         admits.length === 0,
         admits.length === 0 ? "an unfinished row surfaces in all three. A list that exists to say something "
             + "was not measured and then drops the unmeasured row is the v4030 defect exactly."
             : "SILENT: " + admits.join(", "));
 
-    const pd = partialDeafness([{ device: "d", knob: "k", live: ["a"], still: ["b"], echoedStill: ["b"], probed: ["a", "b"], incomplete: false }]);
+    // v4063 -- echoedStill added and the expected wording follows the sharpened list: it now says ECHOED AND
+    // IGNORED rather than STILL, because "still here" alone is the innocent case that moved to unusedInMode.
+    const pd = partialDeafness([{ device: "d", knob: "k", live: ["a"], still: ["b"], echoedStill: ["b"],
+                                  probed: ["a", "b"], incomplete: false }]);
     ok("!! and the PARTICULAR list names its scope, or it would be universal in disguise",
         pd.length === 1 && pd[0].includes("live in a") && pd[0].includes("ECHOED AND IGNORED in b"),
         pd.join(" | ") + " -- it may include an unfinished row precisely BECAUSE it names the modes it is " +

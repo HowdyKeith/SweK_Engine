@@ -168,7 +168,33 @@ export async function probeKnob(device, mode, cfg, knob, base, extra = {}, deadl
         if (Date.now() > deadline) return { state: "budget-cut", moved: [] };
         let out;
         try { out = await device.build({ mode, config: { ...cfg, ...extra, [knob]: alt } }); }
-        catch { return { state: "refused", moved: [] }; }
+        // *** v4063 -- THIS CATCH THREW THE ERROR AWAY, AND THAT MADE A CRASH READ AS A WORKING KNOB. ***
+        // Every exception became "refused", and `refused` counts as LIVE (see the accumulator below) because
+        // a guard firing IS a response -- counting it as silence would mark the best-behaved knobs as the
+        // broken ones. That reasoning is right and the bare catch made it unfalsifiable: a device-authored
+        // refusal and a RangeError from the runtime arrived here identical, so nothing downstream could tell
+        // "this value is not admissible" from "this value crashed me".
+        //
+        // MEASURED across a 673-row sweep of the whole lab: 2 of 658 live rows are live ONLY through this
+        // path, and NEITHER is a guard --
+        //     powder.checkTo      1.5x and 0.5x -> RangeError "Invalid array length" (a non-integer used as
+        //                         an array size; the bind clamps its other integer knobs with `| 0`, not this
+        //                         one). The 8x rung, 968, builds fine.
+        //     geostats.exponents  every rung -> TypeError "Cannot read properties of undefined (reading
+        //                         'outer')", so the exponent array is not freely scalable and nothing says so.
+        // Both have read as healthy live knobs since this census was written. This is the mirror of the v4031
+        // echo bug and the same bad direction: a dead reading invites a look, a live one closes the question.
+        //
+        // THE FIX IS NOT TO RECLASSIFY EVERY THROW AS NOT-LIVE. Both idioms are real here -- 18 binds RETURN
+        // { error: ... } and 13 THROW deliberately -- so "threw" does not mean "crashed", and a rule that
+        // said so would break the sabotage knob section 2 gates. The fix is to STOP DISCARDING WHAT HAPPENED:
+        // keep the constructor name and message, and let the reader see "refused (onset-lo-inside-horizon)"
+        // beside "refused (RangeError: Invalid array length)". The two separate themselves.
+        catch (e) {
+            const name = (e && e.constructor && e.constructor.name) || "Error";
+            const msg = String((e && e.message) || e || "").split("\n")[0].slice(0, 120);
+            return { state: "refused", moved: [], refusal: name + ": " + msg };
+        }
         // *** v4031 -- AN OBSERVABLE THAT IS THE KNOB HANDED BACK IS AN ECHO, NOT A RESPONSE. ***
         // Several binds publish their own config among their observables -- mpmstep does it with `steps` and
         // `dt`, and this round nearly added `nx` and `ny` to the same list before the census obligingly
@@ -420,8 +446,19 @@ export async function knobLiveness({ only = null, budgetMs = 20000, exhaustive =
                         // reintroduced one round later by a different route. Section 3c caught it.
                         overBudget = true; break;
                     }
-                    if (r.state === "still") { a.still.push(where); if (r.echoed) (a.echoedStill ||= []).push(where); }
-                    else { a.live.push(r.state === "refused" ? where + " (refused)" : where); a.movedMost = Math.max(a.movedMost, r.moved.length); }
+                    if (r.state === "still") {
+                        a.still.push(where);
+                        // the mode was still AND handed the knob back -- the deaf shape, not the innocent one
+                        if (r.echoed) (a.echoedStill ||= []).push(where);
+                    }
+                    else {
+                        a.live.push(r.state === "refused" ? where + " (refused: " + (r.refusal || "?") + ")" : where);
+                        // v4063 -- a knob whose ONLY evidence of life is a refusal has not been shown to move
+                        // anything. Tracked so refusedOnly below can say so rather than leaving it as "live".
+                        if (r.state === "refused") (a.refusals ||= []).push(where + " (" + (r.refusal || "?") + ")");
+                        else a.movedByProbe = true;
+                        a.movedMost = Math.max(a.movedMost, r.moved.length);
+                    }
                 }
             }
         }
@@ -494,7 +531,11 @@ export async function widenStill(rows, { budgetMs = 20000 } = {}) {
                 for (const alt of wideValues(cfg[r.knob])) {
                     let out;
                     try { out = await dev.build({ mode: m, config: { ...cfg, ...ps.extra, [r.knob]: alt } }); }
-                    catch { r.wideLive = "refused at " + alt; break; }
+                    catch (e) {
+                        r.wideLive = "refused at " + alt + " (" + ((e && e.constructor && e.constructor.name)
+                            || "Error") + ": " + String((e && e.message) || "").split("\n")[0].slice(0, 80) + ")";
+                        break;
+                    }
                     if (Object.keys(base).some((o) => base[o] !== out[o])) { r.wideLive = "moves at " + alt; break; }
                 }
                 if (r.wideLive) break;
@@ -607,6 +648,7 @@ export const LIST_CLAIMS = {
     incompleteKnobs: "admission",     // the sweep ran out of budget
     deafnessUnanswered: "admission",  // the deafness question was never answered for this knob
     unprobedKnobs: "admission",       // no ordering exists to perturb the default along
+    refusedOnly: "admission",         // every value was rejected, so nothing was shown to MOVE
 };
 
 /**
@@ -657,6 +699,25 @@ export const partialDeafness = (rows) => rows.filter((r) => r.live.length && r.e
  * remainder -- still, and not echoed -- kept as a COUNT so the split is visible and the innocent majority is
  * not passed off as a finding.
  */
+/**
+ * *** v4063 -- LIVE ONLY BECAUSE EVERY VALUE WAS REJECTED, WHICH IS NOT THE SAME AS LIVE. ***
+ *
+ * `refused` counts as live on purpose: a guard that fires is a response, and counting it as silence would
+ * mark the best-behaved knobs as the broken ones. But a knob whose ONLY evidence of life is that every rung
+ * was rejected has not been shown to DO anything -- what has been shown is that a guard exists, or that the
+ * device crashes. Those are different claims wearing one word, in the same family as "was never probed" is
+ * not "moves nothing" (v4030) and "null default" is not "no ladder" (v4059).
+ *
+ * ADMISSION, because the census is conceding it did not demonstrate liveness. The refusal REASON is carried
+ * on each entry, which is what separates a device-authored guard from a runtime crash without needing a
+ * classifier: "onset-lo-inside-horizon" is a bind refusing a value it validated, "RangeError: Invalid array
+ * length" is a bind that never validated one.
+ */
+export const refusedOnly = (rows) => rows.filter((r) => r.live.length && r.refusals && r.refusals.length
+        && !r.movedByProbe)
+    .map((r) => r.device + "." + r.knob + " -- no rung moved an observable; " + r.refusals.join(", "))
+    .sort();
+
 export const unusedInMode = (rows) => rows.filter((r) => r.live.length && r.still.length
         && !(r.echoedStill && r.echoedStill.length))
     .map((r) => r.device + "." + r.knob + " (unused in " + r.still.length + " of "
