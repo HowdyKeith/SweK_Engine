@@ -102,8 +102,13 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
         /Apple's own gate, not this page's/.test(pageSrc));
     ok("!! *** the confirm step names the EXACT volume and device before a mount, in its own sentence ***",
         /This will <b>unmount<\/b>/.test(pageSrc) && /Confirm &amp; Mount/.test(pageSrc));
+    // v4145 -- THE TARGET IS HTML BODY TEXT, WHICH WRAPS WHEREVER THE EDITOR PUT THE NEWLINE. Matching a
+    // sentence against raw source breaks the first time the paragraph re-flows, and the check would then call
+    // a warning that is plainly on screen missing. noComments() is the wrong tool HERE -- it is a JavaScript
+    // comment stripper, and on HTML it would treat the `//` in any https:// URL as the start of a line comment
+    // and eat the rest of that line. Flattening whitespace is the unwrap that actually fits prose in markup.
     ok("   ...and states plainly that this page cannot supply a password",
-        /this page cannot supply one/.test(pageSrc));
+        /this page cannot supply one/.test(pageSrc.replace(/\s+/g, " ")));
 }
 
 // ---- 6. ROUTES + PLACEMENT --------------------------------------------------------------------------------------

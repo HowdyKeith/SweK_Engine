@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 471,
+ "total": 472,
  "areas": {
   "fluid": 7,
   "physics/acoustics": 2,
@@ -54,7 +54,7 @@
   "physics/tomography": 8,
   "physics/voxel": 1,
   "physics/xpbd": 39,
-  "simulation": 120,
+  "simulation": 121,
   "simulation/cosmo": 4,
   "simulation/em": 2,
   "simulation/euler": 2,
@@ -477,6 +477,7 @@
   "simulation/cameraClamp.js",
   "simulation/cameraGroundClamp.js",
   "simulation/cameraSafety.js",
+  "simulation/carrySpawn.js",
   "simulation/cityCivilians.js",
   "simulation/civPersonalities.js",
   "simulation/civRetaliation.js",

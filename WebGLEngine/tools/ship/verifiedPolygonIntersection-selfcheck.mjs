@@ -54,19 +54,37 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
 // ---- 2. REFUSED LIST NAMES THE REAL PROPERTIES, NOT A COPY-PASTE OF grdpwasm's -------------------------------
 {
     console.log("\n2. REFUSED LIST NAMES *** THIS TOOL'S OWN *** RISKS, NOT ITS NEIGHBOURS'");
-    ok("!! refuses to vendor source into the tree or a release zip", /vendoring the repo's source/.test(bridgeSrc));
+    // *** v4145 -- ALL FOUR OF THESE MATCHED PROSE AGAINST RAW SOURCE, AND gateQuality CAUGHT TWO OF THEM. ***
+    // A bare phrase regex tested against the whole bridge file cannot tell a REFUSED entry from a sentence in
+    // a comment that happens to discuss one, and it silently stops matching the moment somebody wraps the
+    // string across two lines. That is the trap this tree names commentFalsePass, and writing three fresh
+    // instances of it while shipping v4143/v4144 is exactly how the debt got to 48 against a baseline of 40.
+    //
+    // *** AND THE FIRST DRAFT OF THIS VERY NOTE QUOTED THE BROKEN CALL VERBATIM, WHICH PUT IT BACK. ***
+    // gateQuality finds a prose regex literal and then looks for where it is applied -- ANYWHERE in the file,
+    // comments included. So a comment demonstrating the wrong form re-created an offender that the code below
+    // no longer contains, and the count went 8 -> 7 instead of 8 -> 6. The same shape as v4139, where the note
+    // removing five frozen decimals quoted all five and took the header from five claims to eight. The rule
+    // that falls out: DESCRIBE the broken form, never spell it -- an example in a comment is still an instance.
+    //
+    // THE FIX IS NOT A DIFFERENT REGEX, IT IS NOT READING RAW SOURCE. The REFUSED array is a structure, so it
+    // is parsed into `what:`/`why:` pairs and the checks assert against THOSE -- which is both immune to
+    // comment text and a stronger claim: the entry has to be in the list, not merely somewhere in the file.
+    const refusedBlock = (bridgeSrc.match(/const REFUSED = Object\.freeze\(\[([\s\S]*?)\n\]\);/) || [, ""])[1];
+    const refusedWhats = [...refusedBlock.matchAll(/what:\s*"([^"]*)"/g)].map((m) => m[1]);
+    const refusedText = refusedBlock.replace(/\s+/g, " ");   // whys are multi-line concatenations; flatten once
+    const refuses = (re) => refusedWhats.some((w) => re.test(w));
+    ok("!! refuses to vendor source into the tree or a release zip", refuses(/vendoring the repo's source/));
     ok("!! refuses to rebuild from source (states WHY -- avoids a slow Lean+emscripten toolchain install for output already built)",
-        /rebuilding the WASM from source/.test(bridgeSrc) && /Lean 4 toolchain/.test(bridgeSrc));
-    ok("!! refuses to patch their JS/WASM to remove the service worker", /patching their JS\/WASM/.test(bridgeSrc));
-    ok("!! refuses to run any commit but the pinned one", /running any commit other than the pinned one/.test(bridgeSrc));
+        refuses(/rebuilding the WASM from source/) && /Lean 4 toolchain/.test(refusedText));
+    ok("!! refuses to patch their JS/WASM to remove the service worker", refuses(/patching their JS\/WASM/));
+    ok("!! refuses to run any commit but the pinned one", refuses(/running any commit other than the pinned one/));
     // *** THIS TOOL HAS NO BIND-ADDRESS RISK, AND THE ABSENCE IS CHECKED RATHER THAN LEFT IMPLICIT. *** grdpwasm's
     // REFUSED list is dominated by an open-relay finding; copying that entry here would misdescribe a bridge
     // that opens no socket of its own at all. *** THIS FILE'S OWN FIRST DRAFT FAILED ITSELF HERE: *** scoping the
     // check to the WHOLE FILE matched the header comment's own explanation of why there is no bind risk ("no
-    // port of its own to bind") -- the exact prose-vs-structure trap this tree has paid for repeatedly. Scoped
-    // to just the REFUSED array's `what:` text instead, which is the actual claim being tested.
-    const refusedBlock = (bridgeSrc.match(/const REFUSED = Object\.freeze\(\[([\s\S]*?)\n\]\);/) || [, ""])[1];
-    const refusedWhats = [...refusedBlock.matchAll(/what:\s*"([^"]*)"/g)].map((m) => m[1]);
+    // port of its own to bind") -- the same prose-vs-structure trap, caught once by hand before shipping and
+    // then re-introduced four lines above it, which is why the whole section reads the structure now.
     ok("!! *** and REFUSED lists no bind-address / loopback entry, because this bridge opens no socket of its own ***",
         refusedWhats.length > 0 && refusedWhats.every((w) => !/loopback|bind/i.test(w)),
         "unlike grdpwasm, nothing here spawns a process or listens on a port -- four files are fetched and served through the ENGINE's own existing port. REFUSED whats: " + JSON.stringify(refusedWhats));

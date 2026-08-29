@@ -20,6 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { prose } from "./sourceScan.mjs";   // v4145 -- the licence-reasoning check reads a COMMENT, so it reads prose()
 import { DEFAULTS, PRESETS, barrel, scanline, mask, vignette, crtImage } from "../../render/crtModel.js";
 
 const require_ = createRequire(import.meta.url);
@@ -39,8 +40,12 @@ console.log("crtPass-selfcheck -- two implementations of the same optics, compar
         "all-rights-reserved. Recording WHICH and WHY is what stops it being reconsidered next year");
     ok("   ...and the MIT ones are named as read rather than ignored",
         /gingerbeardman/.test(src) && /stefanlegg/.test(src) && /Ichiaka/.test(src));
+    // v4145 -- BOTH PHRASES LIVE IN crtModel.js's HEADER COMMENT, so they are matched against prose(), which
+    // flattens comment wrapping. A raw-source match on a sentence that spans two comment lines silently stops
+    // matching the moment somebody re-wraps the paragraph, and this check would then report a documented
+    // reason as missing. gateQuality named this line; the target really is a comment, so prose() is the fit.
     ok("!! ...and the reason for writing rather than lifting is the GATE, not licence-avoidance",
-        /can be graded/i.test(src) || /can only ever be looked at/i.test(src));
+        /can be graded/i.test(prose(src)) || /can only ever be looked at/i.test(prose(src)));
 }
 
 // ---- 2. *** THE PARAMETERS ARE MEASUREMENTS: COUNT WHAT ACTUALLY APPEARS *** ---------------------------------

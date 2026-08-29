@@ -250,7 +250,10 @@ console.log("\n4b. *** v4015: THE PROXY AGAINST THE MODEL'S OWN NUMBER, NOT JUST
     {
         const src = fs.readFileSync(path.join(ENG, "ui", "localModelProbe.js"), "utf8");
         ok("!! the probe carries a quotaNote, the same way it carries vramNote for the other absent number",
-            /quotaNote:/.test(src) && /free disk is not exposed/i.test(src),
+            // v4145 -- the quotaNote text is a STRING LITERAL, so it is read through noComments(): a comment
+            // describing the note would otherwise satisfy this check with the note itself deleted. This file
+            // already imports noComments for exactly that reason on vramNote, one check above.
+            /quotaNote:/.test(src) && /free disk is not exposed/i.test(noComments(src)),
             "free disk is unreadable from a page exactly as VRAM is, and this file's whole discipline is to " +
             "NAME an absent number rather than substitute a plausible one");
         ok("!! ...and records that the quota tracks the browsing CONTEXT, not the disk",

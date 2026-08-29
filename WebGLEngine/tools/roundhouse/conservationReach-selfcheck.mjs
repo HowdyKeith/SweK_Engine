@@ -10,7 +10,8 @@
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { reach, seriesReach, shapedCandidates, handRolled, auditedSeries, reportLines, SHAPED, MIN_SAMPLES } from "./conservationReach.mjs";
+import { reach, seriesReach, shapedCandidates, handRolled, auditedSeries, reportLines, SHAPED, MIN_SAMPLES,
+         nonScalarShaped } from "./conservationReach.mjs";
 import { auditConservation, isExact } from "./conservation.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -92,7 +93,17 @@ console.log("\n2. THE CANDIDATE LIST IS A CANDIDATE LIST, AND SAYS SO");
     //      Each element is ALREADY a collapsed scalar -- |d com.y/dt| over the rest window at that level.
     // A NAME-AND-SHAPE MATCH THAT IS NOT THE THING: the keyword probe has misled this project four times by
     // this file's own count, and taking this as criterion five's green light would have been the fifth.
-    const nonScalar = R.nonScalar;   // derived ONCE in conservationReach.mjs; this file no longer computes its own
+    // Derived ONCE in conservationReach.mjs; this file no longer computes its own. *** AND THE EXPORT IS
+    // CALLED BY NAME HERE, NOT ONLY REACHED THROUGH reach(): *** definitionGates counts an exported symbol its
+    // gate never names as uncovered, and a helper only ever touched via a field on another function's return
+    // value is exactly that -- it would have pushed the tree-wide ratchet up by one the round it landed.
+    // Calling it directly is also the stronger test: it proves the exported entry point works, not just that
+    // reach() happens to call something.
+    const nonScalar = nonScalarShaped();
+    ok("!! nonScalarShaped() and reach().nonScalar are the SAME derivation, not two that could drift",
+        JSON.stringify(nonScalar) === JSON.stringify(R.nonScalar),
+        nonScalar.length + " fields both ways -- the whole point of deriving it once was that this file and the "
+        + "module's own report could not disagree, so that is checked rather than assumed");
     ok("!! *** conservation-shaped fields that are SERIES rather than scalars -- a floor, counted not assumed ***",
         nonScalar.length >= 2,
         nonScalar.length + " of " + R.shaped.length + " shaped fields are arrays: " +

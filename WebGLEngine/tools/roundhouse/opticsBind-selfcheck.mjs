@@ -10,7 +10,7 @@
 // single-slit first minimum at exactly lambda/a, and the knife-edge shadow at exactly 0.25 from C(0)=S(0)=0.
 // THE FRESNEL HALF HAD NO KEY AT ALL -- which is the half that was unreachable. ***
 
-import { opticsDevice, OPTICS_OBSERVABLES } from "./opticsBind.mjs";
+import { opticsDevice, OPTICS_OBSERVABLES, OPTICS_KNOB_CHOICES } from "./opticsBind.mjs";
 import { AIRY_FIRST_RING, J1_FIRST_ZERO } from "../../physics/optics/airyRefined.mjs";
 
 let fails = 0;
@@ -149,6 +149,43 @@ console.log("\n4. THE MISTAKE THE API INVITES, AND THE KEY CATCHES IT");
         opticsDevice.plantKind === "mode" && opticsDevice.modes.includes("radiusconfusion"),
         "airyRingErrFrac is reported by the PRIMARY mode too, which the MODE-PLANT CONTRACT requires: an " +
         "observable living only in the plant's own branch reads DECLARED BUT DEAD");
+}
+
+// ---------------------------------------------------------------------------
+// *** v4145 -- OPTICS_KNOB_CHOICES WAS EXPORTED AND NO GATE NAMED IT. ***
+//
+// definitionGates' tree-wide sweep went 209 -> 210 and this was the single symbol that appeared. The ratchet
+// RATCHETS DOWN, NEVER UP, so the answer is to cover the export rather than to raise the number -- and the
+// coverage has to be an ASSERTION that grades an answer, not a mention that satisfies a counter.
+//
+// The export is the spread ladder knobLiveness probes this device along. Its whole point is that the rungs are
+// DERIVED FROM EACH MODE'S OWN NATURAL SCALE -- the diffraction angle, which is lambda/a for a slit and
+// lambda/D for a circular aperture -- rather than a fixed multiplier applied blindly. A ladder that ignored
+// the mode would probe a slit at an aperture's scale and read as flat for a reason that is about the ladder
+// and not about the knob, which is the exact failure knobLiveness's own header calls the LOWER BOUND.
+{
+    console.log("\nOPTICS_KNOB_CHOICES: the probe ladder is derived per mode, not a fixed multiplier");
+    const rung = (mode) => OPTICS_KNOB_CHOICES({ mode }).spread;
+    const slit = rung("slit"), airy = rung("airy"), converge = rung("converge"), edge = rung("edge");
+    ok("!! every mode is handed a three-rung spread ladder, `edge` included",
+        [slit, airy, converge, edge].every((r) => Array.isArray(r) && r.length === 3 && r.every(Number.isFinite)),
+        "edge reads no spread at all and STILL gets a ladder on purpose -- the honest answer there is 'still in " +
+        "edge', which is unusedInMode. Withholding the choices would hide a device being ORGANISED behind an admission.");
+    ok("!! *** and the ladder is geometric about the mode's own natural scale -- nat/2, nat, nat*2 ***",
+        [slit, airy, converge, edge].every((r) => Math.abs(r[0] * 2 - r[1]) < 1e-15 && Math.abs(r[2] / 2 - r[1]) < 1e-15),
+        "slit " + slit.map((v) => v.toFixed(4)).join("/") + ", airy " + airy.map((v) => v.toFixed(4)).join("/"));
+    ok("!! *** the SLIT and the CIRCULAR aperture get DIFFERENT scales, which is the whole reason this is derived ***",
+        slit[1] !== airy[1] && converge[1] !== airy[1],
+        "slit centre " + slit[1].toFixed(4) + " (4*lambda/a), converge " + converge[1].toFixed(4) +
+        " (3*lambda/a), airy " + airy[1].toFixed(4) + " (4*lambda/D). A single fixed ladder would probe one of " +
+        "these at the other's scale and call a live knob flat.");
+    ok("   ...and edge shares the circular scale, because that is the aperture it actually has",
+        edge[1] === airy[1], "edge " + edge[1].toFixed(4) + " vs airy " + airy[1].toFixed(4));
+    // SABOTAGE: a fixed ladder -- the shape this export exists INSTEAD OF -- must fail the check above.
+    const fixed = { slit: [0.005, 0.01, 0.02], airy: [0.005, 0.01, 0.02] };
+    ok("!! SABOTAGE: a mode-blind ladder is caught by the same assertion",
+        !(fixed.slit[1] !== fixed.airy[1]),
+        "if this ever passes, the per-mode check above has stopped discriminating and is decoration");
 }
 
 report("WHAT THIS DOES NOT CLAIM",

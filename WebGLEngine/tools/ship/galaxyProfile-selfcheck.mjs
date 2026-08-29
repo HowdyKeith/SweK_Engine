@@ -19,6 +19,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL } from "./playwrightResolve.mjs";
+import { prose, noComments } from "./sourceScan.mjs";   // v4145 -- prose() for the header reasoning, noComments() for the REFUSED strings
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -36,12 +37,18 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
     console.log("1. THE LICENCE REASONING, WRITTEN DOWN RATHER THAN JUST ACTED ON");
     ok("!! *** bridge names the licence and states it was actually verified, not assumed ***",
         /GPL-3\.0/.test(bridgeSrc) && /LICENSE file present/.test(bridgeSrc));
+    // v4145 -- TWO SITES, TWO DIFFERENT TARGETS, SO TWO DIFFERENT READERS. The licence reasoning is written in
+    // the bridge's HEADER COMMENT, so it is matched against prose(), which flattens comment wrapping -- a
+    // sentence spanning two comment lines would otherwise stop matching the moment the paragraph is re-wrapped
+    // and this check would report documented reasoning as absent. The REFUSED entries are STRING LITERALS, so
+    // they are matched against noComments(), which keeps string contents and removes the one thing that could
+    // satisfy the check without the entry existing: a comment mentioning it. gateQuality flagged both.
     ok("   ...and states the distribution-vs-linking reasoning that makes this allowed at all",
-        /DISTRIBUTING the code or LINKING/i.test(bridgeSrc) || /distributing it/i.test(bridgeSrc));
+        /DISTRIBUTING the code or LINKING/i.test(prose(bridgeSrc)) || /distributing it/i.test(prose(bridgeSrc)));
     ok("!! *** REFUSED explicitly names: no vendoring, no in-process import, no token persistence ***",
-        /vendoring galaxy-profile's source/.test(bridgeSrc) &&
-        /importing galaxy-profile's Python into this bridge's own process/.test(bridgeSrc) &&
-        /storing a supplied GITHUB_TOKEN anywhere on disk/.test(bridgeSrc));
+        /vendoring galaxy-profile's source/.test(noComments(bridgeSrc)) &&
+        /importing galaxy-profile's Python into this bridge's own process/.test(noComments(bridgeSrc)) &&
+        /storing a supplied GITHUB_TOKEN anywhere on disk/.test(noComments(bridgeSrc)));
 }
 
 // ---- 2. *** A COMMIT IS PINNED, WHICH THIS TREE HAS NOT DONE FOR AN INSTALL BUTTON BEFORE *** -----------------

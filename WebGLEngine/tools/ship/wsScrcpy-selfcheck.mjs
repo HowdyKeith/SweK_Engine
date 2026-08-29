@@ -23,6 +23,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { noComments } from "./sourceScan.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -33,6 +34,11 @@ console.log("wsScrcpy-selfcheck -- an install button whose exposure could NOT be
 
 const bridgeSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "wsScrcpyBridge.js"), "utf8");
 const pageSrc = fs.readFileSync(path.join(ENG, "ws-scrcpy.html"), "utf8");
+// v4145 -- COMMENTS STRIPPED, STRING CONTENTS KEPT. Every claim this gate makes about the page is about text
+// a VIEWER SEES or code that RUNS, and both live in string literals. A regex over raw source cannot tell
+// either from a comment discussing them -- so a warning deleted from the UI but still described in a comment
+// above it would keep this gate green while warning nobody. gateQuality named this line specifically.
+const pageCode = noComments(pageSrc);
 const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
 
 // ---- 1. UPSTREAM FACTS RECORDED, LICENCE ACTUALLY READ, ALTERNATIVE ACTUALLY COMPARED -------------------------
@@ -96,7 +102,10 @@ const serverSrc = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf
         /no loopback-only option upstream/i.test(pageSrc),
         "without this a reader assumes the engine simply forgot to offer one");
     ok("!! *** a live warning banner stays visible the WHOLE time it is running, not just at click time ***",
-        /liveWarn[\s\S]*?style\.display = "block"/.test(pageSrc) && /Running and reachable from your whole network/.test(pageSrc));
+        // v4145 -- the banner's WORDING is matched against pageCode, not pageSrc: a warning that exists only
+        // in a comment explaining the warning would satisfy a raw-source regex and warn nobody. gateQuality
+        // flagged this line as prose-against-source and it was right to.
+        /liveWarn[\s\S]*?style\.display = "block"/.test(pageCode) && /Running and reachable from your whole network/.test(pageCode));
     ok("   ...and it is hidden again when stopped (so it never lies in the other direction)",
         /liveWarn"\)\.style\.display = "none"/.test(pageSrc));
     ok("!! the page's alarm card explains WHY there is no loopback flag, citing their actual source files",

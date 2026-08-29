@@ -85,12 +85,47 @@ console.log("\n2. *** SABOTAGE: THREE KNOBS WHOSE LIVENESS IS KNOWN, EACH HIDING
         + "CONSTRUCTION. Reporting that as dead would have reported a HEALTHY PLANT as a defect, and the "
         + "obvious fix would have been to delete the knob that makes the plant adjustable.");
 
-    const ct = rowFor(rows, "powder", "checkTo");
+    // *** v4145 -- THIS ASSERTION WAS PINNED TO ANOTHER MODULE'S BUG, AND FIXING THE BUG BROKE THE TEST. ***
+    //
+    // It used to read `rowFor(rows, "powder", "checkTo")` and require "refused" among its live modes. That
+    // held only while powder.checkTo CRASHED: it sizes an array from the knob, nothing checked the value was
+    // a whole number, and the 1.5x and 0.5x rungs asked the runtime for an array of fractional length. Every
+    // rung threw, the census recorded a refusal, a refusal counts as live, and the knob read healthy.
+    //
+    // v4064 fixed that (a derived integer clamp), so checkTo now reads live in `friedel` BY MOVING SOMETHING
+    // REAL -- and this assertion went red. *** THE GATE WAS PUNISHING THE REPAIR. *** A fixture that is
+    // another module's defect has exactly this lifetime: it passes until somebody does the right thing.
+    //
+    // The PROPERTY is sound and stays -- a knob that rejects what it is handed has been READ, and counting
+    // that as silence would mark the best-behaved knobs in the lab as the broken ones. So it is tested where
+    // it cannot rot: a synthetic device that refuses BY CONSTRUCTION, in the same shape section 3l uses to
+    // drive probeKnob directly. No real device has to stay broken for this to keep meaning something.
+    const alwaysRefuses = {
+        modes: ["only"], observables: ["out"],
+        build: async ({ config = {} } = {}) => {
+            if (config.guard !== 1) throw new RangeError("guard must be exactly 1");
+            return { out: 1 };
+        },
+    };
+    const gCfg = { guard: 1 };
+    const gBase = await alwaysRefuses.build({ mode: "only", config: gCfg });
+    const gr = await probeKnob(alwaysRefuses, "only", gCfg, "guard", gBase);
     ok("!! *** A KNOB THAT REFUSES A VALUE IS LIVE, NOT DEAD ***",
-        !!ct && ct.live.some((w) => w.includes("refused")),
-        ct ? ct.live.join(", ") : "NOT FOUND");
-    report("powder.checkTo throws on an absurd series length. A knob that rejects what it is handed is READ; "
-        + "counting a refusal as silence would mark the best-behaved knobs in the lab as the broken ones.");
+        gr.state === "refused",
+        "state " + gr.state + ", refusal " + (gr.refusal || "(none)") + " -- every rung throws, so the only "
+        + "evidence of life is the guard firing. Counting that as `still` would call a working guard a dead knob.");
+    ok("   ...and the REASON travels with it, so a thrown RangeError and a device's own named refusal separate",
+        typeof gr.refusal === "string" && /RangeError/.test(gr.refusal) && /guard must be exactly 1/.test(gr.refusal),
+        gr.refusal || "(no reason carried) -- v4063 exists because the exception used to be discarded, which "
+        + "is how a knob that CRASHED its device read as a working knob");
+    // AND THE REAL LAB IS STILL LOOKED AT -- as a REPORT, not an assertion, because whether any device happens
+    // to refuse today is a fact about the lab's current health and not a property this gate should demand.
+    const ct = rowFor(rows, "powder", "checkTo");
+    report("powder.checkTo, the knob this check used to be pinned to, now reads: "
+        + (ct ? ct.live.join(", ") || "(no live modes)" : "NOT FOUND")
+        + " -- live by MOVING something, which is what v4064's clamp was for. `refusedOnly` is the list that "
+        + "now carries knobs whose only evidence of life is a refusal, and it is an ADMISSION rather than a "
+        + "finding: nothing was shown to move.");
 
     const disp = rowFor(rows, "structureFactor", "displace");
     ok("...and an ordinary live knob still reads live", !!disp && disp.live.length > 0,
